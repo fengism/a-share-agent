@@ -311,12 +311,6 @@ cd frontend && npm run lint
 
 如果测试依赖实时行情或外部网络，失败时需要区分代码问题和数据源/网络问题。
 
-## 本地产物清理
-
-执行测试、构建或本地开发后，可能产生 `__pycache__/`、`.pytest_cache/`、`.mypy_cache/`、`.ruff_cache/`、`*.pyc`、`*.pyo` 和 `frontend/dist/` 等可再生成产物。这些文件不需要提交，必要时可直接删除。
-
-清理时不要删除 `backend/.venv/`、`node_modules/`、`backend/data/`、`data/`、`logs/`、`.env` 等依赖、运行数据或本地配置。
-
 ## 免责声明
 
 本系统仅供学习和研究使用，不构成任何投资建议。AI 分析结果基于公开数据和模型推理，不保证准确性、完整性或时效性。投资有风险，入市需谨慎。
