@@ -1,0 +1,14 @@
+.git
+.claude
+.env
+*.pyc
+__pycache__
+node_modules
+.venv
+data
+logs
+docs/superpowers
+note
+backend/tests
+backend/.venv
+frontend/node_modules

@@ -1,0 +1,45 @@
+[project]
+name = "stock-agent-backend"
+version = "0.1.0"
+description = "A 股智能分析系统后端，支持分时、K 线、财报、估值与 AI 分析"
+readme = "../README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "stock-agent contributors" },
+]
+keywords = ["stock", "analysis", "fastapi", "akshare", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: FastAPI",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "akshare>=1.16.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "tenacity>=9.0.0",
+    "python-dotenv>=1.0.0",
+    "openai>=1.60.0",
+    "litellm>=1.55.0",
+    "sse-starlette>=2.0.0",
+    "pypinyin>=0.52.0",
+    "mootdx>=0.9.11",
+    "feedparser>=6.0.12",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+asyncio_mode = "auto"
+addopts = "-ra"

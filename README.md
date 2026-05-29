@@ -1,0 +1,322 @@
+# A 股智能选股助手
+
+基于 AI 的 A 股多维度智能分析平台，覆盖市场概览、热点榜单、龙虎榜、条件选股、每日复盘、个股行情、基本面、技术面、情绪面和 AI 综合分析。内置 AI 选股助手，对话式获取实时数据并智能分析。
+
+## 功能特性
+
+- **全局股票搜索**：支持 6 位股票代码和名称模糊搜索，跳转到个股分析页。
+- **市场概览**：展示主要指数、成交量、热点入口和市场状态。
+- **热点榜单**：支持热股榜、概念榜、行业榜。
+- **龙虎榜**：按日期查看龙虎榜明细，并支持详情弹窗。
+- **条件选股**：按行业、价格、市值、估值等条件筛选，并支持估值百分位过滤。
+- **每日复盘**：聚合市场、热点、新闻和 LLM 结论，生成结构化复盘。
+- **个股分析**：展示分时、K 线、基本面、估值（含机构一致预期）、技术指标、情绪数据和 AI 结论。
+- **AI 综合分析**：LLM 输出评分、评级、目标价格区间和买入/持有/卖出信号，融合机构一致预期数据。
+- **AI 选股助手**：对话式智能选股，支持自然语言提问，自动调用工具获取实时数据并分析。
+- **飞书推送**：将分析结果和每日复盘推送到飞书文档，自动按类型分目录，支持权限授权。聊天结果可推送飞书卡片。
+
+## 技术栈
+
+| 层 | 技术 |
+| --- | --- |
+| 前端 | React 18 + TypeScript + Vite + Ant Design 5 (Dark Theme) |
+| 状态与请求 | Zustand + TanStack Query + SSE |
+| 图表 | Lightweight Charts + ECharts |
+| 后端 | FastAPI + Python 3.11+ + Pydantic v2 |
+| 数据源 | akshare + 东方财富/新浪/同花顺/问财等 fallback |
+| AI 引擎 | OpenAI-compatible SDK + litellm，可配置 DeepSeek/通义千问/OpenAI/Claude/智谱 |
+| 包管理 | uv + npm |
+| 部署 | Docker + Nginx |
+
+## 快速开始
+
+### 一键安装启动
+
+```bash
+# 1. 安装依赖（首次运行）
+./setup.sh
+
+# 2. 配置 API Key
+cp .env.example .env
+# 编辑 .env 填入 LLM_API_KEY
+
+# 3. 启动服务
+./start.sh         # 开发模式（热重载）
+./start.sh prod    # 生产模式
+
+# 4. 停止服务
+./stop.sh
+```
+
+启动后访问 `http://localhost:5173`。也可以通过 Makefile 运行：`make setup`、`make start`、`make stop`。
+
+### Docker 部署
+
+环境要求：Docker 20.10+、Docker Compose v2+
+
+```bash
+# 1. 配置环境变量
+cp .env.example .env
+# 编辑 .env 填入 LLM_API_KEY
+
+# 2. 构建并启动
+docker compose up -d
+
+# 3. 查看日志
+docker compose logs -f
+
+# 4. 停止
+docker compose down
+```
+
+启动后访问 `http://localhost`。`data/` 和 `logs/` 通过卷挂载持久化，容器重建后数据不丢失。代码更新后重新构建：
+
+```bash
+docker compose up -d --build
+```
+
+### 手动安装
+
+环境要求：Python 3.11+、Node.js 18+、uv、npm
+
+### 配置环境变量
+
+```bash
+cp .env.example .env
+```
+
+编辑 `.env`：
+
+```env
+LLM_PROVIDER=deepseek
+LLM_API_KEY=your_api_key_here
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-chat
+```
+
+不配置 API Key 仍可浏览行情和数据页面，AI 分析能力不可用。
+
+所有配置也可在前端设置页面（`/settings`）动态修改，无需重启服务。
+
+### 问财数据源配置
+
+如需使用问财智能搜索和查询功能，在 `.env` 中配置：
+
+```env
+IWENCAI_ENABLED=true
+IWENCAI_BASE_URL=https://openapi.iwencai.com
+IWENCAI_API_KEY=your_iwencai_api_key
+```
+
+### 飞书推送配置
+
+如需将分析结果或每日复盘推送到飞书文档，在 `.env` 中配置：
+
+```env
+FEISHU_ENABLED=True
+FEISHU_APP_ID=cli_xxxxx
+FEISHU_APP_SECRET=xxxxx
+FEISHU_FOLDER_TOKEN=fldcnXXXX                    # 默认云盘文档目录
+FEISHU_WIKI_SPACE_ID=                            # Wiki 空间 ID；填写后优先推送到知识库
+FEISHU_WIKI_DAILY_REVIEW_PARENT=wikcnXXXX        # 每日复盘 Wiki 父节点 Token（可选）
+FEISHU_WIKI_ANALYSIS_PARENT=wikcnXXXX            # 股票分析 Wiki 父节点 Token（可选）
+FEISHU_DAILY_REVIEW_FOLDER=fldcnXXXX             # 复盘云盘目录（可选）
+FEISHU_ANALYSIS_FOLDER=fldcnXXXX                 # 分析云盘目录（可选）
+FEISHU_DEFAULT_RECEIVER=ou_xxxxx                 # 默认推送接收人 open_id / chat_id
+```
+
+配置说明：
+
+- `FEISHU_WIKI_SPACE_ID` 非空时，分析和复盘会优先推送到飞书知识库；为空时推送到云盘文档目录。
+- `FEISHU_WIKI_DAILY_REVIEW_PARENT` 和 `FEISHU_WIKI_ANALYSIS_PARENT` 用于将每日复盘、股票分析分别挂载到不同 Wiki 父节点下；不填则挂载到 Wiki 空间根目录。
+- 云盘模式下优先使用 `FEISHU_DAILY_REVIEW_FOLDER` / `FEISHU_ANALYSIS_FOLDER`，为空时回退到 `FEISHU_FOLDER_TOKEN`。
+- Wiki 模式下系统会创建临时源文档用于挂载，内容写入知识库实际文档后会清理临时源文档，避免云盘目录残留副本。
+
+Token 获取方式：
+
+- `folder_token`：打开飞书云文档目标文件夹，URL 中 `folder/` 后的字符串。
+- `wiki_space_id`：打开知识库空间主页，URL 中空间标识对应的字符串；也可在知识库管理或开放平台调试中获取。
+- `wiki_parent_node_token`：打开目标 Wiki 父节点页面，URL 中 `wiki/` 后的字符串。
+
+### Notion 转存配置
+
+如需使用“转存 Notion”，在 `.env` 中配置：
+
+```env
+NOTION_ENABLED=true
+NOTION_API_TOKEN=secret_xxx
+NOTION_PARENT_PAGE_ID=your_parent_page_id
+# 或使用 database
+# NOTION_DATABASE_ID=your_database_id
+```
+
+Notion token 仅由后端读取，前端不会接触该凭证。
+
+### 手动启动后端
+
+```bash
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+### 手动启动前端
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 访问应用
+
+打开 `http://localhost:5173`，输入股票代码（如 `600519`）或名称（如 `贵州茅台`）开始分析。
+
+前端会将 `/api` 请求代理到后端 `http://localhost:8000`。
+
+## 常用命令
+
+### 后端
+
+```bash
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
+uv run pytest
+```
+
+### 前端
+
+```bash
+cd frontend
+npm install
+npm run dev
+npm run build
+npm run lint
+```
+
+### 根目录 Makefile
+
+```bash
+make setup            # 一键安装
+make start / make dev # 启动（开发模式）
+make prod             # 启动（生产模式）
+make stop             # 停止服务
+make backend-sync     # 安装后端依赖
+make backend-dev      # 启动后端
+make backend-test     # 运行后端测试
+make frontend-install # 安装前端依赖
+make frontend-dev     # 启动前端
+make frontend-build   # 构建前端
+make frontend-lint    # 前端 lint
+```
+
+## 页面路由
+
+| 路径 | 页面 | 说明 |
+| --- | --- | --- |
+| `/` | Dashboard | 市场指数概览、功能入口和搜索 |
+| `/market` | Market | 热点榜单、龙虎榜、指数相关信息 |
+| `/screener` | Screener | 条件选股和估值百分位 |
+| `/daily-review` | DailyReview | 每日市场复盘 |
+| `/chat` | Chat | AI 选股助手（对话式） |
+| `/analysis` | AnalysisEntry | 分析入口 |
+| `/analysis/:code` | Analysis | 个股分析详情 |
+| `/settings` | Settings | 系统配置 |
+
+## API 概览
+
+| Prefix | 说明 |
+| --- | --- |
+| `/api/stock` | 股票搜索、基础信息、分时、K 线、财务、估值（含机构预测）、新闻、技术指标 |
+| `/api/market` | 指数、成交量、热点榜单、龙虎榜、市场情绪 |
+| `/api/analysis` | AI 分析触发、结果查询、SSE 进度流 |
+| `/api/screener` | 条件选股、行业列表、估值百分位 |
+| `/api/daily-review` | 每日复盘生成、查询和存储 |
+| `/api/push` | 推送分析/复盘/聊天到飞书文档或 Notion |
+| `/api/chat` | AI 选股助手对话（SSE 流式） |
+| `/api/config` | 运行时配置读取/更新 |
+| `/api/health` | 健康检查 |
+
+## 项目结构
+
+```text
+stock-agent/
+├── backend/
+│   ├── app/
+│   │   ├── main.py                 # FastAPI 入口和 lifespan 预热任务
+│   │   ├── config.py               # 环境变量配置
+│   │   ├── adapters/               # 飞书/Notion 外部系统适配
+│   │   ├── models/                 # Pydantic 数据模型
+│   │   ├── routers/                # HTTP API 路由
+│   │   ├── services/
+│   │   │   ├── analysis/           # 个股 AI 分析流水线
+│   │   │   ├── base/               # provider chain、文件快照、通用接口
+│   │   │   ├── chat/               # AI 选股助手（agent + skills 注册中心 + prompts）
+│   │   │   ├── daily_review/       # 每日复盘流水线
+│   │   │   ├── llm/                # LLM 客户端工厂
+│   │   │   ├── market/             # 指数、热点、龙虎榜、资讯
+│   │   │   ├── providers/          # akshare、东方财富、同花顺、问财、百度、RSS 等数据源适配
+│   │   │   ├── screener/           # 条件选股、行业映射、估值百分位
+│   │   │   ├── search/             # 新闻和评论搜索
+│   │   │   ├── stock/              # 个股行情、财务、估值、搜索
+│   │   │   └── technical.py        # 技术指标计算
+│   │   └── utils/                  # 股票代码、缓存、限流等工具
+│   ├── tests/                       # 测试（按 adapters/providers/services 组织）
+│   ├── pyproject.toml
+│   └── uv.lock
+├── frontend/
+│   ├── src/
+│   │   ├── api/                    # API client、query hooks、SSE
+│   │   ├── charts/                 # 分时和 K 线图表
+│   │   ├── components/             # 通用组件和布局
+│   │   ├── pages/                  # Dashboard、Market、Screener、DailyReview、Analysis
+│   │   ├── store/                  # Zustand 状态
+│   │   ├── styles/                 # UI 样式常量
+│   │   └── types/                  # TypeScript 类型
+│   └── package.json
+├── docs/
+├── data/                           # 本地运行数据
+├── logs/                           # 本地日志
+├── Makefile
+├── .env.example
+├── CLAUDE.md
+└── README.md
+```
+
+## 核心数据流
+
+1. 用户在前端搜索股票并进入 `/analysis/:code`。
+2. 前端通过 TanStack Query 请求 `/api/stock/*` 获取行情、财务、估值、新闻和技术指标。
+3. 用户触发智能分析后，后端 `/api/analysis` 聚合多维数据并调用 LLM。
+4. 分析进度通过 SSE 返回，最终结果经过 Pydantic 校验后展示。
+5. 市场、选股和每日复盘页面复用 market、screener、daily-review 相关服务。
+6. AI 选股助手（`/chat`）通过多轮 tool-calling 循环自动调用 skills 获取实时数据，SSE 流式返回。
+
+## 数据源与启动说明
+
+- akshare 是同步库，后端服务通过异步包装和限流调用。
+- 网络环境可能影响东方财富、同花顺、新浪等数据源，服务内置多级 fallback。
+- 启动时会预热行业映射和股票名称映射，首次启动可能较慢。
+- 使用 `./setup.sh` 一键安装，`./start.sh` 一键启动，`./stop.sh` 停止服务。
+- `data/` 和 `logs/` 为本地运行产物，是否清理取决于本地使用场景。
+
+## 验证
+
+```bash
+cd backend && uv run pytest
+cd frontend && npm run build
+cd frontend && npm run lint
+```
+
+如果测试依赖实时行情或外部网络，失败时需要区分代码问题和数据源/网络问题。
+
+## 本地产物清理
+
+执行测试、构建或本地开发后，可能产生 `__pycache__/`、`.pytest_cache/`、`.mypy_cache/`、`.ruff_cache/`、`*.pyc`、`*.pyo` 和 `frontend/dist/` 等可再生成产物。这些文件不需要提交，必要时可直接删除。
+
+清理时不要删除 `backend/.venv/`、`node_modules/`、`backend/data/`、`data/`、`logs/`、`.env` 等依赖、运行数据或本地配置。
+
+## 免责声明
+
+本系统仅供学习和研究使用，不构成任何投资建议。AI 分析结果基于公开数据和模型推理，不保证准确性、完整性或时效性。投资有风险，入市需谨慎。

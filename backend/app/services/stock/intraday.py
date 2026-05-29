@@ -1,0 +1,95 @@
+import logging
+
+import pandas as pd
+
+from app.models.stock import IntradayData, IntradayItem
+from app.services.providers.akshare import akshare_provider as _akshare_provider
+from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
+from app.services.providers.sina import sina_provider as _sina_provider
+from app.utils.cache import cache, dated_cache_key
+from app.utils.rate_limiter import call_blocking
+from app.utils.singleflight import AsyncSingleFlight
+from app.utils.symbol_utils import normalize_code
+from app.utils.market_utils import get_last_trade_date
+from app.utils.data_clean import safe_float
+
+logger = logging.getLogger(__name__)
+
+_intraday_singleflight = AsyncSingleFlight[IntradayData]()
+
+
+async def _safe_fetch_intraday(source_name: str, fetcher, code: str, date: str | None = None) -> pd.DataFrame:
+    try:
+        return await call_blocking(fetcher, code=code, date=date)
+    except Exception as exc:
+        logger.info(f"{source_name}分时数据不可用，尝试下一数据源: code={code}, error={exc}")
+        return pd.DataFrame()
+
+
+async def _load_intraday(sym, date: str | None) -> IntradayData:
+    df = await _safe_fetch_intraday("新浪财经分钟直连", _sina_provider.fetch_stock_intraday_minute_direct, sym.raw, date)
+    if df.empty:
+        df = await _safe_fetch_intraday("Akshare新浪分钟", _akshare_provider.fetch_stock_intraday_minute_sina, sym.raw, date)
+    if df.empty:
+        df = await _safe_fetch_intraday("东方财富分钟直连", _eastmoney_provider.fetch_stock_intraday_minute_direct, sym.raw, date)
+    if df.empty:
+        df = await _safe_fetch_intraday("Akshare东方财富分钟K线", _akshare_provider.fetch_stock_intraday_minute, sym.raw, date)
+    if df.empty:
+        df = await _safe_fetch_intraday("Akshare东方财富逐笔成交", _akshare_provider.fetch_stock_intraday_transactions, sym.raw, date)
+    if df.empty:
+        df = await _safe_fetch_intraday("东方财富逐笔直连", _eastmoney_provider.fetch_stock_intraday_transactions, sym.raw, date)
+    if df.empty:
+        return IntradayData(code=sym.raw, prev_close=None, items=[])
+
+    df = df.copy()
+    df["time"] = df["time"].map(lambda value: str(value).strip())
+    df = df[df["time"] != ""]
+    df = df.sort_values("time")
+
+    prev_close = None
+    first_price = safe_float(df.iloc[0].get("price")) if not df.empty else None
+    first_change_pct = safe_float(df.iloc[0].get("change_pct")) if not df.empty else None
+    if first_price not in (None, 0) and first_change_pct is not None:
+        prev_close = round(first_price / (1 + first_change_pct / 100), 4)
+    elif first_price is not None:
+        prev_close = first_price
+
+    items: list[IntradayItem] = []
+    for _, row in df.iterrows():
+        price = safe_float(row.get("price"))
+        if price is None:
+            continue
+        change_pct = safe_float(row.get("change_pct"))
+        if change_pct is None and prev_close not in (None, 0):
+            change_pct = round((price - prev_close) / prev_close * 100, 2)
+        items.append(
+            IntradayItem(
+                time=str(row.get("time", "")),
+                price=price,
+                avg_price=safe_float(row.get("avg_price")),
+                volume=safe_float(row.get("volume")),
+                amount=safe_float(row.get("amount")),
+                change_pct=change_pct,
+            )
+        )
+
+    return IntradayData(code=sym.raw, prev_close=prev_close, items=items)
+
+
+async def get_intraday(code: str) -> IntradayData:
+    sym = normalize_code(code)
+    date = get_last_trade_date(code)
+    cache_key = dated_cache_key("intraday", sym.raw, date)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    async def load_and_cache() -> IntradayData:
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+        result = await _load_intraday(sym, date)
+        cache.set(cache_key, result, ttl=300)
+        return result
+
+    return await _intraday_singleflight.do(cache_key, load_and_cache)

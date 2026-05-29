@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+from app.config import PROVIDER_DEFAULTS, _mask_secret, get_settings, update_settings
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+
+class ConfigResponse(BaseModel):
+    llm_provider: str
+    llm_api_key: str
+    llm_base_url: str
+    llm_model: str
+    llm_temperature: float
+    feishu_enabled: bool
+    feishu_app_id: str
+    feishu_app_secret: str
+    feishu_folder_token: str
+    feishu_wiki_space_id: str
+    feishu_wiki_daily_review_parent: str
+    feishu_wiki_analysis_parent: str
+    feishu_daily_review_folder: str
+    feishu_analysis_folder: str
+    feishu_default_receiver: str
+    notion_enabled: bool
+    notion_parent_page_id: str
+    notion_database_id: str
+    iwencai_enabled: bool
+    iwencai_base_url: str
+    iwencai_api_key: str
+    provider_defaults: dict
+
+
+class ConfigUpdateRequest(BaseModel):
+    llm_provider: str | None = None
+    llm_api_key: str | None = None
+    llm_base_url: str | None = None
+    llm_model: str | None = None
+    llm_temperature: float | None = None
+    feishu_enabled: bool | None = None
+    feishu_app_id: str | None = None
+    feishu_app_secret: str | None = None
+    feishu_folder_token: str | None = None
+    feishu_wiki_space_id: str | None = None
+    feishu_wiki_daily_review_parent: str | None = None
+    feishu_wiki_analysis_parent: str | None = None
+    feishu_daily_review_folder: str | None = None
+    feishu_analysis_folder: str | None = None
+    feishu_default_receiver: str | None = None
+    notion_enabled: bool | None = None
+    notion_parent_page_id: str | None = None
+    notion_database_id: str | None = None
+    iwencai_enabled: bool | None = None
+    iwencai_base_url: str | None = None
+    iwencai_api_key: str | None = None
+
+
+def _to_response(s) -> ConfigResponse:
+    return ConfigResponse(
+        llm_provider=s.llm_provider,
+        llm_api_key=_mask_secret(s.llm_api_key),
+        llm_base_url=s.llm_base_url,
+        llm_model=s.llm_model,
+        llm_temperature=s.llm_temperature,
+        feishu_enabled=s.feishu_enabled,
+        feishu_app_id=s.feishu_app_id,
+        feishu_app_secret=_mask_secret(s.feishu_app_secret),
+        feishu_folder_token=s.feishu_folder_token,
+        feishu_wiki_space_id=s.feishu_wiki_space_id,
+        feishu_wiki_daily_review_parent=s.feishu_wiki_daily_review_parent,
+        feishu_wiki_analysis_parent=s.feishu_wiki_analysis_parent,
+        feishu_daily_review_folder=s.feishu_daily_review_folder,
+        feishu_analysis_folder=s.feishu_analysis_folder,
+        feishu_default_receiver=s.feishu_default_receiver,
+        notion_enabled=s.notion_enabled,
+        notion_parent_page_id=s.notion_parent_page_id,
+        notion_database_id=s.notion_database_id,
+        iwencai_enabled=s.iwencai_enabled,
+        iwencai_base_url=s.iwencai_base_url,
+        iwencai_api_key=_mask_secret(s.iwencai_api_key),
+        provider_defaults=PROVIDER_DEFAULTS,
+    )
+
+
+@router.get("", response_model=ConfigResponse)
+async def get_config():
+    return _to_response(get_settings())
+
+
+@router.put("", response_model=ConfigResponse)
+async def put_config(req: ConfigUpdateRequest):
+    patch = req.model_dump(exclude_none=True)
+    if not patch:
+        return _to_response(get_settings())
+    logger.info(f"Config update: {list(patch.keys())}")
+    updated = update_settings(patch)
+    return _to_response(updated)
