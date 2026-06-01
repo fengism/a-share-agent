@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut } from "./client";
 import { oneYearAgoDate } from "../utils/date";
-import type { StockSearchItem, StockBasicInfo, KlineData, IntradayData, FinancialMetrics, StockValuation, StockValuationDetail, AnalysisResult, AnalysisHistoryItem, TechnicalIndicators, MarketIndices, HsgtFlow, StockNews, CategorizedStockNews, StockSentiment, RetailSentiment, ScreenerFilter, ScreenerResult, ValuationPercentileRequest, ValuationPercentileResult, ThsHotStock, ThsHotPlate, DragonTigerItem, DragonTigerDetail, PushRequest, PushResponse } from "../types/stock";
+import type { StockSearchItem, StockBasicInfo, KlineData, IntradayData, FinancialMetrics, StockValuation, StockValuationDetail, AnalysisResult, AnalysisHistoryItem, TechnicalIndicators, MarketIndices, HsgtFlow, StockNews, CategorizedStockNews, StockSentiment, RetailSentiment, ScreenerFilter, ScreenerResult, ValuationPercentileRequest, ValuationPercentileResult, ThsHotStock, ThsHotPlate, DragonTigerItem, DragonTigerDetail, PushRequest, PushResponse, FeedNewsItem, IndustryRankings, NewsAnalysis } from "../types/stock";
 import type { DailyReviewHistoryItem, DailyReviewRequest, DailyReviewResult } from "../types/dailyReview";
 import type { ConfigData, ConfigUpdate } from "../types/settings";
 
@@ -290,6 +290,14 @@ export function useThsHotIndustry(enabled = true) {
   });
 }
 
+export function useIndustryRankings() {
+  return useQuery({
+    queryKey: ["industryRankings"],
+    queryFn: () => apiGet<IndustryRankings>("/market/industry-rankings"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 // Dragon Tiger
 export function useDragonTigerList(reportDate: string) {
   return useQuery({
@@ -321,5 +329,22 @@ export function useConfig() {
 export function useUpdateConfig() {
   return useMutation({
     mutationFn: (patch: ConfigUpdate) => apiPut<ConfigData>("/config", patch),
+  });
+}
+
+export function useMarketFeed() {
+  return useQuery({
+    queryKey: ["marketFeed"],
+    queryFn: () => apiGet<FeedNewsItem[]>("/market/feed"),
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+}
+
+export function useNewsAnalysis() {
+  return useQuery({
+    queryKey: ["newsAnalysis"],
+    queryFn: () => apiGet<NewsAnalysis>("/market/news-analysis"),
+    staleTime: 5 * 60 * 1000,
   });
 }

@@ -65,7 +65,7 @@ def parse_with_retry(raw_text: str, llm_client=None, messages: list[dict] | None
         ]
 
         try:
-            fixed_text = llm_client.chat(retry_messages)
+            fixed_text = llm_client.chat(retry_messages, json_format=True)
             return parse_analysis_response(fixed_text)
         except Exception:
             logger.error("修复重试也失败，返回原始错误")

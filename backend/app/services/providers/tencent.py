@@ -226,4 +226,4 @@ tencent_provider = TencentDataProvider()
 
 if __name__ == "__main__":
     print(tencent_provider.fetch_stock_kline("688981", "2026-05-01", "2026-05-21", "qfq"))
-    print(tencent_provider.fetch_stock_quote("688981"))
+    print(tencent_provider.fetch_market_sector_rankings_direct())

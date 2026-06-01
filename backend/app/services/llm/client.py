@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class LLMClient(ABC):
     @abstractmethod
-    def chat(self, messages: list[dict], temperature: float = 0.1) -> str:
+    def chat(self, messages: list[dict], temperature: float = 0.1, json_format: bool = False) -> str:
         ...
 
 
@@ -20,15 +20,17 @@ class OpenAICompatibleClient(LLMClient):
         self.model = model
         logger.info(f"初始化OpenAI兼容客户端: model={model}, base_url={base_url}")
 
-    def chat(self, messages: list[dict], temperature: float = 0.1) -> str:
+    def chat(self, messages: list[dict], temperature: float = 0.1, json_format: bool = False) -> str:
         logger.info(f"LLM请求: model={self.model}, messages数={len(messages)}, temperature={temperature}")
         try:
-            resp = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                response_format={"type": "json_object"},
-            )
+            kwargs = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+            }
+            if json_format:
+                kwargs["response_format"] = {"type": "json_object"}
+            resp = self.client.chat.completions.create(**kwargs)
             content = resp.choices[0].message.content
             usage = resp.usage
             logger.info(f"LLM响应: model={self.model}, tokens={usage.prompt_tokens}/{usage.completion_tokens if usage else '?'}")
@@ -45,7 +47,7 @@ class LiteLLMClient(LLMClient):
         self.base_url = base_url
         logger.info(f"初始化LiteLLM客户端: model={model}, base_url={base_url}")
 
-    def chat(self, messages: list[dict], temperature: float = 0.1) -> str:
+    def chat(self, messages: list[dict], temperature: float = 0.1, json_format: bool = False) -> str:
         from litellm import completion
 
         logger.info(f"LiteLLM请求: model={self.model}, messages数={len(messages)}")

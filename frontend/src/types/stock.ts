@@ -165,6 +165,17 @@ export interface CategorizedStockNews {
   cls_news: StockNews[];
 }
 
+export interface FeedNewsItem {
+  title: string;
+  content: string;
+  source: string;
+  publish_time: string;
+  url: string;
+  author: string;
+  read_count: number;
+  comment_count: number;
+}
+
 export interface RetailSentimentPost {
   text: string;
   author: string | null;
@@ -420,6 +431,34 @@ export interface DragonTigerDetail {
   buy_ratio: number | null;
   sell_ratio: number | null;
   reason: string;
+}
+
+export interface IndustryRankItem {
+  rank: number;
+  name: string;
+  change_pct: number | null;
+  code: string;
+  up_count: number | null;
+  down_count: number | null;
+  leader: string;
+  leader_change: number | null;
+}
+
+export interface IndustryRankings {
+  sectors: IndustryRankItem[];
+  total: number;
+}
+
+export interface NewsAnalysisSection {
+  title: string;
+  icon: string;
+  items: string[];
+}
+
+export interface NewsAnalysis {
+  market_sentiment: string;
+  summary: string;
+  sections: NewsAnalysisSection[];
 }
 
 export interface NotionExportResponse {

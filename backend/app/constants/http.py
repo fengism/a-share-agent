@@ -66,3 +66,9 @@ TENCENT_FINANCE_HEADERS = build_headers({
     "referer": "https://gu.qq.com/",
 })
 
+
+BD_HEADERS = build_headers({
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://www.cls.cn/telegraph",
+    "Origin": "https://www.cls.cn/telegrap",
+})

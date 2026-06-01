@@ -812,7 +812,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                     content=content,
                     publish_time=item.get("showTime", ""),
                     url=item.get("url", ""),
-                    source=item.get("mediaName", ""),
+                    source=item.get("mediaName", "") or "东方财富快讯",
                 author=item.get("author", ""),
                 read_count=int(item.get("read_count", 0)),
                 comment_count=int(item.get("comment_count", 0)),

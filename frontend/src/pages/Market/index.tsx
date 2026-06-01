@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Tabs, Typography } from "antd";
-import { FundOutlined, FireOutlined, LineChartOutlined, SwapRightOutlined } from "@ant-design/icons";
+import { FundOutlined, FireOutlined, LineChartOutlined, SwapRightOutlined, AppstoreOutlined } from "@ant-design/icons";
 import AIndexTab from "./AIndexTab";
 import FundFlowTab from "./FundFlowTab";
 import HotRankTab from "./HotRankTab";
 import DragonTigerTab from "./DragonTigerTab";
+import IndustryRankTab from "./IndustryRankTab";
 import { pageContainerStyle, pageDescriptionStyle, pageHeaderStyle, pageTitleStyle } from "../../styles/ui";
 
 const { Title, Paragraph } = Typography;
@@ -32,6 +33,11 @@ export default function Market() {
             key: "fund-flow",
             label: <span><LineChartOutlined /> 资金流向</span>,
             children: <FundFlowTab />,
+          },
+          {
+            key: "industry-rank",
+            label: <span><AppstoreOutlined /> 板块涨跌幅</span>,
+            children: <IndustryRankTab />,
           },
           {
             key: "hot-rank",

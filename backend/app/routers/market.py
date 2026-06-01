@@ -16,6 +16,9 @@ from app.services.market.index_kline import get_index_kline as get_index_kline_s
 from app.services.market.indices import get_indices as get_indices_service
 from app.services.market.volume import get_market_volume as get_market_volume_service
 from app.services.analysis.news import get_stock_news_categorized as get_stock_news_categorized_service
+from app.services.market.news import get_market_feed as get_market_feed_service
+from app.services.market.sector import get_industry_rankings as get_industry_rankings_service
+from app.services.market.news_analysis import analyze_market_news as analyze_market_news_service
 from app.services.analysis.retail import (
     get_retail_sentiment as get_retail_sentiment_service,
     get_stock_sentiment as get_stock_sentiment_service,
@@ -165,3 +168,33 @@ async def get_news_categorized(code: str = Query(..., description="股票代码"
     except Exception as e:
         logger.error(f"获取分类新闻数据失败: code={code}, error={e}")
         raise HTTPException(status_code=500, detail=f"获取分类新闻数据失败: {e}")
+
+
+@router.get("/feed")
+async def get_market_feed():
+    logger.info("获取24小时新闻流")
+    try:
+        return await get_market_feed_service()
+    except Exception as e:
+        logger.error(f"获取新闻流失败: error={e}")
+        raise HTTPException(status_code=500, detail=f"获取新闻流失败: {e}")
+
+
+@router.get("/industry-rankings")
+async def get_industry_rankings():
+    logger.info("获取行业板块涨跌幅排名")
+    try:
+        return await get_industry_rankings_service()
+    except Exception as e:
+        logger.error(f"获取行业板块涨跌幅排名失败: error={e}")
+        raise HTTPException(status_code=500, detail=f"获取行业板块涨跌幅排名失败: {e}")
+
+
+@router.get("/news-analysis")
+async def get_news_analysis():
+    logger.info("获取AI资讯分析")
+    try:
+        return await analyze_market_news_service()
+    except Exception as e:
+        logger.error(f"获取AI资讯分析失败: error={e}")
+        raise HTTPException(status_code=500, detail=f"获取AI资讯分析失败: {e}")

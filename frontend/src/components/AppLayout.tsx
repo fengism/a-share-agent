@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Layout, Input, Menu, Typography, type InputRef } from "antd";
-import { SearchOutlined, HomeOutlined, FundOutlined, FilterOutlined, LineChartOutlined, FileTextOutlined, MessageOutlined, SettingOutlined } from "@ant-design/icons";
+import { SearchOutlined, HomeOutlined, FundOutlined, FilterOutlined, LineChartOutlined, FileTextOutlined, MessageOutlined, SettingOutlined, ClockCircleOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useStockSearch } from "../api/queries";
 import { cardStyle } from "../styles/ui";
@@ -11,6 +11,7 @@ const { Title } = Typography;
 const NAV_ITEMS = [
   { key: "/", icon: <HomeOutlined />, label: "首页" },
   { key: "/market", icon: <FundOutlined />, label: "市场" },
+  { key: "/feed", icon: <ClockCircleOutlined />, label: "资讯" },
   { key: "/screener", icon: <FilterOutlined />, label: "选股" },
   { key: "/chat", icon: <MessageOutlined />, label: "对话" },
   { key: "/daily-review", icon: <FileTextOutlined />, label: "复盘" },
@@ -185,6 +186,7 @@ export default function AppLayout() {
 function getActiveKey(pathname: string): string {
   if (pathname === "/") return "/";
   if (pathname.startsWith("/market")) return "/market";
+  if (pathname.startsWith("/feed")) return "/feed";
   if (pathname.startsWith("/screener")) return "/screener";
   if (pathname.startsWith("/chat")) return "/chat";
   if (pathname.startsWith("/daily-review")) return "/daily-review";

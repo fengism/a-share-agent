@@ -1,9 +1,15 @@
 import requests
 import pandas as pd
 import json
-
+import logging
+from datetime import datetime
 
 from app.services.base.data_provider import BaseDataProvider
+from app.models.search_item import NewsSearchItem
+from app.utils.symbol_utils import contains_stock_reference
+from app.constants.http import BD_HEADERS
+
+logger = logging.getLogger(__name__)
 
 
 class BaiduDataProvider(BaseDataProvider):
@@ -150,12 +156,72 @@ class BaiduDataProvider(BaseDataProvider):
             raise RuntimeError(f"百度PAE错误: {d}")
         result = d.get("Result", {})
         return result
-        
+    
+    def fetch_market_new(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
+        """
+        baidu 7 * 24 快讯
+        https://finance.pae.baidu.com/selfselect/expressnews?rn=20&pn=0&tag=&filterByUserStocks=0&finClientType=pc
+        """    
+        results: list[NewsSearchItem] = []
+        url = "https://finance.pae.baidu.com/selfselect/expressnews"
+        params = {
+            "rn": "20",
+            "pn": "0",
+            "tag": "",
+            "filterByUserStocks": "0",
+            "finClientType": "pc"
+        }
+        r = requests.get(url, headers=BD_HEADERS, params=params, timeout=10)
+        d = r.json()
+        if str(d.get("ResultCode", -1)) != "0":
+            raise RuntimeError(f"百度PAE错误: {d}")
+        result = d.get("Result", {})
+        content = result.get("content", {})
+        lists = content.get("list", [])
+        for item in lists:
+            title = str(item.get("title") or "").strip()
+            content_info = item.get("content", {})
+            content = str(item.get("brief") or "").strip()
+            content_items = content_info.get("items", [])
+            content = ""
+            for content_item in content_items:
+                content = content + content_item.get("data", "")
+            combined = f"{title}\n{content}"
+            if (code_name or code) and not contains_stock_reference(combined, code, code_name):
+                continue
+            publish_time = self._parse_timestamp(item.get("publish_time") or item.get("publish_time") or item.get("publish_time"))
+            results.append(
+                NewsSearchItem(
+                    title=title,
+                    content=content[:500],
+                    source="百度",
+                    publish_time=str(publish_time),
+                    url=item.get("third_url", ""),
+                    author=item.get("author", ""),
+                    read_count=int(item.get("read_count", 0)),
+                    comment_count=int(item.get("comment_count", 0)),
+                )
+            )
+        return results   
+    
+    def _parse_timestamp(self, value) -> datetime | None:
+        if value in (None, "", 0, "0"):
+            return None
+        try:
+            ts = int(float(value))
+        except (TypeError, ValueError):
+            return None
+        if ts > 10**12:
+            ts = ts / 1000
+        try:
+            return datetime.fromtimestamp(ts)
+        except (OverflowError, OSError, ValueError):
+            return None
 
 
 baidu_provider = BaiduDataProvider()
 
 if __name__ == "__main__":
-    data = baidu_provider.fetch_stock_fund_flow("600519")
+    data = baidu_provider.fetch_market_new()
     print(data)
 

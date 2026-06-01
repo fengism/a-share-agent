@@ -340,7 +340,7 @@ async def run_analysis(code: str, progress_callback: ProgressCallback | None = N
             stage=AnalysisStage(stage=4, name=STAGE_NAMES[4], status="started",
                                 detail="正在调用AI模型，可能需要10-25秒..."),
         ))
-        raw_response = await asyncio.to_thread(llm_client.chat, messages, temperature=settings.llm_temperature)
+        raw_response = await asyncio.to_thread(llm_client.chat, messages, temperature=settings.llm_temperature, json_format=True)
         result = await asyncio.to_thread(parse_with_retry, raw_response, llm_client, messages)
         await _emit(progress_callback, AnalysisProgress(
             type="stage_completed",

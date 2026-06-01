@@ -11,6 +11,7 @@ import AnalysisEntry from "./pages/Analysis/Entry";
 import DailyReviewPage from "./pages/DailyReview";
 import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
+import Feed from "./pages/Feed";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +46,7 @@ export default function App() {
               <Route path="/market" element={<Market />} />
               <Route path="/screener" element={<Screener />} />
               <Route path="/daily-review" element={<DailyReviewPage />} />
+              <Route path="/feed" element={<Feed />} />
               <Route path="/analysis" element={<AnalysisEntry />} />
               <Route path="/chat" element={<Chat />} />
               <Route path="/settings" element={<Settings />} />
