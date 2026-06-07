@@ -45,9 +45,18 @@ def _build_index_kline_source_attempts(symbol: str, period: str, start_date: str
     """
     return [
         ProviderAttempt(
+            label="东方财富指数K线直连",
+            loader=lambda: call_blocking(_eastmoney_provider.fetch_index_kline, symbol, period, start_date, end_date),
+        ),
+        ProviderAttempt(
             label="TDX 指数K线",
             loader=lambda: call_blocking(tdx_provider.fetch_index_kline, symbol=symbol, start_date=start_date, end_date=end_date),
             on_error=f"TDX 指数K线不可用，尝试 Akshare 东方财富指数K线: symbol={symbol}",
+        ),
+        ProviderAttempt(
+            label="Akshare 腾讯指数K线",
+            loader=lambda: _load_and_filter(_akshare_provider.fetch_index_kline_tencent, symbol, start_date, end_date),
+            on_error=f"Akshare 腾讯指数K线不可用，尝试东方财富指数K线直连: symbol={symbol}",
         ),
         ProviderAttempt(
             label="Akshare 东方财富指数K线",
@@ -59,15 +68,7 @@ def _build_index_kline_source_attempts(symbol: str, period: str, start_date: str
             loader=lambda: _load_and_filter(_akshare_provider.fetch_index_kline_sina, symbol, start_date, end_date),
             on_error=f"Akshare 新浪指数K线不可用，尝试 Akshare 腾讯指数K线: symbol={symbol}",
         ),
-        ProviderAttempt(
-            label="Akshare 腾讯指数K线",
-            loader=lambda: _load_and_filter(_akshare_provider.fetch_index_kline_tencent, symbol, start_date, end_date),
-            on_error=f"Akshare 腾讯指数K线不可用，尝试东方财富指数K线直连: symbol={symbol}",
-        ),
-        ProviderAttempt(
-            label="东方财富指数K线直连",
-            loader=lambda: call_blocking(_eastmoney_provider.fetch_index_kline, symbol, period, start_date, end_date),
-        ),
+
     ]
 
 

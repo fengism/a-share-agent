@@ -10,14 +10,14 @@ from app.constants.http import BROWSER_USER_AGENT
 logger = logging.getLogger(__name__)
 
 
-# 财经相关 Twitter/X 账号（RSSHub 路由）
+# 财经相关 Twitter/X 账号
 TWITTER_FEEDS = [
     "qinbafrank",
-    "aleabitoreddit",
-    "168X_Fortune",
-    "xiaomustock",
-    "freearkshaw",
-    "kikoaifenxi",
+    #aleabitoreddit",
+    #168X_Fortune",
+    #xiaomustock",
+   #"freearkshaw",
+    #kikoaifenxi",
 ]
 
 
@@ -45,8 +45,97 @@ class TwitterDataProvider(BaseDataProvider):
         except Exception as exc:
             logger.info("Twitter数据获取失败: %s", exc)
             return []
+        
 
+    def fetch_article_by_id(self, id: str) -> dict:
+        """根据 Twitter article ID 拉取该文章的最新文章。
+        https://api.fxtwitter.com/2/status/{id}?about_account=0&lang=es
+        Param:
+            id: Twitter article ID 
+        Return:
+            Dict
+        """
+        req_url = f"https://api.fxtwitter.com/2/status/{id}?about_account=0&lang=es"
+        r = requests.get(req_url, headers=self.headers, timeout=10)
+        if r.status_code != 200:
+            logger.info("Twitter数据获取失败: %s", r.status_code)
+            return []
+        
+        entry = r.json().get("status", {}) or {}
+      
+        result = {
+            "url": entry.get("url", ""),
+            "id": entry.get("id", ""),
+        }
+        article = entry.get("article", {}) or {}
+        title = article.get("title", "")
+        blocks = article.get("content", {}).get("blocks", [])
+        content = ""
+        for block in blocks:
+            content += block.get("text", "")
+            content += "\n"
+
+        result.update({
+            "title": title,
+            "content": content,
+        
+        })
+        return result
+        
     def fetch_market_news(self) -> list[NewsSearchItem]:
+        """获取最新媒体推文
+        
+        Return:
+            NewsSearchItem 列表
+        """
+        return self.fetch_user_articles() + self.fetch_user_posts()
+    
+
+    def fetch_user_articles(self) -> list[NewsSearchItem]:
+        """从预置 Twitter 财经账号列表拉取最新媒体推文。
+
+        Return:
+            NewsSearchItem 列表
+        """
+        results: list[NewsSearchItem] = []
+        for account_name in TWITTER_FEEDS:
+            feed_url = f"https://api.fxtwitter.com/2/profile/{account_name}/articles?count=20&lang=es"
+            entries = self._fetch_posts(feed_url)
+            for entry in entries:
+                url = entry.get("url", "")
+                id = entry.get("id", "")
+                article = entry.get("article", {}) or {}
+                title = article.get("title", "")
+                preview_text = article.get("preview_text", "")
+                article_info = self.fetch_article_by_id(id)
+                if not article_info:
+                    continue
+                content = article_info.get("content", "")
+                if not content:
+                    content = preview_text
+                created_at = entry.get("created_timestamp")
+                publish_time = self._parse_timestamp(created_at)
+                if not title and not content:
+                    continue
+                # Twitter 推文通常 title 和 content 相同，取 content 作为标题
+                if not title:
+                    title = content[:30]
+                results.append(
+                    NewsSearchItem(
+                        title=title[:30],
+                        content=content,
+                        source=f"Twitter",
+                        publish_time=str(publish_time) if publish_time else "",
+                        url=url,
+                        author=account_name,
+                        read_count=0,
+                        comment_count=0,
+                    )
+                )
+        return results
+    
+
+    def fetch_user_posts(self) -> list[NewsSearchItem]:
         """从预置 Twitter 财经账号列表拉取最新媒体推文。
 
         Return:
@@ -66,11 +155,11 @@ class TwitterDataProvider(BaseDataProvider):
                     continue
                 # Twitter 推文通常 title 和 content 相同，取 content 作为标题
                 if not title:
-                    title = content[:80]
+                    title = content[:30]
                 results.append(
                     NewsSearchItem(
-                        title=title[:100],
-                        content=content[:1000],
+                        title=title[:30],
+                        content=content,
                         source=f"Twitter",
                         publish_time=str(publish_time) if publish_time else "",
                         url=url,
@@ -105,8 +194,8 @@ class TwitterDataProvider(BaseDataProvider):
             results.append(
                 NewsSearchItem(
                     title=title,
-                    content=content[:1000],
-                    source=f"Twitter/Search",
+                    content=content,
+                    source=f"Twitter",
                     publish_time=str(publish_time) if publish_time else "",
                     url=url,
                     author=entry.get("author_id", ""),
@@ -117,10 +206,3 @@ class TwitterDataProvider(BaseDataProvider):
         return results 
 
 twitter_provider = TwitterDataProvider()
-
-
-if __name__ == "__main__":
-    data = twitter_provider.search("国产算力")
-    print(f"count: {len(data)}")
-    for item in data[:5]:
-        print(f"  [{item.author}] {item.content[:400]}, publish_time: {item.publish_time}, url: {item.url}")

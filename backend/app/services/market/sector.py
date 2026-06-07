@@ -77,7 +77,7 @@ async def get_industry_rankings() -> dict:
         }
     except Exception as e:
         logger.warning(f"东方财富行业排名获取失败，回退腾讯: {e}")
-        top_df, bottom_df = await call_blocking(_tencent_provider.fetch_market_sector_rankings_direct)
+        top_df, bottom_df = await call_blocking(_tencent_provider.fetch_market_sector_rankings)
         data = _normalize_tencent_sectors(top_df, bottom_df)
 
     cache.set(cache_key, data, ttl=300)

@@ -26,6 +26,7 @@ class DailyReviewDataSnapshot(BaseModel):
     top_sectors: list[dict] = Field(default_factory=list)
     bottom_sectors: list[dict] = Field(default_factory=list)
     market_volume: dict = Field(default_factory=dict)
+    macro_data: dict = Field(default_factory=dict)
 
 
 class DailyReviewResult(BaseModel):

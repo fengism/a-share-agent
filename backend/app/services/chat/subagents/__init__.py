@@ -3,6 +3,7 @@ from app.services.chat.subagents.technical import create_technicalagent
 from app.services.chat.subagents.fundamental import create_fundamentalagent
 from app.services.chat.subagents.news import create_newsagent
 from app.services.chat.subagents.risk import create_riskagent
+from app.services.chat.subagents.macro import create_macro_agent
 
 __all__ = [
     "SubAgent",
@@ -11,4 +12,5 @@ __all__ = [
     "create_fundamentalagent",
     "create_newsagent",
     "create_riskagent",
+    "create_macro_agent",
 ]

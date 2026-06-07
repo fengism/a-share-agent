@@ -15,7 +15,8 @@ from app.services.market.statistic import get_market_statistics
 from app.services.market.dragon_tiger import get_dragon_tiger_list
 from app.services.market.hot_rank import get_hot_stocks, get_ths_hot_concept, get_ths_hot_industry
 from app.services.market.news import get_market_news
-from app.services.market.volume import get_market_volume_data
+from app.services.market.volume import get_realtime_market_volume
+from app.services.market.macro import get_macro_data
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +166,39 @@ def _build_prompt(date: str, snapshot: DailyReviewDataSnapshot) -> str:
         for item in snapshot.market_news[:20]
         if item.get("title")
     ]
-    
+
+    # 构建宏观经济数据
+    macro_bullets = []
+    macro = snapshot.macro_data or {}
+    cpi_latest = macro.get("cpi", {}).get("latest")
+    if cpi_latest:
+        macro_bullets.append(
+            f"CPI({cpi_latest.get('TIME', '')}): 同比 {cpi_latest.get('NATIONAL_SAME', '-')}%, "
+            f"环比 {cpi_latest.get('NATIONAL_SEQUENTIAL', '-')}%, 累计 {cpi_latest.get('NATIONAL_ACCUMULATE', '-')}%"
+        )
+    ppi_latest = macro.get("ppi", {}).get("latest")
+    if ppi_latest:
+        macro_bullets.append(
+            f"PPI({ppi_latest.get('TIME', '')}): 当月 {ppi_latest.get('BASE', '-')}, "
+            f"同比 {ppi_latest.get('BASE_SAME', '-')}%"
+        )
+    pmi_latest = macro.get("pmi", {}).get("latest")
+    if pmi_latest:
+        macro_bullets.append(
+            f"PMI({pmi_latest.get('TIME', '')}): 制造业 {pmi_latest.get('MAKE_INDEX', '-')} "
+            f"(同比 {pmi_latest.get('MAKE_SAME', '-')}%), "
+            f"非制造业 {pmi_latest.get('NMAKE_INDEX', '-')} "
+            f"(同比 {pmi_latest.get('NMAKE_SAME', '-')}%)"
+        )
+    money_latest = macro.get("money_supply", {}).get("latest")
+    if money_latest:
+        macro_bullets.append(
+            f"货币供应({money_latest.get('TIME', '')}): "
+            f"M2 {money_latest.get('BASIC_CURRENCY', '-')}亿 (同比 {money_latest.get('BASIC_CURRENCY_SAME', '-')}%), "
+            f"M1 {money_latest.get('CURRENCY', '-')}亿 (同比 {money_latest.get('CURRENCY_SAME', '-')}%), "
+            f"M0 {money_latest.get('FREE_CASH', '-')}亿 (同比 {money_latest.get('FREE_CASH_SAME', '-')}%)"
+        )
+
     return MARKET_USER_PROMPT.format(
         date=date,
         indices_placeholder=json.dumps(snapshot.indices[:6], ensure_ascii=False),
@@ -178,6 +211,7 @@ def _build_prompt(date: str, snapshot: DailyReviewDataSnapshot) -> str:
         top_sectors_placeholder=top_sector_bullets or json.dumps(snapshot.top_sectors[:10], ensure_ascii=False),
         bottom_sectors_placeholder=bottom_sector_bullets or json.dumps(snapshot.bottom_sectors[:10], ensure_ascii=False),
         market_volume_placeholder=market_volume_placeholder_str or json.dumps(snapshot.market_volume, ensure_ascii=False),
+        macro_data_placeholder="\n".join(macro_bullets) if macro_bullets else "暂无最新宏观数据",
     )
 
 
@@ -190,6 +224,7 @@ def _build_snapshot(
     market_statistics,
     market_news,
     market_volume,
+    macro_data,
 ) -> DailyReviewDataSnapshot:
     """将并行采集的原始数据封装为 DailyReviewDataSnapshot，异常值转为空数据。
 
@@ -202,6 +237,7 @@ def _build_snapshot(
         market_statistics: 市场统计
         market_news: 市场新闻
         market_volume: 市场成交额
+        macro_data: 宏观经济数据
     Return:
         封装后的数据快照
     """
@@ -223,6 +259,8 @@ def _build_snapshot(
     }
     if not isinstance(market_volume, Exception) and market_volume is not None:
         snapshot_data["market_volume"] = market_volume.model_dump()
+    if not isinstance(macro_data, Exception) and macro_data is not None:
+        snapshot_data["macro_data"] = macro_data
     return DailyReviewDataSnapshot(**snapshot_data)
 
 
@@ -240,7 +278,7 @@ async def generate_daily_review(request: DailyReviewRequest) -> DailyReviewResul
         if cached is not None:
             return cached
 
-    indices, hot_stocks, hot_concepts, hot_industries, dragon_tiger, market_statistics, market_news, market_volume = await asyncio.gather(
+    indices, hot_stocks, hot_concepts, hot_industries, dragon_tiger, market_statistics, market_news, market_volume, macro_data = await asyncio.gather(
         get_indices(),
         get_hot_stocks(),
         get_ths_hot_concept(),
@@ -248,7 +286,8 @@ async def generate_daily_review(request: DailyReviewRequest) -> DailyReviewResul
         get_dragon_tiger_list(date),
         get_market_statistics(date),
         get_market_news(),
-        get_market_volume_data(),
+        get_realtime_market_volume(),
+        get_macro_data(),
         return_exceptions=True,
     )
     
@@ -261,6 +300,7 @@ async def generate_daily_review(request: DailyReviewRequest) -> DailyReviewResul
         market_statistics=market_statistics,
         market_news=market_news,
         market_volume=market_volume,
+        macro_data=macro_data,
     )
     llm_review = ""
     try:

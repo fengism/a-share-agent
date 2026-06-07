@@ -62,8 +62,8 @@ def test_fetch_stock_concept_maps_concepts_and_plates(monkeypatch):
     assert captured["timeout"] == 5
 
 
-def test_fetch_market_sector_rankings_direct_maps_top_and_bottom(monkeypatch):
-    """fetch_market_sector_rankings_direct returns top and bottom ranking dataframes."""
+def test_fetch_market_sector_rankings_maps_top_and_bottom(monkeypatch):
+    """fetch_market_sector_rankings returns top and bottom ranking dataframes."""
     provider = tencent.TencentDataProvider()
     orders = []
 
@@ -87,7 +87,7 @@ def test_fetch_market_sector_rankings_direct_maps_top_and_bottom(monkeypatch):
 
     monkeypatch.setattr(tencent.requests, "get", fake_get)
 
-    top_df, bottom_df = provider.fetch_market_sector_rankings_direct()
+    top_df, bottom_df = provider.fetch_market_sector_rankings()
 
     assert top_df.iloc[0]["板块名称"] == "AI"
     assert bottom_df.iloc[0]["领涨跌股票名称"] == "龙头股"

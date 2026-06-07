@@ -128,7 +128,7 @@ class TencentDataProvider(BaseDataProvider):
             },
         )
 
-    def fetch_market_sector_rankings_direct(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def fetch_market_sector_rankings(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """获取市场板块涨跌排行榜（涨与跌各一份）。
 
         Return:
@@ -234,5 +234,6 @@ class TencentDataProvider(BaseDataProvider):
 tencent_provider = TencentDataProvider()
 
 if __name__ == "__main__":
-    print(tencent_provider.fetch_stock_kline("688981", "2026-05-01", "2026-05-21", "qfq"))
-    print(tencent_provider.fetch_market_sector_rankings_direct())
+    print(tencent_provider.fetch_stock_kline("600519", "2026-06-01", "2026-06-07", "qfq"))
+    #print(tencent_provider.fetch_market_sector_rankings())
+    print(tencent_provider.fetch_stock_quote("600519"))

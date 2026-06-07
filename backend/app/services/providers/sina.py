@@ -45,6 +45,7 @@ class SinaDataProvider(BaseDataProvider):
 
         try:
             start_dt = datetime.strptime(start_date, "%Y%m%d")
+            end_dt = datetime.strptime(end_date, "%Y%m%d")
             delta_days = (datetime.now() - start_dt).days
             if period == "daily":
                 datalen = max(delta_days * 5 // 7 + 20, 30)
@@ -53,9 +54,9 @@ class SinaDataProvider(BaseDataProvider):
             else:
                 datalen = max(delta_days // 30 + 3, 5)
             datalen = min(datalen, 2000)
-        except ValueError:
+        except Exception as e:
+            print(f"Invalid date format or range: {e}")
             datalen = 500
-
         params = {
             "symbol": symbol,
             "scale": scale,
@@ -272,5 +273,5 @@ class SinaDataProvider(BaseDataProvider):
 sina_provider = SinaDataProvider()
 
 if __name__ == "__main__":
-    df = sina_provider.fetch_stock_names()
+    df = sina_provider.fetch_market_indices()
     print(df)

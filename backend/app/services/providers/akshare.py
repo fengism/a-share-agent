@@ -352,4 +352,4 @@ akshare_provider = AkshareDataProvider()
 
 
 if __name__ == "__main__":
-    print(akshare_provider.fetch_stock_news("600519"))
+    print(akshare_provider.fetch_market_indices())

@@ -279,10 +279,21 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
           <Text style={{ color: getTimeColor(item.publish_time), fontSize: 12 }}>
             {formatTime(item.publish_time)}
           </Text>
-          {item.author && item.author !== item.source && (
-            <Text style={{ color: "#475569", fontSize: 11 }}>
+          {item.author != null && item.author !== "" && (
+            <Tag
+              style={{
+                margin: 0,
+                borderRadius: 4,
+                fontSize: 10,
+                lineHeight: "16px",
+                paddingInline: 5,
+                color: "#94a3b8",
+                background: "rgba(148,163,184,0.1)",
+                border: "1px solid rgba(148,163,184,0.15)",
+              }}
+            >
               {item.author}
-            </Text>
+            </Tag>
           )}
         </div>
 

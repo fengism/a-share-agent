@@ -19,7 +19,7 @@ def _baidu_request_json(url: str, params: dict, headers: dict | None = None, tim
         url: 请求 URL
         params: URL 查询参数
         headers: 可选请求头；为空则使用 self.default_headers
-        timeout: 超时秒数，默认 10
+        timeout: 超时秒数，默认 10njm nm 
     Return:
         解析后的 JSON 字典
     """
@@ -32,8 +32,8 @@ class BaiduDataProvider(BaseDataProvider):
 
     DEFAULT_BASE_URL = "https://finance.pae.baidu.com"
     DEFAULT_TIMEOUT = 10
-    MAX_PAGES = 40
-    PAGE_SIZE = 200
+    MAX_PAGES = 60
+    PAGE_SIZE = 100
     NAME_LIST_SLEEP_SECONDS = 0.5
 
     def __init__(self):

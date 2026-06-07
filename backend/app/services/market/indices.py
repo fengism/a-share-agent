@@ -67,7 +67,7 @@ def _build_east_direct_indices() -> MarketIndices:
         MarketIndices 模型对象
     """
     data = _eastmoney_provider.fetch_market_indices()
-    return _build_em_indices(data, "east_direct", price_scale=100)
+    return _build_em_indices(data, "east_direct", price_scale=1.)
 
 
 async def _build_akshare_em_indices() -> MarketIndices:
@@ -116,24 +116,25 @@ def _build_indices_attempts() -> list[ProviderAttempt]:
     """
     return [
         ProviderAttempt(
-            label="Akshare 东方财富指数",
-            loader=_build_akshare_em_indices,
-            on_error="大盘指数接口不可用，尝试东方财富直连回退",
-        ),
-        ProviderAttempt(
             label="东方财富指数直连",
             loader=lambda: call_blocking(_build_east_direct_indices),
             on_error="东方财富直连指数接口失败，尝试新浪 akshare 回退",
+        ),
+        ProviderAttempt(
+            label="新浪指数直连",
+            loader=_build_sina_direct_indices,
+        ),
+        ProviderAttempt(
+            label="Akshare 东方财富指数",
+            loader=_build_akshare_em_indices,
+            on_error="大盘指数接口不可用，尝试东方财富直连回退",
         ),
         ProviderAttempt(
             label="Akshare 新浪指数",
             loader=_build_akshare_sina_indices,
             on_error="新浪指数接口失败，尝试新浪直连回退",
         ),
-        ProviderAttempt(
-            label="新浪指数直连",
-            loader=_build_sina_direct_indices,
-        ),
+
     ]
 
 

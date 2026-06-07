@@ -70,7 +70,7 @@ MARKET_USER_PROMPT = """
 {date}
 
 # 数据说明
-以下数据为当日市场快照。请优先使用“主要指数 + 市场统计 + 领涨/领跌板块”判断市场状态，再用“热点概念/行业、热门股票、龙虎榜、新闻”验证主线和情绪。
+以下数据为当日市场快照。请优先使用”主要指数 + 市场统计 + 领涨/领跌板块”判断市场状态，再用”热点概念/行业、热门股票、龙虎榜、新闻”验证主线和情绪。宏观经济数据（CPI/PPI/PMI/货币供应量）用于判断宏观环境对市场的影响。
 
 ## 主要指数
 {indices_placeholder}
@@ -98,6 +98,9 @@ MARKET_USER_PROMPT = """
 
 ## 龙虎榜
 {dragon_tiger_placeholder}
+
+## 宏观经济数据
+{macro_data_placeholder}
 
 ## 市场新闻
 {news_placeholder}

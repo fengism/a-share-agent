@@ -320,6 +320,6 @@ ths_provider = ThsDataProvider()
 
 
 if __name__ == "__main__":
-    hot_stocks_data = ths_provider.fetch_hsgt_realtime()
+    hot_stocks_data = ths_provider.fetch_hot_stock_reasons("2026-06-07")
     print(hot_stocks_data)  
 

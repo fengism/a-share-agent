@@ -141,7 +141,7 @@ async def get_market_news() -> list:
     result = filter_recent_news_items(result)
     result = dedupe_news_items(result)
     result.sort(key=news_sort_key, reverse=True)
-    result = result[:20]
+    result = result[:30]
 
     cache.set(cache_key, result, ttl=600)
     return result

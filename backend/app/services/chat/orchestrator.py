@@ -17,6 +17,7 @@ from app.services.chat.subagents.technical import create_technicalagent
 from app.services.chat.subagents.fundamental import create_fundamentalagent
 from app.services.chat.subagents.news import create_newsagent
 from app.services.chat.subagents.risk import create_riskagent
+from app.services.chat.subagents.macro import create_macro_agent
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ _KEYWORD_MAP: dict[str, list[str]] = {
     "fundamental": ["PE", "PB", "估值", "财报", "财务", "ROE", "营收", "基本面", "市盈率", "市净率", "净利润", "分红"],
     "news": ["新闻", "研报", "公告", "舆情", "热度", "情绪", "利好", "利空", "消息"],
     "risk": ["风险", "止损", "仓位", "波动", "回撤", "预警", "风险评估"],
+    "macro": ["CPI", "PPI", "PMI", "M0", "M1", "M2", "GDP", "宏观", "通胀", "通缩", "货币供应", "降准", "降息", "利率", "货币政策", "经济数据"],
 }
 
 _FULL_ANALYSIS_KEYWORDS = ["分析", "综合", "评估", "深度", "全面", "诊断"]
@@ -38,6 +40,7 @@ _ORCHESTRATOR_CLASSIFY_PROMPT = """分析用户意图，返回JSON格式的路�
 - fundamental: 基本面分析（PE/PB/PS/PEG估值、财报、ROE、营收增长、盈利能力）
 - news: 新闻和情绪分析（新闻、研报、公告、舆情、热度、散户情绪）
 - risk: 风险评估（风险因素、波动性、回撤风险、止损位、仓位建议）
+- macro: 宏观经济分析（CPI、PPI、PMI、M0/M1/M2货币供应量、GDP、通胀通缩、货币政策）
 
 返回严格JSON:
 {"agents": ["代理名称"], "stock_codes": ["股票代码"], "reasoning": "路由理由"}
@@ -47,9 +50,10 @@ _ORCHESTRATOR_CLASSIFY_PROMPT = """分析用户意图，返回JSON格式的路�
 - 问估值/财报/基本面 -> ["fundamental"]
 - 问新闻/研报/舆情 -> ["news"]
 - 问风险/止损/仓位 -> ["risk"]
-- 要求全面分析/深度分析/综合评估 -> 全部四个代理
-- 多股对比 -> 全部四个代理
-- 无法判断 -> 全部四个代理"""
+- 问CPI/PPI/PMI/货币供应/宏观/通胀/利率 -> ["macro"]
+- 要求全面分析/深度分析/综合评估 -> 全部五个代理
+- 多股对比 -> 全部五个代理
+- 无法判断 -> 全部五个代理"""
 
 _SYNTHESIS_PROMPT = """你是资深的 A 股投资决策顾问。基于多位专业分析师的分析结果，给出综合投资建议。
 
@@ -94,6 +98,7 @@ class Orchestrator:
             "fundamental": create_fundamentalagent(),
             "news": create_newsagent(),
             "risk": create_riskagent(),
+            "macro": create_macro_agent(),
         }
 
     async def run(self, message: str, history: list[ChatMessage] | None = None
@@ -120,7 +125,7 @@ class Orchestrator:
                 logger.info(f"LLM classify: agents={decision.agents}")
             except Exception as e:
                 logger.warning(f"LLM classify failed, using all agents: {e}")
-                decision = RoutingDecision(agents=["technical", "fundamental", "news", "risk"],
+                decision = RoutingDecision(agents=["technical", "fundamental", "news", "risk", "macro"],
                                            stock_codes=decision.stock_codes, is_complex=True)
 
         yield ChatStreamDelta(type="text", content="🔍 正在进行多维度分析...\n\n")
@@ -149,12 +154,12 @@ class Orchestrator:
         if not matched_agents and not stock_codes:
             for kw in _FULL_ANALYSIS_KEYWORDS:
                 if kw in message:
-                    matched_agents = ["technical", "fundamental", "news", "risk"]
+                    matched_agents = ["technical", "fundamental", "news", "risk", "macro"]
                     return RoutingDecision(agents=matched_agents, stock_codes=stock_codes, is_complex=True)
             return RoutingDecision(agents=[], stock_codes=[])
 
         if not matched_agents:
-            matched_agents = ["technical", "fundamental", "news", "risk"]
+            matched_agents = ["technical", "fundamental", "news", "risk", "macro"]
             return RoutingDecision(agents=matched_agents, stock_codes=stock_codes, is_complex=True)
 
         if len(matched_agents) == 1:

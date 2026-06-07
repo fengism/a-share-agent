@@ -44,7 +44,7 @@ class EastMoneyDataProvider(BaseDataProvider):
 
     封装东方财富公开 API，提供 A 股行情、K 线、分时、财务、研报、
     龙虎榜、涨停跌停池、行业板块、新闻资讯、资金流向等数据接口。
-    所有请求通过 em_get_response 统一节流和 session 复用。
+    所有请求通过 em_get_response 统一处理和 session 复用。
 
     属性:
         REPORT_API: 研报列表 API 地址
@@ -248,7 +248,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             start_date: 起始日期，格式 "YYYYMMDD"
             end_date: 结束日期，格式 "YYYYMMDD"
         Return:
-            pd.DataFrame: 包含列: 日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 振幅, 涨跌幅, 涨跌额, 换手率
+            pd.DataFrame: 包含列: 日期, 开盘, 收盘, 最高, 最低, 成交量(总手), 成交额(元), 振幅, 涨跌幅, 涨跌额, 换手率
         """
         secid_map = {code: secid for code, _name, secid in INDEX_FALLBACKS}
         secid = secid_map.get(symbol)
@@ -257,7 +257,7 @@ class EastMoneyDataProvider(BaseDataProvider):
 
         klt = {"daily": "101", "weekly": "102", "monthly": "103"}.get(period, "101")
         try:
-            response = http_client.post(
+            response = self.em_get_response(
                 EASTMONEY_STOCK_KLINE_URL,
                 params={
                     "secid": secid,
@@ -288,7 +288,10 @@ class EastMoneyDataProvider(BaseDataProvider):
             return pd.DataFrame()
 
         rows = [item.split(",") for item in lines]
-        return pd.DataFrame(rows, columns=["日期", "开盘", "收盘", "最高", "最低", "成交量", "成交额", "振幅", "涨跌幅", "涨跌额", "换手率"])
+
+        df = pd.DataFrame(rows, columns=["date", "open", "close", "high", "low", "volume", "amount", "amplitude", "change_pct", "change", "turnover_pct"])
+        df["pre_close"] = df["close"].shift(1) 
+        return df
 
 
     def fetch_stock_intraday_transactions(self, code: str = "000001", date: str | None = None) -> pd.DataFrame:
@@ -440,6 +443,14 @@ class EastMoneyDataProvider(BaseDataProvider):
         ]
         for column in ["最新价", "涨跌幅", "涨跌额", "成交量", "成交额", "最高", "最低", "今开", "昨收", "振幅", "量比"]:
             index_df[column] = pd.to_numeric(index_df[column], errors="coerce")
+        index_df["最新价"] = index_df["最新价"] / 100.0
+        index_df["最高"] = index_df["最高"] / 100.0
+        index_df["最低"] = index_df["最低"] / 100.0
+        index_df["今开"] = index_df["今开"] / 100.0
+        index_df["昨收"] = index_df["昨收"] / 100.0
+        index_df["振幅"] = index_df["振幅"] / 100.0
+        index_df["量比"] = index_df["量比"] / 100.0
+        index_df["涨跌幅"] = index_df["涨跌幅"] / 100.0
         return index_df
 
     def _parse_search_item(self, item: dict) -> StockSearchItem | None:
@@ -1132,52 +1143,6 @@ class EastMoneyDataProvider(BaseDataProvider):
         if result is None:
             return None
         return round(result / 10000, 2)
-    
-    
-    def fetch_global_market_news(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
-        """获取东方财富全球财经资讯（7x24 滚动）。
-
-        Param:
-            code: 可选，股票代码，用于过滤相关新闻
-            code_name: 可选，股票名称，用于过滤相关新闻
-        Return:
-            list[NewsSearchItem]: 新闻列表
-        """
-        url = "https://np-weblist.eastmoney.com/comm/web/getFastNewsList"
-        params = {
-            "client": "web", 
-            "biz": "web_724",
-            "fastColumn": "102", 
-            "sortEnd": "",
-            "req_trace": str(int(time.time() * 1000)),
-            "pageSize": "50",
-        }
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36", 
-                   "Referer": "https://kuaixun.eastmoney.com/"
-                }
-        r = self.em_get_response(url, params=params, headers=headers, timeout=10)
-        d = r.json()
-        
-
-        rows = []
-        for item in d.get("data", {}).get("fastNewsList", []):
-            title = str(item.get("title") or "").strip()
-            content = str(item.get("summary") or "").strip()
-            combined = f"{title}\n{content}"
-            if (code_name or code) and not contains_stock_reference(combined, code, code_name):
-                continue
-            rows.append(
-                NewsSearchItem(
-                    title=title,
-                    content=content,
-                    publish_time=item.get("showTime", ""),
-                    url=item.get("url", ""),
-                    source=item.get("mediaName", "") or "东方财富7*24快讯",
-                author=item.get("author", ""),
-                read_count=int(item.get("read_count", 0)),
-                comment_count=int(item.get("comment_count", 0)),
-            ))
-        return rows
 
     def fetch_stock_forecast_reports(self, code: str, max_pages: int = 5) -> pd.DataFrame:
         """获取指定股票的机构研报预测数据。
@@ -1277,9 +1242,6 @@ class EastMoneyDataProvider(BaseDataProvider):
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         }
         items = self._fetch_clist_diff(params=params, headers=headers)
-        #r = self.em_get_response(url, params=params, headers=headers, timeout=15)
-        #d = r.json()
-        #items = d.get("data", {}).get("diff", [])
         if not items:
             return {"top": [], "bottom": [], "total": 0}
 
@@ -1303,7 +1265,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         }
         
     def fetch_stock_fund_flow(self, code: str) -> list[dict]:
-        """获取个股资金流向（日级，最近 120 个交易日）。
+        """获取个股资金流入日级，最近 120 个交易日）。
 
         Param:
             code: 6 位股票代码
@@ -1346,6 +1308,147 @@ class EastMoneyDataProvider(BaseDataProvider):
                 })
         return rows
     
+    def fetch_market_fund_flow(self) -> list[dict]:
+        """获取市场资金流入日级，最近 120 个交易日）。
+
+        Param:
+            code: 6 位股票代码
+        Return:
+            list[dict]: 资金流向列表，每个字典包含:
+                - date (str): 日期
+                - main_net (float): 主力净流入（元）
+                - small_net (float): 小单净流入（元）
+                - mid_net (float): 中单净流入（元）
+                - large_net (float): 大单净流入（元）
+                - super_net (float): 超大单净流入（元）
+        """
+        url = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"    
+        params = {
+            "lmt": "0",
+            "kit": "101",
+            "fields1": "f1,f2,f3,f7",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
+            "secid": "1.000001",
+            "secid2": "0.399001",
+            "ut": "b2884a393a59ad64002292a3e90d46a5",
+            "_": int(time.time() * 1000),
+        }
+        try:
+            r = self.em_get_response(url, params=params, headers=EASTMONEY_HEADERS, timeout=15)
+            d = r.json()
+        except Exception as e:
+            print(f"[WARN] push2 资金流请求失败: {e}")
+            return []
+        klines = d.get("data", {}).get("klines", [])
+        rows = []
+        for line in klines:
+            parts = line.split(",")
+            if len(parts) >= 7:
+                rows.append({
+                    "date": parts[0],
+                    "main_net": float(parts[1]) if parts[1] != "-" else 0,
+                    "small_net": float(parts[2]) if parts[2] != "-" else 0,
+                    "mid_net": float(parts[3]) if parts[3] != "-" else 0,
+                    "large_net": float(parts[4]) if parts[4] != "-" else 0,
+                    "super_net": float(parts[5]) if parts[5] != "-" else 0,
+                })
+        return rows
+    
+
+    def fetch_industry_fund_flow(self) -> list[dict]:
+        """获取市场行业资金流入情况
+        https://push2.eastmoney.com/api/qt/clist/get?fid=f62&po=1&pz=50&pn=1&np=1&fltt=2&invt=2&ut=8dec03ba335b81bf4ebdf7b29ec27d15&fs=m%3A90+s%3A4&fields=f12%2Cf14%2Cf2%2Cf3%2Cf62%2Cf184%2Cf66%2Cf69%2Cf72%2Cf75%2Cf78%2Cf81%2Cf84%2Cf87%2Cf204%2Cf205%2Cf124%2Cf1%2Cf13
+        Param:
+            code: 6 位股票代码
+        Return:
+            list[dict]: 资金流向列表，每个字典包含:
+                - industry_code (str): 行业代码
+                - industry_name (str): 行业名称
+                - change_pct (float): 涨跌幅
+                - main_net (float): 主力净流入（元）
+                - small_net (float): 小单净流入（元）
+                - mid_net (float): 中单净流入（元）
+                - large_net (float): 大单净流入（元）
+                - super_net (float): 超大单净流入（元）
+        """
+        params = {
+            "fid": "f62",
+            "po": "1",
+            "pz": "50",
+            "pn": "1",
+            "np": "1",
+            "fltt": "2",
+            "invt": "2",
+            "ut": "8dec03ba335b81bf4ebdf7b29ec27d15",
+            "fs": "m:90+s:4",
+            "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13",
+            "_": int(time.time() * 1000),
+        }
+        try:
+            items = self._fetch_clist_diff(params=params, headers=EASTMONEY_HEADERS, page_size=100)
+        except Exception as e:
+            print(f"[WARN] push2 资金流请求失败: {e}")
+            return []
+        rows = []
+        for item in items:
+            rows.append({
+                "industry_code": item.get("f12", ""),
+                "industry_name": item.get("f14", ""),
+                "change_pct": safe_float(item.get("f13", "")),
+                "main_net": safe_float(item.get("f62", "")),
+                "small_net": safe_float(item.get("f84", "")),
+                "mid_net": safe_float(item.get("f78", "")),
+                "large_net": safe_float(item.get("f72", "")),
+                "super_net": safe_float(item.get("f66", "")),
+            })
+        return rows
+    
+    def fetch_concept_fund_flow(self) -> list[dict]:
+        """获取市场行业资金流入情况
+        https://push2.eastmoney.com/api/qt/clist/get?fid=f62&po=1&pz=50&pn=1&np=1&fltt=2&invt=2&ut=8dec03ba335b81bf4ebdf7b29ec27d15&fs=m%3A90+t%3A3&fields=f12%2Cf14%2Cf2%2Cf3%2Cf62%2Cf184%2Cf66%2Cf69%2Cf72%2Cf75%2Cf78%2Cf81%2Cf84%2Cf87%2Cf204%2Cf205%2Cf124%2Cf1%2Cf13
+        Param:
+            code: 6 位股票代码
+        Return:
+            list[dict]: 资金流向列表，每个字典包含:
+                - industry_code (str): 行业代码
+                - industry_name (str): 行业名称
+                - change_pct (float): 涨跌幅
+                - main_net (float): 主力净流入（元）
+                - small_net (float): 小单净流入（元）
+                - mid_net (float): 中单净流入（元）
+                - large_net (float): 大单净流入（元）
+                - super_net (float): 超大单净流入（元）
+        """ 
+        params = {
+            "fid": "f62",
+            "po": "1",
+            "pz": "50",
+            "pn": "1",
+            "np": "1",
+            "fltt": "2",
+            "invt": "2",
+            "ut": "8dec03ba335b81bf4ebdf7b29ec27d15",
+            "fs": "m:90+t:3",
+            "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13",
+        }
+        try:
+            items = self._fetch_clist_diff(params=params, headers=EASTMONEY_HEADERS, page_size=100)
+        except Exception as e:
+            print(f"[WARN] push2 资金流请求失败: {e}")
+            return []
+        rows = []
+        for item in items:
+            rows.append({
+                "industry_code": item.get("f12", ""),
+                "industry_name": item.get("f14", ""),
+                "change_pct": safe_float(item.get("f13", "")),
+                "main_net": safe_float(item.get("f62", "")),
+                "small_net": safe_float(item.get("f84", "")),
+                "mid_net": safe_float(item.get("f78", "")),
+                "large_net": safe_float(item.get("f72", "")),
+                "super_net": safe_float(item.get("f66", "")),
+            })
+        return rows
 
     def fetch_dragon_tiger_daily_list(self, report_date: str) -> list[dict]:
         """获取龙虎榜当日上榜股票列表。
@@ -1571,13 +1674,110 @@ class EastMoneyDataProvider(BaseDataProvider):
                 "plan": row.get("ASSIGN_PROGRESS", ""),           # 进度
             })
         return rows
+    
+
+    def fetch_china_cpi(self):
+        """
+        中国CPI数据。
+        https://datacenter-web.eastmoney.com/api/data/v1/get?columns=REPORT_DATE%2CTIME%2CNATIONAL_SAME%2CNATIONAL_BASE%2CNATIONAL_SEQUENTIAL%2CNATIONAL_ACCUMULATE%2CCITY_SAME%2CCITY_BASE%2CCITY_SEQUENTIAL%2CCITY_ACCUMULATE%2CRURAL_SAME%2CRURAL_BASE%2CRURAL_SEQUENTIAL%2CRURAL_ACCUMULATE&pageNumber=1&pageSize=20&sortColumns=REPORT_DATE&sortTypes=-1&source=WEB&client=WEB&reportName=RPT_ECONOMY_CPI&_=1780832254645
+        Return:
+            list[dict]: 中国CPI数据列表，每个字典包含:
+                - date (str): 日期
+                - CITY_SAME (float): 城市CPI
+                - CITY_BASE (float): 城市CPI（基数）
+                - CITY_SEQUENTIAL (float): 城市CPI(环比)
+                - CITY_ACCUMULATE (float): 城市CPI(累计)
+                - RURAL_SAME (float): 农村CPI
+                - RURAL_BASE (float): 农村CPI（基数）
+                - RURAL_SEQUENTIAL (float): 农村CPI(环比)
+                - RURAL_ACCUMULATE (float): 农村CPI(累计)
+                - NATIONAL_SAME (float): 国家CPI
+                - NATIONAL_BASE (float): 国家CPI（基数）、
+                
+                - NATIONAL_SEQUENTIAL (float): 国家CPI(环比)
+                - NATIONAL_ACCUMULATE (float): 国家CPI(累计)
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_ECONOMY_CPI",
+            filter_str="(REPORT_DATE >= '2023-01-01')",
+            columns="REPORT_DATE,TIME,NATIONAL_SAME,NATIONAL_BASE,NATIONAL_SEQUENTIAL,NATIONAL_ACCUMULATE,CITY_SAME,CITY_BASE,CITY_SEQUENTIAL,CITY_ACCUMULATE,RURAL_SAME,RURAL_BASE,RURAL_SEQUENTIAL,RURAL_ACCUMULATE",
+            page_size=20,
+            sort_columns="REPORT_DATE", sort_types="-1",
+        )
+        
+        return data
+    
+
+    def fetch_china_ppi(self):
+        """
+        中国工业品出厂价格指数（PPI）
+        Return:
+            list[dict]: 中国工业品出厂价格指数（PPI）数据列表，每个字典包含:
+                - TIME (str): 日期
+                - BASE (float): 当月PPI
+                - BASE_SAME (float): 当月PPI同比增长
+                - BASE_ACCUMULATE (float): PPI累计
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_ECONOMY_PPI",
+            filter_str="(REPORT_DATE >= '2023-01-01')",
+            columns="REPORT_DATE,TIME,BASE,BASE_SAME,BASE_ACCUMULATE",
+            page_size=20,
+            sort_columns="REPORT_DATE", sort_types="-1",
+        )
+        return data
+    
+
+    def fetch_china_pmi(self):
+        """
+        中国采购经理人指数（PMI）
+        Return:
+            list[dict]: 中国采购经理人指数（PMI）数据列表，每个字典包含:
+                - REPORT_DATE (str): 日期
+                - TIME (str): 日期
+                - MAKE_INDEX (float): 制造业指数
+                - MAKE_SAME (float): 制造业指数(环比)
+                - NMAKE_INDEX (float): 非制造业指数
+                - NMAKE_SAME (float): 非制造业指数(环比)
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_ECONOMY_PMI",
+            filter_str="(REPORT_DATE >= '2025-01-01')",
+            columns="REPORT_DATE,TIME,MAKE_INDEX,MAKE_SAME,NMAKE_INDEX,NMAKE_SAME",
+            page_size=20,
+            sort_columns="REPORT_DATE", sort_types="-1",
+        )
+        return data
+    
+    def fetch_china_economy_currency_supply(self):
+        """
+        中国货币供应指数（货币供应）
+        Return:
+            list[dict]: 中国货币供应指数（货币供应指数）数据列表，每个字典包含:
+                - REPORT_DATE (str): 日期
+                - TIME (str): 日期
+                - BASIC_CURRENCY (float): M2数量(亿元)
+                - BASIC_CURRENCY_SAME (float): M2数量同比增长
+                - BASIC_CURRENCY_SEQUENTIAL (float): M2数量环比
+                - CURRENCY (float): 货币供应指数M1(亿元)
+                - CURRENCY_SAME (float): 货币供应指数M1同比增长
+                - CURRENCY_SEQUENTIAL (float): 货币供应指数M1(环比)
+                - FREE_CASH (float): 流通中现金指数M0(亿元)
+                - FREE_CASH_SAME (float): 流通中现金指数M0同比增长
+                - FREE_CASH_SEQUENTIAL (float): 流通中现金指数M0环比    
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_ECONOMY_CURRENCY_SUPPLY",
+            filter_str="(REPORT_DATE >= '2025-01-01')",
+            columns="REPORT_DATE,TIME,BASIC_CURRENCY,BASIC_CURRENCY_SAME,BASIC_CURRENCY_SEQUENTIAL,CURRENCY,CURRENCY_SAME,CURRENCY_SEQUENTIAL,FREE_CASH,FREE_CASH_SAME,FREE_CASH_SEQUENTIAL",
+            page_size=20,
+            sort_columns="REPORT_DATE", sort_types="-1",
+        )
+        return data
 
 eastmoney_provider = EastMoneyDataProvider()
 
-
 if __name__ == "__main__":
-    #news = eastmoney_provider.fetch_stock_info("603228")
-    #print(news)
     
-    eastmoney_reports = eastmoney_provider.fetch_market_kuaixun()
+    eastmoney_reports = eastmoney_provider.fetch_china_economy_currency_supply()
     print(eastmoney_reports)

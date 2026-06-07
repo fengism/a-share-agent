@@ -93,8 +93,18 @@ async def _get_daily_review(date: str | None = None, force: bool = False) -> Any
     return "\n".join(sections)
 
 
+async def _get_macro_data() -> Any:
+    """获取宏观经济指标汇总：CPI、PPI、PMI 和货币供应量。
+
+    Return:
+        包含 cpi/ppi/pmi/money_supply 四个板块的字典
+    """
+    from app.services.market.macro import get_macro_data
+    return await get_macro_data()
+
+
 def register_market_skills():
-    """注册市场相关技能：get_market_overview、get_hot_rank、get_dragon_tiger、get_daily_review。"""
+    """注册市场相关技能：get_market_overview、get_hot_rank、get_dragon_tiger、get_daily_review、get_macro_data。"""
     registry.register(Skill(
         name="get_market_overview",
         description="获取大盘概览，包括主要指数（上证、深证、创业板等）实时行情和两市成交额。当用户问'大盘怎么样''指数行情''市场情况'时调用。",
@@ -150,4 +160,11 @@ def register_market_skills():
             },
         },
         executor=_get_daily_review,
+    ))
+
+    registry.register(Skill(
+        name="get_macro_data",
+        description="获取宏观经济指标数据，包括CPI（居民消费价格指数）、PPI（工业品出厂价格指数）、PMI（采购经理指数）和货币供应量（M0/M1/M2）。当用户问'CPI多少''PPI走势''PMI数据''货币供应''M2增速''宏观经济数据'时调用。",
+        parameters={"type": "object", "properties": {}},
+        executor=_get_macro_data,
     ))
