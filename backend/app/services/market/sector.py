@@ -1,5 +1,6 @@
 import logging
 
+from app.services.providers.baidu import baidu_provider as _baidu_provider
 from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
 from app.services.providers.tencent import tencent_provider as _tencent_provider
 from app.utils.cache import cache, dated_cache_key
@@ -57,7 +58,7 @@ def _normalize_tencent_sectors(top_df, bottom_df) -> dict:
 
 
 async def get_industry_rankings() -> dict:
-    """获取行业涨幅排名，东方财富优先并回退到腾讯数据源。
+    """获取行业涨幅排名，百度优先，回退东方财富，再回退腾讯。
 
     Param:
         无
@@ -69,16 +70,28 @@ async def get_industry_rankings() -> dict:
     if cached is not None:
         return cached
 
-    try:
-        result = await call_blocking(_eastmoney_provider.fetch_industry_rankings, 200)
-        data = {
-            "sectors": result.get("top", []),
-            "total": result.get("total", 0),
-        }
-    except Exception as e:
-        logger.warning(f"东方财富行业排名获取失败，回退腾讯: {e}")
-        top_df, bottom_df = await call_blocking(_tencent_provider.fetch_market_sector_rankings)
-        data = _normalize_tencent_sectors(top_df, bottom_df)
+    data = None
+    for label, fetch_fn in [
+        ("百度", lambda: _baidu_provider.fetch_industry_rankings(50)),
+        ("东方财富", lambda: _eastmoney_provider.fetch_industry_rankings(50)),
+    ]:
+        try:
+            result = await call_blocking(fetch_fn)
+            data = {
+                "sectors": result.get("top", []),
+                "total": result.get("total", 0),
+            }
+            break
+        except Exception as e:
+            logger.warning(f"{label}行业排名获取失败: {e}")
+
+    if data is None:
+        try:
+            top_df, bottom_df = await call_blocking(_tencent_provider.fetch_industry_rankings)
+            data = _normalize_tencent_sectors(top_df, bottom_df)
+        except Exception as e:
+            logger.warning(f"腾讯行业排名获取失败: {e}")
+            data = {"sectors": [], "total": 0}
 
     cache.set(cache_key, data, ttl=300)
     return data

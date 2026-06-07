@@ -75,6 +75,9 @@ export default function SettingsPage() {
         iwencai_enabled: config.iwencai_enabled,
         iwencai_base_url: config.iwencai_base_url,
         iwencai_api_key: config.iwencai_api_key,
+        twitter_feeds: config.twitter_feeds,
+        eastmoney_cookie: config.eastmoney_cookie,
+        baidu_acs_token: config.baidu_acs_token,
       });
       setPrevProvider(config.llm_provider);
   }, [config, initialized]);
@@ -197,6 +200,46 @@ export default function SettingsPage() {
     updateConfig.mutate(patch, {
       onSuccess: () => {
         message.success("问财数据源配置已保存");
+      },
+      onError: (err: Error) => {
+        message.error(`保存失败: ${err.message}`);
+      },
+    });
+  }, [form, updateConfig]);
+
+  const handleSaveTwitter = useCallback(() => {
+    const raw = form.twitter_feeds ?? [];
+    const cleaned = raw
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    updateConfig.mutate(
+      { twitter_feeds: cleaned },
+      {
+        onSuccess: () => {
+          message.success("Twitter 账号配置已保存");
+        },
+        onError: (err: Error) => {
+          message.error(`保存失败: ${err.message}`);
+        },
+      },
+    );
+  }, [form, updateConfig]);
+
+  const handleSaveDataSourceCookies = useCallback(() => {
+    const patch: ConfigUpdate = {};
+    if (form.eastmoney_cookie && !form.eastmoney_cookie.endsWith("***")) {
+      patch.eastmoney_cookie = form.eastmoney_cookie;
+    }
+    if (form.baidu_acs_token && !form.baidu_acs_token.endsWith("***")) {
+      patch.baidu_acs_token = form.baidu_acs_token;
+    }
+    if (Object.keys(patch).length === 0) {
+      message.info("没有需要保存的变更");
+      return;
+    }
+    updateConfig.mutate(patch, {
+      onSuccess: () => {
+        message.success("数据源 Cookie 配置已保存");
       },
       onError: (err: Error) => {
         message.error(`保存失败: ${err.message}`);
@@ -513,6 +556,92 @@ export default function SettingsPage() {
           loading={updateConfig.isPending}
         >
           保存问财配置
+        </Button>
+      </Card>
+
+      {/* Twitter Feeds Config */}
+      <Card
+        title={
+          <span>
+            <SearchOutlined style={{ marginRight: 8 }} />
+            Twitter 财经账号配置
+          </span>
+        }
+        style={{ ...cardStyle, marginBottom: 16 }}
+        styles={{ body: sectionCardBodyStyle }}
+      >
+        <Row gutter={[24, 16]}>
+          <Col span={24}>
+            <div style={fieldLabelStyle}>
+              Twitter/X 财经账号列表（每行一个，不含 @）
+            </div>
+            <Input.TextArea
+              rows={4}
+              value={(form.twitter_feeds ?? []).join("\n")}
+              onChange={(e) =>
+                set({ twitter_feeds: e.target.value.split("\n") })
+              }
+              placeholder={"qinbafrank\n账号2\n账号3"}
+            />
+            <div style={{ marginTop: 4, fontSize: 12, color: darkColors.textMuted }}>
+              用于拉取 Twitter/X 上的财经推文和文章，每行填写一个账号名（不带 @）
+            </div>
+          </Col>
+        </Row>
+        <Divider style={{ borderColor: darkColors.border, margin: "16px 0" }} />
+        <Button
+          type="primary"
+          icon={<SaveOutlined />}
+          onClick={handleSaveTwitter}
+          loading={updateConfig.isPending}
+        >
+          保存 Twitter 配置
+        </Button>
+      </Card>
+
+      {/* Data Source Cookie Config */}
+      <Card
+        title={
+          <span>
+            <SearchOutlined style={{ marginRight: 8 }} />
+            数据源 Cookie 配置
+          </span>
+        }
+        style={{ ...cardStyle, marginBottom: 16 }}
+        styles={{ body: sectionCardBodyStyle }}
+      >
+        <Row gutter={[24, 16]}>
+          <Col span={24}>
+            <div style={fieldLabelStyle}>东方财富 Cookie</div>
+            <Input.Password
+              value={form.eastmoney_cookie || ""}
+              onChange={(e) => set({ eastmoney_cookie: e.target.value })}
+              placeholder="留空使用内置默认值"
+            />
+            <div style={{ marginTop: 4, fontSize: 12, color: darkColors.textMuted }}>
+              从浏览器 DevTools → Network → 请求头中复制 Cookie 值
+            </div>
+          </Col>
+          <Col span={24}>
+            <div style={fieldLabelStyle}>百度 acs-token</div>
+            <Input.Password
+              value={form.baidu_acs_token || ""}
+              onChange={(e) => set({ baidu_acs_token: e.target.value })}
+              placeholder="留空使用内置默认值"
+            />
+            <div style={{ marginTop: 4, fontSize: 12, color: darkColors.textMuted }}>
+              从浏览器 DevTools → Network → 请求头中复制 acs-token 值
+            </div>
+          </Col>
+        </Row>
+        <Divider style={{ borderColor: darkColors.border, margin: "16px 0" }} />
+        <Button
+          type="primary"
+          icon={<SaveOutlined />}
+          onClick={handleSaveDataSourceCookies}
+          loading={updateConfig.isPending}
+        >
+          保存数据源 Cookie
         </Button>
       </Card>
 

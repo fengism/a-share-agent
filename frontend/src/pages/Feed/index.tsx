@@ -5,7 +5,7 @@ import type { NewsAnalysisItem, NewsAnalysisRef } from "../../types/stock";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/zh-cn";
-import { useMarketKuaixun, useMarketOtherNews, useNewsAnalysis } from "../../api/queries";
+import { useMarketKuaixun, useMarketOtherNews, useMarketTwitterFeed, useNewsAnalysis } from "../../api/queries";
 import { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle, cardStyle } from "../../styles/ui";
 import type { FeedNewsItem } from "../../types/stock";
 
@@ -442,6 +442,19 @@ function KuaixunTab() {
   );
 }
 
+function TwitterTab() {
+  const { data: items = [], isLoading } = useMarketTwitterFeed();
+  return (
+    <PaginatedList
+      items={items}
+      isLoading={isLoading}
+      emptyText="暂无 Twitter 资讯"
+      showSourceTag={true}
+      pageSize={NEWS_PAGE_SIZE}
+    />
+  );
+}
+
 function OtherNewsTab() {
   const { data: items = [], isLoading } = useMarketOtherNews();
 
@@ -553,6 +566,11 @@ export default function Feed() {
                 key: "news",
                 label: <span><ReadOutlined /> 新闻资讯</span>,
                 children: <OtherNewsTab />,
+              },
+              {
+                key: "twitter",
+                label: <span>𝕏 Twitter</span>,
+                children: <TwitterTab />,
               },
             ]}
             style={{ background: "transparent" }}

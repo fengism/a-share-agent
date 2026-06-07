@@ -22,7 +22,7 @@ def get_sector_rankings() -> dict:
     Return:
         包含 top_sectors 和 bottom_sectors 列表的字典
     """
-    top_df, bottom_df = _tencent_provider.fetch_market_sector_rankings()
+    top_df, bottom_df = _tencent_provider.fetch_industry_rankings()
     def to_items(frame: pd.DataFrame) -> list[dict]:
         """将板块 DataFrame 转换为字典列表。
 

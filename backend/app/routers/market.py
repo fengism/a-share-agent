@@ -19,6 +19,7 @@ from app.services.analysis.news import get_stock_news_categorized as get_stock_n
 from app.services.market.news import get_market_feed as get_market_feed_service
 from app.services.market.news import get_market_kuaixun as get_market_kuaixun_service
 from app.services.market.news import get_market_other_news as get_market_other_news_service
+from app.services.market.news import get_twitter_feed as get_twitter_feed_service
 from app.services.market.sector import get_industry_rankings as get_industry_rankings_service
 from app.services.market.news_analysis import analyze_market_news as analyze_market_news_service
 from app.services.analysis.retail import (
@@ -327,6 +328,21 @@ async def get_market_other_news():
     except Exception as e:
         logger.error(f"获取其他新闻失败: error={e}")
         raise HTTPException(status_code=500, detail=f"获取其他新闻失败: {e}")
+
+
+@router.get("/twitter-feed")
+async def get_twitter_feed():
+    """获取 Twitter/X 财经账号的最新推文和文章。
+
+    Return:
+        list[dict]: Twitter 资讯列表，按时间倒序。
+    """
+    logger.info("获取 Twitter 资讯")
+    try:
+        return await get_twitter_feed_service()
+    except Exception as e:
+        logger.error(f"获取 Twitter 资讯失败: error={e}")
+        raise HTTPException(status_code=500, detail=f"获取 Twitter 资讯失败: {e}")
 
 
 @router.get("/industry-rankings")

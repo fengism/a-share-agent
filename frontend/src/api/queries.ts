@@ -359,6 +359,15 @@ export function useMarketOtherNews() {
   });
 }
 
+export function useMarketTwitterFeed() {
+  return useQuery({
+    queryKey: ["marketTwitterFeed"],
+    queryFn: () => apiGet<FeedNewsItem[]>("/market/twitter-feed"),
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+}
+
 export function useNewsAnalysis() {
   return useQuery({
     queryKey: ["newsAnalysis"],

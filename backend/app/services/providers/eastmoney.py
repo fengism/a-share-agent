@@ -67,6 +67,10 @@ class EastMoneyDataProvider(BaseDataProvider):
         self.em_session.trust_env = get_settings().http_trust_env
         self.em_session.headers.update({"User-Agent": self.UA})
         self.EM_MIN_INTERVAL = 1.0
+        # 支持自定义 cookie（配置为空时使用 http.py 中的内置默认值）
+        custom_cookie = get_settings().eastmoney_cookie
+        if custom_cookie:
+            EASTMONEY_HEADERS["cookie"] = custom_cookie
 
     def em_get_response(self, url, params=None, headers=None, timeout=15, **kwargs):
         """东财统一请求入口：自动节流 + 复用 session。
@@ -1241,7 +1245,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         }
-        items = self._fetch_clist_diff(params=params, headers=headers)
+        items = self._fetch_clist_diff(params=params, headers=EASTMONEY_HEADERS)
         if not items:
             return {"top": [], "bottom": [], "total": 0}
 
@@ -1692,8 +1696,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                 - RURAL_SEQUENTIAL (float): 农村CPI(环比)
                 - RURAL_ACCUMULATE (float): 农村CPI(累计)
                 - NATIONAL_SAME (float): 国家CPI
-                - NATIONAL_BASE (float): 国家CPI（基数）、
-                
+                - NATIONAL_BASE (float): 国家CPI（基数）、            
                 - NATIONAL_SEQUENTIAL (float): 国家CPI(环比)
                 - NATIONAL_ACCUMULATE (float): 国家CPI(累计)
         """
@@ -1779,5 +1782,5 @@ eastmoney_provider = EastMoneyDataProvider()
 
 if __name__ == "__main__":
     
-    eastmoney_reports = eastmoney_provider.fetch_china_economy_currency_supply()
+    eastmoney_reports = eastmoney_provider.fetch_industry_rankings()
     print(eastmoney_reports)

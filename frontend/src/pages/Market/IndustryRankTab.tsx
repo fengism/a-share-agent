@@ -97,7 +97,7 @@ export default function IndustryRankTab() {
       <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e293b", display: "flex", alignItems: "center", gap: 8 }}>
         <AppstoreOutlined style={{ color: "#3b82f6" }} />
         <span style={{ color: "#e5e7eb", fontWeight: 500 }}>行业板块涨跌幅排名</span>
-        <Tag color="blue" style={{ marginLeft: 4 }}>东方财富</Tag>
+        <Tag color="blue" style={{ marginLeft: 4 }}>百度</Tag>
         {isFetching && <span style={{ color: "#6b7280", fontSize: 12, marginLeft: "auto" }}>更新中...</span>}
       </div>
       <Table<IndustryRankItem>

@@ -46,7 +46,6 @@ export default function KlineChart({ data, height = 500 }: Props) {
       grid: { vertLines: { color: "#1e293b" }, horzLines: { color: "#1e293b" } },
       timeScale: { timeVisible: false, borderColor: "#1e293b" },
       rightPriceScale: { visible: true, borderColor: "#1e293b" },
-      leftPriceScale: { visible: true, borderColor: "#1e293b" },
       crosshair: {
         vertLine: { color: "#4b5563", labelBackgroundColor: "#1e293b" },
         horzLine: { color: "#4b5563", labelBackgroundColor: "#1e293b" },
@@ -63,7 +62,14 @@ export default function KlineChart({ data, height = 500 }: Props) {
       borderDownColor: "#22c55e",
       wickUpColor: "#ef4444",
       wickDownColor: "#22c55e",
+      priceScaleId: "right",
     });
+    chart.priceScale("right").applyOptions({
+      visible: true,
+      borderColor: "#1e293b",
+      scaleMargins: { top: 0.05, bottom: 0.22 },
+    });
+
     const volume = chart.addSeries(HistogramSeries, {
       priceFormat: {
         type: "custom",
@@ -72,18 +78,17 @@ export default function KlineChart({ data, height = 500 }: Props) {
           ? `${(value / 1e8).toFixed(2)}亿`
           : `${(value / 1e4).toFixed(2)}万`,
       },
-      priceScaleId: "left",
+      priceScaleId: "volume",
     });
-    chart.priceScale("left").applyOptions({
-      visible: true,
-      borderColor: "#1e293b",
-      scaleMargins: { top: 0.8, bottom: 0 },
+    chart.priceScale("volume").applyOptions({
+      visible: false,
+      scaleMargins: { top: 0.82, bottom: 0 },
     });
 
     candle.setData(rows.map((item) => ({ time: item.date, open: item.open, high: item.high, low: item.low, close: item.close })));
     volume.setData(rows.map((item) => ({
       time: item.date,
-      value: item.volume ?? item.amount,
+      value: item.amount ?? item.volume,
       color: item.close >= item.open ? "rgba(239,68,68,0.5)" : "rgba(34,197,94,0.5)",
     })));
     chart.timeScale().fitContent();

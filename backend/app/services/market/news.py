@@ -47,7 +47,6 @@ def _news_sources() -> list[NewsSource]:
         NewsSource("雪球新闻", _rss_provider.fetch_xueqiu_news),
         NewsSource("界面新闻", _rss_provider.fetch_jiemain_news),
         NewsSource("经济观察报", _rss_provider.fetch_eeo_news),
-        NewsSource("Twitter", _twitter_provider.fetch_market_news),
     ]
 
 
@@ -168,4 +167,32 @@ async def get_market_feed() -> list:
     result = result[:300]
 
     cache.set(cache_key, result, ttl=120)
+    return result
+
+
+async def get_twitter_feed() -> list:
+    """获取 Twitter/X 财经账号的最新推文和文章。
+
+    Param:
+        无
+    Return:
+        NewsSearchItem 列表，按发布时间倒序
+    """
+    cache_key = dated_cache_key("twitter_feed")
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        result = await call_blocking(_twitter_provider.fetch_posts)
+    except Exception as e:
+        logger.warning(f"Twitter 数据获取失败: {e}")
+        result = []
+
+    result = filter_recent_news_items(result, days=30)
+    result = dedupe_news_items(result)
+    result.sort(key=news_sort_key, reverse=True)
+    result = result[:100]
+
+    cache.set(cache_key, result, ttl=300)
     return result

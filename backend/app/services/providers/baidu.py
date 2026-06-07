@@ -2,29 +2,16 @@ import logging
 import time
 
 import pandas as pd
+import requests
+
 
 from app.services.base.data_provider import BaseDataProvider
 from app.models.search_item import NewsSearchItem
-from app.utils import http_client
 from app.utils.symbol_utils import contains_stock_reference
 from app.constants.http import BD_HEADERS, BD_HEADERS_WITH_COOKIE
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
-
-
-def _baidu_request_json(url: str, params: dict, headers: dict | None = None, timeout: int = 10) -> dict:
-    """通过共享 http_client 发送 GET 并解析 JSON，自动尊重 http_trust_env 配置。
-
-    Param:
-        url: 请求 URL
-        params: URL 查询参数
-        headers: 可选请求头；为空则使用 self.default_headers
-        timeout: 超时秒数，默认 10njm nm 
-    Return:
-        解析后的 JSON 字典
-    """
-    response = http_client.get(url, params=params, headers=headers, timeout=timeout)
-    return response.json()
 
 
 class BaiduDataProvider(BaseDataProvider):
@@ -37,7 +24,7 @@ class BaiduDataProvider(BaseDataProvider):
     NAME_LIST_SLEEP_SECONDS = 0.5
 
     def __init__(self):
-        """初始化 BaiduDataProvider，配置请求头与分页参数。"""
+        """初始化 BaiduDataProvider，配置请求头、分页参数与独立 session（不走代理）。"""
         super().__init__(name="baidu", source_label="百度")
         self.default_headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -46,12 +33,19 @@ class BaiduDataProvider(BaseDataProvider):
             "Origin": "https://gushitong.baidu.com",
             "Host": "finance.pae.baidu.com",
         }
+        # 百度接口直连，不使用系统代理
+        self._session = requests.Session()
+        self._session.trust_env = False
+        # 支持自定义 acs-token（配置为空时使用 http.py 中的内置默认值）
+        custom_token = get_settings().baidu_acs_token
+        if custom_token:
+            BD_HEADERS_WITH_COOKIE["acs-token"] = custom_token
 
     def _request(self, path: str, params: dict, headers: dict | None = None, timeout: int | None = None) -> dict:
-        """通过共享 HTTP 客户端发起 GET 请求并解析 JSON。
+        """通过独立 session 发起 GET 请求并解析 JSON（不走代理）。
 
         Param:
-            path: URL 路径（如 /selfselect/getstockquotation），会自动拼接 base_url
+            path: URL 路径或完整 URL，会自动拼接 base_url
             params: URL 查询参数
             headers: 可选请求头；为空则使用 default_headers
             timeout: 超时秒数；为空使用 DEFAULT_TIMEOUT
@@ -59,12 +53,13 @@ class BaiduDataProvider(BaseDataProvider):
             解析后的 JSON 字典
         """
         url = path if path.startswith("http") else f"{self.DEFAULT_BASE_URL}{path}"
-        return _baidu_request_json(
+        response = self._session.get(
             url,
-            params,
+            params=params,
             headers=headers or self.default_headers,
             timeout=timeout or self.DEFAULT_TIMEOUT,
         )
+        return response.json()
 
     @staticmethod
     def _check_result_code(data: dict) -> None:
@@ -329,10 +324,138 @@ class BaiduDataProvider(BaseDataProvider):
         self._check_result_code(data)
         return data.get("Result", {}).get("index", {}).get("ab", {}).get("marketDate", [])
 
+    def fetch_industry_rankings(self, top_n: int = 20) -> dict:
+        """获取行业排名（百度 PAE industry 板块）。
+        https://finance.pae.baidu.com/vapi/v2/blocks?style=tablelist&pn=0&rn=200&market=ab&typeCode=HY&finClientType=pc
+        Return:
+            
+        """
+        '''
+        data = self._request(
+            "/sapi/v2/blocks",
+            params={
+                "style": "tablelist",
+                "pn": "0",
+                "rn": "200",
+                "market": "ab",
+                "typeCode": "HY",
+                "finClientType": "pc",
+            },
+            headers=BD_HEADERS_WITH_COOKIE,
+        )
+        '''
+        url = "https://finance.pae.baidu.com/vapi/v2/blocks"
+        params = {
+            "style": "tablelist",
+            "pn": "0",
+            "rn": "200",
+            "market": "ab",
+            "typeCode": "HY",
+            "finClientType": "pc",
+        }
+        response = self._request(
+            url,
+            params=params,
+            headers=BD_HEADERS_WITH_COOKIE,
+        )
+        self._check_result_code(response)
+        items = response.get("Result", {}).get("list", {}).get("body", [])
+        result = []
+        for i, item in enumerate(items):
+            riseFirst = item.get("riseFirst")
+            if not riseFirst:
+                continue
+            lead_stock = riseFirst[0]
+            lead_stock_name = lead_stock.get("name", "")
 
+            raw_pct = str(item.get("pxChangeRate", 0) or 0).replace("%", "")
+            raw_leader_pct = str(lead_stock.get("ratio", {}).get("value", 0) or 0).replace("%", "")
+            _item = {
+                "rank": i + 1,
+                "name": item.get("name", ""),
+                "code": item.get("code", ""),
+                "change_pct": float(raw_pct),
+                "up_count": int(item.get("riseCount", 0) or 0),
+                "down_count": int(item.get("memberCount", 0) or 0) - int(item.get("riseCount", 0) or 0) - int(item.get("flatCount", 0) or 0),
+                "leader": lead_stock_name,
+                "leader_change": float(raw_leader_pct),
+            }
+            result.append(_item)
+
+        return {
+            "top": result[:top_n],
+            "bottom": result[-top_n:],
+            "total": len(result),
+        }
+
+    def fetch_concept_rankings(self, top_n: int = 20) -> dict:
+        """获取概念排名（百度 PAE concept 板块）。
+        https://finance.pae.baidu.com/vapi/v2/blocks?style=tablelist&pn=0&rn=200&market=ab&typeCode=GN&finClientType=pc
+        Return:
+            
+        """
+        '''
+        data = self._request(
+            "/sapi/v2/blocks",
+            params={
+                "style": "tablelist",
+                "pn": "0",
+                "rn": "200",
+                "market": "ab",
+                "typeCode": "HY",
+                "finClientType": "pc",
+            },
+            headers=BD_HEADERS_WITH_COOKIE,
+        )
+        '''
+        url = "https://finance.pae.baidu.com/vapi/v2/blocks"
+        params = {
+            "style": "tablelist",
+            "pn": "0",
+            "rn": "200",
+            "market": "ab",
+            "typeCode": "GN",
+            "finClientType": "pc",
+        }
+        response = self._request(
+            url,
+            params=params,
+            headers=BD_HEADERS_WITH_COOKIE,
+        )
+        self._check_result_code(response)
+        items = response.get("Result", {}).get("list", {}).get("body", [])
+        result = []
+        for i, item in enumerate(items):
+            riseFirst = item.get("riseFirst")
+            if not riseFirst:
+                continue
+            lead_stock = riseFirst[0]
+            lead_stock_name = lead_stock.get("name", "")
+
+            raw_pct = str(item.get("pxChangeRate", 0) or 0).replace("%", "")
+            raw_leader_pct = str(lead_stock.get("ratio", {}).get("value", 0) or 0).replace("%", "")
+            _item = {
+                "rank": i + 1,
+                "name": item.get("name", ""),
+                "code": item.get("code", ""),
+                "change_pct": float(raw_pct),
+                "up_count": int(item.get("riseCount", 0) or 0),
+                "down_count": int(item.get("memberCount", 0) or 0) - int(item.get("riseCount", 0) or 0) - int(item.get("flatCount", 0) or 0),
+                "leader": lead_stock_name,
+                "leader_change": float(raw_leader_pct),
+            }
+            result.append(_item)
+
+        return {
+            "top": result[:top_n],
+            "bottom": result[-top_n:],
+            "total": len(result),
+        }
+    
+        
 baidu_provider = BaiduDataProvider()
 
 
 if __name__ == "__main__":
-    data = baidu_provider.fetch_market_kuaixun()
+    data = baidu_provider.fetch_concept_rankings()
     print(data)

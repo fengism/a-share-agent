@@ -66,7 +66,6 @@ export default function AIndexTab() {
                   <Text type="secondary" style={{ fontSize: 12 }}>{idx.code}</Text>
                 </div>
                 <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>量 {formatAmount(idx.volume)}</Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>额 {formatAmount(idx.amount)}</Text>
                 </div>
               </Card>

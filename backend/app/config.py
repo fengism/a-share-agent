@@ -60,8 +60,15 @@ class Settings(BaseSettings):
     # 设为 false 时，所有 requests 调用将忽略系统 HTTP_PROXY/HTTPS_PROXY 环境变量
     http_trust_env: bool = False
 
+    # 数据源 Cookie 配置（留空使用内置默认值）
+    eastmoney_cookie: str = ""
+    baidu_acs_token: str = ""
+
     # 多 Agent 配置
     multi_agent_enabled: bool = True
+
+    # Twitter 财经账号配置
+    twitter_feeds: list[str] = ["qinbafrank"]
 
     @model_validator(mode="after")
     def apply_provider_defaults(self) -> "Settings":
@@ -147,7 +154,7 @@ def update_settings(patch: dict) -> Settings:
         if value is None or not hasattr(current, key):
             continue
         # Skip masked secrets — user didn't actually change them
-        if key in ("llm_api_key", "feishu_app_secret", "iwencai_api_key") and isinstance(value, str) and value.endswith("***"):
+        if key in ("llm_api_key", "feishu_app_secret", "iwencai_api_key", "eastmoney_cookie", "baidu_acs_token") and isinstance(value, str) and value.endswith("***"):
             continue
         setattr(current, key, value)
 

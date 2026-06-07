@@ -38,6 +38,9 @@ class ConfigResponse(BaseModel):
     iwencai_api_key: str
     http_trust_env: bool
     provider_defaults: dict
+    twitter_feeds: list[str]
+    eastmoney_cookie: str
+    baidu_acs_token: str
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -65,6 +68,9 @@ class ConfigUpdateRequest(BaseModel):
     iwencai_base_url: str | None = None
     iwencai_api_key: str | None = None
     http_trust_env: bool | None = None
+    twitter_feeds: list[str] | None = None
+    eastmoney_cookie: str | None = None
+    baidu_acs_token: str | None = None
 
 
 def _to_response(s) -> ConfigResponse:
@@ -99,6 +105,9 @@ def _to_response(s) -> ConfigResponse:
         iwencai_api_key=_mask_secret(s.iwencai_api_key),
         http_trust_env=s.http_trust_env,
         provider_defaults=PROVIDER_DEFAULTS,
+        twitter_feeds=s.twitter_feeds,
+        eastmoney_cookie=_mask_secret(s.eastmoney_cookie),
+        baidu_acs_token=_mask_secret(s.baidu_acs_token),
     )
 
 

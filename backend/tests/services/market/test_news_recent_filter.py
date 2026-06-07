@@ -52,7 +52,6 @@ async def test_get_market_news_keeps_only_recent_news(monkeypatch):
     monkeypatch.setattr(news._rss_provider, "fetch_xueqiu_news", lambda: [])
     monkeypatch.setattr(news._rss_provider, "fetch_jiemain_news", lambda: [])
     monkeypatch.setattr(news._rss_provider, "fetch_eeo_news", lambda: [])
-    monkeypatch.setattr(news._twitter_provider, "fetch_market_news", lambda: [])
 
     result = await news.get_market_news()
 

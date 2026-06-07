@@ -6,23 +6,14 @@ from app.services.base.data_provider import BaseDataProvider
 from app.models.search_item import NewsSearchItem
 from app.utils.news_utils import parse_struct_time_string
 from app.constants.http import BROWSER_USER_AGENT
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
 
-# 财经相关 Twitter/X 账号
-TWITTER_FEEDS = [
-    "qinbafrank",
-    #aleabitoreddit",
-    #168X_Fortune",
-    #xiaomustock",
-   #"freearkshaw",
-    #kikoaifenxi",
-]
-
-
 class TwitterDataProvider(BaseDataProvider):
     """Purpose: 通过 fxtwitter API 拉取 Twitter/X 财经账号的媒体与搜索结果，统一封装为 NewsSearchItem。"""
+
     def __init__(self):
         """初始化 TwitterDataProvider，设置 name、source_label 与请求头。"""
         super().__init__(name="twitter", source_label="Twitter")
@@ -30,6 +21,15 @@ class TwitterDataProvider(BaseDataProvider):
             "User-Agent": BROWSER_USER_AGENT,
             "Accept": "application/rss+xml, application/xml, text/xml, */*",
         }
+
+    @property
+    def twitter_feeds(self) -> list[str]:
+        """获取当前配置的 Twitter 账号列表。
+
+        Return:
+            从运行时配置中读取的 Twitter 账号列表
+        """
+        return get_settings().twitter_feeds
 
     def _fetch_posts(self, url: str) -> list[dict]:
         """调用 fxtwitter 接口并返回 results 列表（失败时返回空列表）。
@@ -82,9 +82,9 @@ class TwitterDataProvider(BaseDataProvider):
         })
         return result
         
-    def fetch_market_news(self) -> list[NewsSearchItem]:
-        """获取最新媒体推文
-        
+    def fetch_posts(self) -> list[NewsSearchItem]:
+        """获取最新 Twitter/X 媒体推文和文章。
+
         Return:
             NewsSearchItem 列表
         """
@@ -98,7 +98,7 @@ class TwitterDataProvider(BaseDataProvider):
             NewsSearchItem 列表
         """
         results: list[NewsSearchItem] = []
-        for account_name in TWITTER_FEEDS:
+        for account_name in self.twitter_feeds:
             feed_url = f"https://api.fxtwitter.com/2/profile/{account_name}/articles?count=20&lang=es"
             entries = self._fetch_posts(feed_url)
             for entry in entries:
@@ -142,7 +142,7 @@ class TwitterDataProvider(BaseDataProvider):
             NewsSearchItem 列表
         """
         results: list[NewsSearchItem] = []
-        for account_name in TWITTER_FEEDS:
+        for account_name in self.twitter_feeds:
             feed_url = f"https://api.fxtwitter.com/2/profile/{account_name}/media?count=20&lang=zh-cn"
             entries = self._fetch_posts(feed_url)
             for entry in entries:

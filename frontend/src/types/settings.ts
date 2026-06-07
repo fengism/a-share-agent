@@ -26,6 +26,9 @@ export interface ConfigData {
   iwencai_base_url: string;
   iwencai_api_key: string;
   provider_defaults: Record<string, ProviderDefault>;
+  twitter_feeds: string[];
+  eastmoney_cookie: string;
+  baidu_acs_token: string;
 }
 
 export type ConfigUpdate = Partial<Omit<ConfigData, "provider_defaults">>;
