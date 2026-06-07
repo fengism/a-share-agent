@@ -26,7 +26,7 @@ class BaseNoApiKeySearchEngine(ABC):
         """
         初始化搜索引擎客户端
 
-        Args:
+        Param:
             proxy: 代理地址 (可选)
         """
         self.proxy = proxy or os.getenv("NO_API_KEY_PROXY")
@@ -59,7 +59,7 @@ class BaseNoApiKeySearchEngine(ABC):
         """
         执行搜索
 
-        Args:
+        Param:
             query: 搜索关键词
             max_results: 最大结果数
             timeout: 请求超时时间 (秒)
@@ -198,6 +198,7 @@ class GoogleSearchNoAPI(BaseNoApiKeySearchEngine):
     REQUIRES_PROXY = True
 
     def __init__(self, proxy: str = None):
+        """初始化 Google 搜索引擎并附加浏览器风格请求头。"""
         super().__init__(proxy)
         # 添加更多请求头以模拟浏览器
         self.session.headers.update({
@@ -281,7 +282,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    results = search_google(args.query, args.max_results, args.proxy)
+    results = search_baidu(args.query, args.max_results, args.proxy)
     print
 
     if args.json:

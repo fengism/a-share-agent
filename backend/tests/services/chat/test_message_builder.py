@@ -3,6 +3,7 @@ from app.services.chat.message_builder import build_messages
 
 
 def test_build_messages_with_empty_history():
+    """build_messages emits a system prompt and the user query when history is empty."""
     messages = build_messages("你好", None, 20)
 
     assert messages[-1] == {"role": "user", "content": "你好"}
@@ -10,6 +11,7 @@ def test_build_messages_with_empty_history():
 
 
 def test_build_messages_skips_duplicate_latest_user_message():
+    """build_messages drops a trailing user message that duplicates the new query."""
     history = [ChatMessage(role="user", content="PE小于20的白酒股")]
 
     messages = build_messages("PE小于20的白酒股", history, 20)
@@ -19,6 +21,7 @@ def test_build_messages_skips_duplicate_latest_user_message():
 
 
 def test_build_messages_preserves_tool_call_history():
+    """build_messages keeps assistant tool_calls and corresponding tool result messages."""
     tool_call = ToolCallInfo(
         id="call_1",
         type="function",

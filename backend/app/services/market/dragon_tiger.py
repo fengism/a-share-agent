@@ -10,11 +10,26 @@ logger = logging.getLogger(__name__)
 
 
 def _fallback_report_dates(report_date: str, days: int = 5) -> list[str]:
+    """生成龙虎榜日期回退列表，从指定日期往前推 N 天。
+
+    Param:
+        report_date: 起始报告日期，格式 YYYY-MM-DD
+        days: 回退天数
+    Return:
+        逆序日期字符串列表，最近的日期在前
+    """
     base = datetime.strptime(report_date, "%Y-%m-%d")
     return [(base - timedelta(days=offset)).strftime("%Y-%m-%d") for offset in range(days)]
 
 
 async def get_dragon_tiger_list(report_date: str | None = None) -> list[dict]:
+    """获取指定日期的龙虎榜列表，带日期回退和缓存。
+
+    Param:
+        report_date: 报告日期，格式 YYYY-MM-DD，默认当天
+    Return:
+        龙虎榜条目字典列表，失败返回空列表
+    """
     if report_date is None:
         report_date = datetime.now().strftime("%Y-%m-%d")
 
@@ -38,6 +53,14 @@ async def get_dragon_tiger_list(report_date: str | None = None) -> list[dict]:
 
 
 async def get_dragon_tiger_detail(code: str, report_date: str) -> list[dict]:
+    """获取指定股票在指定日期的龙虎榜营业部明细。
+
+    Param:
+        code: 股票代码
+        report_date: 报告日期，格式 YYYY-MM-DD
+    Return:
+        龙虎榜营业部明细字典列表，失败返回空列表
+    """
     cache_key = dated_cache_key("dragon_tiger_detail", code, report_date)
     cached = cache.get(cache_key)
     if cached is not None:

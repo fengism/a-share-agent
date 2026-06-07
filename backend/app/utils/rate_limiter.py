@@ -8,12 +8,29 @@ _semaphore = asyncio.Semaphore(2)
 
 
 async def call_blocking(func: Callable, *args: Any, semaphore: asyncio.Semaphore | None = None, **kwargs: Any) -> Any:
+    """Run a blocking function in a thread under an asyncio semaphore.
+
+    Param:
+        func: blocking callable to execute
+        *args: positional arguments forwarded to func
+        semaphore: optional semaphore to use (defaults to module-level _semaphore)
+        **kwargs: keyword arguments forwarded to func
+    Return:
+        return value from func
+    """
     sem = semaphore or _semaphore
     async with sem:
         return await asyncio.to_thread(func, *args, **kwargs)
 
 
 def with_rate_limit(semaphore: asyncio.Semaphore | None = None) -> Callable:
+    """Build a decorator that runs an async function under a semaphore with retry.
+
+    Param:
+        semaphore: optional semaphore to use (defaults to module-level _semaphore)
+    Return:
+        a decorator that wraps the function with semaphore control and tenacity retry
+    """
     sem = semaphore or _semaphore
 
     def decorator(func: Callable) -> Callable:

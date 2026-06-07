@@ -22,6 +22,13 @@ _EMPTY_STOCK_CONCEPT = StockConceptInfo(
 
 
 def _format_listing_date(value) -> str | None:
+    """将 YYYYMMDD 或其他格式的上市日期统一格式化为 YYYY-MM-DD。
+
+    Param:
+        value: 原始上市日期值
+    Return:
+        规范化日期字符串，空值返回 None
+    """
     if value is None or pd.isna(value):
         return None
     text = str(value).strip()
@@ -31,6 +38,13 @@ def _format_listing_date(value) -> str | None:
 
 
 async def _fetch_exchange_basic_row(code: str) -> dict | None:
+    """根据股票代码所属交易所抓取上市信息行。
+
+    Param:
+        code: 股票代码
+    Return:
+        包含 listing_date/industry/shares 的字典，找不到时返回 None
+    """
     if code.startswith("6"):
         df = await call_blocking(_akshare_provider.fetch_stock_names_sh)
         row = df[df["证券代码"] == code]
@@ -71,12 +85,26 @@ async def _fetch_exchange_basic_row(code: str) -> dict | None:
 
 
 def _extract_basic_info_dict(df: pd.DataFrame) -> dict:
+    """将基本信息 DataFrame 转换为 item→value 字典。
+
+    Param:
+        df: 包含 item/value 两列的 DataFrame
+    Return:
+        item 到 value 的映射字典，空时返回空字典
+    """
     if df.empty:
         return {}
     return dict(zip(df["item"], df["value"]))
 
 
 async def _load_basic_info_spot_df() -> pd.DataFrame | None:
+    """加载市场快照 DataFrame，按缓存/本地/远程顺序回退。
+
+    Param:
+        无
+    Return:
+        市场快照 DataFrame，全部失败时返回 None
+    """
     spot_df = cache.get("stock_spot_all")
     if spot_df is not None:
         return spot_df
@@ -92,6 +120,14 @@ async def _load_basic_info_spot_df() -> pd.DataFrame | None:
 
 
 def _find_spot_row(spot_df: pd.DataFrame | None, code: str):
+    """在快照 DataFrame 中查找指定代码对应的行。
+
+    Param:
+        spot_df: 全市场快照 DataFrame
+        code: 股票代码
+    Return:
+        匹配的 Series，未找到时返回 None
+    """
     if spot_df is None:
         return None
     matched = spot_df[spot_df["代码"] == code]
@@ -101,6 +137,13 @@ def _find_spot_row(spot_df: pd.DataFrame | None, code: str):
 
 
 async def _safe_fetch_exchange_basic_row(code: str) -> dict:
+    """安全调用交易所基本信息获取，异常时返回空字典。
+
+    Param:
+        code: 股票代码
+    Return:
+        交易所基本信息字典，异常时返回空字典
+    """
     try:
         return await _fetch_exchange_basic_row(code) or {}
     except Exception:
@@ -108,6 +151,16 @@ async def _safe_fetch_exchange_basic_row(code: str) -> dict:
 
 
 def _pick_basic_name(info_dict: dict, spot_row, name_map: dict[str, str], code: str) -> str:
+    """按优先级从多数据源中选出股票简称。
+
+    Param:
+        info_dict: 东方财富基本信息字典
+        spot_row: 全市场快照对应行
+        name_map: 股票代码到名称的映射
+        code: 股票代码
+    Return:
+        股票简称字符串
+    """
     return str(
         info_dict.get("股票简称")
         or (spot_row.get("名称") if spot_row is not None else "")
@@ -116,6 +169,14 @@ def _pick_basic_name(info_dict: dict, spot_row, name_map: dict[str, str], code: 
 
 
 def _estimate_shares_from_spot(spot_row, market_cap_field: str) -> float | None:
+    """根据市值和最新价估算股本。
+
+    Param:
+        spot_row: 全市场快照对应行
+        market_cap_field: 市值字段名（总市值或流通市值）
+    Return:
+        估算的股本数量，数据缺失时返回 None
+    """
     if spot_row is None:
         return None
     market_cap = safe_float(spot_row.get(market_cap_field))
@@ -126,6 +187,19 @@ def _estimate_shares_from_spot(spot_row, market_cap_field: str) -> float | None:
 
 
 def _build_basic_info(sym, info_dict: dict, spot_row, exchange_basic_row: dict, name_map: dict[str, str], stock_concept: StockConceptInfo, tencent_basic_data: dict) -> StockBasicInfo:
+    """合并多数据源字段构造 StockBasicInfo 模型。
+
+    Param:
+        sym: 归一化后的代码对象
+        info_dict: 东方财富基本信息字典
+        spot_row: 全市场快照对应行
+        exchange_basic_row: 交易所补充信息字典
+        name_map: 股票代码到名称的映射
+        stock_concept: 概念/行业信息对象
+        tencent_basic_data: 腾讯实时报价字典
+    Return:
+        StockBasicInfo 模型对象
+    """
     return StockBasicInfo(
         code=sym.raw,
         name=tencent_basic_data.get("name") or _pick_basic_name(info_dict, spot_row, name_map, sym.raw),
@@ -146,6 +220,13 @@ def _build_basic_info(sym, info_dict: dict, spot_row, exchange_basic_row: dict, 
     )
 
 async def get_basic_info(code: str) -> StockBasicInfo:
+    """获取股票基本信息，融合东财、交易所、腾讯等多数据源。
+
+    Param:
+        code: 股票代码
+    Return:
+        StockBasicInfo 模型对象，包含估值、股本、行业等字段
+    """
     sym = normalize_code(code)
     cache_key = dated_cache_key("stock_basic_info", sym.raw)
     cached = cache.get(cache_key)

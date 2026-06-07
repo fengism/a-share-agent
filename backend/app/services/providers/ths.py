@@ -1,4 +1,5 @@
 import requests
+import json
 import pandas as pd
 from bs4 import BeautifulSoup
 
@@ -10,15 +11,18 @@ from app.utils.data_clean import safe_float
 
 
 class ThsDataProvider(BaseDataProvider):
+    """Purpose: 封装同花顺 basic.10jqka、dq.10jqka、hexin 等多个域名接口，提供机构预期、热点、资金流向、沪深股通等数据。"""
     def __init__(self):
+        """初始化 ThsDataProvider，固定 name 与 source_label。"""
         super().__init__(name="ths", source_label="同花顺")
 
     def fetch_stock_forecast_reports(self, code: str) -> pd.DataFrame:
-        """
-        同花顺机构一致预期EPS/净利润。
-        直连 basic.10jqka.com.cn，解析HTML表格。
-        返回 DataFrame: 指标, 年度, 预测机构数, 最小值, 均值, 最大值, 行业平均数, 单位
-        "均值" = 机构一致预期值
+        """同花顺机构一致预期 EPS/净利润。
+
+        Param:
+            code: 6 位股票代码
+        Return:
+            包含指标、年度、预测机构数、最小值、均值、最大值、行业平均数、单位等列的 DataFrame
         """
         url = f"https://basic.10jqka.com.cn/new/{code}/worth.html"
         headers = {
@@ -78,10 +82,10 @@ class ThsDataProvider(BaseDataProvider):
         return df
 
     def fetch_hot_stock_rank(self) -> list[dict]:
-        """
-        同花顺热点列表，包含个股和板块两部分。
-        https://dq.10jqka.com.cn/fuyao/hot_list_data/out/hot_list/v1/stock?stock_type=a&type=hour&list_type=normal
-      
+        """同花顺热点列表，包含个股和板块两部分（小时级）。
+
+        Return:
+            包含 rank、code、name、change_pct、hot_value、concept_tag、pop_tag 的字典列表
         """
 
         url = "https://dq.10jqka.com.cn/fuyao/hot_list_data/out/hot_list/v1/stock"
@@ -116,6 +120,13 @@ class ThsDataProvider(BaseDataProvider):
         return result
 
     def fetch_hot_plate_rank(self, plate_type: str) -> list[dict]:
+        """同花顺热点板块排行（按指定板块类型）。
+
+        Param:
+            plate_type: 板块类型
+        Return:
+            包含 rank、code、name、change_pct、hot_value、hot_tag、tag 的字典列表
+        """
         url = f"https://dq.10jqka.com.cn/fuyao/hot_list_data/out/hot_list/v1/plate?type={plate_type}"
         r = requests.get(url, headers=THS_HEADERS, timeout=10)
         plate_list = r.json()["data"]["plate_list"]
@@ -135,12 +146,29 @@ class ThsDataProvider(BaseDataProvider):
         return result
 
     def fetch_market_volume_day(self) -> dict:
+        """获取市场日内成交额（按日维度）。
+
+        Return:
+            包含 date、amount、amount_average_60_day、amount_before_one_day 的字典
+        """
         return self._fetch_market_volume_chart("turnover_day")
 
     def fetch_market_volume_minute(self) -> dict:
+        """获取市场日内成交额（按分钟维度）。
+
+        Return:
+            包含 amount 等字段的字典
+        """
         return self._fetch_market_volume_chart("turnover_minute")
 
     def _fetch_market_volume_chart(self, chart_key: str) -> dict:
+        """拉取同花顺 chart 接口数据并提取指定键的成交额信息。
+
+        Param:
+            chart_key: turnover_day/turnover_minute
+        Return:
+            提取后的成交额字典
+        """
         req_url = "https://dq.10jqka.com.cn/fuyao/market_analysis_api/chart/v1/get_chart_data"
         response = requests.get(
             req_url,
@@ -167,6 +195,11 @@ class ThsDataProvider(BaseDataProvider):
         return amount_data
 
     def fetch_market_volume(self) -> MarketVolume:
+        """汇总分钟级与日级成交额数据，构造 MarketVolume 对象。
+
+        Return:
+            MarketVolume 模型实例
+        """
         day_data = self.fetch_market_volume_day()
         minute_data = self.fetch_market_volume_minute()
         minute_data.update(day_data)
@@ -174,10 +207,12 @@ class ThsDataProvider(BaseDataProvider):
         return MarketVolume(**merged_data)
 
     def fetch_hot_stock_reasons(self, date: str = None) -> pd.DataFrame:
-        """
-        同花顺当日强势股归因。
-        date: 'YYYY-MM-DD' 格式，None=今天
-        返回 DataFrame，含每只股票的题材标签 (reason)。
+        """同花顺当日强势股归因（含题材标签）。
+
+        Param:
+            date: 'YYYY-MM-DD' 格式，None=今天
+        Return:
+            含每只股票的题材归因等中文列名的 DataFrame
         """
         from datetime import date as _date
         if date is None:
@@ -215,11 +250,15 @@ class ThsDataProvider(BaseDataProvider):
     
 
     def fetch_hsgt_realtime(self) -> pd.DataFrame:
+        """沪深股通当日实时分钟流向（含集合竞价 09:10–15:00，262 个时间点）。
+
+        Return:
+            包含 time、hgt_yi(沪股通累计净买入)、sgt_yi(深股通累计净买入) 的 DataFrame（单位：亿元）
         """
-        沪深股通当日实时分钟流向（含集合竞价 09:10–15:00，262 个时间点）。
-        返回字段: time, hgt(沪股通累计净买入), sgt(深股通累计净买入)
-        单位: 亿元
-        """
+        trade_date = self.get_trade_date()
+        if not trade_date:
+            trade_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+
         url = "https://data.hexin.cn/market/hsgtApi/method/dayChart/"
         headers = {
             "User-Agent": (
@@ -236,12 +275,46 @@ class ThsDataProvider(BaseDataProvider):
         sgt = d.get("sgt", [])
 
         n = len(times)
+        full_times = [f"{trade_date} {t}" for t in times]
         return pd.DataFrame({
-            "time": times,
+            "time": full_times,
             "hgt_yi": hgt[:n] + [None] * (n - len(hgt)),
             "sgt_yi": sgt[:n] + [None] * (n - len(sgt)),
         })
+    
+    def get_trade_date(self) -> str:
+        """获取当前交易日期，格式 YYYY-MM-DD。
 
+        Return:
+            当前交易日期字符串
+        """
+        reqUrl = "https://quota-h.10jqka.com.cn/fuyao/common_hq_aggr/quote/v1/trade_time"
+
+        headersList = {
+            "Accept": "*/*",
+            "User-Agent": "Thunder Client (https://www.thunderclient.com)",
+            "Content-Type": "application/json" 
+        }
+
+        payload = json.dumps({
+            "code_list": [
+                {
+                "codes": [
+                    "1A0001"
+                ],
+                "market": "16"
+                }
+            ],
+            "trade_date": 0,
+            "gpid": 2
+        })
+
+        response = requests.request("GET", reqUrl, data=payload,  headers=headersList)
+        data = response.json()
+        time_info = data.get("data", {}).get("time_info",[])
+        trade_date = time_info[0].get("trade_date", "")
+        return trade_date
+        
 
 ths_provider = ThsDataProvider()
 

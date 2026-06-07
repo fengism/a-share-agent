@@ -2,17 +2,20 @@ from pydantic import BaseModel
 
 
 class StockConcept(BaseModel):
+    """Purpose: 股票关联的行业/概念（带编码和名称的最小单元）。"""
     code: str
     name: str
 
 
 class StockConceptInfo(BaseModel):
+    """Purpose: 股票的行业/概念信息集合，包含一级和二级行业以及所有关联概念。"""
     concepts: list[StockConcept]
     first_concept: StockConcept | None = None
     second_concept: StockConcept | None = None
 
 
 class StockSearchItem(BaseModel):
+    """Purpose: 股票搜索结果中的单条记录。"""
     code: str
     name: str
     price: float | None = None
@@ -20,6 +23,7 @@ class StockSearchItem(BaseModel):
 
 
 class StockBasicInfo(BaseModel):
+    """Purpose: 股票的基础信息，包括上市信息、股本、估值指标、行业分类和当前价格。"""
     code: str
     name: str
     listing_date: str | None = None  # 上市日期
@@ -35,9 +39,10 @@ class StockBasicInfo(BaseModel):
     second_industry: StockConcept | None = None  # 第二级行业分类
     current_price: float | None = None  # 当前价格
     concepts: list[StockConcept] | None = None  # 概念
-    
+
 
 class KlineItem(BaseModel):
+    """Purpose: 单根 K 线（蜡烛图）的行情数据。"""
     code: str = ""
     date: str
     open: float
@@ -53,6 +58,7 @@ class KlineItem(BaseModel):
 
 
 class KlineData(BaseModel):
+    """Purpose: 股票的 K 线数据集，包含股票代码、周期、复权方式和 K 线列表。"""
     code: str
     period: str
     adjust: str
@@ -60,6 +66,7 @@ class KlineData(BaseModel):
 
 
 class IntradayItem(BaseModel):
+    """Purpose: 单条分时行情数据点。"""
     time: str
     price: float
     avg_price: float | None = None
@@ -69,18 +76,21 @@ class IntradayItem(BaseModel):
 
 
 class IntradayData(BaseModel):
+    """Purpose: 股票分时行情数据集，包含前收价和分时点列表。"""
     code: str
     prev_close: float | None = None
     items: list[IntradayItem]
 
 
 class FinancialMetrics(BaseModel):
+    """Purpose: 股票财务指标集合，以字典形式存储各类指标值。"""
     code: str
     latest_report_date: str | None = None
     metrics: dict[str, float | None]
 
 
 class ValuationPeer(BaseModel):
+    """Purpose: 估值对比中的同业公司基本信息及估值倍数。"""
     name: str
     code: str
     pe_ttm: float | None = None
@@ -89,6 +99,7 @@ class ValuationPeer(BaseModel):
 
 
 class ValuationMultiples(BaseModel):
+    """Purpose: 股票当前的估值倍数（PE/PB/PS/PEG）。"""
     pe_ttm: float | None = None
     pb: float | None = None
     ps_ttm: float | None = None
@@ -96,12 +107,14 @@ class ValuationMultiples(BaseModel):
 
 
 class ValuationPercentiles(BaseModel):
+    """Purpose: 股票估值倍数在近三年的百分位排名。"""
     pe_3y: float | None = None
     pb_3y: float | None = None
     ps_3y: float | None = None
 
 
 class ValuationFundamentals(BaseModel):
+    """Purpose: 估值分析所引用的基本面财务数据。"""
     revenue: float | None = None
     revenue_yoy: float | None = None
     net_profit: float | None = None
@@ -113,12 +126,14 @@ class ValuationFundamentals(BaseModel):
 
 
 class ValuationProfile(BaseModel):
+    """Purpose: 估值画像（分类、标签及适用估值方法的理由）。"""
     category: str
     label: str
     rationale: list[str] = []
 
 
 class ValuationMethodResult(BaseModel):
+    """Purpose: 单种估值方法（相对估值/绝对估值等）的结果。"""
     method: str
     available: bool
     target_multiple: float | None = None
@@ -135,6 +150,7 @@ class ValuationMethodResult(BaseModel):
 
 
 class DCFValuationResult(BaseModel):
+    """Purpose: DCF（现金流折现）估值方法的结果。"""
     method: str = "DCF"
     available: bool
     base_cashflow: float | None = None
@@ -154,6 +170,7 @@ class DCFValuationResult(BaseModel):
 
 
 class InstitutionForecast(BaseModel):
+    """Purpose: 机构对某项财务指标的预测统计（最小值/均值/最大值及机构数）。"""
     metric: str
     year: str
     institution_count: float | None = None
@@ -165,6 +182,7 @@ class InstitutionForecast(BaseModel):
 
 
 class ValuationPeerSummary(BaseModel):
+    """Purpose: 同业估值汇总，包括中位数、同业数量和对等公司列表。"""
     pe_median: float | None = None
     pb_median: float | None = None
     ps_median: float | None = None
@@ -173,6 +191,7 @@ class ValuationPeerSummary(BaseModel):
 
 
 class ValuationDetail(BaseModel):
+    """Purpose: 估值分析详情，整合估值倍数、百分位、基本面、同业、多种估值方法结果及机构预测。"""
     code: str
     report_date: str | None = None
     current_price: float | None = None

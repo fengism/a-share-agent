@@ -6,6 +6,7 @@ from app.services.stock import financials
 
 @pytest.mark.asyncio
 async def test_get_financial_metrics_uses_existing_stock_financials_provider(monkeypatch):
+    """get_financial_metrics calls the stock financials provider for balance/profit/cashflow."""
     calls = []
 
     async def fake_call_blocking(func, *args, **kwargs):

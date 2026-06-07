@@ -8,6 +8,7 @@ from app.services.stock import intraday
 
 @pytest.mark.asyncio
 async def test_get_intraday_dedupes_concurrent_same_key(monkeypatch):
+    """get_intraday coalesces concurrent requests for the same symbol into one loader call."""
     calls = 0
 
     async def fake_load(sym, date):
@@ -35,6 +36,7 @@ async def test_get_intraday_dedupes_concurrent_same_key(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_intraday_uses_cache_without_loader(monkeypatch):
+    """get_intraday returns the cached payload without invoking the loader."""
     cached = IntradayData(code="600519", prev_close=None, items=[])
 
     async def fake_load(*args, **kwargs):
@@ -52,6 +54,7 @@ async def test_get_intraday_uses_cache_without_loader(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_intraday_clears_inflight_after_failure(monkeypatch):
+    """get_intraday clears inflight state and retries after a loader failure."""
     calls = 0
 
     async def fake_load(sym, date):

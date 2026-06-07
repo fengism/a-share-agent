@@ -6,12 +6,18 @@ from app.routers import screener
 
 
 def build_client() -> TestClient:
+    """Create a TestClient with the screener router mounted.
+
+    Return:
+        a TestClient instance bound to a fresh FastAPI app with the screener routes.
+    """
     app = FastAPI()
     app.include_router(screener.router, prefix="/api/screener")
     return TestClient(app)
 
 
 def test_screen_stocks_returns_400_for_value_error(monkeypatch):
+    """POST /api/screener/screen converts ValueError to 400."""
     async def fake_screen_stocks(filters):
         raise ValueError("invalid filter")
 
@@ -24,6 +30,7 @@ def test_screen_stocks_returns_400_for_value_error(monkeypatch):
 
 
 def test_get_industries_returns_500_for_unexpected_error(monkeypatch):
+    """GET /api/screener/industries converts unexpected errors to 500."""
     async def fake_get_industry_list():
         raise RuntimeError("provider failed")
 
@@ -36,6 +43,7 @@ def test_get_industries_returns_500_for_unexpected_error(monkeypatch):
 
 
 def test_compute_percentiles_preserves_explicit_http_exception():
+    """POST /api/screener/percentile returns 400 for too many codes."""
     response = build_client().post(
         "/api/screener/percentile",
         json={"codes": [f"6005{i:02d}" for i in range(51)]},
@@ -46,6 +54,7 @@ def test_compute_percentiles_preserves_explicit_http_exception():
 
 
 def test_compute_percentiles_preserves_service_http_exception(monkeypatch):
+    """POST /api/screener/percentile preserves HTTPException raised by service."""
     async def fake_compute_percentiles(*, codes, indicator, period):
         raise HTTPException(status_code=409, detail="already running")
 
@@ -58,6 +67,7 @@ def test_compute_percentiles_preserves_service_http_exception(monkeypatch):
 
 
 def test_screen_stocks_success_path(monkeypatch):
+    """POST /api/screener/screen returns the service result on success."""
     async def fake_screen_stocks(filters):
         return ScreenerResult(items=[], total=0, page=filters.page, page_size=filters.page_size)
 

@@ -1,4 +1,4 @@
-import type { AnalysisResult } from "../types/stock";
+import type { AnalysisResult, IndustryChainResult } from "../types/stock";
 
 export interface AnalysisStage {
   stage: number;
@@ -78,6 +78,64 @@ export function streamAnalysis(code: string, onProgress: ProgressHandler): {
     console.log(`[SSE] 主动取消`);
     eventSource.close();
   };
+
+  return { promise, cancel };
+}
+
+// ── 产业链分析 SSE ──
+
+export interface IndustryChainProgress {
+  type: "stage_started" | "stage_completed" | "complete" | "error";
+  stage?: string;
+  message?: string;
+  result?: IndustryChainResult | null;
+}
+
+export type IndustryChainProgressHandler = (event: IndustryChainProgress) => void;
+
+export function streamIndustryChain(name: string, onProgress: IndustryChainProgressHandler): {
+  promise: Promise<IndustryChainResult>;
+  cancel: () => void;
+} {
+  const url = `/api/industry-chain/${encodeURIComponent(name)}/stream`;
+  const eventSource = new EventSource(url);
+
+  let resolveResult: (result: IndustryChainResult) => void;
+  let rejectResult: (error: Error) => void;
+
+  const promise = new Promise<IndustryChainResult>((resolve, reject) => {
+    resolveResult = resolve;
+    rejectResult = reject;
+  });
+
+  const eventTypes = ["stage_started", "stage_completed", "complete", "error"] as const;
+
+  for (const eventType of eventTypes) {
+    eventSource.addEventListener(eventType, (e: MessageEvent) => {
+      let data: IndustryChainProgress;
+      try {
+        data = JSON.parse(e.data);
+      } catch {
+        return;
+      }
+      onProgress(data);
+
+      if (data.type === "complete" && data.result) {
+        eventSource.close();
+        resolveResult(data.result);
+      } else if (data.type === "error") {
+        eventSource.close();
+        rejectResult(new Error(data.message || "分析失败"));
+      }
+    });
+  }
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    rejectResult(new Error("连接断开，请重试"));
+  };
+
+  const cancel = () => eventSource.close();
 
   return { promise, cancel };
 }

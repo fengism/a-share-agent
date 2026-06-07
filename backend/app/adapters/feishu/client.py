@@ -22,10 +22,17 @@ _token_expires_at: float = 0.0
 
 
 class FeishuConfigError(RuntimeError):
-    pass
+    """Purpose: 飞书推送相关配置缺失或非法时抛出的异常。"""
 
 
 def _validate_settings():
+    """校验飞书相关配置项是否启用并已填写。
+
+    Param:
+        无
+    Return:
+        校验通过的 Settings 实例
+    """
     settings = get_settings()
     if not settings.feishu_enabled:
         raise FeishuConfigError("FEISHU_ENABLED must be true to push to Feishu")
@@ -35,6 +42,13 @@ def _validate_settings():
 
 
 def get_tenant_token() -> str:
+    """获取飞书 tenant_access_token，自动缓存并在过期前刷新。
+
+    Param:
+        无
+    Return:
+        飞书 tenant_access_token 字符串
+    """
     global _cached_token, _token_expires_at
     if _cached_token and time.time() < _token_expires_at:
         return _cached_token
@@ -57,6 +71,13 @@ def get_tenant_token() -> str:
 
 
 def _auth_headers() -> dict:
+    """构造飞书 API 请求所需的认证头。
+
+    Param:
+        无
+    Return:
+        包含 Authorization 和 Content-Type 的请求头 dict
+    """
     return {"Authorization": f"Bearer {get_tenant_token()}", "Content-Type": "application/json"}
 
 
@@ -67,6 +88,17 @@ def create_doc(
     wiki_space_id: str = "",
     wiki_parent_node_token: str = "",
 ) -> dict:
+    """在飞书云空间或知识库中创建文档并写入内容。
+
+    Param:
+        title: 文档标题
+        blocks: 飞书文档块 dict 列表
+        folder_token: 云空间目录 token，为空时使用配置默认值
+        wiki_space_id: 知识库空间 ID，为空时使用配置默认值；非空时优先在知识库中创建
+        wiki_parent_node_token: 知识库父节点 token
+    Return:
+        包含 url 和 node_token 的 dict
+    """
     settings = _validate_settings()
     wiki_space_id = wiki_space_id.strip() or settings.feishu_wiki_space_id.strip()
     folder_token = folder_token.strip() or settings.feishu_folder_token.strip()
@@ -79,12 +111,31 @@ def create_doc(
 
 
 def _create_drive_doc(title: str, blocks: list[dict], folder_token: str = "") -> dict:
+    """在飞书云空间目录下创建文档并写入内容。
+
+    Param:
+        title: 文档标题
+        blocks: 飞书文档块 dict 列表
+        folder_token: 云空间目录 token
+    Return:
+        包含 url 和 node_token 的 dict
+    """
     doc_id = _create_docx(title, folder_token=folder_token)
     _write_blocks(doc_id, blocks)
     return {"url": f"https://feishu.cn/docx/{doc_id}", "node_token": ""}
 
 
 def _create_wiki_doc(title: str, blocks: list[dict], wiki_space_id: str, wiki_parent_node_token: str = "") -> dict:
+    """在飞书知识库中创建节点并写入文档内容。
+
+    Param:
+        title: 文档标题
+        blocks: 飞书文档块 dict 列表
+        wiki_space_id: 知识库空间 ID
+        wiki_parent_node_token: 父节点 token
+    Return:
+        包含 url 和 node_token 的 dict
+    """
     source_doc_id = _create_docx(title)
     node_token, wiki_doc_id = create_wiki_node(
         wiki_space_id,
@@ -101,6 +152,14 @@ def _create_wiki_doc(title: str, blocks: list[dict], wiki_space_id: str, wiki_pa
 
 
 def _create_docx(title: str, folder_token: str = "") -> str:
+    """调用飞书 Docx API 创建一个空文档。
+
+    Param:
+        title: 文档标题
+        folder_token: 云空间目录 token，可选
+    Return:
+        新创建文档的 document_id
+    """
     body: dict = {"title": title}
     if folder_token:
         body["folder_token"] = folder_token
@@ -111,11 +170,30 @@ def _create_docx(title: str, folder_token: str = "") -> str:
 
 
 def _post_json(url: str, body: dict, error_prefix: str, *, timeout: int = 10, params: dict | None = None) -> dict:
+    """发送带认证头的 POST JSON 请求并解析响应。
+
+    Param:
+        url: 请求 URL
+        body: 请求体 dict
+        error_prefix: 错误信息前缀
+        timeout: 超时秒数
+        params: 查询参数字典
+    Return:
+        解析后的响应体 dict
+    """
     response = requests.post(url, headers=_auth_headers(), params=params, json=body, timeout=timeout)
     return _parse_response(response, error_prefix)
 
 
 def _parse_response(response, error_prefix: str) -> dict:
+    """解析飞书 API 响应，校验 HTTP 状态码和业务 code。
+
+    Param:
+        response: requests.Response 对象
+        error_prefix: 错误信息前缀
+    Return:
+        解析后的响应体 dict
+    """
     if response.status_code >= 400:
         raise RuntimeError(f"{error_prefix}: {response.text[:300]}")
     data = response.json()
@@ -125,6 +203,14 @@ def _parse_response(response, error_prefix: str) -> dict:
 
 
 def _delete_drive_file(file_token: str, file_type: str = "docx") -> None:
+    """删除飞书云空间中的文件，失败时仅记录警告日志。
+
+    Param:
+        file_token: 文件 token
+        file_type: 文件类型，默认为 docx
+    Return:
+        无
+    """
     response = requests.delete(
         _DRIVE_FILE_URL.format(file_token=file_token),
         headers=_auth_headers(),
@@ -138,22 +224,35 @@ def _delete_drive_file(file_token: str, file_type: str = "docx") -> None:
 
 
 def _write_blocks(doc_id: str, blocks: list[dict]) -> None:
-    """通过 Docx block children API 写入文档内容"""
+    """通过 Docx block children API 写入文档内容，超过 50 个块时分批写入。
+
+    飞书 Docx 单次请求 children 字段上限为 50，业内接口验报错 code=99992402。
+    分批时按顺序 append，每批使用 index=-1（末尾追加）。
+
+    Param:
+        doc_id: 飞书文档 ID
+        blocks: 飞书文档块 dict 列表
+    Return:
+        无；任一批次失败时记录警告但继续后续批次
+    """
     if not blocks:
         logger.warning(f"飞书文档写入跳过: blocks为空, doc_id={doc_id}")
         return
+    chunk_size = 50
     children_url = f"{_DOC_URL}/{doc_id}/blocks/{doc_id}/children"
     logger.info(f"飞书文档写入: doc_id={doc_id}, blocks_count={len(blocks)}, first_block={blocks[0] if blocks else None}")
-    resp = requests.post(
-        children_url,
-        headers=_auth_headers(),
-        json={"children": blocks, "index": -1, "document_revision_id": -1},
-        timeout=20,
-    )
-    try:
-        _parse_response(resp, "飞书文档内容写入失败(文档已创建)")
-    except RuntimeError as exc:
-        logger.warning(str(exc))
+    for start in range(0, len(blocks), chunk_size):
+        chunk = blocks[start:start + chunk_size]
+        resp = requests.post(
+            children_url,
+            headers=_auth_headers(),
+            json={"children": chunk, "index": -1, "document_revision_id": -1},
+            timeout=20,
+        )
+        try:
+            _parse_response(resp, f"飞书文档内容写入失败(批次 {start // chunk_size + 1}, 文档已创建)")
+        except RuntimeError as exc:
+            logger.warning(str(exc))
 
 
 def create_wiki_node(
@@ -197,6 +296,14 @@ def grant_doc_edit_permission(doc_id: str, receiver: str, doc_type: str = "docx"
 
 
 def send_card(receiver: str, card: dict) -> None:
+    """向指定用户或群发送飞书交互式卡片消息。
+
+    Param:
+        receiver: 接收者 open_id 或 chat_id
+        card: 飞书交互式卡片 dict
+    Return:
+        无
+    """
     _validate_settings()
     receive_id_type = "chat_id" if receiver.startswith("oc_") else "open_id"
     _post_json(

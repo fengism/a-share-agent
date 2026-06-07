@@ -22,10 +22,26 @@ _MAX_HISTORY_MESSAGES = 20
 
 
 async def _execute_tool_calls_ordered(tool_calls: list[ToolCallInfo]):
+    """并行执行一组工具调用。
+
+    Param:
+        tool_calls: 工具调用信息列表
+    Return:
+        每个工具调用的结果列表，顺序与输入一致
+    """
     return await asyncio.gather(*(registry.execute(tc) for tc in tool_calls))
 
 
 def _build_create_kwargs(model: str, messages: list[dict], tool_choice: str) -> dict:
+    """构造调用 LLM chat.completions.create 所需的参数字典。
+
+    Param:
+        model: 模型名称
+        messages: 消息历史列表
+        tool_choice: 工具选择策略（none/auto/required）
+    Return:
+        包含 model、messages、tools、tool_choice、stream 的参数字典
+    """
     return {
         "model": model,
         "messages": messages,
@@ -36,6 +52,15 @@ def _build_create_kwargs(model: str, messages: list[dict], tool_choice: str) -> 
 
 
 def _build_assistant_tool_message(tool_calls: list[ToolCallInfo], content: str | None = None, reasoning_content: str = "") -> dict:
+    """构造包含工具调用的 assistant 消息字典。
+
+    Param:
+        tool_calls: 工具调用信息列表
+        content: 文本内容，可选
+        reasoning_content: 推理内容（如 DeepSeek thinking），可选
+    Return:
+        符合 OpenAI 格式的 assistant 消息字典
+    """
     message = {
         "role": "assistant",
         "content": content or None,
@@ -57,6 +82,13 @@ def _build_assistant_tool_message(tool_calls: list[ToolCallInfo], content: str |
 
 
 def _to_tool_call_infos(tool_calls_acc: dict[int, dict]) -> list[ToolCallInfo]:
+    """将流式累积的工具调用字典转换为 ToolCallInfo 列表。
+
+    Param:
+        tool_calls_acc: 按 index 索引累积的工具调用数据字典
+    Return:
+        按 index 排序后的 ToolCallInfo 列表
+    """
     return [
         ToolCallInfo(
             id=tc_data["id"],
@@ -74,6 +106,37 @@ async def run_chat_agent(
     message: str,
     history: list[ChatMessage] | None = None,
 ) -> AsyncGenerator[ChatStreamDelta, None]:
+    """聊天 Agent 入口：根据配置分派到多 Agent 编排器或传统单 Agent 循环。
+
+    Param:
+        message: 用户当前消息
+        history: 历史消息列表，可选
+    Return:
+        产生 ChatStreamDelta 事件的异步生成器
+    """
+    settings = get_settings()
+    if settings.multi_agent_enabled:
+        from app.services.chat.orchestrator import Orchestrator
+        orchestrator = Orchestrator()
+        async for delta in orchestrator.run(message, history):
+            yield delta
+    else:
+        async for delta in _run_legacy_agent(message, history):
+            yield delta
+
+
+async def _run_legacy_agent(
+    message: str,
+    history: list[ChatMessage] | None = None,
+) -> AsyncGenerator[ChatStreamDelta, None]:
+    """传统单 Agent 循环：多轮调用 LLM 并执行工具调用，流式返回增量结果。
+
+    Param:
+        message: 用户当前消息
+        history: 历史消息列表，可选
+    Return:
+        产生 ChatStreamDelta 事件的异步生成器，类型包括 text/reasoning/tool_call/tool_result/error/done
+    """
     settings = get_settings()
     provider = settings.llm_provider.lower()
     defaults = PROVIDER_DEFAULTS.get(provider, {})

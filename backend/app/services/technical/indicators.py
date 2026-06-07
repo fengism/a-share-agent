@@ -6,6 +6,14 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_ma(closes: list[float], period: int) -> list[float | None]:
+    """计算简单移动平均线序列。
+
+    Param:
+        closes: 收盘价序列
+        period: 均线周期
+    Return:
+        与输入等长的均线序列，未满周期位置为 None
+    """
     result: list[float | None] = []
     for i in range(len(closes)):
         if i < period - 1:
@@ -17,6 +25,14 @@ def calculate_ma(closes: list[float], period: int) -> list[float | None]:
 
 
 def calculate_ema(values: list[float], period: int) -> list[float | None]:
+    """计算指数移动平均线序列。
+
+    Param:
+        values: 输入数值序列
+        period: EMA 周期
+    Return:
+        与输入等长的 EMA 序列，未满周期位置为 None
+    """
     result: list[float | None] = []
     multiplier = 2 / (period + 1)
     for i in range(len(values)):
@@ -36,6 +52,16 @@ def calculate_ema(values: list[float], period: int) -> list[float | None]:
 def calculate_macd(
     closes: list[float], fast: int = 12, slow: int = 26, signal: int = 9
 ) -> tuple[list[float | None], list[float | None], list[float | None]]:
+    """计算 MACD 指标的 DIF/DEA/MACD 柱序列。
+
+    Param:
+        closes: 收盘价序列
+        fast: 快线 EMA 周期
+        slow: 慢线 EMA 周期
+        signal: 信号线 EMA 周期
+    Return:
+        (DIF 序列, DEA 序列, MACD 柱序列) 三元组
+    """
     ema_fast = calculate_ema(closes, fast)
     ema_slow = calculate_ema(closes, slow)
 
@@ -71,6 +97,14 @@ def calculate_macd(
 
 
 def calculate_rsi(closes: list[float], period: int = 14) -> list[float | None]:
+    """计算 RSI 相对强弱指标序列。
+
+    Param:
+        closes: 收盘价序列
+        period: RSI 周期，默认 14
+    Return:
+        与输入等长的 RSI 序列，未满周期位置为 None
+    """
     result: list[float | None] = []
     for i in range(len(closes)):
         if i < period:
@@ -97,6 +131,15 @@ def calculate_rsi(closes: list[float], period: int = 14) -> list[float | None]:
 
 
 def calculate_boll(closes: list[float], period: int = 20, std_dev: int = 2) -> tuple[list[float | None], list[float | None], list[float | None]]:
+    """计算布林带（上轨/中轨/下轨）序列。
+
+    Param:
+        closes: 收盘价序列
+        period: 移动平均周期，默认 20
+        std_dev: 标准差倍数，默认 2
+    Return:
+        (上轨, 中轨, 下轨) 三个等长序列
+    """
     upper: list[float | None] = []
     middle: list[float | None] = []
     lower: list[float | None] = []
@@ -119,6 +162,16 @@ def calculate_boll(closes: list[float], period: int = 20, std_dev: int = 2) -> t
 def calculate_kdj(
     highs: list[float], lows: list[float], closes: list[float], period: int = 9
 ) -> tuple[list[float | None], list[float | None], list[float | None]]:
+    """计算 KDJ 随机指标的 K/D/J 序列。
+
+    Param:
+        highs: 最高价序列
+        lows: 最低价序列
+        closes: 收盘价序列
+        period: RSV 计算周期，默认 9
+    Return:
+        (K 序列, D 序列, J 序列) 三元组
+    """
     k_values: list[float | None] = []
     d_values: list[float | None] = []
     j_values: list[float | None] = []
@@ -156,6 +209,13 @@ def calculate_kdj(
 
 
 def calculate_all(items: list[KlineItem]) -> dict:
+    """根据 K 线列表批量计算 MA/MACD/RSI/BOLL/KDJ 等指标。
+
+    Param:
+        items: KlineItem 列表
+    Return:
+        包含最新指标快照和完整序列的字典
+    """
     if not items:
         logger.warning("技术指标计算: K线数据为空")
         return _empty_result()
@@ -227,6 +287,13 @@ def calculate_all(items: list[KlineItem]) -> dict:
 
 
 def _empty_result() -> dict:
+    """构造空 K 线时返回的空指标结果字典。
+
+    Param:
+        无
+    Return:
+        所有字段均为 None 或空列表的指标字典
+    """
     return {
         "ma": {"ma5": None, "ma10": None, "ma20": None, "ma60": None},
         "macd": {"dif": None, "dea": None, "macd_hist": None},

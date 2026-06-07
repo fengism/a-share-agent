@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class SymbolFormats:
+    """Purpose: 封装股票代码的多种标准化格式，包括原始代码、交易所前缀和交易所缩写。"""
+
     raw: str  # "000001"
     prefixed_upper: str  # "SZ000001"
     prefixed_lower: str  # "sz000001"
@@ -13,6 +15,13 @@ class SymbolFormats:
 
 
 def classify_exchange(code: str) -> str:
+    """Classify the exchange of a 6-digit stock code based on its first digit.
+
+    Param:
+        code: 6-digit stock code string
+    Return:
+        exchange code: "SH" for 6/9 prefix, "SZ" for 0/3 prefix, "BJ" for 8 prefix
+    """
     code = code.strip()
     if not code:
         raise ValueError("股票代码为空")
@@ -27,6 +36,13 @@ def classify_exchange(code: str) -> str:
 
 
 def normalize_code(raw: str) -> SymbolFormats:
+    """Normalize a stock code into all standard formats.
+
+    Param:
+        raw: raw stock code, optionally with SH/SZ/BJ prefix
+    Return:
+        SymbolFormats with raw code, prefixed variants, and detected exchange
+    """
     raw = raw.strip()
     # 去掉可能的前缀
     for prefix in ("SH", "SZ", "BJ", "sh", "sz", "bj"):
@@ -49,6 +65,13 @@ def normalize_code(raw: str) -> SymbolFormats:
 
 
 def normalize_index_symbol(symbol: str) -> str:
+    """Add sh/sz prefix to a numeric index symbol based on the leading digit.
+
+    Param:
+        symbol: index symbol, optionally already prefixed with sh/sz
+    Return:
+        prefixed index symbol for Sina API
+    """
     if symbol.startswith(("sh", "sz")):
         return symbol
     if symbol.startswith("0"):
@@ -57,6 +80,13 @@ def normalize_index_symbol(symbol: str) -> str:
 
 
 def normalize_index_symbol_v2(symbol: str) -> str:
+    """Add sh/sz prefix based on whether the symbol starts with 6 (SH) or not (SZ).
+
+    Param:
+        symbol: index symbol, optionally already prefixed with sh/sz
+    Return:
+        prefixed index symbol for Sina API
+    """
     if symbol.startswith(("sh", "sz")):
         return symbol
     if symbol.startswith("6"):
@@ -65,16 +95,39 @@ def normalize_index_symbol_v2(symbol: str) -> str:
 
 
 def normalize_index_code(symbol: str) -> str:
+    """Strip sh/sz prefix from an index symbol, returning the bare numeric code.
+
+    Param:
+        symbol: index symbol, optionally prefixed with sh/sz
+    Return:
+        bare numeric index code without prefix
+    """
     if symbol.startswith(("sh", "sz")):
         return symbol[2:]
     return symbol
 
 
 def normalize_stock_name(name: str) -> str:
+    """Strip whitespace from a stock name string.
+
+    Param:
+        name: stock name string (may be None)
+    Return:
+        stripped stock name with spaces removed
+    """
     return str(name or "").strip().replace(" ", "")
 
 
 def contains_stock_reference(text: str, code: str, code_name: str) -> bool:
+    """Check whether a text contains a reference to a specific stock by code or name.
+
+    Param:
+        text: text to search within
+        code: stock code to look for
+        code_name: stock name to look for (may include ST/N prefixes)
+    Return:
+        True if the text contains the code or any name alias
+    """
     code_base = normalize_stock_name(code)
     code_name_aliases = {code_base}
     for prefix in ("*ST", "ST", "N", "C", "XD", "DR", "XR"):

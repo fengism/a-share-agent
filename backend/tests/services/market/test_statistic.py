@@ -5,6 +5,7 @@ from app.services.market import statistic
 
 @pytest.mark.asyncio
 async def test_get_market_statistics_uses_eastmoney_provider(monkeypatch):
+    """get_market_statistics assembles sector, distribution, and limit data from providers."""
     statistic.cache.delete(statistic.dated_cache_key("market_statistics", "2026-05-25"))
 
     monkeypatch.setattr(

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class IndexItem(BaseModel):
+    """Purpose: 单个市场指数的行情数据项。"""
     code: str
     name: str
     price: float | None = None
@@ -19,14 +20,14 @@ class IndexItem(BaseModel):
 
 
 class MarketIndices(BaseModel):
-    """市场概览数据"""
+    """Purpose: 市场概览数据，包含日期、各指数行情及数据来源和两市总成交额。"""
     date: str | None = None
     indices: list[IndexItem]
     source: str | None = None
     total_amount: float = 0.0           # 两市成交额（亿元）
-    
+
 class MarketStatistics(BaseModel):
-    """市场统计数据"""
+    """Purpose: 市场统计数据，包括板块涨跌榜、涨跌家数、涨停跌停列表和股票涨幅分布。"""
     date: str | None = None
     source: str | None = None
 
@@ -49,13 +50,18 @@ class MarketStatistics(BaseModel):
 
 
 class MarketVolume(BaseModel):
-    """市场成交额数据"""
+    """Purpose: 市场成交额数据，包含当日、前一日和60日均值。"""
     date: str | None = None
     amount: float | None = None
     amount_before_one_day: float | None = None
     amount_average_60_day: float | None = None
-    
+
     def to_str(self):
+        """Format market volume summary as human-readable string.
+
+        Return:
+            包含日期、当日成交额、前一日成交额和60日均值的格式化字符串。
+        """
         return f"大盘成交额 {self.date}: {self.amount} (前一日: {self.amount_before_one_day}, 60日平均: {self.amount_average_60_day})"
 
     

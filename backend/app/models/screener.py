@@ -4,6 +4,7 @@ from app.models.stock import StockConcept
 
 
 class ScreenerFilter(BaseModel):
+    """Purpose: 股票筛选接口的过滤条件参数。"""
     pe_min: float | None = None
     pe_max: float | None = None
     pb_min: float | None = None
@@ -24,6 +25,7 @@ class ScreenerFilter(BaseModel):
 
 
 class ScreenerItem(BaseModel):
+    """Purpose: 股票筛选结果中的单只股票信息。"""
     code: str
     name: str
     price: float | None = None
@@ -37,6 +39,7 @@ class ScreenerItem(BaseModel):
 
 
 class ScreenerResult(BaseModel):
+    """Purpose: 股票筛选的分页结果。"""
     items: list[ScreenerItem]
     total: int
     page: int
@@ -44,15 +47,18 @@ class ScreenerResult(BaseModel):
 
 
 class ValuationPercentileRequest(BaseModel):
+    """Purpose: 估值百分位查询接口的请求参数。"""
     codes: list[str]
     period: str = "近三年"
     indicator: str = "市盈率(TTM)"
 
 
 class ValuationPercentileItem(BaseModel):
+    """Purpose: 单只股票的估值百分位结果。"""
     code: str
     percentile: float | None = None
 
 
 class ValuationPercentileResult(BaseModel):
+    """Purpose: 估值百分位批量查询的返回结果。"""
     items: list[ValuationPercentileItem]

@@ -24,6 +24,11 @@ _active_analyses: dict[str, asyncio.Task] = {}
 
 @router.get("/history/all", response_model=list[AnalysisHistoryItem])
 async def get_all_analysis_history():
+    """获取所有股票的历史 AI 分析记录列表。
+
+    Return:
+        list[AnalysisHistoryItem]: 全部历史分析条目集合。
+    """
     return list_all_analyses()
 
 
@@ -32,6 +37,13 @@ async def get_all_analysis_history():
 
 @router.post("/{code}", response_model=AnalysisResult)
 async def trigger_analysis(code: str):
+    """触发指定股票的同步 AI 分析。
+
+    Param:
+        code: 股票代码（路径参数），6 位数字。
+    Return:
+        AnalysisResult: 完整的结构化分析结果，包含评级、信号与目标价等字段。
+    """
     logger.info(f"触发AI分析: code={code}")
     try:
         result = await run_analysis(code)
@@ -47,6 +59,13 @@ async def trigger_analysis(code: str):
 
 @router.get("/{code}/result")
 async def get_analysis_result(code: str):
+    """读取指定股票当天的最新分析结果，优先返回缓存。
+
+    Param:
+        code: 股票代码（路径参数），6 位数字。
+    Return:
+        dict | AnalysisResult: 缓存或落盘的最近一次分析结果；若不存在则抛出 404。
+    """
     today = datetime.now().strftime("%Y%m%d")
     cache_key = f"analysis:{code}:{today}"
     cached = cache.get(cache_key)
@@ -66,19 +85,42 @@ async def get_analysis_result(code: str):
 
 @router.get("/{code}/stream")
 async def stream_analysis(code: str):
-    """SSE 端点，流式推送分析进度事件"""
+    """SSE 端点，流式推送分析进度事件。
+
+    Param:
+        code: 股票代码（路径参数），6 位数字；同一代码并发请求会返回 409。
+    Return:
+        EventSourceResponse: SSE 流，依次发送 progress 事件并以哨兵结束。
+    """
 
     # 防止同一股票并发分析
     if code in _active_analyses and not _active_analyses[code].done():
         raise HTTPException(status_code=409, detail="该股票正在分析中，请稍后")
 
     async def event_generator():
+        """组合分析任务与事件队列，生成 SSE 事件迭代器。
+
+        Return:
+            AsyncIterator[dict]: 逐条 yield SSE 事件或 keepalive 注释。
+        """
         queue: asyncio.Queue[AnalysisProgress | None] = asyncio.Queue()
 
         async def progress_callback(event: AnalysisProgress):
+            """分析管线进度回调，将事件放入 SSE 队列。
+
+            Param:
+                event: 分析管线发出的单条进度事件。
+            Return:
+                None
+            """
             await queue.put(event)
 
         async def run_and_cleanup():
+            """运行分析管线并在结束时向队列写入终止哨兵。
+
+            Return:
+                None
+            """
             try:
                 await run_analysis(code, progress_callback=progress_callback)
             except Exception:
@@ -113,11 +155,26 @@ async def stream_analysis(code: str):
 
 @router.get("/{code}/history", response_model=list[AnalysisHistoryItem])
 async def get_analysis_history(code: str):
+    """读取指定股票的历史分析索引列表。
+
+    Param:
+        code: 股票代码（路径参数），6 位数字。
+    Return:
+        list[AnalysisHistoryItem]: 按日期排序的历史分析摘要条目。
+    """
     return list_analyses(code)
 
 
 @router.get("/{code}/history/{date}", response_model=AnalysisResult)
 async def get_analysis_by_date(code: str, date: str):
+    """读取指定股票在指定日期的分析结果，命中缓存优先。
+
+    Param:
+        code: 股票代码（路径参数），6 位数字。
+        date: 分析日期（路径参数），格式 YYYYMMDD。
+    Return:
+        AnalysisResult: 该日的完整分析结果；若不存在则返回 404。
+    """
     # Try cache first
     cache_key = f"analysis:{code}:{date}"
     cached = cache.get(cache_key)

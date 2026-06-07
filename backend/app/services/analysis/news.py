@@ -3,6 +3,7 @@ import logging
 
 from app.models.search_item import NewsSearchItem
 from app.services.providers.cls import cls_provider as _cls_provider
+from app.services.providers.akshare import akshare_provider as _akshare_provider
 from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
 from app.services.stock.name_map import get_stock_name_map
 from app.utils.cache import cache, dated_cache_key
@@ -17,6 +18,13 @@ _news_inflight_lock = asyncio.Lock()
 
 
 async def _load_stock_news(sym) -> list[NewsSearchItem]:
+    """Load and merge recent stock news from Eastmoney and CLS providers.
+
+    Param:
+        sym: normalized stock code formats (SymbolFormats)
+    Return:
+        list of up to 20 deduplicated, recent NewsSearchItem sorted by time descending
+    """
     result = []
     stock_name = ""
     try:
@@ -46,6 +54,14 @@ async def _load_stock_news(sym) -> list[NewsSearchItem]:
 
 
 async def _get_or_create_news_task(cache_key: str, sym):
+    """Get cached news value or create/return a single-flight task to load it.
+
+    Param:
+        cache_key: dated cache key for the news
+        sym: normalized stock code formats
+    Return:
+        tuple of (news loading task or None, cached value or None)
+    """
     async with _news_inflight_lock:
         cached = cache.get(cache_key)
         if cached is not None:
@@ -59,6 +75,13 @@ async def _get_or_create_news_task(cache_key: str, sym):
 
 
 async def get_stock_news(code: str) -> list[NewsSearchItem]:
+    """Get the recent news items for a stock, using cache and single-flight deduplication.
+
+    Param:
+        code: 6-digit stock code
+    Return:
+        list of up to 20 NewsSearchItem sorted by publish time descending
+    """
     sym = normalize_code(code)
     cache_key = dated_cache_key("news", sym.raw)
     cached = cache.get(cache_key)
@@ -83,6 +106,13 @@ async def get_stock_news(code: str) -> list[NewsSearchItem]:
 
 
 async def get_stock_news_categorized(code: str) -> dict:
+    """Get stock news split into Eastmoney and CLS categories with daily caching.
+
+    Param:
+        code: 6-digit stock code
+    Return:
+        dict with keys "code", "eastmoney_news", and "cls_news"
+    """
     sym = normalize_code(code)
     cache_key = dated_cache_key("news_categorized", sym.raw)
     cached = cache.get(cache_key)

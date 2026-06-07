@@ -22,6 +22,13 @@ _spot_snapshot_service = BaseFileSnapshotService[pd.DataFrame](
 
 
 def _normalize_market_cap_units(df: pd.DataFrame) -> pd.DataFrame:
+    """Scale up small market-cap values to the standard unit (yuan).
+
+    Param:
+        df: DataFrame containing a "总市值" column
+    Return:
+        DataFrame with normalized "总市值" (and "流通市值" if present) in yuan
+    """
     result = df.copy()
     if "总市值" not in result.columns:
         return result
@@ -34,6 +41,13 @@ def _normalize_market_cap_units(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_spot_snapshot_file() -> pd.DataFrame | None:
+    """Load the cached full-market spot snapshot from local JSON file.
+
+    Param:
+        None
+    Return:
+        DataFrame of spot rows, or None if file missing, malformed, or too small
+    """
     try:
         if not _SPOT_SNAPSHOT_FILE.exists():
             return None
@@ -54,6 +68,13 @@ def load_spot_snapshot_file() -> pd.DataFrame | None:
 
 
 def _save_spot_snapshot_file(df: pd.DataFrame) -> None:
+    """Persist the full-market spot snapshot to the local JSON file.
+
+    Param:
+        df: DataFrame of spot rows to save
+    Return:
+        None
+    """
     try:
         _SPOT_SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
         normalized_df = _normalize_market_cap_units(df)
@@ -68,27 +89,48 @@ def _save_spot_snapshot_file(df: pd.DataFrame) -> None:
         logger.warning(f"保存本地全市场快照失败: {e}")
 
 
-async def _fetch_spot_east_direct() -> pd.DataFrame | None:
+async def _fetch_spot_east() -> pd.DataFrame | None:
+    """Fetch spot snapshot via direct Eastmoney provider call.
+
+    Param:
+        None
+    Return:
+        DataFrame of spot rows, or None on failure
+    """
     try:
-        return await call_blocking(_eastmoney_provider.fetch_spot_snapshot_direct)
+        return await call_blocking(_eastmoney_provider.fetch_spot_snapshot)
     except Exception as e:
         logger.info(f"东方财富直连快照获取失败: {e}")
         return None
 
 
 async def _fetch_spot_sina_vip() -> pd.DataFrame | None:
+    """Fetch spot snapshot via Sina VIP provider call.
+
+    Param:
+        None
+    Return:
+        DataFrame of spot rows, or None on failure
+    """
     try:
-        return await call_blocking(_sina_provider.fetch_spot_snapshot_direct)
+        return await call_blocking(_sina_provider.fetch_spot_snapshot)
     except Exception as e:
         logger.info(f"新浪VIP快照获取失败: {e}")
         return None
 
 
 async def _refresh_spot_snapshot_file() -> None:
+    """Refresh the cached and persisted spot snapshot from the best available provider.
+
+    Param:
+        None
+    Return:
+        None
+    """
     try:
         df = await _fetch_spot_sina_vip()
         if df is None or df.empty:
-            df = await _fetch_spot_east_direct()
+            df = await _fetch_spot_east()
         if df is None or df.empty:
             try:
                 df = await call_blocking(_akshare_provider.fetch_stock_spot_snapshot)
@@ -103,6 +145,13 @@ async def _refresh_spot_snapshot_file() -> None:
 
 
 async def get_spot_snapshot() -> pd.DataFrame | None:
+    """Get the full-market spot snapshot, loading from cache, file, or live providers.
+
+    Param:
+        None
+    Return:
+        DataFrame of spot rows, or None if all sources fail
+    """
     df = _spot_snapshot_service.get_cached()
     if df is not None:
         return df
@@ -119,7 +168,7 @@ async def get_spot_snapshot() -> pd.DataFrame | None:
         _save_spot_snapshot_file(df)
         return df
 
-    df = await _fetch_spot_east_direct()
+    df = await _fetch_spot_east()
     if df is not None and not df.empty:
         _spot_snapshot_service.set_cached(df)
         _save_spot_snapshot_file(df)

@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 async def get_market_volume(start_date: str = "", end_date: str = "") -> list[dict]:
+    """获取上证指数成交量历史序列。
+
+    Param:
+        start_date: 起始日期，留空默认一年前
+        end_date: 结束日期，留空默认当天
+    Return:
+        包含 date/volume/amount 字段的字典列表
+    """
     if not end_date:
         end_date = cache_date()
     if not start_date:
@@ -48,7 +56,14 @@ async def get_market_volume(start_date: str = "", end_date: str = "") -> list[di
 
 
 async def get_market_volume_data() -> MarketVolume:
-    return _ths_provider.fetch_market_volume()
+    """获取同花顺市场成交额实时数据。
+
+    Param:
+        无
+    Return:
+        MarketVolume 模型对象
+    """
+    return await call_blocking(_ths_provider.fetch_market_volume)
 
 
 if __name__ == "__main__":

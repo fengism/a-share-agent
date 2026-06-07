@@ -8,6 +8,13 @@ from app.utils.data_clean import safe_float, safe_string
 
 
 def _build_industry_concept(name: str | None) -> StockConcept | None:
+    """根据行业名称构造 StockConcept 对象。
+
+    Param:
+        name: 行业名称
+    Return:
+        StockConcept 对象，名称为空时返回 None
+    """
     text = safe_string(name)
     if text is None:
         return None
@@ -15,6 +22,13 @@ def _build_industry_concept(name: str | None) -> StockConcept | None:
 
 
 async def screen_stocks(filters: ScreenerFilter) -> ScreenerResult:
+    """按筛选条件过滤股票全市场快照并返回分页结果。
+
+    Param:
+        filters: ScreenerFilter 过滤条件对象
+    Return:
+        ScreenerResult 包含分页后的股票条目与总数
+    """
     df = await get_spot_snapshot()
     if df is None:
         raise ValueError("无法获取市场数据")

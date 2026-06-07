@@ -41,6 +41,13 @@ sentiment_data = SimpleNamespace(
 )
 
 def _format_institution_forecasts(df) -> list[dict] | None:
+    """Format a raw institution-forecast DataFrame into prompt-ready dicts.
+
+    Param:
+        df: DataFrame with columns 指标, 年度, 预测机构数, 最小值, 均值, 最大值, 行业平均数, 单位
+    Return:
+        list of forecast dicts, or None if df is empty
+    """
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return None
     rows = []
@@ -61,6 +68,13 @@ def _format_institution_forecasts(df) -> list[dict] | None:
 
 
 def _format_institution_forecasts_from_detail(forecasts: list) -> list[dict] | None:
+    """Format a list of ForecastItem details into prompt-ready dicts.
+
+    Param:
+        forecasts: list of ForecastItem-like objects with metric, year, etc.
+    Return:
+        list of forecast dicts, or None if the input list is empty
+    """
     if not forecasts:
         return None
     return [
@@ -79,6 +93,13 @@ def _format_institution_forecasts_from_detail(forecasts: list) -> list[dict] | N
 
 
 def _extract_technical_series(indicators: dict) -> dict:
+    """Extract the last 30 days of MACD, RSI, KDJ, and MA series for the LLM prompt.
+
+    Param:
+        indicators: full technical indicators dict containing a "series" block
+    Return:
+        dict of named trend series, omitting any series that has no data
+    """
     series = indicators.get("series", {})
     dates = series.get("dates", [])
     n = min(30, len(dates))
@@ -123,11 +144,27 @@ STAGE_NAMES = {
 
 
 async def _emit(cb: ProgressCallback | None, event: AnalysisProgress):
+    """Invoke the progress callback with an event if one was provided.
+
+    Param:
+        cb: optional progress callback coroutine
+        event: AnalysisProgress event to deliver
+    Return:
+        None
+    """
     if cb is not None:
         await cb(event)
 
 
 async def run_analysis(code: str, progress_callback: ProgressCallback | None = None) -> AnalysisResult:
+    """Run the full stock analysis pipeline (data fetch, indicators, LLM, persist).
+
+    Param:
+        code: 6-digit stock code to analyze
+        progress_callback: optional async callback receiving AnalysisProgress events
+    Return:
+        the final validated AnalysisResult for the stock
+    """
     # 检查缓存
     today = datetime.now().strftime("%Y%m%d")
     cache_key = f"analysis:{code}:{today}"

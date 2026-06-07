@@ -6,11 +6,17 @@ from app.services.market import indices
 
 
 def clear_indices_cache() -> None:
+    """Remove the dated market_indices entry from the indices module cache.
+
+    Return:
+        None
+    """
     indices.cache.delete(indices.dated_cache_key("market_indices"))
 
 
 @pytest.mark.asyncio
 async def test_get_indices_uses_akshare_em_first(monkeypatch):
+    """get_indices returns akshare EastMoney data when available."""
     clear_indices_cache()
 
     monkeypatch.setattr(
@@ -43,12 +49,13 @@ async def test_get_indices_uses_akshare_em_first(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_indices_falls_back_to_east_direct(monkeypatch):
+    """get_indices falls back to the EastMoney direct provider when akshare fails."""
     clear_indices_cache()
 
     monkeypatch.setattr(indices._akshare_provider, "fetch_market_indices", lambda: (_ for _ in ()).throw(RuntimeError("em down")))
     monkeypatch.setattr(
         indices._eastmoney_provider,
-        "fetch_market_indices_direct",
+        "fetch_market_indices",
         lambda: pd.DataFrame([
             {
                 "代码": "399001",
@@ -76,17 +83,18 @@ async def test_get_indices_falls_back_to_east_direct(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_indices_falls_back_to_sina_direct(monkeypatch):
+    """get_indices falls back to the Sina direct provider when earlier sources fail."""
     clear_indices_cache()
 
     monkeypatch.setattr(indices._akshare_provider, "fetch_market_indices", lambda: (_ for _ in ()).throw(RuntimeError("em down")))
-    monkeypatch.setattr(indices._eastmoney_provider, "fetch_market_indices_direct", lambda: (_ for _ in ()).throw(RuntimeError("east down")))
+    monkeypatch.setattr(indices._eastmoney_provider, "fetch_market_indices", lambda: (_ for _ in ()).throw(RuntimeError("east down")))
     monkeypatch.setattr(indices._akshare_provider, "fetch_market_indices_sina", lambda: (_ for _ in ()).throw(RuntimeError("sina ak down")))
     monkeypatch.setattr(
         indices,
         "build_indices_from_sina",
         lambda df: MarketIndices(indices=[indices.IndexItem(code="000001", name="上证指数", amount=400)]),
     )
-    monkeypatch.setattr(indices._sina_provider, "fetch_market_indices_direct", lambda: pd.DataFrame([{"symbol": "sh000001"}]))
+    monkeypatch.setattr(indices._sina_provider, "fetch_market_indices", lambda: pd.DataFrame([{"symbol": "sh000001"}]))
 
     result = await indices.get_indices()
 

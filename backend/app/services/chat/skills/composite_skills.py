@@ -8,6 +8,13 @@ from app.services.chat.skills.registry import Skill, registry
 
 
 async def _gather_labeled(tasks: dict[str, Any]) -> dict[str, Any]:
+    """并行执行一组带标签的协程任务，异常转为 error 字符串。
+
+    Param:
+        tasks: 任务名到协程的映射字典
+    Return:
+        任务名到结果的字典，异常任务的结果为 {"error": str(exc)}
+    """
     labels = list(tasks.keys())
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
     return {
@@ -43,6 +50,13 @@ async def _sector_analysis(name: str) -> Any:
 
 
 async def _get_hot_rank(type: str = "industries") -> Any:
+    """获取热门排名数据，根据 type 返回热门概念/行业/股票。
+
+    Param:
+        type: 热门类型，concepts=热门概念，industries=热门行业，其他=热门股票
+    Return:
+        对应类型的热门排名数据
+    """
     from app.services.market.hot_rank import get_hot_stocks, get_ths_hot_concept, get_ths_hot_industry
     if type == "concepts":
         return await get_ths_hot_concept()
@@ -77,6 +91,7 @@ async def _compare_stocks(codes: str) -> Any:
 
 
 def register_composite_skills():
+    """注册组合技能：analyze_stock、sector_analysis、compare_stocks。"""
     registry.register(Skill(
         name="analyze_stock",
         description="一键获取个股全维度分析数据，包括基本信息、详细估值、技术指标、新闻和情绪。当用户要求'分析某只股票''深度分析''全面评估'时调用，比分别调用多个工具更高效。",

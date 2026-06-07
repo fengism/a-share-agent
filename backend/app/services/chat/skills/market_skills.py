@@ -7,6 +7,7 @@ from app.services.chat.skills.registry import Skill, registry
 
 
 async def _get_market_overview() -> Any:
+    """获取大盘概览，并行获取主要指数行情和两市成交额。"""
     from app.services.market.indices import get_indices
     from app.services.market.volume import get_market_volume
     indices, volume = await asyncio.gather(
@@ -23,6 +24,13 @@ async def _get_market_overview() -> Any:
 
 
 async def _get_hot_rank(type: str = "stocks") -> Any:
+    """获取热门排名数据，根据 type 返回热门概念/行业/股票。
+
+    Param:
+        type: 热门类型，concepts=热门概念，industries=热门行业，其他=热门股票
+    Return:
+        对应类型的热门排名数据
+    """
     from app.services.market.hot_rank import get_hot_stocks, get_ths_hot_concept, get_ths_hot_industry
     if type == "concepts":
         return await get_ths_hot_concept()
@@ -32,11 +40,26 @@ async def _get_hot_rank(type: str = "stocks") -> Any:
 
 
 async def _get_dragon_tiger(date: str | None = None) -> Any:
+    """获取指定日期的龙虎榜数据。
+
+    Param:
+        date: 日期，格式 YYYY-MM-DD，默认 None 表示当天
+    Return:
+        龙虎榜列表数据
+    """
     from app.services.market.dragon_tiger import get_dragon_tiger_list
     return await get_dragon_tiger_list(date)
 
 
 async def _get_daily_review(date: str | None = None, force: bool = False) -> Any:
+    """生成每日复盘报告并格式化为 Markdown 文本。
+
+    Param:
+        date: 日期，格式 YYYY-MM-DD，默认 None 表示当天
+        force: 是否强制重新生成（忽略缓存）
+    Return:
+        格式化为 Markdown 的复盘报告文本
+    """
     from app.models.daily_review import DailyReviewRequest
     from app.services.daily_review.pipeline import generate_daily_review
     request = DailyReviewRequest(date=date or None, force=force)
@@ -71,6 +94,7 @@ async def _get_daily_review(date: str | None = None, force: bool = False) -> Any
 
 
 def register_market_skills():
+    """注册市场相关技能：get_market_overview、get_hot_rank、get_dragon_tiger、get_daily_review。"""
     registry.register(Skill(
         name="get_market_overview",
         description="获取大盘概览，包括主要指数（上证、深证、创业板等）实时行情和两市成交额。当用户问'大盘怎么样''指数行情''市场情况'时调用。",

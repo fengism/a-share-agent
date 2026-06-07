@@ -7,14 +7,31 @@ class _Response:
     status_code = 200
 
     def __init__(self, payload):
+        """Store payload and serialise it as text for json/text accessors.
+
+        Param:
+            payload: arbitrary JSON-serialisable value returned by the mock HTTP call.
+        Return:
+            None
+        """
         self._payload = payload
         self.text = str(payload)
 
     def json(self):
+        """Return the pre-stored JSON payload.
+
+        Return:
+            the payload object passed during construction.
+        """
         return self._payload
 
 
 def _settings():
+    """Return a minimal settings stub with folder/space tokens.
+
+    Return:
+        a SimpleNamespace exposing feishu_wiki_space_id and feishu_folder_token attributes.
+    """
     return SimpleNamespace(
         feishu_wiki_space_id="",
         feishu_folder_token="default-folder",
@@ -22,6 +39,7 @@ def _settings():
 
 
 def test_create_doc_writes_drive_document(monkeypatch):
+    """create_doc writes blocks to Drive when no wiki_space_id is provided."""
     posts = []
 
     def fake_post(url, **kwargs):
@@ -42,6 +60,7 @@ def test_create_doc_writes_drive_document(monkeypatch):
 
 
 def test_create_doc_wiki_writes_wiki_obj_token_and_deletes_source(monkeypatch):
+    """create_doc moves the doc to Wiki and deletes the intermediate Drive file."""
     posts = []
     deletes = []
 

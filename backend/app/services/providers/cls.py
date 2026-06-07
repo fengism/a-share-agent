@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 
 
 from app.constants.http import CLS_HEADERS
@@ -12,46 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 class ClsDataProvider(BaseDataProvider):
+    """Purpose: 封装财联社头条新闻接口，提供 A 股快讯数据获取。"""
     def __init__(self):
+        """初始化 ClsDataProvider，固定 name 与 source_label。"""
         super().__init__(name="cls", source_label="财联社")
 
-    def _fetch_telegraph(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
-        """
-        财联社电报
-        """
-        try:
-            response = http_client.get("https://www.cls.cn/nodeapi/telegraphList", headers=CLS_HEADERS, timeout=10)
-            items = response.json().get("data", {}).get("roll_data") or []
+    def fetch_market_news(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
+        """财联社头条新闻。
 
-            results: list[NewsSearchItem] = []
-            for item in items:
-                title = str(item.get("title") or "").strip()
-                content = str(item.get("content") or "").strip()
-                url = str(item.get("shareurl") or "").strip()
-                combined = f"{title}\n{content}"
-                if (code_name or code) and not contains_stock_reference(combined, code, code_name):
-                    continue
-                publish_time = self._parse_timestamp(item.get("ctime") or item.get("time") or item.get("created_at"))
-                results.append(
-                    NewsSearchItem(
-                        title=title,
-                        content=content[:200],
-                        source="财联社",
-                        publish_time=publish_time.strftime("%Y-%m-%d %H:%M:%S") if publish_time else "",
-                        url=url,
-                        author=item.get("author", ""),
-                        read_count=int(item.get("read_count", 0)),
-                        comment_count=int(item.get("comment_count", 0)),
-                    )
-                )
-            return results
-        except Exception as e:
-            logger.warning(f"财联社电报获取失败: {e}")
-            return []
-
-    def _fetch_news(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
-        """
-        财联社头条新闻
+        Param:
+            code: 可选，6 位股票代码
+            code_name: 可选，股票名称
+        Return:
+            财联社头条 NewsSearchItem 列表
         """
         try:
             params = {
@@ -66,12 +38,22 @@ class ClsDataProvider(BaseDataProvider):
                 headers=CLS_HEADERS,
                 timeout=10,
             )
-            data = http_client.parse_text_json(response).get("data", {}).get("depth_list", []) or []
 
+            data = http_client.parse_text_json(response).get("data", {})
+            top_articles = data.get("top_article", []) or []
+            articles = data.get("depth_list", []) or []
+            articles = top_articles + articles
             results: list[NewsSearchItem] = []
-            for item in data:
+            for item in articles:
                 title = str(item.get("title") or "").strip()
-                content = str(item.get("brief") or "").strip()
+                article_rec = item.get("article_rec", [])
+                content = ""
+                for rec in article_rec:
+                    content += str(rec.get("brief") or "").strip()
+                if content == "":
+                   content = str(item.get("brief") or "").strip()
+                if content == "":
+                    continue
                 combined = f"{title}\n{content}"
                 if (code_name or code) and not contains_stock_reference(combined, code, code_name):
                     continue
@@ -80,7 +62,7 @@ class ClsDataProvider(BaseDataProvider):
                     NewsSearchItem(
                         title=title,
                         content=content[:500],
-                        source=item.get("source", ""),
+                        source=item.get("source", "财联社头条"),
                         publish_time=str(publish_time),
                         url=item.get("external_link", ""),
                         author=item.get("author", ""),
@@ -92,25 +74,6 @@ class ClsDataProvider(BaseDataProvider):
         except Exception as e:
             logger.warning(f"财联社头条获取失败: {e}")
             return []
-
-    def _parse_timestamp(self, value) -> datetime | None:
-        if value in (None, "", 0, "0"):
-            return None
-        try:
-            ts = int(float(value))
-        except (TypeError, ValueError):
-            return None
-        if ts > 10**12:
-            ts = ts / 1000
-        try:
-            return datetime.fromtimestamp(ts)
-        except (OverflowError, OSError, ValueError):
-            return None
-
-    def fetch_market_news(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
-        news = self._fetch_news(code=code, code_name=code_name)
-        telegraph = self._fetch_telegraph(code=code, code_name=code_name)
-        return news + telegraph
 
 cls_provider = ClsDataProvider()
 

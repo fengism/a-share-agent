@@ -6,6 +6,13 @@ from app.models.search_item import NewsSearchItem
 
 
 def news_item_to_dict(item) -> dict:
+    """Normalize a news item (dict or object) into a standard dict shape.
+
+    Param:
+        item: dict or object with news fields (title, content, source, etc.)
+    Return:
+        dict with the standard news field names
+    """
     if isinstance(item, dict):
         return item
     return {
@@ -21,12 +28,27 @@ def news_item_to_dict(item) -> dict:
 
 
 def get_news_field(item, field: str) -> str:
+    """Get a stripped string field from a news item (dict or object).
+
+    Param:
+        item: dict or object to read from
+        field: field name to look up
+    Return:
+        stripped string value, or empty string if missing
+    """
     if isinstance(item, dict):
         return str(item.get(field, "") or "").strip()
     return str(getattr(item, field, "") or "").strip()
 
 
 def dedupe_news_items(items: list) -> list:
+    """Remove duplicate news items by (title, source, time) key.
+
+    Param:
+        items: list of news items (dict or object)
+    Return:
+        list of news items with duplicates removed, preserving first occurrence
+    """
     seen: set[tuple[str, str, str]] = set()
     result: list = []
     for item in items:
@@ -42,6 +64,14 @@ def dedupe_news_items(items: list) -> list:
 
 
 def filter_news_items(items: list[NewsSearchItem], date: datetime) -> list[NewsSearchItem]:
+    """Filter news items to those published on the given date.
+
+    Param:
+        items: list of NewsSearchItem objects
+        date: target date to match
+    Return:
+        list of news items whose publish_time matches the given date
+    """
     result: list[NewsSearchItem] = []
     for item in items:
         publish_time = parse_news_time(get_news_field(item, "publish_time"))
@@ -52,6 +82,15 @@ def filter_news_items(items: list[NewsSearchItem], date: datetime) -> list[NewsS
 
 
 def filter_recent_news_items(items: list, days: int = 2, now: datetime | None = None) -> list:
+    """Filter news items to those published within the last N days.
+
+    Param:
+        items: list of news items (dict or object)
+        days: number of days to look back (default 2)
+        now: reference current time (defaults to datetime.now())
+    Return:
+        list of news items with publish_time within the window
+    """
     current_time = now or datetime.now()
     cutoff_time = current_time - timedelta(days=days)
     result = []
@@ -64,6 +103,13 @@ def filter_recent_news_items(items: list, days: int = 2, now: datetime | None = 
 
 
 def parse_news_time(value: str) -> datetime:
+    """Parse a news publish_time string into datetime with multiple format support.
+
+    Param:
+        value: time string in one of the supported formats
+    Return:
+        parsed datetime, or datetime.min if parsing fails
+    """
     text = str(value or "").strip()
     if not text:
         return datetime.min
@@ -84,10 +130,24 @@ def parse_news_time(value: str) -> datetime:
 
 
 def news_sort_key(item) -> datetime:
+    """Return a sort key for a news item based on its publish_time.
+
+    Param:
+        item: news item (dict or object) with publish_time or time field
+    Return:
+        parsed datetime suitable for sorting
+    """
     return parse_news_time(get_news_field(item, "publish_time") or get_news_field(item, "time"))
 
 
 def parse_struct_time_string(value) -> str:
+    """Parse a struct_time-like value or its repr into a formatted string.
+
+    Param:
+        value: struct_time, its repr string, or other value
+    Return:
+        time string in "YYYY-MM-DD HH:MM:SS" format, or empty string on failure
+    """
     if hasattr(value, "tm_year"):
         try:
             return time.strftime("%Y-%m-%d %H:%M:%S", value)

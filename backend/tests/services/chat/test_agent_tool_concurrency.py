@@ -9,6 +9,13 @@ from app.services.chat import agent
 
 
 def _tool_call(call_id: str) -> ToolCallInfo:
+    """Build a ToolCallInfo with a function name derived from the call id.
+
+    Param:
+        call_id: identifier used for both the tool call id and the function name suffix.
+    Return:
+        a ToolCallInfo with empty JSON arguments.
+    """
     return ToolCallInfo(
         id=call_id,
         type="function",
@@ -18,6 +25,7 @@ def _tool_call(call_id: str) -> ToolCallInfo:
 
 @pytest.mark.asyncio
 async def test_execute_tool_calls_ordered_runs_concurrently_and_preserves_order(monkeypatch):
+    """_execute_tool_calls_ordered runs calls concurrently and returns results in input order."""
     delays = {"call_1": 0.08, "call_2": 0.01, "call_3": 0.03}
     completed: list[str] = []
 
@@ -45,6 +53,7 @@ async def test_execute_tool_calls_ordered_runs_concurrently_and_preserves_order(
 
 @pytest.mark.asyncio
 async def test_execute_tool_calls_ordered_keeps_error_result_in_place(monkeypatch):
+    """_execute_tool_calls_ordered keeps error results at the original position."""
     async def fake_execute(call: ToolCallInfo) -> ToolResultInfo:
         return ToolResultInfo(
             tool_call_id=call.id,
@@ -64,6 +73,7 @@ async def test_execute_tool_calls_ordered_keeps_error_result_in_place(monkeypatc
 
 @pytest.mark.asyncio
 async def test_run_chat_agent_generates_final_text_after_max_tool_rounds(monkeypatch):
+    """run_chat_agent emits a final text delta after exhausting the max tool-call rounds."""
     calls: list[str] = []
 
     def fake_create(**kwargs):

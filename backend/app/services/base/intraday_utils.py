@@ -5,6 +5,13 @@ import requests
 
 
 def normalize_intraday_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize intraday DataFrame columns to English aliases used downstream.
+
+    Param:
+        df: source intraday DataFrame with Chinese or mixed column names
+    Return:
+        DataFrame with columns renamed to standard English aliases, or empty if required columns missing
+    """
     if df is None or df.empty:
         return pd.DataFrame()
 
@@ -35,6 +42,14 @@ def normalize_intraday_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def event_stream(url: str, params: dict):
+    """Yield SSE event blocks from a streaming HTTP GET response.
+
+    Param:
+        url: request URL
+        params: query parameters
+    Return:
+        generator yielding each complete event block as a decoded string
+    """
     response = requests.get(url, params=params, stream=True)
     event_data = ""
 
@@ -47,6 +62,13 @@ def event_stream(url: str, params: dict):
 
 
 def loads_sina_jsonp(text: str) -> dict:
+    """Parse Sina's JSONP response text, stripping the var/function wrapper.
+
+    Param:
+        text: JSONP text, optionally starting with "var ... ="
+    Return:
+        parsed JSON object from the JSONP payload
+    """
     payload = text.strip()
     if payload.startswith("var "):
         start = payload.find("(")

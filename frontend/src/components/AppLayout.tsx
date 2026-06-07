@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Layout, Input, Menu, Typography, type InputRef } from "antd";
-import { SearchOutlined, HomeOutlined, FundOutlined, FilterOutlined, LineChartOutlined, FileTextOutlined, MessageOutlined, SettingOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import { SearchOutlined, HomeOutlined, FundOutlined, FilterOutlined, LineChartOutlined, FileTextOutlined, MessageOutlined, SettingOutlined, ClockCircleOutlined, ApartmentOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useStockSearch } from "../api/queries";
 import { cardStyle } from "../styles/ui";
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { key: "/chat", icon: <MessageOutlined />, label: "对话" },
   { key: "/daily-review", icon: <FileTextOutlined />, label: "复盘" },
   { key: "/analysis", icon: <LineChartOutlined />, label: "分析" },
+  { key: "/industry-chain", icon: <ApartmentOutlined />, label: "产业链" },
   { key: "/settings", icon: <SettingOutlined />, label: "设置" },
 ];
 
@@ -191,6 +192,7 @@ function getActiveKey(pathname: string): string {
   if (pathname.startsWith("/chat")) return "/chat";
   if (pathname.startsWith("/daily-review")) return "/daily-review";
   if (pathname.startsWith("/analysis")) return "/analysis";
+  if (pathname.startsWith("/industry-chain")) return "/industry-chain";
   if (pathname.startsWith("/settings")) return "/settings";
   return "/";
 }

@@ -10,7 +10,14 @@ logger = logging.getLogger(__name__)
 
 
 def _normalize_tencent_sectors(top_df, bottom_df) -> dict:
-    """将腾讯板块数据归一化为统一格式"""
+    """将腾讯板块数据归一化为统一格式。
+
+    Param:
+        top_df: 涨幅榜板块 DataFrame
+        bottom_df: 跌幅榜板块 DataFrame
+    Return:
+        包含 sectors 列表和 total 数量的字典
+    """
     seen = set()
     sectors = []
     for _, row in top_df.iterrows():
@@ -50,6 +57,13 @@ def _normalize_tencent_sectors(top_df, bottom_df) -> dict:
 
 
 async def get_industry_rankings() -> dict:
+    """获取行业涨幅排名，东方财富优先并回退到腾讯数据源。
+
+    Param:
+        无
+    Return:
+        包含 sectors 列表和 total 数量的字典
+    """
     cache_key = dated_cache_key("industry_rankings")
     cached = cache.get(cache_key)
     if cached is not None:

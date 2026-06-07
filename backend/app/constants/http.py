@@ -16,25 +16,39 @@ USER_AGENTS = [
 
 
 def random_user_agent() -> str:
+    """从列表中随机选择一个 User-Agent 字符串。
+
+    Return:
+        随机选取的 User-Agent 字符串。
+    """
     return random.choice(USER_AGENTS)
 
 
 def build_headers(base: dict[str, str]) -> dict[str, str]:
+    """在给定的 headers 字典基础上添加随机 User-Agent。
+
+    Param:
+        base: 基础 headers 字典。
+    Return:
+        复制后的 headers 字典，其中 User-Agent 已被随机替换。
+    """
     headers = dict(base)
     headers["User-Agent"] = random_user_agent()
     return headers
+
+EASTMONEY_COOKIE = "st_nvi=g4m0d6etwkGEZiGDu5SnRc09b; emshistory=%5B%22%E6%99%AF%E6%97%BA%E7%94%B5%E5%AD%90%22%5D; qgqp_b_id=a09dcdfd4160d07a4be8aefbea69d195; st_si=92209040856734; nid18=054d22a620ef5d713ccec6748a620265; nid18_create_time=1780586118901; gviem=zlK3j9JLe3GWBtoNPK9Jp644a; gviem_create_time=1780586118901; wsc_checkuser_ok=1; fullscreengg=1; fullscreengg2=1; st_asi=delete; st_pvi=42924896055142; st_sp=2026-02-26%2022%3A59%3A18; st_inirUrl=https%3A%2F%2Fcn.bing.com%2F; st_sn=27; st_psi=20260604235743304-113200302671-1319660370"
 
 EASTMONEY_HEADERS = build_headers({
     "Referer": "https://quote.eastmoney.com/",
     "Accept": "application/json, text/plain, */*",
     "Content-Type": "application/json",
     "Connection": "keep-alive",
-    "cookie": "qgqp_b_id=b17e651f9bca7585f6e2e8e0ba4e91ee; st_nvi=6hHDz8pD6iGiNwad7KCce0f8c; nid18=0ea78d8b7ecb53018008ec947866af1f; nid18_create_time=1772092956669; gviem=7nlg-6Vl8Sv-h6ioGS4_j11e1; gviem_create_time=1772092956669; emshistory=%5B%22600337%22%2C%22%E6%9D%A5%E4%BC%8A%E4%BB%BD%22%2C%22600519%22%2C%2260519%22%5D; quote_lt=1; websitepoptg_api_time=1778392585412; st_si=62900329194795; st_asi=delete; fullscreengg=1; fullscreengg2=1; wsc_checkuser_ok=1; st_pvi=52494799947571; st_sp=2025-07-25%2015%3A41%3A51; st_inirUrl=https%3A%2F%2Fwww.google.com.hk%2F; st_sn=31; st_psi=20260510224114732-113200313002-9432233957",
+    "cookie": EASTMONEY_COOKIE,
 })
 
 EASTMONEY_STATICS_HEADERS = build_headers({
     "Accept": "*/*",
-    "Cookie": "qgqp_b_id=b17e651f9bca7585f6e2e8e0ba4e91ee; st_nvi=6hHDz8pD6iGiNwad7KCce0f8c; nid18=0ea78d8b7ecb53018008ec947866af1f; nid18_create_time=1772092956669; gviem=7nlg-6Vl8Sv-h6ioGS4_j11e1; gviem_create_time=1772092956669; emshistory=%5B%22600337%22%2C%22%E6%9D%A5%E4%BC%8A%E4%BB%BD%22%2C%22600519%22%2C%2260519%22%5D; quote_lt=1; websitepoptg_api_time=1778392585412; st_si=62900329194795; st_asi=delete; fullscreengg=1; fullscreengg2=1; wsc_checkuser_ok=1; st_pvi=52494799947571; st_sp=2025-07-25%2015%3A41%3A51; st_inirUrl=https%3A%2F%2Fwww.google.com.hk%2F; st_sn=31; st_psi=20260510224114732-113200313002-9432233957",
+    "Cookie": EASTMONEY_COOKIE,
 })
 
 THS_HEADERS = build_headers({
@@ -69,6 +83,14 @@ TENCENT_FINANCE_HEADERS = build_headers({
 
 BD_HEADERS = build_headers({
     "Accept": "application/json, text/plain, */*",
-    "Referer": "https://www.cls.cn/telegraph",
-    "Origin": "https://www.cls.cn/telegrap",
+    "Referer": "https://finance.baidu.com",
+    "Origin": "https://finance.baidu.com",
+})
+
+
+BD_HEADERS_WITH_COOKIE = build_headers({
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://finance.baidu.com",
+    "Origin": "https://finance.baidu.com",
+    "acs-token": "1780466406839_1780502633853_wFsRoiWkd8xYGH2wlWIY7f+IEZt6HLMycievOVDxeDIZaJyrZ/Du8rAJ6tYsX+VLb/TAD7n8lQnd0KKk3psPNivF7V3jr4sNV+6FyElRSJZS2anF70gw9Jv4Jv1IdSFapMaFWUgk/yMIJtWqSU17I3PLXVEJe2xC96eXOXKMh9Wuq8vKHxyqZA/dkiFS7kU2amOki/fo40PXzNnCb07/6u01vfVesMtKZvtoyRDS2vZwnUZ/88PHMTwPWpC9eipAaOQ9/1OSg250WtTcBRtkByoA0RtmRpzALqLTo3EH9s3f0AjrVwny8c5AcxG8QMyq5QHQueCTvPYMyFHYmdlRPxwEp4hNpPlkUkcGolh0xm8ud4qUc9FYUNNL86YNVFmSNfes6YMfOMDZOo/EpIWZwbOFZQ8J/RsF7iN1ZRu2zQc="
 })

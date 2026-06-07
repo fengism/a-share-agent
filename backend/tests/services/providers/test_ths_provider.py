@@ -2,6 +2,7 @@ from app.services.providers import ths
 
 
 def test_fetch_stock_forecast_reports_returns_empty_when_no_tables(monkeypatch):
+    """fetch_stock_forecast_reports returns an empty DataFrame when no HTML tables are present."""
     provider = ths.ThsDataProvider()
 
     class FakeResp:

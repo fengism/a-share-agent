@@ -25,6 +25,13 @@ _STOCK_NAME_MAP_SERVICE = BaseFileSnapshotService[dict[str, str]](
 
 
 def _load_stock_name_file() -> dict[str, str] | None:
+    """从本地 JSON 文件加载股票名称映射。
+
+    Param:
+        无
+    Return:
+        股票代码到名称的字典，数据量不足或异常时返回 None
+    """
     try:
         if _STOCK_NAME_FILE.exists():
             with open(_STOCK_NAME_FILE, "r", encoding="utf-8") as f:
@@ -39,6 +46,13 @@ def _load_stock_name_file() -> dict[str, str] | None:
 
 
 def _load_stock_name_map_from_spot_snapshot() -> dict[str, str] | None:
+    """从本地市场快照文件提取股票名称映射。
+
+    Param:
+        无
+    Return:
+        股票代码到名称的字典，数据量不足或异常时返回 None
+    """
     try:
         df = load_spot_snapshot_file()
         if df is None or df.empty or "代码" not in df.columns or "名称" not in df.columns:
@@ -57,6 +71,13 @@ def _load_stock_name_map_from_spot_snapshot() -> dict[str, str] | None:
 
 
 def _save_stock_name_file(mapping: dict[str, str]) -> None:
+    """将股票名称映射保存到本地 JSON 文件。
+
+    Param:
+        mapping: 股票代码到名称的字典
+    Return:
+        无
+    """
     try:
         _STOCK_NAME_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(_STOCK_NAME_FILE, "w", encoding="utf-8") as f:
@@ -67,6 +88,13 @@ def _save_stock_name_file(mapping: dict[str, str]) -> None:
 
 
 async def _fetch_stock_name_map_remote() -> dict[str, str]:
+    """按顺序从百度、东方财富、新浪远程获取股票名称映射。
+
+    Param:
+        无
+    Return:
+        股票代码到名称的字典，全部失败时返回空字典
+    """
     try:
         stocks = await call_blocking(baidu_provider.fetch_stock_names)
         if len(stocks) >= _STOCK_NAME_MAP_MIN_SIZE:
@@ -98,6 +126,13 @@ async def _fetch_stock_name_map_remote() -> dict[str, str]:
 
 
 async def get_stock_name_map() -> dict[str, str]:
+    """获取股票名称映射，优先缓存→快照→文件→远程。
+
+    Param:
+        无
+    Return:
+        股票代码到名称的字典
+    """
     cached = _STOCK_NAME_MAP_SERVICE.get_cached()
     if cached is not None:
         return cached
@@ -117,6 +152,13 @@ async def get_stock_name_map() -> dict[str, str]:
 
 
 async def _refresh_stock_name_map() -> None:
+    """后台刷新股票名称映射并落地缓存与文件。
+
+    Param:
+        无
+    Return:
+        无
+    """
     try:
         mapping = await _fetch_stock_name_map_remote()
         if mapping:
@@ -128,6 +170,13 @@ async def _refresh_stock_name_map() -> None:
 
 
 async def build_stock_name_map() -> None:
+    """预热股票名称映射；当本地文件超过 24 小时则触发后台刷新。
+
+    Param:
+        无
+    Return:
+        无
+    """
     await get_stock_name_map()
     if _STOCK_NAME_FILE.exists():
         mtime = _STOCK_NAME_FILE.stat().st_mtime

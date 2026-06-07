@@ -6,6 +6,7 @@ from app.services.stock import valuation
 
 
 def test_normalize_peg_growth_rate():
+    """_normalize_peg_growth_rate converts percents, clamps extremes, and rejects invalid values."""
     assert valuation._normalize_peg_growth_rate(25) == 0.25
     assert valuation._normalize_peg_growth_rate(0.25) == 0.25
     assert valuation._normalize_peg_growth_rate(None) is None
@@ -15,6 +16,7 @@ def test_normalize_peg_growth_rate():
 
 
 def test_parse_forecast_year():
+    """_parse_forecast_year extracts a year from strings like '2026', '2026E', '2026年'."""
     assert valuation._parse_forecast_year("2026") == 2026
     assert valuation._parse_forecast_year("2026E") == 2026
     assert valuation._parse_forecast_year("2026年") == 2026
@@ -23,6 +25,7 @@ def test_parse_forecast_year():
 
 
 def test_derive_peg_growth_rate_prefers_eps_forecast(monkeypatch):
+    """_derive_peg_growth_rate prefers institution EPS forecasts with high confidence."""
     monkeypatch.setattr(valuation, "datetime", _FixedDateTime)
     forecasts = [
         InstitutionForecast(
@@ -48,6 +51,7 @@ def test_derive_peg_growth_rate_prefers_eps_forecast(monkeypatch):
 
 
 def test_derive_peg_growth_rate_falls_back_to_net_profit_yoy(monkeypatch):
+    """_derive_peg_growth_rate falls back to historical net profit YoY growth when no forecasts exist."""
     monkeypatch.setattr(valuation, "datetime", _FixedDateTime)
 
     growth_rate, basis, confidence = valuation._derive_peg_growth_rate(
@@ -63,6 +67,7 @@ def test_derive_peg_growth_rate_falls_back_to_net_profit_yoy(monkeypatch):
 
 
 def test_derive_peg_growth_rate_penalizes_low_count_and_wide_range(monkeypatch):
+    """_derive_peg_growth_rate reduces confidence when forecasts have few institutions or wide range."""
     monkeypatch.setattr(valuation, "datetime", _FixedDateTime)
     forecasts = [
         InstitutionForecast(
@@ -87,6 +92,7 @@ def test_derive_peg_growth_rate_penalizes_low_count_and_wide_range(monkeypatch):
 
 
 def test_annualize_report_metric_by_report_period():
+    """_annualize_report_metric scales a period metric up to a full year."""
     assert valuation._annualize_report_metric(100, "2026-12-31") == 100
     assert valuation._annualize_report_metric(100, "2026-06-30") == 200
     assert valuation._annualize_report_metric(100, "2026-03-31") == 400
@@ -94,6 +100,7 @@ def test_annualize_report_metric_by_report_period():
 
 
 def test_build_peg_valuation_available():
+    """_build_peg_valuation returns an available PEG valuation for a growth profile with positive growth."""
     profile = ValuationProfile(category="general", label="通用类", rationale=[])
 
     result = valuation._build_peg_valuation(
@@ -115,6 +122,7 @@ def test_build_peg_valuation_available():
 
 
 def test_build_peg_valuation_unavailable_for_low_growth():
+    """_build_peg_valuation returns an unavailable result when growth is too low or missing."""
     profile = ValuationProfile(category="general", label="通用类", rationale=[])
 
     result = valuation._build_peg_valuation(
@@ -134,6 +142,7 @@ def test_build_peg_valuation_unavailable_for_low_growth():
 
 
 def test_build_peg_valuation_caps_target_pe():
+    """_build_peg_valuation caps the target PE to the peer median."""
     profile = ValuationProfile(category="growth", label="成长类", rationale=[])
 
     result = valuation._build_peg_valuation(
@@ -155,6 +164,7 @@ def test_build_peg_valuation_caps_target_pe():
 
 @pytest.mark.asyncio
 async def test_get_valuation_detail_annualizes_profit_fallback_for_semiannual_report(monkeypatch):
+    """get_valuation_detail annualises a semi-annual report when computing PE/PS fair values."""
     async def fake_basic_info(code: str):
         return StockBasicInfo(
             code=code,
@@ -211,6 +221,7 @@ async def test_get_valuation_detail_annualizes_profit_fallback_for_semiannual_re
 
 @pytest.mark.asyncio
 async def test_get_valuation_detail_includes_peg(monkeypatch):
+    """get_valuation_detail includes a PEG method and institution forecasts in the result."""
     async def fake_basic_info(code: str):
         return StockBasicInfo(
             code=code,
@@ -272,9 +283,21 @@ async def test_get_valuation_detail_includes_peg(monkeypatch):
 class _FixedDateTime:
     @staticmethod
     def now():
+        """Return a fixed datetime stand-in for valuation tests.
+
+        Return:
+            a _FixedNow instance representing year 2026.
+        """
         return _FixedNow(2026)
 
 
 class _FixedNow:
     def __init__(self, year: int):
+        """Store the fixed year on the stand-in datetime.
+
+        Param:
+            year: the fixed year to expose via the .year attribute.
+        Return:
+            None
+        """
         self.year = year

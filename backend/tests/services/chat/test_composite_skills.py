@@ -4,15 +4,28 @@ from app.services.chat.skills import composite_skills
 
 
 async def _ok(value):
+    """Return the given value unchanged as a coroutine.
+
+    Param:
+        value: the value to wrap in a coroutine.
+    Return:
+        the same value after awaiting.
+    """
     return value
 
 
 async def _fail():
+    """Raise RuntimeError to simulate a failed task in gather tests.
+
+    Return:
+        never returns; always raises RuntimeError("boom").
+    """
     raise RuntimeError("boom")
 
 
 @pytest.mark.asyncio
 async def test_gather_labeled_preserves_labels_and_errors():
+    """_gather_labeled maps coroutine results by label and captures per-task errors."""
     result = await composite_skills._gather_labeled({
         "a": _ok(1),
         "b": _fail(),
@@ -23,6 +36,7 @@ async def test_gather_labeled_preserves_labels_and_errors():
 
 @pytest.mark.asyncio
 async def test_compare_stocks_keeps_per_stock_errors(monkeypatch):
+    """_compare_stocks returns per-stock error payloads when individual helpers fail."""
     async def fake_info(code):
         if code == "000001":
             raise RuntimeError("info failed")

@@ -6,6 +6,7 @@ from app.services.stock import intraday
 
 @pytest.mark.asyncio
 async def test_load_intraday_fills_prev_close_and_change_pct_from_basic_info(monkeypatch):
+    """_load_intraday backfills prev_close and change_pct from basic info when missing."""
     class Sym:
         raw = "603228"
 

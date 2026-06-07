@@ -7,6 +7,7 @@ from app.services.base.provider_chain import BaseProviderChain, ProviderAttempt
 
 @pytest.mark.asyncio
 async def test_provider_chain_returns_first_success_without_calling_later_loader():
+    """BaseProviderChain returns the first successful loader result without invoking later loaders."""
     calls: list[str] = []
 
     async def first_loader():
@@ -28,6 +29,7 @@ async def test_provider_chain_returns_first_success_without_calling_later_loader
 
 @pytest.mark.asyncio
 async def test_provider_chain_falls_back_after_failure(caplog):
+    """BaseProviderChain falls back to the next loader and reports the failed attempt."""
     async def first_loader():
         raise ValueError("bad data")
 
@@ -53,6 +55,7 @@ async def test_provider_chain_falls_back_after_failure(caplog):
 
 @pytest.mark.asyncio
 async def test_provider_chain_raises_last_error_when_all_attempts_fail():
+    """BaseProviderChain raises the last loader error when every attempt fails."""
     async def first_loader():
         raise ValueError("first failed")
 
@@ -68,12 +71,14 @@ async def test_provider_chain_raises_last_error_when_all_attempts_fail():
 
 @pytest.mark.asyncio
 async def test_provider_chain_empty_attempts_raise_runtime_error():
+    """BaseProviderChain raises RuntimeError when no loaders are configured."""
     with pytest.raises(RuntimeError, match="provider chain is empty"):
         await BaseProviderChain([]).run()
 
 
 @pytest.mark.asyncio
 async def test_provider_chain_success_log_and_report_selected_provider(caplog):
+    """BaseProviderChain logs success and returns a report identifying the selected provider."""
     async def loader():
         return [1, 2, 3]
 

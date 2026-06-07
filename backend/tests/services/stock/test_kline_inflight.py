@@ -8,6 +8,7 @@ from app.services.stock import kline
 
 @pytest.mark.asyncio
 async def test_get_kline_dedupes_concurrent_same_key(monkeypatch):
+    """get_kline coalesces concurrent requests for the same key into one loader call."""
     calls = 0
 
     async def fake_load(sym, period, start_date, end_date, adjust):
@@ -36,6 +37,7 @@ async def test_get_kline_dedupes_concurrent_same_key(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_kline_does_not_dedupe_different_keys(monkeypatch):
+    """get_kline issues separate loader calls for different stock codes."""
     requested: list[str] = []
 
     async def fake_load(sym, period, start_date, end_date, adjust):
@@ -60,6 +62,7 @@ async def test_get_kline_does_not_dedupe_different_keys(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_kline_uses_cache_without_loader(monkeypatch):
+    """get_kline returns the cached payload without invoking the loader."""
     cached = KlineData(code="600519", period="daily", adjust="qfq", items=[])
 
     async def fake_load(*args, **kwargs):

@@ -10,6 +10,13 @@ logger = logging.getLogger(__name__)
 
 
 def extract_json(text: str) -> str:
+    """Extract a JSON string from raw LLM output, stripping markdown or extra prose.
+
+    Param:
+        text: raw LLM response text potentially containing JSON in a code block
+    Return:
+        cleaned JSON string ready for json.loads
+    """
     # 尝试从 markdown 代码块中提取
     match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
     if match:
@@ -25,6 +32,13 @@ def extract_json(text: str) -> str:
 
 
 def parse_analysis_response(raw_text: str) -> AnalysisResult:
+    """Parse LLM output text into a validated AnalysisResult object.
+
+    Param:
+        raw_text: raw LLM response text containing analysis JSON
+    Return:
+        validated AnalysisResult instance
+    """
     json_str = extract_json(raw_text)
 
     try:
@@ -49,6 +63,15 @@ def parse_analysis_response(raw_text: str) -> AnalysisResult:
 
 
 def parse_with_retry(raw_text: str, llm_client=None, messages: list[dict] | None = None) -> AnalysisResult:
+    """Parse LLM output, retrying once via the LLM if the first parse fails.
+
+    Param:
+        raw_text: raw LLM response text to parse
+        llm_client: optional LLM client used for a single repair retry
+        messages: optional original message list for the retry context
+    Return:
+        validated AnalysisResult from the original or repaired response
+    """
     try:
         return parse_analysis_response(raw_text)
     except ValueError as e:

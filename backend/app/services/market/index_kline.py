@@ -17,12 +17,32 @@ logger = logging.getLogger(__name__)
 
 
 async def _load_and_filter(fetch_fn, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """加载指数历史数据并按日期范围过滤。
+
+    Param:
+        fetch_fn: 同步数据获取函数
+        symbol: 指数代码
+        start_date: 起始日期，格式 YYYY-MM-DD
+        end_date: 结束日期，格式 YYYY-MM-DD
+    Return:
+        过滤后的 DataFrame
+    """
     df = await call_blocking(fetch_fn, symbol=symbol)
     return await asyncio.to_thread(filter_index_hist_range, df, start_date, end_date)
 
 
 
 def _build_index_kline_source_attempts(symbol: str, period: str, start_date: str, end_date: str) -> list[ProviderAttempt]:
+    """构造指数 K 线多数据源回退链。
+
+    Param:
+        symbol: 指数代码
+        period: K 线周期标识
+        start_date: 起始日期，格式 YYYY-MM-DD
+        end_date: 结束日期，格式 YYYY-MM-DD
+    Return:
+        Provider 尝试列表，按优先级排序
+    """
     return [
         ProviderAttempt(
             label="TDX 指数K线",
@@ -46,12 +66,21 @@ def _build_index_kline_source_attempts(symbol: str, period: str, start_date: str
         ),
         ProviderAttempt(
             label="东方财富指数K线直连",
-            loader=lambda: call_blocking(_eastmoney_provider.fetch_index_kline_direct, symbol, period, start_date, end_date),
+            loader=lambda: call_blocking(_eastmoney_provider.fetch_index_kline, symbol, period, start_date, end_date),
         ),
     ]
 
 
 def _to_kline_data(symbol: str, period: str, df: pd.DataFrame) -> KlineData:
+    """将 DataFrame 转换为标准化的 KlineData 模型。
+
+    Param:
+        symbol: 指数代码
+        period: K 线周期
+        df: 包含 OHLCV 字段的 DataFrame
+    Return:
+        填充了 KlineItem 列表的 KlineData 对象
+    """
     items: list[KlineItem] = []
     for _, row in df.iterrows():
         items.append(
@@ -73,6 +102,16 @@ def _to_kline_data(symbol: str, period: str, df: pd.DataFrame) -> KlineData:
 
 
 async def get_index_kline(symbol: str, period: str = "daily", start_date: str = "", end_date: str = "") -> KlineData:
+    """获取指数 K 线数据，支持多数据源回退和缓存。
+
+    Param:
+        symbol: 指数代码
+        period: K 线周期，默认 daily
+        start_date: 起始日期，留空默认一年前
+        end_date: 结束日期，留空默认当天
+    Return:
+        指数 K 线数据 KlineData
+    """
     if not end_date:
         end_date = cache_date()
     if not start_date:

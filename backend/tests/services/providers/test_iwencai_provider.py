@@ -5,15 +5,30 @@ from app.services.providers.iwencai import IwencaiDataProvider
 
 class DummyResponse:
     def __init__(self, status_code=200, payload=None, text=""):
+        """Store status code, JSON payload, and raw text for the mock response.
+
+        Param:
+            status_code: HTTP status to expose; defaults to 200.
+            payload: JSON-serialisable dict returned by json(); defaults to {"status_code": 0}.
+            text: raw response body; defaults to empty string.
+        Return:
+            None
+        """
         self.status_code = status_code
         self._payload = payload or {"status_code": 0}
         self.text = text
 
     def json(self):
+        """Return the pre-stored JSON payload.
+
+        Return:
+            the payload dict passed during construction.
+        """
         return self._payload
 
 
 def test_select_stock_uses_shared_query_payload_and_skill_id(monkeypatch):
+    """select_stocks sends the expected query payload, headers, and skill id."""
     captured = {}
 
     def fake_post(url, json, headers, timeout):
@@ -50,6 +65,7 @@ def test_select_stock_uses_shared_query_payload_and_skill_id(monkeypatch):
 
 
 def test_search_raises_http_error(monkeypatch):
+    """search raises RuntimeError when the underlying HTTP call returns 5xx."""
     def fake_post(*args, **kwargs):
         return DummyResponse(status_code=500, text="server error detail")
 
@@ -66,6 +82,7 @@ def test_search_raises_http_error(monkeypatch):
 
 
 def test_query_raises_business_error(monkeypatch):
+    """query_stock_data raises RuntimeError on a non-zero status_code payload."""
     def fake_post(*args, **kwargs):
         return DummyResponse(payload={"status_code": 1001, "status_msg": "bad query"})
 

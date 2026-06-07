@@ -9,6 +9,8 @@
 - **热点榜单**：支持热股榜、概念榜、行业榜。
 - **龙虎榜**：按日期查看龙虎榜明细，并支持详情弹窗。
 - **条件选股**：按行业、价格、市值、估值等条件筛选，并支持估值百分位过滤。
+- **24小时资讯**：聚合多源快讯和新闻，AI 智能摘要提炼关键信息并附带引用链接，自动刷新。
+- **产业链分析**：输入产业关键词，AI 自动搜索研报数据并生成完整产业链分析报告，支持历史记录和推送。
 - **每日复盘**：聚合市场、热点、新闻和 LLM 结论，生成结构化复盘。
 - **个股分析**：展示分时、K 线、基本面、估值（含机构一致预期）、技术指标、情绪数据和 AI 结论。
 - **AI 综合分析**：LLM 输出评分、评级、目标价格区间和买入/持有/卖出信号，融合机构一致预期数据。
@@ -219,9 +221,11 @@ make frontend-lint    # 前端 lint
 | `/market` | Market | 热点榜单、龙虎榜、指数相关信息 |
 | `/screener` | Screener | 条件选股和估值百分位 |
 | `/daily-review` | DailyReview | 每日市场复盘 |
+| `/feed` | Feed | 24小时资讯：快讯 + 新闻 + AI 智能摘要 |
 | `/chat` | Chat | AI 选股助手（对话式） |
 | `/analysis` | AnalysisEntry | 分析入口 |
 | `/analysis/:code` | Analysis | 个股分析详情 |
+| `/industry-chain` | IndustryChain | AI 产业链分析（支持名称参数） |
 | `/settings` | Settings | 系统配置 |
 
 ## API 概览
@@ -229,7 +233,7 @@ make frontend-lint    # 前端 lint
 | Prefix | 说明 |
 | --- | --- |
 | `/api/stock` | 股票搜索、基础信息、分时、K 线、财务、估值（含机构预测）、新闻、技术指标 |
-| `/api/market` | 指数、成交量、热点榜单、龙虎榜、市场情绪 |
+| `/api/market` | 指数、成交量、热点榜单、龙虎榜、市场情绪、资讯 AI 摘要 |
 | `/api/analysis` | AI 分析触发、结果查询、SSE 进度流 |
 | `/api/screener` | 条件选股、行业列表、估值百分位 |
 | `/api/daily-review` | 每日复盘生成、查询和存储 |
@@ -255,9 +259,10 @@ stock-agent/
 │   │   │   ├── chat/               # AI 选股助手（agent + skills 注册中心 + prompts）
 │   │   │   ├── daily_review/       # 每日复盘流水线
 │   │   │   ├── llm/                # LLM 客户端工厂
-│   │   │   ├── market/             # 指数、热点、龙虎榜、资讯
+│   │   │   ├── market/             # 指数、热点、龙虎榜、资讯、AI 摘要
 │   │   │   ├── providers/          # akshare、东方财富、同花顺、问财、百度、RSS 等数据源适配
 │   │   │   ├── screener/           # 条件选股、行业映射、估值百分位
+│   │   │   ├── industry_chain/     # 产业链分析流水线
 │   │   │   ├── search/             # 新闻和评论搜索
 │   │   │   ├── stock/              # 个股行情、财务、估值、搜索
 │   │   │   └── technical.py        # 技术指标计算
@@ -292,6 +297,8 @@ stock-agent/
 4. 分析进度通过 SSE 返回，最终结果经过 Pydantic 校验后展示。
 5. 市场、选股和每日复盘页面复用 market、screener、daily-review 相关服务。
 6. AI 选股助手（`/chat`）通过多轮 tool-calling 循环自动调用 skills 获取实时数据，SSE 流式返回。
+7. 24小时资讯（`/feed`）聚合多源快讯和新闻，AI 自动分析归类并附带引用链接，前端每 5 分钟自动刷新。
+8. 产业链分析（`/industry-chain`）通过 SSE 流式输出进度，分析结果存档后可从历史记录回看或推送到飞书/Notion。
 
 ## 数据源与启动说明
 

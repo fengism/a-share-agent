@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut } from "./client";
 import { oneYearAgoDate } from "../utils/date";
-import type { StockSearchItem, StockBasicInfo, KlineData, IntradayData, FinancialMetrics, StockValuation, StockValuationDetail, AnalysisResult, AnalysisHistoryItem, TechnicalIndicators, MarketIndices, HsgtFlow, StockNews, CategorizedStockNews, StockSentiment, RetailSentiment, ScreenerFilter, ScreenerResult, ValuationPercentileRequest, ValuationPercentileResult, ThsHotStock, ThsHotPlate, DragonTigerItem, DragonTigerDetail, PushRequest, PushResponse, FeedNewsItem, IndustryRankings, NewsAnalysis } from "../types/stock";
+import type { StockSearchItem, StockBasicInfo, KlineData, IntradayData, FinancialMetrics, StockValuation, StockValuationDetail, AnalysisResult, AnalysisHistoryItem, TechnicalIndicators, MarketIndices, HsgtFlow, StockNews, CategorizedStockNews, StockSentiment, RetailSentiment, ScreenerFilter, ScreenerResult, ValuationPercentileRequest, ValuationPercentileResult, ThsHotStock, ThsHotPlate, DragonTigerItem, DragonTigerDetail, PushRequest, PushResponse, FeedNewsItem, IndustryRankings, NewsAnalysis, IndustryChainResult, IndustryChainHistoryItem } from "../types/stock";
 import type { DailyReviewHistoryItem, DailyReviewRequest, DailyReviewResult } from "../types/dailyReview";
 import type { ConfigData, ConfigUpdate } from "../types/settings";
 
@@ -341,10 +341,59 @@ export function useMarketFeed() {
   });
 }
 
+export function useMarketKuaixun() {
+  return useQuery({
+    queryKey: ["marketKuaixun"],
+    queryFn: () => apiGet<FeedNewsItem[]>("/market/kuaixun"),
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+}
+
+export function useMarketOtherNews() {
+  return useQuery({
+    queryKey: ["marketOtherNews"],
+    queryFn: () => apiGet<FeedNewsItem[]>("/market/other-news"),
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+}
+
 export function useNewsAnalysis() {
   return useQuery({
     queryKey: ["newsAnalysis"],
     queryFn: () => apiGet<NewsAnalysis>("/market/news-analysis"),
     staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+}
+
+export function useIndustryChainHistory(name = "") {
+  return useQuery({
+    queryKey: ["industryChainHistory", name],
+    queryFn: () =>
+      apiGet<IndustryChainHistoryItem[]>(
+        "/industry-chain/history",
+        name ? { name } : {}
+      ),
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useIndustryChainLatest(name: string) {
+  return useQuery({
+    queryKey: ["industryChainLatest", name],
+    queryFn: () => apiGet<{ archive_id: string; saved_at: string }>(`/industry-chain/${encodeURIComponent(name)}/latest`),
+    enabled: !!name,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useIndustryChainArchive() {
+  return useMutation({
+    mutationFn: ({ name, archiveId }: { name: string; archiveId: string }) =>
+      apiGet<IndustryChainResult>(
+        `/industry-chain/${encodeURIComponent(name)}/archive/${archiveId}`
+      ),
   });
 }

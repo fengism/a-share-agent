@@ -7,6 +7,7 @@ from app.utils.singleflight import AsyncSingleFlight
 
 @pytest.mark.asyncio
 async def test_singleflight_dedupes_concurrent_same_key():
+    """AsyncSingleFlight.do deduplicates concurrent calls sharing the same key."""
     singleflight = AsyncSingleFlight[int]()
     calls = 0
 
@@ -27,6 +28,7 @@ async def test_singleflight_dedupes_concurrent_same_key():
 
 @pytest.mark.asyncio
 async def test_singleflight_does_not_dedupe_different_keys():
+    """AsyncSingleFlight.do does not deduplicate concurrent calls with different keys."""
     singleflight = AsyncSingleFlight[str]()
     calls: list[str] = []
 
@@ -51,6 +53,7 @@ async def test_singleflight_does_not_dedupe_different_keys():
 
 @pytest.mark.asyncio
 async def test_singleflight_clears_inflight_after_failure():
+    """AsyncSingleFlight.do clears inflight state and retries after a loader failure."""
     singleflight = AsyncSingleFlight[str]()
     calls = 0
 

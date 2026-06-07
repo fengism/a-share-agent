@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import stock, market, analysis, screener, daily_review, push, chat, config
+from app.routers import stock, market, analysis, screener, daily_review, push, chat, config, industry_chain
 from app.utils.rate_limiter import call_blocking
 
 logger = logging.getLogger(__name__)
@@ -31,8 +31,13 @@ for name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """FastAPI 应用生命周期管理器，启动时初始化数据库与预热任务，关闭时取消任务。"""
+    from app.db import init_db
     from app.services.screener.industry import build_industry_mapping
     from app.services.stock.name_map import build_stock_name_map
+
+    init_db()
+    logger.info("数据库初始化完成")
 
     tasks = [
         asyncio.create_task(build_industry_mapping()),
@@ -70,9 +75,11 @@ app.include_router(daily_review.router, prefix="/api/daily-review", tags=["daily
 app.include_router(push.router, prefix="/api/push", tags=["push"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
+app.include_router(industry_chain.router, prefix="/api/industry-chain", tags=["industry-chain"])
 
 
 async def refresh_industry_mapping_file_daily():
+    """每 24 小时定时更新一次行业映射文件的后台任务。"""
     from app.services.screener.industry import update_industry_mapping_sw_second_file
 
     while True:
@@ -86,4 +93,9 @@ async def refresh_industry_mapping_file_daily():
 
 @app.get("/api/health")
 async def health():
+    """健康检查端点。
+
+    Return:
+        包含 status 字段的字典。
+    """
     return {"status": "ok"}

@@ -8,6 +8,15 @@ from app.services.analysis import news
 
 
 def _item(title: str, source: str = "东方财富", publish_time: str | None = None) -> NewsSearchItem:
+    """Build a NewsSearchItem with sensible defaults for tests.
+
+    Param:
+        title: news headline used for title, content and url slug.
+        source: news source label.
+        publish_time: explicit timestamp string; defaults to current time when None.
+    Return:
+        a populated NewsSearchItem instance.
+    """
     return NewsSearchItem(
         title=title,
         content=title,
@@ -22,6 +31,7 @@ def _item(title: str, source: str = "东方财富", publish_time: str | None = N
 
 @pytest.mark.asyncio
 async def test_load_stock_news_keeps_only_recent_news(monkeypatch):
+    """_load_stock_news filters out news older than the recency window."""
     recent_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     old_time = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -39,6 +49,7 @@ async def test_load_stock_news_keeps_only_recent_news(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_stock_news_dedupes_concurrent_same_code(monkeypatch):
+    """get_stock_news coalesces concurrent calls for the same code into one provider call."""
     calls = {"em": 0, "cls": 0}
 
     async def fake_name_map():
@@ -75,6 +86,7 @@ async def test_get_stock_news_dedupes_concurrent_same_code(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_stock_news_does_not_dedupe_different_codes(monkeypatch):
+    """get_stock_news issues separate provider calls for different stock codes."""
     requested: list[str] = []
 
     async def fake_name_map():
@@ -106,6 +118,7 @@ async def test_get_stock_news_does_not_dedupe_different_codes(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_stock_news_clears_inflight_after_failure(monkeypatch):
+    """get_stock_news clears inflight state when the underlying loader raises."""
     calls = 0
 
     async def fake_load(sym):
@@ -131,6 +144,7 @@ async def test_get_stock_news_clears_inflight_after_failure(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_stock_news_uses_cache_without_provider(monkeypatch):
+    """get_stock_news returns the cached payload without invoking the provider."""
     cached = [_item("cached")]
 
     async def fake_load(sym):

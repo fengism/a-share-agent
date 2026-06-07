@@ -8,6 +8,7 @@ from app.services.analysis import retail
 
 @pytest.mark.asyncio
 async def test_get_retail_sentiment_counts_only_recent_posts(monkeypatch):
+    """get_retail_sentiment counts only posts within the recency window."""
     recent_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     old_time = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
     posts = [

@@ -11,15 +11,33 @@ from app.services.base.data_provider import BaseDataProvider
 from app.services.base.intraday_utils import loads_sina_jsonp, normalize_intraday_df
 from app.utils.symbol_utils import normalize_code
 from app.utils.market_utils import replace_comma
+from app.utils.cache import cache, dated_cache_key
 from app.utils.data_clean import coerce_numeric_columns, rename_and_keep_columns, rename_columns
 
 
 class SinaDataProvider(BaseDataProvider):
+    """Purpose: 直接对接新浪财经接口的 K线、指数、快照、分时等数据提供器（备用源）。"""
+    HQ_PAGE_SIZE = 80
+    HQ_MAX_PAGES = 80
+    HQ_RETRY_DELAY_SECONDS = 0.3
+    NAMES_CACHE_TTL = 86400  # 全市场名称代码，1 天
+    SNAPSHOT_CACHE_TTL = 60  # 实时行情，1 分钟
+
     def __init__(self):
+        """初始化 SinaDataProvider，固定 name 与 source_label。"""
         super().__init__(name="sina", source_label="新浪")
 
 
-    def fetch_kline_direct(self, code: str, period: str, start_date: str="", end_date: str="") -> pd.DataFrame:
+    def fetch_kline(self, code: str, period: str, start_date: str="", end_date: str="") -> pd.DataFrame:
+        """新浪股票 K 线（自行处理 JSONP/范围截取与列重命名）。
+        Param:
+            code: 6 位股票代码
+            period: daily/weekly/monthly
+            start_date: 起始日期，格式 YYYYMMDD
+            end_date: 结束日期，格式 YYYYMMDD
+        Return:
+            包含日期与 OHLCV 等列的 DataFrame
+        """
         sym = normalize_code(code)
         symbol = sym.prefixed_lower
         scale_map = {"daily": "240", "weekly": "1200", "monthly": "5200"}
@@ -76,51 +94,63 @@ class SinaDataProvider(BaseDataProvider):
         return df
 
 
-    def fetch_market_indices_direct(self) -> pd.DataFrame:
-        page_count = self._get_index_page_count()
+    def fetch_market_indices(self) -> pd.DataFrame:
+        """新浪沪深重要指数实时行情并合并为一张 DataFrame
+        https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple?page=1&num=40&sort=symbol&asc=1&node=dpzs&_s_r_a=init
+        Return:
+            包含代码、名称、最新价、涨跌额、涨跌幅、成交量（手）、成交额（万元） 等列的 DataFrame
+        """
         payload = {
             "page": "1",
-            "num": "80",
+            "num": "40",
             "sort": "symbol",
             "asc": "1",
-            "node": "hs_s",
-            "_s_r_a": "page",
+            "node": "dpzs",
+            "_s_r_a": "init",
         }
         big_df = pd.DataFrame()
-        for page in range(1, page_count + 1):
-            payload.update({"page": page})
-            response = requests.get(SINA_INDEX_QUOTE_URL, params=payload, timeout=10)
-            response.raise_for_status()
-            data_json = json.loads(response.text)
-            if not data_json:
-                break
-            big_df = pd.concat(objs=[big_df, pd.DataFrame(data_json)], ignore_index=True)
-        big_df = big_df.map(replace_comma)
+        response = requests.get(SINA_INDEX_QUOTE_URL, params=payload, timeout=10)
+        response.raise_for_status()
+        data_json = json.loads(response.text)
+        if not data_json:
+                return big_df
+        big_df = pd.DataFrame(data_json)
         big_df = coerce_numeric_columns(big_df, ["trade", "pricechange", "changepercent", "buy", "sell", "settlement", "open", "high", "low"])
         big_df.columns = ["代码", "名称", "最新价", "涨跌额", "涨跌幅", "_", "_", "昨收", "今开", "最高", "最低", "成交量", "成交额", "_", "_"]
         big_df = big_df[["代码", "名称", "最新价", "涨跌额", "涨跌幅", "昨收", "今开", "最高", "最低", "成交量", "成交额"]]
         return coerce_numeric_columns(big_df, ["最新价", "涨跌额", "涨跌幅", "昨收", "今开", "最高", "最低", "成交量", "成交额"])
 
-    def _get_index_page_count(self) -> int:
-        response = requests.get(SINA_INDEX_PAGE_COUNT_URL, timeout=10)
-        response.raise_for_status()
-        page_count = int(re.findall(re.compile(r"\d+"), response.text)[0]) / 80
-        if isinstance(page_count, int):
-            return page_count
-        return int(page_count) + 1
-
 
     def fetch_stock_names(self) -> list[dict]:
-        stocks: list[dict] = []
-        for item in self._fetch_market_hq_records():
-            code = str(item.get("code", ""))
-            name = str(item.get("name", "")).replace(" ", "")
-            if code and name:
-                stocks.append({"code": code, "name": name})
-        return stocks
+        """获取全市场 A 股的名称代码对照表（新浪行情列表分页拉取，按日缓存）。
 
-    def fetch_spot_snapshot_direct(self) -> pd.DataFrame:
-        records = self._fetch_market_hq_records()
+        Return:
+            [{"code": 股票代码, "name": 股票名称}, ...] 列表
+        """
+        records = self._fetch_market_hq_records(ttl=self.NAMES_CACHE_TTL, cache_scope="stock_names")
+        return [
+            {"code": str(item.get("code", "")), "name": str(item.get("name", "")).replace(" ", "")}
+            for item in records
+            if item.get("code") and item.get("name")
+        ]
+
+    def fetch_spot_snapshot(self) -> pd.DataFrame:
+        """获取全市场 A 股实时行情快照（新浪行情列表，60 秒内复用缓存）。
+
+        Return:
+            包含代码、名称、最新价、OHLCV、市盈率、市净率、换手率等的 DataFrame
+        """
+        records = self._fetch_market_hq_records(ttl=self.SNAPSHOT_CACHE_TTL, cache_scope="spot_snapshot")
+        return self._records_to_snapshot_df(records)
+
+    def _records_to_snapshot_df(self, records: list[dict]) -> pd.DataFrame:
+        """将新浪行情原始记录转换为标准化的全市场快照 DataFrame。
+
+        Param:
+            records: 新浪 hq_records 列表
+        Return:
+            标准化快照 DataFrame；空记录返回空 DataFrame
+        """
         if not records:
             return pd.DataFrame()
 
@@ -156,16 +186,29 @@ class SinaDataProvider(BaseDataProvider):
             df["流通市值"] = pd.to_numeric(df["流通市值"], errors="coerce") * 10000
         return df
 
-    def _fetch_market_hq_records(self) -> list[dict]:
+    def _fetch_market_hq_records(self, ttl: int | None = None, cache_scope: str = "default") -> list[dict]:
+        """分页拉取新浪沪深 A 股行情原始 JSON 记录，带缓存。
+
+        Param:
+            ttl: 缓存秒数；为 None 表示不缓存（每次都请求网络）
+            cache_scope: 缓存键的作用域标识，不同 scope 互不影响
+        Return:
+            单只股票行情记录字典列表
+        """
+        cache_key: str | None = dated_cache_key("sina", "hq_records", cache_scope) if ttl else None
+        if cache_key is not None:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return cached
+
         records: list[dict] = []
         page = 1
-        page_size = 80
         while True:
             response = requests.get(
                 SINA_MARKET_HQ_URL,
                 params={
                     "page": page,
-                    "num": page_size,
+                    "num": self.HQ_PAGE_SIZE,
                     "sort": "symbol",
                     "asc": 1,
                     "node": "hs_a",
@@ -179,14 +222,25 @@ class SinaDataProvider(BaseDataProvider):
             if not page_records:
                 break
             records.extend(page_records)
-            if len(page_records) < page_size:
+            if len(page_records) < self.HQ_PAGE_SIZE:
                 break
             page += 1
-            if page > 80:
+            if page > self.HQ_MAX_PAGES:
                 break
+
+        if cache_key is not None:
+            cache.set(cache_key, records, ttl=ttl)
         return records
 
     def fetch_stock_intraday_minute_direct(self, code: str = "000001", date: str | None = None) -> pd.DataFrame:
+        """直接拉取新浪个股分时分钟线（解析 JSONP 响应）。
+
+        Param:
+            code: 6 位股票代码，默认 000001
+            date: 可选，交易日，格式 YYYY-MM-DD
+        Return:
+            标准化后的分时 DataFrame
+        """
         sym = normalize_code(code)
         sina_code = sym.prefixed_lower
         params = {
@@ -213,10 +267,10 @@ class SinaDataProvider(BaseDataProvider):
             "成交额": pd.to_numeric(df.get("p"), errors="coerce") * pd.to_numeric(df.get("v"), errors="coerce"),
         })
         return normalize_intraday_df(result_df)
-
+    
 
 sina_provider = SinaDataProvider()
 
 if __name__ == "__main__":
-    df = sina_provider.fetch_kline_direct("600519", "daily", "20260520", "20260526")
+    df = sina_provider.fetch_stock_names()
     print(df)

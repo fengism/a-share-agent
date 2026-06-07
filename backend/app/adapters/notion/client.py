@@ -8,10 +8,17 @@ _NOTION_PAGES_URL = "https://api.notion.com/v1/pages"
 
 
 class NotionConfigError(RuntimeError):
-    pass
+    """Purpose: Notion 推送相关配置缺失或非法时抛出的异常。"""
 
 
 def _resolve_parent(settings: Settings) -> dict:
+    """根据配置解析 Notion 页面或数据库的 parent 字段。
+
+    Param:
+        settings: 应用配置实例
+    Return:
+        包含 database_id 或 page_id 的 parent dict
+    """
     if not settings.notion_enabled:
         raise NotionConfigError("NOTION_ENABLED must be true to export to Notion")
     if not settings.notion_api_token.strip():
@@ -24,12 +31,28 @@ def _resolve_parent(settings: Settings) -> dict:
 
 
 def _properties(title: str, parent: dict) -> dict:
+    """根据 parent 类型构造 Notion 页面 properties。
+
+    Param:
+        title: 页面标题
+        parent: parent dict，含 database_id 或 page_id
+    Return:
+        Notion properties dict
+    """
     if "database_id" in parent:
         return {"Name": {"title": [{"type": "text", "text": {"content": title}}]}}
     return {"title": {"title": [{"type": "text", "text": {"content": title}}]}}
 
 
 def create_page(title: str, blocks: list[dict]) -> NotionExportResponse:
+    """在 Notion 中创建页面并写入块内容。
+
+    Param:
+        title: 页面标题
+        blocks: Notion 块 dict 列表
+    Return:
+        NotionExportResponse，包含 page_id、url 和 title
+    """
     settings = get_settings()
     parent = _resolve_parent(settings)
     response = requests.post(

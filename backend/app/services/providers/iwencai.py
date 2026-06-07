@@ -34,10 +34,16 @@ class IwencaiDataProvider(BaseDataProvider):
     """
     
     def __init__(self):
+        """初始化 IwencaiDataProvider，固定 name 与 source_label。"""
         super().__init__(name="iwencai", source_label="问财")
 
     @property
     def _base_url(self) -> str:
+        """问财 API 的 base_url，优先从配置读取，回退到环境变量与默认值。
+
+        Return:
+            问财 OpenAPI 的 base URL
+        """
         try:
             from app.config import get_settings
             settings = get_settings()
@@ -47,6 +53,11 @@ class IwencaiDataProvider(BaseDataProvider):
 
     @property
     def _api_key(self) -> str:
+        """问财 API 的鉴权 Key，优先从配置读取，回退到环境变量。
+
+        Return:
+            问财 API Key 字符串
+        """
         try:
             from app.config import get_settings
             settings = get_settings()
@@ -58,6 +69,13 @@ class IwencaiDataProvider(BaseDataProvider):
         return os.environ.get("IWENCAI_API_KEY", "")
 
     def _claw_headers(self, call_type: str = "normal") -> dict:
+        """构造问财 Claw 协议所需的自定义头（包含 trace_id）。
+
+        Param:
+            call_type: 调用类型标识
+        Return:
+            包含 X-Claw-* 系列头的字典
+        """
         return {
             "X-Claw-Call-Type": call_type,
             "X-Claw-Skill-Version": "2.0.0",
@@ -67,6 +85,13 @@ class IwencaiDataProvider(BaseDataProvider):
         }
 
     def _request_headers(self, skill_id: str) -> dict:
+        """构造问财请求头（合并鉴权、Claw 头与 skill_id）。
+
+        Param:
+            skill_id: 问财 skill 标识
+        Return:
+            完整的请求头字典
+        """
         return {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
@@ -81,6 +106,16 @@ class IwencaiDataProvider(BaseDataProvider):
         limit: int,
         expand_index: bool = True,
     ) -> dict[str, Any]:
+        """构造问财 query2data 接口的请求体。
+
+        Param:
+            query: 自然语言查询
+            page: 页码
+            limit: 每页条数
+            expand_index: 是否展开指数数据
+        Return:
+            问财 query2data 接口的 payload 字典
+        """
         return {
             "query": query,
             "page": str(page),
@@ -90,6 +125,15 @@ class IwencaiDataProvider(BaseDataProvider):
         }
 
     def _post_json(self, path: str, payload: dict[str, Any], skill_id: str) -> dict[str, Any]:
+        """向问财 OpenAPI 发起 POST 请求并校验返回结果。
+
+        Param:
+            path: 接口路径
+            payload: 请求体
+            skill_id: 问财 skill 标识
+        Return:
+            问财接口返回的 data 字段
+        """
         response = requests.post(
             f"{self._base_url}{path}",
             json=payload,
@@ -112,10 +156,17 @@ class IwencaiDataProvider(BaseDataProvider):
     ) -> list[dict]:
         """语义搜索研报/公告/新闻。
 
-        Args:
+        Param:
             query: 搜索关键词
             channel: "report"(研报) / "announcement"(公告) / "news"(新闻)
             size: 返回条数，默认50
+
+        Param:
+            query: 搜索关键词
+            channel: 搜索频道
+            size: 返回条数
+        Return:
+            问财搜索结果的 data 列表
         """
         payload = {
             "channels": [channel],
@@ -125,23 +176,32 @@ class IwencaiDataProvider(BaseDataProvider):
         }
         data = self._post_json(_SEARCH_PATH, payload, _REPORT_SEARCH_SKILL_ID)
         return data.get("data") or []
-    
+
 
     def query_stock_data(self, query: str, page: int = 1, limit: int = 50) -> list[dict]:
-        """NL 数据查询（结构化字段）。
-        例: "贵州茅台 ROE" → DataFrame-like rows
+        """NL 数据查询（结构化字段）。例: "贵州茅台 ROE" → DataFrame-like rows
+
+        Param:
+            query: 自然语言查询
+            page: 页码
+            limit: 每页条数
+        Return:
+            问财 datas 列表
         """
         payload = self._query_payload(query, page, limit)
         data = self._post_json(_QUERY_PATH, payload, _BASIC_INFO_SKILL_ID)
         return data.get("datas") or []
 
     def select_stocks(self, query: str, page: int = 1, limit: int = 10, expand_index: bool = True) -> list[dict]:
-        """
-        NL 选股票
-        例:
-        "今日涨跌幅大于5%" → DataFrame-like rows
-        "科技股有哪些" → DataFrame-like rows
-        "今日涨停的股票有哪些" → DataFrame-like rows
+        """NL 选股票。
+
+        Param:
+            query: 自然语言选股条件
+            page: 页码
+            limit: 每页条数
+            expand_index: 是否展开指数数据
+        Return:
+            命中的股票列表
         """
         payload = self._query_payload(query, page, limit, expand_index)
         data = self._post_json(_QUERY_PATH, payload, _STOCK_SELECTOR_SKILL_ID)
@@ -149,10 +209,14 @@ class IwencaiDataProvider(BaseDataProvider):
 
     def query_market_macro(self, query: str, page: int = 1, limit: int = 50, expand_index: bool = True) -> list[dict]:
         """NL 宏观查询（结构化字段）。
-        例如：
-        "2024年中国GDP" → DataFrame-like rows
-        "M2增速" → DataFrame-like rows
-        "最近一期CPI" → DataFrame-like rows
+
+        Param:
+            query: 自然语言宏观查询
+            page: 页码
+            limit: 每页条数
+            expand_index: 是否展开指数数据
+        Return:
+            宏观数据行列表
         """
         payload = self._query_payload(query, page, limit, expand_index)
         data = self._post_json(_QUERY_PATH, payload, _MACRO_QUERY_SKILL_ID)
@@ -161,6 +225,13 @@ class IwencaiDataProvider(BaseDataProvider):
 
     @staticmethod
     def _to_news_search_item(item: dict) -> NewsSearchItem:
+        """将问财搜索结果 item 转换为统一的 NewsSearchItem。
+
+        Param:
+            item: 问财搜索返回的单条结果字典
+        Return:
+            NewsSearchItem 对象
+        """
         extra = item.get("extra") or {}
         return NewsSearchItem(
             title=str(item.get("title") or "").strip(),
@@ -174,14 +245,27 @@ class IwencaiDataProvider(BaseDataProvider):
         )
 
     def search_news(self, query: str, size: int = 10) -> list[NewsSearchItem]:
-        """搜索新闻，返回统一 NewsSearchItem 格式。"""
+        """搜索新闻，返回统一 NewsSearchItem 格式。
+
+        Param:
+            query: 新闻搜索关键词
+            size: 返回条数
+        Return:
+            去重后的 NewsSearchItem 列表
+        """
         articles = self.search(query, channel="news", size=size)
         return [self._to_news_search_item(a) for a in self.dedup_articles(articles)]
 
 
     @staticmethod
     def dedup_articles(articles: list[dict]) -> list[dict]:
-        """同一 uid 仅保留 score 最高的段落"""
+        """同一 uid 仅保留 score 最高的段落。
+
+        Param:
+            articles: 问财文章列表
+        Return:
+            按发布时间倒序、去重后的文章列表
+        """
         best: dict[str, dict] = {}
         for a in articles:
             uid = a.get("uid", "") or f"{a.get('title','')}|{a.get('publish_date','')}"
@@ -191,20 +275,25 @@ class IwencaiDataProvider(BaseDataProvider):
         return sorted(best.values(), key=lambda x: x.get("publish_date", ""), reverse=True)
 
     def search_reports(self, query: str, size: int = 50) -> list[dict]:
-        """
-        搜索研报
-        return:
-            list[dict]: 研报列表
-        例: "茅台最近研报" → DataFrame-like rows
+        """搜索研报（去重后返回）。例: "茅台最近研报" → DataFrame-like rows
+
+        Param:
+            query: 研报搜索关键词
+            size: 返回条数
+        Return:
+            研报列表
         """
         articles = self.search(query, channel="report", size=size)
         return self.dedup_articles(articles)
 
     def search_announcements(self, query: str, size: int = 50) -> list[dict]:
-        """搜索公告（便捷方法，自动去重）
-        return:
-            list[dict]: 公告列表
-        例: "茅台有哪些公告" → DataFrame-like rows
+        """搜索公告（便捷方法，自动去重）。例: "茅台有哪些公告" → DataFrame-like rows
+
+        Param:
+            query: 公告搜索关键词
+            size: 返回条数
+        Return:
+            公告列表
         """
         articles = self.search(query, channel="announcement", size=size)
         return self.dedup_articles(articles)

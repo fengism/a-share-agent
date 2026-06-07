@@ -1,7 +1,9 @@
 import json
 import logging
+import random
 import re
 import time
+from urllib.parse import quote
 
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -32,38 +34,142 @@ from app.utils import http_client
 from app.utils.symbol_utils import classify_exchange
 from app.utils.symbol_utils import contains_stock_reference
 from app.utils.data_clean import rename_and_keep_columns, safe_float
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
 
 class EastMoneyDataProvider(BaseDataProvider):
+    """东方财富数据提供者。
+
+    封装东方财富公开 API，提供 A 股行情、K 线、分时、财务、研报、
+    龙虎榜、涨停跌停池、行业板块、新闻资讯、资金流向等数据接口。
+    所有请求通过 em_get_response 统一节流和 session 复用。
+
+    属性:
+        REPORT_API: 研报列表 API 地址
+        PDF_TPL: 研报 PDF 下载模板 URL
+        UA: 默认 User-Agent
+        DATACENTER_URL: 东方财富数据中心 API 地址
+        _em_last_call: 上次请求时间戳（用于节流）
+        em_session: 复用的 requests.Session
+        EM_MIN_INTERVAL: 两次请求最小间隔（秒）
+    """
+
     def __init__(self):
         super().__init__(name="eastmoney", source_label="东方财富")
         self.REPORT_API = "https://reportapi.eastmoney.com/report/list"
         self.PDF_TPL = "https://pdf.dfcfw.com/pdf/H3_{info_code}_1.pdf"
         self.UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
         self.DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+        self._em_last_call = [0.0]
+        self.em_session = requests.Session()
+        self.em_session.trust_env = get_settings().http_trust_env
+        self.em_session.headers.update({"User-Agent": self.UA})
+        self.EM_MIN_INTERVAL = 1.0
+
+    def em_get_response(self, url, params=None, headers=None, timeout=15, **kwargs):
+        """东财统一请求入口：自动节流 + 复用 session。
+
+        Param:
+            url: 请求地址
+            params: URL 查询参数
+            headers: 请求头
+            timeout: 超时秒数
+        Return:
+            requests.Response 响应对象
+        """
+        wait = self.EM_MIN_INTERVAL - (time.time() - self._em_last_call[0])
+        if wait > 0:
+            time.sleep(wait + random.uniform(0.1, 0.5))
+        try:
+            return self.em_session.get(url, params=params, headers=headers, timeout=timeout, **kwargs)
+        finally:
+            self._em_last_call[0] = time.time()
 
     def fetch_datacenter_report(self, report_name: str, columns: str = "ALL",
                                 filter_str: str = "", page_size: int = 50,
                                 sort_columns: str = "", sort_types: str = "-1") -> list[dict]:
-        """东财数据中心统一查询 — 龙虎榜/解禁/融资融券/大宗交易/股东户数/分红 共用"""
+        """东财数据中心统一查询 — 龙虎榜/解禁/融资融券/大宗交易/股东户数/分红 共用。
+
+        Param:
+            report_name: 报表名称，对应东财数据中心的 reportName 参数
+            columns: 返回字段，默认 "ALL"
+            filter_str: 过滤条件字符串
+            page_size: 每页条数
+            sort_columns: 排序字段
+            sort_types: 排序方向（-1 倒序，1 正序）
+        Return:
+            list[dict]: 报表数据行列表，每行为一个字典；无数据时返回空列表
+        """
         params = {
             "reportName": report_name, "columns": columns,
-            "filter": filter_str, "pageNumber": "1", "pageSize": str(page_size),
+            "pageNumber": "1", "pageSize": str(page_size),
             "sortColumns": sort_columns, "sortTypes": sort_types,
             "source": "WEB", "client": "WEB",
         }
-        r = requests.get(self.DATACENTER_URL, params=params, headers={"User-Agent": self.UA}, timeout=15)
+        # filter 需要手工拼入 URL：requests 不编码 ' " < > 等字符，
+        # 但东财 ANTLR 解析器要求 %27 %22 %3C %3E 形式。
+        url = self.DATACENTER_URL + "?" + "&".join(f"{k}={v}" for k, v in params.items())
+        if filter_str:
+            url += "&filter=" + quote(filter_str, safe="")
+        r = self.em_get_response(url, headers={"User-Agent": self.UA}, timeout=15)
         d = r.json()
         if d.get("result") and d["result"].get("data"):
             return d["result"]["data"]
         return []
+    
+
+    def search_stocks(self, query: str, count: int = 10) -> list[StockSearchItem]:
+        """搜索股票。
+
+        根据关键词（代码、名称、拼音）搜索 A 股股票。
+
+        Param:
+            query: 搜索关键词（如 "600519"、"贵州茅台"、"GZMT"）
+            count: 返回结果数量上限，默认 10
+        Return:
+            list[StockSearchItem]: 搜索结果列表，每个元素包含 code 和 name
+        """
+        params = {
+            "input": query,
+            "type": "14",
+            "token": EASTMONEY_SEARCH_SUGGEST_TOKEN,
+            "count": str(max(count, 5)),
+        }
+        response = self.em_get_response(EASTMONEY_SEARCH_SUGGEST_URL, params=params, headers=EASTMONEY_HEADERS, timeout=10)
+        data = response.json().get("QuotationCodeTable", {}).get("Data") or []
+        results: list[StockSearchItem] = []
+        seen_codes: set[str] = set()
+        for item in data:
+            parsed = self._parse_search_item(item)
+            if parsed is None or parsed.code in seen_codes:
+                continue
+            results.append(parsed)
+            seen_codes.add(parsed.code)
+            if len(results) >= count:
+                break
+        return results
+
 
     def fetch_stock_basic_info(self, code: str) -> dict:
-        """
-        东财个股基本面信息。
-        返回: {code, name, industry, total_shares, float_shares, mcap, float_mcap, list_date}
+        """获取个股基本面信息。
+
+        通过东方财富推送接口获取单只股票的基础数据。
+
+        Param:
+            code: 6 位股票代码（如 "600519"）
+        Return:
+            dict: 包含以下字段:
+                - code (str): 股票代码
+                - name (str): 股票名称
+                - industry (str): 所属行业
+                - total_shares (int): 总股本（股）
+                - float_shares (int): 流通股本（股）
+                - mcap (int): 总市值（元）
+                - float_mcap (int): 流通市值（元）
+                - list_date (str): 上市日期（YYYYMMDD）
+                - price (int): 最新价（分）
         """
         market_code = 1 if code.startswith("6") else 0
         url = "https://push2.eastmoney.com/api/qt/stock/get"
@@ -73,7 +179,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "secid": f"{market_code}.{code}",
         }
 
-        r = requests.get(url, params=params, headers=COMMON_HEADERS, timeout=10)
+        r = self.em_get_response(url, params=params, headers=COMMON_HEADERS, timeout=10)
         d = r.json().get("data", {})
         return {
             "code": d.get("f57", ""),
@@ -87,7 +193,18 @@ class EastMoneyDataProvider(BaseDataProvider):
             "price": d.get("f43", 0),
         }
 
-    def fetch_kline(self, code: str, period: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
+    def fetch_kline(self, code: str, period: str, start_date: str, end_date: str, adjust: str = "qfq") -> pd.DataFrame:
+        """获取个股历史 K 线数据
+
+        Param:
+            code: 6 位股票代码
+            period: K 线周期，可选 "daily"（日线）、"weekly"（周线）、"monthly"（月线）
+            start_date: 起始日期，格式 "YYYYMMDD"
+            end_date: 结束日期，格式 "YYYYMMDD"
+            adjust: 复权方式，"qfq"（前复权，默认）、"hfq"（后复权）、""（不复权）
+        Return:
+            pd.DataFrame: 包含列: 日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 振幅, 涨跌幅, 涨跌额, 换手率
+        """
         se_cid = 1 if code.startswith("6") else 0
         k_type_map = {"daily": "101", "weekly": "102", "monthly": "103"}
         klt = k_type_map.get(period, "101")
@@ -105,7 +222,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "end": end_date,
             "_": "1623766962675",
         }
-        r = requests.get(EASTMONEY_STOCK_KLINE_URL, params=params, headers=EASTMONEY_HEADERS, timeout=10)
+        r = self.em_get_response(EASTMONEY_STOCK_KLINE_URL, params=params, headers=EASTMONEY_HEADERS, timeout=10)
         data_json = r.json()
 
         if not data_json.get("data") or not data_json["data"].get("klines"):
@@ -122,7 +239,17 @@ class EastMoneyDataProvider(BaseDataProvider):
             df["振幅"] = pd.to_numeric(df["振幅"], errors="coerce")
         return df
 
-    def fetch_index_kline_direct(self, symbol: str, period: str, start_date: str, end_date: str) -> pd.DataFrame:
+    def fetch_index_kline(self, symbol: str, period: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """获取大盘指数历史 K 线数据。
+
+        Param:
+            symbol: 指数代码（如 "000001" 上证指数、"399001" 深证成指）
+            period: K 线周期，可选 "daily"、"weekly"、"monthly"
+            start_date: 起始日期，格式 "YYYYMMDD"
+            end_date: 结束日期，格式 "YYYYMMDD"
+        Return:
+            pd.DataFrame: 包含列: 日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 振幅, 涨跌幅, 涨跌额, 换手率
+        """
         secid_map = {code: secid for code, _name, secid in INDEX_FALLBACKS}
         secid = secid_map.get(symbol)
         if secid is None:
@@ -165,6 +292,16 @@ class EastMoneyDataProvider(BaseDataProvider):
 
 
     def fetch_stock_intraday_transactions(self, code: str = "000001", date: str | None = None) -> pd.DataFrame:
+        """获取个股分时成交明细（逐笔成交）。
+
+        通过 SSE 推送接口获取当日逐笔成交数据。
+
+        Param:
+            code: 6 位股票代码，默认 "000001"
+            date: 交易日期，格式 "YYYY-MM-DD"，默认当日
+        Return:
+            pd.DataFrame: 包含列: 时间, 成交价, 成交量, 成交额, 买卖盘性质
+        """
         market_code = 1 if code.startswith("6") else 0
         url = "https://61.push2delay.eastmoney.com/api/qt/stock/details/sse"
         params = {
@@ -196,7 +333,17 @@ class EastMoneyDataProvider(BaseDataProvider):
         big_df["成交额"] = pd.to_numeric(big_df["成交价"], errors="coerce") * pd.to_numeric(big_df["成交量"], errors="coerce")
         return normalize_intraday_df(big_df)
 
-    def fetch_stock_intraday_minute_direct(self, code: str = "000001", date: str | None = None) -> pd.DataFrame:
+    def fetch_stock_intraday_minute(self, code: str = "000001", date: str | None = None) -> pd.DataFrame:
+        """获取个股分时分钟数据（1 分钟级别）。
+
+        通过 SSE 推送接口获取分时走势的分钟级数据。
+
+        Param:
+            code: 6 位股票代码，默认 "000001"
+            date: 交易日期，格式 "YYYY-MM-DD"，默认当日
+        Return:
+            pd.DataFrame: 包含列: 时间, 成交价, 手数, 成交额
+        """
         market_code = 1 if code.startswith("6") else 0
         url = "https://69.push2.eastmoney.com/api/qt/stock/trends2/sse"
         params = {
@@ -231,8 +378,15 @@ class EastMoneyDataProvider(BaseDataProvider):
         return normalize_intraday_df(result_df)
 
 
-    def fetch_market_indices_direct(self) -> pd.DataFrame:
-        response = requests.get(
+    def fetch_market_indices(self) -> pd.DataFrame:
+        """获取主要市场指数实时行情。
+
+        获取上证指数、深证成指、创业板指等主要指数的实时行情数据。
+
+        Return:
+            pd.DataFrame: 包含列: 代码, 名称, 最新价, 涨跌幅, 涨跌额, 成交量, 成交额, 最高, 最低, 今开, 昨收, 振幅, 量比
+        """
+        response = self.em_get_response(
             "https://push2delay.eastmoney.com/api/qt/clist/get",
             params={
                 "np": "1",
@@ -288,28 +442,14 @@ class EastMoneyDataProvider(BaseDataProvider):
             index_df[column] = pd.to_numeric(index_df[column], errors="coerce")
         return index_df
 
-    def search_stocks(self, query: str, count: int = 10) -> list[StockSearchItem]:
-        params = {
-            "input": query,
-            "type": "14",
-            "token": EASTMONEY_SEARCH_SUGGEST_TOKEN,
-            "count": str(max(count, 5)),
-        }
-        response = requests.get(EASTMONEY_SEARCH_SUGGEST_URL, params=params, headers=EASTMONEY_HEADERS, timeout=10)
-        data = response.json().get("QuotationCodeTable", {}).get("Data") or []
-        results: list[StockSearchItem] = []
-        seen_codes: set[str] = set()
-        for item in data:
-            parsed = self._parse_search_item(item)
-            if parsed is None or parsed.code in seen_codes:
-                continue
-            results.append(parsed)
-            seen_codes.add(parsed.code)
-            if len(results) >= count:
-                break
-        return results
-
     def _parse_search_item(self, item: dict) -> StockSearchItem | None:
+        """解析搜索结果项。
+
+        Param:
+            item: 东财搜索接口返回的原始字典
+        Return:
+            StockSearchItem | None: 解析成功返回 StockSearchItem，无效数据返回 None
+        """
         code = str(item.get("Code") or item.get("SecurityCode") or "").strip()
         name = str(item.get("Name") or item.get("SecurityName") or item.get("PinYin") or "").strip()
         if not code or not name or len(code) != 6 or not code.isdigit():
@@ -319,6 +459,15 @@ class EastMoneyDataProvider(BaseDataProvider):
         return StockSearchItem(code=code, name=name)
 
     def _is_a_share_search_item(self, item: dict) -> bool:
+        """判断搜索结果是否为 A 股。
+
+        通过代码、分类和市场信息综合判断。
+
+        Param:
+            item: 东财搜索接口返回的原始字典
+        Return:
+            bool: True 表示是 A 股，False 表示不是
+        """
         classify = str(item.get("Classify") or item.get("SecurityTypeName") or "").strip()
         market = str(item.get("MarketType") or item.get("Market") or "").strip().upper()
         code = str(item.get("Code") or item.get("SecurityCode") or "").strip()
@@ -332,11 +481,18 @@ class EastMoneyDataProvider(BaseDataProvider):
         return market in {"SH", "SZ", "BJ", "CN"}
 
     def fetch_stock_names(self) -> list[dict]:
-        response = requests.get(
-            EASTMONEY_CLIST_URL,
-            params={
+        """获取全市场股票代码和名称列表。
+
+        通过东方财富 clist 接口分页获取所有 A 股的代码和名称。
+
+        Return:
+            list[dict]: 股票列表，每个字典包含:
+                - code (str): 6 位股票代码
+                - name (str): 股票名称（去除空格）
+        """
+        params={
                 "pn": "1",
-                "pz": "6000",
+                "pz": "100",
                 "po": "1",
                 "np": "1",
                 "ut": "bd1d9ddb04089700cf9c27f6f7426281",
@@ -345,19 +501,26 @@ class EastMoneyDataProvider(BaseDataProvider):
                 "fid": "f3",
                 "fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048",
                 "fields": "f12,f14",
-            },
-            timeout=15,
-        )
-        data = response.json()
+            }
+
+        all_data = self._fetch_clist_diff(params, headers=EASTMONEY_HEADERS, page_size=100)
         stocks: list[dict] = []
-        for item in data.get("data", {}).get("diff", []):
+        for item in all_data:
             code = str(item.get("f12", ""))
             name = str(item.get("f14", "")).replace(" ", "")
             if code and name and len(code) == 6 and code.isdigit():
                 stocks.append({"code": code, "name": name})
         return stocks
 
-    def fetch_spot_snapshot_direct(self) -> pd.DataFrame:
+    def fetch_spot_snapshot(self) -> pd.DataFrame:
+        """获取全市场个股实时行情快照。
+
+        获取所有 A 股的最新价、涨跌幅、成交量、市值等核心指标。
+
+        Return:
+            pd.DataFrame: 包含列: 代码, 名称, 最新价, 涨跌幅, 涨跌额, 成交量, 成交额,
+                振幅, 换手率, 市盈率-动态, 量比, 最高, 最低, 今开, 昨收, 总市值, 流通市值, 市净率
+        """
         diff = self._fetch_clist_diff(
             {
                 "po": "1",
@@ -369,7 +532,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                 "fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048",
                 "fields": "f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f14,f15,f16,f17,f18,f20,f21,f23",
             },
-            page_size=5000,
+            page_size=100,
         )
         if not diff:
             return pd.DataFrame()
@@ -387,18 +550,31 @@ class EastMoneyDataProvider(BaseDataProvider):
             df["成交量"] = pd.to_numeric(df["成交量"], errors="coerce") * 100
         return df
 
-    def _fetch_clist_diff(self, params: dict[str, str], page_size: int = 200) -> list[dict]:
+    def _fetch_clist_diff(self, params: dict[str, str], headers: dict = None, page_size: int = 100) -> list[dict]:
+        """分页获取东方财富 clist 接口的全部 diff 数据。
+
+        自动处理分页，直到数据取完或达到上限。
+
+        Param:
+            params: 请求参数字典（不含分页参数 pn/pz，由本方法自动添加）
+            headers: 可选的自定义请求头
+            page_size: 每页条数，默认 100
+        Return:
+            list[dict]: 所有页的 diff 数据合并列表
+        """
         all_data: list[dict] = []
         page = 1
         while True:
             req_params = {**params, "pn": str(page), "pz": str(page_size)}
             try:
-                response = http_client.get(EASTMONEY_CLIST_URL, params=req_params, headers=EASTMONEY_HEADERS, timeout=15)
+                response = self.em_get_response(EASTMONEY_CLIST_URL, params=req_params, headers=headers, timeout=15)
+                if response.status_code != 200:
+                    logger.warning(f"东方财富 clist HTTP 错误: page={page}, status={response.status_code}")
+                    break
                 data_json = response.json()
             except Exception as exc:
                 logger.warning(f"东方财富 clist 请求失败: page={page}, error={exc}")
-                raise
-
+                break
             data = data_json.get("data") or {}
             diff = data.get("diff") or []
             if not diff:
@@ -413,7 +589,12 @@ class EastMoneyDataProvider(BaseDataProvider):
             page += 1
         return all_data
 
-    def fetch_industry_boards_direct(self) -> pd.DataFrame:
+    def fetch_industry_boards(self) -> pd.DataFrame:
+        """获取东财行业板块列表。
+
+        Return:
+            pd.DataFrame: 包含列: 板块代码, 板块名称
+        """
         params = {
             "po": "1",
             "np": "1",
@@ -432,7 +613,14 @@ class EastMoneyDataProvider(BaseDataProvider):
         keep_cols = [column for column in ["板块代码", "板块名称"] if column in df.columns]
         return df[keep_cols]
 
-    def fetch_industry_components_direct(self, board_code: str) -> pd.DataFrame:
+    def fetch_industry_components(self, board_code: str) -> pd.DataFrame:
+        """获取指定行业板块的成分股列表。
+
+        Param:
+            board_code: 行业板块代码
+        Return:
+            pd.DataFrame: 包含列: 代码, 名称
+        """
         params = {
             "po": "1",
             "np": "1",
@@ -451,8 +639,17 @@ class EastMoneyDataProvider(BaseDataProvider):
         keep_cols = [column for column in ["代码", "名称"] if column in df.columns]
         return df[keep_cols]
 
-    def build_industry_mapping_direct(self) -> tuple[dict[str, str], list[str]]:
-        boards_df = self.fetch_industry_boards_direct()
+    def build_industry_mapping(self) -> tuple[dict[str, str], list[str]]:
+        """构建股票代码到行业板块的映射关系。
+
+        遍历所有行业板块，获取每个板块的成分股，建立映射。
+
+        Return:
+            tuple[dict[str, str], list[str]]:
+                - dict: 股票代码 -> 行业板块名称 的映射
+                - list: 所有行业板块名称列表
+        """
+        boards_df = self.fetch_industry_boards()
         mapping: dict[str, str] = {}
         industries: list[str] = []
         if "板块名称" in boards_df.columns:
@@ -465,7 +662,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             board_code = str(row["板块代码"])
             board_name = str(row["板块名称"])
             try:
-                cons_df = self.fetch_industry_components_direct(board_code)
+                cons_df = self.fetch_industry_components(board_code)
                 if "代码" not in cons_df.columns:
                     continue
                 for code in cons_df["代码"]:
@@ -478,55 +675,244 @@ class EastMoneyDataProvider(BaseDataProvider):
         return mapping, industries
 
     def fetch_market_news(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
-        timestamp = str(int(time.time() * 1000))
-        params = {
-            "client": "web",
-            "biz": "web_news_col",
-            "column": "366",
-            "order": "1",
-            "needInteractData": "0",
-            "page_index": "1",
-            "page_size": "50",
-            "req_trace": timestamp,
-            "fields": "code,showTime,title,mediaName,summary,image,url,uniqueUrl,Np_dst",
-            "types": "1,20",
-            "callback": "jQuery1830008903121921045032_1778650747671",
-            "_": timestamp,
-        }
-        response = requests.get("https://np-listapi.eastmoney.com/comm/web/getNewsByColumns", params=params, timeout=10)
-        response.raise_for_status()
-        text = response.text.strip()
-        start = text.find("{")
-        end = text.rfind("}")
-        if start == -1 or end == -1:
-            raise ValueError("东方财富新闻接口返回格式异常")
-        payload = json.loads(text[start:end + 1])
+        """获取东方财富财经新闻（中国+国际+导读）。
 
-        results: list[NewsSearchItem] = []
-        for item in payload.get("data", {}).get("list", []) or []:
+        Param:
+            code: 可选，股票代码，用于过滤相关新闻
+            code_name: 可选，股票名称，用于过滤相关新闻
+        Return:
+            list[NewsSearchItem]: 新闻列表
+        """
+        news_ids: list[str] = []
+        all_news: list[NewsSearchItem] = []
+        for column, label in [("350", "中国新闻"), ("351", "国际新闻"), ("366", "导读新闻")]:
+            try:
+                items, news_ids = self._fetch_finance_news(
+                    column=column, news_ids=news_ids, code=code, code_name=code_name,
+                )
+                all_news.extend(items)
+            except Exception as e:
+                logger.warning(f"东方财富{label}获取失败: {e}")
+        return all_news
+
+    def _fetch_finance_news(self, column: str = "", news_ids: list[str] = [],
+                            code: str = "", code_name: str = "") -> tuple[list[NewsSearchItem], list[str]]:
+        """获取东方财富单分类新闻。
+
+        Param:
+            column: 新闻分类 ID（如 "350" 中国新闻、"351" 国际新闻、"366" 导读新闻）
+            news_ids: 已有的新闻 ID 列表，用于去重
+            code: 可选，股票代码，用于过滤相关新闻
+            code_name: 可选，股票名称，用于过滤相关新闻
+        Return:
+            tuple[list[NewsSearchItem], list[str]]:
+                - list: 新闻列表
+                - list: 更新后的新闻 ID 列表（含本次新增）
+        """
+        trace = str(int(time.time() * 1000))
+        url = "https://np-listapi.eastmoney.com/comm/web/getNewsByColumns"
+        params = {
+            "client": "web", "biz": "web_news_col", "column": str(column),
+            "order": "1", "needInteractData": "0", "page_index": "1", "page_size": "20",
+            "req_trace": trace,
+            "fields": "code,showTime,title,mediaName,summary,image,url,uniqueUrl,Np_dst",
+            "types": "1,20", "_": trace,
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://kuaixun.eastmoney.com/",
+        }
+        r = self.em_get_response(url, params=params, headers=headers, timeout=10)
+        d = r.json()
+        rows: list[NewsSearchItem] = []
+        for item in d.get("data", {}).get("list", []):
             title = str(item.get("title") or "").strip()
             content = str(item.get("summary") or "").strip()
             combined = f"{title}\n{content}"
             if (code_name or code) and not contains_stock_reference(combined, code, code_name):
                 continue
-            results.append(
-                NewsSearchItem(
-                    title=title,
-                    content=content,
-                    source=item.get("mediaName", ""),
-                    publish_time=item.get("showTime") or "",
-                    url=item.get("url", ""),
-                    author=item.get("author", ""),
-                    read_count=int(item.get("read_count", 0)),
-                    comment_count=int(item.get("comment_count", 0)),
-                )
-            )
-        return results
+            news_id = item.get("code", title)
+            if news_id in news_ids:
+                continue
+            news_ids.append(news_id)
+            rows.append(NewsSearchItem(
+                title=title, content=content,
+                publish_time=item.get("showTime", ""),
+                url=item.get("url", ""),
+                source="东方财富",
+                author=item.get("mediaName", ""),
+                read_count=int(item.get("read_count", 0)),
+                comment_count=int(item.get("comment_count", 0)),
+            ))
+        return rows, news_ids
 
     def fetch_stock_news(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
-        return akshare_provider.fetch_stock_news(code=code)
+        """获取东方财富个股新闻（column=107）。
+
+        Param:
+            code: 股票代码
+            code_name: 股票名称，用于过滤相关新闻
+        Return:
+            list[NewsSearchItem]: 新闻列表
+        """
+        url = "http://search-api-web.eastmoney.com/search/jsonp"
+        inner_param = {
+            "uid": "",
+            "keyword": code,
+            "type": ["cmsArticleWebOld"],
+            "client": "web",
+            "clientType": "web",
+            "clientVersion": "curr",
+            "param": {
+                "cmsArticleWebOld": {
+                    "searchScope": "default",
+                    "sort": "default",
+                    "pageIndex": 1,
+                    "pageSize": 10,
+                    "preTag": "<em>",
+                    "postTag": "</em>",
+                }
+            },
+        }
+        params = {
+            "cb": "jQuery35101792940631092459_1764599530165",
+            "param": json.dumps(inner_param, ensure_ascii=False),  # 保留中文,
+            "_": "1764599530176",
+        }
+        headers = {
+            "accept": "*/*",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "en,zh-CN;q=0.9,zh;q=0.8",
+            "cache-control": "no-cache",
+            "connection": "keep-alive",
+            "cookie": "qgqp_b_id=652bf4c98a74e210088f372a17d4e27b; st_nvi=ulN5JAj9FUocz3p4klMME9f20; emshistory=%5B%22603777%22%5D; nid18=010d039dd427dc4d187090491f47d7ad; nid18_create_time=1764582801999; gviem=gSdeY51VWSuTzM3kWaagtf560; gviem_create_time=1764582801999; st_si=55269775884615; st_pvi=66803244437563; st_sp=2025-11-19%2014%3A19%3A16; st_inirUrl=https%3A%2F%2Fso.eastmoney.com%2Fnews%2Fs; st_sn=2; st_psi=20251201223210488-118000300905-0940816858; st_asi=delete",
+            "host": "search-api-web.eastmoney.com",
+            "pragma": "no-cache",
+            "referer": "https://so.eastmoney.com/news/s?keyword=603777",
+            "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
+            "sec-fetch-dest": "script",
+            "sec-fetch-mode": "no-cors",
+            "sec-fetch-site": "same-site",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+        }
+        r = self.em_get_response(url, params=params, headers=headers, timeout=10)
+        data_text = r.text
+        data_json = json.loads(
+            data_text.strip("jQuery35101792940631092459_1764599530165(")[:-1]
+        )
+        temp_df = pd.DataFrame(data_json["result"]["cmsArticleWebOld"])
+        temp_df["url"] = "http://finance.eastmoney.com/a/" + temp_df["code"] + ".html"
+        temp_df.rename(
+            columns={
+                "date": "publish_time",
+                "mediaName": "source",
+                "code": "-",
+                "title": "title",
+                "content": "content",
+                "url": "url",
+                "image": "-",
+            },
+            inplace=True,
+        )
+        temp_df["code"] = code
+        temp_df = temp_df[
+            [
+                "code",
+                "title",
+                "content",
+                "publish_time",
+                "source",
+                "url",
+            ]
+        ]
+        temp_df["title"] = (
+            temp_df["title"]
+            .str.replace(r"\(<em>", "", regex=True)
+            .str.replace(r"</em>\)", "", regex=True)
+        )
+        temp_df["title"] = (
+            temp_df["title"]
+            .str.replace(r"<em>", "", regex=True)
+            .str.replace(r"</em>", "", regex=True)
+        )
+        temp_df["content"] = (
+            temp_df["content"]
+            .str.replace(r"\(<em>", "", regex=True)
+            .str.replace(r"</em>\)", "", regex=True)
+        )
+        temp_df["content"] = (
+            temp_df["content"]
+            .str.replace(r"<em>", "", regex=True)
+            .str.replace(r"</em>", "", regex=True)
+        )
+        temp_df["content"] = temp_df["content"].str.replace(r"\u3000", "", regex=True)
+        temp_df["content"] = temp_df["content"].str.replace(r"\r\n", " ", regex=True)
+        results: list[NewsSearchItem] = []
+        if temp_df is not None and not temp_df.empty:
+            for _, row in temp_df.head(20).iterrows():
+                results.append(
+                    NewsSearchItem(
+                        title=str(row.get("title", "")),
+                        content=str(row.get("content", "")),
+                        source=str(row.get("source", "")),
+                        publish_time=str(row.get("publish_time", "")),
+                        url=str(row.get("url", "")),
+                        author=str(row.get("author", "")),
+                        read_count=int(row.get("read", 0)),
+                        comment_count=int(row.get("comment", 0)),
+                    )
+                )
+        return results
+
+    def fetch_market_kuaixun(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
+        """获取东方财富 7x24 快讯。
+
+        Param:
+            code: 可选，股票代码，用于过滤相关新闻
+            code_name: 可选，股票名称，用于过滤相关新闻
+        Return:
+            list[NewsSearchItem]: 快讯列表
+        """
+        url = "https://np-weblist.eastmoney.com/comm/web/getFastNewsList"
+        params = {
+            "client": "web", "biz": "web_724", "fastColumn": "102",
+            "sortEnd": "", "req_trace": str(int(time.time() * 1000)), "pageSize": "50",
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://kuaixun.eastmoney.com/",
+        }
+        r = self.em_get_response(url, params=params, headers=headers, timeout=10)
+        d = r.json()
+        rows = []
+        for item in d.get("data", {}).get("fastNewsList", []):
+            title = str(item.get("title") or "").strip()
+            content_text = str(item.get("summary") or "").strip()
+            combined = f"{title}\n{content_text}"
+            if (code_name or code) and not contains_stock_reference(combined, code, code_name):
+                continue
+            rows.append(NewsSearchItem(
+                title=title, content=content_text,
+                publish_time=item.get("showTime", ""),
+                url=item.get("url", ""),
+                source=item.get("mediaName", "") or "东方财富快讯",
+                author=item.get("author", ""),
+                read_count=int(item.get("read_count", 0)),
+                comment_count=int(item.get("comment_count", 0)),
+            ))
+        return rows
 
     def fetch_stock_comments(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
+        """获取东方财富股吧评论。
+
+        Param:
+            code: 股票代码
+            code_name: 股票名称，用于过滤相关评论
+        Return:
+            list[NewsSearchItem]: 评论列表
+        """
         params = {
             "code": "cjpl",
             "sorttype": "1",
@@ -539,7 +925,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "needzd": "true",
             "callback": "jsonp_1778666941893_8qj7w84su07",
         }
-        response = requests.get(
+        response = self.em_get_response(
             "https://gbapi.eastmoney.com/webarticlelist/api/Article/Articlelist",
             params=params,
             headers=EASTMONEY_HEADERS,
@@ -572,13 +958,23 @@ class EastMoneyDataProvider(BaseDataProvider):
         return results
 
     def fetch_stock_guba_posts(self, code: str = "600519", page: int = 1) -> list[NewsSearchItem]:
+        """获取东方财富股吧帖子列表。
+
+        通过解析股吧 HTML 页面获取帖子数据。
+
+        Param:
+            code: 股票代码，默认 "600519"
+            page: 页码，默认 1
+        Return:
+            list[NewsSearchItem]: 帖子列表
+        """
         url = f"http://guba.eastmoney.com/list,{code},f_{page}.html"
         headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Referer": f"http://guba.eastmoney.com/list,{code}.html",
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         }
-        response = requests.get(url, headers=headers, timeout=15)
+        response = self.em_get_response(url, headers=headers, timeout=15)
         response.raise_for_status()
         response.encoding = "utf-8"
 
@@ -601,6 +997,13 @@ class EastMoneyDataProvider(BaseDataProvider):
         return results
 
     def _extract_guba_article_list(self, html: str) -> dict:
+        """从股吧 HTML 中提取 article_list 数据。
+
+        Param:
+            html: 股吧页面 HTML 内容
+        Return:
+            dict: 包含 "re" 键的文章列表字典
+        """
         soup = BeautifulSoup(html, "html.parser")
         for script in soup.find_all("script"):
             text = script.string or script.get_text()
@@ -612,12 +1015,21 @@ class EastMoneyDataProvider(BaseDataProvider):
         raise ValueError("未找到 article_list")
 
     def fetch_market_limit_up_pool(self, date: str | None = None) -> tuple[list[dict], int]:
+        """获取涨停池数据。
+
+        Param:
+            date: 交易日期，格式 "YYYYMMDD" 或 "YYYY-MM-DD"，默认当日
+        Return:
+            tuple[list[dict], int]:
+                - list: 涨停股票列表，每个字典包含涨停相关字段
+                - int: 涨停股票总数
+        """
         if date is None:
             date = time.strftime("%Y%m%d", time.localtime())
         if "-" in date:
             date = date.replace("-", "")
 
-        response = requests.get(
+        response = self.em_get_response(
             "https://push2ex.eastmoney.com/getTopicZTPool",
             params={
                 "cb": "callbackdata2435777",
@@ -638,12 +1050,21 @@ class EastMoneyDataProvider(BaseDataProvider):
         return payload.get("pool") or [], int(payload.get("tc") or 0)
 
     def fetch_market_limit_down_pool(self, date: str | None = None) -> tuple[list[dict], int]:
+        """获取跌停池数据。
+
+        Param:
+            date: 交易日期，格式 "YYYYMMDD" 或 "YYYY-MM-DD"，默认当日
+        Return:
+            tuple[list[dict], int]:
+                - list: 跌停股票列表，每个字典包含跌停相关字段
+                - int: 跌停股票总数
+        """
         if date is None:
             date = time.strftime("%Y%m%d", time.localtime())
         if "-" in date:
             date = date.replace("-", "")
 
-        response = requests.get(
+        response = self.em_get_response(
             "https://push2ex.eastmoney.com/getTopicDTPool",
             params={
                 "cb": "callbackdata2705894",
@@ -664,7 +1085,12 @@ class EastMoneyDataProvider(BaseDataProvider):
         return payload.get("pool") or [], int(payload.get("tc") or 0)
 
     def fetch_market_pct_distribution(self, date: str | None = None) -> dict:
-        response = requests.get(
+        """获取市场涨跌幅分布统计。
+
+        Return:
+            dict: 涨跌幅分布数据，包含各涨跌幅区间的股票数量
+        """
+        response = self.em_get_response(
             "https://push2ex.eastmoney.com/getTopicZDFenBu",
             params={
                 "cb": "callbackdata6759488",
@@ -679,98 +1105,29 @@ class EastMoneyDataProvider(BaseDataProvider):
         return self._parse_json_from_text(response.text, "分布统计接口返回格式异常").get("data") or {}
 
     def _parse_json_from_text(self, text: str, error_message: str) -> dict:
+        """从可能包含 JSONP 包装的文本中提取 JSON 数据。
+
+        Param:
+            text: 原始响应文本，可能包含 callback 包装
+            error_message: 解析失败时的错误提示
+        Return:
+            dict: 解析后的 JSON 字典
+        """
         start = text.find("{")
         end = text.rfind("}")
         if start == -1 or end == -1:
             raise ValueError(error_message)
         return json.loads(text[start:end + 1])
 
-    def fetch_dragon_tiger_daily_list(self, report_date: str) -> list[dict]:
-        url = (
-            "https://datacenter-web.eastmoney.com/api/data/v1/get?"
-            "sortColumns=SECURITY_CODE,TRADE_DATE&sortTypes=1,-1&pageSize=500&pageNumber=1"
-            "&reportName=RPT_DAILYBILLBOARD_DETAILSNEW"
-            "&columns=SECURITY_CODE,SECUCODE,SECURITY_NAME_ABBR,TRADE_DATE,EXPLAIN,CLOSE_PRICE,"
-            "CHANGE_RATE,BILLBOARD_NET_AMT,BILLBOARD_BUY_AMT,BILLBOARD_SELL_AMT,BILLBOARD_DEAL_AMT,"
-            "ACCUM_AMOUNT,DEAL_NET_RATIO,DEAL_AMOUNT_RATIO,TURNOVERRATE,FREE_MARKET_CAP,EXPLANATION,"
-            "D1_CLOSE_ADJCHRATE,D2_CLOSE_ADJCHRATE,D5_CLOSE_ADJCHRATE,D10_CLOSE_ADJCHRATE,SECURITY_TYPE_CODE"
-            f"&source=WEB&client=WEB"
-            f"&filter=(TRADE_DATE<=%27{report_date}%27)(TRADE_DATE>=%27{report_date}%27)"
-        )
-        response = requests.get(url, timeout=15)
-        text = response.text
-
-        if text.lstrip().startswith(("jQuery", "jquery", "json")):
-            start = text.index("{")
-            data = json.loads(text[start:-2])
-        else:
-            data = json.loads(text)
-
-        if not data.get("result") or not data["result"].get("data"):
-            return []
-
-        result = []
-        for row in data["result"]["data"]:
-            result.append(
-                {
-                    "code": row.get("SECURITY_CODE", ""),
-                    "name": (row.get("SECURITY_NAME_ABBR") or "").replace(" ", ""),
-                    "trade_date": report_date,
-                    "close": safe_float(row.get("CLOSE_PRICE")),
-                    "change_pct": safe_float(row.get("CHANGE_RATE")),
-                    "turnover_pct": safe_float(row.get("TURNOVERRATE")),
-                    "net_amount": self._fmt_amount(row.get("BILLBOARD_NET_AMT")),
-                    "buy_amount": self._fmt_amount(row.get("BILLBOARD_BUY_AMT")),
-                    "sell_amount": self._fmt_amount(row.get("BILLBOARD_SELL_AMT")),
-                    "deal_amount": self._fmt_amount(row.get("BILLBOARD_DEAL_AMT")),
-                    "total_amount": self._fmt_amount(row.get("ACCUM_AMOUNT")),
-                    "net_amount_rate": safe_float(row.get("DEAL_NET_RATIO")),
-                    "deal_amount_rate": safe_float(row.get("DEAL_AMOUNT_RATIO")),
-                    "reason": row.get("EXPLANATION", ""),
-                    "explain": row.get("EXPLAIN", ""),
-                    "d1_chg": safe_float(row.get("D1_CLOSE_ADJCHRATE")),
-                    "d2_chg": safe_float(row.get("D2_CLOSE_ADJCHRATE")),
-                    "d5_chg": safe_float(row.get("D5_CLOSE_ADJCHRATE")),
-                }
-            )
-        return result
-
-    def fetch_dragon_tiger_stock_detail(self, code: str, report_date: str) -> list[dict]:
-        result = []
-        for side, report_name, sort_col in [
-            ("buy", "RPT_BILLBOARD_DAILYDETAILSBUY", "BUY"),
-            ("sell", "RPT_BILLBOARD_DAILYDETAILSSELL", "SELL"),
-        ]:
-            url = (
-                f"https://datacenter-web.eastmoney.com/api/data/v1/get?"
-                f"reportName={report_name}&columns=ALL"
-                f"&filter=(TRADE_DATE=%27{report_date}%27)(SECURITY_CODE=%22{code}%22)"
-                f"&pageNumber=1&pageSize=50&sortTypes=-1&sortColumns={sort_col}"
-                f"&source=WEB&client=WEB"
-            )
-            try:
-                response = requests.get(url, timeout=10)
-                data = response.json()
-                if not data.get("result") or not data["result"].get("data"):
-                    continue
-                for row in data["result"]["data"]:
-                    result.append(
-                        {
-                            "side": side,
-                            "code": row.get("SECURITY_CODE", ""),
-                            "operate_name": row.get("OPERATEDEPT_NAME", ""),
-                            "buy_amount": self._fmt_amount(row.get("BUY")),
-                            "sell_amount": self._fmt_amount(row.get("SELL")),
-                            "net_amount": self._fmt_amount(row.get("NET")),
-                            "buy_ratio": safe_float(row.get("TOTAL_BUYRIO")),
-                            "sell_ratio": safe_float(row.get("TOTAL_SELLRIO")),
-                        }
-                    )
-            except Exception:
-                continue
-        return result
 
     def _fmt_amount(self, value) -> float | None:
+        """格式化金额为万元单位。
+
+        Param:
+            value: 原始金额值（元）
+        Return:
+            float | None: 万元为单位的金额，保留 2 位小数；输入无效返回 None
+        """
         result = safe_float(value)
         if result is None:
             return None
@@ -778,10 +1135,13 @@ class EastMoneyDataProvider(BaseDataProvider):
     
     
     def fetch_global_market_news(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
-        """
-        东方财富全球财经资讯（7x24 滚动）。
-        https://np-weblist.eastmoney.com/comm/web/getFastNewsList?client=web&biz=web_724&fastColumn=102&sortEnd=&pageSize=50&req_trace=1779180355624&_=1779180355625&callback=jQuery183022672122379995496_1779180355554
-        返回: [{title, summary, time}]
+        """获取东方财富全球财经资讯（7x24 滚动）。
+
+        Param:
+            code: 可选，股票代码，用于过滤相关新闻
+            code_name: 可选，股票名称，用于过滤相关新闻
+        Return:
+            list[NewsSearchItem]: 新闻列表
         """
         url = "https://np-weblist.eastmoney.com/comm/web/getFastNewsList"
         params = {
@@ -795,7 +1155,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36", 
                    "Referer": "https://kuaixun.eastmoney.com/"
                 }
-        r = requests.get(url, params=params, headers=headers, timeout=10)
+        r = self.em_get_response(url, params=params, headers=headers, timeout=10)
         d = r.json()
         
 
@@ -812,7 +1172,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                     content=content,
                     publish_time=item.get("showTime", ""),
                     url=item.get("url", ""),
-                    source=item.get("mediaName", "") or "东方财富快讯",
+                    source=item.get("mediaName", "") or "东方财富7*24快讯",
                 author=item.get("author", ""),
                 read_count=int(item.get("read_count", 0)),
                 comment_count=int(item.get("comment_count", 0)),
@@ -820,9 +1180,16 @@ class EastMoneyDataProvider(BaseDataProvider):
         return rows
 
     def fetch_stock_forecast_reports(self, code: str, max_pages: int = 5) -> pd.DataFrame:
-        """拉取指定股票的研报列表"""
-        session = requests.Session()
-        session.headers.update({"User-Agent": self.UA, "Referer": "https://data.eastmoney.com/"})
+        """获取指定股票的机构研报预测数据。
+
+        拉取近 100 天内的机构研报，汇总 EPS 和 PE 预测统计。
+
+        Param:
+            code: 股票代码
+            max_pages: 最大拉取页数，默认 5
+        Return:
+            pd.DataFrame: 包含列: 指标, 年度, 预测机构数, 最小值, 平均值, 最大值, 行业平均数, 单位
+        """
         all_records = []
         end_time = time.strftime("%Y-%m-%d")
         begin_time = time.strftime("%Y-%m-%d", time.localtime(time.time() - 100 * 24 * 3600))
@@ -835,7 +1202,8 @@ class EastMoneyDataProvider(BaseDataProvider):
                 "orgCode": "", "code": code, "rcode": "",
                 "p": str(page), "pageNum": str(page), "pageNumber": str(page),
             }
-            r = session.get(self.REPORT_API, params=params, timeout=30)
+            r = self.em_get_response(self.REPORT_API, params=params,
+                                     headers={"Referer": "https://data.eastmoney.com/"}, timeout=30)
             d = r.json()
             rows = d.get("data") or []
             if not rows:
@@ -886,9 +1254,17 @@ class EastMoneyDataProvider(BaseDataProvider):
         return predict_stat_df
 
     def fetch_industry_rankings(self, top_n: int = 20) -> dict:
-        """
-        全行业涨跌幅排名（东财行业板块，~100 个行业）。
-        返回: {top: [...], bottom: [...], total: int}
+        """获取全行业涨跌幅排名。
+
+        获取东财行业板块（约 100 个行业）的涨跌幅排名。
+
+        Param:
+            top_n: 返回前 N 名和后 N 名，默认 20
+        Return:
+            dict: 包含以下字段:
+                - top (list): 涨幅前 N 名列表，每个元素包含 rank, name, change_pct, code, up_count, down_count, leader, leader_change
+                - bottom (list): 跌幅前 N 名列表（同上结构）
+                - total (int): 行业总数
         """
         url = "https://push2.eastmoney.com/api/qt/clist/get"
         params = {
@@ -900,10 +1276,10 @@ class EastMoneyDataProvider(BaseDataProvider):
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         }
-
-        r = requests.get(url, params=params, headers=headers, timeout=15)
-        d = r.json()
-        items = d.get("data", {}).get("diff", [])
+        items = self._fetch_clist_diff(params=params, headers=headers)
+        #r = self.em_get_response(url, params=params, headers=headers, timeout=15)
+        #d = r.json()
+        #items = d.get("data", {}).get("diff", [])
         if not items:
             return {"top": [], "bottom": [], "total": 0}
 
@@ -927,10 +1303,18 @@ class EastMoneyDataProvider(BaseDataProvider):
         }
         
     def fetch_stock_fund_flow(self, code: str) -> list[dict]:
-        """
-        个股资金流（日级，最近120个交易日）。
-        返回: [{date, main_net(主力净流入), small_net, mid_net, large_net, super_net}]
-        单位: 元
+        """获取个股资金流向（日级，最近 120 个交易日）。
+
+        Param:
+            code: 6 位股票代码
+        Return:
+            list[dict]: 资金流向列表，每个字典包含:
+                - date (str): 日期
+                - main_net (float): 主力净流入（元）
+                - small_net (float): 小单净流入（元）
+                - mid_net (float): 中单净流入（元）
+                - large_net (float): 大单净流入（元）
+                - super_net (float): 超大单净流入（元）
         """
         market_code = 1 if code.startswith("6") else 0
         url = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
@@ -941,7 +1325,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "lmt": "120",
         }
         try:
-            r = requests.get(url, params=params, headers=EASTMONEY_HEADERS, timeout=15)
+            r = self.em_get_response(url, params=params, headers=EASTMONEY_HEADERS, timeout=15)
             d = r.json()
         except Exception as e:
             print(f"[WARN] push2 资金流请求失败: {e}")
@@ -961,7 +1345,232 @@ class EastMoneyDataProvider(BaseDataProvider):
                     "super_net": float(parts[5]) if parts[5] != "-" else 0,
                 })
         return rows
+    
 
+    def fetch_dragon_tiger_daily_list(self, report_date: str) -> list[dict]:
+        """获取龙虎榜当日上榜股票列表。
+
+        Param:
+            report_date: 报告日期，格式 "YYYY-MM-DD"
+        Return:
+            list[dict]: 龙虎榜股票列表，每个字典包含:
+                - code (str): 股票代码
+                - name (str): 股票名称
+                - trade_date (str): 交易日期
+                - close (float): 收盘价
+                - change_pct (float): 涨跌幅
+                - turnover_pct (float): 换手率
+                - net_amount (float): 龙虎榜净买入（万元）
+                - buy_amount (float): 买入金额（万元）
+                - sell_amount (float): 卖出金额（万元）
+                - deal_amount (float): 成交金额（万元）
+                - total_amount (float): 总成交额（万元）
+                - net_amount_rate (float): 净买入占比
+                - deal_amount_rate (float): 成交占比
+                - reason (str): 上榜原因
+                - explain (str): 解释说明
+                - d1_chg (float): D1 涨跌幅
+                - d2_chg (float): D2 涨跌幅
+                - d5_chg (float): D5 涨跌幅
+        """
+        columns = (
+            "SECURITY_CODE,SECUCODE,SECURITY_NAME_ABBR,TRADE_DATE,EXPLAIN,CLOSE_PRICE,"
+            "CHANGE_RATE,BILLBOARD_NET_AMT,BILLBOARD_BUY_AMT,BILLBOARD_SELL_AMT,BILLBOARD_DEAL_AMT,"
+            "ACCUM_AMOUNT,DEAL_NET_RATIO,DEAL_AMOUNT_RATIO,TURNOVERRATE,FREE_MARKET_CAP,EXPLANATION,"
+            "D1_CLOSE_ADJCHRATE,D2_CLOSE_ADJCHRATE,D5_CLOSE_ADJCHRATE,D10_CLOSE_ADJCHRATE,SECURITY_TYPE_CODE"
+        )
+        filter_str = f"(TRADE_DATE<='{report_date}')(TRADE_DATE>='{report_date}')"
+        data = self.fetch_datacenter_report(
+            "RPT_DAILYBILLBOARD_DETAILSNEW", columns=columns,
+            filter_str=filter_str, page_size=500,
+            sort_columns="SECURITY_CODE,TRADE_DATE", sort_types="1,-1",
+        )
+
+        result = []
+        for row in data:
+            result.append(
+                {
+                    "code": row.get("SECURITY_CODE", ""),
+                    "name": (row.get("SECURITY_NAME_ABBR") or "").replace(" ", ""),
+                    "trade_date": report_date,
+                    "close": safe_float(row.get("CLOSE_PRICE")),
+                    "change_pct": safe_float(row.get("CHANGE_RATE")),
+                    "turnover_pct": safe_float(row.get("TURNOVERRATE")),
+                    "net_amount": self._fmt_amount(row.get("BILLBOARD_NET_AMT")),
+                    "buy_amount": self._fmt_amount(row.get("BILLBOARD_BUY_AMT")),
+                    "sell_amount": self._fmt_amount(row.get("BILLBOARD_SELL_AMT")),
+                    "deal_amount": self._fmt_amount(row.get("BILLBOARD_DEAL_AMT")),
+                    "total_amount": self._fmt_amount(row.get("ACCUM_AMOUNT")),
+                    "net_amount_rate": safe_float(row.get("DEAL_NET_RATIO")),
+                    "deal_amount_rate": safe_float(row.get("DEAL_AMOUNT_RATIO")),
+                    "reason": row.get("EXPLANATION", ""),
+                    "explain": row.get("EXPLAIN", ""),
+                    "d1_chg": safe_float(row.get("D1_CLOSE_ADJCHRATE")),
+                    "d2_chg": safe_float(row.get("D2_CLOSE_ADJCHRATE")),
+                    "d5_chg": safe_float(row.get("D5_CLOSE_ADJCHRATE")),
+                }
+            )
+        return result
+
+    def fetch_dragon_tiger_stock_detail(self, code: str, report_date: str) -> list[dict]:
+        """获取龙虎榜个股买卖明细。
+
+        Param:
+            code: 股票代码
+            report_date: 报告日期，格式 "YYYY-MM-DD"
+        Return:
+            list[dict]: 买卖明细列表，每个字典包含:
+                - side (str): "buy" 或 "sell"
+                - code (str): 股票代码
+                - operate_name (str): 营业部名称
+                - buy_amount (float): 买入金额（万元）
+                - sell_amount (float): 卖出金额（万元）
+                - net_amount (float): 净买入（万元）
+                - buy_ratio (float): 买入占比
+                - sell_ratio (float): 卖出占比
+        """
+        result = []
+        filter_str = f"(TRADE_DATE='{report_date}')(SECURITY_CODE=\"{code}\")"
+        for side, report_name, sort_col in [
+            ("buy", "RPT_BILLBOARD_DAILYDETAILSBUY", "BUY"),
+            ("sell", "RPT_BILLBOARD_DAILYDETAILSSELL", "SELL"),
+        ]:
+            try:
+                rows = self.fetch_datacenter_report(
+                    report_name, filter_str=filter_str,
+                    sort_columns=sort_col, sort_types="-1",
+                )
+                print(rows)
+                for row in rows:
+                    result.append(
+                        {
+                            "side": side,
+                            "code": row.get("SECURITY_CODE", ""),
+                            "operate_name": row.get("OPERATEDEPT_NAME", ""),
+                            "buy_amount": self._fmt_amount(row.get("BUY")),
+                            "sell_amount": self._fmt_amount(row.get("SELL")),
+                            "net_amount": self._fmt_amount(row.get("NET")),
+                            "buy_ratio": safe_float(row.get("TOTAL_BUYRIO")),
+                            "sell_ratio": safe_float(row.get("TOTAL_SELLRIO")),
+                        }
+                    )
+            except Exception:
+                continue
+        return result
+    
+    def fetch_margin_trading(self, code: str, page_size: int = 30) -> list[dict]:
+        """
+        融资融券明细（日级）。
+        Param:
+            code: 6 位股票代码
+            page_size: 每页条数，默认 30
+        Return:
+           [{date, rzye(融资余额), rzmre(融资买入额), rzche(融资偿还额), rqye(融券余额额), rqmcl(融券卖出量), rzrqye(融资融券余额合计),}]
+        """
+        data = self.fetch_datacenter_report(
+            "RPTA_WEB_RZRQ_GGMX",
+            filter_str=f'(SCODE="{code}")',
+            page_size=page_size,
+            sort_columns="DATE", sort_types="-1",
+        )
+        rows = []
+        for row in data:
+            rows.append({
+                "date": str(row.get("DATE", ""))[:10],
+                "rzye": row.get("RZYE", 0),       # 融资余额(元)
+                "rzmre": row.get("RZMRE", 0),      # 融资买入额
+                "rzche": row.get("RZCHE", 0),      # 融资偿还额
+                "rqye": row.get("RQYE", 0),        # 融券余额(元)
+                "rqmcl": row.get("RQMCL", 0),      # 融券卖出量
+                "rqchl": row.get("RQCHL", 0),      # 融券偿还量
+                "rzrqye": row.get("RZRQYE", 0),    # 融资融券余额合计
+            })
+        return rows
+
+
+    def fetch_block_trade(self, code: str, page_size: int = 20) -> list[dict]:
+        """
+        大宗交易记录。
+        Param:
+            code: 6 位股票代码
+            page_size: 每页条数，默认 20
+        Return:
+            [{date, price, close, premium_pct, vol, amount, buyer, seller}]
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_DATA_BLOCKTRADE",
+            filter_str=f'(SECURITY_CODE="{code}")',
+            page_size=page_size,
+            sort_columns="TRADE_DATE", sort_types="-1",
+        )
+        rows = []
+        for row in data:
+            close = row.get("CLOSE_PRICE") or 0
+            deal_price = row.get("DEAL_PRICE") or 0
+            premium = ((deal_price / close - 1) * 100) if close else 0
+            rows.append({
+                "date": str(row.get("TRADE_DATE", ""))[:10],
+                "price": deal_price,
+                "close": close,
+                "premium_pct": round(premium, 2),
+                "vol": row.get("DEAL_VOLUME", 0),
+                "amount": row.get("DEAL_AMT", 0),
+                "buyer": row.get("BUYER_NAME", ""),
+                "seller": row.get("SELLER_NAME", ""),
+            })
+        return rows
+    
+    def fetch_holder_num_change(self, code: str, page_size: int = 10) -> list[dict]:
+        """
+        股东户数变化（季度级）, 股东户数持续减少 = 筹码集中 = 主力吸筹信号
+        Param:
+            code: 6 位股票代码
+            page_size: 每页条数，默认 10
+        Return:
+            [{date, holder_num, change_num, change_ratio, avg_shares}]
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_HOLDERNUMLATEST",
+            filter_str=f'(SECURITY_CODE="{code}")',
+            page_size=page_size,
+            sort_columns="END_DATE", sort_types="-1",
+        )
+        rows = []
+        for row in data:
+            rows.append({
+                "date": str(row.get("END_DATE", ""))[:10],
+                "holder_num": row.get("HOLDER_NUM", 0),
+                "change_num": row.get("HOLDER_NUM_CHANGE", 0),
+                "change_ratio": row.get("HOLDER_NUM_RATIO", 0),  # 环比%
+                "avg_shares": row.get("AVG_FREE_SHARES", 0),     # 户均持股
+            })
+        return rows
+    
+    def fetch_dividend_history(self, code: str, page_size: int = 20) -> list[dict]:
+        """
+        分红送转历史。
+        Param:
+            code: 6 位股票代码
+            page_size: 每页条数，默认 20
+        Return:
+            [{date, bonus_rmb(每股派息), transfer_ratio(转增比例), bonus_ratio(送股比例), plan(进度)}]
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_SHAREBONUS_DET",
+            filter_str=f'(SECURITY_CODE="{code}")',
+            page_size=page_size,
+            sort_columns="EX_DIVIDEND_DATE", sort_types="-1",
+        )
+        rows = []
+        for row in data:
+            rows.append({
+                "date": str(row.get("EX_DIVIDEND_DATE", ""))[:10],
+                "bonus_rmb": row.get("PRETAX_BONUS_RMB", 0),    # 每股派息(税前)
+                "transfer_ratio": row.get("TRANSFER_RATIO", 0),  # 每10股转增
+                "bonus_ratio": row.get("BONUS_RATIO", 0),        # 每10股送股
+                "plan": row.get("ASSIGN_PROGRESS", ""),           # 进度
+            })
+        return rows
 
 eastmoney_provider = EastMoneyDataProvider()
 
@@ -970,5 +1579,5 @@ if __name__ == "__main__":
     #news = eastmoney_provider.fetch_stock_info("603228")
     #print(news)
     
-    eastmoney_reports = eastmoney_provider.fetch_stock_fund_flow("600519")
+    eastmoney_reports = eastmoney_provider.fetch_market_kuaixun()
     print(eastmoney_reports)

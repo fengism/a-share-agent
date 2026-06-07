@@ -12,10 +12,24 @@ _DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data" / "ana
 
 
 def _ensure_dir() -> None:
+    """Ensure the analysis storage directory exists.
+
+    Param:
+        None
+    Return:
+        None
+    """
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def save_analysis(result: AnalysisResult) -> Path:
+    """Save an analysis result to a per-stock, per-date JSON file atomically.
+
+    Param:
+        result: AnalysisResult to persist
+    Return:
+        Path to the saved JSON file
+    """
     _ensure_dir()
     stock_dir = _DATA_DIR / result.stock_code
     stock_dir.mkdir(parents=True, exist_ok=True)
@@ -33,6 +47,14 @@ def save_analysis(result: AnalysisResult) -> Path:
 
 
 def load_analysis(code: str, date: str) -> AnalysisResult | None:
+    """Load an analysis result for a stock and date from the local file store.
+
+    Param:
+        code: stock code
+        date: analysis date string used as the filename
+    Return:
+        AnalysisResult if found and parseable, otherwise None
+    """
     filepath = _DATA_DIR / code / f"{date}.json"
     if not filepath.exists():
         return None
@@ -45,6 +67,13 @@ def load_analysis(code: str, date: str) -> AnalysisResult | None:
 
 
 def list_analyses(code: str) -> list[dict]:
+    """List analysis summaries for a single stock, newest first.
+
+    Param:
+        code: stock code
+    Return:
+        list of summary dicts with stock_code, stock_name, analysis_date, current_price, overall_rating, signal, confidence
+    """
     stock_dir = _DATA_DIR / code
     if not stock_dir.exists():
         return []
@@ -67,6 +96,13 @@ def list_analyses(code: str) -> list[dict]:
 
 
 def list_all_analyses() -> list[dict]:
+    """List analysis summaries across all stocks, newest first.
+
+    Param:
+        None
+    Return:
+        list of summary dicts across all stocks, sorted by analysis_date descending
+    """
     _ensure_dir()
     results = []
     for stock_dir in sorted(_DATA_DIR.iterdir()):

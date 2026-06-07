@@ -50,9 +50,11 @@ AppLayout (sticky header: logo + nav menu + global search box, dark theme)
 ├── /market          → Market (指数/热点榜单/龙虎榜相关 Tab)
 ├── /screener        → Screener (FilterPanel + ResultsTable + 估值百分位)
 ├── /daily-review    → DailyReview (每日市场复盘)
+├── /feed            → Feed (24小时资讯：快讯 + 新闻 + AI 摘要面板)
 ├── /chat            → Chat (AI 选股助手，对话式交互)
 ├── /analysis        → AnalysisEntry (分析入口)
 ├── /analysis/:code  → Analysis (分时 + K线 + 基本面 + 估值 + 技术面 + 情绪面 + AI结论)
+├── /industry-chain  → IndustryChain (AI 产业链分析，支持名称参数)
 └── /settings        → Settings (系统配置：大模型/飞书/问财/Notion)
 ```
 
@@ -65,7 +67,7 @@ Global search accepts 6-digit stock codes and fuzzy stock names, then navigates 
 | Prefix | Router | Responsibility |
 | --- | --- | --- |
 | `/api/stock` | `routers/stock.py` | search, info, intraday, kline, financial, valuation, news, indicators |
-| `/api/market` | `routers/market.py` | indices, volume, hot rank, dragon tiger, sentiment and market news |
+| `/api/market` | `routers/market.py` | indices, volume, hot rank, dragon tiger, sentiment, market news and AI news summary |
 | `/api/analysis` | `routers/analysis.py` | trigger analysis, fetch result, stream progress with SSE |
 | `/api/screener` | `routers/screener.py` | screen stocks, industries, valuation percentile |
 | `/api/daily-review` | `routers/daily_review.py` | generate, fetch and store daily review |
@@ -80,8 +82,9 @@ Global search accepts 6-digit stock codes and fuzzy stock names, then navigates 
 - `backend/app/models/`: Pydantic models shared by routers and services.
 - `backend/app/adapters/`: external system adapters — Feishu (doc creation, card messaging, permissions) and Notion (page creation).
 - `backend/app/services/stock/`: stock basic info, intraday, kline, financials, valuation (including institution forecasts from THS) and search.
-- `backend/app/services/market/`: indices, volume, hot rank, dragon tiger, market news and statistics.
+- `backend/app/services/market/`: indices, volume, hot rank, dragon tiger, market news, news AI summary (with citation refs) and statistics.
 - `backend/app/services/screener/`: industry mapping, spot snapshots, screening and percentiles.
+- `backend/app/services/industry_chain/`: industry chain analysis pipeline, prompts, storage and chart generation.
 - `backend/app/services/analysis/`: stock AI analysis pipeline, prompts, parser and domain-specific analysis inputs. Pipeline fetches institution forecasts from THS and injects into LLM prompt.
 - `backend/app/services/daily_review/`: daily review pipeline, prompts, formatter and storage.
 - `backend/app/services/providers/`: provider adapters for akshare, EastMoney (including research report stats), Sina, THS (including EPS/net-profit forecasts), Iwencai (semantic search and structured query), Baidu, CLS, RSS and Tencent.
@@ -117,6 +120,10 @@ Global search accepts 6-digit stock codes and fuzzy stock names, then navigates 
 **Feishu Push:** docs are created via two-step API (create empty doc → write block children). `folder_token` must go in request body JSON, not query params. Block types: 2=text, 3=heading1, 4=heading2, 5=heading3, 12=bullet, 22=divider. Push auto-grants edit permission to receiver and routes to type-specific folders (daily_review vs analysis). Chat push sends card only, no document creation.
 
 **Chat Agent Skills:** the skill system in `backend/app/services/chat/skills/` uses a registry pattern. Each skill auto-converts to an OpenAI function-calling tool definition. To add a new skill, create a .py file in `skills/`, call `registry.register(Skill(...))`, and add the registration call in `__init__.py`. No changes to `agent.py` are needed. Composite skills use `asyncio.gather` for parallel data fetching.
+
+**Market News AI Summary:** `backend/app/services/market/news_analysis.py` calls LLM to produce structured analysis with citation refs. `_resolve_refs` maps LLM ref numbers back to `{title, url}` for each item. Frontend renders these as clickable citation chips in `NewsAnalysisPanel`. News data auto-refreshes every 5 minutes (frontend `refetchInterval` + backend 300s cache TTL).
+
+**Industry Chain Analysis:** the `/industry-chain` page uses SSE streaming for progress updates. History records are always visible in the right sidebar. Analysis results are archived and can be loaded from history or pushed to Feishu/Notion.
 
 ## Configuration
 

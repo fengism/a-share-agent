@@ -29,10 +29,24 @@ _STOPWORDS = {
 
 
 def _normalize_text_for_compare(text: str) -> str:
+    """Normalize text for duplicate comparison by stripping punctuation and whitespace.
+
+    Param:
+        text: raw text to normalize
+    Return:
+        lowercased text with all whitespace and common punctuation removed
+    """
     return re.sub(r"[\s\"“”'‘’。！？!?,，：:；;（）()\-]+", "", str(text or "")).strip().lower()
 
 
 def _clean_retail_post(text: str) -> str:
+    """Clean raw retail post text by removing boilerplate phrases and trailing noise.
+
+    Param:
+        text: raw post text
+    Return:
+        cleaned post text
+    """
     cleaned = str(text or "").strip()
     cleaned = re.sub(r"邀您观看[:：]?", "", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned)
@@ -41,6 +55,13 @@ def _clean_retail_post(text: str) -> str:
 
 
 def _is_low_signal_post(text: str) -> bool:
+    """Determine whether a post is low-signal and should be filtered out.
+
+    Param:
+        text: cleaned post text
+    Return:
+        True if the post is too short, low-value, or boilerplate
+    """
     stripped = str(text or "").strip()
     if not stripped:
         return True
@@ -60,6 +81,13 @@ def _is_low_signal_post(text: str) -> bool:
 
 
 def _aggregate_retail_sentiment(posts: list[dict]) -> dict:
+    """Aggregate cleaned retail posts into a sentiment summary with bullish/bearish ratios.
+
+    Param:
+        posts: list of post dicts with text, author, and publish_time
+    Return:
+        dict with score, post_count, bullish_ratio, bearish_ratio, sample_posts, and summary
+    """
     cleaned_posts = []
     seen_texts = set()
     term_counter = Counter()
@@ -139,11 +167,25 @@ def _aggregate_retail_sentiment(posts: list[dict]) -> dict:
 
 
 def fetch_hot_detail_em(symbol: str) -> pd.DataFrame:
+    """Fetch hot-rank detail for a stock symbol from the akshare provider.
+
+    Param:
+        symbol: prefixed stock symbol, e.g. "SZ000001"
+    Return:
+        DataFrame of hot-rank detail rows
+    """
     return _akshare_provider.fetch_hot_rank_detail(symbol)
 
 
 
 async def get_stock_sentiment(code: str) -> dict:
+    """Get aggregated stock sentiment data (heat score, rank, news count) with daily cache.
+
+    Param:
+        code: 6-digit stock code
+    Return:
+        dict with code, heat_score, hot_rank, and news_count
+    """
     sym = normalize_code(code)
     cache_key = dated_cache_key("sentiment", sym.raw)
     cached = cache.get(cache_key)
@@ -171,8 +213,8 @@ async def get_stock_sentiment(code: str) -> dict:
     try:
         news = await get_stock_news(code)
         result["news_count"] = len(news)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.info("新闻数据获取失败: code=%s, error=%s", code, exc)
 
     cache.set(cache_key, result, ttl=600)
     return result
@@ -180,6 +222,13 @@ async def get_stock_sentiment(code: str) -> dict:
 
 
 async def get_retail_sentiment(code: str) -> dict:
+    """Get aggregated retail-sentiment metrics from Eastmoney guba posts with daily cache.
+
+    Param:
+        code: 6-digit stock code
+    Return:
+        dict with score, post_count, bullish_ratio, bearish_ratio, sample_posts, summary, and guba_post_count
+    """
     sym = normalize_code(code)
     cache_key = dated_cache_key("retail_sentiment", sym.raw)
     cached = cache.get(cache_key)
@@ -234,4 +283,4 @@ async def get_retail_sentiment(code: str) -> dict:
 
 if __name__ == "__main__":
     result = asyncio.run(get_retail_sentiment("603228"))
-    print(result)  
+    print(result)

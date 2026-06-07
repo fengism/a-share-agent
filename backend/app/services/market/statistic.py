@@ -15,8 +15,22 @@ logger = logging.getLogger(__name__)
 
 
 def get_sector_rankings() -> dict:
+    """获取腾讯板块涨跌榜，拆分为 top/bottom 两份字段列表。
+
+    Param:
+        无
+    Return:
+        包含 top_sectors 和 bottom_sectors 列表的字典
+    """
     top_df, bottom_df = _tencent_provider.fetch_market_sector_rankings_direct()
     def to_items(frame: pd.DataFrame) -> list[dict]:
+        """将板块 DataFrame 转换为字典列表。
+
+        Param:
+            frame: 板块 DataFrame
+        Return:
+            板块字段字典列表
+        """
         result = []
         for _, row in frame.iterrows():
             result.append(
@@ -38,6 +52,13 @@ def get_sector_rankings() -> dict:
 
 
 async def get_market_statistics(date: str | None = None) -> MarketStatistics:
+    """聚合大盘统计数据：板块、涨跌分布、涨跌停池等。
+
+    Param:
+        date: 统计日期，格式 YYYY-MM-DD，默认当天
+    Return:
+        MarketStatistics 模型对象，包含各项市场统计指标
+    """
     if date is None:
         date = time.strftime("%Y-%m-%d", time.localtime())
 

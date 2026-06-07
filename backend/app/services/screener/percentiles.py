@@ -17,10 +17,28 @@ _percentile_inflight_lock = asyncio.Lock()
 
 
 def _percentile_key(code: str, indicator: str, period: str) -> tuple[str, str, str]:
+    """构造估值百分位单飞键。
+
+    Param:
+        code: 股票代码
+        indicator: 估值指标名（如市盈率TTM）
+        period: 时间区间标识
+    Return:
+        归一化代码与参数组合的三元组
+    """
     return normalize_code(code).raw, indicator, period
 
 
 async def _compute_percentile(code: str, indicator: str = "市盈率(TTM)", period: str = "近三年") -> float | None:
+    """计算单个股票的估值百分位，带 1 天缓存。
+
+    Param:
+        code: 股票代码
+        indicator: 估值指标名
+        period: 时间区间标识
+    Return:
+        百分位浮点数（0-100），数据不足时返回 None
+    """
     cache_key = dated_cache_key("percentile", code, indicator, period)
     cached = cache.get(cache_key)
     if cached is not None:
@@ -54,6 +72,15 @@ async def _compute_percentile_limited(
     indicator: str,
     period: str,
 ) -> float | None:
+    """带信号量限流的百分位计算包装。
+
+    Param:
+        code: 股票代码
+        indicator: 估值指标名
+        period: 时间区间标识
+    Return:
+        百分位浮点数，数据不足时返回 None
+    """
     async with _percentile_semaphore:
         return await _compute_percentile(code, indicator, period)
 
@@ -63,6 +90,15 @@ async def _compute_percentile_inflight(
     indicator: str,
     period: str,
 ) -> float | None:
+    """复用同一参数的进行中任务，避免重复计算。
+
+    Param:
+        code: 股票代码
+        indicator: 估值指标名
+        period: 时间区间标识
+    Return:
+        百分位浮点数，数据不足时返回 None
+    """
     key = _percentile_key(code, indicator, period)
 
     async with _percentile_inflight_lock:
@@ -81,6 +117,15 @@ async def _compute_percentile_inflight(
 
 
 async def compute_percentiles(codes: list[str], indicator: str = "市盈率(TTM)", period: str = "近三年") -> list[dict]:
+    """批量计算多个股票的估值百分位，自动去重并并发限流。
+
+    Param:
+        codes: 股票代码列表（允许重复）
+        indicator: 估值指标名
+        period: 时间区间标识
+    Return:
+        与输入顺序对齐的 {"code", "percentile"} 字典列表
+    """
     unique_codes: dict[tuple[str, str, str], str] = {}
     ordered_keys: list[tuple[str, str, str]] = []
     code_keys: list[tuple[str, str, str]] = []
@@ -93,6 +138,14 @@ async def compute_percentiles(codes: list[str], indicator: str = "市盈率(TTM)
             ordered_keys.append(key)
 
     async def compute_one(key: tuple[str, str, str], original_code: str) -> tuple[tuple[str, str, str], float | None]:
+        """计算单个键的百分位并返回原键，捕获异常。
+
+        Param:
+            key: 百分位计算键三元组
+            original_code: 原始股票代码
+        Return:
+            (键, 百分位) 元组，计算失败时百分位为 None
+        """
         try:
             return key, await _compute_percentile_inflight(original_code, indicator, period)
         except Exception as e:

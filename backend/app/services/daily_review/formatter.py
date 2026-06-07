@@ -2,6 +2,13 @@ import json
 
 
 def _unwrap_json_block(value: str) -> str:
+    """去除 Markdown 代码块围栏（```），保留代码块内的文本。
+
+    Param:
+        value: 原始字符串
+    Return:
+        去除围栏后的字符串
+    """
     text = value.strip()
     if text.startswith("```") and text.endswith("```"):
         lines = text.splitlines()
@@ -11,6 +18,13 @@ def _unwrap_json_block(value: str) -> str:
 
 
 def _stringify_review_value(value) -> str:
+    """将 LLM 返回的 JSON 值（dict/list/scalar）转换为 Markdown 文本。
+
+    Param:
+        value: 任意 JSON 兼容值
+    Return:
+        Markdown 格式的字符串
+    """
     if value is None:
         return ""
     if isinstance(value, list):
@@ -21,6 +35,13 @@ def _stringify_review_value(value) -> str:
 
 
 def normalize_llm_review(value: str) -> str:
+    """规范化 LLM 返回的复盘文本：尝试解析 JSON 并格式化为 Markdown，解析失败则原样返回。
+
+    Param:
+        value: LLM 返回的原始字符串
+    Return:
+        规范化后的 Markdown 字符串
+    """
     text = _unwrap_json_block(value)
     try:
         parsed = json.loads(text)

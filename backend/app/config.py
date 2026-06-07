@@ -8,6 +8,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
+    """Purpose: 应用全局配置，从 .env 文件或环境变量加载 LLM、缓存、飞书、问财等模块的参数。"""
+
     model_config = SettingsConfigDict(
         env_file=[ROOT_DIR / ".env", ROOT_DIR / "backend" / ".env"],
         env_file_encoding="utf-8",
@@ -54,8 +56,20 @@ class Settings(BaseSettings):
     iwencai_base_url: str = "https://openapi.iwencai.com"
     iwencai_api_key: str = ""
 
+    # HTTP 客户端配置
+    # 设为 false 时，所有 requests 调用将忽略系统 HTTP_PROXY/HTTPS_PROXY 环境变量
+    http_trust_env: bool = False
+
+    # 多 Agent 配置
+    multi_agent_enabled: bool = True
+
     @model_validator(mode="after")
     def apply_provider_defaults(self) -> "Settings":
+        """根据 llm_provider 自动填充 base_url 和 model 的默认值。
+
+        Return:
+            更新后的 Settings 实例。
+        """
         provider = self.llm_provider.lower()
         defaults = PROVIDER_DEFAULTS.get(provider, {})
         default_base_url = Settings.model_fields["llm_base_url"].default
@@ -90,6 +104,11 @@ _current_settings: Settings | None = None
 
 
 def get_settings() -> Settings:
+    """获取全局复用的 Settings 实例，首次调用时自动加载配置。
+
+    Return:
+        全局 Settings 单例。
+    """
     global _current_settings
     if _current_settings is None:
         _current_settings = Settings()
@@ -97,12 +116,27 @@ def get_settings() -> Settings:
 
 
 def _mask_secret(value: str, visible: int = 4) -> str:
+    """将敏感字符串中间部分掩码为星号，仅保留前几位可见。
+
+    Param:
+        value: 原始敏感字符串。
+        visible: 保留前几位可见字符。
+    Return:
+        掩码后的字符串。
+    """
     if not value or len(value) <= visible:
         return value
     return value[:visible] + "***"
 
 
 def update_settings(patch: dict) -> Settings:
+    """运行时更新全局配置，支持密钥掩码识别及 provider 自动切换。
+
+    Param:
+        patch: 要更新的字段及其新值的字典。
+    Return:
+        更新后的 Settings 实例。
+    """
     global _current_settings
     current = get_settings()
 
@@ -134,5 +168,11 @@ def update_settings(patch: dict) -> Settings:
 
         feishu_mod._cached_token = ""
         feishu_mod._token_expires_at = 0.0
+
+    # Reset cached HTTP session when http_trust_env changes
+    if "http_trust_env" in patch:
+        from app.utils.http_client import _reset_session
+
+        _reset_session()
 
     return current

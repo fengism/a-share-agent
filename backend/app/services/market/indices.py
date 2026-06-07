@@ -16,6 +16,14 @@ logger = logging.getLogger(__name__)
 
 
 def _safe_scaled(value, scale: float = 1.0) -> float | None:
+    """安全转换为浮点数并按比例缩放。
+
+    Args:
+        value: 待处理的数值
+        scale: 缩放因子（除数）
+    Return:
+        缩放后的浮点数或 None
+    """
     number = safe_float(value)
     if number is None:
         return None
@@ -23,6 +31,15 @@ def _safe_scaled(value, scale: float = 1.0) -> float | None:
 
 
 def _build_em_indices(data, source: str, price_scale: float = 1.0) -> MarketIndices:
+    """从东方财富 DataFrame 构造统一的 MarketIndices。
+
+    Args:
+        data: 东方财富指数数据 DataFrame
+        source: 数据来源标识
+        price_scale: 价格字段缩放系数
+    Return:
+        MarketIndices 模型对象
+    """
     return MarketIndices(indices=normalize_indices([
         IndexItem(
             code=str(row.get("代码", "")),
@@ -42,26 +59,61 @@ def _build_em_indices(data, source: str, price_scale: float = 1.0) -> MarketIndi
 
 
 def _build_east_direct_indices() -> MarketIndices:
-    data = _eastmoney_provider.fetch_market_indices_direct()
+    """通过东方财富直连接口构造大盘指数。
+
+    Args:
+        无
+    Return:
+        MarketIndices 模型对象
+    """
+    data = _eastmoney_provider.fetch_market_indices()
     return _build_em_indices(data, "east_direct", price_scale=100)
 
 
 async def _build_akshare_em_indices() -> MarketIndices:
+    """通过 akshare 东方财富接口构造大盘指数。
+
+    Args:
+        无
+    Return:
+        MarketIndices 模型对象
+    """
     data = await call_blocking(_akshare_provider.fetch_market_indices)
     return _build_em_indices(data, "em_ak")
 
 
 async def _build_akshare_sina_indices() -> MarketIndices:
+    """通过 akshare 新浪接口构造大盘指数。
+
+    Args:
+        无
+    Return:
+        MarketIndices 模型对象
+    """
     data = await call_blocking(_akshare_provider.fetch_market_indices_sina)
     return build_indices_from_sina(data).model_copy(update={"source": "sina_ak"})
 
 
 async def _build_sina_direct_indices() -> MarketIndices:
-    data = await call_blocking(_sina_provider.fetch_market_indices_direct)
+    """通过新浪直连接口构造大盘指数。
+
+    Args:
+        无
+    Return:
+        MarketIndices 模型对象
+    """
+    data = await call_blocking(_sina_provider.fetch_market_indices)
     return build_indices_from_sina(data).model_copy(update={"source": "sina_direct"})
 
 
 def _build_indices_attempts() -> list[ProviderAttempt]:
+    """构造大盘指数多数据源回退链。
+
+    Args:
+        无
+    Return:
+        Provider 尝试列表，按优先级排序
+    """
     return [
         ProviderAttempt(
             label="Akshare 东方财富指数",
@@ -86,6 +138,13 @@ def _build_indices_attempts() -> list[ProviderAttempt]:
 
 
 def _add_total_amount(result: MarketIndices) -> MarketIndices:
+    """合计沪深主板成交额并写入 total_amount。
+
+    Args:
+        result: 已填充 indices 的 MarketIndices
+    Return:
+        累加完 total_amount 的 MarketIndices
+    """
     result.total_amount = 0.0
     for index in result.indices:
         if index.code not in ["000001", "399001"]:
@@ -97,6 +156,13 @@ def _add_total_amount(result: MarketIndices) -> MarketIndices:
 
 
 async def get_indices() -> MarketIndices:
+    """获取大盘指数数据，带 5 分钟缓存和数据源回退。
+
+    Args:
+        无
+    Return:
+        MarketIndices 模型对象，附带 total_amount
+    """
     cache_key = dated_cache_key("market_indices")
     cached = cache.get(cache_key)
     if cached is not None:

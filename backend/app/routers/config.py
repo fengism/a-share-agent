@@ -13,6 +13,8 @@ router = APIRouter()
 
 
 class ConfigResponse(BaseModel):
+    """Purpose: 对外暴露的系统配置快照，敏感字段已掩码处理。"""
+
     llm_provider: str
     llm_api_key: str
     llm_base_url: str
@@ -34,10 +36,13 @@ class ConfigResponse(BaseModel):
     iwencai_enabled: bool
     iwencai_base_url: str
     iwencai_api_key: str
+    http_trust_env: bool
     provider_defaults: dict
 
 
 class ConfigUpdateRequest(BaseModel):
+    """Purpose: 系统配置局部更新请求体，所有字段均为可选 patch。"""
+
     llm_provider: str | None = None
     llm_api_key: str | None = None
     llm_base_url: str | None = None
@@ -59,9 +64,17 @@ class ConfigUpdateRequest(BaseModel):
     iwencai_enabled: bool | None = None
     iwencai_base_url: str | None = None
     iwencai_api_key: str | None = None
+    http_trust_env: bool | None = None
 
 
 def _to_response(s) -> ConfigResponse:
+    """将运行时 Settings 实例转换为对外的 ConfigResponse，敏感字段做掩码。
+
+    Param:
+        s: app.config.Settings 实例。
+    Return:
+        ConfigResponse: 用于 API 返回的配置快照。
+    """
     return ConfigResponse(
         llm_provider=s.llm_provider,
         llm_api_key=_mask_secret(s.llm_api_key),
@@ -84,17 +97,30 @@ def _to_response(s) -> ConfigResponse:
         iwencai_enabled=s.iwencai_enabled,
         iwencai_base_url=s.iwencai_base_url,
         iwencai_api_key=_mask_secret(s.iwencai_api_key),
+        http_trust_env=s.http_trust_env,
         provider_defaults=PROVIDER_DEFAULTS,
     )
 
 
 @router.get("", response_model=ConfigResponse)
 async def get_config():
+    """读取当前生效的系统配置。
+
+    Return:
+        ConfigResponse: 当前 Settings 的脱敏快照。
+    """
     return _to_response(get_settings())
 
 
 @router.put("", response_model=ConfigResponse)
 async def put_config(req: ConfigUpdateRequest):
+    """部分更新系统配置；未提供的字段保持原值。
+
+    Param:
+        req: ConfigUpdateRequest 请求体，仅包含需要修改的字段。
+    Return:
+        ConfigResponse: 更新后生效的配置快照。
+    """
     patch = req.model_dump(exclude_none=True)
     if not patch:
         return _to_response(get_settings())

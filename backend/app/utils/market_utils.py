@@ -10,12 +10,26 @@ from app.utils.symbol_utils import normalize_index_code, normalize_index_symbol_
 
 
 def replace_comma(x):
+    """Remove commas from a string value, leaving non-string values untouched.
+
+    Param:
+        x: value to process
+    Return:
+        string with commas removed, or original value if no comma present
+    """
     if "," in str(x):
         return str(x).replace(",", "")
     return x
 
 
 def normalize_indices(indices: list[IndexItem]) -> list[IndexItem]:
+    """Filter and order index items to match the canonical INDEX_FALLBACKS order.
+
+    Param:
+        indices: list of IndexItem to normalize
+    Return:
+        filtered list of IndexItem, sorted by INDEX_FALLBACKS order
+    """
     fallback_map = {code: (name, idx) for idx, (code, name, _secid) in enumerate(INDEX_FALLBACKS)}
     normalized: list[IndexItem] = []
     for item in indices:
@@ -45,6 +59,13 @@ def normalize_indices(indices: list[IndexItem]) -> list[IndexItem]:
 
 
 def build_indices_from_sina(df: pd.DataFrame) -> MarketIndices:
+    """Build a MarketIndices object from a Sina quote DataFrame.
+
+    Param:
+        df: DataFrame with Sina-formatted index columns
+    Return:
+        MarketIndices containing normalized index items
+    """
     indices: list[IndexItem] = []
     for _, row in df.iterrows():
         indices.append(
@@ -67,6 +88,15 @@ def build_indices_from_sina(df: pd.DataFrame) -> MarketIndices:
 
 
 def filter_index_hist_range(df: pd.DataFrame, start_date: str, end_date: str) -> pd.DataFrame:
+    """Filter an index history DataFrame to the given date range.
+
+    Param:
+        df: DataFrame with a "date" column
+        start_date: inclusive start date string (YYYY-MM-DD), or empty for no lower bound
+        end_date: inclusive end date string (YYYY-MM-DD), or empty for no upper bound
+    Return:
+        filtered DataFrame with reset index and "date" column formatted as "YYYY-MM-DD"
+    """
     if df.empty:
         return df
     result = df.copy()
@@ -81,6 +111,13 @@ def filter_index_hist_range(df: pd.DataFrame, start_date: str, end_date: str) ->
 
 
 def get_last_trade_date(code: str) -> str:
+    """Fetch the last trade date for an index code via Sina HQ endpoint.
+
+    Param:
+        code: index code
+    Return:
+        last trade date string in "YYYY-MM-DD" format, or empty string on failure
+    """
     sym = normalize_index_symbol_v2(code)
     url = f"https://hq.sinajs.cn/list={sym}"
     headers = {

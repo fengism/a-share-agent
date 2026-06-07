@@ -7,6 +7,7 @@ from app.services.screener import percentiles
 
 @pytest.mark.asyncio
 async def test_compute_percentiles_dedupes_and_preserves_input_order(monkeypatch):
+    """compute_percentiles deduplicates codes and preserves the input order in results."""
     calls: list[str] = []
 
     async def fake_compute(code: str, indicator: str, period: str):
@@ -32,6 +33,7 @@ async def test_compute_percentiles_dedupes_and_preserves_input_order(monkeypatch
 
 @pytest.mark.asyncio
 async def test_compute_percentiles_limits_concurrency(monkeypatch):
+    """compute_percentiles caps the number of concurrent per-code computations."""
     running = 0
     max_running = 0
     lock = asyncio.Lock()
@@ -56,6 +58,7 @@ async def test_compute_percentiles_limits_concurrency(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_compute_percentiles_dedupes_inflight_across_requests(monkeypatch):
+    """compute_percentiles deduplicates inflight computations across concurrent requests."""
     calls = 0
 
     async def fake_compute(code: str, indicator: str, period: str):
@@ -79,6 +82,7 @@ async def test_compute_percentiles_dedupes_inflight_across_requests(monkeypatch)
 
 @pytest.mark.asyncio
 async def test_compute_percentiles_handles_per_code_errors(monkeypatch):
+    """compute_percentiles captures per-code errors and returns None for failed entries."""
     async def fake_compute(code: str, indicator: str, period: str):
         if code == "600519":
             raise RuntimeError("provider failed")

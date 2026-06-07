@@ -3,18 +3,36 @@ from app.services.providers import tencent
 
 class DummyResponse:
     def __init__(self, payload):
+        """Serialise the payload to text and keep it for json() access.
+
+        Param:
+            payload: JSON-serialisable value to expose via .json() and .text.
+        Return:
+            None
+        """
         self._payload = payload
         import json
         self.text = json.dumps(payload, ensure_ascii=False)
 
     def json(self):
+        """Return the pre-stored JSON payload.
+
+        Return:
+            the payload value passed during construction.
+        """
         return self._payload
 
     def raise_for_status(self):
+        """No-op stand-in for requests.Response.raise_for_status in tests.
+
+        Return:
+            None
+        """
         return None
 
 
 def test_fetch_stock_concept_maps_concepts_and_plates(monkeypatch):
+    """fetch_stock_concepts groups concept, first-level, and second-level plates."""
     provider = tencent.TencentDataProvider()
     captured = {}
 
@@ -45,6 +63,7 @@ def test_fetch_stock_concept_maps_concepts_and_plates(monkeypatch):
 
 
 def test_fetch_market_sector_rankings_direct_maps_top_and_bottom(monkeypatch):
+    """fetch_market_sector_rankings_direct returns top and bottom ranking dataframes."""
     provider = tencent.TencentDataProvider()
     orders = []
 

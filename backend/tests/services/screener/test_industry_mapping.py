@@ -7,6 +7,11 @@ from app.services.screener import industry
 
 
 def clear_industry_cache() -> None:
+    """Delete cached industry mapping/list entries from the industry module.
+
+    Return:
+        None
+    """
     industry.cache.delete(industry._INDUSTRY_MAPPING_CACHE_KEY)
     industry.cache.delete(industry._INDUSTRY_LIST_CACHE_KEY)
     mapping_key, list_key = industry._built_cache_keys()
@@ -15,6 +20,7 @@ def clear_industry_cache() -> None:
 
 
 def test_normalize_sw_industry_name_strips_suffix_and_empty_values():
+    """_normalize_sw_industry_name strips suffixes and converts empties to None."""
     assert industry._normalize_sw_industry_name("半导体(申万)") == "半导体"
     assert industry._normalize_sw_industry_name(" 白酒 ") == "白酒"
     assert industry._normalize_sw_industry_name("") is None
@@ -23,6 +29,7 @@ def test_normalize_sw_industry_name_strips_suffix_and_empty_values():
 
 
 def test_build_mapping_skips_empty_sw_components(monkeypatch):
+    """_build_industry_mapping_sw_second_index_akshare ignores industries with no components."""
     monkeypatch.setattr(
         industry._akshare_provider,
         "fetch_sw_index_realtime",
@@ -38,12 +45,13 @@ def test_build_mapping_skips_empty_sw_components(monkeypatch):
 
 
 def test_build_mapping_falls_back_to_east_direct_when_sw_invalid(monkeypatch):
+    """_build_industry_mapping_sw_second falls back to the EastMoney direct provider."""
     clear_industry_cache()
     mapping = {"600519": "白酒", "000858": "白酒"}
 
     monkeypatch.setattr(industry, "_MIN_VALID_MAPPING_SIZE", 1)
     monkeypatch.setattr(industry, "_build_industry_mapping_sw_second_index_akshare", lambda: ({}, []))
-    monkeypatch.setattr(industry._eastmoney_provider, "build_industry_mapping_direct", lambda: (mapping, ["白酒"]))
+    monkeypatch.setattr(industry._eastmoney_provider, "build_industry_mapping", lambda: (mapping, ["白酒"]))
 
     result_mapping, result_industry_list = industry._build_industry_mapping_sw_second()
 
@@ -52,6 +60,7 @@ def test_build_mapping_falls_back_to_east_direct_when_sw_invalid(monkeypatch):
 
 
 def test_fetch_industry_mapping_uses_memory_cache(monkeypatch, tmp_path):
+    """fetch_industry_mapping_sw_second reuses in-memory cache across calls."""
     clear_industry_cache()
     mapping_file = tmp_path / "industry_second_mapping.json"
     mapping_file.write_text(json.dumps({"600519": "白酒"}), encoding="utf-8")
@@ -69,6 +78,7 @@ def test_fetch_industry_mapping_uses_memory_cache(monkeypatch, tmp_path):
 
 
 def test_fetch_industry_mapping_rebuilds_when_file_missing(monkeypatch, tmp_path):
+    """fetch_industry_mapping_sw_second rebuilds the mapping when the cache file is missing."""
     clear_industry_cache()
     mapping = {"600519": "白酒"}
 
@@ -82,6 +92,7 @@ def test_fetch_industry_mapping_rebuilds_when_file_missing(monkeypatch, tmp_path
 
 
 def test_fetch_industry_mapping_rebuilds_when_file_format_invalid(monkeypatch, tmp_path):
+    """fetch_industry_mapping_sw_second rebuilds the mapping when the cache file is malformed."""
     clear_industry_cache()
     mapping_file = tmp_path / "industry_second_mapping.json"
     mapping_file.write_text(json.dumps(["invalid"]), encoding="utf-8")
@@ -97,6 +108,7 @@ def test_fetch_industry_mapping_rebuilds_when_file_format_invalid(monkeypatch, t
 
 
 def test_update_industry_mapping_refreshes_memory_cache(monkeypatch, tmp_path):
+    """update_industry_mapping_sw_second_file refreshes the in-memory cache and persists the file."""
     clear_industry_cache()
     mapping_file = tmp_path / "industry_second_mapping.json"
     mapping = {f"60{i:04d}": "白酒" for i in range(4001)}
@@ -117,6 +129,7 @@ def test_update_industry_mapping_refreshes_memory_cache(monkeypatch, tmp_path):
 
 
 def test_update_industry_mapping_does_not_write_invalid_mapping(monkeypatch, tmp_path):
+    """update_industry_mapping_sw_second_file does not persist a mapping that is too small."""
     clear_industry_cache()
     mapping_file = tmp_path / "industry_second_mapping.json"
 
@@ -132,6 +145,7 @@ def test_update_industry_mapping_does_not_write_invalid_mapping(monkeypatch, tmp
 
 @pytest.mark.asyncio
 async def test_async_accessors_return_expected_parts(monkeypatch):
+    """Async accessors return the mapping and list parts of the industry data."""
     mapping = {"600519": "白酒"}
 
     monkeypatch.setattr(industry, "fetch_industry_mapping_sw_second", lambda: (mapping, ["白酒"]))

@@ -9,6 +9,7 @@ from app.adapters.notion import NotionConfigError, create_page, to_notion_blocks
 from app.adapters.feishu import FeishuConfigError, create_doc, grant_doc_edit_permission, send_card, to_feishu_doc_blocks, to_feishu_card
 from app.config import get_settings
 from app.services.daily_review.storage import load_daily_review
+from app.services.industry_chain.storage import load_industry_chain
 from app.utils.cache import cache
 
 logger = logging.getLogger(__name__)
@@ -16,16 +17,36 @@ router = APIRouter()
 
 
 def _load_data(push_type: str, request: PushRequest):
+    """根据推送类型从缓存或存储中加载原始数据对象。
+
+    Param:
+        push_type: 推送类型字符串，daily_review / analysis / industry_chain。
+        request: 推送请求，提供日期、股票代码或产业链名称与 archive_id。
+    Return:
+        Any | None: 对应类型的数据对象；未知类型返回 None。
+    """
     if push_type == "daily_review":
         return load_daily_review(request.date)
     if push_type == "analysis":
         today = datetime.now().strftime("%Y%m%d")
         cache_key = f"analysis:{request.code}:{today}"
         return cache.get(cache_key)
+    if push_type == "industry_chain":
+        if not request.industry_name.strip() or not request.archive_id.strip():
+            return None
+        return load_industry_chain(request.industry_name, request.archive_id)
     return None
 
 
 def _extract_title(push_type: str, request: PushRequest) -> str:
+    """根据推送类型与请求字段生成推送文档标题。
+
+    Param:
+        push_type: 推送类型字符串。
+        request: 推送请求，包含 chat_title、code、industry_name 等字段。
+    Return:
+        str: 拼接后的推送标题，未识别类型返回默认值"推送"。
+    """
     if push_type == "daily_review":
         data = load_daily_review(request.date)
         return f"每日复盘 - {data.date}"
@@ -36,11 +57,20 @@ def _extract_title(push_type: str, request: PushRequest) -> str:
         return f"股票分析 - {data.stock_code} - {data.stock_name} - {data.analysis_date}"
     if push_type == "chat":
         return request.chat_title or f"AI 对话 - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    if push_type == "industry_chain":
+        return f"产业链分析 - {request.industry_name} - {request.archive_id}"
     return "推送"
 
 
 @router.post("", response_model=PushResponse)
 async def push_content(request: PushRequest):
+    """将分析结果、复盘或聊天内容推送到 Notion 或飞书。
+
+    Param:
+        request: PushRequest 请求体，包含 target、type、receiver 及内容字段。
+    Return:
+        PushResponse: 推送结果，含目标、文档 URL、标题和提示信息。
+    """
     if request.target == "feishu":
         if not request.feishu_receiver.strip():
             settings = get_settings()
@@ -56,8 +86,12 @@ async def push_content(request: PushRequest):
     else:
         data = _load_data(request.type, request)
         if data is None:
-            label = "复盘记录" if request.type == "daily_review" else "分析结果"
-            raise HTTPException(status_code=404, detail=f"暂无{label}，请先生成")
+            label_map = {
+                "daily_review": "复盘记录",
+                "analysis": "分析结果",
+                "industry_chain": "产业链存档",
+            }
+            raise HTTPException(status_code=404, detail=f"暂无{label_map.get(request.type, '内容')}，请先生成")
         content = build_content(request.type, data)
         title = _extract_title(request.type, request)
 
@@ -76,6 +110,7 @@ async def push_content(request: PushRequest):
             folder_map = {
                 "daily_review": settings.feishu_daily_review_folder,
                 "analysis": settings.feishu_analysis_folder,
+                "industry_chain": settings.feishu_analysis_folder,
             }
             wiki_parent_map = {
                 "daily_review": settings.feishu_wiki_daily_review_parent,

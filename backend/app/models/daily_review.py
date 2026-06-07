@@ -2,17 +2,20 @@ from pydantic import BaseModel, Field
 
 
 class DailyReviewRequest(BaseModel):
+    """Purpose: 每日复盘接口的请求参数。"""
     date: str | None = None
     force: bool = False
 
 
 class DailyReviewSection(BaseModel):
+    """Purpose: 每日复盘中单个章节的内容（标题/摘要/要点）。"""
     title: str
     summary: str
     bullets: list[str] = Field(default_factory=list)
 
 
 class DailyReviewDataSnapshot(BaseModel):
+    """Purpose: 每日复盘所引用的市场数据快照，用于回溯复盘生成时的市场状态。"""
     indices: list[dict] = Field(default_factory=list)
     hot_stocks: list[dict] = Field(default_factory=list)
     hot_concepts: list[dict] = Field(default_factory=list)
@@ -26,6 +29,7 @@ class DailyReviewDataSnapshot(BaseModel):
 
 
 class DailyReviewResult(BaseModel):
+    """Purpose: 每日复盘的完整结果，包括各章节、LLM 点评、风险/机会/策略要点及数据快照。"""
     date: str
     title: str
     generated_at: str
@@ -42,6 +46,7 @@ class DailyReviewResult(BaseModel):
 
 
 class DailyReviewHistoryItem(BaseModel):
+    """Purpose: 每日复盘历史列表的单条摘要。"""
     date: str
     title: str
     generated_at: str

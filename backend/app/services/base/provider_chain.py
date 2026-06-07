@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ProviderAttempt:
+    """Purpose: 数据源提供者的单次尝试配置，包含标签、加载函数和错误处理回调。"""
+
     label: str
     loader: Callable[[], Awaitable[Any]]
     on_error: str | None = None
@@ -15,6 +17,8 @@ class ProviderAttempt:
 
 @dataclass(frozen=True)
 class ProviderAttemptResult:
+    """Purpose: 单次数据源尝试的结果记录，包含标签、状态、耗时和错误信息。"""
+
     label: str
     success: bool
     elapsed_ms: float
@@ -24,19 +28,42 @@ class ProviderAttemptResult:
 
 @dataclass(frozen=True)
 class ProviderChainReport:
+    """Purpose: 整个 provider chain 的执行报告，包含所有尝试结果和最终选中的提供者。"""
+
     attempts: list[ProviderAttemptResult]
     selected_label: str | None = None
 
 
 class BaseProviderChain:
+    """Purpose: 提供者链的基类，按顺序执行多个 ProviderAttempt，成功即返回，失败则尝试下一个。"""
+
     def __init__(self, attempts: list[ProviderAttempt]):
+        """Initialize the chain with the ordered list of provider attempts.
+
+        Param:
+            attempts: ordered list of provider attempts to execute
+        """
         self.attempts = attempts
 
     async def run(self):
+        """Run the provider chain and return the first successful result.
+
+        Param:
+            None
+        Return:
+            the value returned by the first successful attempt's loader
+        """
         result, _ = await self.run_with_report()
         return result
 
     async def run_with_report(self):
+        """Run the provider chain and return both the result and a report.
+
+        Param:
+            None
+        Return:
+            tuple of (result value, ProviderChainReport with all attempt outcomes)
+        """
         attempt_results: list[ProviderAttemptResult] = []
         last_error: Exception | None = None
         for attempt in self.attempts:

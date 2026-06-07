@@ -5,6 +5,7 @@ from app.services.chat.skills.registry import Skill, registry
 
 
 def register_stock_skills():
+    """注册个股与选股相关技能：search_stocks、get_stock_info、get_stock_valuation_detail、get_stock_technical_indicators、get_stock_kline、get_stock_financial、get_stock_news、get_stock_sentiment、screen_stocks、get_industries、iwencai_search、iwencai_query、iwencai_select_stock、iwencai_market_macro。"""
     registry.register(Skill(
         name="search_stocks",
         description="搜索股票，支持按代码或名称模糊搜索。返回匹配的股票列表（代码、名称、价格、涨跌幅）。用户提到任何股票名称或代码时必须先调用此工具确认准确代码。",

@@ -18,9 +18,20 @@ SYSTEM_PROMPT = """你是一位资深市场分析师。你需要分析一组市�
   "market_sentiment": "偏多 或 中性 或 偏空",
   "summary": "用 2-3 句话总结当前市场核心要点",
   "sections": [
-    {"title": "板块名称", "icon": "emoji", "items": ["要点1", "要点2"]}
+    {
+      "title": "板块名称",
+      "icon": "emoji",
+      "items": [
+        {"text": "要点描述", "refs": [1, 3]},
+        {"text": "要点描述", "refs": [5]}
+      ]
+    }
   ]
 }
+
+每个 item 是一个对象，包含：
+- text: 要点描述（不超过 30 字）
+- refs: 支撑该观点的资讯编号列表（对应输入中 [i] 的编号），选取最相关的 1-3 条
 
 ## 分类维度
 根据资讯内容，灵活组织 sections，常见的有：
@@ -32,9 +43,10 @@ SYSTEM_PROMPT = """你是一位资深市场分析师。你需要分析一组市�
 - 海外影响（🌍）：美联储、地缘政治、全球市场
 
 ## 原则
-- 每个 section 的 items 控制在 2-5 条，每条不超过 30 字
+- 每个 section 的 items 控制在 2-5 条
 - 只提取有明确市场影响的信息，忽略噪音
 - 基于资讯事实判断，不做无依据推测
+- refs 必须是输入中真实存在的编号
 - 只输出 JSON，不要输出其他内容"""
 
 
@@ -48,13 +60,22 @@ def _get(item, key: str, default="") -> str:
 
 
 def _build_prompt(items) -> str:
+    """构造提供给 LLM 的资讯分析提示词。
+
+    Param:
+        items: 新闻条目列表（dict 或 Pydantic 模型）
+    Return:
+        多行字符串形式的用户提示词
+    """
     lines = []
     for i, item in enumerate(items[:80], 1):
         source = _get(item, "source")
         title = _get(item, "title")
         content = _get(item, "content")[:100]
         time_str = _get(item, "publish_time")
-        lines.append(f"[{i}] [{source}] {time_str} | {title} — {content}")
+        url = _get(item, "url")
+        url_part = f" {url}" if url else ""
+        lines.append(f"[{i}] [{source}] {time_str} | {title} — {content}{url_part}")
     return f"以下是最近的市场资讯（共 {min(len(items), 80)} 条），请分析归类：\n\n" + "\n".join(lines)
 
 
@@ -72,13 +93,57 @@ def _fallback_analysis(items) -> dict:
             {
                 "title": "数据来源分布",
                 "icon": "📰",
-                "items": [f"{src}: {cnt} 条" for src, cnt in sorted(source_counts.items(), key=lambda x: -x[1])],
+                "items": [{"text": f"{src}: {cnt} 条"} for src, cnt in sorted(source_counts.items(), key=lambda x: -x[1])],
             }
         ],
     }
 
 
+def _resolve_refs(result: dict, items: list) -> dict:
+    """将 LLM 输出中每个 item 的 refs 编号解析为实际 URL 和标题。
+
+    Param:
+        result: LLM 返回的分析字典，sections[].items[] 可能是 str 或 dict
+        items: 原始新闻列表，索引与 prompt 中的 [i] 对应
+    Return:
+        原地修改后的 result，items 统一为 {"text": ..., "urls": [...]} 格式
+    """
+    # 建立编号 → {title, url} 映射（prompt 中编号从 1 开始）
+    ref_map = {}
+    for i, item in enumerate(items[:80], 1):
+        url = _get(item, "url")
+        title = _get(item, "title")
+        if url:
+            ref_map[i] = {"title": title or "", "url": url}
+
+    for section in result.get("sections", []):
+        normalized = []
+        for item in section.get("items", []):
+            if isinstance(item, str):
+                normalized.append({"text": item, "urls": []})
+            elif isinstance(item, dict):
+                text = item.get("text", "")
+                refs = item.get("refs", [])
+                # 收集所有有效 ref 的 URL 和标题
+                urls = []
+                for ref in refs:
+                    if isinstance(ref, int) and ref in ref_map:
+                        urls.append(ref_map[ref])
+                normalized.append({"text": text, "urls": urls})
+            else:
+                normalized.append({"text": str(item), "urls": []})
+        section["items"] = normalized
+    return result
+
+
 async def analyze_market_news() -> dict:
+    """调用 LLM 对市场资讯流进行结构化分析，失败时降级返回兜底分析。
+
+    Param:
+        无
+    Return:
+        包含 market_sentiment/summary/sections 字段的结构化分析字典
+    """
     items = await get_market_feed()
     if not items:
         return _fallback_analysis([])
@@ -113,8 +178,9 @@ async def analyze_market_news() -> dict:
             text = text.rsplit("```", 1)[0]
         text = text.strip()
         result = json.loads(text)
-        cache.set(cache_key, result, ttl=3600)
-        cache.set(hash_key, content_hash, ttl=3600)
+        _resolve_refs(result, items)
+        cache.set(cache_key, result, ttl=300)
+        cache.set(hash_key, content_hash, ttl=300)
         return result
     except Exception as e:
         logger.warning(f"AI 资讯分析失败: {e}")

@@ -6,6 +6,7 @@ from app.services.stock import basic_info
 
 @pytest.mark.asyncio
 async def test_get_basic_info_degrades_when_tencent_sources_fail(monkeypatch, capsys):
+    """get_basic_info returns a degraded result when Tencent sources fail."""
     async def fake_call_blocking(func, *args, **kwargs):
         name = getattr(func, "__name__", "")
         if name == "fetch_stock_basic_info":
@@ -32,12 +33,29 @@ async def test_get_basic_info_degrades_when_tencent_sources_fail(monkeypatch, ca
 
 
 async def _empty_exchange_row(code: str):
+    """Return an empty dict for the exchange basic info row.
+
+    Param:
+        code: stock code (unused; accepted for interface compatibility).
+    Return:
+        an empty dict.
+    """
     return {}
 
 
 async def _name_map():
+    """Return a fixed stock name map for tests.
+
+    Return:
+        a dict mapping 600519 to a fixed display name.
+    """
     return {"600519": "名称映射"}
 
 
 async def _empty_spot_df():
+    """Return an empty spot DataFrame with the expected columns.
+
+    Return:
+        a DataFrame with the spot snapshot columns and zero rows.
+    """
     return pd.DataFrame(columns=["代码", "名称", "总市值", "流通市值", "最新价"])

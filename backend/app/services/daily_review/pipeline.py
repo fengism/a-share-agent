@@ -20,6 +20,14 @@ from app.services.market.volume import get_market_volume_data
 logger = logging.getLogger(__name__)
 
 def _build_fallback_review(date: str, snapshot: DailyReviewDataSnapshot) -> DailyReviewResult:
+    """在 LLM 不可用时，根据数据快照构建一份纯模板化的复盘报告。
+
+    Param:
+        date: 复盘日期
+        snapshot: 当日市场数据快照
+    Return:
+        基础复盘结果对象
+    """
     index_bullets = [
         f"{item.get('name', '')}：{item.get('price', '-')}, 涨跌幅 {item.get('change_pct', '-') }%"
         for item in snapshot.indices[:6]
@@ -83,6 +91,14 @@ def _build_fallback_review(date: str, snapshot: DailyReviewDataSnapshot) -> Dail
 
 
 def _build_prompt(date: str, snapshot: DailyReviewDataSnapshot) -> str:
+    """根据数据快照构造发送给 LLM 的复盘 prompt 文本。
+
+    Param:
+        date: 复盘日期
+        snapshot: 当日市场数据快照
+    Return:
+        格式化后的用户 prompt 字符串
+    """
     market_statistics = snapshot.market_statistics or {}
     # 构建市场概览总结
     rising_indices = [item for item in snapshot.indices if isinstance(item.get("change_pct"), (int, float)) and item.get("change_pct", 0) > 0]
@@ -175,6 +191,20 @@ def _build_snapshot(
     market_news,
     market_volume,
 ) -> DailyReviewDataSnapshot:
+    """将并行采集的原始数据封装为 DailyReviewDataSnapshot，异常值转为空数据。
+
+    Param:
+        indices: 指数数据
+        hot_stocks: 热门股票
+        hot_concepts: 热门概念
+        hot_industries: 热门行业
+        dragon_tiger: 龙虎榜
+        market_statistics: 市场统计
+        market_news: 市场新闻
+        market_volume: 市场成交额
+    Return:
+        封装后的数据快照
+    """
     market_statistics_data = {} if isinstance(market_statistics, Exception) or market_statistics is None else market_statistics.model_dump()
     top_sectors = market_statistics_data.get("top_sectors", [])
     bottom_sectors = market_statistics_data.get("bottom_sectors", [])
@@ -197,6 +227,13 @@ def _build_snapshot(
 
 
 async def generate_daily_review(request: DailyReviewRequest) -> DailyReviewResult:
+    """生成每日复盘报告：优先读取缓存，否则并行采集数据并调用 LLM 生成分析。
+
+    Param:
+        request: 复盘请求，包含日期和是否强制刷新标志
+    Return:
+        完整的复盘结果对象
+    """
     date = request.date or datetime.now().strftime("%Y-%m-%d")
     if not request.force:
         cached = load_daily_review(date)

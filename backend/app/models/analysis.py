@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 
 
 class FactorAnalysis(BaseModel):
+    """Purpose: 单因子分析结果（基本面/技术面/情绪面等共用结构）。"""
     score: int = Field(ge=1, le=10)
     summary: str
     strengths: list[str] = []
@@ -15,6 +16,7 @@ class FactorAnalysis(BaseModel):
 
 
 class AnalysisResult(BaseModel):
+    """Purpose: 单只股票 AI 分析的完整结果，包含各因子分析、估值视图、评级、信号和风险提示。"""
     stock_code: str
     stock_name: str
     analysis_date: str
@@ -35,6 +37,7 @@ class AnalysisResult(BaseModel):
 
 
 class AnalysisStage(BaseModel):
+    """Purpose: 分析流水线中单个阶段的状态信息。"""
     stage: int
     name: str
     status: str  # started | completed | failed
@@ -43,6 +46,7 @@ class AnalysisStage(BaseModel):
 
 
 class AnalysisProgress(BaseModel):
+    """Purpose: 分析进度的 SSE 推送事件载荷，支持分阶段开始/完成/失败以及最终结果。"""
     type: str  # stage_started | stage_completed | stage_failed | complete | error | cached
     stage: AnalysisStage | None = None
     total_stages: int = 4
@@ -51,6 +55,7 @@ class AnalysisProgress(BaseModel):
 
 
 class AnalysisHistoryItem(BaseModel):
+    """Purpose: 分析历史列表中单条记录的摘要信息。"""
     stock_code: str
     stock_name: str
     analysis_date: str

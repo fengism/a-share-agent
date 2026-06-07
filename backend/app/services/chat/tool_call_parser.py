@@ -8,6 +8,14 @@ from app.services.chat.skills.registry import SkillRegistry
 
 
 def _find_matching_paren(text: str, start: int) -> int:
+    """在文本中从 start 位置开始查找匹配的右括号位置。
+
+    Param:
+        text: 待搜索的文本
+        start: 起始位置（应指向左括号）
+    Return:
+        匹配的右括号索引，未找到返回 -1
+    """
     depth = 0
     in_str = None
     i = start
@@ -33,6 +41,14 @@ def _find_matching_paren(text: str, start: int) -> int:
 
 
 def _parse_positional_args(args_text: str, param_order: list[str]) -> dict | None:
+    """解析伪工具调用的参数文本，支持 JSON、位置参数和裸字符串三种格式。
+
+    Param:
+        args_text: 参数字符串
+        param_order: 参数名称顺序列表
+    Return:
+        解析后的参数字典，解析失败返回 None
+    """
     args_text = args_text.strip()
     if not args_text:
         return {}
@@ -64,6 +80,16 @@ def _parse_positional_args(args_text: str, param_order: list[str]) -> dict | Non
 
 
 def extract_pseudo_tool_calls(text: str, registry: SkillRegistry) -> list[ToolCallInfo]:
+    """从 LLM 输出的纯文本中提取伪工具调用。
+
+    某些模型不通过标准的 function calling 通道，而是直接在文本中写出 skill_name(args) 形式的调用。
+
+    Param:
+        text: LLM 输出的文本
+        registry: 技能注册中心，用于查找 skill 定义和参数顺序
+    Return:
+        提取出的 ToolCallInfo 列表，每个对应一个伪工具调用
+    """
     if not text:
         return []
 

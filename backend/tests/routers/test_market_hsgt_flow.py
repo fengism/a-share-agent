@@ -8,6 +8,7 @@ client = TestClient(app)
 
 
 def test_get_hsgt_flow_route(monkeypatch):
+    """Test GET /api/market/hsgt-flow returns the service payload."""
     async def fake_get_hsgt_flow():
         return {
             "updated_at": "2026-05-27 14:35:00",

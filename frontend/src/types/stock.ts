@@ -449,16 +449,59 @@ export interface IndustryRankings {
   total: number;
 }
 
+export interface NewsAnalysisRef {
+  title: string;
+  url: string;
+}
+
+export interface NewsAnalysisRef {
+  title: string;
+  url: string;
+}
+
+export interface NewsAnalysisItem {
+  text: string;
+  urls?: NewsAnalysisRef[];
+}
+
 export interface NewsAnalysisSection {
   title: string;
   icon: string;
-  items: string[];
+  items: NewsAnalysisItem[];
 }
 
 export interface NewsAnalysis {
   market_sentiment: string;
   summary: string;
   sections: NewsAnalysisSection[];
+}
+
+export interface IndustryChainChart {
+  title: string;
+  description?: string;
+  type: string;
+  option: Record<string, unknown>;
+}
+
+export interface IndustryChainResult {
+  name: string;
+  summary: string;
+  upstream: Record<string, unknown>[];
+  midstream: Record<string, unknown>[];
+  downstream: Record<string, unknown>[];
+  drivers: string[];
+  risks: string[];
+  key_stocks: Record<string, unknown>[];
+  llm_review: string;
+  charts: IndustryChainChart[];
+}
+
+export interface IndustryChainHistoryItem {
+  name: string;
+  archive_id: string;
+  saved_at: string;
+  title: string;
+  summary: string;
 }
 
 export interface NotionExportResponse {
@@ -477,12 +520,14 @@ export interface NotionAnalysisExportRequest {
 
 export interface PushRequest {
   target: "notion" | "feishu";
-  type: "daily_review" | "analysis" | "chat";
+  type: "daily_review" | "analysis" | "chat" | "industry_chain";
   date?: string;
   code?: string;
   feishu_receiver?: string;
   chat_title?: string;
   chat_content?: string;
+  industry_name?: string;
+  archive_id?: string;
 }
 
 export interface PushResponse {

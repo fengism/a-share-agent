@@ -14,10 +14,19 @@ from app.utils.data_clean import rename_columns
 
 
 class TencentDataProvider(BaseDataProvider):
+    """Purpose: 对接腾讯财经代理接口的 K线、概念板块、行情快照、板块涨跌排行数据提供器。"""
     def __init__(self):
+        """初始化 TencentDataProvider，固定 name 与 source_label。"""
         super().__init__(name="tencent", source_label="腾讯")
 
     def fetch_stock_concepts(self, code: str) -> StockConceptInfo | None:
+        """获取个股所属概念、一级与二级行业板块。
+
+        Param:
+            code: 6 位股票代码
+        Return:
+            StockConceptInfo 对象；无数据时返回 None
+        """
         normalized_code = normalize_index_symbol_v2(code).lower()
         response = requests.get(
             "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/stockinfo/plateNew",
@@ -42,6 +51,16 @@ class TencentDataProvider(BaseDataProvider):
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
     def fetch_stock_kline(self, code: str, start_date: str, end_date: str, adjust: str="qfq") -> pd.DataFrame:
+        """按年分片拉取腾讯个股 K 线，合并后计算振幅并重命名列。
+
+        Param:
+            code: 6 位股票代码
+            start_date: 起始日期，格式 YYYY-MM-DD
+            end_date: 结束日期，格式 YYYY-MM-DD
+            adjust: 复权方式，默认 qfq
+        Return:
+            中文列名的 K线 DataFrame
+        """
         sym = normalize_code(code)
         normalized_start = start_date.replace("-", "")
         normalized_end = end_date.replace("-", "")
@@ -110,9 +129,21 @@ class TencentDataProvider(BaseDataProvider):
         )
 
     def fetch_market_sector_rankings_direct(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """获取市场板块涨跌排行榜（涨与跌各一份）。
+
+        Return:
+            (涨榜 DataFrame, 跌榜 DataFrame)
+        """
         return self._fetch_sector_ranking("0"), self._fetch_sector_ranking("1")
 
     def _fetch_sector_ranking(self, order: str) -> pd.DataFrame:
+        """按指定排序方向拉取腾讯板块行情并重命名列。
+
+        Param:
+            order: 排序方向，"0" 升序/涨，"1" 降序/跌
+        Return:
+            板块行情 DataFrame
+        """
         response = requests.get(
             "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/mktHs/rank",
             params={
@@ -148,34 +179,12 @@ class TencentDataProvider(BaseDataProvider):
         return df
 
     def fetch_stock_quote(self, code: str) -> dict:
-        """
-        批量拉取腾讯股票实时行情。
-        codes: ["688017", "300476", "002463"]
-        也支持指数: ["000001", "000300", "399006"]
-        也支持ETF: ["510050", "510300"]
-        返回: {code: {name, price, pe_ttm, pb, mcap, ...}}
-        索引	含义	示例
-        1	名称	绿的谐波
-        3	当前价	224.12
-        4	昨收	215.01
-        5	今开	214.10
-        9-18	买一~买五(价+量)	
-        19-28	卖一~卖五(价+量)	
-        31	涨跌额	9.11
-        32	涨跌幅%	4.24
-        33	最高	229.62
-        34	最低	214.10
-        37	成交额(万)	187040
-        38	换手率%	4.55
-        39	PE(TTM)	300.45
-        43	振幅%（不是PB！）	7.22
-        44	总市值(亿)	410.88
-        45	流通市值(亿)	410.88
-        46	PB(市净率)	11.51
-        47	涨停价	258.01
-        48	跌停价	172.01
-        49	量比	1.20
-        52	PE(静)	314.76
+        """批量拉取腾讯股票实时行情。
+
+        Param:
+            code: 6 位股票代码（支持个股/指数/ETF）
+        Return:
+            包含 name、price、pe_ttm、pb、mcap 等字段的字典
         """
         sym = normalize_code(code)
         prefixed = sym.prefixed_lower

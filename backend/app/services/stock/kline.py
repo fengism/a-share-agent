@@ -13,6 +13,17 @@ _kline_singleflight = AsyncSingleFlight[KlineData]()
 
 
 def _build_kline_source_attempts(code: str, period: str, start_date: str, end_date: str, adjust: str) -> list[ProviderAttempt]:
+    """构造股票 K 线多数据源回退链。
+
+    Param:
+        code: 股票代码
+        period: K 线周期
+        start_date: 起始日期，格式 YYYY-MM-DD
+        end_date: 结束日期，格式 YYYY-MM-DD
+        adjust: 复权类型（qfq/hfq/none）
+    Return:
+        Provider 尝试列表，按优先级排序
+    """
     return [
         ProviderAttempt(
             label="百度股票K线",
@@ -27,10 +38,32 @@ def _build_kline_source_attempts(code: str, period: str, start_date: str, end_da
     ]
 
 async def _fetch_kline_with_fallback(code: str, period: str, start_date: str, end_date: str, adjust: str):
+    """按回退链获取 K 线 DataFrame。
+
+    Param:
+        code: 股票代码
+        period: K 线周期
+        start_date: 起始日期
+        end_date: 结束日期
+        adjust: 复权类型
+    Return:
+        K 线 DataFrame
+    """
     return await BaseProviderChain(_build_kline_source_attempts(code, period, start_date, end_date, adjust)).run()
 
 
 async def _load_kline(sym, period: str, start_date: str, end_date: str, adjust: str) -> KlineData:
+    """加载 K 线并构造 KlineData，缺失涨跌幅时补算。
+
+    Param:
+        sym: 归一化后的代码对象
+        period: K 线周期
+        start_date: 起始日期
+        end_date: 结束日期
+        adjust: 复权类型
+    Return:
+        KlineData 模型对象
+    """
     df = await _fetch_kline_with_fallback(sym.raw, period, start_date, end_date, adjust)
 
     items: list[KlineItem] = []
@@ -62,6 +95,17 @@ async def _load_kline(sym, period: str, start_date: str, end_date: str, adjust: 
 async def get_kline(
     code: str, period: str = "daily", start_date: str = "", end_date: str = "", adjust: str = "qfq"
 ) -> KlineData:
+    """获取股票 K 线数据，带 single-flight 与 5 分钟缓存。
+
+    Param:
+        code: 股票代码
+        period: K 线周期，默认 daily
+        start_date: 起始日期，留空默认一年前
+        end_date: 结束日期，留空默认当天
+        adjust: 复权类型，默认 qfq
+    Return:
+        KlineData 模型对象
+    """
     sym = normalize_code(code)
     today = cache_date()
     if not end_date:
@@ -75,9 +119,13 @@ async def get_kline(
         return cached
 
     async def load_and_cache() -> KlineData:
-        cached_result = cache.get(cache_key)
-        if cached_result is not None:
-            return cached_result
+        """加载 K 线数据并写入缓存。
+
+        Param:
+            无
+        Return:
+            KlineData 模型对象
+        """
         result = await _load_kline(sym, period, start_date, end_date, adjust)
         cache.set(cache_key, result, ttl=300)
         return result

@@ -9,18 +9,49 @@ logger = logging.getLogger(__name__)
 
 
 class LLMClient(ABC):
+    """LLM 客户端抽象基类，定义统一的 chat 接口。"""
+
     @abstractmethod
     def chat(self, messages: list[dict], temperature: float = 0.1, json_format: bool = False) -> str:
+        """调用 LLM 进行对话。
+
+        Param:
+            messages: OpenAI 格式的消息列表
+            temperature: 生成温度，默认 0.1
+            json_format: 是否要求返回 JSON 格式
+        Return:
+            LLM 生成的文本内容
+        """
         ...
 
 
 class OpenAICompatibleClient(LLMClient):
+    """兼容 OpenAI 接口的 LLM 客户端实现，支持 DeepSeek/Qwen/OpenAI/Zhipu 等。"""
+
     def __init__(self, api_key: str, base_url: str, model: str):
-        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=45.0)
+        """初始化 OpenAI 兼容客户端。
+
+        Param:
+            api_key: API 密钥
+            base_url: API 基础 URL
+            model: 模型名称
+        Return:
+            无
+        """
+        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=120.0)
         self.model = model
         logger.info(f"初始化OpenAI兼容客户端: model={model}, base_url={base_url}")
 
     def chat(self, messages: list[dict], temperature: float = 0.1, json_format: bool = False) -> str:
+        """调用 OpenAI 兼容接口进行对话。
+
+        Param:
+            messages: OpenAI 格式的消息列表
+            temperature: 生成温度，默认 0.1
+            json_format: 是否要求返回 JSON 格式
+        Return:
+            LLM 生成的文本内容
+        """
         logger.info(f"LLM请求: model={self.model}, messages数={len(messages)}, temperature={temperature}")
         try:
             kwargs = {
@@ -41,13 +72,33 @@ class OpenAICompatibleClient(LLMClient):
 
 
 class LiteLLMClient(LLMClient):
+    """基于 litellm 的 LLM 客户端实现，用于 Claude 等非 OpenAI 协议模型。"""
+
     def __init__(self, api_key: str, model: str, base_url: str | None = None):
+        """初始化 LiteLLM 客户端。
+
+        Param:
+            api_key: API 密钥
+            model: 模型名称
+            base_url: API 基础 URL，可选
+        Return:
+            无
+        """
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
         logger.info(f"初始化LiteLLM客户端: model={model}, base_url={base_url}")
 
     def chat(self, messages: list[dict], temperature: float = 0.1, json_format: bool = False) -> str:
+        """通过 litellm 调用 LLM 进行对话。
+
+        Param:
+            messages: OpenAI 格式的消息列表
+            temperature: 生成温度，默认 0.1
+            json_format: 是否要求返回 JSON 格式
+        Return:
+            LLM 生成的文本内容
+        """
         from litellm import completion
 
         logger.info(f"LiteLLM请求: model={self.model}, messages数={len(messages)}")
@@ -71,6 +122,13 @@ class LiteLLMClient(LLMClient):
 
 
 def create_llm_client(settings: Settings | None = None) -> LLMClient:
+    """根据配置创建对应的 LLM 客户端实例。
+
+    Param:
+        settings: 配置对象，默认读取全局设置
+    Return:
+        LLMClient 实例
+    """
     if settings is None:
         settings = get_settings()
 
