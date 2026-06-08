@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut } from "./client";
 import { oneYearAgoDate } from "../utils/date";
-import type { StockSearchItem, StockBasicInfo, KlineData, IntradayData, FinancialMetrics, StockValuation, StockValuationDetail, AnalysisResult, AnalysisHistoryItem, TechnicalIndicators, MarketIndices, HsgtFlow, StockNews, CategorizedStockNews, StockSentiment, RetailSentiment, ScreenerFilter, ScreenerResult, ValuationPercentileRequest, ValuationPercentileResult, ThsHotStock, ThsHotPlate, DragonTigerItem, DragonTigerDetail, PushRequest, PushResponse, FeedNewsItem, IndustryRankings, NewsAnalysis, IndustryChainResult, IndustryChainHistoryItem } from "../types/stock";
+import type { StockSearchItem, StockBasicInfo, KlineData, IntradayData, FinancialMetrics, StockValuation, StockValuationDetail, AnalysisResult, AnalysisHistoryItem, TechnicalIndicators, MarketIndices, HsgtFlow, StockNews, CategorizedStockNews, StockSentiment, RetailSentiment, ScreenerFilter, ScreenerResult, ValuationPercentileRequest, ValuationPercentileResult, ThsHotStock, ThsHotPlate, DragonTigerItem, DragonTigerDetail, PushRequest, PushResponse, FeedNewsItem, IndustryRankings, NewsAnalysis, IndustryChainResult, IndustryChainHistoryItem, MacroAllData } from "../types/stock";
 import type { DailyReviewHistoryItem, DailyReviewRequest, DailyReviewResult } from "../types/dailyReview";
 import type { ConfigData, ConfigUpdate } from "../types/settings";
 
@@ -404,5 +404,13 @@ export function useIndustryChainArchive() {
       apiGet<IndustryChainResult>(
         `/industry-chain/${encodeURIComponent(name)}/archive/${archiveId}`
       ),
+  });
+}
+
+export function useMacroAllData() {
+  return useQuery({
+    queryKey: ["macroAllData"],
+    queryFn: () => apiGet<MacroAllData>("/macro/all"),
+    staleTime: 5 * 60 * 1000,
   });
 }

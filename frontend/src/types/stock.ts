@@ -537,3 +537,22 @@ export interface PushResponse {
   title: string;
   message: string;
 }
+
+// Macro data types
+export interface MacroIndicator {
+  latest: Record<string, string | number | null> | null;
+  trend: Record<string, string | number | null>[];
+}
+
+export interface MacroCategory {
+  [indicatorKey: string]: MacroIndicator;
+}
+
+export interface MacroAllData {
+  prices: MacroCategory;
+  sentiment: MacroCategory;
+  monetary: MacroCategory;
+  rates: MacroCategory;
+  growth: MacroCategory;
+  trade: MacroCategory;
+}

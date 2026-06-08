@@ -565,15 +565,16 @@ class EastMoneyDataProvider(BaseDataProvider):
             df["成交量"] = pd.to_numeric(df["成交量"], errors="coerce") * 100
         return df
 
-    def _fetch_clist_diff(self, params: dict[str, str], headers: dict = None, page_size: int = 100) -> list[dict]:
+    def _fetch_clist_diff(self, params: dict[str, str], headers: dict = None, page_size: int = 100, url: str = EASTMONEY_CLIST_URL) -> list[dict]:
         """分页获取东方财富 clist 接口的全部 diff 数据。
 
         自动处理分页，直到数据取完或达到上限。
 
         Param:
             params: 请求参数字典（不含分页参数 pn/pz，由本方法自动添加）
-            headers: 可选的自定义请求头
+            headers: 可选的自定义请求头，默认使用 EASTMONEY_HEADERS
             page_size: 每页条数，默认 100
+            url: clist 接口 URL，默认使用 EASTMONEY_CLIST_URL
         Return:
             list[dict]: 所有页的 diff 数据合并列表
         """
@@ -582,7 +583,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         while True:
             req_params = {**params, "pn": str(page), "pz": str(page_size)}
             try:
-                response = self.em_get_response(EASTMONEY_CLIST_URL, params=req_params, headers=headers, timeout=15)
+                response = self.em_get_response(url, params=req_params, headers=headers, timeout=15)
                 if response.status_code != 200:
                     logger.warning(f"东方财富 clist HTTP 错误: page={page}, status={response.status_code}")
                     break
@@ -1235,7 +1236,6 @@ class EastMoneyDataProvider(BaseDataProvider):
                 - bottom (list): 跌幅前 N 名列表（同上结构）
                 - total (int): 行业总数
         """
-        url = "https://push2.eastmoney.com/api/qt/clist/get"
         params = {
             "pn": "1", "pz": "100", "po": "1", "np": "1",
             "fltt": "2", "invt": "2",
@@ -1268,6 +1268,58 @@ class EastMoneyDataProvider(BaseDataProvider):
             "total": len(rows),
         }
         
+    def fetch_concept_rankings(self, top_n: int = 20) -> dict:
+        """获取全概念涨跌幅排名。
+
+        获取东财概念板块（约 100 个概念）的涨跌幅排名。
+
+        Param:
+            top_n: 返回前 N 名和后 N 名，默认 20
+        Return:
+            dict: 包含以下字段:
+                - top (list): 涨幅前 N 名列表，每个元素包含 rank, name, change_pct, code, up_count, down_count, leader, leader_change
+                - bottom (list): 跌幅前 N 名列表（同上结构）
+                - total (int): 行业总数
+        """
+        url = "https://push2.eastmoney.com/webguest/api/qt/clist/get"
+        params = {
+            "pn": "1",
+            "pz": "100",
+            "po": "1",
+            "np": "1",
+            "fltt": "2",
+            "invt": "2",
+            "fid": "f3",
+            "fs": "m:90+t:3+f:!50",
+            "dect": "1",
+            "fields": "f2,f3,f4,f12,f13,f14,f104,f105,f128,f136,f140,f141,f207",
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        }
+        items = self._fetch_clist_diff(params=params, headers=EASTMONEY_HEADERS, url=url)
+        if not items:
+            return {"top": [], "bottom": [], "total": 0}
+
+        rows = []
+        for i, item in enumerate(items):
+            rows.append({
+                "rank": i + 1,
+                "name": item.get("f14", ""),
+                "change_pct": item.get("f3", 0),
+                "code": item.get("f12", ""),
+                "up_count": item.get("f104", 0),
+                "down_count": item.get("f105", 0),
+                "leader": item.get("f140", ""),
+                "leader_change": item.get("f136", 0),
+            })
+
+        return {
+            "top": rows[:top_n],
+            "bottom": rows[-top_n:],
+            "total": len(rows),
+        }
+    
     def fetch_stock_fund_flow(self, code: str) -> list[dict]:
         """获取个股资金流入日级，最近 120 个交易日）。
 
@@ -1778,9 +1830,124 @@ class EastMoneyDataProvider(BaseDataProvider):
         )
         return data
 
+    def fetch_china_lpr(self):
+        """
+        中国贷款市场报价利率（LPR）
+        Return:
+            list[dict]: LPR数据列表，每个字典包含:
+                - TRADE_DATE (str): 日期
+                - LPR1Y (float): 1年期LPR
+                - LPR5Y (float): 5年期以上LPR
+                - RATE_1 (float): 短期贷款利率
+                - RATE_2 (float): 中长期贷款利率
+        """
+        data = self.fetch_datacenter_report(
+            "RPTA_WEB_RATE",
+            columns="ALL",
+            page_size=20,
+            sort_columns="TRADE_DATE", sort_types="-1",
+        )
+        return data
+    
+    def fetch_china_gdp(self):
+        """
+        中国GDP数据
+        Return:
+            list[dict]: GDP数据列表，每个字典包含:
+                - TIME (str): 日期
+                - REPORT_DATE (str): 日期
+                - DOMESTICL_PRODUCT_BASE (float): 国内生产总值
+                - FIRST_PRODUCT_BASE (float): 第一产业生产总值
+                - FIRST_SAME (float): 第一产业生产总值同比增长
+                - SECOND_PRODUCT_BASE (float): 第二产业生产总值
+                - SECOND_SAME (float): 第二产业生产总值同比增长
+                - THIRD_PRODUCT_BASE (float): 第三产业生产总值
+                - THIRD_SAME (float): 第三产业生产总值同比增长
+                - SUM_SAME (float): GDP同比增长
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_ECONOMY_GDP",
+            columns="REPORT_DATE,TIME,DOMESTICL_PRODUCT_BASE,FIRST_PRODUCT_BASE,SECOND_PRODUCT_BASE,THIRD_PRODUCT_BASE,SUM_SAME,FIRST_SAME,SECOND_SAME,THIRD_SAME",
+            page_size=20,
+            sort_columns="REPORT_DATE", sort_types="-1",
+        )
+        return data
+
+    def fetch_china_shibor(self):
+        """
+        上海银行间同业拆放利率（SHIBOR）
+        Return:
+            list[dict]: SHIBOR数据列表，每个字典包含:
+                - REPORT_DATE (str): 日期
+                - REPORT_PERIOD (str): 报告周期
+                - IR_RATE (float): 利率
+                - CHANGE_RATE (float): 利率(环比)
+                - INDICATOR_ID (str): 指标ID
+                - LATEST_RECORD (int): 最新记录标志
+                - MARKET (str): 市场
+                - MARKET_CODE (str): 市场代码
+                - CURRENCY (str): 货币
+                - CURRENCY_CODE (str): 货币代码
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_IMP_INTRESTRATEN",
+            filter_str="(LATEST_RECORD=1)(MARKET_CODE='001')",
+            columns="REPORT_DATE,REPORT_PERIOD,IR_RATE,CHANGE_RATE,INDICATOR_ID,LATEST_RECORD,MARKET,MARKET_CODE,CURRENCY,CURRENCY_CODE",
+            page_size=20,
+            sort_columns="INDICATOR_ID", sort_types="-1",
+        )
+        return data
+
+    def fetch_china_trade(self):
+        """
+        中国进出口贸易数据
+        Return:
+            list[dict]: 进出口数据列表，每个字典包含:
+                - TIME (str): 日期
+                - REPORT_DATE (str): 日期
+                - EXIT_ACCUMULATE (float): 出口累计
+                - EXIT_ACCUMULATE_SAME (float): 出口累计同比
+                - EXIT_BASE (float): 出口量
+                - EXIT_BASE_SAME (float): 出口同比
+                - EXIT_BASE_SEQUENTIAL (float): 出口环比
+                - IMPORT_ACCUMULATE (float): 进口累计
+                - IMPORT_ACCUMULATE_SAME (float): 进口累计同比
+                - IMPORT_BASE (float): 进口量
+                - IMPORT_BASE_SAME (float): 进口同比
+                - IMPORT_BASE_SEQUENTIAL (float): 进口环比
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_ECONOMY_CUSTOMS",
+            columns="REPORT_DATE,TIME,EXIT_BASE,IMPORT_BASE,EXIT_BASE_SAME,IMPORT_BASE_SAME,EXIT_BASE_SEQUENTIAL,IMPORT_BASE_SEQUENTIAL,EXIT_ACCUMULATE,IMPORT_ACCUMULATE,EXIT_ACCUMULATE_SAME,IMPORT_ACCUMULATE_SAME",
+            page_size=24,
+            sort_columns="REPORT_DATE", sort_types="-1",
+        )
+        return data
+
+    def fetch_china_social_financing(self):
+        """
+        中国社会融资规模
+        Return:
+            list[dict]: 社融数据列表，每个字典包含:
+                - TIME (str): 日期
+                - REPORT_DATE (str): 日期
+                - RMB_LOAN (float): 新增贷款
+                - RMB_LOAN_SAME (float): 新增贷款同比
+                - RMB_LOAN_SEQUENTIAL (float): 新增贷款环比
+                - RMB_LOAN_ACCUMULATE (float): 新增贷款累计
+                - LOAN_ACCUMULATE_SAME (float): 新增贷款累计同比
+        """
+        data = self.fetch_datacenter_report(
+            "RPT_ECONOMY_RMB_LOAN",
+            columns="REPORT_DATE,TIME,RMB_LOAN,RMB_LOAN_SAME,RMB_LOAN_SEQUENTIAL,RMB_LOAN_ACCUMULATE,LOAN_ACCUMULATE_SAME",
+            page_size=24,
+            sort_columns="REPORT_DATE", sort_types="-1",
+        )
+        return data
+
 eastmoney_provider = EastMoneyDataProvider()
 
 if __name__ == "__main__":
     
-    eastmoney_reports = eastmoney_provider.fetch_industry_rankings()
+    eastmoney_reports = eastmoney_provider.fetch_china_shibor()
     print(eastmoney_reports)

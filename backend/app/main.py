@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import stock, market, analysis, screener, daily_review, push, chat, config, industry_chain
+from app.routers import stock, market, analysis, screener, daily_review, push, chat, config, industry_chain, macro
 from app.utils.rate_limiter import call_blocking
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,7 @@ app.include_router(push.router, prefix="/api/push", tags=["push"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(industry_chain.router, prefix="/api/industry-chain", tags=["industry-chain"])
+app.include_router(macro.router, prefix="/api/macro", tags=["macro"])
 
 
 async def refresh_industry_mapping_file_daily():

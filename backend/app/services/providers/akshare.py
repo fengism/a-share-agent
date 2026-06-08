@@ -346,6 +346,18 @@ class AkshareDataProvider(BaseDataProvider):
         """
         return ak.stock_hot_rank_detail_em(symbol=symbol)
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    def fetch_china_gdp(self) -> pd.DataFrame:
+        """获取中国GDP数据（季度级，来源akshare）。
+
+        Return:
+            pd.DataFrame: GDP数据，包含季度、当季值、同比增长、累计值、累计增长
+        """
+        df = ak.macro_china_gdp()
+        if df is not None and not df.empty:
+            return df.tail(12)
+        return pd.DataFrame()
+
 
 akshare_provider = AkshareDataProvider()
 

@@ -13,6 +13,7 @@ import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
 import Feed from "./pages/Feed";
 import IndustryChain from "./pages/IndustryChain";
+import Macro from "./pages/Macro";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,6 +50,7 @@ export default function App() {
               <Route path="/daily-review" element={<DailyReviewPage />} />
               <Route path="/feed" element={<Feed />} />
               <Route path="/analysis" element={<AnalysisEntry />} />
+              <Route path="/macro" element={<Macro />} />
               <Route path="/industry-chain" element={<IndustryChain />} />
               <Route path="/industry-chain/:name" element={<IndustryChain />} />
               <Route path="/chat" element={<Chat />} />
