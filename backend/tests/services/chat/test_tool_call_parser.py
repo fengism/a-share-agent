@@ -1,4 +1,5 @@
-from app.services.chat.skills import register_all_skills, registry
+from app.services.chat.skills import register_all_skills
+from app.services.chat.tools.registry import registry
 from app.services.chat.tool_call_parser import extract_pseudo_tool_calls
 
 

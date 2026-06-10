@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.chat.skills import composite_skills
+from app.services.chat.tools import composite_tools
 
 
 async def _ok(value):
@@ -26,7 +26,7 @@ async def _fail():
 @pytest.mark.asyncio
 async def test_gather_labeled_preserves_labels_and_errors():
     """_gather_labeled maps coroutine results by label and captures per-task errors."""
-    result = await composite_skills._gather_labeled({
+    result = await composite_tools._gather_labeled({
         "a": _ok(1),
         "b": _fail(),
     })
@@ -47,10 +47,10 @@ async def test_compare_stocks_keeps_per_stock_errors(monkeypatch):
             raise RuntimeError("valuation failed")
         return {"pe": 10}
 
-    monkeypatch.setattr(composite_skills.helpers, "get_stock_info", fake_info)
-    monkeypatch.setattr(composite_skills.helpers, "get_stock_valuation_detail", fake_valuation)
+    monkeypatch.setattr(composite_tools.helpers, "get_stock_info", fake_info)
+    monkeypatch.setattr(composite_tools.helpers, "get_stock_valuation_detail", fake_valuation)
 
-    result = await composite_skills._compare_stocks("600519,000001")
+    result = await composite_tools._compare_stocks("600519,000001")
 
     assert result == {
         "comparison": [

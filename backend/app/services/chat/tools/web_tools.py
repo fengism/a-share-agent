@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Any
 
-from app.services.chat.skills.registry import Skill, registry
+from app.services.chat.tools.registry import Tool, registry
 
 logger = logging.getLogger(__name__)
 
@@ -94,9 +94,9 @@ async def _fetch_url(url: str) -> Any:
     return result
 
 
-def register_web_skills() -> None:
+def register_web_tools() -> None:
     """注册网页相关技能：fetch_url。"""
-    registry.register(Skill(
+    registry.register_tool(Tool(
         name="fetch_url",
         description=(
             "抓取指定 URL 的网页内容并提取正文文本。"

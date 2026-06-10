@@ -4,7 +4,7 @@ import json
 import re
 
 from app.models.chat import ToolCallFunction, ToolCallInfo
-from app.services.chat.skills.registry import SkillRegistry
+from app.services.chat.tools.registry import ChatRegistry
 
 
 def _find_matching_paren(text: str, start: int) -> int:
@@ -79,7 +79,7 @@ def _parse_positional_args(args_text: str, param_order: list[str]) -> dict | Non
     return {param_order[0]: stripped} if param_order else None
 
 
-def extract_pseudo_tool_calls(text: str, registry: SkillRegistry) -> list[ToolCallInfo]:
+def extract_pseudo_tool_calls(text: str, registry: ChatRegistry) -> list[ToolCallInfo]:
     """从 LLM 输出的纯文本中提取伪工具调用。
 
     某些模型不通过标准的 function calling 通道，而是直接在文本中写出 skill_name(args) 形式的调用。
@@ -93,8 +93,8 @@ def extract_pseudo_tool_calls(text: str, registry: SkillRegistry) -> list[ToolCa
     if not text:
         return []
 
-    skills = registry.list_skills()
-    names = [re.escape(s.name) for s in skills]
+    tools = registry.list_tools()
+    names = [re.escape(t.name) for t in tools]
     if not names:
         return []
 
@@ -108,11 +108,11 @@ def extract_pseudo_tool_calls(text: str, registry: SkillRegistry) -> list[ToolCa
         if paren_end == -1:
             continue
 
-        skill = registry.get(name)
-        if skill is None:
+        tool = registry.get_tool(name)
+        if tool is None:
             continue
 
-        param_order = list(skill.parameters.get("properties", {}).keys())
+        param_order = list(tool.parameters.get("properties", {}).keys())
         args_dict = _parse_positional_args(text[paren_start + 1:paren_end], param_order)
         if args_dict is None:
             continue

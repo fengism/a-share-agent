@@ -39,7 +39,7 @@ async def test_execute_tool_calls_ordered_runs_concurrently_and_preserves_order(
             is_error=False,
         )
 
-    monkeypatch.setattr(agent.registry, "execute", fake_execute)
+    monkeypatch.setattr(agent.registry, "execute_tool", fake_execute)
     calls = [_tool_call("call_1"), _tool_call("call_2"), _tool_call("call_3")]
 
     start = time.perf_counter()
@@ -62,7 +62,7 @@ async def test_execute_tool_calls_ordered_keeps_error_result_in_place(monkeypatc
             is_error=call.id == "call_2",
         )
 
-    monkeypatch.setattr(agent.registry, "execute", fake_execute)
+    monkeypatch.setattr(agent.registry, "execute_tool", fake_execute)
     calls = [_tool_call("call_1"), _tool_call("call_2"), _tool_call("call_3")]
 
     results = await agent._execute_tool_calls_ordered(calls)
@@ -116,7 +116,7 @@ async def test_run_chat_agent_generates_final_text_after_max_tool_rounds(monkeyp
         model="test-model",
     )
 
-    monkeypatch.setattr(agent.registry, "execute", fake_execute)
+    monkeypatch.setattr(agent.registry, "execute_tool", fake_execute)
     monkeypatch.setattr(agent.registry, "get_tool_definitions", lambda: [])
     monkeypatch.setattr(agent, "create_openai_chat_runtime", lambda settings=None: fake_runtime)
 

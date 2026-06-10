@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from app.services.chat.skills.registry import Skill, registry
+from app.services.chat.tools.registry import Tool, registry
 
 
 async def _get_market_overview() -> Any:
@@ -103,16 +103,16 @@ async def _get_macro_data() -> Any:
     return await get_macro_data()
 
 
-def register_market_skills():
+def register_market_tools():
     """注册市场相关技能：get_market_overview、get_hot_rank、get_dragon_tiger、get_daily_review、get_macro_data。"""
-    registry.register(Skill(
+    registry.register_tool(Tool(
         name="get_market_overview",
         description="获取大盘概览，包括主要指数（上证、深证、创业板等）实时行情和两市成交额。当用户问'大盘怎么样''指数行情''市场情况'时调用。",
         parameters={"type": "object", "properties": {}},
         executor=_get_market_overview,
     ))
 
-    registry.register(Skill(
+    registry.register_tool(Tool(
         name="get_hot_rank",
         description="获取热门排名数据。当用户问'最近什么火''热门股''热门概念''热门行业'时调用，通过type参数指定查询类型。",
         parameters={
@@ -128,7 +128,7 @@ def register_market_skills():
         executor=_get_hot_rank,
     ))
 
-    registry.register(Skill(
+    registry.register_tool(Tool(
         name="get_dragon_tiger",
         description="获取龙虎榜数据，查看游资和机构席位动向。",
         parameters={
@@ -143,7 +143,7 @@ def register_market_skills():
         executor=_get_dragon_tiger,
     ))
 
-    registry.register(Skill(
+    registry.register_tool(Tool(
         name="get_daily_review",
         description="生成每日大盘复盘报告，包含指数表现、热点题材、龙虎榜、风险提示、机会展望和策略建议。当用户问'今天大盘怎么样''复盘''市场总结'时调用。",
         parameters={
@@ -162,7 +162,7 @@ def register_market_skills():
         executor=_get_daily_review,
     ))
 
-    registry.register(Skill(
+    registry.register_tool(Tool(
         name="get_macro_data",
         description="获取宏观经济指标数据，包括CPI（居民消费价格指数）、PPI（工业品出厂价格指数）、PMI（采购经理指数）和货币供应量（M0/M1/M2）。当用户问'CPI多少''PPI走势''PMI数据''货币供应''M2增速''宏观经济数据'时调用。",
         parameters={"type": "object", "properties": {}},

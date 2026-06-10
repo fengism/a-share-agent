@@ -3,7 +3,7 @@ from app.services.chat.subagents.technical import create_technicalagent
 from app.services.chat.subagents.fundamental import create_fundamentalagent
 from app.services.chat.subagents.news import create_newsagent
 from app.services.chat.subagents.risk import create_riskagent
-from app.services.chat.skills import registry
+from app.services.chat.tools.registry import registry
 
 
 class TestSubAgentCreation:

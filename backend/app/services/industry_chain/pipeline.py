@@ -77,7 +77,7 @@ def _safe_parse_llm_json(text: str):
 
 async def _collect_data(name: str) -> dict:
     """并行采集产业链相关数据"""
-    from app.services.chat.skills.stock_helpers import (
+    from app.services.chat.tools.stock_helpers import (
         iwencai_query,
         iwencai_search,
         iwencai_select_stock,

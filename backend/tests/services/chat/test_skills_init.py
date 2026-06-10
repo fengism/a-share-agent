@@ -6,12 +6,10 @@ def test_register_all_skills_is_idempotent(monkeypatch):
     calls: list[str] = []
 
     monkeypatch.setattr(skills, "_skills_registered", False)
-    monkeypatch.setattr(skills, "register_stock_skills", lambda: calls.append("stock"))
-    monkeypatch.setattr(skills, "register_market_skills", lambda: calls.append("market"))
-    monkeypatch.setattr(skills, "register_composite_skills", lambda: calls.append("composite"))
-    monkeypatch.setattr(skills, "register_web_skills", lambda: calls.append("web"))
+    monkeypatch.setattr(skills, "register_all_tools", lambda: calls.append("tools"))
+    monkeypatch.setattr(skills, "register_skill_catalog", lambda: calls.append("catalog"))
 
     skills.register_all_skills()
     skills.register_all_skills()
 
-    assert calls == ["stock", "market", "composite", "web"]
+    assert calls == ["tools", "catalog"]

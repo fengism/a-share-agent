@@ -10,7 +10,7 @@ from openai import OpenAI
 
 from app.models.chat import ChatMessage, ToolCallFunction, ToolCallInfo, ToolResultInfo
 from app.services.chat.message_builder import build_messages
-from app.services.chat.skills import registry
+from app.services.chat.tools.registry import registry
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class SubAgent:
                     function=ToolCallFunction(name=tc.function.name, arguments=tc.function.arguments),
                 )
                 tools_called.append(tc.function.name)
-                result = await registry.execute(tc_info)
+                result = await registry.execute_tool(tc_info)
                 messages.append({
                     "role": "tool",
                     "tool_call_id": result.tool_call_id,

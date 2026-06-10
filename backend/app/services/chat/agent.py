@@ -7,7 +7,8 @@ from collections.abc import AsyncGenerator
 from app.config import get_settings
 from app.models.chat import ChatMessage, ChatStreamDelta, ToolCallFunction, ToolCallInfo
 from app.services.chat.message_builder import build_messages
-from app.services.chat.skills import registry, register_all_skills
+from app.services.chat.tools.registry import registry
+from app.services.chat.skills import register_all_skills
 from app.services.chat.tool_call_parser import extract_pseudo_tool_calls
 from app.services.llm.client import create_openai_chat_runtime
 
@@ -25,7 +26,7 @@ async def _execute_tool_calls_ordered(tool_calls: list[ToolCallInfo]):
     Return:
         每个工具调用的结果列表，顺序与输入一致
     """
-    return await asyncio.gather(*(registry.execute(tc) for tc in tool_calls))
+    return await asyncio.gather(*(registry.execute_tool(tc) for tc in tool_calls))
 
 
 def _build_create_kwargs(model: str, messages: list[dict], tool_choice: str) -> dict:

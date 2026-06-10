@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from app.services.chat.skills import stock_helpers as helpers
-from app.services.chat.skills.registry import Skill, registry
+from app.services.chat.tools import stock_helpers as helpers
+from app.services.chat.tools.registry import Tool, registry
 
 
 async def _gather_labeled(tasks: dict[str, Any]) -> dict[str, Any]:
@@ -90,9 +90,9 @@ async def _compare_stocks(codes: str) -> Any:
     return {"comparison": results}
 
 
-def register_composite_skills():
+def register_composite_tools():
     """注册组合技能：analyze_stock、sector_analysis、compare_stocks。"""
-    registry.register(Skill(
+    registry.register_tool(Tool(
         name="analyze_stock",
         description="一键获取个股全维度分析数据，包括基本信息、详细估值、技术指标、新闻和情绪。当用户要求'分析某只股票''深度分析''全面评估'时调用，比分别调用多个工具更高效。",
         parameters={
@@ -105,7 +105,7 @@ def register_composite_skills():
         executor=_analyze_stock,
     ))
 
-    registry.register(Skill(
+    registry.register_tool(Tool(
         name="sector_analysis",
         description="行业综合分析，包括行业热度排名、行业内股票筛选和相关研报。当用户问'XX行业怎么样''分析XX行业'时调用。",
         parameters={
@@ -118,7 +118,7 @@ def register_composite_skills():
         executor=_sector_analysis,
     ))
 
-    registry.register(Skill(
+    registry.register_tool(Tool(
         name="compare_stocks",
         description="多股对比分析，同时获取多只股票的基本信息和估值数据进行横向对比。最多支持5只股票。当用户问'XX和YY哪个好''对比几只股票'时调用。",
         parameters={
