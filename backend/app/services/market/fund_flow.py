@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from app.services.providers.ths import ths_provider as _ths_provider
+from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.data_clean import safe_float
 from app.utils.rate_limiter import call_blocking
@@ -69,7 +69,7 @@ async def get_hsgt_flow() -> dict:
     }
 
     try:
-        df = await call_blocking(_ths_provider.fetch_hsgt_realtime)
+        df = await call_blocking(get_provider("ths").fetch_hsgt_realtime)
     except Exception as exc:
         logger.warning(f"沪深股通分钟流向获取失败: error={exc}")
         raise
@@ -91,4 +91,28 @@ async def get_hsgt_flow() -> dict:
     except Exception as exc:
         logger.warning(f"北向数据持久化失败: {exc}")
 
+    return result
+
+
+async def get_hsgt_flow_history(days: int = 30) -> list[dict]:
+    """读取沪深股通历史分钟流向数据。
+
+    Param:
+        days: 查询天数，默认 30 天。
+    Return:
+        每天包含 date、updated_at 和 points 的字典列表。
+    """
+    from app.db.hsgt_store import query_hsgt_dates, query_hsgt_flow
+
+    dates = query_hsgt_dates(limit=days)
+    result = []
+    for record in dates:
+        date_str = record["date"]
+        result.append(
+            {
+                "date": date_str,
+                "updated_at": record.get("updated_at", ""),
+                "points": query_hsgt_flow(date_str),
+            }
+        )
     return result

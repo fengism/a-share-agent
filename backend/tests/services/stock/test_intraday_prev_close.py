@@ -1,11 +1,10 @@
 import pandas as pd
-import pytest
+import asyncio
 
 from app.services.stock import intraday
 
 
-@pytest.mark.asyncio
-async def test_load_intraday_fills_prev_close_and_change_pct_from_basic_info(monkeypatch):
+def test_load_intraday_fills_prev_close_and_change_pct_from_basic_info(monkeypatch):
     """_load_intraday backfills prev_close and change_pct from basic info when missing."""
     class Sym:
         raw = "603228"
@@ -31,7 +30,7 @@ async def test_load_intraday_fills_prev_close_and_change_pct_from_basic_info(mon
     monkeypatch.setattr(intraday, "_safe_fetch_intraday", fake_safe_fetch)
     monkeypatch.setattr(intraday, "get_basic_info", fake_basic_info, raising=False)
 
-    result = await intraday._load_intraday(Sym(), "2026-05-27")
+    result = asyncio.run(intraday._load_intraday(Sym(), "2026-05-27"))
 
     assert result.prev_close == 86.93
     assert result.items[0].change_pct == 0.0

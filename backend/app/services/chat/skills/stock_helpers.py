@@ -154,11 +154,11 @@ def _get_iwencai_provider():
         iwencai_provider 实例或 None
     """
     from app.config import get_settings
-    from app.services.providers.iwencai import iwencai_provider
+    from app.services.providers import get_provider
     settings = get_settings()
     if not settings.iwencai_enabled:
         return None
-    return iwencai_provider
+    return get_provider("iwencai")
 
 
 async def iwencai_search(query: str, channel: str = "report", size: int = 20) -> Any:

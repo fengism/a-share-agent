@@ -7,9 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from app.services.base.file_snapshot import BaseFileSnapshotService
-from app.services.providers.baidu import baidu_provider
-from app.services.providers.eastmoney import eastmoney_provider
-from app.services.providers.sina import sina_provider
+from app.services.providers import get_provider
 from app.services.base.spot_snapshot import load_spot_snapshot_file
 from app.utils.rate_limiter import call_blocking
 
@@ -22,6 +20,21 @@ _STOCK_NAME_MAP_SERVICE = BaseFileSnapshotService[dict[str, str]](
     ttl=86400,
     file_path=_STOCK_NAME_FILE,
 )
+
+
+def _get_baidu_provider():
+    """Lazily resolve the Baidu provider singleton."""
+    return get_provider("baidu")
+
+
+def _get_eastmoney_provider():
+    """Lazily resolve the EastMoney provider singleton."""
+    return get_provider("eastmoney")
+
+
+def _get_sina_provider():
+    """Lazily resolve the Sina provider singleton."""
+    return get_provider("sina")
 
 
 def _load_stock_name_file() -> dict[str, str] | None:
@@ -96,7 +109,7 @@ async def _fetch_stock_name_map_remote() -> dict[str, str]:
         股票代码到名称的字典，全部失败时返回空字典
     """
     try:
-        stocks = await call_blocking(baidu_provider.fetch_stock_names)
+        stocks = await call_blocking(_get_baidu_provider().fetch_stock_names)
         if len(stocks) >= _STOCK_NAME_MAP_MIN_SIZE:
             mapping = {s["code"]: s["name"] for s in stocks}
             logger.info(f"股票名称映射(百度): {len(mapping)} 只")
@@ -106,7 +119,7 @@ async def _fetch_stock_name_map_remote() -> dict[str, str]:
         logger.info(f"百度股票列表获取失败: {e}，尝试东方财富")
 
     try:
-        stocks = await call_blocking(eastmoney_provider.fetch_stock_names)
+        stocks = await call_blocking(_get_eastmoney_provider().fetch_stock_names)
         if len(stocks) >= _STOCK_NAME_MAP_MIN_SIZE:
             mapping = {s["code"]: s["name"] for s in stocks}
             logger.info(f"股票名称映射(东方财富): {len(mapping)} 只")
@@ -116,7 +129,7 @@ async def _fetch_stock_name_map_remote() -> dict[str, str]:
         logger.info(f"东方财富股票列表获取失败: {e}，尝试新浪")
 
     try:
-        stocks = await call_blocking(sina_provider.fetch_stock_names)
+        stocks = await call_blocking(_get_sina_provider().fetch_stock_names)
         mapping = {s["code"]: s["name"] for s in stocks}
         logger.info(f"股票名称映射(新浪): {len(mapping)} 只")
         return mapping

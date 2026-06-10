@@ -111,9 +111,14 @@ async def test_run_chat_agent_generates_final_text_after_max_tool_rounds(monkeyp
             is_error=False,
         )
 
+    fake_runtime = SimpleNamespace(
+        client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))),
+        model="test-model",
+    )
+
     monkeypatch.setattr(agent.registry, "execute", fake_execute)
     monkeypatch.setattr(agent.registry, "get_tool_definitions", lambda: [])
-    monkeypatch.setattr(agent.OpenAI, "chat", SimpleNamespace(completions=SimpleNamespace(create=fake_create)))
+    monkeypatch.setattr(agent, "create_openai_chat_runtime", lambda settings=None: fake_runtime)
 
     deltas = [delta async for delta in agent.run_chat_agent("测试")]
 

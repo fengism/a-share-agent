@@ -1,13 +1,10 @@
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-import pytest
-
 from app.services.analysis import retail
 
 
-@pytest.mark.asyncio
-async def test_get_retail_sentiment_counts_only_recent_posts(monkeypatch):
+def test_get_retail_sentiment_counts_only_recent_posts(monkeypatch):
     """get_retail_sentiment counts only posts within the recency window."""
     recent_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     old_time = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
@@ -22,8 +19,15 @@ async def test_get_retail_sentiment_counts_only_recent_posts(monkeypatch):
     monkeypatch.setattr(retail.cache, "get", lambda key: None)
     monkeypatch.setattr(retail.cache, "set", lambda *args, **kwargs: None)
     monkeypatch.setattr(retail, "call_blocking", fake_call_blocking)
+    monkeypatch.setattr(
+        retail,
+        "_get_eastmoney_provider",
+        lambda: SimpleNamespace(fetch_stock_guba_posts=lambda code: posts),
+    )
 
-    result = await retail.get_retail_sentiment("600519")
+    import asyncio
+
+    result = asyncio.run(retail.get_retail_sentiment("600519"))
 
     assert result["guba_post_count"] == 1
     assert result["post_count"] == 1

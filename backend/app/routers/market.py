@@ -11,7 +11,10 @@ from app.services.market.hot_rank import (
     get_ths_hot_concept as get_ths_hot_concept_service,
     get_ths_hot_industry as get_ths_hot_industry_service,
 )
-from app.services.market.fund_flow import get_hsgt_flow as get_hsgt_flow_service
+from app.services.market.fund_flow import (
+    get_hsgt_flow as get_hsgt_flow_service,
+    get_hsgt_flow_history as get_hsgt_flow_history_service,
+)
 from app.services.market.index_kline import get_index_kline as get_index_kline_service
 from app.services.market.indices import get_indices as get_indices_service
 from app.services.market.volume import get_market_volume as get_market_volume_service
@@ -120,18 +123,7 @@ async def get_hsgt_flow_history(days: int = Query(30, description="查询天数"
     """
     logger.info(f"获取沪深股通历史数据: days={days}")
     try:
-        from app.db.hsgt_store import query_hsgt_dates, query_hsgt_flow
-        dates = query_hsgt_dates(limit=days)
-        result = []
-        for d in dates:
-            date_str = d["date"]
-            points = query_hsgt_flow(date_str)
-            result.append({
-                "date": date_str,
-                "updated_at": d.get("updated_at", ""),
-                "points": points,
-            })
-        return result
+        return await get_hsgt_flow_history_service(days)
     except Exception as e:
         logger.error(f"获取沪深股通历史数据失败: error={e}")
         raise HTTPException(status_code=500, detail=f"获取沪深股通历史数据失败: {e}")

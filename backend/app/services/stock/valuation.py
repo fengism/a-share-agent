@@ -7,8 +7,7 @@ from datetime import datetime
 import pandas as pd
 
 from app.models.stock import DCFValuationResult, InstitutionForecast, StockBasicInfo, ValuationDetail, ValuationFundamentals, ValuationMethodResult, ValuationMultiples, ValuationPeer, ValuationPeerSummary, ValuationPercentiles, ValuationProfile
-from app.services.providers.akshare import akshare_provider as _akshare_provider
-from app.services.providers.ths import ths_provider as _ths_provider
+from app.services.providers import get_provider
 from app.services.stock.basic_info import get_basic_info
 from app.services.stock.financials import get_financial_metrics
 from app.utils.cache import cache, dated_cache_key
@@ -23,6 +22,16 @@ FINANCIAL_KEYWORDS = ("银行", "保险", "证券", "券商", "多元金融", "�
 CYCLICAL_KEYWORDS = ("煤炭", "有色", "钢铁", "化工", "航运", "石油", "建材", "矿", "金属")
 GROWTH_KEYWORDS = ("半导体", "软件", "电子", "计算机", "医药", "新能源", "机器人", "通信", "芯片")
 STABLE_KEYWORDS = ("白酒", "食品", "饮料", "公用事业", "电力", "高速", "运营商", "水务", "燃气")
+
+
+def _get_akshare_provider():
+    """Lazily resolve the Akshare provider singleton."""
+    return get_provider("akshare")
+
+
+def _get_ths_provider():
+    """Lazily resolve the THS provider singleton."""
+    return get_provider("ths")
 
 
 @dataclass(frozen=True)
@@ -81,7 +90,7 @@ async def get_valuation(code: str) -> dict:
     result: dict = {"code": sym.raw, "pe_ttm": None, "pb": None, "ps_ttm": None, "peers": []}
 
     try:
-        df = await call_blocking(_akshare_provider.fetch_stock_valuation_comparison, symbol=sym.prefixed_upper)
+        df = await call_blocking(_get_akshare_provider().fetch_stock_valuation_comparison, symbol=sym.prefixed_upper)
         if len(df) > 0:
             row = df.iloc[0]
             result["pe_ttm"] = safe_float(row.get("市盈率-TTM"))
@@ -583,7 +592,7 @@ async def _fetch_institution_forecasts(code: str) -> list[InstitutionForecast]:
     """
     forecasts: list[InstitutionForecast] = []
     try:
-        reports_df = await call_blocking(_ths_provider.fetch_stock_forecast_reports, code=code)
+        reports_df = await call_blocking(_get_ths_provider().fetch_stock_forecast_reports, code=code)
         if reports_df is not None and not reports_df.empty:
             for _, row in reports_df.iterrows():
                 forecasts.append(InstitutionForecast(

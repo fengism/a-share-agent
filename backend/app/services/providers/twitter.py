@@ -1,26 +1,29 @@
 import logging
-import re
-import feedparser
+
 import requests
-from app.services.base.data_provider import BaseDataProvider
-from app.models.search_item import NewsSearchItem
-from app.utils.news_utils import parse_struct_time_string
-from app.constants.http import BROWSER_USER_AGENT
+
 from app.config import get_settings
+from app.constants.http import BROWSER_USER_AGENT
+from app.models.search_item import NewsSearchItem
+from app.services.base.data_provider import BaseDataProvider
 
 logger = logging.getLogger(__name__)
 
 
 class TwitterDataProvider(BaseDataProvider):
     """Purpose: 通过 fxtwitter API 拉取 Twitter/X 财经账号的媒体与搜索结果，统一封装为 NewsSearchItem。"""
+    DEFAULT_BASE_URL = "https://api.fxtwitter.com/2"
+    DEFAULT_TIMEOUT = 10
 
     def __init__(self):
         """初始化 TwitterDataProvider，设置 name、source_label 与请求头。"""
         super().__init__(name="twitter", source_label="Twitter")
-        self.headers = {
+        self._headers = {
             "User-Agent": BROWSER_USER_AGENT,
             "Accept": "application/rss+xml, application/xml, text/xml, */*",
         }
+        self._session = requests.Session()
+        self._session.trust_env = get_settings().http_trust_env
 
     @property
     def twitter_feeds(self) -> list[str]:
@@ -31,21 +34,55 @@ class TwitterDataProvider(BaseDataProvider):
         """
         return get_settings().twitter_feeds
 
-    def _fetch_posts(self, url: str) -> list[dict]:
+    def _get_session(self) -> requests.Session:
+        """获取当前 Session，并在运行时配置变更后同步 trust_env。"""
+        trust_env = get_settings().http_trust_env
+        if self._session.trust_env != trust_env:
+            self._session.trust_env = trust_env
+        return self._session
+
+    def _request(
+        self,
+        path: str,
+        *,
+        params: dict | None = None,
+        timeout: int | float | None = None,
+    ) -> requests.Response:
+        """通过复用的 Session 发起 GET 请求并检查状态码。"""
+        url = path if path.startswith("http") else f"{self.DEFAULT_BASE_URL}{path}"
+        response = self._get_session().request(
+            "GET",
+            url,
+            params=params,
+            headers=self._headers,
+            timeout=timeout or self.DEFAULT_TIMEOUT,
+        )
+        response.raise_for_status()
+        return response
+
+    def _request_json(
+        self,
+        path: str,
+        *,
+        params: dict | None = None,
+        timeout: int | float | None = None,
+    ) -> dict:
+        """发起请求并解析 JSON；失败时返回空字典。"""
+        try:
+            return self._request(path, params=params, timeout=timeout).json()
+        except Exception as exc:
+            logger.info("Twitter数据获取失败: %s", exc)
+            return {}
+
+    def _fetch_posts(self, path: str, *, params: dict | None = None) -> list[dict]:
         """调用 fxtwitter 接口并返回 results 列表（失败时返回空列表）。
 
         Param:
-            url: fxtwitter 接口地址
+            path: fxtwitter 接口路径或完整地址
         Return:
             results 字段中的原始记录列表
         """
-        try:
-            r = requests.get(url, headers=self.headers, timeout=10)
-            return r.json().get("results", []) or []
-        except Exception as exc:
-            logger.info("Twitter数据获取失败: %s", exc)
-            return []
-        
+        return self._request_json(path, params=params).get("results", []) or []
 
     def fetch_article_by_id(self, id: str) -> dict:
         """根据 Twitter article ID 拉取该文章的最新文章。
@@ -55,14 +92,14 @@ class TwitterDataProvider(BaseDataProvider):
         Return:
             Dict
         """
-        req_url = f"https://api.fxtwitter.com/2/status/{id}?about_account=0&lang=es"
-        r = requests.get(req_url, headers=self.headers, timeout=10)
-        if r.status_code != 200:
-            logger.info("Twitter数据获取失败: %s", r.status_code)
-            return []
-        
-        entry = r.json().get("status", {}) or {}
-      
+        payload = self._request_json(
+            f"/status/{id}",
+            params={"about_account": "0", "lang": "es"},
+        )
+        entry = payload.get("status", {}) or {}
+        if not entry:
+            return {}
+
         result = {
             "url": entry.get("url", ""),
             "id": entry.get("id", ""),
@@ -75,13 +112,14 @@ class TwitterDataProvider(BaseDataProvider):
             content += block.get("text", "")
             content += "\n"
 
-        result.update({
-            "title": title,
-            "content": content,
-        
-        })
+        result.update(
+            {
+                "title": title,
+                "content": content,
+            }
+        )
         return result
-        
+
     def fetch_posts(self) -> list[NewsSearchItem]:
         """获取最新 Twitter/X 媒体推文和文章。
 
@@ -89,7 +127,6 @@ class TwitterDataProvider(BaseDataProvider):
             NewsSearchItem 列表
         """
         return self.fetch_user_articles() + self.fetch_user_posts()
-    
 
     def fetch_user_articles(self) -> list[NewsSearchItem]:
         """从预置 Twitter 财经账号列表拉取最新媒体推文。
@@ -99,8 +136,10 @@ class TwitterDataProvider(BaseDataProvider):
         """
         results: list[NewsSearchItem] = []
         for account_name in self.twitter_feeds:
-            feed_url = f"https://api.fxtwitter.com/2/profile/{account_name}/articles?count=20&lang=es"
-            entries = self._fetch_posts(feed_url)
+            entries = self._fetch_posts(
+                f"/profile/{account_name}/articles",
+                params={"count": "20", "lang": "es"},
+            )
             for entry in entries:
                 url = entry.get("url", "")
                 id = entry.get("id", "")
@@ -133,7 +172,6 @@ class TwitterDataProvider(BaseDataProvider):
                     )
                 )
         return results
-    
 
     def fetch_user_posts(self) -> list[NewsSearchItem]:
         """从预置 Twitter 财经账号列表拉取最新媒体推文。
@@ -143,8 +181,10 @@ class TwitterDataProvider(BaseDataProvider):
         """
         results: list[NewsSearchItem] = []
         for account_name in self.twitter_feeds:
-            feed_url = f"https://api.fxtwitter.com/2/profile/{account_name}/media?count=20&lang=zh-cn"
-            entries = self._fetch_posts(feed_url)
+            entries = self._fetch_posts(
+                f"/profile/{account_name}/media",
+                params={"count": "20", "lang": "zh-cn"},
+            )
             for entry in entries:
                 title = str(entry.get("title") or "").strip()
                 content = str(entry.get("text") or "").strip()
@@ -178,8 +218,15 @@ class TwitterDataProvider(BaseDataProvider):
         Return:
             NewsSearchItem 列表
         """
-        req_url = f"https://api.fxtwitter.com/2/search?q={keyword}&feed=latest&count=30&lang=zh-cn"
-        entries = self._fetch_posts(req_url)
+        entries = self._fetch_posts(
+            "/search",
+            params={
+                "q": keyword,
+                "feed": "latest",
+                "count": "30",
+                "lang": "zh-cn",
+            },
+        )
         results: list[NewsSearchItem] = []
         for entry in entries:
             title = str(entry.get("title") or "").strip()
@@ -203,6 +250,6 @@ class TwitterDataProvider(BaseDataProvider):
                     comment_count=0,
                 )
             )
-        return results 
+        return results
 
 twitter_provider = TwitterDataProvider()

@@ -2,6 +2,7 @@ import json
 import logging
 import random
 import re
+import threading
 import time
 from urllib.parse import quote
 
@@ -30,7 +31,6 @@ from app.models.stock import StockSearchItem
 from app.services.base.data_provider import BaseDataProvider
 from app.services.providers.akshare import akshare_provider
 from app.services.base.intraday_utils import event_stream, normalize_intraday_df
-from app.utils import http_client
 from app.utils.symbol_utils import classify_exchange
 from app.utils.symbol_utils import contains_stock_reference
 from app.utils.data_clean import rename_and_keep_columns, safe_float
@@ -62,15 +62,17 @@ class EastMoneyDataProvider(BaseDataProvider):
         self.PDF_TPL = "https://pdf.dfcfw.com/pdf/H3_{info_code}_1.pdf"
         self.UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
         self.DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
-        self._em_last_call = [0.0]
+        self._em_last_call = 0.0
+        self._em_lock = threading.Lock()
         self.em_session = requests.Session()
         self.em_session.trust_env = get_settings().http_trust_env
         self.em_session.headers.update({"User-Agent": self.UA})
         self.EM_MIN_INTERVAL = 1.0
+        self.eastmoney_headers = EASTMONEY_HEADERS.copy()
         # 支持自定义 cookie（配置为空时使用 http.py 中的内置默认值）
         custom_cookie = get_settings().eastmoney_cookie
         if custom_cookie:
-            EASTMONEY_HEADERS["cookie"] = custom_cookie
+            self.eastmoney_headers["cookie"] = custom_cookie
 
     def em_get_response(self, url, params=None, headers=None, timeout=15, **kwargs):
         """东财统一请求入口：自动节流 + 复用 session。
@@ -83,13 +85,14 @@ class EastMoneyDataProvider(BaseDataProvider):
         Return:
             requests.Response 响应对象
         """
-        wait = self.EM_MIN_INTERVAL - (time.time() - self._em_last_call[0])
-        if wait > 0:
-            time.sleep(wait + random.uniform(0.1, 0.5))
-        try:
-            return self.em_session.get(url, params=params, headers=headers, timeout=timeout, **kwargs)
-        finally:
-            self._em_last_call[0] = time.time()
+        with self._em_lock:
+            wait = self.EM_MIN_INTERVAL - (time.time() - self._em_last_call)
+            if wait > 0:
+                time.sleep(wait + random.uniform(0.1, 0.5))
+            try:
+                return self.em_session.get(url, params=params, headers=headers, timeout=timeout, **kwargs)
+            finally:
+                self._em_last_call = time.time()
 
     def fetch_datacenter_report(self, report_name: str, columns: str = "ALL",
                                 filter_str: str = "", page_size: int = 50,
@@ -141,7 +144,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "token": EASTMONEY_SEARCH_SUGGEST_TOKEN,
             "count": str(max(count, 5)),
         }
-        response = self.em_get_response(EASTMONEY_SEARCH_SUGGEST_URL, params=params, headers=EASTMONEY_HEADERS, timeout=10)
+        response = self.em_get_response(EASTMONEY_SEARCH_SUGGEST_URL, params=params, headers=self.eastmoney_headers, timeout=10)
         data = response.json().get("QuotationCodeTable", {}).get("Data") or []
         results: list[StockSearchItem] = []
         seen_codes: set[str] = set()
@@ -226,7 +229,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "end": end_date,
             "_": "1623766962675",
         }
-        r = self.em_get_response(EASTMONEY_STOCK_KLINE_URL, params=params, headers=EASTMONEY_HEADERS, timeout=10)
+        r = self.em_get_response(EASTMONEY_STOCK_KLINE_URL, params=params, headers=self.eastmoney_headers, timeout=10)
         data_json = r.json()
 
         if not data_json.get("data") or not data_json["data"].get("klines"):
@@ -325,10 +328,15 @@ class EastMoneyDataProvider(BaseDataProvider):
         big_df = pd.DataFrame()
         for event in event_stream(url, params):
             event_json = json.loads(event.replace("data: ", ""))
-            temp_df = pd.DataFrame([item.split(",") for item in event_json["data"]["details"]])
+            details = event_json.get("data", {}).get("details") or []
+            if not details:
+                continue
+            temp_df = pd.DataFrame([item.split(",") for item in details])
             big_df = pd.concat(objs=[big_df, temp_df], ignore_index=True)
             break
 
+        if big_df.empty or len(big_df.columns) < 5:
+            return pd.DataFrame()
         big_df.columns = ["时间", "成交价", "成交量", "-", "买卖盘性质"]
         big_df["买卖盘性质"] = big_df["买卖盘性质"].map({"2": "买盘", "1": "卖盘", "4": "中性盘"})
         if not big_df.empty:
@@ -411,7 +419,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                 "wbp2u": "|0|0|0|web",
                 "_": str(int(time.time() * 1000)),
             },
-            headers=EASTMONEY_HEADERS,
+            headers=self.eastmoney_headers,
             timeout=10,
         )
         response.raise_for_status()
@@ -518,7 +526,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                 "fields": "f12,f14",
             }
 
-        all_data = self._fetch_clist_diff(params, headers=EASTMONEY_HEADERS, page_size=100)
+        all_data = self._fetch_clist_diff(params, headers=self.eastmoney_headers, page_size=100)
         stocks: list[dict] = []
         for item in all_data:
             code = str(item.get("f12", ""))
@@ -572,7 +580,7 @@ class EastMoneyDataProvider(BaseDataProvider):
 
         Param:
             params: 请求参数字典（不含分页参数 pn/pz，由本方法自动添加）
-            headers: 可选的自定义请求头，默认使用 EASTMONEY_HEADERS
+            headers: 可选的自定义请求头，默认使用实例级东财请求头
             page_size: 每页条数，默认 100
             url: clist 接口 URL，默认使用 EASTMONEY_CLIST_URL
         Return:
@@ -711,7 +719,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                 logger.warning(f"东方财富{label}获取失败: {e}")
         return all_news
 
-    def _fetch_finance_news(self, column: str = "", news_ids: list[str] = [],
+    def _fetch_finance_news(self, column: str = "", news_ids: list[str] | None = None,
                             code: str = "", code_name: str = "") -> tuple[list[NewsSearchItem], list[str]]:
         """获取东方财富单分类新闻。
 
@@ -725,6 +733,8 @@ class EastMoneyDataProvider(BaseDataProvider):
                 - list: 新闻列表
                 - list: 更新后的新闻 ID 列表（含本次新增）
         """
+        if news_ids is None:
+            news_ids = []
         trace = str(int(time.time() * 1000))
         url = "https://np-listapi.eastmoney.com/comm/web/getNewsByColumns"
         params = {
@@ -801,10 +811,10 @@ class EastMoneyDataProvider(BaseDataProvider):
             "accept-language": "en,zh-CN;q=0.9,zh;q=0.8",
             "cache-control": "no-cache",
             "connection": "keep-alive",
-            "cookie": "qgqp_b_id=652bf4c98a74e210088f372a17d4e27b; st_nvi=ulN5JAj9FUocz3p4klMME9f20; emshistory=%5B%22603777%22%5D; nid18=010d039dd427dc4d187090491f47d7ad; nid18_create_time=1764582801999; gviem=gSdeY51VWSuTzM3kWaagtf560; gviem_create_time=1764582801999; st_si=55269775884615; st_pvi=66803244437563; st_sp=2025-11-19%2014%3A19%3A16; st_inirUrl=https%3A%2F%2Fso.eastmoney.com%2Fnews%2Fs; st_sn=2; st_psi=20251201223210488-118000300905-0940816858; st_asi=delete",
+            **({"cookie": self.eastmoney_headers["cookie"]} if "cookie" in self.eastmoney_headers else {}),
             "host": "search-api-web.eastmoney.com",
             "pragma": "no-cache",
-            "referer": "https://so.eastmoney.com/news/s?keyword=603777",
+            "referer": f"https://so.eastmoney.com/news/s?keyword={code}",
             "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"Windows"',
@@ -815,10 +825,10 @@ class EastMoneyDataProvider(BaseDataProvider):
         }
         r = self.em_get_response(url, params=params, headers=headers, timeout=10)
         data_text = r.text
-        data_json = json.loads(
-            data_text.strip("jQuery35101792940631092459_1764599530165(")[:-1]
-        )
-        temp_df = pd.DataFrame(data_json["result"]["cmsArticleWebOld"])
+        data_json = self._parse_json_from_text(data_text, "个股新闻接口返回格式异常")
+        temp_df = pd.DataFrame(data_json.get("result", {}).get("cmsArticleWebOld") or [])
+        if temp_df.empty:
+            return []
         temp_df["url"] = "http://finance.eastmoney.com/a/" + temp_df["code"] + ".html"
         temp_df.rename(
             columns={
@@ -944,7 +954,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         response = self.em_get_response(
             "https://gbapi.eastmoney.com/webarticlelist/api/Article/Articlelist",
             params=params,
-            headers=EASTMONEY_HEADERS,
+            headers=self.eastmoney_headers,
             timeout=10,
         )
         response.raise_for_status()
@@ -1057,7 +1067,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                 "date": date,
                 "_": str(int(time.time() * 1000)),
             },
-            headers=EASTMONEY_HEADERS,
+            headers=self.eastmoney_headers,
             timeout=15,
         )
         response.raise_for_status()
@@ -1092,7 +1102,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                 "date": date,
                 "_": str(int(time.time() * 1000)),
             },
-            headers=EASTMONEY_HEADERS,
+            headers=self.eastmoney_headers,
             timeout=15,
         )
         response.raise_for_status()
@@ -1114,7 +1124,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                 "dpt": "wz.ztzt",
                 "_": str(int(time.time() * 1000)),
             },
-            headers=EASTMONEY_HEADERS,
+            headers=self.eastmoney_headers,
             timeout=15,
         )
         response.raise_for_status()
@@ -1197,6 +1207,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             time.sleep(0.3)
         df = pd.DataFrame(all_records)
         predict_stat_dict = []
+        predict_stat_df = pd.DataFrame(columns=["指标", "年度", "预测机构数", "最小值", "平均值", "最大值", "行业平均数", "单位"])
         if not df.empty:
             num_orgs = df["orgName"].nunique()
             this_year = str(time.localtime().tm_year)
@@ -1214,12 +1225,12 @@ class EastMoneyDataProvider(BaseDataProvider):
                 label = f"{metric}"
                 valid = df[col].dropna()
                 if valid.empty:
-                    print(f"{label}: 无有效数据")
+                    logger.debug("东方财富研报预测无有效数据: code=%s, metric=%s", code, label)
                 else:
-                    min = f"{valid.min():.2f}"
-                    max = f"{valid.max():.2f}"
+                    min_value = f"{valid.min():.2f}"
+                    max_value = f"{valid.max():.2f}"
                     mean = f"{valid.mean():.2f}"
-                    predict_stat_dict.append({"指标": label, "年度": year, "预测机构数": num_orgs,"最小值": min, "平均值": mean, "最大值": max, "行业平均数": None, "单位": "单位：元"})
+                    predict_stat_dict.append({"指标": label, "年度": year, "预测机构数": num_orgs,"最小值": min_value, "平均值": mean, "最大值": max_value, "行业平均数": None, "单位": "单位：元"})
             predict_stat_df = pd.DataFrame(predict_stat_dict)
         return predict_stat_df
 
@@ -1242,10 +1253,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "fs": "m:90+t:2",
             "fields": "f2,f3,f4,f12,f13,f14,f104,f105,f128,f136,f140,f141,f207",
         }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        }
-        items = self._fetch_clist_diff(params=params, headers=EASTMONEY_HEADERS)
+        items = self._fetch_clist_diff(params=params, headers=self.eastmoney_headers)
         if not items:
             return {"top": [], "bottom": [], "total": 0}
 
@@ -1294,10 +1302,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "dect": "1",
             "fields": "f2,f3,f4,f12,f13,f14,f104,f105,f128,f136,f140,f141,f207",
         }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        }
-        items = self._fetch_clist_diff(params=params, headers=EASTMONEY_HEADERS, url=url)
+        items = self._fetch_clist_diff(params=params, headers=self.eastmoney_headers, url=url)
         if not items:
             return {"top": [], "bottom": [], "total": 0}
 
@@ -1343,10 +1348,10 @@ class EastMoneyDataProvider(BaseDataProvider):
             "lmt": "120",
         }
         try:
-            r = self.em_get_response(url, params=params, headers=EASTMONEY_HEADERS, timeout=15)
+            r = self.em_get_response(url, params=params, headers=self.eastmoney_headers, timeout=15)
             d = r.json()
         except Exception as e:
-            print(f"[WARN] push2 资金流请求失败: {e}")
+            logger.warning("东方财富个股资金流请求失败: code=%s, error=%s", code, e)
             return []
         klines = d.get("data", {}).get("klines", [])
 
@@ -1390,10 +1395,10 @@ class EastMoneyDataProvider(BaseDataProvider):
             "_": int(time.time() * 1000),
         }
         try:
-            r = self.em_get_response(url, params=params, headers=EASTMONEY_HEADERS, timeout=15)
+            r = self.em_get_response(url, params=params, headers=self.eastmoney_headers, timeout=15)
             d = r.json()
         except Exception as e:
-            print(f"[WARN] push2 资金流请求失败: {e}")
+            logger.warning("东方财富市场资金流请求失败: %s", e)
             return []
         klines = d.get("data", {}).get("klines", [])
         rows = []
@@ -1441,16 +1446,16 @@ class EastMoneyDataProvider(BaseDataProvider):
             "_": int(time.time() * 1000),
         }
         try:
-            items = self._fetch_clist_diff(params=params, headers=EASTMONEY_HEADERS, page_size=100)
+            items = self._fetch_clist_diff(params=params, headers=self.eastmoney_headers, page_size=100)
         except Exception as e:
-            print(f"[WARN] push2 资金流请求失败: {e}")
+            logger.warning("东方财富行业资金流请求失败: %s", e)
             return []
         rows = []
         for item in items:
             rows.append({
                 "industry_code": item.get("f12", ""),
                 "industry_name": item.get("f14", ""),
-                "change_pct": safe_float(item.get("f13", "")),
+                "change_pct": safe_float(item.get("f3", "")),
                 "main_net": safe_float(item.get("f62", "")),
                 "small_net": safe_float(item.get("f84", "")),
                 "mid_net": safe_float(item.get("f78", "")),
@@ -1488,16 +1493,16 @@ class EastMoneyDataProvider(BaseDataProvider):
             "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13",
         }
         try:
-            items = self._fetch_clist_diff(params=params, headers=EASTMONEY_HEADERS, page_size=100)
+            items = self._fetch_clist_diff(params=params, headers=self.eastmoney_headers, page_size=100)
         except Exception as e:
-            print(f"[WARN] push2 资金流请求失败: {e}")
+            logger.warning("东方财富概念资金流请求失败: %s", e)
             return []
         rows = []
         for item in items:
             rows.append({
                 "industry_code": item.get("f12", ""),
                 "industry_name": item.get("f14", ""),
-                "change_pct": safe_float(item.get("f13", "")),
+                "change_pct": safe_float(item.get("f3", "")),
                 "main_net": safe_float(item.get("f62", "")),
                 "small_net": safe_float(item.get("f84", "")),
                 "mid_net": safe_float(item.get("f78", "")),
@@ -1599,7 +1604,6 @@ class EastMoneyDataProvider(BaseDataProvider):
                     report_name, filter_str=filter_str,
                     sort_columns=sort_col, sort_types="-1",
                 )
-                print(rows)
                 for row in rows:
                     result.append(
                         {

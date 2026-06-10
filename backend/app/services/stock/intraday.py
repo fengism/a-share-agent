@@ -4,9 +4,7 @@ import logging
 import pandas as pd
 
 from app.models.stock import IntradayData, IntradayItem
-from app.services.providers.akshare import akshare_provider as _akshare_provider
-from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
-from app.services.providers.sina import sina_provider as _sina_provider
+from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.rate_limiter import call_blocking
 from app.utils.singleflight import AsyncSingleFlight
@@ -17,6 +15,21 @@ from app.utils.data_clean import safe_float
 logger = logging.getLogger(__name__)
 
 _intraday_singleflight = AsyncSingleFlight[IntradayData]()
+
+
+def _get_akshare_provider():
+    """Lazily resolve the Akshare provider singleton."""
+    return get_provider("akshare")
+
+
+def _get_eastmoney_provider():
+    """Lazily resolve the EastMoney provider singleton."""
+    return get_provider("eastmoney")
+
+
+def _get_sina_provider():
+    """Lazily resolve the Sina provider singleton."""
+    return get_provider("sina")
 
 
 async def _safe_fetch_intraday(source_name: str, fetcher, code: str, date: str | None = None) -> pd.DataFrame:
@@ -47,12 +60,12 @@ async def _load_intraday(sym, date: str | None) -> IntradayData:
         IntradayData 模型对象
     """
     fetchers = [
-        ("新浪财经分钟直连", _sina_provider.fetch_stock_intraday_minute_direct),
-        ("Akshare新浪分钟", _akshare_provider.fetch_stock_intraday_minute_sina),
-        ("东方财富分钟直连", _eastmoney_provider.fetch_stock_intraday_minute),
-        ("Akshare东方财富分钟K线", _akshare_provider.fetch_stock_intraday_minute),
-        ("Akshare东方财富逐笔成交", _akshare_provider.fetch_stock_intraday_transactions),
-        ("东方财富逐笔直连", _eastmoney_provider.fetch_stock_intraday_transactions),
+        ("新浪财经分钟直连", _get_sina_provider().fetch_stock_intraday_minute_direct),
+        ("Akshare新浪分钟", _get_akshare_provider().fetch_stock_intraday_minute_sina),
+        ("东方财富分钟直连", _get_eastmoney_provider().fetch_stock_intraday_minute),
+        ("Akshare东方财富分钟K线", _get_akshare_provider().fetch_stock_intraday_minute),
+        ("Akshare东方财富逐笔成交", _get_akshare_provider().fetch_stock_intraday_transactions),
+        ("东方财富逐笔直连", _get_eastmoney_provider().fetch_stock_intraday_transactions),
     ]
 
     tasks = [_safe_fetch_intraday(name, fn, sym.raw, date) for name, fn in fetchers]

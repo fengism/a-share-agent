@@ -17,12 +17,10 @@ from app.services.stock.basic_info import get_basic_info
 from app.services.stock.financials import get_financial_metrics
 from app.services.stock.kline import get_kline
 from app.services.stock.valuation import get_valuation_detail
-from app.services.providers.ths import ths_provider as _ths_provider
-from app.services.llm.client import LLMClient, create_llm_client
+from app.services.llm.client import create_llm_client
 from app.services.analysis.prompts import SCHEMA_INSTRUCTION, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 from app.services.analysis.parser import parse_with_retry
 from app.utils.cache import cache
-from app.utils.rate_limiter import call_blocking
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)

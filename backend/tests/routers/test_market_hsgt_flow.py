@@ -22,3 +22,17 @@ def test_get_hsgt_flow_route(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["points"][0]["total"] == 3.0
+
+
+def test_get_hsgt_flow_history_route(monkeypatch):
+    """Test GET /api/market/hsgt-flow/history delegates to the history service."""
+    async def fake_get_hsgt_flow_history(days: int):
+        assert days == 7
+        return [{"date": "2026-06-10", "updated_at": "2026-06-10 15:01:00", "points": []}]
+
+    monkeypatch.setattr(market, "get_hsgt_flow_history_service", fake_get_hsgt_flow_history)
+
+    response = client.get("/api/market/hsgt-flow/history?days=7")
+
+    assert response.status_code == 200
+    assert response.json()[0]["date"] == "2026-06-10"

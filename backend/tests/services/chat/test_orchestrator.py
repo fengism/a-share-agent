@@ -27,7 +27,7 @@ class TestKeywordClassifier:
 
     def test_full_analysis_routes_to_all(self):
         d = self.orch._keyword_classify("深度分析一下贵州茅台")
-        assert set(d.agents) == {"technical", "fundamental", "news", "risk"}
+        assert set(d.agents) == {"technical", "fundamental", "news", "risk", "macro"}
         assert d.is_complex is True
 
     def test_non_stock_query_returns_empty(self):
@@ -50,4 +50,4 @@ class TestKeywordClassifier:
 
     def test_vague_analysis_keyword_triggers_all(self):
         d = self.orch._keyword_classify("帮我分析一下这只股票")
-        assert set(d.agents) == {"technical", "fundamental", "news", "risk"}
+        assert set(d.agents) == {"technical", "fundamental", "news", "risk", "macro"}

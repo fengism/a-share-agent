@@ -2,8 +2,7 @@ import json
 import logging
 from pathlib import Path
 
-from app.services.providers.akshare import akshare_provider as _akshare_provider
-from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
+from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.rate_limiter import call_blocking
 
@@ -14,6 +13,16 @@ _INDUSTRY_MAPPING_CACHE_KEY = "industry_second_mapping_file"
 _INDUSTRY_LIST_CACHE_KEY = "industry_second_list_file"
 _INDUSTRY_MAPPING_TTL = 24 * 60 * 60
 _MIN_VALID_MAPPING_SIZE = 4000
+
+
+def _get_akshare_provider():
+    """Lazily resolve the Akshare provider singleton."""
+    return get_provider("akshare")
+
+
+def _get_eastmoney_provider():
+    """Lazily resolve the EastMoney provider singleton."""
+    return get_provider("eastmoney")
 
 
 def _is_valid_mapping(mapping: dict[str, str]) -> bool:
@@ -158,7 +167,7 @@ def _build_industry_mapping_sw_second_index_akshare() -> tuple[dict[str, str], l
     """
     申万二级行业映射实时数据
     """
-    index_df = _akshare_provider.fetch_sw_index_realtime()
+    index_df = _get_akshare_provider().fetch_sw_index_realtime()
     if index_df is None or index_df.empty:
         return {}, []
 
@@ -178,7 +187,7 @@ def _build_industry_mapping_sw_second_index_akshare() -> tuple[dict[str, str], l
 
         industries.append(industry_name)
         try:
-            cons_df = _akshare_provider.fetch_sw_index_components(symbol=industry_code)
+            cons_df = _get_akshare_provider().fetch_sw_index_components(symbol=industry_code)
             if cons_df is None or cons_df.empty:
                 continue
             stock_col = _pick_first_column(cons_df.columns.tolist(), ["证券代码", "股票代码", "代码"])
@@ -218,7 +227,7 @@ def _build_industry_mapping_sw_second() -> tuple[dict[str, str], list[str]]:
         logger.info(f"申万二级行业列表不可用: {e}")
 
     try:
-        mapping, industry_list = _eastmoney_provider.build_industry_mapping()
+        mapping, industry_list = _get_eastmoney_provider().build_industry_mapping()
         if _is_valid_mapping(mapping):
             _cache_built_mapping(mapping, industry_list)
             return mapping, industry_list

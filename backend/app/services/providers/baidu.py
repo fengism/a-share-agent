@@ -1,5 +1,6 @@
 import logging
 import time
+import json
 
 import pandas as pd
 import requests
@@ -37,9 +38,14 @@ class BaiduDataProvider(BaseDataProvider):
         self._session = requests.Session()
         self._session.trust_env = False
         # 支持自定义 acs-token（配置为空时使用 http.py 中的内置默认值）
-        custom_token = get_settings().baidu_acs_token
-        if custom_token:
-            BD_HEADERS_WITH_COOKIE["acs-token"] = custom_token
+        self._custom_acs_token = get_settings().baidu_acs_token
+
+    def _get_cookie_headers(self) -> dict[str, str]:
+        """返回带 acs-token 的请求头副本，避免修改共享常量。"""
+        headers = dict(BD_HEADERS_WITH_COOKIE)
+        if self._custom_acs_token:
+            headers["acs-token"] = self._custom_acs_token
+        return headers
 
     def _request(self, path: str, params: dict, headers: dict | None = None, timeout: int | None = None) -> dict:
         """通过独立 session 发起 GET 请求并解析 JSON（不走代理）。
@@ -59,6 +65,7 @@ class BaiduDataProvider(BaseDataProvider):
             headers=headers or self.default_headers,
             timeout=timeout or self.DEFAULT_TIMEOUT,
         )
+        response.raise_for_status()
         return response.json()
 
     @staticmethod
@@ -154,7 +161,7 @@ class BaiduDataProvider(BaseDataProvider):
         data = self._request(
             "/api/getrelatedblock",
             params={
-                "stock": __import__("json").dumps({"market": "ab", "type": "stock", "code": code}),
+                "stock": json.dumps({"market": "ab", "type": "stock", "code": code}),
                 "finClientType": "pc",
             },
         )
@@ -279,7 +286,7 @@ class BaiduDataProvider(BaseDataProvider):
                 "rn": "200",
                 "finClientType": "pc",
             },
-            headers=BD_HEADERS_WITH_COOKIE,
+            headers=self._get_cookie_headers(),
         )
         self._check_result_code(data)
         items = data.get("Result", {}).get("list", {}).get("body", [])
@@ -319,7 +326,7 @@ class BaiduDataProvider(BaseDataProvider):
         data = self._request(
             "/sapi/v1/marketquote",
             params={"bizType": "marketStatus", "finClientType": "pc"},
-            headers=BD_HEADERS_WITH_COOKIE,
+            headers=self._get_cookie_headers(),
         )
         self._check_result_code(data)
         return data.get("Result", {}).get("index", {}).get("ab", {}).get("marketDate", [])
@@ -356,7 +363,7 @@ class BaiduDataProvider(BaseDataProvider):
         response = self._request(
             url,
             params=params,
-            headers=BD_HEADERS_WITH_COOKIE,
+            headers=self._get_cookie_headers(),
         )
         self._check_result_code(response)
         items = response.get("Result", {}).get("list", {}).get("body", [])
@@ -420,7 +427,7 @@ class BaiduDataProvider(BaseDataProvider):
         response = self._request(
             url,
             params=params,
-            headers=BD_HEADERS_WITH_COOKIE,
+            headers=self._get_cookie_headers(),
         )
         self._check_result_code(response)
         items = response.get("Result", {}).get("list", {}).get("body", [])

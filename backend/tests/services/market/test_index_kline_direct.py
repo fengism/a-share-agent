@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -13,7 +14,16 @@ def test_index_kline_source_attempts_include_eastmoney_direct(monkeypatch):
         captured.update({"symbol": symbol, "period": period, "start_date": start_date, "end_date": end_date})
         return pd.DataFrame([{"日期": "2026-05-25", "收盘": "3020"}])
 
-    monkeypatch.setattr(index_kline._eastmoney_provider, "fetch_index_kline", fake_fetch)
+    monkeypatch.setattr(
+        index_kline,
+        "_get_eastmoney_provider",
+        lambda: SimpleNamespace(fetch_index_kline=lambda *args, **kwargs: None),
+    )
+
+    async def fake_call_blocking(func, *args, **kwargs):
+        return fake_fetch(*args, **kwargs)
+
+    monkeypatch.setattr(index_kline, "call_blocking", fake_call_blocking)
 
     attempts = index_kline._build_index_kline_source_attempts("000001", "daily", "20260521", "20260525")
     eastmoney_attempt = [a for a in attempts if "东方财富" in a.label and "直连" in a.label][0]

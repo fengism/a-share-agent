@@ -1,4 +1,5 @@
 import pandas as pd
+import asyncio
 import pytest
 
 from app.models.stock import FinancialMetrics, InstitutionForecast, StockBasicInfo, StockConcept, ValuationFundamentals, ValuationProfile
@@ -162,8 +163,7 @@ def test_build_peg_valuation_caps_target_pe():
     assert "同行 PE 中位数" in result.basis
 
 
-@pytest.mark.asyncio
-async def test_get_valuation_detail_annualizes_profit_fallback_for_semiannual_report(monkeypatch):
+def test_get_valuation_detail_annualizes_profit_fallback_for_semiannual_report(monkeypatch):
     """get_valuation_detail annualises a semi-annual report when computing PE/PS fair values."""
     async def fake_basic_info(code: str):
         return StockBasicInfo(
@@ -212,15 +212,14 @@ async def test_get_valuation_detail_annualizes_profit_fallback_for_semiannual_re
     monkeypatch.setattr(valuation.cache, "get", lambda key: None)
     monkeypatch.setattr(valuation.cache, "set", lambda *args, **kwargs: None)
 
-    detail = await valuation.get_valuation_detail("600519", fake_percentile)
+    detail = asyncio.run(valuation.get_valuation_detail("600519", fake_percentile))
 
     assert detail.fair_values["pe"].equity_value == 1_000_000_000
     assert detail.fair_values["ps"].equity_value == 10_000_000_000
     assert detail.fair_values["dcf"].base_cashflow == 560_000_000
 
 
-@pytest.mark.asyncio
-async def test_get_valuation_detail_includes_peg(monkeypatch):
+def test_get_valuation_detail_includes_peg(monkeypatch):
     """get_valuation_detail includes a PEG method and institution forecasts in the result."""
     async def fake_basic_info(code: str):
         return StockBasicInfo(
@@ -272,7 +271,7 @@ async def test_get_valuation_detail_includes_peg(monkeypatch):
     monkeypatch.setattr(valuation.cache, "set", lambda *args, **kwargs: None)
     monkeypatch.setattr(valuation, "datetime", _FixedDateTime)
 
-    detail = await valuation.get_valuation_detail("600519", fake_percentile)
+    detail = asyncio.run(valuation.get_valuation_detail("600519", fake_percentile))
 
     assert detail.multiples.peg == pytest.approx(1.2)
     assert detail.fair_values["peg"].available is True

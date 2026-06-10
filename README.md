@@ -11,6 +11,7 @@
 - **条件选股**：按行业、价格、市值、估值等条件筛选，并支持估值百分位过滤。
 - **24小时资讯**：聚合多源快讯和新闻，AI 智能摘要提炼关键信息并附带引用链接，自动刷新。
 - **产业链分析**：输入产业关键词，AI 自动搜索研报数据并生成完整产业链分析报告，支持历史记录和推送。
+- **宏观经济**：物价、景气、货币、利率、增速、外贸六大类宏观指标一览，含图表趋势。
 - **每日复盘**：聚合市场、热点、新闻和 LLM 结论，生成结构化复盘。
 - **个股分析**：展示分时、K 线、基本面、估值（含机构一致预期）、技术指标、情绪数据和 AI 结论。
 - **AI 综合分析**：LLM 输出评分、评级、目标价格区间和买入/持有/卖出信号，融合机构一致预期数据。
@@ -25,7 +26,7 @@
 | 状态与请求 | Zustand + TanStack Query + SSE |
 | 图表 | Lightweight Charts + ECharts |
 | 后端 | FastAPI + Python 3.11+ + Pydantic v2 |
-| 数据源 | akshare + 东方财富/新浪/同花顺/问财等 fallback |
+| 数据源 | akshare + 东方财富/新浪/同花顺/问财/Twitter 等 fallback |
 | AI 引擎 | OpenAI-compatible SDK + litellm，可配置 DeepSeek/通义千问/OpenAI/Claude/智谱 |
 | 包管理 | uv + npm |
 | 部署 | Docker + Nginx |
@@ -226,7 +227,8 @@ make frontend-lint    # 前端 lint
 | `/analysis` | AnalysisEntry | 分析入口 |
 | `/analysis/:code` | Analysis | 个股分析详情 |
 | `/industry-chain` | IndustryChain | AI 产业链分析（支持名称参数） |
-| `/settings` | Settings | 系统配置 |
+| `/macro` | Macro | 宏观经济指标（物价/景气/货币/利率/增速/外贸） |
+| `/settings` | Settings | 系统配置（大模型/飞书/问财/Notion/Twitter） |
 
 ## API 概览
 
@@ -260,7 +262,7 @@ stock-agent/
 │   │   │   ├── daily_review/       # 每日复盘流水线
 │   │   │   ├── llm/                # LLM 客户端工厂
 │   │   │   ├── market/             # 指数、热点、龙虎榜、资讯、AI 摘要
-│   │   │   ├── providers/          # akshare、东方财富、同花顺、问财、百度、RSS 等数据源适配
+│   │   │   ├── providers/          # akshare、东方财富、同花顺、问财、百度、RSS、Twitter 等数据源适配
 │   │   │   ├── screener/           # 条件选股、行业映射、估值百分位
 │   │   │   ├── industry_chain/     # 产业链分析流水线
 │   │   │   ├── search/             # 新闻和评论搜索
@@ -275,7 +277,7 @@ stock-agent/
 │   │   ├── api/                    # API client、query hooks、SSE
 │   │   ├── charts/                 # 分时和 K 线图表
 │   │   ├── components/             # 通用组件和布局
-│   │   ├── pages/                  # Dashboard、Market、Screener、DailyReview、Analysis
+│   │   ├── pages/                  # Dashboard、Market、Screener、DailyReview、Analysis、Macro
 │   │   ├── store/                  # Zustand 状态
 │   │   ├── styles/                 # UI 样式常量
 │   │   └── types/                  # TypeScript 类型

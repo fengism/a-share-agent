@@ -9,15 +9,17 @@ from dataclasses import dataclass
 
 from openai import OpenAI
 
-from app.config import PROVIDER_DEFAULTS, get_settings
+from app.config import get_settings
 from app.models.chat import ChatMessage, ChatStreamDelta
 from app.services.chat.message_builder import build_messages
+from app.services.chat.skills import register_all_skills
 from app.services.chat.subagents.base import SubAgentResult
 from app.services.chat.subagents.technical import create_technicalagent
 from app.services.chat.subagents.fundamental import create_fundamentalagent
 from app.services.chat.subagents.news import create_newsagent
 from app.services.chat.subagents.risk import create_riskagent
 from app.services.chat.subagents.macro import create_macro_agent
+from app.services.llm.client import create_openai_chat_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +95,7 @@ class RoutingDecision:
 
 class Orchestrator:
     def __init__(self):
+        register_all_skills()
         self.sub_agents = {
             "technical": create_technicalagent(),
             "fundamental": create_fundamentalagent(),
@@ -103,12 +106,9 @@ class Orchestrator:
 
     async def run(self, message: str, history: list[ChatMessage] | None = None
                   ) -> AsyncGenerator[ChatStreamDelta, None]:
-        settings = get_settings()
-        provider = settings.llm_provider.lower()
-        defaults = PROVIDER_DEFAULTS.get(provider, {})
-        base_url = settings.llm_base_url or defaults.get("base_url", "https://api.openai.com/v1")
-        model = settings.llm_model or defaults.get("model", "gpt-4o-mini")
-        llm_client = OpenAI(api_key=settings.llm_api_key, base_url=base_url, timeout=120.0)
+        runtime = create_openai_chat_runtime(get_settings())
+        llm_client = runtime.client
+        model = runtime.model
 
         decision = self._keyword_classify(message)
         logger.info(f"Keyword classify: agents={decision.agents}, stock_codes={decision.stock_codes}")
@@ -194,12 +194,6 @@ class Orchestrator:
                               history: list[ChatMessage] | None,
                               llm_client: OpenAI, model: str
                               ) -> dict[str, SubAgentResult]:
-        settings = get_settings()
-        provider = settings.llm_provider.lower()
-        defaults = PROVIDER_DEFAULTS.get(provider, {})
-        base_url = settings.llm_base_url or defaults.get("base_url", "https://api.openai.com/v1")
-        model = settings.llm_model or defaults.get("model", "gpt-4o-mini")
-
         tasks = {}
         for name in agent_names:
             if name in self.sub_agents:

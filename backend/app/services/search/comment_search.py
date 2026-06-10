@@ -1,4 +1,5 @@
 from app.models.search_item import NewsSearchItem
+from app.services.providers import get_provider
 
 
 def fetch_guba_post(code: str = "600519", page: int = 1) -> list[NewsSearchItem]:
@@ -10,6 +11,5 @@ def fetch_guba_post(code: str = "600519", page: int = 1) -> list[NewsSearchItem]
     Return:
         NewsSearchItem 列表
     """
-    from app.services.providers.eastmoney import eastmoney_provider
-
-    return eastmoney_provider.fetch_stock_guba_posts(code=code, page=page)
+    from app.services.providers import get_provider
+    return get_provider("eastmoney").fetch_stock_guba_posts(code=code, page=page)

@@ -2,9 +2,7 @@ import asyncio
 import logging
 
 from app.models.search_item import NewsSearchItem
-from app.services.providers.cls import cls_provider as _cls_provider
-from app.services.providers.akshare import akshare_provider as _akshare_provider
-from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
+from app.services.providers import get_provider
 from app.services.stock.name_map import get_stock_name_map
 from app.utils.cache import cache, dated_cache_key
 from app.utils.rate_limiter import call_blocking
@@ -15,6 +13,16 @@ logger = logging.getLogger(__name__)
 
 _news_inflight: dict[str, asyncio.Task[list[NewsSearchItem]]] = {}
 _news_inflight_lock = asyncio.Lock()
+
+
+def _get_cls_provider():
+    """延迟获取财联社 provider。"""
+    return get_provider("cls")
+
+
+def _get_eastmoney_provider():
+    """延迟获取东方财富 provider。"""
+    return get_provider("eastmoney")
 
 
 async def _load_stock_news(sym) -> list[NewsSearchItem]:
@@ -33,8 +41,8 @@ async def _load_stock_news(sym) -> list[NewsSearchItem]:
     except Exception as e:
         logger.info(f"股票名称映射获取失败: {sym.raw}, error={e}")
 
-    em_task = call_blocking(_eastmoney_provider.fetch_stock_news, code=sym.raw, code_name=stock_name)
-    cls_task = call_blocking(_cls_provider.fetch_market_news, code=sym.raw, code_name=stock_name)
+    em_task = call_blocking(_get_eastmoney_provider().fetch_stock_news, code=sym.raw, code_name=stock_name)
+    cls_task = call_blocking(_get_cls_provider().fetch_market_news, code=sym.raw, code_name=stock_name)
     em_result, cls_result = await asyncio.gather(em_task, cls_task, return_exceptions=True)
 
     if isinstance(em_result, Exception):

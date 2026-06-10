@@ -1,11 +1,10 @@
 import pandas as pd
-import pytest
+import asyncio
 
 from app.services.stock import financials
 
 
-@pytest.mark.asyncio
-async def test_get_financial_metrics_uses_existing_stock_financials_provider(monkeypatch):
+def test_get_financial_metrics_uses_existing_stock_financials_provider(monkeypatch):
     """get_financial_metrics calls the stock financials provider for balance/profit/cashflow."""
     calls = []
 
@@ -21,7 +20,7 @@ async def test_get_financial_metrics_uses_existing_stock_financials_provider(mon
     monkeypatch.setattr(financials.cache, "set", lambda *args, **kwargs: None)
     monkeypatch.setattr(financials, "call_blocking", fake_call_blocking)
 
-    result = await financials.get_financial_metrics("603228")
+    result = asyncio.run(financials.get_financial_metrics("603228"))
 
     assert [indicator for _, indicator in calls] == ["balance", "profit", "cashflow"]
     assert all(func.__name__ == "fetch_stock_financials" for func, _ in calls)

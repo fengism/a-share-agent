@@ -1,11 +1,10 @@
 import pandas as pd
-import pytest
+import asyncio
 
 from app.services.stock import basic_info
 
 
-@pytest.mark.asyncio
-async def test_get_basic_info_degrades_when_tencent_sources_fail(monkeypatch, capsys):
+def test_get_basic_info_degrades_when_tencent_sources_fail(monkeypatch, capsys):
     """get_basic_info returns a degraded result when Tencent sources fail."""
     async def fake_call_blocking(func, *args, **kwargs):
         name = getattr(func, "__name__", "")
@@ -24,7 +23,7 @@ async def test_get_basic_info_degrades_when_tencent_sources_fail(monkeypatch, ca
     monkeypatch.setattr(basic_info.cache, "get", lambda key: None)
     monkeypatch.setattr(basic_info.cache, "set", lambda *args, **kwargs: None)
 
-    result = await basic_info.get_basic_info("600519")
+    result = asyncio.run(basic_info.get_basic_info("600519"))
 
     assert result.code == "600519"
     assert result.name == "测试股份"

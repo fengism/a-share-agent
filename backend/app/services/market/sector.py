@@ -1,13 +1,26 @@
 import logging
 
-from app.services.providers.baidu import baidu_provider as _baidu_provider
-from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
-from app.services.providers.tencent import tencent_provider as _tencent_provider
+from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.data_clean import safe_float
 from app.utils.rate_limiter import call_blocking
 
 logger = logging.getLogger(__name__)
+
+
+def _get_baidu_provider():
+    """延迟获取百度 provider。"""
+    return get_provider("baidu")
+
+
+def _get_eastmoney_provider():
+    """延迟获取东方财富 provider。"""
+    return get_provider("eastmoney")
+
+
+def _get_tencent_provider():
+    """延迟获取腾讯 provider。"""
+    return get_provider("tencent")
 
 
 def _normalize_tencent_sectors(top_df, bottom_df) -> dict:
@@ -72,8 +85,8 @@ async def get_industry_rankings() -> dict:
 
     data = None
     for label, fetch_fn in [
-        ("百度", lambda: _baidu_provider.fetch_industry_rankings(50)),
-        ("东方财富", lambda: _eastmoney_provider.fetch_industry_rankings(50)),
+        ("百度", lambda: _get_baidu_provider().fetch_industry_rankings(50)),
+        ("东方财富", lambda: _get_eastmoney_provider().fetch_industry_rankings(50)),
     ]:
         try:
             result = await call_blocking(fetch_fn)
@@ -87,7 +100,7 @@ async def get_industry_rankings() -> dict:
 
     if data is None:
         try:
-            top_df, bottom_df = await call_blocking(_tencent_provider.fetch_industry_rankings)
+            top_df, bottom_df = await call_blocking(_get_tencent_provider().fetch_industry_rankings)
             data = _normalize_tencent_sectors(top_df, bottom_df)
         except Exception as e:
             logger.warning(f"腾讯行业排名获取失败: {e}")

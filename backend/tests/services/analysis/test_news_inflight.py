@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -39,8 +40,16 @@ async def test_load_stock_news_keeps_only_recent_news(monkeypatch):
         return {"600519": "贵州茅台"}
 
     monkeypatch.setattr(news, "get_stock_name_map", fake_name_map)
-    monkeypatch.setattr(news._eastmoney_provider, "fetch_stock_news", lambda **kwargs: [_item("recent", publish_time=recent_time)])
-    monkeypatch.setattr(news._cls_provider, "fetch_market_news", lambda **kwargs: [_item("old", "财联社", old_time)])
+    monkeypatch.setattr(
+        news,
+        "_get_eastmoney_provider",
+        lambda: SimpleNamespace(fetch_stock_news=lambda **kwargs: [_item("recent", publish_time=recent_time)]),
+    )
+    monkeypatch.setattr(
+        news,
+        "_get_cls_provider",
+        lambda: SimpleNamespace(fetch_market_news=lambda **kwargs: [_item("old", "财联社", old_time)]),
+    )
 
     result = await news._load_stock_news(news.normalize_code("600519"))
 
@@ -68,8 +77,8 @@ async def test_get_stock_news_dedupes_concurrent_same_code(monkeypatch):
         return func(*args, **kwargs)
 
     monkeypatch.setattr(news, "get_stock_name_map", fake_name_map)
-    monkeypatch.setattr(news._eastmoney_provider, "fetch_stock_news", fake_em)
-    monkeypatch.setattr(news._cls_provider, "fetch_market_news", fake_cls)
+    monkeypatch.setattr(news, "_get_eastmoney_provider", lambda: SimpleNamespace(fetch_stock_news=fake_em))
+    monkeypatch.setattr(news, "_get_cls_provider", lambda: SimpleNamespace(fetch_market_news=fake_cls))
     monkeypatch.setattr(news.asyncio, "to_thread", fake_to_thread)
     monkeypatch.setattr(news.cache, "get", lambda key: None)
     monkeypatch.setattr(news.cache, "set", lambda *args, **kwargs: None)
@@ -104,8 +113,8 @@ async def test_get_stock_news_does_not_dedupe_different_codes(monkeypatch):
         return func(*args, **kwargs)
 
     monkeypatch.setattr(news, "get_stock_name_map", fake_name_map)
-    monkeypatch.setattr(news._eastmoney_provider, "fetch_stock_news", fake_em)
-    monkeypatch.setattr(news._cls_provider, "fetch_market_news", fake_cls)
+    monkeypatch.setattr(news, "_get_eastmoney_provider", lambda: SimpleNamespace(fetch_stock_news=fake_em))
+    monkeypatch.setattr(news, "_get_cls_provider", lambda: SimpleNamespace(fetch_market_news=fake_cls))
     monkeypatch.setattr(news.asyncio, "to_thread", fake_to_thread)
     monkeypatch.setattr(news.cache, "get", lambda key: None)
     monkeypatch.setattr(news.cache, "set", lambda *args, **kwargs: None)

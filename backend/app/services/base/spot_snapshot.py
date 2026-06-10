@@ -6,9 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 from app.services.base.file_snapshot import BaseFileSnapshotService
-from app.services.providers.akshare import akshare_provider as _akshare_provider
-from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
-from app.services.providers.sina import sina_provider as _sina_provider
+from app.services.providers import get_provider
 from app.utils.rate_limiter import call_blocking
 
 logger = logging.getLogger(__name__)
@@ -19,6 +17,21 @@ _spot_snapshot_service = BaseFileSnapshotService[pd.DataFrame](
     ttl=300,
     file_path=_SPOT_SNAPSHOT_FILE,
 )
+
+
+def _get_akshare_provider():
+    """Lazily resolve the Akshare provider singleton."""
+    return get_provider("akshare")
+
+
+def _get_eastmoney_provider():
+    """Lazily resolve the EastMoney provider singleton."""
+    return get_provider("eastmoney")
+
+
+def _get_sina_provider():
+    """Lazily resolve the Sina provider singleton."""
+    return get_provider("sina")
 
 
 def _normalize_market_cap_units(df: pd.DataFrame) -> pd.DataFrame:
@@ -98,7 +111,7 @@ async def _fetch_spot_east() -> pd.DataFrame | None:
         DataFrame of spot rows, or None on failure
     """
     try:
-        return await call_blocking(_eastmoney_provider.fetch_spot_snapshot)
+        return await call_blocking(_get_eastmoney_provider().fetch_spot_snapshot)
     except Exception as e:
         logger.info(f"东方财富直连快照获取失败: {e}")
         return None
@@ -113,7 +126,7 @@ async def _fetch_spot_sina_vip() -> pd.DataFrame | None:
         DataFrame of spot rows, or None on failure
     """
     try:
-        return await call_blocking(_sina_provider.fetch_spot_snapshot)
+        return await call_blocking(_get_sina_provider().fetch_spot_snapshot)
     except Exception as e:
         logger.info(f"新浪VIP快照获取失败: {e}")
         return None
@@ -133,7 +146,7 @@ async def _refresh_spot_snapshot_file() -> None:
             df = await _fetch_spot_east()
         if df is None or df.empty:
             try:
-                df = await call_blocking(_akshare_provider.fetch_stock_spot_snapshot)
+                df = await call_blocking(_get_akshare_provider().fetch_stock_spot_snapshot)
             except Exception as e:
                 logger.info(f"后台刷新全市场快照失败: {e}")
                 return
@@ -175,7 +188,7 @@ async def get_spot_snapshot() -> pd.DataFrame | None:
         return df
 
     try:
-        df = await call_blocking(_akshare_provider.fetch_spot_em)
+        df = await call_blocking(_get_akshare_provider().fetch_spot_em)
         _spot_snapshot_service.set_cached(df)
         _save_spot_snapshot_file(df)
         return df

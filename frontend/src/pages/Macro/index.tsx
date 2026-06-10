@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Tabs, Typography } from "antd";
-import { DollarOutlined, LineChartOutlined, BankOutlined, PercentageOutlined, BarChartOutlined, GlobalOutlined } from "@ant-design/icons";
+import { DollarOutlined, LineChartOutlined, BankOutlined, FundOutlined, BarChartOutlined, GlobalOutlined } from "@ant-design/icons";
 import PriceTab from "./PriceTab";
 import PmiTab from "./PmiTab";
 import MonetaryTab from "./MonetaryTab";
@@ -44,7 +44,7 @@ export default function Macro() {
           },
           {
             key: "rates",
-            label: <span><PercentageOutlined /> 利率</span>,
+            label: <span><FundOutlined /> 利率</span>,
             children: <RatesTab />,
           },
           {

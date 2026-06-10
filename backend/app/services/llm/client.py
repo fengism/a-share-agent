@@ -1,11 +1,20 @@
 import logging
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from openai import OpenAI
 
 from app.config import Settings, PROVIDER_DEFAULTS, get_settings
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class OpenAIChatRuntime:
+    """OpenAI chat.completions 运行时配置。"""
+
+    client: OpenAI
+    model: str
 
 
 class LLMClient(ABC):
@@ -154,3 +163,16 @@ def create_llm_client(settings: Settings | None = None) -> LLMClient:
     else:
         logger.error(f"不支持的LLM提供商: {provider}")
         raise ValueError(f"Unsupported LLM provider: {provider}")
+
+
+def create_openai_chat_runtime(settings: Settings | None = None) -> OpenAIChatRuntime:
+    """创建基于 openai SDK 的 chat.completions 运行时。"""
+    if settings is None:
+        settings = get_settings()
+
+    provider = settings.llm_provider.lower()
+    defaults = PROVIDER_DEFAULTS.get(provider, {})
+    base_url = settings.llm_base_url or defaults.get("base_url", "https://api.openai.com/v1")
+    model = settings.llm_model or defaults.get("model", "gpt-4o-mini")
+    client = OpenAI(api_key=settings.llm_api_key, base_url=base_url, timeout=120.0)
+    return OpenAIChatRuntime(client=client, model=model)

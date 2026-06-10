@@ -182,4 +182,10 @@ def update_settings(patch: dict) -> Settings:
 
         _reset_session()
 
+    # Reset twitter feed cache when account list changes
+    if "twitter_feeds" in patch:
+        from app.utils.cache import cache, dated_cache_key
+
+        cache.delete(dated_cache_key("twitter_feed"))
+
     return current

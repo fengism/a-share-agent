@@ -3,11 +3,7 @@ import logging
 from dataclasses import dataclass
 from typing import Callable
 
-from app.services.providers.baidu import baidu_provider as _baidu_provider
-from app.services.providers.cls import cls_provider as _cls_provider
-from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
-from app.services.providers.rss import rss_provider as _rss_provider
-from app.services.providers.twitter import twitter_provider as _twitter_provider
+from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.rate_limiter import call_blocking
 from app.utils.news_utils import dedupe_news_items, filter_recent_news_items, news_sort_key
@@ -25,28 +21,59 @@ class NewsSource:
     limit: int = 20  # max items to take from this source
 
 
+def _get_baidu_provider():
+    """延迟获取百度 provider。"""
+    return get_provider("baidu")
+
+
+def _get_cls_provider():
+    """延迟获取财联社 provider。"""
+    return get_provider("cls")
+
+
+def _get_eastmoney_provider():
+    """延迟获取东方财富 provider。"""
+    return get_provider("eastmoney")
+
+
+def _get_rss_provider():
+    """延迟获取 RSS provider。"""
+    return get_provider("rss")
+
+
+def _get_twitter_provider():
+    """延迟获取 Twitter provider。"""
+    return get_provider("twitter")
+
+
 # ── 源列表构建函数（延迟绑定，保证 monkeypatch 生效） ────
 
 def _kuaixun_sources() -> list[NewsSource]:
     """返回快讯数据源列表。"""
+    eastmoney = _get_eastmoney_provider()
+    baidu = _get_baidu_provider()
+    rss = _get_rss_provider()
     return [
-        NewsSource("东方财富7×24快讯", _eastmoney_provider.fetch_market_kuaixun, limit=50),
-        NewsSource("百度7×24快讯", _baidu_provider.fetch_market_kuaixun, limit=50),
-        NewsSource("华尔街见闻7×24快讯", _rss_provider.fetch_market_kuaixun, limit=50),
+        NewsSource("东方财富7×24快讯", eastmoney.fetch_market_kuaixun, limit=50),
+        NewsSource("百度7×24快讯", baidu.fetch_market_kuaixun, limit=50),
+        NewsSource("华尔街见闻7×24快讯", rss.fetch_market_kuaixun, limit=50),
     ]
 
 
 def _news_sources() -> list[NewsSource]:
     """返回非快讯类新闻数据源列表。"""
+    eastmoney = _get_eastmoney_provider()
+    rss = _get_rss_provider()
+    cls = _get_cls_provider()
     return [
-        NewsSource("东方财富财经新闻", _eastmoney_provider.fetch_market_news),
-        NewsSource("中国财经新闻", _rss_provider.fetch_china_news),
-        NewsSource("联合早报", _rss_provider.fetch_zaobao_news),
-        NewsSource("财联社新闻", _cls_provider.fetch_market_news),
-        NewsSource("36氪新闻", _rss_provider.fetch_36kr_news),
-        NewsSource("雪球新闻", _rss_provider.fetch_xueqiu_news),
-        NewsSource("界面新闻", _rss_provider.fetch_jiemain_news),
-        NewsSource("经济观察报", _rss_provider.fetch_eeo_news),
+        NewsSource("东方财富财经新闻", eastmoney.fetch_market_news),
+        NewsSource("中国财经新闻", rss.fetch_china_news),
+        NewsSource("联合早报", rss.fetch_zaobao_news),
+        NewsSource("财联社新闻", cls.fetch_market_news),
+        NewsSource("36氪新闻", rss.fetch_36kr_news),
+        NewsSource("雪球新闻", rss.fetch_xueqiu_news),
+        NewsSource("界面新闻", rss.fetch_jiemain_news),
+        NewsSource("经济观察报", rss.fetch_eeo_news),
     ]
 
 
@@ -184,7 +211,7 @@ async def get_twitter_feed() -> list:
         return cached
 
     try:
-        result = await call_blocking(_twitter_provider.fetch_posts)
+        result = await call_blocking(_get_twitter_provider().fetch_posts)
     except Exception as e:
         logger.warning(f"Twitter 数据获取失败: {e}")
         result = []

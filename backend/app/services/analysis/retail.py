@@ -4,9 +4,8 @@ import re
 from collections import Counter
 import pandas as pd
 
-from app.services.providers.akshare import akshare_provider as _akshare_provider
-from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
 from app.services.analysis.news import get_stock_news
+from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.rate_limiter import call_blocking
 from app.utils.data_clean import safe_float, safe_int
@@ -26,6 +25,16 @@ _STOPWORDS = {
     "贵州茅台", "将召开线上业绩说明会", "召开线上业绩说明会", "召开业绩说明会", "邀您观看", "主场", "有什么好怕的", "江东子弟何在",
     "同比", "公告称", "较去年", "第一季度", "董事", "代总经理", "拟出席", "线上业绩说明会", "出席",
 }
+
+
+def _get_akshare_provider():
+    """Lazily resolve the Akshare provider singleton."""
+    return get_provider("akshare")
+
+
+def _get_eastmoney_provider():
+    """Lazily resolve the EastMoney provider singleton."""
+    return get_provider("eastmoney")
 
 
 def _normalize_text_for_compare(text: str) -> str:
@@ -174,7 +183,7 @@ def fetch_hot_detail_em(symbol: str) -> pd.DataFrame:
     Return:
         DataFrame of hot-rank detail rows
     """
-    return _akshare_provider.fetch_hot_rank_detail(symbol)
+    return _get_akshare_provider().fetch_hot_rank_detail(symbol)
 
 
 
@@ -247,7 +256,7 @@ async def get_retail_sentiment(code: str) -> dict:
     }
 
     try:
-        guba_posts = await call_blocking(_eastmoney_provider.fetch_stock_guba_posts, code)
+        guba_posts = await call_blocking(_get_eastmoney_provider().fetch_stock_guba_posts, code)
         result["guba_post_count"] = len(guba_posts)
         retail_posts = []
         for item in guba_posts:

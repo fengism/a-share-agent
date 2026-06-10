@@ -3,12 +3,19 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from datetime import datetime
 
 from app.models.analysis import AnalysisResult
+from app.utils.cache import cache
 
 logger = logging.getLogger(__name__)
 
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data" / "analyses"
+
+
+def analysis_cache_key(code: str, date: str) -> str:
+    """构造分析结果缓存 key。"""
+    return f"analysis:{code}:{date}"
 
 
 def _ensure_dir() -> None:
@@ -64,6 +71,25 @@ def load_analysis(code: str, date: str) -> AnalysisResult | None:
     except Exception as e:
         logger.warning(f"加载分析结果失败: {filepath}, error={e}")
         return None
+
+
+def get_analysis_by_date(code: str, date: str, *, cache_ttl: int = 14400) -> AnalysisResult | None:
+    """优先从缓存读取指定日期分析结果，未命中则回退到文件存储。"""
+    cache_key = analysis_cache_key(code, date)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    result = load_analysis(code, date)
+    if result is not None:
+        cache.set(cache_key, result, ttl=cache_ttl)
+    return result
+
+
+def get_latest_analysis(code: str, *, cache_ttl: int = 14400) -> AnalysisResult | None:
+    """读取指定股票当天的最新分析结果。"""
+    today = datetime.now().strftime("%Y%m%d")
+    return get_analysis_by_date(code, today, cache_ttl=cache_ttl)
 
 
 def list_analyses(code: str) -> list[dict]:

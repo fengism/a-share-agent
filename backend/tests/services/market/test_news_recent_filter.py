@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -41,17 +42,26 @@ async def test_get_market_news_keeps_only_recent_news(monkeypatch):
     monkeypatch.setattr(news, "call_blocking", fake_call_blocking)
 
     # Patch all providers to return controlled data
-    monkeypatch.setattr(news._eastmoney_provider, "fetch_market_news", lambda: [_item("old_em", old_time)])
-    monkeypatch.setattr(news._eastmoney_provider, "fetch_market_kuaixun", lambda: [])
-    monkeypatch.setattr(news._rss_provider, "fetch_market_kuaixun", lambda: [_item("old_rss", old_time)])
-    monkeypatch.setattr(news._cls_provider, "fetch_market_news", lambda: [])
-    monkeypatch.setattr(news._baidu_provider, "fetch_market_kuaixun", lambda: [])
-    monkeypatch.setattr(news._rss_provider, "fetch_china_news", lambda: [])
-    monkeypatch.setattr(news._rss_provider, "fetch_zaobao_news", lambda: [])
-    monkeypatch.setattr(news._rss_provider, "fetch_36kr_news", lambda: [_item("recent_kr", recent_time)])
-    monkeypatch.setattr(news._rss_provider, "fetch_xueqiu_news", lambda: [])
-    monkeypatch.setattr(news._rss_provider, "fetch_jiemain_news", lambda: [])
-    monkeypatch.setattr(news._rss_provider, "fetch_eeo_news", lambda: [])
+    monkeypatch.setattr(
+        news,
+        "_get_eastmoney_provider",
+        lambda: SimpleNamespace(fetch_market_news=lambda: [_item("old_em", old_time)], fetch_market_kuaixun=lambda: []),
+    )
+    monkeypatch.setattr(
+        news,
+        "_get_rss_provider",
+        lambda: SimpleNamespace(
+            fetch_market_kuaixun=lambda: [_item("old_rss", old_time)],
+            fetch_china_news=lambda: [],
+            fetch_zaobao_news=lambda: [],
+            fetch_36kr_news=lambda: [_item("recent_kr", recent_time)],
+            fetch_xueqiu_news=lambda: [],
+            fetch_jiemain_news=lambda: [],
+            fetch_eeo_news=lambda: [],
+        ),
+    )
+    monkeypatch.setattr(news, "_get_cls_provider", lambda: SimpleNamespace(fetch_market_news=lambda: []))
+    monkeypatch.setattr(news, "_get_baidu_provider", lambda: SimpleNamespace(fetch_market_kuaixun=lambda: []))
 
     result = await news.get_market_news()
 

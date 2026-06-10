@@ -1,13 +1,10 @@
 import asyncio
 
-import pytest
-
 from app.models.stock import KlineData, KlineItem
 from app.services.stock import kline
 
 
-@pytest.mark.asyncio
-async def test_get_kline_dedupes_concurrent_same_key(monkeypatch):
+def test_get_kline_dedupes_concurrent_same_key(monkeypatch):
     """get_kline coalesces concurrent requests for the same key into one loader call."""
     calls = 0
 
@@ -25,18 +22,20 @@ async def test_get_kline_dedupes_concurrent_same_key(monkeypatch):
     monkeypatch.setattr(kline.cache, "set", lambda *args, **kwargs: writes.append((args, kwargs)))
     kline._kline_singleflight.clear()
 
-    result_a, result_b = await asyncio.gather(
-        kline.get_kline("600519"),
-        kline.get_kline("600519"),
-    )
+    async def run_both():
+        return await asyncio.gather(
+            kline.get_kline("600519"),
+            kline.get_kline("600519"),
+        )
+
+    result_a, result_b = asyncio.run(run_both())
 
     assert result_a == result_b
     assert calls == 1
     assert len(writes) == 1
 
 
-@pytest.mark.asyncio
-async def test_get_kline_does_not_dedupe_different_keys(monkeypatch):
+def test_get_kline_does_not_dedupe_different_keys(monkeypatch):
     """get_kline issues separate loader calls for different stock codes."""
     requested: list[str] = []
 
@@ -52,16 +51,18 @@ async def test_get_kline_does_not_dedupe_different_keys(monkeypatch):
     monkeypatch.setattr(kline.cache, "set", lambda *args, **kwargs: None)
     kline._kline_singleflight.clear()
 
-    await asyncio.gather(
-        kline.get_kline("600519"),
-        kline.get_kline("000858"),
-    )
+    async def run_both():
+        await asyncio.gather(
+            kline.get_kline("600519"),
+            kline.get_kline("000858"),
+        )
+
+    asyncio.run(run_both())
 
     assert sorted(requested) == ["000858", "600519"]
 
 
-@pytest.mark.asyncio
-async def test_get_kline_uses_cache_without_loader(monkeypatch):
+def test_get_kline_uses_cache_without_loader(monkeypatch):
     """get_kline returns the cached payload without invoking the loader."""
     cached = KlineData(code="600519", period="daily", adjust="qfq", items=[])
 
@@ -74,6 +75,6 @@ async def test_get_kline_uses_cache_without_loader(monkeypatch):
     monkeypatch.setattr(kline.cache, "get", lambda key: cached)
     kline._kline_singleflight.clear()
 
-    result = await kline.get_kline("600519")
+    result = asyncio.run(kline.get_kline("600519"))
 
     assert result is cached

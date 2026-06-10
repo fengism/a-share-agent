@@ -55,7 +55,8 @@ AppLayout (sticky header: logo + nav menu + global search box, dark theme)
 ├── /analysis        → AnalysisEntry (分析入口)
 ├── /analysis/:code  → Analysis (分时 + K线 + 基本面 + 估值 + 技术面 + 情绪面 + AI结论)
 ├── /industry-chain  → IndustryChain (AI 产业链分析，支持名称参数)
-└── /settings        → Settings (系统配置：大模型/飞书/问财/Notion)
+├── /macro           → Macro (宏观经济指标：物价/景气/货币/利率/增速/外贸)
+└── /settings        → Settings (系统配置：大模型/飞书/问财/Notion/Twitter)
 ```
 
 Dark theme is applied globally via Ant Design `darkAlgorithm` + custom token overrides. All colors are defined in `frontend/src/styles/ui.ts`.
@@ -87,7 +88,7 @@ Global search accepts 6-digit stock codes and fuzzy stock names, then navigates 
 - `backend/app/services/industry_chain/`: industry chain analysis pipeline, prompts, storage and chart generation.
 - `backend/app/services/analysis/`: stock AI analysis pipeline, prompts, parser and domain-specific analysis inputs. Pipeline fetches institution forecasts from THS and injects into LLM prompt.
 - `backend/app/services/daily_review/`: daily review pipeline, prompts, formatter and storage.
-- `backend/app/services/providers/`: provider adapters for akshare, EastMoney (including research report stats), Sina, THS (including EPS/net-profit forecasts), Iwencai (semantic search and structured query), Baidu, CLS, RSS and Tencent.
+- `backend/app/services/providers/`: provider adapters for akshare, EastMoney (including research report stats), Sina, THS (including EPS/net-profit forecasts), Iwencai (semantic search and structured query), Baidu, CLS, RSS, Tencent and Twitter (X feed scraping).
 - `backend/app/services/base/`: provider chain, file snapshots and reusable data-provider primitives.
 - `backend/app/services/chat/`: AI chat agent with extensible skill system. `agent.py` runs multi-round tool-calling loop, `skills/` contains the SkillRegistry + per-domain skill modules, `prompts.py` holds the system prompt.
 - `backend/app/services/llm/`: LLM client factory.
@@ -110,6 +111,8 @@ Global search accepts 6-digit stock codes and fuzzy stock names, then navigates 
 **Async Data Fetching:** akshare and direct `requests` calls are synchronous. Wrap blocking work with `asyncio.to_thread`, preserve rate limiting, and keep business functions async.
 
 **Provider Fallbacks:** external data sources can fail under network restrictions. Preserve provider-chain behavior and return useful partial data where the existing service contract allows it.
+
+**Provider Lazy Loading:** use `get_provider("name")` from `app.services.providers` to access provider singletons. Do not import provider instances directly (e.g. `from app.services.providers.eastmoney import eastmoney_provider`). The `get_provider` function defers module import until first use, avoiding circular imports and startup overhead. The `__init__.py` module uses `__getattr__` for class-level lazy loading and `get_provider()` for instance-level access.
 
 **Startup Prewarm:** `backend/app/main.py` starts industry mapping refresh and stock name map prewarm in lifespan tasks. First startup can be slow.
 

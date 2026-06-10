@@ -127,3 +127,26 @@ async def test_get_hsgt_flow_returns_empty_points_for_empty_dataframe(monkeypatc
 
     assert result["unit"] == "亿元"
     assert result["points"] == []
+
+
+@pytest.mark.asyncio
+async def test_get_hsgt_flow_history_reads_dates_and_points(monkeypatch):
+    """get_hsgt_flow_history should assemble day summaries from storage queries."""
+    monkeypatch.setattr(
+        "app.db.hsgt_store.query_hsgt_dates",
+        lambda limit=30: [{"date": "2026-06-10", "updated_at": "2026-06-10 15:01:00"}],
+    )
+    monkeypatch.setattr(
+        "app.db.hsgt_store.query_hsgt_flow",
+        lambda date: [{"time": "2026-06-10 15:00", "hgt": 1.0, "sgt": 2.0, "total": 3.0}],
+    )
+
+    result = await fund_flow.get_hsgt_flow_history(10)
+
+    assert result == [
+        {
+            "date": "2026-06-10",
+            "updated_at": "2026-06-10 15:01:00",
+            "points": [{"time": "2026-06-10 15:00", "hgt": 1.0, "sgt": 2.0, "total": 3.0}],
+        }
+    ]

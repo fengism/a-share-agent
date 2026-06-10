@@ -5,15 +5,28 @@ import pandas as pd
 
 from app.models.stock import KlineData, KlineItem
 from app.services.base.provider_chain import BaseProviderChain, ProviderAttempt
-from app.services.providers.akshare import akshare_provider as _akshare_provider
-from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
-from app.services.providers.tdx import tdx_provider
+from app.services.providers import get_provider
 from app.utils.cache import cache, cache_date, dated_cache_key, one_year_ago_date
 from app.utils.market_utils import filter_index_hist_range
 from app.utils.rate_limiter import call_blocking
 from app.utils.data_clean import safe_float
 
 logger = logging.getLogger(__name__)
+
+
+def _get_akshare_provider():
+    """Lazily resolve the Akshare provider singleton."""
+    return get_provider("akshare")
+
+
+def _get_eastmoney_provider():
+    """Lazily resolve the EastMoney provider singleton."""
+    return get_provider("eastmoney")
+
+
+def _get_tdx_provider():
+    """Lazily resolve the TDX provider singleton."""
+    return get_provider("tdx")
 
 
 async def _load_and_filter(fetch_fn, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
@@ -46,26 +59,26 @@ def _build_index_kline_source_attempts(symbol: str, period: str, start_date: str
     return [
         ProviderAttempt(
             label="东方财富指数K线直连",
-            loader=lambda: call_blocking(_eastmoney_provider.fetch_index_kline, symbol, period, start_date, end_date),
+            loader=lambda: call_blocking(_get_eastmoney_provider().fetch_index_kline, symbol, period, start_date, end_date),
         ),
         ProviderAttempt(
             label="TDX 指数K线",
-            loader=lambda: call_blocking(tdx_provider.fetch_index_kline, symbol=symbol, start_date=start_date, end_date=end_date),
+            loader=lambda: call_blocking(_get_tdx_provider().fetch_index_kline, symbol=symbol, start_date=start_date, end_date=end_date),
             on_error=f"TDX 指数K线不可用，尝试 Akshare 东方财富指数K线: symbol={symbol}",
         ),
         ProviderAttempt(
             label="Akshare 腾讯指数K线",
-            loader=lambda: _load_and_filter(_akshare_provider.fetch_index_kline_tencent, symbol, start_date, end_date),
+            loader=lambda: _load_and_filter(_get_akshare_provider().fetch_index_kline_tencent, symbol, start_date, end_date),
             on_error=f"Akshare 腾讯指数K线不可用，尝试东方财富指数K线直连: symbol={symbol}",
         ),
         ProviderAttempt(
             label="Akshare 东方财富指数K线",
-            loader=lambda: call_blocking(_akshare_provider.fetch_index_kline, symbol=symbol, period=period, start_date=start_date, end_date=end_date),
+            loader=lambda: call_blocking(_get_akshare_provider().fetch_index_kline, symbol=symbol, period=period, start_date=start_date, end_date=end_date),
             on_error=f"Akshare 东方财富指数K线不可用，尝试 Akshare 新浪指数K线: symbol={symbol}",
         ),
         ProviderAttempt(
             label="Akshare 新浪指数K线",
-            loader=lambda: _load_and_filter(_akshare_provider.fetch_index_kline_sina, symbol, start_date, end_date),
+            loader=lambda: _load_and_filter(_get_akshare_provider().fetch_index_kline_sina, symbol, start_date, end_date),
             on_error=f"Akshare 新浪指数K线不可用，尝试 Akshare 腾讯指数K线: symbol={symbol}",
         ),
 

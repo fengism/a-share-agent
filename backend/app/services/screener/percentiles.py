@@ -3,7 +3,7 @@ import logging
 
 import pandas as pd
 
-from app.services.providers.akshare import akshare_provider as _akshare_provider
+from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.rate_limiter import call_blocking
 from app.utils.symbol_utils import normalize_code
@@ -14,6 +14,11 @@ _PERCENTILE_CONCURRENCY = 5
 _percentile_semaphore = asyncio.Semaphore(_PERCENTILE_CONCURRENCY)
 _percentile_inflight: dict[tuple[str, str, str], asyncio.Task[float | None]] = {}
 _percentile_inflight_lock = asyncio.Lock()
+
+
+def _get_akshare_provider():
+    """Lazily resolve the Akshare provider singleton."""
+    return get_provider("akshare")
 
 
 def _percentile_key(code: str, indicator: str, period: str) -> tuple[str, str, str]:
@@ -46,7 +51,7 @@ async def _compute_percentile(code: str, indicator: str = "市盈率(TTM)", peri
 
     sym = normalize_code(code)
     df = await call_blocking(
-        _akshare_provider.fetch_stock_valuation_baidu,
+        _get_akshare_provider().fetch_stock_valuation_baidu,
         symbol=sym.raw,
         indicator=indicator,
         period=period,

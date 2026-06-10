@@ -3,15 +3,28 @@ import logging
 
 from app.models.market import IndexItem, MarketIndices
 from app.services.base.provider_chain import BaseProviderChain, ProviderAttempt
-from app.services.providers.akshare import akshare_provider as _akshare_provider
-from app.services.providers.eastmoney import eastmoney_provider as _eastmoney_provider
-from app.services.providers.sina import sina_provider as _sina_provider
+from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.market_utils import build_indices_from_sina, normalize_indices
 from app.utils.data_clean import safe_float
 from app.utils.rate_limiter import call_blocking
 
 logger = logging.getLogger(__name__)
+
+
+def _get_akshare_provider():
+    """延迟获取 akshare provider。"""
+    return get_provider("akshare")
+
+
+def _get_eastmoney_provider():
+    """延迟获取东方财富 provider。"""
+    return get_provider("eastmoney")
+
+
+def _get_sina_provider():
+    """延迟获取新浪 provider。"""
+    return get_provider("sina")
 
 
 
@@ -66,7 +79,7 @@ def _build_east_direct_indices() -> MarketIndices:
     Return:
         MarketIndices 模型对象
     """
-    data = _eastmoney_provider.fetch_market_indices()
+    data = _get_eastmoney_provider().fetch_market_indices()
     return _build_em_indices(data, "east_direct", price_scale=1.)
 
 
@@ -78,7 +91,7 @@ async def _build_akshare_em_indices() -> MarketIndices:
     Return:
         MarketIndices 模型对象
     """
-    data = await call_blocking(_akshare_provider.fetch_market_indices)
+    data = await call_blocking(_get_akshare_provider().fetch_market_indices)
     return _build_em_indices(data, "em_ak")
 
 
@@ -90,7 +103,7 @@ async def _build_akshare_sina_indices() -> MarketIndices:
     Return:
         MarketIndices 模型对象
     """
-    data = await call_blocking(_akshare_provider.fetch_market_indices_sina)
+    data = await call_blocking(_get_akshare_provider().fetch_market_indices_sina)
     return build_indices_from_sina(data).model_copy(update={"source": "sina_ak"})
 
 
@@ -102,7 +115,7 @@ async def _build_sina_direct_indices() -> MarketIndices:
     Return:
         MarketIndices 模型对象
     """
-    data = await call_blocking(_sina_provider.fetch_market_indices)
+    data = await call_blocking(_get_sina_provider().fetch_market_indices)
     return build_indices_from_sina(data).model_copy(update={"source": "sina_direct"})
 
 

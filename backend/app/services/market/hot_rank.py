@@ -1,6 +1,6 @@
 import logging
 
-from app.services.providers.ths import ths_provider as _ths_provider
+from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.rate_limiter import call_blocking
 
@@ -23,7 +23,7 @@ async def get_hot_stocks() -> list[dict]:
 
     result = []
     try:
-        result = await call_blocking(_ths_provider.fetch_hot_stock_rank)
+        result = await call_blocking(get_provider("ths").fetch_hot_stock_rank)
     except Exception as e:
         logger.warning(f"同花顺热股榜单获取失败: {e}")
 
@@ -46,7 +46,7 @@ async def get_ths_hot_concept() -> list[dict]:
 
     result = []
     try:
-        result = await call_blocking(_ths_provider.fetch_hot_plate_rank, "concept")
+        result = await call_blocking(get_provider("ths").fetch_hot_plate_rank, "concept")
     except Exception as e:
         logger.warning(f"同花顺热门概念获取失败: {e}")
 
@@ -69,7 +69,7 @@ async def get_ths_hot_industry() -> list[dict]:
 
     result = []
     try:
-        result = await call_blocking(_ths_provider.fetch_hot_plate_rank, "industry")
+        result = await call_blocking(get_provider("ths").fetch_hot_plate_rank, "industry")
     except Exception as e:
         logger.warning(f"同花顺热门行业获取失败: {e}")
 

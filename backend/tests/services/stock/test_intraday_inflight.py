@@ -1,13 +1,10 @@
 import asyncio
 
-import pytest
-
 from app.models.stock import IntradayData, IntradayItem
 from app.services.stock import intraday
 
 
-@pytest.mark.asyncio
-async def test_get_intraday_dedupes_concurrent_same_key(monkeypatch):
+def test_get_intraday_dedupes_concurrent_same_key(monkeypatch):
     """get_intraday coalesces concurrent requests for the same symbol into one loader call."""
     calls = 0
 
@@ -24,18 +21,20 @@ async def test_get_intraday_dedupes_concurrent_same_key(monkeypatch):
     monkeypatch.setattr(intraday.cache, "set", lambda *args, **kwargs: writes.append((args, kwargs)))
     intraday._intraday_singleflight.clear()
 
-    result_a, result_b = await asyncio.gather(
-        intraday.get_intraday("600519"),
-        intraday.get_intraday("600519"),
-    )
+    async def run_both():
+        return await asyncio.gather(
+            intraday.get_intraday("600519"),
+            intraday.get_intraday("600519"),
+        )
+
+    result_a, result_b = asyncio.run(run_both())
 
     assert result_a == result_b
     assert calls == 1
     assert len(writes) == 1
 
 
-@pytest.mark.asyncio
-async def test_get_intraday_uses_cache_without_loader(monkeypatch):
+def test_get_intraday_uses_cache_without_loader(monkeypatch):
     """get_intraday returns the cached payload without invoking the loader."""
     cached = IntradayData(code="600519", prev_close=None, items=[])
 
@@ -47,13 +46,12 @@ async def test_get_intraday_uses_cache_without_loader(monkeypatch):
     monkeypatch.setattr(intraday.cache, "get", lambda key: cached)
     intraday._intraday_singleflight.clear()
 
-    result = await intraday.get_intraday("600519")
+    result = asyncio.run(intraday.get_intraday("600519"))
 
     assert result is cached
 
 
-@pytest.mark.asyncio
-async def test_get_intraday_clears_inflight_after_failure(monkeypatch):
+def test_get_intraday_clears_inflight_after_failure(monkeypatch):
     """get_intraday clears inflight state and retries after a loader failure."""
     calls = 0
 
@@ -70,10 +68,16 @@ async def test_get_intraday_clears_inflight_after_failure(monkeypatch):
     monkeypatch.setattr(intraday.cache, "set", lambda *args, **kwargs: None)
     intraday._intraday_singleflight.clear()
 
-    with pytest.raises(RuntimeError, match="temporary failure"):
+    async def first_attempt():
         await intraday.get_intraday("600519")
 
-    result = await intraday.get_intraday("600519")
+    try:
+        asyncio.run(first_attempt())
+        raise AssertionError("expected RuntimeError")
+    except RuntimeError as exc:
+        assert "temporary failure" in str(exc)
+
+    result = asyncio.run(intraday.get_intraday("600519"))
 
     assert result.code == "600519"
     assert calls == 2

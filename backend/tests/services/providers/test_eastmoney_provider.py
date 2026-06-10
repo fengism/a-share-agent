@@ -1,11 +1,10 @@
 import pandas as pd
-import pytest
 
 from app.services.providers import eastmoney
 
 
 class DummyResponse:
-    def __init__(self, payload, text=None):
+    def __init__(self, payload, text=None, status_code=200):
         """Store the JSON payload and optional text body for the mock response.
 
         Param:
@@ -16,6 +15,7 @@ class DummyResponse:
         """
         self._payload = payload
         self.text = text or ""
+        self.status_code = status_code
 
     def json(self):
         """Return the pre-stored JSON payload.
@@ -39,7 +39,7 @@ def test_fetch_index_kline_parses_klines(monkeypatch):
     provider = eastmoney.EastMoneyDataProvider()
     captured = {}
 
-    def fake_post(url, **kwargs):
+    def fake_get(url, **kwargs):
         captured.update({"url": url, "kwargs": kwargs})
         return DummyResponse({
             "data": {
@@ -48,13 +48,13 @@ def test_fetch_index_kline_parses_klines(monkeypatch):
             }
         })
 
-    monkeypatch.setattr(eastmoney.http_client, "post", fake_post)
+    monkeypatch.setattr(provider, "em_get_response", fake_get)
 
     df = provider.fetch_index_kline("000001", "daily", "20260501", "20260525")
 
     assert isinstance(df, pd.DataFrame)
-    assert df.iloc[0]["日期"] == "2026-05-25"
-    assert df.iloc[0]["收盘"] == "3010"
+    assert df.iloc[0]["date"] == "2026-05-25"
+    assert df.iloc[0]["close"] == "3010"
     assert captured["url"] == eastmoney.EASTMONEY_STOCK_KLINE_URL
     assert captured["kwargs"]["params"]["secid"] == "1.000001"
 
@@ -63,11 +63,7 @@ def test_fetch_index_kline_empty_klines_returns_empty_df(monkeypatch):
     """fetch_index_kline returns an empty DataFrame when the API yields no klines."""
     provider = eastmoney.EastMoneyDataProvider()
 
-    monkeypatch.setattr(
-        eastmoney.http_client,
-        "post",
-        lambda *args, **kwargs: DummyResponse({"data": {"code": "000001", "klines": []}}),
-    )
+    monkeypatch.setattr(provider, "em_get_response", lambda *args, **kwargs: DummyResponse({"data": {"code": "000001", "klines": []}}))
 
     df = provider.fetch_index_kline("000001", "daily", "20260501", "20260525")
 
@@ -87,7 +83,7 @@ def test_fetch_clist_diff_paginates_and_stops_by_total(monkeypatch):
             return DummyResponse({"data": {"diff": [{"f12": "BK1"}], "total": 2}})
         return DummyResponse({"data": {"diff": [{"f12": "BK2"}], "total": 2}})
 
-    monkeypatch.setattr(eastmoney.http_client, "get", fake_get)
+    monkeypatch.setattr(provider, "em_get_response", fake_get)
 
     result = provider._fetch_clist_diff({"fields": "f12"}, page_size=1)
 
@@ -96,8 +92,8 @@ def test_fetch_clist_diff_paginates_and_stops_by_total(monkeypatch):
     assert [req["pz"] for req in captured] == ["1", "1"]
 
 
-def test_fetch_clist_diff_raises_request_error(monkeypatch):
-    """_fetch_clist_diff propagates errors raised by the underlying HTTP call."""
+def test_fetch_clist_diff_returns_empty_on_request_error(monkeypatch):
+    """_fetch_clist_diff returns an empty list when the underlying HTTP call fails."""
     provider = eastmoney.EastMoneyDataProvider()
     requested_urls: list[str] = []
 
@@ -105,11 +101,11 @@ def test_fetch_clist_diff_raises_request_error(monkeypatch):
         requested_urls.append(url)
         raise RuntimeError("temporary failure")
 
-    monkeypatch.setattr(eastmoney.http_client, "get", fake_get)
+    monkeypatch.setattr(provider, "em_get_response", fake_get)
 
-    with pytest.raises(RuntimeError, match="temporary failure"):
-        provider._fetch_clist_diff({"fields": "f12"}, page_size=200)
+    result = provider._fetch_clist_diff({"fields": "f12"}, page_size=200)
 
+    assert result == []
     assert requested_urls == [eastmoney.EASTMONEY_CLIST_URL]
 
 

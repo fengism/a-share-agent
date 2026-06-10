@@ -3,7 +3,7 @@ import logging
 
 from app.models.market import MarketVolume
 from app.services.market.index_kline import get_index_kline
-from app.services.providers.ths import ths_provider as _ths_provider
+from app.services.providers import get_provider
 from app.utils.cache import cache, cache_date, dated_cache_key, one_year_ago_date
 from app.utils.rate_limiter import call_blocking
 
@@ -72,7 +72,7 @@ async def get_realtime_market_volume() -> MarketVolume:
     Return:
         MarketVolume 模型对象
     """
-    return await call_blocking(_ths_provider.fetch_market_volume)
+    return await call_blocking(get_provider("ths").fetch_market_volume)
 
 
 if __name__ == "__main__":

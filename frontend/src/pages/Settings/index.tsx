@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Card,
   Select,
@@ -45,6 +46,7 @@ const PROVIDER_OPTIONS = [
 export default function SettingsPage() {
   const { data: config, isLoading } = useConfig();
   const updateConfig = useUpdateConfig();
+  const queryClient = useQueryClient();
 
   const [form, setForm] = useState<ConfigUpdate>({});
   const [initialized, setInitialized] = useState(false);
@@ -131,14 +133,15 @@ export default function SettingsPage() {
       patch.llm_api_key = form.llm_api_key;
     }
     updateConfig.mutate(patch, {
-      onSuccess: () => {
+      onSuccess: (data) => {
+        queryClient.setQueryData(["config"], data);
         message.success("大模型配置已保存");
       },
       onError: (err: Error) => {
         message.error(`保存失败: ${err.message}`);
       },
     });
-  }, [form, updateConfig]);
+  }, [form, updateConfig, queryClient]);
 
   const handleSaveFeishu = useCallback(() => {
     const patch: ConfigUpdate = {
@@ -159,14 +162,15 @@ export default function SettingsPage() {
       patch.feishu_app_secret = form.feishu_app_secret;
     }
     updateConfig.mutate(patch, {
-      onSuccess: () => {
+      onSuccess: (data) => {
+        queryClient.setQueryData(["config"], data);
         message.success("飞书配置已保存");
       },
       onError: (err: Error) => {
         message.error(`保存失败: ${err.message}`);
       },
     });
-  }, [form, updateConfig]);
+  }, [form, updateConfig, queryClient]);
 
   const handleSaveNotion = useCallback(() => {
     updateConfig.mutate(
@@ -176,7 +180,8 @@ export default function SettingsPage() {
         notion_database_id: form.notion_database_id,
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          queryClient.setQueryData(["config"], data);
           message.success("Notion 配置已保存");
         },
         onError: (err: Error) => {
@@ -184,7 +189,7 @@ export default function SettingsPage() {
         },
       },
     );
-  }, [form, updateConfig]);
+  }, [form, updateConfig, queryClient]);
 
   const handleSaveIwencai = useCallback(() => {
     const patch: ConfigUpdate = {
@@ -198,14 +203,15 @@ export default function SettingsPage() {
       patch.iwencai_api_key = form.iwencai_api_key;
     }
     updateConfig.mutate(patch, {
-      onSuccess: () => {
+      onSuccess: (data) => {
+        queryClient.setQueryData(["config"], data);
         message.success("问财数据源配置已保存");
       },
       onError: (err: Error) => {
         message.error(`保存失败: ${err.message}`);
       },
     });
-  }, [form, updateConfig]);
+  }, [form, updateConfig, queryClient]);
 
   const handleSaveTwitter = useCallback(() => {
     const raw = form.twitter_feeds ?? [];
@@ -215,7 +221,9 @@ export default function SettingsPage() {
     updateConfig.mutate(
       { twitter_feeds: cleaned },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          queryClient.setQueryData(["config"], data);
+          queryClient.invalidateQueries({ queryKey: ["marketTwitterFeed"] });
           message.success("Twitter 账号配置已保存");
         },
         onError: (err: Error) => {
@@ -223,7 +231,7 @@ export default function SettingsPage() {
         },
       },
     );
-  }, [form, updateConfig]);
+  }, [form, updateConfig, queryClient]);
 
   const handleSaveDataSourceCookies = useCallback(() => {
     const patch: ConfigUpdate = {};
@@ -238,14 +246,15 @@ export default function SettingsPage() {
       return;
     }
     updateConfig.mutate(patch, {
-      onSuccess: () => {
+      onSuccess: (data) => {
+        queryClient.setQueryData(["config"], data);
         message.success("数据源 Cookie 配置已保存");
       },
       onError: (err: Error) => {
         message.error(`保存失败: ${err.message}`);
       },
     });
-  }, [form, updateConfig]);
+  }, [form, updateConfig, queryClient]);
 
   if (isLoading) {
     return (

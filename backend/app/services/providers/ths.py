@@ -1,13 +1,20 @@
-import requests
 import json
-import pandas as pd
+import logging
+from concurrent.futures import ThreadPoolExecutor
+
 from bs4 import BeautifulSoup
+import pandas as pd
+import requests
 
 
 from app.constants.http import THS_HEADERS
+from app.config import get_settings
 from app.models.market import MarketVolume
 from app.services.base.data_provider import BaseDataProvider
 from app.utils.data_clean import safe_float
+
+
+logger = logging.getLogger(__name__)
 
 
 class ThsDataProvider(BaseDataProvider):
@@ -15,6 +22,76 @@ class ThsDataProvider(BaseDataProvider):
     def __init__(self):
         """初始化 ThsDataProvider，固定 name 与 source_label。"""
         super().__init__(name="ths", source_label="同花顺")
+        self._session = requests.Session()
+        self._session.trust_env = get_settings().http_trust_env
+
+    def _get_session(self) -> requests.Session:
+        """获取当前 Session，并在运行时配置变更后同步 trust_env。"""
+        trust_env = get_settings().http_trust_env
+        if self._session.trust_env != trust_env:
+            self._session.trust_env = trust_env
+        return self._session
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: dict | None = None,
+        data=None,
+        json_body=None,
+        headers: dict | None = None,
+        timeout: int | float = 10,
+    ) -> requests.Response:
+        """通过复用的 Session 发起 HTTP 请求并检查状态码。"""
+        response = self._get_session().request(
+            method,
+            url,
+            params=params,
+            data=data,
+            json=json_body,
+            headers=headers,
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return response
+
+    def _request_json(self, method: str, url: str, **kwargs) -> dict:
+        """发起请求并解析 JSON。"""
+        return self._request(method, url, **kwargs).json()
+
+    @staticmethod
+    def _normalize_hot_rank_items(items: list[dict], *, plate: bool = False) -> list[dict]:
+        """规范化同花顺热点榜单数据。"""
+        result = []
+        for item in items or []:
+            tag_info = item.get("tag") or {}
+            concept_tag = ""
+            pop_tag = ""
+            if not plate:
+                concept_tag = ";".join(tag_info.get("concept_tag") or [])
+                pop_tag = str(tag_info.get("popularity_tag") or "").replace("\n", "")
+            result.append(
+                {
+                    "rank": item.get("order"),
+                    "code": item.get("code", ""),
+                    "name": item.get("name", ""),
+                    "change_pct": item.get("rise_and_fall"),
+                    "hot_value": safe_float(item.get("rate")),
+                    **(
+                        {
+                            "concept_tag": concept_tag,
+                            "pop_tag": pop_tag,
+                        }
+                        if not plate
+                        else {
+                            "hot_tag": item.get("hot_tag", ""),
+                            "tag": item.get("tag", ""),
+                        }
+                    ),
+                }
+            )
+        return result
 
     def fetch_stock_forecast_reports(self, code: str) -> pd.DataFrame:
         """同花顺机构一致预期 EPS/净利润。
@@ -30,8 +107,7 @@ class ThsDataProvider(BaseDataProvider):
             "Referer": "https://basic.10jqka.com.cn/",
         }
 
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
+        response = self._request("GET", url, headers=headers, timeout=15)
         response.encoding = "gbk"
         soup = BeautifulSoup(response.text, "html.parser")
         reports = []
@@ -87,37 +163,19 @@ class ThsDataProvider(BaseDataProvider):
         Return:
             包含 rank、code、name、change_pct、hot_value、concept_tag、pop_tag 的字典列表
         """
-
-        url = "https://dq.10jqka.com.cn/fuyao/hot_list_data/out/hot_list/v1/stock"
-        params = {
-            "stock_type": "a",
-            "type": "hour", 
-            "list_type": "normal", 
-        }
-        r = requests.get(url, params=params, headers=THS_HEADERS, timeout=10)
-        
-        stock_list = r.json()["data"]["stock_list"]
-        result = []
-        for d in stock_list:
-            concept_tag = ""
-            pop_tag = ""
-            if "tag" in d:
-                if "concept_tag" in d["tag"]:
-                    concept_tag = ";".join(d["tag"]["concept_tag"])
-                if "popularity_tag" in d["tag"]:
-                    pop_tag = d["tag"]["popularity_tag"].replace("\n", "")
-            result.append(
-                {
-                    "rank": d.get("order"),
-                    "code": d.get("code", ""),
-                    "name": d.get("name", ""),
-                    "change_pct": d.get("rise_and_fall"),
-                    "hot_value": safe_float(d.get("rate")),
-                    "concept_tag": concept_tag,
-                    "pop_tag": pop_tag,
-                }
-            )
-        return result
+        payload = self._request_json(
+            "GET",
+            "https://dq.10jqka.com.cn/fuyao/hot_list_data/out/hot_list/v1/stock",
+            params={
+                "stock_type": "a",
+                "type": "hour",
+                "list_type": "normal",
+            },
+            headers=THS_HEADERS,
+            timeout=10,
+        )
+        stock_list = payload.get("data", {}).get("stock_list", [])
+        return self._normalize_hot_rank_items(stock_list)
 
     def fetch_hot_plate_rank(self, plate_type: str) -> list[dict]:
         """同花顺热点板块排行（按指定板块类型）。
@@ -127,23 +185,15 @@ class ThsDataProvider(BaseDataProvider):
         Return:
             包含 rank、code、name、change_pct、hot_value、hot_tag、tag 的字典列表
         """
-        url = f"https://dq.10jqka.com.cn/fuyao/hot_list_data/out/hot_list/v1/plate?type={plate_type}"
-        r = requests.get(url, headers=THS_HEADERS, timeout=10)
-        plate_list = r.json()["data"]["plate_list"]
-        result = []
-        for d in plate_list:
-            result.append(
-                {
-                    "rank": d.get("order"),
-                    "code": d.get("code", ""),
-                    "name": d.get("name", ""),
-                    "change_pct": d.get("rise_and_fall"),
-                    "hot_value": safe_float(d.get("rate")),
-                    "hot_tag": d.get("hot_tag", ""),
-                    "tag": d.get("tag", ""),
-                }
-            )
-        return result
+        payload = self._request_json(
+            "GET",
+            "https://dq.10jqka.com.cn/fuyao/hot_list_data/out/hot_list/v1/plate",
+            params={"type": plate_type},
+            headers=THS_HEADERS,
+            timeout=10,
+        )
+        plate_list = payload.get("data", {}).get("plate_list", [])
+        return self._normalize_hot_rank_items(plate_list, plate=True)
 
     def fetch_market_volume_day(self) -> dict:
         """获取市场日内成交额（按日维度）。
@@ -169,15 +219,13 @@ class ThsDataProvider(BaseDataProvider):
         Return:
             提取后的成交额字典
         """
-        req_url = "https://dq.10jqka.com.cn/fuyao/market_analysis_api/chart/v1/get_chart_data"
-        response = requests.get(
-            req_url,
+        payload = self._request_json(
+            "GET",
+            "https://dq.10jqka.com.cn/fuyao/market_analysis_api/chart/v1/get_chart_data",
             params={"chart_key": chart_key},
             headers={"Accept": "*/*", "User-Agent": "Thunder Client (https://www.thunderclient.com)"},
             timeout=10,
         )
-        response.raise_for_status()
-        payload = response.json()
         if payload.get("status_code") != 0:
             return {}
         charts = payload.get("data", {}).get("charts", {})
@@ -200,8 +248,19 @@ class ThsDataProvider(BaseDataProvider):
         Return:
             MarketVolume 模型实例
         """
-        day_data = self.fetch_market_volume_day()
-        minute_data = self.fetch_market_volume_minute()
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            day_future = executor.submit(self.fetch_market_volume_day)
+            minute_future = executor.submit(self.fetch_market_volume_minute)
+            try:
+                day_data = day_future.result()
+            except Exception as exc:
+                logger.warning("同花顺日级成交额获取失败: %s", exc)
+                day_data = {}
+            try:
+                minute_data = minute_future.result()
+            except Exception as exc:
+                logger.warning("同花顺分钟级成交额获取失败: %s", exc)
+                minute_data = {}
         minute_data.update(day_data)
         merged_data = {**minute_data}
         return MarketVolume(**merged_data)
@@ -228,8 +287,7 @@ class ThsDataProvider(BaseDataProvider):
                 "Chrome/117.0.0.0 Safari/537.36"
             )
         }
-        r = requests.get(url, headers=headers, timeout=10)
-        data = r.json()
+        data = self._request_json("GET", url, headers=headers, timeout=10)
         if data.get("errocode", 0) != 0:
             raise RuntimeError(f"同花顺热点错误: {data.get('errormsg', '')}")
 
@@ -268,11 +326,10 @@ class ThsDataProvider(BaseDataProvider):
             "Host": "data.hexin.cn",
             "Referer": "https://data.hexin.cn/",
         }
-        r = requests.get(url, headers=headers, timeout=10)
-        d = r.json()
-        times = d.get("time", [])
-        hgt = d.get("hgt", [])
-        sgt = d.get("sgt", [])
+        d = self._request_json("GET", url, headers=headers, timeout=10)
+        times = list(d.get("time") or [])
+        hgt = list(d.get("hgt") or [])
+        sgt = list(d.get("sgt") or [])
 
         n = len(times)
         full_times = [f"{trade_date} {t}" for t in times]
@@ -309,10 +366,10 @@ class ThsDataProvider(BaseDataProvider):
             "gpid": 2
         })
 
-        response = requests.request("GET", reqUrl, data=payload,  headers=headersList)
-        data = response.json()
-        time_info = data.get("data", {}).get("time_info",[])
-        trade_date = time_info[0].get("trade_date", "")
+        data = self._request_json("GET", reqUrl, data=payload, headers=headersList)
+        time_info = data.get("data", {}).get("time_info") or []
+        first_time_info = time_info[0] if time_info else {}
+        trade_date = first_time_info.get("trade_date", "")
         return trade_date
         
 
@@ -322,4 +379,3 @@ ths_provider = ThsDataProvider()
 if __name__ == "__main__":
     hot_stocks_data = ths_provider.fetch_hot_stock_reasons("2026-06-07")
     print(hot_stocks_data)  
-

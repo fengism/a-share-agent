@@ -4,16 +4,12 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator
 
-from openai import OpenAI
-
-from app.config import PROVIDER_DEFAULTS, get_settings
+from app.config import get_settings
 from app.models.chat import ChatMessage, ChatStreamDelta, ToolCallFunction, ToolCallInfo
 from app.services.chat.message_builder import build_messages
 from app.services.chat.skills import registry, register_all_skills
 from app.services.chat.tool_call_parser import extract_pseudo_tool_calls
-
-# 启动时注册所有技能
-register_all_skills()
+from app.services.llm.client import create_openai_chat_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +110,7 @@ async def run_chat_agent(
     Return:
         产生 ChatStreamDelta 事件的异步生成器
     """
+    register_all_skills()
     settings = get_settings()
     if settings.multi_agent_enabled:
         from app.services.chat.orchestrator import Orchestrator
@@ -137,13 +134,9 @@ async def _run_legacy_agent(
     Return:
         产生 ChatStreamDelta 事件的异步生成器，类型包括 text/reasoning/tool_call/tool_result/error/done
     """
-    settings = get_settings()
-    provider = settings.llm_provider.lower()
-    defaults = PROVIDER_DEFAULTS.get(provider, {})
-    base_url = settings.llm_base_url or defaults.get("base_url", "https://api.openai.com/v1")
-    model = settings.llm_model or defaults.get("model", "gpt-4o-mini")
-
-    client = OpenAI(api_key=settings.llm_api_key, base_url=base_url, timeout=120.0)
+    runtime = create_openai_chat_runtime(get_settings())
+    client = runtime.client
+    model = runtime.model
 
     messages = build_messages(message, history, _MAX_HISTORY_MESSAGES)
 

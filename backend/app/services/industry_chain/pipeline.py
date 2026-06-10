@@ -97,8 +97,8 @@ async def _collect_data(name: str) -> dict:
     # 行业排名（东财）
     rankings = None
     try:
-        from app.services.providers.eastmoney import eastmoney_provider
-        rankings = await call_blocking(eastmoney_provider.fetch_industry_rankings, 50)
+        from app.services.providers import get_provider
+        rankings = await call_blocking(get_provider("eastmoney").fetch_industry_rankings, 50)
     except Exception:
         pass
 
