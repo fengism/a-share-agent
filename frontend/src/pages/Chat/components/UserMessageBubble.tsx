@@ -1,6 +1,7 @@
-import { darkColors } from "../../../styles/ui";
+import { useColors} from "../../../styles/ui";
 
 export function UserMessageBubble({ content }: { content: string }) {
+  const c = useColors();
   return (
     <div
       style={{
@@ -10,7 +11,7 @@ export function UserMessageBubble({ content }: { content: string }) {
         border: "1px solid rgba(59,130,246,0.3)",
         fontSize: 14,
         lineHeight: 1.6,
-        color: darkColors.textPrimary,
+        color: c.textPrimary,
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
       }}

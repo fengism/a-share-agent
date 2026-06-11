@@ -1,3 +1,5 @@
+import { getColors } from "../theme/store";
+
 export function formatSignedPercent(value: number | null | undefined, digits = 2) {
   if (value == null) return "-";
   return `${value > 0 ? "+" : ""}${value.toFixed(digits)}%`;
@@ -26,6 +28,6 @@ export function formatNumber(value: number | null | undefined, digits = 2) {
 }
 
 export function changeColor(value: number | null | undefined) {
-  if (value == null) return "#9ca3af";
-  return value > 0 ? "#ef4444" : value < 0 ? "#22c55e" : "#9ca3af";
+  if (value == null) return getColors().textSecondary;
+  return value > 0 ? getColors().up : value < 0 ? getColors().down : getColors().textSecondary;
 }

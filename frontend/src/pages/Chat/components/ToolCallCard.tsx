@@ -1,7 +1,7 @@
 import { LoadingOutlined, ToolOutlined } from "@ant-design/icons";
 import { Collapse, Tag, Typography } from "antd";
 import type { ToolCallDisplay } from "../../../types/chat";
-import { darkColors } from "../../../styles/ui";
+import { useColors} from "../../../styles/ui";
 import { TOOL_LABELS } from "../constants";
 
 const { Text } = Typography;
@@ -23,12 +23,13 @@ function truncateText(text: string, maxLen: number): string {
 }
 
 export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
+  const c = useColors();
   const label = TOOL_LABELS[toolCall.name] || toolCall.name;
   const items = [
     {
       key: "args",
       label: (
-        <span style={{ color: darkColors.textSecondary, fontSize: 12 }}>
+        <span style={{ color: c.textSecondary, fontSize: 12 }}>
           <ToolOutlined style={{ marginRight: 4 }} />
           {label}
           {toolCall.isExecuting && (
@@ -47,7 +48,7 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
         </span>
       ),
       children: (
-        <div style={{ fontSize: 12, color: darkColors.textSecondary }}>
+        <div style={{ fontSize: 12, color: c.textSecondary }}>
           <div style={{ marginBottom: 4 }}>
             <Text type="secondary" style={{ fontSize: 11 }}>
               参数:
@@ -75,8 +76,8 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
       size="small"
       style={{
         marginBottom: 6,
-        background: darkColors.nestedBg,
-        border: `1px solid ${darkColors.border}`,
+        background: c.nestedBg,
+        border: `1px solid ${c.border}`,
         borderRadius: 6,
       }}
     />

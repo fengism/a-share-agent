@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
+import { useThemeStore, getAntToken } from "./styles/ui";
+import { themes } from "./theme/themes";
 import AppLayout from "./components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Market from "./pages/Market";
@@ -21,25 +23,32 @@ const queryClient = new QueryClient({
   },
 });
 
-export default function App() {
+function AntProvider({ children }: { children: React.ReactNode }) {
+  const themeKey = useThemeStore((s) => s.themeKey);
+  const meta = themes[themeKey];
+  const token = getAntToken();
+
   return (
     <ConfigProvider
       locale={zhCN}
       theme={{
-        algorithm: theme.darkAlgorithm,
+        algorithm: meta.isLight ? theme.defaultAlgorithm : theme.darkAlgorithm,
         token: {
-          colorPrimary: "#3b82f6",
-          colorBgContainer: "#111827",
-          colorBgElevated: "#1a2332",
-          colorBorder: "#1e293b",
-          colorText: "#e5e7eb",
-          colorTextSecondary: "#9ca3af",
+          ...token,
           borderRadius: 10,
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
         },
       }}
     >
+      {children}
+    </ConfigProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AntProvider>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
@@ -60,6 +69,6 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       </QueryClientProvider>
-    </ConfigProvider>
+    </AntProvider>
   );
 }

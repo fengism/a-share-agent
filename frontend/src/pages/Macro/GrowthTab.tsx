@@ -1,10 +1,11 @@
 import { Row, Col, Spin } from "antd";
 import { useMacroAllData } from "../../api/queries";
 import MacroIndicatorCard from "./MacroIndicatorCard";
+import { getColors } from "../../theme/store";
 
 const GDP_FIELDS = [
-  { key: "GDP_VALUE", label: "当季值", color: "#3b82f6", precision: 1 },
-  { key: "GDP_SAME", label: "同比增长", color: "#ef4444", unit: "%" },
+  { key: "GDP_VALUE", label: "当季值", color: getColors().primary, precision: 1 },
+  { key: "GDP_SAME", label: "同比增长", color: getColors().up, unit: "%" },
 ];
 
 export default function GrowthTab() {

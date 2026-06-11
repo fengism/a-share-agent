@@ -1,14 +1,17 @@
+import { useColors } from "../styles/ui";
+
 interface Props {
   score: number;
   size?: number;
 }
 
 export default function RatingBadge({ score, size = 64 }: Props) {
+  const c = useColors();
   const getColor = (s: number) => {
-    if (s >= 8) return "#ef4444";
+    if (s >= 8) return c.up;
     if (s >= 6) return "#b65c00";
-    if (s >= 4) return "#3b82f6";
-    return "#22c55e";
+    if (s >= 4) return c.primary;
+    return c.down;
   };
 
   const getBg = (s: number) => {
@@ -18,31 +21,25 @@ export default function RatingBadge({ score, size = 64 }: Props) {
     return "rgba(31,132,90,0.08)";
   };
 
-  const getLabel = (s: number) => {
-    if (s >= 8) return "强势";
-    if (s >= 6) return "偏多";
-    if (s >= 4) return "中性";
-    return "偏空";
-  };
-
   return (
     <div
       style={{
         width: size,
         height: size,
         borderRadius: "50%",
-        backgroundColor: getBg(score),
+        background: getBg(score),
         border: `2px solid ${getColor(score)}`,
-        color: getColor(score),
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        fontWeight: 700,
+        flexDirection: "column",
+        flexShrink: 0,
       }}
     >
-      <span style={{ fontSize: size * 0.38, lineHeight: 1 }}>{score}</span>
-      <span style={{ fontSize: size * 0.14, lineHeight: 1, opacity: 0.85 }}>{getLabel(score)}</span>
+      <span style={{ fontSize: size * 0.3, fontWeight: 800, color: getColor(score), lineHeight: 1 }}>
+        {score.toFixed(1)}
+      </span>
+      <span style={{ fontSize: size * 0.13, color: c.textMuted, marginTop: 2 }}>/ 10</span>
     </div>
   );
 }

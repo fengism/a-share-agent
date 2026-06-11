@@ -15,6 +15,39 @@ logger = logging.getLogger(__name__)
 _MAX_RESULT_LEN = 12000
 
 
+def _serialize_result(result: Any) -> str:
+    """将工具结果序列化为 JSON 字符串，超长时智能裁剪以保持合法 JSON。
+
+    Param:
+        result: 工具 executor 返回的任意结果
+    Return:
+        JSON 字符串；list 超长时按条数裁剪并附 _truncated 标记，其他类型回退为字符串截断
+    """
+    content = json.dumps(result, ensure_ascii=False, default=str)
+    if len(content) <= _MAX_RESULT_LEN:
+        return content
+
+    # list 结果：按条数二分裁剪，保证返回的仍是合法 JSON
+    if isinstance(result, list) and result:
+        total = len(result)
+        kept = total
+        while kept > 1:
+            kept = kept // 2
+            payload = {
+                "_truncated": f"共 {total} 条，已截断为前 {kept} 条",
+                "items": result[:kept],
+            }
+            content = json.dumps(payload, ensure_ascii=False, default=str)
+            if len(content) <= _MAX_RESULT_LEN:
+                return content
+        # 单条仍超长，退回字符串截断
+        single = json.dumps(result[0], ensure_ascii=False, default=str)
+        return single[:_MAX_RESULT_LEN] + '...(单条结果过长已截断)'
+
+    # 非 list：字符串截断
+    return content[:_MAX_RESULT_LEN] + "...(truncated)"
+
+
 class Tool:
     """一个可注册的工具，自动转换为 OpenAI function calling 工具定义。"""
 
@@ -65,9 +98,7 @@ class Tool:
         try:
             args = json.loads(call.function.arguments)
             result = await self.executor(**args)
-            content = json.dumps(result, ensure_ascii=False, default=str)
-            if len(content) > _MAX_RESULT_LEN:
-                content = content[:_MAX_RESULT_LEN] + "...(truncated)"
+            content = _serialize_result(result)
             return ToolResultInfo(tool_call_id=call.id, name=call.function.name, content=content)
         except Exception as e:
             logger.error(f"Tool execution failed: {self.name}, error={e}", exc_info=True)

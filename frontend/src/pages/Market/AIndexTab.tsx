@@ -3,15 +3,17 @@ import { Card, Col, Empty, Row, Segmented, Spin, Statistic, Typography } from "a
 import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
 import { useMarketIndexKline, useMarketIndices } from "../../api/queries";
 import KlineChart from "../../charts/KlineChart";
+import { useColors } from "../../styles/ui";
+import type { ThemeColors } from "../../styles/ui";
 
 const { Text } = Typography;
 const INDEX_CODES = ["000001", "399001", "399006", "000688", "000300", "000905"];
 
-function getChangeColor(changePct: number | null) {
-  if (changePct == null) return "#9ca3af";
-  if (changePct > 0) return "#ef4444";
-  if (changePct < 0) return "#22c55e";
-  return "#9ca3af";
+function getChangeColor(changePct: number | null, c: ThemeColors) {
+  if (changePct == null) return c.textSecondary;
+  if (changePct > 0) return c.up;
+  if (changePct < 0) return c.down;
+  return c.textSecondary;
 }
 
 function formatAmount(value: number | null | undefined) {
@@ -22,6 +24,7 @@ function formatAmount(value: number | null | undefined) {
 }
 
 export default function AIndexTab() {
+  const c = useColors();
   const [activeSymbol, setActiveSymbol] = useState("000001");
   const [period, setPeriod] = useState("daily");
   const { data: marketData, isLoading: indicesLoading } = useMarketIndices();
@@ -53,14 +56,14 @@ export default function AIndexTab() {
                 styles={{ body: { padding: 16 } }}
               >
                 <Statistic
-                  title={<span style={{ color: "#9ca3af", fontSize: 13 }}>{idx.name}</span>}
+                  title={<span style={{ color: c.textSecondary, fontSize: 13 }}>{idx.name}</span>}
                   value={idx.price ?? undefined}
                   precision={2}
-                  valueStyle={{ color: getChangeColor(idx.change_pct), fontSize: 24, fontWeight: 700 }}
+                  valueStyle={{ color: getChangeColor(idx.change_pct, c), fontSize: 24, fontWeight: 700 }}
                   prefix={idx.change_pct != null ? (idx.change_pct > 0 ? <ArrowUpOutlined /> : idx.change_pct < 0 ? <ArrowDownOutlined /> : null) : null}
                 />
                 <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ color: getChangeColor(idx.change_pct), fontWeight: 600 }}>
+                  <Text style={{ color: getChangeColor(idx.change_pct, c), fontWeight: 600 }}>
                     {idx.change_pct != null ? `${idx.change_pct > 0 ? "+" : ""}${idx.change_pct.toFixed(2)}%` : "-"}
                   </Text>
                   <Text type="secondary" style={{ fontSize: 12 }}>{idx.code}</Text>

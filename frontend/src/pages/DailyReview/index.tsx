@@ -8,7 +8,7 @@ import jsPDF from "jspdf";
 import { useDailyReview, useDailyReviewHistory, useGenerateDailyReview, usePush } from "../../api/queries";
 import PushModal from "../../components/PushModal";
 import type { PushRequest } from "../../types/stock";
-import { cardStyle, pageContainerStyle } from "../../styles/ui";
+import { useColors, useStyles } from "../../styles/ui";
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -72,6 +72,8 @@ function renderReviewContent(value: string) {
 }
 
 export default function DailyReviewPage() {
+  const { cardStyle, pageContainerStyle } = useStyles();
+  const c = useColors();
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const date = formatDate(selectedDate);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -118,7 +120,7 @@ export default function DailyReviewPage() {
 
   const handleExportPdf = async () => {
     if (!exportRef.current) return;
-    const canvas = await html2canvas(exportRef.current, { scale: 2, useCORS: true, backgroundColor: "#0b1120" });
+    const canvas = await html2canvas(exportRef.current, { scale: 2, useCORS: true, backgroundColor: c.pageBg });
     const pdf = new jsPDF("p", "mm", "a4");
     const pageWidth = 210;
     const pageHeight = 297;
@@ -172,7 +174,7 @@ export default function DailyReviewPage() {
               <List
                 dataSource={historyItems}
                 renderItem={(item) => (
-                  <List.Item onClick={() => setSelectedDate(dayjs(item.date))} style={{ cursor: "pointer", background: item.date === date ? "#1a2332" : undefined, borderLeft: item.date === date ? "3px solid #3b82f6" : undefined, paddingLeft: item.date === date ? 8 : undefined, borderRadius: 4 }}>
+                  <List.Item onClick={() => setSelectedDate(dayjs(item.date))} style={{ cursor: "pointer", background: item.date === date ? c.elevatedBg : undefined, borderLeft: item.date === date ? `3px solid ${c.primary}` : undefined, paddingLeft: item.date === date ? 8 : undefined, borderRadius: 4 }}>
                     <List.Item.Meta title={item.title} description={<Text type="secondary">{item.date}</Text>} />
                   </List.Item>
                 )}
@@ -188,18 +190,18 @@ export default function DailyReviewPage() {
                     <Paragraph>{review.market_summary}</Paragraph>
                     <Paragraph><Text strong>市场情绪结论：</Text>{buildMoodSummary(review)}</Paragraph>
                     <Space wrap>
-                      <Tag style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6", border: "none" }}>指数 {review.data_snapshot.indices.length}</Tag>
-                      <Tag style={{ background: "rgba(99,102,241,0.15)", color: "#6366f1", border: "none" }}>热股 {review.data_snapshot.hot_stocks.length}</Tag>
-                      <Tag style={{ background: "rgba(234,179,8,0.15)", color: "#eab308", border: "none" }}>概念 {review.data_snapshot.hot_concepts.length}</Tag>
-                      <Tag style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "none" }}>行业 {review.data_snapshot.hot_industries.length}</Tag>
-                      <Tag style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444", border: "none" }}>龙虎榜 {review.data_snapshot.dragon_tiger.length}</Tag>
+                      <Tag style={{ background: `${c.primary}26`, color: c.primary, border: "none" }}>指数 {review.data_snapshot.indices.length}</Tag>
+                      <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none" }}>热股 {review.data_snapshot.hot_stocks.length}</Tag>
+                      <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none" }}>概念 {review.data_snapshot.hot_concepts.length}</Tag>
+                      <Tag style={{ background: `${c.down}26`, color: c.down, border: "none" }}>行业 {review.data_snapshot.hot_industries.length}</Tag>
+                      <Tag style={{ background: `${c.up}26`, color: c.up, border: "none" }}>龙虎榜 {review.data_snapshot.dragon_tiger.length}</Tag>
                     </Space>
                     <div style={{ marginTop: 8 }}>
                       <Text type="secondary">生成时间：{review.generated_at}</Text>
                     </div>
                   </Card>
                   {review.llm_review ? (
-                    <Card title="AI 复盘报告" style={{ ...cardStyle, background: "#0f1720" }}>
+                    <Card title="AI 复盘报告" style={{ ...cardStyle, background: c.nestedBg }}>
                       <ReactMarkdown>{renderReviewContent(review.llm_review)}</ReactMarkdown>
                     </Card>
                   ) : (

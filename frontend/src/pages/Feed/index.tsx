@@ -6,7 +6,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/zh-cn";
 import { useMarketKuaixun, useMarketOtherNews, useMarketTwitterFeed, useNewsAnalysis } from "../../api/queries";
-import { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle, cardStyle } from "../../styles/ui";
+import { useColors, useStyles, getColors } from "../../styles/ui";
 import type { FeedNewsItem } from "../../types/stock";
 
 dayjs.extend(relativeTime);
@@ -19,41 +19,47 @@ const { Title, Paragraph, Text } = Typography;
 const KUAIXUN_ACCENT = "#f59e0b";
 const KUAIXUN_ACCENT_BG = "rgba(245,158,11,0.08)";
 
-const SOURCE_COLORS: Record<string, string> = {
-  "东方财富": "#3b82f6",
-  "财联社": "#ef4444",
-  "百度": "#60a5fa",
-  "华尔街见闻": "#a78bfa",
-  "36氪": "#38bdf8",
-  "雪球": "#f87171",
-  "界面新闻": "#34d399",
-  "经济观察报": "#818cf8",
-  "Twitter": "#60a5fa",
-  "联合早报": "#c084fc",
-  "cnnews": "#4ade80",
-  "其他": "#64748b",
-};
+function getSourceColors(): Record<string, string> {
+  const c = getColors();
+  return {
+    "东方财富": c.primary,
+    "财联社": c.up,
+    "百度": c.primary,
+    "华尔街见闻": "#a78bfa",
+    "36氪": "#38bdf8",
+    "雪球": "#f87171",
+    "界面新闻": "#34d399",
+    "经济观察报": "#818cf8",
+    "Twitter": c.primary,
+    "联合早报": "#c084fc",
+    "cnnews": "#4ade80",
+    "其他": c.textMuted,
+  };
+}
 
-const SENTIMENT_CONFIG: Record<string, { color: string; bg: string }> = {
-  "偏多": { color: "#ef4444", bg: "rgba(239,68,68,0.10)" },
-  "偏空": { color: "#22c55e", bg: "rgba(34,197,94,0.10)" },
-  "中性": { color: "#eab308", bg: "rgba(234,179,8,0.10)" },
-};
+function getSentimentConfig(): Record<string, { color: string; bg: string }> {
+  const c = getColors();
+  return {
+    "偏多": { color: c.up, bg: `${c.up}1a` },
+    "偏空": { color: c.down, bg: `${c.down}1a` },
+    "中性": { color: c.accent, bg: `${c.accent}1a` },
+  };
+}
 
 /* ── 工具函数 ──────────────────────────────────────────── */
 
 function getSourceColor(source: string): string {
   if (source.includes("快讯")) return KUAIXUN_ACCENT;
-  for (const [key, color] of Object.entries(SOURCE_COLORS)) {
+  for (const [key, color] of Object.entries(getSourceColors())) {
     if (source.includes(key)) return color;
   }
-  return "#64748b";
+  return getColors().textMuted;
 }
 
 function getSourceLabel(source: string): string {
   if (source.includes("快讯")) return "7×24 快讯";
   if (!source) return "未知";
-  for (const key of Object.keys(SOURCE_COLORS)) {
+  for (const key of Object.keys(getSourceColors())) {
     if (source.includes(key)) return key;
   }
   return source;
@@ -93,11 +99,12 @@ function formatTime(time: string): string {
 }
 
 function getTimeColor(time: string): string {
+  const c = getColors();
   const d = dayjs(time);
-  if (!d.isValid()) return "#64748b";
+  if (!d.isValid()) return c.textMuted;
   const diffMin = dayjs().diff(d, "minute");
   if (diffMin < 30) return KUAIXUN_ACCENT;
-  if (diffMin < 120) return "#94a3b8";
+  if (diffMin < 120) return c.textSecondary;
   return "#64748b";
 }
 
@@ -105,10 +112,11 @@ function getTimeColor(time: string): string {
 
 /** 单条摘要观点，含引用来源链接 */
 function SummaryItem({ item }: { item: NewsAnalysisItem }) {
+  const c = useColors();
   const refs: NewsAnalysisRef[] = item.urls || [];
   return (
     <li style={{ marginBottom: 6 }}>
-      <Text style={{ color: "#cbd5e1", fontSize: 12.5, lineHeight: 1.8 }}>
+      <Text style={{ color: c.textPrimary, fontSize: 12.5, lineHeight: 1.8 }}>
         {item.text}
       </Text>
       {refs.length > 0 && (
@@ -125,9 +133,9 @@ function SummaryItem({ item }: { item: NewsAnalysisItem }) {
                   gap: 3,
                   padding: "1px 6px",
                   borderRadius: 3,
-                  background: "rgba(59,130,246,0.08)",
+                  background: `${c.primary}14`,
                   border: "1px solid rgba(59,130,246,0.15)",
-                  color: "#60a5fa",
+                  color: c.primary,
                   fontSize: 10.5,
                   lineHeight: "16px",
                   textDecoration: "none",
@@ -139,8 +147,8 @@ function SummaryItem({ item }: { item: NewsAnalysisItem }) {
                   e.currentTarget.style.borderColor = "rgba(59,130,246,0.3)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(59,130,246,0.08)";
-                  e.currentTarget.style.borderColor = "rgba(59,130,246,0.15)";
+                  e.currentTarget.style.background = `${c.primary}14`;
+                  e.currentTarget.style.borderColor = `${c.primary}26`;
                 }}
               >
                 <LinkOutlined style={{ fontSize: 9, flexShrink: 0 }} />
@@ -157,13 +165,15 @@ function SummaryItem({ item }: { item: NewsAnalysisItem }) {
 }
 
 function NewsAnalysisPanel() {
+  const c = useColors();
+  const { cardStyle } = useStyles();
   const { data: analysis, isLoading, isError } = useNewsAnalysis();
 
   if (isLoading) {
     return (
       <div style={{ ...cardStyle, marginTop: 46, padding: "40px 0", textAlign: "center", position: "sticky", top: 24 }}>
         <Spin size="large" />
-        <div style={{ marginTop: 12, color: "#64748b", fontSize: 13 }}>AI 正在分析资讯...</div>
+        <div style={{ marginTop: 12, color: c.textMuted, fontSize: 13 }}>AI 正在分析资讯...</div>
       </div>
     );
   }
@@ -171,13 +181,13 @@ function NewsAnalysisPanel() {
   if (isError || !analysis) {
     return (
       <div style={{ ...cardStyle, marginTop: 46, padding: 20, position: "sticky", top: 24 }}>
-        <div style={{ color: "#64748b", fontSize: 13, textAlign: "center" }}>AI 分析暂不可用</div>
+        <div style={{ color: c.textMuted, fontSize: 13, textAlign: "center" }}>AI 分析暂不可用</div>
       </div>
     );
   }
 
   const sentiment = analysis.market_sentiment || "中性";
-  const sConfig = SENTIMENT_CONFIG[sentiment] || SENTIMENT_CONFIG["中性"];
+  const sConfig = getSentimentConfig()[sentiment] || getSentimentConfig()["中性"];
 
   return (
     <div style={{ ...cardStyle, marginTop: 46, padding: 0, position: "sticky", top: 24 }}>
@@ -186,14 +196,14 @@ function NewsAnalysisPanel() {
         style={{
           padding: "14px 16px",
           background: "linear-gradient(135deg, rgba(59,130,246,0.12), rgba(99,102,241,0.08))",
-          borderBottom: "1px solid #1e293b",
+          borderBottom: `1px solid ${c.border}`,
           display: "flex",
           alignItems: "center",
           gap: 8,
         }}
       >
-        <RobotOutlined style={{ color: "#3b82f6", fontSize: 15 }} />
-        <span style={{ color: "#e2e8f0", fontWeight: 600, fontSize: 14 }}>AI 资讯摘要</span>
+        <RobotOutlined style={{ color: c.primary, fontSize: 15 }} />
+        <span style={{ color: c.textPrimary, fontWeight: 600, fontSize: 14 }}>AI 资讯摘要</span>
         <span
           style={{
             marginLeft: "auto",
@@ -210,8 +220,8 @@ function NewsAnalysisPanel() {
       </div>
 
       {/* Summary */}
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e293b" }}>
-        <Text style={{ color: "#cbd5e1", fontSize: 13, lineHeight: 1.75 }}>
+      <div style={{ padding: "12px 16px", borderBottom: `1px solid ${c.border}` }}>
+        <Text style={{ color: c.textPrimary, fontSize: 13, lineHeight: 1.75 }}>
           {analysis.summary}
         </Text>
       </div>
@@ -223,7 +233,7 @@ function NewsAnalysisPanel() {
             key={idx}
             style={{
               padding: "12px 16px",
-              borderBottom: idx < (analysis.sections?.length ?? 0) - 1 ? "1px solid #1e293b" : "none",
+              borderBottom: idx < (analysis.sections?.length ?? 0) - 1 ? `1px solid ${c.border}` : "none",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
@@ -255,7 +265,7 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
         transition: "background 0.15s",
         background: isKuaixun ? KUAIXUN_ACCENT_BG : "transparent",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = "#1a2332"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = getColors().elevatedBg; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = isKuaixun ? KUAIXUN_ACCENT_BG : "transparent"; }}
     >
       <div style={{ width: "100%" }}>
@@ -386,6 +396,8 @@ function PaginatedList({
   showSourceTag: boolean;
   pageSize: number;
 }) {
+  const c = useColors();
+  const { cardStyle } = useStyles();
   const [page, setPage] = useState(1);
   const total = items.length;
   const totalPages = Math.ceil(total / pageSize);
@@ -411,7 +423,7 @@ function PaginatedList({
         renderItem={(item) => <NewsListItem item={item} showSourceTag={showSourceTag} />}
       />
       {totalPages > 1 && (
-        <div style={{ padding: "12px 16px", display: "flex", justifyContent: "center", borderTop: "1px solid #1e293b" }}>
+        <div style={{ padding: "12px 16px", display: "flex", justifyContent: "center", borderTop: `1px solid ${c.border}` }}>
           <Pagination
             current={page}
             total={total}
@@ -456,6 +468,7 @@ function TwitterTab() {
 }
 
 function OtherNewsTab() {
+  const { cardStyle } = useStyles();
   const { data: items = [], isLoading } = useMarketOtherNews();
 
   /* 按平台分组 */
@@ -540,6 +553,7 @@ function OtherNewsTab() {
 /* ── 主页面 ────────────────────────────────────────────── */
 
 export default function Feed() {
+  const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle } = useStyles();
   return (
     <div style={pageContainerStyle}>
       <div style={pageHeaderStyle}>

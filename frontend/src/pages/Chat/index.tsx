@@ -8,10 +8,8 @@ import { useChatStore } from "../../store/chatStore";
 import type { ChatStreamDelta } from "../../types/chat";
 import type { PushRequest } from "../../types/stock";
 import {
-  pageContainerStyle,
-  pageDescriptionStyle,
-  pageHeaderStyle,
-  pageTitleStyle,
+  useColors,
+  useStyles,
 } from "../../styles/ui";
 import { ChatInput } from "./components/ChatInput";
 import { ChatMessageList } from "./components/ChatMessageList";
@@ -24,6 +22,9 @@ export default function ChatPage() {
   const activeAssistantIdRef = useRef<string | null>(null);
   const activeControllerRef = useRef<AbortController | null>(null);
   const pushMutation = usePush();
+
+  const c = useColors();
+  const { pageContainerStyle, pageDescriptionStyle, pageHeaderStyle, pageTitleStyle } = useStyles();
 
   const {
     messages,
@@ -49,8 +50,16 @@ export default function ChatPage() {
     setStreaming(false);
   }, [setAbortController, setStreaming]);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = useCallback((smooth = false) => {
+    const sentinel = messagesEndRef.current;
+    const container = sentinel?.parentElement;
+    // 仅当用户已接近底部时才自动滚动，避免上翻查看历史时被强制拉回
+    if (container) {
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (distanceFromBottom > 120) return;
+    }
+    sentinel?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
   }, []);
 
   useEffect(() => {
@@ -98,7 +107,7 @@ export default function ChatPage() {
               updateToolResult(
                 assistantId,
                 delta.tool_result.tool_call_id,
-                delta.tool_result.content?.slice(0, 500) || "",
+                delta.tool_result.content || "",
                 delta.tool_result.is_error,
               );
             }
@@ -192,18 +201,18 @@ export default function ChatPage() {
         .chat-markdown p:empty { display: none; }
         .chat-markdown ul, .chat-markdown ol { margin: 4px 0; padding-left: 20px; }
         .chat-markdown li { margin-bottom: 2px; }
-        .chat-markdown strong { color: #f0f0f0; font-weight: 700; }
+        .chat-markdown strong { color: ${c.textPrimary}; font-weight: 700; }
         .chat-markdown code {
           background: rgba(59,130,246,0.15);
-          color: #60a5fa;
+          color: ${c.primary};
           padding: 1px 5px;
           border-radius: 4px;
           font-size: 13px;
           font-family: monospace;
         }
         .chat-markdown pre {
-          background: #0f1720;
-          border: 1px solid #1e293b;
+          background: ${c.nestedBg};
+          border: 1px solid ${c.border};
           border-radius: 6px;
           padding: 10px 12px;
           overflow-x: auto;
@@ -212,16 +221,16 @@ export default function ChatPage() {
         .chat-markdown pre code {
           background: none;
           padding: 0;
-          color: #d1d5db;
+          color: ${c.textSecondary};
         }
         .chat-markdown blockquote {
-          border-left: 3px solid #3b82f6;
+          border-left: 3px solid ${c.primary};
           margin: 8px 0;
           padding: 4px 12px;
-          color: #9ca3af;
+          color: ${c.textSecondary};
         }
         .chat-markdown h1, .chat-markdown h2, .chat-markdown h3 {
-          color: #e5e7eb;
+          color: ${c.textPrimary};
           margin: 8px 0 4px;
           font-weight: 700;
         }
@@ -230,7 +239,7 @@ export default function ChatPage() {
         .chat-markdown h1 { font-size: 16px; }
         .chat-markdown hr {
           border: none;
-          border-top: 1px solid #1e293b;
+          border-top: 1px solid ${c.border};
           margin: 10px 0;
         }
         .chat-markdown table {
@@ -240,13 +249,13 @@ export default function ChatPage() {
           font-size: 13px;
         }
         .chat-markdown th, .chat-markdown td {
-          border: 1px solid #1e293b;
+          border: 1px solid ${c.border};
           padding: 6px 10px;
           text-align: left;
         }
         .chat-markdown th {
-          background: #1a2332;
-          color: #9ca3af;
+          background: ${c.elevatedBg};
+          color: ${c.textSecondary};
           font-weight: 600;
         }
       `}</style>

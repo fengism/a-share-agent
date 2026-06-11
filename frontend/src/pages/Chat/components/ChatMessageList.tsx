@@ -1,6 +1,6 @@
 import type { RefObject } from "react";
 import type { ChatDisplayMessage } from "../../../types/chat";
-import { cardStyle, darkColors } from "../../../styles/ui";
+import { useStyles, darkColors } from "../../../styles/ui";;
 import { AssistantMessage } from "./AssistantMessage";
 import { EmptyChatState } from "./EmptyChatState";
 import { UserMessageBubble } from "./UserMessageBubble";
@@ -18,6 +18,7 @@ export function ChatMessageList({
   onPush,
   onSelectPrompt,
 }: ChatMessageListProps) {
+  const { cardStyle } = useStyles();
   return (
     <div
       style={{

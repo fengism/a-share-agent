@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef } from "react";
 import { AreaSeries, ColorType, HistogramSeries, LineStyle, createChart, type IChartApi, type UTCTimestamp } from "lightweight-charts";
 import type { IntradayItem } from "../types/stock";
+import { getColors } from "../styles/ui";
+
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 type Props = {
   data: IntradayItem[];
@@ -32,6 +40,7 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
 
   useEffect(() => {
     if (!containerRef.current || rows.length === 0) return;
+    const c = getColors();
 
     chartRef.current?.remove();
 
@@ -40,18 +49,18 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
       width: container.clientWidth,
       height,
       layout: {
-        background: { type: ColorType.Solid, color: "#111827" },
-        textColor: "#9ca3af",
+        background: { type: ColorType.Solid, color: c.cardBg },
+        textColor: c.textSecondary,
         fontSize: 12,
         attributionLogo: false,
       },
-      grid: { vertLines: { color: "#1e293b" }, horzLines: { color: "#1e293b" } },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: "#1e293b" },
-      rightPriceScale: { visible: true, borderColor: "#1e293b" },
-      leftPriceScale: { visible: true, borderColor: "#1e293b" },
+      grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
+      timeScale: { timeVisible: true, secondsVisible: false, borderColor: c.border },
+      rightPriceScale: { visible: true, borderColor: c.border },
+      leftPriceScale: { visible: true, borderColor: c.border },
       crosshair: {
-        vertLine: { color: "#4b5563", labelBackgroundColor: "#1e293b" },
-        horzLine: { color: "#4b5563", labelBackgroundColor: "#1e293b" },
+        vertLine: { color: c.textMuted, labelBackgroundColor: c.border },
+        horzLine: { color: c.textMuted, labelBackgroundColor: c.border },
       },
       handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
@@ -59,17 +68,17 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
     chartRef.current = chart;
 
     const priceSeries = chart.addSeries(AreaSeries, {
-      lineColor: "#3b82f6",
-      topColor: "rgba(59,130,246,0.18)",
-      bottomColor: "rgba(59,130,246,0.02)",
+      lineColor: c.primary,
+      topColor: hexToRgba(c.primary, 0.18),
+      bottomColor: hexToRgba(c.primary, 0.02),
       lineWidth: 2,
       priceLineVisible: false,
     });
 
     const avgSeries = chart.addSeries(AreaSeries, {
-      lineColor: "#6366f1",
-      topColor: "rgba(99,102,241,0)",
-      bottomColor: "rgba(99,102,241,0)",
+      lineColor: c.accent,
+      topColor: hexToRgba(c.accent, 0),
+      bottomColor: hexToRgba(c.accent, 0),
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
       priceLineVisible: false,
@@ -89,7 +98,7 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
 
     chart.priceScale("left").applyOptions({
       visible: true,
-      borderColor: "#1e293b",
+      borderColor: c.border,
       scaleMargins: { top: 0.72, bottom: 0 },
     });
 
@@ -98,13 +107,13 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
     volumeSeries.setData(rows.map((item) => ({
       time: item.time,
       value: item.volume ?? 0,
-      color: prevClose != null && item.price < prevClose ? "rgba(34,197,94,0.24)" : "rgba(239,68,68,0.24)",
+      color: prevClose != null && item.price < prevClose ? hexToRgba(c.down, 0.24) : hexToRgba(c.up, 0.24),
     })));
 
     if (prevClose != null) {
       priceSeries.createPriceLine({
         price: prevClose,
-        color: "#6b7280",
+        color: c.textMuted,
         lineStyle: LineStyle.Dashed,
         lineWidth: 1,
         axisLabelVisible: true,

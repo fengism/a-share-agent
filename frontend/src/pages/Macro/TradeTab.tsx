@@ -1,14 +1,15 @@
 import { Row, Col, Spin } from "antd";
 import { useMacroAllData } from "../../api/queries";
 import MacroIndicatorCard from "./MacroIndicatorCard";
+import { getColors } from "../../theme/store";
 
 const EXPORTS_IMPORTS_FIELDS = [
-  { key: "EXPORTS_SAME", label: "出口同比", color: "#3b82f6", unit: "%" },
-  { key: "IMPORTS_SAME", label: "进口同比", color: "#6366f1", unit: "%" },
+  { key: "EXPORTS_SAME", label: "出口同比", color: getColors().primary, unit: "%" },
+  { key: "IMPORTS_SAME", label: "进口同比", color: getColors().accent, unit: "%" },
 ];
 
 const BALANCE_FIELDS = [
-  { key: "BALANCE", label: "贸易差额", color: "#f59e0b", precision: 1 },
+  { key: "BALANCE", label: "贸易差额", color: getColors().accent, precision: 1 },
 ];
 
 export default function TradeTab() {

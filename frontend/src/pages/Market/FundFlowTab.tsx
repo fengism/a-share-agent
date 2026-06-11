@@ -3,6 +3,8 @@ import ReactECharts from "echarts-for-react";
 import { Button, Card, Col, Empty, Row, Spin, Statistic, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { useHsgtFlow } from "../../api/queries";
+import { useColors } from "../../styles/ui";
+import type { ThemeColors } from "../../styles/ui";
 
 const { Text } = Typography;
 
@@ -16,14 +18,15 @@ function formatYi(value: number | null | undefined) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
 }
 
-function valueColor(value: number | null | undefined) {
-  if (value == null) return "#9ca3af";
-  if (value > 0) return "#ef4444";
-  if (value < 0) return "#22c55e";
-  return "#9ca3af";
+function valueColor(value: number | null | undefined, c: ThemeColors) {
+  if (value == null) return c.textSecondary;
+  if (value > 0) return c.up;
+  if (value < 0) return c.down;
+  return c.textSecondary;
 }
 
 export default function FundFlowTab() {
+  const c = useColors();
   const [autoRefresh, setAutoRefresh] = useState(() => isAutoRefreshTime());
 
   useEffect(() => {
@@ -38,13 +41,13 @@ export default function FundFlowTab() {
   const option = useMemo(
     () => ({
       tooltip: { trigger: "axis" },
-      legend: { data: ["合计", "沪股通", "深股通"], textStyle: { color: "#9ca3af" } },
+      legend: { data: ["合计", "沪股通", "深股通"], textStyle: { color: c.textSecondary } },
       grid: { left: 48, right: 24, top: 48, bottom: 36 },
-      xAxis: { type: "category", data: points.map((item) => item.time), axisLabel: { color: "#9ca3af" } },
+      xAxis: { type: "category", data: points.map((item) => item.time), axisLabel: { color: c.textSecondary } },
       yAxis: {
         type: "value",
         name: data?.unit || "亿元",
-        axisLabel: { color: "#9ca3af" },
+        axisLabel: { color: c.textSecondary },
         splitLine: { lineStyle: { color: "rgba(148,163,184,0.15)" } },
       },
       series: [
@@ -62,7 +65,7 @@ export default function FundFlowTab() {
           smooth: true,
           showSymbol: false,
           data: points.map((item) => item.hgt),
-          lineStyle: { width: 2, color: "#ef4444" },
+          lineStyle: { width: 2, color: c.up },
         },
         {
           name: "深股通",
@@ -70,11 +73,11 @@ export default function FundFlowTab() {
           smooth: true,
           showSymbol: false,
           data: points.map((item) => item.sgt),
-          lineStyle: { width: 2, color: "#3b82f6" },
+          lineStyle: { width: 2, color: c.primary },
         },
       ],
     }),
-    [data?.unit, points],
+    [data?.unit, points, c.primary, c.textSecondary, c.up],
   );
 
   return (
@@ -82,17 +85,17 @@ export default function FundFlowTab() {
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} md={8}>
           <Card style={{ borderRadius: 12 }}>
-            <Statistic title="北向合计净买入" value={formatYi(latest?.total)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.total) }} />
+            <Statistic title="北向合计净买入" value={formatYi(latest?.total)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.total, c) }} />
           </Card>
         </Col>
         <Col xs={24} md={8}>
           <Card style={{ borderRadius: 12 }}>
-            <Statistic title="沪股通净买入" value={formatYi(latest?.hgt)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.hgt) }} />
+            <Statistic title="沪股通净买入" value={formatYi(latest?.hgt)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.hgt, c) }} />
           </Card>
         </Col>
         <Col xs={24} md={8}>
           <Card style={{ borderRadius: 12 }}>
-            <Statistic title="深股通净买入" value={formatYi(latest?.sgt)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.sgt) }} />
+            <Statistic title="深股通净买入" value={formatYi(latest?.sgt)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.sgt, c) }} />
           </Card>
         </Col>
       </Row>

@@ -1,17 +1,18 @@
 import { Row, Col, Spin } from "antd";
 import { useMacroAllData } from "../../api/queries";
 import MacroIndicatorCard from "./MacroIndicatorCard";
+import { getColors } from "../../theme/store";
 
 const LPR_FIELDS = [
-  { key: "LPR1Y", label: "1年期", color: "#3b82f6", unit: "%" },
-  { key: "LPR5Y", label: "5年期", color: "#6366f1", unit: "%" },
+  { key: "LPR1Y", label: "1年期", color: getColors().primary, unit: "%" },
+  { key: "LPR5Y", label: "5年期", color: getColors().accent, unit: "%" },
 ];
 
 const SHIBOR_FIELDS = [
-  { key: "MONTH3", label: "3月", color: "#3b82f6" },
-  { key: "MONTH6", label: "6月", color: "#6366f1" },
-  { key: "MONTH9", label: "9月", color: "#8b5cf6" },
-  { key: "YEAR1", label: "1年", color: "#22c55e" },
+  { key: "MONTH3", label: "3月", color: getColors().primary },
+  { key: "MONTH6", label: "6月", color: getColors().accent },
+  { key: "MONTH9", label: "9月", color: getColors().accent },
+  { key: "YEAR1", label: "1年", color: getColors().down },
 ];
 
 export default function RatesTab() {

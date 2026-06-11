@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 import { SendOutlined } from "@ant-design/icons";
 import { Button, Input } from "antd";
-import { darkColors } from "../../../styles/ui";
+import { useColors} from "../../../styles/ui";
 
 interface ChatInputProps {
   value: string;
@@ -18,6 +18,7 @@ export function ChatInput({
   onSend,
   onStop,
 }: ChatInputProps) {
+  const c = useColors();
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -43,7 +44,7 @@ export function ChatInput({
         style={{
           flex: 1,
           borderRadius: 10,
-          background: darkColors.elevatedBg,
+          background: c.elevatedBg,
         }}
       />
       {isStreaming ? (

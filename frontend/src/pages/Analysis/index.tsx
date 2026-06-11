@@ -6,7 +6,7 @@ import jsPDF from "jspdf";
 import { useStockInfo, useKlineData, useIntradayData, useAnalysisResult, useValuation, usePush } from "../../api/queries";
 import PushModal from "../../components/PushModal";
 import type { PushRequest } from "../../types/stock";
-import { cardStyle, gradientHeaderStyle, pageContainerStyle, sectionCardBodyStyle } from "../../styles/ui";
+import { useStyles } from "../../styles/ui";;
 import { streamAnalysis } from "../../api/sse";
 import type { AnalysisProgress, AnalysisStage } from "../../api/sse";
 import KlineChart from "../../charts/KlineChart";
@@ -38,6 +38,7 @@ function formatAmountWanYi(value: number | null | undefined) {
 }
 
 export default function Analysis() {
+  const { cardStyle, gradientHeaderStyle, pageContainerStyle, sectionCardBodyStyle } = useStyles();
   const { code } = useParams<{ code: string }>();
   const [messageApi, contextHolder] = message.useMessage();
   const exportRef = useRef<HTMLDivElement>(null);

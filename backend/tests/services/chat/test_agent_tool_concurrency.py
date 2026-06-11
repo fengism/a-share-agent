@@ -76,15 +76,20 @@ async def test_run_chat_agent_generates_final_text_after_max_tool_rounds(monkeyp
     """run_chat_agent emits a final text delta after exhausting the max tool-call rounds."""
     calls: list[str] = []
 
-    def fake_create(**kwargs):
+    async def _as_async_iter(chunks):
+        """Yield streamed chunks from a sync list as an async iterator."""
+        for chunk in chunks:
+            yield chunk
+
+    async def fake_create(**kwargs):
         calls.append(kwargs["tool_choice"])
         if kwargs["tool_choice"] == "none":
-            return [
+            return _as_async_iter([
                 SimpleNamespace(
                     choices=[SimpleNamespace(delta=SimpleNamespace(content="最终结论", tool_calls=None))]
                 )
-            ]
-        return [
+            ])
+        return _as_async_iter([
             SimpleNamespace(
                 choices=[
                     SimpleNamespace(
@@ -101,7 +106,7 @@ async def test_run_chat_agent_generates_final_text_after_max_tool_rounds(monkeyp
                     )
                 ]
             )
-        ]
+        ])
 
     async def fake_execute(call: ToolCallInfo) -> ToolResultInfo:
         return ToolResultInfo(
@@ -118,7 +123,7 @@ async def test_run_chat_agent_generates_final_text_after_max_tool_rounds(monkeyp
 
     monkeypatch.setattr(agent.registry, "execute_tool", fake_execute)
     monkeypatch.setattr(agent.registry, "get_tool_definitions", lambda: [])
-    monkeypatch.setattr(agent, "create_openai_chat_runtime", lambda settings=None: fake_runtime)
+    monkeypatch.setattr(agent, "create_async_openai_chat_runtime", lambda settings=None: fake_runtime)
 
     deltas = [delta async for delta in agent.run_chat_agent("测试")]
 

@@ -39,8 +39,7 @@ def build_messages(
             messages.append({"role": "user", "content": msg.content or ""})
         elif msg.role == "assistant":
             entry: dict = {"role": "assistant", "content": msg.content}
-            if msg.reasoning_content:
-                entry["reasoning_content"] = msg.reasoning_content
+            # reasoning_content 仅用于前端展示，不回灌 API（部分 provider 如 DeepSeek 会报 400）
             if msg.tool_calls:
                 entry["tool_calls"] = [
                     {

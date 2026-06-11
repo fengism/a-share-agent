@@ -1,6 +1,6 @@
 import { RobotOutlined } from "@ant-design/icons";
 import { Tag } from "antd";
-import { darkColors } from "../../../styles/ui";
+import { useColors} from "../../../styles/ui";
 import { SAMPLE_PROMPTS } from "../constants";
 
 interface EmptyChatStateProps {
@@ -8,11 +8,12 @@ interface EmptyChatStateProps {
 }
 
 export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
+  const c = useColors();
   return (
     <div
       style={{
         textAlign: "center",
-        color: darkColors.textMuted,
+        color: c.textMuted,
         paddingTop: 80,
         fontSize: 14,
       }}
@@ -37,9 +38,9 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
               cursor: "pointer",
               borderRadius: 16,
               padding: "4px 12px",
-              background: darkColors.elevatedBg,
-              border: `1px solid ${darkColors.border}`,
-              color: darkColors.textSecondary,
+              background: c.elevatedBg,
+              border: `1px solid ${c.border}`,
+              color: c.textSecondary,
             }}
             onClick={() => onSelectPrompt(prompt)}
           >

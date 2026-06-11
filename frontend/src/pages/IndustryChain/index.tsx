@@ -5,7 +5,7 @@ import { SearchOutlined, ApartmentOutlined, CheckCircleOutlined, LoadingOutlined
 import ReactECharts from "echarts-for-react";
 import { streamIndustryChain, type IndustryChainProgress } from "../../api/sse";
 import { useConfig, usePush, useIndustryChainHistory, useIndustryChainArchive, useIndustryChainLatest } from "../../api/queries";
-import { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle, cardStyle } from "../../styles/ui";
+import { useColors, useStyles } from "../../styles/ui";
 import type { IndustryChainResult, IndustryChainHistoryItem } from "../../types/stock";
 
 const { Title, Paragraph, Text } = Typography;
@@ -18,26 +18,65 @@ const STAGE_MAP: Record<string, number> = {
 };
 
 function MarkdownReport({ content }: { content: string }) {
-  // 简易 Markdown 渲染（标题 + 列表 + 加粗）
-  const html = content
-    .replace(/^### (.+)$/gm, '<h3 style="color:#e5e7eb;margin:20px 0 8px;font-size:15px;">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 style="color:#e5e7eb;margin:24px 0 10px;font-size:17px;border-bottom:1px solid #1e293b;padding-bottom:6px;">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 style="color:#e5e7eb;margin:0 0 16px;font-size:20px;">$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#e5e7eb">$1</strong>')
-    .replace(/^- (.+)$/gm, '<li style="color:#d1d5db;margin:4px 0;line-height:1.7;">$1</li>')
+  const c = useColors();
+
+  // 解析可能的 JSON 包装
+  let text = content?.trim() || "";
+  if (text.startsWith("{") || text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text);
+      // 如果是对象，提取可读文本字段
+      if (typeof parsed === "object" && parsed !== null) {
+        if (typeof parsed.content === "string") { text = parsed.content; }
+        else if (typeof parsed.text === "string") { text = parsed.text; }
+        else if (typeof parsed.review === "string") { text = parsed.review; }
+        else if (typeof parsed.llm_review === "string") { text = parsed.llm_review; }
+        else if (typeof parsed.markdown === "string") { text = parsed.markdown; }
+        else if (typeof parsed.summary === "string") { text = parsed.summary; }
+        else {
+          // 递归提取所有字符串值
+          const parts: string[] = [];
+          const extract = (obj: unknown) => {
+            if (typeof obj === "string") { parts.push(obj); return; }
+            if (Array.isArray(obj)) { obj.forEach(extract); return; }
+            if (obj && typeof obj === "object") { Object.values(obj).forEach(extract); }
+          };
+          extract(parsed);
+          text = parts.filter((p) => p.length > 4).join("\n\n");
+        }
+      }
+    } catch { /* 不是 JSON，直接使用原始文本 */ }
+  }
+
+  // 去除 markdown 代码块包裹
+  const codeBlockMatch = text.match(/^```(?:markdown|md)?\s*([\s\S]*?)```$/);
+  if (codeBlockMatch) text = codeBlockMatch[1].trim();
+
+  const tp = c.textPrimary;
+  const ts = c.textSecondary;
+  const border = c.border;
+
+  const html = text
+    .replace(/^### (.+)$/gm, `<h3 style="color:${tp};margin:20px 0 8px;font-size:15px;">$1</h3>`)
+    .replace(/^## (.+)$/gm, `<h2 style="color:${tp};margin:24px 0 10px;font-size:17px;border-bottom:1px solid ${border};padding-bottom:6px;">$1</h2>`)
+    .replace(/^# (.+)$/gm, `<h1 style="color:${tp};margin:0 0 16px;font-size:20px;">$1</h1>`)
+    .replace(/\*\*(.+?)\*\*/g, `<strong style="color:${tp}">$1</strong>`)
+    .replace(/^- (.+)$/gm, `<li style="color:${ts};margin:4px 0;line-height:1.7;">$1</li>`)
     .replace(/(<li[^>]*>.*<\/li>\n?)+/gs, (match) => `<ul style="padding-left:20px;margin:8px 0;">${match}</ul>`)
-    .replace(/\n\n/g, '<br/>')
-    .replace(/\n/g, '<br/>');
+    .replace(/\n\n/g, "<br/>")
+    .replace(/\n/g, "<br/>");
 
   return (
     <div
-      style={{ color: "#d1d5db", fontSize: 14, lineHeight: 1.8 }}
+      style={{ color: ts, fontSize: 14, lineHeight: 1.8 }}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
 }
 
 export default function IndustryChain() {
+  const c = useColors();
+  const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle, cardStyle } = useStyles();
   const { name: urlName } = useParams();
   const navigate = useNavigate();
   const [inputValue, setInputValue] = useState(urlName ? decodeURIComponent(urlName) : "");
@@ -190,7 +229,7 @@ export default function IndustryChain() {
             ]}
           />
           {stageMessage && (
-            <div style={{ marginTop: 12, color: "#9ca3af", fontSize: 13 }}>
+            <div style={{ marginTop: 12, color: c.textSecondary, fontSize: 13 }}>
               <Spin size="small" style={{ marginRight: 8 }} />{stageMessage}
             </div>
           )}
@@ -200,8 +239,8 @@ export default function IndustryChain() {
       {/* 错误状态 */}
       {error && !isAnalyzing && (
         <div style={{ ...cardStyle, padding: 40, textAlign: "center" }}>
-          <CloseCircleOutlined style={{ fontSize: 40, color: "#ef4444", marginBottom: 12 }} />
-          <div style={{ color: "#ef4444" }}>{error}</div>
+          <CloseCircleOutlined style={{ fontSize: 40, color: c.up, marginBottom: 12 }} />
+          <div style={{ color: c.up }}>{error}</div>
         </div>
       )}
 
@@ -214,7 +253,7 @@ export default function IndustryChain() {
                 {/* 摘要卡片：上中下游 + 驱动风险 */}
                 <div style={{ ...cardStyle, padding: "16px 20px", marginBottom: 16 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 12 }}>
-                    <Text strong style={{ color: "#e5e7eb", fontSize: 15 }}>
+                    <Text strong style={{ color: c.textPrimary, fontSize: 15 }}>
                       <ApartmentOutlined style={{ marginRight: 6 }} />
                       {result.name || activeName} 产业链
                     </Text>
@@ -223,7 +262,7 @@ export default function IndustryChain() {
                       placement="bottomRight"
                       content={(
                         <div style={{ width: 280 }}>
-                          <Text style={{ color: "#9ca3af", fontSize: 12, display: "block", marginBottom: 8 }}>
+                          <Text style={{ color: c.textSecondary, fontSize: 12, display: "block", marginBottom: 8 }}>
                             飞书接收人 open_id
                           </Text>
                           <Input
@@ -256,22 +295,22 @@ export default function IndustryChain() {
                             推送到 Notion
                           </Button>
                           {!archiveId && result && (
-                            <div style={{ color: "#9ca3af", fontSize: 12, marginTop: 8 }}>
+                            <div style={{ color: c.textSecondary, fontSize: 12, marginTop: 8 }}>
                               提示：从右侧历史打开的报告可直接推送。
                             </div>
                           )}
                           {pushResult && (
-                            <div style={{ marginTop: 12, padding: 10, background: "rgba(34,197,94,0.1)", borderRadius: 6 }}>
-                              <div style={{ color: "#22c55e", fontSize: 12, marginBottom: 4 }}>
+                            <div style={{ marginTop: 12, padding: 10, background: `${c.down}1a`, borderRadius: 6 }}>
+                              <div style={{ color: c.down, fontSize: 12, marginBottom: 4 }}>
                                 ✓ 已推送到 {pushResult.target === "feishu" ? "飞书" : "Notion"}
                               </div>
                               {pushResult.url && (
-                                <a href={pushResult.url} target="_blank" rel="noreferrer" style={{ color: "#60a5fa", fontSize: 12, wordBreak: "break-all" }}>
+                                <a href={pushResult.url} target="_blank" rel="noreferrer" style={{ color: c.primary, fontSize: 12, wordBreak: "break-all" }}>
                                   {pushResult.url}
                                 </a>
                               )}
                               {pushResult.message && (
-                                <div style={{ color: "#9ca3af", fontSize: 11, marginTop: 4 }}>
+                                <div style={{ color: c.textSecondary, fontSize: 11, marginTop: 4 }}>
                                   {pushResult.message}
                                 </div>
                               )}
@@ -292,27 +331,27 @@ export default function IndustryChain() {
                     </Popover>
                   </div>
                   {result.summary && (
-                    <Paragraph style={{ color: "#d1d5db", fontSize: 13, marginBottom: 12 }}>
+                    <Paragraph style={{ color: c.textSecondary, fontSize: 13, marginBottom: 12 }}>
                       {result.summary}
                     </Paragraph>
                   )}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
                     {result.drivers.length > 0 && (
                       <div>
-                        <Text style={{ color: "#9ca3af", fontSize: 12, fontWeight: 600 }}>驱动因素</Text>
+                        <Text style={{ color: c.textSecondary, fontSize: 12, fontWeight: 600 }}>驱动因素</Text>
                         <ul style={{ margin: "6px 0 0", paddingLeft: 16 }}>
                           {result.drivers.map((d, i) => (
-                            <li key={i}><Text style={{ color: "#d1d5db", fontSize: 13 }}>{d}</Text></li>
+                            <li key={i}><Text style={{ color: c.textSecondary, fontSize: 13 }}>{d}</Text></li>
                           ))}
                         </ul>
                       </div>
                     )}
                     {result.risks.length > 0 && (
                       <div>
-                        <Text style={{ color: "#9ca3af", fontSize: 12, fontWeight: 600 }}>风险提示</Text>
+                        <Text style={{ color: c.textSecondary, fontSize: 12, fontWeight: 600 }}>风险提示</Text>
                         <ul style={{ margin: "6px 0 0", paddingLeft: 16 }}>
                           {result.risks.map((r, i) => (
-                            <li key={i}><Text style={{ color: "#fbbf24", fontSize: 13 }}>{r}</Text></li>
+                            <li key={i}><Text style={{ color: c.accent, fontSize: 13 }}>{r}</Text></li>
                           ))}
                         </ul>
                       </div>
@@ -320,7 +359,7 @@ export default function IndustryChain() {
                   </div>
                   {result.key_stocks.length > 0 && (
                     <div style={{ marginTop: 10 }}>
-                      <Text style={{ color: "#9ca3af", fontSize: 12, fontWeight: 600 }}>重点关注 </Text>
+                      <Text style={{ color: c.textSecondary, fontSize: 12, fontWeight: 600 }}>重点关注 </Text>
                       <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {result.key_stocks.map((s, i) => (
                           <Tag key={i} color="blue" style={{ margin: 0 }}>{String(s.name || s.code || "")}</Tag>
@@ -334,11 +373,11 @@ export default function IndustryChain() {
                   <div style={{ marginBottom: 16 }}>
                     {result.charts.map((chart, idx) => (
                       <div key={idx} style={{ ...cardStyle, padding: "16px 20px", marginBottom: 16 }}>
-                        <Text strong style={{ color: "#e5e7eb", fontSize: 14, marginBottom: 8, display: "block" }}>
+                        <Text strong style={{ color: c.textPrimary, fontSize: 14, marginBottom: 8, display: "block" }}>
                           {chart.title}
                         </Text>
                         {chart.description && (
-                          <Text style={{ color: "#9ca3af", fontSize: 13, marginBottom: 12, display: "block", lineHeight: 1.6 }}>
+                          <Text style={{ color: c.textSecondary, fontSize: 13, marginBottom: 12, display: "block", lineHeight: 1.6 }}>
                             {chart.description}
                           </Text>
                         )}
@@ -356,8 +395,8 @@ export default function IndustryChain() {
             {/* 空状态 */}
             {!result && !isAnalyzing && !error && (
               <div style={{ ...cardStyle, padding: 60, textAlign: "center" }}>
-                <ApartmentOutlined style={{ fontSize: 48, color: "#374151", marginBottom: 16 }} />
-                <div style={{ color: "#6b7280", fontSize: 14 }}>
+                <ApartmentOutlined style={{ fontSize: 48, color: c.textMuted, marginBottom: 16 }} />
+                <div style={{ color: c.textMuted, fontSize: 14 }}>
                   输入产业关键词，开始 AI 产业链分析
                 </div>
               </div>
@@ -367,14 +406,14 @@ export default function IndustryChain() {
           {/* 右侧：历史记录 */}
           <div style={{ width: 280, flexShrink: 0 }}>
             <div style={{ ...cardStyle, padding: 0, position: "sticky", top: 24 }}>
-              <div style={{ padding: "14px 16px", borderBottom: "1px solid #1e293b" }}>
-                <Text strong style={{ color: "#e5e7eb", fontSize: 14 }}>
+              <div style={{ padding: "14px 16px", borderBottom: `1px solid ${c.border}` }}>
+                <Text strong style={{ color: c.textPrimary, fontSize: 14 }}>
                   <HistoryOutlined style={{ marginRight: 6 }} />
                   历史记录
                 </Text>
               </div>
 
-              <div style={{ padding: "10px 12px", borderBottom: "1px solid #1e293b" }}>
+              <div style={{ padding: "10px 12px", borderBottom: `1px solid ${c.border}` }}>
                 <Input
                   size="small"
                   placeholder="按名称过滤"
@@ -389,7 +428,7 @@ export default function IndustryChain() {
                   <div style={{ padding: 24 }}>
                     <Empty
                       image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description={<span style={{ color: "#6b7280", fontSize: 12 }}>暂无历史记录</span>}
+                      description={<span style={{ color: c.textMuted, fontSize: 12 }}>暂无历史记录</span>}
                     />
                   </div>
                 ) : (
@@ -401,24 +440,24 @@ export default function IndustryChain() {
                           onClick={() => handleLoadArchive(item)}
                           style={{
                             padding: "10px 12px",
-                            borderBottom: "1px solid #1e293b",
+                            borderBottom: `1px solid ${c.border}`,
                             cursor: "pointer",
-                            background: isActive ? "rgba(59,130,246,0.15)" : "transparent",
+                            background: isActive ? `${c.primary}26` : "transparent",
                             transition: "background 0.15s",
                           }}
                           onMouseEnter={(e) => {
-                            if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "rgba(148,163,184,0.08)";
+                            if (!isActive) (e.currentTarget as HTMLDivElement).style.background = `${c.textMuted}14`;
                           }}
                           onMouseLeave={(e) => {
                             if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "transparent";
                           }}
                         >
-                          <div style={{ color: "#e5e7eb", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+                          <div style={{ color: c.textPrimary, fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
                             {item.title || `${item.name} 产业链`}
                           </div>
-                          <div style={{ color: "#9ca3af", fontSize: 11, display: "flex", justifyContent: "space-between" }}>
+                          <div style={{ color: c.textSecondary, fontSize: 11, display: "flex", justifyContent: "space-between" }}>
                             <span>{item.saved_at || item.archive_id}</span>
-                            {isActive && <span style={{ color: "#3b82f6" }}>当前</span>}
+                            {isActive && <span style={{ color: c.primary }}>当前</span>}
                           </div>
                         </div>
                       </Tooltip>

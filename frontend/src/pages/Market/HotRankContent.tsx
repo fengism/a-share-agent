@@ -18,6 +18,7 @@ import {
   formatHotValue,
   formatSignedPercent,
 } from "../../utils/format";
+import { getColors } from "../../styles/ui";
 
 type TabKey = "stock" | "concept" | "industry";
 
@@ -28,11 +29,11 @@ const TAB_OPTIONS = [
 ];
 
 function rankBadge(rank: number) {
-  let color = "#9ca3af";
+  let color = getColors().textSecondary;
   let bg = "transparent";
   if (rank === 1 || rank === 2) {
     color = "#fff";
-    bg = "#ef4444";
+    bg = getColors().up;
   } else if (rank === 3) {
     color = "#fff";
     bg = "#eab308";
@@ -74,7 +75,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
       render: (code: string) => (
         <a
           onClick={() => navigate(`/analysis/${code}`)}
-          style={{ color: "#3b82f6", fontWeight: 500 }}
+          style={{ color: getColors().primary, fontWeight: 500 }}
         >
           {code}
         </a>
@@ -98,7 +99,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
       width: 80,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ fontWeight: 600, color: "#ef4444" }}>
+        <span style={{ fontWeight: 600, color: getColors().up }}>
           {formatHotValue(value)}
         </span>
       ),
@@ -165,7 +166,7 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
       width: 80,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ fontWeight: 600, color: "#ef4444" }}>
+        <span style={{ fontWeight: 600, color: getColors().up }}>
           {formatHotValue(value)}
         </span>
       ),
@@ -229,7 +230,7 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
           </Col>
           <Col>
             <Tag color="red">同花顺</Tag>
-            <span style={{ color: "#9ca3af", fontSize: 12, marginLeft: 8 }}>
+            <span style={{ color: getColors().textSecondary, fontSize: 12, marginLeft: 8 }}>
               {embedded ? "每分钟自动更新" : "数据来源: 同花顺 | 5分钟更新"}
             </span>
           </Col>

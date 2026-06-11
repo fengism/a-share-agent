@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { Card, Col, Empty, Row, Statistic, Typography } from "antd";
-import { cardStyle, darkColors } from "../../styles/ui";
+import { useStyles, darkColors } from "../../styles/ui";;
 
 const { Text } = Typography;
 
@@ -37,6 +37,7 @@ export default function MacroIndicatorCard({
   dateKey = "TIME",
   chartType = "line",
 }: MacroIndicatorCardProps) {
+  const { cardStyle } = useStyles();
   const chartOption = useMemo(() => {
     if (!trend || trend.length === 0) return null;
 

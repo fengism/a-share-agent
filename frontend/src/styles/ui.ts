@@ -1,3 +1,18 @@
+/**
+ * Shared style tokens for the A-Share Agent UI.
+ *
+ * Static exports are kept for backward compatibility with files that
+ * haven't been migrated to the hook-based API yet.  New code should
+ * prefer `useColors()` and `useStyles()` from `../theme/hooks` (or
+ * re-exported below) so that styles update reactively when the user
+ * switches themes.
+ */
+
+import { themes } from "../theme/themes";
+
+// ── Static (default = stellar-blue) – backward compat ──────────────
+export const darkColors = themes["stellar-blue"].colors;
+
 export const pageContainerStyle = {
   maxWidth: 1280,
   margin: "0 auto",
@@ -92,23 +107,10 @@ export const metricValueSecondaryStyle = {
   lineHeight: 1.2,
 };
 
-export const darkColors = {
-  pageBg: "#0b1120",
-  cardBg: "#111827",
-  elevatedBg: "#1a2332",
-  nestedBg: "#0f1720",
-  primary: "#3b82f6",
-  accent: "#6366f1",
-  up: "#ef4444",
-  down: "#22c55e",
-  upBg: "rgba(239,68,68,0.15)",
-  downBg: "rgba(34,197,94,0.15)",
-  upCardGradient: "linear-gradient(135deg, #1a0f0f, #2d1518)",
-  downCardGradient: "linear-gradient(135deg, #0f1a14, #152d1d)",
-  textPrimary: "#e5e7eb",
-  textSecondary: "#9ca3af",
-  textMuted: "#6b7280",
-  border: "#1e293b",
-  headerGradient: "linear-gradient(135deg, #1e3a5f, #0f172a)",
-  logoGradient: "linear-gradient(135deg, #3b82f6, #6366f1)",
-} as const;
+// ── Hook-based (reactive) – preferred ──────────────────────────────
+export { useColors, useStyles } from "../theme/hooks";
+export { useThemeStore } from "../theme/store";
+export { THEME_LIST } from "../theme/themes";
+export type { ThemeKey, ThemeColors } from "../theme/themes";
+export { getAntToken } from "../theme/store";
+export { getColors } from "../theme/store";

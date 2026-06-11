@@ -7,11 +7,12 @@ import MonetaryTab from "./MonetaryTab";
 import RatesTab from "./RatesTab";
 import GrowthTab from "./GrowthTab";
 import TradeTab from "./TradeTab";
-import { pageContainerStyle, pageDescriptionStyle, pageHeaderStyle, pageTitleStyle } from "../../styles/ui";
+import { useStyles } from "../../styles/ui";;
 
 const { Title, Paragraph } = Typography;
 
 export default function Macro() {
+  const { pageContainerStyle, pageDescriptionStyle, pageHeaderStyle, pageTitleStyle } = useStyles();
   const [activeTab, setActiveTab] = useState("prices");
 
   return (

@@ -4,7 +4,7 @@ import { useScreenerScreen, useIndustries, useComputePercentiles } from "../../a
 import FilterPanel from "./FilterPanel";
 import ResultsTable from "./ResultsTable";
 import type { ScreenerFilter } from "../../types/stock";
-import { cardStyle, pageContainerStyle, pageDescriptionStyle, pageHeaderStyle, pageTitleStyle, sectionCardBodyStyle } from "../../styles/ui";
+import { useStyles } from "../../styles/ui";
 
 const DEFAULT_FILTERS: ScreenerFilter = {
   sort_by: "market_cap",
@@ -25,6 +25,7 @@ export default function Screener() {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   const { data: industries = [] } = useIndustries();
+  const { cardStyle, pageContainerStyle, pageDescriptionStyle, pageHeaderStyle, pageTitleStyle, sectionCardBodyStyle } = useStyles();
   const { data: screenerResult, isLoading: screenerLoading, isFetching } = useScreenerScreen(
     searchFilters || DEFAULT_FILTERS,
     searchFilters !== null,

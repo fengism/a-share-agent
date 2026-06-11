@@ -8,7 +8,7 @@ import { Button, Collapse } from "antd";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatDisplayMessage } from "../../../types/chat";
-import { darkColors } from "../../../styles/ui";
+import { useColors} from "../../../styles/ui";
 import { BlinkingCursor } from "./BlinkingCursor";
 import { ToolCallCard } from "./ToolCallCard";
 
@@ -20,6 +20,7 @@ interface AssistantMessageProps {
 }
 
 export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
+  const c = useColors();
   const hasReasoning = !!message.reasoningContent;
   const hasTools = !!message.toolCalls?.length;
   const hasContent = !!message.content;
@@ -37,7 +38,7 @@ export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
                 key: "reasoning",
                 label: (
                   <span
-                    style={{ fontSize: 12, color: darkColors.textSecondary }}
+                    style={{ fontSize: 12, color: c.textSecondary }}
                   >
                     <BulbOutlined
                       style={{ marginRight: 4, color: "#f59e0b" }}
@@ -55,7 +56,7 @@ export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
                   <div
                     style={{
                       fontSize: 12,
-                      color: darkColors.textSecondary,
+                      color: c.textSecondary,
                       lineHeight: 1.7,
                       whiteSpace: "pre-wrap",
                     }}
@@ -88,11 +89,11 @@ export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
           style={{
             padding: "10px 14px",
             borderRadius: 12,
-            background: darkColors.elevatedBg,
-            border: `1px solid ${darkColors.border}`,
+            background: c.elevatedBg,
+            border: `1px solid ${c.border}`,
             fontSize: 14,
             lineHeight: 1.7,
-            color: darkColors.textPrimary,
+            color: c.textPrimary,
             wordBreak: "break-word",
           }}
         >
@@ -103,21 +104,21 @@ export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
               justifyContent: "space-between",
               marginBottom: 6,
               paddingBottom: 6,
-              borderBottom: `1px solid ${darkColors.border}`,
+              borderBottom: `1px solid ${c.border}`,
             }}
           >
             <div style={{ display: "flex", alignItems: "center" }}>
               <FileTextOutlined
                 style={{
                   marginRight: 6,
-                  color: darkColors.primary,
+                  color: c.primary,
                   fontSize: 12,
                 }}
               />
               <span
                 style={{
                   fontSize: 11,
-                  color: darkColors.textSecondary,
+                  color: c.textSecondary,
                   fontWeight: 600,
                 }}
               >
@@ -132,7 +133,7 @@ export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
                 onClick={() => onPush(message.id, message.content)}
                 style={{
                   fontSize: 12,
-                  color: darkColors.textSecondary,
+                  color: c.textSecondary,
                   padding: "0 6px",
                 }}
               >
@@ -154,9 +155,9 @@ export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
           style={{
             padding: "10px 14px",
             borderRadius: 12,
-            background: darkColors.elevatedBg,
-            border: `1px solid ${darkColors.border}`,
-            color: darkColors.textSecondary,
+            background: c.elevatedBg,
+            border: `1px solid ${c.border}`,
+            color: c.textSecondary,
             fontSize: 13,
           }}
         >

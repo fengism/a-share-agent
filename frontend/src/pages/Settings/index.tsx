@@ -22,16 +22,7 @@ import {
 } from "@ant-design/icons";
 import { useConfig, useUpdateConfig } from "../../api/queries";
 import type { ConfigUpdate, ProviderDefault } from "../../types/settings";
-import {
-  pageContainerStyle,
-  pageHeaderStyle,
-  pageTitleStyle,
-  pageDescriptionStyle,
-  cardStyle,
-  fieldLabelStyle,
-  sectionCardBodyStyle,
-  darkColors,
-} from "../../styles/ui";
+import { useStyles, darkColors } from "../../styles/ui";;
 
 const { Text } = Typography;
 
@@ -44,6 +35,7 @@ const PROVIDER_OPTIONS = [
 ];
 
 export default function SettingsPage() {
+  const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle, cardStyle, fieldLabelStyle, sectionCardBodyStyle } = useStyles();
   const { data: config, isLoading } = useConfig();
   const updateConfig = useUpdateConfig();
   const queryClient = useQueryClient();

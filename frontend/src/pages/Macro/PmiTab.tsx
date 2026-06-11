@@ -1,10 +1,11 @@
 import { Row, Col, Spin } from "antd";
 import { useMacroAllData } from "../../api/queries";
 import MacroIndicatorCard from "./MacroIndicatorCard";
+import { getColors } from "../../theme/store";
 
 const PMI_FIELDS = [
-  { key: "MAKE_INDEX", label: "制造业", color: "#3b82f6" },
-  { key: "NMAKE_INDEX", label: "非制造业", color: "#6366f1" },
+  { key: "MAKE_INDEX", label: "制造业", color: getColors().primary },
+  { key: "NMAKE_INDEX", label: "非制造业", color: getColors().accent },
 ];
 
 export default function PmiTab() {

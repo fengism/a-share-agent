@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 
 from app.config import Settings, PROVIDER_DEFAULTS, get_settings
 
@@ -14,6 +14,14 @@ class OpenAIChatRuntime:
     """OpenAI chat.completions 运行时配置。"""
 
     client: OpenAI
+    model: str
+
+
+@dataclass(frozen=True)
+class AsyncOpenAIChatRuntime:
+    """异步 OpenAI chat.completions 运行时配置。"""
+
+    client: AsyncOpenAI
     model: str
 
 
@@ -165,8 +173,14 @@ def create_llm_client(settings: Settings | None = None) -> LLMClient:
         raise ValueError(f"Unsupported LLM provider: {provider}")
 
 
-def create_openai_chat_runtime(settings: Settings | None = None) -> OpenAIChatRuntime:
-    """创建基于 openai SDK 的 chat.completions 运行时。"""
+def _resolve_chat_endpoint(settings: Settings | None = None) -> tuple[str, str, str]:
+    """解析聊天 chat.completions 运行时所需的 api_key、base_url 和 model。
+
+    Param:
+        settings: 配置对象，默认读取全局设置
+    Return:
+        (api_key, base_url, model) 三元组
+    """
     if settings is None:
         settings = get_settings()
 
@@ -174,5 +188,24 @@ def create_openai_chat_runtime(settings: Settings | None = None) -> OpenAIChatRu
     defaults = PROVIDER_DEFAULTS.get(provider, {})
     base_url = settings.llm_base_url or defaults.get("base_url", "https://api.openai.com/v1")
     model = settings.llm_model or defaults.get("model", "gpt-4o-mini")
-    client = OpenAI(api_key=settings.llm_api_key, base_url=base_url, timeout=120.0)
+    return settings.llm_api_key, base_url, model
+
+
+def create_openai_chat_runtime(settings: Settings | None = None) -> OpenAIChatRuntime:
+    """创建基于 openai SDK 的 chat.completions 运行时。"""
+    api_key, base_url, model = _resolve_chat_endpoint(settings)
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=120.0)
     return OpenAIChatRuntime(client=client, model=model)
+
+
+def create_async_openai_chat_runtime(settings: Settings | None = None) -> AsyncOpenAIChatRuntime:
+    """创建基于 openai SDK 的异步 chat.completions 运行时。
+
+    Param:
+        settings: 配置对象，默认读取全局设置
+    Return:
+        AsyncOpenAIChatRuntime，包含 AsyncOpenAI 客户端和模型名称
+    """
+    api_key, base_url, model = _resolve_chat_endpoint(settings)
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=120.0)
+    return AsyncOpenAIChatRuntime(client=client, model=model)

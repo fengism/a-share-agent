@@ -12,6 +12,7 @@ import {
   formatSignedPercent,
   formatWanAmount,
 } from "../../utils/format";
+import { getColors } from "../../styles/ui";
 
 function DetailModal({
   code,
@@ -78,7 +79,7 @@ function DetailModal({
       ) : (
         <Row gutter={16}>
           <Col span={12}>
-            <div style={{ fontWeight: 600, marginBottom: 8, color: "#ef4444" }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, color: getColors().up }}>
               买入前5
             </div>
             <Table
@@ -93,7 +94,7 @@ function DetailModal({
             />
           </Col>
           <Col span={12}>
-            <div style={{ fontWeight: 600, marginBottom: 8, color: "#22c55e" }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, color: getColors().down }}>
               卖出前5
             </div>
             <Table
@@ -129,7 +130,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       render: (code: string) => (
         <a
           onClick={() => navigate(`/analysis/${code}`)}
-          style={{ color: "#3b82f6", fontWeight: 500 }}
+          style={{ color: getColors().primary, fontWeight: 500 }}
         >
           {code}
         </a>
@@ -167,7 +168,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       width: 95,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ color: "#ef4444" }}>{value?.toFixed(0) ?? "-"}</span>
+        <span style={{ color: getColors().up }}>{value?.toFixed(0) ?? "-"}</span>
       ),
     },
     {
@@ -176,7 +177,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       width: 95,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ color: "#22c55e" }}>{value?.toFixed(0) ?? "-"}</span>
+        <span style={{ color: getColors().down }}>{value?.toFixed(0) ?? "-"}</span>
       ),
     },
     {
@@ -283,7 +284,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
           </Col>
           <Col>
             {embedded && <Tag color="orange">东方财富</Tag>}
-            <span style={{ color: "#9ca3af", fontSize: 12, marginLeft: embedded ? 8 : 0 }}>
+            <span style={{ color: getColors().textSecondary, fontSize: 12, marginLeft: embedded ? 8 : 0 }}>
               共 {data?.length ?? 0} 只股票上榜
             </span>
           </Col>

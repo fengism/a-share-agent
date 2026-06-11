@@ -2,7 +2,7 @@ import { Table, Tag, Spin, Empty } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import { useNavigate } from "react-router-dom";
 import type { ScreenerFilter, ScreenerItem, ScreenerResult } from "../../types/stock";
-import { tagStyle } from "../../styles/ui";
+import { useStyles } from "../../styles/ui";;
 
 interface Props {
   data: ScreenerResult | undefined;
@@ -29,6 +29,7 @@ const SORT_FIELD_MAP: Record<string, SortableKey> = {
 export default function ResultsTable({
   data, isLoading, percentileMap, showPercentile, onPageChange, filters, onSortChange,
 }: Props) {
+  const { tagStyle } = useStyles();
   const navigate = useNavigate();
   const currentSortOrder = filters.sort_order === "asc" ? "ascend" : "descend";
 

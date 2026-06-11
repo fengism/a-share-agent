@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import time
 from dataclasses import dataclass, field
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
-from app.models.chat import ChatMessage, ToolCallFunction, ToolCallInfo, ToolResultInfo
+from app.models.chat import ChatMessage, ChatStreamDelta, ToolCallFunction, ToolCallInfo
 from app.services.chat.message_builder import build_messages
 from app.services.chat.tools.registry import registry
 
@@ -35,17 +34,33 @@ class SubAgent:
         self.max_rounds = max_rounds
 
     async def run(self, message: str, history: list[ChatMessage] | None,
-                  llm_client: OpenAI, model: str) -> SubAgentResult:
+                  llm_client: AsyncOpenAI, model: str,
+                  event_queue: asyncio.Queue | None = None) -> SubAgentResult:
+        """运行子 Agent：多轮工具调用后生成最终分析。
+
+        Param:
+            message: 用户消息
+            history: 历史消息列表，可选
+            llm_client: 异步 OpenAI 客户端
+            model: 模型名称
+            event_queue: 可选事件队列，用于实时推送工具调用/结果增量
+        Return:
+            SubAgentResult，包含最终分析文本、调用过的工具和耗时
+        """
         start = time.monotonic()
         messages = build_messages(message, history, 10, system_prompt=self.system_prompt)
         tool_defs = registry.get_tool_definitions_for(self.skill_names)
         tools_called: list[str] = []
         errors: list[str] = []
 
+        async def emit(delta: ChatStreamDelta) -> None:
+            """向事件队列推送一条增量（队列为空时静默忽略）。"""
+            if event_queue is not None:
+                await event_queue.put(delta)
+
         for round_num in range(self.max_rounds):
             try:
-                response = await asyncio.to_thread(
-                    llm_client.chat.completions.create,
+                response = await llm_client.chat.completions.create(
                     model=model,
                     messages=messages,
                     tools=tool_defs if tool_defs else None,
@@ -85,7 +100,9 @@ class SubAgent:
                     function=ToolCallFunction(name=tc.function.name, arguments=tc.function.arguments),
                 )
                 tools_called.append(tc.function.name)
+                await emit(ChatStreamDelta(type="tool_call", tool_call=tc_info))
                 result = await registry.execute_tool(tc_info)
+                await emit(ChatStreamDelta(type="tool_result", tool_result=result))
                 messages.append({
                     "role": "tool",
                     "tool_call_id": result.tool_call_id,
@@ -96,8 +113,7 @@ class SubAgent:
                 logger.info(f"SubAgent {self.name} tool: {tc.function.name}, error={result.is_error}")
 
         try:
-            response = await asyncio.to_thread(
-                llm_client.chat.completions.create,
+            response = await llm_client.chat.completions.create(
                 model=model,
                 messages=messages,
                 tools=[],

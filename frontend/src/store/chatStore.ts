@@ -159,12 +159,15 @@ export const useChatStore = create<ChatState>((set) => ({
   },
 
   updateToolResult: (messageId, toolCallId, result, isError) => {
+    // 展示用截断到 500 字符避免 UI 过长，历史保留完整内容回传给后端
+    const displayResult =
+      result.length > 500 ? `${result.slice(0, 500)}…` : result;
     set((state) => ({
       messages: updateMessageById(state.messages, messageId, (message) => ({
         ...message,
         toolCalls: (message.toolCalls || []).map((tc) =>
           tc.id === toolCallId
-            ? { ...tc, result, isError, isExecuting: false }
+            ? { ...tc, result: displayResult, isError, isExecuting: false }
             : tc,
         ),
       })),

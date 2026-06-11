@@ -10,7 +10,7 @@ from app.services.chat.message_builder import build_messages
 from app.services.chat.tools.registry import registry
 from app.services.chat.skills import register_all_skills
 from app.services.chat.tool_call_parser import extract_pseudo_tool_calls
-from app.services.llm.client import create_openai_chat_runtime
+from app.services.llm.client import create_async_openai_chat_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -48,17 +48,19 @@ def _build_create_kwargs(model: str, messages: list[dict], tool_choice: str) -> 
     }
 
 
-def _build_assistant_tool_message(tool_calls: list[ToolCallInfo], content: str | None = None, reasoning_content: str = "") -> dict:
+def _build_assistant_tool_message(tool_calls: list[ToolCallInfo], content: str | None = None) -> dict:
     """构造包含工具调用的 assistant 消息字典。
+
+    注意：不写入 reasoning_content。部分 OpenAI 兼容厂商（如 DeepSeek）在入参消息中
+    携带 reasoning_content 会返回 400，思考内容仅用于前端展示，不回灌 API。
 
     Param:
         tool_calls: 工具调用信息列表
         content: 文本内容，可选
-        reasoning_content: 推理内容（如 DeepSeek thinking），可选
     Return:
         符合 OpenAI 格式的 assistant 消息字典
     """
-    message = {
+    return {
         "role": "assistant",
         "content": content or None,
         "tool_calls": [
@@ -73,9 +75,6 @@ def _build_assistant_tool_message(tool_calls: list[ToolCallInfo], content: str |
             for tc in tool_calls
         ],
     }
-    if reasoning_content:
-        message["reasoning_content"] = reasoning_content
-    return message
 
 
 def _to_tool_call_infos(tool_calls_acc: dict[int, dict]) -> list[ToolCallInfo]:
@@ -88,14 +87,14 @@ def _to_tool_call_infos(tool_calls_acc: dict[int, dict]) -> list[ToolCallInfo]:
     """
     return [
         ToolCallInfo(
-            id=tc_data["id"],
+            id=tc_data["id"] or f"call_{idx}",
             type="function",
             function=ToolCallFunction(
                 name=tc_data["name"],
                 arguments=tc_data["arguments"],
             ),
         )
-        for _, tc_data in sorted(tool_calls_acc.items())
+        for idx, tc_data in sorted(tool_calls_acc.items())
     ]
 
 
@@ -135,7 +134,7 @@ async def _run_legacy_agent(
     Return:
         产生 ChatStreamDelta 事件的异步生成器，类型包括 text/reasoning/tool_call/tool_result/error/done
     """
-    runtime = create_openai_chat_runtime(get_settings())
+    runtime = create_async_openai_chat_runtime(get_settings())
     client = runtime.client
     model = runtime.model
 
@@ -152,10 +151,7 @@ async def _run_legacy_agent(
         create_kwargs = _build_create_kwargs(model, messages, tool_choice)
 
         try:
-            stream = await asyncio.to_thread(
-                client.chat.completions.create,
-                **create_kwargs,
-            )
+            stream = await client.chat.completions.create(**create_kwargs)
         except Exception as e:
             logger.error(f"LLM call failed: {e}", exc_info=True)
             yield ChatStreamDelta(type="error", error=f"LLM调用失败: {e}")
@@ -166,7 +162,7 @@ async def _run_legacy_agent(
         tool_calls_acc: dict[int, dict] = {}
 
         try:
-            for chunk in stream:
+            async for chunk in stream:
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
@@ -248,7 +244,7 @@ async def _run_legacy_agent(
             f"tool_choice={tool_choice}"
         )
 
-        messages.append(_build_assistant_tool_message(openai_tool_calls, assistant_content, reasoning_content))
+        messages.append(_build_assistant_tool_message(openai_tool_calls, assistant_content))
 
         tool_results = await _execute_tool_calls_ordered(openai_tool_calls)
         for tc_info, result in zip(openai_tool_calls, tool_results):

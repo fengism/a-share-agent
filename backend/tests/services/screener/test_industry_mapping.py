@@ -1,4 +1,5 @@
 import json
+import types
 
 import pandas as pd
 import pytest
@@ -30,12 +31,13 @@ def test_normalize_sw_industry_name_strips_suffix_and_empty_values():
 
 def test_build_mapping_skips_empty_sw_components(monkeypatch):
     """_build_industry_mapping_sw_second_index_akshare ignores industries with no components."""
-    monkeypatch.setattr(
-        industry._akshare_provider,
-        "fetch_sw_index_realtime",
-        lambda: pd.DataFrame([{"指数代码": "801120", "指数名称": "半导体(申万)"}]),
+    fake_akshare = types.SimpleNamespace(
+        fetch_sw_index_realtime=lambda: pd.DataFrame(
+            [{"指数代码": "801120", "指数名称": "半导体(申万)"}]
+        ),
+        fetch_sw_index_components=lambda symbol: pd.DataFrame(),
     )
-    monkeypatch.setattr(industry._akshare_provider, "fetch_sw_index_components", lambda symbol: pd.DataFrame())
+    monkeypatch.setattr(industry, "_get_akshare_provider", lambda: fake_akshare)
 
     mapping, industry_list = industry._build_industry_mapping_sw_second_index_akshare()
 
@@ -51,7 +53,8 @@ def test_build_mapping_falls_back_to_east_direct_when_sw_invalid(monkeypatch):
 
     monkeypatch.setattr(industry, "_MIN_VALID_MAPPING_SIZE", 1)
     monkeypatch.setattr(industry, "_build_industry_mapping_sw_second_index_akshare", lambda: ({}, []))
-    monkeypatch.setattr(industry._eastmoney_provider, "build_industry_mapping", lambda: (mapping, ["白酒"]))
+    fake_eastmoney = types.SimpleNamespace(build_industry_mapping=lambda: (mapping, ["白酒"]))
+    monkeypatch.setattr(industry, "_get_eastmoney_provider", lambda: fake_eastmoney)
 
     result_mapping, result_industry_list = industry._build_industry_mapping_sw_second()
 

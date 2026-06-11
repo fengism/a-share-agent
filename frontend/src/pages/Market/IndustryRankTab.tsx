@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useIndustryRankings } from "../../api/queries";
 import type { IndustryRankItem } from "../../types/stock";
 import { changeColor, formatSignedPercent } from "../../utils/format";
-import { cardStyle } from "../../styles/ui";
+import { useStyles } from "../../styles/ui";;
 
 function rankBadge(rank: number) {
   let color = "#9ca3af";
@@ -89,6 +89,7 @@ const columns: ColumnsType<IndustryRankItem> = [
 ];
 
 export default function IndustryRankTab() {
+  const { cardStyle } = useStyles();
   const { data, isLoading, isFetching } = useIndustryRankings();
   const sectors = data?.sectors ?? [];
 

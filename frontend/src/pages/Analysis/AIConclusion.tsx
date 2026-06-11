@@ -2,7 +2,7 @@ import { Card, List, Progress, Row, Col, Typography } from "antd";
 import RatingBadge from "../../components/RatingBadge";
 import SignalBadge from "../../components/SignalBadge";
 import type { AnalysisResult } from "../../types/stock";
-import { cardStyle, metricTileStyle } from "../../styles/ui";
+import { useStyles } from "../../styles/ui";;
 
 const { Text } = Typography;
 
@@ -11,6 +11,7 @@ interface Props {
 }
 
 export default function AIConclusion({ result }: Props) {
+  const { cardStyle, metricTileStyle } = useStyles();
   const {
     fundamental,
     technical,

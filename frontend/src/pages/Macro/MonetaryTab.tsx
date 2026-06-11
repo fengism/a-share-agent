@@ -1,17 +1,18 @@
 import { Row, Col, Spin } from "antd";
 import { useMacroAllData } from "../../api/queries";
 import MacroIndicatorCard from "./MacroIndicatorCard";
+import { getColors } from "../../theme/store";
 
 const MONEY_SUPPLY_FIELDS = [
-  { key: "BASIC_CURRENCY", label: "M2", color: "#3b82f6", precision: 1 },
-  { key: "CURRENCY", label: "M1", color: "#6366f1", precision: 1 },
-  { key: "FREE_CASH", label: "M0", color: "#f59e0b", precision: 1 },
+  { key: "BASIC_CURRENCY", label: "M2", color: getColors().primary, precision: 1 },
+  { key: "CURRENCY", label: "M1", color: getColors().accent, precision: 1 },
+  { key: "FREE_CASH", label: "M0", color: getColors().accent, precision: 1 },
 ];
 
 const SOCIAL_FIN_FIELDS = [
-  { key: "RMB_LOAN", label: "新增贷款", color: "#3b82f6", precision: 0 },
-  { key: "RMB_LOAN_SAME", label: "同比", color: "#ef4444", unit: "%" },
-  { key: "RMB_LOAN_SEQUENTIAL", label: "环比", color: "#f59e0b", unit: "%" },
+  { key: "RMB_LOAN", label: "新增贷款", color: getColors().primary, precision: 0 },
+  { key: "RMB_LOAN_SAME", label: "同比", color: getColors().up, unit: "%" },
+  { key: "RMB_LOAN_SEQUENTIAL", label: "环比", color: getColors().accent, unit: "%" },
 ];
 
 export default function MonetaryTab() {

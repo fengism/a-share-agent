@@ -1,16 +1,17 @@
 import { Row, Col, Spin } from "antd";
 import { useMacroAllData } from "../../api/queries";
 import MacroIndicatorCard from "./MacroIndicatorCard";
+import { getColors } from "../../theme/store";
 
 const CPI_FIELDS = [
-  { key: "NATIONAL_SAME", label: "同比", color: "#ef4444", unit: "%" },
-  { key: "NATIONAL_SEQUENTIAL", label: "环比", color: "#f59e0b", unit: "%" },
-  { key: "NATIONAL_ACCUMULATE", label: "累计", color: "#3b82f6", unit: "%" },
+  { key: "NATIONAL_SAME", label: "同比", color: getColors().up, unit: "%" },
+  { key: "NATIONAL_SEQUENTIAL", label: "环比", color: getColors().accent, unit: "%" },
+  { key: "NATIONAL_ACCUMULATE", label: "累计", color: getColors().primary, unit: "%" },
 ];
 
 const PPI_FIELDS = [
-  { key: "BASE_SAME", label: "同比", color: "#ef4444", unit: "%" },
-  { key: "BASE_ACCUMULATE", label: "累计", color: "#3b82f6", unit: "%" },
+  { key: "BASE_SAME", label: "同比", color: getColors().up, unit: "%" },
+  { key: "BASE_ACCUMULATE", label: "累计", color: getColors().primary, unit: "%" },
 ];
 
 export default function PriceTab() {
