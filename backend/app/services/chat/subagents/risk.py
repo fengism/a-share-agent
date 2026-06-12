@@ -12,6 +12,6 @@ def create_riskagent() -> SubAgent:
         name="risk",
         display_name="风险评估",
         system_prompt=RISK_AGENT_PROMPT,
-        skill_names=["search_stocks", "get_stock_info", "get_stock_technical_indicators", "get_stock_valuation_detail", "get_stock_sentiment"],
+        skill_names=["get_stock_risk_data", "get_stock_technical_indicators", "get_stock_valuation_detail"],
         max_rounds=3,
     )

@@ -5,7 +5,7 @@ from app.services.chat.tools.registry import Tool, registry
 
 
 def register_stock_tools():
-    """注册个股与选股相关技能：search_stocks、get_stock_info、get_stock_valuation_detail、get_stock_technical_indicators、get_stock_kline、get_stock_financial、get_stock_news、get_stock_sentiment、screen_stocks、get_industries、iwencai_search、iwencai_query、iwencai_select_stock、iwencai_market_macro。"""
+    """注册个股与选股相关技能：search_stocks、get_stock_info、get_stock_valuation_detail、get_stock_technical_indicators、get_stock_kline、get_stock_financial、get_stock_news、get_stock_sentiment、screen_stocks、get_industries、get_stock_risk_data、iwencai_search、iwencai_query、iwencai_select_stock、iwencai_market_macro。"""
     registry.register_tool(Tool(
         name="search_stocks",
         description="搜索股票，支持按代码或名称模糊搜索。返回匹配的股票列表（代码、名称、价格、涨跌幅）。用户提到任何股票名称或代码时必须先调用此工具确认准确代码。",
@@ -206,6 +206,19 @@ def register_stock_tools():
             "required": ["query"],
         },
         executor=helpers.iwencai_select_stock,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_stock_risk_data",
+        description="获取个股风险评估数据：资金流向（主力/大单/中单/小单净流入）、融资融券明细、大宗交易记录、股东户数变化。风险评估时必调用。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": {"type": "string", "description": "6位股票代码"},
+            },
+            "required": ["code"],
+        },
+        executor=helpers.get_stock_risk_data,
     ))
 
     registry.register_tool(Tool(

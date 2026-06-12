@@ -171,6 +171,7 @@ async def iwencai_search(query: str, channel: str = "report", size: int = 20) ->
     Return:
         搜索结果列表或包含 error 的字典
     """
+    size = int(size)
     iwencai_provider = _get_iwencai_provider()
     if iwencai_provider is None:
         return {"error": "问财数据源未启用，请在设置中开启 iwencai_enabled"}
@@ -190,6 +191,7 @@ async def iwencai_query(query: str, limit: int = 30) -> Any:
     Return:
         查询结果或包含 error 的字典
     """
+    limit = int(limit)
     iwencai_provider = _get_iwencai_provider()
     if iwencai_provider is None:
         return {"error": "问财数据源未启用，请在设置中开启 iwencai_enabled"}
@@ -205,10 +207,40 @@ async def iwencai_select_stock(query: str, limit: int = 20) -> Any:
     Return:
         选股结果或包含 error 的字典
     """
+    limit = int(limit)
     iwencai_provider = _get_iwencai_provider()
     if iwencai_provider is None:
         return {"error": "问财数据源未启用，请在设置中开启 iwencai_enabled"}
     return await call_blocking(iwencai_provider.select_stocks, query, 1, limit)
+
+
+async def get_stock_risk_data(code: str) -> Any:
+    """获取个股风险评估相关数据：资金流向、融资融券、大宗交易、股东户数变化。
+
+    Param:
+        code: 6位股票代码
+    Return:
+        包含 fund_flow、margin_trading、block_trade、holder_change 四个维度的字典
+    """
+    import asyncio
+    from app.utils.rate_limiter import call_blocking
+
+    async def _fetch_all():
+        from app.services.providers import get_provider
+        provider = get_provider("eastmoney")
+        fund_flow = await call_blocking(provider.fetch_stock_fund_flow, code)
+        margin = await call_blocking(provider.fetch_margin_trading, code)
+        block = await call_blocking(provider.fetch_block_trade, code)
+        holder = await call_blocking(provider.fetch_holder_num_change, code)
+        return fund_flow, margin, block, holder
+
+    fund_flow, margin, block, holder = await _fetch_all()
+    return {
+        "fund_flow": fund_flow[-30:] if fund_flow else [],   # 最近30个交易日
+        "margin_trading": margin[:10] if margin else [],      # 最近10条
+        "block_trade": block[:10] if block else [],           # 最近10条
+        "holder_change": holder[:4] if holder else [],        # 最近4期（季度级）
+    }
 
 
 async def iwencai_market_macro(query: str, limit: int = 20) -> Any:
@@ -220,6 +252,7 @@ async def iwencai_market_macro(query: str, limit: int = 20) -> Any:
     Return:
         宏观数据查询结果或包含 error 的字典
     """
+    limit = int(limit)
     iwencai_provider = _get_iwencai_provider()
     if iwencai_provider is None:
         return {"error": "问财数据源未启用，请在设置中开启 iwencai_enabled"}

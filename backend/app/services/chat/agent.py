@@ -5,7 +5,7 @@ import logging
 from collections.abc import AsyncGenerator
 
 from app.config import get_settings
-from app.models.chat import ChatMessage, ChatStreamDelta, ToolCallFunction, ToolCallInfo
+from app.models.chat import ChatMessage, ChatStreamDelta, ToolCallFunction, ToolCallInfo, ToolResultInfo
 from app.services.chat.message_builder import build_messages
 from app.services.chat.tools.registry import registry
 from app.services.chat.skills import register_all_skills
@@ -18,15 +18,48 @@ _MAX_ROUNDS = 5
 _MAX_HISTORY_MESSAGES = 20
 
 
-async def _execute_tool_calls_ordered(tool_calls: list[ToolCallInfo]):
-    """并行执行一组工具调用。
+async def _execute_tool_calls_ordered(
+    tool_calls: list[ToolCallInfo],
+    _dedup_cache: dict[str, ToolResultInfo] | None = None,
+):
+    """并行执行一组工具调用，支持去重：name+args 相同的调用直接返回缓存。
 
     Param:
         tool_calls: 工具调用信息列表
+        _dedup_cache: 已执行工具调用的缓存字典（key = "name:arguments"），调用方维护
     Return:
         每个工具调用的结果列表，顺序与输入一致
     """
-    return await asyncio.gather(*(registry.execute_tool(tc) for tc in tool_calls))
+    if _dedup_cache is None:
+        _dedup_cache = {}
+
+    results: list[ToolResultInfo] = []
+    to_execute: list[tuple[int, ToolCallInfo]] = []
+
+    for i, tc in enumerate(tool_calls):
+        dedup_key = f"{tc.function.name}:{tc.function.arguments}"
+        if dedup_key in _dedup_cache:
+            logger.info(f"Dedup hit: {tc.function.name}({tc.function.arguments[:80]})")
+            # 用相同的 tool_call_id 生成新的 ToolResultInfo
+            cached = _dedup_cache[dedup_key]
+            results.append(ToolResultInfo(
+                tool_call_id=tc.id,
+                name=cached.name,
+                content=cached.content,
+                is_error=cached.is_error,
+            ))
+        else:
+            to_execute.append((i, tc))
+            results.append(None)  # placeholder
+
+    if to_execute:
+        executed = await asyncio.gather(*(registry.execute_tool(tc) for _, tc in to_execute))
+        for (idx, tc), result in zip(to_execute, executed):
+            dedup_key = f"{tc.function.name}:{tc.function.arguments}"
+            _dedup_cache[dedup_key] = result
+            results[idx] = result
+
+    return results
 
 
 def _build_create_kwargs(model: str, messages: list[dict], tool_choice: str) -> dict:
@@ -139,6 +172,7 @@ async def _run_legacy_agent(
     model = runtime.model
 
     messages = build_messages(message, history, _MAX_HISTORY_MESSAGES)
+    _dedup_cache: dict[str, ToolResultInfo] = {}
 
     for round_num in range(_MAX_ROUNDS + 1):
         logger.info(f"Agent round {round_num + 1}: calling LLM with {len(messages)} messages")
@@ -205,7 +239,7 @@ async def _run_legacy_agent(
                 for tc_info in openai_tool_calls:
                     yield ChatStreamDelta(type="tool_call", tool_call=tc_info)
                 messages.append(_build_assistant_tool_message(openai_tool_calls))
-                tool_results = await _execute_tool_calls_ordered(openai_tool_calls)
+                tool_results = await _execute_tool_calls_ordered(openai_tool_calls, _dedup_cache)
                 for tc_info, result in zip(openai_tool_calls, tool_results):
                     logger.info(
                         f"Pseudo tool result: {tc_info.function.name} -> "
@@ -246,7 +280,7 @@ async def _run_legacy_agent(
 
         messages.append(_build_assistant_tool_message(openai_tool_calls, assistant_content))
 
-        tool_results = await _execute_tool_calls_ordered(openai_tool_calls)
+        tool_results = await _execute_tool_calls_ordered(openai_tool_calls, _dedup_cache)
         for tc_info, result in zip(openai_tool_calls, tool_results):
             logger.info(
                 f"Tool result: {tc_info.function.name} -> "

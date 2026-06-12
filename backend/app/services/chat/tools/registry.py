@@ -187,10 +187,14 @@ class ChatRegistry:
         """
         tool = self._tools.get(call.function.name)
         if tool is None:
+            available = ", ".join(sorted(self._tools.keys()))
             return ToolResultInfo(
                 tool_call_id=call.id,
                 name=call.function.name,
-                content=f"Unknown tool: {call.function.name}",
+                content=(
+                    f"工具 '{call.function.name}' 不存在。"
+                    f"可用工具：{available}。请从以上列表中选择正确的工具重试。"
+                ),
                 is_error=True,
             )
         return await tool.execute(call)

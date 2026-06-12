@@ -10,8 +10,10 @@ from app.services.chat.tools.registry import registry
 
 _STOCK_QUERY = Skill(
     name="stock_query",
-    description="用户提到股票名称/代码时，先确认准确代码，再按意图选择对应分析工具",
-    usage="""先 search_stocks 确认准确代码，再根据意图选择：
+    description="用户提到股票名称/代码时，按意图选择对应分析工具",
+    usage="""根据意图选择：
+- 已知代码（6位数字或 sh/sz 前缀）→ 直接使用，不调 search_stocks
+- 仅给名称（如"贵州茅台"）→ 先 search_stocks 确认代码，再调分析工具
 - 深度分析 / 全面评估 → analyze_stock
 - 多股对比 → compare_stocks
 - K 线 / 技术面 → get_stock_kline 或 get_stock_technical_indicators
@@ -57,9 +59,12 @@ _NATURAL_LANGUAGE_QUERY = Skill(
 
 _URL_HANDLING = Skill(
     name="url_handling",
-    description="用户发送 URL 链接时，获取网页内容并直接总结",
+    description="用户发送 URL 链接时，获取网页内容并总结。支持新闻、博客、研报、Twitter/X 等",
     usage="""网页内容获取和总结 → fetch_url
-获取内容后直接对正文进行总结，不要再次调用其他工具。""",
+1. 调用 fetch_url(url=用户发送的链接) 获取网页正文
+2. 基于获取的内容直接总结，提取要点，条理清晰
+3. 不要调用其他股票分析工具，不要尝试搜索股票
+4. 如果获取失败，如实告知原因""",
 )
 
 
