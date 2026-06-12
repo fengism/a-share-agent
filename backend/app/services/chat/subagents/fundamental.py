@@ -12,6 +12,6 @@ def create_fundamentalagent() -> SubAgent:
         name="fundamental",
         display_name="基本面分析",
         system_prompt=FUNDAMENTAL_AGENT_PROMPT,
-        skill_names=["search_stocks", "get_stock_info", "get_stock_valuation_detail", "get_stock_financial"],
+        skill_names=["get_stock_valuation_detail", "get_stock_financial"],
         max_rounds=3,
     )

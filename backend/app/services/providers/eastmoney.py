@@ -1326,7 +1326,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         }
     
     def fetch_stock_fund_flow(self, code: str) -> list[dict]:
-        """获取个股资金流入日级，最近 120 个交易日）。
+        """获取个股，最近 120 个交易日）。
 
         Param:
             code: 6 位股票代码

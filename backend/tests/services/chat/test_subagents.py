@@ -11,7 +11,6 @@ class TestSubAgentCreation:
         agent = create_technicalagent()
         assert agent.name == "technical"
         assert agent.display_name == "技术面分析"
-        assert "search_stocks" in agent.skill_names
         assert "get_stock_kline" in agent.skill_names
         assert "get_stock_technical_indicators" in agent.skill_names
         assert agent.max_rounds == 3
@@ -19,7 +18,6 @@ class TestSubAgentCreation:
     def test_fundamental_agent_has_correct_config(self):
         agent = create_fundamentalagent()
         assert agent.name == "fundamental"
-        assert "get_stock_info" in agent.skill_names
         assert "get_stock_valuation_detail" in agent.skill_names
         assert "get_stock_financial" in agent.skill_names
 
@@ -32,8 +30,8 @@ class TestSubAgentCreation:
     def test_risk_agent_has_correct_config(self):
         agent = create_riskagent()
         assert agent.name == "risk"
-        assert "get_stock_info" in agent.skill_names
-        assert "get_stock_sentiment" in agent.skill_names
+        assert "get_stock_risk_data" in agent.skill_names
+        assert "get_stock_technical_indicators" in agent.skill_names
 
 
 class TestSkillRegistryToolDefinitions:

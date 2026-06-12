@@ -12,6 +12,6 @@ def create_newsagent() -> SubAgent:
         name="news",
         display_name="新闻情绪分析",
         system_prompt=NEWS_AGENT_PROMPT,
-        skill_names=["search_stocks", "get_stock_news", "get_stock_sentiment", "iwencai_search"],
+        skill_names=["get_stock_news", "get_stock_sentiment", "iwencai_search"],
         max_rounds=3,
     )

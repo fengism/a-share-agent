@@ -12,6 +12,6 @@ def create_technicalagent() -> SubAgent:
         name="technical",
         display_name="技术面分析",
         system_prompt=TECHNICAL_AGENT_PROMPT,
-        skill_names=["search_stocks", "get_stock_kline", "get_stock_technical_indicators"],
+        skill_names=["get_stock_kline", "get_stock_technical_indicators"],
         max_rounds=3,
     )

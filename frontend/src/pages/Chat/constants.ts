@@ -18,6 +18,7 @@ export const TOOL_LABELS: Record<string, string> = {
   analyze_stock: "个股分析",
   sector_analysis: "行业分析",
   compare_stocks: "对比分析",
+  fetch_url: "获取网页",
 };
 
 export const SAMPLE_PROMPTS = [
@@ -25,4 +26,5 @@ export const SAMPLE_PROMPTS = [
   "帮我找PE小于20的白酒股",
   "今天大盘怎么样",
   "最近哪些概念比较热",
+  "帮我总结这篇新闻 https://finance.sina.com.cn/",
 ];

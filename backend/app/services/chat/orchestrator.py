@@ -12,7 +12,7 @@ from openai import AsyncOpenAI
 from app.config import get_settings
 from app.models.chat import ChatMessage, ChatStreamDelta
 from app.services.chat.skills import register_all_skills
-from app.services.chat.subagents.base import SubAgentResult
+from app.services.chat.subagents.base import SharedToolCache, SubAgentResult
 from app.services.chat.subagents.prompts import (
     DECISION_SYNTHESIS_PROMPT,
     ORCHESTRATOR_CLASSIFY_PROMPT,
@@ -39,6 +39,7 @@ _FULL_ANALYSIS_KEYWORDS = ["分析", "综合", "评估", "深度", "全面", "�
 _STOCK_CODE_PATTERN = re.compile(r"\d{6}")
 
 _ALL_AGENTS = ["technical", "fundamental", "news", "risk", "macro"]
+_URL_PATTERN = re.compile(r'https?://\S+', re.IGNORECASE)
 
 
 @dataclass
@@ -73,6 +74,14 @@ class Orchestrator:
         llm_client = runtime.client
         model = runtime.model
 
+        # URL 消息直接回退到 legacy agent（拥有 fetch_url 工具），
+        # 避免 URL 中的 6 位数字被误匹配为股票代码而路由到子 Agent。
+        if _URL_PATTERN.search(message):
+            from app.services.chat.agent import _run_legacy_agent
+            async for delta in _run_legacy_agent(message, history):
+                yield delta
+            return
+
         decision = self._keyword_classify(message)
         logger.info(f"Keyword classify: agents={decision.agents}, stock_codes={decision.stock_codes}")
 
@@ -96,9 +105,13 @@ class Orchestrator:
 
         yield ChatStreamDelta(type="text", content="🔍 正在进行多维度分析...\n\n")
 
+        # 前置股票识别：一次性解析股票代码和基本信息，注入给所有子 Agent
+        stock_context = await self._resolve_stocks(message)
+        enriched_message = (stock_context + "\n\n" + message) if stock_context else message
+
         results: dict[str, SubAgentResult] = {}
         async for delta in self._run_sub_agents_streaming(
-            decision.agents, message, history, llm_client, model, results
+            decision.agents, enriched_message, history, llm_client, model, results
         ):
             yield delta
 
@@ -108,6 +121,73 @@ class Orchestrator:
             yield ChatStreamDelta(type="text", content=token)
 
         yield ChatStreamDelta(type="done")
+
+    async def _resolve_stocks(self, message: str) -> str:
+        """前置股票识别：解析消息中的股票并返回格式化上下文。
+
+        路由精确化：优先用 6 位代码精确解析；无代码时才走名称搜索，且仅接受
+        股票名（或其去掉常见后缀的核心名）字面出现在消息中的结果，过滤拼音/模糊误匹配，
+        避免「今天大盘怎么样」这类无个股意图的消息被误注入无关股票。
+
+        Param:
+            message: 用户原始消息
+        Return:
+            格式化的股票上下文字符串，无股票时返回空字符串
+        """
+        from app.services.chat.tools.stock_helpers import search_stocks, get_stock_info
+
+        codes = _STOCK_CODE_PATTERN.findall(message)
+        if codes:
+            # 有明确代码：按代码精确解析（最多 3 只），不做模糊搜索
+            stocks = [{"code": c, "name": ""} for c in dict.fromkeys(codes)][:3]
+        else:
+            search_result = await search_stocks(query=message)
+            if isinstance(search_result, dict) and search_result.get("error"):
+                return ""
+            if not search_result:
+                return ""
+            candidates = search_result if isinstance(search_result, list) else [search_result]
+            # 仅保留名称（或核心名）字面出现在消息中的结果，过滤拼音/模糊误匹配
+            stocks = [s for s in candidates if self._name_in_message(s.get("name", ""), message)][:3]
+            if not stocks:
+                return ""
+
+        lines = ["[股票信息预解析 — 已获取代码和基本信息，后续分析直接使用，无需再次搜索]"]
+        for s in stocks:
+            code = s.get("code", s.get("symbol", ""))
+            name = s.get("name", "")
+            if not code:
+                continue
+            info = await get_stock_info(code=code)
+            if isinstance(info, dict) and not info.get("error"):
+                name = name or info.get("name", "")
+                industry = info.get("industry", "")
+                market_cap = info.get("market_cap", info.get("total_market_value", ""))
+                pe = info.get("pe", info.get("pe_ttm", ""))
+                lines.append(f"- {name}（{code}）：行业={industry}，市值={market_cap}，PE={pe}")
+            else:
+                lines.append(f"- {name}（{code}）")
+
+        return "\n".join(lines) if len(lines) > 1 else ""
+
+    @staticmethod
+    def _name_in_message(name: str, message: str) -> bool:
+        """判断股票名是否字面出现在消息中（含去掉常见后缀的核心名）。
+
+        Param:
+            name: 股票名称
+            message: 用户原始消息
+        Return:
+            名称或其核心名出现在消息中返回 True
+        """
+        name = (name or "").strip()
+        if not name:
+            return False
+        if name in message:
+            return True
+        # 去掉 A/B/股份/集团/科技 等常见后缀后再比对核心名，至少 2 字才算匹配
+        core = re.sub(r"(股份|集团|科技|控股|实业|发展|国际|A|B)$", "", name)
+        return len(core) >= 2 and core in message
 
     def _keyword_classify(self, message: str) -> RoutingDecision:
         msg_lower = message.lower()
@@ -177,13 +257,16 @@ class Orchestrator:
         names = [n for n in agent_names if n in self.sub_agents]
         queue: asyncio.Queue = asyncio.Queue()
         _DONE = object()
+        # 跨子 Agent 共享工具缓存：估值/技术指标等被多个 Agent 共用的数据只抓一次
+        tool_cache = SharedToolCache()
 
         async def run_one(name: str) -> None:
             """运行单个子 Agent，向队列推送归属标题与工具增量，完成后存入 results。"""
             agent = self.sub_agents[name]
             await queue.put(ChatStreamDelta(type="text", content=f"\n🔧 **{agent.display_name}**\n"))
             try:
-                res = await agent.run(message, history, llm_client, model, event_queue=queue)
+                res = await agent.run(message, history, llm_client, model,
+                                      event_queue=queue, tool_cache=tool_cache)
             except asyncio.CancelledError:
                 raise
             except Exception as e:

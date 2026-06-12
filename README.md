@@ -101,6 +101,29 @@ LLM_MODEL=deepseek-chat
 
 所有配置也可在前端设置页面（`/settings`）动态修改，无需重启服务。
 
+### 网页抓取增强（可选）
+
+AI 聊天助手支持抓取任意 URL 并总结内容。基础抓取开箱即用，如需反爬绕过和 JS 渲染支持（如抓取需要 JavaScript 加载的 SPA 页面），可安装增强依赖：
+
+```bash
+cd backend
+
+# 1. 安装 Scrapling + 浏览器指纹库（一键安装可选依赖）
+uv pip install -e ".[web-fetch]"
+
+# 2. 安装 Playwright 浏览器（stealth/dynamic 模式需要）
+uv run playwright install chromium
+uv run playwright install-deps chromium   # 需要 sudo 权限
+```
+
+| 模式 | 命令 | 依赖 | 适用场景 |
+|------|------|------|---------|
+| `http` | 默认 | 仅 scrapling | 公开网页，自带反爬指纹 |
+| `stealth` | `--mode stealth` | + playwright + chromium | 反爬严格的网站 |
+| `dynamic` | `--mode dynamic` | + playwright + chromium | JS 渲染的 SPA 页面 |
+
+> 不安装增强依赖时，系统自动降级为纯 HTTP 抓取（`requests` + BeautifulSoup），功能不受影响。
+
 ### 问财数据源配置
 
 如需使用问财智能搜索和查询功能，在 `.env` 中配置：
