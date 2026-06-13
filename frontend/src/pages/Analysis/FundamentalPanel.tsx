@@ -3,7 +3,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useFinancial } from "../../api/queries";
 import type { AnalysisResult } from "../../types/stock";
 import RatingBadge from "../../components/RatingBadge";
-import { cardStyle, sectionHeaderStyle, tagStyle } from "../../styles/ui";
+import { useColors, useStyles } from "../../theme/hooks";
 import { financialFieldLabels } from "../../utils/financialFieldLabels";
 
 interface Props {
@@ -96,7 +96,7 @@ function formatFinancialFieldLabel(key: string) {
   return [...translated, ...suffixLabels].join("");
 }
 
-function renderTags(items: string[] | undefined, color: string) {
+function renderTags(items: string[] | undefined, color: string, tagStyle: React.CSSProperties) {
   if (!items || items.length === 0) {
     return <Text type="secondary">暂无</Text>;
   }
@@ -110,6 +110,8 @@ function renderTags(items: string[] | undefined, color: string) {
 
 
 export default function FundamentalPanel({ code, analysis }: Props) {
+  const c = useColors();
+  const { cardStyle, sectionHeaderStyle, tagStyle } = useStyles();
   const { data: balance, isLoading: l1 } = useFinancial(code, "balance");
   const { data: profit, isLoading: l2 } = useFinancial(code, "profit");
   const { data: cashflow, isLoading: l3 } = useFinancial(code, "cashflow");
@@ -117,7 +119,7 @@ export default function FundamentalPanel({ code, analysis }: Props) {
   if (l1 || l2 || l3) return <Spin />;
 
   const renderTable = (data: Record<string, unknown>[] | undefined) => {
-    if (!data || data.length === 0) return <div style={{ color: "#9ca3af", padding: 16 }}>暂无数据</div>;
+    if (!data || data.length === 0) return <div style={{ color: c.textSecondary, padding: 16 }}>暂无数据</div>;
 
     const filteredRecords = data.map((record) => {
       const entries = Object.entries(record)
@@ -131,7 +133,7 @@ export default function FundamentalPanel({ code, analysis }: Props) {
     );
 
     if (nonEmptyRows.length === 0) {
-      return <div style={{ color: "#9ca3af", padding: 16 }}>暂无数据</div>;
+      return <div style={{ color: c.textSecondary, padding: 16 }}>暂无数据</div>;
     }
 
     const visibleKeys = Object.keys(nonEmptyRows[0]).filter((key) =>
@@ -148,13 +150,13 @@ export default function FundamentalPanel({ code, analysis }: Props) {
     const columns: ColumnsType<Record<string, unknown>> = visibleKeys.map((key) => {
       const align = key.includes("同比") || key.includes("率") || key.includes("金额") || key.includes("收入") || key.includes("利润") || key.includes("现金流") ? "right" : "left";
       return {
-        title: <span style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", whiteSpace: "nowrap" }}>{key}</span>,
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary, whiteSpace: "nowrap" }}>{key}</span>,
         dataIndex: key,
         key,
         width: 150,
         ellipsis: true,
         align,
-        render: (v: unknown) => <span style={{ fontSize: 12, color: "#9ca3af", whiteSpace: "nowrap" }}>{v === "N/A" || v === null || v === undefined || v === "" ? "-" : String(v)}</span>,
+        render: (v: unknown) => <span style={{ fontSize: 12, color: c.textSecondary, whiteSpace: "nowrap" }}>{v === "N/A" || v === null || v === undefined || v === "" ? "-" : String(v)}</span>,
       };
     });
     return (
@@ -185,29 +187,29 @@ export default function FundamentalPanel({ code, analysis }: Props) {
       {analysis?.fundamental && (
         <Card
           size="small"
-          style={{ ...cardStyle, marginBottom: 16, borderTop: "3px solid #1f3a5f" }}
+          style={{ ...cardStyle, marginBottom: 16, borderTop: `3px solid ${c.primary}55` }}
           styles={{ body: { padding: 16 } }}
         >
           <Row gutter={[16, 16]} align="middle">
             <Col xs={24} sm={6} style={{ textAlign: "center" }}>
               <RatingBadge score={analysis.fundamental.score} size={64} />
-              <div style={{ marginTop: 8, fontWeight: 600, color: "#e5e7eb" }}>基本面评分</div>
+              <div style={{ marginTop: 8, fontWeight: 600, color: c.textPrimary }}>基本面评分</div>
             </Col>
             <Col xs={24} sm={18}>
-              <Paragraph style={{ marginBottom: 12, color: "#9ca3af", lineHeight: 1.8 }}>
+              <Paragraph style={{ marginBottom: 12, color: c.textSecondary, lineHeight: 1.8 }}>
                 {analysis.fundamental.summary}
               </Paragraph>
               <div style={tagStyle}>
-                <Text strong style={{ color: "#3b82f6" }}>核心优势：</Text>
+                <Text strong style={{ color: c.primary }}>核心优势：</Text>
               </div>
               <div style={{ marginBottom: 12 }}>
-                {renderTags(analysis.fundamental.strengths, "blue")}
+                {renderTags(analysis.fundamental.strengths, "blue", tagStyle)}
               </div>
               <div style={tagStyle}>
-                <Text strong style={{ color: "#ff4d4f" }}>主要风险：</Text>
+                <Text strong style={{ color: c.up }}>主要风险：</Text>
               </div>
               <div>
-                {renderTags(analysis.fundamental.risks, "red")}
+                {renderTags(analysis.fundamental.risks, "red", tagStyle)}
               </div>
             </Col>
           </Row>
@@ -215,7 +217,7 @@ export default function FundamentalPanel({ code, analysis }: Props) {
       )}
 
       <div style={sectionHeaderStyle}>
-        <Text strong style={{ color: "#e5e7eb", fontSize: 13 }}>三张报表</Text>
+        <Text strong style={{ color: c.textPrimary, fontSize: 13 }}>三张报表</Text>
         <Text type="secondary" style={{ fontSize: 12 }}>按报告期查看明细</Text>
       </div>
       <div style={{ width: "100%", minWidth: 0, overflowX: "hidden" }}>

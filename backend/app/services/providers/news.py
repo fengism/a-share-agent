@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 
-class RssDataProvider(BaseDataProvider):
+class NewsDataProvider(BaseDataProvider):
     """Purpose: 通过 RSS/Atom 订阅源拉取并解析财经新闻媒体内容，输出统一的 NewsSearchItem。"""
     def __init__(self):
-        """初始化 RssDataProvider，固定 name 与 source_label。"""
+        """初始化 NewsDataProvider，固定 name 与 source_label。"""
         super().__init__(name="rss", source_label="RSS")
 
     def _parse_rss_feed(
@@ -157,16 +157,85 @@ class RssDataProvider(BaseDataProvider):
         )
 
     def fetch_wallstreetcn_hot_article(self) -> list[NewsSearchItem]:
-        """获取华尔街见闻最热文章（RSS 订阅源）。
+        """获取华尔街见闻最热文章（Hot Articles API）。
 
+        Return:
+            NewsSearchItem 列表，按热度排序
+        """
+        url = "https://api-one-wscn.awtmt.com/apiv1/content/articles/hot"
+        try:
+            resp = request("GET", url, params={"period": "all"},
+                           headers={"Content-Type": "application/json"}, timeout=10)
+            resp.raise_for_status()
+        except Exception as e:
+            logger.warning("华尔街见闻最热文章获取失败: %s", e)
+            return []
+        data = resp.json()
+        items = data.get("data", {}).get("day_items", []) or []
+        results: list[NewsSearchItem] = []
+        for item in items:
+            title = str(item.get("title") or "").strip()
+            if not title:
+                continue
+            publish_time = self._parse_timestamp(item.get("display_time", ""))
+            results.append(
+                NewsSearchItem(
+                    title=title,
+                    content="",
+                    source="华尔街见闻 - 最热文章",
+                    publish_time=str(publish_time),
+                    url=item.get("uri", ""),
+                    author="华尔街见闻",
+                    read_count=int(item.get("pageviews", 0)),
+                    comment_count=int(item.get("comment_count", 0)),
+                )
+            )
+        return results
+
+    def fetch_wallstreetcn_news(self, limit: int = 10) -> list[NewsSearchItem]:
+        """获取华尔街见闻最新资讯（Information Flow API，article 类型）。
+
+        Param:
+            limit: 返回条数，默认 10
         Return:
             NewsSearchItem 列表
         """
-        return self._parse_rss_feed(
-            "https://rsshub.app/wallstreetcn/hot",
-            source="华尔街见闻 - 最热文章", author="华尔街见闻 - 最热文章",
-            content_field="description", fallback_pub_time=True,
-        )
+        url = "https://api-one-wscn.awtmt.com/apiv1/content/information-flow"
+        params = {"channel": "global", "accept": "article", "limit": limit}
+        try:
+            resp = request("GET", url, params=params, headers={"Content-Type": "application/json"}, timeout=10)
+            resp.raise_for_status()
+        except Exception as e:
+            logger.warning("华尔街见闻资讯获取失败: %s", e)
+            return []
+        data = resp.json()
+        items = data.get("data", {}).get("items", []) or []
+        results: list[NewsSearchItem] = []
+        for item in items:
+            resource = item.get("resource", {})
+            title = str(resource.get("title") or "").strip()
+            content = str(resource.get("content_short") or "").strip()
+            if not title:
+                title = content[:30] + "..." if len(content) > 30 else content
+            article_url = resource.get("uri", "")
+            publish_time = self._parse_timestamp(resource.get("display_time", ""))
+            author_info = resource.get("author", {})
+            author = "华尔街见闻"
+            if isinstance(author_info, dict):
+                author = author_info.get("display_name") or author_info.get("name") or "华尔街见闻"
+            results.append(
+                NewsSearchItem(
+                    title=title,
+                    content=content,
+                    source="华尔街见闻",
+                    publish_time=str(publish_time),
+                    url=article_url,
+                    author=author,
+                    read_count=0,
+                    comment_count=0,
+                )
+            )
+        return results
 
     def fetch_wallstreetcn_kuaixun(self) -> list[NewsSearchItem]:
         """获取华尔街见闻的 7x24 快讯数据。
@@ -237,8 +306,8 @@ class RssDataProvider(BaseDataProvider):
         """
         return self.fetch_wallstreetcn_kuaixun()
 
-rss_provider = RssDataProvider()
+news_provider = NewsDataProvider()
 
 if __name__ == "__main__":
-    result = rss_provider.fetch_wallstreetcn_hot_article()
+    result = news_provider.fetch_wallstreetcn_hot_article()
     print(result)

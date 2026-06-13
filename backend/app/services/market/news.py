@@ -7,6 +7,9 @@ from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.rate_limiter import call_blocking
 from app.utils.news_utils import dedupe_news_items, filter_recent_news_items, news_sort_key
+from app.utils.singleflight import AsyncSingleFlight
+
+_news_singleflight: AsyncSingleFlight[list] = AsyncSingleFlight()
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +39,8 @@ def _get_eastmoney_provider():
     return get_provider("eastmoney")
 
 
-def _get_rss_provider():
-    """延迟获取 RSS provider。"""
+def _get_news_provider():
+    """延迟获取 News（RSS）provider。"""
     return get_provider("rss")
 
 
@@ -52,7 +55,7 @@ def _kuaixun_sources() -> list[NewsSource]:
     """返回快讯数据源列表。"""
     eastmoney = _get_eastmoney_provider()
     baidu = _get_baidu_provider()
-    rss = _get_rss_provider()
+    rss = _get_news_provider()
     return [
         NewsSource("东方财富7×24快讯", eastmoney.fetch_market_kuaixun, limit=50),
         NewsSource("百度7×24快讯", baidu.fetch_market_kuaixun, limit=50),
@@ -63,7 +66,7 @@ def _kuaixun_sources() -> list[NewsSource]:
 def _news_sources() -> list[NewsSource]:
     """返回非快讯类新闻数据源列表。"""
     eastmoney = _get_eastmoney_provider()
-    rss = _get_rss_provider()
+    rss = _get_news_provider()
     cls = _get_cls_provider()
     return [
         NewsSource("东方财富财经新闻", eastmoney.fetch_market_news),
@@ -74,6 +77,7 @@ def _news_sources() -> list[NewsSource]:
         NewsSource("雪球新闻", rss.fetch_xueqiu_news),
         NewsSource("界面新闻", rss.fetch_jiemain_news),
         NewsSource("经济观察报", rss.fetch_eeo_news),
+        NewsSource("华尔街见闻", rss.fetch_wallstreetcn_news),
     ]
 
 
@@ -105,6 +109,8 @@ def _unify_source(items: list, label: str) -> list:
 async def get_market_kuaixun() -> list:
     """聚合多渠道 7×24 快讯，合并去重后返回。
 
+    使用 SingleFlight 防止缓存击穿，高并发时仅一次实际加载。
+
     Param:
         无
     Return:
@@ -115,15 +121,17 @@ async def get_market_kuaixun() -> list:
     if cached is not None:
         return cached
 
-    result = await _gather_news(_kuaixun_sources())
-    result = _unify_source(result, KUAIXUN_LABEL)
-    result = filter_recent_news_items(result, days=1)
-    result = dedupe_news_items(result)
-    result.sort(key=news_sort_key, reverse=True)
-    result = result[:200]
+    async def _load() -> list:
+        result = await _gather_news(_kuaixun_sources())
+        result = _unify_source(result, KUAIXUN_LABEL)
+        result = filter_recent_news_items(result, days=1)
+        result = dedupe_news_items(result)
+        result.sort(key=news_sort_key, reverse=True)
+        result = result[:200]
+        cache.set(cache_key, result, ttl=60)
+        return result
 
-    cache.set(cache_key, result, ttl=60)
-    return result
+    return await _news_singleflight.do(cache_key, _load)
 
 
 async def get_market_other_news() -> list:
@@ -139,14 +147,16 @@ async def get_market_other_news() -> list:
     if cached is not None:
         return cached
 
-    result = await _gather_news(_news_sources())
-    result = filter_recent_news_items(result, days=1)
-    result = dedupe_news_items(result)
-    result.sort(key=news_sort_key, reverse=True)
-    result = result[:100]
+    async def _load() -> list:
+        result = await _gather_news(_news_sources())
+        result = filter_recent_news_items(result, days=1)
+        result = dedupe_news_items(result)
+        result.sort(key=news_sort_key, reverse=True)
+        result = result[:100]
+        cache.set(cache_key, result, ttl=300)
+        return result
 
-    cache.set(cache_key, result, ttl=300)
-    return result
+    return await _news_singleflight.do(cache_key, _load)
 
 
 async def get_market_news() -> list:
@@ -162,15 +172,16 @@ async def get_market_news() -> list:
     if cached is not None:
         return cached
 
-    result = await _gather_news(_all_sources())
+    async def _load() -> list:
+        result = await _gather_news(_all_sources())
+        result = filter_recent_news_items(result)
+        result = dedupe_news_items(result)
+        result.sort(key=news_sort_key, reverse=True)
+        result = result[:30]
+        cache.set(cache_key, result, ttl=600)
+        return result
 
-    result = filter_recent_news_items(result)
-    result = dedupe_news_items(result)
-    result.sort(key=news_sort_key, reverse=True)
-    result = result[:30]
-
-    cache.set(cache_key, result, ttl=600)
-    return result
+    return await _news_singleflight.do(cache_key, _load)
 
 
 async def get_market_feed() -> list:
@@ -186,15 +197,16 @@ async def get_market_feed() -> list:
     if cached is not None:
         return cached
 
-    result = await _gather_news(_all_sources())
+    async def _load() -> list:
+        result = await _gather_news(_all_sources())
+        result = filter_recent_news_items(result, days=1)
+        result = dedupe_news_items(result)
+        result.sort(key=news_sort_key, reverse=True)
+        result = result[:300]
+        cache.set(cache_key, result, ttl=120)
+        return result
 
-    result = filter_recent_news_items(result, days=1)
-    result = dedupe_news_items(result)
-    result.sort(key=news_sort_key, reverse=True)
-    result = result[:300]
-
-    cache.set(cache_key, result, ttl=120)
-    return result
+    return await _news_singleflight.do(cache_key, _load)
 
 
 async def get_twitter_feed() -> list:

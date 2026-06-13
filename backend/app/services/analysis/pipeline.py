@@ -11,8 +11,8 @@ from types import SimpleNamespace
 from app.models.analysis import AnalysisProgress, AnalysisResult, AnalysisStage
 from app.services import technical
 from app.services.market.indices import get_indices
-from app.services.analysis.news import get_stock_news
-from app.services.analysis.retail import get_retail_sentiment, get_stock_sentiment
+from app.services.stock.news import get_stock_news
+from app.services.stock.retail import get_retail_sentiment, get_stock_sentiment
 from app.services.stock.basic_info import get_basic_info
 from app.services.stock.financials import get_financial_metrics
 from app.services.stock.kline import get_kline
@@ -22,7 +22,7 @@ from app.services.analysis.prompts import SCHEMA_INSTRUCTION, SYSTEM_PROMPT, USE
 from app.services.analysis.parser import parse_with_retry
 from app.utils.cache import cache
 from app.config import get_settings
-
+   
 logger = logging.getLogger(__name__)
 
 stock_data = SimpleNamespace(

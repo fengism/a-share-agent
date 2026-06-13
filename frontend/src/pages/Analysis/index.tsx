@@ -6,7 +6,7 @@ import jsPDF from "jspdf";
 import { useStockInfo, useKlineData, useIntradayData, useAnalysisResult, useValuation, usePush } from "../../api/queries";
 import PushModal from "../../components/PushModal";
 import type { PushRequest } from "../../types/stock";
-import { useStyles } from "../../styles/ui";;
+import { useColors, useStyles } from "../../theme/hooks";
 import { streamAnalysis } from "../../api/sse";
 import type { AnalysisProgress, AnalysisStage } from "../../api/sse";
 import KlineChart from "../../charts/KlineChart";
@@ -38,6 +38,7 @@ function formatAmountWanYi(value: number | null | undefined) {
 }
 
 export default function Analysis() {
+  const c = useColors();
   const { cardStyle, gradientHeaderStyle, pageContainerStyle, sectionCardBodyStyle } = useStyles();
   const { code } = useParams<{ code: string }>();
   const [messageApi, contextHolder] = message.useMessage();
@@ -189,7 +190,7 @@ export default function Analysis() {
       const canvas = await html2canvas(exportRef.current, {
         scale: 2,
         useCORS: true,
-        backgroundColor: "#0b1120",
+        backgroundColor: c.pageBg,
       });
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
@@ -220,9 +221,21 @@ export default function Analysis() {
     } finally {
       setIsExportingPdf(false);
     }
-  }, [code, messageApi]);
+  }, [code, messageApi, c.pageBg]);
 
   if (infoLoading) return <Spin size="large" style={{ display: "block", margin: "100px auto" }} />;
+
+  // CSS custom properties for the <style> block to reference
+  const cssVars = {
+    "--theme-page-bg": c.pageBg,
+    "--theme-card-bg": c.cardBg,
+    "--theme-elevated-bg": c.elevatedBg,
+    "--theme-nested-bg": c.nestedBg,
+    "--theme-border": c.border,
+    "--theme-text-primary": c.textPrimary,
+    "--theme-text-secondary": c.textSecondary,
+    "--theme-primary": c.primary,
+  } as React.CSSProperties;
 
   const panelItems = [
     {
@@ -250,7 +263,7 @@ export default function Analysis() {
   const exportPanelContent = isExportingPdf
     ? panelItems.map((item) => (
         <div key={item.key} className="pdf-section-block" style={{ marginTop: item.key === "fundamental" ? 0 : 20 }}>
-          <div className="pdf-section-title" style={{ fontSize: 15, fontWeight: 700, color: "#e5e7eb", marginBottom: 12 }}>
+          <div className="pdf-section-title" style={{ fontSize: 15, fontWeight: 700, color: c.textPrimary, marginBottom: 12 }}>
             {item.label}
           </div>
           {item.children}
@@ -258,37 +271,42 @@ export default function Analysis() {
       ))
     : null;
 
+  const upColor = c.up;
+  const downColor = c.down;
+  const changeColor = latestKline ? ((latestKline.change_pct ?? 0) > 0 ? upColor : (latestKline.change_pct ?? 0) < 0 ? downColor : c.textPrimary) : c.textPrimary;
+  const isDown = latestKline && (latestKline.change_pct ?? 0) < 0;
+
   return (
     <>
       {contextHolder}
-      <div ref={exportRef} style={pageContainerStyle} className={isExportingPdf ? "pdf-exporting" : undefined}>
+      <div ref={exportRef} style={{ ...pageContainerStyle, ...cssVars }} className={isExportingPdf ? "pdf-exporting" : undefined}>
         <style>{`
           .terminal-table-row td {
             font-size: 12px;
-            color: #9ca3af;
+            color: var(--theme-text-secondary);
             padding-top: 8px !important;
             padding-bottom: 8px !important;
-            border-bottom: 1px solid #1e293b !important;
+            border-bottom: 1px solid var(--theme-border) !important;
           }
           .ant-tabs .ant-tabs-tab {
             padding: 10px 14px;
             border-radius: 8px 8px 0 0;
-            color: #9ca3af;
+            color: var(--theme-text-secondary);
             transition: all 0.2s ease;
           }
           .ant-tabs .ant-tabs-tab:hover {
-            color: #3b82f6;
-            background: #1a2332;
+            color: var(--theme-primary);
+            background: var(--theme-elevated-bg);
           }
           .ant-tabs .ant-tabs-tab.ant-tabs-tab-active {
-            background: #0f1720;
+            background: var(--theme-nested-bg);
           }
           .ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
-            color: #3b82f6;
+            color: var(--theme-primary);
             font-weight: 700;
           }
           .ant-tabs .ant-tabs-ink-bar {
-            background: #3b82f6;
+            background: var(--theme-primary);
             height: 3px;
             border-radius: 999px;
           }
@@ -306,29 +324,29 @@ export default function Analysis() {
           }
           .pdf-exporting .ant-card {
             box-shadow: none !important;
-            border-color: #1e293b !important;
-            background: #111827 !important;
+            border-color: var(--theme-border) !important;
+            background: var(--theme-card-bg) !important;
           }
           .pdf-exporting {
             max-width: 1100px !important;
             padding: 0 !important;
-            background: #0b1120 !important;
-            color: #e5e7eb !important;
+            background: var(--theme-page-bg) !important;
+            color: var(--theme-text-primary) !important;
           }
           .pdf-exporting .ant-card-head {
             min-height: 40px !important;
             padding-inline: 16px !important;
-            background: #111827 !important;
-            border-bottom-color: #1e293b !important;
+            background: var(--theme-card-bg) !important;
+            border-bottom-color: var(--theme-border) !important;
           }
           .pdf-exporting .ant-card-body {
             padding-top: 14px !important;
             padding-bottom: 14px !important;
           }
           .pdf-exporting .ant-tag {
-            border-color: #1e293b !important;
-            background: #1a2332 !important;
-            color: #e5e7eb !important;
+            border-color: var(--theme-border) !important;
+            background: var(--theme-elevated-bg) !important;
+            color: var(--theme-text-primary) !important;
           }
           .pdf-exporting .pdf-metric-card {
             min-height: 72px !important;
@@ -340,7 +358,7 @@ export default function Analysis() {
           }
           .pdf-exporting .pdf-section-title {
             padding-bottom: 6px;
-            border-bottom: 1px solid #1e293b;
+            border-bottom: 1px solid var(--theme-border);
           }
           .pdf-exporting .pdf-list-item {
             break-inside: avoid;
@@ -370,26 +388,26 @@ export default function Analysis() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 }}>
             <div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                <Title level={3} style={{ margin: 0, color: "#e5e7eb", letterSpacing: 0.2 }}>
+                <Title level={3} style={{ margin: 0, color: c.textPrimary, letterSpacing: 0.2 }}>
                   {info?.name || code}
                 </Title>
-                <span style={{ fontSize: 14, color: "#9ca3af", fontWeight: 500 }}>
+                <span style={{ fontSize: 14, color: c.textSecondary, fontWeight: 500 }}>
                   {info?.code}
                 </span>
               </div>
               <div style={{ marginTop: 8, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                 {info?.first_industry && (
-                  <span style={{ fontSize: 12, color: "#9ca3af", background: "#1a2332", border: "1px solid #1e293b", padding: "3px 10px", borderRadius: 999 }}>
+                  <span style={{ fontSize: 12, color: c.textSecondary, background: c.elevatedBg, border: `1px solid ${c.border}`, padding: "3px 10px", borderRadius: 999 }}>
                     {info.first_industry.name}
                   </span>
                 )}
                 {info?.second_industry && (
-                  <span style={{ fontSize: 12, color: "#9ca3af", background: "#1a2332", border: "1px solid #1e293b", padding: "3px 10px", borderRadius: 999 }}>
+                  <span style={{ fontSize: 12, color: c.textSecondary, background: c.elevatedBg, border: `1px solid ${c.border}`, padding: "3px 10px", borderRadius: 999 }}>
                     {info.second_industry.name}
                   </span>
                 )}
                 {priceSnapshot.listingDate && (
-                  <span style={{ fontSize: 12, color: "#9ca3af" }}>上市日期 {priceSnapshot.listingDate}</span>
+                  <span style={{ fontSize: 12, color: c.textSecondary }}>上市日期 {priceSnapshot.listingDate}</span>
                 )}
               </div>
             </div>
@@ -429,7 +447,7 @@ export default function Analysis() {
                   size="large"
                   icon={<ThunderboltOutlined />}
                   onClick={handleAnalyze}
-                  style={{ borderRadius: 8, height: 42, paddingInline: 24, fontWeight: 600, background: "#3b82f6" }}
+                  style={{ borderRadius: 8, height: 42, paddingInline: 24, fontWeight: 600 }}
                 >
                   智能分析
                 </Button>
@@ -440,53 +458,53 @@ export default function Analysis() {
           <div style={{ display: "grid", gap: 14 }}>
             <Row gutter={[14, 14]} align="stretch">
               <Col xs={12} md={6}>
-                <div className="pdf-metric-card pdf-metric-card-primary" style={{ padding: "14px 16px", background: "linear-gradient(135deg, #1a0f0f, #2d1518)", border: "1px solid #ead7d5", borderRadius: 10, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>最新股价</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: latestKline ? ((latestKline.change_pct ?? 0) > 0 ? "#ef4444" : (latestKline.change_pct ?? 0) < 0 ? "#22c55e" : "#e5e7eb") : "#e5e7eb", letterSpacing: 0.2 }}>
+                <div className="pdf-metric-card pdf-metric-card-primary" style={{ padding: "14px 16px", background: isDown ? c.downCardGradient : c.upCardGradient, border: `1px solid ${isDown ? `${c.down}40` : `${c.up}40`}`, borderRadius: 10, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>最新股价</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: changeColor, letterSpacing: 0.2 }}>
                     {priceSnapshot.latestPrice != null ? `¥${priceSnapshot.latestPrice.toFixed(2)}` : "-"}
                   </div>
                 </div>
               </Col>
               <Col xs={12} md={6}>
-                <div className="pdf-metric-card pdf-metric-card-primary" style={{ padding: "14px 16px", background: latestKline && (latestKline.change_pct ?? 0) < 0 ? "linear-gradient(135deg, #0f1a14, #152d1d)" : "linear-gradient(135deg, #1a0f0f, #2d1518)", border: `1px solid ${latestKline && (latestKline.change_pct ?? 0) < 0 ? "#152d1d" : "#2d1518"}`, borderRadius: 10, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>单日涨跌幅</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: latestKline ? ((latestKline.change_pct ?? 0) > 0 ? "#ef4444" : (latestKline.change_pct ?? 0) < 0 ? "#22c55e" : "#e5e7eb") : "#e5e7eb" }}>
+                <div className="pdf-metric-card pdf-metric-card-primary" style={{ padding: "14px 16px", background: isDown ? c.downCardGradient : c.upCardGradient, border: `1px solid ${isDown ? `${c.down}40` : `${c.up}40`}`, borderRadius: 10, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>单日涨跌幅</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: changeColor }}>
                     {priceSnapshot.latestChangePct != null ? `${priceSnapshot.latestChangePct > 0 ? "+" : ""}${priceSnapshot.latestChangePct.toFixed(2)}%` : "-"}
                   </div>
                 </div>
               </Col>
               <Col xs={12} md={6}>
-                <div className="pdf-metric-card pdf-metric-card-primary" style={{ padding: "14px 16px", background: valuationSnapshot.peTtm != null && valuationSnapshot.peTtm > 30 ? "linear-gradient(135deg, #1a0f0f, #2d1518)" : "#1a2332", border: `1px solid ${valuationSnapshot.peTtm != null && valuationSnapshot.peTtm > 30 ? "#2d1518" : "#1e293b"}`, borderRadius: 10, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>市盈率(TTM)</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: valuationSnapshot.peTtm != null && valuationSnapshot.peTtm > 30 ? "#ef4444" : "#e5e7eb" }}>{valuationSnapshot.peTtm != null ? valuationSnapshot.peTtm.toFixed(2) : "-"}</div>
+                <div className="pdf-metric-card pdf-metric-card-primary" style={{ padding: "14px 16px", background: valuationSnapshot.peTtm != null && valuationSnapshot.peTtm > 30 ? c.upCardGradient : c.elevatedBg, border: `1px solid ${valuationSnapshot.peTtm != null && valuationSnapshot.peTtm > 30 ? `${c.up}40` : c.border}`, borderRadius: 10, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>市盈率(TTM)</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: valuationSnapshot.peTtm != null && valuationSnapshot.peTtm > 30 ? c.up : c.textPrimary }}>{valuationSnapshot.peTtm != null ? valuationSnapshot.peTtm.toFixed(2) : "-"}</div>
                 </div>
               </Col>
               <Col xs={12} md={6}>
-                <div style={{ padding: "14px 16px", background: valuationSnapshot.pb != null && valuationSnapshot.pb > 3 ? "linear-gradient(135deg, #1a0f0f, #2d1518)" : "#1a2332", border: `1px solid ${valuationSnapshot.pb != null && valuationSnapshot.pb > 3 ? "#2d1518" : "#1e293b"}`, borderRadius: 10, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>市净率</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: valuationSnapshot.pb != null && valuationSnapshot.pb > 3 ? "#ef4444" : "#e5e7eb" }}>{valuationSnapshot.pb != null ? valuationSnapshot.pb.toFixed(2) : "-"}</div>
+                <div style={{ padding: "14px 16px", background: valuationSnapshot.pb != null && valuationSnapshot.pb > 3 ? c.upCardGradient : c.elevatedBg, border: `1px solid ${valuationSnapshot.pb != null && valuationSnapshot.pb > 3 ? `${c.up}40` : c.border}`, borderRadius: 10, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>市净率</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: valuationSnapshot.pb != null && valuationSnapshot.pb > 3 ? c.up : c.textPrimary }}>{valuationSnapshot.pb != null ? valuationSnapshot.pb.toFixed(2) : "-"}</div>
                 </div>
               </Col>
             </Row>
             <Row gutter={[14, 14]} align="stretch">
               <Col xs={12} md={6}>
-                <div className="pdf-metric-card" style={{ padding: "12px 14px", background: "#1a2332", border: "1px solid #1e293b", borderRadius: 10, minHeight: 82, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>成交额</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#e5e7eb" }}>{formatAmountWanYi(latestKline?.amount)}</div>
+                <div className="pdf-metric-card" style={{ padding: "12px 14px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 10, minHeight: 82, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>成交额</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: c.textPrimary }}>{formatAmountWanYi(latestKline?.amount)}</div>
                 </div>
               </Col>
               <Col xs={12} md={6}>
-                <div className="pdf-metric-card" style={{ padding: "12px 14px", background: "#1a2332", border: "1px solid #1e293b", borderRadius: 10, minHeight: 82, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>换手率</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#e5e7eb" }}>
+                <div className="pdf-metric-card" style={{ padding: "12px 14px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 10, minHeight: 82, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>换手率</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: c.textPrimary }}>
                     {latestKline?.turnover_pct != null ? `${latestKline.turnover_pct.toFixed(2)}%` : info?.turnover_pct != null ? `${info.turnover_pct.toFixed(2)}%` : "-"}
                   </div>
                 </div>
               </Col>
               <Col xs={12} md={6}>
-                <div className="pdf-metric-card" style={{ padding: "12px 14px", background: "#1a2332", border: "1px solid #1e293b", borderRadius: 10, minHeight: 82, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>总市值</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#e5e7eb" }}>{formatMarketCap(priceSnapshot.marketCap)}</div>
+                <div className="pdf-metric-card" style={{ padding: "12px 14px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 10, minHeight: 82, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>总市值</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: c.textPrimary }}>{formatMarketCap(priceSnapshot.marketCap)}</div>
                 </div>
               </Col>
             </Row>
@@ -506,7 +524,7 @@ export default function Analysis() {
 
         {/* AI Conclusion or Skeleton */}
         {(displayResult || isAnalyzing) && (
-          <div className="pdf-avoid-break" style={{ marginBottom: 12, borderLeft: "4px solid transparent", borderImage: "linear-gradient(180deg, #3b82f6, #6366f1) 1", background: "#0f1720", borderRadius: 8, padding: 4 }}>
+          <div className="pdf-avoid-break" style={{ marginBottom: 12, borderLeft: "4px solid transparent", borderImage: `linear-gradient(180deg, ${c.primary}, ${c.accent}) 1`, background: c.nestedBg, borderRadius: 8, padding: 4 }}>
             {displayResult ? <AIConclusion result={displayResult} /> : <SkeletonAIConclusion />}
           </div>
         )}
@@ -526,22 +544,21 @@ export default function Analysis() {
           <Card
             size="small"
             className="pdf-avoid-break"
-            style={{ ...cardStyle, marginBottom: 12, borderTop: "3px solid #3b82f6",
-boxShadow: "0 -1px 8px rgba(59,130,246,0.3)" }}
+            style={{ ...cardStyle, marginBottom: 12, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
             styles={{ body: { padding: "12px 16px" } }}
           >
             <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr", gap: 12 }}>
-              <div style={{ padding: "10px 12px", background: "#1a2332", border: "1px solid #1e293b", borderRadius: 8 }}>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>技术结论</div>
-                <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.8 }}>{displayResult.technical.summary}</div>
+              <div style={{ padding: "10px 12px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 8 }}>
+                <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>技术结论</div>
+                <div style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.8 }}>{displayResult.technical.summary}</div>
               </div>
-              <div style={{ padding: "10px 12px", background: "#1a2332", border: "1px solid #1e293b", borderRadius: 8 }}>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>趋势判断</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#e5e7eb" }}>{displayResult.technical.trend || "-"}</div>
+              <div style={{ padding: "10px 12px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 8 }}>
+                <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>趋势判断</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: c.textPrimary }}>{displayResult.technical.trend || "-"}</div>
               </div>
-              <div style={{ padding: "10px 12px", background: "#1a2332", border: "1px solid #1e293b", borderRadius: 8 }}>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>关键位</div>
-                <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.8 }}>
+              <div style={{ padding: "10px 12px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 8 }}>
+                <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>关键位</div>
+                <div style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.8 }}>
                   支撑 {displayResult.technical.support_level?.toFixed(2) ?? "-"} / 压力 {displayResult.technical.resistance_level?.toFixed(2) ?? "-"}
                 </div>
               </div>
@@ -553,26 +570,25 @@ boxShadow: "0 -1px 8px rgba(59,130,246,0.3)" }}
           <Card
             size="small"
             className="pdf-avoid-break"
-            title={<span style={{ fontWeight: 700, color: "#e5e7eb" }}>最新分时图</span>}
-            extra={<span style={{ fontSize: 12, color: "#9ca3af" }}>当日分时走势与成交量</span>}
-            style={{ ...cardStyle, marginBottom: 14, borderTop: "3px solid #3b82f6",
-boxShadow: "0 -1px 8px rgba(59,130,246,0.3)" }}
+            title={<span style={{ fontWeight: 700, color: c.textPrimary }}>最新分时图</span>}
+            extra={<span style={{ fontSize: 12, color: c.textSecondary }}>当日分时走势与成交量</span>}
+            style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
             styles={{ body: { padding: "12px 16px" } }}
           >
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
-              <div className="pdf-metric-card" style={{ padding: "12px 14px", background: "#1a2332", border: "1px solid #1e293b", borderRadius: 10 }}>
-                <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>最新价</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: "#e5e7eb" }}>{intradayData.items[intradayData.items.length - 1]?.price?.toFixed(2) ?? "-"}</div>
+              <div className="pdf-metric-card" style={{ padding: "12px 14px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 10 }}>
+                <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>最新价</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: c.textPrimary }}>{intradayData.items[intradayData.items.length - 1]?.price?.toFixed(2) ?? "-"}</div>
               </div>
-              <div className="pdf-metric-card" style={{ padding: "12px 14px", background: "#1a2332", border: "1px solid #1e293b", borderRadius: 10 }}>
-                <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>分时涨跌幅</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: (intradayData.items[intradayData.items.length - 1]?.change_pct ?? 0) >= 0 ? "#ef4444" : "#22c55e" }}>
+              <div className="pdf-metric-card" style={{ padding: "12px 14px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 10 }}>
+                <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>分时涨跌幅</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: (intradayData.items[intradayData.items.length - 1]?.change_pct ?? 0) >= 0 ? c.up : c.down }}>
                   {intradayData.items[intradayData.items.length - 1]?.change_pct != null ? `${intradayData.items[intradayData.items.length - 1].change_pct! > 0 ? "+" : ""}${intradayData.items[intradayData.items.length - 1].change_pct!.toFixed(2)}%` : "-"}
                 </div>
               </div>
-              <div className="pdf-metric-card" style={{ padding: "12px 14px", background: "#1a2332", border: "1px solid #1e293b", borderRadius: 10 }}>
-                <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>昨收价</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: "#e5e7eb" }}>{intradayData.prev_close != null ? intradayData.prev_close.toFixed(2) : "-"}</div>
+              <div className="pdf-metric-card" style={{ padding: "12px 14px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 10 }}>
+                <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>昨收价</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: c.textPrimary }}>{intradayData.prev_close != null ? intradayData.prev_close.toFixed(2) : "-"}</div>
               </div>
             </div>
             <IntradayChart data={intradayData.items} prevClose={intradayData.prev_close} />
@@ -581,9 +597,8 @@ boxShadow: "0 -1px 8px rgba(59,130,246,0.3)" }}
           <Card
             size="small"
             className="pdf-avoid-break"
-            title={<span style={{ fontWeight: 700, color: "#e5e7eb" }}>最新分时图</span>}
-            style={{ ...cardStyle, marginBottom: 14, borderTop: "3px solid #3b82f6",
-boxShadow: "0 -1px 8px rgba(59,130,246,0.3)" }}
+            title={<span style={{ fontWeight: 700, color: c.textPrimary }}>最新分时图</span>}
+            style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
             styles={{ body: { padding: "32px 16px", textAlign: "center" } }}
           >
             <Spin />
@@ -594,11 +609,10 @@ boxShadow: "0 -1px 8px rgba(59,130,246,0.3)" }}
         <Card
           size="small"
           className="pdf-avoid-break"
-          title={<span style={{ fontWeight: 700, color: "#e5e7eb" }}>K线图</span>}
-          style={{ ...cardStyle, marginBottom: 14, borderTop: "3px solid #3b82f6",
-boxShadow: "0 -1px 8px rgba(59,130,246,0.3)" }}
+          title={<span style={{ fontWeight: 700, color: c.textPrimary }}>K线图</span>}
+          style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
           extra={
-            <Space size={10} style={{ background: "#0f1720", border: "1px solid #1e293b", borderRadius: 10, padding: "6px 8px" }}>
+            <Space size={10} style={{ background: c.nestedBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: "6px 8px" }}>
               <Segmented
                 options={[
                   { label: "日K", value: "daily" },
@@ -626,9 +640,8 @@ boxShadow: "0 -1px 8px rgba(59,130,246,0.3)" }}
         {/* Tabs */}
         <Card
           size="small"
-          style={{ ...cardStyle, borderTop: "3px solid #3b82f6",
-boxShadow: "0 -1px 8px rgba(59,130,246,0.3)" }}
-          styles={{ body: { padding: "10px 16px 14px", background: "#0f1720", borderRadius: 8 } }}
+          style={{ ...cardStyle, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+          styles={{ body: { padding: "10px 16px 14px", background: c.nestedBg, borderRadius: 8 } }}
         >
           {isExportingPdf ? (
             <div>
@@ -640,7 +653,7 @@ boxShadow: "0 -1px 8px rgba(59,130,246,0.3)" }}
               activeKey={activePanelKey}
               onChange={setActivePanelKey}
               size="large"
-              tabBarStyle={{ marginBottom: 18, borderBottom: "1px solid #1e293b", fontWeight: 700 }}
+              tabBarStyle={{ marginBottom: 18, borderBottom: `1px solid ${c.border}`, fontWeight: 700 }}
             />
           )}
         </Card>

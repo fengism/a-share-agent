@@ -124,7 +124,7 @@ async def get_intraday(code: str) -> IntradayData:
         IntradayData 模型对象，包含逐分钟成交点
     """
     sym = normalize_code(code)
-    date = get_last_trade_date(code)
+    date = await asyncio.to_thread(get_last_trade_date, code)
     cache_key = dated_cache_key("intraday", sym.raw, date)
     cached = cache.get(cache_key)
     if cached is not None:

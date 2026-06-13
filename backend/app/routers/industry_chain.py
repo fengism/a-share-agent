@@ -101,8 +101,8 @@ async def stream_industry_chain(name: str):
             """
             try:
                 await run_industry_chain_analysis(name, progress_callback=progress_callback)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("产业链分析后台任务异常退出: %s, error=%s", name, e)
             finally:
                 await queue.put(None)
 

@@ -19,7 +19,7 @@ class TestSubAgentCreation:
         agent = create_fundamentalagent()
         assert agent.name == "fundamental"
         assert "get_stock_valuation_detail" in agent.skill_names
-        assert "get_stock_financial" in agent.skill_names
+        assert "analyze_financials" in agent.skill_names
 
     def test_news_agent_has_correct_config(self):
         agent = create_newsagent()

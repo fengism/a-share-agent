@@ -8,6 +8,9 @@ from app.utils.cache import cache, dated_cache_key
 from app.utils.market_utils import build_indices_from_sina, normalize_indices
 from app.utils.data_clean import safe_float
 from app.utils.rate_limiter import call_blocking
+from app.utils.singleflight import AsyncSingleFlight
+
+_indices_singleflight: AsyncSingleFlight[MarketIndices] = AsyncSingleFlight()
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +175,8 @@ def _add_total_amount(result: MarketIndices) -> MarketIndices:
 async def get_indices() -> MarketIndices:
     """获取大盘指数数据，带 5 分钟缓存和数据源回退。
 
+    使用 SingleFlight 防止缓存击穿。
+
     Args:
         无
     Return:
@@ -182,10 +187,13 @@ async def get_indices() -> MarketIndices:
     if cached is not None:
         return cached
 
-    result = await BaseProviderChain(_build_indices_attempts()).run()
-    result = _add_total_amount(result)
-    cache.set(cache_key, result, ttl=300)
-    return result
+    async def _load() -> MarketIndices:
+        result = await BaseProviderChain(_build_indices_attempts()).run()
+        result = _add_total_amount(result)
+        cache.set(cache_key, result, ttl=300)
+        return result
+
+    return await _indices_singleflight.do(cache_key, _load)
 
 
 if __name__ == "__main__":

@@ -309,13 +309,14 @@ async def generate_daily_review(request: DailyReviewRequest) -> DailyReviewResul
         user_content = _build_prompt(date, snapshot)
         logger.info(user_content)
         logger.info(f"生成复盘报告: date={date}, prompt_length={len(user_content)}")
-        llm_review = normalize_llm_review(llm_client.chat(
+        llm_review = normalize_llm_review((await asyncio.to_thread(
+            llm_client.chat,
             [
                 {"role": "system", "content": MARKET_SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
             ],
             temperature=settings.llm_temperature,
-        ).strip())
+        )).strip())
     except Exception:
         logger.error(f"生成复盘报告失败: date={date}", exc_info=True)
     review = _build_fallback_review(date, snapshot)
@@ -323,4 +324,3 @@ async def generate_daily_review(request: DailyReviewRequest) -> DailyReviewResul
 
     save_daily_review(review)
     return review
-

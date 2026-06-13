@@ -1,7 +1,7 @@
 import logging
 
 from app.db.connection import get_connection
-from app.db.models import TABLES
+from app.db.schema import TABLES
 
 logger = logging.getLogger(__name__)
 

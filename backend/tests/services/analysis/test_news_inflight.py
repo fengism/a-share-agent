@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.models.search_item import NewsSearchItem
-from app.services.analysis import news
+from app.services.stock import news
 
 
 def _item(title: str, source: str = "东方财富", publish_time: str | None = None) -> NewsSearchItem:

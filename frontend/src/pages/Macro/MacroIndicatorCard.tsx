@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { Card, Col, Empty, Row, Statistic, Typography } from "antd";
-import { useStyles, darkColors } from "../../styles/ui";;
+import { useColors, useStyles } from "../../theme/hooks";
 
 const { Text } = Typography;
 
@@ -22,13 +22,6 @@ interface MacroIndicatorCardProps {
   chartType?: "line" | "bar";
 }
 
-function valueColor(value: number | null | undefined) {
-  if (value == null) return darkColors.textSecondary;
-  if (value > 0) return darkColors.up;
-  if (value < 0) return darkColors.down;
-  return darkColors.textSecondary;
-}
-
 export default function MacroIndicatorCard({
   title,
   latest,
@@ -37,7 +30,16 @@ export default function MacroIndicatorCard({
   dateKey = "TIME",
   chartType = "line",
 }: MacroIndicatorCardProps) {
+  const c = useColors();
   const { cardStyle } = useStyles();
+
+  function valueColor(value: number | null | undefined) {
+    if (value == null) return c.textSecondary;
+    if (value > 0) return c.up;
+    if (value < 0) return c.down;
+    return c.textSecondary;
+  }
+
   const chartOption = useMemo(() => {
     if (!trend || trend.length === 0) return null;
 
@@ -57,36 +59,36 @@ export default function MacroIndicatorCard({
           .map((item) => item[f.key])
           .filter((_, i) => trend[i][dateKey] != null)
           .reverse(),
-        lineStyle: { width: 2, color: f.color || darkColors.primary },
-        itemStyle: { color: f.color || darkColors.primary },
+        lineStyle: { width: 2, color: f.color || c.primary },
+        itemStyle: { color: f.color || c.primary },
       }));
 
     return {
       tooltip: { trigger: "axis" },
       legend: {
         data: fields.map((f) => f.label),
-        textStyle: { color: darkColors.textSecondary, fontSize: 11 },
+        textStyle: { color: c.textSecondary, fontSize: 11 },
         top: 4,
       },
       grid: { left: 48, right: 16, top: 36, bottom: 28 },
       xAxis: {
         type: "category",
         data: dates,
-        axisLabel: { color: darkColors.textMuted, fontSize: 10, rotate: 30 },
+        axisLabel: { color: c.textMuted, fontSize: 10, rotate: 30 },
       },
       yAxis: {
         type: "value",
-        axisLabel: { color: darkColors.textMuted, fontSize: 10 },
-        splitLine: { lineStyle: { color: "rgba(148,163,184,0.12)" } },
+        axisLabel: { color: c.textMuted, fontSize: 10 },
+        splitLine: { lineStyle: { color: `${c.textSecondary}1f` } },
       },
       series,
     };
-  }, [trend, fields, dateKey, chartType]);
+  }, [trend, fields, dateKey, chartType, c]);
 
   if (!latest || fields.length === 0) {
     return (
       <Card style={{ ...cardStyle, minHeight: 200 }}>
-        <Text style={{ color: darkColors.textSecondary }}>{title} 暂无数据</Text>
+        <Text style={{ color: c.textSecondary }}>{title} 暂无数据</Text>
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="数据加载中或暂不可用" />
       </Card>
     );
@@ -99,9 +101,9 @@ export default function MacroIndicatorCard({
       style={cardStyle}
       title={
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ color: darkColors.textPrimary, fontWeight: 600 }}>{title}</span>
+          <span style={{ color: c.textPrimary, fontWeight: 600 }}>{title}</span>
           {dateValue && (
-            <Text style={{ color: darkColors.textMuted, fontSize: 12 }}>{String(dateValue)}</Text>
+            <Text style={{ color: c.textMuted, fontSize: 12 }}>{String(dateValue)}</Text>
           )}
         </div>
       }
@@ -115,7 +117,7 @@ export default function MacroIndicatorCard({
           return (
             <Col xs={12} sm={8} md={6} key={f.key}>
               <div style={{ textAlign: "center" }}>
-                <Text style={{ color: darkColors.textMuted, fontSize: 11, display: "block", marginBottom: 2 }}>
+                <Text style={{ color: c.textMuted, fontSize: 11, display: "block", marginBottom: 2 }}>
                   {f.label}
                 </Text>
                 <Statistic

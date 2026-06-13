@@ -1,4 +1,7 @@
+"""热门排名服务：热股、热门概念、热门行业，统一入口 + 5 分钟缓存。"""
+
 import logging
+from typing import Any
 
 from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
@@ -6,6 +9,34 @@ from app.utils.rate_limiter import call_blocking
 
 logger = logging.getLogger(__name__)
 
+# ── 统一获取函数 ──
+
+
+async def _get_hot_rank(cache_prefix: str, provider_method: str, *args: Any, ttl: int = 300) -> list[dict]:
+    """通用热门排名获取：缓存 → 调用 provider → 缓存。
+
+    Param:
+        cache_prefix: 缓存键前缀，如 "hot_rank"、"ths_hot_concept"
+        provider_method: THS provider 上的方法名
+        *args: 传递给 provider 方法的额外参数
+        ttl: 缓存过期时间（秒），默认 300
+    Return:
+        热门排名字典列表，失败返回空列表
+    """
+    cache_key = dated_cache_key(cache_prefix)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    result: list[dict] = []
+    try:
+        method = getattr(get_provider("ths"), provider_method)
+        result = await call_blocking(method, *args)
+    except Exception as e:
+        logger.warning("同花顺热门数据获取失败 [%s]: %s", cache_prefix, e)
+
+    cache.set(cache_key, result, ttl=ttl)
+    return result
 
 
 async def get_hot_stocks() -> list[dict]:
@@ -16,19 +47,7 @@ async def get_hot_stocks() -> list[dict]:
     Return:
         热门股票字典列表，失败返回空列表
     """
-    cache_key = dated_cache_key("hot_rank")
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-
-    result = []
-    try:
-        result = await call_blocking(get_provider("ths").fetch_hot_stock_rank)
-    except Exception as e:
-        logger.warning(f"同花顺热股榜单获取失败: {e}")
-
-    cache.set(cache_key, result, ttl=300)
-    return result
+    return await _get_hot_rank("hot_rank", "fetch_hot_stock_rank")
 
 
 async def get_ths_hot_concept() -> list[dict]:
@@ -39,19 +58,7 @@ async def get_ths_hot_concept() -> list[dict]:
     Return:
         热门概念板块字典列表，失败返回空列表
     """
-    cache_key = dated_cache_key("ths_hot_concept")
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-
-    result = []
-    try:
-        result = await call_blocking(get_provider("ths").fetch_hot_plate_rank, "concept")
-    except Exception as e:
-        logger.warning(f"同花顺热门概念获取失败: {e}")
-
-    cache.set(cache_key, result, ttl=300)
-    return result
+    return await _get_hot_rank("ths_hot_concept", "fetch_hot_plate_rank", "concept")
 
 
 async def get_ths_hot_industry() -> list[dict]:
@@ -62,16 +69,4 @@ async def get_ths_hot_industry() -> list[dict]:
     Return:
         热门行业板块字典列表，失败返回空列表
     """
-    cache_key = dated_cache_key("ths_hot_industry")
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-
-    result = []
-    try:
-        result = await call_blocking(get_provider("ths").fetch_hot_plate_rank, "industry")
-    except Exception as e:
-        logger.warning(f"同花顺热门行业获取失败: {e}")
-
-    cache.set(cache_key, result, ttl=300)
-    return result
+    return await _get_hot_rank("ths_hot_industry", "fetch_hot_plate_rank", "industry")

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from app.services.analysis import retail
+from app.services.stock import retail
 
 
 def test_get_retail_sentiment_counts_only_recent_posts(monkeypatch):

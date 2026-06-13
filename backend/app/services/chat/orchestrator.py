@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # 关键词分类规则
 _KEYWORD_MAP: dict[str, list[str]] = {
     "technical": ["K线", "MACD", "RSI", "KDJ", "布林", "技术面", "均线", "趋势", "支撑", "压力", "量价", "金叉", "死叉", "k线"],
-    "fundamental": ["PE", "PB", "估值", "财报", "财务", "ROE", "营收", "基本面", "市盈率", "市净率", "净利润", "分红"],
+    "fundamental": ["PE", "PB", "估值", "财报", "财务", "ROE", "营收", "基本面", "市盈率", "市净率", "净利润", "分红", "选股", "筛选", "小于", "大于"],
     "news": ["新闻", "研报", "公告", "舆情", "热度", "情绪", "利好", "利空", "消息"],
     "risk": ["风险", "止损", "仓位", "波动", "回撤", "预警", "风险评估"],
     "macro": ["CPI", "PPI", "PMI", "M0", "M1", "M2", "GDP", "宏观", "通胀", "通缩", "货币供应", "降准", "降息", "利率", "货币政策", "经济数据"],
@@ -38,8 +38,12 @@ _KEYWORD_MAP: dict[str, list[str]] = {
 _FULL_ANALYSIS_KEYWORDS = ["分析", "综合", "评估", "深度", "全面", "诊断"]
 _STOCK_CODE_PATTERN = re.compile(r"\d{6}")
 
-_ALL_AGENTS = ["technical", "fundamental", "news", "risk", "macro"]
 _URL_PATTERN = re.compile(r'https?://\S+', re.IGNORECASE)
+# 闲聊/问候模式：不涉及股票/市场分析的纯对话消息
+_GREETING_PATTERN = re.compile(
+    r"^(你好|hi|hello|hey|嗨|谢谢|感谢|好的|ok|再见|拜拜|嗯|哦|啊|是的|对的|知道了|收到|辛苦了|麻烦了)[!！。.?\s]*$",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -77,6 +81,13 @@ class Orchestrator:
         # URL 消息直接回退到 legacy agent（拥有 fetch_url 工具），
         # 避免 URL 中的 6 位数字被误匹配为股票代码而路由到子 Agent。
         if _URL_PATTERN.search(message):
+            from app.services.chat.agent import _run_legacy_agent
+            async for delta in _run_legacy_agent(message, history):
+                yield delta
+            return
+
+        # 闲聊/问候直接用 legacy agent 回复，不触发多 Agent 编排
+        if _GREETING_PATTERN.match(message.strip()):
             from app.services.chat.agent import _run_legacy_agent
             async for delta in _run_legacy_agent(message, history):
                 yield delta

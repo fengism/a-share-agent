@@ -3,10 +3,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 from collections.abc import AsyncGenerator
 
 from app.models.analysis import AnalysisProgress
 from app.services.analysis.pipeline import run_analysis
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisAlreadyRunningError(RuntimeError):
@@ -44,8 +47,8 @@ async def create_analysis_event_generator(code: str) -> AsyncGenerator[dict, Non
     async def run_and_cleanup() -> None:
         try:
             await run_analysis(code, progress_callback=progress_callback)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("个股分析后台任务异常退出: code=%s, error=%s", code, e, exc_info=True)
         finally:
             await queue.put(None)
 

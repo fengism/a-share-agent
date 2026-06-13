@@ -4,7 +4,7 @@ import re
 from collections import Counter
 import pandas as pd
 
-from app.services.analysis.news import get_stock_news
+from app.services.stock.news import get_stock_news
 from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.rate_limiter import call_blocking

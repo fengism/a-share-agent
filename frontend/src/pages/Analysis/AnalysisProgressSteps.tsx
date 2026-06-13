@@ -6,6 +6,7 @@ import {
   RobotOutlined,
 } from "@ant-design/icons";
 import type { AnalysisStage } from "../../api/sse";
+import { useColors } from "../../theme/hooks";
 
 interface Props {
   stages: AnalysisStage[];
@@ -20,6 +21,8 @@ const STAGE_ICONS = [
 ];
 
 export default function AnalysisProgressSteps({ stages, currentStageIndex }: Props) {
+  const c = useColors();
+
   const items = STAGE_ICONS.map((icon, i) => {
     const stage = stages[i];
     const status =
@@ -50,8 +53,8 @@ export default function AnalysisProgressSteps({ stages, currentStageIndex }: Pro
       style={{
         padding: "16px 18px",
         borderRadius: 12,
-        background: "linear-gradient(180deg, #f8fbff 0%, #f5f7fa 100%)",
-        border: "1px solid #e8f2ff",
+        background: `linear-gradient(180deg, ${c.elevatedBg} 0%, ${c.nestedBg} 100%)`,
+        border: `1px solid ${c.border}`,
       }}
     >
       <Steps

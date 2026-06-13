@@ -49,7 +49,7 @@ async def test_get_market_news_keeps_only_recent_news(monkeypatch):
     )
     monkeypatch.setattr(
         news,
-        "_get_rss_provider",
+        "_get_news_provider",
         lambda: SimpleNamespace(
             fetch_market_kuaixun=lambda: [_item("old_rss", old_time)],
             fetch_china_news=lambda: [],
@@ -58,6 +58,7 @@ async def test_get_market_news_keeps_only_recent_news(monkeypatch):
             fetch_xueqiu_news=lambda: [],
             fetch_jiemain_news=lambda: [],
             fetch_eeo_news=lambda: [],
+            fetch_wallstreetcn_news=lambda: [],
         ),
     )
     monkeypatch.setattr(news, "_get_cls_provider", lambda: SimpleNamespace(fetch_market_news=lambda: []))

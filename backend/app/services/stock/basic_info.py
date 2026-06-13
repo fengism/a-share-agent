@@ -124,7 +124,8 @@ async def _load_basic_info_spot_df() -> pd.DataFrame | None:
 
     try:
         return await asyncio.wait_for(get_spot_snapshot(), timeout=2.0)
-    except Exception:
+    except Exception as e:
+        logger.info("实时快照获取失败: %s", e)
         return None
 
 
@@ -155,7 +156,8 @@ async def _safe_fetch_exchange_basic_row(code: str) -> dict:
     """
     try:
         return await _fetch_exchange_basic_row(code) or {}
-    except Exception:
+    except Exception as e:
+        logger.info("交易所基础信息获取失败: code=%s, error=%s", code, e)
         return {}
 
 

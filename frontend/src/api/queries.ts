@@ -106,7 +106,7 @@ export function useStockNews(code: string) {
 export function useCategorizedStockNews(code: string) {
   return useQuery({
     queryKey: ["categorizedNews", code],
-    queryFn: () => apiGet<CategorizedStockNews>(`/market/news-categorized`, { code }),
+    queryFn: () => apiGet<CategorizedStockNews>(`/stock/${code}/news-categorized`),
     enabled: !!code,
     staleTime: 10 * 60 * 1000,
   });
@@ -157,7 +157,7 @@ export function useHotStocks() {
 export function useStockSentiment(code: string) {
   return useQuery({
     queryKey: ["sentiment", code],
-    queryFn: () => apiGet<StockSentiment>(`/market/sentiment`, { code }),
+    queryFn: () => apiGet<StockSentiment>(`/stock/${code}/sentiment`),
     enabled: !!code,
     staleTime: 10 * 60 * 1000,
   });
@@ -166,7 +166,7 @@ export function useStockSentiment(code: string) {
 export function useRetailSentiment(code: string) {
   return useQuery({
     queryKey: ["retailSentiment", code],
-    queryFn: () => apiGet<RetailSentiment>(`/market/retail-sentiment`, { code }),
+    queryFn: () => apiGet<RetailSentiment>(`/stock/${code}/retail-sentiment`),
     enabled: !!code,
     staleTime: 10 * 60 * 1000,
   });
@@ -311,7 +311,7 @@ export function useDragonTigerList(reportDate: string) {
 export function useDragonTigerDetail(code: string, reportDate: string) {
   return useQuery({
     queryKey: ["dragonTigerDetail", code, reportDate],
-    queryFn: () => apiGet<DragonTigerDetail[]>(`/market/dragon-tiger/${code}`, { report_date: reportDate }),
+    queryFn: () => apiGet<DragonTigerDetail[]>(`/stock/${code}/dragon-tiger`, { report_date: reportDate }),
     enabled: !!code && !!reportDate,
     staleTime: 10 * 60 * 1000,
   });

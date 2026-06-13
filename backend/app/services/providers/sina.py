@@ -8,7 +8,7 @@ import requests
 from app.constants.http import SINA_FINANCE_HEADERS
 from app.constants.market import SINA_INDEX_PAGE_COUNT_URL, SINA_INDEX_QUOTE_URL, SINA_MARKET_HQ_URL, SINA_STOCK_KLINE_URL
 from app.services.base.data_provider import BaseDataProvider
-from app.services.base.intraday_utils import loads_sina_jsonp, normalize_intraday_df
+from app.utils.intraday_utils import loads_sina_jsonp, normalize_intraday_df
 from app.utils.symbol_utils import normalize_code
 from app.utils.market_utils import replace_comma
 from app.utils.cache import cache, dated_cache_key

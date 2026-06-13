@@ -99,8 +99,8 @@ async def _collect_data(name: str) -> dict:
     try:
         from app.services.providers import get_provider
         rankings = await call_blocking(get_provider("eastmoney").fetch_industry_rankings, 50)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("行业排名获取失败（非关键）: %s", e)
 
     return {
         "stocks": stocks if not isinstance(stocks, Exception) else {"error": str(stocks)},

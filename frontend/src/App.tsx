@@ -1,21 +1,25 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ConfigProvider, theme } from "antd";
+import { ConfigProvider, Spin, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { useThemeStore, getAntToken } from "./styles/ui";
 import { themes } from "./theme/themes";
 import AppLayout from "./components/AppLayout";
-import Dashboard from "./pages/Dashboard";
-import Market from "./pages/Market";
-import Screener from "./pages/Screener";
-import Analysis from "./pages/Analysis";
-import AnalysisEntry from "./pages/Analysis/Entry";
-import DailyReviewPage from "./pages/DailyReview";
-import Chat from "./pages/Chat";
-import Settings from "./pages/Settings";
-import Feed from "./pages/Feed";
-import IndustryChain from "./pages/IndustryChain";
-import Macro from "./pages/Macro";
+import ErrorBoundary from "./components/ErrorBoundary";
+
+// ── 路由级代码分割 ──
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Market = lazy(() => import("./pages/Market"));
+const Screener = lazy(() => import("./pages/Screener"));
+const Analysis = lazy(() => import("./pages/Analysis"));
+const AnalysisEntry = lazy(() => import("./pages/Analysis/Entry"));
+const DailyReviewPage = lazy(() => import("./pages/DailyReview"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Feed = lazy(() => import("./pages/Feed"));
+const IndustryChain = lazy(() => import("./pages/IndustryChain"));
+const Macro = lazy(() => import("./pages/Macro"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,27 +50,37 @@ function AntProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const PageFallback = (
+  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+    <Spin size="large" tip="加载中..." />
+  </div>
+);
+
 export default function App() {
   return (
     <AntProvider>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/market" element={<Market />} />
-              <Route path="/screener" element={<Screener />} />
-              <Route path="/daily-review" element={<DailyReviewPage />} />
-              <Route path="/feed" element={<Feed />} />
-              <Route path="/analysis" element={<AnalysisEntry />} />
-              <Route path="/macro" element={<Macro />} />
-              <Route path="/industry-chain" element={<IndustryChain />} />
-              <Route path="/industry-chain/:name" element={<IndustryChain />} />
-              <Route path="/chat" element={<Chat />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/analysis/:code" element={<Analysis />} />
-            </Route>
-          </Routes>
+          <ErrorBoundary>
+            <Suspense fallback={PageFallback}>
+              <Routes>
+                <Route element={<AppLayout />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/market" element={<Market />} />
+                  <Route path="/screener" element={<Screener />} />
+                  <Route path="/daily-review" element={<DailyReviewPage />} />
+                  <Route path="/feed" element={<Feed />} />
+                  <Route path="/analysis" element={<AnalysisEntry />} />
+                  <Route path="/macro" element={<Macro />} />
+                  <Route path="/industry-chain" element={<IndustryChain />} />
+                  <Route path="/industry-chain/:name" element={<IndustryChain />} />
+                  <Route path="/chat" element={<Chat />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/analysis/:code" element={<Analysis />} />
+                </Route>
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </BrowserRouter>
       </QueryClientProvider>
     </AntProvider>

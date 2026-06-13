@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -21,7 +22,7 @@ async def push_content(request: PushRequest):
         PushResponse: 推送结果，含目标、文档 URL、标题和提示信息。
     """
     try:
-        return execute_push(request)
+        return await asyncio.to_thread(execute_push, request)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except LookupError as exc:

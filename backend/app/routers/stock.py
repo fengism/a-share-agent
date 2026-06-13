@@ -1,17 +1,26 @@
+"""个股相关 API 端点：搜索、行情、K线、财务、估值、新闻、情绪、技术指标。"""
+
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from app.models.stock import FinancialMetrics, IntradayData, KlineData, StockBasicInfo, StockSearchItem, ValuationDetail
+from app.routers.errors import run_endpoint
 from app.services import technical
-from app.services.analysis.news import get_stock_news as get_stock_news_service
+from app.services.stock.news import get_stock_news as get_stock_news_service
+from app.services.stock.news import get_stock_news_categorized as get_stock_news_categorized_service
 from app.services.stock.basic_info import get_basic_info as get_basic_info_service
 from app.services.stock.financials import get_financial as get_financial_service, get_financial_metrics as get_financial_metrics_service
 from app.services.stock.intraday import get_intraday as get_intraday_service
 from app.services.stock.kline import get_kline as get_stock_kline_service
-from app.services.screener.percentiles import _compute_percentile
+from app.services.screener.percentiles import compute_percentile
 from app.services.stock.search import search_stocks as search_stock_items
 from app.services.stock.valuation import get_valuation as get_valuation_service, get_valuation_detail as get_valuation_detail_service
+from app.services.stock.retail import (
+    get_retail_sentiment as get_retail_sentiment_service,
+    get_stock_sentiment as get_stock_sentiment_service,
+)
+from app.services.market.dragon_tiger import get_dragon_tiger_detail as get_dragon_tiger_detail_service
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +36,11 @@ async def search_stocks(q: str = Query(..., min_length=1, description="股票名
     Return:
         list[StockSearchItem]: 匹配到的股票候选条目。
     """
-    logger.info(f"搜索股票: q={q}")
-    try:
+    async def execute():
         result = await search_stock_items(q)
-        logger.info(f"搜索结果: q={q}, 匹配{len(result)}条")
+        logger.info("搜索结果: q=%s, 匹配%d条", q, len(result))
         return result
-    except Exception as e:
-        logger.error(f"搜索失败: q={q}, error={e}")
-        raise HTTPException(status_code=500, detail=f"搜索失败: {e}")
+    return await run_endpoint("搜索股票", execute)
 
 
 @router.get("/{code}/info", response_model=StockBasicInfo)
@@ -46,15 +52,7 @@ async def get_stock_info(code: str):
     Return:
         StockBasicInfo: 公司名称、所属行业、上市信息等基础数据。
     """
-    logger.info(f"获取股票信息: code={code}")
-    try:
-        return await get_basic_info_service(code)
-    except ValueError as e:
-        logger.warning(f"股票信息参数错误: code={code}, error={e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"获取股票信息失败: code={code}, error={e}")
-        raise HTTPException(status_code=500, detail=f"获取信息失败: {e}")
+    return await run_endpoint("获取股票信息", lambda: get_basic_info_service(code))
 
 
 @router.get("/{code}/kline", response_model=KlineData)
@@ -76,15 +74,7 @@ async def get_kline(
     Return:
         KlineData: 按时间排序的 K 线条目集合。
     """
-    logger.info(f"获取K线: code={code}, period={period}, adjust={adjust}")
-    try:
-        return await get_stock_kline_service(code, period, start_date, end_date, adjust)
-    except ValueError as e:
-        logger.warning(f"K线参数错误: code={code}, error={e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"获取K线失败: code={code}, error={e}")
-        raise HTTPException(status_code=500, detail=f"获取K线失败: {e}")
+    return await run_endpoint("获取K线", lambda: get_stock_kline_service(code, period, start_date, end_date, adjust))
 
 
 @router.get("/{code}/financial")
@@ -97,15 +87,7 @@ async def get_financial(code: str, type: str = Query("balance", pattern="^(balan
     Return:
         dict: 对应报表的多期数据。
     """
-    logger.info(f"获取财务数据: code={code}, type={type}")
-    try:
-        return await get_financial_service(code, type)
-    except ValueError as e:
-        logger.warning(f"财务数据参数错误: code={code}, error={e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"获取财务数据失败: code={code}, type={type}, error={e}")
-        raise HTTPException(status_code=500, detail=f"获取财务数据失败: {e}")
+    return await run_endpoint("获取财务数据", lambda: get_financial_service(code, type))
 
 
 @router.get("/{code}/intraday", response_model=IntradayData)
@@ -117,15 +99,7 @@ async def get_intraday(code: str):
     Return:
         IntradayData: 当日分时价、量、均价等序列。
     """
-    logger.info(f"获取分时数据: code={code}")
-    try:
-        return await get_intraday_service(code)
-    except ValueError as e:
-        logger.warning(f"分时数据参数错误: code={code}, error={e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"获取分时数据失败: code={code}, error={e}")
-        raise HTTPException(status_code=500, detail=f"获取分时数据失败: {e}")
+    return await run_endpoint("获取分时数据", lambda: get_intraday_service(code))
 
 
 @router.get("/{code}/financial-metrics", response_model=FinancialMetrics)
@@ -137,15 +111,7 @@ async def get_financial_metrics(code: str):
     Return:
         FinancialMetrics: 营收、利润、ROE 等核心财务指标。
     """
-    logger.info(f"获取财务指标: code={code}")
-    try:
-        return await get_financial_metrics_service(code)
-    except ValueError as e:
-        logger.warning(f"财务指标参数错误: code={code}, error={e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"获取财务指标失败: code={code}, error={e}")
-        raise HTTPException(status_code=500, detail=f"获取财务指标失败: {e}")
+    return await run_endpoint("获取财务指标", lambda: get_financial_metrics_service(code))
 
 
 @router.get("/{code}/valuation")
@@ -157,15 +123,7 @@ async def get_valuation(code: str):
     Return:
         dict: PE、PB、市值等估值指标。
     """
-    logger.info(f"获取估值数据: code={code}")
-    try:
-        return await get_valuation_service(code)
-    except ValueError as e:
-        logger.warning(f"估值参数错误: code={code}, error={e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"获取估值数据失败: code={code}, error={e}")
-        raise HTTPException(status_code=500, detail=f"获取估值数据失败: {e}")
+    return await run_endpoint("获取估值数据", lambda: get_valuation_service(code))
 
 
 @router.get("/{code}/valuation-detail", response_model=ValuationDetail)
@@ -177,15 +135,7 @@ async def get_valuation_detail(code: str):
     Return:
         ValuationDetail: 当前估值、历史分位以及相关明细。
     """
-    logger.info(f"获取估值详情: code={code}")
-    try:
-        return await get_valuation_detail_service(code, _compute_percentile)
-    except ValueError as e:
-        logger.warning(f"估值详情参数错误: code={code}, error={e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"获取估值详情失败: code={code}, error={e}")
-        raise HTTPException(status_code=500, detail=f"获取估值详情失败: {e}")
+    return await run_endpoint("获取估值详情", lambda: get_valuation_detail_service(code, compute_percentile))
 
 
 @router.get("/{code}/news")
@@ -197,12 +147,7 @@ async def get_news(code: str):
     Return:
         list[dict] | dict: 按时间排序的新闻条目集合。
     """
-    logger.info(f"获取新闻: code={code}")
-    try:
-        return await get_stock_news_service(code)
-    except Exception as e:
-        logger.error(f"获取新闻失败: code={code}, error={e}")
-        raise HTTPException(status_code=500, detail=f"获取新闻失败: {e}")
+    return await run_endpoint("获取新闻", lambda: get_stock_news_service(code))
 
 
 @router.get("/{code}/indicators")
@@ -214,15 +159,58 @@ async def get_indicators(code: str):
     Return:
         dict: 包含 RSI、MACD、KDJ 等技术指标的字典。
     """
-    logger.info(f"计算技术指标: code={code}")
-    try:
+    async def execute():
         kline = await get_stock_kline_service(code)
         indicators = technical.calculate_all(kline.items)
-        logger.info(f"技术指标计算完成: code={code}, 数据点={len(kline.items)}, RSI={indicators['rsi']}")
+        logger.info("技术指标计算完成: code=%s, 数据点=%d", code, len(kline.items))
         return indicators
-    except ValueError as e:
-        logger.warning(f"技术指标参数错误: code={code}, error={e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"计算技术指标失败: code={code}, error={e}")
-        raise HTTPException(status_code=500, detail=f"计算技术指标失败: {e}")
+    return await run_endpoint("计算技术指标", execute)
+
+
+@router.get("/{code}/sentiment")
+async def get_sentiment(code: str):
+    """获取个股情绪数据（热度排名、热度评分、新闻数量）。
+
+    Param:
+        code: 股票代码（路径参数），6 位数字。
+    Return:
+        dict: 个股情绪指标。
+    """
+    return await run_endpoint("获取情绪数据", lambda: get_stock_sentiment_service(code))
+
+
+@router.get("/{code}/retail-sentiment")
+async def get_retail_sentiment(code: str):
+    """获取个股散户情绪指标（股吧帖子情绪分析）。
+
+    Param:
+        code: 股票代码（路径参数），6 位数字。
+    Return:
+        dict: 散户情绪相关指标与详情。
+    """
+    return await run_endpoint("获取散户情绪数据", lambda: get_retail_sentiment_service(code))
+
+
+@router.get("/{code}/news-categorized")
+async def get_news_categorized(code: str):
+    """获取按类别分组的个股新闻流。
+
+    Param:
+        code: 股票代码（路径参数），6 位数字。
+    Return:
+        dict: 按公告、新闻、研报等类别整理的新闻条目。
+    """
+    return await run_endpoint("获取分类新闻数据", lambda: get_stock_news_categorized_service(code))
+
+
+@router.get("/{code}/dragon-tiger")
+async def get_dragon_tiger_detail(code: str, report_date: str = Query(..., description="报告日期 YYYY-MM-DD")):
+    """获取指定龙虎榜个股的买卖席位明细。
+
+    Param:
+        code: 股票代码（路径参数）。
+        report_date: 报告日期（查询参数），格式 YYYY-MM-DD。
+    Return:
+        dict: 买入卖出席位明细及净额。
+    """
+    return await run_endpoint("获取龙虎榜明细", lambda: get_dragon_tiger_detail_service(code, report_date))

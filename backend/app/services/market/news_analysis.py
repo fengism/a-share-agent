@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import logging
@@ -6,6 +7,9 @@ from app.config import get_settings
 from app.services.llm.client import create_llm_client
 from app.services.market.news import get_market_feed
 from app.utils.cache import cache, dated_cache_key
+from app.utils.singleflight import AsyncSingleFlight
+
+_analysis_singleflight: AsyncSingleFlight[dict] = AsyncSingleFlight()
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +143,8 @@ def _resolve_refs(result: dict, items: list) -> dict:
 async def analyze_market_news() -> dict:
     """调用 LLM 对市场资讯流进行结构化分析，失败时降级返回兜底分析。
 
+    使用 SingleFlight 防止并发重复调用 LLM。
+
     Param:
         无
     Return:
@@ -148,43 +154,47 @@ async def analyze_market_news() -> dict:
     if not items:
         return _fallback_analysis([])
 
-    # 用标题生成内容指纹，只有资讯变化时才重新调用 LLM
-    top_titles = [_get(item, "title") for item in items[:80]]
-    content_hash = hashlib.md5("\n".join(top_titles).encode()).hexdigest()
-
     cache_key = dated_cache_key("news_analysis")
-    hash_key = dated_cache_key("news_analysis_hash")
-    cached = cache.get(cache_key)
-    cached_hash = cache.get(hash_key)
-    if cached is not None and cached_hash == content_hash:
-        return cached
 
-    try:
-        settings = get_settings()
-        llm_client = create_llm_client(settings)
-        user_prompt = _build_prompt(items)
-        raw = llm_client.chat(
-            [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.3,
-        )
-        # strip markdown fences if present
-        text = raw.strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[-1]
-        if text.endswith("```"):
-            text = text.rsplit("```", 1)[0]
-        text = text.strip()
-        result = json.loads(text)
-        _resolve_refs(result, items)
-        cache.set(cache_key, result, ttl=300)
-        cache.set(hash_key, content_hash, ttl=300)
-        return result
-    except Exception as e:
-        logger.warning(f"AI 资讯分析失败: {e}")
-        fallback = _fallback_analysis(items)
-        cache.set(cache_key, fallback, ttl=300)
-        cache.set(hash_key, content_hash, ttl=300)
-        return fallback
+    async def _load() -> dict:
+        top_titles = [_get(item, "title") for item in items[:80]]
+        content_hash = hashlib.md5("\n".join(top_titles).encode()).hexdigest()
+
+        hash_key = dated_cache_key("news_analysis_hash")
+        cached = cache.get(cache_key)
+        cached_hash = cache.get(hash_key)
+        if cached is not None and cached_hash == content_hash:
+            return cached
+
+        try:
+            settings = get_settings()
+            llm_client = create_llm_client(settings)
+            user_prompt = _build_prompt(items)
+            raw = await asyncio.to_thread(
+                llm_client.chat,
+                [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
+            )
+            # strip markdown fences if present
+            text = raw.strip()
+            if text.startswith("```"):
+                text = text.split("\n", 1)[-1]
+            if text.endswith("```"):
+                text = text.rsplit("```", 1)[0]
+            text = text.strip()
+            result = json.loads(text)
+            _resolve_refs(result, items)
+            cache.set(cache_key, result, ttl=300)
+            cache.set(hash_key, content_hash, ttl=300)
+            return result
+        except Exception as e:
+            logger.warning("AI 资讯分析失败: %s", e)
+            fallback = _fallback_analysis(items)
+            cache.set(cache_key, fallback, ttl=300)
+            cache.set(hash_key, content_hash, ttl=300)
+            return fallback
+
+    return await _analysis_singleflight.do(cache_key, _load)

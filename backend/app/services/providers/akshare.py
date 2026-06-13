@@ -24,7 +24,7 @@ class _LazyAkshare:
 ak = _LazyAkshare()
 
 from app.services.base.data_provider import BaseDataProvider
-from app.services.base.intraday_utils import normalize_intraday_df
+from app.utils.intraday_utils import normalize_intraday_df
 from app.models.search_item import NewsSearchItem
 from app.utils.symbol_utils import normalize_code
 from app.utils.market_utils import get_last_trade_date

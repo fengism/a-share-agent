@@ -116,7 +116,8 @@ def list_analyses(code: str) -> list[dict]:
                 "signal": data.get("signal"),
                 "confidence": data.get("confidence"),
             })
-        except Exception:
+        except Exception as e:
+            logger.warning("跳过失效的分析文件: %s, error=%s", filepath, e)
             continue
     return results
 
@@ -146,7 +147,8 @@ def list_all_analyses() -> list[dict]:
                     "signal": data.get("signal"),
                     "confidence": data.get("confidence"),
                 })
-            except Exception:
+            except Exception as e:
+                logger.warning("跳过失效的分析文件: %s, error=%s", filepath, e)
                 continue
     # Sort by date descending
     results.sort(key=lambda x: x.get("analysis_date", ""), reverse=True)

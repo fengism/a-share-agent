@@ -6,7 +6,7 @@ from app.services.screener import percentiles
 
 
 @pytest.mark.asyncio
-async def test_compute_percentiles_dedupes_and_preserves_input_order(monkeypatch):
+async def testcompute_percentiles_dedupes_and_preserves_input_order(monkeypatch):
     """compute_percentiles deduplicates codes and preserves the input order in results."""
     calls: list[str] = []
 
@@ -14,7 +14,7 @@ async def test_compute_percentiles_dedupes_and_preserves_input_order(monkeypatch
         calls.append(code)
         return {"600519": 10.0, "000858": 20.0}[code]
 
-    monkeypatch.setattr(percentiles, "_compute_percentile", fake_compute)
+    monkeypatch.setattr(percentiles, "compute_percentile", fake_compute)
     percentiles._percentile_inflight.clear()
 
     result = await percentiles.compute_percentiles(
@@ -32,7 +32,7 @@ async def test_compute_percentiles_dedupes_and_preserves_input_order(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_compute_percentiles_limits_concurrency(monkeypatch):
+async def testcompute_percentiles_limits_concurrency(monkeypatch):
     """compute_percentiles caps the number of concurrent per-code computations."""
     running = 0
     max_running = 0
@@ -48,7 +48,7 @@ async def test_compute_percentiles_limits_concurrency(monkeypatch):
             running -= 1
         return 1.0
 
-    monkeypatch.setattr(percentiles, "_compute_percentile", fake_compute)
+    monkeypatch.setattr(percentiles, "compute_percentile", fake_compute)
     percentiles._percentile_inflight.clear()
 
     await percentiles.compute_percentiles([f"6005{i:02d}" for i in range(10)])
@@ -57,7 +57,7 @@ async def test_compute_percentiles_limits_concurrency(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_compute_percentiles_dedupes_inflight_across_requests(monkeypatch):
+async def testcompute_percentiles_dedupes_inflight_across_requests(monkeypatch):
     """compute_percentiles deduplicates inflight computations across concurrent requests."""
     calls = 0
 
@@ -67,7 +67,7 @@ async def test_compute_percentiles_dedupes_inflight_across_requests(monkeypatch)
         await asyncio.sleep(0.01)
         return 33.3
 
-    monkeypatch.setattr(percentiles, "_compute_percentile", fake_compute)
+    monkeypatch.setattr(percentiles, "compute_percentile", fake_compute)
     percentiles._percentile_inflight.clear()
 
     result_a, result_b = await asyncio.gather(
@@ -81,14 +81,14 @@ async def test_compute_percentiles_dedupes_inflight_across_requests(monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_compute_percentiles_handles_per_code_errors(monkeypatch):
+async def testcompute_percentiles_handles_per_code_errors(monkeypatch):
     """compute_percentiles captures per-code errors and returns None for failed entries."""
     async def fake_compute(code: str, indicator: str, period: str):
         if code == "600519":
             raise RuntimeError("provider failed")
         return 20.0
 
-    monkeypatch.setattr(percentiles, "_compute_percentile", fake_compute)
+    monkeypatch.setattr(percentiles, "compute_percentile", fake_compute)
     percentiles._percentile_inflight.clear()
 
     result = await percentiles.compute_percentiles(["600519", "000858"])

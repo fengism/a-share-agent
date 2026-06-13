@@ -39,9 +39,9 @@ async def get_stock_valuation_detail(code: str) -> Any:
     Return:
         详细估值数据字典
     """
-    from app.services.screener.percentiles import _compute_percentile
+    from app.services.screener.percentiles import compute_percentile
     from app.services.stock.valuation import get_valuation_detail
-    result = await get_valuation_detail(code, _compute_percentile)
+    result = await get_valuation_detail(code, compute_percentile)
     return result.model_dump()
 
 
@@ -88,6 +88,19 @@ async def get_stock_financial(code: str, indicator: str = "balance") -> Any:
     return await get_financial(code, indicator=indicator)
 
 
+async def get_stock_financial_metrics(code: str) -> Any:
+    """获取股票关键财务指标汇总。
+
+    Param:
+        code: 6位股票代码
+    Return:
+        FinancialMetrics 模型对象
+    """
+    from app.services.stock.financials import get_financial_metrics
+    result = await get_financial_metrics(code)
+    return result.model_dump()
+
+
 async def get_stock_news(code: str) -> Any:
     """获取股票相关新闻列表。
 
@@ -96,7 +109,7 @@ async def get_stock_news(code: str) -> Any:
     Return:
         新闻项字典列表
     """
-    from app.services.analysis.news import get_stock_news as _get_stock_news
+    from app.services.stock.news import get_stock_news as _get_stock_news
     result = await _get_stock_news(code)
     return [item.model_dump() if hasattr(item, "model_dump") else item for item in result]
 
@@ -109,7 +122,7 @@ async def get_stock_sentiment(code: str) -> Any:
     Return:
         情绪数据字典
     """
-    from app.services.analysis.retail import get_stock_sentiment
+    from app.services.stock.retail import get_stock_sentiment
     return await get_stock_sentiment(code)
 
 

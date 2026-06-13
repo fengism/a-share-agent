@@ -1,6 +1,9 @@
 import { Card, Skeleton, Row, Col } from "antd";
+import { useColors } from "../../theme/hooks";
 
 export default function SkeletonAIConclusion() {
+  const c = useColors();
+
   return (
     <Card
       size="small"
@@ -8,7 +11,7 @@ export default function SkeletonAIConclusion() {
       style={{
         marginBottom: 16,
         borderRadius: 10,
-        border: "none",
+        border: `1px solid ${c.border}`,
         boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
       }}
       styles={{ body: { padding: "20px 24px" } }}
@@ -27,7 +30,7 @@ export default function SkeletonAIConclusion() {
           <Row gutter={12}>
             {[1, 2, 3].map((i) => (
               <Col span={8} key={i}>
-                <div style={{ padding: 12, background: "#f7f8fa", borderRadius: 8, textAlign: "center" }}>
+                <div style={{ padding: 12, background: c.elevatedBg, borderRadius: 8, textAlign: "center" }}>
                   <Skeleton.Avatar active size={48} shape="circle" />
                   <Skeleton
                     active

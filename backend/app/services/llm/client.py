@@ -138,32 +138,46 @@ class LiteLLMClient(LLMClient):
             raise
 
 
+_client_cache: LLMClient | None = None
+_cache_key: tuple | None = None
+
+
 def create_llm_client(settings: Settings | None = None) -> LLMClient:
-    """根据配置创建对应的 LLM 客户端实例。
+    """根据配置创建对应的 LLM 客户端实例，相同配置下复用单例。
+
+    当 provider/api_key/base_url/model 任一变化时自动重建客户端，
+    复用 HTTP 连接池以提升性能。
 
     Param:
         settings: 配置对象，默认读取全局设置
     Return:
         LLMClient 实例
     """
+    global _client_cache, _cache_key
+
     if settings is None:
         settings = get_settings()
 
     provider = settings.llm_provider.lower()
+    current_key = (provider, settings.llm_api_key, settings.llm_base_url, settings.llm_model)
+
+    if _client_cache is not None and _cache_key == current_key:
+        return _client_cache
+
     logger.info(f"创建LLM客户端: provider={provider}")
 
     if provider in ("deepseek", "qwen", "openai", "zhipu"):
         defaults = PROVIDER_DEFAULTS.get(provider, {})
         base_url = settings.llm_base_url or defaults.get("base_url", "https://api.openai.com/v1")
         model = settings.llm_model or defaults.get("model", "gpt-4o-mini")
-        return OpenAICompatibleClient(
+        client = OpenAICompatibleClient(
             api_key=settings.llm_api_key,
             base_url=base_url,
             model=model,
         )
     elif provider == "claude":
         model = settings.llm_model or "anthropic/claude-sonnet-4-6"
-        return LiteLLMClient(
+        client = LiteLLMClient(
             api_key=settings.llm_api_key,
             model=model,
             base_url=settings.llm_base_url,
@@ -171,6 +185,10 @@ def create_llm_client(settings: Settings | None = None) -> LLMClient:
     else:
         logger.error(f"不支持的LLM提供商: {provider}")
         raise ValueError(f"Unsupported LLM provider: {provider}")
+
+    _client_cache = client
+    _cache_key = current_key
+    return client
 
 
 def _resolve_chat_endpoint(settings: Settings | None = None) -> tuple[str, str, str]:

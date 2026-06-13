@@ -137,7 +137,8 @@ def _enrich_search_results_with_spot(results: list[StockSearchItem], spot_df: pd
                 price=safe_float(row.iloc[0].get("最新价")),
                 change_pct=safe_float(row.iloc[0].get("涨跌幅")),
             )
-    except Exception:
+    except Exception as e:
+        logger.warning("行情数据补充失败，返回原结果: %s", e)
         return results
     return enriched
 

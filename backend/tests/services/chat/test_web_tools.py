@@ -3,48 +3,51 @@
 import pytest
 
 from app.services.chat.tools import web_tools
-from app.services.chat.tools.web_tools import (
+from app.utils.url_utils import (
     UnsafeUrlError,
-    _assert_url_safe,
+    assert_url_safe,
     is_twitter_url,
     parse_tweet_url,
 )
+
+# 向后兼容别名
+_assert_url_safe = assert_url_safe
 
 
 class TestAssertUrlSafe:
     def test_rejects_non_http_scheme(self):
         with pytest.raises(UnsafeUrlError):
-            _assert_url_safe("file:///etc/passwd")
+            assert_url_safe("file:///etc/passwd")
         with pytest.raises(UnsafeUrlError):
-            _assert_url_safe("ftp://example.com/x")
+            assert_url_safe("ftp://example.com/x")
 
     def test_rejects_missing_host(self):
         with pytest.raises(UnsafeUrlError):
-            _assert_url_safe("http://")
+            assert_url_safe("http://")
 
     def test_rejects_loopback(self):
         with pytest.raises(UnsafeUrlError):
-            _assert_url_safe("http://127.0.0.1/admin")
+            assert_url_safe("http://127.0.0.1/admin")
         with pytest.raises(UnsafeUrlError):
-            _assert_url_safe("http://localhost:8000/")
+            assert_url_safe("http://localhost:8000/")
 
     def test_rejects_private_ip(self):
         with pytest.raises(UnsafeUrlError):
-            _assert_url_safe("http://192.168.1.1/")
+            assert_url_safe("http://192.168.1.1/")
         with pytest.raises(UnsafeUrlError):
-            _assert_url_safe("http://10.0.0.5/")
+            assert_url_safe("http://10.0.0.5/")
 
     def test_rejects_cloud_metadata(self):
         with pytest.raises(UnsafeUrlError):
-            _assert_url_safe("http://169.254.169.254/latest/meta-data/")
+            assert_url_safe("http://169.254.169.254/latest/meta-data/")
 
     def test_allows_public_ip(self):
         # 公网 IP 直接通过（无需 DNS），不应抛异常
-        _assert_url_safe("http://1.1.1.1/")
+        assert_url_safe("http://1.1.1.1/")
 
     def test_unresolvable_host_raises(self):
         with pytest.raises(UnsafeUrlError):
-            _assert_url_safe("http://no-such-host.invalid/")
+            assert_url_safe("http://no-such-host.invalid/")
 
 
 class TestIsTwitterUrl:

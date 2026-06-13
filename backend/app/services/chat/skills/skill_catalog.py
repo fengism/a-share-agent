@@ -1,6 +1,11 @@
 """Skill 目录：定义什么场景下使用哪些 Tool。
 
 由系统自动注入到 system prompt 中，编号由 ChatRegistry.get_skill_prompt() 自动生成。
+
+设计原则：
+- 只保留 tool 定义中无法体现的「路由逻辑」和「组合策略」
+- 不重复 tool description 中已有的用途说明
+- 每条 Skill 控制在 3-5 行以内，减少 token 开销
 """
 
 from __future__ import annotations
@@ -11,60 +16,43 @@ from app.services.chat.tools.registry import registry
 _STOCK_QUERY = Skill(
     name="stock_query",
     description="用户提到股票名称/代码时，按意图选择对应分析工具",
-    usage="""根据意图选择：
-- 已知代码（6位数字或 sh/sz 前缀）→ 直接使用，不调 search_stocks
-- 仅给名称（如"贵州茅台"）→ 先 search_stocks 确认代码，再调分析工具
-- 深度分析 / 全面评估 → analyze_stock
+    usage="""路由规则：
+- 已知6位代码 → 直接使用，不调 search_stocks
+- 仅给名称 → 先 search_stocks 确认代码
+- 深度分析/全面评估 → analyze_stock（一次调用获取全维度数据）
+- 财报分析/财务分析/利润表/资产负债表/现金流量表 → analyze_financials
 - 多股对比 → compare_stocks
-- K 线 / 技术面 → get_stock_kline 或 get_stock_technical_indicators
-- 财报 / 基本面 → get_stock_financial 或 get_stock_valuation_detail
-- 新闻 / 研报 / 公告 → get_stock_news 或 iwencai_search
-- 情绪 / 热度 → get_stock_sentiment""",
+- 单维度查询 → 按意图选对应工具""",
 )
 
 _STOCK_SCREENING = Skill(
     name="stock_screening",
     description="用户提到选股条件时，优先使用问财自然语言选股",
-    usage="""优先 iwencai_select_stock：
-- 支持自然语言选股，覆盖面广，如"连续涨停""北向资金净买入""低估值高增长""PE 小于 20 的白酒股"
-- 仅当条件能精确映射到固定参数且问财不可用时，才使用 screen_stocks""",
+    usage="优先 iwencai_select_stock（自然语言）；仅当条件精确映射到固定参数且问财不可用时，才用 screen_stocks。",
 )
 
 _INDUSTRY_SECTOR = Skill(
     name="industry_sector",
     description="用户问行业/板块/题材时，按需选择分析、热度或研报工具",
-    usage="""根据意图选择：
-- 行业综合分析 → sector_analysis
-- 热门概念 / 热门行业 / 热门股 → get_hot_rank
-- 相关研报、新闻、公告 → iwencai_search""",
+    usage="行业综合分析 → sector_analysis；热门概念/行业/股 → get_hot_rank；研报新闻 → iwencai_search。",
 )
 
 _MARKET_OVERVIEW = Skill(
     name="market_overview",
     description="用户问大盘/市场时，按需查询指数、龙虎榜、复盘或宏观数据",
-    usage="""根据意图选择：
-- 指数和成交额 → get_market_overview
-- 龙虎榜 → get_dragon_tiger
-- 每日复盘 / 市场总结 → get_daily_review
-- 宏观指标（GDP、CPI、M2、PMI 等）→ iwencai_market_macro""",
+    usage="指数成交额 → get_market_overview；龙虎榜 → get_dragon_tiger；复盘 → get_daily_review；宏观指标 → iwencai_market_macro。",
 )
 
 _NATURAL_LANGUAGE_QUERY = Skill(
     name="natural_language_query",
     description="自然语言结构化数据查询，按查询类型选择对应工具",
-    usage="""根据查询类型选择：
-- 个股、行业、财务、行情等灵活查询 → iwencai_query
-- 选股类自然语言查询 → iwencai_select_stock（不要用 iwencai_query 代替）""",
+    usage="灵活数据查询 → iwencai_query；选股类查询 → iwencai_select_stock（不要用 iwencai_query 代替）。",
 )
 
 _URL_HANDLING = Skill(
     name="url_handling",
     description="用户发送 URL 链接时，获取网页内容并总结。支持新闻、博客、研报、Twitter/X 等",
-    usage="""网页内容获取和总结 → fetch_url
-1. 调用 fetch_url(url=用户发送的链接) 获取网页正文
-2. 基于获取的内容直接总结，提取要点，条理清晰
-3. 不要调用其他股票分析工具，不要尝试搜索股票
-4. 如果获取失败，如实告知原因""",
+    usage="fetch_url 获取正文 → 直接总结要点。不调用股票工具。获取失败如实告知。",
 )
 
 

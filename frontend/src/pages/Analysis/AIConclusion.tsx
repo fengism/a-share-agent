@@ -2,7 +2,7 @@ import { Card, List, Progress, Row, Col, Typography } from "antd";
 import RatingBadge from "../../components/RatingBadge";
 import SignalBadge from "../../components/SignalBadge";
 import type { AnalysisResult } from "../../types/stock";
-import { useStyles } from "../../styles/ui";;
+import { useColors, useStyles } from "../../theme/hooks";
 
 const { Text } = Typography;
 
@@ -11,6 +11,7 @@ interface Props {
 }
 
 export default function AIConclusion({ result }: Props) {
+  const c = useColors();
   const { cardStyle, metricTileStyle } = useStyles();
   const {
     fundamental,
@@ -34,30 +35,30 @@ export default function AIConclusion({ result }: Props) {
   const signalTheme =
     signal === "buy"
       ? {
-          primary: "#ef4444",
-          soft: "rgba(239,68,68,0.12)",
-          border: "rgba(239,68,68,0.25)",
-          progress: "#ef4444",
+          primary: c.up,
+          soft: c.upBg,
+          border: `${c.up}40`,
+          progress: c.up,
         }
       : signal === "sell"
         ? {
-            primary: "#22c55e",
-            soft: "rgba(34,197,94,0.12)",
-            border: "rgba(34,197,94,0.25)",
-            progress: "#22c55e",
+            primary: c.down,
+            soft: c.downBg,
+            border: `${c.down}40`,
+            progress: c.down,
           }
         : {
-            primary: "#3b82f6",
-            soft: "rgba(59,130,246,0.12)",
-            border: "rgba(59,130,246,0.25)",
-            progress: "#3b82f6",
+            primary: c.primary,
+            soft: `${c.primary}1f`,
+            border: `${c.primary}40`,
+            progress: c.primary,
           };
 
   return (
     <Card
       size="small"
       className="pdf-avoid-break"
-      title={<span style={{ fontWeight: 700, fontSize: 15, color: "#e5e7eb", letterSpacing: 0.2 }}>AI 综合结论</span>}
+      title={<span style={{ fontWeight: 700, fontSize: 15, color: c.textPrimary, letterSpacing: 0.2 }}>AI 综合结论</span>}
       style={{
         ...cardStyle,
         marginBottom: 16,
@@ -69,32 +70,32 @@ export default function AIConclusion({ result }: Props) {
         <div style={{ padding: "14px 16px", borderRadius: 10, border: `1px solid ${signalTheme.border}`, background: signalTheme.soft }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
             <div>
-              <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>核心研判</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#e5e7eb", lineHeight: 1.6 }}>{overall_summary}</div>
+              <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>核心研判</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: c.textPrimary, lineHeight: 1.6 }}>{overall_summary}</div>
             </div>
             <SignalBadge signal={signal} />
           </div>
         </div>
         <Row gutter={[12, 12]}>
           <Col xs={24} md={8}>
-            <div style={{ padding: "12px 14px", borderRadius: 10, border: "1px solid #1e293b", background: "#1a2332", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>投资要点</div>
-              <div style={{ fontSize: 13, lineHeight: 1.8, color: "#9ca3af" }}>{key_factors[0] || "暂无"}</div>
+            <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${c.border}`, background: c.elevatedBg, height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>投资要点</div>
+              <div style={{ fontSize: 13, lineHeight: 1.8, color: c.textSecondary }}>{key_factors[0] || "暂无"}</div>
             </div>
           </Col>
           <Col xs={24} md={8}>
-            <div style={{ padding: "12px 14px", borderRadius: 10, border: "1px solid #1e293b", background: "#1a2332", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>风险要点</div>
-              <div style={{ fontSize: 13, lineHeight: 1.8, color: "#9ca3af" }}>{risk_warnings[0] || "暂无"}</div>
+            <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${c.border}`, background: c.elevatedBg, height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>风险要点</div>
+              <div style={{ fontSize: 13, lineHeight: 1.8, color: c.textSecondary }}>{risk_warnings[0] || "暂无"}</div>
             </div>
           </Col>
           <Col xs={24} md={8}>
-            <div style={{ padding: "12px 14px", borderRadius: 10, border: "1px solid #1e293b", background: "#1a2332", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>估值结论</div>
-              <div style={{ fontSize: 13, lineHeight: 1.8, color: "#9ca3af", minHeight: 48 }}>
+            <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${c.border}`, background: c.elevatedBg, height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>估值结论</div>
+              <div style={{ fontSize: 13, lineHeight: 1.8, color: c.textSecondary, minHeight: 48 }}>
                 {valuation_view && (
                   <span style={{
-                    color: valuation_view === "低估" ? "#ef4444" : valuation_view === "高估" ? "#22c55e" : "#3b82f6",
+                    color: valuation_view === "低估" ? c.up : valuation_view === "高估" ? c.down : c.primary,
                     fontWeight: 600,
                   }}>
                     {valuation_view}
@@ -114,19 +115,19 @@ export default function AIConclusion({ result }: Props) {
 
       <Row gutter={[20, 20]}>
         <Col xs={24} lg={7} className="pdf-avoid-break">
-          <div style={{ padding: "18px 16px", borderRadius: 12, border: `1px solid ${signalTheme.border}`, background: `linear-gradient(180deg, ${signalTheme.soft} 0%, rgba(17,24,39,0.7) 100%)` }}>
+          <div style={{ padding: "18px 16px", borderRadius: 12, border: `1px solid ${signalTheme.border}`, background: `linear-gradient(180deg, ${signalTheme.soft} 0%, ${c.cardBg}b3 100%)` }}>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
               <RatingBadge score={overall_rating} size={84} />
             </div>
             <div style={{ ...metricTileStyle, marginBottom: 12 }}>
               <Text type="secondary" style={{ fontSize: 12 }}>12个月目标区间</Text>
-              <div style={{ fontSize: 22, fontWeight: 700, color: "#3b82f6", marginTop: 6 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: c.primary, marginTop: 6 }}>
                 ¥{priceLow?.toFixed(2)} - ¥{priceHigh?.toFixed(2)}
               </div>
-              <div style={{ marginTop: 6, fontSize: 12, color: "#9ca3af" }}>
+              <div style={{ marginTop: 6, fontSize: 12, color: c.textSecondary }}>
                 当前价格 ¥{current_price?.toFixed(2)}
                 {priceChange && (
-                  <span style={{ marginLeft: 8, color: Number(priceChange) >= 0 ? "#ef4444" : "#22c55e", fontWeight: 600 }}>
+                  <span style={{ marginLeft: 8, color: Number(priceChange) >= 0 ? c.up : c.down, fontWeight: 600 }}>
                     {Number(priceChange) >= 0 ? "+" : ""}{priceChange}%
                   </span>
                 )}
@@ -151,11 +152,11 @@ export default function AIConclusion({ result }: Props) {
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                     <RatingBadge score={item.score} size={44} />
                     <div>
-                      <div style={{ fontSize: 12, color: "#9ca3af" }}>{item.label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#e5e7eb" }}>{item.score.toFixed(1)}</div>
+                      <div style={{ fontSize: 12, color: c.textSecondary }}>{item.label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: c.textPrimary }}>{item.score.toFixed(1)}</div>
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.7 }}>{item.summary}</div>
+                  <div style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.7 }}>{item.summary}</div>
                 </div>
               </Col>
             ))}
@@ -163,30 +164,30 @@ export default function AIConclusion({ result }: Props) {
 
           <Row gutter={[16, 16]} className="pdf-avoid-break">
             <Col xs={24} md={12}>
-              <div style={{ padding: "14px 16px", border: "1px solid #ead7d5", background: "linear-gradient(135deg, #1a0f0f, #2d1518)", borderRadius: 10, height: "100%" }}>
-                <Text strong style={{ color: "#ef4444", fontSize: 13 }}>看多因素</Text>
+              <div style={{ padding: "14px 16px", border: `1px solid ${c.up}40`, background: c.upCardGradient, borderRadius: 10, height: "100%" }}>
+                <Text strong style={{ color: c.up, fontSize: 13 }}>看多因素</Text>
                 <List
                   size="small"
                   dataSource={key_factors}
                   locale={{ emptyText: "暂无" }}
                   renderItem={(item) => (
-                    <List.Item style={{ padding: "4px 0", border: "none", fontSize: 12, color: "#9ca3af" }}>
-                      <span style={{ color: "#ef4444", marginRight: 6, fontWeight: 700 }}>+</span>{item}
+                    <List.Item style={{ padding: "4px 0", border: "none", fontSize: 12, color: c.textSecondary }}>
+                      <span style={{ color: c.up, marginRight: 6, fontWeight: 700 }}>+</span>{item}
                     </List.Item>
                   )}
                 />
               </div>
             </Col>
             <Col xs={24} md={12}>
-              <div style={{ padding: "14px 16px", border: "1px solid #d6e7df", background: "linear-gradient(135deg, #0f1a14, #152d1d)", borderRadius: 10, height: "100%" }}>
-                <Text strong style={{ color: "#22c55e", fontSize: 13 }}>风险提示</Text>
+              <div style={{ padding: "14px 16px", border: `1px solid ${c.down}40`, background: c.downCardGradient, borderRadius: 10, height: "100%" }}>
+                <Text strong style={{ color: c.down, fontSize: 13 }}>风险提示</Text>
                 <List
                   size="small"
                   dataSource={risk_warnings}
                   locale={{ emptyText: "暂无" }}
                   renderItem={(item) => (
-                    <List.Item style={{ padding: "4px 0", border: "none", fontSize: 12, color: "#9ca3af" }}>
-                      <span style={{ color: "#22c55e", marginRight: 6, fontWeight: 700 }}>!</span>{item}
+                    <List.Item style={{ padding: "4px 0", border: "none", fontSize: 12, color: c.textSecondary }}>
+                      <span style={{ color: c.down, marginRight: 6, fontWeight: 700 }}>!</span>{item}
                     </List.Item>
                   )}
                 />

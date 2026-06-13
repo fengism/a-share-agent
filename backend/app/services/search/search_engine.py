@@ -6,12 +6,15 @@ No API Key Search Engine Base Class
 
 import os
 import sys
+import logging
 from urllib.parse import quote
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 
 import requests
 from lxml import html
+
+logger = logging.getLogger(__name__)
 
 class BaseNoApiKeySearchEngine(ABC):
     """无需 API Key 搜索引擎基类"""
@@ -141,11 +144,12 @@ class BaiduSearchNoApi(BaseNoApiKeySearchEngine):
                             'body': body,
                             'engine': self.ENGINE_NAME
                         })
-            except Exception:
+            except Exception as e:
+                logger.debug("解析搜索条目失败: %s", e)
                 continue
 
         return results
-    
+
 
 class BingCnSearchNoAPI(BaseNoApiKeySearchEngine):
     """Bing 中国搜索引擎 (无需 API Key)"""
@@ -184,11 +188,12 @@ class BingCnSearchNoAPI(BaseNoApiKeySearchEngine):
                             'body': body,
                             'engine': self.ENGINE_NAME
                         })
-            except Exception:
+            except Exception as e:
+                logger.debug("解析搜索条目失败: %s", e)
                 continue
 
         return results
-    
+
 class GoogleSearchNoAPI(BaseNoApiKeySearchEngine):
     """Google 搜索引擎 (无需 API Key)"""
 
@@ -245,7 +250,8 @@ class GoogleSearchNoAPI(BaseNoApiKeySearchEngine):
                             'body': body,
                             'engine': self.ENGINE_NAME
                         })
-            except Exception:
+            except Exception as e:
+                logger.debug("解析搜索条目失败: %s", e)
                 continue
 
         return results

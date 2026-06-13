@@ -34,7 +34,7 @@ def _percentile_key(code: str, indicator: str, period: str) -> tuple[str, str, s
     return normalize_code(code).raw, indicator, period
 
 
-async def _compute_percentile(code: str, indicator: str = "市盈率(TTM)", period: str = "近三年") -> float | None:
+async def compute_percentile(code: str, indicator: str = "市盈率(TTM)", period: str = "近三年") -> float | None:
     """计算单个股票的估值百分位，带 1 天缓存。
 
     Param:
@@ -87,7 +87,7 @@ async def _compute_percentile_limited(
         百分位浮点数，数据不足时返回 None
     """
     async with _percentile_semaphore:
-        return await _compute_percentile(code, indicator, period)
+        return await compute_percentile(code, indicator, period)
 
 
 async def _compute_percentile_inflight(

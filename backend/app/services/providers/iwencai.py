@@ -48,7 +48,8 @@ class IwencaiDataProvider(BaseDataProvider):
             from app.config import get_settings
             settings = get_settings()
             return settings.iwencai_base_url
-        except Exception:
+        except Exception as e:
+            logger.debug("问财 base_url 读取配置失败，使用环境变量回退: %s", e)
             return os.environ.get("IWENCAI_BASE_URL", "https://openapi.iwencai.com")
 
     @property
@@ -64,8 +65,8 @@ class IwencaiDataProvider(BaseDataProvider):
             key = settings.iwencai_api_key
             if key:
                 return key
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("问财 API Key 读取配置失败，使用环境变量回退: %s", e)
         return os.environ.get("IWENCAI_API_KEY", "")
 
     def _claw_headers(self, call_type: str = "normal") -> dict:

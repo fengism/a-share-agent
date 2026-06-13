@@ -29,8 +29,7 @@ from app.constants.market import (
 from app.models.search_item import NewsSearchItem
 from app.models.stock import StockSearchItem
 from app.services.base.data_provider import BaseDataProvider
-from app.services.providers.akshare import akshare_provider
-from app.services.base.intraday_utils import event_stream, normalize_intraday_df
+from app.utils.intraday_utils import event_stream, normalize_intraday_df
 from app.utils.symbol_utils import classify_exchange
 from app.utils.symbol_utils import contains_stock_reference
 from app.utils.data_clean import rename_and_keep_columns, safe_float
@@ -1325,6 +1324,52 @@ class EastMoneyDataProvider(BaseDataProvider):
             "total": len(rows),
         }
     
+    @staticmethod
+    def _parse_fund_flow_klines(klines: list[str]) -> list[dict]:
+        """解析资金流向 kline 字符串列表为结构化字典列表。
+
+        Param:
+            klines: 逗号分隔的 kline 字符串列表
+        Return:
+            资金流向字典列表，包含 date/main_net/small_net/mid_net/large_net/super_net
+        """
+        rows = []
+        for line in klines:
+            parts = line.split(",")
+            if len(parts) >= 7:
+                rows.append({
+                    "date": parts[0],
+                    "main_net": float(parts[1]) if parts[1] != "-" else 0,
+                    "small_net": float(parts[2]) if parts[2] != "-" else 0,
+                    "mid_net": float(parts[3]) if parts[3] != "-" else 0,
+                    "large_net": float(parts[4]) if parts[4] != "-" else 0,
+                    "super_net": float(parts[5]) if parts[5] != "-" else 0,
+                })
+        return rows
+
+    @staticmethod
+    def _parse_fund_flow_items(items: list[dict]) -> list[dict]:
+        """解析 clist 接口返回的资金流向 item 列表。
+
+        Param:
+            items: 东财 clist 接口返回的 item 字典列表
+        Return:
+            资金流向字典列表，包含 industry_code/industry_name/change_pct 及各级净流入
+        """
+        rows = []
+        for item in items:
+            rows.append({
+                "industry_code": item.get("f12", ""),
+                "industry_name": item.get("f14", ""),
+                "change_pct": safe_float(item.get("f3", "")),
+                "main_net": safe_float(item.get("f62", "")),
+                "small_net": safe_float(item.get("f84", "")),
+                "mid_net": safe_float(item.get("f78", "")),
+                "large_net": safe_float(item.get("f72", "")),
+                "super_net": safe_float(item.get("f66", "")),
+            })
+        return rows
+
     def fetch_stock_fund_flow(self, code: str) -> list[dict]:
         """获取个股，最近 120 个交易日）。
 
@@ -1354,21 +1399,8 @@ class EastMoneyDataProvider(BaseDataProvider):
             logger.warning("东方财富个股资金流请求失败: code=%s, error=%s", code, e)
             return []
         klines = d.get("data", {}).get("klines", [])
+        return self._parse_fund_flow_klines(klines)
 
-        rows = []
-        for line in klines:
-            parts = line.split(",")
-            if len(parts) >= 7:
-                rows.append({
-                    "date": parts[0],
-                    "main_net": float(parts[1]) if parts[1] != "-" else 0,
-                    "small_net": float(parts[2]) if parts[2] != "-" else 0,
-                    "mid_net": float(parts[3]) if parts[3] != "-" else 0,
-                    "large_net": float(parts[4]) if parts[4] != "-" else 0,
-                    "super_net": float(parts[5]) if parts[5] != "-" else 0,
-                })
-        return rows
-    
     def fetch_market_fund_flow(self) -> list[dict]:
         """获取市场资金流入日级，最近 120 个交易日）。
 
@@ -1401,19 +1433,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             logger.warning("东方财富市场资金流请求失败: %s", e)
             return []
         klines = d.get("data", {}).get("klines", [])
-        rows = []
-        for line in klines:
-            parts = line.split(",")
-            if len(parts) >= 7:
-                rows.append({
-                    "date": parts[0],
-                    "main_net": float(parts[1]) if parts[1] != "-" else 0,
-                    "small_net": float(parts[2]) if parts[2] != "-" else 0,
-                    "mid_net": float(parts[3]) if parts[3] != "-" else 0,
-                    "large_net": float(parts[4]) if parts[4] != "-" else 0,
-                    "super_net": float(parts[5]) if parts[5] != "-" else 0,
-                })
-        return rows
+        return self._parse_fund_flow_klines(klines)
     
 
     def fetch_industry_fund_flow(self) -> list[dict]:
@@ -1450,19 +1470,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         except Exception as e:
             logger.warning("东方财富行业资金流请求失败: %s", e)
             return []
-        rows = []
-        for item in items:
-            rows.append({
-                "industry_code": item.get("f12", ""),
-                "industry_name": item.get("f14", ""),
-                "change_pct": safe_float(item.get("f3", "")),
-                "main_net": safe_float(item.get("f62", "")),
-                "small_net": safe_float(item.get("f84", "")),
-                "mid_net": safe_float(item.get("f78", "")),
-                "large_net": safe_float(item.get("f72", "")),
-                "super_net": safe_float(item.get("f66", "")),
-            })
-        return rows
+        return self._parse_fund_flow_items(items)
     
     def fetch_concept_fund_flow(self) -> list[dict]:
         """获取市场行业资金流入情况
@@ -1497,19 +1505,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         except Exception as e:
             logger.warning("东方财富概念资金流请求失败: %s", e)
             return []
-        rows = []
-        for item in items:
-            rows.append({
-                "industry_code": item.get("f12", ""),
-                "industry_name": item.get("f14", ""),
-                "change_pct": safe_float(item.get("f3", "")),
-                "main_net": safe_float(item.get("f62", "")),
-                "small_net": safe_float(item.get("f84", "")),
-                "mid_net": safe_float(item.get("f78", "")),
-                "large_net": safe_float(item.get("f72", "")),
-                "super_net": safe_float(item.get("f66", "")),
-            })
-        return rows
+        return self._parse_fund_flow_items(items)
 
     def fetch_dragon_tiger_daily_list(self, report_date: str) -> list[dict]:
         """获取龙虎榜当日上榜股票列表。
@@ -1617,10 +1613,10 @@ class EastMoneyDataProvider(BaseDataProvider):
                             "sell_ratio": safe_float(row.get("TOTAL_SELLRIO")),
                         }
                     )
-            except Exception:
+            except Exception as e:
+                logger.warning("龙虎榜明细[%s]获取失败: code=%s, date=%s, error=%s", side, code, report_date, e)
                 continue
         return result
-    
     def fetch_margin_trading(self, code: str, page_size: int = 30) -> list[dict]:
         """
         融资融券明细（日级）。

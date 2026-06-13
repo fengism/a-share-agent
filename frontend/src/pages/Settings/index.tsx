@@ -22,7 +22,7 @@ import {
 } from "@ant-design/icons";
 import { useConfig, useUpdateConfig } from "../../api/queries";
 import type { ConfigUpdate, ProviderDefault } from "../../types/settings";
-import { useStyles, darkColors } from "../../styles/ui";;
+import { useStyles, useColors } from "../../styles/ui";;
 
 const { Text } = Typography;
 
@@ -36,6 +36,7 @@ const PROVIDER_OPTIONS = [
 
 export default function SettingsPage() {
   const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle, cardStyle, fieldLabelStyle, sectionCardBodyStyle } = useStyles();
+  const c = useColors();
   const { data: config, isLoading } = useConfig();
   const updateConfig = useUpdateConfig();
   const queryClient = useQueryClient();
@@ -253,7 +254,7 @@ export default function SettingsPage() {
       <div
         style={{
           ...pageContainerStyle,
-          color: darkColors.textSecondary,
+          color: c.textSecondary,
           textAlign: "center",
           paddingTop: 80,
         }}
@@ -268,13 +269,13 @@ export default function SettingsPage() {
       <div
         style={{
           ...pageContainerStyle,
-          color: darkColors.up,
+          color: c.up,
           textAlign: "center",
           paddingTop: 80,
         }}
       >
         配置加载失败，请确认后端服务已启动。
-        <div style={{ marginTop: 12, color: darkColors.textMuted, fontSize: 12 }}>
+        <div style={{ marginTop: 12, color: c.textMuted, fontSize: 12 }}>
           API 地址: /api/config
         </div>
       </div>
@@ -350,7 +351,7 @@ export default function SettingsPage() {
             />
           </Col>
         </Row>
-        <Divider style={{ borderColor: darkColors.border, margin: "16px 0" }} />
+        <Divider style={{ borderColor: c.border, margin: "16px 0" }} />
         <Button
           type="primary"
           icon={<SaveOutlined />}
@@ -454,7 +455,7 @@ export default function SettingsPage() {
             />
           </Col>
         </Row>
-        <Divider style={{ borderColor: darkColors.border, margin: "16px 0" }} />
+        <Divider style={{ borderColor: c.border, margin: "16px 0" }} />
         <Button
           type="primary"
           icon={<SaveOutlined />}
@@ -503,7 +504,7 @@ export default function SettingsPage() {
             />
           </Col>
         </Row>
-        <Divider style={{ borderColor: darkColors.border, margin: "16px 0" }} />
+        <Divider style={{ borderColor: c.border, margin: "16px 0" }} />
         <Button
           type="primary"
           icon={<SaveOutlined />}
@@ -549,7 +550,7 @@ export default function SettingsPage() {
             />
           </Col>
         </Row>
-        <Divider style={{ borderColor: darkColors.border, margin: "16px 0" }} />
+        <Divider style={{ borderColor: c.border, margin: "16px 0" }} />
         <Button
           type="primary"
           icon={<SaveOutlined />}
@@ -584,12 +585,12 @@ export default function SettingsPage() {
               }
               placeholder={"qinbafrank\n账号2\n账号3"}
             />
-            <div style={{ marginTop: 4, fontSize: 12, color: darkColors.textMuted }}>
+            <div style={{ marginTop: 4, fontSize: 12, color: c.textMuted }}>
               用于拉取 Twitter/X 上的财经推文和文章，每行填写一个账号名（不带 @）
             </div>
           </Col>
         </Row>
-        <Divider style={{ borderColor: darkColors.border, margin: "16px 0" }} />
+        <Divider style={{ borderColor: c.border, margin: "16px 0" }} />
         <Button
           type="primary"
           icon={<SaveOutlined />}
@@ -619,7 +620,7 @@ export default function SettingsPage() {
               onChange={(e) => set({ eastmoney_cookie: e.target.value })}
               placeholder="留空使用内置默认值"
             />
-            <div style={{ marginTop: 4, fontSize: 12, color: darkColors.textMuted }}>
+            <div style={{ marginTop: 4, fontSize: 12, color: c.textMuted }}>
               从浏览器 DevTools → Network → 请求头中复制 Cookie 值
             </div>
           </Col>
@@ -630,12 +631,12 @@ export default function SettingsPage() {
               onChange={(e) => set({ baidu_acs_token: e.target.value })}
               placeholder="留空使用内置默认值"
             />
-            <div style={{ marginTop: 4, fontSize: 12, color: darkColors.textMuted }}>
+            <div style={{ marginTop: 4, fontSize: 12, color: c.textMuted }}>
               从浏览器 DevTools → Network → 请求头中复制 acs-token 值
             </div>
           </Col>
         </Row>
-        <Divider style={{ borderColor: darkColors.border, margin: "16px 0" }} />
+        <Divider style={{ borderColor: c.border, margin: "16px 0" }} />
         <Button
           type="primary"
           icon={<SaveOutlined />}
@@ -665,16 +666,16 @@ export default function SettingsPage() {
                 key={name}
                 style={{
                   padding: "10px 14px",
-                  background: darkColors.elevatedBg,
-                  border: `1px solid ${darkColors.border}`,
+                  background: c.elevatedBg,
+                  border: `1px solid ${c.border}`,
                   borderRadius: 8,
                   fontSize: 12,
                 }}
               >
-                <Text strong style={{ color: darkColors.primary, fontSize: 13 }}>
+                <Text strong style={{ color: c.primary, fontSize: 13 }}>
                   {PROVIDER_OPTIONS.find((p) => p.value === name)?.label || name}
                 </Text>
-                <div style={{ marginTop: 6, color: darkColors.textSecondary }}>
+                <div style={{ marginTop: 6, color: c.textSecondary }}>
                   <div>URL: {defaults.base_url}</div>
                   <div>Model: {defaults.model}</div>
                 </div>
