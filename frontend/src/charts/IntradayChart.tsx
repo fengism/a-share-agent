@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { AreaSeries, ColorType, HistogramSeries, LineStyle, createChart, type IChartApi, type UTCTimestamp } from "lightweight-charts";
 import type { IntradayItem } from "../types/stock";
-import { getColors } from "../styles/ui";
+import { useColors } from "../styles/ui";
 
 function hexToRgba(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -26,6 +26,7 @@ function toTimestamp(time: string): UTCTimestamp | null {
 }
 
 export default function IntradayChart({ data, prevClose, height = 320 }: Props) {
+  const c = useColors();
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const rows = useMemo(
@@ -40,7 +41,6 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
 
   useEffect(() => {
     if (!containerRef.current || rows.length === 0) return;
-    const c = getColors();
 
     chartRef.current?.remove();
 
@@ -136,7 +136,7 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
       chart.remove();
       chartRef.current = null;
     };
-  }, [height, prevClose, rows]);
+  }, [height, prevClose, rows, c.pageBg]);
 
   return <div ref={containerRef} style={{ width: "100%", height, minHeight: height }} />;
 }

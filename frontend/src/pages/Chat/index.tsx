@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, message } from "antd";
 import { ClearOutlined, RobotOutlined } from "@ant-design/icons";
 import { streamChat } from "../../api/chat";
@@ -30,16 +30,9 @@ export default function ChatPage() {
     messages,
     isStreaming,
     abortController,
-    addUserMessage,
-    addAssistantMessage,
-    appendToAssistant,
-    addToolCall,
-    updateToolResult,
     setStreaming,
     setAbortController,
     clearChat,
-    setReasoningContent,
-    appendToReasoning,
     finalizeMessage,
   } = useChatStore();
 
@@ -79,32 +72,33 @@ export default function ChatPage() {
     const input = inputValue.trim();
     if (!input || isStreaming) return;
 
-    const currentHistory = useChatStore.getState().history;
+    const store = useChatStore.getState();
 
     setInputValue("");
-    addUserMessage(input);
+    store.addUserMessage(input);
 
     const assistantId = `msg-${Date.now()}`;
     activeAssistantIdRef.current = assistantId;
-    addAssistantMessage(assistantId);
+    store.addAssistantMessage(assistantId);
 
-    const controller = streamChat(input, currentHistory, {
+    const controller = streamChat(input, store.history, {
       onDelta: (delta: ChatStreamDelta) => {
+        const s = useChatStore.getState();
         switch (delta.type) {
           case "reasoning":
-            appendToReasoning(assistantId, delta.content || "");
+            s.appendToReasoning(assistantId, delta.content || "");
             break;
           case "text":
-            appendToAssistant(assistantId, delta.content || "");
+            s.appendToAssistant(assistantId, delta.content || "");
             break;
           case "tool_call":
             if (delta.tool_call) {
-              addToolCall(assistantId, delta.tool_call);
+              s.addToolCall(assistantId, delta.tool_call);
             }
             break;
           case "tool_result":
             if (delta.tool_result) {
-              updateToolResult(
+              s.updateToolResult(
                 assistantId,
                 delta.tool_result.tool_call_id,
                 delta.tool_result.content || "",
@@ -113,43 +107,34 @@ export default function ChatPage() {
             }
             break;
           case "error":
-            appendToAssistant(assistantId, `\n\n[错误] ${delta.error}`);
+            s.appendToAssistant(assistantId, `\n\n[错误] ${delta.error}`);
             break;
           case "done":
             if (delta.reasoning_content) {
-              setReasoningContent(assistantId, delta.reasoning_content);
+              s.setReasoningContent(assistantId, delta.reasoning_content);
             }
-            finalizeMessage(assistantId);
+            s.finalizeMessage(assistantId);
             break;
         }
       },
       onError: (err) => {
-        appendToAssistant(assistantId, `\n\n[连接错误] ${err.message}`);
-        finalizeMessage(assistantId);
+        const s = useChatStore.getState();
+        s.appendToAssistant(assistantId, `\n\n[连接错误] ${err.message}`);
+        s.finalizeMessage(assistantId);
         clearActiveRequest();
       },
       onDone: () => {
-        finalizeMessage(assistantId);
+        useChatStore.getState().finalizeMessage(assistantId);
         clearActiveRequest();
       },
     });
 
     activeControllerRef.current = controller;
-    setAbortController(controller);
-    setStreaming(true);
+    store.setAbortController(controller);
+    store.setStreaming(true);
   }, [
     inputValue,
     isStreaming,
-    addUserMessage,
-    addAssistantMessage,
-    appendToAssistant,
-    addToolCall,
-    updateToolResult,
-    appendToReasoning,
-    setReasoningContent,
-    setStreaming,
-    setAbortController,
-    finalizeMessage,
     clearActiveRequest,
   ]);
 
@@ -190,9 +175,7 @@ export default function ChatPage() {
     }
   };
 
-  return (
-    <div style={pageContainerStyle}>
-      <style>{`
+  const chatMarkdownCss = useMemo(() => `
         @keyframes blink {
           50% { opacity: 0; }
         }
@@ -258,7 +241,11 @@ export default function ChatPage() {
           color: ${c.textSecondary};
           font-weight: 600;
         }
-      `}</style>
+    `, [c.textPrimary, c.primary, c.nestedBg, c.border, c.textSecondary, c.textMuted, c.elevatedBg, c.pageBg]);
+
+  return (
+    <div style={pageContainerStyle}>
+      <style>{chatMarkdownCss}</style>
 
       <div style={pageHeaderStyle}>
         <div

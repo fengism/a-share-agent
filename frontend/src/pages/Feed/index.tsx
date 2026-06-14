@@ -6,8 +6,9 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/zh-cn";
 import { useMarketKuaixun, useMarketOtherNews, useMarketTwitterFeed, useNewsAnalysis } from "../../api/queries";
-import { useColors, useStyles, getColors } from "../../styles/ui";
+import { useColors, useStyles } from "../../styles/ui";
 import type { FeedNewsItem } from "../../types/stock";
+import type { ThemeColors } from "../../theme/themes";
 
 dayjs.extend(relativeTime);
 dayjs.locale("zh-cn");
@@ -19,8 +20,7 @@ const { Title, Paragraph, Text } = Typography;
 const KUAIXUN_ACCENT = "#f59e0b";
 const KUAIXUN_ACCENT_BG = "rgba(245,158,11,0.08)";
 
-function getSourceColors(): Record<string, string> {
-  const c = getColors();
+function getSourceColors(c: ThemeColors): Record<string, string> {
   return {
     "东方财富": c.primary,
     "财联社": c.up,
@@ -37,8 +37,7 @@ function getSourceColors(): Record<string, string> {
   };
 }
 
-function getSentimentConfig(): Record<string, { color: string; bg: string }> {
-  const c = getColors();
+function getSentimentConfig(c: ThemeColors): Record<string, { color: string; bg: string }> {
   return {
     "偏多": { color: c.up, bg: `${c.up}1a` },
     "偏空": { color: c.down, bg: `${c.down}1a` },
@@ -48,18 +47,18 @@ function getSentimentConfig(): Record<string, { color: string; bg: string }> {
 
 /* ── 工具函数 ──────────────────────────────────────────── */
 
-function getSourceColor(source: string): string {
+function getSourceColor(source: string, c: ThemeColors): string {
   if (source.includes("快讯")) return KUAIXUN_ACCENT;
-  for (const [key, color] of Object.entries(getSourceColors())) {
+  for (const [key, color] of Object.entries(getSourceColors(c))) {
     if (source.includes(key)) return color;
   }
-  return getColors().textMuted;
+  return c.textMuted;
 }
 
-function getSourceLabel(source: string): string {
+function getSourceLabel(source: string, c: ThemeColors): string {
   if (source.includes("快讯")) return "7×24 快讯";
   if (!source) return "未知";
-  for (const key of Object.keys(getSourceColors())) {
+  for (const key of Object.keys(getSourceColors(c))) {
     if (source.includes(key)) return key;
   }
   return source;
@@ -98,8 +97,7 @@ function formatTime(time: string): string {
   return d.format("MM-DD HH:mm");
 }
 
-function getTimeColor(time: string): string {
-  const c = getColors();
+function getTimeColor(time: string, c: ThemeColors): string {
   const d = dayjs(time);
   if (!d.isValid()) return c.textMuted;
   const diffMin = dayjs().diff(d, "minute");
@@ -187,7 +185,7 @@ function NewsAnalysisPanel() {
   }
 
   const sentiment = analysis.market_sentiment || "中性";
-  const sConfig = getSentimentConfig()[sentiment] || getSentimentConfig()["中性"];
+  const sConfig = getSentimentConfig(c)[sentiment] || getSentimentConfig(c)["中性"];
 
   return (
     <div style={{ ...cardStyle, marginTop: 46, padding: 0, position: "sticky", top: 24 }}>
@@ -238,7 +236,7 @@ function NewsAnalysisPanel() {
           >
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
               <span style={{ fontSize: 13 }}>{section.icon}</span>
-              <Text style={{ color: "#94a3b8", fontWeight: 600, fontSize: 12, letterSpacing: 0.3 }}>{section.title}</Text>
+              <Text style={{ color: c.textSecondary, fontWeight: 600, fontSize: 12, letterSpacing: 0.3 }}>{section.title}</Text>
             </div>
             <ul style={{ margin: 0, paddingLeft: 16, listStyle: "none" }}>
               {(section.items || []).map((item, i) => (
@@ -255,17 +253,18 @@ function NewsAnalysisPanel() {
 /* ── 新闻列表项 ────────────────────────────────────────── */
 
 function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; showSourceTag?: boolean }) {
+  const c = useColors();
   const isKuaixun = item.source.includes("快讯");
   return (
     <List.Item
       style={{
         padding: isKuaixun ? "12px 16px 12px 20px" : "14px 16px",
         borderLeft: isKuaixun ? `3px solid ${KUAIXUN_ACCENT}` : "3px solid transparent",
-        borderBottom: "1px solid rgba(30,41,59,0.6)",
+        borderBottom: `1px solid ${c.border}80`,
         transition: "background 0.15s",
         background: isKuaixun ? KUAIXUN_ACCENT_BG : "transparent",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = getColors().elevatedBg; }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = c.elevatedBg; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = isKuaixun ? KUAIXUN_ACCENT_BG : "transparent"; }}
     >
       <div style={{ width: "100%" }}>
@@ -273,7 +272,7 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
           {showSourceTag && (
             <Tag
-              color={getSourceColor(item.source)}
+              color={getSourceColor(item.source, c)}
               style={{
                 margin: 0,
                 borderRadius: 4,
@@ -282,11 +281,11 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
                 paddingInline: 6,
               }}
             >
-              {getSourceLabel(item.source)}
+              {getSourceLabel(item.source, c)}
             </Tag>
           )}
-          <ClockCircleOutlined style={{ color: "#475569", fontSize: 11 }} />
-          <Text style={{ color: getTimeColor(item.publish_time), fontSize: 12 }}>
+          <ClockCircleOutlined style={{ color: c.textMuted, fontSize: 11 }} />
+          <Text style={{ color: getTimeColor(item.publish_time, c), fontSize: 12 }}>
             {formatTime(item.publish_time)}
           </Text>
           {item.author != null && item.author !== "" && (
@@ -297,9 +296,9 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
                 fontSize: 10,
                 lineHeight: "16px",
                 paddingInline: 5,
-                color: "#94a3b8",
-                background: "rgba(148,163,184,0.1)",
-                border: "1px solid rgba(148,163,184,0.15)",
+                color: c.textSecondary,
+                background: `${c.primary}0a`,
+                border: `1px solid ${c.border}`,
               }}
             >
               {item.author}
@@ -319,7 +318,7 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
               <Text
                 strong
                 style={{
-                  color: isKuaixun ? "#f1f5f9" : "#e2e8f0",
+                  color: c.textPrimary,
                   fontSize: isKuaixun ? 14 : 14.5,
                   flex: 1,
                   lineHeight: 1.6,
@@ -327,13 +326,13 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
               >
                 {item.title}
               </Text>
-              <LinkOutlined style={{ color: "#475569", fontSize: 11, flexShrink: 0, marginLeft: 4 }} />
+              <LinkOutlined style={{ color: c.textMuted, fontSize: 11, flexShrink: 0, marginLeft: 4 }} />
             </div>
           </a>
         ) : (
           <Text
             strong
-            style={{ color: isKuaixun ? "#f1f5f9" : "#e2e8f0", fontSize: isKuaixun ? 14 : 14.5, lineHeight: 1.6 }}
+            style={{ color: c.textPrimary, fontSize: isKuaixun ? 14 : 14.5, lineHeight: 1.6 }}
           >
             {item.title}
           </Text>
@@ -343,7 +342,7 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
         {item.content && (
           <Paragraph
             style={{
-              color: "#94a3b8",
+              color: c.textSecondary,
               fontSize: 12.5,
               marginTop: 4,
               marginBottom: 0,
@@ -362,12 +361,12 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
         {(item.read_count > 0 || item.comment_count > 0) && (
           <div style={{ marginTop: 4, display: "flex", gap: 12 }}>
             {item.read_count > 0 && (
-              <Text style={{ color: "#475569", fontSize: 11 }}>
+              <Text style={{ color: c.textMuted, fontSize: 11 }}>
                 阅读 {item.read_count.toLocaleString()}
               </Text>
             )}
             {item.comment_count > 0 && (
-              <Text style={{ color: "#475569", fontSize: 11 }}>
+              <Text style={{ color: c.textMuted, fontSize: 11 }}>
                 评论 {item.comment_count.toLocaleString()}
               </Text>
             )}
@@ -468,6 +467,7 @@ function TwitterTab() {
 }
 
 function OtherNewsTab() {
+  const c = useColors();
   const { cardStyle } = useStyles();
   const { data: items = [], isLoading } = useMarketOtherNews();
 
@@ -509,7 +509,7 @@ function OtherNewsTab() {
                 width: 8,
                 height: 8,
                 borderRadius: "50%",
-                background: getSourceColor(source),
+                background: getSourceColor(source, c),
                 flexShrink: 0,
               }}
             />

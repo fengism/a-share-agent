@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createChart, CandlestickSeries, HistogramSeries, ColorType, type IChartApi, type BusinessDay } from "lightweight-charts";
 import type { KlineItem } from "../types/stock";
-import { getColors } from "../styles/ui";
+import { useColors } from "../styles/ui";
 
 type Props = { data: KlineItem[]; height?: number };
 type ChartItem = Omit<KlineItem, "date"> & { date: BusinessDay };
@@ -27,6 +27,7 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 export default function KlineChart({ data, height = 500 }: Props) {
+  const c = useColors();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const chartElRef = useRef<HTMLDivElement>(null);
   const brushRef = useRef<HTMLDivElement>(null);
@@ -46,7 +47,6 @@ export default function KlineChart({ data, height = 500 }: Props) {
     if (!wrapperRef.current || !chartElRef.current || !brushRef.current || rows.length === 0) return;
     chartRef.current?.remove();
 
-    const c = getColors();
     const chart = createChart(chartElRef.current, {
       width: chartElRef.current.clientWidth,
       height,
@@ -161,19 +161,19 @@ export default function KlineChart({ data, height = 500 }: Props) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [height, rows]);
+  }, [height, rows, c.pageBg]);
 
   return (
     <div ref={wrapperRef} style={{ position: "relative", width: "100%" }}>
       <div ref={chartElRef} />
       <div ref={brushRef} style={{
         position: "absolute", top: 0, bottom: 0, display: "none", pointerEvents: "none",
-        background: hexToRgba(getColors().primary, 0.12), border: `1px solid ${hexToRgba(getColors().primary, 0.35)}`,
+        background: hexToRgba(c.primary, 0.12), border: `1px solid ${hexToRgba(c.primary, 0.35)}`,
       }} />
       <div style={{ position: "absolute", right: 12, top: 12, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
         <div style={{
-          padding: "6px 10px", fontSize: 12, color: getColors().textSecondary,
-          background: hexToRgba(getColors().pageBg, 0.96), border: `1px solid ${getColors().border}`,
+          padding: "6px 10px", fontSize: 12, color: c.textSecondary,
+          background: hexToRgba(c.pageBg, 0.96), border: `1px solid ${c.border}`,
           borderRadius: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.2)", pointerEvents: "none",
         }}>
           左键拖拽框选缩放，双击重置
@@ -181,9 +181,9 @@ export default function KlineChart({ data, height = 500 }: Props) {
         {isZoomed && (
           <button type="button" onClick={() => { chartRef.current?.timeScale().fitContent(); setIsZoomed(false); }}
             style={{
-              padding: "8px 12px", fontSize: 12, fontWeight: 600, color: getColors().primary,
-              background: hexToRgba(getColors().pageBg, 0.98), border: `1px solid ${getColors().border}`,
-              borderRadius: 999, cursor: "pointer", boxShadow: `0 4px 12px ${hexToRgba(getColors().primary, 0.15)}`,
+              padding: "8px 12px", fontSize: 12, fontWeight: 600, color: c.primary,
+              background: hexToRgba(c.pageBg, 0.98), border: `1px solid ${c.border}`,
+              borderRadius: 999, cursor: "pointer", boxShadow: `0 4px 12px ${hexToRgba(c.primary, 0.15)}`,
             }}>
             返回全视图
           </button>

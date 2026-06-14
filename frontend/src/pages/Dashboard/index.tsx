@@ -3,6 +3,7 @@ import { ArrowUpOutlined, ArrowDownOutlined, FundOutlined, MessageOutlined, Robo
 import { useNavigate } from "react-router-dom";
 import { useMarketIndices } from "../../api/queries";
 import { useColors, useStyles } from "../../styles/ui";
+import { formatAmount } from "../../utils/format";
 
 const { Text } = Typography;
 
@@ -13,13 +14,6 @@ const shortcuts = [
 ];
 
 const INDEX_NAMES = ["上证指数", "深证成指", "创业板指", "科创50", "沪深300", "中证500"];
-
-function formatAmount(value: number | null | undefined) {
-  if (value == null) return "-";
-  if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(1)}亿`;
-  if (Math.abs(value) >= 1e4) return `${(value / 1e4).toFixed(1)}万`;
-  return value.toFixed(0);
-}
 
 function formatIndexPrice(value: number | string | null | undefined) {
   const numericValue = typeof value === "number" ? value : Number(value);

@@ -1,14 +1,17 @@
 import { Row, Col, Spin } from "antd";
 import { useMacroAllData } from "../../api/queries";
 import MacroIndicatorCard from "./MacroIndicatorCard";
-import { getColors } from "../../theme/store";
+import { useColors } from "../../styles/ui";
+import type { ThemeColors } from "../../theme/themes";
 
-const PMI_FIELDS = [
-  { key: "MAKE_INDEX", label: "制造业", color: getColors().primary },
-  { key: "NMAKE_INDEX", label: "非制造业", color: getColors().accent },
+const PMI_FIELDS = (c: ThemeColors) => [
+  { key: "MAKE_INDEX", label: "制造业", color: c.primary },
+  { key: "NMAKE_INDEX", label: "非制造业", color: c.accent },
+
 ];
 
 export default function PmiTab() {
+  const c = useColors();
   const { data, isLoading } = useMacroAllData();
 
   if (isLoading) {
@@ -24,7 +27,7 @@ export default function PmiTab() {
           title="PMI 采购经理人指数"
           latest={pmi?.latest ?? null}
           trend={pmi?.trend ?? []}
-          fields={PMI_FIELDS}
+          fields={PMI_FIELDS(c)}
         />
       </Col>
     </Row>

@@ -37,14 +37,14 @@ class BaiduDataProvider(BaseDataProvider):
         # 百度接口直连，不使用系统代理
         self._session = requests.Session()
         self._session.trust_env = False
-        # 支持自定义 acs-token（配置为空时使用 http.py 中的内置默认值）
-        self._custom_acs_token = get_settings().baidu_acs_token
+        # 支持自定义 Cookie（配置为空时使用 http.py 中的内置默认值）
+        self._custom_cookie = get_settings().baidu_cookie
 
     def _get_cookie_headers(self) -> dict[str, str]:
-        """返回带 acs-token 的请求头副本，避免修改共享常量。"""
+        """返回带自定义 Cookie 的请求头副本，避免修改共享常量。"""
         headers = dict(BD_HEADERS_WITH_COOKIE)
-        if self._custom_acs_token:
-            headers["acs-token"] = self._custom_acs_token
+        if self._custom_cookie:
+            headers["cookie"] = self._custom_cookie
         return headers
 
     def _request(self, path: str, params: dict, headers: dict | None = None, timeout: int | None = None) -> dict:
@@ -210,7 +210,7 @@ class BaiduDataProvider(BaseDataProvider):
 
     def fetch_market_kuaixun(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
         """百度 7x24 快讯（ExpressNews），可选按股票代码/名称过滤。
-
+        https://finance.pae.baidu.com/selfselect/expressnews?rn=20&pn=0&tag=&filterByUserStocks=0&finClientType=pc
         Param:
             code: 可选，6 位股票代码
             code_name: 可选，股票名称
@@ -218,7 +218,7 @@ class BaiduDataProvider(BaseDataProvider):
             NewsSearchItem 列表
         """
         data = self._request(
-            "/selfselect/expressnews",
+            "https://finance.pae.baidu.com/selfselect/expressnews",
             params={
                 "rn": "20",
                 "pn": "0",
@@ -464,5 +464,5 @@ baidu_provider = BaiduDataProvider()
 
 
 if __name__ == "__main__":
-    data = baidu_provider.fetch_concept_rankings()
+    data = baidu_provider.fetch_market_kuaixun()
     print(data)

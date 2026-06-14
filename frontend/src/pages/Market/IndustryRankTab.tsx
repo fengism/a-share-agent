@@ -57,7 +57,7 @@ export default function IndustryRankTab() {
       sorter: (a, b) => (a.change_pct ?? 0) - (b.change_pct ?? 0),
       defaultSortOrder: "descend",
       render: (value: number) => (
-        <span style={{ color: changeColor(value), fontWeight: 500 }}>
+        <span style={{ color: changeColor(value, c), fontWeight: 500 }}>
           {formatSignedPercent(value)}
         </span>
       ),
@@ -87,7 +87,7 @@ export default function IndustryRankTab() {
       width: 90,
       align: "right",
       render: (value: number) => (
-        <span style={{ color: changeColor(value) }}>
+        <span style={{ color: changeColor(value, c) }}>
           {formatSignedPercent(value)}
         </span>
       ),

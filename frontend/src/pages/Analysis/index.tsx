@@ -21,21 +21,9 @@ import SkeletonAIConclusion from "./SkeletonAIConclusion";
 import { useAnalysisStore } from "../../store/analysisStore";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { AnalysisResult } from "../../types/stock";
+import { formatMarketCap, formatAmountWanYi } from "../../utils/format";
 
 const { Title } = Typography;
-
-function formatMarketCap(value: number | null | undefined) {
-  if (value == null) return "-";
-  if (Math.abs(value) >= 1e12) return `${(value / 1e12).toFixed(2)}万亿`;
-  if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(2)}亿`;
-  return value.toFixed(0);
-}
-
-function formatAmountWanYi(value: number | null | undefined) {
-  if (value == null) return "-";
-  if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(2)}亿`;
-  return `${(value / 1e4).toFixed(2)}万`;
-}
 
 export default function Analysis() {
   const c = useColors();

@@ -18,7 +18,8 @@ import {
   formatHotValue,
   formatSignedPercent,
 } from "../../utils/format";
-import { getColors } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
+import type { ThemeColors } from "../../theme/themes";
 
 type TabKey = "stock" | "concept" | "industry";
 
@@ -28,12 +29,12 @@ const TAB_OPTIONS = [
   { label: <span><AppstoreOutlined /> 行业榜</span>, value: "industry" as TabKey },
 ];
 
-function rankBadge(rank: number) {
-  let color = getColors().textSecondary;
+function rankBadge(rank: number, c: ThemeColors) {
+  let color = c.textSecondary;
   let bg = "transparent";
   if (rank === 1 || rank === 2) {
     color = "#fff";
-    bg = getColors().up;
+    bg = c.up;
   } else if (rank === 3) {
     color = "#fff";
     bg = "#eab308";
@@ -63,11 +64,12 @@ function rankBadge(rank: number) {
 }
 
 function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number }) {
+  const c = useColors();
   const navigate = useNavigate();
   const { data, isLoading, isFetching } = useThsHotRank(enabled);
 
   const columns: ColumnsType<ThsHotStock> = [
-    { title: "排名", dataIndex: "rank", width: 60, align: "center", render: rankBadge },
+    { title: "排名", dataIndex: "rank", width: 60, align: "center", render: (rank: number) => rankBadge(rank, c) },
     {
       title: "代码",
       dataIndex: "code",
@@ -75,7 +77,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
       render: (code: string) => (
         <a
           onClick={() => navigate(`/analysis/${code}`)}
-          style={{ color: getColors().primary, fontWeight: 500 }}
+          style={{ color: c.primary, fontWeight: 500 }}
         >
           {code}
         </a>
@@ -88,7 +90,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
       width: 85,
       align: "right",
       render: (value: number) => (
-        <span style={{ color: changeColor(value), fontWeight: 500 }}>
+        <span style={{ color: changeColor(value, c), fontWeight: 500 }}>
           {formatSignedPercent(value)}
         </span>
       ),
@@ -99,7 +101,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
       width: 80,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ fontWeight: 600, color: getColors().up }}>
+        <span style={{ fontWeight: 600, color: c.up }}>
           {formatHotValue(value)}
         </span>
       ),
@@ -137,11 +139,12 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
 }
 
 function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: boolean }) {
+  const c = useColors();
   const hook = type === "concept" ? useThsHotConcept : useThsHotIndustry;
   const { data, isLoading, isFetching } = hook(enabled);
 
   const columns: ColumnsType<ThsHotPlate> = [
-    { title: "排名", dataIndex: "rank", width: 60, align: "center", render: rankBadge },
+    { title: "排名", dataIndex: "rank", width: 60, align: "center", render: (rank: number) => rankBadge(rank, c) },
     {
       title: type === "concept" ? "概念名称" : "行业名称",
       dataIndex: "name",
@@ -155,7 +158,7 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
       width: 85,
       align: "right",
       render: (value: number) => (
-        <span style={{ color: changeColor(value), fontWeight: 500 }}>
+        <span style={{ color: changeColor(value, c), fontWeight: 500 }}>
           {formatSignedPercent(value)}
         </span>
       ),
@@ -166,7 +169,7 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
       width: 80,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ fontWeight: 600, color: getColors().up }}>
+        <span style={{ fontWeight: 600, color: c.up }}>
           {formatHotValue(value)}
         </span>
       ),
@@ -205,6 +208,7 @@ interface HotRankContentProps {
 }
 
 export function HotRankContent({ embedded = false }: HotRankContentProps) {
+  const c = useColors();
   const [tab, setTab] = useState<TabKey>("stock");
   const stockScrollY = embedded ? 580 : 600;
 
@@ -230,7 +234,7 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
           </Col>
           <Col>
             <Tag color="red">同花顺</Tag>
-            <span style={{ color: getColors().textSecondary, fontSize: 12, marginLeft: 8 }}>
+            <span style={{ color: c.textSecondary, fontSize: 12, marginLeft: 8 }}>
               {embedded ? "每分钟自动更新" : "数据来源: 同花顺 | 5分钟更新"}
             </span>
           </Col>

@@ -72,7 +72,7 @@ export default function SettingsPage() {
         iwencai_api_key: config.iwencai_api_key,
         twitter_feeds: config.twitter_feeds,
         eastmoney_cookie: config.eastmoney_cookie,
-        baidu_acs_token: config.baidu_acs_token,
+        baidu_cookie: config.baidu_cookie,
       });
       setPrevProvider(config.llm_provider);
   }, [config, initialized]);
@@ -231,8 +231,8 @@ export default function SettingsPage() {
     if (form.eastmoney_cookie && !form.eastmoney_cookie.endsWith("***")) {
       patch.eastmoney_cookie = form.eastmoney_cookie;
     }
-    if (form.baidu_acs_token && !form.baidu_acs_token.endsWith("***")) {
-      patch.baidu_acs_token = form.baidu_acs_token;
+    if (form.baidu_cookie && !form.baidu_cookie.endsWith("***")) {
+      patch.baidu_cookie = form.baidu_cookie;
     }
     if (Object.keys(patch).length === 0) {
       message.info("没有需要保存的变更");
@@ -625,14 +625,14 @@ export default function SettingsPage() {
             </div>
           </Col>
           <Col span={24}>
-            <div style={fieldLabelStyle}>百度 acs-token</div>
+            <div style={fieldLabelStyle}>百度 Cookie</div>
             <Input.Password
-              value={form.baidu_acs_token || ""}
-              onChange={(e) => set({ baidu_acs_token: e.target.value })}
+              value={form.baidu_cookie || ""}
+              onChange={(e) => set({ baidu_cookie: e.target.value })}
               placeholder="留空使用内置默认值"
             />
             <div style={{ marginTop: 4, fontSize: 12, color: c.textMuted }}>
-              从浏览器 DevTools → Network → 请求头中复制 acs-token 值
+              从浏览器 DevTools → Network → 请求头中复制 Cookie 值
             </div>
           </Col>
         </Row>

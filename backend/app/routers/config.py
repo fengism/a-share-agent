@@ -40,7 +40,7 @@ class ConfigResponse(BaseModel):
     provider_defaults: dict
     twitter_feeds: list[str]
     eastmoney_cookie: str
-    baidu_acs_token: str
+    baidu_cookie: str
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -70,7 +70,7 @@ class ConfigUpdateRequest(BaseModel):
     http_trust_env: bool | None = None
     twitter_feeds: list[str] | None = None
     eastmoney_cookie: str | None = None
-    baidu_acs_token: str | None = None
+    baidu_cookie: str | None = None
 
 
 def _to_response(s) -> ConfigResponse:
@@ -107,7 +107,7 @@ def _to_response(s) -> ConfigResponse:
         provider_defaults=PROVIDER_DEFAULTS,
         twitter_feeds=s.twitter_feeds,
         eastmoney_cookie=_mask_secret(s.eastmoney_cookie),
-        baidu_acs_token=_mask_secret(s.baidu_acs_token),
+        baidu_cookie=_mask_secret(s.baidu_cookie),
     )
 
 

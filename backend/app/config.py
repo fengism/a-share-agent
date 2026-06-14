@@ -62,7 +62,7 @@ class Settings(BaseSettings):
 
     # 数据源 Cookie 配置（留空使用内置默认值）
     eastmoney_cookie: str = ""
-    baidu_acs_token: str = ""
+    baidu_cookie: str = ""
 
     # 多 Agent 配置
     multi_agent_enabled: bool = True
@@ -154,7 +154,7 @@ def update_settings(patch: dict) -> Settings:
         if value is None or not hasattr(current, key):
             continue
         # Skip masked secrets — user didn't actually change them
-        if key in ("llm_api_key", "feishu_app_secret", "iwencai_api_key", "eastmoney_cookie", "baidu_acs_token") and isinstance(value, str) and value.endswith("***"):
+        if key in ("llm_api_key", "feishu_app_secret", "iwencai_api_key", "eastmoney_cookie", "baidu_cookie") and isinstance(value, str) and value.endswith("***"):
             continue
         setattr(current, key, value)
 

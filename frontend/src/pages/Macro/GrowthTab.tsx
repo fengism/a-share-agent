@@ -1,14 +1,16 @@
 import { Row, Col, Spin } from "antd";
 import { useMacroAllData } from "../../api/queries";
 import MacroIndicatorCard from "./MacroIndicatorCard";
-import { getColors } from "../../theme/store";
+import { useColors } from "../../styles/ui";
+import type { ThemeColors } from "../../theme/themes";
 
-const GDP_FIELDS = [
-  { key: "GDP_VALUE", label: "当季值", color: getColors().primary, precision: 1 },
-  { key: "GDP_SAME", label: "同比增长", color: getColors().up, unit: "%" },
+const GDP_FIELDS = (c: ThemeColors) => [
+  { key: "GDP_VALUE", label: "当季值", color: c.primary, precision: 1 },
+  { key: "GDP_SAME", label: "同比增长", color: c.up, unit: "%" },
 ];
 
 export default function GrowthTab() {
+  const c = useColors();
   const { data, isLoading } = useMacroAllData();
 
   if (isLoading) {
@@ -24,7 +26,7 @@ export default function GrowthTab() {
           title="GDP 国内生产总值（季度）"
           latest={gdp?.latest ?? null}
           trend={gdp?.trend ?? []}
-          fields={GDP_FIELDS}
+          fields={GDP_FIELDS(c)}
         />
       </Col>
     </Row>

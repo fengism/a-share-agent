@@ -28,7 +28,7 @@ export interface ConfigData {
   provider_defaults: Record<string, ProviderDefault>;
   twitter_feeds: string[];
   eastmoney_cookie: string;
-  baidu_acs_token: string;
+  baidu_cookie: string;
 }
 
 export type ConfigUpdate = Partial<Omit<ConfigData, "provider_defaults">>;

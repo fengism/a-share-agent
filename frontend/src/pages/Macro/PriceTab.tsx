@@ -1,20 +1,24 @@
 import { Row, Col, Spin } from "antd";
 import { useMacroAllData } from "../../api/queries";
 import MacroIndicatorCard from "./MacroIndicatorCard";
-import { getColors } from "../../theme/store";
+import { useColors } from "../../styles/ui";
+import type { ThemeColors } from "../../theme/themes";
 
-const CPI_FIELDS = [
-  { key: "NATIONAL_SAME", label: "同比", color: getColors().up, unit: "%" },
-  { key: "NATIONAL_SEQUENTIAL", label: "环比", color: getColors().accent, unit: "%" },
-  { key: "NATIONAL_ACCUMULATE", label: "累计", color: getColors().primary, unit: "%" },
+const CPI_FIELDS = (c: ThemeColors) => [
+  { key: "NATIONAL_SAME", label: "同比", color: c.up, unit: "%" },
+  { key: "NATIONAL_SEQUENTIAL", label: "环比", color: c.accent, unit: "%" },
+  { key: "NATIONAL_ACCUMULATE", label: "累计", color: c.primary, unit: "%" },
+
 ];
 
-const PPI_FIELDS = [
-  { key: "BASE_SAME", label: "同比", color: getColors().up, unit: "%" },
-  { key: "BASE_ACCUMULATE", label: "累计", color: getColors().primary, unit: "%" },
+const PPI_FIELDS = (c: ThemeColors) => [
+  { key: "BASE_SAME", label: "同比", color: c.up, unit: "%" },
+  { key: "BASE_ACCUMULATE", label: "累计", color: c.primary, unit: "%" },
+
 ];
 
 export default function PriceTab() {
+  const c = useColors();
   const { data, isLoading } = useMacroAllData();
 
   if (isLoading) {
@@ -31,7 +35,7 @@ export default function PriceTab() {
           title="CPI 居民消费价格指数"
           latest={cpi?.latest ?? null}
           trend={cpi?.trend ?? []}
-          fields={CPI_FIELDS}
+          fields={CPI_FIELDS(c)}
         />
       </Col>
       <Col xs={24} md={12}>
@@ -39,7 +43,7 @@ export default function PriceTab() {
           title="PPI 工业生产者出厂价格指数"
           latest={ppi?.latest ?? null}
           trend={ppi?.trend ?? []}
-          fields={PPI_FIELDS}
+          fields={PPI_FIELDS(c)}
         />
       </Col>
     </Row>

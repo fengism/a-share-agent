@@ -12,7 +12,7 @@ import {
   formatSignedPercent,
   formatWanAmount,
 } from "../../utils/format";
-import { getColors } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 
 function DetailModal({
   code,
@@ -27,6 +27,7 @@ function DetailModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const c = useColors();
   const { data, isLoading } = useDragonTigerDetail(code, reportDate);
   const buyItems = (data || []).filter((item) => item.side === "buy").slice(0, 5);
   const sellItems = (data || []).filter((item) => item.side === "sell").slice(0, 5);
@@ -79,7 +80,7 @@ function DetailModal({
       ) : (
         <Row gutter={16}>
           <Col span={12}>
-            <div style={{ fontWeight: 600, marginBottom: 8, color: getColors().up }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, color: c.up }}>
               买入前5
             </div>
             <Table
@@ -94,7 +95,7 @@ function DetailModal({
             />
           </Col>
           <Col span={12}>
-            <div style={{ fontWeight: 600, marginBottom: 8, color: getColors().down }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, color: c.down }}>
               卖出前5
             </div>
             <Table
@@ -115,6 +116,7 @@ function DetailModal({
 }
 
 export function DragonTigerContent({ embedded = false }: { embedded?: boolean }) {
+  const c = useColors();
   const navigate = useNavigate();
   const [date, setDate] = useState<Dayjs>(dayjs().subtract(1, "day"));
   const reportDate = date.format("YYYY-MM-DD");
@@ -130,7 +132,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       render: (code: string) => (
         <a
           onClick={() => navigate(`/analysis/${code}`)}
-          style={{ color: getColors().primary, fontWeight: 500 }}
+          style={{ color: c.primary, fontWeight: 500 }}
         >
           {code}
         </a>
@@ -150,7 +152,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       width: 80,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ color: changeColor(value), fontWeight: 500 }}>
+        <span style={{ color: changeColor(value, c), fontWeight: 500 }}>
           {formatSignedPercent(value)}
         </span>
       ),
@@ -168,7 +170,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       width: 95,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ color: getColors().up }}>{value?.toFixed(0) ?? "-"}</span>
+        <span style={{ color: c.up }}>{value?.toFixed(0) ?? "-"}</span>
       ),
     },
     {
@@ -177,7 +179,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       width: 95,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ color: getColors().down }}>{value?.toFixed(0) ?? "-"}</span>
+        <span style={{ color: c.down }}>{value?.toFixed(0) ?? "-"}</span>
       ),
     },
     {
@@ -189,7 +191,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
         value == null ? (
           "-"
         ) : (
-          <span style={{ color: changeColor(value), fontWeight: 600 }}>
+          <span style={{ color: changeColor(value, c), fontWeight: 600 }}>
             {value > 0 ? "+" : ""}{value.toFixed(0)}
           </span>
         ),
@@ -221,7 +223,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       width: 70,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ color: changeColor(value) }}>{formatSignedPercent(value)}</span>
+        <span style={{ color: changeColor(value, c) }}>{formatSignedPercent(value)}</span>
       ),
     },
     {
@@ -230,7 +232,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       width: 70,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ color: changeColor(value) }}>{formatSignedPercent(value)}</span>
+        <span style={{ color: changeColor(value, c) }}>{formatSignedPercent(value)}</span>
       ),
     },
     {
@@ -239,7 +241,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       width: 70,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ color: changeColor(value) }}>{formatSignedPercent(value)}</span>
+        <span style={{ color: changeColor(value, c) }}>{formatSignedPercent(value)}</span>
       ),
     },
     {
@@ -284,7 +286,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
           </Col>
           <Col>
             {embedded && <Tag color="orange">东方财富</Tag>}
-            <span style={{ color: getColors().textSecondary, fontSize: 12, marginLeft: embedded ? 8 : 0 }}>
+            <span style={{ color: c.textSecondary, fontSize: 12, marginLeft: embedded ? 8 : 0 }}>
               共 {data?.length ?? 0} 只股票上榜
             </span>
           </Col>
