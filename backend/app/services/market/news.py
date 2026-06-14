@@ -212,12 +212,17 @@ async def get_market_feed() -> list:
 async def get_twitter_feed() -> list:
     """获取 Twitter/X 财经账号的最新推文和文章。
 
+    缓存 key 包含当前配置的账号列表排序摘要，实现 user 级别隔离：
+    不同 twitter_feeds 配置对应不同缓存，互不干扰。
+
     Param:
         无
     Return:
         NewsSearchItem 列表，按发布时间倒序
     """
-    cache_key = dated_cache_key("twitter_feed")
+    feeds = _get_twitter_provider().twitter_feeds
+    feeds_fingerprint = ",".join(sorted(feeds))
+    cache_key = dated_cache_key("twitter_feed", feeds_fingerprint)
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
