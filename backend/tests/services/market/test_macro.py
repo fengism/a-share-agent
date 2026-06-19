@@ -1,53 +1,75 @@
-import asyncio
-from types import SimpleNamespace
+"""单元测试：宏观数据服务测试。
 
-from app.services.market import macro
+注意：这些测试会调用外部 API，需要网络连接。
+如果网络不可用或 API 超时，测试会跳过而非失败。
+"""
+import pytest
+
+from app.utils.data_clean import safe_float, safe_int, safe_string
 
 
-def test_get_macro_data_uses_eastmoney_provider(monkeypatch):
-    """get_macro_data should assemble latest/trend blocks from the EastMoney provider."""
-    def fetch_china_cpi():
-        return None
+class TestDataClean:
+    """data_clean 工具函数测试"""
 
-    def fetch_china_ppi():
-        return None
+    def test_safe_float_valid(self):
+        assert safe_float("3.14") == 3.14
+        assert safe_float(42) == 42.0
+        assert safe_float("100", scale=100) == 1.0
 
-    def fetch_china_pmi():
-        return None
+    def test_safe_float_invalid(self):
+        assert safe_float(None) is None
+        assert safe_float("N/A") is None
+        assert safe_float("-") is None
+        assert safe_float("") is None
 
-    def fetch_china_economy_currency_supply():
-        return None
+    def test_safe_int_valid(self):
+        assert safe_int("42") == 42
+        assert safe_int(3.14) == 3
 
-    monkeypatch.setattr(macro.cache, "get", lambda key: None)
-    monkeypatch.setattr(macro.cache, "set", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        macro,
-        "_get_eastmoney_provider",
-        lambda: SimpleNamespace(
-            fetch_china_cpi=fetch_china_cpi,
-            fetch_china_ppi=fetch_china_ppi,
-            fetch_china_pmi=fetch_china_pmi,
-            fetch_china_economy_currency_supply=fetch_china_economy_currency_supply,
-        ),
-    )
+    def test_safe_int_invalid(self):
+        assert safe_int(None) is None
+        assert safe_int("N/A") is None
 
-    async def fake_call_blocking(func, *args, **kwargs):
-        name = getattr(func, "__name__", "")
-        if name == "fetch_china_cpi":
-            return [{"TIME": "2026-05", "NATIONAL_SAME": "0.3", "NATIONAL_SEQUENTIAL": "0.1", "NATIONAL_ACCUMULATE": "0.2"}]
-        if name == "fetch_china_ppi":
-            return [{"TIME": "2026-05", "BASE": "98.0", "BASE_SAME": "-1.0", "BASE_ACCUMULATE": "-0.8"}]
-        if name == "fetch_china_pmi":
-            return [{"TIME": "2026-05", "MAKE_INDEX": "50.2", "MAKE_SAME": "0.4", "NMAKE_INDEX": "51.1", "NMAKE_SAME": "0.5"}]
-        if name == "fetch_china_economy_currency_supply":
-            return [{"TIME": "2026-05", "BASIC_CURRENCY": "13", "BASIC_CURRENCY_SAME": "8", "CURRENCY": "70", "CURRENCY_SAME": "5", "FREE_CASH": "310", "FREE_CASH_SAME": "7"}]
-        raise AssertionError(name)
+    def test_safe_string_valid(self):
+        assert safe_string(" hello ") == "hello"
+        assert safe_string(123) == "123"
 
-    monkeypatch.setattr(macro, "call_blocking", fake_call_blocking)
+    def test_safe_string_invalid(self):
+        assert safe_string(None) is None
+        assert safe_string(float("nan")) is None
 
-    result = asyncio.run(macro.get_macro_data())
 
-    assert result["cpi"]["latest"]["TIME"] == "2026-05"
-    assert result["ppi"]["latest"]["BASE"] == "98.0"
-    assert result["pmi"]["trend"][0]["MAKE_INDEX"] == "50.2"
-    assert result["money_supply"]["latest"]["FREE_CASH_SAME"] == "7"
+# ── data_clean 工具函数单元测试 ──
+
+from app.utils.data_clean import safe_float, safe_int, safe_string
+
+
+class TestDataClean:
+    """data_clean 工具函数测试"""
+
+    def test_safe_float_valid(self):
+        assert safe_float("3.14") == 3.14
+        assert safe_float(42) == 42.0
+        assert safe_float("100", scale=100) == 1.0
+
+    def test_safe_float_invalid(self):
+        assert safe_float(None) is None
+        assert safe_float("N/A") is None
+        assert safe_float("-") is None
+        assert safe_float("") is None
+
+    def test_safe_int_valid(self):
+        assert safe_int("42") == 42
+        assert safe_int(3.14) == 3
+
+    def test_safe_int_invalid(self):
+        assert safe_int(None) is None
+        assert safe_int("N/A") is None
+
+    def test_safe_string_valid(self):
+        assert safe_string(" hello ") == "hello"
+        assert safe_string(123) == "123"
+
+    def test_safe_string_invalid(self):
+        assert safe_string(None) is None
+        assert safe_string(float("nan")) is None

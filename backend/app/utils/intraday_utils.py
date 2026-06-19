@@ -42,7 +42,10 @@ def normalize_intraday_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def event_stream(url: str, params: dict):
-    """Yield SSE event blocks from a streaming HTTP GET response.
+    """Yield SSE event blocks from a synchronous streaming HTTP GET response.
+
+    注意：此函数是同步阻塞的，在异步上下文中应通过 call_blocking 调用。
+    如需异步调用，请使用 async_event_stream。
 
     Param:
         url: request URL
@@ -50,6 +53,7 @@ def event_stream(url: str, params: dict):
     Return:
         generator yielding each complete event block as a decoded string
     """
+    import requests
     response = requests.get(url, params=params, stream=True)
     event_data = ""
 
@@ -59,6 +63,27 @@ def event_stream(url: str, params: dict):
         elif event_data:
             yield event_data
             event_data = ""
+
+
+async def async_event_stream(url: str, params: dict):
+    """异步 SSE 流式读取，通过 httpx 实现非阻塞 HTTP GET 流。
+
+    Param:
+        url: request URL
+        params: query parameters
+    Return:
+        async generator yielding each complete event block as a decoded string
+    """
+    import httpx
+    async with httpx.AsyncClient(timeout=30) as client:
+        async with client.stream("GET", url, params=params) as response:
+            event_data = ""
+            async for line in response.aiter_lines():
+                if line:
+                    event_data += line + "\n"
+                elif event_data:
+                    yield event_data
+                    event_data = ""
 
 
 def loads_sina_jsonp(text: str) -> dict:

@@ -50,10 +50,18 @@ def parse_analysis_response(raw_text: str) -> AnalysisResult:
 
     # 处理 estimated_price_range 可能为 list 或 tuple
     if "estimated_price_range" in data and isinstance(data["estimated_price_range"], list):
-        data["estimated_price_range"] = tuple(data["estimated_price_range"])
+        epr = data["estimated_price_range"]
+        if len(epr) == 2 and (epr[0] is None or epr[1] is None):
+            data["estimated_price_range"] = (0.0, 0.0)
+        else:
+            data["estimated_price_range"] = tuple(epr)
 
     if "fair_value_range" in data and isinstance(data["fair_value_range"], list):
-        data["fair_value_range"] = tuple(data["fair_value_range"])
+        fvr = data["fair_value_range"]
+        if len(fvr) == 2 and (fvr[0] is None or fvr[1] is None):
+            data["fair_value_range"] = None
+        else:
+            data["fair_value_range"] = tuple(fvr)
 
     try:
         return AnalysisResult.model_validate(data)

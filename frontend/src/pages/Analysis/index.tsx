@@ -3,7 +3,7 @@ import { Spin, Card, Segmented, Space, Typography, Row, Col, Tabs, Button, Alert
 import { DownloadOutlined, ThunderboltOutlined, StopOutlined } from "@ant-design/icons";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import { useStockInfo, useKlineData, useIntradayData, useAnalysisResult, useValuation, usePush } from "../../api/queries";
+import { useAnalysisPageData, usePush } from "../../api/queries";
 import PushModal from "../../components/PushModal";
 import type { PushRequest } from "../../types/stock";
 import { useColors, useStyles } from "../../theme/hooks";
@@ -18,10 +18,11 @@ import ValuationPanel from "./ValuationPanel";
 import AIConclusion from "./AIConclusion";
 import AnalysisProgressSteps from "./AnalysisProgressSteps";
 import SkeletonAIConclusion from "./SkeletonAIConclusion";
+import AnalysisHeader from "./AnalysisHeader";
 import { useAnalysisStore } from "../../store/analysisStore";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { AnalysisResult } from "../../types/stock";
-import { formatMarketCap, formatAmountWanYi } from "../../utils/format";
+import { formatAmountWanYi, formatMarketCap } from "../../utils/format";
 
 const { Title } = Typography;
 
@@ -32,14 +33,10 @@ export default function Analysis() {
   const [messageApi, contextHolder] = message.useMessage();
   const exportRef = useRef<HTMLDivElement>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const { data: info, isLoading: infoLoading } = useStockInfo(code || "");
-  const { data: valuation } = useValuation(code || "");
-  const { data: intradayData, isLoading: intradayLoading } = useIntradayData(code || "");
+  const { data: pageData, isLoading: pageLoading } = useAnalysisPageData(code || "");
   const [period, setPeriod] = useState<string>("daily");
   const [adjust, setAdjust] = useState<string>("qfq");
   const [activePanelKey, setActivePanelKey] = useState<string>("fundamental");
-  const { data: klineData, isLoading: klineLoading } = useKlineData(code || "", period, adjust);
-  const { data: cachedResult } = useAnalysisResult(code || "");
   const exportNotionMutation = usePush();
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const {
@@ -57,8 +54,13 @@ export default function Analysis() {
     resetAnalysisProgress,
   } = useAnalysisStore();
 
-  const displayResult = analysisResult || cachedResult;
-  const latestKline = klineData?.items?.length ? klineData.items[klineData.items.length - 1] : null;
+  const displayResult = analysisResult || pageData?.cached_analysis;
+  const latestKline = pageData?.kline?.items?.length ? pageData.kline.items[pageData.kline.items.length - 1] : null;
+
+  const info = pageData?.stock_info;
+  const intradayData = pageData?.intraday;
+  const klineData = pageData?.kline;
+  const valuation = pageData?.valuation;
 
   const priceSnapshot = {
     latestPrice: latestKline?.close ?? null,
@@ -211,7 +213,7 @@ export default function Analysis() {
     }
   }, [code, messageApi, c.pageBg]);
 
-  if (infoLoading) return <Spin size="large" style={{ display: "block", margin: "100px auto" }} />;
+  if (pageLoading) return <Spin size="large" style={{ display: "block", margin: "100px auto" }} />;
 
   // CSS custom properties for the <style> block to reference
   const cssVars = {
@@ -581,7 +583,7 @@ export default function Analysis() {
             </div>
             <IntradayChart data={intradayData.items} prevClose={intradayData.prev_close} />
           </Card>
-        ) : intradayLoading ? (
+        ) : pageLoading ? (
           <Card
             size="small"
             className="pdf-avoid-break"
@@ -622,7 +624,7 @@ export default function Analysis() {
             </Space>
           }
         >
-          {klineLoading ? <Spin /> : klineData && <KlineChart data={klineData.items} />}
+          {pageLoading ? <Spin /> : klineData && <KlineChart data={klineData.items} />}
         </Card>
 
         {/* Tabs */}

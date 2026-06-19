@@ -414,3 +414,29 @@ export function useMacroAllData() {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+// ── 分析页面聚合查询 ──
+
+export function useAnalysisPageData(code: string) {
+  return useQuery({
+    queryKey: ["analysisPage", code],
+    queryFn: () => apiGet<import("../types/stock").AnalysisPageData>(`/stock/analysis-page/${code}`),
+    enabled: !!code,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ── Twitter 用户分析 ──
+
+export function useTwitterAnalyze(username: string) {
+  return useQuery({
+    queryKey: ["twitterAnalyze", username],
+    queryFn: () =>
+      apiGet<{ username: string; tweet_count: number; tweets: unknown[]; analysis: string }>(
+        "/market/twitter-analyze",
+        { username }
+      ),
+    enabled: !!username && username.length > 0,
+    staleTime: 5 * 60 * 1000, // 5 分钟缓存
+  });
+}

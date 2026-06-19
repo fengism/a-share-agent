@@ -7,8 +7,16 @@ import pandas as pd
 import requests
 
 
-from app.constants.http import THS_HEADERS
 from app.config import get_settings
+
+def _get_ths_headers():
+    """动态构建同花顺请求头，从 .env 配置获取 cookie。"""
+    from app.constants.http import THS_HEADERS
+    settings = get_settings()
+    headers = dict(THS_HEADERS)
+    if settings.ths_cookie:
+        headers["cookie"] = settings.ths_cookie
+    return headers
 from app.models.market import MarketVolume
 from app.services.base.data_provider import BaseDataProvider
 from app.utils.data_clean import safe_float
@@ -171,7 +179,7 @@ class ThsDataProvider(BaseDataProvider):
                 "type": "hour",
                 "list_type": "normal",
             },
-            headers=THS_HEADERS,
+            headers=_get_ths_headers(),
             timeout=10,
         )
         stock_list = payload.get("data", {}).get("stock_list", [])
@@ -189,7 +197,7 @@ class ThsDataProvider(BaseDataProvider):
             "GET",
             "https://dq.10jqka.com.cn/fuyao/hot_list_data/out/hot_list/v1/plate",
             params={"type": plate_type},
-            headers=THS_HEADERS,
+            headers=_get_ths_headers(),
             timeout=10,
         )
         plate_list = payload.get("data", {}).get("plate_list", [])

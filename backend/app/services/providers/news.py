@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 import time
@@ -15,6 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class NewsDataProvider(BaseDataProvider):
+    """Purpose: 通过 RSS/Atom 订阅源拉取并解析财经新闻媒体内容，输出统一的 NewsSearchItem。
+
+    注意：RSS 解析使用 feedparser（同步库），在异步上下文中应通过 asyncio.to_thread 调用。
+    """
     """Purpose: 通过 RSS/Atom 订阅源拉取并解析财经新闻媒体内容，输出统一的 NewsSearchItem。"""
     def __init__(self):
         """初始化 NewsDataProvider，固定 name 与 source_label。"""

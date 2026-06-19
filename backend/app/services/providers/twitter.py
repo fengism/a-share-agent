@@ -121,12 +121,64 @@ class TwitterDataProvider(BaseDataProvider):
         return result
 
     def fetch_posts(self) -> list[NewsSearchItem]:
-        """获取最新 Twitter/X 媒体推文和文章。
+        """获取全部配置账号的最新 Twitter/X 媒体推文和文章。
 
         Return:
             NewsSearchItem 列表
         """
         return self.fetch_user_articles() + self.fetch_user_posts()
+
+    def fetch_posts_for_users(self, users: list[str]) -> list[NewsSearchItem]:
+        """按指定用户列表拉取最新推文和文章。
+
+        Param:
+            users: 要拉取的用户名列表。
+        Return:
+            NewsSearchItem 列表
+        """
+        if not users:
+            return []
+        results: list[NewsSearchItem] = []
+        for account_name in users:
+            for entries, params in [
+                (self._fetch_posts(f"/profile/{account_name}/articles", params={"count": "20", "lang": "es"}), "articles"),
+                (self._fetch_posts(f"/profile/{account_name}/media", params={"count": "20", "lang": "zh-cn"}), "media"),
+            ]:
+                for entry in entries:
+                    if params == "articles":
+                        article = entry.get("article", {}) or {}
+                        title = article.get("title", "")
+                        content = ""
+                        preview_text = article.get("preview_text", "")
+                        article_info = self.fetch_article_by_id(entry.get("id", ""))
+                        if article_info:
+                            content = article_info.get("content", "") or preview_text
+                        else:
+                            content = preview_text
+                    else:
+                        title = str(entry.get("title") or "").strip()
+                        content = str(entry.get("text") or "").strip()
+
+                    url = entry.get("url", "")
+                    created_at = entry.get("created_timestamp")
+                    publish_time = self._parse_timestamp(created_at)
+                    if not title and not content:
+                        continue
+                    if not title:
+                        title = (content or "")[:30]
+                    results.append(
+                        NewsSearchItem(
+                            title=title[:30],
+                            content=content or "",
+                            source="Twitter",
+                            publish_time=str(publish_time) if publish_time else "",
+                            url=url,
+                            author=account_name,
+                            read_count=0,
+                            comment_count=0,
+                        )
+                    )
+        return results
 
     def fetch_user_articles(self) -> list[NewsSearchItem]:
         """从预置 Twitter 财经账号列表拉取最新媒体推文。
@@ -171,6 +223,47 @@ class TwitterDataProvider(BaseDataProvider):
                         comment_count=0,
                     )
                 )
+        return results
+
+    def fetch_user_articles_raw(self, username: str, count: int = 20) -> list[dict]:
+        """拉取指定 Twitter 用户发布的文章（仅 articles），返回原始字典列表。
+
+        每篇文章会通过 fetch_article_by_id 获取完整正文内容。
+        此方法仅供 twitter_analysis 服务使用，不保存数据库。
+
+        Param:
+            username: Twitter 用户名（不含 @）
+            count: 拉取的文章数量上限
+        Return:
+            包含 title、content、publish_time、url 的字典列表
+        """
+        results: list[dict] = []
+        entries = self._fetch_posts(
+            f"/profile/{username}/articles",
+            params={"count": str(count), "lang": "es"},
+        )
+        for entry in entries:
+            article = entry.get("article", {}) or {}
+            title = article.get("title", "")
+            preview_text = article.get("preview_text", "")
+            article_info = self.fetch_article_by_id(entry.get("id", ""))
+            if not article_info:
+                continue
+            content = article_info.get("content", "")
+            if not content:
+                content = preview_text
+            created_at = entry.get("created_timestamp")
+            publish_time = self._parse_timestamp(created_at)
+            if not title and not content:
+                continue
+            if not title:
+                title = (content or "")[:30]
+            results.append({
+                "title": title[:30],
+                "content": content,
+                "publish_time": str(publish_time) if publish_time else "",
+                "url": entry.get("url", ""),
+            })
         return results
 
     def fetch_user_posts(self) -> list[NewsSearchItem]:

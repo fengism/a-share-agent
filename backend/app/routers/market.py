@@ -26,6 +26,7 @@ from app.services.market.news import get_market_other_news as get_market_other_n
 from app.services.market.news import get_twitter_feed as get_twitter_feed_service
 from app.services.market.sector import get_industry_rankings as get_industry_rankings_service
 from app.services.market.news_analysis import analyze_market_news as analyze_market_news_service
+from app.services.twitter_analysis import analyze_twitter_user
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +202,20 @@ async def get_industry_rankings():
         list[dict]: 行业名称、涨跌幅及成交活跃度排序。
     """
     return await run_endpoint("获取行业板块涨跌幅排名", get_industry_rankings_service)
+
+
+@router.get("/twitter-analyze")
+async def get_twitter_analyze(
+    username: str = Query(..., description="Twitter 用户名，如 qinbafrank"),
+):
+    """分析指定 Twitter 用户的最新推文并生成 AI 分析报告。
+
+    Param:
+        username: Twitter 用户名（查询参数）。
+    Return:
+        dict: 包含 username、tweet_count、tweets 原始推文列表和 AI analysis 分析报告。
+    """
+    return await run_endpoint("分析 Twitter 用户", lambda: analyze_twitter_user(username))
 
 
 @router.get("/news-analysis")

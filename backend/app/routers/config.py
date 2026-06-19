@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
 from app.config import PROVIDER_DEFAULTS, _mask_secret, get_settings, update_settings
@@ -10,6 +11,16 @@ from app.config import PROVIDER_DEFAULTS, _mask_secret, get_settings, update_set
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+_security = HTTPBearer(auto_error=False)
+
+
+def _verify_admin(credentials: HTTPAuthorizationCredentials | None = Depends(_security)) -> None:
+    """验证管理员访问权限。如果配置了 admin_api_key，则所有请求必须携带有效的 Bearer token。"""
+    settings = get_settings()
+    if not settings.admin_api_key:
+        return  # 未配置密钥则不启用鉴权
+    if credentials is None or credentials.credentials != settings.admin_api_key:
+        raise HTTPException(status_code=403, detail="Forbidden: invalid or missing admin token")
 
 
 class ConfigResponse(BaseModel):
@@ -31,6 +42,7 @@ class ConfigResponse(BaseModel):
     feishu_analysis_folder: str
     feishu_default_receiver: str
     notion_enabled: bool
+    notion_api_token: str
     notion_parent_page_id: str
     notion_database_id: str
     iwencai_enabled: bool
@@ -41,6 +53,7 @@ class ConfigResponse(BaseModel):
     twitter_feeds: list[str]
     eastmoney_cookie: str
     baidu_cookie: str
+    ths_cookie: str
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -61,7 +74,8 @@ class ConfigUpdateRequest(BaseModel):
     feishu_daily_review_folder: str | None = None
     feishu_analysis_folder: str | None = None
     feishu_default_receiver: str | None = None
-    notion_enabled: bool | None = None
+    notion_enabled: bool
+    notion_api_token: str | None = None
     notion_parent_page_id: str | None = None
     notion_database_id: str | None = None
     iwencai_enabled: bool | None = None
@@ -70,7 +84,8 @@ class ConfigUpdateRequest(BaseModel):
     http_trust_env: bool | None = None
     twitter_feeds: list[str] | None = None
     eastmoney_cookie: str | None = None
-    baidu_cookie: str | None = None
+    baidu_cookie: str
+    ths_cookie: str | None = None
 
 
 def _to_response(s) -> ConfigResponse:
@@ -98,6 +113,7 @@ def _to_response(s) -> ConfigResponse:
         feishu_analysis_folder=s.feishu_analysis_folder,
         feishu_default_receiver=s.feishu_default_receiver,
         notion_enabled=s.notion_enabled,
+        notion_api_token=_mask_secret(s.notion_api_token),
         notion_parent_page_id=s.notion_parent_page_id,
         notion_database_id=s.notion_database_id,
         iwencai_enabled=s.iwencai_enabled,
@@ -108,10 +124,11 @@ def _to_response(s) -> ConfigResponse:
         twitter_feeds=s.twitter_feeds,
         eastmoney_cookie=_mask_secret(s.eastmoney_cookie),
         baidu_cookie=_mask_secret(s.baidu_cookie),
+        ths_cookie=_mask_secret(s.ths_cookie),
     )
 
 
-@router.get("", response_model=ConfigResponse)
+@router.get("", response_model=ConfigResponse, dependencies=[Depends(_verify_admin)])
 async def get_config():
     """读取当前生效的系统配置。
 
@@ -121,7 +138,7 @@ async def get_config():
     return _to_response(get_settings())
 
 
-@router.put("", response_model=ConfigResponse)
+@router.put("", response_model=ConfigResponse, dependencies=[Depends(_verify_admin)])
 async def put_config(req: ConfigUpdateRequest):
     """部分更新系统配置；未提供的字段保持原值。
 

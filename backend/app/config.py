@@ -63,12 +63,16 @@ class Settings(BaseSettings):
     # 数据源 Cookie 配置（留空使用内置默认值）
     eastmoney_cookie: str = ""
     baidu_cookie: str = ""
+    ths_cookie: str = ""
 
     # 多 Agent 配置
     multi_agent_enabled: bool = True
 
     # Twitter 财经账号配置
     twitter_feeds: list[str] = ["qinbafrank"]
+    
+    # 管理端认证密钥（留空不启用鉴权）
+    admin_api_key: str = ""
 
     @model_validator(mode="after")
     def apply_provider_defaults(self) -> "Settings":
@@ -123,17 +127,19 @@ def get_settings() -> Settings:
 
 
 def _mask_secret(value: str, visible: int = 4) -> str:
-    """将敏感字符串中间部分掩码为星号，仅保留前几位可见。
+    """将敏感字符串中间部分掩码为星号，仅保留前 4 位和后 4 位。
 
     Param:
         value: 原始敏感字符串。
-        visible: 保留前几位可见字符。
+        visible: 保留前几位可见字符（忽略，统一保留前后4位）。
     Return:
         掩码后的字符串。
     """
-    if not value or len(value) <= visible:
-        return value
-    return value[:visible] + "***"
+    if not value or len(value) <= 8:
+        if not value or len(value) <= 4:
+            return value
+        return value[:4] + "***"
+    return value[:4] + "***" + value[-4:]
 
 
 def update_settings(patch: dict) -> Settings:
@@ -154,7 +160,7 @@ def update_settings(patch: dict) -> Settings:
         if value is None or not hasattr(current, key):
             continue
         # Skip masked secrets — user didn't actually change them
-        if key in ("llm_api_key", "feishu_app_secret", "iwencai_api_key", "eastmoney_cookie", "baidu_cookie") and isinstance(value, str) and value.endswith("***"):
+        if key in ("llm_api_key", "feishu_app_secret", "iwencai_api_key", "notion_api_token", "eastmoney_cookie", "baidu_cookie", "ths_cookie") and isinstance(value, str) and value.endswith("***"):
             continue
         setattr(current, key, value)
 
@@ -182,12 +188,16 @@ def update_settings(patch: dict) -> Settings:
 
         _reset_session()
 
-    # Reset twitter feed cache when account list changes (clear old user-level key)
+    # Trigger immediate twitter fetch when account list changes
     if "twitter_feeds" in patch:
-        from app.utils.cache import cache, dated_cache_key
+        from app.services.providers.twitter import twitter_provider
+        from app.db.twitter_store import save_twitter_posts
 
-        old_feeds = current.twitter_feeds
-        old_fingerprint = ",".join(sorted(old_feeds))
-        cache.delete(dated_cache_key("twitter_feed", old_fingerprint))
+        try:
+            raw = twitter_provider.fetch_posts_for_users(current.twitter_feeds)
+            save_twitter_posts([p.model_dump() for p in raw])
+            logger.info(f"twitter_feeds changed, immediate fetch done: {current.twitter_feeds}")
+        except Exception as exc:
+            logger.warning(f"twitter_feeds changed, immediate fetch failed: {exc}")
 
     return current

@@ -210,33 +210,25 @@ async def get_market_feed() -> list:
 
 
 async def get_twitter_feed() -> list:
-    """获取 Twitter/X 财经账号的最新推文和文章。
+    """从数据库读取 Twitter/X 财经账号的最新推文和文章。
 
-    缓存 key 包含当前配置的账号列表排序摘要，实现 user 级别隔离：
-    不同 twitter_feeds 配置对应不同缓存，互不干扰。
+    数据由后台定期任务 `refresh_twitter_feed_task` 负责拉取写入，
+    本函数仅查询数据库。
 
     Param:
         无
     Return:
         NewsSearchItem 列表，按发布时间倒序
     """
+    from app.db.twitter_store import query_twitter_posts_by_authors
+
     feeds = _get_twitter_provider().twitter_feeds
-    feeds_fingerprint = ",".join(sorted(feeds))
-    cache_key = dated_cache_key("twitter_feed", feeds_fingerprint)
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
+    if not feeds:
+        return []
 
-    try:
-        result = await call_blocking(_get_twitter_provider().fetch_posts)
-    except Exception as e:
-        logger.warning(f"Twitter 数据获取失败: {e}")
-        result = []
+    db_rows = query_twitter_posts_by_authors(feeds)
+    if not db_rows:
+        return []
 
-    result = filter_recent_news_items(result, days=30)
-    result = dedupe_news_items(result)
-    result.sort(key=news_sort_key, reverse=True)
-    result = result[:100]
-
-    cache.set(cache_key, result, ttl=300)
-    return result
+    from app.models.search_item import NewsSearchItem
+    return [NewsSearchItem(**row) for row in db_rows]

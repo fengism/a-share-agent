@@ -15,6 +15,8 @@ from app.constants.http import EASTMONEY_HEADERS, COMMON_HEADERS
 from app.constants.market import (
     A_SHARE_SEARCH_CLASSIFY,
     EASTMONEY_API_TOKEN,
+    EASTMONEY_UT_HISTORY,
+    EASTMONEY_UT_TRADE,
     EASTMONEY_CLIST_URL,
     INDEX_FALLBACKS,
     EASTMONEY_FLATTEN_FLAG,
@@ -220,7 +222,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         params = {
             "fields1": "f1,f2,f3,f4,f5,f6",
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f116",
-            "ut": "7eea3edcaed734bea9cbfc24409ed989",
+            "ut": EASTMONEY_UT_HISTORY,
             "klt": klt,
             "fqt": fqt,
             "secid": f"{se_cid}.{code}",
@@ -317,7 +319,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "fields1": "f1,f2,f3,f4",
             "fields2": "f51,f52,f53,f54,f55",
             "mpi": "2000",
-            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+            "ut": EASTMONEY_UT_TRADE,
             "fltt": "2",
             "pos": "-0",
             "secid": f"{market_code}.{code}",
@@ -364,7 +366,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "fields1": "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f17",
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
             "mpi": "1000",
-            "ut": "fa5fd1943c7b386f172d6893dbfba10b",
+            "ut": EASTMONEY_API_TOKEN,
             "ndays": "1",
             "iscr": "0",
             "iscca": "0",
@@ -517,7 +519,7 @@ class EastMoneyDataProvider(BaseDataProvider):
                 "pz": "100",
                 "po": "1",
                 "np": "1",
-                "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+                "ut": EASTMONEY_UT_TRADE,
                 "fltt": "2",
                 "invt": "2",
                 "fid": "f3",
@@ -547,7 +549,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             {
                 "po": "1",
                 "np": "1",
-                "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+                "ut": EASTMONEY_UT_TRADE,
                 "fltt": "2",
                 "invt": "2",
                 "fid": "f3",
@@ -621,7 +623,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         params = {
             "po": "1",
             "np": "1",
-            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+            "ut": EASTMONEY_UT_TRADE,
             "fltt": "2",
             "invt": "2",
             "fid": "f3",
@@ -647,7 +649,7 @@ class EastMoneyDataProvider(BaseDataProvider):
         params = {
             "po": "1",
             "np": "1",
-            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+            "ut": EASTMONEY_UT_TRADE,
             "fltt": "2",
             "invt": "2",
             "fid": "f3",
@@ -1058,7 +1060,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "https://push2ex.eastmoney.com/getTopicZTPool",
             params={
                 "cb": "callbackdata2435777",
-                "ut": "7eea3edcaed734bea9cbfc24409ed989",
+                "ut": EASTMONEY_UT_HISTORY,
                 "dpt": "wz.ztzt",
                 "Pageindex": "0",
                 "pagesize": "200",
@@ -1093,7 +1095,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "https://push2ex.eastmoney.com/getTopicDTPool",
             params={
                 "cb": "callbackdata2705894",
-                "ut": "7eea3edcaed734bea9cbfc24409ed989",
+                "ut": EASTMONEY_UT_HISTORY,
                 "dpt": "wz.ztzt",
                 "Pageindex": "0",
                 "pagesize": "200",
@@ -1119,7 +1121,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "https://push2ex.eastmoney.com/getTopicZDFenBu",
             params={
                 "cb": "callbackdata6759488",
-                "ut": "7eea3edcaed734bea9cbfc24409ed989",
+                "ut": EASTMONEY_UT_HISTORY,
                 "dpt": "wz.ztzt",
                 "_": str(int(time.time() * 1000)),
             },
@@ -1423,7 +1425,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
             "secid": "1.000001",
             "secid2": "0.399001",
-            "ut": "b2884a393a59ad64002292a3e90d46a5",
+            "ut": EASTMONEY_UT_TOKEN,
             "_": int(time.time() * 1000),
         }
         try:
@@ -1460,7 +1462,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "np": "1",
             "fltt": "2",
             "invt": "2",
-            "ut": "8dec03ba335b81bf4ebdf7b29ec27d15",
+            "ut": EASTMONEY_UT_TOKEN_ALT,
             "fs": "m:90+s:4",
             "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13",
             "_": int(time.time() * 1000),
@@ -1496,7 +1498,7 @@ class EastMoneyDataProvider(BaseDataProvider):
             "np": "1",
             "fltt": "2",
             "invt": "2",
-            "ut": "8dec03ba335b81bf4ebdf7b29ec27d15",
+            "ut": EASTMONEY_UT_TOKEN_ALT,
             "fs": "m:90+t:3",
             "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13",
         }

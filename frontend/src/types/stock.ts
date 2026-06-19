@@ -556,3 +556,13 @@ export interface MacroAllData {
   growth: MacroCategory;
   trade: MacroCategory;
 }
+
+// ── 分析页面聚合数据类型 ──
+
+export interface AnalysisPageData {
+  stock_info: StockBasicInfo | null;
+  kline: KlineData | null;
+  intraday: IntradayData | null;
+  valuation: StockValuation | null;
+  cached_analysis: AnalysisResult | null;
+}

@@ -785,3 +785,99 @@ def register_web_tools() -> None:
         },
         executor=_fetch_urls,
     ))
+
+
+# ── Twitter 用户分析工具 ──
+
+def _execute_twitter_analyze(username: str) -> str:
+    """分析指定 Twitter 用户发布的最新文章。
+
+    仅分析该用户发布的文章（articles），不含媒体推文。
+    不使用 iwencai 相关服务。
+
+    Param:
+        username: Twitter 用户名（不含 @）
+    Return:
+        Markdown 格式的分析报告
+    """
+    from app.services.twitter_analysis import analyze_twitter_user
+
+    result = analyze_twitter_user(username)
+    if result["article_count"] == 0:
+        return "用户 @{} 暂无已发布的文章数据。".format(username)
+
+    lines = []
+    lines.append("## Twitter 用户 @{} 文章分析".format(username))
+    lines.append("")
+    lines.append("共分析 {} 篇文章。".format(result["article_count"]))
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("### AI 分析")
+    lines.append("")
+    lines.append(result["analysis"])
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("### 文章摘要（前 {} 篇）".format(min(result["article_count"], 20)))
+    lines.append("")
+    for i, article in enumerate(result["articles"], 1):
+        content_preview = (article["content"] or "")[:200]
+        lines.append("{}. **{}** ({})".format(i, article["title"], article["publish_time"]))
+        lines.append("   {}".format(content_preview))
+        lines.append("   [{}]({})".format(article["url"], article["url"]))
+        lines.append("")
+
+    return "\n".join(lines)
+
+    """分析指定 Twitter 用户的最新推文。
+
+    Param:
+        username: Twitter 用户名（不含 @）
+    Return:
+        Markdown 格式的分析报告
+    """
+    from app.services.twitter_analysis import analyze_twitter_user
+
+    result = analyze_twitter_user(username)
+    if result["tweet_count"] == 0:
+        return f"用户 @{username} 暂无可用推文数据。"
+
+    report = f"""## Twitter 用户 @{username} 分析报告
+
+共分析 {result["tweet_count"]} 条推文。
+
+---
+
+### AI 分析
+
+{result["analysis"]}
+
+---
+
+### 原始推文摘要（前 {min(result["tweet_count"], 20)} 条）
+
+"""
+    for i, tweet in enumerate(result["tweets"], 1):
+        report += f"{i}. **{tweet['title']}** ({tweet['publish_time']})\n   {tweet['content'][:200]}\n   [{tweet['url']}]({tweet['url']})\n\n"
+
+    return report.strip()
+
+
+def register_twitter_tools():
+    """注册 Twitter 用户分析工具。"""
+    registry.register_tool(Tool(
+        name="analyze_twitter_user",
+        description="分析指定 Twitter/X 用户的最新推文，借助 AI 生成中文分析报告（总结核心观点、提取投资要点、评估倾向性）。适合分析财经大V的观点。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "username": {
+                    "type": "string",
+                    "description": "Twitter 用户名，不含 @ 符号，例如 qinbafrank",
+                },
+            },
+            "required": ["username"],
+        },
+        executor=_execute_twitter_analyze,
+    ))

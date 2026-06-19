@@ -9,6 +9,7 @@ from app.services.providers import get_provider
 from app.utils.cache import cache, cache_date, dated_cache_key, one_year_ago_date
 from app.utils.market_utils import filter_index_hist_range
 from app.utils.rate_limiter import call_blocking
+from app.utils.singleflight import AsyncSingleFlight
 from app.utils.data_clean import safe_float
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,9 @@ def _get_eastmoney_provider():
 def _get_tdx_provider():
     """Lazily resolve the TDX provider singleton."""
     return get_provider("tdx")
+
+
+_index_kline_singleflight = AsyncSingleFlight[KlineData]()
 
 
 async def _load_and_filter(fetch_fn, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
@@ -116,7 +120,7 @@ def _to_kline_data(symbol: str, period: str, df: pd.DataFrame) -> KlineData:
 
 
 async def get_index_kline(symbol: str, period: str = "daily", start_date: str = "", end_date: str = "") -> KlineData:
-    """获取指数 K 线数据，支持多数据源回退和缓存。
+    """获取指数 K 线数据，支持多数据源回退和缓存，使用 singleflight 去重并发请求。
 
     Param:
         symbol: 指数代码
@@ -136,9 +140,11 @@ async def get_index_kline(symbol: str, period: str = "daily", start_date: str = 
     if cached is not None:
         return cached
 
-    df = await BaseProviderChain(_build_index_kline_source_attempts(symbol, period, start_date, end_date)).run()
+    async def _load() -> KlineData:
+        df = await BaseProviderChain(_build_index_kline_source_attempts(symbol, period, start_date, end_date)).run()
+        result = _to_kline_data(symbol, period, df)
+        logger.info(f"指数K线获取成功: symbol={symbol}, items={len(result.items)}")
+        cache.set(cache_key, result, ttl=300)
+        return result
 
-    result = _to_kline_data(symbol, period, df)
-    logger.info(f"指数K线获取成功: symbol={symbol}, items={len(result.items)}")
-    cache.set(cache_key, result, ttl=300)
-    return result
+    return await _index_kline_singleflight.do(cache_key, _load)

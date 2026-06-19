@@ -44,3 +44,21 @@ TABLES = [
     )
     """,
 ]
+
+TABLES.append(
+    """
+    CREATE TABLE IF NOT EXISTS twitter_posts (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        title         TEXT    NOT NULL,
+        content       TEXT    NOT NULL DEFAULT '',
+        source        TEXT    NOT NULL DEFAULT 'Twitter',
+        publish_time  TEXT    NOT NULL DEFAULT '',
+        url           TEXT    NOT NULL,
+        author        TEXT    NOT NULL DEFAULT '',
+        read_count    INTEGER NOT NULL DEFAULT 0,
+        comment_count INTEGER NOT NULL DEFAULT 0,
+        fetched_at    TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+        UNIQUE(author, url)
+    )
+    """
+)
