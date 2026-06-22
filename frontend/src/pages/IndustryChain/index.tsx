@@ -1,12 +1,12 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Input, Steps, Typography, Spin, Tag, Button, message, Empty, Tooltip, Popover } from "antd";
-import { SearchOutlined, ApartmentOutlined, CheckCircleOutlined, LoadingOutlined, CloseCircleOutlined, SendOutlined, HistoryOutlined, CloudUploadOutlined } from "@ant-design/icons";
+import { Input, Steps, Typography, Spin, Tag, Button, message, Empty, Tooltip, Popover, Modal } from "antd";
+import { SearchOutlined, ApartmentOutlined, CheckCircleOutlined, LoadingOutlined, CloseCircleOutlined, SendOutlined, HistoryOutlined, CloudUploadOutlined, FullscreenOutlined } from "@ant-design/icons";
 import ReactECharts from "echarts-for-react";
 import { streamIndustryChain, type IndustryChainProgress } from "../../api/sse";
 import { useConfig, usePush, useIndustryChainHistory, useIndustryChainArchive, useIndustryChainLatest } from "../../api/queries";
 import { useColors, useStyles } from "../../styles/ui";
-import type { IndustryChainResult, IndustryChainHistoryItem } from "../../types/stock";
+import type { IndustryChainResult, IndustryChainHistoryItem, IndustryChainChart } from "../../types/stock";
 
 const { Title, Paragraph, Text } = Typography;
 const { Search } = Input;
@@ -17,46 +17,108 @@ const STAGE_MAP: Record<string, number> = {
   "AI 生成分析报告": 2,
 };
 
+/** Extract readable text from a JSON string, trying multiple parsing approaches. */
+function tryExtractFromJson(raw: string): string {
+  const tryParse = (s: string) => {
+    try { return JSON.parse(s); } catch { return null; }
+  };
+
+  // Try 1: Standard parse
+  let obj = tryParse(raw);
+
+  // Try 2: Fix literal newlines inside string values
+  if (!obj) {
+    const cleaned = raw.replace(/:\s*"((?:[^"\\]|\\.)*?)"/gs, (m) =>
+      m.replace(/\n/g, "\\n").replace(/\r/g, "\\r")
+    );
+    obj = tryParse(cleaned);
+  }
+
+  // Try 3: Extract JSON portion from surrounding text
+  if (!obj) {
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    if (start !== -1 && end > start) {
+      const portion = raw.slice(start, end + 1);
+      obj = tryParse(portion);
+      if (!obj) {
+        const cleaned = portion.replace(/:\s*"((?:[^"\\]|\\.)*?)"/gs, (m) =>
+          m.replace(/\n/g, "\\n").replace(/\r/g, "\\r")
+        );
+        obj = tryParse(cleaned);
+      }
+    }
+  }
+
+  if (obj && typeof obj === "object") {
+    return extractBestString(obj);
+  }
+  return raw;
+}
+
+/** Recursively extract the best readable string from a parsed JSON value. */
+function extractBestString(obj: unknown, depth = 0): string {
+  if (depth > 5) return "";
+  if (typeof obj === "string" && obj.length > 10) return obj;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const r = extractBestString(item, depth + 1);
+      if (r) return r;
+    }
+    return obj.filter(v => typeof v === "string" && v.length > 4).join("\n\n").slice(0, 50000);
+  }
+  if (obj && typeof obj === "object") {
+    const entries = obj as Record<string, unknown>;
+    // Priority keys
+    for (const key of ["llm_report", "content", "text", "review", "llm_review", "markdown", "summary", "analysis", "report"]) {
+      if (typeof entries[key] === "string" && entries[key].length > 10) return entries[key];
+    }
+    // Fallback: collect all string values
+    const parts: string[] = [];
+    const collect = (v: unknown, d: number) => {
+      if (d > 10) return;
+      if (typeof v === "string" && v.length > 4) parts.push(v);
+      else if (Array.isArray(v)) v.forEach(item => collect(item, d + 1));
+      else if (v && typeof v === "object") Object.values(v as Record<string, unknown>).forEach(item => collect(item, d + 1));
+    };
+    collect(obj, 0);
+    if (parts.length > 0) return parts.join("\n\n").slice(0, 50000);
+  }
+  return "";
+}
+
 function MarkdownReport({ content }: { content: string }) {
   const c = useColors();
 
-  // 解析可能的 JSON 包装
   let text = content?.trim() || "";
+
+  // If content looks like JSON, try to extract readable text
   if (text.startsWith("{") || text.startsWith("[")) {
-    try {
-      const parsed = JSON.parse(text);
-      // 如果是对象，提取可读文本字段
-      if (typeof parsed === "object" && parsed !== null) {
-        if (typeof parsed.content === "string") { text = parsed.content; }
-        else if (typeof parsed.text === "string") { text = parsed.text; }
-        else if (typeof parsed.review === "string") { text = parsed.review; }
-        else if (typeof parsed.llm_review === "string") { text = parsed.llm_review; }
-        else if (typeof parsed.markdown === "string") { text = parsed.markdown; }
-        else if (typeof parsed.summary === "string") { text = parsed.summary; }
-        else {
-          // 递归提取所有字符串值
-          const parts: string[] = [];
-          const extract = (obj: unknown) => {
-            if (typeof obj === "string") { parts.push(obj); return; }
-            if (Array.isArray(obj)) { obj.forEach(extract); return; }
-            if (obj && typeof obj === "object") { Object.values(obj).forEach(extract); }
-          };
-          extract(parsed);
-          text = parts.filter((p) => p.length > 4).join("\n\n");
-        }
-      }
-    } catch { /* 不是 JSON，直接使用原始文本 */ }
+    text = tryExtractFromJson(text);
   }
 
   // 去除 markdown 代码块包裹
   const codeBlockMatch = text.match(/^```(?:markdown|md)?\s*([\s\S]*?)```$/);
   if (codeBlockMatch) text = codeBlockMatch[1].trim();
 
+  // 提取代码块，用占位符替换，markdown→HTML 转换完成后还原为格式化 <pre><code>
+  const codeBlocks: { lang: string; pretty: string }[] = [];
+  text = text.replace(/```(\w*)\s*\n?([\s\S]*?)```/g, (_match, lang, code) => {
+    const idx = codeBlocks.length;
+    let display = code.trim();
+    if (lang === "json") {
+      try { display = JSON.stringify(JSON.parse(display), null, 2); } catch { /* keep raw */ }
+    }
+    codeBlocks.push({ lang: lang || "", pretty: display });
+    return `\x00CB${idx}\x00`;
+  });
+
   const tp = c.textPrimary;
   const ts = c.textSecondary;
   const border = c.border;
 
-  const html = text
+  const bg = c.elevatedBg;
+  let html = text
     .replace(/^### (.+)$/gm, `<h3 style="color:${tp};margin:20px 0 8px;font-size:15px;">$1</h3>`)
     .replace(/^## (.+)$/gm, `<h2 style="color:${tp};margin:24px 0 10px;font-size:17px;border-bottom:1px solid ${border};padding-bottom:6px;">$1</h2>`)
     .replace(/^# (.+)$/gm, `<h1 style="color:${tp};margin:0 0 16px;font-size:20px;">$1</h1>`)
@@ -65,6 +127,15 @@ function MarkdownReport({ content }: { content: string }) {
     .replace(/(<li[^>]*>.*<\/li>\n?)+/gs, (match) => `<ul style="padding-left:20px;margin:8px 0;">${match}</ul>`)
     .replace(/\n\n/g, "<br/>")
     .replace(/\n/g, "<br/>");
+
+  // 还原代码块为格式化 <pre><code>（\x00 为占位符分隔，故意使用控制字符）
+  // eslint-disable-next-line no-control-regex
+  html = html.replace(/\x00CB(\d+)\x00/g, (_match, idx) => {
+    const b = codeBlocks[parseInt(idx, 10)];
+    if (!b) return _match;
+    const escaped = b.pretty.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<pre style="background:${bg};border:1px solid ${border};border-radius:6px;padding:12px 16px;overflow-x:auto;font-size:12px;line-height:1.6;margin:12px 0;"><code style="color:${ts};font-family:monospace;white-space:pre;">${escaped}</code></pre>`;
+  });
 
   return (
     <div
@@ -87,9 +158,19 @@ export default function IndustryChain() {
   const [archiveId, setArchiveId] = useState<string>("");
   const [error, setError] = useState("");
   const [historyFilter, setHistoryFilter] = useState("");
-  const [pushResult, setPushResult] = useState<{ url?: string; message?: string; target?: string } | null>(null);
+ const [pushResult, setPushResult] = useState<{ url?: string; message?: string; target?: string } | null>(null);
+  const [expandedChart, setExpandedChart] = useState<{ chart: IndustryChainChart; idx: number } | null>(null);
+  const cancelStreamRef = useRef<(() => void) | null>(null);
 
   const activeName = urlName ? decodeURIComponent(urlName) : "";
+
+  // 组件卸载时关闭未结束的 SSE 连接，避免连接泄漏
+  useEffect(() => {
+    return () => {
+      cancelStreamRef.current?.();
+      cancelStreamRef.current = null;
+    };
+  }, []);
 
   const { data: config } = useConfig();
   const pushMutation = usePush();
@@ -112,6 +193,8 @@ export default function IndustryChain() {
     if (!name) return;
 
     navigate(`/industry-chain/${encodeURIComponent(name)}`, { replace: true });
+    // 重新发起分析前先取消上一次的 SSE 连接
+    cancelStreamRef.current?.();
     setIsAnalyzing(true);
     setCurrentStage(-1);
     setStageMessage("");
@@ -120,7 +203,7 @@ export default function IndustryChain() {
     setError("");
     setPushResult(null);
 
-    const { promise } = streamIndustryChain(name, (event: IndustryChainProgress) => {
+    const { promise, cancel } = streamIndustryChain(name, (event: IndustryChainProgress) => {
       if (event.type === "stage_started" && event.stage) {
         const idx = STAGE_MAP[event.stage] ?? 0;
         setCurrentStage(idx);
@@ -132,6 +215,7 @@ export default function IndustryChain() {
         refetchHistory();
       }
     });
+    cancelStreamRef.current = cancel;
 
     promise
       .then((data) => {
@@ -145,6 +229,9 @@ export default function IndustryChain() {
         setError(err.message || "分析失败");
         setIsAnalyzing(false);
         message.error(err.message || "分析失败");
+      })
+      .finally(() => {
+        cancelStreamRef.current = null;
       });
   }, [navigate, refetchHistory, refetchLatest]);
 
@@ -367,23 +454,78 @@ export default function IndustryChain() {
                       </div>
                     </div>
                   )}
+                  {(result.upstream?.length > 0 || result.midstream?.length > 0 || result.downstream?.length > 0) && (
+                    <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                      {result.upstream?.length > 0 && (
+                        <div>
+                          <Text style={{ color: c.textSecondary, fontSize: 12, fontWeight: 600 }}>上游 </Text>
+                          <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {result.upstream.map((item, i) => (
+                              <Tag key={i} style={{ margin: 0, fontSize: 11 }} color="orange">{String(item.name || item.company || item.code || "")}</Tag>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {result.midstream?.length > 0 && (
+                        <div>
+                          <Text style={{ color: c.textSecondary, fontSize: 12, fontWeight: 600 }}>中游 </Text>
+                          <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {result.midstream.map((item, i) => (
+                              <Tag key={i} style={{ margin: 0, fontSize: 11 }} color="blue">{String(item.name || item.company || item.code || "")}</Tag>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {result.downstream?.length > 0 && (
+                        <div>
+                          <Text style={{ color: c.textSecondary, fontSize: 12, fontWeight: 600 }}>下游 </Text>
+                          <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {result.downstream.map((item, i) => (
+                              <Tag key={i} style={{ margin: 0, fontSize: 11 }} color="green">{String(item.name || item.company || item.code || "")}</Tag>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {result.charts && result.charts.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
-                    {result.charts.map((chart, idx) => (
-                      <div key={idx} style={{ ...cardStyle, padding: "16px 20px", marginBottom: 16 }}>
-                        <Text strong style={{ color: c.textPrimary, fontSize: 14, marginBottom: 8, display: "block" }}>
-                          {chart.title}
-                        </Text>
-                        {chart.description && (
-                          <Text style={{ color: c.textSecondary, fontSize: 13, marginBottom: 12, display: "block", lineHeight: 1.6 }}>
-                            {chart.description}
-                          </Text>
-                        )}
-                        <ReactECharts option={chart.option} style={{ height: 350 }} notMerge />
-                      </div>
-                    ))}
+                    {result.charts.map((chart, idx) => {
+                      const chartHeight = chart.type === "tree" ? Math.min(900, Math.max(400, Math.round(window.innerHeight * 0.55))) : Math.min(550, Math.max(300, Math.round(window.innerHeight * 0.4)));
+                      const hasValidOption = Boolean(chart.option && typeof chart.option === "object");
+                      return (
+                        <div key={idx} style={{ ...cardStyle, padding: "16px 20px", marginBottom: 16 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <Text strong style={{ color: c.textPrimary, fontSize: 14 }}>
+                              {chart.title}
+                            </Text>
+                            {hasValidOption && (
+                              <Button
+                                type="text"
+                                size="small"
+                                icon={<FullscreenOutlined />}
+                                onClick={() => setExpandedChart({ chart, idx })}
+                                style={{ color: c.textMuted }}
+                              />
+                            )}
+                          </div>
+                          {chart.description && (
+                            <Text style={{ color: c.textSecondary, fontSize: 13, marginBottom: 12, display: "block", lineHeight: 1.6 }}>
+                              {chart.description}
+                            </Text>
+                          )}
+                          {hasValidOption ? (
+                            <div style={{ width: "100%", overflow: "auto" }}><ReactECharts option={chart.option} style={{ height: chartHeight, width: "100%" }} notMerge /></div>
+                          ) : (
+                            <div style={{ height: chartHeight, display: "flex", alignItems: "center", justifyContent: "center", color: c.textMuted, fontSize: 13 }}>
+                              图表配置不可用
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -468,6 +610,23 @@ export default function IndustryChain() {
             </div>
           </div>
       </div>
+      <Modal
+        title={expandedChart?.chart?.title || ""}
+        open={!!expandedChart}
+        onCancel={() => setExpandedChart(null)}
+        footer={null}
+        width={Math.min(1200, Math.round(window.innerWidth * 0.92))}
+        style={{ top: 20 }}
+        destroyOnClose
+      >
+        {expandedChart && (
+          <ReactECharts
+            option={expandedChart.chart.option}
+            style={{ height: expandedChart.chart.type === "tree" ? Math.min(1600, Math.round(window.innerHeight * 0.85)) : Math.min(800, Math.round(window.innerHeight * 0.7)), width: "100%" }}
+            notMerge
+          />
+        )}
+      </Modal>
     </div>
   );
 }

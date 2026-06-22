@@ -161,7 +161,7 @@ export default function KlineChart({ data, height = 500 }: Props) {
       chart.remove();
       chartRef.current = null;
     };
-  }, [height, rows, c.pageBg]);
+  }, [height, rows, c.pageBg, c.border, c.cardBg, c.down, c.textMuted, c.textSecondary, c.up]);
 
   return (
     <div ref={wrapperRef} style={{ position: "relative", width: "100%" }}>

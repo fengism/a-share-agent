@@ -16,6 +16,8 @@ from app.services.stock.kline import get_kline as get_stock_kline_service
 from app.services.screener.percentiles import compute_percentile
 from app.services.stock.search import search_stocks as search_stock_items
 from app.services.stock.valuation import get_valuation as get_valuation_service, get_valuation_detail as get_valuation_detail_service
+from app.services.stock.fund_flow import get_stock_fund_flow as get_stock_fund_flow_service
+from app.services.stock.compare import compare_stocks as compare_stocks_service
 from app.services.stock.retail import (
     get_retail_sentiment as get_retail_sentiment_service,
     get_stock_sentiment as get_stock_sentiment_service,
@@ -189,6 +191,30 @@ async def get_retail_sentiment(code: str):
         dict: 散户情绪相关指标与详情。
     """
     return await run_endpoint("获取散户情绪数据", lambda: get_retail_sentiment_service(code))
+
+
+@router.get("/{code}/fund-flow")
+async def get_fund_flow(code: str):
+    """获取个股资金流向日级数据。
+
+    Param:
+        code: 股票代码（路径参数），6 位数字。
+    Return:
+        list[dict]: 按日期倒序排列的资金流向列表。
+    """
+    return await run_endpoint("获取资金流向", lambda: get_stock_fund_flow_service(code))
+
+
+@router.get("/compare")
+async def get_compare(codes: str = Query(..., description="逗号分隔的股票代码，如 600519,000858")):
+    """多股对比分析，获取基本信息、估值和财务指标进行横向对比。
+
+    Param:
+        codes: 逗号分隔的股票代码（查询参数），最多 5 个。
+    Return:
+        list[dict]: 每只股票的合并数据列表。
+    """
+    return await run_endpoint("对比分析", lambda: compare_stocks_service(codes))
 
 
 @router.get("/{code}/news-categorized")

@@ -1,7 +1,10 @@
+import logging
 from pathlib import Path
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 # 项目根目录（backend 的上一级）
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -23,7 +26,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-v4-flash"
     llm_temperature: float = 0.1
-    llm_timeout_seconds: int = 60
+    llm_timeout_seconds: int = 180
 
     # 缓存配置
     cache_ttl_realtime: int = 300  # 5分钟

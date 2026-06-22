@@ -103,7 +103,14 @@ class TwitterDataProvider(BaseDataProvider):
         result = {
             "url": entry.get("url", ""),
             "id": entry.get("id", ""),
+            "image_url": "",
         }
+        # 提取首张图片缩略图
+        media = entry.get("media", {}) or {}
+        photos = media.get("photos", [])
+        if photos:
+            result["image_url"] = photos[0].get("url", "")
+
         article = entry.get("article", {}) or {}
         title = article.get("title", "")
         blocks = article.get("content", {}).get("blocks", [])
@@ -153,11 +160,17 @@ class TwitterDataProvider(BaseDataProvider):
                         article_info = self.fetch_article_by_id(entry.get("id", ""))
                         if article_info:
                             content = article_info.get("content", "") or preview_text
+                            image_url = article_info.get("image_url", "")
                         else:
                             content = preview_text
+                            image_url = ""
                     else:
                         title = str(entry.get("title") or "").strip()
                         content = str(entry.get("text") or "").strip()
+                        # 尝试从 media 推文提取图片
+                        media = entry.get("media", {}) or {}
+                        photos = media.get("photos", [])
+                        image_url = photos[0].get("url", "") if photos else ""
 
                     url = entry.get("url", "")
                     created_at = entry.get("created_timestamp")
@@ -170,6 +183,7 @@ class TwitterDataProvider(BaseDataProvider):
                         NewsSearchItem(
                             title=title[:30],
                             content=content or "",
+                            image_url=image_url or "",
                             source="Twitter",
                             publish_time=str(publish_time) if publish_time else "",
                             url=url,
@@ -202,6 +216,7 @@ class TwitterDataProvider(BaseDataProvider):
                 if not article_info:
                     continue
                 content = article_info.get("content", "")
+                image_url = article_info.get("image_url", "")
                 if not content:
                     content = preview_text
                 created_at = entry.get("created_timestamp")
@@ -215,6 +230,7 @@ class TwitterDataProvider(BaseDataProvider):
                     NewsSearchItem(
                         title=title[:30],
                         content=content,
+                        image_url=image_url or "",
                         source=f"Twitter",
                         publish_time=str(publish_time) if publish_time else "",
                         url=url,

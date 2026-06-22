@@ -11,3 +11,4 @@ class NewsSearchItem(BaseModel):
     author: str
     read_count: int
     comment_count: int
+    image_url: str = ""

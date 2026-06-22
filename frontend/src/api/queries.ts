@@ -1,7 +1,7 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut } from "./client";
 import { oneYearAgoDate } from "../utils/date";
-import type { StockSearchItem, StockBasicInfo, KlineData, IntradayData, FinancialMetrics, StockValuation, StockValuationDetail, AnalysisResult, AnalysisHistoryItem, TechnicalIndicators, MarketIndices, HsgtFlow, StockNews, CategorizedStockNews, StockSentiment, RetailSentiment, ScreenerFilter, ScreenerResult, ValuationPercentileRequest, ValuationPercentileResult, ThsHotStock, ThsHotPlate, DragonTigerItem, DragonTigerDetail, PushRequest, PushResponse, FeedNewsItem, IndustryRankings, NewsAnalysis, IndustryChainResult, IndustryChainHistoryItem, MacroAllData } from "../types/stock";
+import type { StockSearchItem, StockBasicInfo, KlineData, IntradayData, FinancialMetrics, StockValuation, StockValuationDetail, AnalysisResult, AnalysisHistoryItem, TechnicalIndicators, MarketIndices, HsgtFlow, StockNews, CategorizedStockNews, StockSentiment, RetailSentiment, ScreenerFilter, ScreenerResult, ValuationPercentileRequest, ValuationPercentileResult, ThsHotStock, ThsHotPlate, DragonTigerItem, DragonTigerDetail, PushRequest, PushResponse, FeedNewsItem, IndustryRankings, NewsAnalysis, IndustryChainResult, IndustryChainHistoryItem, MacroAllData, StockFundFlowItem, StockCompareItem } from "../types/stock";
 import type { DailyReviewHistoryItem, DailyReviewRequest, DailyReviewResult } from "../types/dailyReview";
 import type { ConfigData, ConfigUpdate } from "../types/settings";
 
@@ -322,7 +322,7 @@ export function useConfig() {
   return useQuery({
     queryKey: ["config"],
     queryFn: () => apiGet<ConfigData>("/config"),
-    staleTime: 0,
+    staleTime: 30 * 1000,
   });
 }
 
@@ -363,11 +363,21 @@ export function useMarketTwitterFeed() {
   return useQuery({
     queryKey: ["marketTwitterFeed"],
     queryFn: () => apiGet<FeedNewsItem[]>("/market/twitter-feed"),
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
+    refetchInterval: 30 * 60 * 1000,
   });
 }
 
+
+export function useMarketTwitterFeedRefresh() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost("/market/twitter-feed/refresh"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["marketTwitterFeed"] });
+    },
+  });
+}
 export function useNewsAnalysis() {
   return useQuery({
     queryKey: ["newsAnalysis"],
@@ -385,7 +395,7 @@ export function useIndustryChainHistory(name = "") {
         "/industry-chain/history",
         name ? { name } : {}
       ),
-    staleTime: 30 * 1000,
+    staleTime: 0,
   });
 }
 
@@ -394,7 +404,7 @@ export function useIndustryChainLatest(name: string) {
     queryKey: ["industryChainLatest", name],
     queryFn: () => apiGet<{ archive_id: string; saved_at: string }>(`/industry-chain/${encodeURIComponent(name)}/latest`),
     enabled: !!name,
-    staleTime: 30 * 1000,
+    staleTime: 0,
   });
 }
 
@@ -416,6 +426,26 @@ export function useMacroAllData() {
 }
 
 // ── 分析页面聚合查询 ──
+
+
+
+export function useStockCompare(codes: string) {
+  return useQuery({
+    queryKey: ["stockCompare", codes],
+    queryFn: () => apiGet<StockCompareItem[]>("/stock/compare", { codes }),
+    enabled: codes.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useStockFundFlow(code: string) {
+  return useQuery({
+    queryKey: ["stockFundFlow", code],
+    queryFn: () => apiGet<StockFundFlowItem[]>(`/stock/${code}/fund-flow`),
+    enabled: !!code,
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 export function useAnalysisPageData(code: string) {
   return useQuery({

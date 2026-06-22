@@ -232,3 +232,28 @@ async def get_twitter_feed() -> list:
 
     from app.models.search_item import NewsSearchItem
     return [NewsSearchItem(**row) for row in db_rows]
+
+async def refresh_twitter_feed_now() -> dict:
+    """立即强制刷新 Twitter 资讯数据库（不等待后台周期任务）。
+
+    直接从 Twitter provider 拉取配置账号的最新推文并写入数据库。
+
+    Return:
+        包含刷新状态的字典 (status, authors, posts_count)
+    """
+    from app.config import get_settings
+    from app.services.providers.twitter import twitter_provider
+    from app.db.twitter_store import save_twitter_posts, get_stale_authors
+
+    feeds = get_settings().twitter_feeds
+    if not feeds:
+        return {"status": "skipped", "reason": "未配置 Twitter feeds"}
+
+    stale = await asyncio.to_thread(get_stale_authors, feeds)
+    if not stale:
+        return {"status": "skipped", "reason": "没有需要刷新的账号（5 分钟内已刷新过）"}
+
+    logger.info(f"Twitter manual refresh: fetching stale authors: {stale}")
+    raw = await asyncio.to_thread(twitter_provider.fetch_posts_for_users, stale)
+    await asyncio.to_thread(save_twitter_posts, [p.model_dump() for p in raw])
+    return {"status": "ok", "authors": stale, "posts_count": len(raw)}

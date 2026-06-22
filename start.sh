@@ -73,19 +73,28 @@ esac
 BACKEND_PID=$!
 info "后端 PID: $BACKEND_PID"
 
-# 等待后端就绪
-for i in $(seq 1 15); do
+# 等待后端就绪（首次启动需预热行业/股票名称映射，给足 90s）
+BACKEND_READY=0
+for i in $(seq 1 90); do
     if curl -sf http://127.0.0.1:8000/api/health >/dev/null 2>&1; then
-        info "后端就绪"
+        info "后端就绪 (耗时 ${i}s)"
+        BACKEND_READY=1
         break
     fi
-    if [ "$i" -eq 15 ]; then
-        error "后端启动超时，请检查日志: $LOG_DIR/backend.log"
-        tail -20 "$LOG_DIR/backend.log"
+    # 进程已退出则直接报错，不再傻等
+    if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+        error "后端进程已退出，请检查日志: $LOG_DIR/backend.log"
+        tail -30 "$LOG_DIR/backend.log"
         exit 1
     fi
     sleep 1
 done
+
+if [ "$BACKEND_READY" -ne 1 ]; then
+    error "后端 90s 内未就绪，请检查日志: $LOG_DIR/backend.log"
+    tail -30 "$LOG_DIR/backend.log"
+    exit 1
+fi
 
 echo ""
 

@@ -47,11 +47,44 @@ SYSTEM_PROMPT = """你是一位资深产业分析师。你需要基于提供的�
 ## 配图要求
 在 charts 数组中生成 1-2 个 ECharts 图表：
 
-1. **产业链结构图**（type: "tree"）— 展示上中下游及代表公司，使用 ECharts tree 图表
-2. **核心标的对比**（type: "bar"）— 对比重点公司的市值或涨跌幅
+1. **产业链结构图**（type: "tree"）— 展示上中下游及代表公司，使用 ECharts tree 图表，配置参考：
+\`\`\`json
+{
+  "tooltip": { "trigger": "item", "triggerOn": "mousemove" },
+  "series": [{
+    "type": "tree",
+    "data": [{"name":"某产业链","children":[{"name":"上游","children":[{"name":"代表公司A"},{"name":"代表公司B"}]},{"name":"中游","children":[{"name":"代表公司C"},{"name":"代表公司D"}]},{"name":"下游","children":[{"name":"代表公司E"},{"name":"代表公司F"}]}]}],
+    "top": 20, "left": 100, "bottom": 20, "right": 100,
+    "symbolSize": [6, 10],
+    "roam": true,
+    "expandAndCollapse": true,
+    "initialTreeDepth": 2,
+    "label": { "position": "left", "fontSize": 12, "color": "#e5e7eb" },
+    "leaves": { "label": { "position": "right", "fontSize": 12, "color": "#e5e7eb" } },
+    "lineStyle": { "color": "#4b5563", "width": 1.5 }
+  }],
+  "backgroundColor": "transparent"
+}
+\`\`\`
 
-ECharts option 必须是合法的 JSON 配置，使用暗色主题（背景透明，文字 #e5e7eb）。
-图表尺寸建议 width 100%，height 350px。
+2. **核心标的对比**（type: "bar"）— 对比重点公司的市值或涨跌幅，配置参考：
+\`\`\`json
+{
+  "tooltip": { "trigger": "axis" },
+  "grid": { "containLabel": true, "left": 40, "right": 20, "bottom": 40, "top": 20 },
+  "xAxis": { "type": "category", "data": ["公司A","公司B","公司C"], "axisLabel": { "color": "#9ca3af", "fontSize": 11 } },
+  "yAxis": { "type": "value", "name": "市值(亿)", "axisLabel": { "color": "#9ca3af" }, "splitLine": { "lineStyle": { "color": "#374151" } } },
+  "series": [{ "type": "bar", "data": [9800, 7500, 1200], "itemStyle": { "borderRadius": [4,4,0,0] }, "color": "#3b82f6" }],
+  "backgroundColor": "transparent"
+}
+\`\`\`
+
+### ECharts 配置要点
+- 所有图表必须配置 **tooltip**
+- 树形图必须配置 **top/left/bottom/right** 边距和 **roam: true**，节点标签左右交错排列（leaves 放右侧，其余放左侧）
+- 柱状图必须配置 **grid** 并设置 **containLabel: true**
+- 全部使用暗色主题颜色：背景 transparent，文字 #e5e7eb，次要文字 #9ca3af，分割线 #374151，主色 #3b82f6
+- 树形图节点数量控制在 15-25 个（含根节点），确保可完全展示
 
 ## 原则
 - 基于提供的数据进行分析，不编造不存在的公司或数据

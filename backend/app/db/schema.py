@@ -57,6 +57,7 @@ TABLES.append(
         author        TEXT    NOT NULL DEFAULT '',
         read_count    INTEGER NOT NULL DEFAULT 0,
         comment_count INTEGER NOT NULL DEFAULT 0,
+        image_url     TEXT    NOT NULL DEFAULT '',
         fetched_at    TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
         UNIQUE(author, url)
     )

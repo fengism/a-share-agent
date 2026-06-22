@@ -19,6 +19,7 @@ const Chat = lazy(() => import("./pages/Chat"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Feed = lazy(() => import("./pages/Feed"));
 const IndustryChain = lazy(() => import("./pages/IndustryChain"));
+const Compare = lazy(() => import("./pages/Compare"));
 const Macro = lazy(() => import("./pages/Macro"));
 
 const queryClient = new QueryClient({
@@ -72,6 +73,7 @@ export default function App() {
                   <Route path="/feed" element={<Feed />} />
                   <Route path="/analysis" element={<AnalysisEntry />} />
                   <Route path="/macro" element={<Macro />} />
+                  <Route path="/compare" element={<Compare />} />
                   <Route path="/industry-chain" element={<IndustryChain />} />
                   <Route path="/industry-chain/:name" element={<IndustryChain />} />
                   <Route path="/chat" element={<Chat />} />

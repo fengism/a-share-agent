@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, message } from "antd";
-import { ClearOutlined, RobotOutlined } from "@ant-design/icons";
+import { ClearOutlined, DeleteOutlined, MessageOutlined, PlusOutlined, RobotOutlined } from "@ant-design/icons";
 import { streamChat } from "../../api/chat";
 import { usePush } from "../../api/queries";
 import PushModal from "../../components/PushModal";
@@ -18,22 +18,28 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState("");
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const [pushContent, setPushContent] = useState("");
+  const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeAssistantIdRef = useRef<string | null>(null);
   const activeControllerRef = useRef<AbortController | null>(null);
   const pushMutation = usePush();
 
   const c = useColors();
-  const { pageContainerStyle, pageDescriptionStyle, pageHeaderStyle, pageTitleStyle } = useStyles();
+  const { pageDescriptionStyle, pageHeaderStyle, pageTitleStyle } = useStyles();
 
   const {
     messages,
     isStreaming,
     abortController,
+    sessions,
+    activeSessionId,
     setStreaming,
     setAbortController,
     clearChat,
     finalizeMessage,
+    createSession,
+    setActiveSession,
+    deleteSession,
   } = useChatStore();
 
   const clearActiveRequest = useCallback(() => {
@@ -66,7 +72,24 @@ export default function ChatPage() {
       setStreaming(false);
     },
     [setAbortController, setStreaming],
-  );
+ );
+
+  const handleNewSession = useCallback(() => {
+    abortController?.abort();
+    createSession();
+  }, [abortController, createSession]);
+
+  const handleSessionClick = useCallback((sessionId: string) => {
+    if (!isStreaming) {
+      setActiveSession(sessionId);
+      setHoveredSessionId(null);
+    }
+  }, [isStreaming, setActiveSession]);
+
+  const handleDeleteSession = useCallback((e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    deleteSession(sessionId);
+  }, [deleteSession]);
 
   const handleSend = useCallback(() => {
     const input = inputValue.trim();
@@ -75,7 +98,9 @@ export default function ChatPage() {
     const store = useChatStore.getState();
 
     setInputValue("");
-    store.addUserMessage(input);
+   store.addUserMessage(input);
+    // 自动将首条消息设为会话标题
+    store.syncSessionTitle();
 
     const assistantId = `msg-${Date.now()}`;
     activeAssistantIdRef.current = assistantId;
@@ -241,56 +266,158 @@ export default function ChatPage() {
           color: ${c.textSecondary};
           font-weight: 600;
         }
-    `, [c.textPrimary, c.primary, c.nestedBg, c.border, c.textSecondary, c.textMuted, c.elevatedBg, c.pageBg]);
+    `, [c.textPrimary, c.primary, c.nestedBg, c.border, c.textSecondary, c.elevatedBg]);
 
   return (
-    <div style={pageContainerStyle}>
+    <>
       <style>{chatMarkdownCss}</style>
-
-      <div style={pageHeaderStyle}>
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          alignItems: "flex-start",
+          maxWidth: 1400,
+          margin: "0 auto",
+          padding: "0 0 24px",
+        }}
+      >
+        {/* ── Session Sidebar ── */}
         <div
           style={{
+            width: 220,
+            flexShrink: 0,
+            position: "sticky",
+            top: 0,
+            background: c.nestedBg,
+            border: `1px solid ${c.border}`,
+            borderRadius: 12,
+            padding: 12,
+            maxHeight: "calc(100vh - 120px)",
+            overflowY: "auto",
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            flexDirection: "column",
+            gap: 8,
           }}
         >
-          <div>
-            <h2 style={pageTitleStyle}>
-              <RobotOutlined style={{ marginRight: 8 }} />
-              AI 选股助手
-            </h2>
-            <p style={pageDescriptionStyle}>
-              自由对话，智能选股。输入股票名称、筛选条件或市场问题，AI
-              助手将调用工具获取实时数据并分析。
-            </p>
-          </div>
           <Button
-            icon={<ClearOutlined />}
-            onClick={handleClear}
-            disabled={isStreaming || messages.length === 0}
+            type="primary"
+            block
+            icon={<PlusOutlined />}
+            onClick={handleNewSession}
             style={{ borderRadius: 8 }}
           >
-            清空对话
+            新对话
           </Button>
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+            }}
+          >
+            {sessions.map((session) => {
+              const isActive = session.id === activeSessionId;
+              return (
+                <div
+                  key={session.id}
+                  onClick={() => handleSessionClick(session.id)}
+                  onMouseEnter={() => setHoveredSessionId(session.id)}
+                  onMouseLeave={() => setHoveredSessionId(null)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    cursor: isStreaming ? "not-allowed" : "pointer",
+                    background:
+                      hoveredSessionId === session.id && !isActive
+                        ? c.elevatedBg
+                        : isActive
+                          ? `${c.primary}20`
+                          : "transparent",
+                    border: isActive
+                      ? `1px solid ${c.primary}40`
+                      : "1px solid transparent",
+                    transition: "all 0.15s ease",
+                    color: isActive ? c.primary : c.textSecondary,
+                    fontSize: 13,
+                  }}
+                >
+                  <MessageOutlined style={{ fontSize: 14, flexShrink: 0 }} />
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {session.title}
+                  </span>
+                  {hoveredSessionId === session.id && sessions.length > 1 && (
+                    <DeleteOutlined
+                      onClick={(e) => handleDeleteSession(e, session.id)}
+                      style={{
+                        fontSize: 12,
+                        color: c.textMuted,
+                        cursor: "pointer",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {/* ── Main Chat Area ── */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={pageHeaderStyle}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div>
+                <h2 style={pageTitleStyle}>
+                  <RobotOutlined style={{ marginRight: 8 }} />
+                  AI 选股助手
+                </h2>
+                <p style={pageDescriptionStyle}>
+                  自由对话，智能选股。输入股票名称、筛选条件或市场问题，AI
+                  助手将调用工具获取实时数据并分析。
+                </p>
+              </div>
+              <Button
+                icon={<ClearOutlined />}
+                onClick={handleClear}
+                disabled={isStreaming || messages.length === 0}
+                style={{ borderRadius: 8 }}
+              >
+                清空对话
+              </Button>
+            </div>
+          </div>
+          <ChatMessageList
+            messages={messages}
+            messagesEndRef={messagesEndRef}
+            onPush={handleOpenPush}
+            onSelectPrompt={setInputValue}
+          />
+          <ChatInput
+            value={inputValue}
+            isStreaming={isStreaming}
+            onChange={setInputValue}
+            onSend={handleSend}
+            onStop={handleStop}
+          />
         </div>
       </div>
-
-      <ChatMessageList
-        messages={messages}
-        messagesEndRef={messagesEndRef}
-        onPush={handleOpenPush}
-        onSelectPrompt={setInputValue}
-      />
-
-      <ChatInput
-        value={inputValue}
-        isStreaming={isStreaming}
-        onChange={setInputValue}
-        onSend={handleSend}
-        onStop={handleStop}
-      />
-
       <PushModal
         open={pushModalOpen}
         type="chat"
@@ -298,6 +425,6 @@ export default function ChatPage() {
         onCancel={() => setPushModalOpen(false)}
         loading={pushMutation.isPending}
       />
-    </div>
+    </>
   );
 }

@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { key: "/", icon: <HomeOutlined />, label: "首页" },
   { key: "/market", icon: <FundOutlined />, label: "市场" },
   { key: "/macro", icon: <GlobalOutlined />, label: "宏观" },
+  { key: "/compare", icon: <LineChartOutlined />, label: "对比" },
   { key: "/feed", icon: <ClockCircleOutlined />, label: "资讯" },
   { key: "/screener", icon: <FilterOutlined />, label: "选股" },
   { key: "/chat", icon: <MessageOutlined />, label: "对话" },

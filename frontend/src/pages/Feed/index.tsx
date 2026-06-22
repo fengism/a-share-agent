@@ -1,17 +1,33 @@
-import React, { useState, useMemo } from "react";
-import { List, Pagination, Tabs, Tag, Typography, Empty, Spin, Tooltip } from "antd";
-import { LinkOutlined, RobotOutlined, ThunderboltOutlined, ReadOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import React, { useState, useMemo, useEffect } from "react";
+import { Button, Input, List, Pagination, Select, Tabs, Tag, Typography, Empty, Skeleton, Tooltip, message } from "antd";
+import { LinkOutlined, RobotOutlined, SyncOutlined, ThunderboltOutlined, ReadOutlined, ClockCircleOutlined } from "@ant-design/icons";
 import type { NewsAnalysisItem, NewsAnalysisRef } from "../../types/stock";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/zh-cn";
-import { useMarketKuaixun, useMarketOtherNews, useMarketTwitterFeed, useNewsAnalysis } from "../../api/queries";
+import { useMarketKuaixun, useMarketOtherNews, useMarketTwitterFeed, useMarketTwitterFeedRefresh, useNewsAnalysis } from "../../api/queries";
 import { useColors, useStyles } from "../../styles/ui";
 import type { FeedNewsItem } from "../../types/stock";
 import type { ThemeColors } from "../../theme/themes";
 
 dayjs.extend(relativeTime);
 dayjs.locale("zh-cn");
+
+/* ── 响应式 Hook ────────────────────────────────────────── */
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = React.useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
+  React.useEffect(() => {
+    const mql = window.matchMedia(query);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mql.addEventListener("change", handler);
+    setMatches(mql.matches);
+    return () => mql.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -53,6 +69,10 @@ function getSourceColor(source: string, c: ThemeColors): string {
     if (source.includes(key)) return color;
   }
   return c.textMuted;
+}
+
+function isTwitterItem(item: FeedNewsItem): boolean {
+  return item.source === "Twitter" || item.source.includes("𝕏");
 }
 
 function getSourceLabel(source: string, c: ThemeColors): string {
@@ -104,6 +124,53 @@ function getTimeColor(time: string, c: ThemeColors): string {
   if (diffMin < 30) return KUAIXUN_ACCENT;
   if (diffMin < 120) return c.textSecondary;
   return "#64748b";
+}
+
+/* ── 时间展示（相对时间 + 绝对时间 Tooltip） ────────────── */
+
+function TimeDisplay({ time }: { time: string }) {
+  const c = useColors();
+  if (!time) return null;
+  const d = dayjs(time);
+  if (!d.isValid()) return <Text style={{ color: c.textMuted, fontSize: 12 }}>{time}</Text>;
+  const absoluteTime = d.format("YYYY-MM-DD HH:mm:ss");
+  return (
+    <Tooltip title={absoluteTime}>
+      <Text style={{ color: getTimeColor(time, c), fontSize: 12 }}>
+        {formatTime(time)}
+      </Text>
+    </Tooltip>
+  );
+}
+
+/* ── 媒体缩略图 ────────────────────────────────────────── */
+
+function MediaPreview({ imageUrl, title }: { imageUrl: string; title: string }) {
+  if (!imageUrl) return null;
+  return (
+    <div
+      style={{
+        marginTop: 8,
+        borderRadius: 8,
+        overflow: "hidden",
+        maxWidth: 480,
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      <img
+        src={imageUrl}
+        alt={title}
+        style={{
+          width: "100%",
+          height: "auto",
+          maxHeight: 300,
+          objectFit: "cover",
+          display: "block",
+        }}
+        loading="lazy"
+      />
+    </div>
+  );
 }
 
 /* ── AI 摘要面板 ───────────────────────────────────────── */
@@ -169,9 +236,13 @@ function NewsAnalysisPanel() {
 
   if (isLoading) {
     return (
-      <div style={{ ...cardStyle, marginTop: 46, padding: "40px 0", textAlign: "center", position: "sticky", top: 24 }}>
-        <Spin size="large" />
-        <div style={{ marginTop: 12, color: c.textMuted, fontSize: 13 }}>AI 正在分析资讯...</div>
+      <div style={{ ...cardStyle, padding: 0, marginTop: 46, position: "sticky", top: 24 }}>
+        <div style={{ padding: "14px 16px", borderBottom: `1px solid ${c.border}` }}>
+          <Skeleton active title={{ width: 120 }} paragraph={false} />
+        </div>
+        <div style={{ padding: "12px 16px" }}>
+          <Skeleton active paragraph={{ rows: 4 }} />
+        </div>
       </div>
     );
   }
@@ -281,13 +352,11 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
                 paddingInline: 6,
               }}
             >
-              {getSourceLabel(item.source, c)}
+              {isTwitterItem(item) ? <span>𝕏 {getSourceLabel(item.source, c)}</span> : getSourceLabel(item.source, c)}
             </Tag>
           )}
           <ClockCircleOutlined style={{ color: c.textMuted, fontSize: 11 }} />
-          <Text style={{ color: getTimeColor(item.publish_time, c), fontSize: 12 }}>
-            {formatTime(item.publish_time)}
-          </Text>
+          <TimeDisplay time={item.publish_time} />
           {item.author != null && item.author !== "" && (
             <Tag
               style={{
@@ -348,7 +417,7 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
               marginBottom: 0,
               lineHeight: 1.6,
               display: "-webkit-box",
-              WebkitLineClamp: 2,
+              WebkitLineClamp: isTwitterItem(item) ? 5 : 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
             }}
@@ -357,17 +426,19 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
           </Paragraph>
         )}
 
+        {item.image_url && <MediaPreview imageUrl={item.image_url} title={item.title} />}
+
         {/* Row 4: engagement */}
         {(item.read_count > 0 || item.comment_count > 0) && (
           <div style={{ marginTop: 4, display: "flex", gap: 12 }}>
             {item.read_count > 0 && (
               <Text style={{ color: c.textMuted, fontSize: 11 }}>
-                阅读 {item.read_count.toLocaleString()}
+                {isTwitterItem(item) ? '浏览' : '阅读'} {item.read_count.toLocaleString()}
               </Text>
             )}
             {item.comment_count > 0 && (
               <Text style={{ color: c.textMuted, fontSize: 11 }}>
-                评论 {item.comment_count.toLocaleString()}
+                {isTwitterItem(item) ? '回复' : '评论'} {item.comment_count.toLocaleString()}
               </Text>
             )}
           </div>
@@ -388,25 +459,38 @@ function PaginatedList({
   emptyText,
   showSourceTag,
   pageSize,
+  searchQuery = "",
 }: {
   items: FeedNewsItem[];
   isLoading: boolean;
   emptyText: string;
   showSourceTag: boolean;
   pageSize: number;
+  searchQuery?: string;
 }) {
   const c = useColors();
   const { cardStyle } = useStyles();
   const [page, setPage] = useState(1);
-  const total = items.length;
+
+  // Search filter
+  const filtered = useMemo(() => {
+    if (!searchQuery) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter(item =>
+      (item.title && item.title.toLowerCase().includes(q)) ||
+      (item.content && item.content.toLowerCase().includes(q))
+    );
+  }, [items, searchQuery]);
+
+  const total = filtered.length;
   const totalPages = Math.ceil(total / pageSize);
   const start = (page - 1) * pageSize;
-  const pageItems = items.slice(start, start + pageSize);
+  const pageItems = filtered.slice(start, start + pageSize);
 
   if (isLoading) {
     return (
-      <div style={{ ...cardStyle, padding: "60px 0", textAlign: "center" }}>
-        <Spin size="large" />
+      <div style={{ ...cardStyle, padding: "16px" }}>
+        <Skeleton active paragraph={{ rows: 5 }} />
       </div>
     );
   }
@@ -427,7 +511,7 @@ function PaginatedList({
             current={page}
             total={total}
             pageSize={pageSize}
-            onChange={setPage}
+            onChange={(p) => { window.scrollTo({ top: 0, behavior: "smooth" }); setPage(p); }}
             size="small"
             showSizeChanger={false}
             showTotal={(t) => `共 ${t} 条`}
@@ -440,34 +524,96 @@ function PaginatedList({
 
 /* ── Tab 内容 ──────────────────────────────────────────── */
 
-function KuaixunTab() {
+function KuaixunTab({ searchQuery = "" }: { searchQuery?: string }) {
+  const c = useColors();
   const { data: items = [], isLoading } = useMarketKuaixun();
   return (
-    <PaginatedList
-      items={items}
-      isLoading={isLoading}
-      emptyText="暂无快讯"
-      showSourceTag={false}
-      pageSize={KUAIXUN_PAGE_SIZE}
-    />
+    <div>
+      {!isLoading && items.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <Text style={{ color: c.textSecondary, fontSize: 12 }}>
+            共 {items.length} 条快讯
+          </Text>
+        </div>
+      )}
+      <PaginatedList
+        items={items}
+        isLoading={isLoading}
+        emptyText="暂无快讯"
+        showSourceTag={false}
+        pageSize={KUAIXUN_PAGE_SIZE}
+        searchQuery={searchQuery}
+      />
+    </div>
   );
 }
 
-function TwitterTab() {
-  const { data: items = [], isLoading } = useMarketTwitterFeed();
-  return (
-    <PaginatedList
-      items={items}
-      isLoading={isLoading}
-      emptyText="暂无 Twitter 资讯"
-      showSourceTag={true}
-      pageSize={NEWS_PAGE_SIZE}
-    />
-  );
-}
-
-function OtherNewsTab() {
+function TwitterTab({ searchQuery = "" }: { searchQuery?: string }) {
   const c = useColors();
+  const { data: items = [], isLoading } = useMarketTwitterFeed();
+  const refreshMutation = useMarketTwitterFeedRefresh();
+  const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading && items.length > 0 && !lastRefreshed) {
+      setLastRefreshed(new Date().toISOString());
+    }
+  }, [isLoading, items, lastRefreshed]);
+
+  // Countdown tick every 15s
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 15000);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleRefresh = () => {
+    refreshMutation.mutate(undefined, {
+      onSuccess: () => {
+        setLastRefreshed(new Date().toISOString());
+        message.success("Twitter 资讯已刷新");
+      },
+      onError: (err) => message.error(err?.message || "刷新失败"),
+    });
+  };
+
+  const timeSince = lastRefreshed ? dayjs(lastRefreshed).fromNow() : null;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        {timeSince && (
+          <Text style={{ color: c.textSecondary, fontSize: 12 }}>
+            <ClockCircleOutlined style={{ marginRight: 4 }} />
+            上次更新 {timeSince}
+            {items.length > 0 && (
+              <span style={{ marginLeft: 8 }}>· 共 {items.length} 条</span>
+            )}
+          </Text>
+        )}
+        <div style={{ flex: 1 }} />
+        <Button
+          size="small"
+          icon={<SyncOutlined />}
+          loading={refreshMutation.isPending}
+          onClick={handleRefresh}
+        >
+          刷新
+        </Button>
+      </div>
+      <PaginatedList
+        items={items}
+        isLoading={isLoading}
+        emptyText="暂无 Twitter 资讯"
+        showSourceTag={true}
+        pageSize={NEWS_PAGE_SIZE}
+        searchQuery={searchQuery}
+      />
+    </div>
+  );
+}
+
+function OtherNewsTab({ searchQuery = "" }: { searchQuery?: string }) {
   const { cardStyle } = useStyles();
   const { data: items = [], isLoading } = useMarketOtherNews();
 
@@ -482,78 +628,68 @@ function OtherNewsTab() {
     }
     return Array.from(map.entries()).sort((a, b) => b[1].length - a[1].length);
   }, [items]);
+  const [platform, setPlatform] = useState("all");
+  const totalCount = items.length;
 
-  const subTabs = useMemo(() => {
-    const tabs: { key: string; label: React.ReactNode; children: React.ReactNode }[] = [
-      {
-        key: "all",
-        label: <span>全部 <Tag style={{ margin: 0, borderRadius: 8, fontSize: 11, lineHeight: "16px", paddingInline: 5 }}>{items.length}</Tag></span>,
-        children: (
-          <PaginatedList
-            items={items}
-            isLoading={isLoading}
-            emptyText="暂无新闻"
-            showSourceTag={true}
-            pageSize={NEWS_PAGE_SIZE}
-          />
-        ),
-      },
-    ];
-    for (const [source, sourceItems] of grouped) {
-      tabs.push({
-        key: source,
-        label: (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: getSourceColor(source, c),
-                flexShrink: 0,
-              }}
-            />
-            {source}
-            <Tag style={{ margin: 0, borderRadius: 8, fontSize: 11, lineHeight: "16px", paddingInline: 5 }}>{sourceItems.length}</Tag>
-          </span>
-        ),
-        children: (
-          <PaginatedList
-            items={sourceItems}
-            isLoading={isLoading}
-            emptyText={`暂无${source}新闻`}
-            showSourceTag={false}
-            pageSize={NEWS_PAGE_SIZE}
-          />
-        ),
-      });
-    }
-    return tabs;
-  }, [grouped, items, isLoading]);
+  const filteredItems = useMemo(() => {
+    if (platform === "all") return items;
+    const found = grouped.find(([k]) => k === platform);
+    return found ? found[1] : [];
+  }, [platform, grouped, items]);
 
   if (isLoading) {
     return (
-      <div style={{ ...cardStyle, padding: "60px 0", textAlign: "center" }}>
-        <Spin size="large" />
+      <div style={{ ...cardStyle, padding: "16px" }}>
+        <Skeleton active paragraph={{ rows: 5 }} />
       </div>
     );
   }
 
   return (
-    <Tabs
-      defaultActiveKey="all"
-      tabPosition="top"
-      size="small"
-      items={subTabs}
-      style={{ background: "transparent" }}
-    />
+    <div>
+      {/* Platform filter bar — pills for top sources + dropdown for rest */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          marginBottom: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <Select
+          value={platform}
+          onChange={(v) => setPlatform(v)}
+          size="small"
+          style={{ minWidth: 140 }}
+          options={[
+            { value: "all", label: `全部 (${totalCount})` },
+            ...grouped.map(([source, srcItems]) => ({
+              value: source,
+              label: `${source} (${srcItems.length})`,
+            })),
+          ]}
+        />
+      </div>
+      <PaginatedList
+        items={filteredItems}
+        isLoading={isLoading}
+        emptyText="暂无新闻"
+        showSourceTag={true}
+        pageSize={NEWS_PAGE_SIZE}
+        searchQuery={searchQuery}
+      />
+    </div>
   );
-}
 
+
+}
 /* ── 主页面 ────────────────────────────────────────────── */
 
 export default function Feed() {
   const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle } = useStyles();
+  const isNarrow = useMediaQuery("(max-width: 1024px)");
+  const [searchQuery, setSearchQuery] = React.useState("");
   return (
     <div style={pageContainerStyle}>
       <div style={pageHeaderStyle}>
@@ -563,8 +699,18 @@ export default function Feed() {
         </Paragraph>
       </div>
 
+      {/* Global search bar */}
+      <Input.Search
+        placeholder="搜索资讯标题或内容..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onSearch={(v) => setSearchQuery(v)}
+        allowClear
+        style={{ marginBottom: 16 }}
+      />
+
       {/* Two-column layout: tabs left, AI analysis right */}
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+      <div style={{ display: isNarrow ? "block" : "flex", gap: 16, alignItems: "flex-start" }}>
         {/* Left: Tabs */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <Tabs
@@ -574,25 +720,26 @@ export default function Feed() {
               {
                 key: "kuaixun",
                 label: <span><ThunderboltOutlined /> 7×24 快讯</span>,
-                children: <KuaixunTab />,
+                children: <KuaixunTab searchQuery={searchQuery} />,
               },
               {
                 key: "news",
                 label: <span><ReadOutlined /> 新闻资讯</span>,
-                children: <OtherNewsTab />,
+                children: <OtherNewsTab searchQuery={searchQuery} />,
               },
               {
                 key: "twitter",
                 label: <span>𝕏 Twitter</span>,
-                children: <TwitterTab />,
+                children: <TwitterTab searchQuery={searchQuery} />,
               },
             ]}
+            destroyInactiveTabPane
             style={{ background: "transparent" }}
           />
         </div>
 
         {/* Right: AI Analysis */}
-        <div style={{ width: 340, flexShrink: 0 }}>
+        <div style={{ width: isNarrow ? "100%" : 340, flexShrink: 0, marginTop: isNarrow ? 16 : 0 }}>
           <NewsAnalysisPanel />
         </div>
       </div>

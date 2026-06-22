@@ -174,6 +174,7 @@ export interface FeedNewsItem {
   author: string;
   read_count: number;
   comment_count: number;
+  image_url?: string;
 }
 
 export interface RetailSentimentPost {
@@ -555,6 +556,32 @@ export interface MacroAllData {
   rates: MacroCategory;
   growth: MacroCategory;
   trade: MacroCategory;
+}
+
+
+export interface StockCompareItem {
+  code: string;
+  name: string;
+  price: number | null;
+  change_pct: number | null;
+  pe_ttm: number | null;
+  pb: number | null;
+  ps_ttm: number | null;
+  market_cap: number | null;
+  turnover_pct: number | null;
+  industry: string | null;
+  revenue: number | null;
+  net_profit: number | null;
+  roe: number | null;
+}
+
+export interface StockFundFlowItem {
+  date: string;
+  main_net: number;
+  small_net: number;
+  mid_net: number;
+  large_net: number;
+  super_net: number;
 }
 
 // ── 分析页面聚合数据类型 ──

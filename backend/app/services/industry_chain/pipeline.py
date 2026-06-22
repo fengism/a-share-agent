@@ -36,10 +36,10 @@ async def _emit(callback, event: IndustryChainProgress):
 def _safe_parse_llm_json(text: str):
     """容错解析 LLM 返回的 JSON 字符串。
 
-    LLM 经常在 JSON 字符串值里输出字面换行（而非 \\n 转义），导致标准 json.loads 失败。
+    LLM 经常在 JSON 字符串值里输出字面换行（而非 \n 转义），导致标准 json.loads 失败。
     这里依次尝试：
       1. 直接 json.loads
-      2. 把字符串值中的字面换行转义后再 json.loads
+      2. 逐字符修复字符串内的字面换行和未转义引号后 json.loads
       3. 提取首个平衡的 {...} 子串再试
 
     Param:
@@ -49,30 +49,240 @@ def _safe_parse_llm_json(text: str):
     """
     if not text:
         return None
+    # 方法 1: 直接 json.loads
     try:
         return json.loads(text)
     except (json.JSONDecodeError, ValueError):
         pass
-
+    # 方法 2: 逐字符修复字符串内的字面换行和未转义引号
+    fixed = _fix_json_newlines(text)
     try:
-        escaped = re.sub(r'(?<=":)\s*\n', r"\\n", text)
-        return json.loads(escaped)
+        return json.loads(fixed)
     except (json.JSONDecodeError, ValueError):
         pass
-
+    # 方法 3: 提取首个平衡的 {...} 子串再试
     start = text.find("{")
-    end = text.rfind("}")
+    end = _find_matching_brace(text, start) if start != -1 else -1
     if start != -1 and end > start:
         candidate = text[start:end + 1]
         try:
             return json.loads(candidate)
         except (json.JSONDecodeError, ValueError):
             pass
+        fixed2 = _fix_json_newlines(candidate)
         try:
-            return json.loads(re.sub(r"(?<=:)\s*\n", r"\\n", candidate))
+            return json.loads(fixed2)
         except (json.JSONDecodeError, ValueError):
             pass
     return None
+
+
+def _find_matching_brace(text: str, start: int) -> int:
+    """找到从 start 位置 { 开始的匹配 }（跳过字符串内的假括号）。"""
+    depth = 0
+    in_str = False
+    i = start
+    while i < len(text):
+        ch = text[i]
+        if in_str:
+            if ch == '\\':
+                i += 2
+                continue
+            elif ch == '"':
+                in_str = False
+        else:
+            if ch == '"':
+                in_str = True
+            elif ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    return i
+        i += 1
+    return -1
+
+
+def _fix_json_newlines(text: str) -> str:
+    """修复 JSON 字符串值中的字面换行和未转义引号。
+
+    逐字符扫描，仅在字符串值（双引号内）做替换：
+    - 字面换行 \n/\r → 转义为 \n
+    - 属于字符串内容而非结尾的 " → 转义为 \"
+    """
+    out = []
+    in_str = False
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if in_str:
+            if ch == '\\':
+                out.append(ch)
+                i += 1
+                if i < len(text):
+                    out.append(text[i])
+                    i += 1
+            elif ch == '"':
+                rest = text[i + 1:].lstrip()
+                if not rest or rest[0] in (',', ']', '}', '\n', '\r'):
+                    out.append(ch)
+                    in_str = False
+                    i += 1
+                else:
+                    out.append('\\"')
+                    i += 1
+            elif ch == '\n':
+                out.append('\\n')
+                i += 1
+            elif ch == '\r':
+                out.append('\\r')
+                i += 1
+            else:
+                out.append(ch)
+                i += 1
+        else:
+            out.append(ch)
+            if ch == '"':
+                in_str = True
+            i += 1
+    return ''.join(out)
+
+
+def _unescape_json_string(s: str) -> str:
+    """简单反转义 JSON 字符串中的 \n、\" 等转义序列。"""
+    result = []
+    i = 0
+    while i < len(s):
+        if s[i] == "\\" and i + 1 < len(s):
+            nxt = s[i + 1]
+            if nxt == "n":
+                result.append("\n")
+            elif nxt == "r":
+                result.append("\r")
+            elif nxt == "t":
+                result.append("\t")
+            elif nxt == '"':
+                result.append('"')
+            elif nxt == "\\":
+                result.append("\\")
+            else:
+                result.append(s[i])
+                result.append(nxt)
+            i += 2
+        else:
+            result.append(s[i])
+            i += 1
+    return "".join(result)
+
+
+def _try_extract_llm_report(text: str) -> str | None:
+    """当 JSON 解析失败时，从原始文本中手动提取 llm_report 字段值。
+
+    使用逐字符扫描方式，定位 "llm_report" 后的冒号和引号，
+    提取引号内的原始内容，不做 JSON 转义处理。
+    """
+    for prefix in ('"llm_report"', "'llm_report'"):
+        idx = text.find(prefix)
+        if idx == -1:
+            continue
+        after_prefix = text[idx + len(prefix):]
+        colon = after_prefix.find(":")
+        if colon == -1:
+            continue
+        content = after_prefix[colon + 1:].lstrip()
+        if not content:
+            continue
+        if content[0] not in ('"', "'"'"', "'", '\'"'):
+            continue
+        delim = content[0]
+        j = 1
+        while j < len(content):
+            if content[j] == "\\":
+                j += 2
+                continue
+            if content[j] == delim:
+                return content[1:j]
+            j += 1
+        # 没有找到匹配的结束引号，换 prefix 继续搜索
+    return None
+
+    """对 LLM 生成的 ECharts option 做后处理，修复常见缺漏。
+
+    包括：补全 backgroundColor、tooltip、grid、roam 等关键属性，
+    确保暗色主题配色完整。
+    """
+    enhanced = []
+    for chart in charts:
+        if not isinstance(chart, dict):
+            continue
+        opt = chart.get("option", {})
+        if not isinstance(opt, dict):
+            chart["option"] = {}
+            enhanced.append(chart)
+            continue
+
+        chart_type = chart.get("type", "")
+        series = opt.get("series", [])
+
+        # 1) background
+        if "backgroundColor" not in opt:
+            opt["backgroundColor"] = "transparent"
+
+        # 2) tooltip
+        if "tooltip" not in opt:
+            if chart_type in ("tree",):
+                opt["tooltip"] = {"trigger": "item", "triggerOn": "mousemove"}
+            else:
+                opt["tooltip"] = {
+                    "trigger": "axis",
+                    "backgroundColor": "rgba(15,23,42,0.9)",
+                    "borderColor": "#334155",
+                    "textStyle": {"color": "#e5e7eb", "fontSize": 12},
+                }
+
+        # 3) grid for cartesian charts
+        if chart_type in ("bar", "line") and "grid" not in opt:
+            opt["grid"] = {"containLabel": True, "left": 40, "right": 20, "bottom": 40, "top": 20}
+        elif chart_type in ("bar", "line") and isinstance(opt.get("grid"), dict):
+            opt["grid"]["containLabel"] = opt["grid"].get("containLabel", True)
+
+        # 4) dark theme fallbacks for cartesian axes
+        if chart_type in ("bar", "line"):
+            for axis_key in ("xAxis", "yAxis"):
+                axis = opt.get(axis_key)
+                if isinstance(axis, dict) and "axisLabel" in axis:
+                    al = axis["axisLabel"]
+                    if isinstance(al, dict) and "color" not in al:
+                        al["color"] = "#9ca3af"
+                elif isinstance(axis, list):
+                    for a in axis:
+                        if isinstance(a, dict) and "axisLabel" in a:
+                            al = a["axisLabel"]
+                            if isinstance(al, dict) and "color" not in al:
+                                al["color"] = "#9ca3af"
+
+        # 5) tree chart defaults
+        if chart_type == "tree":
+            for s in series if isinstance(series, list) else []:
+                if isinstance(s, dict) and s.get("type") == "tree":
+                    s.setdefault("roam", True)
+                    s.setdefault("top", 20)
+                    s.setdefault("left", 80)
+                    s.setdefault("bottom", 20)
+                    s.setdefault("right", 80)
+                    s.setdefault("expandAndCollapse", True)
+                    s.setdefault("initialTreeDepth", 5)
+                    if "lineStyle" not in s:
+                        s["lineStyle"] = {"color": "#4b5563", "width": 1.5}
+                    if "label" not in s:
+                        s["label"] = {"position": "left", "fontSize": 12, "color": "#e5e7eb"}
+                    if "leaves" not in s:
+                        s["leaves"] = {"label": {"position": "right", "fontSize": 12, "color": "#e5e7eb"}}
+
+        chart["option"] = opt
+        enhanced.append(chart)
+
+    return enhanced
 
 
 async def _collect_data(name: str) -> dict:
@@ -150,7 +360,8 @@ async def run_industry_chain_analysis(
         settings = get_settings()
         llm_client = create_llm_client(settings)
         user_prompt = build_user_prompt(name, data)
-        raw = llm_client.chat(
+        raw = await asyncio.to_thread(
+            llm_client.chat,
             [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
@@ -171,7 +382,7 @@ async def run_industry_chain_analysis(
         parsed = _safe_parse_llm_json(text)
         if isinstance(parsed, dict):
             result.llm_review = parsed.get("llm_report", "")
-            result.charts = parsed.get("charts", [])
+            result.charts = _enhance_chart_options(parsed.get("charts", []))
             result.summary = parsed.get("summary", "")
             result.drivers = parsed.get("drivers", [])
             result.risks = parsed.get("risks", [])
@@ -190,11 +401,13 @@ async def run_industry_chain_analysis(
                 if value:
                     setattr(result, target, value)
         else:
-            # 纯 Markdown 报告
-            result.llm_review = text
-
-        cache.set(cache_key, result, ttl=3600)
-
+            # JSON 解析失败，尝试手动提取 llm_report 字段
+            extracted = _try_extract_llm_report(text)
+            result.llm_review = _unescape_json_string(extracted) if extracted else (text or "（AI 分析报告生成失败，请重试）")
+            if extracted:
+                logger.info("产业链分析 JSON 解析失败，通过手动提取恢复 llm_report, name=%s", name)
+            else:
+                logger.warning("产业链分析 JSON 解析失败，手动提取也失败，使用原始文本作为 llm_review, name=%s", name)
         try:
             save_industry_chain(name, result)
         except Exception as save_exc:

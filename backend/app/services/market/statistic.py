@@ -90,7 +90,7 @@ async def get_market_statistics(date: str | None = None) -> MarketStatistics:
     source = "fallback"
 
     try:
-        sector_rankings = get_sector_rankings()
+        sector_rankings = await call_blocking(get_sector_rankings)
         top_sectors = sector_rankings.get("top_sectors", [])
         bottom_sectors = sector_rankings.get("bottom_sectors", [])
         source = "sector-rankings"

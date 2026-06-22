@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 from app.models.analysis import AnalysisProgress, AnalysisResult, AnalysisStage
 from app.services import technical
+from app.services.screener.percentiles import compute_percentile
 from app.services.market.indices import get_indices
 from app.services.stock.news import get_stock_news
 from app.services.stock.retail import get_retail_sentiment, get_stock_sentiment
@@ -188,7 +189,7 @@ async def run_analysis(code: str, progress_callback: ProgressCallback | None = N
                 stock_data.get_basic_info(code),
                 stock_data.get_kline(code, period="daily", start_date=one_year_ago),
                 stock_data.get_financial_metrics(code),
-                stock_data.get_valuation_detail(code, compute_percentile=True),
+                stock_data.get_valuation_detail(code, compute_percentile),
                 sentiment_data.get_stock_news(code),
                 sentiment_data.get_stock_sentiment(code),
                 sentiment_data.get_retail_sentiment(code),

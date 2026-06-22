@@ -1,10 +1,50 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Card, Alert, Typography } from "antd";
+import { Card, Alert, Tag, Typography } from "antd";
 import { useScreenerScreen, useIndustries, useComputePercentiles } from "../../api/queries";
 import FilterPanel from "./FilterPanel";
 import ResultsTable from "./ResultsTable";
 import type { ScreenerFilter } from "../../types/stock";
 import { useStyles } from "../../styles/ui";
+
+interface PresetStrategy {
+  label: string;
+  description: string;
+  icon: string;
+  filters: Partial<ScreenerFilter>;
+}
+
+const PRESET_STRATEGIES: PresetStrategy[] = [
+  {
+    label: "低估值蓝筹",
+    description: "PE<15 · PB<2 · 市值>200亿",
+    icon: "🛡️",
+    filters: { pe_min: 0, pe_max: 15, pb_min: 0, pb_max: 2, market_cap_min: 200, market_cap_max: null, sort_by: "market_cap", sort_order: "desc" },
+  },
+  {
+    label: "破净股",
+    description: "PB<1 · 市值>50亿",
+    icon: "💎",
+    filters: { pb_min: 0, pb_max: 1, market_cap_min: 50, market_cap_max: null, sort_by: "pb", sort_order: "asc" },
+  },
+  {
+    label: "高成长活跃",
+    description: "涨跌幅>2% · 换手率>3%",
+    icon: "🚀",
+    filters: { change_pct_min: 2, change_pct_max: null, turnover_pct_min: 3, turnover_pct_max: null, sort_by: "change_pct", sort_order: "desc" },
+  },
+  {
+    label: "低价活跃股",
+    description: "股价<10 · 换手率>5%",
+    icon: "⚡",
+    filters: { price_min: 0, price_max: 10, turnover_pct_min: 5, turnover_pct_max: null, sort_by: "turnover_pct", sort_order: "desc" },
+  },
+  {
+    label: "绩优蓝筹",
+    description: "PE 5-30 · PB 1-8 · 市值>500亿",
+    icon: "🏆",
+    filters: { pe_min: 5, pe_max: 30, pb_min: 1, pb_max: 8, market_cap_min: 500, market_cap_max: null, sort_by: "market_cap", sort_order: "desc" },
+  },
+];
 
 const DEFAULT_FILTERS: ScreenerFilter = {
   sort_by: "market_cap",
@@ -131,6 +171,27 @@ export default function Screener() {
           style={{ ...cardStyle, marginBottom: 16 }}
           styles={{ body: sectionCardBodyStyle }}
         >
+        {/* Preset strategies */}
+        <div style={{ marginBottom: 14, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {PRESET_STRATEGIES.map((p) => (
+            <Tag
+              key={p.label}
+              style={{ cursor: "pointer", padding: "4px 14px", borderRadius: 999, fontSize: 13, fontWeight: 500, border: "none", transition: "all 0.2s" }}
+              color="blue"
+              onClick={() => {
+                const newFilters = { ...DEFAULT_FILTERS, ...p.filters, page: 1 };
+                setFilters(newFilters);
+                setSearchFilters(newFilters);
+                setShowPercentile(false);
+                setPercentileMap(new Map());
+              }}
+              title={p.description}
+            >
+              {p.icon} {p.label}
+            </Tag>
+          ))}
+        </div>
+
           <FilterPanel
             filters={filters}
             onFiltersChange={setFilters}

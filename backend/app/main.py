@@ -110,6 +110,10 @@ async def _run_periodic(name: str, coro_factory, interval_seconds: int, health_c
     consecutive_errors = 0
     while True:
         try:
+            if health_check is not None:
+                healthy = await health_check()
+                if not healthy:
+                    raise RuntimeError(f"后台任务 [{name}] 健康检查失败")
             coro = coro_factory()
             await coro
             entry["last_run"] = __import__("datetime").datetime.now().isoformat()
@@ -149,7 +153,7 @@ async def refresh_industry_mapping_file_daily():
 
 
 async def refresh_twitter_feed_periodic():
-    """每 60 秒轮询配置的 Twitter 账号，拉取最新推文写入数据库。
+    """每 30 分钟轮询配置的 Twitter 账号，拉取最新推文写入数据库。
 
     后台任务，应用启动后常驻运行。通过 get_stale_authors 判断每个账号
     是否超过 5 分钟未刷新，仅刷新过期账号。
@@ -164,19 +168,19 @@ async def refresh_twitter_feed_periodic():
         if not feeds:
             return
 
-        stale = get_stale_authors(feeds)
+        stale = await asyncio.to_thread(get_stale_authors, feeds)
         if not stale:
             logger.debug(f"Twitter no refresh needed: {feeds}")
             return
 
         logger.info(f"Twitter fetching stale authors: {stale}")
-        raw = twitter_provider.fetch_posts_for_users(stale)
-        save_twitter_posts([p.model_dump() for p in raw])
+        raw = await asyncio.to_thread(twitter_provider.fetch_posts_for_users, stale)
+        await asyncio.to_thread(save_twitter_posts, [p.model_dump() for p in raw])
 
     await _run_periodic(
         name="twitter_feed",
         coro_factory=_iteration,
-        interval_seconds=60,
+        interval_seconds=30 * 60,
         health_check=_twitter_health_check,
     )
 
@@ -209,7 +213,7 @@ async def health():
         pass
 
     return {
-        "status": "ok",
+        "status": "ok" if db_ok else "error",
         "database": "connected" if db_ok else "error",
         "background_tasks": {
             name: {

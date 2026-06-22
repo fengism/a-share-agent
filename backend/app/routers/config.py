@@ -74,7 +74,7 @@ class ConfigUpdateRequest(BaseModel):
     feishu_daily_review_folder: str | None = None
     feishu_analysis_folder: str | None = None
     feishu_default_receiver: str | None = None
-    notion_enabled: bool
+    notion_enabled: bool | None = None
     notion_api_token: str | None = None
     notion_parent_page_id: str | None = None
     notion_database_id: str | None = None
@@ -84,7 +84,7 @@ class ConfigUpdateRequest(BaseModel):
     http_trust_env: bool | None = None
     twitter_feeds: list[str] | None = None
     eastmoney_cookie: str | None = None
-    baidu_cookie: str
+    baidu_cookie: str | None = None
     ths_cookie: str | None = None
 
 

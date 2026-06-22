@@ -69,8 +69,15 @@ async def get_analysis_page(code: str):
 
 
 async def _safe_get_latest_analysis(code: str):
-    """安全获取最新分析结果，失败返回 None。"""
+    """安全获取最新分析结果，失败返回 None。
+
+    Param:
+        code: 6 位股票代码
+    Return:
+        最新分析结果 dict；读取失败返回 None
+    """
     try:
-        return get_latest_analysis(code)
+        # get_latest_analysis 是同步磁盘 IO，放到线程池避免阻塞事件循环
+        return await asyncio.to_thread(get_latest_analysis, code)
     except Exception:
         return None

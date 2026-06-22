@@ -23,7 +23,7 @@ from app.services.market.volume import get_market_volume as get_market_volume_se
 from app.services.market.news import get_market_feed as get_market_feed_service
 from app.services.market.news import get_market_kuaixun as get_market_kuaixun_service
 from app.services.market.news import get_market_other_news as get_market_other_news_service
-from app.services.market.news import get_twitter_feed as get_twitter_feed_service
+from app.services.market.news import get_twitter_feed as get_twitter_feed_service, refresh_twitter_feed_now
 from app.services.market.sector import get_industry_rankings as get_industry_rankings_service
 from app.services.market.news_analysis import analyze_market_news as analyze_market_news_service
 from app.services.twitter_analysis import analyze_twitter_user
@@ -194,6 +194,17 @@ async def get_twitter_feed():
     return await run_endpoint("获取 Twitter 资讯", get_twitter_feed_service)
 
 
+
+@router.post("/twitter-feed/refresh")
+async def refresh_twitter_feed():
+    """手动触发 Twitter 资讯刷新。
+
+    立即从 Twitter provider 拉取最新推文并写入数据库。
+
+    Return:
+        dict: 刷新结果 {status, authors, posts_count}
+    """
+    return await run_endpoint("手动刷新 Twitter", refresh_twitter_feed_now)
 @router.get("/industry-rankings")
 async def get_industry_rankings():
     """获取行业板块涨跌幅排名。

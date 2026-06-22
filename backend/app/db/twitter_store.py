@@ -5,7 +5,26 @@ from app.db.connection import get_connection
 
 logger = logging.getLogger(__name__)
 
-_REFRESH_MINUTES = 5
+_REFRESH_MINUTES = 30
+
+
+_migrated = False
+
+
+def _ensure_schema():
+    """迁移：为已有数据库添加 image_url 列（幂等）。"""
+    global _migrated
+    if _migrated:
+        return
+    conn = get_connection()
+    try:
+        conn.execute("ALTER TABLE twitter_posts ADD COLUMN image_url TEXT NOT NULL DEFAULT ''")
+        conn.commit()
+        logger.info("数据库迁移：twitter_posts 添加 image_url 列")
+    except Exception:
+        # 列已存在则忽略
+        pass
+    _migrated = True
 
 
 def save_twitter_posts(posts: list[dict]) -> None:
@@ -21,6 +40,7 @@ def save_twitter_posts(posts: list[dict]) -> None:
         (
             p.get("title", ""),
             p.get("content", ""),
+            p.get("image_url", ""),
             p.get("publish_time", ""),
             p.get("url", ""),
             p.get("author", ""),
@@ -32,8 +52,8 @@ def save_twitter_posts(posts: list[dict]) -> None:
         return
     conn.executemany(
         "INSERT OR IGNORE INTO twitter_posts "
-        "(title, content, publish_time, url, author) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "(title, content, image_url, publish_time, url, author) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
         rows,
     )
     conn.commit()
@@ -54,7 +74,7 @@ def query_twitter_posts_by_authors(authors: list[str], limit: int = 100) -> list
     conn = get_connection()
     placeholders = ",".join("?" for _ in authors)
     cursor = conn.execute(
-        f"""SELECT title, content, source, publish_time, url, author, read_count, comment_count
+        f"""SELECT title, content, source, publish_time, url, author, read_count, comment_count, image_url
             FROM twitter_posts
             WHERE author IN ({placeholders})
             ORDER BY publish_time DESC
@@ -88,3 +108,7 @@ def get_stale_authors(authors: list[str]) -> list[str]:
     fresh = {row["author"] for row in cursor.fetchall()}
     stale = [a for a in authors if a not in fresh]
     return stale
+
+
+# 在模块导入时执行迁移
+_ensure_schema()

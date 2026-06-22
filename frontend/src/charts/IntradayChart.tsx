@@ -136,7 +136,7 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
       chart.remove();
       chartRef.current = null;
     };
-  }, [height, prevClose, rows, c.pageBg]);
+  }, [height, prevClose, rows, c.pageBg, c.accent, c.border, c.cardBg, c.down, c.primary, c.textMuted, c.textSecondary, c.up]);
 
   return <div ref={containerRef} style={{ width: "100%", height, minHeight: height }} />;
 }

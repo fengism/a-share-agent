@@ -10,15 +10,16 @@ import { useColors, useStyles } from "../../theme/hooks";
 import { streamAnalysis } from "../../api/sse";
 import type { AnalysisProgress, AnalysisStage } from "../../api/sse";
 import KlineChart from "../../charts/KlineChart";
+import IndicatorSubCharts from "../../charts/IndicatorSubCharts";
 import IntradayChart from "../../charts/IntradayChart";
 import FundamentalPanel from "./FundamentalPanel";
 import TechnicalPanel from "./TechnicalPanel";
 import SentimentPanel from "./SentimentPanel";
+import FundFlowPanel from "./FundFlowPanel";
 import ValuationPanel from "./ValuationPanel";
 import AIConclusion from "./AIConclusion";
 import AnalysisProgressSteps from "./AnalysisProgressSteps";
 import SkeletonAIConclusion from "./SkeletonAIConclusion";
-import AnalysisHeader from "./AnalysisHeader";
 import { useAnalysisStore } from "../../store/analysisStore";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { AnalysisResult } from "../../types/stock";
@@ -247,6 +248,11 @@ export default function Analysis() {
       key: "sentiment",
       label: "情绪面",
       children: code ? <SentimentPanel code={code} analysis={displayResult} /> : null,
+    },
+    {
+      key: "fundflow",
+      label: "资金流向",
+      children: code ? <FundFlowPanel code={code} /> : null,
     },
   ];
 
@@ -626,6 +632,13 @@ export default function Analysis() {
         >
           {pageLoading ? <Spin /> : klineData && <KlineChart data={klineData.items} />}
         </Card>
+
+        {/* Indicator sub-charts */}
+        {code && !pageLoading && (
+          <Card size="small" style={{ ...cardStyle, marginTop: 16 }} styles={{ body: { padding: "12px 16px" } }}>
+            <IndicatorSubCharts code={code} />
+          </Card>
+        )}
 
         {/* Tabs */}
         <Card

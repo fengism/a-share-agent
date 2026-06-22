@@ -85,70 +85,61 @@ export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
       )}
 
       {hasContent && (
-        <div
-          style={{
-            padding: "10px 14px",
-            borderRadius: 12,
-            background: c.elevatedBg,
-            border: `1px solid ${c.border}`,
-            fontSize: 14,
-            lineHeight: 1.7,
-            color: c.textPrimary,
-            wordBreak: "break-word",
-          }}
-        >
-          <div
+        <div style={{ marginBottom: 8 }}>
+          <Collapse
+            size="small"
+            defaultActiveKey={["content"]}
+            items={[
+              {
+                key: "content",
+                label: (
+                  <span style={{ fontSize: 12, color: c.textSecondary }}>
+                    <FileTextOutlined style={{ marginRight: 4, color: c.primary }} />
+                    分析结果
+                  </span>
+                ),
+                extra: !isStreaming && onPush ? (
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<ExportOutlined />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPush(message.id, message.content);
+                    }}
+                    style={{ fontSize: 12, color: c.textSecondary, padding: "0 6px" }}
+                  >
+                    推送
+                  </Button>
+                ) : null,
+                children: (
+                  <div
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 1.7,
+                      color: c.textPrimary,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    <div className="chat-markdown">
+                      <ReactMarkdown remarkPlugins={markdownPlugins}>
+                        {message.content.replace(/\n{3,}/g, "\n\n")}
+                      </ReactMarkdown>
+                    </div>
+                    {isStreaming && <BlinkingCursor />}
+                  </div>
+                ),
+              },
+            ]}
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 6,
-              paddingBottom: 6,
-              borderBottom: `1px solid ${c.border}`,
+              background: c.elevatedBg,
+              border: `1px solid ${c.border}`,
+              borderRadius: 8,
             }}
-          >
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <FileTextOutlined
-                style={{
-                  marginRight: 6,
-                  color: c.primary,
-                  fontSize: 12,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 11,
-                  color: c.textSecondary,
-                  fontWeight: 600,
-                }}
-              >
-                分析结果
-              </span>
-            </div>
-            {!isStreaming && onPush && (
-              <Button
-                type="text"
-                size="small"
-                icon={<ExportOutlined />}
-                onClick={() => onPush(message.id, message.content)}
-                style={{
-                  fontSize: 12,
-                  color: c.textSecondary,
-                  padding: "0 6px",
-                }}
-              >
-                推送
-              </Button>
-            )}
-          </div>
-          <div className="chat-markdown">
-            <ReactMarkdown remarkPlugins={markdownPlugins}>
-              {message.content.replace(/\n{3,}/g, "\n\n")}
-            </ReactMarkdown>
-          </div>
-          {isStreaming && <BlinkingCursor />}
+          />
         </div>
       )}
+
 
       {isStreaming && !hasReasoning && !hasTools && !hasContent && (
         <div
