@@ -4,7 +4,7 @@ import json
 import logging
 
 from app.config import get_settings
-from app.services.llm.client import create_llm_client
+from app.services.llm.client import llm_chat
 from app.services.market.news import get_market_feed
 from app.utils.cache import cache, dated_cache_key
 from app.utils.singleflight import AsyncSingleFlight
@@ -168,10 +168,8 @@ async def analyze_market_news() -> dict:
 
         try:
             settings = get_settings()
-            llm_client = create_llm_client(settings)
             user_prompt = _build_prompt(items)
-            raw = await asyncio.to_thread(
-                llm_client.chat,
+            raw = await llm_chat(
                 [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},

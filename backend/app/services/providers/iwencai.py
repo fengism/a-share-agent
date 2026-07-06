@@ -5,7 +5,8 @@ import os
 import secrets
 from typing import Any, Literal
 
-import requests
+from app.utils.http_client import get_session as _get_session
+from app.config import get_settings
 
 from app.models.search_item import NewsSearchItem
 from app.services.base.data_provider import BaseDataProvider
@@ -25,7 +26,6 @@ _REPORT_SEARCH_SKILL_ID = "report-search"
 _BASIC_INFO_SKILL_ID = "hithink-basicinfo-query"
 _STOCK_SELECTOR_SKILL_ID = "hithink-astock-selector"
 _MACRO_QUERY_SKILL_ID = "hithink-macro-query"
-
 
 class IwencaiDataProvider(BaseDataProvider):
     """
@@ -135,7 +135,7 @@ class IwencaiDataProvider(BaseDataProvider):
         Return:
             问财接口返回的 data 字段
         """
-        response = requests.post(
+        response = _get_session().post(
             f"{self._base_url}{path}",
             json=payload,
             headers=self._request_headers(skill_id),
@@ -177,7 +177,6 @@ class IwencaiDataProvider(BaseDataProvider):
         }
         data = self._post_json(_SEARCH_PATH, payload, _REPORT_SEARCH_SKILL_ID)
         return data.get("data") or []
-
 
     def query_stock_data(self, query: str, page: int = 1, limit: int = 50) -> list[dict]:
         """NL 数据查询（结构化字段）。例: "贵州茅台 ROE" → DataFrame-like rows
@@ -223,7 +222,6 @@ class IwencaiDataProvider(BaseDataProvider):
         data = self._post_json(_QUERY_PATH, payload, _MACRO_QUERY_SKILL_ID)
         return data.get("datas") or []
 
-
     @staticmethod
     def _to_news_search_item(item: dict) -> NewsSearchItem:
         """将问财搜索结果 item 转换为统一的 NewsSearchItem。
@@ -256,7 +254,6 @@ class IwencaiDataProvider(BaseDataProvider):
         """
         articles = self.search(query, channel="news", size=size)
         return [self._to_news_search_item(a) for a in self.dedup_articles(articles)]
-
 
     @staticmethod
     def dedup_articles(articles: list[dict]) -> list[dict]:
@@ -298,7 +295,6 @@ class IwencaiDataProvider(BaseDataProvider):
         """
         articles = self.search(query, channel="announcement", size=size)
         return self.dedup_articles(articles)
-
 
 iwencai_provider = IwencaiDataProvider()
 

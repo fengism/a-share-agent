@@ -5,7 +5,7 @@ from app.models.search_item import NewsSearchItem
 from app.services.providers import get_provider
 from app.services.stock.name_map import get_stock_name_map
 from app.utils.cache import cache, dated_cache_key
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, cls_semaphore, eastmoney_semaphore
 from app.utils.symbol_utils import normalize_code
 from app.utils.news_utils import dedupe_news_items, filter_recent_news_items, news_sort_key
 
@@ -41,8 +41,8 @@ async def _load_stock_news(sym) -> list[NewsSearchItem]:
     except Exception as e:
         logger.info(f"股票名称映射获取失败: {sym.raw}, error={e}")
 
-    em_task = call_blocking(_get_eastmoney_provider().fetch_stock_news, code=sym.raw, code_name=stock_name)
-    cls_task = call_blocking(_get_cls_provider().fetch_market_news, code=sym.raw, code_name=stock_name)
+    em_task = call_blocking(_get_eastmoney_provider().fetch_stock_news, semaphore=eastmoney_semaphore, code=sym.raw, code_name=stock_name)
+    cls_task = call_blocking(_get_cls_provider().fetch_market_news, semaphore=cls_semaphore, code=sym.raw, code_name=stock_name)
     em_result, cls_result = await asyncio.gather(em_task, cls_task, return_exceptions=True)
 
     if isinstance(em_result, Exception):

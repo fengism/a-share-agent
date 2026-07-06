@@ -322,7 +322,11 @@ class AkshareDataProvider(BaseDataProvider):
         Return:
             申万行业指数实时 DataFrame
         """
-        return ak.index_realtime_sw(symbol="二级行业")
+        try:
+            return ak.index_realtime_sw(symbol="二级行业")
+        except Exception:
+            logger.warning("申万行业指数实时数据获取失败", exc_info=True)
+            return pd.DataFrame()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
     def fetch_sw_index_components(self, symbol: str) -> pd.DataFrame:
@@ -333,7 +337,15 @@ class AkshareDataProvider(BaseDataProvider):
         Return:
             成分股 DataFrame
         """
-        return ak.index_component_sw(symbol=symbol)
+        try:
+            return ak.index_component_sw(symbol=symbol)
+        except KeyError:
+            # akshare 对空结果（成分股为空的指数）处理有缺陷，返回空 DataFrame
+            logger.debug("申万行业指数成分数据为空: symbol=%s", symbol)
+            return pd.DataFrame()
+        except Exception:
+            logger.warning(f"申万行业指数成分数据格式异常: symbol={symbol}", exc_info=True)
+            return pd.DataFrame()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
     def fetch_hot_rank_detail(self, symbol: str) -> pd.DataFrame:

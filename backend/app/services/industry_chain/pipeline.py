@@ -7,9 +7,9 @@ from app.config import get_settings
 from app.models.industry_chain import IndustryChainProgress, IndustryChainResult
 from app.services.industry_chain.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.services.industry_chain.storage import save_industry_chain
-from app.services.llm.client import create_llm_client
+from app.services.llm.client import llm_chat
 from app.utils.cache import cache
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, eastmoney_semaphore
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +308,7 @@ async def _collect_data(name: str) -> dict:
     rankings = None
     try:
         from app.services.providers import get_provider
-        rankings = await call_blocking(get_provider("eastmoney").fetch_industry_rankings, 50)
+        rankings = await call_blocking(get_provider("eastmoney").fetch_industry_rankings, 50, semaphore=eastmoney_semaphore)
     except Exception as e:
         logger.debug("行业排名获取失败（非关键）: %s", e)
 
@@ -358,10 +358,8 @@ async def run_industry_chain_analysis(
         ))
 
         settings = get_settings()
-        llm_client = create_llm_client(settings)
         user_prompt = build_user_prompt(name, data)
-        raw = await asyncio.to_thread(
-            llm_client.chat,
+        raw = await llm_chat(
             [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},

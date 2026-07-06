@@ -8,6 +8,8 @@ from typing import Awaitable, Callable
 
 from types import SimpleNamespace
 
+from decimal import Decimal
+
 from app.models.analysis import AnalysisProgress, AnalysisResult, AnalysisStage
 from app.services import technical
 from app.services.screener.percentiles import compute_percentile
@@ -18,6 +20,7 @@ from app.services.stock.basic_info import get_basic_info
 from app.services.stock.financials import get_financial_metrics
 from app.services.stock.kline import get_kline
 from app.services.stock.valuation import get_valuation_detail
+from app.services.llm.client import llm_chat
 from app.services.llm.client import create_llm_client
 from app.services.analysis.prompts import SCHEMA_INSTRUCTION, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 from app.services.analysis.parser import parse_with_retry
@@ -89,6 +92,26 @@ def _format_institution_forecasts_from_detail(forecasts: list) -> list[dict] | N
         }
         for f in forecasts
     ]
+
+
+def _json_default_handler(obj: object) -> str:
+    """Convert non-serializable objects to JSON-safe types before serialization.
+
+    Param:
+        obj: object that the default JSON encoder cannot handle
+    Return:
+        JSON-serializable representation
+    Raise:
+        TypeError if the object type is not recognized
+    """
+    if isinstance(obj, datetime):
+        return obj.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(obj, Decimal):
+        return float(obj)
+    # Handle numpy / pandas scalar types (e.g. np.float64, np.int64)
+    if hasattr(obj, "item") and callable(obj.item):
+        return obj.item()
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 
 def _extract_technical_series(indicators: dict) -> dict:
@@ -287,7 +310,7 @@ async def run_analysis(code: str, progress_callback: ProgressCallback | None = N
                 "机构一致预期": _format_institution_forecasts_from_detail(vd.institution_forecasts) if vd else None,
             },
             ensure_ascii=False,
-            default=str,
+            default=_json_default_handler,
         )
 
         technical_json = json.dumps(
@@ -376,7 +399,7 @@ async def run_analysis(code: str, progress_callback: ProgressCallback | None = N
             stage=AnalysisStage(stage=4, name=STAGE_NAMES[4], status="started",
                                 detail="正在调用AI模型，可能需要10-25秒..."),
         ))
-        raw_response = await asyncio.to_thread(llm_client.chat, messages, temperature=settings.llm_temperature, json_format=True)
+        raw_response = await llm_chat(messages, temperature=settings.llm_temperature, json_format=True, client=llm_client)
         result = await asyncio.to_thread(parse_with_retry, raw_response, llm_client, messages)
         await _emit(progress_callback, AnalysisProgress(
             type="stage_completed",

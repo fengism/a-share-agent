@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, eastmoney_semaphore
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ async def get_dragon_tiger_list(report_date: str | None = None) -> list[dict]:
     result = []
     try:
         for candidate_date in _fallback_report_dates(report_date):
-            data = await call_blocking(_get_eastmoney_provider().fetch_dragon_tiger_daily_list, candidate_date)
+            data = await call_blocking(_get_eastmoney_provider().fetch_dragon_tiger_daily_list, candidate_date, semaphore=eastmoney_semaphore)
             if data:
                 result = data
                 break
@@ -73,7 +73,7 @@ async def get_dragon_tiger_detail(code: str, report_date: str) -> list[dict]:
 
     result = []
     try:
-        result = await call_blocking(_get_eastmoney_provider().fetch_dragon_tiger_stock_detail, code, report_date)
+        result = await call_blocking(_get_eastmoney_provider().fetch_dragon_tiger_stock_detail, code, report_date, semaphore=eastmoney_semaphore)
     except Exception as e:
         logger.warning(f"龙虎榜明细获取失败: {code}, {e}")
 

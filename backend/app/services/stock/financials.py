@@ -6,7 +6,7 @@ from app.constants.financial_labels import FINANCIAL_METRIC_ALIASES, FINANCIAL_M
 from app.models.stock import FinancialMetrics
 from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key, dated_cache_key_no_day
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, akshare_semaphore
 from app.utils.data_clean import safe_float
 from app.utils.symbol_utils import normalize_code
 
@@ -31,7 +31,7 @@ async def get_financial(code: str, indicator: str = "balance") -> list[dict]:
     if cached is not None:
         return cached
 
-    df = await call_blocking(_get_akshare_provider().fetch_stock_financials, symbol=sym.prefixed_upper, indicator=indicator)
+    df = await call_blocking(_get_akshare_provider().fetch_stock_financials, semaphore=akshare_semaphore, symbol=sym.prefixed_upper, indicator=indicator)
     df = df.head(4)
     result = df.fillna("N/A").to_dict(orient="records")
     cache.set(cache_key, result, ttl=86400)
@@ -169,9 +169,9 @@ async def get_financial_metrics(code: str) -> FinancialMetrics:
         return cached
 
     balance_df, profit_df, cashflow_df = await asyncio.gather(
-        call_blocking(_get_akshare_provider().fetch_stock_financials, symbol=sym.prefixed_upper, indicator="balance"),
-        call_blocking(_get_akshare_provider().fetch_stock_financials, symbol=sym.prefixed_upper, indicator="profit"),
-        call_blocking(_get_akshare_provider().fetch_stock_financials, symbol=sym.prefixed_upper, indicator="cashflow"),
+        call_blocking(_get_akshare_provider().fetch_stock_financials, semaphore=akshare_semaphore, symbol=sym.prefixed_upper, indicator="balance"),
+        call_blocking(_get_akshare_provider().fetch_stock_financials, semaphore=akshare_semaphore, symbol=sym.prefixed_upper, indicator="profit"),
+        call_blocking(_get_akshare_provider().fetch_stock_financials, semaphore=akshare_semaphore, symbol=sym.prefixed_upper, indicator="cashflow"),
     )
     latest_report_date, metrics = _build_financial_metrics(balance_df, profit_df, cashflow_df)
     result = FinancialMetrics(code=sym.raw, latest_report_date=latest_report_date, metrics=metrics)

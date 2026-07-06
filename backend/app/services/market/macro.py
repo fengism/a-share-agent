@@ -7,10 +7,16 @@ from app.utils.rate_limiter import call_blocking
 
 logger = logging.getLogger(__name__)
 
+# Cache the provider at module level to avoid repeated import_module calls
+_eastmoney_provider = None
+
 
 def _get_eastmoney_provider():
-    """Lazily resolve the EastMoney provider singleton."""
-    return get_provider("eastmoney")
+    """Lazily resolve the EastMoney provider singleton, cached at module level."""
+    global _eastmoney_provider
+    if _eastmoney_provider is None:
+        _eastmoney_provider = get_provider("eastmoney")
+    return _eastmoney_provider
 
 
 def _extract_latest(data: list[dict], keys: list[str]) -> dict | None:
@@ -62,11 +68,13 @@ async def get_macro_data() -> dict:
     if cached is not None:
         return cached
 
+    provider = _get_eastmoney_provider()
+
     cpi_data, ppi_data, pmi_data, money_data = await asyncio.gather(
-        call_blocking(_get_eastmoney_provider().fetch_china_cpi),
-        call_blocking(_get_eastmoney_provider().fetch_china_ppi),
-        call_blocking(_get_eastmoney_provider().fetch_china_pmi),
-        call_blocking(_get_eastmoney_provider().fetch_china_economy_currency_supply),
+        call_blocking(provider.fetch_china_cpi),
+        call_blocking(provider.fetch_china_ppi),
+        call_blocking(provider.fetch_china_pmi),
+        call_blocking(provider.fetch_china_economy_currency_supply),
         return_exceptions=True,
     )
 
@@ -161,18 +169,20 @@ async def get_macro_all_data() -> dict:
     if cached is not None:
         return cached
 
+    provider = _get_eastmoney_provider()
+
     # 并发获取所有数据源
     (cpi_data, ppi_data, pmi_data, money_data,
      lpr_data, shibor_data, trade_data, sf_data, gdp_data) = await asyncio.gather(
-        call_blocking(_get_eastmoney_provider().fetch_china_cpi),
-        call_blocking(_get_eastmoney_provider().fetch_china_ppi),
-        call_blocking(_get_eastmoney_provider().fetch_china_pmi),
-        call_blocking(_get_eastmoney_provider().fetch_china_economy_currency_supply),
-        call_blocking(_get_eastmoney_provider().fetch_china_lpr),
-        call_blocking(_get_eastmoney_provider().fetch_china_shibor),
-        call_blocking(_get_eastmoney_provider().fetch_china_trade),
-        call_blocking(_get_eastmoney_provider().fetch_china_social_financing),
-        call_blocking(_get_eastmoney_provider().fetch_china_gdp),
+        call_blocking(provider.fetch_china_cpi),
+        call_blocking(provider.fetch_china_ppi),
+        call_blocking(provider.fetch_china_pmi),
+        call_blocking(provider.fetch_china_economy_currency_supply),
+        call_blocking(provider.fetch_china_lpr),
+        call_blocking(provider.fetch_china_shibor),
+        call_blocking(provider.fetch_china_trade),
+        call_blocking(provider.fetch_china_social_financing),
+        call_blocking(provider.fetch_china_gdp),
         return_exceptions=True,
     )
 

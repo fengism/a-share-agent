@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import stock, market, analysis, screener, daily_review, push, chat, config, industry_chain, macro, stock_aggregate
@@ -84,6 +85,23 @@ app.include_router(macro.router, prefix="/api/macro", tags=["macro"])
 app.include_router(stock_aggregate.router, prefix="/api/stock", tags=["stock"])
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc: Exception):
+    logger.error("未捕获异常: %s %s error=%s", request.method, request.url.path, exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"服务器内部错误: {exc}"},
+    )
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request, exc: ValueError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc)},
+    )
+
+
 # 后台任务健康状态追踪
 _background_task_health: dict[str, dict] = {}
 
@@ -128,7 +146,7 @@ async def _run_periodic(name: str, coro_factory, interval_seconds: int, health_c
             entry["last_error"] = str(exc)
             logger.error(f"后台任务 [{name}] 第 {loop_count + 1} 次循环失败（连续 {consecutive_errors} 次）: {exc}", exc_info=True)
             # 指数退避：连续失败时延长等待时间，最长 10 分钟
-            backoff = min(interval_seconds, 10 * 60) * min(consecutive_errors, 5)
+            backoff = min(60, 2 ** consecutive_errors)
             await asyncio.sleep(backoff)
             continue
 

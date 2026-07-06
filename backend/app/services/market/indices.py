@@ -7,7 +7,7 @@ from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.market_utils import build_indices_from_sina, normalize_indices
 from app.utils.data_clean import safe_float
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, akshare_semaphore, sina_semaphore
 from app.utils.singleflight import AsyncSingleFlight
 
 _indices_singleflight: AsyncSingleFlight[MarketIndices] = AsyncSingleFlight()
@@ -94,7 +94,7 @@ async def _build_akshare_em_indices() -> MarketIndices:
     Return:
         MarketIndices 模型对象
     """
-    data = await call_blocking(_get_akshare_provider().fetch_market_indices)
+    data = await call_blocking(_get_akshare_provider().fetch_market_indices, semaphore=akshare_semaphore)
     return _build_em_indices(data, "em_ak")
 
 
@@ -106,7 +106,7 @@ async def _build_akshare_sina_indices() -> MarketIndices:
     Return:
         MarketIndices 模型对象
     """
-    data = await call_blocking(_get_akshare_provider().fetch_market_indices_sina)
+    data = await call_blocking(_get_akshare_provider().fetch_market_indices_sina, semaphore=akshare_semaphore)
     return build_indices_from_sina(data).model_copy(update={"source": "sina_ak"})
 
 

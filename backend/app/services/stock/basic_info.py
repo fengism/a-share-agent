@@ -7,7 +7,7 @@ from app.services.providers import get_provider
 from app.services.base.spot_snapshot import get_spot_snapshot, load_spot_snapshot_file
 from app.services.stock.name_map import get_stock_name_map
 from app.utils.cache import cache, dated_cache_key
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, akshare_semaphore, tencent_semaphore
 from app.utils.data_clean import safe_float, safe_string
 from app.utils.symbol_utils import normalize_code
 
@@ -55,7 +55,7 @@ async def _fetch_exchange_basic_row(code: str) -> dict | None:
         包含 listing_date/industry/shares 的字典，找不到时返回 None
     """
     if code.startswith("6"):
-        df = await call_blocking(_get_akshare_provider().fetch_stock_names_sh)
+        df = await call_blocking(_get_akshare_provider().fetch_stock_names_sh, semaphore=akshare_semaphore)
         row = df[df["证券代码"] == code]
         if row.empty:
             return None
@@ -67,7 +67,7 @@ async def _fetch_exchange_basic_row(code: str) -> dict | None:
             "circulating_shares": None,
         }
     if code.startswith(("0", "3")):
-        df = await call_blocking(_get_akshare_provider().fetch_stock_names_sz)
+        df = await call_blocking(_get_akshare_provider().fetch_stock_names_sz, semaphore=akshare_semaphore)
         row = df[df["A股代码"] == code]
         if row.empty:
             return None
@@ -79,7 +79,7 @@ async def _fetch_exchange_basic_row(code: str) -> dict | None:
             "circulating_shares": safe_float(str(r.get("A股流通股本", "")).replace(",", "")),
         }
     if code.startswith(("4", "8", "9")):
-        df = await call_blocking(_get_akshare_provider().fetch_stock_names_bj)
+        df = await call_blocking(_get_akshare_provider().fetch_stock_names_bj, semaphore=akshare_semaphore)
         row = df[df["证券代码"] == code]
         if row.empty:
             return None
@@ -246,7 +246,7 @@ async def get_basic_info(code: str) -> StockBasicInfo:
 
     info_dict: dict = {}
     try:
-        info_dict = await call_blocking(_get_akshare_provider().fetch_stock_basic_info, code=sym.raw)
+        info_dict = await call_blocking(_get_akshare_provider().fetch_stock_basic_info, semaphore=akshare_semaphore, code=sym.raw)
     except Exception:
         logger.info(f"东方财富个股信息不可用，尝试备用方案: {sym.raw}")
     spot_df = await _load_basic_info_spot_df()
@@ -254,8 +254,8 @@ async def get_basic_info(code: str) -> StockBasicInfo:
     exchange_result, name_map_result, concept_result, tencent_result = await asyncio.gather(
         _safe_fetch_exchange_basic_row(sym.raw),
         get_stock_name_map(),
-        call_blocking(_get_tencent_provider().fetch_stock_concepts, sym.raw),
-        call_blocking(_get_tencent_provider().fetch_stock_quote, sym.raw),
+        call_blocking(_get_tencent_provider().fetch_stock_concepts, sym.raw, semaphore=tencent_semaphore),
+        call_blocking(_get_tencent_provider().fetch_stock_quote, sym.raw, semaphore=tencent_semaphore),
         return_exceptions=True,
     )
     exchange_basic_row = exchange_result if isinstance(exchange_result, dict) else {}

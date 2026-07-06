@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import datetime
+from collections import OrderedDict
 from threading import Lock
 from typing import Any
 
@@ -10,10 +11,11 @@ logger = logging.getLogger(__name__)
 class TTLCache:
     """Purpose: 线程安全的带过期时间的内存缓存，支持按 key 读取、写入、删除和清空。"""
 
-    def __init__(self) -> None:
+    def __init__(self, maxsize: int = 1000) -> None:
         """Initialize the TTL cache with empty store and lock."""
-        self._store: dict[str, tuple[Any, float]] = {}
+        self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
         self._lock = Lock()
+        self._maxsize = maxsize
 
     def get(self, key: str) -> Any | None:
         """Get a cached value by key, returns None if missing or expired.
@@ -32,6 +34,8 @@ class TTLCache:
                 del self._store[key]
                 logger.debug(f"缓存过期: key={key}")
                 return None
+            # 标记为最近使用（LRU 顺序维护）
+            self._store.move_to_end(key)
             return value
 
     def set(self, key: str, value: Any, ttl: int) -> None:
@@ -45,7 +49,12 @@ class TTLCache:
             None
         """
         with self._lock:
+            # 达到容量上限时淘汰最久未使用的条目（先淘汰，后插入）
+            if key not in self._store and self._maxsize > 0 and len(self._store) >= self._maxsize:
+                evicted_key, _ = self._store.popitem(last=False)
+                logger.debug(f"缓存淘汰: key={evicted_key}")
             self._store[key] = (value, time.time() + ttl)
+            self._store.move_to_end(key)  # 标记为最近使用
             logger.debug(f"缓存写入: key={key}, ttl={ttl}s, 当前缓存数={len(self._store)}")
 
     def delete(self, key: str) -> None:

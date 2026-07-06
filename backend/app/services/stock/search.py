@@ -5,7 +5,7 @@ from app.models.stock import StockSearchItem
 from app.services.providers import get_provider
 from app.services.stock.name_map import get_stock_name_map
 from app.utils.cache import cache
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, eastmoney_semaphore
 from app.utils.data_clean import safe_float
 
 logger = logging.getLogger(__name__)
@@ -160,7 +160,7 @@ async def search_stocks(query: str) -> list[StockSearchItem]:
 
     if len(results) < _SEARCH_RESULT_LIMIT:
         try:
-            remote_results = await call_blocking(_get_eastmoney_provider().search_stocks, query=query, count=_SEARCH_RESULT_LIMIT)
+            remote_results = await call_blocking(_get_eastmoney_provider().search_stocks, semaphore=eastmoney_semaphore, query=query, count=_SEARCH_RESULT_LIMIT)
             results = _merge_search_results(results, remote_results)
         except Exception as e:
             logger.info(f"EastMoney 搜索建议 fallback 失败: {query}, error={e}")

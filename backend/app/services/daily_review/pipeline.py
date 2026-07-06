@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 
 from datetime import datetime
 
@@ -8,7 +9,7 @@ from app.config import get_settings
 from app.models.daily_review import DailyReviewDataSnapshot, DailyReviewRequest, DailyReviewResult, DailyReviewSection
 from app.services.daily_review.storage import load_daily_review, save_daily_review
 from app.services.daily_review.formatter import normalize_llm_review
-from app.services.llm.client import create_llm_client
+from app.services.llm.client import llm_chat
 from app.services.daily_review.prompts import MARKET_SYSTEM_PROMPT, MARKET_USER_PROMPT
 from app.services.market import get_indices
 from app.services.market.statistic import get_market_statistics
@@ -303,22 +304,28 @@ async def generate_daily_review(request: DailyReviewRequest) -> DailyReviewResul
         macro_data=macro_data,
     )
     llm_review = ""
-    try:
-        settings = get_settings()
-        llm_client = create_llm_client(settings)
-        user_content = _build_prompt(date, snapshot)
-        logger.info(user_content)
-        logger.info(f"生成复盘报告: date={date}, prompt_length={len(user_content)}")
-        llm_review = normalize_llm_review((await asyncio.to_thread(
-            llm_client.chat,
-            [
-                {"role": "system", "content": MARKET_SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-            temperature=settings.llm_temperature,
-        )).strip())
-    except Exception:
-        logger.error(f"生成复盘报告失败: date={date}", exc_info=True)
+    last_error = None
+    for attempt in range(1, 4):
+        try:
+            settings = get_settings()
+            user_content = _build_prompt(date, snapshot)
+            logger.info(user_content)
+            logger.info(f"生成复盘报告: date={date}, prompt_length={len(user_content)}, attempt={attempt}/3")
+            llm_review = normalize_llm_review((await llm_chat(
+                [
+                    {"role": "system", "content": MARKET_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_content},
+                ],
+                temperature=settings.llm_temperature,
+            )).strip())
+            break
+        except Exception as e:
+            last_error = e
+            logger.warning(f"生成复盘报告失败 (attempt {attempt}/3): date={date}", exc_info=True)
+            if attempt < 3:
+                await asyncio.sleep(2 ** attempt)
+    else:
+        logger.error(f"生成复盘报告失败(已重试3次): date={date}", exc_info=last_error)
     review = _build_fallback_review(date, snapshot)
     review.llm_review = llm_review
 

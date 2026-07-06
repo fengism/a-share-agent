@@ -8,7 +8,7 @@ from app.models.market import MarketStatistics
 from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.data_clean import safe_float
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, eastmoney_semaphore
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ async def get_market_statistics(date: str | None = None) -> MarketStatistics:
         logger.warning(f"获取板块涨跌榜失败: {e}")
 
     try:
-        stock_pct_data = await call_blocking(_get_eastmoney_provider().fetch_market_pct_distribution, date)
+        stock_pct_data = await call_blocking(_get_eastmoney_provider().fetch_market_pct_distribution, date, semaphore=eastmoney_semaphore)
         source = source if source != "fallback" else "stock-pct-distribution"
         fenbu = stock_pct_data.get("fenbu", []) if isinstance(stock_pct_data, dict) else []
         stock_pct_distribution = []
@@ -113,7 +113,7 @@ async def get_market_statistics(date: str | None = None) -> MarketStatistics:
         logger.warning(f"获取股票涨跌分布失败: {e}")
 
     try:
-        limit_up_data, limit_up_count_value = await call_blocking(_get_eastmoney_provider().fetch_market_limit_up_pool, date)
+        limit_up_data, limit_up_count_value = await call_blocking(_get_eastmoney_provider().fetch_market_limit_up_pool, date, semaphore=eastmoney_semaphore)
         limit_up_stocks = limit_up_data[:10]
         limit_up_count = int(limit_up_count_value or 0)
         source = source if source != "fallback" else "limit-up-pool"
@@ -121,7 +121,7 @@ async def get_market_statistics(date: str | None = None) -> MarketStatistics:
         logger.warning(f"获取涨停池失败: {e}")
 
     try:
-        limit_down_data, limit_down_count_value = await call_blocking(_get_eastmoney_provider().fetch_market_limit_down_pool, date)
+        limit_down_data, limit_down_count_value = await call_blocking(_get_eastmoney_provider().fetch_market_limit_down_pool, date, semaphore=eastmoney_semaphore)
         limit_down_stocks = limit_down_data[:10]
         limit_down_count = int(limit_down_count_value or 0)
         source = source if source != "fallback" else "limit-down-pool"

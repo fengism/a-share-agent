@@ -1,38 +1,31 @@
 from fastapi import APIRouter, HTTPException
+import logging
+
+from app.routers.errors import run_endpoint
 
 from app.models.daily_review import DailyReviewHistoryItem, DailyReviewRequest, DailyReviewResult
 from app.services.daily_review.pipeline import generate_daily_review
 from app.services.daily_review.storage import list_daily_reviews, load_daily_review
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 @router.post("/generate", response_model=DailyReviewResult)
 async def generate_review(request: DailyReviewRequest):
-    """触发生成指定日期的每日市场复盘。
-
-    Param:
-        request: DailyReviewRequest 请求体，包含目标日期等参数。
-    Return:
-        DailyReviewResult: 生成完成的结构化复盘内容。
-    """
-    try:
-        return await generate_daily_review(request)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成每日复盘失败: {e}")
+    """触发生成指定日期的每日市场复盘。"""
+    return await run_endpoint("生成每日复盘", lambda: generate_daily_review(request))
 
 
 @router.get("/history", response_model=list[DailyReviewHistoryItem])
 async def get_daily_review_history():
-    """获取已生成的每日复盘历史索引。
-
-    Return:
-        list[DailyReviewHistoryItem]: 历史复盘条目摘要列表。
-    """
+    """获取已生成的每日复盘历史索引。"""
     try:
-        return list_daily_reviews()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取复盘历史失败: {e}")
+        reviews = list_daily_reviews()
+        return reviews
+    except Exception as exc:
+        logger.error("获取复盘历史失败: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取复盘历史失败: {exc}") from exc
 
 
 @router.get("/{date}", response_model=DailyReviewResult)

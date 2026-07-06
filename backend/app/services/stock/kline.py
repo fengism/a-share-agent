@@ -2,7 +2,7 @@ from app.models.stock import KlineData, KlineItem
 from app.services.base.provider_chain import BaseProviderChain, ProviderAttempt
 from app.services.providers import get_provider
 from app.utils.cache import cache, cache_date, dated_cache_key, one_year_ago_date
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, baidu_semaphore, tdx_semaphore
 from app.utils.singleflight import AsyncSingleFlight
 from app.utils.symbol_utils import normalize_code
 from app.utils.data_clean import safe_float
@@ -36,12 +36,12 @@ def _build_kline_source_attempts(code: str, period: str, start_date: str, end_da
     return [
         ProviderAttempt(
             label="百度股票K线",
-            loader=lambda: call_blocking(_get_baidu_provider().fetch_stock_kline, code=code, start_date=start_date, end_date=end_date),
+            loader=lambda: call_blocking(_get_baidu_provider().fetch_stock_kline, semaphore=baidu_semaphore, code=code, start_date=start_date, end_date=end_date),
             on_error=f"百度股票K线不可用，尝试 TDX 股票K线: code={code}",
         ),
         ProviderAttempt(
             label="TDX 股票K线",
-            loader=lambda: call_blocking(_get_tdx_provider().fetch_stock_kline, code=code, start_date=start_date, end_date=end_date),
+            loader=lambda: call_blocking(_get_tdx_provider().fetch_stock_kline, semaphore=tdx_semaphore, code=code, start_date=start_date, end_date=end_date),
             on_error=f"TDX 股票K线不可用: code={code}",
         ),
     ]

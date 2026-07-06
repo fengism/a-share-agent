@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, iwencai_semaphore, misc_semaphore
 
 
 async def search_stocks(query: str) -> Any:
@@ -189,9 +189,9 @@ async def iwencai_search(query: str, channel: str = "report", size: int = 20) ->
     if iwencai_provider is None:
         return {"error": "问财数据源未启用，请在设置中开启 iwencai_enabled"}
     if channel == "news":
-        result = await call_blocking(iwencai_provider.search_news, query, size)
+        result = await call_blocking(iwencai_provider.search_news, query, size, semaphore=iwencai_semaphore)
         return [item.model_dump() for item in result[:size]]
-    result = await call_blocking(iwencai_provider.search, query, channel, size)
+    result = await call_blocking(iwencai_provider.search, query, channel, size, semaphore=iwencai_semaphore)
     return iwencai_provider.dedup_articles(result)[:size]
 
 
@@ -208,7 +208,7 @@ async def iwencai_query(query: str, limit: int = 30) -> Any:
     iwencai_provider = _get_iwencai_provider()
     if iwencai_provider is None:
         return {"error": "问财数据源未启用，请在设置中开启 iwencai_enabled"}
-    return await call_blocking(iwencai_provider.query_stock_data, query, 1, limit)
+    return await call_blocking(iwencai_provider.query_stock_data, query, 1, limit, semaphore=iwencai_semaphore)
 
 
 async def iwencai_select_stock(query: str, limit: int = 20) -> Any:
@@ -224,7 +224,7 @@ async def iwencai_select_stock(query: str, limit: int = 20) -> Any:
     iwencai_provider = _get_iwencai_provider()
     if iwencai_provider is None:
         return {"error": "问财数据源未启用，请在设置中开启 iwencai_enabled"}
-    return await call_blocking(iwencai_provider.select_stocks, query, 1, limit)
+    return await call_blocking(iwencai_provider.select_stocks, query, 1, limit, semaphore=iwencai_semaphore)
 
 
 async def get_stock_risk_data(code: str) -> Any:
@@ -236,15 +236,15 @@ async def get_stock_risk_data(code: str) -> Any:
         包含 fund_flow、margin_trading、block_trade、holder_change 四个维度的字典
     """
     import asyncio
-    from app.utils.rate_limiter import call_blocking
+    from app.utils.rate_limiter import call_blocking, iwencai_semaphore, misc_semaphore
 
     async def _fetch_all():
         from app.services.providers import get_provider
         provider = get_provider("eastmoney")
-        fund_flow = await call_blocking(provider.fetch_stock_fund_flow, code)
-        margin = await call_blocking(provider.fetch_margin_trading, code)
-        block = await call_blocking(provider.fetch_block_trade, code)
-        holder = await call_blocking(provider.fetch_holder_num_change, code)
+        fund_flow = await call_blocking(provider.fetch_stock_fund_flow, code, semaphore=misc_semaphore)
+        margin = await call_blocking(provider.fetch_margin_trading, code, semaphore=misc_semaphore)
+        block = await call_blocking(provider.fetch_block_trade, code, semaphore=misc_semaphore)
+        holder = await call_blocking(provider.fetch_holder_num_change, code, semaphore=misc_semaphore)
         return fund_flow, margin, block, holder
 
     fund_flow, margin, block, holder = await _fetch_all()
@@ -269,4 +269,4 @@ async def iwencai_market_macro(query: str, limit: int = 20) -> Any:
     iwencai_provider = _get_iwencai_provider()
     if iwencai_provider is None:
         return {"error": "问财数据源未启用，请在设置中开启 iwencai_enabled"}
-    return await call_blocking(iwencai_provider.query_market_macro, query, 1, limit)
+    return await call_blocking(iwencai_provider.query_market_macro, query, 1, limit, semaphore=iwencai_semaphore)

@@ -23,6 +23,10 @@ def _get_session() -> requests.Session:
     return _session
 
 
+get_session = _get_session
+"""Public alias for _get_session."""
+
+
 def _reset_session() -> None:
     """Reset the cached session; call after http_trust_env is changed at runtime."""
     global _session

@@ -7,7 +7,7 @@ import pandas as pd
 from app.services.stock.news import get_stock_news
 from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, eastmoney_semaphore
 from app.utils.data_clean import safe_float, safe_int
 from app.utils.symbol_utils import normalize_code
 from app.utils.news_utils import filter_recent_news_items
@@ -256,7 +256,7 @@ async def get_retail_sentiment(code: str) -> dict:
     }
 
     try:
-        guba_posts = await call_blocking(_get_eastmoney_provider().fetch_stock_guba_posts, code)
+        guba_posts = await call_blocking(_get_eastmoney_provider().fetch_stock_guba_posts, code, semaphore=eastmoney_semaphore)
         result["guba_post_count"] = len(guba_posts)
         retail_posts = []
         for item in guba_posts:

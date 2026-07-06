@@ -6,6 +6,18 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 _semaphore = asyncio.Semaphore(2)
 
+# ── 按数据源拆分的信号量，避免互相争抢 ──
+eastmoney_semaphore = asyncio.Semaphore(3)
+akshare_semaphore = asyncio.Semaphore(2)
+tencent_semaphore = asyncio.Semaphore(2)
+sina_semaphore = asyncio.Semaphore(2)
+ths_semaphore = asyncio.Semaphore(2)
+iwencai_semaphore = asyncio.Semaphore(1)
+baidu_semaphore = asyncio.Semaphore(2)
+cls_semaphore = asyncio.Semaphore(2)
+tdx_semaphore = asyncio.Semaphore(2)
+misc_semaphore = asyncio.Semaphore(4)
+
 
 async def call_blocking(func: Callable, *args: Any, semaphore: asyncio.Semaphore | None = None, **kwargs: Any) -> Any:
     """Run a blocking function in a thread under an asyncio semaphore.

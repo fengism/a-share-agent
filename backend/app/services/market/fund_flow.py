@@ -6,7 +6,7 @@ import pandas as pd
 from app.services.providers import get_provider
 from app.utils.cache import cache, dated_cache_key
 from app.utils.data_clean import safe_float
-from app.utils.rate_limiter import call_blocking
+from app.utils.rate_limiter import call_blocking, ths_semaphore
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ async def get_hsgt_flow() -> dict:
     }
 
     try:
-        df = await call_blocking(get_provider("ths").fetch_hsgt_realtime)
+        df = await call_blocking(get_provider("ths").fetch_hsgt_realtime, semaphore=ths_semaphore)
     except Exception as exc:
         logger.warning(f"沪深股通分钟流向获取失败: error={exc}")
         raise

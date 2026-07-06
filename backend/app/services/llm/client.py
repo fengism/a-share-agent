@@ -1,6 +1,9 @@
 import logging
+import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+
+import httpx
 
 from openai import AsyncOpenAI, OpenAI
 
@@ -55,7 +58,8 @@ class OpenAICompatibleClient(LLMClient):
         Return:
             无
         """
-        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+        http_client = httpx.Client(trust_env=False)
+        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, http_client=http_client)
         self.model = model
         logger.info(f"初始化OpenAI兼容客户端: model={model}, base_url={base_url}")
 
@@ -195,6 +199,36 @@ def create_llm_client(settings: Settings | None = None) -> LLMClient:
     _client_cache = client
     _cache_key = current_key
     return client
+
+
+async def llm_chat(
+    messages: list[dict],
+    temperature: float = 0.1,
+    json_format: bool = False,
+    settings: Settings | None = None,
+    client: LLMClient | None = None,
+) -> str:
+    """在后台线程池中执行 LLM.chat()，避免阻塞事件循环。
+
+    自动创建或复用 LLMClient，省去手动 create_llm_client + asyncio.to_thread 的样板代码。
+
+    Param:
+        messages: OpenAI 格式的消息列表。
+        temperature: 生成温度，默认 0.1。
+        json_format: 是否要求返回 JSON 格式。
+        settings: 配置对象，默认读取全局设置。
+        client: 已有 LLMClient 实例，为空时自动从 settings 创建。
+    Return:
+        LLM 生成的文本内容。
+    """
+    if client is None:
+        client = create_llm_client(settings)
+    return await asyncio.to_thread(
+        client.chat,
+        messages,
+        temperature=temperature,
+        json_format=json_format,
+    )
 
 
 def _resolve_chat_endpoint(settings: Settings | None = None) -> tuple[str, str, str]:

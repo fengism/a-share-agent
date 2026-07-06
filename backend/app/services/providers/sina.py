@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 import requests
+from app.utils.http_client import get_session as _get_session
 
 from app.constants.http import SINA_FINANCE_HEADERS
 from app.constants.market import SINA_INDEX_PAGE_COUNT_URL, SINA_INDEX_QUOTE_URL, SINA_MARKET_HQ_URL, SINA_STOCK_KLINE_URL
@@ -26,6 +27,9 @@ class SinaDataProvider(BaseDataProvider):
     def __init__(self):
         """初始化 SinaDataProvider，固定 name 与 source_label。"""
         super().__init__(name="sina", source_label="新浪")
+        # Sina 接口常常无法通过代理访问，使用独立 session 并禁用代理
+        self._session = requests.Session()
+        self._session.trust_env = False
 
 
     def fetch_kline(self, code: str, period: str, start_date: str="", end_date: str="") -> pd.DataFrame:
@@ -63,7 +67,7 @@ class SinaDataProvider(BaseDataProvider):
             "ma": "no",
             "datalen": str(datalen),
         }
-        r = requests.get(SINA_STOCK_KLINE_URL, params=params, headers=SINA_FINANCE_HEADERS, timeout=10)
+        r = self._session.get(SINA_STOCK_KLINE_URL, params=params, headers=SINA_FINANCE_HEADERS, timeout=10)
         text = r.text.strip()
         if text.startswith("=") or text.startswith("/*"):
             import re
@@ -110,7 +114,7 @@ class SinaDataProvider(BaseDataProvider):
             "_s_r_a": "init",
         }
         big_df = pd.DataFrame()
-        response = requests.get(SINA_INDEX_QUOTE_URL, params=payload, timeout=10)
+        response = self._session.get(SINA_INDEX_QUOTE_URL, params=payload, timeout=10)
         response.raise_for_status()
         data_json = json.loads(response.text)
         if not data_json:
@@ -205,7 +209,7 @@ class SinaDataProvider(BaseDataProvider):
         records: list[dict] = []
         page = 1
         while True:
-            response = requests.get(
+            response = self._session.get(
                 SINA_MARKET_HQ_URL,
                 params={
                     "page": page,
@@ -250,7 +254,7 @@ class SinaDataProvider(BaseDataProvider):
             "version": "7.11.0",
             "dpc": "1",
         }
-        response = requests.get("https://cn.finance.sina.com.cn/minline/getMinlineData", params=params, timeout=10)
+        response = self._session.get("https://cn.finance.sina.com.cn/minline/getMinlineData", params=params, timeout=10)
         response.raise_for_status()
         payload = loads_sina_jsonp(response.text)
         rows = payload.get("result", {}).get("data", [])

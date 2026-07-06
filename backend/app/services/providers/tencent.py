@@ -2,7 +2,8 @@ import json
 from datetime import datetime
 
 import pandas as pd
-import requests
+from app.utils.http_client import get_session as _get_session
+from app.config import get_settings
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.constants.http import TENCENT_FINANCE_HEADERS
@@ -11,7 +12,6 @@ from app.services.base.data_provider import BaseDataProvider
 from app.utils.symbol_utils import normalize_code
 from app.utils.symbol_utils import normalize_index_symbol_v2
 from app.utils.data_clean import rename_columns
-
 
 class TencentDataProvider(BaseDataProvider):
     """Purpose: 对接腾讯财经代理接口的 K线、概念板块、行情快照、板块涨跌排行数据提供器。"""
@@ -28,7 +28,7 @@ class TencentDataProvider(BaseDataProvider):
             StockConceptInfo 对象；无数据时返回 None
         """
         normalized_code = normalize_index_symbol_v2(code).lower()
-        response = requests.get(
+        response = _get_session().get(
             "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/stockinfo/plateNew",
             params={"code": normalized_code, "app": "wzq", "zdf": 1},
             headers=TENCENT_FINANCE_HEADERS,
@@ -76,7 +76,7 @@ class TencentDataProvider(BaseDataProvider):
                 "param": f"{sym.prefixed_lower},day,{year}-01-01,{year + 1}-12-31,640,{adjust}",
                 "r": "0.8205512681390605",
             }
-            response = requests.get(url, params=params, timeout=10)
+            response = _get_session().get(url, params=params, timeout=10)
             text = response.text
             json_start = text.find("={")
             if json_start < 0:
@@ -144,7 +144,7 @@ class TencentDataProvider(BaseDataProvider):
         Return:
             板块行情 DataFrame
         """
-        response = requests.get(
+        response = _get_session().get(
             "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/mktHs/rank",
             params={
                 "l": "10",
@@ -194,7 +194,7 @@ class TencentDataProvider(BaseDataProvider):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
         }
         
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = _get_session().get(url, headers=headers, timeout=10)
         data = resp.text
 
         result = {}
@@ -229,7 +229,6 @@ class TencentDataProvider(BaseDataProvider):
             "pe_static":    float(vals[52]) if vals[52] else 0,
         }
         return result
-
 
 tencent_provider = TencentDataProvider()
 
