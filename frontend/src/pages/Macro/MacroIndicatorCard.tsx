@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
+import echarts from "../../charts/echarts-setup";
 import { Card, Col, Empty, Row, Statistic, Typography } from "antd";
 import { useColors, useStyles } from "../../theme/hooks";
 
@@ -137,7 +138,7 @@ export default function MacroIndicatorCard({
       </Row>
       {chartOption && (
         <div style={{ marginTop: 12 }}>
-          <ReactECharts option={chartOption} style={{ height: 200 }} />
+          <ReactECharts echarts={echarts} option={chartOption} style={{ height: 200 }} />
         </div>
       )}
     </Card>

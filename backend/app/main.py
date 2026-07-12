@@ -1,8 +1,10 @@
 import asyncio
 import contextlib
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -15,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 # 配置日志格式，确保 uvicorn 不会覆盖
 log_format = "%(asctime)s %(levelname)-8s [%(name)s] %(message)s"
+log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, log_level, logging.INFO),
     format=log_format,
     datefmt="%Y-%m-%d %H:%M:%S",
     force=True,
@@ -33,18 +36,29 @@ for name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """FastAPI 应用生命周期管理器，启动时初始化数据库与预热任务，关闭时取消任务。"""
+    import concurrent.futures
     from app.db import init_db
     from app.services.screener.industry import build_industry_mapping
     from app.services.stock.name_map import build_stock_name_map
     from app.config import get_settings
 
+    # 增大默认线程池，避免 asyncio.to_thread 耗尽线程
+    loop = asyncio.get_running_loop()
+    loop.set_default_executor(concurrent.futures.ThreadPoolExecutor(max_workers=20))
+
     init_db()
     logger.info("数据库初始化完成")
+
+    # 预注册 chat agent 的 skills 和 tools（仅执行一次）
+    from app.services.chat.skills import register_all_skills
+    register_all_skills()
+    logger.info("Chat skills 注册完成")
 
     tasks = [
         asyncio.create_task(build_industry_mapping()),
         asyncio.create_task(refresh_industry_mapping_file_daily()),
         asyncio.create_task(build_stock_name_map()),
+        asyncio.create_task(_periodic_wal_checkpoint()),
     ]
     if getattr(get_settings(), "twitter_feeds", None):
         tasks.append(asyncio.create_task(refresh_twitter_feed_periodic()))
@@ -134,7 +148,7 @@ async def _run_periodic(name: str, coro_factory, interval_seconds: int, health_c
                     raise RuntimeError(f"后台任务 [{name}] 健康检查失败")
             coro = coro_factory()
             await coro
-            entry["last_run"] = __import__("datetime").datetime.now().isoformat()
+            entry["last_run"] = datetime.now().isoformat()
             entry["status"] = "running"
             consecutive_errors = 0
         except asyncio.CancelledError:
@@ -146,7 +160,7 @@ async def _run_periodic(name: str, coro_factory, interval_seconds: int, health_c
             entry["last_error"] = str(exc)
             logger.error(f"后台任务 [{name}] 第 {loop_count + 1} 次循环失败（连续 {consecutive_errors} 次）: {exc}", exc_info=True)
             # 指数退避：连续失败时延长等待时间，最长 10 分钟
-            backoff = min(60, 2 ** consecutive_errors)
+            backoff = min(600, 2 ** consecutive_errors)
             await asyncio.sleep(backoff)
             continue
 
@@ -166,6 +180,21 @@ async def refresh_industry_mapping_file_daily():
         name="industry_mapping",
         coro_factory=_iteration,
         interval_seconds=24 * 60 * 60,
+    )
+
+
+async def _periodic_wal_checkpoint():
+    """每 6 小时执行一次 WAL checkpoint，控制 WAL 文件大小。"""
+    from app.db.connection import checkpoint_wal
+
+    async def _iteration():
+        await call_blocking(checkpoint_wal)
+        logger.info("WAL checkpoint 完成")
+
+    await _run_periodic(
+        name="wal_checkpoint",
+        coro_factory=_iteration,
+        interval_seconds=6 * 60 * 60,
     )
 
 

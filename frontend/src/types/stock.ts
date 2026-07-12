@@ -455,11 +455,6 @@ export interface NewsAnalysisRef {
   url: string;
 }
 
-export interface NewsAnalysisRef {
-  title: string;
-  url: string;
-}
-
 export interface NewsAnalysisItem {
   text: string;
   urls?: NewsAnalysisRef[];

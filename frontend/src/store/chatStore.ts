@@ -37,18 +37,63 @@ function loadPersisted(): { sessions: SessionMeta[]; sessionData: Record<string,
   return { sessions: [], sessionData: {}, activeSessionId: null };
 }
 
-function persist(
+// Debounced persist: avoids repeated localStorage writes during high-frequency updates
+let _persistTimer: ReturnType<typeof setTimeout> | null = null;
+let _pendingPersist: { sessions: SessionMeta[]; sessionData: Record<string, SessionData>; activeSessionId: string | null } | null = null;
+
+function schedulePersist(
+  sessions: SessionMeta[],
+  sessionData: Record<string, SessionData>,
+  activeSessionId: string | null,
+) {
+  _pendingPersist = { sessions, sessionData, activeSessionId };
+  if (_persistTimer) return; // already scheduled
+  _persistTimer = setTimeout(() => {
+    _persistTimer = null;
+    if (!_pendingPersist) return;
+    const { sessions, sessionData, activeSessionId } = _pendingPersist;
+    _pendingPersist = null;
+    _doPersist(sessions, sessionData, activeSessionId);
+  }, 300);
+}
+
+function _doPersist(
   sessions: SessionMeta[],
   sessionData: Record<string, SessionData>,
   activeSessionId: string | null,
 ) {
   try {
-    // Only persist session metadata + activeId, not full message data
+    // localStorage 容量保护：如果数据超过 4MB，清理最旧会话的消息历史
+    const dataStr = JSON.stringify(sessionData);
+    if (dataStr.length > 4 * 1024 * 1024) {
+      const sorted = [...sessions].sort((a, b) => a.updatedAt - b.updatedAt);
+      for (const s of sorted) {
+        if (s.id === activeSessionId) continue;
+        const entry = sessionData[s.id];
+        if (entry && entry.messages.length > 0) {
+          // 只保留最后 2 条消息
+          entry.messages = entry.messages.slice(-2);
+          entry.history = entry.history.slice(-4);
+        }
+      }
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ sessions, activeSessionId }));
-    // Messages data goes to a separate key to avoid loading too much
     localStorage.setItem(STORAGE_KEY + "-data", JSON.stringify(sessionData));
   } catch {
     // localStorage might be full - silently fail
+  }
+}
+
+/** Immediate persist — use for critical writes (e.g. before page unload). */
+function flushPersist() {
+  if (_persistTimer) {
+    clearTimeout(_persistTimer);
+    _persistTimer = null;
+  }
+  if (_pendingPersist) {
+    const { sessions, sessionData, activeSessionId } = _pendingPersist;
+    _pendingPersist = null;
+    _doPersist(sessions, sessionData, activeSessionId);
   }
 }
 
@@ -147,6 +192,11 @@ export const useChatStore = create<ChatState>((set, get) => {
   const sessionData = persisted.sessionData;
   let activeSessionId = persisted.activeSessionId;
 
+  // Flush pending localStorage writes on page unload
+  if (typeof window !== "undefined") {
+    window.addEventListener("beforeunload", flushPersist);
+  }
+
   // Ensure at least one session
   if (sessions.length === 0) {
     const id = `session-${Date.now()}`;
@@ -192,7 +242,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         history: [],
       });
 
-      persist(
+      schedulePersist(
         get().sessions,
         get().sessionData,
         get().activeSessionId,
@@ -223,7 +273,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         history: newData.history,
       });
 
-      persist(
+      schedulePersist(
         get().sessions,
         get().sessionData,
         get().activeSessionId,
@@ -259,7 +309,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         history: newHistory,
       });
 
-      persist(
+      schedulePersist(
         get().sessions,
         get().sessionData,
         get().activeSessionId,
@@ -273,7 +323,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         ),
       }));
 
-      persist(
+      schedulePersist(
         get().sessions,
         get().sessionData,
         get().activeSessionId,

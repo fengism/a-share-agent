@@ -1,0 +1,93 @@
+/**
+ * Shared markdown rendering styles.
+ *
+ * Requires the following CSS custom properties to be set on an ancestor:
+ *   --theme-text-primary, --theme-primary, --theme-nested-bg,
+ *   --theme-border, --theme-text-secondary, --theme-elevated-bg
+ */
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.chat-markdown p { margin: 0 0 4px; }
+.chat-markdown p:last-child { margin-bottom: 0; }
+.chat-markdown p:empty { display: none; }
+
+.chat-markdown ul,
+.chat-markdown ol { margin: 4px 0; padding-left: 20px; }
+.chat-markdown li { margin-bottom: 2px; }
+
+.chat-markdown strong {
+  color: var(--theme-text-primary);
+  font-weight: 700;
+}
+
+.chat-markdown code {
+  background: color-mix(in srgb, var(--theme-primary) 15%, transparent);
+  color: var(--theme-primary);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.chat-markdown pre {
+  background: var(--theme-nested-bg);
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.chat-markdown pre code {
+  background: none;
+  padding: 0;
+  color: var(--theme-text-secondary);
+}
+
+.chat-markdown blockquote {
+  border-left: 3px solid var(--theme-primary);
+  margin: 8px 0;
+  padding: 4px 12px;
+  color: var(--theme-text-secondary);
+}
+
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3 {
+  color: var(--theme-text-primary);
+  margin: 8px 0 4px;
+  font-weight: 700;
+}
+
+.chat-markdown h3 { font-size: 14px; }
+.chat-markdown h2 { font-size: 15px; }
+.chat-markdown h1 { font-size: 16px; }
+
+.chat-markdown hr {
+  border: none;
+  border-top: 1px solid var(--theme-border);
+  margin: 10px 0;
+}
+
+.chat-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 6px 0;
+  font-size: 13px;
+}
+
+.chat-markdown th,
+.chat-markdown td {
+  border: 1px solid var(--theme-border);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.chat-markdown th {
+  background: var(--theme-elevated-bg);
+  color: var(--theme-text-secondary);
+  font-weight: 600;
+}

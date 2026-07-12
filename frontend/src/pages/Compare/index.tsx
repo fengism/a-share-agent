@@ -181,7 +181,7 @@ export default function ComparePage() {
                     <span style={{ color: c.textSecondary }}>最新价</span>
                     <span style={{ fontWeight: 600, textAlign: "right", color: c.textPrimary }}>{stock.price?.toFixed(2) ?? "-"}</span>
                     <span style={{ color: c.textSecondary }}>涨跌幅</span>
-                    <span style={{ fontWeight: 600, textAlign: "right", color: stock.change_pct != null ? (stock.change_pct >= 0 ? "#e74c3c" : "#2ecc71") : c.textSecondary }}>
+                    <span style={{ fontWeight: 600, textAlign: "right", color: stock.change_pct != null ? (stock.change_pct >= 0 ? c.up : c.down) : c.textSecondary }}>
                       {stock.change_pct != null ? `${stock.change_pct >= 0 ? "+" : ""}${stock.change_pct.toFixed(2)}%` : "-"}
                     </span>
                     <span style={{ color: c.textSecondary }}>PE(TTM)</span>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, message } from "antd";
 import { ClearOutlined, DeleteOutlined, MessageOutlined, PlusOutlined, RobotOutlined } from "@ant-design/icons";
 import { streamChat } from "../../api/chat";
@@ -200,77 +200,8 @@ export default function ChatPage() {
     }
   };
 
-  const chatMarkdownCss = useMemo(() => `
-        @keyframes blink {
-          50% { opacity: 0; }
-        }
-        .chat-markdown p { margin: 0 0 4px; }
-        .chat-markdown p:last-child { margin-bottom: 0; }
-        .chat-markdown p:empty { display: none; }
-        .chat-markdown ul, .chat-markdown ol { margin: 4px 0; padding-left: 20px; }
-        .chat-markdown li { margin-bottom: 2px; }
-        .chat-markdown strong { color: ${c.textPrimary}; font-weight: 700; }
-        .chat-markdown code {
-          background: rgba(59,130,246,0.15);
-          color: ${c.primary};
-          padding: 1px 5px;
-          border-radius: 4px;
-          font-size: 13px;
-          font-family: monospace;
-        }
-        .chat-markdown pre {
-          background: ${c.nestedBg};
-          border: 1px solid ${c.border};
-          border-radius: 6px;
-          padding: 10px 12px;
-          overflow-x: auto;
-          margin: 8px 0;
-        }
-        .chat-markdown pre code {
-          background: none;
-          padding: 0;
-          color: ${c.textSecondary};
-        }
-        .chat-markdown blockquote {
-          border-left: 3px solid ${c.primary};
-          margin: 8px 0;
-          padding: 4px 12px;
-          color: ${c.textSecondary};
-        }
-        .chat-markdown h1, .chat-markdown h2, .chat-markdown h3 {
-          color: ${c.textPrimary};
-          margin: 8px 0 4px;
-          font-weight: 700;
-        }
-        .chat-markdown h3 { font-size: 14px; }
-        .chat-markdown h2 { font-size: 15px; }
-        .chat-markdown h1 { font-size: 16px; }
-        .chat-markdown hr {
-          border: none;
-          border-top: 1px solid ${c.border};
-          margin: 10px 0;
-        }
-        .chat-markdown table {
-          border-collapse: collapse;
-          width: 100%;
-          margin: 6px 0;
-          font-size: 13px;
-        }
-        .chat-markdown th, .chat-markdown td {
-          border: 1px solid ${c.border};
-          padding: 6px 10px;
-          text-align: left;
-        }
-        .chat-markdown th {
-          background: ${c.elevatedBg};
-          color: ${c.textSecondary};
-          font-weight: 600;
-        }
-    `, [c.textPrimary, c.primary, c.nestedBg, c.border, c.textSecondary, c.elevatedBg]);
-
   return (
     <>
-      <style>{chatMarkdownCss}</style>
       <div
         style={{
           display: "flex",
@@ -279,7 +210,13 @@ export default function ChatPage() {
           maxWidth: 1400,
           margin: "0 auto",
           padding: "0 0 24px",
-        }}
+          "--theme-text-primary": c.textPrimary,
+          "--theme-primary": c.primary,
+          "--theme-nested-bg": c.nestedBg,
+          "--theme-border": c.border,
+          "--theme-text-secondary": c.textSecondary,
+          "--theme-elevated-bg": c.elevatedBg,
+        } as React.CSSProperties}
       >
         {/* ── Session Sidebar ── */}
         <div

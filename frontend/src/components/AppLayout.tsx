@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Layout, Input, Menu, Typography, Tooltip, type InputRef } from "antd";
 import {
   SearchOutlined, HomeOutlined, FundOutlined, FilterOutlined,
@@ -37,6 +37,7 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const { data: results = [], isFetching } = useStockSearch(searchQuery);
   const searchRef = useRef<InputRef>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const c = useColors();
   const s = useStyles();
@@ -45,20 +46,25 @@ export default function AppLayout() {
 
   const activeKey = getActiveKey(location.pathname);
 
-  const handleNavClick = (key: string) => navigate(key);
+  const handleNavClick = useCallback((key: string) => navigate(key), [navigate]);
 
-  const handleSearchChange = (val: string) => {
-    setSearchQuery(val.trim());
-    setDropdownOpen(val.trim().length >= 1);
-  };
+  const handleSearchChange = useCallback((val: string) => {
+    const trimmed = val.trim();
+    // Debounce: 200ms 内连续击键只触发一次搜索
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      setSearchQuery(trimmed);
+      setDropdownOpen(trimmed.length >= 1);
+    }, 200);
+  }, []);
 
-  const handleSelect = (code: string) => {
+  const handleSelect = useCallback((code: string) => {
     navigate(`/analysis/${code}`);
     setSearchQuery("");
     setDropdownOpen(false);
-  };
+  }, [navigate]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       if (searchQuery.length === 6 && /^\d{6}$/.test(searchQuery)) {
         navigate(`/analysis/${searchQuery}`);
@@ -71,13 +77,13 @@ export default function AppLayout() {
       }
     }
     if (e.key === "Escape") setDropdownOpen(false);
-  };
+  }, [searchQuery, results, navigate]);
 
-  const cycleTheme = () => {
+  const cycleTheme = useCallback(() => {
     const keys = THEME_LIST.map((t) => t.key);
     const idx = keys.indexOf(themeKey);
     setThemeKey(keys[(idx + 1) % keys.length] as ThemeKey);
-  };
+  }, [themeKey, setThemeKey]);
 
   return (
     <Layout style={{ minHeight: "100vh", background: c.pageBg }}>

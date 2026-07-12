@@ -1,14 +1,16 @@
-import { useColors} from "../../../styles/ui";
+import React from "react";
+import { useColors } from "../../../styles/ui";
+import { hexToRgba } from "../../../charts/utils";
 
-export function UserMessageBubble({ content }: { content: string }) {
+export const UserMessageBubble = React.memo(function UserMessageBubble({ content }: { content: string }) {
   const c = useColors();
   return (
     <div
       style={{
         padding: "10px 14px",
         borderRadius: 12,
-        background: "rgba(59,130,246,0.2)",
-        border: "1px solid rgba(59,130,246,0.3)",
+        background: hexToRgba(c.primary, 0.2),
+        border: `1px solid ${hexToRgba(c.primary, 0.3)}`,
         fontSize: 14,
         lineHeight: 1.6,
         color: c.textPrimary,
@@ -19,4 +21,4 @@ export function UserMessageBubble({ content }: { content: string }) {
       {content}
     </div>
   );
-}
+});

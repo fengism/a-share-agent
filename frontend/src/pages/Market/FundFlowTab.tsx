@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import ReactECharts from "echarts-for-react";
+import echarts from "../../charts/echarts-setup";
 import { Button, Card, Col, Empty, Row, Spin, Statistic, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { useHsgtFlow } from "../../api/queries";
@@ -119,7 +120,7 @@ export default function FundFlowTab() {
         ) : isError ? (
           <Empty description="沪深股通分钟流向获取失败" />
         ) : points.length ? (
-          <ReactECharts option={option} style={{ height: 420 }} notMerge />
+          <ReactECharts echarts={echarts} option={option} style={{ height: 420 }} notMerge />
         ) : (
           <Empty description="暂无沪深股通分钟流向数据" />
         )}

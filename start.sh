@@ -62,7 +62,7 @@ case "$MODE" in
         nohup .venv/bin/uvicorn app.main:app --reload --port 8000 >> "$LOG_DIR/backend.log" 2>&1 &
         ;;
     prod)
-        nohup .venv/bin/uvicorn app.main:app --port 8000 >> "$LOG_DIR/backend.log" 2>&1 &
+        nohup .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 >> "$LOG_DIR/backend.log" 2>&1 &
         ;;
     *)
         error "未知模式: $MODE，请使用 dev 或 prod"

@@ -325,7 +325,50 @@ class AkshareDataProvider(BaseDataProvider):
         try:
             return ak.index_realtime_sw(symbol="二级行业")
         except Exception:
-            logger.warning("申万行业指数实时数据获取失败", exc_info=True)
+            logger.debug("akshare index_realtime_sw 异常，尝试直接调用申万宏源 API", exc_info=True)
+
+        # akshare 内部列名映射与上游 API 列数不匹配时，直接请求申万宏源接口兜底
+        try:
+            import math
+            import requests as _requests
+
+            url = "https://www.swsresearch.com/institute-sw/api/index_publish/current/"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                              "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            }
+            params: dict = {"page": "1", "page_size": "50", "indextype": "二级行业"}
+
+            resp = _requests.get(url, params=params, headers=headers, timeout=15)
+            data = resp.json().get("data", {})
+            total_num = int(data.get("count", 0))
+            records = data.get("list", [])
+            total_page = math.ceil(total_num / 50) if total_num else 1
+
+            for pg in range(2, total_page + 1):
+                params["page"] = str(pg)
+                page_resp = _requests.get(url, params=params, headers=headers, timeout=15)
+                page_data = page_resp.json().get("data", {})
+                records.extend(page_data.get("list", []))
+
+            if not records:
+                logger.warning("申万宏源 API 返回空数据")
+                return pd.DataFrame()
+
+            df = pd.DataFrame(records)
+            # 统一列名（上游字段顺序固定为 9 列）
+            expected_cols = ["指数代码", "指数名称", "昨收盘", "今开盘", "成交额",
+                             "最高价", "最低价", "最新价", "成交量"]
+            if len(df.columns) >= 9:
+                df.columns = expected_cols[:len(df.columns)]
+                df = df[expected_cols]
+            for col in expected_cols[2:]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+            logger.info("申万宏源 API 兜底获取成功: %d 条", len(df))
+            return df
+        except Exception:
+            logger.warning("申万行业指数实时数据获取失败（akshare 与直接 API 均不可用）", exc_info=True)
             return pd.DataFrame()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))

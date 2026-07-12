@@ -309,7 +309,6 @@ async def generate_daily_review(request: DailyReviewRequest) -> DailyReviewResul
         try:
             settings = get_settings()
             user_content = _build_prompt(date, snapshot)
-            logger.info(user_content)
             logger.info(f"生成复盘报告: date={date}, prompt_length={len(user_content)}, attempt={attempt}/3")
             llm_review = normalize_llm_review((await llm_chat(
                 [

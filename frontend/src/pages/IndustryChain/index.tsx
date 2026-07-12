@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Input, Steps, Typography, Spin, Tag, Button, message, Empty, Tooltip, Popover, Modal } from "antd";
 import { SearchOutlined, ApartmentOutlined, CheckCircleOutlined, LoadingOutlined, CloseCircleOutlined, SendOutlined, HistoryOutlined, CloudUploadOutlined, FullscreenOutlined } from "@ant-design/icons";
 import ReactECharts from "echarts-for-react";
+import DOMPurify from "dompurify";
+import echarts from "../../charts/echarts-setup";
 import { streamIndustryChain, type IndustryChainProgress } from "../../api/sse";
 import { useConfig, usePush, useIndustryChainHistory, useIndustryChainArchive, useIndustryChainLatest } from "../../api/queries";
 import { useColors, useStyles } from "../../styles/ui";
@@ -140,7 +142,7 @@ function MarkdownReport({ content }: { content: string }) {
   return (
     <div
       style={{ color: ts, fontSize: 14, lineHeight: 1.8 }}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html, { ADD_TAGS: ["pre", "code"], ADD_ATTR: ["style"] }) }}
     />
   );
 }
@@ -517,7 +519,7 @@ export default function IndustryChain() {
                             </Text>
                           )}
                           {hasValidOption ? (
-                            <div style={{ width: "100%", overflow: "auto" }}><ReactECharts option={chart.option} style={{ height: chartHeight, width: "100%" }} notMerge /></div>
+                            <div style={{ width: "100%", overflow: "auto" }}><ReactECharts echarts={echarts} option={chart.option} style={{ height: chartHeight, width: "100%" }} notMerge /></div>
                           ) : (
                             <div style={{ height: chartHeight, display: "flex", alignItems: "center", justifyContent: "center", color: c.textMuted, fontSize: 13 }}>
                               图表配置不可用
@@ -621,6 +623,7 @@ export default function IndustryChain() {
       >
         {expandedChart && (
           <ReactECharts
+            echarts={echarts}
             option={expandedChart.chart.option}
             style={{ height: expandedChart.chart.type === "tree" ? Math.min(1600, Math.round(window.innerHeight * 0.85)) : Math.min(800, Math.round(window.innerHeight * 0.7)), width: "100%" }}
             notMerge

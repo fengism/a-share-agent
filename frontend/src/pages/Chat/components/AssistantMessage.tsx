@@ -1,3 +1,4 @@
+import React from "react";
 import {
   BulbOutlined,
   ExportOutlined,
@@ -8,7 +9,8 @@ import { Button, Collapse } from "antd";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatDisplayMessage } from "../../../types/chat";
-import { useColors} from "../../../styles/ui";
+import { useColors } from "../../../styles/ui";
+import { hexToRgba } from "../../../charts/utils";
 import { BlinkingCursor } from "./BlinkingCursor";
 import { ToolCallCard } from "./ToolCallCard";
 
@@ -19,7 +21,7 @@ interface AssistantMessageProps {
   onPush?: (messageId: string, content: string) => void;
 }
 
-export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
+export const AssistantMessage = React.memo(function AssistantMessage({ message, onPush }: AssistantMessageProps) {
   const c = useColors();
   const hasReasoning = !!message.reasoningContent;
   const hasTools = !!message.toolCalls?.length;
@@ -41,7 +43,7 @@ export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
                     style={{ fontSize: 12, color: c.textSecondary }}
                   >
                     <BulbOutlined
-                      style={{ marginRight: 4, color: "#f59e0b" }}
+                      style={{ marginRight: 4, color: c.accent }}
                     />
                     思考过程
                     {isStreaming && !hasTools && !hasContent && (
@@ -67,8 +69,8 @@ export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
               },
             ]}
             style={{
-              background: "rgba(245, 158, 11, 0.06)",
-              border: "1px solid rgba(245, 158, 11, 0.2)",
+              background: hexToRgba(c.accent, 0.06),
+              border: `1px solid ${hexToRgba(c.accent, 0.2)}`,
               borderRadius: 8,
             }}
           />
@@ -158,4 +160,4 @@ export function AssistantMessage({ message, onPush }: AssistantMessageProps) {
       )}
     </div>
   );
-}
+});

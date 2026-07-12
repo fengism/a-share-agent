@@ -830,39 +830,6 @@ def _execute_twitter_analyze(username: str) -> str:
 
     return "\n".join(lines)
 
-    """分析指定 Twitter 用户的最新推文。
-
-    Param:
-        username: Twitter 用户名（不含 @）
-    Return:
-        Markdown 格式的分析报告
-    """
-    from app.services.twitter_analysis import analyze_twitter_user
-
-    result = analyze_twitter_user(username)
-    if result["tweet_count"] == 0:
-        return f"用户 @{username} 暂无可用推文数据。"
-
-    report = f"""## Twitter 用户 @{username} 分析报告
-
-共分析 {result["tweet_count"]} 条推文。
-
----
-
-### AI 分析
-
-{result["analysis"]}
-
----
-
-### 原始推文摘要（前 {min(result["tweet_count"], 20)} 条）
-
-"""
-    for i, tweet in enumerate(result["tweets"], 1):
-        report += f"{i}. **{tweet['title']}** ({tweet['publish_time']})\n   {tweet['content'][:200]}\n   [{tweet['url']}]({tweet['url']})\n\n"
-
-    return report.strip()
-
 
 def register_twitter_tools():
     """注册 Twitter 用户分析工具。"""

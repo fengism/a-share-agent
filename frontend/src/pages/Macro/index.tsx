@@ -27,6 +27,7 @@ export default function Macro() {
         activeKey={activeTab}
         onChange={setActiveTab}
         size="large"
+        destroyInactiveTabPane
         items={[
           {
             key: "prices",

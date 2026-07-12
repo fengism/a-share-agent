@@ -241,10 +241,12 @@ async def get_stock_risk_data(code: str) -> Any:
     async def _fetch_all():
         from app.services.providers import get_provider
         provider = get_provider("eastmoney")
-        fund_flow = await call_blocking(provider.fetch_stock_fund_flow, code, semaphore=misc_semaphore)
-        margin = await call_blocking(provider.fetch_margin_trading, code, semaphore=misc_semaphore)
-        block = await call_blocking(provider.fetch_block_trade, code, semaphore=misc_semaphore)
-        holder = await call_blocking(provider.fetch_holder_num_change, code, semaphore=misc_semaphore)
+        fund_flow, margin, block, holder = await asyncio.gather(
+            call_blocking(provider.fetch_stock_fund_flow, code, semaphore=misc_semaphore),
+            call_blocking(provider.fetch_margin_trading, code, semaphore=misc_semaphore),
+            call_blocking(provider.fetch_block_trade, code, semaphore=misc_semaphore),
+            call_blocking(provider.fetch_holder_num_change, code, semaphore=misc_semaphore),
+        )
         return fund_flow, margin, block, holder
 
     fund_flow, margin, block, holder = await _fetch_all()

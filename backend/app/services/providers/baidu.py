@@ -39,12 +39,20 @@ class BaiduDataProvider(BaseDataProvider):
         self._session.trust_env = False
         # 支持自定义 Cookie（配置为空时使用 http.py 中的内置默认值）
         self._custom_cookie = get_settings().baidu_cookie
+        # 支持 acs-token 配置
+        self._custom_acs_token = get_settings().baidu_acs_token
+        if self._custom_acs_token:
+            self._custom_acs_token = self._custom_acs_token.strip()
+            self.default_headers["acs-token"] = self._custom_acs_token
 
     def _get_cookie_headers(self) -> dict[str, str]:
-        """返回带自定义 Cookie 的请求头副本，避免修改共享常量。"""
-        headers = dict(BD_HEADERS_WITH_COOKIE)
+        """返回带自定义 Cookie 和 acs-token 的请求头副本，避免修改共享常量。"""
+        headers = dict(self.default_headers)
+        headers.update(BD_HEADERS_WITH_COOKIE)
         if self._custom_cookie:
             headers["cookie"] = self._custom_cookie
+        if self._custom_acs_token:
+            headers["acs-token"] = self._custom_acs_token
         return headers
 
     def _request(self, path: str, params: dict, headers: dict | None = None, timeout: int | None = None) -> dict:
@@ -59,10 +67,12 @@ class BaiduDataProvider(BaseDataProvider):
             解析后的 JSON 字典
         """
         url = path if path.startswith("http") else f"{self.DEFAULT_BASE_URL}{path}"
+        effective_headers = headers or self.default_headers
+        logger.debug(f"Baidu request: {url}, headers_keys={list(effective_headers.keys())}")
         response = self._session.get(
             url,
             params=params,
-            headers=headers or self.default_headers,
+            headers=effective_headers,
             timeout=timeout or self.DEFAULT_TIMEOUT,
         )
         response.raise_for_status()

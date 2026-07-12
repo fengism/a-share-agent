@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Card, Col, Row, Table, Spin, Typography, Tag } from "antd";
 import ReactEChartsCore from "echarts-for-react";
+import echarts from "../../charts/echarts-setup";
 import { useStockFundFlow } from "../../api/queries";
 import { useColors, useStyles } from "../../theme/hooks";
 import { formatAmount } from "../../utils/format";
@@ -104,7 +105,7 @@ export default function FundFlowPanel({ code }: { code: string }) {
       {chartOption && (
         <Card size="small" style={cardStyle} styles={{ body: { padding: 8 } }}>
           <Text style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary, marginBottom: 4, display: "block", paddingLeft: 4 }}>主力净流入走势（近60日）</Text>
-          <ReactEChartsCore option={chartOption} style={{ height: 220 }} notMerge />
+          <ReactEChartsCore echarts={echarts} option={chartOption} style={{ height: 220 }} notMerge />
         </Card>
       )}
 

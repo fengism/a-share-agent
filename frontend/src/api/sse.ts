@@ -18,12 +18,14 @@ export interface AnalysisProgress {
 
 export type ProgressHandler = (event: AnalysisProgress) => void;
 
+const isDev = import.meta.env.DEV;
+
 export function streamAnalysis(code: string, onProgress: ProgressHandler): {
   promise: Promise<AnalysisResult>;
   cancel: () => void;
 } {
   const url = `/api/analysis/${code}/stream`;
-  console.log(`[SSE] 连接: ${url}`);
+  if (isDev) console.log(`[SSE] 连接: ${url}`);
   const eventSource = new EventSource(url);
 
   let resolveResult: (result: AnalysisResult) => void;
@@ -38,26 +40,26 @@ export function streamAnalysis(code: string, onProgress: ProgressHandler): {
 
   for (const eventType of eventTypes) {
     eventSource.addEventListener(eventType, (e: MessageEvent) => {
-      console.log(`[SSE] 事件: ${eventType}, 原始数据:`, e.data);
+      if (isDev) console.log(`[SSE] 事件: ${eventType}, 原始数据:`, e.data);
       let data: AnalysisProgress;
       try {
         data = JSON.parse(e.data);
       } catch (parseErr) {
-        console.error(`[SSE] JSON解析失败:`, e.data, parseErr);
+        if (isDev) console.error(`[SSE] JSON解析失败:`, e.data, parseErr);
         return;
       }
       onProgress(data);
 
       if (data.type === "complete" && data.result) {
-        console.log(`[SSE] 分析完成, rating=${data.result.overall_rating}`);
+        if (isDev) console.log(`[SSE] 分析完成, rating=${data.result.overall_rating}`);
         eventSource.close();
         resolveResult(data.result);
       } else if (data.type === "cached" && data.result) {
-        console.log(`[SSE] 缓存命中, rating=${data.result.overall_rating}`);
+        if (isDev) console.log(`[SSE] 缓存命中, rating=${data.result.overall_rating}`);
         eventSource.close();
         resolveResult(data.result);
       } else if (data.type === "error") {
-        console.error(`[SSE] 服务端错误: ${data.error}`);
+        if (isDev) console.error(`[SSE] 服务端错误: ${data.error}`);
         eventSource.close();
         rejectResult(new Error(data.error || "分析失败"));
       }
@@ -65,17 +67,17 @@ export function streamAnalysis(code: string, onProgress: ProgressHandler): {
   }
 
   eventSource.onopen = () => {
-    console.log(`[SSE] 连接已建立: ${url}`);
+    if (isDev) console.log(`[SSE] 连接已建立: ${url}`);
   };
 
   eventSource.onerror = (e) => {
-    console.error(`[SSE] 连接错误:`, e, `readyState=${eventSource.readyState}`);
+    if (isDev) console.error(`[SSE] 连接错误:`, e, `readyState=${eventSource.readyState}`);
     eventSource.close();
     rejectResult(new Error("连接断开，请重试"));
   };
 
   const cancel = () => {
-    console.log(`[SSE] 主动取消`);
+    if (isDev) console.log(`[SSE] 主动取消`);
     eventSource.close();
   };
 

@@ -51,6 +51,13 @@ export function useStyles() {
         textAlign: "center" as const,
       },
 
+      cardContentStyle: {
+        padding: "14px 16px",
+        background: c.elevatedBg,
+        border: `1px solid ${c.border}`,
+        borderRadius: 10,
+      },
+
       tagStyle: { marginBottom: 8, borderRadius: 999, paddingInline: 10 },
 
       fieldLabelStyle: { marginBottom: 4, color: c.textSecondary, fontSize: 12 },

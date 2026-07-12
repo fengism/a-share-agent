@@ -12,6 +12,7 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
+*.egg-info/
 
 # Node / frontend
 node_modules/
@@ -22,6 +23,8 @@ dist/
 # Local runtime data
 data/
 logs/
+*.sqlite
+*.db
 
 # macOS metadata
 .DS_Store
@@ -35,3 +38,18 @@ note/
 
 # Build artifacts
 *.log
+stock-agent.tar.gz
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage
+coverage/
+.coverage
+
+# Environment overrides
+.env.local
+.env.*.local

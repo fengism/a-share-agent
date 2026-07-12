@@ -4,43 +4,25 @@ import { createChart, LineSeries, HistogramSeries, ColorType, type IChartApi, ty
 import { useIndicators } from "../api/queries";
 import type { TechnicalIndicators } from "../types/stock";
 import { useColors } from "../styles/ui";
+import type { ThemeColors } from "../theme/themes";
+import { toBusinessDay, hexToRgba } from "./utils";
 
 type Props = { code: string };
 type IndicatorType = "macd" | "rsi" | "kdj";
-
-function toBusinessDay(value: string): BusinessDay | null {
-  const text = String(value || "").trim();
-  if (!text) return null;
-  const normalized = /^\d{8}$/.test(text)
-    ? `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}`
-    : /^\d{4}[/-]\d{2}[/-]\d{2}/.test(text)
-      ? text.slice(0, 10).replace(/\//g, "-")
-      : null;
-  if (!normalized) return null;
-  const [year, month, day] = normalized.split("-").map(Number);
-  return year && month && day ? { year, month, day } : null;
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
 
 
 function macdChart(
   chart: IChartApi,
   seriesData: TechnicalIndicators["series"],
   dates: BusinessDay[],
-
+  c: ThemeColors,
 ) {
   const dif = chart.addSeries(LineSeries, {
-    color: "#4a9eff", lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
+    color: c.primary, lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.01, formatter: (v: number) => v.toFixed(2) },
   });
   const dea = chart.addSeries(LineSeries, {
-    color: "#f5a623", lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
+    color: c.accent, lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.01, formatter: (v: number) => v.toFixed(2) },
   });
   const hist = chart.addSeries(HistogramSeries, {
@@ -56,7 +38,7 @@ function macdChart(
     const h = seriesData.macd_hist?.[i];
     const d = seriesData.dif?.[i];
     const e = seriesData.dea?.[i];
-    if (h != null) histData.push({ time: dates[i], value: h, color: h >= 0 ? "#e74c3c" : "#2ecc71" });
+    if (h != null) histData.push({ time: dates[i], value: h, color: h >= 0 ? c.up : c.down });
     if (d != null) difData.push({ time: dates[i], value: d });
     if (e != null) deaData.push({ time: dates[i], value: e });
   }
@@ -74,10 +56,10 @@ function rsiChart(
   chart: IChartApi,
   series: TechnicalIndicators["series"],
   dates: BusinessDay[],
-
+  c: ThemeColors,
 ) {
   const rsiLine = chart.addSeries(LineSeries, {
-    color: "#ab47bc", lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
+    color: c.accent, lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.1, formatter: (v: number) => v.toFixed(1) },
   });
 
@@ -90,10 +72,10 @@ function rsiChart(
 
   // Reference lines at 70 and 30 using price line series
   const ref70 = chart.addSeries(LineSeries, {
-    color: hexToRgba("#e74c3c", 0.3), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+    color: hexToRgba(c.up, 0.3), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
   });
   const ref30 = chart.addSeries(LineSeries, {
-    color: hexToRgba("#2ecc71", 0.3), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+    color: hexToRgba(c.down, 0.3), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
   });
 
   if (data.length >= 2) {
@@ -116,18 +98,18 @@ function kdjChart(
   chart: IChartApi,
   series: TechnicalIndicators["series"],
   dates: BusinessDay[],
-
+  c: ThemeColors,
 ) {
   const kLine = chart.addSeries(LineSeries, {
-    color: "#4a9eff", lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
+    color: c.primary, lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.01, formatter: (v: number) => v.toFixed(2) },
   });
   const dLine = chart.addSeries(LineSeries, {
-    color: "#f5a623", lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
+    color: c.accent, lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.01, formatter: (v: number) => v.toFixed(2) },
   });
   const jLine = chart.addSeries(LineSeries, {
-    color: "#ab47bc", lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
+    color: c.textSecondary, lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.01, formatter: (v: number) => v.toFixed(2) },
   });
 
@@ -186,13 +168,13 @@ export default function IndicatorSubCharts({ code }: Props) {
 
     switch (indicatorType) {
       case "macd":
-        macdChart(chart, indicators.series, dates);
+        macdChart(chart, indicators.series, dates, c);
         break;
       case "rsi":
-        rsiChart(chart, indicators.series, dates);
+        rsiChart(chart, indicators.series, dates, c);
         break;
       case "kdj":
-        kdjChart(chart, indicators.series, dates);
+        kdjChart(chart, indicators.series, dates, c);
         break;
     }
 
@@ -208,7 +190,7 @@ export default function IndicatorSubCharts({ code }: Props) {
       chart.remove();
       chartInstanceRef.current = null;
     };
-  }, [indicatorType, indicators, c.cardBg, c.border, c.down, c.textMuted, c.textSecondary, c.up, c.primary]);
+  }, [indicatorType, indicators, c]);
 
   return (
     <div>

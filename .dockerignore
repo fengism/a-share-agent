@@ -1,14 +1,56 @@
+# Git
 .git
+.gitignore
+
+# Claude local state
 .claude
+
+# 环境配置
 .env
+.env.*
+!.env.example
+
+# Python 缓存
 *.pyc
+*.pyo
 __pycache__
-node_modules
+**/__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
 .venv
+**/.venv
+
+# Node / 前端依赖和构建
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+
+# 数据和日志（通过 volume 挂载）
 data
 logs
+*.db
+*.sqlite
+
+# 测试
+backend/tests
+**/tests
+
+# 文档
 docs/superpowers
 note
-backend/tests
-backend/.venv
-frontend/node_modules
+*.md
+LICENSE
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+**/._*

@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import React, { type RefObject } from "react";
 import type { ChatDisplayMessage } from "../../../types/chat";
 import { useColors, useStyles } from "../../../theme/hooks";
 import { AssistantMessage } from "./AssistantMessage";
@@ -12,7 +12,7 @@ interface ChatMessageListProps {
   onSelectPrompt: (prompt: string) => void;
 }
 
-export function ChatMessageList({
+export const ChatMessageList = React.memo(function ChatMessageList({
   messages,
   messagesEndRef,
   onPush,
@@ -79,4 +79,4 @@ export function ChatMessageList({
       </div>
     </div>
   );
-}
+});

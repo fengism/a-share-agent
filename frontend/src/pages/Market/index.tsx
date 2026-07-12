@@ -24,6 +24,7 @@ export default function Market() {
         activeKey={activeTab}
         onChange={setActiveTab}
         size="large"
+        destroyInactiveTabPane
         items={[
           { key: "a-index", label: <span><FundOutlined /> A股大盘</span>, children: <AIndexTab /> },
           { key: "fund-flow", label: <span><LineChartOutlined /> 资金流向</span>, children: <FundFlowTab /> },

@@ -63,9 +63,10 @@ class Settings(BaseSettings):
     # 设为 false 时，所有 requests 调用将忽略系统 HTTP_PROXY/HTTPS_PROXY 环境变量
     http_trust_env: bool = False
 
-    # 数据源 Cookie 配置（留空使用内置默认值）
+    # 数据源 Cookie / Token 配置（留空使用内置默认值）
     eastmoney_cookie: str = ""
     baidu_cookie: str = ""
+    baidu_acs_token: str = ""
     ths_cookie: str = ""
 
     # 多 Agent 配置
@@ -191,16 +192,35 @@ def update_settings(patch: dict) -> Settings:
 
         _reset_session()
 
-    # Trigger immediate twitter fetch when account list changes
+    # Trigger immediate twitter fetch when account list changes (async to avoid blocking event loop)
     if "twitter_feeds" in patch:
-        from app.services.providers.twitter import twitter_provider
-        from app.db.twitter_store import save_twitter_posts
+        import asyncio
+
+        async def _async_twitter_fetch(feeds: list[str]) -> None:
+            """异步拉取 Twitter 帖子并持久化，避免阻塞事件循环。"""
+            try:
+                from app.services.providers.twitter import twitter_provider
+                from app.db.twitter_store import save_twitter_posts
+
+                raw = await asyncio.to_thread(twitter_provider.fetch_posts_for_users, feeds)
+                await asyncio.to_thread(save_twitter_posts, [p.model_dump() for p in raw])
+                logger.info(f"twitter_feeds changed, immediate fetch done: {feeds}")
+            except Exception as exc:
+                logger.warning(f"twitter_feeds changed, immediate fetch failed: {exc}")
 
         try:
-            raw = twitter_provider.fetch_posts_for_users(current.twitter_feeds)
-            save_twitter_posts([p.model_dump() for p in raw])
-            logger.info(f"twitter_feeds changed, immediate fetch done: {current.twitter_feeds}")
-        except Exception as exc:
-            logger.warning(f"twitter_feeds changed, immediate fetch failed: {exc}")
+            loop = asyncio.get_running_loop()
+            loop.create_task(_async_twitter_fetch(current.twitter_feeds))
+        except RuntimeError:
+            # No running event loop (e.g. CLI usage) — run synchronously
+            try:
+                from app.services.providers.twitter import twitter_provider
+                from app.db.twitter_store import save_twitter_posts
+
+                raw = twitter_provider.fetch_posts_for_users(current.twitter_feeds)
+                save_twitter_posts([p.model_dump() for p in raw])
+                logger.info(f"twitter_feeds changed, immediate fetch done: {current.twitter_feeds}")
+            except Exception as exc:
+                logger.warning(f"twitter_feeds changed, immediate fetch failed: {exc}")
 
     return current

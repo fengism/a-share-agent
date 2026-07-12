@@ -5,6 +5,8 @@ import { ConfigProvider, Spin, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { useThemeStore, getAntToken } from "./styles/ui";
 import { themes } from "./theme/themes";
+import "./styles/markdown.css";
+import "./styles/analysis-export.css";
 import AppLayout from "./components/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -66,19 +68,19 @@ export default function App() {
             <Suspense fallback={PageFallback}>
               <Routes>
                 <Route element={<AppLayout />}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/market" element={<Market />} />
-                  <Route path="/screener" element={<Screener />} />
-                  <Route path="/daily-review" element={<DailyReviewPage />} />
-                  <Route path="/feed" element={<Feed />} />
-                  <Route path="/analysis" element={<AnalysisEntry />} />
-                  <Route path="/macro" element={<Macro />} />
-                  <Route path="/compare" element={<Compare />} />
-                  <Route path="/industry-chain" element={<IndustryChain />} />
-                  <Route path="/industry-chain/:name" element={<IndustryChain />} />
-                  <Route path="/chat" element={<Chat />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/analysis/:code" element={<Analysis />} />
+                  <Route path="/" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+                  <Route path="/market" element={<ErrorBoundary><Market /></ErrorBoundary>} />
+                  <Route path="/screener" element={<ErrorBoundary><Screener /></ErrorBoundary>} />
+                  <Route path="/daily-review" element={<ErrorBoundary><DailyReviewPage /></ErrorBoundary>} />
+                  <Route path="/feed" element={<ErrorBoundary><Feed /></ErrorBoundary>} />
+                  <Route path="/analysis" element={<ErrorBoundary><AnalysisEntry /></ErrorBoundary>} />
+                  <Route path="/macro" element={<ErrorBoundary><Macro /></ErrorBoundary>} />
+                  <Route path="/compare" element={<ErrorBoundary><Compare /></ErrorBoundary>} />
+                  <Route path="/industry-chain" element={<ErrorBoundary><IndustryChain /></ErrorBoundary>} />
+                  <Route path="/industry-chain/:name" element={<ErrorBoundary><IndustryChain /></ErrorBoundary>} />
+                  <Route path="/chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
+                  <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
+                  <Route path="/analysis/:code" element={<ErrorBoundary><Analysis /></ErrorBoundary>} />
                 </Route>
               </Routes>
             </Suspense>

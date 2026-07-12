@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import pandas as pd
 import time
 from datetime import datetime
 from typing import Awaitable, Callable
@@ -41,33 +40,6 @@ sentiment_data = SimpleNamespace(
     get_stock_sentiment=get_stock_sentiment,
     get_retail_sentiment=get_retail_sentiment,
 )
-
-def _format_institution_forecasts(df) -> list[dict] | None:
-    """Format a raw institution-forecast DataFrame into prompt-ready dicts.
-
-    Param:
-        df: DataFrame with columns 指标, 年度, 预测机构数, 最小值, 均值, 最大值, 行业平均数, 单位
-    Return:
-        list of forecast dicts, or None if df is empty
-    """
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return None
-    rows = []
-    for _, row in df.iterrows():
-        metric = str(row.get("指标", ""))
-        label = "每股收益" if metric == "EPS" else "净利润" if metric == "NET_PROFIT" else metric
-        rows.append({
-            "指标": label,
-            "年度": str(row.get("年度", "")),
-            "预测机构数": row.get("预测机构数"),
-            "最小值": row.get("最小值"),
-            "均值": row.get("均值"),
-            "最大值": row.get("最大值"),
-            "行业平均数": row.get("行业平均数"),
-            "单位": str(row.get("单位", "")).strip(),
-        })
-    return rows
-
 
 def _format_institution_forecasts_from_detail(forecasts: list) -> list[dict] | None:
     """Format a list of ForecastItem details into prompt-ready dicts.
@@ -379,7 +351,7 @@ async def run_analysis(code: str, progress_callback: ProgressCallback | None = N
             market_data=market_json,
         )
 
-        logger.info(f"[Pipeline] prompt ready: code={code}, prompt_length={len(user_content)}，basic_info={user_content}")
+        logger.info(f"[Pipeline] prompt ready: code={code}, prompt_length={len(user_content)}")
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},

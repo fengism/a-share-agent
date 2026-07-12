@@ -10,6 +10,19 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-    allowedHosts: true,
+    allowedHosts: ["localhost", "127.0.0.1"],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-antd": ["antd", "@ant-design/icons"],
+          "vendor-echarts": ["echarts", "echarts-for-react"],
+          "vendor-charts": ["lightweight-charts"],
+          "vendor-pdf": ["html2canvas", "jspdf"],
+        },
+      },
+    },
   },
 });

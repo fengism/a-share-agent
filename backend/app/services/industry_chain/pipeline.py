@@ -1,9 +1,7 @@
 import asyncio
 import json
 import logging
-import re
 
-from app.config import get_settings
 from app.models.industry_chain import IndustryChainProgress, IndustryChainResult
 from app.services.industry_chain.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.services.industry_chain.storage import save_industry_chain
@@ -206,6 +204,8 @@ def _try_extract_llm_report(text: str) -> str | None:
         # 没有找到匹配的结束引号，换 prefix 继续搜索
     return None
 
+
+def _enhance_chart_options(charts: list) -> list:
     """对 LLM 生成的 ECharts option 做后处理，修复常见缺漏。
 
     包括：补全 backgroundColor、tooltip、grid、roam 等关键属性，
@@ -357,7 +357,6 @@ async def run_industry_chain_analysis(
             type="stage_started", stage=_STAGES[2], message="AI 正在生成分析报告...",
         ))
 
-        settings = get_settings()
         user_prompt = build_user_prompt(name, data)
         raw = await llm_chat(
             [
