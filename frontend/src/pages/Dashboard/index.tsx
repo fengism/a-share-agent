@@ -8,9 +8,9 @@ import { formatAmount } from "../../utils/format";
 const { Text } = Typography;
 
 const shortcuts = [
-  { icon: <FundOutlined style={{ fontSize: 24 }} />, title: "市场行情", desc: "热点榜单与龙虎榜", link: "/market", gradientKey: "header" as const },
-  { icon: <MessageOutlined style={{ fontSize: 24 }} />, title: "对话", desc: "AI 智能选股助手", link: "/chat", gradientKey: "elevated" as const },
-  { icon: <RobotOutlined style={{ fontSize: 24 }} />, title: "AI 分析", desc: "输入代码获取深度分析", link: "/analysis", gradientKey: "accent" as const },
+  { icon: <FundOutlined style={{ fontSize: 24 }} />, title: "市场行情", desc: "热点榜单与龙虎榜", link: "/market" },
+  { icon: <MessageOutlined style={{ fontSize: 24 }} />, title: "对话", desc: "AI 智能选股助手", link: "/chat" },
+  { icon: <RobotOutlined style={{ fontSize: 24 }} />, title: "AI 分析", desc: "输入代码获取深度分析", link: "/analysis" },
 ];
 
 const INDEX_NAMES = ["上证指数", "深证成指", "创业板指", "科创50", "沪深300", "中证500"];
@@ -33,16 +33,11 @@ export default function Dashboard() {
   const today = new Date();
   const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
 
-  const shortcutGradients = {
-    header: c.headerGradient,
-    elevated: `linear-gradient(135deg, ${c.elevatedBg}, ${c.cardBg})`,
-    accent: `linear-gradient(135deg, ${c.accent}22, ${c.cardBg})`,
-  };
-
   return (
     <div style={pageContainerStyle}>
-      <div style={{ padding: "16px 0 20px" }}>
-        <Text style={{ fontSize: 18, fontWeight: 600, color: c.textPrimary }}>{dateStr} · 市场概览</Text>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 0 20px" }}>
+        <span style={{ width: 3, height: 18, borderRadius: 2, background: c.primary, display: "inline-block" }} />
+        <Text style={{ fontSize: 18, fontWeight: 600, color: c.textPrimary, letterSpacing: 0.2 }}>{dateStr} · 市场概览</Text>
       </div>
       {mainIndices.length > 0 && (
         <Row gutter={[12, 12]} style={{ marginBottom: 24 }}>
@@ -53,9 +48,10 @@ export default function Dashboard() {
             return (
               <Col xs={24} sm={12} lg={8} key={idx.code}>
                 <div style={{
-                  display: "flex", flexDirection: "column", gap: 4, padding: "14px 18px",
-                  background: isUp ? c.upCardGradient : isDown ? c.downCardGradient : c.elevatedBg,
-                  border: `1px solid ${c.border}`, borderRadius: 10, height: "100%",
+                  display: "flex", flexDirection: "column", gap: 4, padding: "14px 16px",
+                  background: c.elevatedBg,
+                  border: `1px solid ${c.border}`, borderLeft: `3px solid ${color}`,
+                  borderRadius: 8, height: "100%",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <Text style={{ color: c.textSecondary, fontSize: 13, fontWeight: 500 }}>{idx.name}</Text>
@@ -84,16 +80,15 @@ export default function Dashboard() {
               className="dash-shortcut"
               style={{
                 ...cardStyle, cursor: "pointer",
-                background: shortcutGradients[s.gradientKey],
               }}
               styles={{ body: { padding: "20px 24px" } }}
               onClick={() => navigate(s.link)}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{
-                  width: 48, height: 48, borderRadius: 10, background: `${c.primary}20`,
+                  width: 44, height: 44, borderRadius: 8, background: `${c.primary}14`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  color: c.primary, boxShadow: `0 0 12px ${c.primary}33`,
+                  color: c.primary, border: `1px solid ${c.primary}33`,
                 }}>{s.icon}</div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 15, color: c.textPrimary }}>{s.title}</div>

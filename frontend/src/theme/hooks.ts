@@ -26,16 +26,16 @@ export function useStyles() {
       pageDescriptionStyle: { fontSize: 14, marginTop: 8, color: c.textSecondary },
 
       cardStyle: {
-        borderRadius: 12,
+        borderRadius: 10,
         border: `1px solid ${c.border}`,
-        boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.20)",
         background: c.cardBg,
       },
 
       softCardStyle: {
-        borderRadius: 12,
+        borderRadius: 10,
         border: `1px solid ${c.border}`,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
         background: c.nestedBg,
       },
 
@@ -47,7 +47,7 @@ export function useStyles() {
         padding: "14px 16px",
         background: c.elevatedBg,
         border: `1px solid ${c.border}`,
-        borderRadius: 10,
+        borderRadius: 8,
         textAlign: "center" as const,
       },
 
@@ -55,7 +55,7 @@ export function useStyles() {
         padding: "14px 16px",
         background: c.elevatedBg,
         border: `1px solid ${c.border}`,
-        borderRadius: 10,
+        borderRadius: 8,
       },
 
       tagStyle: { marginBottom: 8, borderRadius: 999, paddingInline: 10 },
