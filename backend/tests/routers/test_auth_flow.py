@@ -242,12 +242,13 @@ def test_revoke_missing_invite_returns_404(client):
 
 
 def test_login_lockout_after_repeated_failures(client):
-    from app.utils import login_throttle
+    from app.config import get_settings
 
+    max_failures = get_settings().login_max_failures
     client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"})
 
-    # The first (MAX_FAILURES - 1) wrong attempts are plain 401s ...
-    for _ in range(login_throttle.MAX_FAILURES - 1):
+    # The first (max_failures - 1) wrong attempts are plain 401s ...
+    for _ in range(max_failures - 1):
         r = client.post("/api/auth/login", json={"username": "alice", "password": "wrong"})
         assert r.status_code == 401
 
@@ -262,12 +263,13 @@ def test_login_lockout_after_repeated_failures(client):
 
 
 def test_successful_login_resets_failure_counter(client):
-    from app.utils import login_throttle
+    from app.config import get_settings
 
+    max_failures = get_settings().login_max_failures
     client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"})
 
     # Several failures short of the threshold, then a success clears the counter.
-    for _ in range(login_throttle.MAX_FAILURES - 1):
+    for _ in range(max_failures - 1):
         assert client.post("/api/auth/login", json={"username": "alice", "password": "wrong"}).status_code == 401
     assert client.post("/api/auth/login", json={"username": "alice", "password": "pw123456"}).status_code == 200
 

@@ -4,7 +4,12 @@ After too many *consecutive* failed attempts for a given key (we key logins by
 both username and client IP), the key is locked for a short cool-down. A
 successful login clears the key. State lives in-process (no DB round-trip on the
 hot path) and resets on restart, which is acceptable for slowing password
-guessing. Thresholds are tunable via environment variables.
+guessing.
+
+Thresholds come from application Settings (``login_max_failures`` /
+``login_window_seconds`` / ``login_lock_seconds``), loaded from ``.env`` via
+pydantic-settings, so dev and Docker read them the same way. The Settings import
+is lazy (inside ``_cfg``) to keep this module import-light and easy to unit-test.
 
 Not a substitute for a network-edge rate limiter in a multi-process deployment
 (each worker keeps its own counters); it raises the cost of guessing without new
@@ -12,13 +17,8 @@ infrastructure.
 """
 from __future__ import annotations
 
-import os
 import threading
 import time
-
-MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "5"))       # failures before lockout
-WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "300"))  # rolling window for counting
-LOCK_SECONDS = int(os.getenv("LOGIN_LOCK_SECONDS", "300"))      # cool-down once locked
 
 _lock = threading.Lock()
 # key -> {"fails": int, "first": float, "until": float}
@@ -28,6 +28,14 @@ _state: dict[str, dict] = {}
 def _now() -> float:
     # monotonic: immune to wall-clock changes (all comparisons are durations)
     return time.monotonic()
+
+
+def _cfg() -> tuple[int, int, int]:
+    """(max_failures, window_seconds, lock_seconds) from Settings."""
+    from app.config import get_settings
+
+    s = get_settings()
+    return s.login_max_failures, s.login_window_seconds, s.login_lock_seconds
 
 
 def _remaining(entry: dict, now: float) -> int:
@@ -49,14 +57,15 @@ def record_failure(key: str) -> int:
     lockout, else 0. Counting resets when the window elapses since the first
     failure and the key is not currently locked.
     """
+    max_failures, window_seconds, lock_seconds = _cfg()
     with _lock:
         now = _now()
         entry = _state.get(key)
-        if entry is None or (now - entry["first"] > WINDOW_SECONDS and entry["until"] <= now):
+        if entry is None or (now - entry["first"] > window_seconds and entry["until"] <= now):
             entry = {"fails": 0, "first": now, "until": 0.0}
         entry["fails"] += 1
-        if entry["fails"] >= MAX_FAILURES:
-            entry["until"] = now + LOCK_SECONDS
+        if entry["fails"] >= max_failures:
+            entry["until"] = now + lock_seconds
         _state[key] = entry
         return _remaining(entry, now)
 

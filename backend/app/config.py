@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     # 管理端认证密钥（留空不启用鉴权）
     admin_api_key: str = ""
 
+    # 登录失败限流（防暴力破解，按用户名 + 客户端 IP 双维度计数）
+    login_max_failures: int = 5
+    login_window_seconds: int = 300
+    login_lock_seconds: int = 300
+
     @model_validator(mode="after")
     def apply_provider_defaults(self) -> "Settings":
         """根据 llm_provider 自动填充 base_url 和 model 的默认值。
