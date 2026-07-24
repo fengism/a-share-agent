@@ -334,7 +334,7 @@ export default function IndustryChain() {
       )}
 
       {/* 两栏布局：左报告 · 右历史（始终显示） */}
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+      <div className="two-pane" style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
           {/* 左侧：报告区 */}
           <div style={{ flex: 1, minWidth: 0 }}>
             {result && (
@@ -548,7 +548,7 @@ export default function IndustryChain() {
           </div>
 
           {/* 右侧：历史记录 */}
-          <div style={{ width: 280, flexShrink: 0 }}>
+          <div className="pane-side" style={{ width: 280, flexShrink: 0 }}>
             <div style={{ ...cardStyle, padding: 0, position: "sticky", top: 24 }}>
               <div style={{ padding: "14px 16px", borderBottom: `1px solid ${c.border}` }}>
                 <Text strong style={{ color: c.textPrimary, fontSize: 14 }}>

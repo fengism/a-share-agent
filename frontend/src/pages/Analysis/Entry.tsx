@@ -44,9 +44,9 @@ export default function AnalysisEntry() {
   const grouped = allHistory ? groupByStock(allHistory) : {};
 
   return (
-    <div style={{ display: "flex", gap: 20, minHeight: "calc(100vh - 120px)" }}>
+    <div className="two-pane" style={{ display: "flex", gap: 20, minHeight: "calc(100vh - 120px)" }}>
       {/* Left: History Panel */}
-      <div style={{ width: 280, flexShrink: 0 }}>
+      <div className="pane-side" style={{ width: 280, flexShrink: 0 }}>
         <Card
           style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, height: "100%" }}
           styles={{ body: { padding: 0 } }}

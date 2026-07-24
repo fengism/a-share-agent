@@ -111,7 +111,7 @@ export default function SentimentPanel({ code, analysis }: Props) {
         <Text strong style={{ color: c.textPrimary, fontSize: 13 }}>情绪与热度快照</Text>
         <Text type="secondary" style={{ fontSize: 12 }}>市场关注度概览</Text>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div className="metric-grid cols-3" style={{ gap: 12, marginBottom: 16 }}>
         <Indicator
           label="热度评分"
           value={heatScore != null ? String(heatScore) : "-"}
@@ -127,7 +127,7 @@ export default function SentimentPanel({ code, analysis }: Props) {
         <Text type="secondary" style={{ fontSize: 12 }}>股吧情绪样本</Text>
       </div>
       <Card size="small" title={`散户评论情绪（${retailSentiment?.guba_post_count ?? 0}条）`} extra={<Text type="secondary">股吧帖子聚合</Text>} style={{ ...cardStyle, marginBottom: 16 }} styles={{ body: { padding: 14 } }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+        <div className="metric-grid cols-3" style={{ gap: 12, marginBottom: 16 }}>
           <Indicator label="情绪评分" value={retailSentiment?.score != null ? String(retailSentiment.score) : "-"} colors={tileColors} />
           <Indicator label="讨论帖数" value={`${retailSentiment?.post_count ?? 0}条`} colors={tileColors} />
           <Indicator label="看多占比" value={retailSentiment?.bullish_ratio != null ? `${(retailSentiment.bullish_ratio * 100).toFixed(1)}%` : "-"} colors={tileColors} />

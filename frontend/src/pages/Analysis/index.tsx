@@ -449,7 +449,7 @@ export default function Analysis() {
             style={{ ...cardStyle, marginBottom: 12, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr", gap: 12 }}>
+            <div className="metric-grid cols-3v" style={{ gap: 12 }}>
               <div style={{ padding: "10px 12px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 8 }}>
                 <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>技术结论</div>
                 <div style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.8 }}>{displayResult.technical.summary}</div>
@@ -477,7 +477,7 @@ export default function Analysis() {
             style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
+            <div className="metric-grid cols-3" style={{ gap: 12, marginBottom: 12 }}>
               <div className="pdf-metric-card" style={{ padding: "12px 14px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 10 }}>
                 <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>最新价</div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: c.textPrimary }}>{intradayData.items[intradayData.items.length - 1]?.price?.toFixed(2) ?? "-"}</div>

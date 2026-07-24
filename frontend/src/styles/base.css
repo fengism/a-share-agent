@@ -118,6 +118,28 @@ body {
   opacity: 1;
 }
 
+/* --- Mobile responsiveness helpers ---
+   Desktop layout is driven by existing inline styles; these only kick in
+   at narrow widths, so desktop is unchanged. */
+.metric-grid { display: grid; }
+.metric-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.metric-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.metric-grid.cols-3v { grid-template-columns: 1.3fr 1fr 1fr; }
+@media (max-width: 640px) {
+  .metric-grid.cols-3,
+  .metric-grid.cols-4,
+  .metric-grid.cols-3v { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 380px) {
+  .metric-grid.cols-3,
+  .metric-grid.cols-4 { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .two-pane { flex-direction: column; }
+  /* side panel (history) drops below the main content on mobile */
+  .pane-side { width: 100% !important; order: 2; }
+}
+
 /* Respect users who prefer reduced motion: near-instant transitions,
    no spinners/looping animations. */
 @media (prefers-reduced-motion: reduce) {

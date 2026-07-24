@@ -90,12 +90,12 @@ export default function FundFlowPanel({ code }: { code: string }) {
       {/* Summary cards for latest day */}
       {latest && (
         <Row gutter={[10, 10]}>
-          <Col span={8}><FlowTile label="主力净流入" value={latest.main_net} colors={tileColors} /></Col>
-          <Col span={8}><FlowTile label="超大单净流入" value={latest.super_net} colors={tileColors} /></Col>
-          <Col span={8}><FlowTile label="大单净流入" value={latest.large_net} colors={tileColors} /></Col>
-          <Col span={8}><FlowTile label="中单净流入" value={latest.mid_net} colors={tileColors} /></Col>
-          <Col span={8}><FlowTile label="小单净流入" value={latest.small_net} colors={tileColors} /></Col>
-          <Col span={8}>
+          <Col xs={12} sm={8}><FlowTile label="主力净流入" value={latest.main_net} colors={tileColors} /></Col>
+          <Col xs={12} sm={8}><FlowTile label="超大单净流入" value={latest.super_net} colors={tileColors} /></Col>
+          <Col xs={12} sm={8}><FlowTile label="大单净流入" value={latest.large_net} colors={tileColors} /></Col>
+          <Col xs={12} sm={8}><FlowTile label="中单净流入" value={latest.mid_net} colors={tileColors} /></Col>
+          <Col xs={12} sm={8}><FlowTile label="小单净流入" value={latest.small_net} colors={tileColors} /></Col>
+          <Col xs={12} sm={8}>
             <div style={{ padding: "14px 12px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 10, textAlign: "center" }}>
               <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 4 }}>统计日期</div>
               <div style={{ fontSize: 14, fontWeight: 700, color: c.textPrimary }}>{latest.date}</div>
