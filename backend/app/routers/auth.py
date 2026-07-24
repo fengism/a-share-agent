@@ -6,10 +6,11 @@ an admin.
 """
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.db import user_store
+from app.utils import login_throttle
 from app.utils.auth import generate_invite_code, invite_expiry, now_ts
 from app.models.auth import (
     RegisterRequest,
@@ -73,11 +74,45 @@ def register(req: RegisterRequest) -> AuthResponse:
     return AuthResponse(token=token, user=_user_out(user))
 
 
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP, honouring X-Forwarded-For behind a proxy."""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _throttle_keys(username: str, request: Request) -> list[str]:
+    return [f"user:{username}", f"ip:{_client_ip(request)}"]
+
+
 @router.post("/login", response_model=AuthResponse)
-def login(req: LoginRequest) -> AuthResponse:
+def login(req: LoginRequest, request: Request) -> AuthResponse:
+    keys = _throttle_keys(req.username, request)
+
+    # Reject early if this username or IP is currently locked out.
+    locked = max((login_throttle.retry_after(k) for k in keys), default=0)
+    if locked > 0:
+        raise HTTPException(
+            status_code=429,
+            detail=f"尝试过于频繁，请 {locked} 秒后再试",
+            headers={"Retry-After": str(locked)},
+        )
+
     user = user_store.verify_credentials(req.username, req.password)
     if not user:
+        after = max(login_throttle.record_failure(k) for k in keys)
+        if after > 0:
+            raise HTTPException(
+                status_code=429,
+                detail=f"失败次数过多，已临时锁定，请 {after} 秒后再试",
+                headers={"Retry-After": str(after)},
+            )
         raise HTTPException(status_code=401, detail="用户名或密码错误")
+
+    # Success clears the counters for this username + IP.
+    for k in keys:
+        login_throttle.reset(k)
     token = user_store.create_session(user["id"])
     return AuthResponse(token=token, user=_user_out(user))
 

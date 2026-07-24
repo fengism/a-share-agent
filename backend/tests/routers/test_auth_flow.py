@@ -24,14 +24,19 @@ def client(tmp_path, monkeypatch):
 
     from app.db import init_db
     from app.routers import auth
+    from app.utils import login_throttle
 
     init_db()
+    # All TestClient requests share client IP "testclient", so reset the
+    # in-process login throttle to isolate tests from each other.
+    login_throttle._reset_all()
 
     app = FastAPI()
     app.include_router(auth.router, prefix="/api/auth")
     try:
         yield TestClient(app)
     finally:
+        login_throttle._reset_all()
         conn_mod.close_connection()
         conn_mod._connection = None
 
@@ -234,3 +239,37 @@ def test_cannot_revoke_used_invite(client):
 def test_revoke_missing_invite_returns_404(client):
     admin = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
     assert client.delete("/api/auth/invite/does-not-exist", headers=_auth(admin["token"])).status_code == 404
+
+
+def test_login_lockout_after_repeated_failures(client):
+    from app.utils import login_throttle
+
+    client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"})
+
+    # The first (MAX_FAILURES - 1) wrong attempts are plain 401s ...
+    for _ in range(login_throttle.MAX_FAILURES - 1):
+        r = client.post("/api/auth/login", json={"username": "alice", "password": "wrong"})
+        assert r.status_code == 401
+
+    # ... the attempt hitting the threshold locks the account (429 + Retry-After) ...
+    r = client.post("/api/auth/login", json={"username": "alice", "password": "wrong"})
+    assert r.status_code == 429
+    assert "retry-after" in {k.lower() for k in r.headers.keys()}
+
+    # ... and even the correct password is refused while locked.
+    r = client.post("/api/auth/login", json={"username": "alice", "password": "pw123456"})
+    assert r.status_code == 429
+
+
+def test_successful_login_resets_failure_counter(client):
+    from app.utils import login_throttle
+
+    client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"})
+
+    # Several failures short of the threshold, then a success clears the counter.
+    for _ in range(login_throttle.MAX_FAILURES - 1):
+        assert client.post("/api/auth/login", json={"username": "alice", "password": "wrong"}).status_code == 401
+    assert client.post("/api/auth/login", json={"username": "alice", "password": "pw123456"}).status_code == 200
+
+    # Counter reset → a subsequent failure is a plain 401, not an immediate lock.
+    assert client.post("/api/auth/login", json={"username": "alice", "password": "wrong"}).status_code == 401
