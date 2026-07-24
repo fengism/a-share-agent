@@ -37,3 +37,36 @@ body {
   outline-offset: 2px;
   border-radius: 6px;
 }
+
+/* Interaction states migrated from JS onMouseEnter/Leave to CSS :hover,
+   driven by the theme CSS variables set on <html data-theme> in App.tsx. */
+.al-icon-btn {
+  border: 1px solid var(--c-border);
+  transition: border-color 0.2s;
+}
+.al-icon-btn:hover {
+  border-color: var(--c-primary);
+}
+
+.al-collapse-btn {
+  color: var(--c-text-secondary);
+  transition: color 0.2s;
+}
+.al-collapse-btn:hover {
+  color: var(--c-text-primary);
+}
+
+.al-search-row {
+  transition: background 0.15s ease;
+}
+.al-search-row:hover {
+  background: var(--c-card-bg);
+}
+
+.dash-shortcut {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.dash-shortcut:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}

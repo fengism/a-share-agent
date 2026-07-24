@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useLayoutEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, Spin, theme } from "antd";
@@ -35,6 +35,30 @@ function AntProvider({ children }: { children: React.ReactNode }) {
   const themeKey = useThemeStore((s) => s.themeKey);
   const meta = themes[themeKey];
   const token = getAntToken();
+
+  // Expose the active theme's colors as CSS custom properties on <html>,
+  // so CSS :hover rules (see base.css) can react to theme changes without
+  // per-element JS handlers. Single source of truth: theme/themes.ts.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-theme", themeKey);
+    const cc = meta.colors;
+    const vars: Record<string, string> = {
+      "--c-page-bg": cc.pageBg,
+      "--c-card-bg": cc.cardBg,
+      "--c-elevated-bg": cc.elevatedBg,
+      "--c-nested-bg": cc.nestedBg,
+      "--c-primary": cc.primary,
+      "--c-accent": cc.accent,
+      "--c-up": cc.up,
+      "--c-down": cc.down,
+      "--c-text-primary": cc.textPrimary,
+      "--c-text-secondary": cc.textSecondary,
+      "--c-text-muted": cc.textMuted,
+      "--c-border": cc.border,
+    };
+    for (const k in vars) root.style.setProperty(k, vars[k]);
+  }, [themeKey, meta]);
 
   return (
     <ConfigProvider

@@ -81,15 +81,13 @@ export default function Dashboard() {
           <Col xs={24} md={8} key={s.title}>
             <Card
               hoverable
+              className="dash-shortcut"
               style={{
                 ...cardStyle, cursor: "pointer",
-                transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 background: shortcutGradients[s.gradientKey],
               }}
               styles={{ body: { padding: "20px 24px" } }}
               onClick={() => navigate(s.link)}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.4)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = cardStyle.boxShadow as string; }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{

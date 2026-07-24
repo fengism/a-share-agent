@@ -154,16 +154,14 @@ export default function AppLayout() {
             role="button"
             tabIndex={0}
             aria-label="切换主题"
+            className="al-icon-btn"
             onClick={cycleTheme}
             onKeyDown={onActivate(cycleTheme)}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 36, height: 36, borderRadius: 8, cursor: "pointer",
-              background: c.elevatedBg, border: `1px solid ${c.border}`,
-              transition: "border-color 0.2s",
+              background: c.elevatedBg,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.primary; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; }}
           >
             <BgColorsOutlined style={{ color: c.primary, fontSize: 16 }} />
           </div>
@@ -175,15 +173,14 @@ export default function AppLayout() {
             role="button"
             tabIndex={0}
             aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
+            className="al-collapse-btn"
             onClick={() => setCollapsed(!collapsed)}
             onKeyDown={onActivate(() => setCollapsed(!collapsed))}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 36, height: 36, borderRadius: 8, cursor: "pointer",
-              color: c.textSecondary, fontSize: 14, transition: "color 0.2s",
+              fontSize: 14,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = c.textPrimary; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = c.textSecondary; }}
           >
             {collapsed ? "»" : "«"}
           </div>
@@ -294,15 +291,14 @@ export default function AppLayout() {
                       key={item.code}
                       role="button"
                       tabIndex={0}
+                      className="al-search-row"
                       onClick={() => handleSelect(item.code)}
                       onKeyDown={onActivate(() => handleSelect(item.code))}
                       style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
                         padding: "10px 14px", cursor: "pointer",
-                        borderBottom: `1px solid ${c.border}`, transition: "background 0.15s ease",
+                        borderBottom: `1px solid ${c.border}`,
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = c.cardBg; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ color: c.primary, fontWeight: 600, fontSize: 13, fontFamily: "monospace" }}>{item.code}</span>
