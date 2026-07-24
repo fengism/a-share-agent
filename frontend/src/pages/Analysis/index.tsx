@@ -1,8 +1,7 @@
 import { useParams } from "react-router-dom";
 import { Spin, Card, Segmented, Space, Typography, Row, Col, Tabs, Button, Alert, message } from "antd";
 import { DownloadOutlined, ThunderboltOutlined, StopOutlined } from "@ant-design/icons";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+// html2canvas & jsPDF are loaded lazily inside handleExportPdf (kept out of the initial bundle)
 import { useAnalysisPageData, usePush } from "../../api/queries";
 import PushModal from "../../components/PushModal";
 import type { PushRequest } from "../../types/stock";
@@ -178,6 +177,10 @@ export default function Analysis() {
       setIsExportingPdf(true);
       messageApi.loading({ content: "正在生成 PDF...", key: "export-pdf" });
       await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(exportRef.current, {
         scale: 2,
         useCORS: true,

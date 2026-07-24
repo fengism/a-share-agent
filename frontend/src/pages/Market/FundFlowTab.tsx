@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import ReactECharts from "echarts-for-react";
+import ReactECharts from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
 import { Button, Card, Col, Empty, Row, Spin, Statistic, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";

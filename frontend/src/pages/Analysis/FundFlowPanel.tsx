@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Card, Col, Row, Table, Spin, Typography, Tag } from "antd";
-import ReactEChartsCore from "echarts-for-react";
+import ReactEChartsCore from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
 import { useStockFundFlow } from "../../api/queries";
 import { useColors, useStyles } from "../../theme/hooks";

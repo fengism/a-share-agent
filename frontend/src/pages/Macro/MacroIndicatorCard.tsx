@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import ReactECharts from "echarts-for-react";
+import ReactECharts from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
 import { Card, Col, Empty, Row, Statistic, Typography } from "antd";
 import { useColors, useStyles } from "../../theme/hooks";

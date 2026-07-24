@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Input, Steps, Typography, Spin, Tag, Button, message, Empty, Tooltip, Popover, Modal } from "antd";
 import { SearchOutlined, ApartmentOutlined, CheckCircleOutlined, LoadingOutlined, CloseCircleOutlined, SendOutlined, HistoryOutlined, CloudUploadOutlined, FullscreenOutlined } from "@ant-design/icons";
-import ReactECharts from "echarts-for-react";
+import ReactECharts from "echarts-for-react/lib/core";
 import DOMPurify from "dompurify";
 import echarts from "../../charts/echarts-setup";
 import { streamIndustryChain, type IndustryChainProgress } from "../../api/sse";
