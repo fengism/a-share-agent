@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import stock, market, analysis, screener, daily_review, push, chat, config, industry_chain, macro, stock_aggregate
 from app.utils.rate_limiter import call_blocking
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +79,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="A股智能分析系统", version="0.1.0", lifespan=lifespan)
 
+_cors_origins = [o.strip() for o in get_settings().cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -104,7 +106,7 @@ async def global_exception_handler(request, exc: Exception):
     logger.error("未捕获异常: %s %s error=%s", request.method, request.url.path, exc, exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": f"服务器内部错误: {exc}"},
+        content={"detail": "服务器内部错误，请稍后重试"},
     )
 
 

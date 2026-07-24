@@ -2,6 +2,8 @@ import json
 from typing import Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from app.config import get_settings
 
@@ -20,6 +22,19 @@ def _get_session() -> requests.Session:
     if _session is None:
         _session = requests.Session()
         _session.trust_env = get_settings().http_trust_env
+        # Resilience: retry transient failures with backoff + bounded connection pool.
+        retry = Retry(
+            total=2,
+            connect=2,
+            read=2,
+            backoff_factor=0.3,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset({"GET", "POST"}),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry, pool_connections=20, pool_maxsize=50)
+        _session.mount("http://", adapter)
+        _session.mount("https://", adapter)
     return _session
 
 

@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     # 设为 false 时，所有 requests 调用将忽略系统 HTTP_PROXY/HTTPS_PROXY 环境变量
     http_trust_env: bool = False
 
+    # CORS 允许来源（逗号分隔）。默认仅本地开发端口；生产经 nginx 同源时无需改动，
+    # 若前端部署在独立域名，将该域名加入此列表即可。
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
     # 数据源 Cookie / Token 配置（留空使用内置默认值）
     eastmoney_cookie: str = ""
     baidu_cookie: str = ""

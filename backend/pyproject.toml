@@ -50,3 +50,17 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 asyncio_mode = "auto"
 addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# Conservative baseline: pyflakes (F), import sorting (I) and core pycodestyle (E).
+# Line length is enforced by the formatter, not the linter, so E501 is ignored.
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# self-test/demo blocks and package inits keep their imports/prints
+"**/__init__.py" = ["F401"]
