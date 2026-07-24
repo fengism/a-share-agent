@@ -5,6 +5,7 @@ import { ConfigProvider, Spin, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { useThemeStore, getAntToken } from "./styles/ui";
 import { themes } from "./theme/themes";
+import "./styles/base.css";
 import "./styles/markdown.css";
 import "./styles/analysis-export.css";
 import AppLayout from "./components/AppLayout";
@@ -44,7 +45,7 @@ function AntProvider({ children }: { children: React.ReactNode }) {
           ...token,
           borderRadius: 10,
           fontFamily:
-            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Helvetica Neue", Arial, sans-serif',
         },
       }}
     >

@@ -1,0 +1,31 @@
+/* Global base styles.
+   - tabular-nums keeps financial figures vertically aligned in tables/stats
+   - font smoothing + legibility for crisp CJK + latin text
+   - thin, unobtrusive scrollbars that suit the dark themes */
+
+body {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
