@@ -27,7 +27,10 @@ const Macro = lazy(() => import("./pages/Macro"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false },
+    // Global default staleTime — safety net so any query without its own
+    // staleTime doesn't fall back to 0 (refetch on every mount). Individual
+    // queries still override this with their own tuned values.
+    queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 60 * 1000 },
   },
 });
 
