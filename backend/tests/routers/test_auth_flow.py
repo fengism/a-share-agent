@@ -130,3 +130,52 @@ def test_me_requires_token_and_logout_invalidates_session(client):
     assert client.post("/api/auth/logout", headers=_auth(token)).json() == {"ok": True}
     # Session is gone after logout.
     assert client.get("/api/auth/me", headers=_auth(token)).status_code == 401
+
+
+def test_consumed_invite_leaves_no_orphan_account(client):
+    """Regression: reusing a consumed invite must be rejected AND must not leave
+    a usable orphan account behind (previously the user row was created before
+    the invite was consumed, so a rejected registration could still log in)."""
+    admin = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
+    code = client.post("/api/auth/invite", headers=_auth(admin["token"])).json()["code"]
+
+    # First registration with the invite succeeds.
+    r1 = client.post(
+        "/api/auth/register",
+        json={"username": "bob", "password": "pw123456", "invite_code": code},
+    )
+    assert r1.status_code == 200
+
+    # Reusing the now-consumed invite is rejected ...
+    r2 = client.post(
+        "/api/auth/register",
+        json={"username": "carol", "password": "pw123456", "invite_code": code},
+    )
+    assert r2.status_code == 403
+
+    # ... and no orphan account was created for carol — she cannot log in.
+    login = client.post("/api/auth/login", json={"username": "carol", "password": "pw123456"})
+    assert login.status_code == 401
+
+
+def test_create_account_atomic_rollback(client):
+    """create_account rolls back the user insert when the invite is unavailable,
+    and reports duplicate usernames without creating a second row."""
+    from app.db import user_store
+    from app.utils.auth import generate_invite_code
+
+    admin = user_store.create_user("root", "pw123456", is_admin=True)
+    code = generate_invite_code()
+    user_store.create_invite(admin["id"], code)
+
+    ok_status, ok_user = user_store.create_account("u1", "pw123456", is_admin=False, invite_code=code)
+    assert ok_status == "ok" and ok_user is not None
+
+    # Same code again → invite_taken, and no orphan "u2" survives the rollback.
+    status, user = user_store.create_account("u2", "pw123456", is_admin=False, invite_code=code)
+    assert status == "invite_taken" and user is None
+    assert user_store.get_user_by_username("u2") is None
+
+    # Duplicate username → duplicate status, still exactly one "u1".
+    dup_status, dup_user = user_store.create_account("u1", "pw123456", is_admin=False, invite_code=None)
+    assert dup_status == "duplicate" and dup_user is None

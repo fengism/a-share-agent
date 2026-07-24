@@ -1,5 +1,6 @@
 """Data access for accounts: users, sessions, invites and per-user config."""
 import logging
+import sqlite3
 
 from app.db.connection import get_connection
 from app.utils.auth import (
@@ -37,6 +38,51 @@ def create_user(username: str, password: str, is_admin: bool = False) -> dict:
     )
     conn.commit()
     return get_user_by_id(cur.lastrowid)
+
+
+def create_account(
+    username: str,
+    password: str,
+    *,
+    is_admin: bool,
+    invite_code: str | None,
+) -> tuple[str, dict | None]:
+    """Create a user and, when invite_code is given, consume the invite in the
+    SAME transaction.
+
+    Registration used to create the user first and consume the invite second, so
+    a lost race (or any consume failure) left an orphan account that could still
+    log in. Here the invite is claimed with an atomic guarded UPDATE inside the
+    same transaction as the INSERT; if it can't be claimed, the whole transaction
+    is rolled back and no user row survives.
+
+    Returns (status, user):
+      - ("ok", user)            success
+      - ("invite_taken", None)  invite already used / expired / lost the race
+      - ("duplicate", None)     username already exists (UNIQUE-constraint race)
+    """
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)",
+            (username, hash_password(password), 1 if is_admin else 0),
+        )
+        user_id = cur.lastrowid
+        if invite_code is not None:
+            now = now_ts()
+            res = conn.execute(
+                "UPDATE invites SET used_by = ?, used_at = ? "
+                "WHERE code = ? AND used_by IS NULL AND (expires_at IS NULL OR expires_at > ?)",
+                (user_id, now, invite_code, now),
+            )
+            if res.rowcount != 1:
+                conn.rollback()  # undo the INSERT — no orphan account
+                return ("invite_taken", None)
+        conn.commit()
+        return ("ok", get_user_by_id(user_id))
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return ("duplicate", None)
 
 
 def verify_credentials(username: str, password: str) -> dict | None:

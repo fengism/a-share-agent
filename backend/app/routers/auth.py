@@ -44,13 +44,21 @@ def register(req: RegisterRequest) -> AuthResponse:
         raise HTTPException(status_code=409, detail="用户名已存在")
 
     is_first = user_store.count_users() == 0
-    if not is_first and not (req.invite_code and user_store.invite_is_valid(req.invite_code)):
-        raise HTTPException(status_code=403, detail="需要有效的邀请码")
+    invite_code: str | None = None
+    if not is_first:
+        invite_code = (req.invite_code or "").strip()
+        if not invite_code or not user_store.invite_is_valid(invite_code):
+            raise HTTPException(status_code=403, detail="需要有效的邀请码")
 
-    user = user_store.create_user(req.username, req.password, is_admin=is_first)
-
-    if not is_first and not user_store.consume_invite(req.invite_code, user["id"]):
-        # Lost a race for the invite — reject to avoid a free account.
+    # Create the user and consume the invite atomically. If the invite can't be
+    # claimed (already used / expired / lost a race), the user insert is rolled
+    # back — so a failed registration never leaves a usable orphan account.
+    status, user = user_store.create_account(
+        req.username, req.password, is_admin=is_first, invite_code=invite_code
+    )
+    if status == "duplicate":
+        raise HTTPException(status_code=409, detail="用户名已存在")
+    if user is None:
         raise HTTPException(status_code=403, detail="邀请码无效或已被使用")
 
     token = user_store.create_session(user["id"])
