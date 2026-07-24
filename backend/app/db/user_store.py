@@ -92,6 +92,15 @@ def verify_credentials(username: str, password: str) -> dict | None:
     return user
 
 
+def update_password(user_id: int, new_password: str) -> None:
+    conn = get_connection()
+    conn.execute(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+        (hash_password(new_password), user_id),
+    )
+    conn.commit()
+
+
 # ── Sessions ───────────────────────────────────────────
 def create_session(user_id: int) -> str:
     token = generate_session_token()
@@ -117,6 +126,23 @@ def delete_session(token: str) -> None:
     conn = get_connection()
     conn.execute("DELETE FROM auth_sessions WHERE token_hash = ?", (hash_token(token),))
     conn.commit()
+
+
+def delete_other_sessions(user_id: int, keep_token_hash: str | None) -> int:
+    """Revoke all of a user's sessions except the one whose token hash is kept.
+
+    Pass keep_token_hash=None to revoke every session. Returns rows deleted.
+    """
+    conn = get_connection()
+    if keep_token_hash:
+        cur = conn.execute(
+            "DELETE FROM auth_sessions WHERE user_id = ? AND token_hash != ?",
+            (user_id, keep_token_hash),
+        )
+    else:
+        cur = conn.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+    conn.commit()
+    return cur.rowcount
 
 
 # ── Invites ────────────────────────────────────────────

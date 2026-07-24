@@ -11,10 +11,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.db import user_store
 from app.utils import login_throttle
-from app.utils.auth import generate_invite_code, invite_expiry, now_ts
+from app.utils.auth import generate_invite_code, invite_expiry, now_ts, verify_password, hash_token
 from app.models.auth import (
     RegisterRequest,
     LoginRequest,
+    ChangePasswordRequest,
     AuthResponse,
     UserOut,
     InviteOut,
@@ -127,6 +128,26 @@ def logout(credentials: HTTPAuthorizationCredentials | None = Depends(_security)
 @router.get("/me", response_model=UserOut)
 def me(user: dict = Depends(get_current_user)) -> UserOut:
     return _user_out(user)
+
+
+@router.post("/change-password")
+def change_password(
+    req: ChangePasswordRequest,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_security),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Change the current user's password after verifying the old one, then
+    revoke every other session (the current device stays logged in)."""
+    if not verify_password(req.old_password, user.get("password_hash", "")):
+        raise HTTPException(status_code=400, detail="原密码错误")
+    if req.old_password == req.new_password:
+        raise HTTPException(status_code=400, detail="新密码不能与原密码相同")
+
+    user_store.update_password(user["id"], req.new_password)
+    keep = hash_token(credentials.credentials) if credentials else None
+    revoked = user_store.delete_other_sessions(user["id"], keep)
+    logger.info("用户修改密码: id=%s, 其它会话已吊销=%s", user["id"], revoked)
+    return {"ok": True, "revoked_sessions": revoked}
 
 
 @router.get("/needs-setup")

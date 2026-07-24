@@ -273,3 +273,45 @@ def test_successful_login_resets_failure_counter(client):
 
     # Counter reset → a subsequent failure is a plain 401, not an immediate lock.
     assert client.post("/api/auth/login", json={"username": "alice", "password": "wrong"}).status_code == 401
+
+
+def test_change_password_success_revokes_other_sessions(client):
+    # Register (session A) and log in again (session B) — two devices.
+    a = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
+    token_a = a["token"]
+    token_b = client.post("/api/auth/login", json={"username": "alice", "password": "pw123456"}).json()["token"]
+    assert client.get("/api/auth/me", headers=_auth(token_a)).status_code == 200
+    assert client.get("/api/auth/me", headers=_auth(token_b)).status_code == 200
+
+    # Change the password from session A.
+    r = client.post(
+        "/api/auth/change-password",
+        headers=_auth(token_a),
+        json={"old_password": "pw123456", "new_password": "newpw12345"},
+    )
+    assert r.status_code == 200
+
+    # Session A (current) still works; session B was revoked.
+    assert client.get("/api/auth/me", headers=_auth(token_a)).status_code == 200
+    assert client.get("/api/auth/me", headers=_auth(token_b)).status_code == 401
+
+    # Old password no longer works; the new one does.
+    assert client.post("/api/auth/login", json={"username": "alice", "password": "pw123456"}).status_code == 401
+    assert client.post("/api/auth/login", json={"username": "alice", "password": "newpw12345"}).status_code == 200
+
+
+def test_change_password_wrong_old_rejected(client):
+    a = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
+    r = client.post(
+        "/api/auth/change-password",
+        headers=_auth(a["token"]),
+        json={"old_password": "WRONG", "new_password": "newpw12345"},
+    )
+    assert r.status_code == 400
+    # Password unchanged: the original still logs in.
+    assert client.post("/api/auth/login", json={"username": "alice", "password": "pw123456"}).status_code == 200
+
+
+def test_change_password_requires_auth(client):
+    r = client.post("/api/auth/change-password", json={"old_password": "x", "new_password": "yyyyyy"})
+    assert r.status_code == 401

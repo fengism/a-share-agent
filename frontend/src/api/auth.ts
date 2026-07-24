@@ -13,6 +13,10 @@ export function logoutApi() {
   return apiPost<{ ok: boolean }>("/auth/logout");
 }
 
+export function changePasswordApi(body: { old_password: string; new_password: string }) {
+  return apiPost<{ ok: boolean; revoked_sessions?: number }>("/auth/change-password", body);
+}
+
 export function meApi() {
   return apiGet<AuthUser>("/auth/me");
 }

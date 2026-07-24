@@ -31,6 +31,7 @@ import { useConfig, useUpdateConfig, useInvites, useCreateInvite, useRevokeInvit
 import type { ConfigUpdate, ProviderDefault } from "../../types/settings";
 import type { InviteItem } from "../../types/auth";
 import { useAuthStore } from "../../store/authStore";
+import ChangePasswordCard from "../../components/ChangePasswordCard";
 import { useStyles, useColors } from "../../styles/ui";
 
 const { Text } = Typography;
@@ -444,6 +445,9 @@ export default function SettingsPage() {
           )}
         </p>
       </div>
+
+      {/* 账号安全（所有登录用户） */}
+      <ChangePasswordCard />
 
       {/* 邀请码管理（仅管理员） */}
       {isAdmin && <InviteManagerCard />}
