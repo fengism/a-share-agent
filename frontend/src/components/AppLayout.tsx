@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState } from "react";
-import { Layout, Input, Menu, Typography, Tooltip, type InputRef } from "antd";
+import { Layout, Input, Menu, Typography, Tooltip, Drawer, Grid, Button, type InputRef } from "antd";
 import {
   SearchOutlined, HomeOutlined, FundOutlined, FilterOutlined,
   LineChartOutlined, FileTextOutlined, MessageOutlined, SettingOutlined,
   ClockCircleOutlined, ApartmentOutlined, GlobalOutlined,
-  BgColorsOutlined,
+  BgColorsOutlined, MenuOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useStockSearch } from "../api/queries";
@@ -14,6 +14,7 @@ import type { ThemeKey } from "../styles/ui";
 
 const { Header, Sider, Content } = Layout;
 const { Title } = Typography;
+const { useBreakpoint } = Grid;
 
 const NAV_ITEMS = [
   { key: "/", icon: <HomeOutlined />, label: "首页" },
@@ -35,6 +36,7 @@ export default function AppLayout() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { data: results = [], isFetching } = useStockSearch(searchQuery);
   const searchRef = useRef<InputRef>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,10 +45,15 @@ export default function AppLayout() {
   const s = useStyles();
   const themeKey = useThemeStore((st) => st.themeKey);
   const setThemeKey = useThemeStore((st) => st.setThemeKey);
+  const screens = useBreakpoint();
+  const isMobile = !screens.md; // < 768px
 
   const activeKey = getActiveKey(location.pathname);
 
-  const handleNavClick = useCallback((key: string) => navigate(key), [navigate]);
+  const handleNavClick = useCallback((key: string) => {
+    navigate(key);
+    setMobileNavOpen(false);
+  }, [navigate]);
 
   const handleSearchChange = useCallback((val: string) => {
     const trimmed = val.trim();
@@ -85,87 +92,91 @@ export default function AppLayout() {
     setThemeKey(keys[(idx + 1) % keys.length] as ThemeKey);
   }, [themeKey, setThemeKey]);
 
-  return (
-    <Layout style={{ minHeight: "100vh", background: c.pageBg }}>
-      {/* Sidebar */}
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        width={200}
-        collapsedWidth={64}
+  // Keyboard activation for role="button" elements (Enter / Space)
+  const onActivate = (fn: () => void) => (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fn();
+    }
+  };
+
+  // Shared sidebar content, reused by the desktop Sider and the mobile Drawer.
+  const sideNavInner = (isCollapsed: boolean) => (
+    <>
+      {/* Logo */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="返回首页"
         style={{
-          background: themes[themeKey].siderBg,
-          borderRight: `1px solid ${c.border}`,
-          position: "fixed",
-          left: 0, top: 0, bottom: 0,
-          zIndex: 110,
-          display: "flex",
-          flexDirection: "column",
+          display: "flex", alignItems: "center",
+          justifyContent: isCollapsed ? "center" : "flex-start",
+          gap: 10,
+          padding: isCollapsed ? "16px 0" : "16px 18px",
+          borderBottom: `1px solid ${c.border}`,
+          height: 56, cursor: "pointer",
         }}
-        trigger={null}
+        onClick={() => handleNavClick("/")}
+        onKeyDown={onActivate(() => handleNavClick("/"))}
       >
-        {/* Logo */}
-        <div
-          style={{
-            display: "flex", alignItems: "center",
-            justifyContent: collapsed ? "center" : "flex-start",
-            gap: 10,
-            padding: collapsed ? "16px 0" : "16px 18px",
-            borderBottom: `1px solid ${c.border}`,
-            height: 56, cursor: "pointer",
-          }}
-          onClick={() => navigate("/")}
-        >
-          <div style={{
-            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-            background: c.logoGradient,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <LineChartOutlined style={{ color: "#fff", fontSize: 16 }} />
-          </div>
-          {!collapsed && (
-            <Title level={4} style={{ margin: 0, color: c.textPrimary, whiteSpace: "nowrap", fontSize: 15 }}>
-              A股智能分析
-            </Title>
-          )}
-        </div>
-
-        {/* Nav Menu */}
-        <Menu
-          mode="inline"
-          selectedKeys={[activeKey]}
-          items={NAV_ITEMS}
-          onClick={({ key }) => handleNavClick(key)}
-          style={{ border: "none", background: "transparent", flex: 1, marginTop: 4 }}
-        />
-
-        {/* Bottom actions */}
         <div style={{
-          borderTop: `1px solid ${c.border}`,
-          display: "flex", flexDirection: "column", alignItems: "center",
-          padding: "8px 0", gap: 4,
+          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+          background: c.logoGradient,
+          display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          {/* Theme switcher */}
-          <Tooltip title={`切换主题：${THEME_LIST.find((t) => t.key === themeKey)?.label}`} placement="right">
-            <div
-              onClick={cycleTheme}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 36, height: 36, borderRadius: 8, cursor: "pointer",
-                background: c.elevatedBg, border: `1px solid ${c.border}`,
-                transition: "border-color 0.2s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.primary; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; }}
-            >
-              <BgColorsOutlined style={{ color: c.primary, fontSize: 16 }} />
-            </div>
-          </Tooltip>
+          <LineChartOutlined style={{ color: "#fff", fontSize: 16 }} />
+        </div>
+        {!isCollapsed && (
+          <Title level={4} style={{ margin: 0, color: c.textPrimary, whiteSpace: "nowrap", fontSize: 15 }}>
+            A股智能分析
+          </Title>
+        )}
+      </div>
 
-          {/* Collapse toggle */}
+      {/* Nav Menu */}
+      <Menu
+        mode="inline"
+        selectedKeys={[activeKey]}
+        items={NAV_ITEMS}
+        onClick={({ key }) => handleNavClick(key)}
+        style={{ border: "none", background: "transparent", flex: 1, marginTop: 4 }}
+      />
+
+      {/* Bottom actions */}
+      <div style={{
+        borderTop: `1px solid ${c.border}`,
+        display: "flex", flexDirection: "column", alignItems: "center",
+        padding: "8px 0", gap: 4,
+      }}>
+        {/* Theme switcher */}
+        <Tooltip title={`切换主题：${THEME_LIST.find((t) => t.key === themeKey)?.label}`} placement="right">
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="切换主题"
+            onClick={cycleTheme}
+            onKeyDown={onActivate(cycleTheme)}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 36, height: 36, borderRadius: 8, cursor: "pointer",
+              background: c.elevatedBg, border: `1px solid ${c.border}`,
+              transition: "border-color 0.2s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.primary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; }}
+          >
+            <BgColorsOutlined style={{ color: c.primary, fontSize: 16 }} />
+          </div>
+        </Tooltip>
+
+        {/* Collapse toggle — desktop only */}
+        {!isMobile && (
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
             onClick={() => setCollapsed(!collapsed)}
+            onKeyDown={onActivate(() => setCollapsed(!collapsed))}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 36, height: 36, borderRadius: 8, cursor: "pointer",
@@ -176,19 +187,75 @@ export default function AppLayout() {
           >
             {collapsed ? "»" : "«"}
           </div>
-        </div>
-      </Sider>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <Layout style={{ minHeight: "100vh", background: c.pageBg }}>
+      {/* Desktop sidebar (fixed) */}
+      {!isMobile && (
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={setCollapsed}
+          width={200}
+          collapsedWidth={64}
+          style={{
+            background: themes[themeKey].siderBg,
+            borderRight: `1px solid ${c.border}`,
+            position: "fixed",
+            left: 0, top: 0, bottom: 0,
+            zIndex: 110,
+            display: "flex",
+            flexDirection: "column",
+          }}
+          trigger={null}
+        >
+          {sideNavInner(collapsed)}
+        </Sider>
+      )}
+
+      {/* Mobile navigation drawer */}
+      {isMobile && (
+        <Drawer
+          placement="left"
+          open={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
+          width={240}
+          closable={false}
+          styles={{
+            body: {
+              padding: 0, display: "flex", flexDirection: "column",
+              background: themes[themeKey].siderBg,
+            },
+            header: { display: "none" },
+          }}
+        >
+          {sideNavInner(false)}
+        </Drawer>
+      )}
 
       {/* Main area */}
-      <Layout style={{ marginLeft: collapsed ? 64 : 200, transition: "margin-left 0.2s" }}>
+      <Layout style={{ marginLeft: isMobile ? 0 : collapsed ? 64 : 200, transition: "margin-left 0.2s" }}>
         <Header style={{
-          display: "flex", alignItems: "center", justifyContent: "flex-end",
-          padding: "0 24px", background: themes[themeKey].headerBg,
+          display: "flex", alignItems: "center", gap: 12,
+          padding: isMobile ? "0 12px" : "0 24px", background: themes[themeKey].headerBg,
           borderBottom: `1px solid ${c.border}`,
           position: "sticky", top: 0, zIndex: 100,
           boxShadow: "0 1px 4px rgba(0,0,0,0.2)", height: 56,
         }}>
-          <div style={{ position: "relative", maxWidth: 400, width: "100%" }}>
+          {isMobile && (
+            <Button
+              type="text"
+              aria-label="打开导航菜单"
+              icon={<MenuOutlined style={{ fontSize: 18 }} />}
+              onClick={() => setMobileNavOpen(true)}
+              style={{ color: c.textPrimary, flexShrink: 0 }}
+            />
+          )}
+          <div style={{ position: "relative", maxWidth: 400, width: "100%", marginLeft: "auto" }}>
             <Input.Search
               ref={searchRef}
               placeholder="输入股票代码或名称"
@@ -225,7 +292,10 @@ export default function AppLayout() {
                   results.map((item) => (
                     <div
                       key={item.code}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleSelect(item.code)}
+                      onKeyDown={onActivate(() => handleSelect(item.code))}
                       style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
                         padding: "10px 14px", cursor: "pointer",
@@ -259,7 +329,7 @@ export default function AppLayout() {
           </div>
         </Header>
 
-        <Content style={{ padding: "20px 24px", minHeight: "calc(100vh - 56px)" }}>
+        <Content style={{ padding: isMobile ? "16px 12px" : "20px 24px", minHeight: "calc(100vh - 56px)" }}>
           <Outlet />
         </Content>
       </Layout>
