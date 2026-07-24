@@ -128,7 +128,7 @@ export default function AnalysisEntry() {
         </div>
         <Card
           style={{
-            borderRadius: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
+            borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.18)",
             padding: "8px 0", width: "100%", maxWidth: 560,
             background: c.cardBg, border: `1px solid ${c.border}`,
           }}

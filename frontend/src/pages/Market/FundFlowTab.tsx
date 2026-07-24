@@ -85,17 +85,17 @@ export default function FundFlowTab() {
     <div>
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} md={8}>
-          <Card style={{ borderRadius: 12 }}>
+          <Card style={{ borderRadius: 8 }}>
             <Statistic title="北向合计净买入" value={formatYi(latest?.total)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.total, c) }} />
           </Card>
         </Col>
         <Col xs={24} md={8}>
-          <Card style={{ borderRadius: 12 }}>
+          <Card style={{ borderRadius: 8 }}>
             <Statistic title="沪股通净买入" value={formatYi(latest?.hgt)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.hgt, c) }} />
           </Card>
         </Col>
         <Col xs={24} md={8}>
-          <Card style={{ borderRadius: 12 }}>
+          <Card style={{ borderRadius: 8 }}>
             <Statistic title="深股通净买入" value={formatYi(latest?.sgt)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.sgt, c) }} />
           </Card>
         </Col>
@@ -108,7 +108,7 @@ export default function FundFlowTab() {
             刷新
           </Button>
         }
-        style={{ borderRadius: 12 }}
+        style={{ borderRadius: 8 }}
       >
         <div style={{ marginBottom: 12 }}>
           <Text type="secondary">

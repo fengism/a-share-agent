@@ -446,7 +446,7 @@ export default function Analysis() {
           <Card
             size="small"
             className="pdf-avoid-break"
-            style={{ ...cardStyle, marginBottom: 12, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+            style={{ ...cardStyle, marginBottom: 12, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
             styles={{ body: { padding: "12px 16px" } }}
           >
             <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr", gap: 12 }}>
@@ -474,7 +474,7 @@ export default function Analysis() {
             className="pdf-avoid-break"
             title={<span style={{ fontWeight: 700, color: c.textPrimary }}>最新分时图</span>}
             extra={<span style={{ fontSize: 12, color: c.textSecondary }}>当日分时走势与成交量</span>}
-            style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+            style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
             styles={{ body: { padding: "12px 16px" } }}
           >
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
@@ -500,7 +500,7 @@ export default function Analysis() {
             size="small"
             className="pdf-avoid-break"
             title={<span style={{ fontWeight: 700, color: c.textPrimary }}>最新分时图</span>}
-            style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+            style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
             styles={{ body: { padding: "32px 16px", textAlign: "center" } }}
           >
             <Spin />
@@ -512,7 +512,7 @@ export default function Analysis() {
           size="small"
           className="pdf-avoid-break"
           title={<span style={{ fontWeight: 700, color: c.textPrimary }}>K线图</span>}
-          style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+          style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
           extra={
             <Space size={10} style={{ background: c.nestedBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: "6px 8px" }}>
               <Segmented
@@ -549,7 +549,7 @@ export default function Analysis() {
         {/* Tabs */}
         <Card
           size="small"
-          style={{ ...cardStyle, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+          style={{ ...cardStyle, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
           styles={{ body: { padding: "10px 16px 14px", background: c.nestedBg, borderRadius: 8 } }}
         >
           {isExportingPdf ? (

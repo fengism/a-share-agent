@@ -71,6 +71,17 @@ function AntProvider({ children }: { children: React.ReactNode }) {
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Helvetica Neue", Arial, sans-serif',
         },
+        components: {
+          // Institutional/terminal table feel: subtle header band, crisp
+          // hairline separators, quiet row hover — applied app-wide.
+          Table: {
+            headerBg: meta.colors.nestedBg,
+            headerColor: meta.colors.textSecondary,
+            borderColor: meta.colors.border,
+            rowHoverBg: meta.colors.elevatedBg,
+            headerSplitColor: "transparent",
+          },
+        },
       }}
     >
       {children}
