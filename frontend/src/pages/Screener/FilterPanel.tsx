@@ -19,7 +19,7 @@ interface RangeFieldProps {
 function RangeField({ label, min, max, onMinChange, onMaxChange, minPlaceholder = "最小", maxPlaceholder = "最大", step = 0.01 }: RangeFieldProps) {
   const { fieldLabelStyle } = useStyles();
   return (
-    <Col span={8}>
+    <Col xs={24} sm={12} md={8}>
       <div style={fieldLabelStyle}>{label}</div>
       <Space.Compact style={{ width: "100%" }}>
         <InputNumber style={{ width: "50%" }} value={min} onChange={onMinChange} placeholder={minPlaceholder} step={step} size="small" />
@@ -66,11 +66,11 @@ export default function FilterPanel({
       </Row>
 
       <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <div style={fieldLabelStyle}>行业板块</div>
           <Select mode="multiple" style={{ width: "100%" }} placeholder="选择行业（可多选）" value={filters.industries || []} onChange={(v) => set({ industries: v.length > 0 ? v : null })} options={industries.map((n) => ({ label: n, value: n }))} size="small" maxTagCount={3} allowClear />
         </Col>
-        <Col span={6}>
+        <Col xs={24} sm={12} md={6}>
           <div style={fieldLabelStyle}>排序</div>
           <Space>
             <Select size="small" value={filters.sort_by} onChange={(v) => set({ sort_by: v })} style={{ width: 100 }} options={[
@@ -82,7 +82,7 @@ export default function FilterPanel({
             ]} />
           </Space>
         </Col>
-        <Col span={6} style={{ textAlign: "right", paddingTop: 20 }}>
+        <Col xs={24} sm={12} md={6} style={{ textAlign: "right", paddingTop: 20 }}>
           <Space>
             <Button icon={<ReloadOutlined />} onClick={onReset} size="small">重置</Button>
             <Button type="primary" icon={<SearchOutlined />} onClick={onSearch} size="small">筛选</Button>
@@ -100,11 +100,11 @@ export default function FilterPanel({
         </Col>
         {showPercentile && (
           <>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <div style={fieldLabelStyle}>PE百分位 ≤ {pePercentileMax}%</div>
               <Slider min={0} max={100} value={pePercentileMax} onChange={onPePercentileMaxChange} marks={{ 0: "0%", 30: "30%", 50: "50%", 100: "100%" }} />
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <div style={fieldLabelStyle}>PB百分位 ≤ {pbPercentileMax}%</div>
               <Slider min={0} max={100} value={pbPercentileMax} onChange={onPbPercentileMaxChange} marks={{ 0: "0%", 30: "30%", 50: "50%", 100: "100%" }} />
             </Col>
