@@ -315,3 +315,42 @@ def test_change_password_wrong_old_rejected(client):
 def test_change_password_requires_auth(client):
     r = client.post("/api/auth/change-password", json={"old_password": "x", "new_password": "yyyyyy"})
     assert r.status_code == 401
+
+
+def test_session_sliding_renewal(client):
+    from app.db import connection as conn_mod
+    from app.db import user_store
+    from app.utils import auth as auth_mod
+
+    alice = user_store.create_user("alice", "pw123456", is_admin=True)
+    conn = conn_mod.get_connection()
+
+    def make(token, expires_at):
+        conn.execute(
+            "INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
+            (auth_mod.hash_token(token), alice["id"], expires_at),
+        )
+        conn.commit()
+
+    def expires_of(token):
+        return conn.execute(
+            "SELECT expires_at FROM auth_sessions WHERE token_hash = ?",
+            (auth_mod.hash_token(token),),
+        ).fetchone()["expires_at"]
+
+    cutoff = auth_mod.session_expiry(auth_mod.SESSION_RENEW_THRESHOLD_DAYS)
+
+    # Near-expiry session (1 day left) → renewed past the threshold cutoff.
+    make("near", auth_mod.session_expiry(1))
+    assert user_store.resolve_and_renew_session("near")["id"] == alice["id"]
+    assert expires_of("near") > cutoff
+
+    # Fresh session (full TTL) → left untouched (no needless write).
+    far_val = auth_mod.session_expiry(auth_mod.SESSION_TTL_DAYS)
+    make("far", far_val)
+    user_store.resolve_and_renew_session("far")
+    assert expires_of("far") == far_val
+
+    # Expired session → not resolved.
+    make("dead", auth_mod.session_expiry(-1))
+    assert user_store.resolve_and_renew_session("dead") is None

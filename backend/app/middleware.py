@@ -33,7 +33,9 @@ class UserContextMiddleware:
             try:
                 from app.db import user_store
 
-                user = user_store.get_user_by_token(token)
+                # Resolve the user and slide the session's expiry when near the
+                # end — any authenticated request keeps an active session alive.
+                user = user_store.resolve_and_renew_session(token)
                 if user:
                     reset = set_current_user_id(user["id"])
             except Exception:

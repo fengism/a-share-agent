@@ -10,6 +10,7 @@ from app.utils.auth import (
     generate_session_token,
     session_expiry,
     now_ts,
+    SESSION_RENEW_THRESHOLD_DAYS,
 )
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,35 @@ def get_user_by_token(token: str) -> dict | None:
         (hash_token(token), now_ts()),
     ).fetchone()
     return dict(row) if row else None
+
+
+def resolve_and_renew_session(token: str) -> dict | None:
+    """Resolve the user for a valid session and, if it is within the renewal
+    threshold of expiring, slide its expiry back to a full TTL.
+
+    Returns the user dict (or None for a missing/expired session). Uses a single
+    JOIN read on the common path; the UPDATE only fires when renewal is actually
+    due, so token-bearing reads don't write on every request.
+    """
+    conn = get_connection()
+    th = hash_token(token)
+    row = conn.execute(
+        """SELECT u.*, s.expires_at AS _session_expires
+           FROM auth_sessions s JOIN users u ON u.id = s.user_id
+           WHERE s.token_hash = ? AND s.expires_at > ?""",
+        (th, now_ts()),
+    ).fetchone()
+    if not row:
+        return None
+    if row["_session_expires"] <= session_expiry(SESSION_RENEW_THRESHOLD_DAYS):
+        conn.execute(
+            "UPDATE auth_sessions SET expires_at = ? WHERE token_hash = ?",
+            (session_expiry(), th),
+        )
+        conn.commit()
+    user = dict(row)
+    user.pop("_session_expires", None)
+    return user
 
 
 def delete_session(token: str) -> None:

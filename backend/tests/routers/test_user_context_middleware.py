@@ -65,3 +65,27 @@ def test_invalid_token_falls_back_to_global(ctx):
     client, _, _ = ctx
     body = client.get("/probe", headers=_auth("not-a-real-token")).json()
     assert body["llm_api_key"] != "ALICE_KEY"
+
+
+def test_middleware_slides_near_expiry_session(ctx):
+    client, _, _ = ctx
+    from app.db import connection as conn_mod
+    from app.db import user_store
+    from app.utils import auth as auth_mod
+
+    alice_id = user_store.get_user_by_username("alice")["id"]
+    conn = conn_mod.get_connection()
+    conn.execute(
+        "INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
+        (auth_mod.hash_token("slide-token"), alice_id, auth_mod.session_expiry(1)),
+    )
+    conn.commit()
+
+    # An authenticated request carrying the near-expiry token slides it forward.
+    assert client.get("/probe", headers=_auth("slide-token")).status_code == 200
+
+    new_exp = conn.execute(
+        "SELECT expires_at FROM auth_sessions WHERE token_hash = ?",
+        (auth_mod.hash_token("slide-token"),),
+    ).fetchone()["expires_at"]
+    assert new_exp > auth_mod.session_expiry(auth_mod.SESSION_RENEW_THRESHOLD_DAYS)

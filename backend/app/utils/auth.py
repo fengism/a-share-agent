@@ -12,6 +12,10 @@ from datetime import datetime, timedelta
 _PBKDF2_ROUNDS = 200_000
 _SALT_BYTES = 16
 SESSION_TTL_DAYS = 14
+# Sliding renewal: a still-valid session is extended back to a full TTL once it
+# is within this many days of expiring (so active users stay logged in, while
+# the DB is written at most once per (TTL - threshold) per session).
+SESSION_RENEW_THRESHOLD_DAYS = 7
 _TS_FMT = "%Y-%m-%d %H:%M:%S"
 
 
