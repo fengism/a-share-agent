@@ -162,6 +162,28 @@ def list_invites(created_by: int) -> list[dict]:
     return [dict(r) for r in cur.fetchall()]
 
 
+def revoke_invite(code: str, created_by: int) -> str:
+    """Delete an unused invite created by this admin. Returns:
+    "revoked" (deleted) | "used" (already consumed, kept) | "not_found".
+
+    The DELETE is guarded by ``used_by IS NULL`` so a concurrent consumption
+    (someone registering with it right now) wins the race and the invite is
+    reported as "used" rather than silently deleted.
+    """
+    inv = get_invite(code)
+    if not inv or inv["created_by"] != created_by:
+        return "not_found"
+    if inv["used_by"] is not None:
+        return "used"
+    conn = get_connection()
+    cur = conn.execute(
+        "DELETE FROM invites WHERE code = ? AND created_by = ? AND used_by IS NULL",
+        (code, created_by),
+    )
+    conn.commit()
+    return "revoked" if cur.rowcount == 1 else "used"
+
+
 # ── Per-user config ────────────────────────────────────
 def get_user_config(user_id: int) -> dict[str, str]:
     cur = get_connection().execute("SELECT key, value FROM user_config WHERE user_id = ?", (user_id,))

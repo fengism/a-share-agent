@@ -12,6 +12,7 @@ export interface AuthResponse {
 export interface InviteItem {
   code: string;
   used: boolean;
+  expired?: boolean;
   created_at?: string | null;
   expires_at?: string | null;
 }

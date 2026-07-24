@@ -10,8 +10,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.db import user_store
-from app.utils.auth import generate_invite_code
-from app.models.auth import RegisterRequest, LoginRequest, AuthResponse, UserOut, InviteOut
+from app.utils.auth import generate_invite_code, invite_expiry, now_ts
+from app.models.auth import (
+    RegisterRequest,
+    LoginRequest,
+    AuthResponse,
+    UserOut,
+    InviteOut,
+    CreateInviteRequest,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -94,20 +101,39 @@ def needs_setup() -> dict:
 
 
 def _invite_out(inv: dict) -> InviteOut:
+    used = inv["used_by"] is not None
+    expires_at = inv.get("expires_at")
+    expired = (not used) and bool(expires_at) and expires_at < now_ts()
     return InviteOut(
         code=inv["code"],
-        used=inv["used_by"] is not None,
+        used=used,
+        expired=expired,
         created_at=inv.get("created_at"),
-        expires_at=inv.get("expires_at"),
+        expires_at=expires_at,
     )
 
 
 @router.post("/invite", response_model=InviteOut)
-def create_invite(admin: dict = Depends(require_admin)) -> InviteOut:
-    inv = user_store.create_invite(admin["id"], generate_invite_code())
+def create_invite(
+    req: CreateInviteRequest | None = None,
+    admin: dict = Depends(require_admin),
+) -> InviteOut:
+    expires_at = invite_expiry(req.expires_in_days) if req and req.expires_in_days else None
+    inv = user_store.create_invite(admin["id"], generate_invite_code(), expires_at=expires_at)
     return _invite_out(inv)
 
 
 @router.get("/invites", response_model=list[InviteOut])
 def list_invites(admin: dict = Depends(require_admin)) -> list[InviteOut]:
     return [_invite_out(i) for i in user_store.list_invites(admin["id"])]
+
+
+@router.delete("/invite/{code}")
+def revoke_invite(code: str, admin: dict = Depends(require_admin)) -> dict:
+    """Cancel an unused invite. Already-used invites cannot be revoked."""
+    status = user_store.revoke_invite(code, admin["id"])
+    if status == "not_found":
+        raise HTTPException(status_code=404, detail="邀请码不存在")
+    if status == "used":
+        raise HTTPException(status_code=409, detail="该邀请码已被使用，无法撤销")
+    return {"ok": True}

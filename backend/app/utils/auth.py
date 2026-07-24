@@ -58,6 +58,11 @@ def now_ts() -> str:
     return datetime.now().strftime(_TS_FMT)
 
 
+def invite_expiry(days: int) -> str:
+    """Return an expiry timestamp `days` from now (for invite codes)."""
+    return (datetime.now() + timedelta(days=days)).strftime(_TS_FMT)
+
+
 def generate_invite_code() -> str:
     """Generate a URL-safe invite code."""
     return secrets.token_urlsafe(12)

@@ -14,6 +14,7 @@ import {
   Divider,
   Tag,
   Space,
+  Popconfirm,
 } from "antd";
 import {
   SaveOutlined,
@@ -24,9 +25,11 @@ import {
   TeamOutlined,
   PlusOutlined,
   CopyOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
-import { useConfig, useUpdateConfig, useInvites, useCreateInvite } from "../../api/queries";
+import { useConfig, useUpdateConfig, useInvites, useCreateInvite, useRevokeInvite } from "../../api/queries";
 import type { ConfigUpdate, ProviderDefault } from "../../types/settings";
+import type { InviteItem } from "../../types/auth";
 import { useAuthStore } from "../../store/authStore";
 import { useStyles, useColors } from "../../styles/ui";
 
@@ -46,15 +49,35 @@ function InviteManagerCard() {
   const queryClient = useQueryClient();
   const { data: invites = [], isLoading } = useInvites(true);
   const createInvite = useCreateInvite();
+  const revokeInvite = useRevokeInvite();
+  const [expiresInDays, setExpiresInDays] = useState<number | undefined>(undefined);
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["invites"] });
 
   const handleGenerate = () => {
-    createInvite.mutate(undefined, {
+    createInvite.mutate(expiresInDays, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["invites"] });
+        refresh();
         message.success("已生成新的邀请码");
       },
       onError: (err: Error) => message.error(`生成失败: ${err.message}`),
     });
+  };
+
+  const handleRevoke = (code: string) => {
+    revokeInvite.mutate(code, {
+      onSuccess: () => {
+        refresh();
+        message.success("邀请码已撤销");
+      },
+      onError: (err: Error) => message.error(`撤销失败: ${err.message}`),
+    });
+  };
+
+  const statusTag = (inv: InviteItem) => {
+    if (inv.used) return <Tag color="default">已使用</Tag>;
+    if (inv.expired) return <Tag color="red">已过期</Tag>;
+    return <Tag color="green">未使用</Tag>;
   };
 
   const copyCode = async (code: string) => {
@@ -70,20 +93,34 @@ function InviteManagerCard() {
     <Card
       title={<span><TeamOutlined style={{ marginRight: 8 }} />邀请码管理</span>}
       extra={
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleGenerate}
-          loading={createInvite.isPending}
-        >
-          生成邀请码
-        </Button>
+        <Space>
+          <Select
+            size="small"
+            value={expiresInDays ?? 0}
+            style={{ width: 128 }}
+            onChange={(v) => setExpiresInDays(v === 0 ? undefined : v)}
+            options={[
+              { value: 0, label: "永不过期" },
+              { value: 1, label: "1 天后过期" },
+              { value: 7, label: "7 天后过期" },
+              { value: 30, label: "30 天后过期" },
+            ]}
+          />
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleGenerate}
+            loading={createInvite.isPending}
+          >
+            生成邀请码
+          </Button>
+        </Space>
       }
       style={{ ...cardStyle, marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
     >
       <div style={{ fontSize: 12, color: c.textMuted, marginBottom: 12 }}>
-        新用户注册需填写有效且未使用的邀请码；每个邀请码仅可使用一次。
+        新用户注册需填写有效且未使用的邀请码；每个邀请码仅可使用一次。可为邀请码设置过期时间，未使用的邀请码可随时撤销。
       </div>
       {isLoading ? (
         <div style={{ color: c.textSecondary }}>加载中...</div>
@@ -100,15 +137,34 @@ function InviteManagerCard() {
                 border: `1px solid ${c.border}`, borderRadius: 8,
               }}
             >
-              <code style={{ fontFamily: "monospace", fontSize: 13, color: c.textPrimary, wordBreak: "break-all" }}>
-                {inv.code}
-              </code>
+              <div style={{ minWidth: 0 }}>
+                <code style={{ fontFamily: "monospace", fontSize: 13, color: c.textPrimary, wordBreak: "break-all" }}>
+                  {inv.code}
+                </code>
+                <div style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>
+                  {inv.expires_at ? `过期时间：${inv.expires_at}` : "永不过期"}
+                </div>
+              </div>
               <Space>
-                <Tag color={inv.used ? "default" : "green"}>{inv.used ? "已使用" : "未使用"}</Tag>
+                {statusTag(inv)}
                 {!inv.used && (
                   <Button size="small" icon={<CopyOutlined />} onClick={() => copyCode(inv.code)}>
                     复制
                   </Button>
+                )}
+                {!inv.used && (
+                  <Popconfirm
+                    title="撤销该邀请码？"
+                    description="撤销后将无法用于注册。"
+                    okText="撤销"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => handleRevoke(inv.code)}
+                  >
+                    <Button size="small" danger icon={<DeleteOutlined />} loading={revokeInvite.isPending}>
+                      撤销
+                    </Button>
+                  </Popconfirm>
                 )}
               </Space>
             </div>

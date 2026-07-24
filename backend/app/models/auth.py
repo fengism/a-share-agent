@@ -24,8 +24,14 @@ class AuthResponse(BaseModel):
     user: UserOut
 
 
+class CreateInviteRequest(BaseModel):
+    # Days until the invite expires; omit / null = never expires.
+    expires_in_days: int | None = Field(default=None, ge=1, le=3650)
+
+
 class InviteOut(BaseModel):
     code: str
     used: bool
+    expired: bool = False
     created_at: str | None = None
     expires_at: str | None = None

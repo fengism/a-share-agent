@@ -179,3 +179,58 @@ def test_create_account_atomic_rollback(client):
     # Duplicate username → duplicate status, still exactly one "u1".
     dup_status, dup_user = user_store.create_account("u1", "pw123456", is_admin=False, invite_code=None)
     assert dup_status == "duplicate" and dup_user is None
+
+
+def test_create_invite_with_expiry_sets_expires_at(client):
+    admin = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
+    r = client.post("/api/auth/invite", headers=_auth(admin["token"]), json={"expires_in_days": 7})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["expires_at"] is not None
+    assert body["used"] is False and body["expired"] is False
+
+
+def test_expired_invite_is_rejected(client):
+    from app.db import user_store
+    from app.utils.auth import generate_invite_code, invite_expiry
+
+    admin = user_store.create_user("root", "pw123456", is_admin=True)
+
+    past = generate_invite_code()
+    user_store.create_invite(admin["id"], past, expires_at=invite_expiry(-1))  # already expired
+    assert user_store.invite_is_valid(past) is False
+    status, user = user_store.create_account("bob", "pw123456", is_admin=False, invite_code=past)
+    assert status == "invite_taken" and user is None
+
+    future = generate_invite_code()
+    user_store.create_invite(admin["id"], future, expires_at=invite_expiry(1))
+    assert user_store.invite_is_valid(future) is True
+
+
+def test_revoke_unused_invite(client):
+    admin = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
+    headers = _auth(admin["token"])
+    code = client.post("/api/auth/invite", headers=headers).json()["code"]
+
+    assert client.delete(f"/api/auth/invite/{code}", headers=headers).status_code == 200
+    # A revoked invite is unusable and no longer listed.
+    reg = client.post(
+        "/api/auth/register",
+        json={"username": "bob", "password": "pw123456", "invite_code": code},
+    )
+    assert reg.status_code == 403
+    assert all(i["code"] != code for i in client.get("/api/auth/invites", headers=headers).json())
+
+
+def test_cannot_revoke_used_invite(client):
+    admin = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
+    headers = _auth(admin["token"])
+    code = client.post("/api/auth/invite", headers=headers).json()["code"]
+    client.post("/api/auth/register", json={"username": "bob", "password": "pw123456", "invite_code": code})
+
+    assert client.delete(f"/api/auth/invite/{code}", headers=headers).status_code == 409
+
+
+def test_revoke_missing_invite_returns_404(client):
+    admin = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
+    assert client.delete("/api/auth/invite/does-not-exist", headers=_auth(admin["token"])).status_code == 404
