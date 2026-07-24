@@ -32,6 +32,7 @@ import type { ConfigUpdate, ProviderDefault } from "../../types/settings";
 import type { InviteItem } from "../../types/auth";
 import { useAuthStore } from "../../store/authStore";
 import ChangePasswordCard from "../../components/ChangePasswordCard";
+import AdminResetCard from "../../components/AdminResetCard";
 import { useStyles, useColors } from "../../styles/ui";
 
 const { Text } = Typography;
@@ -451,6 +452,9 @@ export default function SettingsPage() {
 
       {/* 邀请码管理（仅管理员） */}
       {isAdmin && <InviteManagerCard />}
+
+      {/* 用户密码重置（仅管理员） */}
+      {isAdmin && <AdminResetCard />}
 
       {/* LLM Config */}
       <Card

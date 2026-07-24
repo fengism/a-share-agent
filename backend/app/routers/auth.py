@@ -11,7 +11,15 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.db import user_store
 from app.utils import login_throttle
-from app.utils.auth import generate_invite_code, invite_expiry, now_ts, verify_password, hash_token
+from app.utils.auth import (
+    generate_invite_code,
+    generate_session_token,
+    invite_expiry,
+    expiry_in_hours,
+    now_ts,
+    verify_password,
+    hash_token,
+)
 from app.models.auth import (
     RegisterRequest,
     LoginRequest,
@@ -20,6 +28,9 @@ from app.models.auth import (
     UserOut,
     InviteOut,
     CreateInviteRequest,
+    AdminResetLinkRequest,
+    ResetLinkOut,
+    ResetPasswordRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -192,4 +203,55 @@ def revoke_invite(code: str, admin: dict = Depends(require_admin)) -> dict:
         raise HTTPException(status_code=404, detail="邀请码不存在")
     if status == "used":
         raise HTTPException(status_code=409, detail="该邀请码已被使用，无法撤销")
+    return {"ok": True}
+
+
+@router.post("/admin/reset-link", response_model=ResetLinkOut)
+def admin_reset_link(req: AdminResetLinkRequest, admin: dict = Depends(require_admin)) -> ResetLinkOut:
+    """Admin issues a one-time, expiring password-reset token for a user.
+
+    The token is shown to the admin once (to hand over out-of-band); only its
+    hash is stored. No email infrastructure is involved.
+    """
+    target = user_store.get_user_by_username(req.username.strip())
+    if not target:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    token = generate_session_token()
+    expires_at = expiry_in_hours(req.expires_in_hours)
+    user_store.create_password_reset(target["id"], admin["id"], token, expires_at)
+    logger.info("管理员签发密码重置链接: target=%s by admin=%s", target["id"], admin["id"])
+    return ResetLinkOut(username=target["username"], token=token, expires_at=expires_at)
+
+
+@router.post("/reset-password")
+def reset_password(req: ResetPasswordRequest, request: Request) -> dict:
+    """Public: redeem a reset token to set a new password.
+
+    On success every session for that user is revoked (they forgot the
+    password), so all devices must log in again. Throttled by IP.
+    """
+    ip_key = f"reset-ip:{_client_ip(request)}"
+    locked = login_throttle.retry_after(ip_key)
+    if locked > 0:
+        raise HTTPException(
+            status_code=429,
+            detail=f"尝试过于频繁，请 {locked} 秒后再试",
+            headers={"Retry-After": str(locked)},
+        )
+
+    user_id = user_store.consume_password_reset(req.token)
+    if user_id is None:
+        after = login_throttle.record_failure(ip_key)
+        if after > 0:
+            raise HTTPException(
+                status_code=429,
+                detail=f"尝试过于频繁，请 {after} 秒后再试",
+                headers={"Retry-After": str(after)},
+            )
+        raise HTTPException(status_code=400, detail="重置链接无效或已过期")
+
+    login_throttle.reset(ip_key)
+    user_store.update_password(user_id, req.new_password)
+    user_store.delete_other_sessions(user_id, None)  # revoke ALL sessions
+    logger.info("密码经重置链接更新: user=%s", user_id)
     return {"ok": True}

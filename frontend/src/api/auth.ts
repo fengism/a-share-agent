@@ -17,6 +17,14 @@ export function changePasswordApi(body: { old_password: string; new_password: st
   return apiPost<{ ok: boolean; revoked_sessions?: number }>("/auth/change-password", body);
 }
 
+export function adminResetLinkApi(body: { username: string; expires_in_hours?: number }) {
+  return apiPost<{ username: string; token: string; expires_at: string }>("/auth/admin/reset-link", body);
+}
+
+export function resetPasswordApi(body: { token: string; new_password: string }) {
+  return apiPost<{ ok: boolean }>("/auth/reset-password", body);
+}
+
 export function meApi() {
   return apiGet<AuthUser>("/auth/me");
 }

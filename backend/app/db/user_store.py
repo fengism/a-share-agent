@@ -240,6 +240,36 @@ def revoke_invite(code: str, created_by: int) -> str:
     return "revoked" if cur.rowcount == 1 else "used"
 
 
+# ── Password resets (admin-issued one-time links) ──────
+def create_password_reset(user_id: int, created_by: int, token: str, expires_at: str) -> None:
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO password_resets (token_hash, user_id, created_by, expires_at) VALUES (?, ?, ?, ?)",
+        (hash_token(token), user_id, created_by, expires_at),
+    )
+    conn.commit()
+
+
+def consume_password_reset(token: str) -> int | None:
+    """Atomically consume an unused, unexpired reset token.
+
+    Returns the target user_id on success, else None (missing / expired /
+    already used). The guarded UPDATE makes the token strictly single-use.
+    """
+    conn = get_connection()
+    th = hash_token(token)
+    now = now_ts()
+    cur = conn.execute(
+        "UPDATE password_resets SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?",
+        (now, th, now),
+    )
+    conn.commit()
+    if cur.rowcount != 1:
+        return None
+    row = conn.execute("SELECT user_id FROM password_resets WHERE token_hash = ?", (th,)).fetchone()
+    return row["user_id"] if row else None
+
+
 # ── Per-user config ────────────────────────────────────
 def get_user_config(user_id: int) -> dict[str, str]:
     cur = get_connection().execute("SELECT key, value FROM user_config WHERE user_id = ?", (user_id,))

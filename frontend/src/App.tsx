@@ -28,6 +28,7 @@ const Compare = lazy(() => import("./pages/Compare"));
 const Macro = lazy(() => import("./pages/Macro"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -121,6 +122,7 @@ export default function App() {
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route element={<RequireAuth />}>
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />

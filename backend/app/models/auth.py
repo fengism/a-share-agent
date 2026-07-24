@@ -40,3 +40,20 @@ class InviteOut(BaseModel):
     expired: bool = False
     created_at: str | None = None
     expires_at: str | None = None
+
+
+class AdminResetLinkRequest(BaseModel):
+    username: str
+    # Hours until the reset link expires (default 24h, max 7 days).
+    expires_in_hours: int = Field(default=24, ge=1, le=168)
+
+
+class ResetLinkOut(BaseModel):
+    username: str
+    token: str
+    expires_at: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=6, max_length=128)

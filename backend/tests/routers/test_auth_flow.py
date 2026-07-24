@@ -354,3 +354,74 @@ def test_session_sliding_renewal(client):
     # Expired session → not resolved.
     make("dead", auth_mod.session_expiry(-1))
     assert user_store.resolve_and_renew_session("dead") is None
+
+
+def _make_bob_via_invite(client, admin_token):
+    code = client.post("/api/auth/invite", headers=_auth(admin_token)).json()["code"]
+    return client.post(
+        "/api/auth/register",
+        json={"username": "bob", "password": "pw123456", "invite_code": code},
+    ).json()
+
+
+def test_admin_reset_link_and_reset_flow(client):
+    admin = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
+    bob = _make_bob_via_invite(client, admin["token"])
+    bob_token = bob["token"]
+    assert client.get("/api/auth/me", headers=_auth(bob_token)).status_code == 200
+
+    # Admin issues a one-time reset link for bob.
+    link = client.post(
+        "/api/auth/admin/reset-link",
+        headers=_auth(admin["token"]),
+        json={"username": "bob"},
+    )
+    assert link.status_code == 200
+    body = link.json()
+    assert body["username"] == "bob" and body["token"] and body["expires_at"]
+    token = body["token"]
+
+    # Redeem it to set a new password.
+    r = client.post("/api/auth/reset-password", json={"token": token, "new_password": "newbob123"})
+    assert r.status_code == 200
+
+    # All of bob's sessions were revoked; old password no longer works, new does.
+    assert client.get("/api/auth/me", headers=_auth(bob_token)).status_code == 401
+    assert client.post("/api/auth/login", json={"username": "bob", "password": "pw123456"}).status_code == 401
+    assert client.post("/api/auth/login", json={"username": "bob", "password": "newbob123"}).status_code == 200
+
+    # The token is single-use.
+    assert client.post("/api/auth/reset-password", json={"token": token, "new_password": "another99"}).status_code == 400
+
+
+def test_reset_link_requires_admin(client):
+    admin = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
+    bob = _make_bob_via_invite(client, admin["token"])
+    r = client.post("/api/auth/admin/reset-link", headers=_auth(bob["token"]), json={"username": "alice"})
+    assert r.status_code == 403
+
+
+def test_reset_link_unknown_user_returns_404(client):
+    admin = client.post("/api/auth/register", json={"username": "alice", "password": "pw123456"}).json()
+    r = client.post("/api/auth/admin/reset-link", headers=_auth(admin["token"]), json={"username": "ghost"})
+    assert r.status_code == 404
+
+
+def test_reset_password_invalid_token_rejected(client):
+    r = client.post("/api/auth/reset-password", json={"token": "not-a-real-token", "new_password": "whatever6"})
+    assert r.status_code == 400
+
+
+def test_password_reset_single_use_and_expiry(client):
+    from app.db import user_store
+    from app.utils import auth as auth_mod
+
+    admin = user_store.create_user("root", "pw123456", is_admin=True)
+    bob = user_store.create_user("bob", "pw123456", is_admin=False)
+
+    user_store.create_password_reset(bob["id"], admin["id"], "tok1", auth_mod.expiry_in_hours(24))
+    assert user_store.consume_password_reset("tok1") == bob["id"]
+    assert user_store.consume_password_reset("tok1") is None  # single-use
+
+    user_store.create_password_reset(bob["id"], admin["id"], "tok2", auth_mod.expiry_in_hours(-1))
+    assert user_store.consume_password_reset("tok2") is None  # expired

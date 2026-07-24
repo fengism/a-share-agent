@@ -67,6 +67,11 @@ def invite_expiry(days: int) -> str:
     return (datetime.now() + timedelta(days=days)).strftime(_TS_FMT)
 
 
+def expiry_in_hours(hours: int) -> str:
+    """Return an expiry timestamp `hours` from now (for password-reset links)."""
+    return (datetime.now() + timedelta(hours=hours)).strftime(_TS_FMT)
+
+
 def generate_invite_code() -> str:
     """Generate a URL-safe invite code."""
     return secrets.token_urlsafe(12)

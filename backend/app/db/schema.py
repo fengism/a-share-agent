@@ -111,3 +111,18 @@ TABLES.append(
     )
     """
 )
+# ── 管理员签发的一次性密码重置令牌 ──
+TABLES.append(
+    """
+    CREATE TABLE IF NOT EXISTS password_resets (
+        token_hash TEXT    PRIMARY KEY,
+        user_id    INTEGER NOT NULL,
+        created_by INTEGER NOT NULL,
+        created_at TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+        expires_at TEXT    NOT NULL,
+        used_at    TEXT,
+        FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """
+)
