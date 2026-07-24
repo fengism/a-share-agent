@@ -192,28 +192,18 @@ function SummaryItem({ item }: { item: NewsAnalysisItem }) {
                 href={ref.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                className="feed-srctag"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 3,
                   padding: "1px 6px",
                   borderRadius: 3,
-                  background: `${c.primary}14`,
-                  border: "1px solid rgba(59,130,246,0.15)",
                   color: c.primary,
                   fontSize: 10.5,
                   lineHeight: "16px",
                   textDecoration: "none",
-                  transition: "all 0.15s",
                   maxWidth: 200,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(59,130,246,0.16)";
-                  e.currentTarget.style.borderColor = "rgba(59,130,246,0.3)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = `${c.primary}14`;
-                  e.currentTarget.style.borderColor = `${c.primary}26`;
                 }}
               >
                 <LinkOutlined style={{ fontSize: 9, flexShrink: 0 }} />
@@ -328,6 +318,7 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
   const isKuaixun = item.source.includes("快讯");
   return (
     <List.Item
+      className="feed-row"
       style={{
         padding: isKuaixun ? "12px 16px 12px 20px" : "14px 16px",
         borderLeft: isKuaixun ? `3px solid ${KUAIXUN_ACCENT}` : "3px solid transparent",
@@ -335,8 +326,6 @@ function NewsListItem({ item, showSourceTag = true }: { item: FeedNewsItem; show
         transition: "background 0.15s",
         background: isKuaixun ? KUAIXUN_ACCENT_BG : "transparent",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = c.elevatedBg; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = isKuaixun ? KUAIXUN_ACCENT_BG : "transparent"; }}
     >
       <div style={{ width: "100%" }}>
         {/* Row 1: tag + time + author */}

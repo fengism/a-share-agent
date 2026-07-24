@@ -18,7 +18,7 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState("");
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const [pushContent, setPushContent] = useState("");
-  const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
+  // session-row hover (bg + delete-button reveal) is handled purely in CSS
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeAssistantIdRef = useRef<string | null>(null);
   const activeControllerRef = useRef<AbortController | null>(null);
@@ -82,7 +82,6 @@ export default function ChatPage() {
   const handleSessionClick = useCallback((sessionId: string) => {
     if (!isStreaming) {
       setActiveSession(sessionId);
-      setHoveredSessionId(null);
     }
   }, [isStreaming, setActiveSession]);
 
@@ -260,8 +259,7 @@ export default function ChatPage() {
                 <div
                   key={session.id}
                   onClick={() => handleSessionClick(session.id)}
-                  onMouseEnter={() => setHoveredSessionId(session.id)}
-                  onMouseLeave={() => setHoveredSessionId(null)}
+                  className={isActive ? "chat-session active" : "chat-session"}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -269,12 +267,7 @@ export default function ChatPage() {
                     padding: "8px 10px",
                     borderRadius: 8,
                     cursor: isStreaming ? "not-allowed" : "pointer",
-                    background:
-                      hoveredSessionId === session.id && !isActive
-                        ? c.elevatedBg
-                        : isActive
-                          ? `${c.primary}20`
-                          : "transparent",
+                    background: isActive ? `${c.primary}20` : "transparent",
                     border: isActive
                       ? `1px solid ${c.primary}40`
                       : "1px solid transparent",
@@ -294,8 +287,9 @@ export default function ChatPage() {
                   >
                     {session.title}
                   </span>
-                  {hoveredSessionId === session.id && sessions.length > 1 && (
+                  {sessions.length > 1 && (
                     <DeleteOutlined
+                      className="chat-del"
                       onClick={(e) => handleDeleteSession(e, session.id)}
                       style={{
                         fontSize: 12,

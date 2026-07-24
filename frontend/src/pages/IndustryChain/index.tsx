@@ -582,18 +582,13 @@ export default function IndustryChain() {
                       <Tooltip key={`${item.name}-${item.archive_id}`} title={item.summary || item.title} placement="left">
                         <div
                           onClick={() => handleLoadArchive(item)}
+                          className={isActive ? undefined : "hover-mutedrow"}
                           style={{
                             padding: "10px 12px",
                             borderBottom: `1px solid ${c.border}`,
                             cursor: "pointer",
-                            background: isActive ? `${c.primary}26` : "transparent",
+                            background: isActive ? `${c.primary}26` : undefined,
                             transition: "background 0.15s",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isActive) (e.currentTarget as HTMLDivElement).style.background = `${c.textMuted}14`;
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "transparent";
                           }}
                         >
                           <div style={{ color: c.textPrimary, fontSize: 13, fontWeight: 500, marginBottom: 4 }}>

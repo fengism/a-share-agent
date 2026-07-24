@@ -70,3 +70,50 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
+
+/* Remaining hover states migrated from JS to CSS
+   (Feed / Chat / IndustryChain / Analysis Entry). */
+.hover-row {
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+  transition: border-color 0.15s, background 0.15s;
+}
+.hover-row:hover {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.hover-mutedrow {
+  background: transparent;
+  transition: background 0.15s;
+}
+.hover-mutedrow:hover {
+  background: var(--c-muted-soft);
+}
+
+/* base background is set inline (conditional); only override on hover */
+.feed-row:hover {
+  background: var(--c-elevated-bg) !important;
+}
+
+.feed-srctag {
+  background: var(--c-primary-soft);
+  border: 1px solid var(--c-primary-2);
+  transition: background 0.15s, border-color 0.15s;
+}
+.feed-srctag:hover {
+  background: var(--c-primary-2);
+  border-color: var(--c-primary-3);
+}
+
+.chat-session:not(.active):hover {
+  background: var(--c-elevated-bg) !important;
+}
+.chat-del {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.chat-session:hover .chat-del,
+.chat-session:focus-within .chat-del {
+  opacity: 1;
+}

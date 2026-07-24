@@ -56,6 +56,10 @@ function AntProvider({ children }: { children: React.ReactNode }) {
       "--c-text-secondary": cc.textSecondary,
       "--c-text-muted": cc.textMuted,
       "--c-border": cc.border,
+      "--c-primary-soft": `${cc.primary}14`,
+      "--c-primary-2": `${cc.primary}26`,
+      "--c-primary-3": `${cc.primary}4d`,
+      "--c-muted-soft": `${cc.textMuted}14`,
     };
     for (const k in vars) root.style.setProperty(k, vars[k]);
   }, [themeKey, meta]);

@@ -77,14 +77,12 @@ export default function AnalysisEntry() {
                       <div
                         key={`${code}-${dateStr}`}
                         onClick={() => navigate(`/analysis/${code}`)}
+                        className="hover-row"
                         style={{
                           display: "flex", justifyContent: "space-between", alignItems: "center",
                           padding: "8px 10px", marginBottom: 4,
-                          background: c.nestedBg, border: `1px solid ${c.border}`,
-                          borderRadius: 8, cursor: "pointer", transition: "all 0.15s",
+                          borderRadius: 8, cursor: "pointer",
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.primary; e.currentTarget.style.background = `${c.primary}15`; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = c.nestedBg; }}
                       >
                         <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
