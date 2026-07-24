@@ -85,3 +85,11 @@ class TestContainsStockReference:
 
     def test_empty_text(self):
         assert contains_stock_reference("", "600519", "贵州茅台") is False
+
+    def test_name_in_text(self):
+        # name-based matching (code absent from the text)
+        assert contains_stock_reference("贵州茅台今日大涨", "600519", "贵州茅台") is True
+
+    def test_name_alias_strips_st_prefix(self):
+        # "ST平安银行" should also match the bare "平安银行"
+        assert contains_stock_reference("平安银行涨停", "000001", "ST平安银行") is True
