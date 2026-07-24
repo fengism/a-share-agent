@@ -44,9 +44,9 @@ export default function AnalysisEntry() {
   const grouped = allHistory ? groupByStock(allHistory) : {};
 
   return (
-    <div style={{ display: "flex", gap: 20, minHeight: "calc(100vh - 120px)" }}>
+    <div className="two-pane" style={{ display: "flex", gap: 20, minHeight: "calc(100vh - 120px)" }}>
       {/* Left: History Panel */}
-      <div style={{ width: 280, flexShrink: 0 }}>
+      <div className="pane-side" style={{ width: 280, flexShrink: 0 }}>
         <Card
           style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, height: "100%" }}
           styles={{ body: { padding: 0 } }}
@@ -76,15 +76,16 @@ export default function AnalysisEntry() {
                     return (
                       <div
                         key={`${code}-${dateStr}`}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => navigate(`/analysis/${code}`)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/analysis/${code}`); } }}
+                        className="hover-row"
                         style={{
                           display: "flex", justifyContent: "space-between", alignItems: "center",
                           padding: "8px 10px", marginBottom: 4,
-                          background: c.nestedBg, border: `1px solid ${c.border}`,
-                          borderRadius: 8, cursor: "pointer", transition: "all 0.15s",
+                          borderRadius: 8, cursor: "pointer",
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.primary; e.currentTarget.style.background = `${c.primary}15`; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = c.nestedBg; }}
                       >
                         <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -128,7 +129,7 @@ export default function AnalysisEntry() {
         </div>
         <Card
           style={{
-            borderRadius: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
+            borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.18)",
             padding: "8px 0", width: "100%", maxWidth: 560,
             background: c.cardBg, border: `1px solid ${c.border}`,
           }}

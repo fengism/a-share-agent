@@ -48,10 +48,10 @@ export default function AIndexTab() {
                 hoverable
                 onClick={() => setActiveSymbol(idx.code)}
                 style={{
-                  borderRadius: 12,
+                  borderRadius: 8,
                   cursor: "pointer",
-                  border: idx.code === activeSymbol ? "1px solid #1677ff" : "1px solid #f0f0f0",
-                  boxShadow: idx.code === activeSymbol ? "0 6px 18px rgba(22,119,255,0.12)" : "0 1px 4px rgba(0,0,0,0.04)",
+                  border: `1px solid ${idx.code === activeSymbol ? c.primary : c.border}`,
+                  boxShadow: "none",
                 }}
                 styles={{ body: { padding: 16 } }}
               >
@@ -93,7 +93,7 @@ export default function AIndexTab() {
             onChange={(value) => setPeriod(String(value))}
           />
         }
-        style={{ borderRadius: 12, border: "none", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}
+        style={{ borderRadius: 8, border: `1px solid ${c.border}`, boxShadow: "none" }}
       >
         {klineLoading ? (
           <Spin />

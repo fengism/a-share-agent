@@ -113,7 +113,7 @@ export default function TechnicalPanel({ code, analysis }: Props) {
         <Text strong style={{ color: c.textPrimary, fontSize: 13 }}>均线与趋势</Text>
         <Text type="secondary" style={{ fontSize: 12 }}>中短周期趋势判断</Text>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div className="metric-grid cols-4" style={{ gap: 12, marginBottom: 16 }}>
         <Indicator label="MA5" value={ma.ma5?.toFixed(2) ?? "-"} colors={tileColors} />
         <Indicator label="MA10" value={ma.ma10?.toFixed(2) ?? "-"} colors={tileColors} />
         <Indicator label="MA20" value={ma.ma20?.toFixed(2) ?? "-"} colors={tileColors} />
@@ -124,7 +124,7 @@ export default function TechnicalPanel({ code, analysis }: Props) {
         <Text strong style={{ color: c.textPrimary, fontSize: 13 }}>动量指标</Text>
         <Text type="secondary" style={{ fontSize: 12 }}>MACD、RSI、KDJ 联合观察</Text>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div className="metric-grid cols-4" style={{ gap: 12, marginBottom: 16 }}>
         <Indicator
           label="MACD信号"
           value={macdSignal.text}
@@ -153,7 +153,7 @@ export default function TechnicalPanel({ code, analysis }: Props) {
         <Text strong style={{ color: c.textPrimary, fontSize: 13 }}>波动区间</Text>
         <Text type="secondary" style={{ fontSize: 12 }}>布林带上下轨观察</Text>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div className="metric-grid cols-3" style={{ gap: 12, marginBottom: 16 }}>
         <Indicator label="BOLL上轨" value={boll.upper?.toFixed(2) ?? "-"} colors={tileColors} />
         <Indicator label="BOLL中轨" value={boll.middle?.toFixed(2) ?? "-"} colors={tileColors} />
         <Indicator label="BOLL下轨" value={boll.lower?.toFixed(2) ?? "-"} colors={tileColors} />

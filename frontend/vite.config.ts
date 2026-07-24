@@ -15,12 +15,20 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-antd": ["antd", "@ant-design/icons"],
-          "vendor-echarts": ["echarts", "echarts-for-react"],
-          "vendor-charts": ["lightweight-charts"],
-          "vendor-pdf": ["html2canvas", "jspdf"],
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          // ECharts (+ echarts-for-react wrapper) — heaviest vendor, keep isolated
+          if (id.includes("echarts")) return "vendor-echarts";
+          if (id.includes("lightweight-charts")) return "vendor-charts";
+          if (id.includes("antd") || id.includes("@ant-design")) return "vendor-antd";
+          if (
+            id.includes("/react-router") ||
+            id.includes("/react-dom/") ||
+            id.includes("/react/") ||
+            id.includes("/scheduler/")
+          )
+            return "vendor-react";
+          // html2canvas & jspdf are dynamically imported → Rollup auto-splits them
         },
       },
     },
