@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import stock, market, analysis, screener, daily_review, push, chat, config, industry_chain, macro, stock_aggregate
+from app.routers import stock, market, analysis, screener, daily_review, push, chat, config, industry_chain, macro, stock_aggregate, auth
 from app.utils.rate_limiter import call_blocking
 from app.config import get_settings
 
@@ -99,6 +99,7 @@ app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(industry_chain.router, prefix="/api/industry-chain", tags=["industry-chain"])
 app.include_router(macro.router, prefix="/api/macro", tags=["macro"])
 app.include_router(stock_aggregate.router, prefix="/api/stock", tags=["stock"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
 
 @app.exception_handler(Exception)
