@@ -1,3 +1,5 @@
+import { getToken, notifyUnauthorized } from "./authToken";
+
 const BASE_URL = "/api";
 const isDev = import.meta.env.DEV;
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -14,18 +16,27 @@ async function apiRequest<T>(method: string, path: string, body?: unknown, param
   if (isDev) console.log(`[API] ${method} ${fullUrl}`);
   const startTime = performance.now();
 
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (body) headers["Content-Type"] = "application/json";
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const res = await fetch(fullUrl, {
       method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
+      headers,
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
     const elapsed = Math.round(performance.now() - startTime);
 
   if (!res.ok) {
+    // A 401 on a request that carried a token means the session expired/was
+    // revoked — drop local auth so the guard redirects to /login. (A 401 on a
+    // tokenless request, e.g. a failed login, is just a normal error.)
+    if (res.status === 401 && token) notifyUnauthorized();
     const errData = await res.json().catch(() => ({}));
     const errMsg = errData.detail || `API error: ${res.status}`;
     if (isDev) console.error(`[API] ${method} ${path} 失败: ${res.status} ${errMsg} (${elapsed}ms)`);

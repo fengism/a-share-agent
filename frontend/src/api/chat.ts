@@ -1,4 +1,5 @@
 import type { ChatMessage, ChatStreamDelta } from "../types/chat";
+import { getToken, notifyUnauthorized } from "./authToken";
 
 const BASE_URL = "/api";
 
@@ -20,14 +21,19 @@ export function streamChat(
     history: history?.length ? history : undefined,
   });
 
+  const token = getToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   fetch(`${BASE_URL}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body,
     signal: controller.signal,
   })
     .then(async (response) => {
       if (!response.ok) {
+        if (response.status === 401 && token) notifyUnauthorized();
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.detail || `Chat API error: ${response.status}`);
       }

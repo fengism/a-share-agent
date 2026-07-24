@@ -1,4 +1,4 @@
-import { lazy, Suspense, useLayoutEffect } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, Spin, theme } from "antd";
@@ -9,7 +9,9 @@ import "./styles/base.css";
 import "./styles/markdown.css";
 import "./styles/analysis-export.css";
 import AppLayout from "./components/AppLayout";
+import RequireAuth from "./components/RequireAuth";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { useAuthStore } from "./store/authStore";
 
 // ── 路由级代码分割 ──
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -24,6 +26,8 @@ const Feed = lazy(() => import("./pages/Feed"));
 const IndustryChain = lazy(() => import("./pages/IndustryChain"));
 const Compare = lazy(() => import("./pages/Compare"));
 const Macro = lazy(() => import("./pages/Macro"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -103,6 +107,11 @@ const PageFallback = (
 );
 
 export default function App() {
+  // Validate a persisted token once on startup, then RequireAuth can render.
+  useEffect(() => {
+    useAuthStore.getState().bootstrap();
+  }, []);
+
   return (
     <AntProvider>
       <QueryClientProvider client={queryClient}>
@@ -110,6 +119,9 @@ export default function App() {
           <ErrorBoundary>
             <Suspense fallback={PageFallback}>
               <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route element={<RequireAuth />}>
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
                   <Route path="/market" element={<ErrorBoundary><Market /></ErrorBoundary>} />
@@ -124,6 +136,7 @@ export default function App() {
                   <Route path="/chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
                   <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
                   <Route path="/analysis/:code" element={<ErrorBoundary><Analysis /></ErrorBoundary>} />
+                </Route>
                 </Route>
               </Routes>
             </Suspense>

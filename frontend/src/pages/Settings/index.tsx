@@ -12,6 +12,8 @@ import {
   Row,
   Col,
   Divider,
+  Tag,
+  Space,
 } from "antd";
 import {
   SaveOutlined,
@@ -19,10 +21,14 @@ import {
   SendOutlined,
   BookOutlined,
   SearchOutlined,
+  TeamOutlined,
+  PlusOutlined,
+  CopyOutlined,
 } from "@ant-design/icons";
-import { useConfig, useUpdateConfig } from "../../api/queries";
+import { useConfig, useUpdateConfig, useInvites, useCreateInvite } from "../../api/queries";
 import type { ConfigUpdate, ProviderDefault } from "../../types/settings";
-import { useStyles, useColors } from "../../styles/ui";;
+import { useAuthStore } from "../../store/authStore";
+import { useStyles, useColors } from "../../styles/ui";
 
 const { Text } = Typography;
 
@@ -34,12 +40,93 @@ const PROVIDER_OPTIONS = [
   { value: "claude", label: "Claude (litellm)" },
 ];
 
+function InviteManagerCard() {
+  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const c = useColors();
+  const queryClient = useQueryClient();
+  const { data: invites = [], isLoading } = useInvites(true);
+  const createInvite = useCreateInvite();
+
+  const handleGenerate = () => {
+    createInvite.mutate(undefined, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["invites"] });
+        message.success("已生成新的邀请码");
+      },
+      onError: (err: Error) => message.error(`生成失败: ${err.message}`),
+    });
+  };
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      message.success("邀请码已复制");
+    } catch {
+      message.warning("复制失败，请手动选择复制");
+    }
+  };
+
+  return (
+    <Card
+      title={<span><TeamOutlined style={{ marginRight: 8 }} />邀请码管理</span>}
+      extra={
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleGenerate}
+          loading={createInvite.isPending}
+        >
+          生成邀请码
+        </Button>
+      }
+      style={{ ...cardStyle, marginBottom: 16 }}
+      styles={{ body: sectionCardBodyStyle }}
+    >
+      <div style={{ fontSize: 12, color: c.textMuted, marginBottom: 12 }}>
+        新用户注册需填写有效且未使用的邀请码；每个邀请码仅可使用一次。
+      </div>
+      {isLoading ? (
+        <div style={{ color: c.textSecondary }}>加载中...</div>
+      ) : invites.length === 0 ? (
+        <div style={{ color: c.textMuted }}>暂无邀请码，点击右上角生成。</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {invites.map((inv) => (
+            <div
+              key={inv.code}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: 8, padding: "8px 12px", background: c.elevatedBg,
+                border: `1px solid ${c.border}`, borderRadius: 8,
+              }}
+            >
+              <code style={{ fontFamily: "monospace", fontSize: 13, color: c.textPrimary, wordBreak: "break-all" }}>
+                {inv.code}
+              </code>
+              <Space>
+                <Tag color={inv.used ? "default" : "green"}>{inv.used ? "已使用" : "未使用"}</Tag>
+                {!inv.used && (
+                  <Button size="small" icon={<CopyOutlined />} onClick={() => copyCode(inv.code)}>
+                    复制
+                  </Button>
+                )}
+              </Space>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle, cardStyle, fieldLabelStyle, sectionCardBodyStyle } = useStyles();
   const c = useColors();
   const { data: config, isLoading } = useConfig();
   const updateConfig = useUpdateConfig();
   const queryClient = useQueryClient();
+  const user = useAuthStore((st) => st.user);
+  const isAdmin = !!config?.is_admin;
 
   const [form, setForm] = useState<ConfigUpdate>({});
   const [initialized, setInitialized] = useState(false);
@@ -291,9 +378,19 @@ export default function SettingsPage() {
           系统配置
         </h2>
         <p style={pageDescriptionStyle}>
-          配置大模型、飞书推送、问财数据源和 Notion 转存参数，修改后即时生效无需重启。
+          大模型、飞书、Notion、问财等为<strong>每账号独立的私密配置</strong>，仅对当前登录用户生效；
+          修改后即时生效无需重启。
+          {user && (
+            <span style={{ marginLeft: 8, color: c.textMuted }}>
+              当前账号：<strong style={{ color: c.textSecondary }}>{user.username}</strong>
+              {user.is_admin && <Tag color="gold" style={{ marginLeft: 6 }}>管理员</Tag>}
+            </span>
+          )}
         </p>
       </div>
+
+      {/* 邀请码管理（仅管理员） */}
+      {isAdmin && <InviteManagerCard />}
 
       {/* LLM Config */}
       <Card
@@ -561,12 +658,13 @@ export default function SettingsPage() {
         </Button>
       </Card>
 
-      {/* Twitter Feeds Config */}
+      {/* Twitter 财经账号配置（全局，仅管理员可改） */}
+      {isAdmin && (
       <Card
         title={
           <span>
             <SearchOutlined style={{ marginRight: 8 }} />
-            Twitter 财经账号配置
+            Twitter 财经账号配置（全局）
           </span>
         }
         style={{ ...cardStyle, marginBottom: 16 }}
@@ -600,13 +698,15 @@ export default function SettingsPage() {
           保存 Twitter 配置
         </Button>
       </Card>
+      )}
 
-      {/* Data Source Cookie Config */}
+      {/* 数据源 Cookie（全局，仅管理员可改） */}
+      {isAdmin && (
       <Card
         title={
           <span>
             <SearchOutlined style={{ marginRight: 8 }} />
-            数据源 Cookie 配置
+            数据源 Cookie 配置（全局）
           </span>
         }
         style={{ ...cardStyle, marginBottom: 16 }}
@@ -646,6 +746,7 @@ export default function SettingsPage() {
           保存数据源 Cookie
         </Button>
       </Card>
+      )}
 
       {/* Provider Defaults Reference */}
       <Card

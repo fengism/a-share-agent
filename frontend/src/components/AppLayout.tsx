@@ -1,13 +1,14 @@
 import { useCallback, useRef, useState } from "react";
-import { Layout, Input, Menu, Typography, Tooltip, Drawer, Grid, Button, type InputRef } from "antd";
+import { Layout, Input, Menu, Typography, Tooltip, Drawer, Grid, Button, Dropdown, Avatar, Tag, type InputRef } from "antd";
 import {
   SearchOutlined, HomeOutlined, FundOutlined, FilterOutlined,
   LineChartOutlined, FileTextOutlined, MessageOutlined, SettingOutlined,
   ClockCircleOutlined, ApartmentOutlined, GlobalOutlined,
-  BgColorsOutlined, MenuOutlined,
+  BgColorsOutlined, MenuOutlined, UserOutlined, LogoutOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useStockSearch } from "../api/queries";
+import { useAuthStore } from "../store/authStore";
 import { useColors, useStyles, useThemeStore, THEME_LIST } from "../styles/ui";
 import { themes } from "../theme/themes";
 import type { ThemeKey } from "../styles/ui";
@@ -45,8 +46,15 @@ export default function AppLayout() {
   const s = useStyles();
   const themeKey = useThemeStore((st) => st.themeKey);
   const setThemeKey = useThemeStore((st) => st.setThemeKey);
+  const user = useAuthStore((st) => st.user);
+  const logout = useAuthStore((st) => st.logout);
   const screens = useBreakpoint();
   const isMobile = !screens.md; // < 768px
+
+  const handleLogout = useCallback(async () => {
+    await logout();
+    navigate("/login", { replace: true });
+  }, [logout, navigate]);
 
   const activeKey = getActiveKey(location.pathname);
 
@@ -323,6 +331,52 @@ export default function AppLayout() {
               </div>
             )}
           </div>
+
+          {user && (
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                items: [
+                  {
+                    key: "user",
+                    disabled: true,
+                    label: (
+                      <span style={{ fontWeight: 600 }}>
+                        {user.username}
+                        {user.is_admin && (
+                          <Tag color="gold" style={{ marginLeft: 6 }}>管理员</Tag>
+                        )}
+                      </span>
+                    ),
+                  },
+                  { type: "divider" },
+                  { key: "settings", icon: <SettingOutlined />, label: "设置", onClick: () => handleNavClick("/settings") },
+                  { key: "logout", icon: <LogoutOutlined />, label: "退出登录", onClick: handleLogout },
+                ],
+              }}
+            >
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="用户菜单"
+                className="al-icon-btn"
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                  padding: "4px 8px", borderRadius: 8, flexShrink: 0,
+                }}
+              >
+                <Avatar size={30} style={{ background: c.primary }} icon={<UserOutlined />} />
+                {!isMobile && (
+                  <span style={{
+                    color: c.textPrimary, fontSize: 13, maxWidth: 120,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {user.username}
+                  </span>
+                )}
+              </div>
+            </Dropdown>
+          )}
         </Header>
 
         <Content style={{ padding: isMobile ? "16px 12px" : "20px 24px", minHeight: "calc(100vh - 56px)" }}>

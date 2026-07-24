@@ -29,6 +29,9 @@ export interface ConfigData {
   twitter_feeds: string[];
   eastmoney_cookie: string;
   baidu_cookie: string;
+  ths_cookie: string;
+  /** Whether the current user may edit instance-global fields. */
+  is_admin: boolean;
 }
 
-export type ConfigUpdate = Partial<Omit<ConfigData, "provider_defaults">>;
+export type ConfigUpdate = Partial<Omit<ConfigData, "provider_defaults" | "is_admin">>;
