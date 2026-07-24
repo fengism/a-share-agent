@@ -6,7 +6,7 @@ import time
 
 import requests
 
-from app.config import get_settings
+from app.config import get_effective_settings
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +17,8 @@ _PERMISSION_URL = "https://open.feishu.cn/open-apis/drive/v1/permissions/{token}
 _DRIVE_FILE_URL = "https://open.feishu.cn/open-apis/drive/v1/files/{file_token}"
 _WIKI_NODE_URL = "https://open.feishu.cn/open-apis/wiki/v2/spaces/{space_id}/nodes"
 
-_cached_token: str = ""
-_token_expires_at: float = 0.0
+# 按 feishu_app_id 缓存 tenant_access_token，避免多用户（不同飞书应用）之间串号。
+_token_cache: dict[str, tuple[str, float]] = {}
 
 
 class FeishuConfigError(RuntimeError):
@@ -33,7 +33,7 @@ def _validate_settings():
     Return:
         校验通过的 Settings 实例
     """
-    settings = get_settings()
+    settings = get_effective_settings()
     if not settings.feishu_enabled:
         raise FeishuConfigError("FEISHU_ENABLED must be true to push to Feishu")
     if not settings.feishu_app_id.strip() or not settings.feishu_app_secret.strip():
@@ -49,15 +49,15 @@ def get_tenant_token() -> str:
     Return:
         飞书 tenant_access_token 字符串
     """
-    global _cached_token, _token_expires_at
-    if _cached_token and time.time() < _token_expires_at:
-        return _cached_token
+    settings = _validate_settings()
+    app_id = settings.feishu_app_id.strip()
+    cached = _token_cache.get(app_id)
+    if cached and time.time() < cached[1]:
+        return cached[0]
 
-    _validate_settings()
-    settings = get_settings()
     response = requests.post(
         _TOKEN_URL,
-        json={"app_id": settings.feishu_app_id.strip(), "app_secret": settings.feishu_app_secret.strip()},
+        json={"app_id": app_id, "app_secret": settings.feishu_app_secret.strip()},
         timeout=10,
     )
     if response.status_code >= 400:
@@ -65,9 +65,9 @@ def get_tenant_token() -> str:
     data = response.json()
     if data.get("code", -1) != 0:
         raise RuntimeError(f"飞书认证失败: {data.get('msg', 'unknown error')}")
-    _cached_token = data["tenant_access_token"]
-    _token_expires_at = time.time() + data.get("expire", 7200) - 300
-    return _cached_token
+    token = data["tenant_access_token"]
+    _token_cache[app_id] = (token, time.time() + data.get("expire", 7200) - 300)
+    return token
 
 
 def _auth_headers() -> dict:

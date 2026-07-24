@@ -1,6 +1,6 @@
 import requests
 
-from app.config import Settings, get_settings
+from app.config import Settings, get_effective_settings
 from app.models.notion import NotionExportResponse
 
 _NOTION_VERSION = "2022-06-28"
@@ -53,7 +53,7 @@ def create_page(title: str, blocks: list[dict]) -> NotionExportResponse:
     Return:
         NotionExportResponse，包含 page_id、url 和 title
     """
-    settings = get_settings()
+    settings = get_effective_settings()
     parent = _resolve_parent(settings)
     response = requests.post(
         _NOTION_PAGES_URL,

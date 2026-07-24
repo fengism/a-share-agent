@@ -24,7 +24,7 @@ from app.services.llm.client import create_llm_client
 from app.services.analysis.prompts import SCHEMA_INSTRUCTION, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 from app.services.analysis.parser import parse_with_retry
 from app.utils.cache import cache
-from app.config import get_settings
+from app.config import get_effective_settings
    
 logger = logging.getLogger(__name__)
 
@@ -167,7 +167,7 @@ async def run_analysis(code: str, progress_callback: ProgressCallback | None = N
         await _emit(progress_callback, AnalysisProgress(type="cached", result=cached))
         return cached
 
-    settings = get_settings()
+    settings = get_effective_settings()
     llm_client = create_llm_client(settings)
 
     try:

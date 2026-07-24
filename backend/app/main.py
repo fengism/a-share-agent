@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import stock, market, analysis, screener, daily_review, push, chat, config, industry_chain, macro, stock_aggregate, auth
+from app.middleware import UserContextMiddleware
 from app.utils.rate_limiter import call_blocking
 from app.config import get_settings
 
@@ -87,6 +88,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 按 Bearer token 将登录用户绑定到请求上下文，供 get_effective_settings 叠加私密配置。
+app.add_middleware(UserContextMiddleware)
 
 app.include_router(stock.router, prefix="/api/stock", tags=["stock"])
 app.include_router(market.router, prefix="/api/market", tags=["market"])

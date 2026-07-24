@@ -166,9 +166,9 @@ def _get_iwencai_provider():
     Return:
         iwencai_provider 实例或 None
     """
-    from app.config import get_settings
+    from app.config import get_effective_settings
     from app.services.providers import get_provider
-    settings = get_settings()
+    settings = get_effective_settings()
     if not settings.iwencai_enabled:
         return None
     return get_provider("iwencai")
