@@ -258,7 +258,10 @@ export default function ChatPage() {
               return (
                 <div
                   key={session.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSessionClick(session.id)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSessionClick(session.id); } }}
                   className={isActive ? "chat-session active" : "chat-session"}
                   style={{
                     display: "flex",

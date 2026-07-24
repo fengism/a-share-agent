@@ -47,6 +47,7 @@
       }
       #app-boot .label { font-size: 13px; letter-spacing: 0.04em; opacity: 0.72; }
       @keyframes bootspin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { #app-boot .ring { animation: none; } }
     </style>
   </head>
   <body>

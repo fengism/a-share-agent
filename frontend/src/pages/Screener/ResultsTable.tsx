@@ -55,7 +55,7 @@ export default function ResultsTable({
       dataIndex: "code",
       width: 90,
       render: (code: string) => (
-        <a onClick={() => navigate(`/analysis/${code}`)} style={{ color: c.primary, fontWeight: 500 }}>{code}</a>
+        <a role="button" tabIndex={0} onClick={() => navigate(`/analysis/${code}`)} onKeyDown={(e) => { if (e.key === "Enter") navigate(`/analysis/${code}`); }} style={{ color: c.primary, fontWeight: 500, cursor: "pointer" }}>{code}</a>
       ),
     },
     {

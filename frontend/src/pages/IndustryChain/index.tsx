@@ -581,7 +581,10 @@ export default function IndustryChain() {
                     return (
                       <Tooltip key={`${item.name}-${item.archive_id}`} title={item.summary || item.title} placement="left">
                         <div
+                          role="button"
+                          tabIndex={0}
                           onClick={() => handleLoadArchive(item)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleLoadArchive(item); } }}
                           className={isActive ? undefined : "hover-mutedrow"}
                           style={{
                             padding: "10px 12px",

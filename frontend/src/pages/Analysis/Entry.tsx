@@ -76,7 +76,10 @@ export default function AnalysisEntry() {
                     return (
                       <div
                         key={`${code}-${dateStr}`}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => navigate(`/analysis/${code}`)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/analysis/${code}`); } }}
                         className="hover-row"
                         style={{
                           display: "flex", justifyContent: "space-between", alignItems: "center",
