@@ -20,12 +20,15 @@ export default function RequireAuth() {
         style={{
           minHeight: "100vh",
           display: "flex",
+          flexDirection: "column",
+          gap: 12,
           alignItems: "center",
           justifyContent: "center",
           background: c.pageBg,
         }}
       >
-        <Spin size="large" tip="正在验证登录状态..." />
+        <Spin size="large" />
+        <div style={{ color: c.textSecondary, fontSize: 13 }}>正在验证登录状态...</div>
       </div>
     );
   }
