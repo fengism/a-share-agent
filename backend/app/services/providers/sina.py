@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from datetime import datetime
 
@@ -14,6 +15,8 @@ from app.utils.symbol_utils import normalize_code
 from app.utils.market_utils import replace_comma
 from app.utils.cache import cache, dated_cache_key
 from app.utils.data_clean import coerce_numeric_columns, rename_and_keep_columns, rename_columns
+
+logger = logging.getLogger(__name__)
 
 
 class SinaDataProvider(BaseDataProvider):
@@ -59,7 +62,7 @@ class SinaDataProvider(BaseDataProvider):
                 datalen = max(delta_days // 30 + 3, 5)
             datalen = min(datalen, 2000)
         except Exception as e:
-            print(f"Invalid date format or range: {e}")
+            logger.warning("解析日期范围失败: %s", e)
             datalen = 500
         params = {
             "symbol": symbol,
