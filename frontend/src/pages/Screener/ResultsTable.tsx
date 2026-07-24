@@ -2,7 +2,7 @@ import { Table, Tag, Spin, Empty } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import { useNavigate } from "react-router-dom";
 import type { ScreenerFilter, ScreenerItem, ScreenerResult } from "../../types/stock";
-import { useStyles } from "../../styles/ui";;
+import { useColors, useStyles } from "../../styles/ui";
 
 interface Props {
   data: ScreenerResult | undefined;
@@ -30,6 +30,7 @@ export default function ResultsTable({
   data, isLoading, percentileMap, showPercentile, onPageChange, filters, onSortChange,
 }: Props) {
   const { tagStyle } = useStyles();
+  const c = useColors();
   const navigate = useNavigate();
   const currentSortOrder = filters.sort_order === "asc" ? "ascend" : "descend";
 
@@ -54,7 +55,7 @@ export default function ResultsTable({
       dataIndex: "code",
       width: 90,
       render: (code: string) => (
-        <a onClick={() => navigate(`/analysis/${code}`)} style={{ color: "#3b82f6", fontWeight: 500 }}>{code}</a>
+        <a onClick={() => navigate(`/analysis/${code}`)} style={{ color: c.primary, fontWeight: 500 }}>{code}</a>
       ),
     },
     {
@@ -81,7 +82,7 @@ export default function ResultsTable({
       sortOrder: filters.sort_by === "change_pct" ? currentSortOrder : null,
       render: (v: number | null) => {
         if (v == null) return "-";
-        const color = v > 0 ? "#ef4444" : v < 0 ? "#22c55e" : "#9ca3af";
+        const color = v > 0 ? c.up : v < 0 ? c.down : c.textMuted;
         return <span style={{ color, fontWeight: 500 }}>{v > 0 ? "+" : ""}{v.toFixed(2)}%</span>;
       },
     },
@@ -158,7 +159,7 @@ export default function ResultsTable({
         render: (_: unknown, record: ScreenerItem) => {
           const p = percentileMap.get(record.code);
           if (p == null) return <Spin size="small" />;
-          const color = p <= 30 ? "#22c55e" : p <= 70 ? "#eab308" : "#ef4444";
+          const color = p <= 30 ? c.down : p <= 70 ? "#eab308" : c.up;
           return <span style={{ color, fontWeight: 500 }}>{p.toFixed(0)}%</span>;
         },
       },
@@ -170,7 +171,7 @@ export default function ResultsTable({
         render: (_: unknown, record: ScreenerItem) => {
           const p = percentileMap.get(record.code + "_pb");
           if (p == null) return <Spin size="small" />;
-          const color = p <= 30 ? "#22c55e" : p <= 70 ? "#eab308" : "#ef4444";
+          const color = p <= 30 ? c.down : p <= 70 ? "#eab308" : c.up;
           return <span style={{ color, fontWeight: 500 }}>{p.toFixed(0)}%</span>;
         },
       },
