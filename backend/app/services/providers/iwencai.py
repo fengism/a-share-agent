@@ -6,7 +6,6 @@ import secrets
 from typing import Any, Literal
 
 from app.utils.http_client import get_session as _get_session
-from app.config import get_settings
 
 from app.models.search_item import NewsSearchItem
 from app.services.base.data_provider import BaseDataProvider
@@ -45,8 +44,8 @@ class IwencaiDataProvider(BaseDataProvider):
             问财 OpenAPI 的 base URL
         """
         try:
-            from app.config import get_settings
-            settings = get_settings()
+            from app.config import get_effective_settings
+            settings = get_effective_settings()
             return settings.iwencai_base_url
         except Exception as e:
             logger.debug("问财 base_url 读取配置失败，使用环境变量回退: %s", e)
@@ -60,8 +59,8 @@ class IwencaiDataProvider(BaseDataProvider):
             问财 API Key 字符串
         """
         try:
-            from app.config import get_settings
-            settings = get_settings()
+            from app.config import get_effective_settings
+            settings = get_effective_settings()
             key = settings.iwencai_api_key
             if key:
                 return key

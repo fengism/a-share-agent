@@ -63,3 +63,67 @@ TABLES.append(
     )
     """
 )
+
+# ── 账号系统：用户 / 会话 / 邀请 / 每用户私密配置 ──
+TABLES.append(
+    """
+    CREATE TABLE IF NOT EXISTS users (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        username             TEXT    NOT NULL UNIQUE,
+        password_hash        TEXT    NOT NULL,
+        is_admin             INTEGER NOT NULL DEFAULT 0,
+        must_change_password INTEGER NOT NULL DEFAULT 0,
+        created_at           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+    )
+    """
+)
+TABLES.append(
+    """
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+        token_hash TEXT    PRIMARY KEY,
+        user_id    INTEGER NOT NULL,
+        created_at TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+        expires_at TEXT    NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """
+)
+TABLES.append(
+    """
+    CREATE TABLE IF NOT EXISTS invites (
+        code       TEXT    PRIMARY KEY,
+        created_by INTEGER NOT NULL,
+        used_by    INTEGER,
+        created_at TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+        expires_at TEXT,
+        used_at    TEXT,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """
+)
+TABLES.append(
+    """
+    CREATE TABLE IF NOT EXISTS user_config (
+        user_id INTEGER NOT NULL,
+        key     TEXT    NOT NULL,
+        value   TEXT    NOT NULL DEFAULT '',
+        PRIMARY KEY (user_id, key),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """
+)
+# ── 管理员签发的一次性密码重置令牌 ──
+TABLES.append(
+    """
+    CREATE TABLE IF NOT EXISTS password_resets (
+        token_hash TEXT    PRIMARY KEY,
+        user_id    INTEGER NOT NULL,
+        created_by INTEGER NOT NULL,
+        created_at TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+        expires_at TEXT    NOT NULL,
+        used_at    TEXT,
+        FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """
+)

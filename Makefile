@@ -1,4 +1,4 @@
-.PHONY: setup start stop dev prod pack backend-sync backend-dev backend-test frontend-install frontend-dev frontend-build frontend-lint export-industry-mapping docker-up docker-down docker-build docker-logs
+.PHONY: setup start stop dev prod pack backend-sync backend-dev backend-test backend-reset-accounts frontend-install frontend-dev frontend-build frontend-lint export-industry-mapping docker-up docker-down docker-build docker-logs
 
 # 一键命令
 setup:
@@ -42,6 +42,9 @@ backend-dev:
 
 backend-test:
 	cd backend && uv run pytest
+
+backend-reset-accounts:
+	cd backend && uv run python -m app.scripts.reset_accounts
 
 frontend-install:
 	cd frontend && npm install

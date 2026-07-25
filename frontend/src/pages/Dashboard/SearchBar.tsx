@@ -2,12 +2,14 @@ import { useState, useCallback } from "react";
 import { AutoComplete, Input } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { useStockSearch } from "../../api/queries";
+import { useColors } from "../../styles/ui";
 import { useNavigate } from "react-router-dom";
 
 export default function SearchBar() {
   const [query, setQuery] = useState("");
   const { data: results = [], isLoading } = useStockSearch(query);
   const navigate = useNavigate();
+  const c = useColors();
 
   const options = results.map((item) => ({
     value: item.code,
@@ -17,21 +19,18 @@ export default function SearchBar() {
           {item.code} {item.name}
         </span>
         {item.price !== null && (
-          <span style={{ color: "#333" }}>¥{item.price.toFixed(2)}</span>
+          <span style={{ color: c.textSecondary }}>¥{item.price.toFixed(2)}</span>
         )}
       </div>
     ),
   }));
 
   const handleSearch = useCallback((val: string) => {
-    const trimmed = val.trim();
-    console.log(`[Search] 输入: "${trimmed}"`);
-    setQuery(trimmed);
+    setQuery(val.trim());
   }, []);
 
   const handleSelect = useCallback(
     (val: string) => {
-      console.log(`[Search] 选中: ${val}，跳转分析页`);
       navigate(`/analysis/${val}`);
     },
     [navigate]
@@ -41,7 +40,6 @@ export default function SearchBar() {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && query.length === 6 && /^\d{6}$/.test(query)) {
-        console.log(`[Search] 回车跳转: ${query}`);
         navigate(`/analysis/${query}`);
       }
     },
@@ -60,7 +58,7 @@ export default function SearchBar() {
         size="large"
         placeholder="输入股票代码或名称，如 600519 或 贵州茅台"
         prefix={<SearchOutlined />}
-        suffix={isLoading ? <span style={{ color: "#999", fontSize: 12 }}>搜索中...</span> : null}
+        suffix={isLoading ? <span style={{ color: c.textMuted, fontSize: 12 }}>搜索中...</span> : null}
         allowClear
         onKeyDown={handleKeyDown}
       />

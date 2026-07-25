@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut } from "./client";
+import { listInvitesApi, createInviteApi, revokeInviteApi } from "./auth";
+import type { InviteItem } from "../types/auth";
 import { oneYearAgoDate } from "../utils/date";
 import type { StockSearchItem, StockBasicInfo, KlineData, IntradayData, FinancialMetrics, StockValuation, StockValuationDetail, AnalysisResult, AnalysisHistoryItem, TechnicalIndicators, MarketIndices, HsgtFlow, StockNews, CategorizedStockNews, StockSentiment, RetailSentiment, ScreenerFilter, ScreenerResult, ValuationPercentileRequest, ValuationPercentileResult, ThsHotStock, ThsHotPlate, DragonTigerItem, DragonTigerDetail, PushRequest, PushResponse, FeedNewsItem, IndustryRankings, NewsAnalysis, IndustryChainResult, IndustryChainHistoryItem, MacroAllData, StockFundFlowItem, StockCompareItem } from "../types/stock";
 import type { DailyReviewHistoryItem, DailyReviewRequest, DailyReviewResult } from "../types/dailyReview";
@@ -330,6 +332,24 @@ export function useUpdateConfig() {
   return useMutation({
     mutationFn: (patch: ConfigUpdate) => apiPut<ConfigData>("/config", patch),
   });
+}
+
+// Invites (admin only)
+export function useInvites(enabled: boolean) {
+  return useQuery<InviteItem[]>({
+    queryKey: ["invites"],
+    queryFn: listInvitesApi,
+    enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useCreateInvite() {
+  return useMutation({ mutationFn: (expiresInDays?: number) => createInviteApi(expiresInDays) });
+}
+
+export function useRevokeInvite() {
+  return useMutation({ mutationFn: (code: string) => revokeInviteApi(code) });
 }
 
 export function useMarketFeed() {

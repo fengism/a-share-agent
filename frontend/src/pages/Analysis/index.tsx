@@ -1,8 +1,7 @@
 import { useParams } from "react-router-dom";
 import { Spin, Card, Segmented, Space, Typography, Row, Col, Tabs, Button, Alert, message } from "antd";
 import { DownloadOutlined, ThunderboltOutlined, StopOutlined } from "@ant-design/icons";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+// html2canvas & jsPDF are loaded lazily inside handleExportPdf (kept out of the initial bundle)
 import { useAnalysisPageData, usePush } from "../../api/queries";
 import PushModal from "../../components/PushModal";
 import type { PushRequest } from "../../types/stock";
@@ -178,6 +177,10 @@ export default function Analysis() {
       setIsExportingPdf(true);
       messageApi.loading({ content: "正在生成 PDF...", key: "export-pdf" });
       await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(exportRef.current, {
         scale: 2,
         useCORS: true,
@@ -443,10 +446,10 @@ export default function Analysis() {
           <Card
             size="small"
             className="pdf-avoid-break"
-            style={{ ...cardStyle, marginBottom: 12, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+            style={{ ...cardStyle, marginBottom: 12, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr", gap: 12 }}>
+            <div className="metric-grid cols-3v" style={{ gap: 12 }}>
               <div style={{ padding: "10px 12px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 8 }}>
                 <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>技术结论</div>
                 <div style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.8 }}>{displayResult.technical.summary}</div>
@@ -471,10 +474,10 @@ export default function Analysis() {
             className="pdf-avoid-break"
             title={<span style={{ fontWeight: 700, color: c.textPrimary }}>最新分时图</span>}
             extra={<span style={{ fontSize: 12, color: c.textSecondary }}>当日分时走势与成交量</span>}
-            style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+            style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
+            <div className="metric-grid cols-3" style={{ gap: 12, marginBottom: 12 }}>
               <div className="pdf-metric-card" style={{ padding: "12px 14px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 10 }}>
                 <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>最新价</div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: c.textPrimary }}>{intradayData.items[intradayData.items.length - 1]?.price?.toFixed(2) ?? "-"}</div>
@@ -497,7 +500,7 @@ export default function Analysis() {
             size="small"
             className="pdf-avoid-break"
             title={<span style={{ fontWeight: 700, color: c.textPrimary }}>最新分时图</span>}
-            style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+            style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
             styles={{ body: { padding: "32px 16px", textAlign: "center" } }}
           >
             <Spin />
@@ -509,7 +512,7 @@ export default function Analysis() {
           size="small"
           className="pdf-avoid-break"
           title={<span style={{ fontWeight: 700, color: c.textPrimary }}>K线图</span>}
-          style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+          style={{ ...cardStyle, marginBottom: 14, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
           extra={
             <Space size={10} style={{ background: c.nestedBg, border: `1px solid ${c.border}`, borderRadius: 10, padding: "6px 8px" }}>
               <Segmented
@@ -546,7 +549,7 @@ export default function Analysis() {
         {/* Tabs */}
         <Card
           size="small"
-          style={{ ...cardStyle, borderTop: `3px solid ${c.primary}`, boxShadow: `0 -1px 8px ${c.primary}4d` }}
+          style={{ ...cardStyle, borderTop: `3px solid ${c.primary}`, boxShadow: `0 1px 2px rgba(0,0,0,0.18)` }}
           styles={{ body: { padding: "10px 16px 14px", background: c.nestedBg, borderRadius: 8 } }}
         >
           {isExportingPdf ? (

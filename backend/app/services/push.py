@@ -12,7 +12,7 @@ from app.adapters.feishu import (
     to_feishu_doc_blocks,
 )
 from app.adapters.notion import create_page, to_notion_blocks
-from app.config import get_settings
+from app.config import get_effective_settings
 from app.models.push import PushRequest, PushResponse
 from app.services.analysis.storage import get_latest_analysis
 from app.services.daily_review.storage import load_daily_review
@@ -33,7 +33,7 @@ def _resolve_feishu_receiver(request: PushRequest) -> str:
     receiver = request.feishu_receiver.strip()
     if receiver:
         return receiver
-    return get_settings().feishu_default_receiver.strip()
+    return get_effective_settings().feishu_default_receiver.strip()
 
 
 def _resolve_content(request: PushRequest) -> ResolvedPushContent:
@@ -107,7 +107,7 @@ def _push_to_feishu(request: PushRequest, resolved: ResolvedPushContent) -> Push
             message=f"已推送到 {resolved.receiver}",
         )
 
-    settings = get_settings()
+    settings = get_effective_settings()
     folder_map = {
         "daily_review": settings.feishu_daily_review_folder,
         "analysis": settings.feishu_analysis_folder,

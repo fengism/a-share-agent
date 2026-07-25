@@ -12,6 +12,9 @@ import {
   Row,
   Col,
   Divider,
+  Tag,
+  Space,
+  Popconfirm,
 } from "antd";
 import {
   SaveOutlined,
@@ -19,10 +22,18 @@ import {
   SendOutlined,
   BookOutlined,
   SearchOutlined,
+  TeamOutlined,
+  PlusOutlined,
+  CopyOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
-import { useConfig, useUpdateConfig } from "../../api/queries";
+import { useConfig, useUpdateConfig, useInvites, useCreateInvite, useRevokeInvite } from "../../api/queries";
 import type { ConfigUpdate, ProviderDefault } from "../../types/settings";
-import { useStyles, useColors } from "../../styles/ui";;
+import type { InviteItem } from "../../types/auth";
+import { useAuthStore } from "../../store/authStore";
+import ChangePasswordCard from "../../components/ChangePasswordCard";
+import AdminResetCard from "../../components/AdminResetCard";
+import { useStyles, useColors } from "../../styles/ui";
 
 const { Text } = Typography;
 
@@ -34,12 +45,146 @@ const PROVIDER_OPTIONS = [
   { value: "claude", label: "Claude (litellm)" },
 ];
 
+function InviteManagerCard() {
+  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const c = useColors();
+  const queryClient = useQueryClient();
+  const { data: invites = [], isLoading } = useInvites(true);
+  const createInvite = useCreateInvite();
+  const revokeInvite = useRevokeInvite();
+  const [expiresInDays, setExpiresInDays] = useState<number | undefined>(undefined);
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["invites"] });
+
+  const handleGenerate = () => {
+    createInvite.mutate(expiresInDays, {
+      onSuccess: () => {
+        refresh();
+        message.success("已生成新的邀请码");
+      },
+      onError: (err: Error) => message.error(`生成失败: ${err.message}`),
+    });
+  };
+
+  const handleRevoke = (code: string) => {
+    revokeInvite.mutate(code, {
+      onSuccess: () => {
+        refresh();
+        message.success("邀请码已撤销");
+      },
+      onError: (err: Error) => message.error(`撤销失败: ${err.message}`),
+    });
+  };
+
+  const statusTag = (inv: InviteItem) => {
+    if (inv.used) return <Tag color="default">已使用</Tag>;
+    if (inv.expired) return <Tag color="red">已过期</Tag>;
+    return <Tag color="green">未使用</Tag>;
+  };
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      message.success("邀请码已复制");
+    } catch {
+      message.warning("复制失败，请手动选择复制");
+    }
+  };
+
+  return (
+    <Card
+      title={<span><TeamOutlined style={{ marginRight: 8 }} />邀请码管理</span>}
+      extra={
+        <Space>
+          <Select
+            size="small"
+            value={expiresInDays ?? 0}
+            style={{ width: 128 }}
+            onChange={(v) => setExpiresInDays(v === 0 ? undefined : v)}
+            options={[
+              { value: 0, label: "永不过期" },
+              { value: 1, label: "1 天后过期" },
+              { value: 7, label: "7 天后过期" },
+              { value: 30, label: "30 天后过期" },
+            ]}
+          />
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleGenerate}
+            loading={createInvite.isPending}
+          >
+            生成邀请码
+          </Button>
+        </Space>
+      }
+      style={{ ...cardStyle, marginBottom: 16 }}
+      styles={{ body: sectionCardBodyStyle }}
+    >
+      <div style={{ fontSize: 12, color: c.textMuted, marginBottom: 12 }}>
+        新用户注册需填写有效且未使用的邀请码；每个邀请码仅可使用一次。可为邀请码设置过期时间，未使用的邀请码可随时撤销。
+      </div>
+      {isLoading ? (
+        <div style={{ color: c.textSecondary }}>加载中...</div>
+      ) : invites.length === 0 ? (
+        <div style={{ color: c.textMuted }}>暂无邀请码，点击右上角生成。</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {invites.map((inv) => (
+            <div
+              key={inv.code}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: 8, padding: "8px 12px", background: c.elevatedBg,
+                border: `1px solid ${c.border}`, borderRadius: 8,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <code style={{ fontFamily: "monospace", fontSize: 13, color: c.textPrimary, wordBreak: "break-all" }}>
+                  {inv.code}
+                </code>
+                <div style={{ fontSize: 11, color: c.textMuted, marginTop: 2 }}>
+                  {inv.expires_at ? `过期时间：${inv.expires_at}` : "永不过期"}
+                </div>
+              </div>
+              <Space>
+                {statusTag(inv)}
+                {!inv.used && (
+                  <Button size="small" icon={<CopyOutlined />} onClick={() => copyCode(inv.code)}>
+                    复制
+                  </Button>
+                )}
+                {!inv.used && (
+                  <Popconfirm
+                    title="撤销该邀请码？"
+                    description="撤销后将无法用于注册。"
+                    okText="撤销"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => handleRevoke(inv.code)}
+                  >
+                    <Button size="small" danger icon={<DeleteOutlined />} loading={revokeInvite.isPending}>
+                      撤销
+                    </Button>
+                  </Popconfirm>
+                )}
+              </Space>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle, cardStyle, fieldLabelStyle, sectionCardBodyStyle } = useStyles();
   const c = useColors();
   const { data: config, isLoading } = useConfig();
   const updateConfig = useUpdateConfig();
   const queryClient = useQueryClient();
+  const user = useAuthStore((st) => st.user);
+  const isAdmin = !!config?.is_admin;
 
   const [form, setForm] = useState<ConfigUpdate>({});
   const [initialized, setInitialized] = useState(false);
@@ -291,9 +436,25 @@ export default function SettingsPage() {
           系统配置
         </h2>
         <p style={pageDescriptionStyle}>
-          配置大模型、飞书推送、问财数据源和 Notion 转存参数，修改后即时生效无需重启。
+          大模型、飞书、Notion、问财等为<strong>每账号独立的私密配置</strong>，仅对当前登录用户生效；
+          修改后即时生效无需重启。
+          {user && (
+            <span style={{ marginLeft: 8, color: c.textMuted }}>
+              当前账号：<strong style={{ color: c.textSecondary }}>{user.username}</strong>
+              {user.is_admin && <Tag color="gold" style={{ marginLeft: 6 }}>管理员</Tag>}
+            </span>
+          )}
         </p>
       </div>
+
+      {/* 账号安全（所有登录用户） */}
+      <ChangePasswordCard />
+
+      {/* 邀请码管理（仅管理员） */}
+      {isAdmin && <InviteManagerCard />}
+
+      {/* 用户密码重置（仅管理员） */}
+      {isAdmin && <AdminResetCard />}
 
       {/* LLM Config */}
       <Card
@@ -561,12 +722,13 @@ export default function SettingsPage() {
         </Button>
       </Card>
 
-      {/* Twitter Feeds Config */}
+      {/* Twitter 财经账号配置（全局，仅管理员可改） */}
+      {isAdmin && (
       <Card
         title={
           <span>
             <SearchOutlined style={{ marginRight: 8 }} />
-            Twitter 财经账号配置
+            Twitter 财经账号配置（全局）
           </span>
         }
         style={{ ...cardStyle, marginBottom: 16 }}
@@ -600,13 +762,15 @@ export default function SettingsPage() {
           保存 Twitter 配置
         </Button>
       </Card>
+      )}
 
-      {/* Data Source Cookie Config */}
+      {/* 数据源 Cookie（全局，仅管理员可改） */}
+      {isAdmin && (
       <Card
         title={
           <span>
             <SearchOutlined style={{ marginRight: 8 }} />
-            数据源 Cookie 配置
+            数据源 Cookie 配置（全局）
           </span>
         }
         style={{ ...cardStyle, marginBottom: 16 }}
@@ -646,6 +810,7 @@ export default function SettingsPage() {
           保存数据源 Cookie
         </Button>
       </Card>
+      )}
 
       {/* Provider Defaults Reference */}
       <Card

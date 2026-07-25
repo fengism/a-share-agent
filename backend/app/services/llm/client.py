@@ -7,7 +7,7 @@ import httpx
 
 from openai import AsyncOpenAI, OpenAI
 
-from app.config import Settings, PROVIDER_DEFAULTS, get_settings
+from app.config import Settings, PROVIDER_DEFAULTS, get_effective_settings
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +164,7 @@ def create_llm_client(settings: Settings | None = None) -> LLMClient:
     global _client_cache, _cache_key
 
     if settings is None:
-        settings = get_settings()
+        settings = get_effective_settings()
 
     provider = settings.llm_provider.lower()
     current_key = (provider, settings.llm_api_key, settings.llm_base_url, settings.llm_model)
@@ -240,7 +240,7 @@ def _resolve_chat_endpoint(settings: Settings | None = None) -> tuple[str, str, 
         (api_key, base_url, model) 三元组
     """
     if settings is None:
-        settings = get_settings()
+        settings = get_effective_settings()
 
     provider = settings.llm_provider.lower()
     defaults = PROVIDER_DEFAULTS.get(provider, {})

@@ -76,7 +76,6 @@ class BaseNoApiKeySearchEngine(ABC):
         try:
             response = self.session.get(search_url, timeout=timeout)
             response.raise_for_status()
-            print(response.content)
             tree = html.fromstring(response.content)
             results = self.parse_results(tree)
 

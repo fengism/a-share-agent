@@ -3,8 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button, Card, DatePicker, Divider, List, Row, Col, Space, Tag, Typography, message } from "antd";
 import ReactMarkdown from "react-markdown";
 import dayjs from "dayjs";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+// html2canvas & jsPDF are loaded lazily inside handleExportPdf (kept out of the initial bundle)
 import { useDailyReview, useDailyReviewHistory, useGenerateDailyReview, usePush } from "../../api/queries";
 import PushModal from "../../components/PushModal";
 import type { PushRequest } from "../../types/stock";
@@ -120,6 +119,10 @@ export default function DailyReviewPage() {
 
   const handleExportPdf = async () => {
     if (!exportRef.current) return;
+    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf"),
+    ]);
     const canvas = await html2canvas(exportRef.current, { scale: 2, useCORS: true, backgroundColor: c.pageBg });
     const pdf = new jsPDF("p", "mm", "a4");
     const pageWidth = 210;

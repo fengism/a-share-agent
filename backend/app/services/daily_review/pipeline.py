@@ -5,7 +5,7 @@ import time
 
 from datetime import datetime
 
-from app.config import get_settings
+from app.config import get_effective_settings
 from app.models.daily_review import DailyReviewDataSnapshot, DailyReviewRequest, DailyReviewResult, DailyReviewSection
 from app.services.daily_review.storage import load_daily_review, save_daily_review
 from app.services.daily_review.formatter import normalize_llm_review
@@ -307,7 +307,7 @@ async def generate_daily_review(request: DailyReviewRequest) -> DailyReviewResul
     last_error = None
     for attempt in range(1, 4):
         try:
-            settings = get_settings()
+            settings = get_effective_settings()
             user_content = _build_prompt(date, snapshot)
             logger.info(f"生成复盘报告: date={date}, prompt_length={len(user_content)}, attempt={attempt}/3")
             llm_review = normalize_llm_review((await llm_chat(

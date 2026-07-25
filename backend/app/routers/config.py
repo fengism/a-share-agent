@@ -3,28 +3,29 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
-from app.config import PROVIDER_DEFAULTS, _mask_secret, get_settings, update_settings
+from app.config import (
+    PRIVATE_USER_KEYS,
+    PROVIDER_DEFAULTS,
+    SECRET_KEYS,
+    _mask_secret,
+    effective_settings_for_user,
+    update_settings,
+)
+from app.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-_security = HTTPBearer(auto_error=False)
-
-
-def _verify_admin(credentials: HTTPAuthorizationCredentials | None = Depends(_security)) -> None:
-    """验证管理员访问权限。如果配置了 admin_api_key，则所有请求必须携带有效的 Bearer token。"""
-    settings = get_settings()
-    if not settings.admin_api_key:
-        return  # 未配置密钥则不启用鉴权
-    if credentials is None or credentials.credentials != settings.admin_api_key:
-        raise HTTPException(status_code=403, detail="Forbidden: invalid or missing admin token")
 
 
 class ConfigResponse(BaseModel):
-    """Purpose: 对外暴露的系统配置快照，敏感字段已掩码处理。"""
+    """Purpose: 对外暴露的系统配置快照，敏感字段已掩码处理。
+
+    返回的是“当前登录用户的生效配置”：全局实例基线叠加该用户的私密配置。
+    is_admin 标识当前用户是否可修改全局项（twitter_feeds / http_trust_env / 数据源 Cookie 等）。
+    """
 
     llm_provider: str
     llm_api_key: str
@@ -54,10 +55,15 @@ class ConfigResponse(BaseModel):
     eastmoney_cookie: str
     baidu_cookie: str
     ths_cookie: str
+    is_admin: bool
 
 
 class ConfigUpdateRequest(BaseModel):
-    """Purpose: 系统配置局部更新请求体，所有字段均为可选 patch。"""
+    """Purpose: 系统配置局部更新请求体，所有字段均为可选 patch。
+
+    私密项（LLM / 飞书 / Notion / 问财）写入当前登录用户的私密配置；
+    全局项（twitter_feeds / http_trust_env / 数据源 Cookie）仅管理员可改。
+    """
 
     llm_provider: str | None = None
     llm_api_key: str | None = None
@@ -88,14 +94,8 @@ class ConfigUpdateRequest(BaseModel):
     ths_cookie: str | None = None
 
 
-def _to_response(s) -> ConfigResponse:
-    """将运行时 Settings 实例转换为对外的 ConfigResponse，敏感字段做掩码。
-
-    Param:
-        s: app.config.Settings 实例。
-    Return:
-        ConfigResponse: 用于 API 返回的配置快照。
-    """
+def _to_response(s, is_admin: bool = False) -> ConfigResponse:
+    """将生效 Settings 转换为对外的 ConfigResponse，敏感字段做掩码。"""
     return ConfigResponse(
         llm_provider=s.llm_provider,
         llm_api_key=_mask_secret(s.llm_api_key),
@@ -125,31 +125,53 @@ def _to_response(s) -> ConfigResponse:
         eastmoney_cookie=_mask_secret(s.eastmoney_cookie),
         baidu_cookie=_mask_secret(s.baidu_cookie),
         ths_cookie=_mask_secret(s.ths_cookie),
+        is_admin=is_admin,
     )
 
 
-@router.get("", response_model=ConfigResponse, dependencies=[Depends(_verify_admin)])
-async def get_config():
-    """读取当前生效的系统配置。
-
-    Return:
-        ConfigResponse: 当前 Settings 的脱敏快照。
-    """
-    return _to_response(get_settings())
+@router.get("", response_model=ConfigResponse)
+async def get_config(user: dict = Depends(get_current_user)):
+    """读取当前登录用户的生效配置（全局基线叠加其私密配置），敏感字段脱敏。"""
+    settings = effective_settings_for_user(user["id"])
+    return _to_response(settings, is_admin=bool(user["is_admin"]))
 
 
-@router.put("", response_model=ConfigResponse, dependencies=[Depends(_verify_admin)])
-async def put_config(req: ConfigUpdateRequest):
-    """部分更新系统配置；未提供的字段保持原值。
+@router.put("", response_model=ConfigResponse)
+async def put_config(req: ConfigUpdateRequest, user: dict = Depends(get_current_user)):
+    """部分更新配置。
 
-    Param:
-        req: ConfigUpdateRequest 请求体，仅包含需要修改的字段。
-    Return:
-        ConfigResponse: 更新后生效的配置快照。
+    - 私密项写入当前用户的私密配置（掩码回传的密钥视为未修改，跳过）。
+    - 全局项仅管理员可修改；非管理员提交全局项将被拒绝。
     """
     patch = req.model_dump(exclude_none=True)
     if not patch:
-        return _to_response(get_settings())
-    logger.info(f"Config update: {list(patch.keys())}")
-    updated = update_settings(patch)
-    return _to_response(updated)
+        return _to_response(effective_settings_for_user(user["id"]), is_admin=bool(user["is_admin"]))
+
+    private_patch = {k: v for k, v in patch.items() if k in PRIVATE_USER_KEYS}
+    global_patch = {k: v for k, v in patch.items() if k not in PRIVATE_USER_KEYS}
+
+    if global_patch and not user["is_admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="仅管理员可修改全局配置项: " + ", ".join(sorted(global_patch)),
+        )
+
+    # 写入每用户私密配置：掩码未变更的密钥（以 *** 结尾）跳过，避免用掩码覆盖真实值。
+    to_store = {
+        k: v
+        for k, v in private_patch.items()
+        if not (k in SECRET_KEYS and isinstance(v, str) and v.endswith("***"))
+    }
+    if to_store:
+        from app.db import user_store
+
+        user_store.set_user_config(user["id"], to_store)
+
+    if global_patch:
+        update_settings(global_patch)
+
+    logger.info(
+        "Config update by user=%s private=%s global=%s",
+        user["id"], list(private_patch.keys()), list(global_patch.keys()),
+    )
+    return _to_response(effective_settings_for_user(user["id"]), is_admin=bool(user["is_admin"]))

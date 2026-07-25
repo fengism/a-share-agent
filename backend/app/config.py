@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 
@@ -63,6 +65,10 @@ class Settings(BaseSettings):
     # 设为 false 时，所有 requests 调用将忽略系统 HTTP_PROXY/HTTPS_PROXY 环境变量
     http_trust_env: bool = False
 
+    # CORS 允许来源（逗号分隔）。默认仅本地开发端口；生产经 nginx 同源时无需改动，
+    # 若前端部署在独立域名，将该域名加入此列表即可。
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
     # 数据源 Cookie / Token 配置（留空使用内置默认值）
     eastmoney_cookie: str = ""
     baidu_cookie: str = ""
@@ -77,6 +83,14 @@ class Settings(BaseSettings):
     
     # 管理端认证密钥（留空不启用鉴权）
     admin_api_key: str = ""
+
+    # 登录失败限流（防暴力破解，按用户名 + 客户端 IP 双维度计数）
+    login_max_failures: int = 5
+    login_window_seconds: int = 300
+    login_lock_seconds: int = 300
+
+    # 首启无用户时自动创建的默认管理员用户名（密码随机生成并打印到日志，首登强制改密）
+    default_admin_username: str = "admin"
 
     @model_validator(mode="after")
     def apply_provider_defaults(self) -> "Settings":
@@ -130,6 +144,102 @@ def get_settings() -> Settings:
     return _current_settings
 
 
+# ── 每用户私密配置 ────────────────────────────────────────────
+# 这些字段按登录用户隔离：存储于 user_config 表，并在请求内叠加到全局 Settings 之上。
+# 之外的字段（缓存 TTL、并发、CORS、twitter_feeds、http_trust_env、数据源 Cookie、
+# admin_api_key 等）属于实例级全局配置，仅管理员可改。数据源 Cookie 未纳入每用户隔离，
+# 因其鉴权的是所有用户共享且全局缓存的公开行情数据，按用户隔离无隐私收益。
+PRIVATE_USER_KEYS = frozenset({
+    "llm_provider", "llm_api_key", "llm_base_url", "llm_model", "llm_temperature",
+    "notion_enabled", "notion_api_token", "notion_parent_page_id", "notion_database_id",
+    "feishu_enabled", "feishu_app_id", "feishu_app_secret", "feishu_folder_token",
+    "feishu_wiki_space_id", "feishu_wiki_daily_review_parent", "feishu_wiki_analysis_parent",
+    "feishu_daily_review_folder", "feishu_analysis_folder", "feishu_default_receiver",
+    "iwencai_enabled", "iwencai_base_url", "iwencai_api_key",
+})
+
+# 敏感字段：对外掩码；当传入值以 "***" 结尾（掩码回传）时视为“未修改”，跳过写入。
+SECRET_KEYS = frozenset({
+    "llm_api_key", "feishu_app_secret", "iwencai_api_key", "notion_api_token",
+    "eastmoney_cookie", "baidu_cookie", "baidu_acs_token", "ths_cookie",
+})
+
+
+def _coerce_setting_value(key: str, raw):
+    """将 user_config 中以 TEXT 存储的值转换为 Settings 字段对应的类型。"""
+    field = Settings.model_fields.get(key)
+    annotation = field.annotation if field is not None else str
+    if annotation is bool:
+        if isinstance(raw, bool):
+            return raw
+        return str(raw).strip().lower() in ("1", "true", "yes", "on")
+    if annotation is int:
+        return int(raw)
+    if annotation is float:
+        return float(raw)
+    return raw if isinstance(raw, str) else str(raw)
+
+
+def _overlay_private(base: "Settings", overrides: dict) -> "Settings":
+    """在全局 Settings 之上叠加某用户的私密配置，返回新的 Settings（不修改全局单例）。
+
+    仅叠加 PRIVATE_USER_KEYS 中的字段；空字符串视为“未设置”并回退全局值。
+    当仅覆盖了 llm_provider 而未覆盖 base_url/model 时，按 provider 默认值回填。
+    """
+    patch: dict = {}
+    for key, value in overrides.items():
+        if key not in PRIVATE_USER_KEYS:
+            continue
+        if value is None or (isinstance(value, str) and value == ""):
+            continue  # 空值 = 未设置，回退全局
+        try:
+            patch[key] = _coerce_setting_value(key, value)
+        except (ValueError, TypeError):
+            logger.warning("忽略无法解析的用户私密配置项: %s", key)
+            continue
+    if not patch:
+        return base
+
+    merged = base.model_copy(update=patch)
+
+    if "llm_provider" in patch:
+        defaults = PROVIDER_DEFAULTS.get(str(merged.llm_provider).lower(), {})
+        if "llm_base_url" not in patch and defaults.get("base_url"):
+            merged.llm_base_url = defaults["base_url"]
+        if "llm_model" not in patch and defaults.get("model"):
+            merged.llm_model = defaults["model"]
+    return merged
+
+
+def effective_settings_for_user(user_id: int | None) -> "Settings":
+    """返回指定用户的生效配置（全局基线叠加其私密配置）。user_id 为空时返回全局基线。"""
+    base = get_settings()
+    if user_id is None:
+        return base
+    try:
+        from app.db import user_store
+
+        overrides = user_store.get_user_config(user_id)
+    except Exception:
+        logger.warning("加载用户私密配置失败 user_id=%s", user_id, exc_info=True)
+        return base
+    if not overrides:
+        return base
+    return _overlay_private(base, overrides)
+
+
+def get_effective_settings() -> "Settings":
+    """返回“当前请求用户”的生效配置。
+
+    用户由 UserContextMiddleware 按 Bearer token 绑定到 ContextVar；无用户上下文
+    （启动期后台任务 / CLI）时回退全局基线。私密项消费方（LLM/飞书/Notion/问财）应
+    调用本函数而非 get_settings()，即可透明获得按用户隔离的配置。
+    """
+    from app.utils.request_context import get_current_user_id
+
+    return effective_settings_for_user(get_current_user_id())
+
+
 def _mask_secret(value: str, visible: int = 4) -> str:
     """将敏感字符串中间部分掩码为星号，仅保留前 4 位和后 4 位。
 
@@ -178,13 +288,10 @@ def update_settings(patch: dict) -> Settings:
             current.llm_model = new_defaults["model"]
 
     # Reset feishu token cache when credentials change
-    from app.adapters.feishu.client import _cached_token, _token_expires_at
-
     if any(k in patch for k in ("feishu_app_id", "feishu_app_secret")):
         import app.adapters.feishu.client as feishu_mod
 
-        feishu_mod._cached_token = ""
-        feishu_mod._token_expires_at = 0.0
+        feishu_mod._token_cache.clear()
 
     # Reset cached HTTP session when http_trust_env changes
     if "http_trust_env" in patch:

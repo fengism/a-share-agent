@@ -4,7 +4,7 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator
 
-from app.config import get_settings
+from app.config import get_settings, get_effective_settings
 from app.models.chat import ChatMessage, ChatStreamDelta, ToolCallFunction, ToolCallInfo, ToolResultInfo
 from app.services.chat.message_builder import build_messages
 from app.services.chat.tools.registry import registry
@@ -167,7 +167,7 @@ async def _run_legacy_agent(
     Return:
         产生 ChatStreamDelta 事件的异步生成器，类型包括 text/reasoning/tool_call/tool_result/error/done
     """
-    runtime = create_async_openai_chat_runtime(get_settings())
+    runtime = create_async_openai_chat_runtime(get_effective_settings())
     client = runtime.client
     model = runtime.model
 

@@ -128,7 +128,7 @@ def contains_stock_reference(text: str, code: str, code_name: str) -> bool:
     Return:
         True if the text contains the code or any name alias
     """
-    code_base = normalize_stock_name(code)
+    code_base = normalize_stock_name(code_name)
     code_name_aliases = {code_base}
     for prefix in ("*ST", "ST", "N", "C", "XD", "DR", "XR"):
         if code_base.startswith(prefix) and len(code_base) > len(prefix):

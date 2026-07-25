@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from openai import AsyncOpenAI
 
-from app.config import get_settings
+from app.config import get_effective_settings
 from app.models.chat import ChatMessage, ChatStreamDelta
 from app.services.chat.skills import register_all_skills
 from app.services.chat.subagents.base import SharedToolCache, SubAgentResult
@@ -74,7 +74,7 @@ class Orchestrator:
         Return:
             产生 ChatStreamDelta 事件的异步生成器
         """
-        runtime = create_async_openai_chat_runtime(get_settings())
+        runtime = create_async_openai_chat_runtime(get_effective_settings())
         llm_client = runtime.client
         model = runtime.model
 

@@ -10,8 +10,10 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import stock, market, analysis, screener, daily_review, push, chat, config, industry_chain, macro, stock_aggregate
+from app.routers import stock, market, analysis, screener, daily_review, push, chat, config, industry_chain, macro, stock_aggregate, auth
+from app.middleware import UserContextMiddleware
 from app.utils.rate_limiter import call_blocking
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,19 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     init_db()
     logger.info("数据库初始化完成")
 
+    # 首启无用户时自动创建默认管理员（随机密码，仅打印一次；首次登录强制改密）
+    from app.db.user_store import ensure_default_admin
+
+    _seed_pw = ensure_default_admin()
+    if _seed_pw:
+        _admin_name = get_settings().default_admin_username or "admin"
+        logger.warning("=" * 60)
+        logger.warning("已创建默认管理员账号（首次登录后必须修改密码）")
+        logger.warning("  用户名: %s", _admin_name)
+        logger.warning("  临时密码: %s", _seed_pw)
+        logger.warning("  该临时密码仅此次打印，请尽快登录并修改。")
+        logger.warning("=" * 60)
+
     # 预注册 chat agent 的 skills 和 tools（仅执行一次）
     from app.services.chat.skills import register_all_skills
     register_all_skills()
@@ -78,13 +93,17 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="A股智能分析系统", version="0.1.0", lifespan=lifespan)
 
+_cors_origins = [o.strip() for o in get_settings().cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 按 Bearer token 将登录用户绑定到请求上下文，供 get_effective_settings 叠加私密配置。
+app.add_middleware(UserContextMiddleware)
 
 app.include_router(stock.router, prefix="/api/stock", tags=["stock"])
 app.include_router(market.router, prefix="/api/market", tags=["market"])
@@ -97,6 +116,7 @@ app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(industry_chain.router, prefix="/api/industry-chain", tags=["industry-chain"])
 app.include_router(macro.router, prefix="/api/macro", tags=["macro"])
 app.include_router(stock_aggregate.router, prefix="/api/stock", tags=["stock"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
 
 @app.exception_handler(Exception)
@@ -104,7 +124,7 @@ async def global_exception_handler(request, exc: Exception):
     logger.error("未捕获异常: %s %s error=%s", request.method, request.url.path, exc, exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": f"服务器内部错误: {exc}"},
+        content={"detail": "服务器内部错误，请稍后重试"},
     )
 
 

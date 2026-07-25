@@ -115,7 +115,7 @@ export default function AIConclusion({ result }: Props) {
 
       <Row gutter={[20, 20]}>
         <Col xs={24} lg={7} className="pdf-avoid-break">
-          <div style={{ padding: "18px 16px", borderRadius: 12, border: `1px solid ${signalTheme.border}`, background: `linear-gradient(180deg, ${signalTheme.soft} 0%, ${c.cardBg}b3 100%)` }}>
+          <div style={{ padding: "18px 16px", borderRadius: 10, border: `1px solid ${signalTheme.border}`, background: signalTheme.soft }}>
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
               <RatingBadge score={overall_rating} size={84} />
             </div>

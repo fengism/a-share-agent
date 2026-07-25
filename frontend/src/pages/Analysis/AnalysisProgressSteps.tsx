@@ -52,8 +52,8 @@ export default function AnalysisProgressSteps({ stages, currentStageIndex }: Pro
     <div
       style={{
         padding: "16px 18px",
-        borderRadius: 12,
-        background: `linear-gradient(180deg, ${c.elevatedBg} 0%, ${c.nestedBg} 100%)`,
+        borderRadius: 10,
+        background: c.elevatedBg,
         border: `1px solid ${c.border}`,
       }}
     >

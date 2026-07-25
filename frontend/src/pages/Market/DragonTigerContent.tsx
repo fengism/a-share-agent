@@ -79,7 +79,7 @@ function DetailModal({
         <div style={{ textAlign: "center", padding: 40 }}>加载中...</div>
       ) : (
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} lg={12}>
             <div style={{ fontWeight: 600, marginBottom: 8, color: c.up }}>
               买入前5
             </div>
@@ -94,7 +94,7 @@ function DetailModal({
               }}
             />
           </Col>
-          <Col span={12}>
+          <Col xs={24} lg={12}>
             <div style={{ fontWeight: 600, marginBottom: 8, color: c.down }}>
               卖出前5
             </div>

@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Input, Steps, Typography, Spin, Tag, Button, message, Empty, Tooltip, Popover, Modal } from "antd";
 import { SearchOutlined, ApartmentOutlined, CheckCircleOutlined, LoadingOutlined, CloseCircleOutlined, SendOutlined, HistoryOutlined, CloudUploadOutlined, FullscreenOutlined } from "@ant-design/icons";
-import ReactECharts from "echarts-for-react";
+import ReactECharts from "echarts-for-react/lib/core";
 import DOMPurify from "dompurify";
 import echarts from "../../charts/echarts-setup";
 import { streamIndustryChain, type IndustryChainProgress } from "../../api/sse";
@@ -334,7 +334,7 @@ export default function IndustryChain() {
       )}
 
       {/* 两栏布局：左报告 · 右历史（始终显示） */}
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+      <div className="two-pane" style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
           {/* 左侧：报告区 */}
           <div style={{ flex: 1, minWidth: 0 }}>
             {result && (
@@ -548,7 +548,7 @@ export default function IndustryChain() {
           </div>
 
           {/* 右侧：历史记录 */}
-          <div style={{ width: 280, flexShrink: 0 }}>
+          <div className="pane-side" style={{ width: 280, flexShrink: 0 }}>
             <div style={{ ...cardStyle, padding: 0, position: "sticky", top: 24 }}>
               <div style={{ padding: "14px 16px", borderBottom: `1px solid ${c.border}` }}>
                 <Text strong style={{ color: c.textPrimary, fontSize: 14 }}>
@@ -581,19 +581,17 @@ export default function IndustryChain() {
                     return (
                       <Tooltip key={`${item.name}-${item.archive_id}`} title={item.summary || item.title} placement="left">
                         <div
+                          role="button"
+                          tabIndex={0}
                           onClick={() => handleLoadArchive(item)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleLoadArchive(item); } }}
+                          className={isActive ? undefined : "hover-mutedrow"}
                           style={{
                             padding: "10px 12px",
                             borderBottom: `1px solid ${c.border}`,
                             cursor: "pointer",
-                            background: isActive ? `${c.primary}26` : "transparent",
+                            background: isActive ? `${c.primary}26` : undefined,
                             transition: "background 0.15s",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isActive) (e.currentTarget as HTMLDivElement).style.background = `${c.textMuted}14`;
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isActive) (e.currentTarget as HTMLDivElement).style.background = "transparent";
                           }}
                         >
                           <div style={{ color: c.textPrimary, fontSize: 13, fontWeight: 500, marginBottom: 4 }}>

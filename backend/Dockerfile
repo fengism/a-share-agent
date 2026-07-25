@@ -3,7 +3,8 @@ FROM python:3.11-slim
 COPY --from=ghcr.io/astral-sh/uv:0.9.1 /uv /uvx /bin/
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
