@@ -427,3 +427,48 @@ def test_password_reset_single_use_and_expiry(client):
 
     user_store.create_password_reset(bob["id"], admin["id"], "tok2", auth_mod.expiry_in_hours(-1))
     assert user_store.consume_password_reset("tok2") is None  # expired
+
+
+def test_reset_accounts_command_clears_all_tables(client):
+    from app.db import user_store
+    from app.utils.auth import generate_invite_code, expiry_in_hours
+    from app.scripts.reset_accounts import main
+
+    admin = user_store.create_user("alice", "pw123456", is_admin=True)
+    user_store.create_session(admin["id"])
+    user_store.create_invite(admin["id"], generate_invite_code())
+    user_store.set_user_config(admin["id"], {"llm_api_key": "K"})
+    user_store.create_password_reset(admin["id"], admin["id"], "rtok", expiry_in_hours(24))
+
+    before = user_store.count_all_accounts()
+    assert before["users"] == 1
+    assert before["auth_sessions"] >= 1
+    assert before["invites"] == 1
+    assert before["user_config"] == 1
+    assert before["password_resets"] == 1
+
+    assert main(["--yes"]) == 0
+
+    after = user_store.count_all_accounts()
+    assert all(v == 0 for v in after.values())
+    # First registration becomes admin again (no invite needed).
+    assert client.get("/api/auth/needs-setup").json()["needs_setup"] is True
+
+
+def test_reset_accounts_stats_does_not_delete(client):
+    from app.db import user_store
+    from app.scripts.reset_accounts import main
+
+    user_store.create_user("alice", "pw123456", is_admin=True)
+    assert main(["--stats"]) == 0
+    assert user_store.count_users() == 1  # unchanged
+
+
+def test_reset_accounts_aborts_without_confirmation(client, monkeypatch):
+    from app.db import user_store
+    from app.scripts.reset_accounts import main
+
+    user_store.create_user("alice", "pw123456", is_admin=True)
+    monkeypatch.setattr("builtins.input", lambda *a, **k: "no")
+    assert main([]) == 1
+    assert user_store.count_users() == 1  # not deleted

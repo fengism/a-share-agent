@@ -286,3 +286,31 @@ def set_user_config(user_id: int, items: dict) -> None:
         [(user_id, k, "" if v is None else str(v)) for k, v in items.items()],
     )
     conn.commit()
+
+
+# ── Account reset (admin maintenance) ──────────────────
+# Table names are fixed constants below, never user input (no injection risk).
+_ACCOUNT_TABLES = ("users", "auth_sessions", "invites", "user_config", "password_resets")
+
+
+def count_all_accounts() -> dict[str, int]:
+    """Row counts for every account table (users + related)."""
+    conn = get_connection()
+    return {t: conn.execute(f"SELECT COUNT(*) AS n FROM {t}").fetchone()["n"] for t in _ACCOUNT_TABLES}
+
+
+def reset_all_accounts() -> dict[str, int]:
+    """Delete ALL account data (users / sessions / invites / per-user config /
+    reset tokens). Other application data (market cache, etc.) is untouched.
+
+    Returns the pre-reset row counts. Afterwards the next registration becomes
+    the first-user admin again (no invite needed).
+    """
+    before = count_all_accounts()
+    conn = get_connection()
+    # Delete referencing tables before `users` so it works regardless of the
+    # foreign_keys pragma state.
+    for table in ("auth_sessions", "password_resets", "invites", "user_config", "users"):
+        conn.execute(f"DELETE FROM {table}")
+    conn.commit()
+    return before

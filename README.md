@@ -242,6 +242,19 @@ npm run dev
 
 重置令牌只存哈希、单次使用、可过期；重置端点按 IP 限流。
 
+### 重置账号（忘记管理员 / 重新开始）
+
+忘记唯一管理员的凭据，或想清空全部账号重新初始化时，可一键重置（**仅清空账号相关表，不影响行情缓存等其它数据**）：
+
+```bash
+make backend-reset-accounts
+# 或：cd backend && uv run python -m app.scripts.reset_accounts
+#   跳过确认：加 --yes      只看统计不删除：加 --stats
+# Docker：docker compose exec backend python -m app.scripts.reset_accounts --yes
+```
+
+命令会先显示各账号表条数并要求输入 `yes` 确认。清空后**重启后端**，打开注册页即可**免邀请码注册新的首个管理员**。
+
 ### 相关环境变量
 
 登录失败限流（防暴力破解）可用环境变量调整（可选，均有默认值）：
