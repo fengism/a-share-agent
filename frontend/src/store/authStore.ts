@@ -12,6 +12,8 @@ interface AuthState {
   logout: () => Promise<void>;
   /** Clear local session without hitting the API (used on 401 expiry). */
   clearLocal: () => void;
+  /** Re-fetch the current user (e.g. after a forced password change). */
+  refreshUser: () => Promise<void>;
   /** Validate a persisted token on app start and load the user. */
   bootstrap: () => Promise<void>;
 }
@@ -49,6 +51,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   clearLocal: () => {
     setToken(null);
     set({ user: null });
+  },
+
+  refreshUser: async () => {
+    const user = await meApi();
+    set({ user });
   },
 
   bootstrap: async () => {

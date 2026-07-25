@@ -21,7 +21,7 @@ describe("authStore", () => {
   });
 
   it("login persists the token and user", async () => {
-    asMock(loginApi).mockResolvedValue({ token: "tok", user: { id: 1, username: "alice", is_admin: false } });
+    asMock(loginApi).mockResolvedValue({ token: "tok", user: { id: 1, username: "alice", is_admin: false, must_change_password: false } });
     await useAuthStore.getState().login("alice", "pw123456");
     expect(loginApi).toHaveBeenCalledWith({ username: "alice", password: "pw123456" });
     expect(getToken()).toBe("tok");
@@ -29,7 +29,7 @@ describe("authStore", () => {
   });
 
   it("register forwards the invite code and stores the session", async () => {
-    asMock(registerApi).mockResolvedValue({ token: "t2", user: { id: 2, username: "bob", is_admin: false } });
+    asMock(registerApi).mockResolvedValue({ token: "t2", user: { id: 2, username: "bob", is_admin: false, must_change_password: false } });
     await useAuthStore.getState().register("bob", "pw123456", "INVITE1");
     expect(registerApi).toHaveBeenCalledWith({ username: "bob", password: "pw123456", invite_code: "INVITE1" });
     expect(getToken()).toBe("t2");
@@ -38,7 +38,7 @@ describe("authStore", () => {
 
   it("logout clears token and user", async () => {
     setToken("x");
-    useAuthStore.setState({ user: { id: 1, username: "alice", is_admin: false } });
+    useAuthStore.setState({ user: { id: 1, username: "alice", is_admin: false, must_change_password: false } });
     asMock(logoutApi).mockResolvedValue({ ok: true });
     await useAuthStore.getState().logout();
     expect(getToken()).toBeNull();
@@ -47,7 +47,7 @@ describe("authStore", () => {
 
   it("clearLocal drops the session without calling the API", () => {
     setToken("x");
-    useAuthStore.setState({ user: { id: 1, username: "alice", is_admin: false } });
+    useAuthStore.setState({ user: { id: 1, username: "alice", is_admin: false, must_change_password: false } });
     useAuthStore.getState().clearLocal();
     expect(getToken()).toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
@@ -63,7 +63,7 @@ describe("authStore", () => {
 
   it("bootstrap with a valid token loads the user", async () => {
     setToken("tok");
-    asMock(meApi).mockResolvedValue({ id: 1, username: "alice", is_admin: true });
+    asMock(meApi).mockResolvedValue({ id: 1, username: "alice", is_admin: true, must_change_password: false });
     await useAuthStore.getState().bootstrap();
     expect(useAuthStore.getState().user?.is_admin).toBe(true);
     expect(useAuthStore.getState().bootstrapped).toBe(true);

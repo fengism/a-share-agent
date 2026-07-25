@@ -22,6 +22,7 @@ class UserOut(BaseModel):
     id: int
     username: str
     is_admin: bool
+    must_change_password: bool = False
 
 
 class AuthResponse(BaseModel):

@@ -75,3 +75,8 @@ def expiry_in_hours(hours: int) -> str:
 def generate_invite_code() -> str:
     """Generate a URL-safe invite code."""
     return secrets.token_urlsafe(12)
+
+
+def generate_temp_password() -> str:
+    """Generate a random, typeable temporary password (for the seeded admin)."""
+    return secrets.token_urlsafe(12)

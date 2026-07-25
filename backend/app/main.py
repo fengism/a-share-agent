@@ -51,6 +51,19 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     init_db()
     logger.info("数据库初始化完成")
 
+    # 首启无用户时自动创建默认管理员（随机密码，仅打印一次；首次登录强制改密）
+    from app.db.user_store import ensure_default_admin
+
+    _seed_pw = ensure_default_admin()
+    if _seed_pw:
+        _admin_name = get_settings().default_admin_username or "admin"
+        logger.warning("=" * 60)
+        logger.warning("已创建默认管理员账号（首次登录后必须修改密码）")
+        logger.warning("  用户名: %s", _admin_name)
+        logger.warning("  临时密码: %s", _seed_pw)
+        logger.warning("  该临时密码仅此次打印，请尽快登录并修改。")
+        logger.warning("=" * 60)
+
     # 预注册 chat agent 的 skills 和 tools（仅执行一次）
     from app.services.chat.skills import register_all_skills
     register_all_skills()

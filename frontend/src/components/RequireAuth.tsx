@@ -37,5 +37,14 @@ export default function RequireAuth() {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  // Force a password change (seeded admin / flagged account) before anything else.
+  if (user.must_change_password && location.pathname !== "/force-change-password") {
+    return <Navigate to="/force-change-password" replace />;
+  }
+  // Don't linger on the forced-change screen once it's no longer required.
+  if (!user.must_change_password && location.pathname === "/force-change-password") {
+    return <Navigate to="/" replace />;
+  }
+
   return <Outlet />;
 }

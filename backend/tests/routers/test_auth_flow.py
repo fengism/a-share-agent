@@ -472,3 +472,29 @@ def test_reset_accounts_aborts_without_confirmation(client, monkeypatch):
     monkeypatch.setattr("builtins.input", lambda *a, **k: "no")
     assert main([]) == 1
     assert user_store.count_users() == 1  # not deleted
+
+
+def test_seeded_admin_must_change_password_flow(client):
+    from app.db import user_store
+    from app.config import get_settings
+
+    pw = user_store.ensure_default_admin()
+    assert pw is not None
+    assert user_store.ensure_default_admin() is None  # idempotent once a user exists
+
+    name = get_settings().default_admin_username
+    login = client.post("/api/auth/login", json={"username": name, "password": pw})
+    assert login.status_code == 200
+    token = login.json()["token"]
+    assert login.json()["user"]["is_admin"] is True
+    assert login.json()["user"]["must_change_password"] is True
+    assert client.get("/api/auth/me", headers=_auth(token)).json()["must_change_password"] is True
+
+    # Changing the password clears the forced-change flag.
+    r = client.post(
+        "/api/auth/change-password",
+        headers=_auth(token),
+        json={"old_password": pw, "new_password": "brandnew123"},
+    )
+    assert r.status_code == 200
+    assert client.get("/api/auth/me", headers=_auth(token)).json()["must_change_password"] is False

@@ -39,7 +39,12 @@ _security = HTTPBearer(auto_error=False)
 
 
 def _user_out(u: dict) -> UserOut:
-    return UserOut(id=u["id"], username=u["username"], is_admin=bool(u["is_admin"]))
+    return UserOut(
+        id=u["id"],
+        username=u["username"],
+        is_admin=bool(u["is_admin"]),
+        must_change_password=bool(u.get("must_change_password", 0)),
+    )
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(_security)) -> dict:

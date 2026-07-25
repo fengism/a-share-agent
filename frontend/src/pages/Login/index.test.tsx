@@ -38,7 +38,7 @@ describe("LoginPage", () => {
   });
 
   it("submits trimmed credentials and navigates home on success", async () => {
-    asMock(loginApi).mockResolvedValue({ token: "tok", user: { id: 1, username: "alice", is_admin: false } });
+    asMock(loginApi).mockResolvedValue({ token: "tok", user: { id: 1, username: "alice", is_admin: false, must_change_password: false } });
     renderLogin();
 
     fireEvent.change(screen.getByPlaceholderText("用户名"), { target: { value: "alice" } });
@@ -63,7 +63,7 @@ describe("LoginPage", () => {
   });
 
   it("redirects away when already authenticated", () => {
-    useAuthStore.setState({ user: { id: 1, username: "alice", is_admin: false }, bootstrapped: true });
+    useAuthStore.setState({ user: { id: 1, username: "alice", is_admin: false, must_change_password: false }, bootstrapped: true });
     renderLogin();
     expect(screen.getByText("HOME PAGE")).toBeInTheDocument();
   });

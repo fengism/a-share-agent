@@ -12,6 +12,7 @@ function renderGuard() {
           <Route path="/secret" element={<div>SECRET CONTENT</div>} />
         </Route>
         <Route path="/login" element={<div>LOGIN PAGE</div>} />
+        <Route path="/force-change-password" element={<div>FORCE CHANGE</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -37,8 +38,15 @@ describe("RequireAuth", () => {
   });
 
   it("renders the protected route when authenticated", () => {
-    useAuthStore.setState({ bootstrapped: true, user: { id: 1, username: "alice", is_admin: false } });
+    useAuthStore.setState({ bootstrapped: true, user: { id: 1, username: "alice", is_admin: false, must_change_password: false } });
     renderGuard();
     expect(screen.getByText("SECRET CONTENT")).toBeInTheDocument();
+  });
+
+  it("forces a password change before the app when must_change_password is set", () => {
+    useAuthStore.setState({ bootstrapped: true, user: { id: 1, username: "alice", is_admin: true, must_change_password: true } });
+    renderGuard();
+    expect(screen.getByText("FORCE CHANGE")).toBeInTheDocument();
+    expect(screen.queryByText("SECRET CONTENT")).toBeNull();
   });
 });

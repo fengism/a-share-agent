@@ -89,6 +89,9 @@ class Settings(BaseSettings):
     login_window_seconds: int = 300
     login_lock_seconds: int = 300
 
+    # 首启无用户时自动创建的默认管理员用户名（密码随机生成并打印到日志，首登强制改密）
+    default_admin_username: str = "admin"
+
     @model_validator(mode="after")
     def apply_provider_defaults(self) -> "Settings":
         """根据 llm_provider 自动填充 base_url 和 model 的默认值。

@@ -8,6 +8,7 @@ from app.utils.auth import (
     verify_password,
     hash_token,
     generate_session_token,
+    generate_temp_password,
     session_expiry,
     now_ts,
     SESSION_RENEW_THRESHOLD_DAYS,
@@ -31,14 +32,37 @@ def get_user_by_id(user_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def create_user(username: str, password: str, is_admin: bool = False) -> dict:
+def create_user(
+    username: str,
+    password: str,
+    is_admin: bool = False,
+    must_change_password: bool = False,
+) -> dict:
     conn = get_connection()
     cur = conn.execute(
-        "INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)",
-        (username, hash_password(password), 1 if is_admin else 0),
+        "INSERT INTO users (username, password_hash, is_admin, must_change_password) VALUES (?, ?, ?, ?)",
+        (username, hash_password(password), 1 if is_admin else 0, 1 if must_change_password else 0),
     )
     conn.commit()
     return get_user_by_id(cur.lastrowid)
+
+
+def ensure_default_admin() -> str | None:
+    """Seed a default admin when there are no users yet.
+
+    Creates an admin with a RANDOM password and ``must_change_password=1`` so the
+    operator must set a real password on first login. Returns the generated
+    password (to be logged exactly once by the caller), or None if any user
+    already exists. Idempotent — safe to call on every startup.
+    """
+    if count_users() > 0:
+        return None
+    from app.config import get_settings
+
+    username = (get_settings().default_admin_username or "admin").strip() or "admin"
+    password = generate_temp_password()
+    create_user(username, password, is_admin=True, must_change_password=True)
+    return password
 
 
 def create_account(
@@ -96,7 +120,7 @@ def verify_credentials(username: str, password: str) -> dict | None:
 def update_password(user_id: int, new_password: str) -> None:
     conn = get_connection()
     conn.execute(
-        "UPDATE users SET password_hash = ? WHERE id = ?",
+        "UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?",
         (hash_password(new_password), user_id),
     )
     conn.commit()

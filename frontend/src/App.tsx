@@ -29,6 +29,7 @@ const Macro = lazy(() => import("./pages/Macro"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const ForceChangePassword = lazy(() => import("./pages/ForceChangePassword"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -124,6 +125,7 @@ export default function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route element={<RequireAuth />}>
+                <Route path="/force-change-password" element={<ErrorBoundary><ForceChangePassword /></ErrorBoundary>} />
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
                   <Route path="/market" element={<ErrorBoundary><Market /></ErrorBoundary>} />
