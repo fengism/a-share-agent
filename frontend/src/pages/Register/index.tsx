@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Button, Form, Input, Typography, Alert, Tag } from "antd";
 import { UserOutlined, LockOutlined, KeyOutlined, LineChartOutlined } from "@ant-design/icons";
@@ -16,20 +16,66 @@ export default function RegisterPage() {
   const register = useAuthStore((s) => s.register);
 
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [setupError, setSetupError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    needsSetupApi()
-      .then((r) => alive && setNeedsSetup(r.needs_setup))
-      .catch(() => alive && setNeedsSetup(false));
-    return () => {
-      alive = false;
-    };
+  // Determine whether this is first-time setup (no users yet → first account is
+  // admin, no invite needed). On failure, surface a clear error + retry rather
+  // than silently assuming "invite required" — that fallback would block a
+  // legitimate first-admin registration whenever the check merely hiccups.
+  const loadNeedsSetup = useCallback(async () => {
+    setChecking(true);
+    setSetupError(null);
+    try {
+      const r = await needsSetupApi();
+      setNeedsSetup(r.needs_setup);
+    } catch (e) {
+      setNeedsSetup(null);
+      setSetupError(e instanceof Error ? e.message : "无法确认初始化状态，请稍后重试");
+    } finally {
+      setChecking(false);
+    }
   }, []);
 
+  useEffect(() => {
+    loadNeedsSetup();
+  }, [loadNeedsSetup]);
+
   if (user) return <Navigate to="/" replace />;
+
+  // needs-setup 无法确定：明确报错 + 重试，绝不静默回退成“需要邀请码”。
+  if (setupError) {
+    return (
+      <AuthShell>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <div
+            style={{
+              width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
+              background: c.logoGradient, display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <LineChartOutlined style={{ color: "#fff", fontSize: 24 }} />
+          </div>
+          <Title level={3} style={{ margin: 0, color: c.textPrimary }}>注册</Title>
+        </div>
+        <Alert
+          type="error"
+          showIcon
+          title="无法确认初始化状态"
+          description={setupError}
+          style={{ marginBottom: 16 }}
+        />
+        <Button type="primary" block onClick={loadNeedsSetup} loading={checking}>
+          重试
+        </Button>
+        <div style={{ textAlign: "center", color: c.textSecondary, fontSize: 13, marginTop: 16 }}>
+          已有账号？<Link to="/login">去登录</Link>
+        </div>
+      </AuthShell>
+    );
+  }
 
   const onFinish = async (values: {
     username: string;
@@ -73,8 +119,10 @@ export default function RegisterPage() {
           <Tag color="gold" style={{ marginTop: 8 }}>
             首位注册用户将成为管理员
           </Tag>
-        ) : (
+        ) : needsSetup === false ? (
           <Text style={{ color: c.textSecondary }}>需要管理员提供的邀请码</Text>
+        ) : (
+          <Text style={{ color: c.textSecondary }}>正在检测初始化状态…</Text>
         )}
       </div>
 
@@ -129,7 +177,7 @@ export default function RegisterPage() {
         )}
 
         <Form.Item style={{ marginBottom: 8 }}>
-          <Button type="primary" htmlType="submit" block loading={loading} disabled={needsSetup === null}>
+          <Button type="primary" htmlType="submit" block loading={loading} disabled={checking || needsSetup === null}>
             {needsSetup ? "创建管理员账号" : "注册"}
           </Button>
         </Form.Item>

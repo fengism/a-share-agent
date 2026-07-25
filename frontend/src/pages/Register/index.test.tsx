@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 vi.mock("../../api/auth", () => ({
@@ -49,5 +49,22 @@ describe("RegisterPage", () => {
 
     expect(await screen.findByPlaceholderText("管理员提供的邀请码")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /注\s*册/ })).toBeInTheDocument();
+  });
+
+  it("shows an error with retry when needs-setup fails — no silent invite fallback", async () => {
+    asMock(needsSetupApi)
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValueOnce({ needs_setup: true });
+    renderRegister();
+
+    // Error state — must NOT silently render the invite field / register form.
+    expect(await screen.findByText("无法确认初始化状态")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("管理员提供的邀请码")).toBeNull();
+    expect(screen.queryByPlaceholderText("用户名")).toBeNull();
+
+    // Retry re-checks; now it resolves to first-user (admin) mode.
+    fireEvent.click(screen.getByRole("button", { name: /重\s*试/ }));
+    expect(await screen.findByText("首位注册用户将成为管理员")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("管理员提供的邀请码")).toBeNull();
   });
 });
