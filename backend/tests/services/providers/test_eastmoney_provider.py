@@ -1,5 +1,6 @@
 import pandas as pd
 
+from app.constants import EASTMONEY_CLIST_URL, EASTMONEY_STOCK_KLINE_URL
 from app.services.providers import eastmoney
 
 
@@ -55,7 +56,7 @@ def test_fetch_index_kline_parses_klines(monkeypatch):
     assert isinstance(df, pd.DataFrame)
     assert df.iloc[0]["date"] == "2026-05-25"
     assert df.iloc[0]["close"] == "3010"
-    assert captured["url"] == eastmoney.EASTMONEY_STOCK_KLINE_URL
+    assert captured["url"] == EASTMONEY_STOCK_KLINE_URL
     assert captured["kwargs"]["params"]["secid"] == "1.000001"
 
 
@@ -106,7 +107,7 @@ def test_fetch_clist_diff_returns_empty_on_request_error(monkeypatch):
     result = provider._fetch_clist_diff({"fields": "f12"}, page_size=200)
 
     assert result == []
-    assert requested_urls == [eastmoney.EASTMONEY_CLIST_URL]
+    assert requested_urls == [EASTMONEY_CLIST_URL]
 
 
 def test_fetch_industry_boards_maps_columns(monkeypatch):

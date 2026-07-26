@@ -116,8 +116,14 @@ async def test_run_chat_agent_generates_final_text_after_max_tool_rounds(monkeyp
             is_error=False,
         )
 
+    async def fake_close() -> None:
+        return None
+
     fake_runtime = SimpleNamespace(
-        client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))),
+        client=SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create)),
+            close=fake_close,
+        ),
         model="test-model",
     )
 

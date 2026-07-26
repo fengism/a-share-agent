@@ -13,6 +13,17 @@ logger = logging.getLogger(__name__)
 from datetime import datetime
 from app.utils.symbol_utils import normalize_code
 
+from app.services.stock.valuation.helpers import (
+    _confidence_text,
+    _current_peg,
+    _normalize_growth_rate,
+    _value_range,
+)
+from app.services.stock.valuation.profile import (
+    _cap_peg_target_pe,
+    _target_peg_by_profile,
+)
+
 def _build_multiple_valuation(method: str, basis_metric: float | None, target_multiple: float | None, current_price: float | None, total_shares: float | None, basis: str, confidence_score: float, applicability: str) -> ValuationMethodResult:
     """构造单一倍数法估值结果。
 

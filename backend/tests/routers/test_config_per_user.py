@@ -14,7 +14,7 @@ def ctx(tmp_path, monkeypatch):
     from app.db import connection as conn_mod
 
     monkeypatch.setattr(conn_mod, "_DB_PATH", tmp_path / "config_test.db")
-    conn_mod._connection = None
+    conn_mod.reset_for_tests()
 
     from app.db import init_db, user_store
     from app.routers import config
@@ -31,8 +31,7 @@ def ctx(tmp_path, monkeypatch):
     try:
         yield client, admin, member, admin_token, member_token
     finally:
-        conn_mod.close_connection()
-        conn_mod._connection = None
+        conn_mod.reset_for_tests()
 
 
 def _h(token: str) -> dict:
@@ -62,7 +61,7 @@ def test_masked_secret_is_not_overwritten(ctx):
 
     client.put("/api/config", headers=_h(mt), json={"llm_api_key": "REALKEY1234"})
     masked = client.get("/api/config", headers=_h(mt)).json()["llm_api_key"]
-    assert masked.endswith("***")
+    assert "***" in masked
 
     # Echoing the masked value back must not clobber the stored real key.
     client.put("/api/config", headers=_h(mt), json={"llm_api_key": masked})

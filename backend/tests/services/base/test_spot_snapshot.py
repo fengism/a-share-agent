@@ -25,6 +25,7 @@ def test_get_spot_snapshot_uses_akshare_as_last_fallback(monkeypatch):
     monkeypatch.setattr(spot_snapshot, "_save_spot_snapshot_file", lambda value: None)
 
     async def fake_call_blocking(func, *args, **kwargs):
+        kwargs.pop("semaphore", None)
         return func(*args, **kwargs)
 
     monkeypatch.setattr(spot_snapshot, "call_blocking", fake_call_blocking)

@@ -47,11 +47,12 @@ def with_rate_limit(semaphore: asyncio.Semaphore | None = None) -> Callable:
 
     def decorator(func: Callable) -> Callable:
         @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
-        @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             async with sem:
                 return await asyncio.to_thread(func, *args, **kwargs)
 
-        return wrapper
+        # 在 retry 包装之后再复制元数据，确保最终返回对象的 __name__/__wrapped__
+        # 指向原函数（retry 会覆盖内层的 @wraps 结果，破坏 introspection 链）。
+        return wraps(func)(wrapper)
 
     return decorator

@@ -74,9 +74,8 @@ class Orchestrator:
         Return:
             产生 ChatStreamDelta 事件的异步生成器
         """
-        runtime = create_async_openai_chat_runtime(get_effective_settings())
-        llm_client = runtime.client
-        model = runtime.model
+        # 以下三个早退分支直接回退到 legacy agent（自带独立 client），无需在此
+        # 创建 runtime，故把 client 创建下移，避免早退时泄漏一个未使用的连接池。
 
         # URL 消息直接回退到 legacy agent（拥有 fetch_url 工具），
         # 避免 URL 中的 6 位数字被误匹配为股票代码而路由到子 Agent。
@@ -102,36 +101,43 @@ class Orchestrator:
                 yield delta
             return
 
-        # 仅当关键词无法精确判断（落到全部 5 个 Agent 的兜底）时才用 LLM 二次分类，
-        # 关键词已明确匹配的场景直接执行，省去一次阻塞式 LLM 往返以降低首字延迟。
-        all_agents = list(self.sub_agents.keys())
-        if decision.is_complex and set(decision.agents) == set(all_agents):
-            try:
-                decision = await self._llm_classify(message, llm_client, model)
-                logger.info(f"LLM classify: agents={decision.agents}")
-            except Exception as e:
-                logger.warning(f"LLM classify failed, using all agents: {e}")
-                decision = RoutingDecision(agents=all_agents,
-                                           stock_codes=decision.stock_codes, is_complex=True)
+        runtime = create_async_openai_chat_runtime(get_effective_settings())
+        llm_client = runtime.client
+        model = runtime.model
+        try:
+            # 仅当关键词无法精确判断（落到全部 5 个 Agent 的兜底）时才用 LLM 二次分类，
+            # 关键词已明确匹配的场景直接执行，省去一次阻塞式 LLM 往返以降低首字延迟。
+            all_agents = list(self.sub_agents.keys())
+            if decision.is_complex and set(decision.agents) == set(all_agents):
+                try:
+                    decision = await self._llm_classify(message, llm_client, model)
+                    logger.info(f"LLM classify: agents={decision.agents}")
+                except Exception as e:
+                    logger.warning(f"LLM classify failed, using all agents: {e}")
+                    decision = RoutingDecision(agents=all_agents,
+                                               stock_codes=decision.stock_codes, is_complex=True)
 
-        yield ChatStreamDelta(type="text", content="🔍 正在进行多维度分析...\n\n")
+            yield ChatStreamDelta(type="text", content="🔍 正在进行多维度分析...\n\n")
 
-        # 前置股票识别：一次性解析股票代码和基本信息，注入给所有子 Agent
-        stock_context = await self._resolve_stocks(message)
-        enriched_message = (stock_context + "\n\n" + message) if stock_context else message
+            # 前置股票识别：一次性解析股票代码和基本信息，注入给所有子 Agent
+            stock_context = await self._resolve_stocks(message)
+            enriched_message = (stock_context + "\n\n" + message) if stock_context else message
 
-        results: dict[str, SubAgentResult] = {}
-        async for delta in self._run_sub_agents_streaming(
-            decision.agents, enriched_message, history, llm_client, model, results
-        ):
-            yield delta
+            results: dict[str, SubAgentResult] = {}
+            async for delta in self._run_sub_agents_streaming(
+                decision.agents, enriched_message, history, llm_client, model, results
+            ):
+                yield delta
 
-        yield ChatStreamDelta(type="text", content="\n🧠 正在综合分析...\n\n")
+            yield ChatStreamDelta(type="text", content="\n🧠 正在综合分析...\n\n")
 
-        async for token in self._synthesize(message, results, llm_client, model):
-            yield ChatStreamDelta(type="text", content=token)
+            async for token in self._synthesize(message, results, llm_client, model):
+                yield ChatStreamDelta(type="text", content=token)
 
-        yield ChatStreamDelta(type="done")
+            yield ChatStreamDelta(type="done")
+        finally:
+            # 释放底层 httpx 连接池，避免每次编排泄漏一个连接池。
+            await llm_client.close()
 
     async def _resolve_stocks(self, message: str) -> str:
         """前置股票识别：解析消息中的股票并返回格式化上下文。

@@ -11,6 +11,15 @@ from app.utils.data_clean import safe_float
 logger = logging.getLogger(__name__)
 
 import re
+from datetime import datetime
+
+from app.services.stock.valuation.helpers import (
+    _forecast_confidence_adjustment,
+    _normalize_growth_rate,
+    _normalize_peg_growth_rate,
+    _parse_forecast_year,
+    _select_forecast,
+)
 
 FINANCIAL_KEYWORDS = ("银行", "保险", "证券", "券商", "多元金融", "金融")
 CYCLICAL_KEYWORDS = ("煤炭", "有色", "钢铁", "化工", "航运", "石油", "建材", "矿", "金属")

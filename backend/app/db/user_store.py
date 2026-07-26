@@ -6,6 +6,7 @@ from app.db.connection import get_connection
 from app.utils.auth import (
     hash_password,
     verify_password,
+    dummy_verify,
     hash_token,
     generate_session_token,
     generate_temp_password,
@@ -112,7 +113,12 @@ def create_account(
 
 def verify_credentials(username: str, password: str) -> dict | None:
     user = get_user_by_username(username)
-    if not user or not verify_password(password, user["password_hash"]):
+    if not user:
+        # Spend the same PBKDF2 time as a real verify so response timing does not
+        # reveal whether the username exists.
+        dummy_verify()
+        return None
+    if not verify_password(password, user["password_hash"]):
         return None
     return user
 
@@ -199,6 +205,23 @@ def delete_other_sessions(user_id: int, keep_token_hash: str | None) -> int:
     return cur.rowcount
 
 
+def purge_expired() -> dict[str, int]:
+    """Delete expired sessions and expired/used password-reset tokens.
+
+    Expired rows are already filtered out at read time, but never removed, so
+    both tables grow unbounded. Call periodically to reclaim space. Returns the
+    number of rows deleted per table.
+    """
+    conn = get_connection()
+    now = now_ts()
+    sessions = conn.execute("DELETE FROM auth_sessions WHERE expires_at <= ?", (now,)).rowcount
+    resets = conn.execute(
+        "DELETE FROM password_resets WHERE expires_at <= ? OR used_at IS NOT NULL", (now,)
+    ).rowcount
+    conn.commit()
+    return {"auth_sessions": sessions, "password_resets": resets}
+
+
 # ── Invites ────────────────────────────────────────────
 def create_invite(created_by: int, code: str, expires_at: str | None = None) -> dict:
     conn = get_connection()
@@ -222,17 +245,6 @@ def invite_is_valid(code: str) -> bool:
     if inv["expires_at"] and inv["expires_at"] < now_ts():
         return False
     return True
-
-
-def consume_invite(code: str, used_by: int) -> bool:
-    """Atomically mark an unused, unexpired invite as used. Returns True on success."""
-    conn = get_connection()
-    cur = conn.execute(
-        "UPDATE invites SET used_by = ?, used_at = ? WHERE code = ? AND used_by IS NULL",
-        (used_by, now_ts(), code),
-    )
-    conn.commit()
-    return cur.rowcount == 1
 
 
 def list_invites(created_by: int) -> list[dict]:

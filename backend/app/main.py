@@ -64,6 +64,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         logger.warning("  该临时密码仅此次打印，请尽快登录并修改。")
         logger.warning("=" * 60)
 
+    # 启动时清理一次过期会话与重置令牌（历史遗留行不会随查询自动删除）
+    from app.db.user_store import purge_expired
+
+    try:
+        logger.info("启动清理过期认证数据: %s", purge_expired())
+    except Exception:
+        logger.warning("启动清理过期认证数据失败", exc_info=True)
+
     # 预注册 chat agent 的 skills 和 tools（仅执行一次）
     from app.services.chat.skills import register_all_skills
     register_all_skills()
@@ -204,12 +212,14 @@ async def refresh_industry_mapping_file_daily():
 
 
 async def _periodic_wal_checkpoint():
-    """每 6 小时执行一次 WAL checkpoint，控制 WAL 文件大小。"""
+    """每 6 小时执行一次 WAL checkpoint 与过期认证数据清理，控制存储增长。"""
     from app.db.connection import checkpoint_wal
+    from app.db.user_store import purge_expired
 
     async def _iteration():
         await call_blocking(checkpoint_wal)
-        logger.info("WAL checkpoint 完成")
+        purged = await call_blocking(purge_expired)
+        logger.info("WAL checkpoint 完成，过期认证数据已清理: %s", purged)
 
     await _run_periodic(
         name="wal_checkpoint",

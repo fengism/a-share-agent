@@ -89,6 +89,10 @@ class Settings(BaseSettings):
     login_window_seconds: int = 300
     login_lock_seconds: int = 300
 
+    # 是否信任 X-Forwarded-For 头解析客户端真实 IP。仅当服务部署在可信反向代理
+    # （nginx / 网关）之后时才应开启；直连暴露时开启会让攻击者伪造 IP 绕过限流。
+    trust_proxy_headers: bool = False
+
     # 首启无用户时自动创建的默认管理员用户名（密码随机生成并打印到日志，首登强制改密）
     default_admin_username: str = "admin"
 
@@ -273,8 +277,9 @@ def update_settings(patch: dict) -> Settings:
     for key, value in patch.items():
         if value is None or not hasattr(current, key):
             continue
-        # Skip masked secrets — user didn't actually change them
-        if key in ("llm_api_key", "feishu_app_secret", "iwencai_api_key", "notion_api_token", "eastmoney_cookie", "baidu_cookie", "ths_cookie") and isinstance(value, str) and value.endswith("***"):
+        # Skip masked secrets — user didn't actually change them。
+        # _mask_secret 输出格式为 {前4}***{后4}，不以 *** 结尾，故用包含判断。
+        if key in ("llm_api_key", "feishu_app_secret", "iwencai_api_key", "notion_api_token", "eastmoney_cookie", "baidu_cookie", "ths_cookie") and isinstance(value, str) and "***" in value:
             continue
         setattr(current, key, value)
 

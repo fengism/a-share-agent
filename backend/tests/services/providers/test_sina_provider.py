@@ -1,5 +1,7 @@
 import json
 
+import requests
+
 from app.services.providers import sina
 
 
@@ -22,7 +24,7 @@ def test_fetch_spot_snapshot_direct_maps_columns_and_units(monkeypatch):
     provider = sina.SinaDataProvider()
     calls = []
 
-    def fake_get(url, *, params, timeout):
+    def fake_get(self, url, *, params, timeout):
         calls.append(params)
         if params["page"] == 1:
             return DummyResponse([
@@ -37,7 +39,7 @@ def test_fetch_spot_snapshot_direct_maps_columns_and_units(monkeypatch):
             ])
         return DummyResponse([])
 
-    monkeypatch.setattr(sina.requests, "get", fake_get)
+    monkeypatch.setattr(requests.Session, "get", fake_get)
 
     df = provider.fetch_spot_snapshot()
 

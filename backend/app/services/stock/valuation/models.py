@@ -12,33 +12,37 @@ logger = logging.getLogger(__name__)
 
 from dataclasses import dataclass
 
+@dataclass
 class _MultipleMethodContext:
     """Purpose: 倍数法估值方法的目标倍数、依据、置信度与适用性上下文。"""
-    target: float | None
-    basis: str | None
-    confidence: float
-    applicability: str
+    target: float | None = None
+    basis: str | None = None
+    confidence: float = 0.0
+    applicability: str = ""
 
+@dataclass
 class _ValuationBases:
     """Purpose: 估值计算共享的盈利、收入、现金流年化与 TTM 基础数据。"""
-    net_profit_annualized: float | None
-    revenue_annualized: float | None
-    operating_cashflow_annualized: float | None
-    net_profit_ttm: float | None
-    revenue_ttm: float | None
+    net_profit_annualized: float | None = None
+    revenue_annualized: float | None = None
+    operating_cashflow_annualized: float | None = None
+    net_profit_ttm: float | None = None
+    revenue_ttm: float | None = None
 
+@dataclass
 class _PegContext:
     """Purpose: PEG 估值方法使用的增长率、依据与当前 PEG 上下文。"""
-    growth_rate: float | None
-    growth_basis: str | None
-    confidence: float
-    current_peg: float | None
+    growth_rate: float | None = None
+    growth_basis: str | None = None
+    confidence: float = 0.0
+    current_peg: float | None = None
 
+@dataclass
 class _WeightedValuationOutputs:
     """Purpose: 加权估值产物（权重、综合公允价值、区间、观点、摘要）。"""
-    method_weights: dict[str, float]
-    blended_fair_value: float | None
-    fair_value_range: list[float] | None
-    valuation_view: str | None
-    valuation_summary: str | None
+    method_weights: dict[str, float] = None
+    blended_fair_value: float | None = None
+    fair_value_range: list[float] | None = None
+    valuation_view: str | None = None
+    valuation_summary: str | None = None
 

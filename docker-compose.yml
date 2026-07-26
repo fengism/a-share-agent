@@ -2,6 +2,10 @@ services:
   backend:
     build: ./backend
     env_file: .env
+    environment:
+      # 容器化部署固定经 frontend 的 Nginx 反代，需信任其透传的 X-Forwarded-For
+      # 才能拿到真实客户端 IP 做限流。可被 .env 中的同名变量覆盖。
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

@@ -24,6 +24,7 @@ def test_fetch_stock_name_map_remote_falls_back_to_sina(monkeypatch):
     )
 
     async def fake_call_blocking(func, *args, **kwargs):
+        kwargs.pop("semaphore", None)
         return func(*args, **kwargs)
 
     monkeypatch.setattr(name_map, "call_blocking", fake_call_blocking)

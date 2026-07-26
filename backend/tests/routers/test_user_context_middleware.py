@@ -15,7 +15,7 @@ def ctx(tmp_path, monkeypatch):
     from app.db import connection as conn_mod
 
     monkeypatch.setattr(conn_mod, "_DB_PATH", tmp_path / "mw_test.db")
-    conn_mod._connection = None
+    conn_mod.reset_for_tests()
 
     from app.db import init_db, user_store
     from app.middleware import UserContextMiddleware
@@ -38,8 +38,7 @@ def ctx(tmp_path, monkeypatch):
     try:
         yield client, token, get_effective_settings
     finally:
-        conn_mod.close_connection()
-        conn_mod._connection = None
+        conn_mod.reset_for_tests()
 
 
 def _auth(token: str) -> dict:

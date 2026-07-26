@@ -11,6 +11,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.db import user_store
 from app.utils import login_throttle
+from app.utils.request_context import get_current_user as get_bound_user
 from app.utils.auth import (
     generate_invite_code,
     generate_session_token,
@@ -48,32 +49,68 @@ def _user_out(u: dict) -> UserOut:
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(_security)) -> dict:
-    """FastAPI dependency: resolve the authenticated user from the Bearer token."""
+    """FastAPI dependency: resolve the authenticated user from the Bearer token.
+
+    Reuses the user already resolved by ``UserContextMiddleware`` for this
+    request (bound into the request context) to avoid a second session lookup;
+    falls back to a direct token lookup only when the context is empty (e.g. the
+    middleware's best-effort bind failed), preserving the 401 semantics.
+    """
     if credentials is None:
         raise HTTPException(status_code=401, detail="未登录")
-    user = user_store.get_user_by_token(credentials.credentials)
+    user = get_bound_user()
+    if user is None:
+        user = user_store.get_user_by_token(credentials.credentials)
     if user is None:
         raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
     return user
 
 
-def require_admin(user: dict = Depends(get_current_user)) -> dict:
+def require_active_user(user: dict = Depends(get_current_user)) -> dict:
+    """Like get_current_user, but rejects accounts still flagged
+    must_change_password. Server-side backstop so a forced password change can't
+    be skipped by calling protected APIs directly (the frontend guard alone is
+    not authoritative). Endpoints needed to *perform* the change (change-password,
+    me, logout) must keep using get_current_user instead.
+    """
+    if user.get("must_change_password"):
+        raise HTTPException(status_code=403, detail="请先修改初始密码")
+    return user
+
+
+def require_admin(user: dict = Depends(require_active_user)) -> dict:
     if not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return user
 
 
 @router.post("/register", response_model=AuthResponse)
-def register(req: RegisterRequest) -> AuthResponse:
+def register(req: RegisterRequest, request: Request) -> AuthResponse:
+    # Throttle by IP so invite codes can't be brute-forced. The first-user
+    # bootstrap (no invite required) is exempt so initial setup is never locked.
+    ip_key = f"register-ip:{_client_ip(request)}"
+    is_first = user_store.count_users() == 0
+    if not is_first:
+        locked = login_throttle.retry_after(ip_key)
+        if locked > 0:
+            raise HTTPException(
+                status_code=429,
+                detail=f"尝试过于频繁，请 {locked} 秒后再试",
+                headers={"Retry-After": str(locked)},
+            )
+
     if user_store.get_user_by_username(req.username):
         raise HTTPException(status_code=409, detail="用户名已存在")
 
-    is_first = user_store.count_users() == 0
     invite_code: str | None = None
     if not is_first:
         invite_code = (req.invite_code or "").strip()
         if not invite_code or not user_store.invite_is_valid(invite_code):
-            raise HTTPException(status_code=403, detail="需要有效的邀请码")
+            after = login_throttle.record_failure(ip_key)
+            detail = "需要有效的邀请码"
+            if after > 0:
+                detail = f"邀请码错误次数过多，请 {after} 秒后再试"
+            raise HTTPException(status_code=403 if after == 0 else 429, detail=detail)
 
     # Create the user and consume the invite atomically. If the invite can't be
     # claimed (already used / expired / lost a race), the user insert is rolled
@@ -84,18 +121,33 @@ def register(req: RegisterRequest) -> AuthResponse:
     if status == "duplicate":
         raise HTTPException(status_code=409, detail="用户名已存在")
     if user is None:
-        raise HTTPException(status_code=403, detail="邀请码无效或已被使用")
+        after = login_throttle.record_failure(ip_key)
+        detail = "邀请码无效或已被使用"
+        if after > 0:
+            detail = f"邀请码错误次数过多，请 {after} 秒后再试"
+        raise HTTPException(status_code=403 if after == 0 else 429, detail=detail)
 
+    if not is_first:
+        login_throttle.reset(ip_key)  # successful registration clears the counter
     token = user_store.create_session(user["id"])
     logger.info("新用户注册: %s (admin=%s)", req.username, is_first)
     return AuthResponse(token=token, user=_user_out(user))
 
 
 def _client_ip(request: Request) -> str:
-    """Best-effort client IP, honouring X-Forwarded-For behind a proxy."""
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
+    """Best-effort client IP.
+
+    Honours X-Forwarded-For only when ``trust_proxy_headers`` is enabled (i.e.
+    the app runs behind a trusted reverse proxy). When disabled, XFF is ignored
+    so a directly-exposed instance can't be tricked into trusting a spoofed IP
+    for throttling / lockout purposes.
+    """
+    from app.config import get_settings
+
+    if get_settings().trust_proxy_headers:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            return xff.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 

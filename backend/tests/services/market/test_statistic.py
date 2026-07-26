@@ -9,6 +9,7 @@ def test_get_market_statistics_uses_eastmoney_provider(monkeypatch):
     statistic.cache.delete(statistic.dated_cache_key("market_statistics", "2026-05-25"))
 
     async def fake_call_blocking(func, *args, **kwargs):
+        kwargs.pop("semaphore", None)
         return func(*args, **kwargs)
 
     monkeypatch.setattr(

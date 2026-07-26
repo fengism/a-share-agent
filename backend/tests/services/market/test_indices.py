@@ -20,6 +20,7 @@ def test_get_indices_uses_akshare_em_first(monkeypatch):
     clear_indices_cache()
 
     async def fake_call_blocking(func, *args, **kwargs):
+        kwargs.pop("semaphore", None)
         return func(*args, **kwargs)
 
     monkeypatch.setattr(indices, "call_blocking", fake_call_blocking)
@@ -69,6 +70,7 @@ def test_get_indices_falls_back_to_east_direct(monkeypatch):
     clear_indices_cache()
 
     async def fake_call_blocking(func, *args, **kwargs):
+        kwargs.pop("semaphore", None)
         return func(*args, **kwargs)
 
     monkeypatch.setattr(indices, "call_blocking", fake_call_blocking)
@@ -115,6 +117,7 @@ def test_get_indices_falls_back_to_sina_direct(monkeypatch):
     clear_indices_cache()
 
     async def fake_call_blocking(func, *args, **kwargs):
+        kwargs.pop("semaphore", None)
         return func(*args, **kwargs)
 
     monkeypatch.setattr(indices, "call_blocking", fake_call_blocking)

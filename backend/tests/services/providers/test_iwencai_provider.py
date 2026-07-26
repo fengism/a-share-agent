@@ -31,11 +31,12 @@ def test_select_stock_uses_shared_query_payload_and_skill_id(monkeypatch):
     """select_stocks sends the expected query payload, headers, and skill id."""
     captured = {}
 
-    def fake_post(url, json, headers, timeout):
-        captured.update({"url": url, "json": json, "headers": headers, "timeout": timeout})
-        return DummyResponse(payload={"status_code": 0, "datas": [{"股票简称": "贵州茅台"}]})
+    class FakeSession:
+        def post(self, url, json=None, headers=None, timeout=None):
+            captured.update({"url": url, "json": json, "headers": headers, "timeout": timeout})
+            return DummyResponse(payload={"status_code": 0, "datas": [{"股票简称": "贵州茅台"}]})
 
-    monkeypatch.setattr("app.services.providers.iwencai.requests.post", fake_post)
+    monkeypatch.setattr("app.services.providers.iwencai._get_session", lambda: FakeSession())
     monkeypatch.setattr(
         IwencaiDataProvider,
         "_base_url",
@@ -66,10 +67,11 @@ def test_select_stock_uses_shared_query_payload_and_skill_id(monkeypatch):
 
 def test_search_raises_http_error(monkeypatch):
     """search raises RuntimeError when the underlying HTTP call returns 5xx."""
-    def fake_post(*args, **kwargs):
-        return DummyResponse(status_code=500, text="server error detail")
+    class FakeSession:
+        def post(self, *args, **kwargs):
+            return DummyResponse(status_code=500, text="server error detail")
 
-    monkeypatch.setattr("app.services.providers.iwencai.requests.post", fake_post)
+    monkeypatch.setattr("app.services.providers.iwencai._get_session", lambda: FakeSession())
     monkeypatch.setattr(
         IwencaiDataProvider,
         "_base_url",
@@ -83,10 +85,11 @@ def test_search_raises_http_error(monkeypatch):
 
 def test_query_raises_business_error(monkeypatch):
     """query_stock_data raises RuntimeError on a non-zero status_code payload."""
-    def fake_post(*args, **kwargs):
-        return DummyResponse(payload={"status_code": 1001, "status_msg": "bad query"})
+    class FakeSession:
+        def post(self, *args, **kwargs):
+            return DummyResponse(payload={"status_code": 1001, "status_msg": "bad query"})
 
-    monkeypatch.setattr("app.services.providers.iwencai.requests.post", fake_post)
+    monkeypatch.setattr("app.services.providers.iwencai._get_session", lambda: FakeSession())
     monkeypatch.setattr(
         IwencaiDataProvider,
         "_base_url",

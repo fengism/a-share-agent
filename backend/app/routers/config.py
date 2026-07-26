@@ -13,7 +13,7 @@ from app.config import (
     effective_settings_for_user,
     update_settings,
 )
-from app.routers.auth import get_current_user
+from app.routers.auth import require_active_user
 
 logger = logging.getLogger(__name__)
 
@@ -130,14 +130,14 @@ def _to_response(s, is_admin: bool = False) -> ConfigResponse:
 
 
 @router.get("", response_model=ConfigResponse)
-async def get_config(user: dict = Depends(get_current_user)):
+async def get_config(user: dict = Depends(require_active_user)):
     """读取当前登录用户的生效配置（全局基线叠加其私密配置），敏感字段脱敏。"""
     settings = effective_settings_for_user(user["id"])
     return _to_response(settings, is_admin=bool(user["is_admin"]))
 
 
 @router.put("", response_model=ConfigResponse)
-async def put_config(req: ConfigUpdateRequest, user: dict = Depends(get_current_user)):
+async def put_config(req: ConfigUpdateRequest, user: dict = Depends(require_active_user)):
     """部分更新配置。
 
     - 私密项写入当前用户的私密配置（掩码回传的密钥视为未修改，跳过）。
@@ -160,7 +160,7 @@ async def put_config(req: ConfigUpdateRequest, user: dict = Depends(get_current_
     to_store = {
         k: v
         for k, v in private_patch.items()
-        if not (k in SECRET_KEYS and isinstance(v, str) and v.endswith("***"))
+        if not (k in SECRET_KEYS and isinstance(v, str) and "***" in v)
     }
     if to_store:
         from app.db import user_store

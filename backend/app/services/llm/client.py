@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -59,9 +60,17 @@ class OpenAICompatibleClient(LLMClient):
             无
         """
         http_client = httpx.Client(trust_env=False)
+        self._http_client = http_client
         self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, http_client=http_client)
         self.model = model
         logger.info(f"初始化OpenAI兼容客户端: model={model}, base_url={base_url}")
+
+    def close(self) -> None:
+        """关闭底层 httpx 连接池；在单例被替换时调用以避免连接池泄漏。"""
+        try:
+            self._http_client.close()
+        except Exception:
+            logger.warning("关闭 OpenAI 兼容客户端连接池失败", exc_info=True)
 
     def chat(self, messages: list[dict], temperature: float = 0.1, json_format: bool = False) -> str:
         """调用 OpenAI 兼容接口进行对话。
@@ -148,13 +157,15 @@ class LiteLLMClient(LLMClient):
 
 _client_cache: LLMClient | None = None
 _cache_key: tuple | None = None
+_client_lock = threading.Lock()
 
 
 def create_llm_client(settings: Settings | None = None) -> LLMClient:
     """根据配置创建对应的 LLM 客户端实例，相同配置下复用单例。
 
     当 provider/api_key/base_url/model 任一变化时自动重建客户端，
-    复用 HTTP 连接池以提升性能。
+    复用 HTTP 连接池以提升性能。重建时会关闭旧客户端的连接池，并用锁保护
+    全局缓存的读改写，避免并发请求下的竞态与连接池泄漏。
 
     Param:
         settings: 配置对象，默认读取全局设置
@@ -169,36 +180,42 @@ def create_llm_client(settings: Settings | None = None) -> LLMClient:
     provider = settings.llm_provider.lower()
     current_key = (provider, settings.llm_api_key, settings.llm_base_url, settings.llm_model)
 
-    if _client_cache is not None and _cache_key == current_key:
-        return _client_cache
+    with _client_lock:
+        if _client_cache is not None and _cache_key == current_key:
+            return _client_cache
 
-    logger.info(f"创建LLM客户端: provider={provider}")
+        logger.info(f"创建LLM客户端: provider={provider}")
 
-    if provider in ("deepseek", "qwen", "openai", "zhipu"):
-        defaults = PROVIDER_DEFAULTS.get(provider, {})
-        base_url = settings.llm_base_url or defaults.get("base_url", "https://api.openai.com/v1")
-        model = settings.llm_model or defaults.get("model", "gpt-4o-mini")
-        client = OpenAICompatibleClient(
-            api_key=settings.llm_api_key,
-            base_url=base_url,
-            model=model,
-            timeout=float(settings.llm_timeout_seconds),
-        )
-    elif provider == "claude":
-        model = settings.llm_model or "anthropic/claude-sonnet-4-6"
-        client = LiteLLMClient(
-            api_key=settings.llm_api_key,
-            model=model,
-            base_url=settings.llm_base_url,
-            timeout=float(settings.llm_timeout_seconds),
-        )
-    else:
-        logger.error(f"不支持的LLM提供商: {provider}")
-        raise ValueError(f"Unsupported LLM provider: {provider}")
+        if provider in ("deepseek", "qwen", "openai", "zhipu"):
+            defaults = PROVIDER_DEFAULTS.get(provider, {})
+            base_url = settings.llm_base_url or defaults.get("base_url", "https://api.openai.com/v1")
+            model = settings.llm_model or defaults.get("model", "gpt-4o-mini")
+            client = OpenAICompatibleClient(
+                api_key=settings.llm_api_key,
+                base_url=base_url,
+                model=model,
+                timeout=float(settings.llm_timeout_seconds),
+            )
+        elif provider == "claude":
+            model = settings.llm_model or "anthropic/claude-sonnet-4-6"
+            client = LiteLLMClient(
+                api_key=settings.llm_api_key,
+                model=model,
+                base_url=settings.llm_base_url,
+                timeout=float(settings.llm_timeout_seconds),
+            )
+        else:
+            logger.error(f"不支持的LLM提供商: {provider}")
+            raise ValueError(f"Unsupported LLM provider: {provider}")
 
-    _client_cache = client
-    _cache_key = current_key
-    return client
+        # 关闭被替换的旧客户端连接池（若支持），避免配置切换时泄漏。
+        old = _client_cache
+        if old is not None and hasattr(old, "close"):
+            old.close()
+
+        _client_cache = client
+        _cache_key = current_key
+        return client
 
 
 async def llm_chat(
@@ -253,7 +270,9 @@ def create_openai_chat_runtime(settings: Settings | None = None) -> OpenAIChatRu
     """创建基于 openai SDK 的 chat.completions 运行时。"""
     api_key, base_url, model = _resolve_chat_endpoint(settings)
     timeout = float(getattr(settings, "llm_timeout_seconds", 120.0)) if settings is not None else 120.0
-    client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+    # trust_env=False 与 OpenAICompatibleClient 保持一致，避免意外读取 HTTP(S)_PROXY
+    # 等环境变量导致请求走非预期代理。
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, http_client=httpx.Client(trust_env=False))
     return OpenAIChatRuntime(client=client, model=model)
 
 
@@ -264,8 +283,13 @@ def create_async_openai_chat_runtime(settings: Settings | None = None) -> AsyncO
         settings: 配置对象，默认读取全局设置
     Return:
         AsyncOpenAIChatRuntime，包含 AsyncOpenAI 客户端和模型名称
+
+    注意：调用方需在使用完毕后 await client.close() 释放底层 httpx 连接池。
     """
     api_key, base_url, model = _resolve_chat_endpoint(settings)
     timeout = float(getattr(settings, "llm_timeout_seconds", 120.0)) if settings is not None else 120.0
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+    # trust_env=False 与 OpenAICompatibleClient 保持一致，避免意外读取代理环境变量。
+    client = AsyncOpenAI(
+        api_key=api_key, base_url=base_url, timeout=timeout, http_client=httpx.AsyncClient(trust_env=False)
+    )
     return AsyncOpenAIChatRuntime(client=client, model=model)

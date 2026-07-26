@@ -16,6 +16,7 @@ def test_get_industry_rankings_falls_back_to_tencent(monkeypatch):
     clear_sector_cache()
 
     async def fake_call_blocking(func, *args, **kwargs):
+        kwargs.pop("semaphore", None)
         return func(*args, **kwargs)
 
     monkeypatch.setattr(sector, "call_blocking", fake_call_blocking)

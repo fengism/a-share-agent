@@ -36,21 +36,22 @@ def test_fetch_stock_concept_maps_concepts_and_plates(monkeypatch):
     provider = tencent.TencentDataProvider()
     captured = {}
 
-    def fake_get(url, *, params, headers, timeout):
-        captured.update({"params": params, "timeout": timeout})
-        return DummyResponse(
-            {
-                "data": {
-                    "concept": [{"id": "C1", "name": "人工智能"}],
-                    "plate": [
-                        {"level": "1", "code": "P1", "name": "科技"},
-                        {"level": "2", "code": "P2", "name": "半导体"},
-                    ],
+    class FakeSession:
+        def get(self, url, *, params, headers, timeout):
+            captured.update({"params": params, "timeout": timeout})
+            return DummyResponse(
+                {
+                    "data": {
+                        "concept": [{"id": "C1", "name": "人工智能"}],
+                        "plate": [
+                            {"level": "1", "code": "P1", "name": "科技"},
+                            {"level": "2", "code": "P2", "name": "半导体"},
+                        ],
+                    }
                 }
-            }
-        )
+            )
 
-    monkeypatch.setattr(tencent.requests, "get", fake_get)
+    monkeypatch.setattr(tencent, "_get_session", lambda: FakeSession())
 
     result = provider.fetch_stock_concepts("600519")
 
@@ -66,26 +67,29 @@ def test_fetch_industry_rankings_maps_top_and_bottom(monkeypatch):
     """fetch_industry_rankings returns top and bottom ranking dataframes."""
     provider = tencent.TencentDataProvider()
     orders = []
+    calls = []
 
-    def fake_get(url, *, params, timeout):
-        orders.append(params["o"])
-        return DummyResponse(
-            {
-                "data": [
-                    {
-                        "bd_name": "AI",
-                        "bd_code": "BK001",
-                        "bd_zdf": "1.2",
-                        "bd_zdf5": "3.4",
-                        "bd_zdf20": "5.6",
-                        "nzg_name": "龙头股",
-                        "nzg_zdf": "7.8",
-                    }
-                ]
-            }
-        )
+    class FakeSession:
+        def get(self, url, *, params, timeout):
+            orders.append(params["o"])
+            calls.append(params)
+            return DummyResponse(
+                {
+                    "data": [
+                        {
+                            "bd_name": "AI",
+                            "bd_code": "BK001",
+                            "bd_zdf": "1.2",
+                            "bd_zdf5": "3.4",
+                            "bd_zdf20": "5.6",
+                            "nzg_name": "龙头股",
+                            "nzg_zdf": "7.8",
+                        }
+                    ]
+                }
+            )
 
-    monkeypatch.setattr(tencent.requests, "get", fake_get)
+    monkeypatch.setattr(tencent, "_get_session", lambda: FakeSession())
 
     top_df, bottom_df = provider.fetch_industry_rankings()
 

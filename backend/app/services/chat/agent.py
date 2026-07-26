@@ -169,8 +169,21 @@ async def _run_legacy_agent(
     """
     runtime = create_async_openai_chat_runtime(get_effective_settings())
     client = runtime.client
-    model = runtime.model
+    try:
+        async for delta in _legacy_agent_loop(client, runtime.model, message, history):
+            yield delta
+    finally:
+        # 释放底层 httpx 连接池，避免每次对话泄漏一个连接池。
+        await client.close()
 
+
+async def _legacy_agent_loop(
+    client,
+    model: str,
+    message: str,
+    history: list[ChatMessage] | None,
+) -> AsyncGenerator[ChatStreamDelta, None]:
+    """多轮 LLM 调用与工具执行的核心循环，client 生命周期由调用方管理。"""
     messages = build_messages(message, history, _MAX_HISTORY_MESSAGES)
     _dedup_cache: dict[str, ToolResultInfo] = {}
 

@@ -27,7 +27,7 @@ def test_parse_forecast_year():
 
 def test_derive_peg_growth_rate_prefers_eps_forecast(monkeypatch):
     """_derive_peg_growth_rate prefers institution EPS forecasts with high confidence."""
-    monkeypatch.setattr(valuation, "datetime", _FixedDateTime)
+    monkeypatch.setattr(valuation.profile, "datetime", _FixedDateTime)
     forecasts = [
         InstitutionForecast(
             metric="EPS",
@@ -53,7 +53,7 @@ def test_derive_peg_growth_rate_prefers_eps_forecast(monkeypatch):
 
 def test_derive_peg_growth_rate_falls_back_to_net_profit_yoy(monkeypatch):
     """_derive_peg_growth_rate falls back to historical net profit YoY growth when no forecasts exist."""
-    monkeypatch.setattr(valuation, "datetime", _FixedDateTime)
+    monkeypatch.setattr(valuation.profile, "datetime", _FixedDateTime)
 
     growth_rate, basis, confidence = valuation._derive_peg_growth_rate(
         [],
@@ -69,7 +69,7 @@ def test_derive_peg_growth_rate_falls_back_to_net_profit_yoy(monkeypatch):
 
 def test_derive_peg_growth_rate_penalizes_low_count_and_wide_range(monkeypatch):
     """_derive_peg_growth_rate reduces confidence when forecasts have few institutions or wide range."""
-    monkeypatch.setattr(valuation, "datetime", _FixedDateTime)
+    monkeypatch.setattr(valuation.profile, "datetime", _FixedDateTime)
     forecasts = [
         InstitutionForecast(
             metric="EPS",
@@ -205,10 +205,10 @@ def test_get_valuation_detail_annualizes_profit_fallback_for_semiannual_report(m
     async def fake_percentile(*args, **kwargs):
         return None
 
-    monkeypatch.setattr(valuation, "get_basic_info", fake_basic_info)
-    monkeypatch.setattr(valuation, "get_valuation", fake_valuation)
-    monkeypatch.setattr(valuation, "get_financial_metrics", fake_financial_metrics)
-    monkeypatch.setattr(valuation, "call_blocking", fake_call_blocking)
+    monkeypatch.setattr(valuation.detail, "get_basic_info", fake_basic_info)
+    monkeypatch.setattr(valuation.detail, "get_valuation", fake_valuation)
+    monkeypatch.setattr(valuation.detail, "get_financial_metrics", fake_financial_metrics)
+    monkeypatch.setattr(valuation.detail, "call_blocking", fake_call_blocking)
     monkeypatch.setattr(valuation.cache, "get", lambda key: None)
     monkeypatch.setattr(valuation.cache, "set", lambda *args, **kwargs: None)
 
@@ -263,13 +263,13 @@ def test_get_valuation_detail_includes_peg(monkeypatch):
     async def fake_percentile(*args, **kwargs):
         return 50.0
 
-    monkeypatch.setattr(valuation, "get_basic_info", fake_basic_info)
-    monkeypatch.setattr(valuation, "get_valuation", fake_valuation)
-    monkeypatch.setattr(valuation, "get_financial_metrics", fake_financial_metrics)
-    monkeypatch.setattr(valuation, "call_blocking", fake_call_blocking)
+    monkeypatch.setattr(valuation.detail, "get_basic_info", fake_basic_info)
+    monkeypatch.setattr(valuation.detail, "get_valuation", fake_valuation)
+    monkeypatch.setattr(valuation.detail, "get_financial_metrics", fake_financial_metrics)
+    monkeypatch.setattr(valuation.detail, "call_blocking", fake_call_blocking)
     monkeypatch.setattr(valuation.cache, "get", lambda key: None)
     monkeypatch.setattr(valuation.cache, "set", lambda *args, **kwargs: None)
-    monkeypatch.setattr(valuation, "datetime", _FixedDateTime)
+    monkeypatch.setattr(valuation.detail, "datetime", _FixedDateTime)
 
     detail = asyncio.run(valuation.get_valuation_detail("600519", fake_percentile))
 

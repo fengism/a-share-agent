@@ -42,6 +42,18 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
+# A valid-shaped hash of a random throwaway password. Verifying against it when a
+# username does not exist makes a "no such user" path spend the same PBKDF2 time
+# as a "wrong password" path, so response timing can't be used to enumerate valid
+# usernames. Computed once at import.
+_DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(16))
+
+
+def dummy_verify() -> None:
+    """Burn one PBKDF2 verification to equalise timing on the no-such-user path."""
+    verify_password("timing-equaliser", _DUMMY_PASSWORD_HASH)
+
+
 def generate_session_token() -> str:
     """Generate an opaque, URL-safe session token (the plaintext given to the client)."""
     return secrets.token_urlsafe(32)

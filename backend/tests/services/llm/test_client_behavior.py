@@ -76,8 +76,8 @@ def test_create_openai_chat_runtime_uses_settings_timeout(monkeypatch):
     monkeypatch.setattr(
         client,
         "OpenAI",
-        lambda api_key, base_url, timeout: captured.update(
-            {"api_key": api_key, "base_url": base_url, "timeout": timeout}
+        lambda api_key, base_url, timeout, http_client: captured.update(
+            {"api_key": api_key, "base_url": base_url, "timeout": timeout, "trust_env": http_client.trust_env}
         ) or SimpleNamespace(),
     )
 
@@ -96,4 +96,5 @@ def test_create_openai_chat_runtime_uses_settings_timeout(monkeypatch):
         "api_key": "secret",
         "base_url": "https://api.openai.com/v1",
         "timeout": 25.0,
+        "trust_env": False,
     }

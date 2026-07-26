@@ -42,7 +42,7 @@ def test_execute_push_to_feishu_chat_uses_default_receiver(monkeypatch):
     class FakeSettings:
         feishu_default_receiver = "ou_default"
 
-    monkeypatch.setattr(push, "get_settings", lambda: FakeSettings())
+    monkeypatch.setattr(push, "get_effective_settings", lambda: FakeSettings())
     monkeypatch.setattr(push, "to_feishu_card", lambda push_type, title, content, url: {"title": title, "url": url})
     monkeypatch.setattr(push, "send_card", lambda receiver, card: sent.update({"receiver": receiver, "card": card}))
 

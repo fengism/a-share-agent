@@ -21,6 +21,7 @@ def test_index_kline_source_attempts_include_eastmoney_direct(monkeypatch):
     )
 
     async def fake_call_blocking(func, *args, **kwargs):
+        kwargs.pop("semaphore", None)
         return fake_fetch(*args, **kwargs)
 
     monkeypatch.setattr(index_kline, "call_blocking", fake_call_blocking)

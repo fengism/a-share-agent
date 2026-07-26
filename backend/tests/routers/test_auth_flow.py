@@ -20,7 +20,7 @@ def client(tmp_path, monkeypatch):
     from app.db import connection as conn_mod
 
     monkeypatch.setattr(conn_mod, "_DB_PATH", tmp_path / "auth_test.db")
-    conn_mod._connection = None  # force a fresh connection against the temp path
+    conn_mod.reset_for_tests()  # force a fresh connection against the temp path
 
     from app.db import init_db
     from app.routers import auth
@@ -37,8 +37,7 @@ def client(tmp_path, monkeypatch):
         yield TestClient(app)
     finally:
         login_throttle._reset_all()
-        conn_mod.close_connection()
-        conn_mod._connection = None
+        conn_mod.reset_for_tests()
 
 
 def _auth(token: str) -> dict:
