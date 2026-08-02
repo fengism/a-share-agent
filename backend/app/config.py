@@ -134,17 +134,17 @@ PROVIDER_DEFAULTS = {
 }
 
 _current_settings: Settings | None = None
+_settings_lock = __import__("threading").Lock()
 
 
 def get_settings() -> Settings:
-    """获取全局复用的 Settings 实例，首次调用时自动加载配置。
-
-    Return:
-        全局 Settings 单例。
-    """
+    """获取全局复用的 Settings 实例，首次调用时自动加载配置。"""
     global _current_settings
-    if _current_settings is None:
-        _current_settings = Settings()
+    if _current_settings is not None:
+        return _current_settings
+    with _settings_lock:
+        if _current_settings is None:
+            _current_settings = Settings()
     return _current_settings
 
 
@@ -245,14 +245,7 @@ def get_effective_settings() -> "Settings":
 
 
 def _mask_secret(value: str, visible: int = 4) -> str:
-    """将敏感字符串中间部分掩码为星号，仅保留前 4 位和后 4 位。
-
-    Param:
-        value: 原始敏感字符串。
-        visible: 保留前几位可见字符（忽略，统一保留前后4位）。
-    Return:
-        掩码后的字符串。
-    """
+    """将敏感字符串中间部分掩码为星号，仅保留前 4 位和后 4 位。"""
     if not value or len(value) <= 8:
         if not value or len(value) <= 4:
             return value
@@ -274,6 +267,11 @@ def update_settings(patch: dict) -> Settings:
     old_provider = current.llm_provider.lower()
     old_defaults = PROVIDER_DEFAULTS.get(old_provider, {})
 
+    # Copy-on-write：先在副本上应用变更，再原子替换全局引用。
+    # 这样并发请求要么看到完整的旧实例，要么看到完整的新实例，
+    # 不会观察到半写状态。
+    updated = current.model_copy(deep=True)
+
     for key, value in patch.items():
         if value is None or not hasattr(current, key):
             continue
@@ -281,16 +279,19 @@ def update_settings(patch: dict) -> Settings:
         # _mask_secret 输出格式为 {前4}***{后4}，不以 *** 结尾，故用包含判断。
         if key in ("llm_api_key", "feishu_app_secret", "iwencai_api_key", "notion_api_token", "eastmoney_cookie", "baidu_cookie", "ths_cookie") and isinstance(value, str) and "***" in value:
             continue
-        setattr(current, key, value)
+        setattr(updated, key, value)
 
     # If provider changed and base_url/model still match old defaults, auto-switch
-    new_provider = current.llm_provider.lower()
+    new_provider = updated.llm_provider.lower()
     new_defaults = PROVIDER_DEFAULTS.get(new_provider, {})
     if new_provider != old_provider:
-        if current.llm_base_url == old_defaults.get("base_url") and "base_url" in new_defaults:
-            current.llm_base_url = new_defaults["base_url"]
-        if current.llm_model == old_defaults.get("model") and "model" in new_defaults:
-            current.llm_model = new_defaults["model"]
+        if updated.llm_base_url == old_defaults.get("base_url") and "base_url" in new_defaults:
+            updated.llm_base_url = new_defaults["base_url"]
+        if updated.llm_model == old_defaults.get("model") and "model" in new_defaults:
+            updated.llm_model = new_defaults["model"]
+
+    # 原子替换：在制品请求仍持有旧实例引用，不受影响。
+    _current_settings = updated
 
     # Reset feishu token cache when credentials change
     if any(k in patch for k in ("feishu_app_id", "feishu_app_secret")):
@@ -322,17 +323,17 @@ def update_settings(patch: dict) -> Settings:
 
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(_async_twitter_fetch(current.twitter_feeds))
+            loop.create_task(_async_twitter_fetch(updated.twitter_feeds))
         except RuntimeError:
             # No running event loop (e.g. CLI usage) — run synchronously
             try:
                 from app.services.providers.twitter import twitter_provider
                 from app.db.twitter_store import save_twitter_posts
 
-                raw = twitter_provider.fetch_posts_for_users(current.twitter_feeds)
+                raw = twitter_provider.fetch_posts_for_users(updated.twitter_feeds)
                 save_twitter_posts([p.model_dump() for p in raw])
-                logger.info(f"twitter_feeds changed, immediate fetch done: {current.twitter_feeds}")
+                logger.info(f"twitter_feeds changed, immediate fetch done: {updated.twitter_feeds}")
             except Exception as exc:
                 logger.warning(f"twitter_feeds changed, immediate fetch failed: {exc}")
 
-    return current
+    return updated

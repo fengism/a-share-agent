@@ -70,11 +70,9 @@ def _load_stock_name_map_from_spot_snapshot() -> dict[str, str] | None:
         df = load_spot_snapshot_file()
         if df is None or df.empty or "代码" not in df.columns or "名称" not in df.columns:
             return None
-        mapping = {
-            str(row["代码"]): str(row["名称"])
-            for _, row in df.iterrows()
-            if row.get("代码") and row.get("名称")
-        }
+        # 向量化构建映射，比 iterrows 快一个数量级
+        valid = df["代码"].notna() & df["名称"].notna()
+        mapping = dict(zip(df.loc[valid, "代码"].astype(str), df.loc[valid, "名称"].astype(str)))
         if len(mapping) >= _STOCK_NAME_MAP_MIN_SIZE:
             logger.info(f"从本地快照文件加载股票名称映射: {len(mapping)} 只")
             return mapping

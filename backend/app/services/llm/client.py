@@ -266,30 +266,61 @@ def _resolve_chat_endpoint(settings: Settings | None = None) -> tuple[str, str, 
     return settings.llm_api_key, base_url, model
 
 
+# ── OpenAI SDK runtime 缓存 ──────────────────────────────────
+# 与 _client_cache 同理：相同配置下复用 AsyncOpenAI / OpenAI 客户端及其
+# 底层 httpx 连接池，避免每次请求创建/销毁连接池的开销。
+_sync_runtime_cache: OpenAIChatRuntime | None = None
+_sync_runtime_key: tuple | None = None
+_async_runtime_cache: AsyncOpenAIChatRuntime | None = None
+_async_runtime_key: tuple | None = None
+_runtime_lock = threading.Lock()
+
+
 def create_openai_chat_runtime(settings: Settings | None = None) -> OpenAIChatRuntime:
-    """创建基于 openai SDK 的 chat.completions 运行时。"""
+    """获取基于 openai SDK 的 chat.completions 运行时（相同配置复用单例）。"""
+    global _sync_runtime_cache, _sync_runtime_key
     api_key, base_url, model = _resolve_chat_endpoint(settings)
     timeout = float(getattr(settings, "llm_timeout_seconds", 120.0)) if settings is not None else 120.0
-    # trust_env=False 与 OpenAICompatibleClient 保持一致，避免意外读取 HTTP(S)_PROXY
-    # 等环境变量导致请求走非预期代理。
-    client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, http_client=httpx.Client(trust_env=False))
-    return OpenAIChatRuntime(client=client, model=model)
+    current_key = (api_key, base_url, model, timeout)
+
+    with _runtime_lock:
+        if _sync_runtime_cache is not None and _sync_runtime_key == current_key:
+            return _sync_runtime_cache
+
+        # trust_env=False 与 OpenAICompatibleClient 保持一致，避免意外读取 HTTP(S)_PROXY
+        # 等环境变量导致请求走非预期代理。
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, http_client=httpx.Client(trust_env=False))
+        runtime = OpenAIChatRuntime(client=client, model=model)
+
+        _sync_runtime_cache = runtime
+        _sync_runtime_key = current_key
+        return runtime
 
 
 def create_async_openai_chat_runtime(settings: Settings | None = None) -> AsyncOpenAIChatRuntime:
-    """创建基于 openai SDK 的异步 chat.completions 运行时。
+    """获取基于 openai SDK 的异步 chat.completions 运行时（相同配置复用单例）。
 
     Param:
         settings: 配置对象，默认读取全局设置
     Return:
         AsyncOpenAIChatRuntime，包含 AsyncOpenAI 客户端和模型名称
-
-    注意：调用方需在使用完毕后 await client.close() 释放底层 httpx 连接池。
     """
+    global _async_runtime_cache, _async_runtime_key
     api_key, base_url, model = _resolve_chat_endpoint(settings)
     timeout = float(getattr(settings, "llm_timeout_seconds", 120.0)) if settings is not None else 120.0
-    # trust_env=False 与 OpenAICompatibleClient 保持一致，避免意外读取代理环境变量。
-    client = AsyncOpenAI(
-        api_key=api_key, base_url=base_url, timeout=timeout, http_client=httpx.AsyncClient(trust_env=False)
-    )
-    return AsyncOpenAIChatRuntime(client=client, model=model)
+    current_key = (api_key, base_url, model, timeout)
+
+    with _runtime_lock:
+        if _async_runtime_cache is not None and _async_runtime_key == current_key:
+            return _async_runtime_cache
+
+        # trust_env=False 与 OpenAICompatibleClient 保持一致，避免意外读取代理环境变量。
+        client = AsyncOpenAI(
+            api_key=api_key, base_url=base_url, timeout=timeout,
+            http_client=httpx.AsyncClient(trust_env=False),
+        )
+        runtime = AsyncOpenAIChatRuntime(client=client, model=model)
+
+        _async_runtime_cache = runtime
+        _async_runtime_key = current_key
+        return runtime

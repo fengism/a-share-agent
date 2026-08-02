@@ -169,12 +169,10 @@ async def _run_legacy_agent(
     """
     runtime = create_async_openai_chat_runtime(get_effective_settings())
     client = runtime.client
-    try:
-        async for delta in _legacy_agent_loop(client, runtime.model, message, history):
-            yield delta
-    finally:
-        # 释放底层 httpx 连接池，避免每次对话泄漏一个连接池。
-        await client.close()
+
+    # client 来自 runtime 缓存（单例），生命周期由模块级缓存管理，此处不关闭。
+    async for delta in _legacy_agent_loop(client, runtime.model, message, history):
+        yield delta
 
 
 async def _legacy_agent_loop(
@@ -193,7 +191,7 @@ async def _legacy_agent_loop(
         if round_num == _MAX_ROUNDS:
             tool_choice = "none"
         else:
-            tool_choice = "required" if round_num == 0 else "auto"
+            tool_choice = "auto"
 
         create_kwargs = _build_create_kwargs(model, messages, tool_choice)
 

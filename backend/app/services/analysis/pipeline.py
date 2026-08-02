@@ -168,6 +168,8 @@ async def run_analysis(code: str, progress_callback: ProgressCallback | None = N
         return cached
 
     settings = get_effective_settings()
+    # llm_client 来自 create_llm_client 的模块级缓存（单例），由缓存管理器负责
+    # 生命周期，此函数不负责关闭它。
     llm_client = create_llm_client(settings)
 
     try:

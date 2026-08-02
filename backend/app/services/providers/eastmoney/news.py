@@ -15,6 +15,27 @@ from app.models.search_item import NewsSearchItem
 from app.utils.symbol_utils import contains_stock_reference
 
 
+_EM_TAG_PATTERNS = [
+    (r"\(<em>", ""),
+    (r"</em>\)", ""),
+    (r"<em>", ""),
+    (r"</em>", ""),
+]
+
+
+def _strip_em_tags(series: "pd.Series") -> "pd.Series":
+    """清除 DataFrame 列中的 <em> 高亮标签。
+
+    Param:
+        series: pandas Series 包含 HTML 标记的文本列
+    Return:
+        清除标签后的 Series
+    """
+    for pattern, replacement in _EM_TAG_PATTERNS:
+        series = series.str.replace(pattern, replacement, regex=True)
+    return series
+
+
 class NewsMixin:
     """东方财富 news 数据接口。"""
 
@@ -173,26 +194,8 @@ class NewsMixin:
                 "url",
             ]
         ]
-        temp_df["title"] = (
-            temp_df["title"]
-            .str.replace(r"\(<em>", "", regex=True)
-            .str.replace(r"</em>\)", "", regex=True)
-        )
-        temp_df["title"] = (
-            temp_df["title"]
-            .str.replace(r"<em>", "", regex=True)
-            .str.replace(r"</em>", "", regex=True)
-        )
-        temp_df["content"] = (
-            temp_df["content"]
-            .str.replace(r"\(<em>", "", regex=True)
-            .str.replace(r"</em>\)", "", regex=True)
-        )
-        temp_df["content"] = (
-            temp_df["content"]
-            .str.replace(r"<em>", "", regex=True)
-            .str.replace(r"</em>", "", regex=True)
-        )
+        temp_df["title"] = _strip_em_tags(temp_df["title"])
+        temp_df["content"] = _strip_em_tags(temp_df["content"])
         temp_df["content"] = temp_df["content"].str.replace(r"\u3000", "", regex=True)
         temp_df["content"] = temp_df["content"].str.replace(r"\r\n", " ", regex=True)
         results: list[NewsSearchItem] = []

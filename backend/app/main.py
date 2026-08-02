@@ -169,6 +169,7 @@ async def _run_periodic(name: str, coro_factory, interval_seconds: int, health_c
     loop_count = 0
     consecutive_errors = 0
     while True:
+        loop_count += 1
         try:
             if health_check is not None:
                 healthy = await health_check()
@@ -186,14 +187,13 @@ async def _run_periodic(name: str, coro_factory, interval_seconds: int, health_c
             consecutive_errors += 1
             entry["status"] = "error"
             entry["last_error"] = str(exc)
-            logger.error(f"后台任务 [{name}] 第 {loop_count + 1} 次循环失败（连续 {consecutive_errors} 次）: {exc}", exc_info=True)
+            logger.error(f"后台任务 [{name}] 第 {loop_count} 次循环失败（连续 {consecutive_errors} 次）: {exc}", exc_info=True)
             # 指数退避：连续失败时延长等待时间，最长 10 分钟
             backoff = min(600, 2 ** consecutive_errors)
             await asyncio.sleep(backoff)
             continue
 
         await asyncio.sleep(interval_seconds)
-        loop_count += 1
 
 
 async def refresh_industry_mapping_file_daily():
