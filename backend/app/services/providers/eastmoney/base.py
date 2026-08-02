@@ -54,11 +54,16 @@ class EastMoneyBase(BaseDataProvider):
         self.em_session.trust_env = get_settings().http_trust_env
         self.em_session.headers.update({"User-Agent": self.UA})
         self.EM_MIN_INTERVAL = 1.0
-        self.eastmoney_headers = EASTMONEY_HEADERS.copy()
-        # 支持自定义 cookie（配置为空时使用 http.py 中的内置默认值）
+        self._base_eastmoney_headers = EASTMONEY_HEADERS.copy()
+
+    @property
+    def eastmoney_headers(self) -> dict:
+        """动态构建东财请求头，每次读取最新 cookie 配置。"""
+        headers = self._base_eastmoney_headers.copy()
         custom_cookie = get_settings().eastmoney_cookie
         if custom_cookie:
-            self.eastmoney_headers["cookie"] = custom_cookie
+            headers["cookie"] = custom_cookie
+        return headers
     def em_get_response(self, url, params=None, headers=None, timeout=15, **kwargs):
         """东财统一请求入口：自动节流 + 复用 session。
 

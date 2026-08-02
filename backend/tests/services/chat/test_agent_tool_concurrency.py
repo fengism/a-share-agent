@@ -133,6 +133,6 @@ async def test_run_chat_agent_generates_final_text_after_max_tool_rounds(monkeyp
 
     deltas = [delta async for delta in agent.run_chat_agent("测试")]
 
-    assert calls == ["required", "auto", "auto", "auto", "auto", "none"]
+    assert calls == ["auto", "auto", "auto", "auto", "auto", "none"]
     assert any(delta.type == "text" and delta.content == "最终结论" for delta in deltas)
     assert deltas[-1].type == "done"

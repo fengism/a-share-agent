@@ -10,6 +10,7 @@ from app.utils.news_utils import dedupe_news_items, filter_recent_news_items, ne
 from app.utils.singleflight import AsyncSingleFlight
 
 _news_singleflight: AsyncSingleFlight[list] = AsyncSingleFlight()
+_news_semaphore = asyncio.Semaphore(4)  # 限制同时拉取的数据源数量
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ def _all_sources() -> list[NewsSource]:
 
 async def _gather_news(sources: list[NewsSource]) -> list:
     """Run all source tasks in parallel, collect results with error handling."""
-    tasks = [call_blocking(s.fetcher) for s in sources]
+    tasks = [call_blocking(s.fetcher, semaphore=_news_semaphore) for s in sources]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     collected = []
     for source, result in zip(sources, results):

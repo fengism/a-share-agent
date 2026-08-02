@@ -35,6 +35,9 @@ async def test_get_market_news_keeps_only_recent_news(monkeypatch):
     old_time = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
 
     async def fake_call_blocking(func, *args, **kwargs):
+        # semaphore 参数由 _gather_news 传入，只用于 concurrency control，
+        # 不传递给 fetch 函数。
+        kwargs.pop("semaphore", None)
         return func(*args, **kwargs)
 
     monkeypatch.setattr(news.cache, "get", lambda key: None)
