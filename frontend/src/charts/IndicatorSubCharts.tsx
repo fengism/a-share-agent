@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Segmented, Spin } from "antd";
-import { createChart, LineSeries, HistogramSeries, ColorType, type IChartApi, type BusinessDay } from "lightweight-charts";
+import { Segmented, Skeleton } from "antd";
+import { createChart, LineSeries, HistogramSeries, ColorType, type IChartApi, type ISeriesApi, type BusinessDay } from "lightweight-charts";
 import { useIndicators } from "../api/queries";
 import type { TechnicalIndicators } from "../types/stock";
 import { useColors } from "../styles/ui";
 import type { ThemeColors } from "../theme/themes";
+import { shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
 
 type Props = { code: string };
 type IndicatorType = "macd" | "rsi" | "kdj";
+type IndicatorSeries = ISeriesApi<"Line"> | ISeriesApi<"Histogram">;
 
 
 function macdChart(
@@ -16,7 +18,7 @@ function macdChart(
   seriesData: TechnicalIndicators["series"],
   dates: BusinessDay[],
   c: ThemeColors,
-) {
+): IndicatorSeries[] {
   const dif = chart.addSeries(LineSeries, {
     color: c.primary, lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.01, formatter: (v: number) => v.toFixed(2) },
@@ -50,6 +52,7 @@ function macdChart(
   chart.priceScale("right").applyOptions({
     scaleMargins: { top: 0.12, bottom: 0.12 },
   });
+  return [dif, dea, hist];
 }
 
 function rsiChart(
@@ -57,7 +60,7 @@ function rsiChart(
   series: TechnicalIndicators["series"],
   dates: BusinessDay[],
   c: ThemeColors,
-) {
+): IndicatorSeries[] {
   const rsiLine = chart.addSeries(LineSeries, {
     color: c.accent, lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.1, formatter: (v: number) => v.toFixed(1) },
@@ -70,7 +73,6 @@ function rsiChart(
   }
   rsiLine.setData(data);
 
-  // Reference lines at 70 and 30 using price line series
   const ref70 = chart.addSeries(LineSeries, {
     color: hexToRgba(c.up, 0.3), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
   });
@@ -92,6 +94,7 @@ function rsiChart(
   chart.priceScale("right").applyOptions({
     scaleMargins: { top: 0.12, bottom: 0.12 },
   });
+  return [rsiLine, ref70, ref30];
 }
 
 function kdjChart(
@@ -99,7 +102,7 @@ function kdjChart(
   series: TechnicalIndicators["series"],
   dates: BusinessDay[],
   c: ThemeColors,
-) {
+): IndicatorSeries[] {
   const kLine = chart.addSeries(LineSeries, {
     color: c.primary, lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.01, formatter: (v: number) => v.toFixed(2) },
@@ -133,55 +136,44 @@ function kdjChart(
   chart.priceScale("right").applyOptions({
     scaleMargins: { top: 0.12, bottom: 0.12 },
   });
+  return [kLine, dLine, jLine];
 }
 
 export default function IndicatorSubCharts({ code }: Props) {
   const c = useColors();
+  const colorsRef = useRef(c);
+  colorsRef.current = c;
   const [indicatorType, setIndicatorType] = useState<IndicatorType>("macd");
   const { data: indicators, isLoading } = useIndicators(code);
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<IChartApi | null>(null);
+  const seriesRefs = useRef<IndicatorSeries[]>([]);
+  const fittedViewKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!chartRef.current || !indicators?.series) return;
-
-    chartInstanceRef.current?.remove();
-    const dates = indicators.series.dates?.map((d) => toBusinessDay(d)).filter((d): d is BusinessDay => d !== null) || [];
-    if (dates.length === 0) return;
+    if (!chartRef.current) return;
+    const colors = colorsRef.current;
 
     const chart = createChart(chartRef.current, {
       width: chartRef.current.clientWidth,
       height: 180,
-      layout: { background: { type: ColorType.Solid, color: c.cardBg }, textColor: c.textSecondary, fontSize: 11, attributionLogo: false },
-      grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
-      timeScale: { timeVisible: false, borderColor: c.border },
-      rightPriceScale: { visible: true, borderColor: c.border },
+      layout: { background: { type: ColorType.Solid, color: colors.cardBg }, textColor: colors.textSecondary, fontSize: 11, attributionLogo: false },
+      grid: { vertLines: { color: colors.border }, horzLines: { color: colors.border } },
+      timeScale: { timeVisible: false, borderColor: colors.border },
+      rightPriceScale: { visible: true, borderColor: colors.border },
       crosshair: {
-        vertLine: { color: c.textMuted, labelBackgroundColor: c.border },
-        horzLine: { color: c.textMuted, labelBackgroundColor: c.border },
+        vertLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
+        horzLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
       },
       handleScroll: { mouseWheel: true, pressedMouseMove: false, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
     });
     chartInstanceRef.current = chart;
-
-
-    switch (indicatorType) {
-      case "macd":
-        macdChart(chart, indicators.series, dates, c);
-        break;
-      case "rsi":
-        rsiChart(chart, indicators.series, dates, c);
-        break;
-      case "kdj":
-        kdjChart(chart, indicators.series, dates, c);
-        break;
-    }
-
-    chart.timeScale().fitContent();
+    fittedViewKeyRef.current = null;
 
     const resizeObserver = new ResizeObserver(([entry]) => {
-      chart.applyOptions({ width: Math.floor(entry.contentRect.width) });
+      const width = Math.floor(entry.contentRect.width);
+      if (width > 0) chart.applyOptions({ width });
     });
     resizeObserver.observe(chartRef.current);
 
@@ -189,8 +181,55 @@ export default function IndicatorSubCharts({ code }: Props) {
       resizeObserver.disconnect();
       chart.remove();
       chartInstanceRef.current = null;
+      seriesRefs.current = [];
     };
-  }, [indicatorType, indicators, c]);
+  }, []);
+
+  useEffect(() => {
+    const chart = chartInstanceRef.current;
+    if (!chart || !indicators?.series) return;
+
+    for (const series of seriesRefs.current) chart.removeSeries(series);
+    seriesRefs.current = [];
+
+    const dates = indicators.series.dates
+      ?.map((date) => toBusinessDay(date))
+      .filter((date): date is BusinessDay => date !== null) ?? [];
+    if (dates.length === 0) return;
+
+    switch (indicatorType) {
+      case "macd":
+        seriesRefs.current = macdChart(chart, indicators.series, dates, c);
+        break;
+      case "rsi":
+        seriesRefs.current = rsiChart(chart, indicators.series, dates, c);
+        break;
+      case "kdj":
+        seriesRefs.current = kdjChart(chart, indicators.series, dates, c);
+        break;
+    }
+
+    const viewKey = `${code}:${indicatorType}`;
+    if (shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
+      chart.timeScale().fitContent();
+      fittedViewKeyRef.current = viewKey;
+    }
+  }, [c, code, indicatorType, indicators]);
+
+  useEffect(() => {
+    const chart = chartInstanceRef.current;
+    if (!chart) return;
+    chart.applyOptions({
+      layout: { background: { type: ColorType.Solid, color: c.cardBg }, textColor: c.textSecondary },
+      grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
+      timeScale: { borderColor: c.border },
+      rightPriceScale: { borderColor: c.border },
+      crosshair: {
+        vertLine: { color: c.textMuted, labelBackgroundColor: c.border },
+        horzLine: { color: c.textMuted, labelBackgroundColor: c.border },
+      },
+    });
+  }, [c.border, c.cardBg, c.textMuted, c.textSecondary]);
 
   return (
     <div>
@@ -205,11 +244,15 @@ export default function IndicatorSubCharts({ code }: Props) {
         style={{ marginBottom: 8 }}
         size="small"
       />
-      {isLoading ? (
-        <div style={{ textAlign: "center", padding: 20 }}><Spin /></div>
-      ) : (
-        <div ref={chartRef} />
-      )}
+      <div style={{ position: "relative", height: 180 }}>
+        <div ref={chartRef} style={{ height: 180 }} />
+        {isLoading && (
+          <Skeleton.Node
+            active
+            style={{ position: "absolute", inset: 0, width: "100%", height: 180 }}
+          />
+        )}
+      </div>
     </div>
   );
 }

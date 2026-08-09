@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   getSourceColor, getSourceLabel, getSourcePlatform, isTwitterItem,
-  formatTime, getTimeColor, getSentimentConfig, KUAIXUN_ACCENT,
+  formatTime, getTimeColor, getSentimentConfig, clampPage,
+  getRelativeTimeRefreshDelay, KUAIXUN_ACCENT,
 } from "./feedHelpers";
 import { themes } from "../../theme/themes";
 import type { FeedNewsItem } from "../../types/stock";
@@ -48,5 +49,27 @@ describe("feedHelpers", () => {
     expect(cfg["偏多"].color).toBe(c.up);
     expect(cfg["偏空"].color).toBe(c.down);
     expect(cfg["中性"].color).toBe(c.accent);
+  });
+
+  it("clampPage keeps the page within available data", () => {
+    expect(clampPage(3, 45, 20)).toBe(3);
+    expect(clampPage(4, 45, 20)).toBe(3);
+    expect(clampPage(0, 45, 20)).toBe(1);
+  });
+
+  it("clampPage handles empty data and invalid page sizes", () => {
+    expect(clampPage(5, 0, 20)).toBe(1);
+    expect(clampPage(5, 10, 0)).toBe(1);
+  });
+
+  it("aligns relative time refreshes to the next minute boundary", () => {
+    expect(getRelativeTimeRefreshDelay(120_000)).toBe(60_000);
+    expect(getRelativeTimeRefreshDelay(120_001)).toBe(59_999);
+    expect(getRelativeTimeRefreshDelay(179_999)).toBe(1);
+  });
+
+  it("falls back to one minute for invalid clocks", () => {
+    expect(getRelativeTimeRefreshDelay(Number.NaN)).toBe(60_000);
+    expect(getRelativeTimeRefreshDelay(-1)).toBe(60_000);
   });
 });

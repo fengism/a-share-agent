@@ -1,9 +1,9 @@
-import { Card, Typography, Tag, Empty, Spin } from "antd";
-import { RobotOutlined, HistoryOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { Button, Card, message, Popconfirm, Tag, Typography } from "antd";
+import { DeleteOutlined, HistoryOutlined, RobotOutlined } from "@ant-design/icons";
+import { Link } from "react-router-dom";
 import SearchBar from "../Dashboard/SearchBar";
-import { useAllAnalysisHistory } from "../../api/queries";
-;
+import { useDeleteAnalysisHistory, useInfiniteAllAnalysisHistory } from "../../api/queries";
+import SectionDataState from "../../components/SectionDataState";
 import type { AnalysisHistoryItem } from "../../types/stock";
 import { useColors } from "../../styles/ui";
 
@@ -38,10 +38,30 @@ function groupByStock(items: AnalysisHistoryItem[]): Record<string, AnalysisHist
 
 export default function AnalysisEntry() {
   const c = useColors();
-  const navigate = useNavigate();
-  const { data: allHistory, isLoading } = useAllAnalysisHistory();
+  const {
+    data: historyPages,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteAllAnalysisHistory();
+  const deleteMutation = useDeleteAnalysisHistory();
+  const allHistory = historyPages?.pages.flat() ?? [];
 
-  const grouped = allHistory ? groupByStock(allHistory) : {};
+  const grouped = groupByStock(allHistory);
+
+  const handleDelete = async (item: AnalysisHistoryItem) => {
+    try {
+      await deleteMutation.mutateAsync({ code: item.stock_code, date: item.analysis_date });
+      await refetch();
+      message.success("分析记录已删除");
+    } catch (deleteError) {
+      message.error(deleteError instanceof Error ? deleteError.message : "删除分析记录失败");
+    }
+  };
 
   return (
     <div className="two-pane" style={{ display: "flex", gap: 20, minHeight: "calc(100vh - 120px)" }}>
@@ -58,60 +78,104 @@ export default function AnalysisEntry() {
             </span>
           </div>
           <div style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto", padding: "8px 10px" }}>
-            {isLoading ? (
-              <div style={{ textAlign: "center", padding: 24 }}><Spin /></div>
-            ) : Object.keys(grouped).length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={<span style={{ color: c.textSecondary, fontSize: 12 }}>暂无分析记录</span>}
-                style={{ marginTop: 40 }}
-              />
-            ) : (
-              Object.entries(grouped).map(([code, items]) => (
-                <div key={code} style={{ marginBottom: 10 }}>
-                  {items.map((item) => {
-                    const dateStr = item.analysis_date;
-                    const displayDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
-                    const sc = signalColor(c.up, c.down, c.textPrimary, item.signal);
-                    return (
-                      <div
-                        key={`${code}-${dateStr}`}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => navigate(`/analysis/${code}`)}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/analysis/${code}`); } }}
-                        className="hover-row"
-                        style={{
-                          display: "flex", justifyContent: "space-between", alignItems: "center",
-                          padding: "8px 10px", marginBottom: 4,
-                          borderRadius: 8, cursor: "pointer",
-                        }}
-                      >
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ fontSize: 12, color: c.primary, fontFamily: "monospace", fontWeight: 600 }}>{item.stock_code}</span>
-                            <span style={{ fontSize: 12, color: c.textPrimary, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.stock_name}</span>
-                          </div>
-                          <span style={{ fontSize: 11, color: c.textSecondary }}>{displayDate}</span>
+            <SectionDataState
+              isLoading={isLoading && allHistory.length === 0}
+              error={isError && allHistory.length === 0 ? error : undefined}
+              onRetry={() => refetch()}
+              isEmpty={!isLoading && !isError && allHistory.length === 0}
+              emptyText="暂无分析记录"
+              errorTitle="分析历史加载失败"
+              skeletonRows={6}
+              minHeight={260}
+            >
+              <>
+                {Object.entries(grouped).map(([code, items]) => (
+                  <div key={code} style={{ marginBottom: 10 }}>
+                    {items.map((item) => {
+                      const dateStr = item.analysis_date;
+                      const displayDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
+                      const sc = signalColor(c.up, c.down, c.textPrimary, item.signal);
+                      const itemKey = `${code}-${dateStr}`;
+                      const isDeleting = deleteMutation.isPending
+                        && `${deleteMutation.variables?.code}-${deleteMutation.variables?.date}` === itemKey;
+                      return (
+                        <div
+                          key={itemKey}
+                          className="hover-row"
+                          style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            padding: "0 4px 0 0", marginBottom: 4,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Link
+                            to={`/analysis/${code}`}
+                            style={{
+                              display: "flex", flex: 1, minWidth: 0, justifyContent: "space-between", alignItems: "center",
+                              padding: "8px 6px 8px 10px", color: "inherit", textDecoration: "none",
+                            }}
+                          >
+                            <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <span style={{ fontSize: 12, color: c.primary, fontFamily: "monospace", fontWeight: 600 }}>{item.stock_code}</span>
+                                <span style={{ fontSize: 12, color: c.textPrimary, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.stock_name}</span>
+                              </div>
+                              <span style={{ fontSize: 11, color: c.textSecondary }}>{displayDate}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                              {item.overall_rating != null && (
+                                <span style={{ fontSize: 12, fontWeight: 700, color: item.overall_rating >= 7 ? c.up : item.overall_rating <= 3 ? c.down : c.textPrimary }}>
+                                  {item.overall_rating}
+                                </span>
+                              )}
+                              {item.signal && (
+                                <Tag style={{ color: sc, background: "transparent", border: `1px solid ${sc}33`, fontSize: 11, margin: 0, padding: "0 4px" }}>
+                                  {signalLabel(item.signal)}
+                                </Tag>
+                              )}
+                            </div>
+                          </Link>
+                          {item.can_delete ? (
+                            <Popconfirm
+                              title="删除这条分析记录？"
+                              description="删除后无法恢复"
+                              okText="删除"
+                              cancelText="取消"
+                              okButtonProps={{ danger: true }}
+                              onConfirm={() => handleDelete(item)}
+                            >
+                              <Button
+                                type="text"
+                                danger
+                                size="small"
+                                icon={<DeleteOutlined />}
+                                loading={isDeleting}
+                                aria-label={`删除 ${item.stock_code} ${displayDate} 分析记录`}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }}
+                              />
+                            </Popconfirm>
+                          ) : null}
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                          {item.overall_rating != null && (
-                            <span style={{ fontSize: 12, fontWeight: 700, color: item.overall_rating >= 7 ? c.up : item.overall_rating <= 3 ? c.down : c.textPrimary }}>
-                              {item.overall_rating}
-                            </span>
-                          )}
-                          {item.signal && (
-                            <Tag style={{ color: sc, background: "transparent", border: `1px solid ${sc}33`, fontSize: 11, margin: 0, padding: "0 4px" }}>
-                              {signalLabel(item.signal)}
-                            </Tag>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))
-            )}
+                      );
+                    })}
+                  </div>
+                ))}
+                {hasNextPage && (
+                  <Button
+                    block
+                    size="small"
+                    loading={isFetchingNextPage}
+                    onClick={() => fetchNextPage()}
+                    style={{ marginTop: 8 }}
+                  >
+                    加载更多
+                  </Button>
+                )}
+              </>
+            </SectionDataState>
           </div>
         </Card>
       </div>

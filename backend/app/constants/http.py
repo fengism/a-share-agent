@@ -36,17 +36,11 @@ def build_headers(base: dict[str, str]) -> dict[str, str]:
     headers["User-Agent"] = random_user_agent()
     return headers
 
-EASTMONEY_COOKIE = ""  # 通过 .env 配置（eastmoney_cookie），不再硬编码
-
 EASTMONEY_HEADERS = build_headers({
     "Referer": "https://quote.eastmoney.com/",
     "Accept": "application/json, text/plain, */*",
     "Content-Type": "application/json",
     "Connection": "keep-alive",
-})
-
-EASTMONEY_STATICS_HEADERS = build_headers({
-    "Accept": "*/*",
 })
 
 THS_HEADERS = build_headers({

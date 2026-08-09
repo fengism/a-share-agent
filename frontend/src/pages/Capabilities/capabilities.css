@@ -1,0 +1,269 @@
+.capability-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.capability-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.capability-summary-card,
+.capability-card {
+  border: 1px solid var(--c-border);
+  background: var(--c-card-bg);
+}
+
+.capability-summary-card .ant-card-body {
+  padding: 16px 18px;
+}
+
+.capability-unassigned-alert {
+  margin-bottom: 16px;
+}
+
+.capability-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.capability-search {
+  width: min(380px, 100%);
+}
+
+.capability-card-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.capability-skill-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.capability-tool-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.capability-card {
+  min-width: 0;
+  height: 100%;
+}
+
+.capability-card-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+}
+
+.capability-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--c-primary), var(--c-accent));
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.capability-title-text {
+  display: block;
+  overflow: hidden;
+  color: var(--c-text-primary);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capability-code-name {
+  display: inline-block;
+  margin-top: 3px;
+  color: var(--c-text-muted);
+  font-size: 11px;
+}
+
+.capability-label {
+  margin-bottom: 7px;
+  color: var(--c-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.capability-section-gap {
+  margin-top: 16px;
+}
+
+.capability-rule-list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--c-text-secondary);
+  line-height: 1.75;
+}
+
+.capability-exclusions {
+  margin-top: 12px;
+  padding: 9px 11px;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  color: var(--c-text-secondary);
+  background: var(--c-nested-bg);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.capability-tool-chip {
+  max-width: 100%;
+  margin-inline-end: 0;
+  overflow: hidden;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.capability-tool-chip:hover {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.capability-tool-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 250px;
+}
+
+.capability-tool-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.capability-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 10px;
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+  font-size: 17px;
+}
+
+.capability-tool-name-wrap {
+  min-width: 0;
+}
+
+.capability-tool-name {
+  display: block;
+  max-width: 100%;
+  margin-bottom: 7px;
+  overflow: hidden;
+  color: var(--c-text-primary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capability-tool-description {
+  min-height: 66px;
+  margin: 16px 0 14px !important;
+  color: var(--c-text-secondary);
+  line-height: 1.6;
+}
+
+.capability-policy-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--c-border);
+  color: var(--c-text-muted);
+  font-size: 12px;
+}
+
+.capability-linked-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.capability-linked-skills .ant-tag {
+  margin-inline-end: 0;
+}
+
+.capability-drawer-content {
+  min-width: 0;
+}
+
+.capability-parameter-title {
+  margin-top: 24px !important;
+}
+
+@media (max-width: 1100px) {
+  .capability-tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .capability-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .capability-skill-grid,
+  .capability-tool-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .capability-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .capability-search {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .capability-page-header {
+    margin-bottom: 14px;
+  }
+
+  .capability-summary-grid {
+    gap: 8px;
+  }
+
+  .capability-summary-card .ant-card-body {
+    padding: 12px;
+  }
+
+  .capability-toolbar .ant-segmented-item-label {
+    padding-inline: 8px;
+  }
+
+  .capability-skill-card .ant-card-head,
+  .capability-skill-card .ant-card-body {
+    padding-inline: 14px;
+  }
+}

@@ -2,6 +2,7 @@ import { Card, Col, Row, Tag, Typography } from "antd";
 import { useIndicators } from "../../api/queries";
 import type { AnalysisResult, TechnicalIndicators } from "../../types/stock";
 import RatingBadge from "../../components/RatingBadge";
+import SectionDataState from "../../components/SectionDataState";
 import { useColors, useStyles } from "../../theme/hooks";
 
 interface Props {
@@ -49,9 +50,23 @@ function renderTags(items: string[] | undefined, color: string, tagStyle: React.
 export default function TechnicalPanel({ code, analysis }: Props) {
   const c = useColors();
   const { cardStyle, sectionHeaderStyle, tagStyle } = useStyles();
-  const { data: indicators, isLoading } = useIndicators(code);
+  const { data: indicators, isLoading, error, refetch } = useIndicators(code);
 
-  if (isLoading || !indicators) return null;
+  if (!indicators) {
+    return (
+      <SectionDataState
+        isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
+        isEmpty={!isLoading && !error && !indicators}
+        emptyText="暂无技术指标数据"
+        errorTitle="技术指标加载失败"
+        minHeight={240}
+      >
+        {null}
+      </SectionDataState>
+    );
+  }
 
   const { ma, macd, rsi, boll, kdj, volume_ma } = indicators;
   const colorCtx = { textSecondary: c.textSecondary, up: c.up, down: c.down, primary: c.primary };

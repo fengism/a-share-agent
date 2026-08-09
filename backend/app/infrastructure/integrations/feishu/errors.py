@@ -1,0 +1,2 @@
+class FeishuConfigError(RuntimeError):
+    pass

@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { Button, Form, Input, Typography, Alert, Tag } from "antd";
-import { UserOutlined, LockOutlined, KeyOutlined, LineChartOutlined } from "@ant-design/icons";
+import { Alert, Button, Form, Input, Tag } from "antd";
+import { KeyOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import { useAuthStore } from "../../store/authStore";
 import { needsSetupApi } from "../../api/auth";
-import { useColors } from "../../styles/ui";
+import AuthHeader from "../../components/AuthHeader";
 import AuthShell from "../../components/AuthShell";
 
-const { Title, Text } = Typography;
-
 export default function RegisterPage() {
-  const c = useColors();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const register = useAuthStore((s) => s.register);
@@ -49,17 +46,7 @@ export default function RegisterPage() {
   if (setupError) {
     return (
       <AuthShell>
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <div
-            style={{
-              width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
-              background: c.logoGradient, display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-          >
-            <LineChartOutlined style={{ color: "#fff", fontSize: 24 }} />
-          </div>
-          <Title level={3} style={{ margin: 0, color: c.textPrimary }}>注册</Title>
-        </div>
+        <AuthHeader title="创建账号" description="初始化状态暂时不可用，请重试后继续" />
         <Alert
           type="error"
           showIcon
@@ -67,10 +54,10 @@ export default function RegisterPage() {
           description={setupError}
           style={{ marginBottom: 16 }}
         />
-        <Button type="primary" block onClick={loadNeedsSetup} loading={checking}>
+        <Button className="auth-primary-action" type="primary" block onClick={loadNeedsSetup} loading={checking}>
           重试
         </Button>
-        <div style={{ textAlign: "center", color: c.textSecondary, fontSize: 13, marginTop: 16 }}>
+        <div className="auth-footer auth-footer--spaced">
           已有账号？<Link to="/login">去登录</Link>
         </div>
       </AuthShell>
@@ -97,38 +84,22 @@ export default function RegisterPage() {
 
   return (
     <AuthShell>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 12,
-            margin: "0 auto 12px",
-            background: c.logoGradient,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <LineChartOutlined style={{ color: "#fff", fontSize: 24 }} />
-        </div>
-        <Title level={3} style={{ margin: 0, color: c.textPrimary }}>
-          注册
-        </Title>
-        {needsSetup === true ? (
-          <Tag color="gold" style={{ marginTop: 8 }}>
-            首位注册用户将成为管理员
-          </Tag>
-        ) : needsSetup === false ? (
-          <Text style={{ color: c.textSecondary }}>需要管理员提供的邀请码</Text>
-        ) : (
-          <Text style={{ color: c.textSecondary }}>正在检测初始化状态…</Text>
-        )}
-      </div>
+      <AuthHeader
+        title="创建账号"
+        description={
+          needsSetup === true ? (
+            <Tag color="gold">首位注册用户将成为管理员</Tag>
+          ) : needsSetup === false ? (
+            "使用管理员提供的邀请码完成注册"
+          ) : (
+            "正在检测初始化状态…"
+          )
+        }
+      />
 
       {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
 
-      <Form layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
+      <Form className="auth-form" layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
         <Form.Item
           name="username"
           label="用户名"
@@ -176,14 +147,14 @@ export default function RegisterPage() {
           </Form.Item>
         )}
 
-        <Form.Item style={{ marginBottom: 8 }}>
+        <Form.Item className="auth-form__submit">
           <Button type="primary" htmlType="submit" block loading={loading} disabled={checking || needsSetup === null}>
             {needsSetup ? "创建管理员账号" : "注册"}
           </Button>
         </Form.Item>
       </Form>
 
-      <div style={{ textAlign: "center", color: c.textSecondary, fontSize: 13 }}>
+      <div className="auth-footer">
         已有账号？<Link to="/login">去登录</Link>
       </div>
     </AuthShell>

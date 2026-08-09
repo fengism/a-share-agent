@@ -1,9 +1,27 @@
 import { getColors } from "../theme/store";
 import type { ThemeColors } from "../theme/themes";
 
+export type ChangeDirection = "up" | "down" | "flat" | "unknown";
+
+export function getChangeDirection(value: number | null | undefined): ChangeDirection {
+  if (value == null) return "unknown";
+  if (value > 0) return "up";
+  if (value < 0) return "down";
+  return "flat";
+}
+
 export function formatSignedPercent(value: number | null | undefined, digits = 2) {
   if (value == null) return "-";
   return `${value > 0 ? "+" : ""}${value.toFixed(digits)}%`;
+}
+
+export function formatChangeAriaLabel(value: number | null | undefined, digits = 2): string {
+  const direction = getChangeDirection(value);
+  if (direction === "unknown") return "暂无涨跌数据";
+  const magnitude = Math.abs(value ?? 0).toFixed(digits);
+  if (direction === "up") return `上涨 ${magnitude}%`;
+  if (direction === "down") return `下跌 ${magnitude}%`;
+  return `持平 ${magnitude}%`;
 }
 
 export function formatRatioPercent(value: number | null | undefined, digits = 1) {

@@ -22,12 +22,12 @@
 
 | 层 | 技术 |
 | --- | --- |
-| 前端 | React 18 + TypeScript + Vite + Ant Design 5 (Dark Theme) |
+| 前端 | React 18 + TypeScript + Vite + Ant Design 6（多主题） |
 | 状态与请求 | Zustand + TanStack Query + SSE |
 | 图表 | Lightweight Charts + ECharts |
 | 后端 | FastAPI + Python 3.11+ + Pydantic v2 |
 | 数据源 | akshare + 东方财富/新浪/同花顺/问财/Twitter 等 fallback |
-| AI 引擎 | OpenAI-compatible SDK + litellm，可配置 DeepSeek/通义千问/OpenAI/Claude/智谱 |
+| AI 引擎 | OpenAI-compatible SDK + LiteLLM，可配置 DeepSeek、通义千问、OpenAI、Claude、Gemini、Azure、Ollama 等 |
 | 包管理 | uv + npm |
 | 部署 | Docker + Nginx |
 
@@ -51,7 +51,13 @@ cp .env.example .env
 ./stop.sh
 ```
 
-启动后访问 `http://localhost:5173`。也可以通过 Makefile 运行：`make setup`、`make start`、`make stop`。
+启动后访问 `http://localhost:5173`。脚本使用 PID 文件管理当前项目进程；若端口被其他项目占用，会明确报错而不会直接终止外部进程。也可以运行 `make help` 查看统一命令入口。
+
+端口可按需覆盖，例如：
+
+```bash
+BACKEND_PORT=8100 FRONTEND_PORT=5174 make dev
+```
 
 ### Docker 部署
 
@@ -60,27 +66,52 @@ cp .env.example .env
 ```bash
 # 1. 配置环境变量
 cp .env.example .env
-# 编辑 .env 填入 LLM_API_KEY
+# Docker Compose 不会自动生成 CONFIG_ENCRYPTION_KEY；请编辑 .env 填入 LLM_API_KEY，
+# 并执行以下命令生成密钥后写入 CONFIG_ENCRYPTION_KEY：
+openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n'; echo
 
 # 2. 构建并启动
+# Linux 若当前用户不是 UID/GID 1000，可先执行：
+# export APP_UID=$(id -u) APP_GID=$(id -g)
 docker compose up -d
 
-# 3. 查看日志
-docker compose logs -f
+# 3. 查看状态和首次启动生成的管理员临时密码
+docker compose ps
+docker compose logs backend
 
 # 4. 停止
 docker compose down
 ```
 
-启动后访问 `http://localhost`。`data/` 和 `logs/` 通过卷挂载持久化，容器重建后数据不丢失。代码更新后重新构建：
+Docker Compose 只会从 `.env` 读取 `CONFIG_ENCRYPTION_KEY`，不会在首次启动或容器重建时自动生成。将密钥生成命令的输出填入 `.env` 的 `CONFIG_ENCRYPTION_KEY`，并妥善备份该值；后续容器重建、迁移或数据恢复时必须继续使用同一个密钥，否则已加密的用户私密配置无法解密。未配置密钥时，空数据库仍可启动，但无法保存 API Key、Token 等敏感配置；如果数据库中已经存在敏感配置，后端就绪检查将失败。
+
+启动后访问 `http://localhost:8080`。如端口冲突，可在 `.env` 中设置 `DOCKER_FRONTEND_PORT=8081`，再访问对应端口。`data/` 和 `logs/` 通过卷挂载持久化，容器重建后数据不丢失。服务异常退出后会自动重启，容器日志按单文件 10 MB、最多 3 个文件轮转。代码更新后重新构建，BuildKit 会复用 uv 和 npm 下载缓存：
 
 ```bash
 docker compose up -d --build
 ```
 
+#### Docker 数据备份与恢复
+
+备份前暂停后端，确保 SQLite 主文件及 `-wal`、`-shm` 文件状态一致；归档同时包含 `.env` 中的加密密钥，请安全保存：
+
+```bash
+docker compose stop backend
+tar -czf ../a-share-agent-backup.tar.gz data .env
+docker compose start backend
+```
+
+恢复时会覆盖当前 `data/` 和 `.env`，应先停止容器并确认当前数据已另行保留：
+
+```bash
+docker compose down
+tar -xzf ../a-share-agent-backup.tar.gz
+docker compose up -d
+```
+
 ### 手动安装
 
-环境要求：Python 3.11+、Node.js 18+、uv、npm
+环境要求：Python 3.11+、Node.js 22、uv、npm
 
 ### 配置环境变量
 
@@ -92,14 +123,29 @@ cp .env.example .env
 
 ```env
 LLM_PROVIDER=deepseek
+LLM_API_MODE=auto
+LLM_API_VERSION=
 LLM_API_KEY=your_api_key_here
 LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=deepseek-chat
+LLM_TEMPERATURE=0.1
+LLM_TIMEOUT_SECONDS=180
+
+# Chat 成本与稳定性保护
+MAX_CONCURRENT_CHAT_PER_USER=2
+MAX_CONCURRENT_CHAT_TOTAL=8
+MAX_CONCURRENT_LLM_REQUESTS=6
+CHAT_MAX_COMPLETION_TOKENS=4096
+CHAT_TOTAL_TIMEOUT_SECONDS=300
+CHAT_HEARTBEAT_SECONDS=15
+CHAT_TOOL_TIMEOUT_SECONDS=45
 ```
+
+`LLM_API_MODE` 支持 `auto`、`openai`、`litellm`；推荐使用 `auto` 跟随 Provider。Azure 等接口可通过 `LLM_API_VERSION` 指定版本，本地 Ollama 可不配置 API Key。
 
 不配置 API Key 仍可浏览行情和数据页面，AI 分析能力不可用。
 
-所有配置也可在前端设置页面（`/settings`）动态修改，无需重启服务。
+所有配置也可在前端设置页面（`/settings`）动态修改，无需重启服务。每个账号还可在「Skill 与 Agent」卡片中独立关闭 Chat Skill 或专业 Agent；关闭 Skill 会同步限制关联工具，关闭 Agent 后它不再参与多 Agent 路由。新能力默认启用。
 
 ### 网页抓取增强（可选）
 
@@ -116,11 +162,11 @@ uv run playwright install chromium
 uv run playwright install-deps chromium   # 需要 sudo 权限
 ```
 
-| 模式 | 命令 | 依赖 | 适用场景 |
-|------|------|------|---------|
-| `http` | 默认 | 仅 scrapling | 公开网页，自带反爬指纹 |
-| `stealth` | `--mode stealth` | + playwright + chromium | 反爬严格的网站 |
-| `dynamic` | `--mode dynamic` | + playwright + chromium | JS 渲染的 SPA 页面 |
+| 模式 | 触发方式 | 依赖 | 适用场景 |
+|------|---------|------|---------|
+| `http` | 自动降级 | 仅 scrapling | 公开网页，自带反爬指纹 |
+| `stealth` | HTTP 模式失败后自动尝试 | + playwright + chromium | 反爬严格的网站 |
+| `dynamic` | 启用动态抓取后自动尝试 | + playwright + chromium | JS 渲染的 SPA 页面 |
 
 > 不安装增强依赖时，系统自动降级为纯 HTTP 抓取（`requests` + BeautifulSoup），功能不受影响。
 
@@ -164,6 +210,43 @@ Token 获取方式：
 - `wiki_space_id`：打开知识库空间主页，URL 中空间标识对应的字符串；也可在知识库管理或开放平台调试中获取。
 - `wiki_parent_node_token`：打开目标 Wiki 父节点页面，URL 中 `wiki/` 后的字符串。
 
+### 飞书 Bot Command
+
+飞书应用订阅 `im.message.receive_v1` 事件，并将请求地址配置为
+`https://<服务域名>/api/bot/feishu`。Bot 使用本地服务账号的模型配置、持仓和分析存储：
+
+```env
+BOT_ENABLED=true
+BOT_SERVICE_USER_ID=1
+BOT_FEISHU_APP_ID=cli_xxxxx
+BOT_FEISHU_APP_SECRET=xxxxx
+BOT_COMMAND_PREFIX=/
+BOT_RATE_LIMIT_REQUESTS=10
+BOT_RATE_LIMIT_WINDOW=60
+BOT_WEBHOOK_MAX_SKEW_SECONDS=300
+BOT_EVENT_DEDUP_TTL_SECONDS=600
+BOT_JOB_POLL_SECONDS=1.0
+BOT_JOB_LEASE_SECONDS=900
+BOT_JOB_MAX_ATTEMPTS=3
+BOT_JOB_RETRY_BASE_SECONDS=5.0
+BOT_JOB_WORKER_CONCURRENCY=2
+BOT_BATCH_CONCURRENCY=2
+BOT_BATCH_MAX_STOCKS=10
+BOT_ADMIN_USERS=["ou_xxxxx"]
+FEISHU_VERIFICATION_TOKEN=xxxxx
+FEISHU_ENCRYPT_KEY=xxxxx
+```
+
+- 支持 `/help`、`/status`、`/task [任务ID]`、`/analyze <股票代码>`、`/market`、`/batch`。
+- 群聊消息需 `@机器人`；私聊可直接发送命令。
+- `/batch` 仅允许 `BOT_ADMIN_USERS` 中的飞书用户执行。
+- 分析类命令会先回发 8 位任务 ID，可通过 `/task` 查看最近任务或查询指定任务。
+- `/batch` 使用受限并发执行，并分阶段回发已完成数量；并发数和最大股票数均可配置。
+- 用户命令采用数据库共享滑动窗口限流，多实例部署时共享同一计数结果。
+- 启用飞书 Encrypt Key 后，签名请求时间戳默认只允许前后 5 分钟，避免合法请求被重复播放。
+- Webhook 会先完成 Token、签名和加密事件校验，将任务持久化后立即确认接收；Worker 支持进程重启恢复、租约接管和失败重试。
+- 命令响应会在回发前持久化；飞书发送失败时只重试回发，不会重复执行股票分析。
+
 ### Notion 转存配置
 
 如需使用“转存 Notion”，在 `.env` 中配置：
@@ -198,8 +281,6 @@ npm run dev
 
 打开 `http://localhost:5173`，输入股票代码（如 `600519`）或名称（如 `贵州茅台`）开始分析。
 
-前端会将 `/api` 请求代理到后端 `http://localhost:8000`。
-
 ## 账号系统与访问控制
 
 系统内置多用户账号体系：首次启动自动创建管理员，其余用户需管理员发放的**邀请码**才能注册。每个账号拥有**独立的私密配置**（各自的 LLM Key、飞书、Notion、问财凭据），互不可见。
@@ -226,8 +307,9 @@ npm run dev
 
 - `/settings` 页仅对管理员显示全局项卡片；普通用户只能配置自己的私密项。
 - 请求按登录用户作用域读取私密配置：你在对话 / 分析里用的是**你自己的 LLM Key**（消耗你自己的额度）。
-- 数据源 Cookie 维持实例级全局：它们鉴权的是所有用户共享且全局缓存的公开行情数据，按用户隔离无隐私收益。
-- **注意**：启用账号系统后 `/api/config` 需登录后访问。
+- 个股分析、每日复盘、产业链分析和市场资讯 AI 摘要的运行状态、缓存或历史文件均按用户隔离，不会复用其他用户的 LLM 结果。
+- 数据源 Cookie 是实例级全局配置，对所有用户生效。
+- **注意**：所有业务 API 均需登录，只有认证接口和健康检查保持公开。
 
 ### 修改密码与会话
 
@@ -268,159 +350,7 @@ LOGIN_LOCK_SECONDS=300      # 锁定时长（秒）
 ```
 
 - 首次启动自动创建的默认管理员用户名可用 `DEFAULT_ADMIN_USERNAME` 修改（默认 `admin`；密码随机生成并打印到后端日志，非环境变量，首登强制改密）。
-- 会话有效期与滑动续期阈值为内置常量（`backend/app/utils/auth.py` 中的 `SESSION_TTL_DAYS`、`SESSION_RENEW_THRESHOLD_DAYS`），如需调整改代码即可。
 - 若前端部署在与后端不同的域名，用 `CORS_ORIGINS`（逗号分隔）配置允许来源。
-
-### 数据表
-
-账号系统在 SQLite 中新增 5 张表：`users`、`auth_sessions`、`invites`、`user_config`、`password_resets`。均在启动时自动创建（`CREATE TABLE IF NOT EXISTS`，纯增量），**现有数据库无需手动迁移**。
-
-## 常用命令
-
-### 后端
-
-```bash
-cd backend
-uv sync
-uv run uvicorn app.main:app --reload --port 8000
-uv run pytest
-```
-
-### 前端
-
-```bash
-cd frontend
-npm install
-npm run dev
-npm run build
-npm run lint
-```
-
-### 根目录 Makefile
-
-```bash
-make setup            # 一键安装
-make start / make dev # 启动（开发模式）
-make prod             # 启动（生产模式）
-make stop             # 停止服务
-make backend-sync     # 安装后端依赖
-make backend-dev      # 启动后端
-make backend-test     # 运行后端测试
-make frontend-install # 安装前端依赖
-make frontend-dev     # 启动前端
-make frontend-build   # 构建前端
-make frontend-lint    # 前端 lint
-```
-
-## 页面路由
-
-| 路径 | 页面 | 说明 |
-| --- | --- | --- |
-| `/` | Dashboard | 市场指数概览、功能入口和搜索 |
-| `/market` | Market | 热点榜单、龙虎榜、指数相关信息 |
-| `/screener` | Screener | 条件选股和估值百分位 |
-| `/daily-review` | DailyReview | 每日市场复盘 |
-| `/feed` | Feed | 24小时资讯：快讯 + 新闻 + AI 智能摘要 |
-| `/chat` | Chat | AI 选股助手（对话式） |
-| `/analysis` | AnalysisEntry | 分析入口 |
-| `/analysis/:code` | Analysis | 个股分析详情 |
-| `/industry-chain` | IndustryChain | AI 产业链分析（支持名称参数） |
-| `/macro` | Macro | 宏观经济指标（物价/景气/货币/利率/增速/外贸） |
-| `/settings` | Settings | 系统配置（大模型/飞书/问财/Notion/Twitter）、账号安全（改密）、管理员邀请码与密码重置 |
-| `/login` | Login | 登录（公开） |
-| `/register` | Register | 注册；首个用户即管理员，其余需邀请码（公开） |
-| `/reset-password` | ResetPassword | 通过管理员签发的链接重置密码（公开） |
-
-## API 概览
-
-| Prefix | 说明 |
-| --- | --- |
-| `/api/stock` | 股票搜索、基础信息、分时、K 线、财务、估值（含机构预测）、新闻、技术指标 |
-| `/api/market` | 指数、成交量、热点榜单、龙虎榜、市场情绪、资讯 AI 摘要 |
-| `/api/analysis` | AI 分析触发、结果查询、SSE 进度流 |
-| `/api/screener` | 条件选股、行业列表、估值百分位 |
-| `/api/daily-review` | 每日复盘生成、查询和存储 |
-| `/api/push` | 推送分析/复盘/聊天到飞书文档或 Notion |
-| `/api/chat` | AI 选股助手对话（SSE 流式） |
-| `/api/auth` | 账号注册/登录/登出/会话、修改密码、邀请码管理、管理员密码重置链接 |
-| `/api/config` | 运行时配置读取/更新（需登录，按用户作用域） |
-| `/api/health` | 健康检查 |
-
-## 项目结构
-
-```text
-stock-agent/
-├── backend/
-│   ├── app/
-│   │   ├── main.py                 # FastAPI 入口和 lifespan 预热任务
-│   │   ├── config.py               # 环境变量配置
-│   │   ├── adapters/               # 飞书/Notion 外部系统适配
-│   │   ├── models/                 # Pydantic 数据模型
-│   │   ├── routers/                # HTTP API 路由
-│   │   ├── services/
-│   │   │   ├── analysis/           # 个股 AI 分析流水线
-│   │   │   ├── base/               # provider chain、文件快照、通用接口
-│   │   │   ├── chat/               # AI 选股助手（agent + skills 注册中心 + prompts）
-│   │   │   ├── daily_review/       # 每日复盘流水线
-│   │   │   ├── llm/                # LLM 客户端工厂
-│   │   │   ├── market/             # 指数、热点、龙虎榜、资讯、AI 摘要
-│   │   │   ├── providers/          # akshare、东方财富、同花顺、问财、百度、RSS、Twitter 等数据源适配
-│   │   │   ├── screener/           # 条件选股、行业映射、估值百分位
-│   │   │   ├── industry_chain/     # 产业链分析流水线
-│   │   │   ├── search/             # 新闻和评论搜索
-│   │   │   ├── stock/              # 个股行情、财务、估值、搜索
-│   │   │   └── technical.py        # 技术指标计算
-│   │   └── utils/                  # 股票代码、缓存、限流等工具
-│   ├── tests/                       # 测试（按 adapters/providers/services 组织）
-│   ├── pyproject.toml
-│   └── uv.lock
-├── frontend/
-│   ├── src/
-│   │   ├── api/                    # API client、query hooks、SSE
-│   │   ├── charts/                 # 分时和 K 线图表
-│   │   ├── components/             # 通用组件和布局
-│   │   ├── pages/                  # Dashboard、Market、Screener、DailyReview、Analysis、Macro
-│   │   ├── store/                  # Zustand 状态
-│   │   ├── styles/                 # UI 样式常量
-│   │   └── types/                  # TypeScript 类型
-│   └── package.json
-├── docs/
-├── data/                           # 本地运行数据
-├── logs/                           # 本地日志
-├── Makefile
-├── .env.example
-├── CLAUDE.md
-└── README.md
-```
-
-## 核心数据流
-
-1. 用户在前端搜索股票并进入 `/analysis/:code`。
-2. 前端通过 TanStack Query 请求 `/api/stock/*` 获取行情、财务、估值、新闻和技术指标。
-3. 用户触发智能分析后，后端 `/api/analysis` 聚合多维数据并调用 LLM。
-4. 分析进度通过 SSE 返回，最终结果经过 Pydantic 校验后展示。
-5. 市场、选股和每日复盘页面复用 market、screener、daily-review 相关服务。
-6. AI 选股助手（`/chat`）通过多轮 tool-calling 循环自动调用 skills 获取实时数据，SSE 流式返回。
-7. 24小时资讯（`/feed`）聚合多源快讯和新闻，AI 自动分析归类并附带引用链接，前端每 5 分钟自动刷新。
-8. 产业链分析（`/industry-chain`）通过 SSE 流式输出进度，分析结果存档后可从历史记录回看或推送到飞书/Notion。
-
-## 数据源与启动说明
-
-- akshare 是同步库，后端服务通过异步包装和限流调用。
-- 网络环境可能影响东方财富、同花顺、新浪等数据源，服务内置多级 fallback。
-- 启动时会预热行业映射和股票名称映射，首次启动可能较慢。
-- 使用 `./setup.sh` 一键安装，`./start.sh` 一键启动，`./stop.sh` 停止服务。
-- `data/` 和 `logs/` 为本地运行产物，是否清理取决于本地使用场景。
-
-## 验证
-
-```bash
-cd backend && uv run pytest
-cd frontend && npm run build
-cd frontend && npm run lint
-```
-
-如果测试依赖实时行情或外部网络，失败时需要区分代码问题和数据源/网络问题。
 
 ## 免责声明
 

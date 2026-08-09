@@ -5,7 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="A股智能分析助手 —— 实时行情、资金流向、龙虎榜、宏观数据与 AI 深度个股分析。" />
-    <meta name="theme-color" content="#0b1120" />
+    <meta name="theme-color" content="#0b0f14" />
     <title>A股智能分析助手</title>
     <script>
       // Anti-FOUC: paint the persisted theme background before React mounts,
@@ -14,8 +14,8 @@
         try {
           var raw = localStorage.getItem("a-share-agent-theme");
           var key = raw ? (JSON.parse(raw).state || {}).themeKey : null;
-          var BG = { "stellar-blue": "#0b1120", "jade-green": "#0a1410", "twilight-purple": "#100d1a", light: "#f5f7fa" };
-          var FG = { "stellar-blue": "#e5e7eb", "jade-green": "#e2e8f0", "twilight-purple": "#e8e3f3", light: "#1d2129" };
+          var BG = { "stellar-blue": "#0b0f14", light: "#f5f7fa" };
+          var FG = { "stellar-blue": "#f2f4f7", light: "#182230" };
           var k = BG[key] ? key : "stellar-blue";
           var root = document.documentElement;
           root.setAttribute("data-theme", k);
@@ -27,22 +27,22 @@
     </script>
     <style>
       html, body, #root { height: 100%; margin: 0; }
-      body { background: var(--boot-bg, #0b1120); }
+      body { background: var(--boot-bg, #0b0f14); }
       #app-boot {
         position: fixed; inset: 0; display: flex; flex-direction: column;
         align-items: center; justify-content: center; gap: 18px;
-        background: var(--boot-bg, #0b1120); color: var(--boot-fg, #e5e7eb);
+        background: var(--boot-bg, #0b0f14); color: var(--boot-fg, #f2f4f7);
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       }
       #app-boot .logo {
         width: 46px; height: 46px; border-radius: 12px;
-        background: linear-gradient(135deg, #3b82f6, #6366f1);
+        background: linear-gradient(135deg, #6c60db, #9b8cf2);
         display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35);
+        box-shadow: 0 8px 24px rgba(111, 99, 217, 0.34);
       }
       #app-boot .ring {
         width: 26px; height: 26px; border-radius: 50%;
-        border: 3px solid rgba(148, 163, 184, 0.25); border-top-color: #3b82f6;
+        border: 3px solid rgba(148, 163, 184, 0.25); border-top-color: #6f63d9;
         animation: bootspin 0.8s linear infinite;
       }
       #app-boot .label { font-size: 13px; letter-spacing: 0.04em; opacity: 0.72; }

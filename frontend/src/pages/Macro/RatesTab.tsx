@@ -1,5 +1,6 @@
-import { Row, Col, Spin } from "antd";
+import { Row, Col } from "antd";
 import { useMacroAllData } from "../../api/queries";
+import SectionDataState from "../../components/SectionDataState";
 import MacroIndicatorCard from "./MacroIndicatorCard";
 import { useColors } from "../../styles/ui";
 import type { ThemeColors } from "../../theme/themes";
@@ -20,33 +21,39 @@ const SHIBOR_FIELDS = (c: ThemeColors) => [
 
 export default function RatesTab() {
   const c = useColors();
-  const { data, isLoading } = useMacroAllData();
-
-  if (isLoading) {
-    return <div style={{ textAlign: "center", padding: 40 }}><Spin size="large" /></div>;
-  }
+  const { data, isLoading, error, refetch } = useMacroAllData();
 
   const lpr = data?.rates?.lpr;
   const shibor = data?.rates?.shibor;
 
   return (
-    <Row gutter={[16, 16]}>
-      <Col xs={24} md={12}>
-        <MacroIndicatorCard
-          title="LPR 贷款市场报价利率"
-          latest={lpr?.latest ?? null}
-          trend={lpr?.trend ?? []}
-          fields={LPR_FIELDS(c)}
-        />
-      </Col>
-      <Col xs={24} md={12}>
-        <MacroIndicatorCard
-          title="SHIBOR 上海银行间同业拆放利率"
-          latest={shibor?.latest ?? null}
-          trend={shibor?.trend ?? []}
-          fields={SHIBOR_FIELDS(c)}
-        />
-      </Col>
-    </Row>
+    <SectionDataState
+      isLoading={isLoading && !data}
+      error={data ? undefined : error}
+      onRetry={() => refetch()}
+      isEmpty={!data}
+      emptyText="暂无利率数据"
+      errorTitle="利率数据加载失败"
+      minHeight={280}
+    >
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={12}>
+          <MacroIndicatorCard
+            title="LPR 贷款市场报价利率"
+            latest={lpr?.latest ?? null}
+            trend={lpr?.trend ?? []}
+            fields={LPR_FIELDS(c)}
+          />
+        </Col>
+        <Col xs={24} md={12}>
+          <MacroIndicatorCard
+            title="SHIBOR 上海银行间同业拆放利率"
+            latest={shibor?.latest ?? null}
+            trend={shibor?.trend ?? []}
+            fields={SHIBOR_FIELDS(c)}
+          />
+        </Col>
+      </Row>
+    </SectionDataState>
   );
 }

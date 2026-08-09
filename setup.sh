@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # A股智能分析系统 - 一键安装
 # 首次使用或依赖变更时运行
 
-set -e
+set -Eeuo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$PROJECT_DIR/backend"
@@ -41,6 +41,10 @@ if command -v uv >/dev/null 2>&1; then
     info "uv 已安装: $(uv --version)"
 else
     warn "uv 未安装，正在安装..."
+    if ! command -v curl >/dev/null 2>&1; then
+        error "缺少 curl，无法自动安装 uv"
+        exit 1
+    fi
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
     if command -v uv >/dev/null 2>&1; then
@@ -77,7 +81,7 @@ echo ""
 
 echo "=== 安装后端依赖 ==="
 cd "$BACKEND_DIR"
-uv sync
+uv sync --frozen
 info "后端依赖安装完成"
 
 echo ""
@@ -86,7 +90,11 @@ echo ""
 
 echo "=== 安装前端依赖 ==="
 cd "$FRONTEND_DIR"
-npm install
+if [ -f package-lock.json ]; then
+    npm ci
+else
+    npm install
+fi
 info "前端依赖安装完成"
 
 echo ""

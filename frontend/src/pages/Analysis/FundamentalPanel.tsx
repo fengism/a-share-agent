@@ -1,8 +1,10 @@
-import { Card, Table, Tabs, Spin, Row, Col, Tag, Typography } from "antd";
+import { useState } from "react";
+import { Card, Table, Segmented, Row, Col, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useFinancial } from "../../api/queries";
 import type { AnalysisResult } from "../../types/stock";
 import RatingBadge from "../../components/RatingBadge";
+import SectionDataState from "../../components/SectionDataState";
 import { useColors, useStyles } from "../../theme/hooks";
 import { financialFieldLabels } from "../../utils/financialFieldLabels";
 
@@ -12,6 +14,7 @@ interface Props {
 }
 
 const { Paragraph, Text } = Typography;
+type StatementKey = "balance" | "profit" | "cashflow";
 
 const financialFieldTokenLabels: Record<string, string> = {
   NOTE: "票据",
@@ -112,11 +115,15 @@ function renderTags(items: string[] | undefined, color: string, tagStyle: React.
 export default function FundamentalPanel({ code, analysis }: Props) {
   const c = useColors();
   const { cardStyle, sectionHeaderStyle, tagStyle } = useStyles();
-  const { data: balance, isLoading: l1 } = useFinancial(code, "balance");
-  const { data: profit, isLoading: l2 } = useFinancial(code, "profit");
-  const { data: cashflow, isLoading: l3 } = useFinancial(code, "cashflow");
-
-  if (l1 || l2 || l3) return <Spin />;
+  const [activeStatement, setActiveStatement] = useState<StatementKey>("balance");
+  const balanceQuery = useFinancial(code, "balance");
+  const profitQuery = useFinancial(code, "profit");
+  const cashflowQuery = useFinancial(code, "cashflow");
+  const balance = balanceQuery.data;
+  const profit = profitQuery.data;
+  const cashflow = cashflowQuery.data;
+  const isLoading = balanceQuery.isLoading || profitQuery.isLoading || cashflowQuery.isLoading;
+  const error = balanceQuery.error || profitQuery.error || cashflowQuery.error;
 
   const renderTable = (data: Record<string, unknown>[] | undefined) => {
     if (!data || data.length === 0) return <div style={{ color: c.textSecondary, padding: 16 }}>暂无数据</div>;
@@ -183,7 +190,19 @@ export default function FundamentalPanel({ code, analysis }: Props) {
 
 
   return (
-    <div style={{ display: "grid", gap: 16, width: "100%", minWidth: 0, overflowX: "hidden" }}>
+    <SectionDataState
+      isLoading={isLoading}
+      error={error}
+      onRetry={() => Promise.all([
+        balanceQuery.refetch(),
+        profitQuery.refetch(),
+        cashflowQuery.refetch(),
+      ])}
+      errorTitle="财务报表加载失败"
+      skeletonRows={6}
+      minHeight={280}
+    >
+      <div style={{ display: "grid", gap: 16, width: "100%", minWidth: 0, overflowX: "hidden" }}>
       {analysis?.fundamental && (
         <Card
           size="small"
@@ -221,8 +240,16 @@ export default function FundamentalPanel({ code, analysis }: Props) {
         <Text type="secondary" style={{ fontSize: 12 }}>按报告期查看明细</Text>
       </div>
       <div style={{ width: "100%", minWidth: 0, overflowX: "hidden" }}>
-        <Tabs items={items} size="small" />
+        <Segmented
+          block
+          value={activeStatement}
+          onChange={(value) => setActiveStatement(value as StatementKey)}
+          options={items.map(({ key, label }) => ({ value: key, label }))}
+          style={{ marginBottom: 12 }}
+        />
+        {items.find((item) => item.key === activeStatement)?.children}
       </div>
-    </div>
+      </div>
+    </SectionDataState>
   );
 }

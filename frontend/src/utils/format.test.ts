@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   formatSignedPercent, formatRatioPercent, formatHotValue, formatWanAmount,
   formatNumber, formatMarketCap, formatAmount, formatAmountWanYi, changeColor,
+  formatChangeAriaLabel, getChangeDirection,
 } from "./format";
 import { themes } from "../theme/themes";
 
@@ -65,5 +66,19 @@ describe("format utils", () => {
     expect(changeColor(-1, c)).toBe(c.down);
     expect(changeColor(0, c)).toBe(c.textSecondary);
     expect(changeColor(null, c)).toBe(c.textSecondary);
+  });
+
+  it("getChangeDirection classifies signed values", () => {
+    expect(getChangeDirection(1)).toBe("up");
+    expect(getChangeDirection(-1)).toBe("down");
+    expect(getChangeDirection(0)).toBe("flat");
+    expect(getChangeDirection(null)).toBe("unknown");
+  });
+
+  it("formatChangeAriaLabel describes percentage direction", () => {
+    expect(formatChangeAriaLabel(1.234)).toBe("上涨 1.23%");
+    expect(formatChangeAriaLabel(-0.5)).toBe("下跌 0.50%");
+    expect(formatChangeAriaLabel(0)).toBe("持平 0.00%");
+    expect(formatChangeAriaLabel(null)).toBe("暂无涨跌数据");
   });
 });

@@ -1,4 +1,4 @@
-export type ThemeKey = "stellar-blue" | "jade-green" | "twilight-purple" | "light";
+export type ThemeKey = "stellar-blue" | "light";
 
 export interface ThemeColors {
   pageBg: string;
@@ -19,6 +19,11 @@ export interface ThemeColors {
   border: string;
   headerGradient: string;
   logoGradient: string;
+  focusRing: string;
+  surfaceOverlay: string;
+  authBackground: string;
+  authHeroGradient: string;
+  cardShadow: string;
 }
 
 export interface ThemeMeta {
@@ -29,9 +34,18 @@ export interface ThemeMeta {
   colors: ThemeColors;
   antToken: {
     colorPrimary: string;
+    colorPrimaryHover: string;
+    colorPrimaryActive: string;
+    colorPrimaryBg: string;
+    colorInfo: string;
+    colorSuccess: string;
+    colorWarning: string;
+    colorError: string;
+    colorBgLayout: string;
     colorBgContainer: string;
     colorBgElevated: string;
     colorBorder: string;
+    colorBorderSecondary: string;
     colorText: string;
     colorTextSecondary: string;
   };
@@ -42,149 +56,105 @@ export interface ThemeMeta {
 export const themes: Record<ThemeKey, ThemeMeta> = {
   "stellar-blue": {
     key: "stellar-blue",
-    label: "星空蓝",
-    labelEn: "Stellar Blue",
+    label: "专业深色",
+    labelEn: "Professional Dark",
     isLight: false,
-    siderBg: "#0f172a",
-    headerBg: "#0f172a",
+    siderBg: "#0d121a",
+    headerBg: "#0d121a",
     colors: {
-      pageBg: "#0b1120",
-      cardBg: "#111827",
-      elevatedBg: "#1a2332",
-      nestedBg: "#0f1720",
-      primary: "#3b82f6",
-      accent: "#6366f1",
-      up: "#ef4444",
-      down: "#22c55e",
-      upBg: "rgba(239,68,68,0.15)",
-      downBg: "rgba(34,197,94,0.15)",
-      upCardGradient: "linear-gradient(135deg, #1a0f0f, #2d1518)",
-      downCardGradient: "linear-gradient(135deg, #0f1a14, #152d1d)",
-      textPrimary: "#e5e7eb",
-      textSecondary: "#9ca3af",
-      textMuted: "#6b7280",
-      border: "#1e293b",
-      headerGradient: "linear-gradient(135deg, #1e3a5f, #0f172a)",
-      logoGradient: "linear-gradient(135deg, #3b82f6, #6366f1)",
+      pageBg: "#0b0f14",
+      cardBg: "#151b24",
+      elevatedBg: "#1b2430",
+      nestedBg: "#111821",
+      primary: "#6f63d9",
+      accent: "#a89af4",
+      up: "#f04438",
+      down: "#12b76a",
+      upBg: "rgba(240,68,56,0.10)",
+      downBg: "rgba(18,183,106,0.10)",
+      upCardGradient: "linear-gradient(135deg, rgba(240,68,56,0.12), rgba(240,68,56,0.04))",
+      downCardGradient: "linear-gradient(135deg, rgba(18,183,106,0.12), rgba(18,183,106,0.04))",
+      textPrimary: "#f2f4f7",
+      textSecondary: "#a7b0be",
+      textMuted: "#6f7a89",
+      border: "#283241",
+      headerGradient: "linear-gradient(135deg, #18212d, #131a24)",
+      logoGradient: "linear-gradient(135deg, #6c60db, #9b8cf2)",
+      focusRing: "rgba(111,99,217,0.34)",
+      surfaceOverlay: "rgba(21,27,36,0.96)",
+      authBackground:
+        "radial-gradient(circle at 14% 12%, rgba(111,99,217,0.12), transparent 32%), radial-gradient(circle at 86% 82%, rgba(168,154,244,0.07), transparent 28%), #0b0f14",
+      authHeroGradient: "linear-gradient(145deg, rgba(24,33,45,0.96), rgba(13,18,26,0.86))",
+      cardShadow: "0 12px 32px rgba(0,0,0,0.24)",
     },
     antToken: {
-      colorPrimary: "#3b82f6",
-      colorBgContainer: "#111827",
-      colorBgElevated: "#1a2332",
-      colorBorder: "#1e293b",
-      colorText: "#e5e7eb",
-      colorTextSecondary: "#9ca3af",
-    },
-  },
-
-  "jade-green": {
-    key: "jade-green",
-    label: "翡翠绿",
-    labelEn: "Jade Green",
-    isLight: false,
-    siderBg: "#0b1a14",
-    headerBg: "#0b1a14",
-    colors: {
-      pageBg: "#0a1410",
-      cardBg: "#0f1e18",
-      elevatedBg: "#162a22",
-      nestedBg: "#0c1a14",
-      primary: "#10b981",
-      accent: "#059669",
-      up: "#ef4444",
-      down: "#22c55e",
-      upBg: "rgba(239,68,68,0.15)",
-      downBg: "rgba(34,197,94,0.15)",
-      upCardGradient: "linear-gradient(135deg, #1a0f0f, #2d1518)",
-      downCardGradient: "linear-gradient(135deg, #0f1a14, #152d1d)",
-      textPrimary: "#e2e8f0",
-      textSecondary: "#94a3b8",
-      textMuted: "#64748b",
-      border: "#1e3a2f",
-      headerGradient: "linear-gradient(135deg, #1a3a2a, #0f172a)",
-      logoGradient: "linear-gradient(135deg, #10b981, #059669)",
-    },
-    antToken: {
-      colorPrimary: "#10b981",
-      colorBgContainer: "#0f1e18",
-      colorBgElevated: "#162a22",
-      colorBorder: "#1e3a2f",
-      colorText: "#e2e8f0",
-      colorTextSecondary: "#94a3b8",
-    },
-  },
-
-  "twilight-purple": {
-    key: "twilight-purple",
-    label: "暮光紫",
-    labelEn: "Twilight Purple",
-    isLight: false,
-    siderBg: "#13101e",
-    headerBg: "#13101e",
-    colors: {
-      pageBg: "#100d1a",
-      cardBg: "#171225",
-      elevatedBg: "#221a35",
-      nestedBg: "#13101e",
-      primary: "#a78bfa",
-      accent: "#7c3aed",
-      up: "#ef4444",
-      down: "#22c55e",
-      upBg: "rgba(239,68,68,0.15)",
-      downBg: "rgba(34,197,94,0.15)",
-      upCardGradient: "linear-gradient(135deg, #1a0f0f, #2d1518)",
-      downCardGradient: "linear-gradient(135deg, #0f1a14, #152d1d)",
-      textPrimary: "#e8e3f3",
-      textSecondary: "#a5a0b8",
-      textMuted: "#716d85",
-      border: "#2d2545",
-      headerGradient: "linear-gradient(135deg, #2a1e4a, #13101e)",
-      logoGradient: "linear-gradient(135deg, #a78bfa, #7c3aed)",
-    },
-    antToken: {
-      colorPrimary: "#a78bfa",
-      colorBgContainer: "#171225",
-      colorBgElevated: "#221a35",
-      colorBorder: "#2d2545",
-      colorText: "#e8e3f3",
-      colorTextSecondary: "#a5a0b8",
+      colorPrimary: "#6f63d9",
+      colorPrimaryHover: "#7266dd",
+      colorPrimaryActive: "#6256c7",
+      colorPrimaryBg: "#211e38",
+      colorInfo: "#4c8dff",
+      colorSuccess: "#12b76a",
+      colorWarning: "#f79009",
+      colorError: "#f04438",
+      colorBgLayout: "#0b0f14",
+      colorBgContainer: "#151b24",
+      colorBgElevated: "#1b2430",
+      colorBorder: "#283241",
+      colorBorderSecondary: "#202a37",
+      colorText: "#f2f4f7",
+      colorTextSecondary: "#a7b0be",
     },
   },
 
   "light": {
     key: "light",
-    label: "清晨白",
-    labelEn: "Morning Light",
+    label: "清爽浅色",
+    labelEn: "Clean Light",
     isLight: true,
     siderBg: "#ffffff",
     headerBg: "#ffffff",
     colors: {
       pageBg: "#f5f7fa",
       cardBg: "#ffffff",
-      elevatedBg: "#f0f2f5",
-      nestedBg: "#f8f9fb",
-      primary: "#1677ff",
-      accent: "#722ed1",
-      up: "#cf1322",
-      down: "#3f8600",
-      upBg: "rgba(207,19,34,0.08)",
-      downBg: "rgba(63,134,0,0.08)",
-      upCardGradient: "linear-gradient(135deg, #fff1f0, #ffe7e6)",
-      downCardGradient: "linear-gradient(135deg, #f6ffed, #e6ffec)",
-      textPrimary: "#1d2129",
-      textSecondary: "#4e5969",
-      textMuted: "#86909c",
-      border: "#e5e6eb",
-      headerGradient: "linear-gradient(135deg, #e8f4fd, #f0f2f5)",
-      logoGradient: "linear-gradient(135deg, #1677ff, #722ed1)",
+      elevatedBg: "#f0f3f7",
+      nestedBg: "#f8fafc",
+      primary: "#6658be",
+      accent: "#8a79d0",
+      up: "#d92d20",
+      down: "#039855",
+      upBg: "rgba(217,45,32,0.08)",
+      downBg: "rgba(3,152,85,0.08)",
+      upCardGradient: "linear-gradient(135deg, rgba(217,45,32,0.09), rgba(217,45,32,0.03))",
+      downCardGradient: "linear-gradient(135deg, rgba(3,152,85,0.09), rgba(3,152,85,0.03))",
+      textPrimary: "#182230",
+      textSecondary: "#475467",
+      textMuted: "#98a2b3",
+      border: "#e2e8f0",
+      headerGradient: "linear-gradient(135deg, #f8fafc, #f1f4f8)",
+      logoGradient: "linear-gradient(135deg, #6658be, #9484d8)",
+      focusRing: "rgba(102,88,190,0.22)",
+      surfaceOverlay: "rgba(255,255,255,0.97)",
+      authBackground:
+        "radial-gradient(circle at 14% 12%, rgba(102,88,190,0.08), transparent 32%), radial-gradient(circle at 86% 82%, rgba(138,121,208,0.05), transparent 28%), #f5f7fa",
+      authHeroGradient: "linear-gradient(145deg, rgba(248,250,252,0.98), rgba(240,243,247,0.92))",
+      cardShadow: "0 10px 28px rgba(16,24,40,0.08)",
     },
     antToken: {
-      colorPrimary: "#1677ff",
+      colorPrimary: "#6658be",
+      colorPrimaryHover: "#584bb0",
+      colorPrimaryActive: "#4b409b",
+      colorPrimaryBg: "#f0eefb",
+      colorInfo: "#3b82f6",
+      colorSuccess: "#039855",
+      colorWarning: "#dc6803",
+      colorError: "#d92d20",
+      colorBgLayout: "#f5f7fa",
       colorBgContainer: "#ffffff",
       colorBgElevated: "#ffffff",
-      colorBorder: "#e5e6eb",
-      colorText: "#1d2129",
-      colorTextSecondary: "#4e5969",
+      colorBorder: "#e2e8f0",
+      colorBorderSecondary: "#eef1f5",
+      colorText: "#182230",
+      colorTextSecondary: "#475467",
     },
   },
 };

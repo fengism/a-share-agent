@@ -1,0 +1,308 @@
+from __future__ import annotations
+
+from app.agentic.catalog import registry
+from app.agentic.tools.contracts import Tool, ToolPolicy
+from app.agentic.tools.packs.stock import helpers
+
+_STOCK_CODE_SCHEMA = {
+    "type": "string",
+    "pattern": r"^\d{6}$",
+    "description": "6位股票代码，如 600519",
+}
+_QUERY_SCHEMA = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 300,
+}
+_REALTIME_POLICY = ToolPolicy(cache_ttl_seconds=30, freshness="realtime")
+_MEDIUM_REALTIME_POLICY = ToolPolicy(
+    cost="medium",
+    cache_ttl_seconds=30,
+    freshness="realtime",
+)
+_MEDIUM_QUERY_POLICY = ToolPolicy(cost="medium", cache_ttl_seconds=60)
+_DAILY_POLICY = ToolPolicy(cost="medium", cache_ttl_seconds=900, freshness="daily")
+_STATIC_POLICY = ToolPolicy(cache_ttl_seconds=3600, freshness="static")
+_HIGH_COST_POLICY = ToolPolicy(cost="high", cache_ttl_seconds=60)
+
+
+def _register_stock_lookup_tools() -> None:
+    """Register stock search and basic-information tools."""
+    registry.register_tool(Tool(
+        name="search_stocks",
+        description="按股票名称或不完整代码搜索股票，返回代码、名称、价格和涨跌幅。仅在用户未提供完整6位代码时调用；已知完整代码可直接使用其他工具。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {**_QUERY_SCHEMA, "maxLength": 30, "description": "股票代码或名称关键词"},
+            },
+            "required": ["query"],
+        },
+        policy=_REALTIME_POLICY,
+        executor=helpers.search_stocks,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_stock_info",
+        description="获取股票基本信息，包括行业分类、市值、PE/PB、上市日期等。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+            },
+            "required": ["code"],
+        },
+        policy=_REALTIME_POLICY,
+        executor=helpers.get_stock_info,
+    ))
+
+
+def _register_stock_analysis_tools() -> None:
+    """Register valuation, technical, K-line, and financial tools."""
+    registry.register_tool(Tool(
+        name="get_stock_valuation_detail",
+        description="获取股票详细估值分析，包含PE/PB/PS、估值百分位、同业对比、多种估值方法结果（含DCF）、机构预测等。个股分析时必调用的核心工具。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+            },
+            "required": ["code"],
+        },
+        policy=_MEDIUM_QUERY_POLICY,
+        executor=helpers.get_stock_valuation_detail,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_stock_technical_indicators",
+        description="计算股票技术指标，包括均线、MACD、RSI、布林带、KDJ等。个股分析时必调用的核心工具。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+            },
+            "required": ["code"],
+        },
+        policy=_MEDIUM_REALTIME_POLICY,
+        executor=helpers.get_stock_technical_indicators,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_stock_kline",
+        description="获取股票K线数据（日K/周K/月K），含开高低收、成交量等。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+                "period": {
+                    "type": "string",
+                    "enum": ["daily", "weekly", "monthly"],
+                    "default": "daily",
+                    "description": "K线周期，默认daily",
+                },
+            },
+            "required": ["code"],
+        },
+        policy=_MEDIUM_REALTIME_POLICY,
+        executor=helpers.get_stock_kline,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_stock_financial",
+        description="获取股票单类财务报表数据。仅查询一张指定报表时使用；完整财报分析优先使用 analyze_financials。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+                "indicator": {
+                    "type": "string",
+                    "enum": ["balance", "profit", "cashflow"],
+                    "default": "balance",
+                    "description": "报表类型，默认balance",
+                },
+            },
+            "required": ["code"],
+        },
+        policy=_DAILY_POLICY,
+        executor=helpers.get_stock_financial,
+    ))
+
+
+def _register_stock_news_tools() -> None:
+    """Register stock news and sentiment tools."""
+    registry.register_tool(Tool(
+        name="get_stock_news",
+        description="获取股票相关新闻列表。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+            },
+            "required": ["code"],
+        },
+        policy=_MEDIUM_QUERY_POLICY,
+        executor=helpers.get_stock_news,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_stock_sentiment",
+        description="获取股票情绪数据，包括热度排名、热度分数等。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+            },
+            "required": ["code"],
+        },
+        policy=_MEDIUM_REALTIME_POLICY,
+        executor=helpers.get_stock_sentiment,
+    ))
+
+
+def _register_structured_screening_tools() -> None:
+    """Register fixed-field screening and industry lookup tools."""
+    registry.register_tool(Tool(
+        name="screen_stocks",
+        description="按固定维度筛选股票，支持PE、PB、价格、市值、涨跌幅、换手率、行业等结构化条件。仅当选股条件能精确映射到这些参数时使用（如简单的数值范围筛选）。对于自然语言选股条件，优先使用 iwencai_select_stock。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "pe_min": {"type": "number", "minimum": -100000, "maximum": 100000, "description": "PE下限"},
+                "pe_max": {"type": "number", "minimum": -100000, "maximum": 100000, "description": "PE上限"},
+                "pb_min": {"type": "number", "minimum": -10000, "maximum": 10000, "description": "PB下限"},
+                "pb_max": {"type": "number", "minimum": -10000, "maximum": 10000, "description": "PB上限"},
+                "price_min": {"type": "number", "minimum": 0, "maximum": 1000000, "description": "价格下限"},
+                "price_max": {"type": "number", "minimum": 0, "maximum": 1000000, "description": "价格上限"},
+                "market_cap_min": {"type": "number", "minimum": 0, "maximum": 100000000, "description": "市值下限（亿元）"},
+                "market_cap_max": {"type": "number", "minimum": 0, "maximum": 100000000, "description": "市值上限（亿元）"},
+                "change_pct_min": {"type": "number", "minimum": -100, "maximum": 1000, "description": "涨跌幅下限(%)"},
+                "change_pct_max": {"type": "number", "minimum": -100, "maximum": 1000, "description": "涨跌幅上限(%)"},
+                "turnover_pct_min": {"type": "number", "minimum": 0, "maximum": 1000, "description": "换手率下限(%)"},
+                "turnover_pct_max": {"type": "number", "minimum": 0, "maximum": 1000, "description": "换手率上限(%)"},
+                "industries": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1, "maxLength": 50},
+                    "maxItems": 20,
+                    "uniqueItems": True,
+                    "description": "行业列表",
+                },
+                "sort_by": {
+                    "type": "string",
+                    "enum": ["market_cap", "pe", "pb", "price", "change_pct", "turnover_pct", "volume"],
+                    "default": "market_cap",
+                    "description": "排序字段，默认market_cap",
+                },
+                "sort_order": {
+                    "type": "string",
+                    "enum": ["asc", "desc"],
+                    "default": "desc",
+                    "description": "排序方向，默认desc",
+                },
+            },
+        },
+        policy=_MEDIUM_REALTIME_POLICY,
+        executor=helpers.screen_stocks,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_industries",
+        description="获取所有行业列表，用于筛选股票时确定行业参数名称。当用户提到的行业名称不确定时先调用此工具查找。",
+        parameters={"type": "object", "properties": {}},
+        policy=_STATIC_POLICY,
+        executor=helpers.get_industries,
+    ))
+
+
+def _register_iwencai_research_tools() -> None:
+    registry.register_tool(Tool(
+        name="iwencai_search",
+        description="语义搜索研报、公告、新闻。支持自然语言查询，如'人形机器人 研报'、'贵州茅台 公告'、'半导体 利好新闻'。当用户需要查找研报、公告或新闻资讯时调用。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {**_QUERY_SCHEMA, "description": "搜索关键词，支持自然语言"},
+                "channel": {
+                    "type": "string",
+                    "enum": ["report", "announcement", "news"],
+                    "default": "report",
+                    "description": "搜索类型：report=研报，announcement=公告，news=新闻，默认report",
+                },
+                "size": {"type": "integer", "minimum": 1, "maximum": 50, "default": 20, "description": "返回条数，默认20"},
+            },
+            "required": ["query"],
+        },
+        policy=_MEDIUM_QUERY_POLICY,
+        executor=helpers.iwencai_search,
+    ))
+
+    registry.register_tool(Tool(
+        name="iwencai_query",
+        description="自然语言结构化数据查询。输入自然语言描述即可获取结构化财务/行情数据，如'贵州茅台 ROE'、'白酒行业 市值前10'、'连续3天涨停的股票'。适合用户需要用自然语言灵活查询数据时使用。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {**_QUERY_SCHEMA, "description": "自然语言查询，如'贵州茅台 ROE'、'连续3天涨停'"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 30, "description": "返回条数，默认30"},
+            },
+            "required": ["query"],
+        },
+        policy=_MEDIUM_QUERY_POLICY,
+        executor=helpers.iwencai_query,
+    ))
+
+    registry.register_tool(Tool(
+        name="iwencai_select_stock",
+        description="问财智能选股（首选选股工具）。输入自然语言选股条件即可返回符合条件的股票列表，如'今日涨跌幅大于5%'、'连续涨停的股票'、'低市盈率高增长'、'北向资金连续净买入'、'科技股有哪些'。选股场景下优先使用此工具，仅在条件无法用自然语言表达且能精确映射到结构化参数时才用 screen_stocks。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {**_QUERY_SCHEMA, "description": "自然语言选股条件，如'今日涨停'、'PE小于20且ROE大于15%'、'北向资金连续净买入'"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 20, "description": "返回条数，默认20"},
+            },
+            "required": ["query"],
+        },
+        policy=_MEDIUM_QUERY_POLICY,
+        executor=helpers.iwencai_select_stock,
+    ))
+
+def _register_risk_tool() -> None:
+    registry.register_tool(Tool(
+        name="get_stock_risk_data",
+        description="获取个股风险评估数据：资金流向（主力/大单/中单/小单净流入）、融资融券明细、大宗交易记录、股东户数变化。风险评估时必调用。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+            },
+            "required": ["code"],
+        },
+        policy=_HIGH_COST_POLICY,
+        executor=helpers.get_stock_risk_data,
+    ))
+
+def _register_macro_query_tool() -> None:
+    registry.register_tool(Tool(
+        name="iwencai_market_macro",
+        description="按自然语言查询指定宏观指标、历史区间或统计口径，如GDP、CPI、PPI、M2、PMI。若只需最新常用指标汇总，使用 get_macro_data。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {**_QUERY_SCHEMA, "description": "自然语言宏观经济查询，如'中国GDP增速'、'M2增速'、'CPI同比'"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 20, "description": "返回条数，默认20"},
+            },
+            "required": ["query"],
+        },
+        policy=_MEDIUM_QUERY_POLICY,
+        executor=helpers.iwencai_market_macro,
+    ))
+
+
+def register_stock_tools() -> None:
+    """Register stock, screening, research, risk, and macro Tool groups."""
+    _register_stock_lookup_tools()
+    _register_stock_analysis_tools()
+    _register_stock_news_tools()
+    _register_structured_screening_tools()
+    _register_iwencai_research_tools()
+    _register_risk_tool()
+    _register_macro_query_tool()

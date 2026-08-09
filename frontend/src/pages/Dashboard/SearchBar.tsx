@@ -1,17 +1,28 @@
-import { useState, useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { AutoComplete, Input } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
-import { useStockSearch } from "../../api/queries";
+import QueryErrorState from "../../components/QueryErrorState";
+import { useStockSearchController } from "../../hooks/useStockSearchController";
 import { useColors } from "../../styles/ui";
 import { useNavigate } from "react-router-dom";
 
 export default function SearchBar() {
-  const [query, setQuery] = useState("");
-  const { data: results = [], isLoading } = useStockSearch(query);
+  const {
+    inputValue,
+    normalizedInput,
+    currentResults,
+    isPending,
+    isError,
+    error,
+    retry,
+    setInputValue,
+    clear,
+    resolveCode,
+  } = useStockSearchController();
   const navigate = useNavigate();
   const c = useColors();
 
-  const options = results.map((item) => ({
+  const options = useMemo(() => currentResults.map((item) => ({
     value: item.code,
     label: (
       <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -23,42 +34,47 @@ export default function SearchBar() {
         )}
       </div>
     ),
-  }));
-
-  const handleSearch = useCallback((val: string) => {
-    setQuery(val.trim());
-  }, []);
+  })), [c.textSecondary, currentResults]);
 
   const handleSelect = useCallback(
     (val: string) => {
       navigate(`/analysis/${val}`);
+      clear();
     },
-    [navigate]
+    [clear, navigate]
   );
 
   // 回车直接跳转（输入6位代码时）
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && query.length === 6 && /^\d{6}$/.test(query)) {
-        navigate(`/analysis/${query}`);
-      }
+      if (e.key !== "Enter") return;
+      const code = resolveCode(inputValue);
+      if (code) navigate(`/analysis/${code}`);
     },
-    [query, navigate]
+    [inputValue, navigate, resolveCode]
   );
 
   return (
     <AutoComplete
       style={{ width: "100%", maxWidth: 500 }}
       options={options}
-      onSearch={handleSearch}
+      value={inputValue}
+      onChange={setInputValue}
       onSelect={handleSelect}
-      notFoundContent={isLoading ? "搜索中..." : query ? "未找到匹配股票，输入6位代码后回车可直接跳转" : undefined}
+      filterOption={false}
+      notFoundContent={
+        isPending
+          ? "搜索中..."
+          : isError
+            ? <QueryErrorState error={error} onRetry={() => retry()} title="搜索失败" compact />
+            : normalizedInput ? "未找到匹配股票，输入6位代码后回车可直接跳转" : undefined
+      }
     >
       <Input
         size="large"
         placeholder="输入股票代码或名称，如 600519 或 贵州茅台"
         prefix={<SearchOutlined />}
-        suffix={isLoading ? <span style={{ color: c.textMuted, fontSize: 12 }}>搜索中...</span> : null}
+        suffix={isPending ? <span style={{ color: c.textMuted, fontSize: 12 }}>搜索中...</span> : null}
         allowClear
         onKeyDown={handleKeyDown}
       />

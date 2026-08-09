@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Card, Col, Empty, Row, Segmented, Spin, Statistic, Typography } from "antd";
-import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
+import { Card, Col, Row, Segmented, Statistic, Typography } from "antd";
 import { useMarketIndexKline, useMarketIndices } from "../../api/queries";
 import KlineChart from "../../charts/KlineChart";
+import ChangeValue from "../../components/ChangeValue";
+import SectionDataState from "../../components/SectionDataState";
 import { useColors } from "../../styles/ui";
 import type { ThemeColors } from "../../styles/ui";
 
@@ -27,57 +28,84 @@ export default function AIndexTab() {
   const c = useColors();
   const [activeSymbol, setActiveSymbol] = useState("000001");
   const [period, setPeriod] = useState("daily");
-  const { data: marketData, isLoading: indicesLoading } = useMarketIndices();
-  const { data: klineData, isLoading: klineLoading } = useMarketIndexKline(activeSymbol, period);
+  const {
+    data: marketData,
+    isLoading: indicesLoading,
+    error: indicesError,
+    refetch: refetchIndices,
+  } = useMarketIndices();
+  const {
+    data: klineData,
+    isLoading: klineLoading,
+    error: klineError,
+    refetch: refetchKline,
+  } = useMarketIndexKline(activeSymbol, period);
 
   const mainIndices = useMemo(
     () => INDEX_CODES.map((code) => (marketData?.indices || []).find((item) => item.code === code)).filter((item) => item != null),
     [marketData],
   );
+  const klineItems = klineData?.items ?? [];
+  const hasKlineData = klineItems.length > 0;
   const activeIndex = mainIndices.find((item) => item.code === activeSymbol) || mainIndices[0];
 
   return (
     <div>
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        {indicesLoading ? (
-          <Col span={24}><Card><Spin /></Card></Col>
-        ) : mainIndices.length > 0 ? (
-          mainIndices.map((idx) => (
-            <Col xs={24} sm={12} lg={4} key={idx.code}>
-              <Card
-                hoverable
-                onClick={() => setActiveSymbol(idx.code)}
-                style={{
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  border: `1px solid ${idx.code === activeSymbol ? c.primary : c.border}`,
-                  boxShadow: "none",
-                }}
-                styles={{ body: { padding: 16 } }}
-              >
-                <Statistic
-                  title={<span style={{ color: c.textSecondary, fontSize: 13 }}>{idx.name}</span>}
-                  value={idx.price ?? undefined}
-                  precision={2}
-                  valueStyle={{ color: getChangeColor(idx.change_pct, c), fontSize: 24, fontWeight: 700 }}
-                  prefix={idx.change_pct != null ? (idx.change_pct > 0 ? <ArrowUpOutlined /> : idx.change_pct < 0 ? <ArrowDownOutlined /> : null) : null}
-                />
-                <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ color: getChangeColor(idx.change_pct, c), fontWeight: 600 }}>
-                    {idx.change_pct != null ? `${idx.change_pct > 0 ? "+" : ""}${idx.change_pct.toFixed(2)}%` : "-"}
-                  </Text>
-                  <Text type="secondary" style={{ fontSize: 12 }}>{idx.code}</Text>
-                </div>
-                <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>额 {formatAmount(idx.amount)}</Text>
-                </div>
-              </Card>
-            </Col>
-          ))
-        ) : (
-          <Col span={24}><Empty description="暂无大盘指数数据" /></Col>
-        )}
-      </Row>
+      <div style={{ marginBottom: 16 }}>
+        <SectionDataState
+          isLoading={indicesLoading && mainIndices.length === 0}
+          error={mainIndices.length > 0 ? undefined : indicesError}
+          onRetry={() => refetchIndices()}
+          isEmpty={mainIndices.length === 0}
+          emptyText="暂无大盘指数数据"
+          errorTitle="大盘指数加载失败"
+          minHeight={180}
+        >
+          <Row gutter={[16, 16]}>
+            {mainIndices.map((idx) => (
+              <Col xs={24} sm={12} lg={4} key={idx.code}>
+                <button
+                  type="button"
+                  onClick={() => setActiveSymbol(idx.code)}
+                  aria-pressed={idx.code === activeSymbol}
+                  style={{
+                    cursor: "pointer",
+                    border: 0,
+                    padding: 0,
+                    width: "100%",
+                    background: "transparent",
+                    textAlign: "left",
+                  }}
+                >
+                  <Card
+                    hoverable
+                    style={{
+                      borderRadius: 8,
+                      border: `1px solid ${idx.code === activeSymbol ? c.primary : c.border}`,
+                      boxShadow: "none",
+                    }}
+                    styles={{ body: { padding: 16 } }}
+                  >
+                    <Statistic
+                      title={<span style={{ color: c.textSecondary, fontSize: 13 }}>{idx.name}</span>}
+                      value={idx.price ?? undefined}
+                      precision={2}
+                      valueStyle={{ color: getChangeColor(idx.change_pct, c), fontSize: 24, fontWeight: 700 }}
+                    />
+                    <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <ChangeValue value={idx.change_pct} showIcon />
+                      <Text type="secondary" style={{ fontSize: 12 }}>{idx.code}</Text>
+                    </div>
+                    <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>额 {formatAmount(idx.amount)}</Text>
+                    </div>
+                  </Card>
+                </button>
+              </Col>
+            ))}
+          </Row>
+        </SectionDataState>
+      </div>
 
       <Card
         size="small"
@@ -95,13 +123,22 @@ export default function AIndexTab() {
         }
         style={{ borderRadius: 8, border: `1px solid ${c.border}`, boxShadow: "none" }}
       >
-        {klineLoading ? (
-          <Spin />
-        ) : klineData?.items?.length ? (
-          <KlineChart data={klineData.items} height={420} />
-        ) : (
-          <Empty description="暂无指数K线数据" />
-        )}
+        <SectionDataState
+          isLoading={klineLoading && !hasKlineData}
+          error={hasKlineData ? undefined : klineError}
+          onRetry={() => refetchKline()}
+          isEmpty={!hasKlineData}
+          emptyText="暂无指数 K 线数据"
+          errorTitle="指数 K 线加载失败"
+          minHeight={420}
+          skeletonRows={8}
+        >
+          <KlineChart
+            data={klineItems}
+            height={420}
+            viewKey={`${activeSymbol}:${period}`}
+          />
+        </SectionDataState>
       </Card>
     </div>
   );

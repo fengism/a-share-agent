@@ -1,11 +1,17 @@
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        APP_UID: "${APP_UID:-1000}"
+        APP_GID: "${APP_GID:-1000}"
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
     env_file: .env
     environment:
-      # 容器化部署固定经 frontend 的 Nginx 反代，需信任其透传的 X-Forwarded-For
-      # 才能拿到真实客户端 IP 做限流。可被 .env 中的同名变量覆盖。
-      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
+      # backend 只在 Compose 内网暴露，并固定经 frontend Nginx 反代。
+      TRUST_PROXY_HEADERS: "true"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -15,8 +21,13 @@ services:
       resources:
         limits:
           memory: 2G
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/ready')"]
       interval: 30s
       timeout: 5s
       start_period: 90s
@@ -24,12 +35,19 @@ services:
 
   frontend:
     build: ./frontend
+    restart: unless-stopped
+    stop_grace_period: 10s
     ports:
-      - "8080:8080"
+      - "${DOCKER_FRONTEND_PORT:-8080}:8080"
     deploy:
       resources:
         limits:
           memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
       interval: 30s

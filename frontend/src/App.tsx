@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useLayoutEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, Spin, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { useThemeStore, getAntToken } from "./styles/ui";
@@ -8,12 +8,13 @@ import { themes } from "./theme/themes";
 import "./styles/base.css";
 import "./styles/markdown.css";
 import "./styles/analysis-export.css";
-import AppLayout from "./components/AppLayout";
 import RequireAuth from "./components/RequireAuth";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { useAuthStore } from "./store/authStore";
+import { queryClient } from "./api/queryClient";
 
 // ── 路由级代码分割 ──
+const AppLayout = lazy(() => import("./components/AppLayout"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Market = lazy(() => import("./pages/Market"));
 const Screener = lazy(() => import("./pages/Screener"));
@@ -23,22 +24,17 @@ const DailyReviewPage = lazy(() => import("./pages/DailyReview"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Feed = lazy(() => import("./pages/Feed"));
+const Twitter = lazy(() => import("./pages/Twitter"));
 const IndustryChain = lazy(() => import("./pages/IndustryChain"));
 const Compare = lazy(() => import("./pages/Compare"));
 const Macro = lazy(() => import("./pages/Macro"));
+const Portfolio = lazy(() => import("./pages/Portfolio"));
+const Quant = lazy(() => import("./pages/Quant"));
+const Capabilities = lazy(() => import("./pages/Capabilities"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ForceChangePassword = lazy(() => import("./pages/ForceChangePassword"));
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    // Global default staleTime — safety net so any query without its own
-    // staleTime doesn't fall back to 0 (refetch on every mount). Individual
-    // queries still override this with their own tuned values.
-    queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 60 * 1000 },
-  },
-});
 
 function AntProvider({ children }: { children: React.ReactNode }) {
   const themeKey = useThemeStore((s) => s.themeKey);
@@ -51,6 +47,7 @@ function AntProvider({ children }: { children: React.ReactNode }) {
   useLayoutEffect(() => {
     const root = document.documentElement;
     root.setAttribute("data-theme", themeKey);
+    root.style.colorScheme = meta.isLight ? "light" : "dark";
     const cc = meta.colors;
     const vars: Record<string, string> = {
       "--c-page-bg": cc.pageBg,
@@ -65,6 +62,11 @@ function AntProvider({ children }: { children: React.ReactNode }) {
       "--c-text-secondary": cc.textSecondary,
       "--c-text-muted": cc.textMuted,
       "--c-border": cc.border,
+      "--c-focus-ring": cc.focusRing,
+      "--c-surface-overlay": cc.surfaceOverlay,
+      "--c-auth-background": cc.authBackground,
+      "--c-auth-hero-gradient": cc.authHeroGradient,
+      "--c-card-shadow": cc.cardShadow,
       "--c-primary-soft": `${cc.primary}14`,
       "--c-primary-2": `${cc.primary}26`,
       "--c-primary-3": `${cc.primary}4d`,
@@ -109,7 +111,7 @@ const PageFallback = (
 );
 
 export default function App() {
-  // Validate a persisted token once on startup, then RequireAuth can render.
+  // Validate the HttpOnly cookie session once before protected routes render.
   useEffect(() => {
     useAuthStore.getState().bootstrap();
   }, []);
@@ -132,12 +134,16 @@ export default function App() {
                   <Route path="/screener" element={<ErrorBoundary><Screener /></ErrorBoundary>} />
                   <Route path="/daily-review" element={<ErrorBoundary><DailyReviewPage /></ErrorBoundary>} />
                   <Route path="/feed" element={<ErrorBoundary><Feed /></ErrorBoundary>} />
+                  <Route path="/twitter" element={<ErrorBoundary><Twitter /></ErrorBoundary>} />
                   <Route path="/analysis" element={<ErrorBoundary><AnalysisEntry /></ErrorBoundary>} />
                   <Route path="/macro" element={<ErrorBoundary><Macro /></ErrorBoundary>} />
                   <Route path="/compare" element={<ErrorBoundary><Compare /></ErrorBoundary>} />
+                  <Route path="/portfolio" element={<ErrorBoundary><Portfolio /></ErrorBoundary>} />
+                  <Route path="/quant" element={<ErrorBoundary><Quant /></ErrorBoundary>} />
                   <Route path="/industry-chain" element={<ErrorBoundary><IndustryChain /></ErrorBoundary>} />
                   <Route path="/industry-chain/:name" element={<ErrorBoundary><IndustryChain /></ErrorBoundary>} />
                   <Route path="/chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
+                  <Route path="/capabilities" element={<ErrorBoundary><Capabilities /></ErrorBoundary>} />
                   <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
                   <Route path="/analysis/:code" element={<ErrorBoundary><Analysis /></ErrorBoundary>} />
                 </Route>

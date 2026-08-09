@@ -10,8 +10,12 @@ export interface DailyReviewDataSnapshot {
   hot_concepts: Record<string, unknown>[];
   hot_industries: Record<string, unknown>[];
   dragon_tiger: Record<string, unknown>[];
+  market_statistics: Record<string, unknown>;
+  market_news: Record<string, unknown>[];
   top_sectors: Record<string, unknown>[];
   bottom_sectors: Record<string, unknown>[];
+  market_volume: Record<string, unknown>;
+  macro_data: Record<string, unknown>;
 }
 
 export interface DailyReviewResult {
@@ -34,6 +38,7 @@ export interface DailyReviewHistoryItem {
   title: string;
   generated_at: string;
   market_summary: string;
+  can_delete: boolean;
 }
 
 export interface DailyReviewRequest {

@@ -1,5 +1,5 @@
 import { RobotOutlined } from "@ant-design/icons";
-import { Tag } from "antd";
+import { Button } from "antd";
 import { useColors} from "../../../styles/ui";
 import { SAMPLE_PROMPTS } from "../constants";
 
@@ -32,12 +32,12 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
         }}
       >
         {SAMPLE_PROMPTS.map((prompt) => (
-          <Tag
+          <Button
             key={prompt}
+            type="default"
+            size="small"
+            shape="round"
             style={{
-              cursor: "pointer",
-              borderRadius: 16,
-              padding: "4px 12px",
               background: c.elevatedBg,
               border: `1px solid ${c.border}`,
               color: c.textSecondary,
@@ -45,7 +45,7 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
             onClick={() => onSelectPrompt(prompt)}
           >
             {prompt}
-          </Tag>
+          </Button>
         ))}
       </div>
     </div>

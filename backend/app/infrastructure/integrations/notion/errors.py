@@ -1,0 +1,2 @@
+class NotionConfigError(RuntimeError):
+    pass

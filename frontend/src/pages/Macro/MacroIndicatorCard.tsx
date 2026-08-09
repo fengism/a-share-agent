@@ -90,7 +90,7 @@ export default function MacroIndicatorCard({
     return (
       <Card style={{ ...cardStyle, minHeight: 200 }}>
         <Text style={{ color: c.textSecondary }}>{title} 暂无数据</Text>
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="数据加载中或暂不可用" />
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可用数据" />
       </Card>
     );
   }

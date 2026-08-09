@@ -20,11 +20,11 @@ body {
   height: 9px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
+  background: var(--c-border);
   border-radius: 999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.55);
+  background: var(--c-text-muted);
 }
 *::-webkit-scrollbar-track {
   background: transparent;
@@ -33,7 +33,7 @@ body {
 /* Keyboard focus ring for custom clickable elements (role="button").
    Only shows on keyboard navigation, not mouse clicks. */
 [role="button"]:focus-visible {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--c-primary);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -56,6 +56,18 @@ body {
   color: var(--c-text-primary);
 }
 
+.app-sidebar-menu .ant-menu-item-group-title {
+  padding: 14px 18px 5px;
+  color: var(--c-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.app-sidebar-menu .ant-menu-item-group-list .ant-menu-item {
+  padding-left: 18px !important;
+}
+
 .al-search-row {
   transition: background 0.15s ease;
 }
@@ -68,7 +80,7 @@ body {
 }
 .dash-shortcut:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--c-card-shadow);
 }
 
 /* Remaining hover states migrated from JS to CSS
@@ -106,6 +118,43 @@ body {
   border-color: var(--c-primary-3);
 }
 
+.data-refresh-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.responsive-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  padding: 10px 4px;
+}
+
+.responsive-metric-item {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.responsive-metric-label {
+  color: var(--c-text-muted);
+  font-size: 12px;
+}
+
+.responsive-metric-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--c-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+
 .chat-session:not(.active):hover {
   background: var(--c-elevated-bg) !important;
 }
@@ -133,11 +182,24 @@ body {
 @media (max-width: 380px) {
   .metric-grid.cols-3,
   .metric-grid.cols-4 { grid-template-columns: 1fr; }
+  .responsive-metric-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 768px) {
   .two-pane { flex-direction: column; }
   /* side panel (history) drops below the main content on mobile */
   .pane-side { width: 100% !important; order: 2; }
+
+  .app-header-search.ant-input-search .ant-input-search-btn {
+    width: 40px;
+    min-width: 40px;
+    flex: 0 0 40px;
+    padding-inline: 0;
+  }
+
+  .app-header-search .ant-input-affix-wrapper,
+  .app-header-search input.ant-input {
+    min-width: 0;
+  }
 }
 
 /* Respect users who prefer reduced motion: near-instant transitions,

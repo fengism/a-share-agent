@@ -1,16 +1,13 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Button, Form, Input, Typography, Alert, Result } from "antd";
-import { LockOutlined, LineChartOutlined } from "@ant-design/icons";
+import { Alert, Button, Form, Input, Result } from "antd";
+import { LockOutlined } from "@ant-design/icons";
 import { resetPasswordApi } from "../../api/auth";
-import { useColors } from "../../styles/ui";
+import AuthHeader from "../../components/AuthHeader";
 import AuthShell from "../../components/AuthShell";
-
-const { Title, Text } = Typography;
 
 /** Public page reached via an admin-issued reset link (/reset-password?token=…). */
 export default function ResetPasswordPage() {
-  const c = useColors();
   const [params] = useSearchParams();
   const token = params.get("token") || "";
   const [loading, setLoading] = useState(false);
@@ -49,23 +46,20 @@ export default function ResetPasswordPage() {
 
   return (
     <AuthShell>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <div
-          style={{
-            width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
-            background: c.logoGradient, display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          <LineChartOutlined style={{ color: "#fff", fontSize: 24 }} />
-        </div>
-        <Title level={3} style={{ margin: 0, color: c.textPrimary }}>重置密码</Title>
-        <Text style={{ color: c.textSecondary }}>设置新的登录密码</Text>
-      </div>
+      <AuthHeader title="重置密码" description="设置新的登录密码" icon={<LockOutlined />} />
 
-      {!token && <Alert type="error" showIcon title="链接无效：缺少重置令牌" style={{ marginBottom: 16 }} />}
+      {!token && (
+        <Alert
+          type="warning"
+          showIcon
+          title="链接无效：缺少重置令牌"
+          description="请联系管理员生成一次性重置链接后再继续。"
+          style={{ marginBottom: 16 }}
+        />
+      )}
       {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
 
-      <Form layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
+      <Form className="auth-form" layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
         <Form.Item
           name="new_password"
           label="新密码"
@@ -92,14 +86,14 @@ export default function ResetPasswordPage() {
         >
           <Input.Password prefix={<LockOutlined />} autoComplete="new-password" disabled={!token} />
         </Form.Item>
-        <Form.Item style={{ marginBottom: 8 }}>
+        <Form.Item className="auth-form__submit">
           <Button type="primary" htmlType="submit" block loading={loading} disabled={!token}>
             重置密码
           </Button>
         </Form.Item>
       </Form>
 
-      <div style={{ textAlign: "center", color: c.textSecondary, fontSize: 13 }}>
+      <div className="auth-footer">
         想起密码了？<Link to="/login">去登录</Link>
       </div>
     </AuthShell>

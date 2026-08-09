@@ -1,26 +1,29 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getToken, setToken, setUnauthorizedHandler, notifyUnauthorized } from "./authToken";
-
-const TOKEN_KEY = "a-share-agent-token";
+import {
+  getCsrfToken,
+  getToken,
+  notifyUnauthorized,
+  setToken,
+  setUnauthorizedHandler,
+} from "./authToken";
 
 describe("authToken", () => {
   beforeEach(() => {
-    localStorage.clear();
     setToken(null);
     setUnauthorizedHandler(null);
+    document.cookie = "a_share_csrf=; Max-Age=0; path=/";
   });
 
-  it("stores and reads the token in memory and localStorage", () => {
+  it("stores legacy bearer tokens in memory only", () => {
     setToken("abc.def");
     expect(getToken()).toBe("abc.def");
-    expect(localStorage.getItem(TOKEN_KEY)).toBe("abc.def");
+    expect(localStorage.getItem("a-share-agent-token")).toBeNull();
   });
 
-  it("clears the token from memory and localStorage", () => {
+  it("clears the in-memory legacy token", () => {
     setToken("abc");
     setToken(null);
     expect(getToken()).toBeNull();
-    expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 
   it("invokes the registered unauthorized handler", () => {
@@ -35,10 +38,8 @@ describe("authToken", () => {
     expect(() => notifyUnauthorized()).not.toThrow();
   });
 
-  it("rehydrates the token from localStorage on module load", async () => {
-    localStorage.setItem(TOKEN_KEY, "persisted-token");
-    vi.resetModules();
-    const fresh = await import("./authToken");
-    expect(fresh.getToken()).toBe("persisted-token");
+  it("reads the double-submit CSRF cookie", () => {
+    document.cookie = "a_share_csrf=csrf-token; path=/";
+    expect(getCsrfToken()).toBe("csrf-token");
   });
 });

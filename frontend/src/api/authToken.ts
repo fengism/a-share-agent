@@ -1,23 +1,14 @@
-/**
- * Session token holder — single source of truth for the Bearer token.
- *
- * Kept in-memory for fast synchronous reads (every API request) and mirrored to
- * localStorage so the session survives reloads. This is a dependency-free leaf
- * module: both the API layer (client/sse/chat) and the auth store import it,
- * avoiding an import cycle.
- */
-const TOKEN_KEY = "a-share-agent-token";
+const LEGACY_TOKEN_KEY = "a-share-agent-token";
+const CSRF_COOKIE_NAME = "a_share_csrf";
 
-function readStored(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-let _token: string | null = readStored();
+let _token: string | null = null;
 let _onUnauthorized: (() => void) | null = null;
+
+try {
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
+} catch {
+  // Storage may be unavailable; cookie authentication is unaffected.
+}
 
 export function getToken(): string | null {
   return _token;
@@ -26,10 +17,22 @@ export function getToken(): string | null {
 export function setToken(token: string | null): void {
   _token = token;
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
   } catch {
-    /* storage unavailable (private mode / quota) — in-memory still works */
+    // Storage may be unavailable; the token remains memory-only.
+  }
+}
+
+export function getCsrfToken(): string | null {
+  try {
+    const prefix = `${CSRF_COOKIE_NAME}=`;
+    const cookie = document.cookie
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(prefix));
+    return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null;
+  } catch {
+    return null;
   }
 }
 

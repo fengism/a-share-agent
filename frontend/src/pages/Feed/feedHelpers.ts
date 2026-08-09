@@ -4,7 +4,6 @@ import type { ThemeColors } from "../../theme/themes";
 
 /* ── 配色常量 ── */
 export const KUAIXUN_ACCENT = "#f59e0b";
-export const KUAIXUN_ACCENT_BG = "rgba(245,158,11,0.08)";
 
 function getSourceColors(c: ThemeColors): Record<string, string> {
   return {
@@ -94,4 +93,17 @@ export function getTimeColor(time: string, c: ThemeColors): string {
   if (diffMin < 30) return KUAIXUN_ACCENT;
   if (diffMin < 120) return c.textSecondary;
   return "#64748b";
+}
+
+export function clampPage(page: number, totalItems: number, pageSize: number): number {
+  if (pageSize <= 0) return 1;
+  const totalPages = Math.max(1, Math.ceil(Math.max(0, totalItems) / pageSize));
+  return Math.min(Math.max(1, Math.trunc(page)), totalPages);
+}
+
+export function getRelativeTimeRefreshDelay(now: number): number {
+  const minuteMs = 60_000;
+  if (!Number.isFinite(now) || now < 0) return minuteMs;
+  const remainder = Math.trunc(now) % minuteMs;
+  return remainder === 0 ? minuteMs : minuteMs - remainder;
 }

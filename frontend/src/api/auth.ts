@@ -37,8 +37,8 @@ export function createInviteApi(expiresInDays?: number) {
   return apiPost<InviteItem>("/auth/invite", { expires_in_days: expiresInDays ?? null });
 }
 
-export function listInvitesApi() {
-  return apiGet<InviteItem[]>("/auth/invites");
+export function listInvitesApi(signal?: AbortSignal) {
+  return apiGet<InviteItem[]>("/auth/invites", undefined, { signal });
 }
 
 export function revokeInviteApi(code: string) {

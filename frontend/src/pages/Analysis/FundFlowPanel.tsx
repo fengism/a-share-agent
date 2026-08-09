@@ -1,22 +1,27 @@
-import { useMemo } from "react";
-import { Card, Col, Row, Table, Spin, Typography, Tag } from "antd";
+import { useCallback, useMemo } from "react";
+import { Card, Col, Row, Table, Typography, Tag } from "antd";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
 import { useStockFundFlow } from "../../api/queries";
+import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
+import SectionDataState from "../../components/SectionDataState";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors, useStyles } from "../../theme/hooks";
+import type { StockFundFlowItem } from "../../types/stock";
 import { formatAmount } from "../../utils/format";
 
 const { Text } = Typography;
 
 interface NetColors { up: string; down: string; muted: string }
 
-function formatNet(value: number, colors: NetColors): { text: string; color: string } {
+function formatNet(value: number | null, colors: NetColors): { text: string; color: string } {
+  if (value === null) return { text: "-", color: colors.muted };
   if (value > 0) return { text: `+${formatAmount(value)}`, color: colors.up };
   if (value < 0) return { text: formatAmount(value), color: colors.down };
   return { text: formatAmount(value), color: colors.muted };
 }
 
-function FlowTile({ label, value, colors }: { label: string; value: number; colors: { textSecondary: string; elevatedBg: string; border: string } & NetColors }) {
+function FlowTile({ label, value, colors }: { label: string; value: number | null; colors: { textSecondary: string; elevatedBg: string; border: string } & NetColors }) {
   const fmt = formatNet(value, colors);
   return (
     <div style={{ padding: "14px 12px", background: colors.elevatedBg, border: `1px solid ${colors.border}`, borderRadius: 10, textAlign: "center" }}>
@@ -28,16 +33,20 @@ function FlowTile({ label, value, colors }: { label: string; value: number; colo
 
 export default function FundFlowPanel({ code }: { code: string }) {
   const c = useColors();
+  const isNarrow = useMediaQuery("(max-width: 768px)");
   const { cardStyle } = useStyles();
-  const { data, isLoading } = useStockFundFlow(code);
-  const net: NetColors = { up: c.up, down: c.down, muted: c.textMuted };
+  const { data, isLoading, error, refetch } = useStockFundFlow(code);
+  const net = useMemo<NetColors>(
+    () => ({ up: c.up, down: c.down, muted: c.textMuted }),
+    [c.down, c.textMuted, c.up],
+  );
 
   const latest = useMemo(() => data?.[0] ?? null, [data]);
   const chartOption = useMemo(() => {
     if (!data || data.length === 0) return null;
     const recent = data.slice(0, 60).reverse();
     const dates = recent.map((d) => d.date.slice(5));
-    const mainNets = recent.map((d) => +(d.main_net / 1e8).toFixed(2));
+    const mainNets = recent.map((d) => d.main_net === null ? null : +(d.main_net / 1e8).toFixed(2));
     return {
       tooltip: { trigger: "axis" as const, axisPointer: { type: "shadow" as const } },
       grid: { left: 60, right: 20, top: 20, bottom: 30 },
@@ -48,7 +57,7 @@ export default function FundFlowPanel({ code }: { code: string }) {
           type: "bar",
           data: mainNets.map((v) => ({
             value: v,
-            itemStyle: { color: v >= 0 ? c.up : c.down, borderRadius: [3, 3, 0, 0] },
+            itemStyle: { color: v === null || v >= 0 ? c.up : c.down, borderRadius: [3, 3, 0, 0] },
           })),
           barMaxWidth: 18,
         },
@@ -56,37 +65,71 @@ export default function FundFlowPanel({ code }: { code: string }) {
     };
   }, [data, c.textSecondary, c.up, c.down]);
 
-  if (isLoading) return <Spin style={{ display: "block", margin: "40px auto" }} />;
-  if (!data || data.length === 0) return <Text type="secondary">暂无资金流向数据</Text>;
-
   const tileColors = { textSecondary: c.textSecondary, elevatedBg: c.elevatedBg, border: c.border, up: c.up, down: c.down, muted: c.textMuted };
 
-  const columns = [
-    { title: "日期", dataIndex: "date", key: "date", width: 100, render: (v: string) => <Text style={{ fontWeight: 500 }}>{v}</Text> },
-    {
-      title: "主力净流入", dataIndex: "main_net", key: "main_net", width: 130, align: "right" as const,
-      render: (v: number) => <Tag color={v >= 0 ? "red" : "green"} style={{ fontWeight: 600 }}>{formatNet(v, net).text}</Tag>,
-    },
-    {
-      title: "超大单", dataIndex: "super_net", key: "super_net", width: 110, align: "right" as const,
-      render: (v: number) => <span style={{ color: v >= 0 ? c.up : c.down, fontWeight: 500 }}>{formatNet(v, net).text}</span>,
-    },
-    {
-      title: "大单", dataIndex: "large_net", key: "large_net", width: 100, align: "right" as const,
-      render: (v: number) => <span style={{ color: v >= 0 ? c.up : c.down }}>{formatNet(v, net).text}</span>,
-    },
-    {
-      title: "中单", dataIndex: "mid_net", key: "mid_net", width: 100, align: "right" as const,
-      render: (v: number) => <span style={{ color: v >= 0 ? c.down : c.up }}>{formatNet(v, net).text}</span>,
-    },
-    {
-      title: "小单", dataIndex: "small_net", key: "small_net", width: 100, align: "right" as const,
-      render: (v: number) => <span style={{ color: v >= 0 ? c.down : c.up }}>{formatNet(v, net).text}</span>,
-    },
-  ];
+  const columns = useMemo(() => {
+    if (isNarrow) {
+      return [
+        { title: "日期", dataIndex: "date", key: "date", width: 110, render: (value: string) => <Text style={{ fontWeight: 500 }}>{value}</Text> },
+        {
+          title: "主力净流入",
+          dataIndex: "main_net",
+          key: "main_net",
+          width: 140,
+          align: "right" as const,
+          render: (value: number | null) => <Tag color={value === null ? "default" : value >= 0 ? "red" : "green"} style={{ fontWeight: 600 }}>{formatNet(value, net).text}</Tag>,
+        },
+      ];
+    }
+
+    return [
+      { title: "日期", dataIndex: "date", key: "date", width: 100, render: (value: string) => <Text style={{ fontWeight: 500 }}>{value}</Text> },
+      {
+        title: "主力净流入", dataIndex: "main_net", key: "main_net", width: 130, align: "right" as const,
+        render: (value: number | null) => <Tag color={value === null ? "default" : value >= 0 ? "red" : "green"} style={{ fontWeight: 600 }}>{formatNet(value, net).text}</Tag>,
+      },
+      {
+        title: "超大单", dataIndex: "super_net", key: "super_net", width: 110, align: "right" as const,
+        render: (value: number | null) => <span style={{ color: formatNet(value, net).color, fontWeight: 500 }}>{formatNet(value, net).text}</span>,
+      },
+      {
+        title: "大单", dataIndex: "large_net", key: "large_net", width: 100, align: "right" as const,
+        render: (value: number | null) => <span style={{ color: formatNet(value, net).color }}>{formatNet(value, net).text}</span>,
+      },
+      {
+        title: "中单", dataIndex: "mid_net", key: "mid_net", width: 100, align: "right" as const,
+        render: (value: number | null) => <span style={{ color: value === null ? net.muted : value >= 0 ? c.down : c.up }}>{formatNet(value, net).text}</span>,
+      },
+      {
+        title: "小单", dataIndex: "small_net", key: "small_net", width: 100, align: "right" as const,
+        render: (value: number | null) => <span style={{ color: value === null ? net.muted : value >= 0 ? c.down : c.up }}>{formatNet(value, net).text}</span>,
+      },
+    ];
+  }, [c.down, c.up, isNarrow, net]);
+
+  const renderExpandedRow = useCallback((record: StockFundFlowItem) => (
+    <ResponsiveMetricGrid
+      items={[
+        { key: "super", label: "超大单", value: formatNet(record.super_net, net).text },
+        { key: "large", label: "大单", value: formatNet(record.large_net, net).text },
+        { key: "mid", label: "中单", value: formatNet(record.mid_net, net).text },
+        { key: "small", label: "小单", value: formatNet(record.small_net, net).text },
+      ]}
+    />
+  ), [net]);
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <SectionDataState
+      isLoading={isLoading}
+      error={error}
+      onRetry={() => refetch()}
+      isEmpty={!data || data.length === 0}
+      emptyText="暂无资金流向数据"
+      errorTitle="资金流向加载失败"
+      skeletonRows={5}
+      minHeight={260}
+    >
+      <div style={{ display: "grid", gap: 16 }}>
       {/* Summary cards for latest day */}
       {latest && (
         <Row gutter={[10, 10]}>
@@ -115,14 +158,19 @@ export default function FundFlowPanel({ code }: { code: string }) {
       {/* Data table */}
       <Card size="small" style={cardStyle} styles={{ body: { padding: 0 } }}>
         <Table
-          dataSource={data}
+          dataSource={data ?? []}
           columns={columns}
           rowKey="date"
           pagination={{ pageSize: 15, showSizeChanger: false, simple: true }}
           size="small"
-          scroll={{ x: 600 }}
+          expandable={isNarrow ? {
+            expandedRowRender: renderExpandedRow,
+            columnWidth: 38,
+          } : undefined}
+          scroll={isNarrow ? undefined : { x: 600 }}
         />
       </Card>
-    </div>
+      </div>
+    </SectionDataState>
   );
 }

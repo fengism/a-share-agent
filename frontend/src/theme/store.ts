@@ -8,13 +8,27 @@ interface ThemeState {
   setThemeKey: (key: ThemeKey) => void;
 }
 
+export function normalizeThemeKey(value: unknown): ThemeKey {
+  return value === "light" ? "light" : "stellar-blue";
+}
+
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
       themeKey: "stellar-blue",
       setThemeKey: (key) => set({ themeKey: key }),
     }),
-    { name: "a-share-agent-theme" },
+    {
+      name: "a-share-agent-theme",
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<ThemeState> | undefined;
+        return {
+          ...currentState,
+          ...persisted,
+          themeKey: normalizeThemeKey(persisted?.themeKey),
+        };
+      },
+    },
   ),
 );
 

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef } from "react";
-import { AreaSeries, ColorType, HistogramSeries, LineStyle, createChart, type IChartApi, type UTCTimestamp } from "lightweight-charts";
+import { AreaSeries, ColorType, HistogramSeries, LineStyle, createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import type { IntradayItem } from "../types/stock";
 import { useColors } from "../styles/ui";
+import { shouldFitChartContent } from "./chartLifecycle";
 import { hexToRgba } from "./utils";
 
 type Props = {
   data: IntradayItem[];
   prevClose?: number | null;
   height?: number;
+  viewKey?: string;
 };
 
 function toTimestamp(time: string): UTCTimestamp | null {
@@ -19,10 +21,17 @@ function toTimestamp(time: string): UTCTimestamp | null {
   return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)) / 1000 as UTCTimestamp;
 }
 
-export default function IntradayChart({ data, prevClose, height = 320 }: Props) {
+export default function IntradayChart({ data, prevClose, height = 320, viewKey = "default" }: Props) {
   const c = useColors();
+  const colorsRef = useRef(c);
+  colorsRef.current = c;
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const priceSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const avgSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const priceLineRef = useRef<ReturnType<ISeriesApi<"Area">["createPriceLine"]> | null>(null);
+  const fittedViewKeyRef = useRef<string | null>(null);
   const rows = useMemo(
     () => data
       .map((item) => {
@@ -34,49 +43,53 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
   );
 
   useEffect(() => {
-    if (!containerRef.current || rows.length === 0) return;
+    if (!containerRef.current) return;
 
     chartRef.current?.remove();
 
     const container = containerRef.current;
+    const colors = colorsRef.current;
     const chart = createChart(container, {
       width: container.clientWidth,
       height,
       layout: {
-        background: { type: ColorType.Solid, color: c.cardBg },
-        textColor: c.textSecondary,
+        background: { type: ColorType.Solid, color: colors.cardBg },
+        textColor: colors.textSecondary,
         fontSize: 12,
         attributionLogo: false,
       },
-      grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: c.border },
-      rightPriceScale: { visible: true, borderColor: c.border },
-      leftPriceScale: { visible: true, borderColor: c.border },
+      grid: { vertLines: { color: colors.border }, horzLines: { color: colors.border } },
+      timeScale: { timeVisible: true, secondsVisible: false, borderColor: colors.border },
+      rightPriceScale: { visible: true, borderColor: colors.border },
+      leftPriceScale: { visible: true, borderColor: colors.border },
       crosshair: {
-        vertLine: { color: c.textMuted, labelBackgroundColor: c.border },
-        horzLine: { color: c.textMuted, labelBackgroundColor: c.border },
+        vertLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
+        horzLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
       },
       handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
     });
     chartRef.current = chart;
+    fittedViewKeyRef.current = null;
 
     const priceSeries = chart.addSeries(AreaSeries, {
-      lineColor: c.primary,
-      topColor: hexToRgba(c.primary, 0.18),
-      bottomColor: hexToRgba(c.primary, 0.02),
+      lineColor: colors.primary,
+      topColor: hexToRgba(colors.primary, 0.18),
+      bottomColor: hexToRgba(colors.primary, 0.02),
       lineWidth: 2,
       priceLineVisible: false,
     });
+    priceSeriesRef.current = priceSeries;
 
     const avgSeries = chart.addSeries(AreaSeries, {
-      lineColor: c.accent,
-      topColor: hexToRgba(c.accent, 0),
-      bottomColor: hexToRgba(c.accent, 0),
+      lineColor: colors.accent,
+      topColor: hexToRgba(colors.accent, 0),
+      bottomColor: hexToRgba(colors.accent, 0),
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
       priceLineVisible: false,
     });
+    avgSeriesRef.current = avgSeries;
 
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceScaleId: "left",
@@ -89,23 +102,57 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
           : `${(value / 1e4).toFixed(2)}万`,
       },
     });
+    volumeSeriesRef.current = volumeSeries;
 
     chart.priceScale("left").applyOptions({
       visible: true,
-      borderColor: c.border,
+      borderColor: colors.border,
       scaleMargins: { top: 0.72, bottom: 0 },
     });
 
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      const width = Math.floor(entry.contentRect.width);
+      if (width <= 0) return;
+      chart.applyOptions({ width, height });
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      chart.remove();
+      chartRef.current = null;
+      priceSeriesRef.current = null;
+      avgSeriesRef.current = null;
+      volumeSeriesRef.current = null;
+      priceLineRef.current = null;
+    };
+  }, [height]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const priceSeries = priceSeriesRef.current;
+    const avgSeries = avgSeriesRef.current;
+    const volumeSeries = volumeSeriesRef.current;
+    if (!chart || !priceSeries || !avgSeries || !volumeSeries) return;
+
     priceSeries.setData(rows.map((item) => ({ time: item.time, value: item.price })));
-    avgSeries.setData(rows.filter((item) => item.avg_price != null).map((item) => ({ time: item.time, value: item.avg_price as number })));
+    avgSeries.setData(rows
+      .filter((item) => item.avg_price != null)
+      .map((item) => ({ time: item.time, value: item.avg_price as number })));
     volumeSeries.setData(rows.map((item) => ({
       time: item.time,
       value: item.volume ?? 0,
-      color: prevClose != null && item.price < prevClose ? hexToRgba(c.down, 0.24) : hexToRgba(c.up, 0.24),
+      color: prevClose != null && item.price < prevClose
+        ? hexToRgba(c.down, 0.24)
+        : hexToRgba(c.up, 0.24),
     })));
 
+    if (priceLineRef.current) {
+      priceSeries.removePriceLine(priceLineRef.current);
+      priceLineRef.current = null;
+    }
     if (prevClose != null) {
-      priceSeries.createPriceLine({
+      priceLineRef.current = priceSeries.createPriceLine({
         price: prevClose,
         color: c.textMuted,
         lineStyle: LineStyle.Dashed,
@@ -115,22 +162,38 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
       });
     }
 
-    chart.timeScale().fitContent();
-
-    const resizeObserver = new ResizeObserver(([entry]) => {
-      const width = Math.floor(entry.contentRect.width);
-      if (width <= 0) return;
-      chart.applyOptions({ width, height });
+    if (rows.length > 0 && shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
       chart.timeScale().fitContent();
-    });
-    resizeObserver.observe(container);
+      fittedViewKeyRef.current = viewKey;
+    }
+  }, [c.down, c.textMuted, c.up, height, prevClose, rows, viewKey]);
 
-    return () => {
-      resizeObserver.disconnect();
-      chart.remove();
-      chartRef.current = null;
-    };
-  }, [height, prevClose, rows, c.pageBg, c.accent, c.border, c.cardBg, c.down, c.primary, c.textMuted, c.textSecondary, c.up]);
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    chart.applyOptions({
+      layout: { background: { type: ColorType.Solid, color: c.cardBg }, textColor: c.textSecondary },
+      grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
+      timeScale: { borderColor: c.border },
+      rightPriceScale: { borderColor: c.border },
+      leftPriceScale: { borderColor: c.border },
+      crosshair: {
+        vertLine: { color: c.textMuted, labelBackgroundColor: c.border },
+        horzLine: { color: c.textMuted, labelBackgroundColor: c.border },
+      },
+    });
+    priceSeriesRef.current?.applyOptions({
+      lineColor: c.primary,
+      topColor: hexToRgba(c.primary, 0.18),
+      bottomColor: hexToRgba(c.primary, 0.02),
+    });
+    avgSeriesRef.current?.applyOptions({
+      lineColor: c.accent,
+      topColor: hexToRgba(c.accent, 0),
+      bottomColor: hexToRgba(c.accent, 0),
+    });
+  }, [c.accent, c.border, c.cardBg, c.primary, c.textMuted, c.textSecondary, height]);
 
   return <div ref={containerRef} style={{ width: "100%", height, minHeight: height }} />;
 }

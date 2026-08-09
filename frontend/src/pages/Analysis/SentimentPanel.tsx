@@ -1,7 +1,8 @@
-import { Card, Col, List, Row, Tag, Spin, Typography } from "antd";
+import { Card, Col, List, Row, Tag, Typography } from "antd";
 import { useCategorizedStockNews, useRetailSentiment, useStockSentiment } from "../../api/queries";
 import type { AnalysisResult } from "../../types/stock";
 import RatingBadge from "../../components/RatingBadge";
+import SectionDataState from "../../components/SectionDataState";
 import { useColors, useStyles } from "../../theme/hooks";
 
 interface Props {
@@ -48,11 +49,14 @@ function renderTags(items: string[] | undefined, color: string, tagStyle: React.
 export default function SentimentPanel({ code, analysis }: Props) {
   const c = useColors();
   const { cardStyle, sectionHeaderStyle, tagStyle } = useStyles();
-  const { data: categorizedNews, isLoading: newsLoading } = useCategorizedStockNews(code);
-  const { data: sentiment, isLoading: sentLoading } = useStockSentiment(code);
-  const { data: retailSentiment, isLoading: retailLoading } = useRetailSentiment(code);
-
-  if (newsLoading || sentLoading || retailLoading) return <Spin />;
+  const newsQuery = useCategorizedStockNews(code);
+  const sentimentQuery = useStockSentiment(code);
+  const retailQuery = useRetailSentiment(code);
+  const categorizedNews = newsQuery.data;
+  const sentiment = sentimentQuery.data;
+  const retailSentiment = retailQuery.data;
+  const isLoading = newsQuery.isLoading || sentimentQuery.isLoading || retailQuery.isLoading;
+  const error = newsQuery.error || sentimentQuery.error || retailQuery.error;
 
   const heatScore = sentiment?.heat_score;
   const hotRank = sentiment?.hot_rank;
@@ -64,7 +68,19 @@ export default function SentimentPanel({ code, analysis }: Props) {
   const tileColors = { textSecondary: c.textSecondary, textPrimary: c.textPrimary, elevatedBg: c.elevatedBg, border: c.border };
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <SectionDataState
+      isLoading={isLoading}
+      error={error}
+      onRetry={() => Promise.all([
+        newsQuery.refetch(),
+        sentimentQuery.refetch(),
+        retailQuery.refetch(),
+      ])}
+      errorTitle="情绪数据加载失败"
+      skeletonRows={6}
+      minHeight={280}
+    >
+      <div style={{ display: "grid", gap: 16 }}>
       {analysis?.sentiment && (
         <Card
           size="small"
@@ -176,7 +192,7 @@ export default function SentimentPanel({ code, analysis }: Props) {
               <List.Item style={{ padding: "6px 0" }}>
                 <List.Item.Meta
                   title={<span style={{ fontSize: 13, color: c.textPrimary }}>{item.title}</span>}
-                  description={<span style={{ fontSize: 12, color: c.textSecondary }}>{item.time}</span>}
+                  description={<span style={{ fontSize: 12, color: c.textSecondary }}>{item.publish_time}</span>}
                 />
               </List.Item>
             )}
@@ -197,7 +213,7 @@ export default function SentimentPanel({ code, analysis }: Props) {
                   title={<span style={{ fontSize: 13, color: c.textPrimary }}>{item.title}</span>}
                   description={
                     <span style={{ fontSize: 12, color: c.textSecondary }}>
-                      {item.source} | {item.time}
+                      {item.source} | {item.publish_time}
                     </span>
                   }
                 />
@@ -208,6 +224,7 @@ export default function SentimentPanel({ code, analysis }: Props) {
           <div style={{ color: c.textSecondary }}>暂无东方财富新闻</div>
         )}
       </Card>
-    </div>
+      </div>
+    </SectionDataState>
   );
 }

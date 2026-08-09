@@ -40,7 +40,7 @@ export default function PushModal({ open, type, date, code, onConfirm, onCancel,
       onCancel={onCancel}
       okText="推送"
       okButtonProps={{ loading, icon: <SendOutlined /> }}
-      destroyOnClose
+      destroyOnHidden
     >
       <Space direction="vertical" style={{ width: "100%" }}>
         {!isChat && (

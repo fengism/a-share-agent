@@ -1,252 +1,100 @@
 import { create } from "zustand";
-import type {
-  ChatDisplayMessage,
-  ChatMessage,
-  ToolCallDisplay,
-  ToolCallInfo,
-} from "../types/chat";
-
-// ── 会话管理 ──
-
-export interface SessionMeta {
-  id: string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-interface SessionData {
-  messages: ChatDisplayMessage[];
-  history: ChatMessage[];
-}
-
-const STORAGE_KEY = "chat-sessions";
-
-function loadPersisted(): { sessions: SessionMeta[]; sessionData: Record<string, SessionData>; activeSessionId: string | null } {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const meta = raw ? JSON.parse(raw) : {};
-    const rawData = localStorage.getItem(STORAGE_KEY + "-data");
-    const sessionData = rawData ? JSON.parse(rawData) : {};
-    return {
-      sessions: meta.sessions ?? [],
-      sessionData: sessionData ?? {},
-      activeSessionId: meta.activeSessionId ?? null,
-    };
-  } catch { /* ignore */ }
-  return { sessions: [], sessionData: {}, activeSessionId: null };
-}
-
-// Debounced persist: avoids repeated localStorage writes during high-frequency updates
-let _persistTimer: ReturnType<typeof setTimeout> | null = null;
-let _pendingPersist: { sessions: SessionMeta[]; sessionData: Record<string, SessionData>; activeSessionId: string | null } | null = null;
-
-function schedulePersist(
-  sessions: SessionMeta[],
-  sessionData: Record<string, SessionData>,
-  activeSessionId: string | null,
-) {
-  _pendingPersist = { sessions, sessionData, activeSessionId };
-  if (_persistTimer) return; // already scheduled
-  _persistTimer = setTimeout(() => {
-    _persistTimer = null;
-    if (!_pendingPersist) return;
-    const { sessions, sessionData, activeSessionId } = _pendingPersist;
-    _pendingPersist = null;
-    _doPersist(sessions, sessionData, activeSessionId);
-  }, 300);
-}
-
-function _doPersist(
-  sessions: SessionMeta[],
-  sessionData: Record<string, SessionData>,
-  activeSessionId: string | null,
-) {
-  try {
-    // localStorage 容量保护：如果数据超过 4MB，清理最旧会话的消息历史
-    const dataStr = JSON.stringify(sessionData);
-    if (dataStr.length > 4 * 1024 * 1024) {
-      const sorted = [...sessions].sort((a, b) => a.updatedAt - b.updatedAt);
-      for (const s of sorted) {
-        if (s.id === activeSessionId) continue;
-        const entry = sessionData[s.id];
-        if (entry && entry.messages.length > 0) {
-          // 只保留最后 2 条消息
-          entry.messages = entry.messages.slice(-2);
-          entry.history = entry.history.slice(-4);
-        }
-      }
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ sessions, activeSessionId }));
-    localStorage.setItem(STORAGE_KEY + "-data", JSON.stringify(sessionData));
-  } catch {
-    // localStorage might be full - silently fail
-  }
-}
-
-/** Immediate persist — use for critical writes (e.g. before page unload). */
-function flushPersist() {
-  if (_persistTimer) {
-    clearTimeout(_persistTimer);
-    _persistTimer = null;
-  }
-  if (_pendingPersist) {
-    const { sessions, sessionData, activeSessionId } = _pendingPersist;
-    _pendingPersist = null;
-    _doPersist(sessions, sessionData, activeSessionId);
-  }
-}
-
-// Interactive ChatState
-interface ChatState {
-  // Active session
-  messages: ChatDisplayMessage[];
-  history: ChatMessage[];
-  isStreaming: boolean;
-  abortController: AbortController | null;
-
-  // Session management
-  sessions: SessionMeta[];
-  activeSessionId: string | null;
-  sessionData: Record<string, SessionData>;
-
-  // Session methods
-  createSession: () => string;
-  setActiveSession: (sessionId: string) => void;
-  deleteSession: (sessionId: string) => void;
-  renameSession: (sessionId: string, title: string) => void;
-  syncSessionTitle: () => void;
-
-  // Message methods (operate on active session)
-  addUserMessage: (content: string) => void;
-  addAssistantMessage: (id: string) => void;
-  appendToAssistant: (id: string, text: string) => void;
-  addToolCall: (messageId: string, tc: ToolCallInfo) => void;
-  updateToolResult: (
-    messageId: string,
-    toolCallId: string,
-    result: string,
-    isError: boolean,
-  ) => void;
-  setReasoningContent: (messageId: string, reasoningContent: string) => void;
-  appendToReasoning: (messageId: string, text: string) => void;
-  setStreaming: (streaming: boolean) => void;
-  setAbortController: (controller: AbortController | null) => void;
-  clearChat: () => void;
-  finalizeMessage: (messageId: string) => void;
-}
-
-let _msgCounter = 0;
-function nextId() {
-  return `msg-${++_msgCounter}`;
-}
-
-function updateMessageById(
-  messages: ChatDisplayMessage[],
-  id: string,
-  updater: (message: ChatDisplayMessage) => ChatDisplayMessage,
-) {
-  return messages.map((message) =>
-    message.id === id ? updater(message) : message,
-  );
-}
-
-function findLastAssistantIndex(history: ChatMessage[]) {
-  for (let i = history.length - 1; i >= 0; i--) {
-    if (history[i].role === "assistant") {
-      return i;
-    }
-  }
-  return -1;
-}
-
-function upsertAssistantHistory(
-  history: ChatMessage[],
-  content: string,
-  reasoningContent?: string,
-) {
-  const nextHistory = [...history];
-  const assistantIdx = findLastAssistantIndex(nextHistory);
-
-  if (assistantIdx >= 0) {
-    nextHistory[assistantIdx] = {
-      ...nextHistory[assistantIdx],
-      content,
-      reasoning_content: reasoningContent,
-    };
-  } else {
-    nextHistory.push({
-      role: "assistant",
-      content,
-      reasoning_content: reasoningContent,
-    });
-  }
-
-  return nextHistory;
-}
+import type { ToolCallDisplay } from "../types/chat";
+import {
+  getActiveUserScope,
+  registerUserScopeHandler,
+} from "./userScope";
+import {
+  createChatPersistSnapshot,
+  flushChatPersist,
+  scheduleChatPersist,
+} from "./chatPersistence";
+import type { SessionMeta } from "./chatPersistence";
+import {
+  loadUserChatState,
+  nextChatMessageId,
+  prepareLastAssistantRegeneration,
+  updateMessageById,
+  upsertAssistantHistory,
+} from "./chatStoreHelpers";
+import type { ChatState } from "./chatStoreTypes";
 
 export const useChatStore = create<ChatState>((set, get) => {
-  // Restore persisted sessions
-  const persisted = loadPersisted();
-  const sessions = persisted.sessions;
-  const sessionData = persisted.sessionData;
-  let activeSessionId = persisted.activeSessionId;
+  const scopedState = loadUserChatState(window.localStorage, getActiveUserScope());
+
+  const persist = () => {
+    const state = get();
+    scheduleChatPersist(
+      window.localStorage,
+      getActiveUserScope(),
+      createChatPersistSnapshot(
+        state.sessions,
+        state.sessionData,
+        state.activeSessionId,
+        state.messages,
+        state.history,
+        state.agentNames,
+        state.skillNames,
+      ),
+    );
+  };
 
   // Flush pending localStorage writes on page unload
   if (typeof window !== "undefined") {
-    window.addEventListener("beforeunload", flushPersist);
+    window.addEventListener("beforeunload", flushChatPersist);
   }
-
-  // Ensure at least one session
-  if (sessions.length === 0) {
-    const id = `session-${Date.now()}`;
-    sessions.push({ id, title: "新对话", createdAt: Date.now(), updatedAt: Date.now() });
-    sessionData[id] = { messages: [], history: [] };
-    activeSessionId = id;
-  }
-
-  const activeData = activeSessionId ? sessionData[activeSessionId] : undefined;
 
   return {
     // Active session
-    messages: activeData?.messages ?? [],
-    history: activeData?.history ?? [],
+    messages: scopedState.messages,
+    history: scopedState.history,
+    agentNames: scopedState.agentNames,
+    skillNames: scopedState.skillNames,
     isStreaming: false,
     abortController: null,
 
     // Session management
-    sessions,
-    activeSessionId,
-    sessionData,
+    sessions: scopedState.sessions,
+    activeSessionId: scopedState.activeSessionId,
+    sessionData: scopedState.sessionData,
 
     createSession: () => {
       const state = get();
-      const id = `session-${Date.now()}`;
+      const timestamp = Date.now();
+      let sequence = 0;
+      let id = `session-${timestamp}`;
+      while (state.sessions.some((session) => session.id === id)) {
+        sequence += 1;
+        id = `session-${timestamp}-${sequence}`;
+      }
       const newSession: SessionMeta = {
         id, title: "新对话", createdAt: Date.now(), updatedAt: Date.now(),
       };
 
-      // Save the current session's data
+      const nextSessionData = { ...state.sessionData };
       if (state.activeSessionId) {
-        state.sessionData[state.activeSessionId] = {
+        nextSessionData[state.activeSessionId] = {
           messages: state.messages,
           history: state.history,
+          agentNames: state.agentNames,
+          skillNames: state.skillNames,
         };
       }
 
       set({
         sessions: [...state.sessions, newSession],
         activeSessionId: id,
-        sessionData: { ...state.sessionData, [id]: { messages: [], history: [] } },
+        sessionData: {
+          ...nextSessionData,
+          [id]: { messages: [], history: [], agentNames: null, skillNames: null },
+        },
         messages: [],
         history: [],
+        agentNames: null,
+        skillNames: null,
       });
 
-      schedulePersist(
-        get().sessions,
-        get().sessionData,
-        get().activeSessionId,
-      );
+      persist();
 
       return id;
     },
@@ -255,29 +103,34 @@ export const useChatStore = create<ChatState>((set, get) => {
       const state = get();
       if (sessionId === state.activeSessionId) return;
 
-      // Save current session data
+      const nextSessionData = { ...state.sessionData };
       if (state.activeSessionId) {
-        state.sessionData[state.activeSessionId] = {
+        nextSessionData[state.activeSessionId] = {
           messages: state.messages,
           history: state.history,
+          agentNames: state.agentNames,
+          skillNames: state.skillNames,
         };
       }
 
       // Load new session data
-      const newData = state.sessionData[sessionId] || { messages: [], history: [] };
+      const newData = nextSessionData[sessionId] || {
+        messages: [],
+        history: [],
+        agentNames: null,
+        skillNames: null,
+      };
 
       set({
         activeSessionId: sessionId,
-        sessionData: { ...state.sessionData },
+        sessionData: nextSessionData,
         messages: newData.messages,
         history: newData.history,
+        agentNames: newData.agentNames ?? null,
+        skillNames: newData.skillNames ?? null,
       });
 
-      schedulePersist(
-        get().sessions,
-        get().sessionData,
-        get().activeSessionId,
-      );
+      persist();
     },
 
     deleteSession: (sessionId) => {
@@ -291,14 +144,23 @@ export const useChatStore = create<ChatState>((set, get) => {
       let newActiveId = state.activeSessionId;
       let newMessages = state.messages;
       let newHistory = state.history;
+      let newAgentNames = state.agentNames;
+      let newSkillNames = state.skillNames;
 
       if (sessionId === state.activeSessionId) {
         // Switch to another session
         const fallback = newSessions[0];
         newActiveId = fallback.id;
-        const fallbackData = newSessionData[fallback.id] || { messages: [], history: [] };
+        const fallbackData = newSessionData[fallback.id] || {
+          messages: [],
+          history: [],
+          agentNames: null,
+          skillNames: null,
+        };
         newMessages = fallbackData.messages;
         newHistory = fallbackData.history;
+        newAgentNames = fallbackData.agentNames ?? null;
+        newSkillNames = fallbackData.skillNames ?? null;
       }
 
       set({
@@ -307,13 +169,11 @@ export const useChatStore = create<ChatState>((set, get) => {
         activeSessionId: newActiveId,
         messages: newMessages,
         history: newHistory,
+        agentNames: newAgentNames,
+        skillNames: newSkillNames,
       });
 
-      schedulePersist(
-        get().sessions,
-        get().sessionData,
-        get().activeSessionId,
-      );
+      persist();
     },
 
     renameSession: (sessionId, title) => {
@@ -323,11 +183,17 @@ export const useChatStore = create<ChatState>((set, get) => {
         ),
       }));
 
-      schedulePersist(
-        get().sessions,
-        get().sessionData,
-        get().activeSessionId,
-      );
+      persist();
+    },
+
+    setAgentNames: (agentNames) => {
+      set({ agentNames: agentNames === null ? null : [...agentNames] });
+      persist();
+    },
+
+    setSkillNames: (skillNames) => {
+      set({ skillNames: skillNames === null ? null : [...skillNames] });
+      persist();
     },
 
     syncSessionTitle: () => {
@@ -349,7 +215,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
 
     addUserMessage: (content) => {
-      const id = nextId();
+      const id = nextChatMessageId();
       set((state) => ({
         messages: [
           ...state.messages,
@@ -380,6 +246,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         messages: updateMessageById(state.messages, id, (message) => ({
           ...message,
           content: message.content + text,
+          status: undefined,
         })),
       }));
     },
@@ -422,7 +289,7 @@ export const useChatStore = create<ChatState>((set, get) => {
 
     updateToolResult: (messageId, toolCallId, result, isError) => {
       const displayResult =
-        result.length > 500 ? `${result.slice(0, 500)}…` : result;
+        result.length > 4000 ? `${result.slice(0, 4000)}…` : result;
       set((state) => ({
         messages: updateMessageById(state.messages, messageId, (message) => ({
           ...message,
@@ -443,20 +310,45 @@ export const useChatStore = create<ChatState>((set, get) => {
       }));
     },
 
+    setAssistantPlan: (messageId, plan) => {
+      set((state) => ({
+        messages: updateMessageById(state.messages, messageId, (message) => ({
+          ...message,
+          plan: {
+            ...plan,
+            steps: plan.steps.map((step) => ({ ...step })),
+          },
+        })),
+      }));
+    },
+
+    updateAssistantPlanStep: (messageId, update) => {
+      set((state) => ({
+        messages: updateMessageById(state.messages, messageId, (message) => {
+          if (!message.plan) return message;
+          return {
+            ...message,
+            plan: {
+              ...message.plan,
+              steps: message.plan.steps.map((step) =>
+                step.id === update.step_id
+                  ? {
+                      ...step,
+                      status: update.status,
+                      detail: update.detail,
+                      attempt: update.attempt,
+                    }
+                  : step,
+              ),
+            },
+          };
+        }),
+      }));
+    },
+
     setReasoningContent: (messageId, reasoningContent) => {
       set((state) => {
-        const history = [...state.history];
-        const assistantIdx = findLastAssistantIndex(history);
-
-        if (assistantIdx >= 0) {
-          history[assistantIdx] = {
-            ...history[assistantIdx],
-            reasoning_content: reasoningContent,
-          };
-        }
-
         return {
-          history,
           messages: updateMessageById(state.messages, messageId, (message) => ({
             ...message,
             reasoningContent,
@@ -475,6 +367,15 @@ export const useChatStore = create<ChatState>((set, get) => {
       }));
     },
 
+    setAssistantStatus: (messageId, status) => {
+      set((state) => ({
+        messages: updateMessageById(state.messages, messageId, (message) => ({
+          ...message,
+          status: status || undefined,
+        })),
+      }));
+    },
+
     setStreaming: (streaming) => set({ isStreaming: streaming }),
     setAbortController: (controller) => set({ abortController: controller }),
 
@@ -485,9 +386,27 @@ export const useChatStore = create<ChatState>((set, get) => {
         isStreaming: false,
         abortController: null,
       });
+      persist();
     },
 
-    finalizeMessage: (messageId) =>
+    regenerateLastAssistant: () => {
+      const state = get();
+      if (state.isStreaming) return null;
+      const prepared = prepareLastAssistantRegeneration(state.messages, state.history);
+      if (!prepared) return null;
+
+      set({
+        messages: prepared.nextMessages,
+        history: prepared.nextHistory,
+      });
+      persist();
+      return {
+        message: prepared.message,
+        history: prepared.history,
+      };
+    },
+
+    finalizeMessage: (messageId) => {
       set((state) => {
         const target = state.messages.find((m) => m.id === messageId);
         if (!target || target.isStreaming === false) return state;
@@ -497,7 +416,6 @@ export const useChatStore = create<ChatState>((set, get) => {
             ? upsertAssistantHistory(
                 state.history,
                 target.content,
-                target.reasoningContent,
               )
             : state.history;
 
@@ -506,8 +424,43 @@ export const useChatStore = create<ChatState>((set, get) => {
           messages: updateMessageById(state.messages, messageId, (message) => ({
             ...message,
             isStreaming: false,
+            status: undefined,
+            plan: message.plan
+              ? {
+                  ...message.plan,
+                  steps: message.plan.steps.map((step) =>
+                    step.status === "pending" || step.status === "running"
+                      ? { ...step, status: "cancelled", detail: "执行已停止" }
+                      : step,
+                  ),
+                }
+              : undefined,
+            toolCalls: message.toolCalls?.map((toolCall) =>
+              toolCall.isExecuting
+                ? { ...toolCall, isExecuting: false, isCancelled: true }
+                : toolCall,
+            ),
           })),
         };
-      }),
+      });
+      persist();
+    },
   };
+});
+
+registerUserScopeHandler((userId) => {
+  flushChatPersist();
+  useChatStore.getState().abortController?.abort();
+  const scopedState = loadUserChatState(window.localStorage, userId);
+  useChatStore.setState({
+    messages: scopedState.messages,
+    history: scopedState.history,
+    agentNames: scopedState.agentNames,
+    skillNames: scopedState.skillNames,
+    isStreaming: false,
+    abortController: null,
+    sessions: scopedState.sessions,
+    activeSessionId: scopedState.activeSessionId,
+    sessionData: scopedState.sessionData,
+  });
 });

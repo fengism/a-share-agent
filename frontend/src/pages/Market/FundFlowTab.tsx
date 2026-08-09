@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import ReactECharts from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
-import { Button, Card, Col, Empty, Row, Spin, Statistic, Typography } from "antd";
+import { Button, Card, Col, Row, Statistic, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { useHsgtFlow } from "../../api/queries";
+import SectionDataState from "../../components/SectionDataState";
 import { useColors } from "../../styles/ui";
 import type { ThemeColors } from "../../styles/ui";
 
@@ -35,8 +36,9 @@ export default function FundFlowTab() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const { data, isLoading, isFetching, isError, refetch } = useHsgtFlow(true, autoRefresh);
+  const { data, isLoading, isFetching, error, refetch } = useHsgtFlow(true, autoRefresh);
   const points = useMemo(() => data?.points || [], [data?.points]);
+  const hasData = points.length > 0;
   const latest = points[points.length - 1];
 
   const option = useMemo(
@@ -82,49 +84,52 @@ export default function FundFlowTab() {
   );
 
   return (
-    <div>
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} md={8}>
-          <Card style={{ borderRadius: 8 }}>
-            <Statistic title="北向合计净买入" value={formatYi(latest?.total)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.total, c) }} />
-          </Card>
-        </Col>
-        <Col xs={24} md={8}>
-          <Card style={{ borderRadius: 8 }}>
-            <Statistic title="沪股通净买入" value={formatYi(latest?.hgt)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.hgt, c) }} />
-          </Card>
-        </Col>
-        <Col xs={24} md={8}>
-          <Card style={{ borderRadius: 8 }}>
-            <Statistic title="深股通净买入" value={formatYi(latest?.sgt)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.sgt, c) }} />
-          </Card>
-        </Col>
-      </Row>
+    <SectionDataState
+      isLoading={isLoading && !hasData}
+      error={hasData ? undefined : error}
+      onRetry={() => refetch()}
+      isEmpty={!isLoading && !error && !hasData}
+      emptyText="暂无沪深股通分钟流向数据"
+      errorTitle="沪深股通分钟流向加载失败"
+      minHeight={420}
+      skeletonRows={8}
+    >
+      <div>
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={24} md={8}>
+            <Card style={{ borderRadius: 8 }}>
+              <Statistic title="北向合计净买入" value={formatYi(latest?.total)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.total, c) }} />
+            </Card>
+          </Col>
+          <Col xs={24} md={8}>
+            <Card style={{ borderRadius: 8 }}>
+              <Statistic title="沪股通净买入" value={formatYi(latest?.hgt)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.hgt, c) }} />
+            </Card>
+          </Col>
+          <Col xs={24} md={8}>
+            <Card style={{ borderRadius: 8 }}>
+              <Statistic title="深股通净买入" value={formatYi(latest?.sgt)} suffix={data?.unit || "亿元"} valueStyle={{ color: valueColor(latest?.sgt, c) }} />
+            </Card>
+          </Col>
+        </Row>
 
-      <Card
-        title="沪深股通当日实时分钟流向"
-        extra={
-          <Button icon={<ReloadOutlined />} loading={isFetching} onClick={() => refetch()}>
-            刷新
-          </Button>
-        }
-        style={{ borderRadius: 8 }}
-      >
-        <div style={{ marginBottom: 12 }}>
-          <Text type="secondary">
-            更新时间：{data?.updated_at || "-"}，单位：{data?.unit || "亿元"}，自动刷新：{autoRefresh ? "09:20–15:30 每 60 秒" : "已暂停，可手动刷新"}
-          </Text>
-        </div>
-        {isLoading ? (
-          <Spin />
-        ) : isError ? (
-          <Empty description="沪深股通分钟流向获取失败" />
-        ) : points.length ? (
+        <Card
+          title="沪深股通当日实时分钟流向"
+          extra={
+            <Button icon={<ReloadOutlined />} loading={isFetching} onClick={() => refetch()}>
+              刷新
+            </Button>
+          }
+          style={{ borderRadius: 8 }}
+        >
+          <div style={{ marginBottom: 12 }}>
+            <Text type="secondary">
+              更新时间：{data?.updated_at || "-"}，单位：{data?.unit || "亿元"}，自动刷新：{autoRefresh ? "09:20–15:30 每 60 秒" : "已暂停，可手动刷新"}
+            </Text>
+          </div>
           <ReactECharts echarts={echarts} option={option} style={{ height: 420 }} notMerge />
-        ) : (
-          <Empty description="暂无沪深股通分钟流向数据" />
-        )}
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </SectionDataState>
   );
 }

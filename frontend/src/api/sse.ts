@@ -1,5 +1,7 @@
 import type { AnalysisResult, IndustryChainResult } from "../types/stock";
+import type { ChatStreamDelta } from "../types/chat";
 import { getToken, notifyUnauthorized } from "./authToken";
+import { parseApiError } from "./errors";
 
 export interface AnalysisStage {
   stage: number;
@@ -22,8 +24,8 @@ export type ProgressHandler = (event: AnalysisProgress) => void;
 const isDev = import.meta.env.DEV;
 
 /**
- * Stream a Server-Sent-Events endpoint via fetch (instead of EventSource) so we
- * can attach the Bearer token — the backend binds the per-user config from it.
+ * Stream a Server-Sent-Events endpoint via fetch so cookie credentials, aborts,
+ * and streamed response parsing share the same lifecycle.
  * Each `data:` payload is JSON-parsed and passed to onData. Resolves when the
  * stream ends; rejects on network/HTTP error (401 also drops local auth).
  */
@@ -36,11 +38,19 @@ async function readSSE(
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(url, { method: "GET", headers, signal });
+  const res = await fetch(url, {
+    method: "GET",
+    headers,
+    signal,
+    credentials: "include",
+  });
   if (!res.ok) {
-    if (res.status === 401 && token) notifyUnauthorized();
-    const errData = await res.json().catch(() => ({}));
-    throw new Error((errData as { detail?: string }).detail || `SSE error: ${res.status}`);
+    if (res.status === 401) notifyUnauthorized();
+    const error = parseApiError(
+      await res.json().catch(() => ({})),
+      `SSE error: ${res.status}`,
+    );
+    throw new Error(error.message);
   }
   const reader = res.body?.getReader();
   if (!reader) throw new Error("No response body");
@@ -110,9 +120,10 @@ export function streamAnalysis(
 // ── 产业链分析 SSE ──
 
 export interface IndustryChainProgress {
-  type: "stage_started" | "stage_completed" | "complete" | "error";
+  type: "stage_started" | "stage_completed" | "agent_event" | "complete" | "error";
   stage?: string;
   message?: string;
+  agent_event?: ChatStreamDelta | null;
   result?: IndustryChainResult | null;
 }
 

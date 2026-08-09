@@ -1,5 +1,10 @@
-import { Card, Col, Row, Spin, Table, Tag, Typography } from "antd";
+import { useCallback, useMemo } from "react";
+import { Card, Col, Row, Table, Tag, Typography } from "antd";
+import type { ColumnsType } from "antd/es/table";
 import { useValuationDetail } from "../../api/queries";
+import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
+import SectionDataState from "../../components/SectionDataState";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { AnalysisResult, DCFValuationResult, InstitutionForecast, StockValuationPeer, ValuationMethodResult } from "../../types/stock";
 import { useColors, useStyles } from "../../theme/hooks";
 
@@ -52,6 +57,16 @@ function formatConfidence(value: number | null | undefined) {
   return `${(value * 100).toFixed(0)}%`;
 }
 
+function formatTableNumber(value: number | null | undefined) {
+  return value != null ? value.toFixed(2) : "-";
+}
+
+function forecastMetricLabel(value: string) {
+  if (value === "EPS") return "每股收益";
+  if (value === "NET_PROFIT") return "净利润";
+  return value;
+}
+
 function renderMethodCard(title: string, item: ValuationMethodResult | DCFValuationResult | undefined, c: ReturnType<typeof useColors>, tagStyle: React.CSSProperties) {
   const tileStyle = {
     padding: "14px 16px",
@@ -92,36 +107,175 @@ function renderMethodCard(title: string, item: ValuationMethodResult | DCFValuat
 
 export default function ValuationPanel({ code }: Props) {
   const c = useColors();
+  const isNarrow = useMediaQuery("(max-width: 768px)");
   const { cardStyle, sectionHeaderStyle, tagStyle, sectionCardBodyStyle, metricTileStyle, metricValueEmphasisStyle } = useStyles();
-  const { data: detail, isLoading } = useValuationDetail(code);
+  const { data: detail, isLoading, error, refetch } = useValuationDetail(code);
 
-  const peerColumns = [
-    { title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>名称</span>, dataIndex: "name", key: "name", render: (value: string) => <span style={{ fontSize: 12, color: c.textSecondary }}>{value}</span> },
-    { title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>代码</span>, dataIndex: "code", key: "code", render: (value: string) => <span style={{ fontSize: 12, color: c.textSecondary }}>{value}</span> },
-    {
-      title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>PE(TTM)</span>,
-      dataIndex: "pe_ttm",
-      key: "pe_ttm",
-      align: "right" as const, render: (value: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{value != null ? value.toFixed(2) : "-"}</span>,
-    },
-    {
-      title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>PB</span>,
-      dataIndex: "pb",
-      key: "pb",
-      align: "right" as const, render: (value: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{value != null ? value.toFixed(2) : "-"}</span>,
-    },
-    {
-      title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>PS(TTM)</span>,
-      dataIndex: "ps_ttm",
-      key: "ps_ttm",
-      align: "right" as const, render: (value: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{value != null ? value.toFixed(2) : "-"}</span>,
-    },
-  ];
+  const forecastColumns: ColumnsType<InstitutionForecast> = useMemo(() => {
+    if (isNarrow) {
+      return [
+        {
+          title: "指标",
+          key: "metric-year",
+          width: 150,
+          render: (_: unknown, record: InstitutionForecast) => (
+            <div>
+              <Tag style={{ ...tagStyle, marginBottom: 2 }}>{forecastMetricLabel(record.metric)}</Tag>
+              <div style={{ color: c.textMuted, fontSize: 11 }}>{record.year}</div>
+            </div>
+          ),
+        },
+        {
+          title: <span style={{ color: c.accent }}>均值</span>,
+          dataIndex: "mean_value",
+          key: "mean_value",
+          width: 88,
+          align: "right",
+          render: (value: number | null) => <span style={{ fontSize: 13, fontWeight: 600, color: c.accent }}>{formatTableNumber(value)}</span>,
+        },
+      ];
+    }
 
-  if (isLoading) return <Spin />;
+    return [
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>指标</span>,
+        dataIndex: "metric",
+        key: "metric",
+        render: (value: string) => <Tag style={tagStyle}>{forecastMetricLabel(value)}</Tag>,
+      },
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>年度</span>,
+        dataIndex: "year",
+        key: "year",
+        render: (value: string) => <span style={{ fontSize: 12, color: c.textPrimary }}>{value}</span>,
+      },
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>机构数</span>,
+        dataIndex: "institution_count",
+        key: "institution_count",
+        align: "right",
+        render: (value: number | null) => <span style={{ fontSize: 12, color: c.primary }}>{value ?? "-"}</span>,
+      },
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>最小值</span>,
+        dataIndex: "min_value",
+        key: "min_value",
+        align: "right",
+        render: (value: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+      },
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.accent }}>均值</span>,
+        dataIndex: "mean_value",
+        key: "mean_value",
+        align: "right",
+        render: (value: number | null) => <span style={{ fontSize: 13, fontWeight: 600, color: c.accent }}>{formatTableNumber(value)}</span>,
+      },
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>最大值</span>,
+        dataIndex: "max_value",
+        key: "max_value",
+        align: "right",
+        render: (value: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+      },
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>行业均值</span>,
+        dataIndex: "industry_avg",
+        key: "industry_avg",
+        align: "right",
+        render: (value: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+      },
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>单位</span>,
+        dataIndex: "unit",
+        key: "unit",
+        render: (value: string | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{value ?? "-"}</span>,
+      },
+    ];
+  }, [c, isNarrow, tagStyle]);
+
+  const peerColumns: ColumnsType<StockValuationPeer> = useMemo(() => {
+    if (isNarrow) {
+      return [
+        {
+          title: "同行",
+          key: "peer",
+          width: 150,
+          render: (_: unknown, record: StockValuationPeer) => (
+            <div>
+              <div style={{ color: c.textPrimary, fontSize: 12, fontWeight: 600 }}>{record.name}</div>
+              <div style={{ color: c.textMuted, fontSize: 11 }}>{record.code}</div>
+            </div>
+          ),
+        },
+        {
+          title: "PE(TTM)",
+          dataIndex: "pe_ttm",
+          key: "pe_ttm",
+          width: 92,
+          align: "right",
+          render: (value: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+        },
+      ];
+    }
+
+    return [
+      { title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>名称</span>, dataIndex: "name", key: "name", render: (value: string) => <span style={{ fontSize: 12, color: c.textSecondary }}>{value}</span> },
+      { title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>代码</span>, dataIndex: "code", key: "code", render: (value: string) => <span style={{ fontSize: 12, color: c.textSecondary }}>{value}</span> },
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>PE(TTM)</span>,
+        dataIndex: "pe_ttm",
+        key: "pe_ttm",
+        align: "right",
+        render: (value: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+      },
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>PB</span>,
+        dataIndex: "pb",
+        key: "pb",
+        align: "right",
+        render: (value: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+      },
+      {
+        title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>PS(TTM)</span>,
+        dataIndex: "ps_ttm",
+        key: "ps_ttm",
+        align: "right",
+        render: (value: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{formatTableNumber(value)}</span>,
+      },
+    ];
+  }, [c, isNarrow]);
+
+  const renderForecastExpandedRow = useCallback((record: InstitutionForecast) => (
+    <ResponsiveMetricGrid
+      items={[
+        { key: "institutions", label: "机构数", value: record.institution_count ?? "-" },
+        { key: "min", label: "最小值", value: formatTableNumber(record.min_value) },
+        { key: "max", label: "最大值", value: formatTableNumber(record.max_value) },
+        { key: "industry", label: "行业均值", value: formatTableNumber(record.industry_avg) },
+        { key: "unit", label: "单位", value: record.unit ?? "-" },
+      ]}
+    />
+  ), []);
+
+  const renderPeerExpandedRow = useCallback((record: StockValuationPeer) => (
+    <ResponsiveMetricGrid
+      items={[
+        { key: "pb", label: "PB", value: formatTableNumber(record.pb) },
+        { key: "ps", label: "PS(TTM)", value: formatTableNumber(record.ps_ttm) },
+      ]}
+    />
+  ), []);
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <SectionDataState
+      isLoading={isLoading}
+      error={error}
+      onRetry={() => refetch()}
+      errorTitle="估值数据加载失败"
+      skeletonRows={7}
+      minHeight={320}
+    >
+      <div style={{ display: "grid", gap: 16 }}>
       <Card size="small" title="当前估值快照" style={{ ...cardStyle, marginBottom: 16, borderTop: `3px solid ${c.primary}55` }} styles={{ body: { ...sectionCardBodyStyle, padding: "16px 20px" } }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} md={6}>
@@ -237,67 +391,23 @@ export default function ValuationPanel({ code }: Props) {
             <Text strong style={{ color: c.textPrimary, fontSize: 13 }}>机构一致预期</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>EPS / 净利润预测</Text>
           </div>
-          <Card size="small" title="机构一致预期" style={{ ...cardStyle, marginBottom: 16 }} styles={{ body: { padding: "8px 16px" } }}>
+          <Card
+            size="small"
+            title="机构一致预期"
+            style={{ ...cardStyle, marginBottom: 16 }}
+            styles={{ body: { padding: isNarrow ? "8px" : "8px 16px" } }}
+          >
             <Table<InstitutionForecast>
               dataSource={detail.institution_forecasts}
-              columns={[
-                {
-                  title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>指标</span>,
-                  dataIndex: "metric",
-                  key: "metric",
-                  render: (v: string) => <Tag style={tagStyle}>{v === "EPS" ? "每股收益" : v === "NET_PROFIT" ? "净利润" : v}</Tag>,
-                },
-                {
-                  title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>年度</span>,
-                  dataIndex: "year",
-                  key: "year",
-                  render: (v: string) => <span style={{ fontSize: 12, color: c.textPrimary }}>{v}</span>,
-                },
-                {
-                  title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>机构数</span>,
-                  dataIndex: "institution_count",
-                  key: "institution_count",
-                  align: "right" as const,
-                  render: (v: number | null) => <span style={{ fontSize: 12, color: c.primary }}>{v != null ? v : "-"}</span>,
-                },
-                {
-                  title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>最小值</span>,
-                  dataIndex: "min_value",
-                  key: "min_value",
-                  align: "right" as const,
-                  render: (v: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{v != null ? v.toFixed(2) : "-"}</span>,
-                },
-                {
-                  title: <span style={{ fontSize: 12, fontWeight: 700, color: c.accent }}>均值</span>,
-                  dataIndex: "mean_value",
-                  key: "mean_value",
-                  align: "right" as const,
-                  render: (v: number | null) => <span style={{ fontSize: 13, fontWeight: 600, color: c.accent }}>{v != null ? v.toFixed(2) : "-"}</span>,
-                },
-                {
-                  title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>最大值</span>,
-                  dataIndex: "max_value",
-                  key: "max_value",
-                  align: "right" as const,
-                  render: (v: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{v != null ? v.toFixed(2) : "-"}</span>,
-                },
-                {
-                  title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>行业均值</span>,
-                  dataIndex: "industry_avg",
-                  key: "industry_avg",
-                  align: "right" as const,
-                  render: (v: number | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{v != null ? v.toFixed(2) : "-"}</span>,
-                },
-                {
-                  title: <span style={{ fontSize: 12, fontWeight: 700, color: c.textSecondary }}>单位</span>,
-                  dataIndex: "unit",
-                  key: "unit",
-                  render: (v: string | null) => <span style={{ fontSize: 12, color: c.textSecondary }}>{v ?? "-"}</span>,
-                },
-              ]}
+              columns={forecastColumns}
               rowKey={(r) => `${r.metric}-${r.year}`}
               size="small"
               pagination={false}
+              expandable={isNarrow ? {
+                expandedRowRender: renderForecastExpandedRow,
+                columnWidth: 38,
+              } : undefined}
+              scroll={isNarrow ? undefined : { x: "max-content" }}
               bordered={false}
               rowClassName={() => "terminal-table-row"}
             />
@@ -309,18 +419,28 @@ export default function ValuationPanel({ code }: Props) {
         <Text strong style={{ color: c.textPrimary, fontSize: 13 }}>同行对比</Text>
         <Text type="secondary" style={{ fontSize: 12 }}>同业倍数参考</Text>
       </div>
-      <Card size="small" title="同行对比" style={cardStyle} styles={{ body: { padding: "8px 16px" } }}>
+      <Card
+        size="small"
+        title="同行对比"
+        style={cardStyle}
+        styles={{ body: { padding: isNarrow ? "8px" : "8px 16px" } }}
+      >
         <Table<StockValuationPeer>
           dataSource={detail?.peer_summary.peers ?? []}
           columns={peerColumns}
           rowKey={(record) => record.code}
           size="small"
           pagination={false}
-          scroll={{ x: "max-content" }}
+          expandable={isNarrow ? {
+            expandedRowRender: renderPeerExpandedRow,
+            columnWidth: 38,
+          } : undefined}
+          scroll={isNarrow ? undefined : { x: "max-content" }}
           bordered={false}
           rowClassName={() => "terminal-table-row"}
         />
       </Card>
-    </div>
+      </div>
+    </SectionDataState>
   );
 }

@@ -2,19 +2,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createChart, CandlestickSeries, HistogramSeries, ColorType, type IChartApi, type ISeriesApi, type BusinessDay } from "lightweight-charts";
 import type { KlineItem } from "../types/stock";
 import { useColors } from "../styles/ui";
+import { shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
 
-type Props = { data: KlineItem[]; height?: number };
+type Props = { data: KlineItem[]; height?: number; viewKey?: string };
 type ChartItem = Omit<KlineItem, "date"> & { date: BusinessDay };
 
-export default function KlineChart({ data, height = 500 }: Props) {
+export default function KlineChart({ data, height = 500, viewKey = "default" }: Props) {
   const c = useColors();
+  const colorsRef = useRef(c);
+  colorsRef.current = c;
   const wrapperRef = useRef<HTMLDivElement>(null);
   const chartElRef = useRef<HTMLDivElement>(null);
   const brushRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const fittedViewKeyRef = useRef<string | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const rows = useMemo<ChartItem[]>(
     () => data
@@ -26,36 +30,37 @@ export default function KlineChart({ data, height = 500 }: Props) {
     [data]
   );
 
-  // Chart creation: only re-run when data or height changes
   useEffect(() => {
-    if (!wrapperRef.current || !chartElRef.current || !brushRef.current || rows.length === 0) return;
+    if (!wrapperRef.current || !chartElRef.current || !brushRef.current) return;
     chartRef.current?.remove();
+    const colors = colorsRef.current;
 
     const chart = createChart(chartElRef.current, {
       width: chartElRef.current.clientWidth,
       height,
-      layout: { background: { type: ColorType.Solid, color: c.cardBg }, textColor: c.textSecondary, fontSize: 12, attributionLogo: false },
-      grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
-      timeScale: { timeVisible: false, borderColor: c.border },
-      rightPriceScale: { visible: true, borderColor: c.border },
+      layout: { background: { type: ColorType.Solid, color: colors.cardBg }, textColor: colors.textSecondary, fontSize: 12, attributionLogo: false },
+      grid: { vertLines: { color: colors.border }, horzLines: { color: colors.border } },
+      timeScale: { timeVisible: false, borderColor: colors.border },
+      rightPriceScale: { visible: true, borderColor: colors.border },
       crosshair: {
-        vertLine: { color: c.textMuted, labelBackgroundColor: c.border },
-        horzLine: { color: c.textMuted, labelBackgroundColor: c.border },
+        vertLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
+        horzLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
       },
       handleScroll: { mouseWheel: true, pressedMouseMove: false, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
     });
     chartRef.current = chart;
+    fittedViewKeyRef.current = null;
 
     const candle = chart.addSeries(CandlestickSeries, {
-      upColor: c.up, downColor: c.down,
-      borderUpColor: c.up, borderDownColor: c.down,
-      wickUpColor: c.up, wickDownColor: c.down,
+      upColor: colors.up, downColor: colors.down,
+      borderUpColor: colors.up, borderDownColor: colors.down,
+      wickUpColor: colors.up, wickDownColor: colors.down,
       priceScaleId: "right",
     });
     candleSeriesRef.current = candle;
     chart.priceScale("right").applyOptions({
-      visible: true, borderColor: c.border,
+      visible: true, borderColor: colors.border,
       scaleMargins: { top: 0.05, bottom: 0.22 },
     });
 
@@ -71,14 +76,6 @@ export default function KlineChart({ data, height = 500 }: Props) {
     chart.priceScale("volume").applyOptions({
       visible: false, scaleMargins: { top: 0.82, bottom: 0 },
     });
-
-    candle.setData(rows.map((item) => ({ time: item.date, open: item.open, high: item.high, low: item.low, close: item.close })));
-    volume.setData(rows.map((item) => ({
-      time: item.date,
-      value: item.amount ?? item.volume,
-      color: item.close >= item.open ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
-    })));
-    chart.timeScale().fitContent();
 
     const wrapper = wrapperRef.current;
     const brush = brushRef.current;
@@ -149,10 +146,34 @@ export default function KlineChart({ data, height = 500 }: Props) {
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [height, rows]);
+  }, [height]);
 
-  // Theme-only updates: apply options without recreating the chart
+  useEffect(() => {
+    const chart = chartRef.current;
+    const candle = candleSeriesRef.current;
+    const volume = volumeSeriesRef.current;
+    if (!chart || !candle || !volume) return;
+
+    candle.setData(rows.map((item) => ({
+      time: item.date,
+      open: item.open,
+      high: item.high,
+      low: item.low,
+      close: item.close,
+    })));
+    volume.setData(rows.map((item) => ({
+      time: item.date,
+      value: item.amount ?? item.volume,
+      color: item.close >= item.open ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
+    })));
+
+    if (rows.length > 0 && shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
+      chart.timeScale().fitContent();
+      fittedViewKeyRef.current = viewKey;
+      setIsZoomed(false);
+    }
+  }, [c.down, c.up, height, rows, viewKey]);
+
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -174,14 +195,7 @@ export default function KlineChart({ data, height = 500 }: Props) {
       wickUpColor: c.up, wickDownColor: c.down,
     });
     chart.priceScale("right").applyOptions({ borderColor: c.border });
-
-    // Re-set volume data to reflect new theme colors (per-bar colors)
-    volumeSeriesRef.current?.setData(rows.map((item) => ({
-      time: item.date,
-      value: item.amount ?? item.volume,
-      color: item.close >= item.open ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
-    })));
-  }, [c.cardBg, c.border, c.down, c.textMuted, c.textSecondary, c.up, rows]);
+  }, [c.cardBg, c.border, c.down, c.textMuted, c.textSecondary, c.up, height]);
 
   return (
     <div ref={wrapperRef} style={{ position: "relative", width: "100%" }}>

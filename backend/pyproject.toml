@@ -30,12 +30,12 @@ dependencies = [
     "mootdx>=0.9.11",
     "feedparser>=6.0.12",
     "beautifulsoup4>=4.12.0",
+    "cryptography>=44.0.0",
 ]
 
 [project.optional-dependencies]
 web-fetch = [
-    "scrapling>=0.4",
-    "browserforge>=1.2",
+    "scrapling[fetchers]>=0.4",
 ]
 
 [dependency-groups]
@@ -43,6 +43,9 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "httpx>=0.28.0",
+    "mypy>=1.17.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.12.0",
 ]
 
 [tool.pytest.ini_options]
@@ -64,3 +67,26 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 # self-test/demo blocks and package inits keep their imports/prints
 "**/__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.11"
+files = [
+    "app/agentic/research.py",
+    "app/agentic/tools/application.py",
+    "app/agentic/tools/packs/stock/financial_analysis.py",
+    "app/agentic/tools/packs/web/content.py",
+    "app/core/exceptions.py",
+    "app/core/progress.py",
+    "app/core/retry.py",
+    "app/market_data/market/quotes/statistic.py",
+    "app/modules/quant/engine.py",
+    "app/modules/stock/compare.py",
+    "app/runtime/agentic_tools.py",
+    "app/runtime/task_scheduler.py",
+]
+check_untyped_defs = true
+follow_imports = "skip"
+ignore_missing_imports = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true

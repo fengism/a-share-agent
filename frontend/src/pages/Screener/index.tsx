@@ -1,10 +1,19 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { Card, Alert, Tag, Typography } from "antd";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Button, Card, Typography } from "antd";
+import { useSearchParams } from "react-router-dom";
 import { useScreenerScreen, useIndustries, useComputePercentiles } from "../../api/queries";
+import DataRefreshIndicator from "../../components/DataRefreshIndicator";
+import SectionDataState from "../../components/SectionDataState";
 import FilterPanel from "./FilterPanel";
 import ResultsTable from "./ResultsTable";
 import type { ScreenerFilter } from "../../types/stock";
 import { useStyles } from "../../styles/ui";
+import {
+  DEFAULT_SCREENER_FILTERS,
+  parseScreenerUrlState,
+  serializeScreenerUrlState,
+  type ScreenerUrlState,
+} from "./screenerUrlState";
 
 interface PresetStrategy {
   label: string;
@@ -46,40 +55,48 @@ const PRESET_STRATEGIES: PresetStrategy[] = [
   },
 ];
 
-const DEFAULT_FILTERS: ScreenerFilter = {
-  sort_by: "market_cap",
-  sort_order: "desc",
-  page: 1,
-  page_size: 50,
-};
-
 const { Title, Paragraph } = Typography;
 
 export default function Screener() {
-  const [filters, setFilters] = useState<ScreenerFilter>(DEFAULT_FILTERS);
-  const [searchFilters, setSearchFilters] = useState<ScreenerFilter | null>(null);
-  const [showPercentile, setShowPercentile] = useState(false);
-  const [pePercentileMax, setPePercentileMax] = useState(50);
-  const [pbPercentileMax, setPbPercentileMax] = useState(50);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const appliedState = useMemo(() => parseScreenerUrlState(searchParams), [searchParams]);
+  const [filters, setFilters] = useState<ScreenerFilter>(appliedState.filters);
   const [percentileMap, setPercentileMap] = useState<Map<string, number | null>>(new Map());
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const { showPercentile, pePercentileMax, pbPercentileMax } = appliedState;
 
-  const { data: industries = [] } = useIndustries();
+  const {
+    data: industries = [],
+    error: industriesError,
+    refetch: refetchIndustries,
+  } = useIndustries();
   const { cardStyle, pageContainerStyle, pageDescriptionStyle, pageHeaderStyle, pageTitleStyle, sectionCardBodyStyle } = useStyles();
-  const { data: screenerResult, isLoading: screenerLoading, isFetching } = useScreenerScreen(
-    searchFilters || DEFAULT_FILTERS,
-    searchFilters !== null,
-  );
+  const {
+    data: screenerResult,
+    isLoading: screenerLoading,
+    isFetching,
+    error: screenerError,
+    refetch: refetchScreener,
+  } = useScreenerScreen(appliedState.filters, true);
   const { mutate: computePercentiles, isPending: isPercentilePending } = useComputePercentiles();
+
+  const commitUrlState = useCallback((nextState: ScreenerUrlState) => {
+    const nextParams = serializeScreenerUrlState(nextState);
+    if (nextParams.toString() !== searchParams.toString()) {
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    setFilters(appliedState.filters);
+  }, [appliedState.filters]);
 
   // 自动搜索（防抖）
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setSearchFilters({ ...filters });
+    const timeoutId = window.setTimeout(() => {
+      commitUrlState({ ...appliedState, filters: { ...filters } });
     }, 300);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [filters]);
+    return () => window.clearTimeout(timeoutId);
+  }, [appliedState, commitUrlState, filters]);
 
   // 百分位计算
   useEffect(() => {
@@ -121,29 +138,43 @@ export default function Screener() {
   }, [computePercentiles, showPercentile, screenerResult?.items]);
 
   const handleSearch = useCallback(() => {
-    setSearchFilters({ ...filters });
-  }, [filters]);
+    commitUrlState({ ...appliedState, filters: { ...filters } });
+  }, [appliedState, commitUrlState, filters]);
 
   const handleReset = useCallback(() => {
-    setFilters(DEFAULT_FILTERS);
-    setSearchFilters(DEFAULT_FILTERS);
-    setShowPercentile(false);
-    setPePercentileMax(50);
-    setPbPercentileMax(50);
+    setFilters(DEFAULT_SCREENER_FILTERS);
+    commitUrlState({
+      filters: DEFAULT_SCREENER_FILTERS,
+      showPercentile: false,
+      pePercentileMax: 50,
+      pbPercentileMax: 50,
+    });
     setPercentileMap(new Map());
-  }, []);
+  }, [commitUrlState]);
 
   const handlePageChange = useCallback((page: number, pageSize: number) => {
     const newFilters = { ...filters, page, page_size: pageSize };
     setFilters(newFilters);
-    setSearchFilters(newFilters);
-  }, [filters]);
+    commitUrlState({ ...appliedState, filters: newFilters });
+  }, [appliedState, commitUrlState, filters]);
 
   const handleSortChange = useCallback((sortBy: ScreenerFilter["sort_by"], sortOrder: ScreenerFilter["sort_order"]) => {
     const newFilters = { ...filters, sort_by: sortBy, sort_order: sortOrder, page: 1 };
     setFilters(newFilters);
-    setSearchFilters(newFilters);
-  }, [filters]);
+    commitUrlState({ ...appliedState, filters: newFilters });
+  }, [appliedState, commitUrlState, filters]);
+
+  const handleShowPercentileChange = useCallback((value: boolean) => {
+    commitUrlState({ ...appliedState, filters: { ...filters }, showPercentile: value });
+  }, [appliedState, commitUrlState, filters]);
+
+  const handlePePercentileMaxChange = useCallback((value: number) => {
+    commitUrlState({ ...appliedState, filters: { ...filters }, pePercentileMax: value });
+  }, [appliedState, commitUrlState, filters]);
+
+  const handlePbPercentileMaxChange = useCallback((value: number) => {
+    commitUrlState({ ...appliedState, filters: { ...filters }, pbPercentileMax: value });
+  }, [appliedState, commitUrlState, filters]);
 
   // 百分位过滤（客户端）
   const filteredItems = showPercentile && percentileMap.size > 0
@@ -174,21 +205,21 @@ export default function Screener() {
         {/* Preset strategies */}
         <div style={{ marginBottom: 14, display: "flex", flexWrap: "wrap", gap: 8 }}>
           {PRESET_STRATEGIES.map((p) => (
-            <Tag
+            <Button
               key={p.label}
-              style={{ cursor: "pointer", padding: "4px 14px", borderRadius: 999, fontSize: 13, fontWeight: 500, border: "none", transition: "all 0.2s" }}
-              color="blue"
+              size="small"
+              shape="round"
+              style={{ fontSize: 13, fontWeight: 500 }}
               onClick={() => {
-                const newFilters = { ...DEFAULT_FILTERS, ...p.filters, page: 1 };
+                const newFilters = { ...DEFAULT_SCREENER_FILTERS, ...p.filters, page: 1 };
                 setFilters(newFilters);
-                setSearchFilters(newFilters);
-                setShowPercentile(false);
+                commitUrlState({ ...appliedState, filters: newFilters, showPercentile: false });
                 setPercentileMap(new Map());
               }}
               title={p.description}
             >
               {p.icon} {p.label}
-            </Tag>
+            </Button>
           ))}
         </div>
 
@@ -199,18 +230,27 @@ export default function Screener() {
             onSearch={handleSearch}
             onReset={handleReset}
             showPercentile={showPercentile}
-            onShowPercentileChange={setShowPercentile}
+            onShowPercentileChange={handleShowPercentileChange}
             pePercentileMax={pePercentileMax}
             pbPercentileMax={pbPercentileMax}
-            onPePercentileMaxChange={setPePercentileMax}
-            onPbPercentileMaxChange={setPbPercentileMax}
+            onPePercentileMaxChange={handlePePercentileMaxChange}
+            onPbPercentileMaxChange={handlePbPercentileMaxChange}
           />
+          {industriesError && industries.length === 0 && (
+            <Alert
+              title="行业列表加载失败，仍可使用其他筛选条件"
+              type="warning"
+              showIcon
+              action={<Button size="small" onClick={() => refetchIndustries()}>重试</Button>}
+              style={{ marginTop: 12, borderRadius: 8 }}
+            />
+          )}
         </Card>
 
         {/* Percentile loading */}
         {showPercentile && isPercentilePending && (
           <Alert
-            message="正在计算估值百分位，请稍候..."
+            title="正在计算估值百分位，请稍候..."
             type="info"
             showIcon
             style={{ marginBottom: 16, borderRadius: 8 }}
@@ -221,18 +261,29 @@ export default function Screener() {
         <Card
           size="small"
           title={<span style={{ fontWeight: 600 }}>筛选结果 {screenerResult ? `(${screenerResult.total} 只)` : ""}</span>}
+          extra={<DataRefreshIndicator active={isFetching && !!screenerResult} />}
           style={cardStyle}
           styles={{ body: { padding: "12px 18px" } }}
         >
-          <ResultsTable
-            data={displayData}
-            isLoading={screenerLoading || isFetching}
-            percentileMap={percentileMap}
-            showPercentile={showPercentile}
-            onPageChange={handlePageChange}
-            filters={filters}
-            onSortChange={handleSortChange}
-          />
+          <SectionDataState
+            isLoading={screenerLoading && !screenerResult}
+            error={screenerResult ? undefined : screenerError}
+            onRetry={() => refetchScreener()}
+            isEmpty={!screenerLoading && !screenerError && !screenerResult}
+            emptyText="暂无筛选结果"
+            errorTitle="筛选结果加载失败"
+            minHeight={320}
+          >
+            <ResultsTable
+              data={displayData}
+              isLoading={screenerLoading && !screenerResult}
+              percentileMap={percentileMap}
+              showPercentile={showPercentile}
+              onPageChange={handlePageChange}
+              filters={appliedState.filters}
+              onSortChange={handleSortChange}
+            />
+          </SectionDataState>
         </Card>
     </div>
   );

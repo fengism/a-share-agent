@@ -1,18 +1,24 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button, Card, DatePicker, Divider, List, Row, Col, Space, Tag, Typography, message } from "antd";
+import { queryKeys } from "../../api/queryKeys";
+import { DeleteOutlined } from "@ant-design/icons";
+import { Button, Card, DatePicker, Divider, List, Row, Col, message, Popconfirm, Skeleton, Space, Tag, Typography } from "antd";
 import ReactMarkdown from "react-markdown";
 import dayjs from "dayjs";
 // html2canvas & jsPDF are loaded lazily inside handleExportPdf (kept out of the initial bundle)
-import { useDailyReview, useDailyReviewHistory, useGenerateDailyReview, usePush } from "../../api/queries";
+import { useDailyReview, useDeleteDailyReview, useGenerateDailyReview, useInfiniteDailyReviewHistory, usePush } from "../../api/queries";
+import { ApiError } from "../../api/client";
 import PushModal from "../../components/PushModal";
+import QueryErrorState from "../../components/QueryErrorState";
+import SectionDataState from "../../components/SectionDataState";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { PushRequest } from "../../types/stock";
 import { useColors, useStyles } from "../../styles/ui";
 
 const { Title, Paragraph, Text } = Typography;
 
 function formatDate(value: dayjs.Dayjs | null) {
-  return value ? value.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD");
+  return value?.format("YYYY-MM-DD") ?? "";
 }
 
 function buildMoodSummary(review: NonNullable<ReturnType<typeof useDailyReview>["data"]>) {
@@ -73,28 +79,65 @@ function renderReviewContent(value: string) {
 export default function DailyReviewPage() {
   const { cardStyle, pageContainerStyle } = useStyles();
   const c = useColors();
-  const [selectedDate, setSelectedDate] = useState(dayjs());
+  const isNarrow = useMediaQuery("(max-width: 768px)");
+  const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(dayjs());
   const date = formatDate(selectedDate);
   const exportRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
-  const { data: history = [] } = useDailyReviewHistory();
-  const { data: review } = useDailyReview(date);
+  const {
+    data: historyPages,
+    isLoading: isHistoryLoading,
+    isError: isHistoryError,
+    error: historyError,
+    refetch: retryHistory,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteDailyReviewHistory();
+  const {
+    data: review,
+    isLoading: isReviewLoading,
+    isError: isReviewError,
+    error: reviewError,
+    refetch: retryReview,
+  } = useDailyReview(date);
   const generateMutation = useGenerateDailyReview();
+  const deleteMutation = useDeleteDailyReview();
   const pushMutation = usePush();
   const [pushModalOpen, setPushModalOpen] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
-  const historyItems = useMemo(() => history, [history]);
+  const historyItems = historyPages?.pages.flat() ?? [];
 
   const handleGenerate = async (force = false) => {
+    if (!date) {
+      message.warning("请先选择复盘日期");
+      return;
+    }
     try {
       await generateMutation.mutateAsync({ date, force });
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["dailyReviewHistory"] }),
-        queryClient.invalidateQueries({ queryKey: ["dailyReview", date] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.workflows.dailyReviewHistoryRoot }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.workflows.dailyReview(date) }),
       ]);
       message.success(force ? "已重新生成复盘" : "已生成复盘");
     } catch (error) {
       message.error(`生成失败: ${String(error)}`);
+    }
+  };
+
+  const handleDelete = async (deleteDate: string) => {
+    try {
+      await deleteMutation.mutateAsync(deleteDate);
+      queryClient.removeQueries({ queryKey: queryKeys.workflows.dailyReview(deleteDate), exact: true });
+      if (deleteDate === date) {
+        const nextItem = historyItems.find((item) => item.date !== deleteDate);
+        setSelectedDate(nextItem ? dayjs(nextItem.date) : null);
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.workflows.dailyReviewHistoryRoot });
+      message.success("复盘记录已删除");
+    } catch (deleteError) {
+      message.error(deleteError instanceof Error ? deleteError.message : "删除复盘记录失败");
     }
   };
 
@@ -118,30 +161,40 @@ export default function DailyReviewPage() {
   };
 
   const handleExportPdf = async () => {
-    if (!exportRef.current) return;
-    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-      import("html2canvas"),
-      import("jspdf"),
-    ]);
-    const canvas = await html2canvas(exportRef.current, { scale: 2, useCORS: true, backgroundColor: c.pageBg });
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
-    const imgData = canvas.toDataURL("image/png");
+    if (!exportRef.current || !review || isExportingPdf) return;
+    setIsExportingPdf(true);
+    message.loading({ content: "正在生成 PDF...", key: "daily-review-export" });
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+      const canvas = await html2canvas(exportRef.current, { scale: 2, useCORS: true, backgroundColor: c.pageBg });
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      const imgData = canvas.toDataURL("image/png");
 
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
       pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      pdf.save(`每日复盘-${date}.pdf`);
+      message.success({ content: "PDF 导出成功", key: "daily-review-export" });
+    } catch (error) {
+      console.error("[DailyReview] PDF 导出失败", error);
+      message.error({ content: "PDF 导出失败，请稍后重试", key: "daily-review-export" });
+    } finally {
+      setIsExportingPdf(false);
     }
-    pdf.save(`每日复盘-${date}.pdf`);
   };
 
   return (
@@ -152,13 +205,25 @@ export default function DailyReviewPage() {
             <Title level={3} style={{ margin: 0 }}>每日复盘</Title>
             <Paragraph type="secondary" style={{ margin: 0 }}>按日期生成并保存市场复盘历史</Paragraph>
           </Col>
-          <Col>
-            <Space>
-              <DatePicker value={selectedDate} onChange={(value) => setSelectedDate(value || dayjs())} />
-              <Button type="primary" loading={generateMutation.isPending} onClick={() => handleGenerate(false)}>生成复盘</Button>
-              <Button loading={generateMutation.isPending} onClick={() => handleGenerate(true)}>重新生成</Button>
-              <Button onClick={handleExportPdf} disabled={!review}>导出 PDF</Button>
-              <Button onClick={() => setPushModalOpen(true)} disabled={!review}>推送</Button>
+          <Col style={{ width: isNarrow ? "100%" : undefined }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isNarrow ? "repeat(2, minmax(0, 1fr))" : "repeat(5, max-content)",
+                gap: 8,
+                justifyContent: isNarrow ? "stretch" : "end",
+              }}
+            >
+              <DatePicker
+                value={selectedDate}
+                disabled={generateMutation.isPending || isExportingPdf}
+                onChange={setSelectedDate}
+                style={{ width: "100%", gridColumn: isNarrow ? "1 / -1" : undefined }}
+              />
+              <Button block={isNarrow} type="primary" loading={generateMutation.isPending} disabled={isExportingPdf} onClick={() => handleGenerate(false)}>生成复盘</Button>
+              <Button block={isNarrow} loading={generateMutation.isPending} disabled={isExportingPdf} onClick={() => handleGenerate(true)}>重新生成</Button>
+              <Button block={isNarrow} loading={isExportingPdf} onClick={handleExportPdf} disabled={!review || generateMutation.isPending}>导出 PDF</Button>
+              <Button block={isNarrow} onClick={() => setPushModalOpen(true)} disabled={!review || generateMutation.isPending || isExportingPdf}>推送</Button>
               <PushModal
                 open={pushModalOpen}
                 type="daily_review"
@@ -167,26 +232,90 @@ export default function DailyReviewPage() {
                 onCancel={() => setPushModalOpen(false)}
                 loading={pushMutation.isPending}
               />
-            </Space>
+            </div>
           </Col>
         </Row>
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={7}>
             <Card title="历史复盘" style={cardStyle}>
-              <List
-                dataSource={historyItems}
-                renderItem={(item) => (
-                  <List.Item onClick={() => setSelectedDate(dayjs(item.date))} style={{ cursor: "pointer", background: item.date === date ? c.elevatedBg : undefined, borderLeft: item.date === date ? `3px solid ${c.primary}` : undefined, paddingLeft: item.date === date ? 8 : undefined, borderRadius: 4 }}>
-                    <List.Item.Meta title={item.title} description={<Text type="secondary">{item.date}</Text>} />
-                  </List.Item>
-                )}
-              />
+              <SectionDataState
+                isLoading={isHistoryLoading && historyItems.length === 0}
+                error={isHistoryError && historyItems.length === 0 ? historyError : undefined}
+                onRetry={() => retryHistory()}
+                isEmpty={!isHistoryLoading && !isHistoryError && historyItems.length === 0}
+                emptyText="暂无历史复盘"
+                errorTitle="历史复盘加载失败"
+                skeletonRows={5}
+                minHeight={240}
+              >
+                <List
+                  dataSource={historyItems}
+                  footer={hasNextPage ? (
+                    <Button block loading={isFetchingNextPage} onClick={() => fetchNextPage()}>
+                      加载更多
+                    </Button>
+                  ) : null}
+                  renderItem={(item) => (
+                    <List.Item style={{ display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDate(dayjs(item.date))}
+                        aria-pressed={item.date === date}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          textAlign: "left",
+                          padding: "12px 8px",
+                          cursor: "pointer",
+                          background: item.date === date ? c.elevatedBg : "transparent",
+                          border: 0,
+                          borderLeft: item.date === date ? `3px solid ${c.primary}` : "3px solid transparent",
+                          borderRadius: 4,
+                        }}
+                      >
+                        <List.Item.Meta title={item.title} description={<Text type="secondary">{item.date}</Text>} />
+                      </button>
+                      {item.can_delete ? (
+                        <Popconfirm
+                          title="删除这条复盘记录？"
+                          description="删除后无法恢复"
+                          okText="删除"
+                          cancelText="取消"
+                          okButtonProps={{ danger: true }}
+                          onConfirm={() => handleDelete(item.date)}
+                        >
+                          <Button
+                            type="text"
+                            danger
+                            size="small"
+                            icon={<DeleteOutlined />}
+                            loading={deleteMutation.isPending && deleteMutation.variables === item.date}
+                            aria-label={`删除 ${item.date} 复盘记录`}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                            }}
+                          />
+                        </Popconfirm>
+                      ) : null}
+                    </List.Item>
+                  )}
+                />
+              </SectionDataState>
             </Card>
           </Col>
           <Col xs={24} lg={17}>
             <div ref={exportRef}>
-              {review ? (
+              {isReviewLoading ? (
+                <Card style={cardStyle}>
+                  <div aria-label="复盘内容加载中" style={{ minHeight: 420, padding: 16 }}>
+                    <Skeleton active paragraph={{ rows: 10 }} />
+                  </div>
+                </Card>
+              ) : isReviewError && !(reviewError instanceof ApiError && reviewError.status === 404) ? (
+                <QueryErrorState error={reviewError} onRetry={() => retryReview()} title="复盘内容加载失败" />
+              ) : review ? (
                 <Space direction="vertical" size={16} style={{ width: "100%" }}>
                   <Card style={cardStyle}>
                     <Title level={4} style={{ marginTop: 0 }}>{review.title}</Title>

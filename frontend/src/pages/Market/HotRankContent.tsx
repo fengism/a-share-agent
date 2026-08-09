@@ -1,23 +1,24 @@
-import { useState } from "react";
-import { Card, Col, Empty, Row, Segmented, Table, Tag } from "antd";
+import { useCallback, useMemo, useState } from "react";
+import { Card, Col, Row, Segmented, Table, Tag } from "antd";
 import {
   AppstoreOutlined,
   FireOutlined,
   RiseOutlined,
 } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { ColumnsType } from "antd/es/table";
+import ChangeValue from "../../components/ChangeValue";
+import DataRefreshIndicator from "../../components/DataRefreshIndicator";
+import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
+import SectionDataState from "../../components/SectionDataState";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import {
   useThsHotConcept,
   useThsHotIndustry,
   useThsHotRank,
 } from "../../api/queries";
 import type { ThsHotPlate, ThsHotStock } from "../../types/stock";
-import {
-  changeColor,
-  formatHotValue,
-  formatSignedPercent,
-} from "../../utils/format";
+import { formatHotValue } from "../../utils/format";
 import { useColors } from "../../styles/ui";
 import type { ThemeColors } from "../../theme/themes";
 
@@ -65,22 +66,54 @@ function rankBadge(rank: number, c: ThemeColors) {
 
 function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number }) {
   const c = useColors();
-  const navigate = useNavigate();
-  const { data, isLoading, isFetching } = useThsHotRank(enabled);
+  const isNarrow = useMediaQuery("(max-width: 768px)");
+  const { data, isLoading, isFetching, error, refetch } = useThsHotRank(enabled);
+  const hasData = (data?.length ?? 0) > 0;
 
-  const columns: ColumnsType<ThsHotStock> = [
+  const columns: ColumnsType<ThsHotStock> = useMemo(() => {
+    if (isNarrow) {
+      return [
+        {
+          title: "股票",
+          key: "stock",
+          width: 150,
+          render: (_: unknown, record: ThsHotStock) => (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {rankBadge(record.rank, c)}
+              <Link to={`/analysis/${record.code}`} style={{ minWidth: 0, color: c.primary }}>
+                <span style={{ display: "block", color: c.textPrimary, fontWeight: 600 }}>{record.name}</span>
+                <span style={{ display: "block", color: c.textMuted, fontSize: 11 }}>{record.code}</span>
+              </Link>
+            </div>
+          ),
+        },
+        {
+          title: "涨跌幅",
+          dataIndex: "change_pct",
+          width: 82,
+          align: "right",
+          render: (value: number) => <ChangeValue value={value} fontWeight={500} />,
+        },
+        {
+          title: "热度",
+          dataIndex: "hot_value",
+          width: 70,
+          align: "right",
+          render: (value: number | null) => <span style={{ fontWeight: 600, color: c.up }}>{formatHotValue(value)}</span>,
+        },
+      ];
+    }
+
+    return [
     { title: "排名", dataIndex: "rank", width: 60, align: "center", render: (rank: number) => rankBadge(rank, c) },
     {
       title: "代码",
       dataIndex: "code",
       width: 90,
       render: (code: string) => (
-        <a
-          onClick={() => navigate(`/analysis/${code}`)}
-          style={{ color: c.primary, fontWeight: 500 }}
-        >
+        <Link to={`/analysis/${code}`} style={{ color: c.primary, fontWeight: 500 }}>
           {code}
-        </a>
+        </Link>
       ),
     },
     { title: "名称", dataIndex: "name", width: 100, ellipsis: true },
@@ -89,11 +122,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
       dataIndex: "change_pct",
       width: 85,
       align: "right",
-      render: (value: number) => (
-        <span style={{ color: changeColor(value, c), fontWeight: 500 }}>
-          {formatSignedPercent(value)}
-        </span>
-      ),
+      render: (value: number) => <ChangeValue value={value} fontWeight={500} />,
     },
     {
       title: "热度",
@@ -122,28 +151,88 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
               ))
           : "-",
     },
-  ];
+    ];
+  }, [c, isNarrow]);
+
+  const renderExpandedRow = useCallback((record: ThsHotStock) => (
+    <ResponsiveMetricGrid
+      items={[
+        { key: "concept", label: "关联概念", value: record.concept_tag || "-" },
+        { key: "pop", label: "人气标签", value: record.pop_tag || "-" },
+      ]}
+    />
+  ), []);
 
   return (
-    <Table
-      columns={columns}
-      dataSource={data || []}
-      rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
-      loading={isLoading || isFetching}
-      size="small"
-      pagination={false}
-      locale={{ emptyText: <Empty description="暂无数据" /> }}
-      scroll={{ y: scrollY }}
-    />
+    <div>
+      <div style={{ minHeight: 22, display: "flex", justifyContent: "flex-end" }}>
+        <DataRefreshIndicator active={isFetching && !isLoading} />
+      </div>
+      <SectionDataState
+        isLoading={isLoading && !hasData}
+        error={hasData ? undefined : error}
+        onRetry={() => refetch()}
+        isEmpty={!isLoading && !error && !hasData}
+        emptyText="暂无热股排行数据"
+        errorTitle="热股排行加载失败"
+        minHeight={320}
+      >
+        <Table
+          columns={columns}
+          dataSource={data || []}
+          rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
+          size="small"
+          pagination={false}
+          expandable={isNarrow ? {
+            expandedRowRender: renderExpandedRow,
+            columnWidth: 38,
+          } : undefined}
+          scroll={{ y: scrollY }}
+        />
+      </SectionDataState>
+    </div>
   );
 }
 
 function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: boolean }) {
   const c = useColors();
+  const isNarrow = useMediaQuery("(max-width: 768px)");
   const hook = type === "concept" ? useThsHotConcept : useThsHotIndustry;
-  const { data, isLoading, isFetching } = hook(enabled);
+  const { data, isLoading, isFetching, error, refetch } = hook(enabled);
+  const hasData = (data?.length ?? 0) > 0;
 
-  const columns: ColumnsType<ThsHotPlate> = [
+  const columns: ColumnsType<ThsHotPlate> = useMemo(() => {
+    if (isNarrow) {
+      return [
+        {
+          title: type === "concept" ? "概念" : "行业",
+          key: "plate",
+          width: 150,
+          render: (_: unknown, record: ThsHotPlate) => (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {rankBadge(record.rank, c)}
+              <span style={{ minWidth: 0, color: c.textPrimary, fontWeight: 600 }}>{record.name}</span>
+            </div>
+          ),
+        },
+        {
+          title: "涨跌幅",
+          dataIndex: "change_pct",
+          width: 82,
+          align: "right",
+          render: (value: number) => <ChangeValue value={value} fontWeight={500} />,
+        },
+        {
+          title: "热度",
+          dataIndex: "hot_value",
+          width: 70,
+          align: "right",
+          render: (value: number | null) => <span style={{ fontWeight: 600, color: c.up }}>{formatHotValue(value)}</span>,
+        },
+      ];
+    }
+
+    return [
     { title: "排名", dataIndex: "rank", width: 60, align: "center", render: (rank: number) => rankBadge(rank, c) },
     {
       title: type === "concept" ? "概念名称" : "行业名称",
@@ -157,11 +246,7 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
       dataIndex: "change_pct",
       width: 85,
       align: "right",
-      render: (value: number) => (
-        <span style={{ color: changeColor(value, c), fontWeight: 500 }}>
-          {formatSignedPercent(value)}
-        </span>
-      ),
+      render: (value: number) => <ChangeValue value={value} fontWeight={500} />,
     },
     {
       title: "热度",
@@ -188,18 +273,45 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
       render: (tag: string) =>
         tag ? <Tag color="volcano" style={{ fontSize: 11 }}>{tag}</Tag> : "-",
     },
-  ];
+    ];
+  }, [c, isNarrow, type]);
+
+  const renderExpandedRow = useCallback((record: ThsHotPlate) => (
+    <ResponsiveMetricGrid
+      items={[
+        { key: "hot-tag", label: "上榜标签", value: record.hot_tag || "-" },
+        { key: "limit-tag", label: "涨跌停", value: record.tag || "-" },
+      ]}
+    />
+  ), []);
 
   return (
-    <Table
-      columns={columns}
-      dataSource={data || []}
-      rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
-      loading={isLoading || isFetching}
-      size="small"
-      pagination={false}
-      locale={{ emptyText: <Empty description="暂无数据" /> }}
-    />
+    <div>
+      <div style={{ minHeight: 22, display: "flex", justifyContent: "flex-end" }}>
+        <DataRefreshIndicator active={isFetching && !isLoading} />
+      </div>
+      <SectionDataState
+        isLoading={isLoading && !hasData}
+        error={hasData ? undefined : error}
+        onRetry={() => refetch()}
+        isEmpty={!isLoading && !error && !hasData}
+        emptyText={`暂无${type === "concept" ? "概念" : "行业"}热榜数据`}
+        errorTitle={`${type === "concept" ? "概念" : "行业"}热榜加载失败`}
+        minHeight={320}
+      >
+        <Table
+          columns={columns}
+          dataSource={data || []}
+          rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
+          size="small"
+          pagination={false}
+          expandable={isNarrow ? {
+            expandedRowRender: renderExpandedRow,
+            columnWidth: 38,
+          } : undefined}
+        />
+      </SectionDataState>
+    </div>
   );
 }
 

@@ -1,5 +1,6 @@
-import { Row, Col, Spin } from "antd";
+import { Row, Col } from "antd";
 import { useMacroAllData } from "../../api/queries";
+import SectionDataState from "../../components/SectionDataState";
 import MacroIndicatorCard from "./MacroIndicatorCard";
 import { useColors } from "../../styles/ui";
 import type { ThemeColors } from "../../theme/themes";
@@ -11,24 +12,30 @@ const GDP_FIELDS = (c: ThemeColors) => [
 
 export default function GrowthTab() {
   const c = useColors();
-  const { data, isLoading } = useMacroAllData();
-
-  if (isLoading) {
-    return <div style={{ textAlign: "center", padding: 40 }}><Spin size="large" /></div>;
-  }
+  const { data, isLoading, error, refetch } = useMacroAllData();
 
   const gdp = data?.growth?.gdp;
 
   return (
-    <Row gutter={[16, 16]}>
-      <Col xs={24}>
-        <MacroIndicatorCard
-          title="GDP 国内生产总值（季度）"
-          latest={gdp?.latest ?? null}
-          trend={gdp?.trend ?? []}
-          fields={GDP_FIELDS(c)}
-        />
-      </Col>
-    </Row>
+    <SectionDataState
+      isLoading={isLoading && !data}
+      error={data ? undefined : error}
+      onRetry={() => refetch()}
+      isEmpty={!data}
+      emptyText="暂无 GDP 数据"
+      errorTitle="GDP 数据加载失败"
+      minHeight={280}
+    >
+      <Row gutter={[16, 16]}>
+        <Col xs={24}>
+          <MacroIndicatorCard
+            title="GDP 国内生产总值（季度）"
+            latest={gdp?.latest ?? null}
+            trend={gdp?.trend ?? []}
+            fields={GDP_FIELDS(c)}
+          />
+        </Col>
+      </Row>
+    </SectionDataState>
   );
 }

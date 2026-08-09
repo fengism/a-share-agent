@@ -1,6 +1,10 @@
+import { useCallback, useMemo } from "react";
 import { Table, Tag, Spin, Empty } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import ChangeValue from "../../components/ChangeValue";
+import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { ScreenerFilter, ScreenerItem, ScreenerResult } from "../../types/stock";
 import { useColors, useStyles } from "../../styles/ui";
 
@@ -31,10 +35,10 @@ export default function ResultsTable({
 }: Props) {
   const { tagStyle } = useStyles();
   const c = useColors();
-  const navigate = useNavigate();
+  const isNarrow = useMediaQuery("(max-width: 768px)");
   const currentSortOrder = filters.sort_order === "asc" ? "ascend" : "descend";
 
-  const handleTableChange: TableProps<ScreenerItem>["onChange"] = (pagination, _tableFilters, sorter) => {
+  const handleTableChange = useCallback<NonNullable<TableProps<ScreenerItem>["onChange"]>>((pagination, _tableFilters, sorter) => {
     const sorterConfig = Array.isArray(sorter) ? sorter[0] : sorter;
     const field = typeof sorterConfig?.field === "string" ? SORT_FIELD_MAP[sorterConfig.field] : undefined;
     const order = sorterConfig?.order;
@@ -47,15 +51,50 @@ export default function ResultsTable({
     const page = pagination.current ?? data?.page ?? 1;
     const pageSize = pagination.pageSize ?? data?.page_size ?? 50;
     onPageChange(page, pageSize);
-  };
+  }, [data?.page, data?.page_size, onPageChange, onSortChange]);
 
-  const columns: ColumnsType<ScreenerItem & { pe_percentile?: number | null; pb_percentile?: number | null }> = [
+  const columns: ColumnsType<ScreenerItem & { pe_percentile?: number | null; pb_percentile?: number | null }> = useMemo(() => {
+    if (isNarrow) {
+      return [
+        {
+          title: "股票",
+          key: "stock",
+          width: 132,
+          render: (_: unknown, record: ScreenerItem) => (
+            <Link to={`/analysis/${record.code}`} style={{ display: "block", color: c.primary }}>
+              <span style={{ display: "block", color: c.textPrimary, fontWeight: 600 }}>{record.name}</span>
+              <span style={{ display: "block", color: c.textMuted, fontSize: 11 }}>{record.code}</span>
+            </Link>
+          ),
+        },
+        {
+          title: "价格",
+          dataIndex: "price",
+          width: 72,
+          align: "right",
+          sorter: true,
+          sortOrder: filters.sort_by === "price" ? currentSortOrder : null,
+          render: (value: number | null) => value?.toFixed(2) ?? "-",
+        },
+        {
+          title: "涨跌幅",
+          dataIndex: "change_pct",
+          width: 82,
+          align: "right",
+          sorter: true,
+          sortOrder: filters.sort_by === "change_pct" ? currentSortOrder : null,
+          render: (value: number | null) => <ChangeValue value={value} />,
+        },
+      ];
+    }
+
+    const nextColumns: ColumnsType<ScreenerItem & { pe_percentile?: number | null; pb_percentile?: number | null }> = [
     {
       title: "代码",
       dataIndex: "code",
       width: 90,
       render: (code: string) => (
-        <a role="button" tabIndex={0} onClick={() => navigate(`/analysis/${code}`)} onKeyDown={(e) => { if (e.key === "Enter") navigate(`/analysis/${code}`); }} style={{ color: c.primary, fontWeight: 500, cursor: "pointer" }}>{code}</a>
+        <Link to={`/analysis/${code}`} style={{ color: c.primary, fontWeight: 500 }}>{code}</Link>
       ),
     },
     {
@@ -80,11 +119,7 @@ export default function ResultsTable({
       align: "right",
       sorter: true,
       sortOrder: filters.sort_by === "change_pct" ? currentSortOrder : null,
-      render: (v: number | null) => {
-        if (v == null) return "-";
-        const color = v > 0 ? c.up : v < 0 ? c.down : c.textMuted;
-        return <span style={{ color, fontWeight: 500 }}>{v > 0 ? "+" : ""}{v.toFixed(2)}%</span>;
-      },
+      render: (value: number | null) => <ChangeValue value={value} fontWeight={500} />,
     },
     {
       title: "PE(TTM)",
@@ -147,36 +182,77 @@ export default function ResultsTable({
       ellipsis: true,
       render: (v: ScreenerItem["second_industry"]) => v?.name ? <Tag style={{ ...tagStyle, fontSize: 11 }}>{v.name}</Tag> : "-",
     },
-  ];
+    ];
 
-  if (showPercentile) {
-    columns.push(
-      {
-        title: "PE分位",
-        key: "pe_percentile",
-        width: 75,
-        align: "right",
-        render: (_: unknown, record: ScreenerItem) => {
-          const p = percentileMap.get(record.code);
-          if (p == null) return <Spin size="small" />;
-          const color = p <= 30 ? c.down : p <= 70 ? "#eab308" : c.up;
-          return <span style={{ color, fontWeight: 500 }}>{p.toFixed(0)}%</span>;
+    if (showPercentile) {
+      nextColumns.push(
+        {
+          title: "PE分位",
+          key: "pe_percentile",
+          width: 75,
+          align: "right",
+          render: (_: unknown, record: ScreenerItem) => {
+            const p = percentileMap.get(record.code);
+            if (p == null) return <Spin size="small" />;
+            const color = p <= 30 ? c.down : p <= 70 ? "#eab308" : c.up;
+            return <span style={{ color, fontWeight: 500 }}>{p.toFixed(0)}%</span>;
+          },
         },
-      },
-      {
-        title: "PB分位",
-        key: "pb_percentile",
-        width: 75,
-        align: "right",
-        render: (_: unknown, record: ScreenerItem) => {
-          const p = percentileMap.get(record.code + "_pb");
-          if (p == null) return <Spin size="small" />;
-          const color = p <= 30 ? c.down : p <= 70 ? "#eab308" : c.up;
-          return <span style={{ color, fontWeight: 500 }}>{p.toFixed(0)}%</span>;
+        {
+          title: "PB分位",
+          key: "pb_percentile",
+          width: 75,
+          align: "right",
+          render: (_: unknown, record: ScreenerItem) => {
+            const p = percentileMap.get(record.code + "_pb");
+            if (p == null) return <Spin size="small" />;
+            const color = p <= 30 ? c.down : p <= 70 ? "#eab308" : c.up;
+            return <span style={{ color, fontWeight: 500 }}>{p.toFixed(0)}%</span>;
+          },
         },
-      },
+      );
+    }
+    return nextColumns;
+  }, [c, currentSortOrder, filters.sort_by, isNarrow, percentileMap, showPercentile, tagStyle]);
+
+  const renderExpandedRow = useCallback((record: ScreenerItem) => {
+    const pePercentile = percentileMap.get(record.code);
+    const pbPercentile = percentileMap.get(`${record.code}_pb`);
+    return (
+      <ResponsiveMetricGrid
+        items={[
+          { key: "pe", label: "PE(TTM)", value: record.pe_ttm?.toFixed(1) ?? "-" },
+          { key: "pb", label: "PB", value: record.pb?.toFixed(2) ?? "-" },
+          {
+            key: "market-cap",
+            label: "市值(亿)",
+            value: record.market_cap == null
+              ? "-"
+              : record.market_cap >= 10000
+                ? `${(record.market_cap / 10000).toFixed(1)}万`
+                : record.market_cap.toFixed(1),
+          },
+          { key: "turnover", label: "换手率", value: record.turnover_pct == null ? "-" : `${record.turnover_pct.toFixed(2)}%` },
+          {
+            key: "volume",
+            label: "成交量",
+            value: record.volume == null
+              ? "-"
+              : record.volume >= 1e8
+                ? `${(record.volume / 1e8).toFixed(2)}亿`
+                : record.volume >= 1e4
+                  ? `${(record.volume / 1e4).toFixed(1)}万`
+                  : record.volume.toFixed(0),
+          },
+          { key: "industry", label: "二级行业", value: record.second_industry?.name ?? "-" },
+          ...(showPercentile ? [
+            { key: "pe-percentile", label: "PE分位", value: pePercentile == null ? "计算中" : `${pePercentile.toFixed(0)}%` },
+            { key: "pb-percentile", label: "PB分位", value: pbPercentile == null ? "计算中" : `${pbPercentile.toFixed(0)}%` },
+          ] : []),
+        ]}
+      />
     );
-  }
+  }, [percentileMap, showPercentile]);
 
   return (
     <Table
@@ -189,14 +265,20 @@ export default function ResultsTable({
         current: data?.page || 1,
         pageSize: data?.page_size || 50,
         total: data?.total || 0,
-        showSizeChanger: true,
+        showSizeChanger: !isNarrow,
+        showLessItems: isNarrow,
+        responsive: true,
         pageSizeOptions: ["20", "50", "100"],
         showTotal: (total) => `共 ${total} 只`,
         onChange: (page, pageSize) => onPageChange(page, pageSize),
       }}
       onChange={handleTableChange}
+      expandable={isNarrow ? {
+        expandedRowRender: renderExpandedRow,
+        columnWidth: 38,
+      } : undefined}
       locale={{ emptyText: <Empty description="无匹配股票，请调整筛选条件" /> }}
-      scroll={{ x: "max-content" }}
+      scroll={isNarrow ? undefined : { x: "max-content" }}
     />
   );
 }

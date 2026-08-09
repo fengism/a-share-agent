@@ -1,7 +1,9 @@
 import { Typography, Row, Col, Card } from "antd";
-import { ArrowUpOutlined, ArrowDownOutlined, FundOutlined, MessageOutlined, RobotOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { FundOutlined, MessageOutlined, RobotOutlined } from "@ant-design/icons";
+import { Link } from "react-router-dom";
 import { useMarketIndices } from "../../api/queries";
+import ChangeValue from "../../components/ChangeValue";
+import SectionDataState from "../../components/SectionDataState";
 import { useColors, useStyles } from "../../styles/ui";
 import { formatAmount } from "../../utils/format";
 
@@ -21,8 +23,7 @@ function formatIndexPrice(value: number | string | null | undefined) {
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const { data: marketData } = useMarketIndices();
+  const { data: marketData, isLoading, error, refetch } = useMarketIndices();
   const c = useColors();
   const { cardStyle, pageContainerStyle } = useStyles();
 
@@ -39,7 +40,16 @@ export default function Dashboard() {
         <span style={{ width: 3, height: 18, borderRadius: 2, background: c.primary, display: "inline-block" }} />
         <Text style={{ fontSize: 18, fontWeight: 600, color: c.textPrimary, letterSpacing: 0.2 }}>{dateStr} · 市场概览</Text>
       </div>
-      {mainIndices.length > 0 && (
+      <SectionDataState
+        isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
+        isEmpty={mainIndices.length === 0}
+        emptyText="暂无市场指数数据"
+        errorTitle="市场指数加载失败"
+        skeletonRows={3}
+        minHeight={180}
+      >
         <Row gutter={[12, 12]} style={{ marginBottom: 24 }}>
           {mainIndices.map((idx) => {
             const isUp = idx.change_pct != null && idx.change_pct > 0;
@@ -59,43 +69,37 @@ export default function Dashboard() {
                   </div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                     <Text style={{ color, fontSize: 24, fontWeight: 700, lineHeight: 1.2 }}>{formatIndexPrice(idx.price)}</Text>
-                    {idx.change_pct != null && (
-                      <Text style={{ color, fontSize: 14, fontWeight: 600 }}>
-                        {isUp ? <ArrowUpOutlined /> : isDown ? <ArrowDownOutlined /> : null}
-                        {" "}{isUp ? "+" : ""}{idx.change_pct.toFixed(2)}%
-                      </Text>
-                    )}
+                    <ChangeValue value={idx.change_pct} showIcon style={{ fontSize: 14 }} />
                   </div>
                 </div>
               </Col>
             );
           })}
         </Row>
-      )}
+      </SectionDataState>
       <Row gutter={[16, 16]}>
         {shortcuts.map((s) => (
           <Col xs={24} md={8} key={s.title}>
-            <Card
-              hoverable
-              className="dash-shortcut"
-              style={{
-                ...cardStyle, cursor: "pointer",
-              }}
-              styles={{ body: { padding: "20px 24px" } }}
-              onClick={() => navigate(s.link)}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: 8, background: `${c.primary}14`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: c.primary, border: `1px solid ${c.primary}33`,
-                }}>{s.icon}</div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 15, color: c.textPrimary }}>{s.title}</div>
-                  <div style={{ color: c.textSecondary, fontSize: 13, marginTop: 2 }}>{s.desc}</div>
+            <Link to={s.link} aria-label={`${s.title}：${s.desc}`} style={{ display: "block", height: "100%", textDecoration: "none" }}>
+              <Card
+                hoverable
+                className="dash-shortcut"
+                style={{ ...cardStyle, height: "100%" }}
+                styles={{ body: { padding: "20px 24px" } }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 8, background: `${c.primary}14`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: c.primary, border: `1px solid ${c.primary}33`,
+                  }}>{s.icon}</div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 15, color: c.textPrimary }}>{s.title}</div>
+                    <div style={{ color: c.textSecondary, fontSize: 13, marginTop: 2 }}>{s.desc}</div>
+                  </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </Link>
           </Col>
         ))}
       </Row>

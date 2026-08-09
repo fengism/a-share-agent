@@ -1,19 +1,16 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Button, Form, Input, Typography, Alert } from "antd";
+import { Alert, Button, Form, Input } from "antd";
 import { LockOutlined, SafetyOutlined } from "@ant-design/icons";
 import { useAuthStore } from "../../store/authStore";
 import { changePasswordApi } from "../../api/auth";
-import { useColors } from "../../styles/ui";
+import AuthHeader from "../../components/AuthHeader";
 import AuthShell from "../../components/AuthShell";
-
-const { Title, Text } = Typography;
 
 /** Full-screen forced password change shown on first login for a seeded admin
  *  (or any account flagged must_change_password). The app is unreachable until
  *  a new password is set. */
 export default function ForceChangePasswordPage() {
-  const c = useColors();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -45,24 +42,15 @@ export default function ForceChangePasswordPage() {
 
   return (
     <AuthShell>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <div
-          style={{
-            width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
-            background: c.logoGradient, display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          <SafetyOutlined style={{ color: "#fff", fontSize: 24 }} />
-        </div>
-        <Title level={3} style={{ margin: 0, color: c.textPrimary }}>请修改初始密码</Title>
-        <Text style={{ color: c.textSecondary }}>
-          {user.username}，首次登录需设置新密码后才能继续
-        </Text>
-      </div>
+      <AuthHeader
+        title="请修改初始密码"
+        description={`${user.username}，首次登录需设置新密码后才能继续`}
+        icon={<SafetyOutlined />}
+      />
 
       {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
 
-      <Form layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
+      <Form className="auth-form" layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
         <Form.Item
           name="old_password"
           label="当前密码（临时密码）"
@@ -96,15 +84,15 @@ export default function ForceChangePasswordPage() {
         >
           <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
         </Form.Item>
-        <Form.Item style={{ marginBottom: 8 }}>
+        <Form.Item className="auth-form__submit">
           <Button type="primary" htmlType="submit" block loading={loading}>
             修改并继续
           </Button>
         </Form.Item>
       </Form>
 
-      <div style={{ textAlign: "center" }}>
-        <Button type="link" onClick={handleLogout} style={{ color: c.textSecondary, fontSize: 13 }}>
+      <div className="auth-footer">
+        <Button type="link" onClick={handleLogout}>
           退出登录
         </Button>
       </div>

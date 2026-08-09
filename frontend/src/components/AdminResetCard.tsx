@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, Form, Input, Button, Select, message, Typography } from "antd";
 import { KeyOutlined, CopyOutlined } from "@ant-design/icons";
 import { adminResetLinkApi } from "../api/auth";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useStyles, useColors } from "../styles/ui";
 
 const { Text } = Typography;
@@ -10,6 +11,7 @@ const { Text } = Typography;
 export default function AdminResetCard() {
   const { cardStyle, sectionCardBodyStyle } = useStyles();
   const c = useColors();
+  const isNarrow = useMediaQuery("(max-width: 640px)");
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ url: string; username: string; expires_at: string } | null>(null);
@@ -51,17 +53,17 @@ export default function AdminResetCard() {
       </div>
       <Form
         form={form}
-        layout="inline"
+        layout={isNarrow ? "vertical" : "inline"}
         onFinish={onFinish}
         initialValues={{ expires_in_hours: 24 }}
         style={{ rowGap: 8, flexWrap: "wrap" }}
       >
         <Form.Item name="username" rules={[{ required: true, message: "请输入用户名" }]}>
-          <Input placeholder="用户名" style={{ width: 180 }} />
+          <Input placeholder="用户名" style={{ width: isNarrow ? "100%" : 180 }} />
         </Form.Item>
         <Form.Item name="expires_in_hours">
           <Select
-            style={{ width: 140 }}
+            style={{ width: isNarrow ? "100%" : 140 }}
             options={[
               { value: 1, label: "1 小时后过期" },
               { value: 24, label: "24 小时后过期" },
@@ -71,7 +73,7 @@ export default function AdminResetCard() {
           />
         </Form.Item>
         <Form.Item>
-          <Button type="primary" htmlType="submit" loading={loading}>
+          <Button type="primary" htmlType="submit" loading={loading} block={isNarrow}>
             生成重置链接
           </Button>
         </Form.Item>
@@ -87,11 +89,11 @@ export default function AdminResetCard() {
           <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>
             已为 <Text strong>{result.username}</Text> 生成链接（{result.expires_at} 前有效），仅显示一次：
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: isNarrow ? "stretch" : "center", flexDirection: isNarrow ? "column" : "row" }}>
             <code style={{ flex: 1, fontFamily: "monospace", fontSize: 12, color: c.textPrimary, wordBreak: "break-all" }}>
               {result.url}
             </code>
-            <Button size="small" icon={<CopyOutlined />} onClick={copy}>复制</Button>
+            <Button size="small" icon={<CopyOutlined />} onClick={copy} style={{ alignSelf: isNarrow ? "flex-end" : undefined }}>复制</Button>
           </div>
         </div>
       )}

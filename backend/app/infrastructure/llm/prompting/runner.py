@@ -1,0 +1,108 @@
+import hashlib
+import json
+import logging
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel
+
+from app.configuration import Settings
+from app.infrastructure.llm.adapters import LLMClient
+from app.infrastructure.llm.prompting.schemas import PromptTrace
+from app.infrastructure.llm.prompting.spec import PromptContext, PromptSpec
+from app.infrastructure.llm.sync_client import create_llm_client, llm_chat
+
+logger = logging.getLogger(__name__)
+OutputT = TypeVar("OutputT", bound=BaseModel)
+
+
+@dataclass(frozen=True)
+class PromptRun(Generic[OutputT]):
+    value: OutputT
+    trace: PromptTrace
+
+
+class PromptExecutionError(ValueError):
+    def __init__(self, message: str, *, raw_response: str, trace: PromptTrace):
+        super().__init__(message)
+        self.raw_response = raw_response
+        self.trace = trace
+
+
+def _input_digest(messages: list[dict[str, str]]) -> str:
+    serialized = json.dumps(messages, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _trace(spec: PromptSpec, messages: list[dict[str, str]], client: LLMClient, temperature: float) -> PromptTrace:
+    return PromptTrace(
+        prompt_id=spec.id,
+        prompt_version=spec.version,
+        model=str(getattr(client, "model", "")),
+        temperature=temperature,
+        input_digest=_input_digest(messages),
+        generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
+    )
+
+
+async def run_structured_prompt(
+    spec: PromptSpec[OutputT],
+    context: PromptContext,
+    *,
+    settings: Settings | None = None,
+    client: LLMClient | None = None,
+    temperature: float | None = None,
+) -> PromptRun[OutputT]:
+    """渲染、执行并校验一个结构化 Prompt，失败时按规格执行修复重试。"""
+    if client is None:
+        client = create_llm_client(settings)
+    effective_temperature = spec.temperature if temperature is None else temperature
+    messages = spec.render(context)
+    trace = _trace(spec, messages, client, effective_temperature)
+    raw_response = ""
+    parse_error: Exception | None = None
+
+    for attempt in range(spec.repair_attempts + 1):
+        request_messages = messages
+        request_temperature = effective_temperature
+        if attempt > 0:
+            request_temperature = 0.0
+            request_messages = messages + [
+                {"role": "assistant", "content": raw_response},
+                {
+                    "role": "user",
+                    "content": (
+                        "上一版输出未通过 JSON Schema/Pydantic 校验。"
+                        f"错误：{str(parse_error)[:1000]}\n请只重新输出修复后的完整 JSON 对象。"
+                    ),
+                },
+            ]
+        raw_response = await llm_chat(
+            request_messages,
+            temperature=request_temperature,
+            json_format=True,
+            settings=settings,
+            client=client,
+        )
+        try:
+            value = spec.parse(raw_response)
+            completed_trace = trace.model_copy(update={"attempts": attempt + 1})
+            logger.info(
+                "Prompt 执行成功: prompt=%s model=%s attempts=%s digest=%s",
+                spec.ref,
+                completed_trace.model,
+                completed_trace.attempts,
+                completed_trace.input_digest[:12],
+            )
+            return PromptRun(value=value, trace=completed_trace)
+        except (TypeError, ValueError) as exc:
+            parse_error = exc
+            logger.warning("Prompt 输出校验失败: prompt=%s attempt=%s error=%s", spec.ref, attempt + 1, exc)
+
+    failed_trace = trace.model_copy(update={"attempts": spec.repair_attempts + 1})
+    raise PromptExecutionError(
+        f"Prompt 输出在 {failed_trace.attempts} 次尝试后仍未通过校验: {parse_error}",
+        raw_response=raw_response,
+        trace=failed_trace,
+    )

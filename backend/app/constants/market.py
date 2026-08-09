@@ -8,10 +8,6 @@ INDEX_FALLBACKS = [
 ]
 
 SINA_INDEX_QUOTE_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple"
-SINA_INDEX_PAGE_COUNT_URL = (
-    "http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/"
-    "Market_Center.getHQNodeStockCountSimple?node=hs_s"
-)
 SINA_MARKET_HQ_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData"
 SINA_STOCK_KLINE_URL = "https://quotes.sina.cn/cn/api/jsonp_v2.php/=/CN_MarketDataService.getKLineData"
 

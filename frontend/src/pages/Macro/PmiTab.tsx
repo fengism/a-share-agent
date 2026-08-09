@@ -1,5 +1,6 @@
-import { Row, Col, Spin } from "antd";
+import { Row, Col } from "antd";
 import { useMacroAllData } from "../../api/queries";
+import SectionDataState from "../../components/SectionDataState";
 import MacroIndicatorCard from "./MacroIndicatorCard";
 import { useColors } from "../../styles/ui";
 import type { ThemeColors } from "../../theme/themes";
@@ -12,24 +13,30 @@ const PMI_FIELDS = (c: ThemeColors) => [
 
 export default function PmiTab() {
   const c = useColors();
-  const { data, isLoading } = useMacroAllData();
-
-  if (isLoading) {
-    return <div style={{ textAlign: "center", padding: 40 }}><Spin size="large" /></div>;
-  }
+  const { data, isLoading, error, refetch } = useMacroAllData();
 
   const pmi = data?.sentiment?.pmi;
 
   return (
-    <Row gutter={[16, 16]}>
-      <Col xs={24}>
-        <MacroIndicatorCard
-          title="PMI 采购经理人指数"
-          latest={pmi?.latest ?? null}
-          trend={pmi?.trend ?? []}
-          fields={PMI_FIELDS(c)}
-        />
-      </Col>
-    </Row>
+    <SectionDataState
+      isLoading={isLoading && !data}
+      error={data ? undefined : error}
+      onRetry={() => refetch()}
+      isEmpty={!data}
+      emptyText="暂无 PMI 数据"
+      errorTitle="PMI 数据加载失败"
+      minHeight={280}
+    >
+      <Row gutter={[16, 16]}>
+        <Col xs={24}>
+          <MacroIndicatorCard
+            title="PMI 采购经理人指数"
+            latest={pmi?.latest ?? null}
+            trend={pmi?.trend ?? []}
+            fields={PMI_FIELDS(c)}
+          />
+        </Col>
+      </Row>
+    </SectionDataState>
   );
 }

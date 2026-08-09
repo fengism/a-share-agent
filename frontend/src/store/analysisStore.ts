@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { AnalysisResult } from "../types/stock";
 import type { AnalysisStage } from "../api/sse";
+import { registerUserScopeHandler } from "./userScope";
 
 const INITIAL_STAGES: AnalysisStage[] = [
   { stage: 1, name: "数据采集", status: "failed" },
@@ -26,16 +27,23 @@ interface AnalysisState {
   setAnalysisError: (error: string | null) => void;
   setCancelAnalysis: (cancel: (() => void) | null) => void;
   resetAnalysisProgress: () => void;
+  resetAnalysis: () => void;
 }
 
-export const useAnalysisStore = create<AnalysisState>((set) => ({
-  currentCode: "",
-  analysisResult: null,
-  isAnalyzing: false,
-  analysisStages: [...INITIAL_STAGES],
-  currentStageIndex: 0,
-  analysisError: null,
-  cancelAnalysis: null,
+function initialAnalysisState() {
+  return {
+    currentCode: "",
+    analysisResult: null,
+    isAnalyzing: false,
+    analysisStages: [...INITIAL_STAGES],
+    currentStageIndex: 0,
+    analysisError: null,
+    cancelAnalysis: null,
+  };
+}
+
+export const useAnalysisStore = create<AnalysisState>((set, get) => ({
+  ...initialAnalysisState(),
   setCurrentCode: (code) => set({ currentCode: code }),
   setAnalysisResult: (result) => set({ analysisResult: result }),
   setIsAnalyzing: (loading) => set({ isAnalyzing: loading }),
@@ -57,4 +65,12 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
     currentStageIndex: 0,
     analysisError: null,
   }),
+  resetAnalysis: () => {
+    get().cancelAnalysis?.();
+    set(initialAnalysisState());
+  },
 }));
+
+registerUserScopeHandler(() => {
+  useAnalysisStore.getState().resetAnalysis();
+});

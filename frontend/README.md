@@ -13,6 +13,8 @@ A 股智能分析平台的 Web 前端:实时行情、资金流向、龙虎榜、
 
 ## 开发
 
+建议使用 Node.js 22，以保持与 Docker 镜像和 CI 环境一致。
+
 ```bash
 npm install
 npm run dev        # 启动开发服务器(默认 5173)
@@ -52,4 +54,4 @@ src/
 
 ## 部署
 
-`Dockerfile` 基于 nginx 提供静态产物,`nginx.conf` 配置了 gzip、静态资源长缓存、`/api` 反向代理与限流。见仓库根目录的 `docker-compose.yml`。
+`Dockerfile` 使用 Node.js 22 构建，并由 nginx 在容器内的 `8080` 端口提供静态产物。`nginx.conf` 配置了 gzip、静态资源长缓存、`/api` 反向代理与限流；Compose 默认映射到 `http://localhost:8080`，可通过 `DOCKER_FRONTEND_PORT` 修改宿主机端口。完整部署和备份步骤见仓库根目录的 `README.md`。
