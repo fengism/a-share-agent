@@ -2,7 +2,8 @@
 
 FROM python:3.11-slim AS build
 
-COPY --from=ghcr.io/astral-sh/uv:0.9.1 /uv /uvx /bin/
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install uv==0.9.1
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy

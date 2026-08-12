@@ -14,7 +14,7 @@ RUN_DIR="$LOG_DIR/run"
 MODE="${1:-dev}"
 
 BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
-BACKEND_PORT="${BACKEND_PORT:-8000}"
+BACKEND_PORT="${BACKEND_PORT:-8090}"
 FRONTEND_HOST="${FRONTEND_HOST:-127.0.0.1}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 STARTUP_TIMEOUT="${STARTUP_TIMEOUT:-90}"
@@ -122,6 +122,34 @@ wait_for_http() {
     return 1
 }
 
+print_initial_password() {
+    local log_file="$1"
+    local username=""
+    local password=""
+
+    if ! grep -q "已创建默认管理员账号" "$log_file" 2>/dev/null; then
+        return 0
+    fi
+
+    username="$(
+        grep -E '用户名:' "$log_file" 2>/dev/null |
+            tail -1 |
+            sed -E 's/.*用户名:[[:space:]]*([^[:space:]]+).*/\1/' || true
+    )"
+    password="$(
+        grep -E '临时密码:' "$log_file" 2>/dev/null |
+            tail -1 |
+            sed -E 's/.*临时密码:[[:space:]]*([^[:space:]]+).*/\1/' || true
+    )"
+
+    [ -n "$password" ] || return 0
+    [ -n "$username" ] || username="admin"
+
+    printf "\n%b首次启动默认管理员（仅本次显示，请立即登录并修改密码）%b\n" "$YELLOW" "$NC"
+    printf "  用户名: %s\n" "$username"
+    printf "  临时密码: %s\n\n" "$password"
+}
+
 case "$MODE" in
     dev|prod) ;;
     -h|--help)
@@ -203,6 +231,7 @@ case "$BACKEND_CHECK_HOST" in
 esac
 BACKEND_URL="http://${BACKEND_CHECK_HOST}:${BACKEND_PORT}"
 wait_for_http "后端" "$BACKEND_URL/api/health/ready" "$BACKEND_PID" "$BACKEND_LOG"
+print_initial_password "$BACKEND_LOG"
 
 printf "\n=== 启动前端 (Vite) [%b%s%b] ===\n" "$CYAN" "$MODE" "$NC"
 cd "$FRONTEND_DIR"
