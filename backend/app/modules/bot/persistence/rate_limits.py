@@ -3,6 +3,7 @@
 import time
 
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
+from app.infrastructure.persistence.retention import PurgeResult, purge_rows_in_batches
 
 
 def _delete_expired(conn, cutoff: float) -> int:
@@ -44,8 +45,19 @@ def allow(
 
 
 def purge_expired(window_seconds: int, *, now: float | None = None) -> int:
+    return purge_expired_with_status(window_seconds, now=now).deleted
+
+
+def purge_expired_with_status(
+    window_seconds: int,
+    *,
+    now: float | None = None,
+) -> PurgeResult:
     current_time = time.time() if now is None else now
-    conn = get_connection("user")
-    deleted = _delete_expired(conn, current_time - max(1, window_seconds))
-    conn.commit()
-    return deleted
+    return purge_rows_in_batches(
+        get_connection("user"),
+        table_name="bot_rate_limit_events",
+        predicate_sql="occurred_at <= ?",
+        parameters=(current_time - max(1, window_seconds),),
+        order_by="occurred_at, rowid",
+    )

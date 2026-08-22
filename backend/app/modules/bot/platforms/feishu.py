@@ -15,8 +15,8 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 
 from app.configuration.schema import Settings
-from app.contracts.content import ContentBlock
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
+from app.domain.content import ContentBlock
 from app.infrastructure.integrations.feishu.adapter import to_feishu_card
 from app.infrastructure.integrations.feishu.client import FeishuClient, feishu_client
 from app.modules.bot.models import BotMessage, BotResponse

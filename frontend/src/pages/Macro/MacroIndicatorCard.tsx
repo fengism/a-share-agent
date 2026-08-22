@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
-import { Card, Col, Empty, Row, Statistic, Typography } from "antd";
+import { Card, Col, Empty, Row, Space, Statistic, Tag, Tooltip, Typography } from "antd";
 import { useColors, useStyles } from "../../theme/hooks";
+import type { MacroIndicator } from "../../types/stock";
 
 const { Text } = Typography;
 
@@ -21,6 +22,7 @@ interface MacroIndicatorCardProps {
   fields: FieldDef[];
   dateKey?: string;
   chartType?: "line" | "bar";
+  metadata?: MacroIndicator;
 }
 
 export default function MacroIndicatorCard({
@@ -30,6 +32,7 @@ export default function MacroIndicatorCard({
   fields,
   dateKey = "TIME",
   chartType = "line",
+  metadata,
 }: MacroIndicatorCardProps) {
   const c = useColors();
   const { cardStyle } = useStyles();
@@ -95,17 +98,30 @@ export default function MacroIndicatorCard({
     );
   }
 
-  const dateValue = latest[dateKey];
+  const dateValue = metadata?.latest_period ?? latest[dateKey];
+  const sourceLabel = metadata?.source === "nbs"
+    ? "国家统计局"
+    : metadata?.source === "eastmoney" ? "东方财富" : metadata?.source;
 
   return (
     <Card
       style={cardStyle}
       title={
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
           <span style={{ color: c.textPrimary, fontWeight: 600 }}>{title}</span>
-          {dateValue && (
-            <Text style={{ color: c.textMuted, fontSize: 12 }}>{String(dateValue)}</Text>
-          )}
+          <Space size={4} wrap>
+            {sourceLabel ? (
+              <Tooltip title={metadata?.source_api || undefined}>
+                <Tag color={metadata?.source === "nbs" ? "blue" : undefined}>{sourceLabel}</Tag>
+              </Tooltip>
+            ) : null}
+            {metadata?.is_fallback ? <Tag color="warning">fallback</Tag> : null}
+            {metadata?.is_stale ? <Tag color="error">数据滞后</Tag> : null}
+            {!metadata?.is_stale && metadata?.stale_fields?.length ? <Tag color="warning">部分字段滞后</Tag> : null}
+            {dateValue && (
+              <Text style={{ color: c.textMuted, fontSize: 12 }}>{String(dateValue)}</Text>
+            )}
+          </Space>
         </div>
       }
       styles={{ body: { padding: "12px 16px" } }}
@@ -119,16 +135,21 @@ export default function MacroIndicatorCard({
             <Col xs={12} sm={8} md={6} key={f.key}>
               <div style={{ textAlign: "center" }}>
                 <Text style={{ color: c.textMuted, fontSize: 11, display: "block", marginBottom: 2 }}>
-                  {f.label}
+                  <Tooltip title={metadata?.field_periods?.[f.key] ? `数据周期：${metadata.field_periods[f.key]}` : undefined}>
+                    <span>{f.label}</span>
+                  </Tooltip>
+                  {metadata?.stale_fields?.includes(f.key) ? <Tag color="warning" style={{ marginInlineStart: 4, marginInlineEnd: 0 }}>滞后</Tag> : null}
                 </Text>
                 <Statistic
                   value={numVal ?? undefined}
                   precision={numVal != null ? precision : undefined}
                   suffix={f.unit}
-                  valueStyle={{
-                    color: f.color || valueColor(numVal),
-                    fontSize: 18,
-                    fontWeight: 600,
+                  styles={{
+                    content: {
+                      color: f.color || valueColor(numVal),
+                      fontSize: 18,
+                      fontWeight: 600,
+                    },
                   }}
                 />
               </div>

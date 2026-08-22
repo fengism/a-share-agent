@@ -17,12 +17,9 @@ function makeRun(overrides: Partial<QuantBacktestRun> = {}): QuantBacktestRun {
       universe: { source: "custom", codes: ["600519"] },
       strategy: {
         type: "ma_cross",
-        fast_period: 5,
-        slow_period: 20,
-        lookback_period: 20,
-        rsi_period: 14,
-        buy_threshold: 30,
-        sell_threshold: 70,
+        version: "1.0.0",
+        name: "双均线趋势",
+        parameters: { fast_period: 5, slow_period: 20 },
       },
       start_date: "2025-01-01",
       end_date: "2026-01-01",
@@ -86,6 +83,8 @@ describe("BacktestHistory", () => {
     const failedRun = makeRun({ id: "run-failed", name: "银行突破", status: "failed" });
     render(<BacktestHistory {...baseProps} runs={[makeRun(), failedRun]} />);
 
+    expect(screen.queryByRole("textbox", { name: "搜索历史回测" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /筛选历史回测/ }));
     fireEvent.change(screen.getByRole("textbox", { name: "搜索历史回测" }), { target: { value: "银行" } });
     expect(screen.getByRole("button", { name: "查看回测 银行突破" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "查看回测 消费双均线" })).not.toBeInTheDocument();
@@ -97,5 +96,87 @@ describe("BacktestHistory", () => {
 
     expect(screen.getByRole("button", { name: "查看回测 银行突破" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "查看回测 消费双均线" })).not.toBeInTheDocument();
+  });
+
+  it("shows the actual strategy even when an old run name says double moving average", () => {
+    const run = makeRun({
+      name: "双均线回测",
+      request: {
+        name: "双均线回测",
+        universe: { source: "custom", codes: ["600519"] },
+        strategy: {
+          type: "bias_reversal",
+          version: "1.0.0",
+          name: "BIAS 乖离率反转",
+          parameters: { period: 6, buy_threshold: -3, sell_threshold: 3 },
+        },
+        start_date: "2025-01-01",
+        end_date: "2026-01-01",
+        benchmark: "000300",
+      },
+    });
+
+    render(<BacktestHistory {...baseProps} runs={[run]} />);
+
+    expect(screen.getByText(/BIAS 乖离率反转/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看回测 双均线回测" })).toBeInTheDocument();
+  });
+
+
+  it("filters history by the persisted strategy type", async () => {
+    const biasRun = makeRun({
+      id: "run-bias",
+      name: "BIAS 实验",
+      request: {
+        name: "BIAS 实验",
+        universe: { source: "custom", codes: ["600519"] },
+        strategy: {
+          type: "bias_reversal",
+          version: "1.0.0",
+          name: "BIAS 乖离率反转",
+          parameters: { period: 6, buy_threshold: -3, sell_threshold: 3 },
+        },
+        start_date: "2025-01-01",
+        end_date: "2026-01-01",
+        benchmark: "000300",
+      },
+    });
+    render(<BacktestHistory {...baseProps} runs={[makeRun(), biasRun]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /筛选历史回测/ }));
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "历史策略" }));
+    fireEvent.click(await screen.findByText("BIAS 乖离率反转"));
+
+    expect(screen.getByRole("button", { name: "查看回测 BIAS 实验" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查看回测 消费双均线" })).not.toBeInTheDocument();
+    expect(screen.getByText("1/2 条")).toBeInTheDocument();
+  });
+
+  it("loads more history pages only when more runs exist", async () => {
+    const onLoadMore = vi.fn();
+    const { rerender } = render(
+      <BacktestHistory
+        {...baseProps}
+        runs={[makeRun()]}
+        hasMore
+        isLoadingMore={false}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "加载更多" });
+    fireEvent.click(button);
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <BacktestHistory
+        {...baseProps}
+        runs={[makeRun()]}
+        hasMore={false}
+        isLoadingMore={false}
+        onLoadMore={onLoadMore}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "加载更多" })).not.toBeInTheDocument();
   });
 });

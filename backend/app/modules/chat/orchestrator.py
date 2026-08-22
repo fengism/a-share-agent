@@ -23,11 +23,16 @@ from app.agentic.orchestration.reviewer import (
 )
 from app.agentic.orchestration.synthesis import stream_synthesis
 from app.agentic.protocol import AgentMessage
+from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.tools.packs.stock.context import resolve_stock_context
 from app.configuration import get_effective_settings
+from app.core.metrics import metrics
 from app.infrastructure.llm.runtime import borrow_async_openai_chat_runtime
 from app.modules.chat.general_agent import stream_general_agent
-from app.modules.chat.prompts import DECISION_SYNTHESIS_PROMPT
+from app.modules.chat.prompts import (
+    DECISION_SYNTHESIS_PROMPT,
+    DECISION_SYNTHESIS_PROMPT_REF,
+)
 from app.modules.chat.routing import (
     RoutingDecision,
     classify_message,
@@ -46,6 +51,8 @@ class Orchestrator:
         agent_names: Collection[str] | None = None,
         skill_names: Collection[str] | None = None,
         allowed_tool_names: Collection[str] | None = None,
+        require_tool_evidence: bool = False,
+        execution_context: AgentExecutionContext | None = None,
     ):
         register_all_capabilities()
         selected_skills = None if skill_names is None else set(skill_names)
@@ -60,6 +67,8 @@ class Orchestrator:
             else list(dict.fromkeys(allowed_tool_names))
         )
         self.sub_agents = select_agent_profiles(agent_names)
+        self.require_tool_evidence = require_tool_evidence
+        self.execution_context = execution_context
 
     def _early_general_tool_names(self, message: str) -> list[str] | None:
         if is_url_message(message):
@@ -83,6 +92,8 @@ class Orchestrator:
             history,
             tool_names=tool_names,
             skill_names=self.skill_names,
+            require_tool_evidence=self.require_tool_evidence and bool(tool_names),
+            execution_context=self.execution_context,
         ):
             yield delta
 
@@ -161,30 +172,35 @@ class Orchestrator:
         }
         if not usable_results:
             yield AgentEvent(type="error", error="当前分析未生成有效结果，请稍后重试")
-            yield AgentEvent(type="done")
+            yield AgentEvent(type="done", status="failed")
             return
 
         if len(usable_results) == 1:
             result = next(iter(usable_results.values()))
             yield AgentEvent(type="text", content=result.analysis)
-            yield AgentEvent(type="done")
+            yield AgentEvent(
+                type="done",
+                status=result.status,
+                warnings=result.warnings,
+            )
             return
 
         yield AgentEvent(type="status", content="正在综合各维度结论…")
-        async for token in self._synthesize(
+        async for event in self._synthesize(
             message,
             usable_results,
             llm_client,
             model,
             temperature,
         ):
-            yield AgentEvent(type="text", content=token)
-        yield AgentEvent(type="done")
+            yield event
 
     async def run(
         self,
         message: str,
         history: list[AgentMessage] | None = None,
+        *,
+        initial_decision: RoutingDecision | None = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         """多 Agent 编排主流程：路由 → 并发执行子 Agent → 综合分析。"""
         early_tool_names = self._early_general_tool_names(message)
@@ -193,7 +209,7 @@ class Orchestrator:
                 yield delta
             return
 
-        decision = self._keyword_classify(message)
+        decision = initial_decision or self._keyword_classify(message)
         logger.info("Keyword classify: agents=%s", decision.agents)
 
         if not decision.agents:
@@ -205,7 +221,11 @@ class Orchestrator:
                 yield delta
             return
 
-        settings = get_effective_settings()
+        settings = (
+            self.execution_context.settings
+            if self.execution_context is not None
+            else get_effective_settings()
+        )
         async with borrow_async_openai_chat_runtime(settings) as runtime:
             llm_client = runtime.client
             model = runtime.model
@@ -221,7 +241,8 @@ class Orchestrator:
                 yield delta
 
     async def _resolve_stocks(self, message: str) -> str:
-        return await resolve_stock_context(message, extract_stock_codes(message))
+        resolved = await resolve_stock_context(message, extract_stock_codes(message))
+        return str(resolved)
 
     def _keyword_classify(self, message: str) -> RoutingDecision:
         return classify_message(message, self.sub_agents)
@@ -248,6 +269,7 @@ class Orchestrator:
             results,
             temperature,
             attempt=attempt,
+            execution_context=self.execution_context,
         ):
             yield delta
 
@@ -278,6 +300,7 @@ class Orchestrator:
             review.retry_task_ids,
             [issue.reason for issue in review.issues],
         )
+        metrics.record_agentic_event("review_retry")
         retry_issues = {
             issue.task_id: issue.reason
             for issue in review.issues
@@ -320,13 +343,24 @@ class Orchestrator:
 
     async def _synthesize(self, message: str, results: dict[str, AgentExecutionResult],
                           llm_client: AsyncOpenAI, model: str,
-                          temperature: float = 0.1) -> AsyncGenerator[str, None]:
-        async for token in stream_synthesis(
+                          temperature: float = 0.1) -> AsyncGenerator[AgentEvent, None]:
+        async for event in stream_synthesis(
             message,
             results,
             llm_client,
             model,
             system_prompt=DECISION_SYNTHESIS_PROMPT,
+            prompt_ref=DECISION_SYNTHESIS_PROMPT_REF,
             temperature=temperature,
+            max_completion_tokens=(
+                self.execution_context.settings.chat_max_completion_tokens
+                if self.execution_context is not None
+                else None
+            ),
+            max_input_characters=(
+                self.execution_context.settings.chat_max_synthesis_characters
+                if self.execution_context is not None
+                else 60_000
+            ),
         ):
-            yield token
+            yield event

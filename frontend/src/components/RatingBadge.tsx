@@ -9,16 +9,18 @@ export default function RatingBadge({ score, size = 64 }: Props) {
   const c = useColors();
   const getColor = (s: number) => {
     if (s >= 8) return c.up;
-    if (s >= 6) return "#b65c00";
+    if (s >= 6) return c.warning;
     if (s >= 4) return c.primary;
     return c.down;
   };
 
+  // Background tint tracks the border color exactly (8% alpha via hex "14"
+  // suffix) so fill and ring stay in the same hue across both themes.
   const getBg = (s: number) => {
-    if (s >= 8) return "rgba(201,55,44,0.08)";
-    if (s >= 6) return "rgba(182,92,0,0.08)";
-    if (s >= 4) return "rgba(31,58,95,0.08)";
-    return "rgba(31,132,90,0.08)";
+    if (s >= 8) return `${c.up}14`;
+    if (s >= 6) return `${c.warning}14`;
+    if (s >= 4) return `${c.primary}14`;
+    return `${c.down}14`;
   };
 
   return (

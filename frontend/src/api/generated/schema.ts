@@ -141,7 +141,7 @@ export interface paths {
          * @description SSE 端点，流式推送分析进度事件。
          *
          *     Param:
-         *         code: 股票代码（路径参数），6 位数字；同一代码并发请求会返回 409。
+         *         code: 股票代码（路径参数），6 位数字；同一代码并发请求会附着到已有任务。
          *     Return:
          *         EventSourceResponse: SSE 流，依次发送 progress 事件并以哨兵结束。
          */
@@ -476,6 +476,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Chat Sessions */
+        get: operations["read_chat_sessions_api_chat_sessions_get"];
+        /** Write Chat Sessions */
+        put: operations["write_chat_sessions_api_chat_sessions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config": {
         parameters: {
             query?: never;
@@ -620,6 +638,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/health/metrics/prometheus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Prometheus Metrics */
+        get: operations["prometheus_metrics_api_health_metrics_prometheus_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health/ready": {
         parameters: {
             query?: never;
@@ -729,7 +764,7 @@ export interface paths {
          * @description SSE 端点，流式推送产业链分析进度。
          *
          *     Param:
-         *         name: 产业链名称（路径参数）；同名并发请求会返回 409。
+         *         name: 产业链名称（路径参数）；同名并发请求会附着到已有任务。
          *     Return:
          *         EventSourceResponse: SSE 流，逐条推送 IndustryChainProgress 事件。
          */
@@ -751,12 +786,26 @@ export interface paths {
         };
         /**
          * Get Macro All
-         * @description 获取全量宏观经济指标数据（6大类）。
-         *
-         *     Return:
-         *         dict: 物价/景气/货币/利率/增速/外贸 六大板块的最新值与趋势数据。
+         * @description 获取全量宏观经济指标数据。
          */
         get: operations["get_macro_all_api_macro_all_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/macro/us": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Us Macro */
+        get: operations["get_us_macro_api_macro_us_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -775,13 +824,28 @@ export interface paths {
         /**
          * Get Dragon Tiger List
          * @description 获取龙虎榜列表。
-         *
-         *     Param:
-         *         report_date: 报告日期（查询参数），格式 YYYY-MM-DD，留空表示当天。
-         *     Return:
-         *         list[dict]: 龙虎榜个股摘要。
          */
         get: operations["get_dragon_tiger_list_api_market_dragon_tiger_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/emotion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Emotion
+         * @description 获取财联社实时市场情绪。
+         */
+        get: operations["get_market_emotion_api_market_emotion_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -800,9 +864,6 @@ export interface paths {
         /**
          * Get Market Feed
          * @description 获取 24 小时市场新闻流。
-         *
-         *     Return:
-         *         list[dict] | dict: 综合多源的新闻列表，按时间倒序。
          */
         get: operations["get_market_feed_api_market_feed_get"];
         put?: never;
@@ -822,10 +883,7 @@ export interface paths {
         };
         /**
          * Get Ths Hot Rank
-         * @description 获取同花顺热股榜单（与 /hot-stocks 等价）。
-         *
-         *     Return:
-         *         list[dict]: 同花顺热股榜数据。
+         * @description 获取同花顺热股榜单。
          */
         get: operations["get_ths_hot_rank_api_market_hot_rank_ths_get"];
         put?: never;
@@ -846,9 +904,6 @@ export interface paths {
         /**
          * Get Ths Hot Concept
          * @description 获取同花顺热门概念榜。
-         *
-         *     Return:
-         *         list[dict]: 热门概念名称与热度指标。
          */
         get: operations["get_ths_hot_concept_api_market_hot_rank_ths_concept_get"];
         put?: never;
@@ -869,9 +924,6 @@ export interface paths {
         /**
          * Get Ths Hot Industry
          * @description 获取同花顺热门行业榜。
-         *
-         *     Return:
-         *         list[dict]: 热门行业名称与对应热度指标。
          */
         get: operations["get_ths_hot_industry_api_market_hot_rank_ths_industry_get"];
         put?: never;
@@ -891,10 +943,7 @@ export interface paths {
         };
         /**
          * Get Hot Stocks
-         * @description 获取热门股排名（默认同花顺数据源）。
-         *
-         *     Return:
-         *         list[dict]: 热门股排序与对应人气指标。
+         * @description 获取热门股排名。
          */
         get: operations["get_hot_stocks_api_market_hot_stocks_get"];
         put?: never;
@@ -945,6 +994,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/index-intraday": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Index Intraday
+         * @description 获取主要大盘指数当前交易日分时行情。
+         */
+        get: operations["get_index_intraday_api_market_index_intraday_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/index-kline": {
         parameters: {
             query?: never;
@@ -955,14 +1024,6 @@ export interface paths {
         /**
          * Get Index Kline
          * @description 获取指数 K 线数据。
-         *
-         *     Param:
-         *         symbol: 指数代码（查询参数），例如 000001。
-         *         period: K 线周期（查询参数），daily / weekly / monthly。
-         *         start_date: 起始日期（查询参数），格式 YYYYMMDD，可留空。
-         *         end_date: 结束日期（查询参数），格式 YYYYMMDD，可留空表示至今天。
-         *     Return:
-         *         dict: 指数 K 线时序数据，包含日期、开高低收和成交量。
          */
         get: operations["get_index_kline_api_market_index_kline_get"];
         put?: never;
@@ -983,9 +1044,6 @@ export interface paths {
         /**
          * Get Indices
          * @description 获取主要大盘指数实时行情。
-         *
-         *     Return:
-         *         list[dict] | dict: 上证、深证等核心指数的当前点位与涨跌幅数据。
          */
         get: operations["get_indices_api_market_indices_get"];
         put?: never;
@@ -1005,10 +1063,7 @@ export interface paths {
         };
         /**
          * Get Industry Rankings
-         * @description 获取行业板块涨跌幅排名。
-         *
-         *     Return:
-         *         list[dict]: 行业名称、涨跌幅及成交活跃度排序。
+         * @description 获取行业板块涨跌与资金排名。
          */
         get: operations["get_industry_rankings_api_market_industry_rankings_get"];
         put?: never;
@@ -1028,12 +1083,69 @@ export interface paths {
         };
         /**
          * Get Market Kuaixun
-         * @description 获取 7×24 快讯流（多源合并去重，分钟级刷新）。
-         *
-         *     Return:
-         *         list[dict]: 快讯列表，source 统一为 "7×24 快讯"。
+         * @description 获取 7×24 快讯流。
          */
         get: operations["get_market_kuaixun_api_market_kuaixun_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/limit-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Limit History
+         * @description 获取开盘红历史涨停、跌停或风向标列表。
+         */
+        get: operations["get_limit_history_api_market_limit_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/limit-up-ladder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Limit Up Ladder
+         * @description 获取开盘红涨停天梯与板块涨停分布。
+         */
+        get: operations["get_limit_up_ladder_api_market_limit_up_ladder_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/mainline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Mainline
+         * @description 获取财联社今日主线机会。
+         */
+        get: operations["get_market_mainline_api_market_mainline_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1052,9 +1164,6 @@ export interface paths {
         /**
          * Get News Analysis
          * @description 获取由 LLM 生成的市场资讯综合分析。
-         *
-         *     Return:
-         *         dict: AI 汇总的市场资讯解读与要点。
          */
         get: operations["get_news_analysis_api_market_news_analysis_get"];
         put?: never;
@@ -1074,12 +1183,69 @@ export interface paths {
         };
         /**
          * Get Market Other News
-         * @description 获取非快讯类新闻（30 分钟刷新）。
-         *
-         *     Return:
-         *         list[dict]: 新闻列表，按时间倒序。
+         * @description 获取非快讯类新闻。
          */
         get: operations["get_market_other_news_api_market_other_news_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/sector-stocks-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sector Stocks History
+         * @description 获取开盘红板块在指定历史日期的成分股列表。
+         */
+        get: operations["get_sector_stocks_history_api_market_sector_stocks_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/today-wind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Wind
+         * @description 获取财联社今日风口板块。
+         */
+        get: operations["get_market_wind_api_market_today_wind_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/today-wind/{plate_code}/stocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Wind Stocks
+         * @description 获取指定风口板块的龙头股。
+         */
+        get: operations["get_market_wind_stocks_api_market_today_wind__plate_code__stocks_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1118,9 +1284,6 @@ export interface paths {
         /**
          * Get Twitter Feed
          * @description 获取 Twitter/X 财经账号的最新推文和文章。
-         *
-         *     Return:
-         *         list[dict]: Twitter 资讯列表，按时间倒序。
          */
         get: operations["get_twitter_feed_api_market_twitter_feed_get"];
         put?: never;
@@ -1143,11 +1306,6 @@ export interface paths {
         /**
          * Refresh Twitter Feed
          * @description 手动触发 Twitter 资讯刷新。
-         *
-         *     立即从 Twitter provider 拉取最新推文并写入数据库。
-         *
-         *     Return:
-         *         dict: 刷新结果 {status, authors, posts_count}
          */
         post: operations["refresh_twitter_feed_api_market_twitter_feed_refresh_post"];
         delete?: never;
@@ -1166,12 +1324,6 @@ export interface paths {
         /**
          * Get Volume
          * @description 获取大盘成交量历史数据。
-         *
-         *     Param:
-         *         start_date: 起始日期（查询参数），格式 YYYYMMDD，可留空。
-         *         end_date: 结束日期（查询参数），格式 YYYYMMDD，可留空。
-         *     Return:
-         *         dict: 大盘成交量、成交额时序数据。
          */
         get: operations["get_volume_api_market_volume_get"];
         put?: never;
@@ -1194,6 +1346,75 @@ export interface paths {
         put?: never;
         /** Add Position */
         post: operations["add_position_api_portfolio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Transaction */
+        post: operations["create_transaction_api_portfolio_transactions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/transactions/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Transaction */
+        post: operations["preview_transaction_api_portfolio_transactions_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/transactions/{transaction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Transaction */
+        put: operations["update_transaction_api_portfolio_transactions__transaction_id__put"];
+        post?: never;
+        /** Delete Transaction */
+        delete: operations["delete_transaction_api_portfolio_transactions__transaction_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/transactions/{transaction_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Transaction Update */
+        post: operations["preview_transaction_update_api_portfolio_transactions__transaction_id__preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1347,6 +1568,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quant/strategy-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Strategy Drafts */
+        get: operations["get_strategy_drafts_api_quant_strategy_drafts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quant/strategy-drafts/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Quant Strategy Draft */
+        post: operations["generate_quant_strategy_draft_api_quant_strategy_drafts_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quant/strategy-drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Quant Strategy Draft */
+        get: operations["get_quant_strategy_draft_api_quant_strategy_drafts__draft_id__get"];
+        /** Update Quant Strategy Draft */
+        put: operations["update_quant_strategy_draft_api_quant_strategy_drafts__draft_id__put"];
+        post?: never;
+        /** Delete Quant Strategy Draft */
+        delete: operations["delete_quant_strategy_draft_api_quant_strategy_drafts__draft_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quant/strategy-drafts/{draft_id}/backtest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Backtest Quant Strategy Draft */
+        post: operations["backtest_quant_strategy_draft_api_quant_strategy_drafts__draft_id__backtest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quant/strategy-drafts/{draft_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Quant Strategy Draft */
+        post: operations["publish_quant_strategy_draft_api_quant_strategy_drafts__draft_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quant/strategy-drafts/{draft_id}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Quant Strategy Draft */
+        post: operations["validate_quant_strategy_draft_api_quant_strategy_drafts__draft_id__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quant/strategy-presets": {
         parameters: {
             query?: never;
@@ -1356,6 +1681,23 @@ export interface paths {
         };
         /** Get Strategy Presets */
         get: operations["get_strategy_presets_api_quant_strategy_presets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quant/strategy-registry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Strategy Registry Status */
+        get: operations["get_strategy_registry_status_api_quant_strategy_registry_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1437,6 +1779,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/screener/strategies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Screener Strategies */
+        get: operations["get_screener_strategies_api_screener_strategies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screener/strategy-screen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Screener Strategy */
+        post: operations["apply_screener_strategy_api_screener_strategy_screen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stock/analysis-page/{code}": {
         parameters: {
             query?: never;
@@ -1474,12 +1850,7 @@ export interface paths {
         };
         /**
          * Get Compare
-         * @description 多股对比分析，获取基本信息、估值和财务指标进行横向对比。
-         *
-         *     Param:
-         *         codes: 逗号分隔的股票代码（查询参数），最多 5 个。
-         *     Return:
-         *         list[dict]: 每只股票的合并数据列表。
+         * @description 多股对比分析。
          */
         get: operations["get_compare_api_stock_compare_get"];
         put?: never;
@@ -1500,11 +1871,6 @@ export interface paths {
         /**
          * Search Stocks
          * @description 按名称或代码模糊搜索股票。
-         *
-         *     Param:
-         *         q: 查询关键字（查询参数），可为代码片段或股票名称，至少 1 个字符。
-         *     Return:
-         *         list[StockSearchItem]: 匹配到的股票候选条目。
          */
         get: operations["search_stocks_api_stock_search_get"];
         put?: never;
@@ -1525,12 +1891,6 @@ export interface paths {
         /**
          * Get Dragon Tiger Detail
          * @description 获取指定龙虎榜个股的买卖席位明细。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数）。
-         *         report_date: 报告日期（查询参数），格式 YYYY-MM-DD。
-         *     Return:
-         *         dict: 买入卖出席位明细及净额。
          */
         get: operations["get_dragon_tiger_detail_api_stock__code__dragon_tiger_get"];
         put?: never;
@@ -1551,12 +1911,6 @@ export interface paths {
         /**
          * Get Financial
          * @description 获取个股财务报表数据。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *         type: 报表类型（查询参数），balance / profit / cashflow。
-         *     Return:
-         *         dict: 对应报表的多期数据。
          */
         get: operations["get_financial_api_stock__code__financial_get"];
         put?: never;
@@ -1577,11 +1931,6 @@ export interface paths {
         /**
          * Get Financial Metrics
          * @description 获取个股关键财务指标汇总。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         FinancialMetrics: 营收、利润、ROE 等核心财务指标。
          */
         get: operations["get_financial_metrics_api_stock__code__financial_metrics_get"];
         put?: never;
@@ -1602,11 +1951,6 @@ export interface paths {
         /**
          * Get Fund Flow
          * @description 获取个股资金流向日级数据。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         list[dict]: 按日期倒序排列的资金流向列表。
          */
         get: operations["get_fund_flow_api_stock__code__fund_flow_get"];
         put?: never;
@@ -1627,11 +1971,6 @@ export interface paths {
         /**
          * Get Indicators
          * @description 基于日 K 线计算个股常用技术指标。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         dict: 包含 RSI、MACD、KDJ 等技术指标的字典。
          */
         get: operations["get_indicators_api_stock__code__indicators_get"];
         put?: never;
@@ -1652,11 +1991,6 @@ export interface paths {
         /**
          * Get Stock Info
          * @description 获取个股基本资料。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         StockBasicInfo: 公司名称、所属行业、上市信息等基础数据。
          */
         get: operations["get_stock_info_api_stock__code__info_get"];
         put?: never;
@@ -1677,11 +2011,6 @@ export interface paths {
         /**
          * Get Intraday
          * @description 获取个股分时数据。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         IntradayData: 当日分时价、量、均价等序列。
          */
         get: operations["get_intraday_api_stock__code__intraday_get"];
         put?: never;
@@ -1702,15 +2031,6 @@ export interface paths {
         /**
          * Get Kline
          * @description 获取个股 K 线数据。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *         period: K 线周期（查询参数），daily / weekly / monthly。
-         *         start_date: 起始日期（查询参数），格式 YYYYMMDD，可留空。
-         *         end_date: 结束日期（查询参数），格式 YYYYMMDD，可留空。
-         *         adjust: 复权类型（查询参数），qfq、hfq 或空字符串表示不复权。
-         *     Return:
-         *         KlineData: 按时间排序的 K 线条目集合。
          */
         get: operations["get_kline_api_stock__code__kline_get"];
         put?: never;
@@ -1731,11 +2051,6 @@ export interface paths {
         /**
          * Get News
          * @description 获取个股最新新闻流。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         list[dict] | dict: 按时间排序的新闻条目集合。
          */
         get: operations["get_news_api_stock__code__news_get"];
         put?: never;
@@ -1756,11 +2071,6 @@ export interface paths {
         /**
          * Get News Categorized
          * @description 获取按类别分组的个股新闻流。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         dict: 按公告、新闻、研报等类别整理的新闻条目。
          */
         get: operations["get_news_categorized_api_stock__code__news_categorized_get"];
         put?: never;
@@ -1780,12 +2090,7 @@ export interface paths {
         };
         /**
          * Get Retail Sentiment
-         * @description 获取个股散户情绪指标（股吧帖子情绪分析）。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         dict: 散户情绪相关指标与详情。
+         * @description 获取个股散户情绪指标。
          */
         get: operations["get_retail_sentiment_api_stock__code__retail_sentiment_get"];
         put?: never;
@@ -1805,12 +2110,7 @@ export interface paths {
         };
         /**
          * Get Sentiment
-         * @description 获取个股情绪数据（热度排名、热度评分、新闻数量）。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         dict: 个股情绪指标。
+         * @description 获取个股情绪数据。
          */
         get: operations["get_sentiment_api_stock__code__sentiment_get"];
         put?: never;
@@ -1831,11 +2131,6 @@ export interface paths {
         /**
          * Get Valuation
          * @description 获取个股估值数据。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         dict: PE、PB、市值等估值指标。
          */
         get: operations["get_valuation_api_stock__code__valuation_get"];
         put?: never;
@@ -1855,14 +2150,181 @@ export interface paths {
         };
         /**
          * Get Valuation Detail
-         * @description 获取个股估值详情，包括历史分位与对比指标。
-         *
-         *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
-         *     Return:
-         *         ValuationDetail: 当前估值、历史分位以及相关明细。
+         * @description 获取个股估值详情。
          */
         get: operations["get_valuation_detail_api_stock__code__valuation_detail_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Watchlist */
+        get: operations["list_watchlist_api_watchlist_get"];
+        put?: never;
+        /** Create Watchlist Item */
+        post: operations["create_watchlist_item_api_watchlist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/alerts/{alert_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Watchlist Alert */
+        delete: operations["delete_watchlist_alert_api_watchlist_alerts__alert_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/{stock_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Watchlist Item */
+        delete: operations["delete_watchlist_item_api_watchlist__stock_code__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/{stock_code}/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Watchlist Alert */
+        post: operations["create_watchlist_alert_api_watchlist__stock_code__alerts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/analysis/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Analysis Job */
+        post: operations["submit_analysis_job_api_workflows_analysis__code__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/daily-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Daily Review Job */
+        post: operations["submit_daily_review_job_api_workflows_daily_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/industry-chain/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Industry Chain Job */
+        post: operations["submit_industry_chain_job_api_workflows_industry_chain__name__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/screener-strategy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Screener Strategy Job */
+        post: operations["submit_screener_strategy_job_api_workflows_screener_strategy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Workflow Job */
+        get: operations["get_workflow_job_api_workflows__job_id__get"];
+        put?: never;
+        post?: never;
+        /** Cancel Workflow Job */
+        delete: operations["cancel_workflow_job_api_workflows__job_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/{job_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream Workflow Job */
+        get: operations["stream_workflow_job_api_workflows__job_id__stream_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1925,12 +2387,22 @@ export interface components {
             /** Stock Name */
             stock_name: string;
         };
-        /** AnalysisPageData */
+        /**
+         * AnalysisPageData
+         * @description 分析页聚合响应；单个分区失败时保留其余可用数据。
+         */
         AnalysisPageData: {
             cached_analysis?: components["schemas"]["AnalysisResult"] | null;
             intraday?: components["schemas"]["IntradayData"] | null;
             kline?: components["schemas"]["KlineData"] | null;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
             stock_info?: components["schemas"]["StockBasicInfo"] | null;
+            /** Unavailable Sections */
+            unavailable_sections?: ("stock_info" | "kline" | "intraday" | "valuation" | "cached_analysis")[];
             valuation?: components["schemas"]["StockValuation"] | null;
         };
         /** AnalysisResult */
@@ -2064,6 +2536,8 @@ export interface components {
             max_rounds: number;
             /** Name */
             name: string;
+            /** Skill Names */
+            skill_names: string[];
             /** Tool Names */
             tool_names: string[];
         };
@@ -2117,6 +2591,30 @@ export interface components {
             /** Skill Names */
             skill_names?: string[] | null;
         };
+        /** ChatSessionData */
+        ChatSessionData: {
+            /** Agent Names */
+            agent_names?: string[] | null;
+            /** History */
+            history?: components["schemas"]["AgentMessage"][];
+            /** Messages */
+            messages?: {
+                [key: string]: unknown;
+            }[];
+            /** Skill Names */
+            skill_names?: string[] | null;
+        };
+        /** ChatSessionMeta */
+        ChatSessionMeta: {
+            /** Created At */
+            created_at: number;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: number;
+        };
         /**
          * ChatSkillCapabilityInfo
          * @description Purpose: 单个 Chat Skill 的公开路由定义。
@@ -2136,6 +2634,25 @@ export interface components {
             tool_names: string[];
             /** Triggers */
             triggers: string[];
+        };
+        /** ChatStateResponse */
+        ChatStateResponse: {
+            state?: components["schemas"]["ChatStateSnapshot"] | null;
+            /** Updated At */
+            updated_at?: number | null;
+        };
+        /** ChatStateSnapshot */
+        ChatStateSnapshot: {
+            /** Active Session Id */
+            active_session_id?: string | null;
+            /** Revision */
+            revision: number;
+            /** Session Data */
+            session_data: {
+                [key: string]: components["schemas"]["ChatSessionData"];
+            };
+            /** Sessions */
+            sessions: components["schemas"]["ChatSessionMeta"][];
         };
         /**
          * ChatToolCapabilityInfo
@@ -2171,11 +2688,17 @@ export interface components {
              * @enum {string}
              */
             freshness: "realtime" | "near_realtime" | "daily" | "static";
+            /** Max Parallel Calls */
+            max_parallel_calls?: number | null;
+            /** Max Result Characters */
+            max_result_characters: number;
             /**
              * Scope
              * @enum {string}
              */
             scope: "public" | "user";
+            /** Timeout Seconds */
+            timeout_seconds?: number | null;
         };
         /**
          * ConfigResponse
@@ -2481,6 +3004,11 @@ export interface components {
             bottom_sectors?: components["schemas"]["SectorSnapshotItem"][];
             /** Dragon Tiger */
             dragon_tiger?: components["schemas"]["DragonTigerSnapshotItem"][];
+            /**
+             * Effective Date
+             * @default
+             */
+            effective_date: string;
             /** Hot Concepts */
             hot_concepts?: components["schemas"]["HotRankSnapshotItem"][];
             /** Hot Industries */
@@ -2497,6 +3025,15 @@ export interface components {
             market_news?: components["schemas"]["MarketNewsSnapshotItem"][];
             market_statistics?: components["schemas"]["MarketBreadthSnapshot"];
             market_volume?: components["schemas"]["MarketVolumeSnapshot"];
+            /**
+             * Requested Date
+             * @default
+             */
+            requested_date: string;
+            /** Source Status */
+            source_status?: {
+                [key: string]: components["schemas"]["DailyReviewSourceStatus"];
+            };
             /** Top Sectors */
             top_sectors?: components["schemas"]["SectorSnapshotItem"][];
         };
@@ -2531,29 +3068,89 @@ export interface components {
         };
         /** DailyReviewResult */
         DailyReviewResult: {
+            /** Data Gaps */
+            data_gaps?: string[];
             data_snapshot: components["schemas"]["DailyReviewDataSnapshot"];
             /** Date */
             date: string;
             dragon_tiger_review: components["schemas"]["DailyReviewSection"];
+            /**
+             * Effective Date
+             * @default
+             */
+            effective_date: string;
             /** Generated At */
             generated_at: string;
+            /**
+             * Generation Status
+             * @default fallback
+             * @enum {string}
+             */
+            generation_status: "llm" | "fallback";
             hotspot_review: components["schemas"]["DailyReviewSection"];
             index_review: components["schemas"]["DailyReviewSection"];
+            /** Invalid Conditions */
+            invalid_conditions?: string[];
+            /**
+             * Llm Error
+             * @default
+             */
+            llm_error: string;
             /**
              * Llm Review
              * @default
              */
             llm_review: string;
+            /**
+             * Market State
+             * @default unknown
+             * @enum {string}
+             */
+            market_state: "attack" | "balanced" | "defensive" | "unknown";
             /** Market Summary */
             market_summary: string;
             /** Opportunities */
             opportunities?: string[];
+            /**
+             * Position Range
+             * @default
+             */
+            position_range: string;
+            prompt_trace?: components["schemas"]["PromptTrace"] | null;
+            /**
+             * Quality Status
+             * @default complete
+             * @enum {string}
+             */
+            quality_status: "complete" | "degraded";
+            /**
+             * Requested Date
+             * @default
+             */
+            requested_date: string;
             /** Risk Alerts */
             risk_alerts?: string[];
+            /**
+             * Schema Version
+             * @default 3
+             */
+            schema_version: number;
+            /**
+             * Session Status
+             * @default completed
+             * @enum {string}
+             */
+            session_status: "completed" | "adjusted";
+            /** Source Errors */
+            source_errors?: {
+                [key: string]: string;
+            };
             /** Strategy Notes */
             strategy_notes?: string[];
             /** Title */
             title: string;
+            /** Warnings */
+            warnings?: string[];
         };
         /** DailyReviewSection */
         DailyReviewSection: {
@@ -2563,6 +3160,40 @@ export interface components {
             summary: string;
             /** Title */
             title: string;
+        };
+        /** DailyReviewSourceStatus */
+        DailyReviewSourceStatus: {
+            /**
+             * Data Date
+             * @default
+             */
+            data_date: string;
+            /**
+             * Error
+             * @default
+             */
+            error: string;
+            /**
+             * Is Realtime
+             * @default false
+             */
+            is_realtime: boolean;
+            /**
+             * Provider
+             * @default
+             */
+            provider: string;
+            /**
+             * Requested Date
+             * @default
+             */
+            requested_date: string;
+            /**
+             * Status
+             * @default unavailable
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable";
         };
         /** DeleteResponse */
         DeleteResponse: {
@@ -2812,9 +3443,7 @@ export interface components {
             };
             /** Provider Circuits */
             provider_circuits: {
-                [key: string]: {
-                    [key: string]: unknown;
-                };
+                [key: string]: components["schemas"]["ProviderCircuitStateResponse"];
             };
             /**
              * Status
@@ -2880,6 +3509,41 @@ export interface components {
              * @default
              */
             updated_at: string;
+        };
+        /**
+         * IndexIntradayData
+         * @description 当前交易日指数分时行情。
+         */
+        IndexIntradayData: {
+            /** Code */
+            code: string;
+            /** Items */
+            items?: components["schemas"]["IndexIntradayItem"][];
+            /** Prev Close */
+            prev_close?: number | null;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+        };
+        /**
+         * IndexIntradayItem
+         * @description 单条指数分时行情数据点。
+         */
+        IndexIntradayItem: {
+            /** Amount */
+            amount?: number | null;
+            /** Avg Price */
+            avg_price?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Price */
+            price: number;
+            /** Time */
+            time: string;
+            /** Volume */
+            volume?: number | null;
         };
         /**
          * IndexItem
@@ -2968,13 +3632,80 @@ export interface components {
              */
             summary: string;
         };
+        /** IndustryChainConflict */
+        IndustryChainConflict: {
+            /** Evidence Ids */
+            evidence_ids?: string[];
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Topic */
+            topic: string;
+            /** Values */
+            values?: string[];
+        };
+        /** IndustryChainCoverage */
+        IndustryChainCoverage: {
+            /**
+             * Chain
+             * @default missing
+             * @enum {string}
+             */
+            chain: "complete" | "partial" | "missing";
+            /**
+             * Companies
+             * @default missing
+             * @enum {string}
+             */
+            companies: "complete" | "partial" | "missing";
+            /**
+             * Competition
+             * @default missing
+             * @enum {string}
+             */
+            competition: "complete" | "partial" | "missing";
+            /**
+             * Events
+             * @default missing
+             * @enum {string}
+             */
+            events: "complete" | "partial" | "missing";
+            /**
+             * Market
+             * @default missing
+             * @enum {string}
+             */
+            market: "complete" | "partial" | "missing";
+            /**
+             * Technology
+             * @default missing
+             * @enum {string}
+             */
+            technology: "complete" | "partial" | "missing";
+        };
         /** IndustryChainEvent */
         IndustryChainEvent: {
+            /**
+             * Claim Type
+             * @default fact
+             * @enum {string}
+             */
+            claim_type: "fact" | "inference" | "opinion";
+            /**
+             * Confidence
+             * @default medium
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
             /**
              * Date
              * @default
              */
             date: string;
+            /** Evidence Ids */
+            evidence_ids?: string[];
             /**
              * Impact
              * @default
@@ -2992,6 +3723,94 @@ export interface components {
             source_url: string;
             /** Title */
             title: string;
+        };
+        /** IndustryChainEvidence */
+        IndustryChainEvidence: {
+            /**
+             * Arguments
+             * @default
+             */
+            arguments: string;
+            /**
+             * Content Preview
+             * @default
+             */
+            content_preview: string;
+            /**
+             * Error Message
+             * @default
+             */
+            error_message: string;
+            /** Evidence Id */
+            evidence_id: string;
+            /**
+             * Fetched At
+             * @default
+             */
+            fetched_at: string;
+            /**
+             * Provider
+             * @default
+             */
+            provider: string;
+            /**
+             * Published At
+             * @default
+             */
+            published_at: string;
+            /** Source Urls */
+            source_urls?: string[];
+            /**
+             * Status
+             * @default success
+             * @enum {string}
+             */
+            status: "success" | "error";
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Tool Name */
+            tool_name: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** IndustryChainEvidenceStats */
+        IndustryChainEvidenceStats: {
+            /**
+             * Failed Count
+             * @default 0
+             */
+            failed_count: number;
+            /**
+             * Omitted Count
+             * @default 0
+             */
+            omitted_count: number;
+            /**
+             * Prompt Characters
+             * @default 0
+             */
+            prompt_characters: number;
+            /**
+             * Selected Count
+             * @default 0
+             */
+            selected_count: number;
+            /**
+             * Total Count
+             * @default 0
+             */
+            total_count: number;
+            /**
+             * Unique Count
+             * @default 0
+             */
+            unique_count: number;
         };
         /**
          * IndustryChainHistoryItem
@@ -3023,6 +3842,18 @@ export interface components {
         /** IndustryChainInsight */
         IndustryChainInsight: {
             /**
+             * Claim Type
+             * @default inference
+             * @enum {string}
+             */
+            claim_type: "fact" | "inference" | "opinion";
+            /**
+             * Confidence
+             * @default medium
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
              * Detail
              * @default
              */
@@ -3032,11 +3863,18 @@ export interface components {
              * @default
              */
             evidence: string;
+            /** Evidence Ids */
+            evidence_ids?: string[];
             /**
              * Source
              * @default
              */
             source: string;
+            /**
+             * Source Url
+             * @default
+             */
+            source_url: string;
             /** Title */
             title: string;
         };
@@ -3052,6 +3890,20 @@ export interface components {
         };
         /** IndustryChainMetric */
         IndustryChainMetric: {
+            /**
+             * Claim Type
+             * @default fact
+             * @enum {string}
+             */
+            claim_type: "fact" | "inference" | "opinion";
+            /**
+             * Confidence
+             * @default medium
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Evidence Ids */
+            evidence_ids?: string[];
             /**
              * Growth
              * @default
@@ -3079,6 +3931,12 @@ export interface components {
         };
         /** IndustryChainNode */
         IndustryChainNode: {
+            /**
+             * Claim Type
+             * @default fact
+             * @enum {string}
+             */
+            claim_type: "fact" | "inference" | "opinion";
             /** Code */
             code?: string | null;
             /** Companies */
@@ -3086,10 +3944,18 @@ export interface components {
             /** Company */
             company?: string | null;
             /**
+             * Confidence
+             * @default medium
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
              * Description
              * @default
              */
             description: string;
+            /** Evidence Ids */
+            evidence_ids?: string[];
             /**
              * Market Share
              * @default
@@ -3112,23 +3978,74 @@ export interface components {
              * @default
              */
             source: string;
+            /**
+             * Source Url
+             * @default
+             */
+            source_url: string;
         } & {
             [key: string]: unknown;
+        };
+        /** IndustryChainResearchScope */
+        IndustryChainResearchScope: {
+            /** As Of Date */
+            as_of_date?: string | null;
+            /**
+             * Company Scope
+             * @default a_share
+             * @enum {string}
+             */
+            company_scope: "a_share" | "all_public";
+            /** End Date */
+            end_date?: string | null;
+            /**
+             * Region
+             * @default china_and_global
+             * @enum {string}
+             */
+            region: "china" | "global" | "china_and_global";
+            /** Start Date */
+            start_date?: string | null;
+            /**
+             * Time Range
+             * @default half_year
+             * @enum {string}
+             */
+            time_range: "half_year" | "one_year" | "three_years" | "custom";
         };
         /** IndustryChainResult */
         IndustryChainResult: {
             /** Aliases */
             aliases?: string[];
+            /**
+             * Archive Id
+             * @default
+             */
+            archive_id: string;
+            /**
+             * Archive Status
+             * @default none
+             * @enum {string}
+             */
+            archive_status: "none" | "saved" | "failed";
             /** Capital Moves */
             capital_moves?: components["schemas"]["IndustryChainInsight"][];
             /** Charts */
             charts?: components["schemas"]["IndustryChainChart"][];
             /** Competition */
             competition?: components["schemas"]["IndustryChainCompetitionGroup"][];
+            /** Conflicts */
+            conflicts?: components["schemas"]["IndustryChainConflict"][];
+            coverage?: components["schemas"]["IndustryChainCoverage"];
             /** Downstream */
             downstream?: components["schemas"]["IndustryChainNode"][];
+            /** Driver Insights */
+            driver_insights?: components["schemas"]["IndustryChainInsight"][];
             /** Drivers */
             drivers?: string[];
+            /** Evidence Catalog */
+            evidence_catalog?: components["schemas"]["IndustryChainEvidence"][];
+            evidence_stats?: components["schemas"]["IndustryChainEvidenceStats"];
             /** Key Events */
             key_events?: components["schemas"]["IndustryChainEvent"][];
             /** Key Stocks */
@@ -3142,6 +4059,8 @@ export interface components {
             market_metrics?: components["schemas"]["IndustryChainMetric"][];
             /** Midstream */
             midstream?: components["schemas"]["IndustryChainNode"][];
+            /** Missing Evidence */
+            missing_evidence?: string[];
             /**
              * Name
              * @default
@@ -3152,7 +4071,21 @@ export interface components {
              * @default
              */
             positioning: string;
+            /** Positioning Evidence Ids */
+            positioning_evidence_ids?: string[];
             prompt_trace?: components["schemas"]["PromptTrace"] | null;
+            /**
+             * Quality Status
+             * @default complete
+             * @enum {string}
+             */
+            quality_status: "complete" | "degraded";
+            /** Research Scope */
+            research_scope?: {
+                [key: string]: string;
+            };
+            /** Risk Insights */
+            risk_insights?: components["schemas"]["IndustryChainInsight"][];
             /** Risks */
             risks?: string[];
             /**
@@ -3167,12 +4100,16 @@ export interface components {
              * @default
              */
             summary: string;
+            /** Summary Evidence Ids */
+            summary_evidence_ids?: string[];
             /** Technology Routes */
             technology_routes?: components["schemas"]["IndustryChainInsight"][];
             /** Trends */
             trends?: components["schemas"]["IndustryChainInsight"][];
             /** Upstream */
             upstream?: components["schemas"]["IndustryChainNode"][];
+            /** Warnings */
+            warnings?: string[];
         };
         /** IndustryChainSource */
         IndustryChainSource: {
@@ -3181,6 +4118,8 @@ export interface components {
              * @default
              */
             date: string;
+            /** Evidence Ids */
+            evidence_ids?: string[];
             /**
              * Publisher
              * @default
@@ -3196,6 +4135,12 @@ export interface components {
         };
         /** IndustryRankItem */
         IndustryRankItem: {
+            /** Amount */
+            amount?: number | null;
+            /** Avg Change */
+            avg_change?: number | null;
+            /** Buy Amount */
+            buy_amount?: number | null;
             /** Change Pct */
             change_pct?: number | null;
             /**
@@ -3212,13 +4157,21 @@ export interface components {
             leader: string;
             /** Leader Change */
             leader_change?: number | null;
+            /** Market Cap */
+            market_cap?: number | null;
             /**
              * Name
              * @default
              */
             name: string;
+            /** Net Inflow */
+            net_inflow?: number | null;
             /** Rank */
             rank?: number | null;
+            /** Sell Amount */
+            sell_amount?: number | null;
+            /** Turnover Rate */
+            turnover_rate?: number | null;
             /** Up Count */
             up_count?: number | null;
         } & {
@@ -3226,8 +4179,28 @@ export interface components {
         };
         /** IndustryRankings */
         IndustryRankings: {
+            /**
+             * Date
+             * @default
+             */
+            date: string;
+            /**
+             * Fetched At
+             * @default
+             */
+            fetched_at: string;
+            /**
+             * Fund Data Available
+             * @default false
+             */
+            fund_data_available: boolean;
             /** Sectors */
             sectors?: components["schemas"]["IndustryRankItem"][];
+            /**
+             * Source
+             * @default
+             */
+            source: string;
             /**
              * Total
              * @default 0
@@ -3267,6 +4240,11 @@ export interface components {
             items: components["schemas"]["IntradayItem"][];
             /** Prev Close */
             prev_close?: number | null;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
         };
         /**
          * IntradayItem
@@ -3309,12 +4287,19 @@ export interface components {
         KlineData: {
             /** Adjust */
             adjust: string;
+            /**
+             * Adjustment Verified
+             * @default false
+             */
+            adjustment_verified: boolean;
             /** Code */
             code: string;
             /** Items */
             items: components["schemas"]["KlineItem"][];
             /** Period */
             period: string;
+            /** Source */
+            source?: string | null;
         };
         /**
          * KlineItem
@@ -3393,14 +4378,54 @@ export interface components {
         };
         /** MacroIndicator */
         MacroIndicator: {
+            /** Field Periods */
+            field_periods?: {
+                [key: string]: string;
+            };
+            /**
+             * Is Fallback
+             * @default false
+             */
+            is_fallback: boolean;
+            /**
+             * Is Stale
+             * @default false
+             */
+            is_stale: boolean;
             /** Latest */
             latest?: {
                 [key: string]: string | number | null;
             } | null;
+            /** Latest Period */
+            latest_period?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Source Api */
+            source_api?: string | null;
+            /** Stale Fields */
+            stale_fields?: string[];
             /** Trend */
             trend?: {
                 [key: string]: string | number | null;
             }[];
+        };
+        /** MacroUsDataResponse */
+        MacroUsDataResponse: {
+            /** Failed Indicators */
+            failed_indicators?: {
+                [key: string]: string;
+            };
+            /** Indicators */
+            indicators?: {
+                [key: string]: components["schemas"]["MacroIndicator"];
+            };
+            /**
+             * Refreshing
+             * @default false
+             */
+            refreshing: boolean;
+            /** Updated At */
+            updated_at?: string | null;
         };
         /** MarketBreadthSnapshot */
         MarketBreadthSnapshot: {
@@ -3408,6 +4433,10 @@ export interface components {
             date?: string | null;
             /** Down Count */
             down_count?: number;
+            /** Field Sources */
+            field_sources?: {
+                [key: string]: string;
+            };
             /** Flat Count */
             flat_count?: number;
             /** Limit Down Count */
@@ -3422,16 +4451,172 @@ export interface components {
             limit_up_stocks?: {
                 [key: string]: unknown;
             }[];
+            /** Partial */
+            partial?: boolean;
             /** Source */
             source?: string | null;
+            /** Source Apis */
+            source_apis?: {
+                [key: string]: string;
+            };
             /** Stock Pct Distribution */
             stock_pct_distribution?: {
                 [key: string]: unknown;
             }[];
             /** Total Stocks */
             total_stocks?: number;
+            /** Unavailable Sections */
+            unavailable_sections?: string[];
             /** Up Count */
             up_count?: number;
+        };
+        /** MarketEmotion */
+        MarketEmotion: {
+            /** Fetched At */
+            fetched_at: string;
+            /** Limit Up Board */
+            limit_up_board?: components["schemas"]["MarketLimitUpBoardItem"][];
+            /** Market Degree */
+            market_degree?: number | null;
+            /**
+             * Performance
+             * @default
+             */
+            performance: string;
+            /**
+             * Preview Balance
+             * @default
+             */
+            preview_balance: string;
+            /**
+             * Preview Balance Change Px
+             * @default
+             */
+            preview_balance_change_px: string;
+            /**
+             * Profit Ratio
+             * @default
+             */
+            profit_ratio: string;
+            /**
+             * Shsz Balance
+             * @default
+             */
+            shsz_balance: string;
+            /**
+             * Shsz Balance Change Px
+             * @default
+             */
+            shsz_balance_change_px: string;
+            /**
+             * Source
+             * @default 财联社
+             * @constant
+             */
+            source: "财联社";
+            up_down_dis?: components["schemas"]["MarketEmotionDistribution"];
+            /** Up Open Num */
+            up_open_num?: number | null;
+            /**
+             * Up Open Ratio
+             * @default
+             */
+            up_open_ratio: string;
+            /**
+             * Up Ratio
+             * @default
+             */
+            up_ratio: string;
+            /** Up Ratio Num */
+            up_ratio_num?: number | null;
+        };
+        /** MarketEmotionDistribution */
+        MarketEmotionDistribution: {
+            /**
+             * Down 10
+             * @default 0
+             */
+            down_10: number;
+            /**
+             * Down 2
+             * @default 0
+             */
+            down_2: number;
+            /**
+             * Down 4
+             * @default 0
+             */
+            down_4: number;
+            /**
+             * Down 6
+             * @default 0
+             */
+            down_6: number;
+            /**
+             * Down 8
+             * @default 0
+             */
+            down_8: number;
+            /**
+             * Down Num
+             * @default 0
+             */
+            down_num: number;
+            /**
+             * Fall Num
+             * @default 0
+             */
+            fall_num: number;
+            /**
+             * Flat Num
+             * @default 0
+             */
+            flat_num: number;
+            /**
+             * Rise Num
+             * @default 0
+             */
+            rise_num: number;
+            /**
+             * Status
+             * @default false
+             */
+            status: boolean;
+            /**
+             * Suspend Num
+             * @default 0
+             */
+            suspend_num: number;
+            /**
+             * Up 10
+             * @default 0
+             */
+            up_10: number;
+            /**
+             * Up 2
+             * @default 0
+             */
+            up_2: number;
+            /**
+             * Up 4
+             * @default 0
+             */
+            up_4: number;
+            /**
+             * Up 6
+             * @default 0
+             */
+            up_6: number;
+            /**
+             * Up 8
+             * @default 0
+             */
+            up_8: number;
+            /**
+             * Up Num
+             * @default 0
+             */
+            up_num: number;
         };
         /**
          * MarketIndices
@@ -3449,6 +4634,324 @@ export interface components {
              * @default 0
              */
             total_amount: number;
+        };
+        /** MarketLimitHistoryItem */
+        MarketLimitHistoryItem: {
+            /** Code */
+            code: string;
+            /**
+             * Industry Id
+             * @default
+             */
+            industry_id: string;
+            /**
+             * Industry Limit Up Count
+             * @default 0
+             */
+            industry_limit_up_count: number;
+            /**
+             * Limit Count
+             * @default 0
+             */
+            limit_count: number;
+            /**
+             * Limit Tag
+             * @default
+             */
+            limit_tag: string;
+            /**
+             * Limit Time
+             * @default
+             */
+            limit_time: string;
+            /**
+             * Market Cap
+             * @default 0
+             */
+            market_cap: number;
+            /** Name */
+            name: string;
+            /**
+             * Net Inflow
+             * @default 0
+             */
+            net_inflow: number;
+            /**
+             * Open Time
+             * @default
+             */
+            open_time: string;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /**
+             * Seal Amount
+             * @default 0
+             */
+            seal_amount: number;
+            /**
+             * Seal Money
+             * @default 0
+             */
+            seal_money: number;
+            /**
+             * Themes
+             * @default
+             */
+            themes: string;
+            /**
+             * Turnover
+             * @default 0
+             */
+            turnover: number;
+            /** Turnover Rate */
+            turnover_rate?: number | null;
+        };
+        /** MarketLimitHistoryResponse */
+        MarketLimitHistoryResponse: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "limit_up" | "limit_down" | "wind_vane";
+            /** Date */
+            date: string;
+            /** Fetched At */
+            fetched_at: string;
+            /** Items */
+            items?: components["schemas"]["MarketLimitHistoryItem"][];
+            /**
+             * Source
+             * @default 开盘红
+             * @constant
+             */
+            source: "开盘红";
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /** MarketLimitUpBoardItem */
+        MarketLimitUpBoardItem: {
+            /**
+             * Count
+             * @default 0
+             */
+            count: number;
+            /** Name */
+            name: string;
+            /** Promotion Rate */
+            promotion_rate?: string | null;
+        };
+        /** MarketLimitUpLadderResponse */
+        MarketLimitUpLadderResponse: {
+            /** Date */
+            date: string;
+            /** Fetched At */
+            fetched_at: string;
+            /** Sectors */
+            sectors?: components["schemas"]["MarketLimitUpLadderSector"][];
+            /**
+             * Source
+             * @default 开盘红
+             * @constant
+             */
+            source: "开盘红";
+            /** Stocks */
+            stocks?: components["schemas"]["MarketLimitUpLadderStock"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /** MarketLimitUpLadderSector */
+        MarketLimitUpLadderSector: {
+            /**
+             * Amount
+             * @default 0
+             */
+            amount: number;
+            /**
+             * Sector Code
+             * @default
+             */
+            sector_code: string;
+            /** Sector Name */
+            sector_name: string;
+            /** Stock Codes */
+            stock_codes?: string[];
+            /**
+             * Stock Count
+             * @default 0
+             */
+            stock_count: number;
+        };
+        /** MarketLimitUpLadderStock */
+        MarketLimitUpLadderStock: {
+            /**
+             * Amount
+             * @default 0
+             */
+            amount: number;
+            /**
+             * Board Count
+             * @default 0
+             */
+            board_count: number;
+            /** Code */
+            code: string;
+            /**
+             * Limit Up Time
+             * @default
+             */
+            limit_up_time: string;
+            /** Name */
+            name: string;
+            /**
+             * One Word
+             * @default false
+             */
+            one_word: boolean;
+            /**
+             * Popular
+             * @default false
+             */
+            popular: boolean;
+            /**
+             * Sector Amount
+             * @default 0
+             */
+            sector_amount: number;
+            /**
+             * Sector Code
+             * @default
+             */
+            sector_code: string;
+            /**
+             * Sector Limit Up Count
+             * @default 0
+             */
+            sector_limit_up_count: number;
+            /**
+             * Sector Name
+             * @default
+             */
+            sector_name: string;
+        };
+        /** MarketMainlineChance */
+        MarketMainlineChance: {
+            /** Continued Days */
+            continued_days?: number | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Hot */
+            hot?: number | null;
+            /** Plates */
+            plates?: components["schemas"]["MarketMainlinePlate"][];
+            /** Title */
+            title: string;
+        };
+        /** MarketMainlineFaucetStock */
+        MarketMainlineFaucetStock: {
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /** MarketMainlinePlate */
+        MarketMainlinePlate: {
+            /**
+             * Article Title
+             * @default
+             */
+            article_title: string;
+            /** Change Pct */
+            change_pct?: number | null;
+            /**
+             * Code
+             * @default
+             */
+            code: string;
+            /** Faucets */
+            faucets?: components["schemas"]["MarketMainlineFaucetStock"][];
+            /** Name */
+            name: string;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Rise Count */
+            rise_count?: number | null;
+        };
+        /** MarketMainlineResponse */
+        MarketMainlineResponse: {
+            /** Fetched At */
+            fetched_at: string;
+            /** Items */
+            items?: components["schemas"]["MarketMainlineChance"][];
+            /**
+             * Source
+             * @default 财联社
+             * @constant
+             */
+            source: "财联社";
+            style?: components["schemas"]["MarketMainlineStyle"] | null;
+        };
+        /** MarketMainlineStyle */
+        MarketMainlineStyle: {
+            /** Indexes */
+            indexes?: components["schemas"]["MarketMainlineStyleIndex"][];
+            /**
+             * Interpret
+             * @default
+             */
+            interpret: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+        };
+        /** MarketMainlineStyleIndex */
+        MarketMainlineStyleIndex: {
+            /** Change 30D */
+            change_30d?: number | null;
+            /**
+             * Code
+             * @default
+             */
+            code: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Stocks */
+            stocks?: components["schemas"]["MarketMainlineStyleIndexStock"][];
+        };
+        /** MarketMainlineStyleIndexStock */
+        MarketMainlineStyleIndexStock: {
+            /** Change 30D */
+            change_30d?: number | null;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
         };
         /** MarketNewsSnapshotItem */
         MarketNewsSnapshotItem: {
@@ -3470,6 +4973,120 @@ export interface components {
             title?: string;
             /** Url */
             url?: string;
+        };
+        /** MarketSectorStocksHistoryItem */
+        MarketSectorStocksHistoryItem: {
+            /**
+             * Amount
+             * @default 0
+             */
+            amount: number;
+            /** Buy Ratio */
+            buy_ratio?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Chg 1D */
+            chg_1d?: number | null;
+            /** Chg 20D */
+            chg_20d?: number | null;
+            /** Chg 5D */
+            chg_5d?: number | null;
+            /** Code */
+            code: string;
+            /**
+             * Float Amount
+             * @default 0
+             */
+            float_amount: number;
+            /**
+             * Limit Count
+             * @default 0
+             */
+            limit_count: number;
+            /**
+             * Limit Tag
+             * @default
+             */
+            limit_tag: string;
+            /**
+             * Main Buy
+             * @default 0
+             */
+            main_buy: number;
+            /**
+             * Main Net
+             * @default 0
+             */
+            main_net: number;
+            /**
+             * Main Sell
+             * @default 0
+             */
+            main_sell: number;
+            /** Name */
+            name: string;
+            /** Net Ratio */
+            net_ratio?: number | null;
+            /** Price */
+            price?: number | null;
+            /**
+             * Rank Tag
+             * @default
+             */
+            rank_tag: string;
+            /** Recent Chg */
+            recent_chg?: number | null;
+            /** Sell Ratio */
+            sell_ratio?: number | null;
+            /**
+             * Tags
+             * @default
+             */
+            tags: string;
+            /** Turnover Rate */
+            turnover_rate?: number | null;
+        };
+        /** MarketSectorStocksHistoryResponse */
+        MarketSectorStocksHistoryResponse: {
+            /** Date */
+            date: string;
+            /** Fetched At */
+            fetched_at: string;
+            /** Items */
+            items?: components["schemas"]["MarketSectorStocksHistoryItem"][];
+            /** Plate Id */
+            plate_id: string;
+            /**
+             * Source
+             * @default 开盘红
+             * @constant
+             */
+            source: "开盘红";
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /** MarketVolumeResponse */
+        MarketVolumeResponse: {
+            /** Items */
+            items?: components["schemas"]["MarketVolumeSeriesItem"][];
+            /** Market Sources */
+            market_sources?: {
+                [key: string]: string;
+            };
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
+            /** Source Apis */
+            source_apis?: {
+                [key: string]: string;
+            };
+            /** Unavailable Markets */
+            unavailable_markets?: ("shanghai" | "shenzhen")[];
         };
         /** MarketVolumeSeriesItem */
         MarketVolumeSeriesItem: {
@@ -3496,6 +5113,62 @@ export interface components {
             amount_before_one_day?: number | null;
             /** Date */
             date?: string | null;
+        };
+        /** MarketWindPlate */
+        MarketWindPlate: {
+            /**
+             * Catalyst
+             * @default
+             */
+            catalyst: string;
+            /** Plate Code */
+            plate_code: string;
+            /** Plate Name */
+            plate_name: string;
+        };
+        /** MarketWindResponse */
+        MarketWindResponse: {
+            /** Fetched At */
+            fetched_at: string;
+            /** Items */
+            items?: components["schemas"]["MarketWindPlate"][];
+            /**
+             * Source
+             * @default 财联社
+             * @constant
+             */
+            source: "财联社";
+        };
+        /** MarketWindStock */
+        MarketWindStock: {
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /**
+             * Limit Up Days
+             * @default 0
+             */
+            limit_up_days: number;
+            /** Name */
+            name: string;
+            /** Price */
+            price?: number | null;
+        };
+        /** MarketWindStocksResponse */
+        MarketWindStocksResponse: {
+            /** Fetched At */
+            fetched_at: string;
+            /** Items */
+            items?: components["schemas"]["MarketWindStock"][];
+            /** Plate Code */
+            plate_code: string;
+            /**
+             * Source
+             * @default 财联社
+             * @constant
+             */
+            source: "财联社";
         };
         /** NeedsSetupResponse */
         NeedsSetupResponse: {
@@ -3553,6 +5226,11 @@ export interface components {
         NewsSearchItem: {
             /** Author */
             author: string;
+            /**
+             * Category
+             * @default
+             */
+            category: string;
             /** Comment Count */
             comment_count: number;
             /** Content */
@@ -3568,6 +5246,11 @@ export interface components {
             read_count: number;
             /** Source */
             source: string;
+            /**
+             * Source Api
+             * @default
+             */
+            source_api: string;
             /** Title */
             title: string;
             /** Url */
@@ -3581,10 +5264,47 @@ export interface components {
              */
             ok: boolean;
         };
-        /** PortfolioDeleteResponse */
-        PortfolioDeleteResponse: {
-            /** Deleted */
-            deleted: boolean;
+        /** PortfolioClosedPosition */
+        PortfolioClosedPosition: {
+            /** Buy Count */
+            buy_count: number;
+            /** First Trade Time */
+            first_trade_time: string;
+            /** Holding Days */
+            holding_days: number;
+            /** Last Trade Time */
+            last_trade_time: string;
+            /** Matched Cost */
+            matched_cost: number;
+            /** Realized Profit Amount */
+            realized_profit_amount: number;
+            /** Realized Profit Pct */
+            realized_profit_pct?: number | null;
+            /** Sell Count */
+            sell_count: number;
+            /** Stock Code */
+            stock_code: string;
+            /** Stock Name */
+            stock_name: string;
+            /** Total Shares */
+            total_shares: number;
+            /** Transaction Count */
+            transaction_count: number;
+        };
+        /** PortfolioLotMatch */
+        PortfolioLotMatch: {
+            /** Buy Price */
+            buy_price: number;
+            /** Buy Time */
+            buy_time: string;
+            /** Buy Transaction Id */
+            buy_transaction_id: number;
+            /** Matched Cost */
+            matched_cost: number;
+            /** Shares */
+            shares: number;
+            /** Unit Cost */
+            unit_cost: number;
         };
         /** PortfolioPosition */
         PortfolioPosition: {
@@ -3629,6 +5349,8 @@ export interface components {
         };
         /** PortfolioResponse */
         PortfolioResponse: {
+            /** Closed Positions */
+            closed_positions: components["schemas"]["PortfolioClosedPosition"][];
             /** Positions */
             positions: components["schemas"]["PortfolioPosition"][];
             /**
@@ -3643,12 +5365,39 @@ export interface components {
             quote_stale: boolean;
             /** Quoted At */
             quoted_at: string;
+            risk: components["schemas"]["PortfolioRiskSummary"];
             /** Stocks */
             stocks: components["schemas"]["PortfolioStockSummary"][];
             summary: components["schemas"]["PortfolioSummary"];
+            /** Transactions */
+            transactions: components["schemas"]["PortfolioTransaction"][];
+        };
+        /** PortfolioRiskSummary */
+        PortfolioRiskSummary: {
+            /**
+             * Concentration Level
+             * @enum {string}
+             */
+            concentration_level: "low" | "medium" | "high" | "unknown";
+            /** Largest Position Stock Code */
+            largest_position_stock_code?: string | null;
+            /** Largest Position Stock Name */
+            largest_position_stock_name?: string | null;
+            /** Max Single Stock Pct */
+            max_single_stock_pct?: number | null;
+            /** Priced Stock Count */
+            priced_stock_count: number;
+            /** Top3 Concentration Pct */
+            top3_concentration_pct?: number | null;
+            /** Unpriced Stock Count */
+            unpriced_stock_count: number;
+            /** Warnings */
+            warnings?: string[];
         };
         /** PortfolioStockSummary */
         PortfolioStockSummary: {
+            /** Allocation Pct */
+            allocation_pct?: number | null;
             /** Average Cost */
             average_cost: number;
             /** Change Pct */
@@ -3663,17 +5412,25 @@ export interface components {
             position_count: number;
             /** Profit Amount */
             profit_amount?: number | null;
+            /** Profit Contribution Pct */
+            profit_contribution_pct?: number | null;
             /** Profit Pct */
             profit_pct?: number | null;
+            /** Realized Profit Amount */
+            realized_profit_amount: number;
             /** Stock Code */
             stock_code: string;
             /** Stock Name */
             stock_name: string;
+            /** Total Profit Amount */
+            total_profit_amount?: number | null;
             /** Total Shares */
             total_shares: number;
         };
         /** PortfolioSummary */
         PortfolioSummary: {
+            /** Combined Profit Amount */
+            combined_profit_amount: number;
             /** Losing Count */
             losing_count: number;
             /** Position Count */
@@ -3682,6 +5439,8 @@ export interface components {
             priced_cost: number;
             /** Profitable Count */
             profitable_count: number;
+            /** Realized Profit Amount */
+            realized_profit_amount: number;
             /** Stock Count */
             stock_count: number;
             /** Total Cost */
@@ -3692,8 +5451,97 @@ export interface components {
             total_profit_amount: number;
             /** Total Profit Pct */
             total_profit_pct?: number | null;
+            /** Transaction Count */
+            transaction_count: number;
             /** Unpriced Count */
             unpriced_count: number;
+            /** Unrealized Profit Amount */
+            unrealized_profit_amount: number;
+        };
+        /** PortfolioTransaction */
+        PortfolioTransaction: {
+            /** Created At */
+            created_at: string;
+            /** Fee */
+            fee: number;
+            /** Id */
+            id: number;
+            /** Matched Cost */
+            matched_cost?: number | null;
+            /** Matches */
+            matches?: components["schemas"]["PortfolioLotMatch"][];
+            /** Note */
+            note: string;
+            /** Realized Profit Amount */
+            realized_profit_amount?: number | null;
+            /** Shares */
+            shares: number;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+            /** Stock Code */
+            stock_code: string;
+            /** Stock Name */
+            stock_name: string;
+            /** Trade Price */
+            trade_price: number;
+            /** Trade Time */
+            trade_time: string;
+        };
+        /** PortfolioTransactionCreate */
+        PortfolioTransactionCreate: {
+            /**
+             * Fee
+             * @default 0
+             */
+            fee: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Shares */
+            shares: number;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+            /** Stock Code */
+            stock_code: string;
+            /** Trade Price */
+            trade_price: number;
+            /**
+             * Trade Time
+             * Format: date-time
+             */
+            trade_time: string;
+        };
+        /** PortfolioTransactionPreview */
+        PortfolioTransactionPreview: {
+            /** Available Shares */
+            available_shares: number;
+            /** Current Shares After */
+            current_shares_after: number;
+            /** Matched Cost */
+            matched_cost?: number | null;
+            /** Matches */
+            matches?: components["schemas"]["PortfolioLotMatch"][];
+            /** Realized Profit Amount */
+            realized_profit_amount?: number | null;
+            /** Shares After Trade */
+            shares_after_trade: number;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+            /** Stock Code */
+            stock_code: string;
+            /** Trade Time */
+            trade_time: string;
         };
         /**
          * PromptTrace
@@ -3727,6 +5575,18 @@ export interface components {
              * @default 0
              */
             temperature: number;
+        };
+        /** ProviderCircuitStateResponse */
+        ProviderCircuitStateResponse: {
+            /** Consecutive Failures */
+            consecutive_failures: number;
+            /** Retry In Seconds */
+            retry_in_seconds: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "closed" | "open" | "half_open_ready" | "half_open";
         };
         /**
          * PushRequest
@@ -3847,6 +5707,8 @@ export interface components {
             engine_version: string;
             /** Equity Curve */
             equity_curve: components["schemas"]["QuantEquityPoint"][];
+            /** Market Snapshots */
+            market_snapshots?: components["schemas"]["QuantMarketSnapshot"][];
             metrics: components["schemas"]["QuantMetrics"];
             /** Monthly Returns */
             monthly_returns: components["schemas"]["QuantMonthlyReturn"][];
@@ -3879,11 +5741,6 @@ export interface components {
             status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
             /** Updated At */
             updated_at: number;
-        };
-        /** QuantDeleteResponse */
-        QuantDeleteResponse: {
-            /** Deleted */
-            deleted: boolean;
         };
         /** QuantEquityPoint */
         QuantEquityPoint: {
@@ -3939,6 +5796,20 @@ export interface components {
              */
             transfer_fee_rate: number;
         };
+        /** QuantMarketSnapshot */
+        QuantMarketSnapshot: {
+            /** Code */
+            code: string;
+            /**
+             * Data Hash
+             * @default
+             */
+            data_hash: string;
+            /** Items */
+            items?: components["schemas"]["KlineItem"][];
+            /** Source */
+            source: string;
+        };
         /** QuantMetrics */
         QuantMetrics: {
             /** Annualized Return */
@@ -3985,55 +5856,228 @@ export interface components {
         };
         /** QuantStrategyConfig */
         QuantStrategyConfig: {
-            /**
-             * Buy Threshold
-             * @default 30
-             */
-            buy_threshold: number;
-            /**
-             * Fast Period
-             * @default 5
-             */
-            fast_period: number;
-            /**
-             * Lookback Period
-             * @default 20
-             */
-            lookback_period: number;
-            /**
-             * Rsi Period
-             * @default 14
-             */
-            rsi_period: number;
-            /**
-             * Sell Threshold
-             * @default 70
-             */
-            sell_threshold: number;
-            /**
-             * Slow Period
-             * @default 20
-             */
-            slow_period: number;
+            /** Name */
+            name?: string | null;
+            /** Parameters */
+            parameters?: {
+                [key: string]: number | boolean | string;
+            };
             /**
              * Type
              * @default ma_cross
+             */
+            type: string;
+            /** Version */
+            version?: string | null;
+        };
+        /** QuantStrategyConstraintDescriptor */
+        QuantStrategyConstraintDescriptor: {
+            /** Left */
+            left: number | string;
+            /** Message */
+            message: string;
+            /**
+             * Operator
              * @enum {string}
              */
-            type: "ma_cross" | "momentum_breakout" | "rsi_reversion";
+            operator: "greater_than" | "greater_or_equal" | "less_than" | "less_or_equal";
+            /** Right */
+            right: number | string;
+        };
+        /** QuantStrategyDraft */
+        QuantStrategyDraft: {
+            /** Backtest Run Id */
+            backtest_run_id?: string | null;
+            /** Created At */
+            created_at: number;
+            /** Created By */
+            created_by: number;
+            definition: components["schemas"]["StrategyDefinition-Output"];
+            /** Definition Hash */
+            definition_hash: string;
+            /** Id */
+            id: string;
+            /** Last Error */
+            last_error?: string | null;
+            /** Prompt */
+            prompt: string;
+            /** Published At */
+            published_at?: number | null;
+            /** Published Path */
+            published_path?: string | null;
+            quality_gate?: components["schemas"]["QuantStrategyDraftQualityGate"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "validated" | "testing" | "backtested" | "published";
+            /** Updated At */
+            updated_at: number;
+            validation?: components["schemas"]["QuantStrategyDraftValidationReport"] | null;
+        };
+        /** QuantStrategyDraftBacktestRequest */
+        QuantStrategyDraftBacktestRequest: {
+            /**
+             * Benchmark
+             * @default 000300
+             */
+            benchmark: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            execution?: components["schemas"]["QuantExecutionConfig"];
+            /**
+             * Maximum Drawdown Pct
+             * @default 80
+             */
+            maximum_drawdown_pct: number;
+            /**
+             * Minimum Trade Count
+             * @default 1
+             */
+            minimum_trade_count: number;
+            /** Name */
+            name?: string | null;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            universe: components["schemas"]["QuantUniverse"];
+        };
+        /** QuantStrategyDraftGenerateRequest */
+        QuantStrategyDraftGenerateRequest: {
+            /** Prompt */
+            prompt: string;
+        };
+        /** QuantStrategyDraftPublishRequest */
+        QuantStrategyDraftPublishRequest: {
+            /** Expected Definition Hash */
+            expected_definition_hash: string;
+        };
+        /** QuantStrategyDraftQualityGate */
+        QuantStrategyDraftQualityGate: {
+            /** Definition Hash */
+            definition_hash: string;
+            /** Errors */
+            errors?: string[];
+            /** Max Drawdown */
+            max_drawdown?: number | null;
+            /**
+             * Maximum Drawdown Pct
+             * @default 80
+             */
+            maximum_drawdown_pct: number;
+            /**
+             * Minimum Trade Count
+             * @default 1
+             */
+            minimum_trade_count: number;
+            /** Passed */
+            passed?: boolean | null;
+            /**
+             * Run Status
+             * @default pending
+             */
+            run_status: string;
+            /** Trade Count */
+            trade_count?: number | null;
+        };
+        /** QuantStrategyDraftUpdateRequest */
+        QuantStrategyDraftUpdateRequest: {
+            definition: components["schemas"]["StrategyDefinition-Input"];
+            /** Expected Definition Hash */
+            expected_definition_hash: string;
+        };
+        /** QuantStrategyDraftValidationReport */
+        QuantStrategyDraftValidationReport: {
+            /** Definition Hash */
+            definition_hash: string;
+            /** Valid */
+            valid: boolean;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /** QuantStrategyParameterDescriptor */
+        QuantStrategyParameterDescriptor: {
+            /** Choices */
+            choices?: (number | boolean | string)[];
+            /** Default */
+            default: number | boolean | string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Maximum */
+            maximum?: number | null;
+            /** Minimum */
+            minimum?: number | null;
+            /** Step */
+            step?: number | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "integer" | "number" | "boolean" | "string";
         };
         /** QuantStrategyPreset */
         QuantStrategyPreset: {
             config: components["schemas"]["QuantStrategyConfig"];
+            /** Constraints */
+            constraints: components["schemas"]["QuantStrategyConstraintDescriptor"][];
+            /** Definition Hash */
+            definition_hash: string;
             /** Description */
             description: string;
-            /**
-             * Key
-             * @enum {string}
-             */
-            key: "ma_cross" | "momentum_breakout" | "rsi_reversion";
+            /** Key */
+            key: string;
             /** Name */
             name: string;
+            /** Parameters */
+            parameters: components["schemas"]["QuantStrategyParameterDescriptor"][];
+            /** Presentation */
+            presentation: {
+                [key: string]: string;
+            };
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "medium" | "high";
+            /** Scenario */
+            scenario: string;
+            /** Version */
+            version: string;
+        };
+        /** QuantStrategyRegistryStatus */
+        QuantStrategyRegistryStatus: {
+            /** Directory */
+            directory: string;
+            /** Generation */
+            generation: number;
+            /** Last Attempt At */
+            last_attempt_at: number | null;
+            /** Last Error */
+            last_error: string | null;
+            /** Latest Versions */
+            latest_versions: {
+                [key: string]: string;
+            };
+            /** Ledger Path */
+            ledger_path: string | null;
+            /** Loaded At */
+            loaded_at: number | null;
+            /** Published Directory */
+            published_directory: string | null;
+            /** Strategy Count */
+            strategy_count: number;
         };
         /** QuantStrategySave */
         QuantStrategySave: {
@@ -4131,11 +6175,20 @@ export interface components {
             bullish_ratio?: number | null;
             /** Code */
             code: string;
+            /** Field Sources */
+            field_sources?: {
+                [key: string]: string;
+            };
             /**
              * Guba Post Count
              * @default 0
              */
             guba_post_count: number;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
             /**
              * Post Count
              * @default 0
@@ -4145,11 +6198,17 @@ export interface components {
             sample_posts?: components["schemas"]["RetailSentimentPost"][];
             /** Score */
             score?: number | null;
+            /** Source Apis */
+            source_apis?: {
+                [key: string]: string;
+            };
             /**
              * Summary
              * @default
              */
             summary: string;
+            /** Unavailable Sections */
+            unavailable_sections?: "guba_posts"[];
         };
         /** RetailSentimentPost */
         RetailSentimentPost: {
@@ -4217,10 +6276,18 @@ export interface components {
          * @description Purpose: 股票筛选结果中的单只股票信息。
          */
         ScreenerItem: {
+            /** Board */
+            board?: string | null;
             /** Change Pct */
             change_pct?: number | null;
             /** Code */
             code: string;
+            /** Exchange */
+            exchange?: string | null;
+            /** Exchange Industry */
+            exchange_industry?: string | null;
+            /** Listing Date */
+            listing_date?: string | null;
             /** Market Cap */
             market_cap?: number | null;
             /** Name */
@@ -4242,14 +6309,142 @@ export interface components {
          * @description Purpose: 股票筛选的分页结果。
          */
         ScreenerResult: {
+            /**
+             * Exchange Industry Coverage
+             * @default 0
+             */
+            exchange_industry_coverage: number;
             /** Items */
             items: components["schemas"]["ScreenerItem"][];
             /** Page */
             page: number;
             /** Page Size */
             page_size: number;
+            /**
+             * Stock Master Complete
+             * @default false
+             */
+            stock_master_complete: boolean;
+            /**
+             * Sw Industry Coverage
+             * @default 0
+             */
+            sw_industry_coverage: number;
             /** Total */
             total: number;
+        };
+        /** ScreenerStrategyMatch */
+        ScreenerStrategyMatch: {
+            /** Code */
+            code: string;
+            /**
+             * Data Hash
+             * @default
+             */
+            data_hash: string;
+            /**
+             * Data Source
+             * @default
+             */
+            data_source: string;
+            /** Signal Date */
+            signal_date: string;
+            /** Target Position */
+            target_position: number;
+            /**
+             * Used Fallback
+             * @default false
+             */
+            used_fallback: boolean;
+        };
+        /** ScreenerStrategyParameter */
+        ScreenerStrategyParameter: {
+            /** Default */
+            default: number | boolean | string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Maximum */
+            maximum?: number | null;
+            /** Minimum */
+            minimum?: number | null;
+            /** Step */
+            step?: number | null;
+            /** Type */
+            type: string;
+        };
+        /** ScreenerStrategyPreset */
+        ScreenerStrategyPreset: {
+            /** Description */
+            description: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Parameter Definitions */
+            parameter_definitions: components["schemas"]["ScreenerStrategyParameter"][];
+            /** Parameters */
+            parameters: {
+                [key: string]: number | boolean | string;
+            };
+            /** Risk Level */
+            risk_level: string;
+            /** Scenario */
+            scenario: string;
+        };
+        /** ScreenerStrategyRequest */
+        ScreenerStrategyRequest: {
+            /** Codes */
+            codes: string[];
+            /**
+             * Lookback Days
+             * @default 400
+             */
+            lookback_days: number;
+            /** Parameters */
+            parameters?: {
+                [key: string]: number | boolean | string;
+            };
+            /** Strategy Key */
+            strategy_key: string;
+            /** Version */
+            version?: string | null;
+        };
+        /** ScreenerStrategyResult */
+        ScreenerStrategyResult: {
+            /** Definition Hash */
+            definition_hash: string;
+            /** Evaluated */
+            evaluated: number;
+            /** Failed */
+            failed?: {
+                [key: string]: string;
+            };
+            /**
+             * Fallback Count
+             * @default 0
+             */
+            fallback_count: number;
+            /** Matched Codes */
+            matched_codes: string[];
+            /** Matches */
+            matches: components["schemas"]["ScreenerStrategyMatch"][];
+            /** Parameters */
+            parameters: {
+                [key: string]: number | boolean | string;
+            };
+            /** Strategy Key */
+            strategy_key: string;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Strategy Version */
+            strategy_version: string;
         };
         /** SectorSnapshotItem */
         SectorSnapshotItem: {
@@ -4279,6 +6474,14 @@ export interface components {
             concepts?: components["schemas"]["StockConcept"][] | null;
             /** Current Price */
             current_price?: number | null;
+            /** Data Sources */
+            data_sources?: components["schemas"]["StockDataSource"][];
+            /** Exchange Industry */
+            exchange_industry?: string | null;
+            /** Field Sources */
+            field_sources?: {
+                [key: string]: string;
+            };
             first_industry?: components["schemas"]["StockConcept"] | null;
             /** Float Market Cap */
             float_market_cap?: number | null;
@@ -4312,8 +6515,11 @@ export interface components {
             info_error?: string | null;
             /** Market Cap */
             market_cap?: number | null;
-            /** Name */
-            name?: string | null;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
             /** Net Profit */
             net_profit?: number | null;
             /** Pb */
@@ -4342,12 +6548,33 @@ export interface components {
             name: string;
         };
         /**
+         * StockDataSource
+         * @description 基础资料使用的数据来源及上游 API。
+         */
+        StockDataSource: {
+            /** Api */
+            api: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Operation */
+            operation: string;
+            /** Provider */
+            provider: string;
+        };
+        /**
          * StockFundFlowItem
          * @description 单个交易日的个股分级资金净流入。
          */
         StockFundFlowItem: {
             /** Date */
             date: string;
+            /**
+             * Is Stale
+             * @default false
+             */
+            is_stale: boolean;
             /** Large Net */
             large_net?: number | null;
             /** Main Net */
@@ -4356,6 +6583,16 @@ export interface components {
             mid_net?: number | null;
             /** Small Net */
             small_net?: number | null;
+            /**
+             * Source
+             * @default eastmoney_stock_fund_flow
+             */
+            source: string;
+            /**
+             * Source Api
+             * @default https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get
+             */
+            source_api: string;
             /** Super Net */
             super_net?: number | null;
         };
@@ -4380,6 +6617,10 @@ export interface components {
         StockSentiment: {
             /** Code */
             code: string;
+            /** Field Sources */
+            field_sources?: {
+                [key: string]: string;
+            };
             /** Heat Score */
             heat_score?: number | null;
             /** Hot Rank */
@@ -4389,6 +6630,17 @@ export interface components {
              * @default 0
              */
             news_count: number;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
+            /** Source Apis */
+            source_apis?: {
+                [key: string]: string;
+            };
+            /** Unavailable Sections */
+            unavailable_sections?: ("heat" | "news_count")[];
         };
         /**
          * StockValuation
@@ -4405,6 +6657,222 @@ export interface components {
             peers?: components["schemas"]["ValuationPeer"][];
             /** Ps Ttm */
             ps_ttm?: number | null;
+        };
+        /** StrategyDefinition */
+        "StrategyDefinition-Input": {
+            /**
+             * Api Version
+             * @constant
+             */
+            api_version: "quant.strategy/v1";
+            /**
+             * Constraints
+             * @default []
+             */
+            constraints: components["schemas"]["StrategyParameterConstraint"][];
+            /** Description */
+            description: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Indicators */
+            indicators: {
+                [key: string]: components["schemas"]["StrategyIndicatorDefinition"];
+            };
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Parameters */
+            parameters?: {
+                [key: string]: components["schemas"]["StrategyParameterDefinition"];
+            };
+            position?: components["schemas"]["StrategyPositionDefinition"];
+            presentation?: components["schemas"]["StrategyPresentation"];
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "medium" | "high";
+            /** Scenario */
+            scenario: string;
+            signals: components["schemas"]["StrategySignals-Input"];
+            /** Version */
+            version: string;
+        };
+        /** StrategyDefinition */
+        "StrategyDefinition-Output": {
+            /**
+             * Api Version
+             * @constant
+             */
+            api_version: "quant.strategy/v1";
+            /**
+             * Constraints
+             * @default []
+             */
+            constraints: components["schemas"]["StrategyParameterConstraint"][];
+            /** Description */
+            description: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Indicators */
+            indicators: {
+                [key: string]: components["schemas"]["StrategyIndicatorDefinition"];
+            };
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Parameters */
+            parameters?: {
+                [key: string]: components["schemas"]["StrategyParameterDefinition"];
+            };
+            position?: components["schemas"]["StrategyPositionDefinition"];
+            presentation?: components["schemas"]["StrategyPresentation"];
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "medium" | "high";
+            /** Scenario */
+            scenario: string;
+            signals: components["schemas"]["StrategySignals-Output"];
+            /** Version */
+            version: string;
+        };
+        /** StrategyIndicatorDefinition */
+        StrategyIndicatorDefinition: {
+            /** Input */
+            input?: string | null;
+            /** Left */
+            left?: number | string | null;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number | string;
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: "sma" | "ema" | "rsi" | "rolling_max" | "rolling_min" | "rolling_std" | "add" | "subtract" | "multiply" | "divide" | "obv";
+            /** Period */
+            period?: number | string | null;
+            /** Right */
+            right?: number | string | null;
+            /** Volume Input */
+            volume_input?: string | null;
+            /** Zero Value */
+            zero_value?: number | string | null;
+        };
+        /** StrategyParameterConstraint */
+        StrategyParameterConstraint: {
+            /** Left */
+            left: number | string;
+            /** Message */
+            message: string;
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: "greater_than" | "greater_or_equal" | "less_than" | "less_or_equal";
+            /** Right */
+            right: number | string;
+        };
+        /** StrategyParameterDefinition */
+        StrategyParameterDefinition: {
+            /**
+             * Choices
+             * @default []
+             */
+            choices: (number | boolean | string)[];
+            /** Default */
+            default: number | boolean | string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Label */
+            label: string;
+            /** Maximum */
+            maximum?: number | null;
+            /** Minimum */
+            minimum?: number | null;
+            /** Step */
+            step?: number | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "integer" | "number" | "boolean" | "string";
+        };
+        /** StrategyPositionDefinition */
+        StrategyPositionDefinition: {
+            /**
+             * Mode
+             * @default binary
+             * @constant
+             */
+            mode: "binary";
+        };
+        /** StrategyPresentation */
+        StrategyPresentation: {
+            /**
+             * Icon
+             * @default line-chart
+             */
+            icon: string;
+        };
+        /** StrategySignalExpression */
+        "StrategySignalExpression-Input": {
+            /** Left */
+            left?: number | string | null;
+            /**
+             * Operands
+             * @default []
+             */
+            operands: components["schemas"]["StrategySignalExpression-Input"][];
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: "greater_than" | "greater_or_equal" | "less_than" | "less_or_equal" | "cross_above" | "cross_below" | "and" | "or" | "not";
+            /** Right */
+            right?: number | string | null;
+        };
+        /** StrategySignalExpression */
+        "StrategySignalExpression-Output": {
+            /** Left */
+            left?: number | string | null;
+            /**
+             * Operands
+             * @default []
+             */
+            operands: components["schemas"]["StrategySignalExpression-Output"][];
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: "greater_than" | "greater_or_equal" | "less_than" | "less_or_equal" | "cross_above" | "cross_below" | "and" | "or" | "not";
+            /** Right */
+            right?: number | string | null;
+        };
+        /** StrategySignals */
+        "StrategySignals-Input": {
+            entry: components["schemas"]["StrategySignalExpression-Input"];
+            exit: components["schemas"]["StrategySignalExpression-Input"];
+        };
+        /** StrategySignals */
+        "StrategySignals-Output": {
+            entry: components["schemas"]["StrategySignalExpression-Output"];
+            exit: components["schemas"]["StrategySignalExpression-Output"];
         };
         /** TechnicalBoll */
         TechnicalBoll: {
@@ -4525,7 +6993,7 @@ export interface components {
              * Tag
              * @default
              */
-            tag: unknown;
+            tag: string;
         } & {
             [key: string]: unknown;
         };
@@ -4932,6 +7400,122 @@ export interface components {
             label: string;
             /** Rationale */
             rationale?: string[];
+        };
+        /** WatchlistAlert */
+        WatchlistAlert: {
+            /**
+             * Condition
+             * @enum {string}
+             */
+            condition: "price_above" | "price_below" | "change_pct_above" | "change_pct_below";
+            /** Created At */
+            created_at: string;
+            /** Current Value */
+            current_value?: number | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: number;
+            /** Stock Code */
+            stock_code: string;
+            /** Threshold */
+            threshold: number;
+            /**
+             * Triggered
+             * @default false
+             */
+            triggered: boolean;
+        };
+        /** WatchlistAlertCreate */
+        WatchlistAlertCreate: {
+            /**
+             * Condition
+             * @enum {string}
+             */
+            condition: "price_above" | "price_below" | "change_pct_above" | "change_pct_below";
+            /** Threshold */
+            threshold: number;
+        };
+        /** WatchlistItem */
+        WatchlistItem: {
+            /** Alerts */
+            alerts?: components["schemas"]["WatchlistAlert"][];
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Created At */
+            created_at: string;
+            /** Current Price */
+            current_price?: number | null;
+            /** Id */
+            id: number;
+            /** Note */
+            note: string;
+            /**
+             * Quote Source
+             * @default
+             */
+            quote_source: string;
+            /** Stock Code */
+            stock_code: string;
+            /** Stock Name */
+            stock_name: string;
+        };
+        /** WatchlistItemCreate */
+        WatchlistItemCreate: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Stock Code */
+            stock_code: string;
+        };
+        /** WatchlistResponse */
+        WatchlistResponse: {
+            /** Items */
+            items: components["schemas"]["WatchlistItem"][];
+            /** Quoted At */
+            quoted_at: string;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+        };
+        /** WorkflowJobResponse */
+        WorkflowJobResponse: {
+            /** Attempts */
+            attempts: number;
+            /** Completed At */
+            completed_at: number | null;
+            /** Created At */
+            created_at: number;
+            /** Dedupe Key */
+            dedupe_key: string;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "analysis" | "industry_chain" | "screener_strategy" | "daily_review";
+            /** Last Error */
+            last_error: string | null;
+            /** Max Attempts */
+            max_attempts: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
+            /** Updated At */
+            updated_at: number;
+        };
+        /** WorkflowSubmissionResponse */
+        WorkflowSubmissionResponse: {
+            /** Attached */
+            attached: boolean;
+            job: components["schemas"]["WorkflowJobResponse"];
         };
     };
     responses: never;
@@ -5697,6 +8281,68 @@ export interface operations {
             };
         };
     };
+    read_chat_sessions_api_chat_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatStateResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    write_chat_sessions_api_chat_sessions_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatStateSnapshot"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatStateResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_config_api_config_get: {
         parameters: {
             query?: never;
@@ -5946,6 +8592,26 @@ export interface operations {
             };
         };
     };
+    prometheus_metrics_api_health_metrics_prometheus_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+        };
+    };
     readiness_api_health_ready_get: {
         parameters: {
             query?: never;
@@ -6157,6 +8823,38 @@ export interface operations {
             };
         };
     };
+    get_us_macro_api_macro_us_get: {
+        parameters: {
+            query?: {
+                /** @description 忽略缓存并重新获取美国宏观数据 */
+                force_refresh?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroUsDataResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_dragon_tiger_list_api_market_dragon_tiger_get: {
         parameters: {
             query?: {
@@ -6176,6 +8874,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DragonTigerItem"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_market_emotion_api_market_emotion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketEmotion"];
                 };
             };
             /** @description 统一错误响应 */
@@ -6395,6 +9122,38 @@ export interface operations {
             };
         };
     };
+    get_index_intraday_api_market_index_intraday_get: {
+        parameters: {
+            query: {
+                /** @description 指数代码，例如 000001 */
+                symbol: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndexIntradayData"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_index_kline_api_market_index_kline_get: {
         parameters: {
             query: {
@@ -6462,7 +9221,10 @@ export interface operations {
     };
     get_industry_rankings_api_market_industry_rankings_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 查询日期 YYYY-MM-DD，默认今天 */
+                date?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6505,6 +9267,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NewsSearchItem"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_limit_history_api_market_limit_history_get: {
+        parameters: {
+            query: {
+                /** @description 历史日期 YYYY-MM-DD，必须早于今天 */
+                date: string;
+                /** @description limit_up / limit_down / wind_vane */
+                category: "limit_up" | "limit_down" | "wind_vane";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketLimitHistoryResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_limit_up_ladder_api_market_limit_up_ladder_get: {
+        parameters: {
+            query?: {
+                /** @description 查询日期 YYYY-MM-DD，默认当天 */
+                date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketLimitUpLadderResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_market_mainline_api_market_mainline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketMainlineResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -6563,6 +9420,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NewsSearchItem"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_sector_stocks_history_api_market_sector_stocks_history_get: {
+        parameters: {
+            query: {
+                /** @description 历史日期 YYYY-MM-DD，必须早于今天 */
+                date: string;
+                /** @description 开盘红板块 ID，例如 881169 */
+                plate_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketSectorStocksHistoryResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_market_wind_api_market_today_wind_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketWindResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_market_wind_stocks_api_market_today_wind__plate_code__stocks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plate_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketWindStocksResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -6686,7 +9637,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MarketVolumeSeriesItem"][];
+                    "application/json": components["schemas"]["MarketVolumeResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -6762,6 +9713,173 @@ export interface operations {
             };
         };
     };
+    create_transaction_api_portfolio_transactions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTransactionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTransaction"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_transaction_api_portfolio_transactions_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTransactionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTransactionPreview"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_transaction_api_portfolio_transactions__transaction_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTransactionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTransaction"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_transaction_api_portfolio_transactions__transaction_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_transaction_update_api_portfolio_transactions__transaction_id__preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTransactionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTransactionPreview"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     delete_position_api_portfolio__position_id__delete: {
         parameters: {
             query?: never;
@@ -6779,7 +9897,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PortfolioDeleteResponse"];
+                    "application/json": components["schemas"]["DeleteResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -6938,7 +10056,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QuantDeleteResponse"];
+                    "application/json": components["schemas"]["DeleteResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -7093,7 +10211,269 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["QuantDeleteResponse"];
+                    "application/json": components["schemas"]["DeleteResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_strategy_drafts_api_quant_strategy_drafts_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantStrategyDraft"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    generate_quant_strategy_draft_api_quant_strategy_drafts_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuantStrategyDraftGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantStrategyDraft"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_quant_strategy_draft_api_quant_strategy_drafts__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantStrategyDraft"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_quant_strategy_draft_api_quant_strategy_drafts__draft_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuantStrategyDraftUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantStrategyDraft"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_quant_strategy_draft_api_quant_strategy_drafts__draft_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    backtest_quant_strategy_draft_api_quant_strategy_drafts__draft_id__backtest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuantStrategyDraftBacktestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantBacktestRun"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_quant_strategy_draft_api_quant_strategy_drafts__draft_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuantStrategyDraftPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantStrategyDraft"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    validate_quant_strategy_draft_api_quant_strategy_drafts__draft_id__validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantStrategyDraft"];
                 };
             };
             /** @description 统一错误响应 */
@@ -7123,6 +10503,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuantStrategyPreset"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_strategy_registry_status_api_quant_strategy_registry_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantStrategyRegistryStatus"];
                 };
             };
             /** @description 统一错误响应 */
@@ -7218,6 +10627,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScreenerResult"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_screener_strategies_api_screener_strategies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenerStrategyPreset"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    apply_screener_strategy_api_screener_strategy_screen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenerStrategyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenerStrategyResult"];
                 };
             };
             /** @description 统一错误响应 */
@@ -7757,6 +11228,392 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ValuationDetail"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_watchlist_api_watchlist_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_watchlist_item_api_watchlist_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistItem"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_watchlist_alert_api_watchlist_alerts__alert_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alert_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_watchlist_item_api_watchlist__stock_code__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_watchlist_alert_api_watchlist__stock_code__alerts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistAlertCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistAlert"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_analysis_job_api_workflows_analysis__code__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowSubmissionResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_daily_review_job_api_workflows_daily_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DailyReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowSubmissionResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_industry_chain_job_api_workflows_industry_chain__name__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["IndustryChainResearchScope"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowSubmissionResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_screener_strategy_job_api_workflows_screener_strategy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenerStrategyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowSubmissionResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_workflow_job_api_workflows__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowJobResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_workflow_job_api_workflows__job_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowJobResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    stream_workflow_job_api_workflows__job_id__stream_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Last-Event-ID"?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-Sent Events stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
                 };
             };
             /** @description 统一错误响应 */

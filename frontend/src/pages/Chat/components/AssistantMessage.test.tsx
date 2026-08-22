@@ -37,4 +37,24 @@ describe("AssistantMessage", () => {
 
     expect(screen.queryByRole("button", { name: "重新生成回答" })).not.toBeInTheDocument();
   });
+
+  it("turns structured stock results into follow-up actions", () => {
+    const onResultAction = vi.fn();
+    render(
+      <AssistantMessage
+        message={{
+          id: "assistant-1",
+          role: "assistant",
+          content: "候选股票：贵州茅台 600519",
+          isStreaming: false,
+        }}
+        onResultAction={onResultAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /加入自选/ }));
+    expect(onResultAction).toHaveBeenCalledWith("watchlist", expect.objectContaining({ stockCodes: ["600519"] }));
+    expect(screen.getByRole("button", { name: /设置提醒/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /转为量化策略/ })).toBeInTheDocument();
+  });
 });

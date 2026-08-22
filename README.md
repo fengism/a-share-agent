@@ -1,13 +1,13 @@
 # A 股智能选股助手
 
-基于 AI 的 A 股多维度智能分析平台，覆盖市场概览、热点榜单、龙虎榜、条件选股、每日复盘、个股行情、基本面、技术面、情绪面和 AI 综合分析。内置 AI 选股助手，对话式获取实时数据并智能分析。
+基于 AI 的 A 股多维度智能分析平台，覆盖市场概览、今日主线、热点榜单、涨停复盘、龙虎榜、板块资金、条件选股、每日复盘、个股行情、基本面、技术面、情绪面和 AI 综合分析。内置 AI 选股助手，对话式获取实时数据并智能分析。
 
 ## 功能特性
 
 - **全局股票搜索**：支持 6 位股票代码和名称模糊搜索，跳转到个股分析页。
-- **市场概览**：展示主要指数、成交量、热点入口和市场状态。
-- **热点榜单**：支持热股榜、概念榜、行业榜。
-- **龙虎榜**：按日期查看龙虎榜明细，并支持详情弹窗。
+- **市场概览**：展示主要指数、成交量、自选栏和今日主线（财联社主线题材、板块涨跌、龙头股与风格判断）。
+- **市场数据**：指数分时/K线、涨停天梯、历史涨跌停与风向标复盘、北向资金、热门榜单、龙虎榜、行业资金排行。
+- **板块下钻**：行业排行按开盘红板块代码一键查看历史成分股明细（涨跌幅、主力净额、连板与龙虎榜标签）。
 - **条件选股**：按行业、价格、市值、估值等条件筛选，并支持估值百分位过滤。
 - **24小时资讯**：聚合多源快讯和新闻，AI 智能摘要提炼关键信息并附带引用链接，自动刷新。
 - **产业链分析**：输入产业关键词，AI 自动搜索研报数据并生成完整产业链分析报告，支持历史记录和推送。
@@ -15,7 +15,9 @@
 - **每日复盘**：聚合市场、热点、新闻和 LLM 结论，生成结构化复盘。
 - **个股分析**：展示分时、K 线、基本面、估值（含机构一致预期）、技术指标、情绪数据和 AI 结论。
 - **AI 综合分析**：LLM 输出评分、评级、目标价格区间和买入/持有/卖出信号，融合机构一致预期数据。
-- **AI 选股助手**：对话式智能选股，支持自然语言提问，自动调用工具获取实时数据并分析。
+- **量化研究**：YAML DSL 声明式策略热加载、确定性回测引擎、在线 LLM 草稿工作台与发布门禁；回测历史分页加载。
+- **可恢复长任务**：个股分析和产业链分析由 SQLite 持久化 Workflow 执行，支持进度续传、断线重连和远程取消。
+- **AI 选股助手**：对话式智能选股，支持自然语言提问，自动调用工具获取实时数据并分析；专业 Agent 可回答主线、板块资金与历史成分股等问题。
 - **飞书推送**：将分析结果和每日复盘推送到飞书文档，自动按类型分目录，支持权限授权。聊天结果可推送飞书卡片。
 
 ## 技术栈
@@ -26,7 +28,7 @@
 | 状态与请求 | Zustand + TanStack Query + SSE |
 | 图表 | Lightweight Charts + ECharts |
 | 后端 | FastAPI + Python 3.11+ + Pydantic v2 |
-| 数据源 | akshare + 东方财富/新浪/同花顺/问财/Twitter 等 fallback |
+| 数据源 | 国家统计局 + 交易所官方名录 + akshare/东方财富/新浪/同花顺/问财/财联社/开盘红/百度/腾讯/巨潮资讯/Twitter 等 fallback |
 | AI 引擎 | OpenAI-compatible SDK + LiteLLM，可配置 DeepSeek、通义千问、OpenAI、Claude、Gemini、Azure、Ollama 等 |
 | 包管理 | uv + npm |
 | 部署 | Docker + Nginx |
@@ -85,7 +87,68 @@ docker compose down
 
 Docker Compose 只会从 `.env` 读取 `CONFIG_ENCRYPTION_KEY`，不会在首次启动或容器重建时自动生成。将密钥生成命令的输出填入 `.env` 的 `CONFIG_ENCRYPTION_KEY`，并妥善备份该值；后续容器重建、迁移或数据恢复时必须继续使用同一个密钥，否则已加密的用户私密配置无法解密。未配置密钥时，空数据库仍可启动，但无法保存 API Key、Token 等敏感配置；如果数据库中已经存在敏感配置，后端就绪检查将失败。
 
-启动后访问 `http://localhost:8080`。如端口冲突，可在 `.env` 中设置 `DOCKER_FRONTEND_PORT=8081`，再访问对应端口。`data/` 和 `logs/` 通过卷挂载持久化，容器重建后数据不丢失。服务异常退出后会自动重启，容器日志按单文件 10 MB、最多 3 个文件轮转。代码更新后重新构建，BuildKit 会复用 uv 和 npm 下载缓存：
+启动后访问 `http://localhost:8080`。默认拓扑只有一个 `backend` 容器：同一 Uvicorn 进程运行 HTTP 服务、周期维护以及 Bot、Quant 和 Analysis/Industry Chain 持久化任务 Worker；此外还有一个 `frontend` 容器和一个 `tdx-api` sidecar，不会额外启动 `backend-worker`。如端口冲突，可在 `.env` 中设置 `DOCKER_FRONTEND_PORT=8081`，再访问对应端口。`tdx-api` 默认仅绑定宿主机 `127.0.0.1:18080`。
+
+#### YAML 量化策略热加载
+
+量化策略使用受限 YAML DSL，默认目录为 `backend/app/modules/quant/strategies/definitions/`。新增 `.yaml` 文件后，后端会按 `QUANT_STRATEGY_RELOAD_SECONDS` 定期扫描；整目录全部校验和编译成功后才原子替换注册表，失败时继续使用上一份有效版本。前端会定期刷新策略描述符，动态渲染数值、布尔、选项参数及跨参数约束。
+
+回测执行会按策略指标图自动计算预热周期，在请求开始日前加载额外行情，但净值、交易和基准指标只覆盖用户选择的回测区间。股票与基准统一使用 ISO 交易日期，结果记录真实数据源、数据哈希和引擎版本；当前正确语义版本为 `2026-08-18-v3`。
+
+```yaml
+api_version: quant.strategy/v1
+key: price_above_average
+version: 1.0.0
+enabled: true
+name: 价格均线策略
+description: 收盘价高于均线时持仓
+scenario: 趋势行情
+risk_level: medium
+parameters:
+  period:
+    type: integer
+    label: 均线周期
+    default: 20
+    minimum: 2
+    maximum: 250
+constraints:
+  - operator: greater_or_equal
+    left: $period
+    right: 10
+    message: 均线周期不能小于 10
+indicators:
+  average:
+    operator: sma
+    input: close
+    period: $period
+signals:
+  entry: { operator: greater_than, left: close, right: average }
+  exit: { operator: less_or_equal, left: close, right: average }
+position: { mode: binary }
+```
+
+DSL v1 支持 `sma`、`ema`、`rsi`、`rolling_max`、`rolling_min`、`rolling_std`、`obv`、`shift` 指标，以及 `add` / `subtract` / `multiply` / `divide` 指标序列运算；信号支持比较、交叉和 `and` / `or` / `not` 组合。`shift` 将输入序列滞后指定周期，可表达 ROC 动量、连续上涨和跳空缺口等形态。YAML 只通过 `safe_load` 解析，不支持 Python 导入、自定义 Tag 或任意代码执行。
+
+内置预制策略包括：双均线趋势、均线金叉、动量突破、放量突破、RSI 均值回归、EXPMA 交叉、MACD 金叉死叉、布林带反转、KDJ 低位金叉、海龟唐安奇突破、BIAS 乖离率反转、量价配合、OBV 能量潮趋势、多头趋势、缩量回踩、底部放量、一阳夹三阴和箱体震荡共 18 个。
+
+智能选股页还提供多头趋势、均线金叉、放量突破、缩量回踩、底部放量、一阳夹三阴和箱体震荡 7 个历史信号策略。策略可扫描当前分页中的候选，或当前筛选条件下前 200 只候选，并使用与量化回测完全相同的 YAML snapshot 和前复权日线计算最新目标仓位。扫描任务通过持久化 Workflow 执行，支持进度展示、断线续传和取消；结果会展示最近一次入场信号日期，并完整列出扫描范围内的命中股票，自动勾选前 10 只以便继续批量分析或回测。部分行情失败会明确提示且不会写入结果缓存，全部行情失败时任务会自动重试。
+
+- 同一 `key + version` 的内容不可修改；版本哈希账本持久化在 `APP_DATA_DIR/quant-strategy-hashes.json`，服务重启后仍会拒绝同版本篡改。交易逻辑或参数定义变化时必须提升版本号。
+- 新任务会把规范化定义、参数、版本和 SHA-256 写入任务快照，已排队和历史回测不受后续热加载影响。
+- 管理员可访问 `GET /api/quant/strategy-registry` 查看当前目录、账本、generation、最后加载/尝试时间、最近错误和 last-good 策略版本。
+- 管理员登录后可在“量化研究”页使用在线策略工作台：自然语言生成受限 DSL 草稿，编辑 JSON，编译校验，以当前定义快照发起回测，并在交易次数与最大回撤门禁通过后显式确认发布。
+- 量化回测前端按“配置回测 / 任务记录 / 结果分析”三个独立视图组织；创建任务后自动进入任务记录，当前视图和任务 ID 会保留在 URL 中，刷新或分享链接后可恢复上下文。
+- 配置页默认只展示当前策略摘要，预制策略目录按需展开；在任务记录中打开已完成回测会直接进入对应结果，减少重复切换。
+- 当前策略摘要会同步显示实际参数并标记修改状态；低频的策略配置管理默认收起，结果页补充任务上下文和返回入口，移动端提供吸附的回测提交操作。
+- 草稿更新必须携带当前定义哈希并通过 SQLite Compare-And-Swap，过期页面不会覆盖其他管理员的修改；回测中和已通过门禁的定义保持冻结，重复试跑使用同一不可变快照。
+- 最大允许回撤只能从默认 80% 向下收紧；非有限数值、正回撤、负交易次数或陈旧快照都会直接使质量门禁失败。并发试跑未能绑定草稿时会自动撤销并清理孤儿任务。
+- 在线草稿和状态持久化在 SQLite；发布文件原子写入 `APP_DATA_DIR/quant-strategies-published`，随后与只读策略目录一起全量校验并热加载。生成、回测或 LLM 失败都不会修改 last-good 注册表。
+- Chat 中的 `quant_strategy_authoring` Skill 只向管理员开放受限策略工具；只有用户明确要求发布且提供当前定义哈希时，Agent 才能调用发布工具。
+- 本地开发可通过 `QUANT_STRATEGY_DIR` 指向外部目录。
+- Docker Compose 默认将 `QUANT_STRATEGY_HOST_DIR` 只读挂载到容器；首次更换宿主机目录需要重建容器，之后修改 YAML 无需重启。
+- 热加载协议见 `docs/design/202608160039-quant-yaml-strategy-hot-reload.md`；在线生成、质量门禁和发布流程见 `docs/design/202608161016-quant-online-strategy-authoring.md`。
+
+`backend` 和 `frontend` 默认使用只读根文件系统、删除 Linux capabilities 并启用 `no-new-privileges`，Nginx 以非 root 用户运行；`data/` 和 `logs/` 是后端显式可写卷，临时文件写入受限 `tmpfs`。容器重建后持久化数据不会丢失，服务异常退出后会自动重启，日志按单文件 10 MB、最多 3 个文件轮转。当前不支持多 Uvicorn Worker 或多 Backend 副本；这需要先将进程内缓存、限流和任务所有权迁移到共享基础设施。代码更新后重新构建，BuildKit 会复用 uv 和 npm 下载缓存：
 
 ```bash
 docker compose up -d --build
@@ -93,7 +156,9 @@ docker compose up -d --build
 
 #### Docker 数据备份与恢复
 
-备份前暂停后端，确保 SQLite 主文件及 `-wal`、`-shm` 文件状态一致；归档同时包含 `.env` 中的加密密钥，请安全保存：
+后端默认每天使用 SQLite 在线备份 API 将两个数据库备份到 `data/backups/`，写入后执行 `quick_check` 并生成 SHA-256 校验文件，每个数据库保留最近 7 份。可通过 `DATABASE_BACKUP_ENABLED`、`DATABASE_BACKUP_INTERVAL_SECONDS` 和 `DATABASE_BACKUP_RETENTION_COUNT` 调整。生产环境可设置 `DATABASE_BACKUP_DIR` 使用独立备份盘，并设置 `DATABASE_BACKUP_MIRROR_DIR` 将验证通过的备份同步到另一个已挂载的可写目录；使用 Compose 时需在 override 文件中显式挂载这两个目录。
+
+执行完整离线归档前仍应暂停后端；归档同时包含在线备份、原始数据和 `.env` 中的加密密钥，请安全保存：
 
 ```bash
 docker compose stop backend
@@ -107,6 +172,36 @@ docker compose start backend
 docker compose down
 tar -xzf ../a-share-agent-backup.tar.gz
 docker compose up -d
+```
+
+也可以从单个已校验的在线备份离线恢复数据库。恢复命令会再次校验 SHA-256（存在时）和 SQLite `quick_check`，并在覆盖前保存原数据库以及仍存在的 WAL/SHM 安全副本；任一步失败都会恢复完整文件组：
+
+```bash
+docker compose down
+docker compose run --rm --no-deps backend \
+  python -m app.scripts.restore_database_backup market \
+  /app/data/backups/market-YYYYMMDDTHHMMSSZ.sqlite3 \
+  --confirm-backend-stopped
+docker compose run --rm --no-deps backend \
+  python -m app.scripts.restore_database_backup user \
+  /app/data/backups/user-YYYYMMDDTHHMMSSZ.sqlite3 \
+  --confirm-backend-stopped
+docker compose up -d
+```
+
+#### Workflow 进度与取消
+
+个股分析和产业链分析先通过 `POST /api/workflows/analysis/{code}` 或 `POST /api/workflows/industry-chain/{name}` 创建持久化任务，再通过 `GET /api/workflows/{job_id}/stream` 接收 SSE 进度。浏览器断线重连时会携带 `Last-Event-ID`，后端从游标之后继续回放事件并去重；取消操作先调用 `DELETE /api/workflows/{job_id}`，再中止本地连接。旧 Analysis/Industry Chain SSE 地址继续作为兼容入口。
+
+队列默认最多并发执行 2 个任务、每个用户同时运行 1 个任务，并限制用户级和全局活动任务数量；终态任务默认保留 30 天。相关参数见 `.env.example` 中的 `WORKFLOW_JOB_*` 配置。
+
+#### Prometheus 指标
+
+`GET /api/health/metrics/prometheus` 以 Prometheus 文本格式输出 Workflow 队列、后台任务重启和备份新鲜度等指标。设置 `METRICS_API_KEY` 后使用 `X-Metrics-Key` 访问；未设置时也可使用管理员 Bearer Token：
+
+```bash
+curl -H "X-Metrics-Key: ${METRICS_API_KEY}" \
+  http://localhost:8080/api/health/metrics/prometheus
 ```
 
 ### 手动安装
@@ -139,6 +234,10 @@ CHAT_MAX_COMPLETION_TOKENS=4096
 CHAT_TOTAL_TIMEOUT_SECONDS=300
 CHAT_HEARTBEAT_SECONDS=15
 CHAT_TOOL_TIMEOUT_SECONDS=45
+CHAT_MAX_TOOL_CALLS_PER_ROUND=8
+CHAT_MAX_TOOL_CALLS_TOTAL=32
+CHAT_MAX_TOOL_CONTEXT_CHARACTERS=60000
+CHAT_MAX_SYNTHESIS_CHARACTERS=60000
 ```
 
 `LLM_API_MODE` 支持 `auto`、`openai`、`litellm`；推荐使用 `auto` 跟随 Provider。Azure 等接口可通过 `LLM_API_VERSION` 指定版本，本地 Ollama 可不配置 API Key。
@@ -147,28 +246,22 @@ CHAT_TOOL_TIMEOUT_SECONDS=45
 
 所有配置也可在前端设置页面（`/settings`）动态修改，无需重启服务。每个账号还可在「Skill 与 Agent」卡片中独立关闭 Chat Skill 或专业 Agent；关闭 Skill 会同步限制关联工具，关闭 Agent 后它不再参与多 Agent 路由。新能力默认启用。
 
-### 网页抓取增强（可选）
+### 安全网页抓取
 
-AI 聊天助手支持抓取任意 URL 并总结内容。基础抓取开箱即用，如需反爬绕过和 JS 渲染支持（如抓取需要 JavaScript 加载的 SPA 页面），可安装增强依赖：
+AI 聊天助手通过受控 HTTP 传输抓取公开 URL：域名的全部解析结果必须是公网地址，实际连接固定到已校验 IP，并在每一跳重定向时重新解析、校验和固定目标；HTTPS 仍使用原始域名执行 SNI 和证书校验。
+
+DNS 解析在线程池中执行，并与连接及重定向共享同一个请求截止时间。响应体采用流式读取，默认最多保留 20 MiB（可通过 `WEB_FETCH_MAX_RESPONSE_BYTES` 调整，范围 64 KiB ~ 100 MiB），同时检查声明大小和解压后的实际大小。
+
+`fetch_url` / `fetch_urls` 支持 `auto`、`http`、`stealth`、`dynamic` 四种模式。`auto` 先使用固定 IP HTTP，失败或正文不足时依次尝试 stealth 和 dynamic。浏览器运行在后端主进程中并直接联网，以保持与旧版 Scrapling 行为一致；浏览器模式只校验初始 URL 为 HTTP(S)，不会对重定向、iframe、XHR 或子资源执行私网/DNS Rebinding 防护。
+
+首次安装由 `./setup.sh` 自动安装 Patchright Chromium；也可以手动执行：
 
 ```bash
-cd backend
-
-# 1. 安装 Scrapling + 浏览器指纹库（一键安装可选依赖）
-uv pip install -e ".[web-fetch]"
-
-# 2. 安装 Playwright 浏览器（stealth/dynamic 模式需要）
-uv run playwright install chromium
-uv run playwright install-deps chromium   # 需要 sudo 权限
+make backend-sync
+make backend-browser-install
 ```
 
-| 模式 | 触发方式 | 依赖 | 适用场景 |
-|------|---------|------|---------|
-| `http` | 自动降级 | 仅 scrapling | 公开网页，自带反爬指纹 |
-| `stealth` | HTTP 模式失败后自动尝试 | + playwright + chromium | 反爬严格的网站 |
-| `dynamic` | 启用动态抓取后自动尝试 | + playwright + chromium | JS 渲染的 SPA 页面 |
-
-> 不安装增强依赖时，系统自动降级为纯 HTTP 抓取（`requests` + BeautifulSoup），功能不受影响。
+浏览器模式由 `WEB_FETCH_BROWSER_ENABLED` 控制，默认总超时 60 秒；dynamic 等待 DOMContentLoaded 后再稳定 5 秒（`WEB_FETCH_BROWSER_SETTLE_SECONDS`），不等待尾部统计资源触发完整 load；stealth/dynamic 在进程内共享并发上限（`WEB_FETCH_BROWSER_MAX_CONCURRENCY`，默认 2）。主进程方案不能隔离 Chromium 漏洞带来的进程权限风险，面向不可信公网长期运行时仍建议使用独立容器。
 
 ### 问财数据源配置
 
@@ -280,6 +373,15 @@ npm run dev
 ### 访问应用
 
 打开 `http://localhost:5173`，输入股票代码（如 `600519`）或名称（如 `贵州茅台`）开始分析。
+
+### 质量验证
+
+```bash
+make check          # 后端 Ruff/Mypy/pytest + 前端 API 合同/Vitest/ESLint/Build
+make frontend-e2e   # Playwright 登录与 Workflow 重连/取消 smoke 测试
+```
+
+完整前端验证使用 Node.js 22。Playwright 首次运行前需在 `frontend/` 执行 `npx playwright install chromium`。
 
 ## 账号系统与访问控制
 

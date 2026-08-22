@@ -1,0 +1,68 @@
+.market-fund-flow {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.market-fund-flow__metrics {
+  margin-bottom: 0;
+}
+
+.market-fund-flow__metrics .ant-card,
+.market-fund-flow__chart-card.ant-card {
+  height: 100%;
+  border-color: var(--c-border);
+  border-radius: var(--c-radius-lg);
+  background: var(--c-card-bg);
+  box-shadow: var(--c-shadow-sm);
+}
+
+.market-fund-flow__metric-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.market-fund-flow__metric-title i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.market-fund-flow__disclosure-note {
+  display: block;
+  margin-top: 4px;
+  line-height: 1.6;
+}
+
+.market-fund-flow__chart-card .ant-card-head {
+  min-height: 62px;
+  gap: 12px;
+  border-bottom-color: var(--c-border);
+}
+
+.market-fund-flow__chart-card .ant-card-head-title {
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+}
+
+.market-fund-flow__chart {
+  min-width: 0;
+}
+
+@media (max-width: 575px) {
+  .market-fund-flow__chart-card .ant-card-head {
+    flex-wrap: wrap;
+    padding-block: 12px;
+  }
+
+  .market-fund-flow__chart-card .ant-card-extra {
+    margin-inline-start: 0;
+  }
+
+  .market-fund-flow__chart {
+    margin-inline: -10px;
+    width: calc(100% + 20px) !important;
+  }
+}

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
 from app.infrastructure.persistence.leased_jobs import LeasedJobSpec, LeasedJobStateStore
+from app.infrastructure.persistence.retention import PurgeResult
 
 QUANT_RUN_RETENTION_SECONDS = 90 * 24 * 60 * 60
 
@@ -39,6 +40,7 @@ class QuantRunRow:
     updated_at: float
     completed_at: float | None
     lease_owner: str | None = None
+    input_snapshot: dict[str, Any] | None = None
 
 
 def _loads(value: str | None) -> dict[str, Any] | None:
@@ -63,6 +65,7 @@ def _row_to_run(row) -> QuantRunRow:
         updated_at=row["updated_at"],
         completed_at=row["completed_at"],
         lease_owner=row["lease_owner"],
+        input_snapshot=_loads(row["input_snapshot_json"]),
     )
 
 
@@ -116,15 +119,15 @@ def get_run(user_id: int, run_id: str) -> QuantRunRow | None:
     return _row_to_run(row) if row is not None else None
 
 
-def list_runs(user_id: int, *, limit: int = 50) -> list[QuantRunRow]:
+def list_runs(user_id: int, *, limit: int = 50, offset: int = 0) -> list[QuantRunRow]:
     rows = get_connection("user").execute(
         """
         SELECT * FROM quant_backtest_runs
         WHERE user_id = ?
         ORDER BY created_at DESC
-        LIMIT ?
+        LIMIT ? OFFSET ?
         """,
-        (user_id, limit),
+        (user_id, limit, offset),
     ).fetchall()
     return [_row_to_run(row) for row in rows]
 
@@ -149,6 +152,33 @@ def claim_next(owner_id: str, *, lease_seconds: int = 600, now: float | None = N
         now=current_time,
     )
     return _row_to_run(claimed) if claimed is not None else None
+
+
+def renew_lease(
+    run_id: str,
+    owner_id: str,
+    lease_seconds: float,
+    *,
+    now: float | None = None,
+) -> bool:
+    current_time = time.time() if now is None else now
+    return _RUN_STATE.renew_lease(
+        run_id,
+        owner_id,
+        lease_seconds,
+        now=current_time,
+    )
+
+
+def release(
+    run_id: str,
+    owner_id: str,
+    reason: str,
+    *,
+    now: float | None = None,
+) -> bool:
+    current_time = time.time() if now is None else now
+    return _RUN_STATE.release(run_id, owner_id, reason, now=current_time)
 
 
 def complete(
@@ -232,3 +262,12 @@ def delete_run(user_id: int, run_id: str) -> bool:
 def purge_completed(*, retention_seconds: int = QUANT_RUN_RETENTION_SECONDS, now: float | None = None) -> int:
     current_time = time.time() if now is None else now
     return _RUN_STATE.purge_completed(retention_seconds, now=current_time)
+
+
+def purge_completed_with_status(
+    *,
+    retention_seconds: int = QUANT_RUN_RETENTION_SECONDS,
+    now: float | None = None,
+) -> PurgeResult:
+    current_time = time.time() if now is None else now
+    return _RUN_STATE.purge_completed_with_status(retention_seconds, now=current_time)

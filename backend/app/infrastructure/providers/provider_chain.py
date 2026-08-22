@@ -1,19 +1,20 @@
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import Awaitable, Callable, Generic, TypeVar
 
 from app.infrastructure.providers.provider_gateway import provider_gateway
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class ProviderAttempt:
+class ProviderAttempt(Generic[T]):
     """Purpose: 数据源提供者的单次尝试配置，包含标签、加载函数和错误处理回调。"""
 
     label: str
-    loader: Callable[[], Awaitable[Any]]
+    loader: Callable[[], Awaitable[T]]
     on_error: str | None = None
 
 
@@ -36,10 +37,10 @@ class ProviderChainReport:
     selected_label: str | None = None
 
 
-class BaseProviderChain:
+class BaseProviderChain(Generic[T]):
     """Purpose: 提供者链的基类，按顺序执行多个 ProviderAttempt，成功即返回，失败则尝试下一个。"""
 
-    def __init__(self, attempts: list[ProviderAttempt], operation: str = "provider_chain"):
+    def __init__(self, attempts: list[ProviderAttempt[T]], operation: str = "provider_chain"):
         """Initialize the chain with the ordered list of provider attempts.
 
         Param:
@@ -48,7 +49,7 @@ class BaseProviderChain:
         self.attempts = attempts
         self.operation = operation
 
-    async def run(self):
+    async def run(self) -> T:
         """Run the provider chain and return the first successful result.
 
         Param:
@@ -59,7 +60,7 @@ class BaseProviderChain:
         result, _ = await self.run_with_report()
         return result
 
-    async def run_with_report(self):
+    async def run_with_report(self) -> tuple[T, ProviderChainReport]:
         """Run the provider chain and return both the result and a report.
 
         Param:

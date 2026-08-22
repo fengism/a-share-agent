@@ -7,10 +7,10 @@ import "dayjs/locale/zh-cn";
 import { useMarketTwitterFeed, useMarketTwitterFeedRefresh } from "../../api/queries";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useColors, useStyles } from "../../styles/ui";
-import { getRelativeTimeRefreshDelay } from "../Feed/feedHelpers";
-import PaginatedList from "../Feed/PaginatedList";
+import { getRelativeTimeRefreshDelay } from "../../features/feed/feedHelpers";
+import PaginatedList from "../../features/feed/PaginatedList";
 import TwitterAnalysisPanel from "./TwitterAnalysisPanel";
-import "../Feed/feed.css";
+import "../../features/feed/feed.css";
 
 dayjs.extend(relativeTime);
 dayjs.locale("zh-cn");
@@ -68,7 +68,7 @@ export default function Twitter() {
   };
 
   return (
-    <div style={{ ...pageContainerStyle, maxWidth: 1180 }}>
+    <div style={{ ...pageContainerStyle, maxWidth: "var(--c-container-feed)" }}>
       <section className="feed-paper">
         <header className="feed-masthead">
           <span className="feed-masthead-kicker">SOCIAL MARKET SIGNALS</span>

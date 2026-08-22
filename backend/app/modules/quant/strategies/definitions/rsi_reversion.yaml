@@ -1,0 +1,54 @@
+api_version: quant.strategy/v1
+key: rsi_reversion
+version: 1.0.0
+enabled: true
+name: RSI 均值回归
+description: RSI 进入超卖区间后买入，进入超买区间后退出。
+scenario: 震荡行情
+risk_level: medium
+presentation:
+  icon: dashboard
+parameters:
+  rsi_period:
+    type: integer
+    label: RSI 周期
+    description: RSI 指标计算周期
+    default: 14
+    minimum: 2
+    maximum: 100
+  buy_threshold:
+    type: number
+    label: 买入阈值
+    description: RSI 低于该阈值时入场
+    default: 30
+    minimum: 0
+    maximum: 100
+  sell_threshold:
+    type: number
+    label: 卖出阈值
+    description: RSI 高于该阈值时退出
+    default: 70
+    minimum: 0
+    maximum: 100
+constraints:
+  - operator: less_than
+    left: $buy_threshold
+    right: $sell_threshold
+    message: 买入阈值必须小于卖出阈值
+indicators:
+  rsi:
+    operator: rsi
+    input: close
+    period: $rsi_period
+signals:
+  entry:
+    operator: less_or_equal
+    left: rsi
+    right: $buy_threshold
+  exit:
+    operator: greater_or_equal
+    left: rsi
+    right: $sell_threshold
+position:
+  mode: binary
+

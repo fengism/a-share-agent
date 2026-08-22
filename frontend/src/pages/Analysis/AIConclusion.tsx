@@ -1,8 +1,10 @@
-import { Card, List, Progress, Row, Col, Typography } from "antd";
+import type { CSSProperties } from "react";
+import { Card, Progress, Typography } from "antd";
 import RatingBadge from "../../components/RatingBadge";
 import SignalBadge from "../../components/SignalBadge";
 import type { AnalysisResult } from "../../types/stock";
-import { useColors, useStyles } from "../../theme/hooks";
+import { useColors, useStyles, useTokens } from "../../theme/hooks";
+import "./analysis-conclusion.css";
 
 const { Text } = Typography;
 
@@ -12,7 +14,8 @@ interface Props {
 
 export default function AIConclusion({ result }: Props) {
   const c = useColors();
-  const { cardStyle, metricTileStyle } = useStyles();
+  const t = useTokens();
+  const { cardStyle } = useStyles();
   const {
     fundamental,
     technical,
@@ -30,172 +33,119 @@ export default function AIConclusion({ result }: Props) {
   } = result;
 
   const [priceLow, priceHigh] = estimated_price_range;
-  const priceChange = current_price && priceLow ? ((priceHigh - current_price) / current_price * 100).toFixed(1) : null;
+  const priceChange = current_price && priceHigh
+    ? ((priceHigh - current_price) / current_price * 100).toFixed(1)
+    : null;
+  const isBuy = signal === "buy" || signal === "strong_buy";
+  const isSell = signal === "sell" || signal === "strong_sell";
+  const accent = isBuy ? c.up : isSell ? c.down : c.primary;
+  const accentSoft = isBuy ? c.upBg : isSell ? c.downBg : `${c.primary}14`;
+  const scoreColor = (score: number) => score >= 8 ? c.up : score >= 6 ? c.primary : score >= 4 ? c.warning : c.down;
+  const dimensionScores = [
+    { label: "基本面", score: fundamental.score, summary: fundamental.summary },
+    { label: "技术面", score: technical.score, summary: technical.summary },
+    { label: "情绪面", score: sentiment.score, summary: sentiment.summary },
+  ];
+  const valuationText = valuation_view || "暂无明确结论";
+  const valuationRange = fair_value_range?.[0] != null
+    ? `¥${fair_value_range[0].toFixed(2)} – ¥${fair_value_range[1].toFixed(2)}`
+    : "暂无公允区间";
 
-  const signalTheme =
-    signal === "buy"
-      ? {
-          primary: c.up,
-          soft: c.upBg,
-          border: `${c.up}40`,
-          progress: c.up,
-        }
-      : signal === "sell"
-        ? {
-            primary: c.down,
-            soft: c.downBg,
-            border: `${c.down}40`,
-            progress: c.down,
-          }
-        : {
-            primary: c.primary,
-            soft: `${c.primary}1f`,
-            border: `${c.primary}40`,
-            progress: c.primary,
-          };
+  const conclusionStyle = {
+    ...cardStyle,
+    marginBottom: t.space[4],
+    "--analysis-accent": accent,
+    "--analysis-accent-soft": accentSoft,
+  } as CSSProperties;
 
   return (
     <Card
       size="small"
-      className="pdf-avoid-break"
-      title={<span style={{ fontWeight: 700, fontSize: 15, color: c.textPrimary, letterSpacing: 0.2 }}>AI 综合结论</span>}
-      style={{
-        ...cardStyle,
-        marginBottom: 16,
-        borderTop: `3px solid ${signalTheme.primary}`,
-      }}
-      styles={{ body: { padding: "20px 24px" } }}
+      className="analysis-conclusion pdf-avoid-break"
+      title={<span className="analysis-conclusion__title">AI 综合研判</span>}
+      style={conclusionStyle}
+      styles={{ body: { padding: 0 } }}
     >
-      <div className="pdf-avoid-break" style={{ marginBottom: 18, display: "grid", gap: 12 }}>
-        <div style={{ padding: "14px 16px", borderRadius: 10, border: `1px solid ${signalTheme.border}`, background: signalTheme.soft }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>核心研判</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: c.textPrimary, lineHeight: 1.6 }}>{overall_summary}</div>
+      <section className="analysis-conclusion__hero pdf-avoid-break" aria-label="综合研判">
+        <div className="analysis-conclusion__decision-row">
+          <div className="analysis-conclusion__decision-copy">
+            <span className="analysis-conclusion__eyebrow">核心判断</span>
+            <p className="analysis-conclusion__summary">{overall_summary}</p>
+          </div>
+          <div className="analysis-conclusion__signal-cluster">
+            <RatingBadge score={overall_rating} size={72} />
+            <div className="analysis-conclusion__signal-meta">
+              <SignalBadge signal={signal} />
+              <span>模型置信度 {Math.round(confidence * 100)}%</span>
+              <Progress
+                percent={Math.round(confidence * 100)}
+                size="small"
+                showInfo={false}
+                strokeColor={accent}
+                aria-label="模型置信度"
+              />
             </div>
-            <SignalBadge signal={signal} />
           </div>
         </div>
-        <Row gutter={[12, 12]}>
-          <Col xs={24} md={8}>
-            <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${c.border}`, background: c.elevatedBg, height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>投资要点</div>
-              <div style={{ fontSize: 13, lineHeight: 1.8, color: c.textSecondary }}>{key_factors[0] || "暂无"}</div>
-            </div>
-          </Col>
-          <Col xs={24} md={8}>
-            <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${c.border}`, background: c.elevatedBg, height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>风险要点</div>
-              <div style={{ fontSize: 13, lineHeight: 1.8, color: c.textSecondary }}>{risk_warnings[0] || "暂无"}</div>
-            </div>
-          </Col>
-          <Col xs={24} md={8}>
-            <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${c.border}`, background: c.elevatedBg, height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>估值结论</div>
-              <div style={{ fontSize: 13, lineHeight: 1.8, color: c.textSecondary, minHeight: 48 }}>
-                {valuation_view && (
-                  <span style={{
-                    color: valuation_view === "低估" ? c.up : valuation_view === "高估" ? c.down : c.primary,
-                    fontWeight: 600,
-                  }}>
-                    {valuation_view}
-                  </span>
-                )}
-                {fair_value_range && fair_value_range[0] != null && (
-                  <span> · 公允 ¥{fair_value_range[0].toFixed(2)}-¥{fair_value_range[1].toFixed(2)}</span>
-                )}
-                {!fair_value_range && (
-                  <span>目标区间 ¥{priceLow?.toFixed(2)} - ¥{priceHigh?.toFixed(2)}</span>
-                )}
-              </div>
-            </div>
-          </Col>
-        </Row>
-      </div>
+      </section>
 
-      <Row gutter={[20, 20]}>
-        <Col xs={24} lg={7} className="pdf-avoid-break">
-          <div style={{ padding: "18px 16px", borderRadius: 10, border: `1px solid ${signalTheme.border}`, background: signalTheme.soft }}>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
-              <RatingBadge score={overall_rating} size={84} />
-            </div>
-            <div style={{ ...metricTileStyle, marginBottom: 12 }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>12个月目标区间</Text>
-              <div style={{ fontSize: 22, fontWeight: 700, color: c.primary, marginTop: 6 }}>
-                ¥{priceLow?.toFixed(2)} - ¥{priceHigh?.toFixed(2)}
-              </div>
-              <div style={{ marginTop: 6, fontSize: 12, color: c.textSecondary }}>
-                当前价格 ¥{current_price?.toFixed(2)}
-                {priceChange && (
-                  <span style={{ marginLeft: 8, color: Number(priceChange) >= 0 ? c.up : c.down, fontWeight: 600 }}>
-                    {Number(priceChange) >= 0 ? "+" : ""}{priceChange}%
-                  </span>
-                )}
-              </div>
-            </div>
-            <div>
-              <Text type="secondary" style={{ fontSize: 12 }}>模型置信度</Text>
-              <Progress percent={Math.round(confidence * 100)} size="small" strokeColor={signalTheme.progress} style={{ marginTop: 6 }} />
-            </div>
+      <div className="analysis-conclusion__content">
+        <div className="analysis-conclusion__metrics pdf-avoid-break">
+          <div className="analysis-conclusion__metric">
+            <span>12个月估值区间</span>
+            <strong>¥{priceLow?.toFixed(2)} – ¥{priceHigh?.toFixed(2)}</strong>
           </div>
-        </Col>
+          <div className="analysis-conclusion__metric">
+            <span>当前价与预期空间</span>
+            <strong>
+              ¥{current_price?.toFixed(2) ?? "-"}
+              {priceChange ? <em className={Number(priceChange) >= 0 ? "is-positive" : "is-negative"}>{Number(priceChange) >= 0 ? "+" : ""}{priceChange}%</em> : null}
+            </strong>
+          </div>
+          <div className="analysis-conclusion__metric">
+            <span>估值结论</span>
+            <strong>{valuationText}</strong>
+            <small>{valuationRange}</small>
+          </div>
+        </div>
 
-        <Col xs={24} lg={17} className="pdf-avoid-break">
-          <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-            {[
-              { label: "基本面", score: fundamental.score, summary: fundamental.summary },
-              { label: "技术面", score: technical.score, summary: technical.summary },
-              { label: "情绪面", score: sentiment.score, summary: sentiment.summary },
-            ].map((item) => (
-              <Col xs={24} md={8} key={item.label}>
-                <div style={{ ...metricTileStyle, padding: "14px 12px", height: "100%", textAlign: "left" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                    <RatingBadge score={item.score} size={44} />
-                    <div>
-                      <div style={{ fontSize: 12, color: c.textSecondary }}>{item.label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: c.textPrimary }}>{item.score.toFixed(1)}</div>
-                    </div>
+        <div className="analysis-conclusion__decision-grid pdf-avoid-break">
+          <section className="analysis-conclusion__score-panel" aria-label="分项评分">
+            <h3>决策因子</h3>
+            <div className="analysis-conclusion__score-list">
+              {dimensionScores.map((item) => (
+                <div className="analysis-conclusion__score-row" key={item.label}>
+                  <div className="analysis-conclusion__score-heading">
+                    <span>{item.label}</span>
+                    <strong>{item.score.toFixed(1)}</strong>
                   </div>
-                  <div style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.7 }}>{item.summary}</div>
+                  <Progress percent={item.score * 10} showInfo={false} strokeColor={scoreColor(item.score)} size="small" aria-label={`${item.label}评分`} />
+                  <p>{item.summary}</p>
                 </div>
-              </Col>
-            ))}
-          </Row>
+              ))}
+            </div>
+          </section>
 
-          <Row gutter={[16, 16]} className="pdf-avoid-break">
-            <Col xs={24} md={12}>
-              <div style={{ padding: "14px 16px", border: `1px solid ${c.up}40`, background: c.upCardGradient, borderRadius: 10, height: "100%" }}>
-                <Text strong style={{ color: c.up, fontSize: 13 }}>看多因素</Text>
-                <List
-                  size="small"
-                  dataSource={key_factors}
-                  locale={{ emptyText: "暂无" }}
-                  renderItem={(item) => (
-                    <List.Item style={{ padding: "4px 0", border: "none", fontSize: 12, color: c.textSecondary }}>
-                      <span style={{ color: c.up, marginRight: 6, fontWeight: 700 }}>+</span>{item}
-                    </List.Item>
-                  )}
-                />
-              </div>
-            </Col>
-            <Col xs={24} md={12}>
-              <div style={{ padding: "14px 16px", border: `1px solid ${c.down}40`, background: c.downCardGradient, borderRadius: 10, height: "100%" }}>
-                <Text strong style={{ color: c.down, fontSize: 13 }}>风险提示</Text>
-                <List
-                  size="small"
-                  dataSource={risk_warnings}
-                  locale={{ emptyText: "暂无" }}
-                  renderItem={(item) => (
-                    <List.Item style={{ padding: "4px 0", border: "none", fontSize: 12, color: c.textSecondary }}>
-                      <span style={{ color: c.down, marginRight: 6, fontWeight: 700 }}>!</span>{item}
-                    </List.Item>
-                  )}
-                />
-              </div>
-            </Col>
-          </Row>
-        </Col>
-      </Row>
+          <div className="analysis-conclusion__factor-grid">
+            <section className="analysis-conclusion__factor-card is-positive">
+              <h3>核心驱动</h3>
+              {key_factors.length ? (
+                <ul className="analysis-factor-list">
+                  {key_factors.map((item, index) => <li key={`${item}-${index}`}><span>+</span>{item}</li>)}
+                </ul>
+              ) : <Text type="secondary">暂无</Text>}
+            </section>
+            <section className="analysis-conclusion__factor-card is-negative">
+              <h3>主要风险</h3>
+              {risk_warnings.length ? (
+                <ul className="analysis-factor-list">
+                  {risk_warnings.map((item, index) => <li key={`${item}-${index}`}><span>!</span>{item}</li>)}
+                </ul>
+              ) : <Text type="secondary">暂无</Text>}
+            </section>
+          </div>
+        </div>
+      </div>
     </Card>
   );
 }

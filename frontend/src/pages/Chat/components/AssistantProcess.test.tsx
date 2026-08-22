@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AssistantProcess } from "./AssistantProcess";
 
@@ -41,5 +41,34 @@ describe("AssistantProcess", () => {
     expect(screen.getByText("执行中")).toBeInTheDocument();
     expect(screen.getByText("风险分析")).toBeInTheDocument();
     expect(screen.getByText("等待执行")).toBeInTheDocument();
+  });
+
+  it("shows only the actual tool name and arguments", () => {
+    render(
+      <AssistantProcess
+        message={{
+          id: "assistant-tool",
+          role: "assistant",
+          content: "",
+          isStreaming: true,
+          toolCalls: [{
+            id: "call-1",
+            name: "web_search",
+            arguments: '{"query":"AI服务器"}',
+            result: '{"count":3}',
+            isExecuting: false,
+          }],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("web_search")).toBeInTheDocument();
+    expect(screen.queryByText("网页搜索")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /web_search/ }));
+
+    expect(screen.getByText(/AI服务器/)).toBeInTheDocument();
+    expect(screen.queryByText(/"count": 3/)).not.toBeInTheDocument();
+    expect(screen.queryByText("执行结果")).not.toBeInTheDocument();
   });
 });

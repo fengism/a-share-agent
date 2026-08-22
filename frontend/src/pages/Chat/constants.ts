@@ -1,5 +1,3 @@
-export { AGENT_TOOL_LABELS as TOOL_LABELS } from "../../constants/agentTools";
-
 export const SAMPLE_PROMPTS = [
   "贵州茅台怎么样",
   "帮我找PE小于20的白酒股",

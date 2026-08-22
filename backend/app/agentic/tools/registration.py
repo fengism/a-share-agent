@@ -2,6 +2,7 @@
 
 from app.agentic.tools.packs.composite.registration import register_composite_tools
 from app.agentic.tools.packs.market.registration import register_market_tools
+from app.agentic.tools.packs.quant.registration import register_quant_tools
 from app.agentic.tools.packs.stock.registration import register_stock_tools
 from app.agentic.tools.packs.web.runtime import register_twitter_tools, register_web_tools
 
@@ -16,6 +17,7 @@ def register_all_tools() -> None:
 
     register_stock_tools()
     register_market_tools()
+    register_quant_tools()
     register_composite_tools()
     register_web_tools()
     register_twitter_tools()

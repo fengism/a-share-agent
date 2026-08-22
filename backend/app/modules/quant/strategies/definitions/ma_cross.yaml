@@ -1,0 +1,51 @@
+api_version: quant.strategy/v1
+key: ma_cross
+version: 1.0.0
+enabled: true
+name: 双均线趋势
+description: 短期均线上穿长期均线后持有，跌破后退出。
+scenario: 趋势行情
+risk_level: low
+presentation:
+  icon: line-chart
+parameters:
+  fast_period:
+    type: integer
+    label: 短均线
+    description: 短期移动平均线周期
+    default: 5
+    minimum: 2
+    maximum: 120
+  slow_period:
+    type: integer
+    label: 长均线
+    description: 长期移动平均线周期
+    default: 20
+    minimum: 3
+    maximum: 250
+constraints:
+  - operator: less_than
+    left: $fast_period
+    right: $slow_period
+    message: 短周期必须小于长周期
+indicators:
+  fast_ma:
+    operator: sma
+    input: close
+    period: $fast_period
+  slow_ma:
+    operator: sma
+    input: close
+    period: $slow_period
+signals:
+  entry:
+    operator: greater_than
+    left: fast_ma
+    right: slow_ma
+  exit:
+    operator: less_or_equal
+    left: fast_ma
+    right: slow_ma
+position:
+  mode: binary
+

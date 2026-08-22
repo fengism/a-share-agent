@@ -1,12 +1,12 @@
 import { useCallback, useMemo } from "react";
-import { Card, Col, Row, Table, Typography, Tag } from "antd";
+import { Alert, Card, Col, Row, Table, Typography, Tag } from "antd";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
 import { useStockFundFlow } from "../../api/queries";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useColors, useStyles } from "../../theme/hooks";
+import { useColors, useStyles, semanticTagStyle } from "../../theme/hooks";
 import type { StockFundFlowItem } from "../../types/stock";
 import { formatAmount } from "../../utils/format";
 
@@ -21,10 +21,10 @@ function formatNet(value: number | null, colors: NetColors): { text: string; col
   return { text: formatAmount(value), color: colors.muted };
 }
 
-function FlowTile({ label, value, colors }: { label: string; value: number | null; colors: { textSecondary: string; elevatedBg: string; border: string } & NetColors }) {
+function FlowTile({ label, value, colors }: { label: string; value: number | null; colors: { textSecondary: string; hoverBg: string; border: string } & NetColors }) {
   const fmt = formatNet(value, colors);
   return (
-    <div style={{ padding: "14px 12px", background: colors.elevatedBg, border: `1px solid ${colors.border}`, borderRadius: 10, textAlign: "center" }}>
+    <div style={{ padding: "14px 12px", background: colors.hoverBg, border: `1px solid ${colors.border}`, borderRadius: 10, textAlign: "center" }}>
       <div style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 700, color: fmt.color, lineHeight: 1.3 }}>{fmt.text}</div>
     </div>
@@ -42,6 +42,7 @@ export default function FundFlowPanel({ code }: { code: string }) {
   );
 
   const latest = useMemo(() => data?.[0] ?? null, [data]);
+  const isStale = useMemo(() => Boolean(data?.some((item) => item.is_stale)), [data]);
   const chartOption = useMemo(() => {
     if (!data || data.length === 0) return null;
     const recent = data.slice(0, 60).reverse();
@@ -65,7 +66,7 @@ export default function FundFlowPanel({ code }: { code: string }) {
     };
   }, [data, c.textSecondary, c.up, c.down]);
 
-  const tileColors = { textSecondary: c.textSecondary, elevatedBg: c.elevatedBg, border: c.border, up: c.up, down: c.down, muted: c.textMuted };
+  const tileColors = { textSecondary: c.textSecondary, hoverBg: c.hoverBg, border: c.border, up: c.up, down: c.down, muted: c.textMuted };
 
   const columns = useMemo(() => {
     if (isNarrow) {
@@ -77,7 +78,27 @@ export default function FundFlowPanel({ code }: { code: string }) {
           key: "main_net",
           width: 140,
           align: "right" as const,
-          render: (value: number | null) => <Tag color={value === null ? "default" : value >= 0 ? "red" : "green"} style={{ fontWeight: 600 }}>{formatNet(value, net).text}</Tag>,
+          render: (value: number | null) => value === null ? (
+            <Tag>{formatNet(value, net).text}</Tag>
+          ) : (
+            <Tag style={{ ...semanticTagStyle(value >= 0 ? "up" : "down"), fontWeight: 600 }}>{formatNet(value, net).text}</Tag>
+          ),
+        },
+        {
+          title: "超大单", dataIndex: "super_net", key: "super_net", width: 110, align: "right" as const,
+          render: (value: number | null) => <span style={{ color: formatNet(value, net).color, fontWeight: 500 }}>{formatNet(value, net).text}</span>,
+        },
+        {
+          title: "大单", dataIndex: "large_net", key: "large_net", width: 100, align: "right" as const,
+          render: (value: number | null) => <span style={{ color: formatNet(value, net).color }}>{formatNet(value, net).text}</span>,
+        },
+        {
+          title: "中单", dataIndex: "mid_net", key: "mid_net", width: 100, align: "right" as const,
+          render: (value: number | null) => <span style={{ color: value === null ? net.muted : value >= 0 ? c.down : c.up }}>{formatNet(value, net).text}</span>,
+        },
+        {
+          title: "小单", dataIndex: "small_net", key: "small_net", width: 100, align: "right" as const,
+          render: (value: number | null) => <span style={{ color: value === null ? net.muted : value >= 0 ? c.down : c.up }}>{formatNet(value, net).text}</span>,
         },
       ];
     }
@@ -86,7 +107,11 @@ export default function FundFlowPanel({ code }: { code: string }) {
       { title: "日期", dataIndex: "date", key: "date", width: 100, render: (value: string) => <Text style={{ fontWeight: 500 }}>{value}</Text> },
       {
         title: "主力净流入", dataIndex: "main_net", key: "main_net", width: 130, align: "right" as const,
-        render: (value: number | null) => <Tag color={value === null ? "default" : value >= 0 ? "red" : "green"} style={{ fontWeight: 600 }}>{formatNet(value, net).text}</Tag>,
+        render: (value: number | null) => value === null ? (
+          <Tag>{formatNet(value, net).text}</Tag>
+        ) : (
+          <Tag style={{ ...semanticTagStyle(value >= 0 ? "up" : "down"), fontWeight: 600 }}>{formatNet(value, net).text}</Tag>
+        ),
       },
       {
         title: "超大单", dataIndex: "super_net", key: "super_net", width: 110, align: "right" as const,
@@ -130,6 +155,13 @@ export default function FundFlowPanel({ code }: { code: string }) {
       minHeight={260}
     >
       <div style={{ display: "grid", gap: 16 }}>
+      {isStale ? (
+        <Alert
+          type="warning"
+          showIcon
+          title="资金流上游暂不可用，当前展示最近一次成功缓存"
+        />
+      ) : null}
       {/* Summary cards for latest day */}
       {latest && (
         <Row gutter={[10, 10]}>
@@ -139,7 +171,7 @@ export default function FundFlowPanel({ code }: { code: string }) {
           <Col xs={12} sm={8}><FlowTile label="中单净流入" value={latest.mid_net} colors={tileColors} /></Col>
           <Col xs={12} sm={8}><FlowTile label="小单净流入" value={latest.small_net} colors={tileColors} /></Col>
           <Col xs={12} sm={8}>
-            <div style={{ padding: "14px 12px", background: c.elevatedBg, border: `1px solid ${c.border}`, borderRadius: 10, textAlign: "center" }}>
+            <div style={{ padding: "14px 12px", background: c.hoverBg, border: `1px solid ${c.border}`, borderRadius: 10, textAlign: "center" }}>
               <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 4 }}>统计日期</div>
               <div style={{ fontSize: 14, fontWeight: 700, color: c.textPrimary }}>{latest.date}</div>
             </div>

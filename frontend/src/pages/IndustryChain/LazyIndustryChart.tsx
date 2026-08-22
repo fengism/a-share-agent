@@ -34,7 +34,7 @@ export default function LazyIndustryChart({ option, height }: LazyIndustryChartP
         width: "100%",
         minHeight: 300,
         borderRadius: 8,
-        background: shouldRender ? "transparent" : colors.elevatedBg,
+        background: shouldRender ? "transparent" : colors.hoverBg,
       }}
     >
       {shouldRender ? (

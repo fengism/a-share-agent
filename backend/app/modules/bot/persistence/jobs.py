@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
 from app.infrastructure.persistence.leased_jobs import LeasedJobSpec, LeasedJobStateStore
+from app.infrastructure.persistence.retention import PurgeResult
 
 JOB_STATUSES = frozenset({"pending", "running", "succeeded", "failed"})
 
@@ -92,6 +93,15 @@ def enqueue(
 def purge_completed(retention_seconds: int, *, now: float | None = None) -> int:
     current_time = time.time() if now is None else now
     return _JOB_STATE.purge_completed(max(1, retention_seconds), now=current_time)
+
+
+def purge_completed_with_status(
+    retention_seconds: int,
+    *,
+    now: float | None = None,
+) -> PurgeResult:
+    current_time = time.time() if now is None else now
+    return _JOB_STATE.purge_completed_with_status(max(1, retention_seconds), now=current_time)
 
 
 def claim_next(

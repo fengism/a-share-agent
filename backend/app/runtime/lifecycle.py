@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Callable, Coroutine
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 
@@ -11,14 +12,15 @@ from app.core.concurrency.rate_limiter import (
     call_blocking,
     configure_blocking_executor,
     database_semaphore,
+    misc_semaphore,
     shutdown_blocking_executor,
 )
 from app.runtime.task_supervisor import BackgroundTaskSpec, BackgroundTaskSupervisor
 
 logger = logging.getLogger(__name__)
 
-AsyncTaskFactory = Callable[[], Awaitable[None]]
-SupervisedRunner = Callable[[str, AsyncTaskFactory], Awaitable[None]]
+AsyncTaskFactory = Callable[[], Coroutine[Any, Any, None]]
+SupervisedRunner = Callable[[str, AsyncTaskFactory], Coroutine[Any, Any, None]]
 
 
 def ensure_history_indexes() -> None:
@@ -39,6 +41,12 @@ def load_persisted_global_settings() -> None:
         logger.info("已加载持久化全局配置 keys=%s", sorted(persisted))
 
 
+def verify_database_integrity() -> None:
+    from app.infrastructure.persistence.operations import verify_database_integrity as verify
+
+    verify()
+
+
 def _supervised_task_factory(
     supervised_once: SupervisedRunner,
     name: str,
@@ -55,11 +63,15 @@ def build_background_task_specs(
     supervised_once: SupervisedRunner,
     industry_mapping_prewarm: AsyncTaskFactory,
     stock_name_map_prewarm: AsyncTaskFactory,
+    us_macro_prewarm: AsyncTaskFactory,
     industry_mapping_refresh: AsyncTaskFactory,
     wal_checkpoint: AsyncTaskFactory,
+    database_backup: AsyncTaskFactory,
     twitter_feed_refresh: AsyncTaskFactory,
     bot_job_worker: AsyncTaskFactory,
+    quant_strategy_reload: AsyncTaskFactory,
     quant_job_worker: AsyncTaskFactory,
+    workflow_job_worker: AsyncTaskFactory,
 ) -> tuple[BackgroundTaskSpec, ...]:
     return (
         BackgroundTaskSpec(
@@ -81,10 +93,20 @@ def build_background_task_specs(
             start_message="股票名称映射预热任务已启动",
         ),
         BackgroundTaskSpec(
+            name="us_macro_prewarm",
+            factory=_supervised_task_factory(
+                supervised_once,
+                "us_macro_prewarm",
+                us_macro_prewarm,
+            ),
+            start_message="美国宏观快照预热任务已启动",
+        ),
+        BackgroundTaskSpec(
             name="industry_mapping_refresh",
             factory=industry_mapping_refresh,
             long_running=True,
             critical=True,
+            restart_on_exit=True,
             start_message="行业映射文件定时更新任务已启动",
         ),
         BackgroundTaskSpec(
@@ -92,13 +114,23 @@ def build_background_task_specs(
             factory=wal_checkpoint,
             long_running=True,
             critical=True,
+            restart_on_exit=True,
             start_message="WAL checkpoint 定时任务已启动",
+        ),
+        BackgroundTaskSpec(
+            name="database_backup",
+            factory=database_backup,
+            long_running=True,
+            critical=True,
+            restart_on_exit=True,
+            start_message="SQLite 在线备份任务已启动",
         ),
         BackgroundTaskSpec(
             name="twitter_feed",
             factory=twitter_feed_refresh,
             long_running=True,
             critical=True,
+            restart_on_exit=True,
             start_message="Twitter 资讯定时拉取任务已启动",
         ),
         BackgroundTaskSpec(
@@ -106,14 +138,32 @@ def build_background_task_specs(
             factory=bot_job_worker,
             long_running=True,
             critical=True,
+            restart_on_exit=True,
             start_message="Bot 持久化任务 Worker 已启动",
+        ),
+        BackgroundTaskSpec(
+            name="quant_strategy_reload",
+            factory=quant_strategy_reload,
+            long_running=True,
+            critical=True,
+            restart_on_exit=True,
+            start_message="量化策略热加载任务已启动",
         ),
         BackgroundTaskSpec(
             name="quant_job_worker",
             factory=quant_job_worker,
             long_running=True,
             critical=True,
+            restart_on_exit=True,
             start_message="量化回测任务 Worker 已启动",
+        ),
+        BackgroundTaskSpec(
+            name="workflow_job_worker",
+            factory=workflow_job_worker,
+            long_running=True,
+            critical=True,
+            restart_on_exit=True,
+            start_message="分析 Workflow 持久化任务 Worker 已启动",
         ),
     )
 
@@ -126,21 +176,29 @@ async def application_lifespan(
     supervised_once: SupervisedRunner,
     industry_mapping_refresh: AsyncTaskFactory,
     wal_checkpoint: AsyncTaskFactory,
+    database_backup: AsyncTaskFactory,
     twitter_feed_refresh: AsyncTaskFactory,
     bot_job_worker: AsyncTaskFactory,
+    quant_strategy_reload: AsyncTaskFactory,
     quant_job_worker: AsyncTaskFactory,
+    workflow_job_worker: AsyncTaskFactory,
     settings_effects_shutdown: AsyncTaskFactory,
     history_index_initializer: Callable[[], None] = ensure_history_indexes,
     global_settings_initializer: Callable[[], None] = load_persisted_global_settings,
+    database_integrity_checker: Callable[[], None] = verify_database_integrity,
     blocking_runner=call_blocking,
 ) -> AsyncIterator[None]:
+    from app.financial_data.market.public import prewarm_us_macro_data
+    from app.financial_data.stock.public import build_industry_mapping, build_stock_name_map
     from app.infrastructure.persistence import init_db
-    from app.market_data.stock.public import build_industry_mapping, build_stock_name_map
 
     configure_blocking_executor(settings_provider().blocking_thread_pool_workers)
 
     await blocking_runner(init_db, semaphore=database_semaphore)
     logger.info("数据库初始化完成")
+
+    await blocking_runner(database_integrity_checker, semaphore=database_semaphore)
+    logger.info("SQLite quick_check 通过")
 
     await blocking_runner(global_settings_initializer, semaphore=database_semaphore)
 
@@ -181,15 +239,30 @@ async def application_lifespan(
     register_all_capabilities()
     logger.info("Chat skills 注册完成")
 
+    from app.modules.quant.public import configure_strategy_registry
+
+    await blocking_runner(
+        configure_strategy_registry,
+        settings_provider().quant_strategy_dir,
+        settings_provider().quant_strategy_hash_ledger_path,
+        settings_provider().quant_strategy_publish_dir,
+        semaphore=misc_semaphore,
+    )
+    logger.info("量化策略定义加载完成")
+
     task_specs = build_background_task_specs(
         supervised_once=supervised_once,
         industry_mapping_prewarm=build_industry_mapping,
         stock_name_map_prewarm=build_stock_name_map,
+        us_macro_prewarm=prewarm_us_macro_data,
         industry_mapping_refresh=industry_mapping_refresh,
         wal_checkpoint=wal_checkpoint,
+        database_backup=database_backup,
         twitter_feed_refresh=twitter_feed_refresh,
         bot_job_worker=bot_job_worker,
+        quant_strategy_reload=quant_strategy_reload,
         quant_job_worker=quant_job_worker,
+        workflow_job_worker=workflow_job_worker,
     )
     task_supervisor = BackgroundTaskSupervisor()
     try:

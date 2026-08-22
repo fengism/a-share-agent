@@ -1,0 +1,65 @@
+api_version: quant.strategy/v1
+key: bias_reversal
+version: 1.0.0
+enabled: true
+name: BIAS 乖离率反转
+description: 短期乖离率低于负阈值时入场，高于正阈值时退出。
+scenario: 震荡回归
+risk_level: medium
+presentation:
+  icon: swap
+parameters:
+  period:
+    type: integer
+    label: 乖离周期
+    default: 6
+    minimum: 2
+    maximum: 120
+  buy_threshold:
+    type: number
+    label: 超跌阈值
+    default: -3.0
+    minimum: -30
+    maximum: 0
+    step: 0.1
+  sell_threshold:
+    type: number
+    label: 超涨阈值
+    default: 3.0
+    minimum: 0
+    maximum: 30
+    step: 0.1
+constraints:
+  - operator: less_than
+    left: $buy_threshold
+    right: $sell_threshold
+    message: 超跌阈值必须小于超涨阈值
+indicators:
+  average:
+    operator: sma
+    input: close
+    period: $period
+  distance:
+    operator: subtract
+    left: close
+    right: average
+  ratio:
+    operator: divide
+    left: distance
+    right: average
+    zero_value: 0
+  bias:
+    operator: multiply
+    left: ratio
+    right: 100
+signals:
+  entry:
+    operator: less_than
+    left: bias
+    right: $buy_threshold
+  exit:
+    operator: greater_than
+    left: bias
+    right: $sell_threshold
+position:
+  mode: binary

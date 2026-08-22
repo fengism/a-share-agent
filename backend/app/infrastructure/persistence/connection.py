@@ -3,11 +3,14 @@ from __future__ import annotations
 import logging
 import sqlite3
 import threading
+from collections.abc import Callable
 from pathlib import Path
+from time import perf_counter
 from types import TracebackType
 from typing import Literal
 
 from app.configuration.paths import DATA_DIR
+from app.core.metrics import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,7 @@ _USER_DB_PATH = _DATA_DIR / "user_data.db"
 # 线程本地连接——每个线程的事务由 SQLite 自身隔离，无需全局写锁。
 _local = threading.local()
 _all_connections: list[sqlite3.Connection] = []
+_connection_names: dict[int, str] = {}
 _registry_lock = threading.Lock()
 _connection_generation = 0
 
@@ -61,6 +65,7 @@ def get_connection(database: DatabaseName = "market") -> sqlite3.Connection:
         connections[database] = conn
         with _registry_lock:
             _all_connections.append(conn)
+            _connection_names[id(conn)] = database
         logger.info(
             "SQLite 线程连接已建立: database=%s path=%s thread=%s",
             database,
@@ -68,6 +73,47 @@ def get_connection(database: DatabaseName = "market") -> sqlite3.Connection:
             threading.get_ident(),
         )
     return conn
+
+
+def database_storage_snapshot(
+    *,
+    databases: tuple[DatabaseName, ...] = ("market", "user"),
+    connection_provider: Callable[[DatabaseName], sqlite3.Connection] = get_connection,
+    path_provider: Callable[[DatabaseName], Path] = database_path,
+) -> dict[str, dict[str, int | float | str]]:
+    """Collect a bounded read-only storage snapshot for each SQLite database."""
+    snapshot: dict[str, dict[str, int | float | str]] = {}
+    for database in databases:
+        connection = connection_provider(database)
+        path = path_provider(database)
+        page_count = int(connection.execute("PRAGMA page_count").fetchone()[0])
+        page_size = int(connection.execute("PRAGMA page_size").fetchone()[0])
+        freelist_count = int(connection.execute("PRAGMA freelist_count").fetchone()[0])
+        journal_mode = str(connection.execute("PRAGMA journal_mode").fetchone()[0])
+        wal_path = Path(f"{path}-wal")
+        shm_path = Path(f"{path}-shm")
+        snapshot[database] = {
+            "file_bytes": path.stat().st_size if path.is_file() else 0,
+            "wal_bytes": wal_path.stat().st_size if wal_path.is_file() else 0,
+            "shm_bytes": shm_path.stat().st_size if shm_path.is_file() else 0,
+            "page_count": page_count,
+            "page_size": page_size,
+            "freelist_count": freelist_count,
+            "freelist_bytes": freelist_count * page_size,
+            "freelist_ratio": round(freelist_count / page_count, 6) if page_count else 0.0,
+            "journal_mode": journal_mode,
+        }
+    return snapshot
+
+
+def _is_busy_error(error: BaseException | None) -> bool:
+    if not isinstance(error, sqlite3.Error):
+        return False
+    error_code = getattr(error, "sqlite_errorcode", None)
+    if isinstance(error_code, int) and error_code & 0xFF in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
+        return True
+    message = str(error).lower()
+    return "database is locked" in message or "database is busy" in message
 
 
 class SQLiteUnitOfWork:
@@ -79,19 +125,38 @@ class SQLiteUnitOfWork:
         self._rollback_only = False
         self._savepoint: str | None = None
         self._active = False
+        self._started_at = 0.0
+        with _registry_lock:
+            self._database = _connection_names.get(id(connection), "external")
+
+    def _record(self, error: BaseException | None) -> None:
+        metrics.record_persistence_operation(
+            self._database,
+            "transaction",
+            success=not isinstance(error, sqlite3.Error),
+            duration_ms=(perf_counter() - self._started_at) * 1000,
+            busy=_is_busy_error(error),
+            error_type=type(error).__name__ if isinstance(error, sqlite3.Error) else None,
+        )
 
     def __enter__(self) -> SQLiteUnitOfWork:
         if self._active:
             raise RuntimeError("Unit of Work 不可重复进入")
         self._active = True
-        if self.connection.in_transaction:
-            counter = getattr(_local, "savepoint_counter", 0) + 1
-            _local.savepoint_counter = counter
-            self._savepoint = f"uow_{counter}"
-            self.connection.execute(f"SAVEPOINT {self._savepoint}")
-        else:
-            statement = "BEGIN IMMEDIATE" if self._immediate else "BEGIN"
-            self.connection.execute(statement)
+        self._started_at = perf_counter()
+        try:
+            if self.connection.in_transaction:
+                counter = getattr(_local, "savepoint_counter", 0) + 1
+                _local.savepoint_counter = counter
+                self._savepoint = f"uow_{counter}"
+                self.connection.execute(f"SAVEPOINT {self._savepoint}")
+            else:
+                statement = "BEGIN IMMEDIATE" if self._immediate else "BEGIN"
+                self.connection.execute(statement)
+        except Exception as error:
+            self._active = False
+            self._record(error)
+            raise
         return self
 
     def mark_rollback(self) -> None:
@@ -107,14 +172,19 @@ class SQLiteUnitOfWork:
     ) -> bool:
         should_rollback = exc_type is not None or self._rollback_only
         try:
-            if self._savepoint is not None:
-                if should_rollback:
-                    self.connection.execute(f"ROLLBACK TO SAVEPOINT {self._savepoint}")
-                self.connection.execute(f"RELEASE SAVEPOINT {self._savepoint}")
-            elif should_rollback:
-                self.connection.rollback()
-            else:
-                self.connection.commit()
+            try:
+                if self._savepoint is not None:
+                    if should_rollback:
+                        self.connection.execute(f"ROLLBACK TO SAVEPOINT {self._savepoint}")
+                    self.connection.execute(f"RELEASE SAVEPOINT {self._savepoint}")
+                elif should_rollback:
+                    self.connection.rollback()
+                else:
+                    self.connection.commit()
+            except Exception as transaction_error:
+                self._record(transaction_error)
+                raise
+            self._record(exc)
         finally:
             self._active = False
         return False
@@ -138,6 +208,8 @@ def close_connection():
     with _registry_lock:
         conns = list(_all_connections)
         _all_connections.clear()
+        for conn in conns:
+            _connection_names.pop(id(conn), None)
         _connection_generation += 1
     checkpointed_paths: set[str] = set()
     for conn in conns:
@@ -166,10 +238,70 @@ def reset_for_tests() -> None:
     close_connection()
 
 
-def checkpoint_wal():
+def checkpoint_wal() -> dict[str, dict[str, int | bool | str]]:
     """主动触发两个数据库的 WAL checkpoint，控制 WAL 文件大小。"""
+    snapshot: dict[str, dict[str, int | bool | str]] = {}
     for database in ("market", "user"):
+        started_at = perf_counter()
         try:
-            get_connection(database).execute("PRAGMA wal_checkpoint(PASSIVE)")
+            row = get_connection(database).execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+            busy = int(row[0])
+            log_frames = int(row[1])
+            checkpointed_frames = int(row[2])
+            pending = busy > 0 or checkpointed_frames < log_frames
+            metrics.record_persistence_operation(
+                database,
+                "wal_checkpoint",
+                success=True,
+                duration_ms=(perf_counter() - started_at) * 1000,
+                busy=busy > 0,
+                processed=checkpointed_frames,
+                pending=pending,
+            )
+            snapshot[database] = {
+                "busy": busy,
+                "log_frames": log_frames,
+                "checkpointed_frames": checkpointed_frames,
+                "pending": pending,
+            }
         except Exception as exc:
+            metrics.record_persistence_operation(
+                database,
+                "wal_checkpoint",
+                success=False,
+                duration_ms=(perf_counter() - started_at) * 1000,
+                busy=_is_busy_error(exc),
+                error_type=type(exc).__name__,
+            )
+            snapshot[database] = {"error": type(exc).__name__}
             logger.warning("WAL checkpoint 失败: database=%s error=%s", database, exc)
+    return snapshot
+
+
+def optimize_databases() -> dict[str, dict[str, bool | int | str]]:
+    """执行 SQLite 推荐的轻量统计优化，不重建数据库文件。"""
+    snapshot: dict[str, dict[str, bool | int | str]] = {}
+    for database in ("market", "user"):
+        started_at = perf_counter()
+        try:
+            rows = get_connection(database).execute("PRAGMA optimize").fetchall()
+            metrics.record_persistence_operation(
+                database,
+                "optimize",
+                success=True,
+                duration_ms=(perf_counter() - started_at) * 1000,
+                processed=len(rows),
+            )
+            snapshot[database] = {"success": True, "result_rows": len(rows)}
+        except Exception as exc:
+            metrics.record_persistence_operation(
+                database,
+                "optimize",
+                success=False,
+                duration_ms=(perf_counter() - started_at) * 1000,
+                busy=_is_busy_error(exc),
+                error_type=type(exc).__name__,
+            )
+            snapshot[database] = {"success": False, "error": type(exc).__name__}
+            logger.warning("SQLite optimize 失败: database=%s error=%s", database, exc)
+    return snapshot

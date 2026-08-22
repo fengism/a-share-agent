@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
+
+if TYPE_CHECKING:
+    from app.configuration.views import (
+        IntegrationSettingsView,
+        LLMSettingsView,
+        ProviderSettingsView,
+        RuntimeSettingsView,
+        WorkerSettingsView,
+    )
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ROOT_DIR = BACKEND_DIR.parent
@@ -84,9 +93,13 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = 180
 
     cache_ttl_analysis: int = 14400
+    analysis_page_section_timeout_seconds: float = Field(default=15.0, gt=0)
+    market_statistics_section_timeout_seconds: float = Field(default=15.0, gt=0)
     app_data_dir: Path = BACKEND_DIR / "data"
     portfolio_quote_cache_ttl_seconds: int = 10
     portfolio_quote_stale_ttl_seconds: int = 300
+    quant_strategy_dir: Path = BACKEND_DIR / "app" / "modules" / "quant" / "strategies" / "definitions"
+    quant_strategy_reload_seconds: float = Field(default=5.0, ge=1.0, le=3600.0)
 
     max_concurrent_chat_per_user: int = 2
     max_concurrent_chat_total: int = 8
@@ -96,6 +109,10 @@ class Settings(BaseSettings):
     chat_total_timeout_seconds: int = 300
     chat_heartbeat_seconds: int = 15
     chat_tool_timeout_seconds: int = 45
+    chat_max_tool_calls_per_round: int = Field(default=8, ge=1, le=32)
+    chat_max_tool_calls_total: int = Field(default=32, ge=1, le=128)
+    chat_max_tool_context_characters: int = Field(default=60_000, ge=4_096, le=500_000)
+    chat_max_synthesis_characters: int = Field(default=60_000, ge=4_096, le=500_000)
 
     provider_gateway_max_attempts: int = 2
     provider_failure_threshold: int = 3
@@ -103,6 +120,10 @@ class Settings(BaseSettings):
     provider_retry_base_seconds: float = 0.2
     provider_retry_budget_seconds: float = 5.0
     provider_retry_jitter_seconds: float = 0.1
+
+    tdx_http_enabled: bool = False
+    tdx_http_base_url: str = "http://127.0.0.1:18080"
+    tdx_http_timeout_seconds: float = Field(default=10.0, gt=0)
 
     eastmoney_min_interval_seconds: float = 1.0
     eastmoney_datacenter_min_interval_seconds: float = 1.0
@@ -115,6 +136,21 @@ class Settings(BaseSettings):
     background_task_jitter_seconds: float = 15.0
     background_task_lease_seconds: float = 60.0
     background_task_standby_poll_seconds: float = 10.0
+    background_task_readiness_failure_threshold: int = Field(default=3, ge=1, le=100)
+    workflow_job_poll_seconds: float = Field(default=0.5, gt=0)
+    workflow_job_lease_seconds: int = Field(default=900, ge=30)
+    workflow_job_max_attempts: int = Field(default=2, ge=1, le=5)
+    workflow_job_retry_base_seconds: float = Field(default=5.0, ge=0)
+    workflow_job_worker_concurrency: int = Field(default=2, ge=1, le=8)
+    workflow_job_max_running_per_user: int = Field(default=1, ge=1, le=8)
+    workflow_job_max_active_per_user: int = Field(default=10, ge=1, le=1000)
+    workflow_job_max_active_total: int = Field(default=100, ge=1, le=10000)
+    workflow_job_retention_seconds: int = Field(default=30 * 24 * 60 * 60, ge=3600)
+    database_backup_enabled: bool = True
+    database_backup_interval_seconds: int = Field(default=24 * 60 * 60, ge=300)
+    database_backup_retention_count: int = Field(default=7, ge=1, le=90)
+    database_backup_dir: Path | None = None
+    database_backup_mirror_dir: Path | None = None
 
     notion_enabled: bool = False
     notion_api_token: str = ""
@@ -158,8 +194,11 @@ class Settings(BaseSettings):
 
     http_trust_env: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
-    web_fetch_scrapling_allowed_hosts: str = ""
-    web_fetch_scrapling_dynamic_enabled: bool = False
+    web_fetch_max_response_bytes: int = Field(default=20 * 1024 * 1024, ge=64 * 1024, le=100 * 1024 * 1024)
+    web_fetch_browser_enabled: bool = True
+    web_fetch_browser_timeout_seconds: float = Field(default=60.0, ge=5.0, le=120.0)
+    web_fetch_browser_settle_seconds: float = Field(default=5.0, ge=0.0, le=15.0)
+    web_fetch_browser_max_concurrency: int = Field(default=2, ge=1, le=8)
 
     eastmoney_cookie: str = ""
     baidu_cookie: str = ""
@@ -182,11 +221,59 @@ class Settings(BaseSettings):
     auth_cookie_secure: bool = False
     default_admin_username: str = "admin"
 
+    @property
+    def llm(self) -> LLMSettingsView:
+        from app.configuration.views import LLMSettingsView
+
+        return LLMSettingsView.from_settings(self)
+
+    @property
+    def provider(self) -> ProviderSettingsView:
+        from app.configuration.views import ProviderSettingsView
+
+        return ProviderSettingsView.from_settings(self)
+
+    @property
+    def runtime(self) -> RuntimeSettingsView:
+        from app.configuration.views import RuntimeSettingsView
+
+        return RuntimeSettingsView.from_settings(self)
+
+    @property
+    def integrations(self) -> IntegrationSettingsView:
+        from app.configuration.views import IntegrationSettingsView
+
+        return IntegrationSettingsView.from_settings(self)
+
+    @property
+    def worker(self) -> WorkerSettingsView:
+        from app.configuration.views import WorkerSettingsView
+
+        return WorkerSettingsView.from_settings(self)
+
+    @property
+    def quant_strategy_hash_ledger_path(self) -> Path:
+        return self.app_data_dir / "quant-strategy-hashes.json"
+
+    @property
+    def quant_strategy_publish_dir(self) -> Path:
+        return self.app_data_dir / "quant-strategies-published"
+
     @model_validator(mode="after")
     def apply_provider_defaults(self) -> "Settings":
         if not self.app_data_dir.is_absolute():
             self.app_data_dir = BACKEND_DIR / self.app_data_dir
         self.app_data_dir = self.app_data_dir.resolve()
+        if not self.quant_strategy_dir.is_absolute():
+            self.quant_strategy_dir = BACKEND_DIR / self.quant_strategy_dir
+        self.quant_strategy_dir = self.quant_strategy_dir.resolve()
+        for field_name in ("database_backup_dir", "database_backup_mirror_dir"):
+            path = getattr(self, field_name)
+            if path is None:
+                continue
+            if not path.is_absolute():
+                path = BACKEND_DIR / path
+            setattr(self, field_name, path.resolve())
         provider = self.llm_provider.lower()
         defaults = PROVIDER_DEFAULTS.get(provider, {})
         default_base_url = Settings.model_fields["llm_base_url"].default

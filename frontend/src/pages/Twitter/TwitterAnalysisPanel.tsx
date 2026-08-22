@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useMarketTwitterAnalysis, useMarketTwitterAnalysisRefresh } from "../../api/queries";
 import QueryErrorState from "../../components/QueryErrorState";
-import { useColors } from "../../styles/ui";
+import { useColors, semanticTagStyle } from "../../styles/ui";
 
 const markdownPlugins = [remarkGfm];
 
@@ -85,7 +85,7 @@ export default function TwitterAnalysisPanel({ authors }: { authors: string[] })
             <div className="twitter-analysis-structured">
               <div className="twitter-analysis-overview">
                 <div>
-                  <Tag color={analysis.stance === "看多" ? "green" : analysis.stance === "看空" ? "red" : "default"}>
+                  <Tag style={analysis.stance === "看多" ? semanticTagStyle("up") : analysis.stance === "看空" ? semanticTagStyle("down") : undefined}>
                     {analysis.stance || "中性"}
                   </Tag>
                   <span>置信度 {analysis.confidence || 0}%</span>
@@ -122,7 +122,7 @@ export default function TwitterAnalysisPanel({ authors }: { authors: string[] })
                   <h3>关注方向</h3>
                   <div className="twitter-analysis-tags">
                     {sectors.map((sector) => <Tag key={`sector-${sector}`}>{sector}</Tag>)}
-                    {stocks.map((stock) => <Tag color="blue" key={`stock-${stock}`}>{stock}</Tag>)}
+                    {stocks.map((stock) => <Tag style={semanticTagStyle("primary")} key={`stock-${stock}`}>{stock}</Tag>)}
                   </div>
                 </section>
               ) : null}

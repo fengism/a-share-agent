@@ -10,6 +10,7 @@ import requests
 from app.configuration import get_settings
 from app.constants.http import EASTMONEY_HEADERS
 from app.constants.market import EASTMONEY_CLIST_URL
+from app.core.exceptions import UpstreamUnavailableError
 from app.core.market import safe_float
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 _DATACENTER_HOST = "datacenter-web.eastmoney.com"
 
 
-class EastMoneyCooldownError(RuntimeError):
+class EastMoneyCooldownError(UpstreamUnavailableError):
     """东方财富风控冷却期内拒绝继续发起网络请求。"""
 
     def __init__(self, retry_after_seconds: float):
@@ -150,16 +151,34 @@ class EastMoneyBase:
 
     def _activate_em_cooldown(self, hostname: str, seconds: float, reason: str) -> None:
         cooldown_seconds = max(0.0, seconds)
+        now = time.monotonic()
+        previous_until = self._em_cooldown_until_by_host.get(hostname, 0.0)
         self._em_cooldown_until_by_host[hostname] = max(
-            self._em_cooldown_until_by_host.get(hostname, 0.0),
-            time.monotonic() + cooldown_seconds,
+            previous_until,
+            now + cooldown_seconds,
         )
+        if previous_until > now:
+            logger.debug(
+                "东方财富冷却期已生效: host=%s reason=%s remaining_seconds=%.1f",
+                hostname,
+                reason,
+                previous_until - now,
+            )
+            return
         logger.warning(
             "东方财富请求触发冷却: host=%s reason=%s cooldown_seconds=%.1f",
             hostname,
             reason,
             cooldown_seconds,
         )
+
+    def em_cooldown_remaining(self, url: str) -> float:
+        hostname = self._request_hostname(url)
+        with self._em_lock:
+            return max(
+                0.0,
+                self._em_cooldown_until_by_host.get(hostname, 0.0) - time.monotonic(),
+            )
 
     @staticmethod
     def _retry_after_seconds(response) -> float:
@@ -227,9 +246,22 @@ class EastMoneyBase:
                     _log.warning(f"东方财富 clist HTTP 错误: page={page}, status={response.status_code}")
                     break
                 data_json = response.json()
+            except EastMoneyCooldownError:
+                logger.debug("东方财富 clist 跳过冷却期请求: page=%s", page)
+                break
+            except requests.HTTPError as exc:
+                status_code = int(getattr(getattr(exc, "response", None), "status_code", 0) or 0)
+                if status_code in {403, 429} or status_code >= 500:
+                    logger.debug(
+                        "东方财富 clist 上游错误已由冷却日志记录: page=%s status=%s",
+                        page,
+                        status_code,
+                    )
+                else:
+                    logger.warning("东方财富 clist 请求失败: page=%s, error=%s", page, exc)
+                break
             except Exception as exc:
-                _log = __import__("logging").getLogger(__name__)
-                _log.warning(f"东方财富 clist 请求失败: page={page}, error={exc}")
+                logger.warning("东方财富 clist 请求失败: page=%s, error=%s", page, exc)
                 break
             data = data_json.get("data") or {}
             diff = data.get("diff") or []

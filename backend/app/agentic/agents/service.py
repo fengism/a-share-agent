@@ -7,6 +7,7 @@ from app.agentic.agents.contracts import AgentProfile
 from app.agentic.agents.executor import agent_executor
 from app.agentic.events import AgentEvent
 from app.agentic.protocol import AgentMessage
+from app.agentic.runtime.context import AgentExecutionContext
 from app.configuration import get_effective_settings
 from app.infrastructure.llm.runtime import borrow_async_openai_chat_runtime
 
@@ -20,9 +21,12 @@ async def stream_agent(
     tool_selection_prompt: str = "",
     max_history_messages: int = 10,
     require_tool_first_round: bool = False,
+    require_tool_evidence: bool = False,
+    execution_context: AgentExecutionContext | None = None,
     settings: Any = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     effective_settings = settings or get_effective_settings()
+    effective_context = execution_context or AgentExecutionContext.from_current(effective_settings)
     async with borrow_async_openai_chat_runtime(effective_settings) as runtime:
         async for event in agent_executor.stream(
             profile,
@@ -35,5 +39,7 @@ async def stream_agent(
             tool_selection_prompt=tool_selection_prompt,
             max_history_messages=max_history_messages,
             require_tool_first_round=require_tool_first_round,
+            require_tool_evidence=require_tool_evidence,
+            execution_context=effective_context,
         ):
             yield event

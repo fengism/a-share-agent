@@ -1,0 +1,35 @@
+.technical-summary__signal-list {
+  display: grid;
+  min-width: 0;
+  gap: var(--c-space-2);
+}
+
+.technical-summary__levels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--c-space-3);
+}
+
+.technical-summary__level {
+  display: grid;
+  min-width: 0;
+  gap: var(--c-space-1);
+  padding: var(--c-space-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-nested-bg);
+}
+
+.technical-summary__level strong {
+  min-width: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-xl);
+  line-height: var(--c-leading-tight);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .technical-summary__levels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

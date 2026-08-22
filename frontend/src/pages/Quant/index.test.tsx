@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/client";
+import { useAuthStore } from "../../store/authStore";
 import QuantPage from ".";
 
 const run = {
@@ -17,12 +18,9 @@ const run = {
     universe: { source: "custom" as const, codes: ["600519"] },
     strategy: {
       type: "ma_cross" as const,
-      fast_period: 5,
-      slow_period: 20,
-      lookback_period: 20,
-      rsi_period: 14,
-      buy_threshold: 30,
-      sell_threshold: 70,
+      version: "1.0.0",
+      name: "双均线趋势",
+      parameters: { fast_period: 5, slow_period: 20 },
     },
     start_date: "2025-01-01",
     end_date: "2026-01-01",
@@ -54,7 +52,12 @@ const secondRun = {
   request: {
     ...run.request,
     name: "动量测试",
-    strategy: { ...run.request.strategy, type: "momentum_breakout" as const },
+    strategy: {
+      type: "momentum_breakout" as const,
+      version: "1.0.0",
+      name: "动量突破",
+      parameters: { lookback_period: 20 },
+    },
   },
 };
 
@@ -67,10 +70,13 @@ vi.mock("../../api/queries", () => ({
   useDeleteQuantStrategy: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateQuantBacktest: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useQuantBacktests: () => ({
-    data: { items: [run, secondRun] },
+    data: { pages: [{ items: [run, secondRun] }] },
+    hasNextPage: false,
     isLoading: false,
     isFetching: false,
+    isFetchingNextPage: false,
     refetch: vi.fn(),
+    fetchNextPage: vi.fn(),
   }),
   useQuantBacktest: (runId?: string) => ({
     data: [run, secondRun].find((item) => item.id === runId),
@@ -79,14 +85,32 @@ vi.mock("../../api/queries", () => ({
   useCancelQuantBacktest: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRetryQuantBacktest: () => ({ mutateAsync: vi.fn(), isPending: false, variables: undefined }),
   useDeleteQuantBacktest: () => ({ mutateAsync: vi.fn(), isPending: false, variables: undefined }),
+  useQuantStrategyDrafts: () => ({ data: [], isLoading: false }),
+  useQuantStrategyRegistryStatus: () => ({ data: undefined }),
+  useGenerateQuantStrategyDraft: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateQuantStrategyDraft: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useValidateQuantStrategyDraft: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useBacktestQuantStrategyDraft: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  usePublishQuantStrategyDraft: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-vi.mock("./BacktestResult", () => ({
-  default: () => <div>回测结果已渲染</div>,
+vi.mock("./BacktestResultSection", () => ({
+  default: ({ run: selectedRun }: { run?: typeof run }) => (
+    <section aria-label="回测结果分析">
+      {selectedRun?.result ? "回测结果已渲染" : "暂无回测结果"}
+    </section>
+  ),
 }));
 
 describe("Quant page", () => {
-  it("renders strategy controls, completed result and history", () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { id: 1, username: "alice", is_admin: false, must_change_password: false },
+      bootstrapped: true,
+    });
+  });
+
+  it("splits configuration, task history, and result analysis into separate views", async () => {
     render(
       <MemoryRouter>
         <QuantPage />
@@ -94,11 +118,26 @@ describe("Quant page", () => {
     );
 
     expect(screen.getByRole("heading", { name: "量化研究" })).toBeInTheDocument();
+    expect(screen.getByText("策略实验室")).toBeInTheDocument();
+    expect(screen.queryByLabelText("回测能力")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("量化研究流程")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "量化回测配置" })).toBeInTheDocument();
     expect(screen.getByText("策略与回测参数")).toBeInTheDocument();
-    expect(screen.getByText("回测结果已渲染")).toBeInTheDocument();
+
+    expect(screen.queryByText("历史回测")).not.toBeInTheDocument();
+    expect(screen.queryByText("回测结果已渲染")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /任务记录/ }));
     expect(screen.getByText("历史回测")).toBeInTheDocument();
     expect(screen.getByText("当前回测")).toBeInTheDocument();
     expect(screen.getAllByText("双均线测试").length).toBeGreaterThan(0);
+    const taskColumns = screen.getByText("当前回测").closest(".ant-card")?.parentElement;
+    expect(taskColumns).toHaveClass("quant-task-columns");
+    expect(taskColumns).toContainElement(screen.getByText("历史回测").closest(".ant-card"));
+    expect(screen.getByRole("tab", { name: /结果分析.*可查看/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "查看回测 双均线测试" }));
+    expect(screen.getByRole("region", { name: "回测结果分析" })).toBeInTheDocument();
+    expect(await screen.findByText("回测结果已渲染")).toBeInTheDocument();
   });
 
   it("restores and updates the selected run through the URL", async () => {
@@ -107,17 +146,18 @@ describe("Quant page", () => {
     }
 
     render(
-      <MemoryRouter initialEntries={["/?run=run-two"]}>
+      <MemoryRouter initialEntries={["/?run=run-two&panel=runs"]}>
         <QuantPage />
         <LocationProbe />
       </MemoryRouter>,
     );
 
     expect(screen.getByRole("button", { name: "查看回测 动量测试" })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByTestId("location-search")).toHaveTextContent("?run=run-two");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("run=run-two");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("panel=runs");
 
     fireEvent.click(screen.getByRole("button", { name: "查看回测 双均线测试" }));
-    await waitFor(() => expect(screen.getByTestId("location-search")).toHaveTextContent("?run=run-one"));
+    await waitFor(() => expect(screen.getByTestId("location-search")).toHaveTextContent("run=run-one"));
   });
 
   it("falls back to the latest run when a shared URL no longer exists", async () => {
@@ -126,13 +166,66 @@ describe("Quant page", () => {
     }
 
     render(
-      <MemoryRouter initialEntries={["/?run=missing"]}>
+      <MemoryRouter initialEntries={["/?run=missing&panel=runs"]}>
         <QuantPage />
         <LocationProbe />
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByTestId("location-search")).toHaveTextContent("?run=run-one"));
+    await waitFor(() => expect(screen.getByTestId("location-search")).toHaveTextContent("run=run-one"));
     expect(screen.getByRole("button", { name: "查看回测 双均线测试" })).toHaveAttribute("aria-current", "true");
+  });
+
+  it("loads the online strategy workbench only after an administrator selects it", async () => {
+    useAuthStore.setState({
+      user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+    });
+
+    function LocationProbe() {
+      return <div data-testid="location-search">{useLocation().search}</div>;
+    }
+
+    render(
+      <MemoryRouter>
+        <QuantPage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("region", { name: "在线策略生成工作台" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("回测名称"), { target: { value: "未提交回测参数" } });
+
+    fireEvent.click(screen.getByRole("tab", { name: /在线策略/ }));
+
+    expect(await screen.findByRole("region", { name: "在线策略生成工作台" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText("生成受限策略草稿")).toBeInTheDocument();
+    expect(screen.getByTestId("location-search")).toHaveTextContent("view=authoring");
+    fireEvent.change(screen.getByPlaceholderText(/例如：使用 20 日和 60 日均线/), {
+      target: { value: "尚未提交的在线策略提示词" },
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: /回测实验/ }));
+    expect(screen.getByLabelText("回测名称")).toHaveValue("未提交回测参数");
+
+    fireEvent.click(screen.getByRole("tab", { name: /在线策略/ }));
+    expect(screen.getByPlaceholderText(/例如：使用 20 日和 60 日均线/))
+      .toHaveValue("尚未提交的在线策略提示词");
+  });
+
+  it("removes an administrator-only workspace URL for regular users", async () => {
+    function LocationProbe() {
+      return <div data-testid="location-search">{useLocation().search}</div>;
+    }
+
+    render(
+      <MemoryRouter initialEntries={["/?view=authoring&run=run-two"]}>
+        <QuantPage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("location-search")).toHaveTextContent("?run=run-two"));
+    expect(screen.queryByText("在线策略")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "量化回测配置" })).toBeInTheDocument();
   });
 });

@@ -1,5 +1,4 @@
 import { Component, type ReactNode } from "react";
-import { Button, Result } from "antd";
 
 interface Props {
   children: ReactNode;
@@ -31,18 +30,12 @@ export default class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: 48, display: "flex", justifyContent: "center" }}>
-          <Result
-            status="error"
-            title="页面加载失败"
-            subTitle={this.state.error?.message || "发生了未知错误"}
-            extra={
-              <Button type="primary" onClick={this.handleReset}>
-                重试
-              </Button>
-            }
-          />
-        </div>
+        <section className="app-error-boundary" role="alert">
+          <div className="app-error-boundary__icon" aria-hidden="true">!</div>
+          <h1>页面加载失败</h1>
+          <p>{this.state.error?.message || "发生了未知错误"}</p>
+          <button type="button" onClick={this.handleReset}>重试</button>
+        </section>
       );
     }
     return this.props.children;

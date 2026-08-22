@@ -4,6 +4,7 @@ import time
 from collections import Counter
 
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
+from app.infrastructure.persistence.retention import PurgeResult, purge_rows_in_batches
 
 logger = logging.getLogger(__name__)
 
@@ -108,17 +109,25 @@ def query_twitter_posts_by_authors(authors: list[str], limit: int = 100) -> list
 
 
 def purge_twitter_posts(retention_days: int, *, now: float | None = None) -> int:
+    return purge_twitter_posts_with_status(retention_days, now=now).deleted
+
+
+def purge_twitter_posts_with_status(
+    retention_days: int,
+    *,
+    now: float | None = None,
+) -> PurgeResult:
     if retention_days <= 0:
-        return 0
+        return PurgeResult(0, 0, False)
     current_time = time.time() if now is None else now
     cutoff = current_time - retention_days * 24 * 60 * 60
-    connection = get_connection()
-    cursor = connection.execute(
-        "DELETE FROM twitter_posts WHERE fetched_at <= datetime(?, 'unixepoch', 'localtime')",
-        (cutoff,),
+    return purge_rows_in_batches(
+        get_connection(),
+        table_name="twitter_posts",
+        predicate_sql="fetched_at <= datetime(?, 'unixepoch', 'localtime')",
+        parameters=(cutoff,),
+        order_by="fetched_at, rowid",
     )
-    connection.commit()
-    return cursor.rowcount
 
 
 def load_twitter_analysis_snapshot(

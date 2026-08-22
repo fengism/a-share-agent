@@ -1,6 +1,65 @@
-"""Auth 模块对其他模块开放的稳定入口。"""
+"""Auth 业务模块对 HTTP 和其他适配器开放的稳定入口。"""
 
-from app.contracts.auth import AuthenticatedUser
-from app.modules.auth.dependencies import require_active_user, require_admin, require_metrics_access
+from app.modules.auth.schemas import (
+    AdminResetLinkRequest,
+    AuthResponse,
+    ChangePasswordRequest,
+    ChangePasswordResponse,
+    CreateInviteRequest,
+    InviteOut,
+    LoginRequest,
+    NeedsSetupResponse,
+    OkResponse,
+    RegisterRequest,
+    ResetLinkOut,
+    ResetPasswordRequest,
+    UserOut,
+)
+from app.modules.auth.service import (
+    AuthErrorCode,
+    AuthServiceError,
+    AuthSession,
+    PasswordResetLink,
+    change_password,
+    create_invite,
+    create_password_reset_link,
+    get_user_by_token,
+    list_invites,
+    login,
+    logout,
+    needs_setup,
+    register_account,
+    reset_password,
+    revoke_invite,
+)
 
-__all__ = ["AuthenticatedUser", "require_active_user", "require_admin", "require_metrics_access"]
+__all__ = [
+    "AdminResetLinkRequest",
+    "AuthErrorCode",
+    "AuthResponse",
+    "AuthServiceError",
+    "AuthSession",
+    "ChangePasswordRequest",
+    "ChangePasswordResponse",
+    "CreateInviteRequest",
+    "InviteOut",
+    "LoginRequest",
+    "NeedsSetupResponse",
+    "OkResponse",
+    "PasswordResetLink",
+    "RegisterRequest",
+    "ResetLinkOut",
+    "ResetPasswordRequest",
+    "UserOut",
+    "change_password",
+    "create_invite",
+    "create_password_reset_link",
+    "get_user_by_token",
+    "list_invites",
+    "login",
+    "logout",
+    "needs_setup",
+    "register_account",
+    "reset_password",
+    "revoke_invite",
+]

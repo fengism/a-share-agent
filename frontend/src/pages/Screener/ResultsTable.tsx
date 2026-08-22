@@ -1,12 +1,12 @@
 import { useCallback, useMemo } from "react";
 import { Table, Tag, Spin, Empty } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
-import { Link } from "react-router-dom";
 import ChangeValue from "../../components/ChangeValue";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
+import PreloadLink from "../../components/PreloadLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { ScreenerFilter, ScreenerItem, ScreenerResult } from "../../types/stock";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors } from "../../styles/ui";
 
 interface Props {
   data: ScreenerResult | undefined;
@@ -16,6 +16,11 @@ interface Props {
   onPageChange: (page: number, pageSize: number) => void;
   filters: ScreenerFilter;
   onSortChange: (sortBy: ScreenerFilter["sort_by"], sortOrder: ScreenerFilter["sort_order"]) => void;
+  selectedCodes: string[];
+  onSelectedCodesChange: (codes: string[]) => void;
+  strategySignalDates?: ReadonlyMap<string, string>;
+  strategyDataSources?: ReadonlyMap<string, string>;
+  strategyFallbackCodes?: ReadonlySet<string>;
 }
 
 type SortableKey = "price" | "change_pct" | "pe" | "pb" | "market_cap" | "turnover_pct" | "volume";
@@ -31,9 +36,19 @@ const SORT_FIELD_MAP: Record<string, SortableKey> = {
 };
 
 export default function ResultsTable({
-  data, isLoading, percentileMap, showPercentile, onPageChange, filters, onSortChange,
+  data,
+  isLoading,
+  percentileMap,
+  showPercentile,
+  onPageChange,
+  filters,
+  onSortChange,
+  selectedCodes,
+  onSelectedCodesChange,
+  strategySignalDates,
+  strategyDataSources,
+  strategyFallbackCodes,
 }: Props) {
-  const { tagStyle } = useStyles();
   const c = useColors();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const currentSortOrder = filters.sort_order === "asc" ? "ascend" : "descend";
@@ -61,10 +76,12 @@ export default function ResultsTable({
           key: "stock",
           width: 132,
           render: (_: unknown, record: ScreenerItem) => (
-            <Link to={`/analysis/${record.code}`} style={{ display: "block", color: c.primary }}>
+            <PreloadLink to={`/analysis/${encodeURIComponent(record.code)}`} style={{ display: "block", color: c.primary }}>
               <span style={{ display: "block", color: c.textPrimary, fontWeight: 600 }}>{record.name}</span>
-              <span style={{ display: "block", color: c.textMuted, fontSize: 11 }}>{record.code}</span>
-            </Link>
+              <span style={{ display: "block", color: c.textMuted, fontSize: 11 }}>
+                {record.code}{record.board || record.exchange ? ` · ${record.board || record.exchange}` : ""}
+              </span>
+            </PreloadLink>
           ),
         },
         {
@@ -94,7 +111,7 @@ export default function ResultsTable({
       dataIndex: "code",
       width: 90,
       render: (code: string) => (
-        <Link to={`/analysis/${code}`} style={{ color: c.primary, fontWeight: 500 }}>{code}</Link>
+        <PreloadLink to={`/analysis/${encodeURIComponent(code)}`} style={{ color: c.primary, fontWeight: 500 }}>{code}</PreloadLink>
       ),
     },
     {
@@ -102,6 +119,13 @@ export default function ResultsTable({
       dataIndex: "name",
       width: 100,
       ellipsis: true,
+    },
+    {
+      title: "市场",
+      key: "exchange_market",
+      width: 90,
+      ellipsis: true,
+      render: (_: unknown, record: ScreenerItem) => record.board || record.exchange || "-",
     },
     {
       title: "价格",
@@ -176,13 +200,38 @@ export default function ResultsTable({
       },
     },
     {
-      title: "二级行业",
+      title: "申万二级",
       dataIndex: "second_industry",
       width: 100,
       ellipsis: true,
-      render: (v: ScreenerItem["second_industry"]) => v?.name ? <Tag style={{ ...tagStyle, fontSize: 11 }}>{v.name}</Tag> : "-",
+      render: (value: ScreenerItem["second_industry"]) => value?.name || "-",
+    },
+    {
+      title: "交易所行业",
+      dataIndex: "exchange_industry",
+      width: 120,
+      ellipsis: true,
+      render: (value: string | null | undefined) => value || "-",
     },
     ];
+
+    if (strategySignalDates?.size) {
+      nextColumns.splice(2, 0, {
+        title: "信号日",
+        key: "strategy_signal_date",
+        width: 100,
+        render: (_: unknown, record: ScreenerItem) => strategySignalDates.get(record.code) ?? "-",
+      });
+      nextColumns.splice(3, 0, {
+        title: "K线源",
+        key: "strategy_data_source",
+        width: 150,
+        render: (_: unknown, record: ScreenerItem) => {
+          const source = strategyDataSources?.get(record.code) || "-";
+          return <Tag color={strategyFallbackCodes?.has(record.code) ? "warning" : undefined}>{source}</Tag>;
+        },
+      });
+    }
 
     if (showPercentile) {
       nextColumns.push(
@@ -194,7 +243,7 @@ export default function ResultsTable({
           render: (_: unknown, record: ScreenerItem) => {
             const p = percentileMap.get(record.code);
             if (p == null) return <Spin size="small" />;
-            const color = p <= 30 ? c.down : p <= 70 ? "#eab308" : c.up;
+            const color = p <= 30 ? c.down : p <= 70 ? c.warning : c.up;
             return <span style={{ color, fontWeight: 500 }}>{p.toFixed(0)}%</span>;
           },
         },
@@ -206,14 +255,14 @@ export default function ResultsTable({
           render: (_: unknown, record: ScreenerItem) => {
             const p = percentileMap.get(record.code + "_pb");
             if (p == null) return <Spin size="small" />;
-            const color = p <= 30 ? c.down : p <= 70 ? "#eab308" : c.up;
+            const color = p <= 30 ? c.down : p <= 70 ? c.warning : c.up;
             return <span style={{ color, fontWeight: 500 }}>{p.toFixed(0)}%</span>;
           },
         },
       );
     }
     return nextColumns;
-  }, [c, currentSortOrder, filters.sort_by, isNarrow, percentileMap, showPercentile, tagStyle]);
+  }, [c, currentSortOrder, filters.sort_by, isNarrow, percentileMap, showPercentile, strategyDataSources, strategyFallbackCodes, strategySignalDates]);
 
   const renderExpandedRow = useCallback((record: ScreenerItem) => {
     const pePercentile = percentileMap.get(record.code);
@@ -244,7 +293,20 @@ export default function ResultsTable({
                   ? `${(record.volume / 1e4).toFixed(1)}万`
                   : record.volume.toFixed(0),
           },
-          { key: "industry", label: "二级行业", value: record.second_industry?.name ?? "-" },
+          { key: "market", label: "所属市场", value: record.board || record.exchange || "-" },
+          { key: "listing-date", label: "上市日期", value: record.listing_date ?? "-" },
+          { key: "sw-industry", label: "申万二级", value: record.second_industry?.name ?? "-" },
+          { key: "exchange-industry", label: "交易所行业", value: record.exchange_industry ?? "-" },
+          ...(strategySignalDates?.size ? [{
+            key: "strategy-signal-date",
+            label: "策略信号日",
+            value: strategySignalDates.get(record.code) ?? "-",
+          }] : []),
+          ...(strategyDataSources?.size ? [{
+            key: "strategy-data-source",
+            label: "K线源",
+            value: `${strategyDataSources.get(record.code) ?? "-"}${strategyFallbackCodes?.has(record.code) ? "（fallback）" : ""}`,
+          }] : []),
           ...(showPercentile ? [
             { key: "pe-percentile", label: "PE分位", value: pePercentile == null ? "计算中" : `${pePercentile.toFixed(0)}%` },
             { key: "pb-percentile", label: "PB分位", value: pbPercentile == null ? "计算中" : `${pbPercentile.toFixed(0)}%` },
@@ -252,13 +314,21 @@ export default function ResultsTable({
         ]}
       />
     );
-  }, [percentileMap, showPercentile]);
+  }, [percentileMap, showPercentile, strategyDataSources, strategyFallbackCodes, strategySignalDates]);
 
   return (
     <Table
       columns={columns}
       dataSource={data?.items || []}
-      rowKey={(record) => `${record.code}-${record.name}`}
+      rowKey="code"
+      rowSelection={{
+        selectedRowKeys: selectedCodes,
+        preserveSelectedRowKeys: true,
+        onChange: (keys) => onSelectedCodesChange(keys.map(String).slice(0, 10)),
+        getCheckboxProps: (record) => ({
+          disabled: selectedCodes.length >= 10 && !selectedCodes.includes(record.code),
+        }),
+      }}
       loading={isLoading}
       size="small"
       pagination={{

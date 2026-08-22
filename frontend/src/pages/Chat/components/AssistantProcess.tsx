@@ -14,7 +14,6 @@ import type {
   AgentPlanStepStatus,
   ChatDisplayMessage,
 } from "../../../types/chat";
-import { TOOL_LABELS } from "../constants";
 import { BlinkingCursor } from "./BlinkingCursor";
 import { ToolCallCard } from "./ToolCallCard";
 
@@ -84,7 +83,7 @@ export const AssistantProcess = memo(function AssistantProcess({
 
   const summary = isStreaming
     ? runningTool
-      ? `正在调用 ${TOOL_LABELS[runningTool.name] || runningTool.name}`
+      ? `正在调用 ${runningTool.name}`
       : runningPlanStep
         ? `正在执行 ${runningPlanStep.title}`
         : message.status || (hasReasoning ? "正在思考" : "正在准备回答")

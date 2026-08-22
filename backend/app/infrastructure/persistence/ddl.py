@@ -1,5 +1,59 @@
 """所有表的 DDL 定义。新增数据类型只需追加建表语句。"""
 
+WORKFLOW_JOB_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS workflow_jobs (
+        id           TEXT PRIMARY KEY,
+        kind         TEXT NOT NULL CHECK (kind IN ('analysis', 'industry_chain', 'screener_strategy', 'daily_review')),
+        user_id      INTEGER NOT NULL,
+        dedupe_key   TEXT NOT NULL,
+        request_json TEXT NOT NULL,
+        status       TEXT NOT NULL DEFAULT 'pending'
+                     CHECK (status IN ('pending', 'running', 'succeeded', 'failed', 'cancelled')),
+        attempts     INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 2,
+        available_at REAL NOT NULL,
+        lease_owner  TEXT,
+        lease_until  REAL,
+        last_error   TEXT,
+        created_at   REAL NOT NULL,
+        updated_at   REAL NOT NULL,
+        completed_at REAL
+    )
+    """,
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_workflow_jobs_active_key
+    ON workflow_jobs(kind, user_id, dedupe_key)
+    WHERE status IN ('pending', 'running')
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_workflow_jobs_claim
+    ON workflow_jobs(status, available_at, lease_until, created_at)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS workflow_job_events (
+        job_id       TEXT NOT NULL,
+        attempt      INTEGER NOT NULL,
+        sequence     INTEGER NOT NULL,
+        event_type   TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        created_at   REAL NOT NULL,
+        PRIMARY KEY (job_id, attempt, sequence),
+        FOREIGN KEY (job_id) REFERENCES workflow_jobs(id) ON DELETE CASCADE
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_workflow_job_events_read
+    ON workflow_job_events(job_id, attempt, sequence)
+    """,
+)
+
+WORKFLOW_ACTIVE_USER_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_workflow_jobs_active_user
+ON workflow_jobs(user_id)
+WHERE status IN ('pending', 'running')
+"""
+
 MARKET_TABLES = [
     # ── 北向资金（沪深股通）分钟级流向 ──
     """
@@ -34,6 +88,37 @@ MARKET_TABLES.append(
     """
 )
 
+MARKET_TABLES.extend(
+    [
+        """
+        CREATE TABLE IF NOT EXISTS background_task_leases (
+            task_name   TEXT PRIMARY KEY,
+            owner_id    TEXT NOT NULL,
+            lease_until REAL NOT NULL,
+            updated_at  REAL NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS twitter_feed_refresh_state (
+            author            TEXT PRIMARY KEY,
+            last_refreshed_at REAL NOT NULL
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_twitter_posts_author_fetched
+        ON twitter_posts(author, fetched_at DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_twitter_posts_author_published
+        ON twitter_posts(author, publish_time DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_twitter_posts_fetched_at
+        ON twitter_posts(fetched_at)
+        """,
+    ]
+)
+
 MARKET_TABLES.append(
     """
     CREATE TABLE IF NOT EXISTS twitter_analysis_snapshots (
@@ -47,6 +132,19 @@ MARKET_TABLES.append(
         PRIMARY KEY (username, content_hash, llm_provider, llm_model, prompt_version)
     )
     """
+)
+
+MARKET_TABLES.extend(
+    [
+        """
+        CREATE INDEX IF NOT EXISTS idx_twitter_analysis_snapshots_user_time
+        ON twitter_analysis_snapshots(username, generated_at DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_twitter_analysis_snapshots_generated_at
+        ON twitter_analysis_snapshots(generated_at)
+        """,
+    ]
 )
 
 # ── 账号系统：用户 / 会话 / 邀请 / 每用户私密配置 ──
@@ -64,6 +162,7 @@ USER_TABLES.append(
     )
     """
 )
+
 USER_TABLES.append(
     """
     CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -87,6 +186,59 @@ USER_TABLES.append(
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
     )
     """
+)
+
+USER_TABLES.extend(
+    [
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions(expires_at)",
+        "CREATE INDEX IF NOT EXISTS idx_invites_creator_created ON invites(created_by, created_at DESC)",
+        """
+        CREATE TABLE IF NOT EXISTS bot_command_jobs (
+            id              TEXT PRIMARY KEY,
+            event_id        TEXT NOT NULL UNIQUE,
+            platform        TEXT NOT NULL,
+            request_user_id TEXT NOT NULL DEFAULT '',
+            command_name    TEXT NOT NULL DEFAULT '',
+            message_json    TEXT NOT NULL,
+            response_json   TEXT,
+            status          TEXT NOT NULL DEFAULT 'pending'
+                            CHECK (status IN ('pending', 'running', 'succeeded', 'failed')),
+            attempts        INTEGER NOT NULL DEFAULT 0,
+            max_attempts    INTEGER NOT NULL DEFAULT 3,
+            available_at    REAL NOT NULL,
+            lease_owner     TEXT,
+            lease_until     REAL,
+            last_error      TEXT,
+            created_at      REAL NOT NULL,
+            updated_at      REAL NOT NULL,
+            completed_at    REAL
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_bot_command_jobs_claim
+        ON bot_command_jobs(status, available_at, lease_until, created_at)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_bot_command_jobs_user_time
+        ON bot_command_jobs(request_user_id, created_at DESC)
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS bot_rate_limit_events (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            scope_key   TEXT NOT NULL,
+            occurred_at REAL NOT NULL
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_bot_rate_limit_events_scope_time
+        ON bot_rate_limit_events(scope_key, occurred_at)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_bot_rate_limit_events_time
+        ON bot_rate_limit_events(occurred_at)
+        """,
+    ]
 )
 USER_TABLES.append(
     """
@@ -126,25 +278,114 @@ USER_TABLES.append(
 
 USER_TABLES.extend(
     [
+        "CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id)",
         """
-        CREATE TABLE IF NOT EXISTS portfolio_positions (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER NOT NULL,
-            stock_code TEXT    NOT NULL,
-            stock_name TEXT    NOT NULL DEFAULT '',
-            buy_price  REAL    NOT NULL CHECK (buy_price > 0),
-            buy_time   TEXT    NOT NULL,
-            shares     INTEGER NOT NULL CHECK (shares > 0),
-            created_at TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
+        CREATE INDEX IF NOT EXISTS idx_password_resets_expiry_used
+        ON password_resets(expires_at, used_at)
         """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_portfolio_positions_user_time
-        ON portfolio_positions(user_id, buy_time DESC, id DESC)
-        """,
+        "CREATE INDEX IF NOT EXISTS idx_user_config_key ON user_config(key)",
     ]
 )
+
+PORTFOLIO_TRANSACTION_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS portfolio_transactions (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL,
+        stock_code  TEXT    NOT NULL,
+        stock_name  TEXT    NOT NULL DEFAULT '',
+        side        TEXT    NOT NULL CHECK (side IN ('buy', 'sell')),
+        trade_price REAL    NOT NULL CHECK (trade_price > 0),
+        trade_time  TEXT    NOT NULL,
+        shares      INTEGER NOT NULL CHECK (shares > 0),
+        fee         REAL    NOT NULL DEFAULT 0 CHECK (fee >= 0),
+        note        TEXT    NOT NULL DEFAULT '',
+        created_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_user_time
+    ON portfolio_transactions(user_id, trade_time DESC, id DESC)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_user_stock_time
+    ON portfolio_transactions(user_id, stock_code, trade_time, id)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_user_stock_id
+    ON portfolio_transactions(user_id, stock_code, id DESC)
+    """,
+)
+
+USER_TABLES.extend(PORTFOLIO_TRANSACTION_STATEMENTS)
+
+WATCHLIST_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS watchlist_items (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL,
+        stock_code TEXT    NOT NULL,
+        stock_name TEXT    NOT NULL DEFAULT '',
+        note       TEXT    NOT NULL DEFAULT '',
+        created_at TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+        UNIQUE(user_id, stock_code),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_watchlist_items_user_time
+    ON watchlist_items(user_id, created_at DESC, id DESC)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS watchlist_alerts (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id           INTEGER NOT NULL,
+        stock_code        TEXT    NOT NULL,
+        condition         TEXT    NOT NULL CHECK (
+            condition IN ('price_above', 'price_below', 'change_pct_above', 'change_pct_below')
+        ),
+        threshold         REAL    NOT NULL,
+        enabled           INTEGER NOT NULL DEFAULT 1,
+        last_triggered_at TEXT,
+        created_at        TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+        FOREIGN KEY (user_id, stock_code)
+            REFERENCES watchlist_items(user_id, stock_code) ON DELETE CASCADE
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_watchlist_alerts_user_stock
+    ON watchlist_alerts(user_id, stock_code, id)
+    """,
+)
+
+USER_TABLES.extend(WATCHLIST_STATEMENTS)
+
+CHAT_STATE_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS chat_states (
+        user_id      INTEGER PRIMARY KEY,
+        payload_json TEXT NOT NULL,
+        updated_at   REAL NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """,
+)
+
+CHAT_STATE_LATEST_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS chat_states (
+        user_id      INTEGER PRIMARY KEY,
+        payload_json TEXT NOT NULL,
+        payload_hash TEXT NOT NULL DEFAULT '',
+        revision     INTEGER NOT NULL DEFAULT 0,
+        updated_at   REAL NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """,
+)
+
+USER_TABLES.extend(CHAT_STATE_LATEST_STATEMENTS)
 
 USER_TABLES.extend(
     [
@@ -196,6 +437,60 @@ USER_TABLES.extend(
         CREATE INDEX IF NOT EXISTS idx_quant_backtest_runs_user_time
         ON quant_backtest_runs(user_id, created_at DESC)
         """,
+    ]
+)
+
+QUANT_STRATEGY_DRAFT_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS quant_strategy_drafts (
+        id                TEXT PRIMARY KEY,
+        created_by        INTEGER NOT NULL,
+        prompt            TEXT NOT NULL,
+        definition_json   TEXT NOT NULL,
+        definition_hash   TEXT NOT NULL,
+        status            TEXT NOT NULL DEFAULT 'draft'
+                          CHECK (status IN ('draft', 'validated', 'testing', 'backtested', 'published')),
+        validation_json   TEXT,
+        backtest_run_id   TEXT,
+        quality_gate_json TEXT,
+        published_path    TEXT,
+        last_error        TEXT,
+        created_at        REAL NOT NULL,
+        updated_at        REAL NOT NULL,
+        published_at      REAL,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (backtest_run_id) REFERENCES quant_backtest_runs(id) ON DELETE SET NULL
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_quant_strategy_drafts_updated
+    ON quant_strategy_drafts(updated_at DESC, id DESC)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_quant_strategy_drafts_status
+    ON quant_strategy_drafts(status, updated_at DESC)
+    """,
+)
+
+USER_TABLES.extend(QUANT_STRATEGY_DRAFT_STATEMENTS)
+
+QUANT_ACTIVE_USER_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_quant_backtest_runs_active_user
+ON quant_backtest_runs(user_id)
+WHERE status IN ('pending', 'running')
+"""
+
+WORKFLOW_RETENTION_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_workflow_jobs_retention
+ON workflow_jobs(status, completed_at)
+"""
+
+USER_TABLES.extend(
+    [
+        QUANT_ACTIVE_USER_INDEX,
+        *WORKFLOW_JOB_STATEMENTS,
+        WORKFLOW_RETENTION_INDEX,
+        WORKFLOW_ACTIVE_USER_INDEX,
     ]
 )
 

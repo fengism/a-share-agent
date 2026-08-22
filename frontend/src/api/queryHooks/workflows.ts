@@ -1,27 +1,32 @@
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
-import { API_TIMEOUTS, apiDelete, apiGet, apiPost } from "../client";
+import { API_TIMEOUTS } from "../client";
+import {
+  asApiModel,
+  openApiDelete,
+  openApiGet,
+  openApiPost,
+} from "../openapiClient";
 import { queryKeys } from "../queryKeys";
 import type { DailyReviewHistoryItem, DailyReviewRequest, DailyReviewResult } from "../../types/dailyReview";
 import type {
   AnalysisHistoryItem,
+  AnalysisResult,
   IndustryChainHistoryItem,
   IndustryChainResult,
   PushRequest,
   PushResponse,
 } from "../../types/stock";
 
-interface DeleteResponse {
-  deleted: boolean;
-}
-
 export function useInfiniteDailyReviewHistory(pageSize = 50) {
   return useInfiniteQuery({
     queryKey: queryKeys.workflows.dailyReviewHistory(pageSize),
-    queryFn: ({ pageParam, signal }) => apiGet<DailyReviewHistoryItem[]>(
-      "/daily-review/history",
-      { limit: pageSize, offset: pageParam },
-      { signal },
-    ),
+    queryFn: ({ pageParam }) => openApiGet("/api/daily-review/history", {
+      query: { limit: pageSize, offset: pageParam },
+    }),
+    select: (data) => ({
+      ...data,
+      pages: data.pages.map(asApiModel<DailyReviewHistoryItem[]>()),
+    }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, pages) => (
       lastPage.length < pageSize
@@ -35,7 +40,10 @@ export function useInfiniteDailyReviewHistory(pageSize = 50) {
 export function useDailyReview(date: string) {
   return useQuery({
     queryKey: queryKeys.workflows.dailyReview(date),
-    queryFn: ({ signal }) => apiGet<DailyReviewResult>(`/daily-review/${date}`, undefined, { signal }),
+    queryFn: () => openApiGet("/api/daily-review/{date}", {
+      path: { date },
+    }),
+    select: asApiModel<DailyReviewResult>(),
     enabled: !!date,
     staleTime: 5 * 60 * 1000,
   });
@@ -43,33 +51,40 @@ export function useDailyReview(date: string) {
 
 export function useGenerateDailyReview() {
   return useMutation({
-    mutationFn: (req: DailyReviewRequest) => apiPost<DailyReviewResult>("/daily-review/generate", req, { timeoutMs: API_TIMEOUTS.LONG_RUNNING }),
+    mutationFn: (request: DailyReviewRequest) => openApiPost("/api/daily-review/generate", {
+      body: request,
+      options: { timeoutMs: API_TIMEOUTS.LONG_RUNNING },
+    }).then(asApiModel<DailyReviewResult>()),
   });
 }
 
 export function useDeleteDailyReview() {
   return useMutation({
-    mutationFn: (date: string) => apiDelete<DeleteResponse>(
-      `/daily-review/${encodeURIComponent(date)}`,
-    ),
+    mutationFn: (date: string) => openApiDelete("/api/daily-review/{date}", {
+      path: { date },
+    }),
   });
 }
 
 export function usePush() {
   return useMutation({
-    mutationFn: (req: PushRequest) =>
-      apiPost<PushResponse>("/push", req, { timeoutMs: API_TIMEOUTS.EXTERNAL }),
+    mutationFn: (request: PushRequest) => openApiPost("/api/push", {
+      body: request,
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }).then(asApiModel<PushResponse>()),
   });
 }
 
 export function useInfiniteAllAnalysisHistory(pageSize = 50) {
   return useInfiniteQuery({
     queryKey: queryKeys.workflows.analysisHistory(pageSize),
-    queryFn: ({ pageParam, signal }) => apiGet<AnalysisHistoryItem[]>(
-      "/analysis/history/all",
-      { limit: pageSize, offset: pageParam },
-      { signal },
-    ),
+    queryFn: ({ pageParam }) => openApiGet("/api/analysis/history/all", {
+      query: { limit: pageSize, offset: pageParam },
+    }),
+    select: (data) => ({
+      ...data,
+      pages: data.pages.map(asApiModel<AnalysisHistoryItem[]>()),
+    }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, pages) => (
       lastPage.length < pageSize
@@ -80,10 +95,23 @@ export function useInfiniteAllAnalysisHistory(pageSize = 50) {
   });
 }
 
+export function useAnalysisHistorySnapshot(code: string, date: string) {
+  return useQuery({
+    queryKey: queryKeys.workflows.analysisHistorySnapshot(code, date),
+    queryFn: () => openApiGet("/api/analysis/{code}/history/{date}", {
+      path: { code, date },
+    }),
+    select: asApiModel<AnalysisResult>(),
+    enabled: !!code && !!date,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
 export function useDeleteAnalysisHistory() {
   return useMutation({
-    mutationFn: ({ code, date }: { code: string; date: string }) => apiDelete<DeleteResponse>(
-      `/analysis/${encodeURIComponent(code)}/history/${encodeURIComponent(date)}`,
+    mutationFn: ({ code, date }: { code: string; date: string }) => openApiDelete(
+      "/api/analysis/{code}/history/{date}",
+      { path: { code, date } },
     ),
   });
 }
@@ -91,11 +119,13 @@ export function useDeleteAnalysisHistory() {
 export function useInfiniteIndustryChainHistory(name = "", pageSize = 50) {
   return useInfiniteQuery({
     queryKey: queryKeys.workflows.industryChainHistory(name, pageSize),
-    queryFn: ({ pageParam, signal }) => apiGet<IndustryChainHistoryItem[]>(
-      "/industry-chain/history",
-      { name: name || undefined, limit: pageSize, offset: pageParam },
-      { signal },
-    ),
+    queryFn: ({ pageParam }) => openApiGet("/api/industry-chain/history", {
+      query: { name: name || undefined, limit: pageSize, offset: pageParam },
+    }),
+    select: (data) => ({
+      ...data,
+      pages: data.pages.map(asApiModel<IndustryChainHistoryItem[]>()),
+    }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, pages) => (
       lastPage.length < pageSize
@@ -109,11 +139,9 @@ export function useInfiniteIndustryChainHistory(name = "", pageSize = 50) {
 export function useIndustryChainLatest(name: string) {
   return useQuery({
     queryKey: queryKeys.workflows.industryChainLatest(name),
-    queryFn: ({ signal }) => apiGet<{ archive_id: string; saved_at: string }>(
-      `/industry-chain/${encodeURIComponent(name)}/latest`,
-      undefined,
-      { signal },
-    ),
+    queryFn: () => openApiGet("/api/industry-chain/{name}/latest", {
+      path: { name },
+    }),
     enabled: !!name,
     staleTime: 0,
   });
@@ -121,17 +149,18 @@ export function useIndustryChainLatest(name: string) {
 
 export function useIndustryChainArchive() {
   return useMutation({
-    mutationFn: ({ name, archiveId }: { name: string; archiveId: string }) =>
-      apiGet<IndustryChainResult>(
-        `/industry-chain/${encodeURIComponent(name)}/archive/${archiveId}`,
-      ),
+    mutationFn: ({ name, archiveId }: { name: string; archiveId: string }) => openApiGet(
+      "/api/industry-chain/{name}/archive/{archive_id}",
+      { path: { name, archive_id: archiveId } },
+    ).then(asApiModel<IndustryChainResult>()),
   });
 }
 
 export function useDeleteIndustryChainArchive() {
   return useMutation({
-    mutationFn: ({ name, archiveId }: { name: string; archiveId: string }) => apiDelete<DeleteResponse>(
-      `/industry-chain/${encodeURIComponent(name)}/archive/${encodeURIComponent(archiveId)}`,
+    mutationFn: ({ name, archiveId }: { name: string; archiveId: string }) => openApiDelete(
+      "/api/industry-chain/{name}/archive/{archive_id}",
+      { path: { name, archive_id: archiveId } },
     ),
   });
 }

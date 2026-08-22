@@ -8,19 +8,10 @@ import {
   ToolOutlined,
 } from "@ant-design/icons";
 import type { ToolCallDisplay } from "../../../types/chat";
-import { TOOL_LABELS } from "../constants";
-
-function formatJsonText(value: string): string {
-  try {
-    return JSON.stringify(JSON.parse(value), null, 2);
-  } catch {
-    return value;
-  }
-}
+import { formatToolArguments } from "../../../utils/toolCall";
 
 export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
   const [expanded, setExpanded] = useState(false);
-  const label = TOOL_LABELS[toolCall.name] || toolCall.name;
   const status = toolCall.isExecuting
     ? "执行中"
     : toolCall.isError
@@ -56,7 +47,6 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
           onClick={() => setExpanded((current) => !current)}
         >
           <span className="chat-tool-heading">
-            <strong>{label}</strong>
             <code>{toolCall.name}</code>
           </span>
           <span className={`chat-tool-status ${statusClass}`}>
@@ -68,16 +58,8 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
 
         {expanded && (
           <div className="chat-tool-details">
-            <div className="chat-tool-detail-label">输入参数</div>
-            <pre>{formatJsonText(toolCall.arguments || "{}")}</pre>
-            {toolCall.result !== undefined && (
-              <>
-                <div className="chat-tool-detail-label">执行结果</div>
-                <pre className={toolCall.isError ? "is-error" : ""}>
-                  {formatJsonText(toolCall.result || "（无返回内容）")}
-                </pre>
-              </>
-            )}
+            <div className="chat-tool-detail-label">调用参数</div>
+            <pre>{formatToolArguments(toolCall.arguments)}</pre>
           </div>
         )}
       </div>

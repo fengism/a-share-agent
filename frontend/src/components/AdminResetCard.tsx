@@ -82,7 +82,7 @@ export default function AdminResetCard() {
       {result && (
         <div
           style={{
-            marginTop: 12, padding: "10px 12px", background: c.elevatedBg,
+            marginTop: 12, padding: "10px 12px", background: c.hoverBg,
             border: `1px solid ${c.border}`, borderRadius: 8,
           }}
         >

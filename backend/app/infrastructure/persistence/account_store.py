@@ -2,7 +2,6 @@ import sqlite3
 from collections.abc import Callable
 from typing import cast
 
-from app.contracts.auth import UserRecord
 from app.core.security import (
     dummy_verify,
     generate_temp_password,
@@ -11,6 +10,7 @@ from app.core.security import (
     now_ts,
     verify_password,
 )
+from app.domain.identity import UserRecord
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
 
 

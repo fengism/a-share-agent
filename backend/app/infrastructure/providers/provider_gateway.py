@@ -8,6 +8,7 @@ from typing import Awaitable, Callable, TypeVar
 from app.configuration import get_settings
 from app.core.concurrency.rate_limiter import call_blocking as run_blocking
 from app.core.metrics import metrics
+from app.core.operational import ProviderCircuitSnapshot
 from app.core.retry import RetryPolicy
 from app.infrastructure.providers.provider_circuit import ProviderCircuitBreaker
 from app.infrastructure.providers.provider_policy import (
@@ -274,7 +275,7 @@ class ProviderGateway:
     def _release_half_open(self, key: tuple[str, str]) -> None:
         self._circuit_breaker.release_half_open(key)
 
-    def snapshot(self) -> dict[str, dict]:
+    def snapshot(self) -> dict[str, ProviderCircuitSnapshot]:
         settings = get_settings()
         open_seconds = max(0.0, settings.provider_circuit_open_seconds)
         return self._circuit_breaker.snapshot(open_seconds, time.monotonic())

@@ -2,6 +2,8 @@ from enum import StrEnum
 
 import requests
 
+from app.core.exceptions import UpstreamUnavailableError
+
 
 class ProviderErrorCategory(StrEnum):
     TIMEOUT = "timeout"
@@ -11,7 +13,7 @@ class ProviderErrorCategory(StrEnum):
     CIRCUIT_OPEN = "circuit_open"
 
 
-class ProviderCircuitOpenError(RuntimeError):
+class ProviderCircuitOpenError(UpstreamUnavailableError):
     pass
 
 

@@ -5,10 +5,12 @@ import AnalysisChartsSection from "./AnalysisChartsSection";
 
 const mocks = vi.hoisted(() => ({
   useKlineData: vi.fn(),
+  useStockIntraday: vi.fn(),
 }));
 
 vi.mock("../../api/queries", () => ({
   useKlineData: mocks.useKlineData,
+  useStockIntraday: mocks.useStockIntraday,
 }));
 
 vi.mock("../../charts/KlineChart", () => ({
@@ -24,6 +26,7 @@ vi.mock("../../theme/hooks", () => ({
     border: "#333",
     nestedBg: "#111",
     elevatedBg: "#222",
+    hoverBg: "#222",
     textPrimary: "#fff",
     textSecondary: "#aaa",
     up: "#f00",
@@ -46,6 +49,12 @@ const weeklyKline = {
 describe("AnalysisChartsSection", () => {
   beforeEach(() => {
     mocks.useKlineData.mockReset();
+    mocks.useStockIntraday.mockReset().mockImplementation((_code, initialData) => ({
+      data: initialData ?? undefined,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
     mocks.useKlineData.mockImplementation((_code, period, adjust, enabled) => ({
       data: enabled && period === "weekly" && adjust === "qfq" ? weeklyKline : undefined,
       isLoading: false,

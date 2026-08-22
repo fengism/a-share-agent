@@ -2,41 +2,18 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncGenerator
 
-from app.core.concurrency.task_stream import KeyedTaskEventStream
-from app.modules.industry_chain.events import IndustryChainProgress
-from app.modules.industry_chain.pipeline import run_industry_chain_analysis
-
-logger = logging.getLogger(__name__)
-
-
-class IndustryChainAlreadyRunningError(RuntimeError):
-    """同一用户的同名产业链已有分析任务在运行。"""
-
-
-_industry_chain_stream = KeyedTaskEventStream[IndustryChainProgress](
-    lambda: IndustryChainAlreadyRunningError("该产业链正在分析中，请稍后")
+from app.modules.workflow.public import (
+    create_workflow_event_generator,
+    submit_industry_chain_workflow,
 )
-_active_industry_chains = _industry_chain_stream.active_tasks
-
-
-def task_key(user_id: int, name: str) -> tuple[int, str]:
-    return user_id, name
 
 
 async def create_industry_chain_event_generator(name: str, user_id: int) -> AsyncGenerator[dict, None]:
     """创建指定产业链的 SSE 事件生成器。"""
-
-    async def runner(progress_callback) -> None:
-        await run_industry_chain_analysis(name, user_id, progress_callback=progress_callback)
-
-    def log_error(error: Exception) -> None:
-        logger.warning("产业链分析后台任务异常退出: %s, error=%s", name, error)
-
-    return await _industry_chain_stream.create(
-        task_key(user_id, name),
-        runner,
-        error_handler=log_error,
-    )
+    submission = await submit_industry_chain_workflow(name, user_id)
+    stream = await create_workflow_event_generator(submission.job.id, user_id)
+    if stream is None:
+        raise RuntimeError("Workflow 提交后无法读取")
+    return stream

@@ -82,7 +82,8 @@ echo ""
 echo "=== 安装后端依赖 ==="
 cd "$BACKEND_DIR"
 uv sync --frozen
-info "后端依赖安装完成"
+uv run --frozen patchright install chromium
+info "后端依赖与 Patchright Chromium 安装完成"
 
 echo ""
 

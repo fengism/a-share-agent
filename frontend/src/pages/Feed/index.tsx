@@ -5,14 +5,14 @@ import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useStyles } from "../../styles/ui";
 import FeedTabs from "./FeedTabs";
 import NewsAnalysisPanel from "./NewsAnalysisPanel";
-import "./feed.css";
+import "../../features/feed/feed.css";
 
 export default function Feed() {
   const { pageContainerStyle } = useStyles();
   const [searchQuery, setSearchQuery] = useUrlSearchParam("q", "", { replace: true });
 
   return (
-    <div style={{ ...pageContainerStyle, maxWidth: 1180 }}>
+    <div style={{ ...pageContainerStyle, maxWidth: "var(--c-container-feed)" }}>
       <section className="feed-paper">
         <header className="feed-masthead">
           <span className="feed-masthead-kicker">A-SHARE INTELLIGENCE</span>

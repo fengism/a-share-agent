@@ -1,19 +1,16 @@
-import { Typography, Row, Col, Card } from "antd";
-import { FundOutlined, MessageOutlined, RobotOutlined } from "@ant-design/icons";
-import { Link } from "react-router-dom";
-import { useMarketIndices } from "../../api/queries";
+import { useEffect, useMemo, useState } from "react";
+import { Card, Col, Row, Tag, Typography } from "antd";
+import { useMarketIndices, useMarketMainline } from "../../api/queries";
 import ChangeValue from "../../components/ChangeValue";
+import IndexIntradayCard from "../../components/IndexIntradayCard";
 import SectionDataState from "../../components/SectionDataState";
-import { useColors, useStyles } from "../../styles/ui";
+import StockExternalLink from "../../components/StockExternalLink";
+import { useColors, useStyles, useTokens } from "../../styles/ui";
+import type { MarketMainlineChance, MarketMainlineStyle } from "../../types/stock";
 import { formatAmount } from "../../utils/format";
+import WatchlistPanel from "./WatchlistPanel";
 
 const { Text } = Typography;
-
-const shortcuts = [
-  { icon: <FundOutlined style={{ fontSize: 24 }} />, title: "市场行情", desc: "热点榜单与龙虎榜", link: "/market" },
-  { icon: <MessageOutlined style={{ fontSize: 24 }} />, title: "对话", desc: "AI 智能选股助手", link: "/chat" },
-  { icon: <RobotOutlined style={{ fontSize: 24 }} />, title: "AI 分析", desc: "输入代码获取深度分析", link: "/analysis" },
-];
 
 const INDEX_NAMES = ["上证指数", "深证成指", "创业板指", "科创50", "沪深300", "中证500"];
 
@@ -22,87 +19,264 @@ function formatIndexPrice(value: number | string | null | undefined) {
   return Number.isFinite(numericValue) ? numericValue.toFixed(2) : "-";
 }
 
+function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
+  const c = useColors();
+  const t = useTokens();
+  return (
+    <Card
+      size="small"
+      title={chance.title}
+      extra={
+        <span style={{ display: "inline-flex", gap: t.space[1] }}>
+          {chance.continued_days != null && chance.continued_days > 0 ? (
+            <Tag style={{ marginInlineEnd: 0 }}>持续 {chance.continued_days} 天</Tag>
+          ) : null}
+          {chance.hot != null && chance.hot > 0 ? (
+            <Tag color="volcano" style={{ marginInlineEnd: 0 }}>热度 {chance.hot}</Tag>
+          ) : null}
+        </span>
+      }
+      style={{
+        borderRadius: t.radius.md,
+        boxShadow: t.shadow.xs,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
+      styles={{ body: { flex: 1, minHeight: 0 } }}
+    >
+      {chance.description ? (
+        <Text type="secondary" style={{ fontSize: t.font.sm }}>{chance.description}</Text>
+      ) : null}
+      <div style={{ marginTop: chance.description ? t.space[2] : 0, display: "grid", gap: t.space[2] }}>
+        {chance.plates.map((plate) => (
+          <div
+            key={`${plate.code}-${plate.name}`}
+            style={{
+              background: c.nestedBg,
+              borderRadius: t.radius.sm,
+              padding: `${t.space[2]} ${t.space[3]}`,
+              display: "grid",
+              gap: t.space[1],
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", gap: t.space[2], flexWrap: "wrap" }}>
+              <Text strong>{plate.name}</Text>
+              <ChangeValue value={plate.change_pct} />
+              {plate.rise_count != null && plate.rise_count > 0 ? (
+                <Text type="secondary" style={{ fontSize: t.font.xs }}>{plate.rise_count} 家上涨</Text>
+              ) : null}
+            </div>
+            {plate.reason ? (
+              <Text type="secondary" style={{ fontSize: t.font.xs }} ellipsis>{plate.reason}</Text>
+            ) : null}
+            {plate.faucets.length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: t.space[3] }}>
+                {plate.faucets.map((faucet) => (
+                  <span key={faucet.code} style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[1] }}>
+                    <StockExternalLink code={faucet.code} name={faucet.name}>
+                      {faucet.name}
+                    </StockExternalLink>
+                    <ChangeValue value={faucet.change_pct} />
+                    {faucet.reason ? (
+                      <Text type="secondary" style={{ fontSize: t.font.xs }}>{faucet.reason}</Text>
+                    ) : null}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function MainlineStyleCard({ style }: { style: MarketMainlineStyle }) {
+  const c = useColors();
+  const t = useTokens();
+  return (
+    <Card size="small" title="风格判断" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+      <div style={{ display: "grid", gap: t.space[2] }}>
+        <div style={{ display: "grid", gap: 2 }}>
+          {style.title ? (
+            <Text strong style={{ fontSize: t.font.sm }}>{style.title}</Text>
+          ) : null}
+          {style.interpret ? (
+            <Text type="secondary" style={{ fontSize: t.font.xs }}>{style.interpret}</Text>
+          ) : null}
+        </div>
+        {style.indexes.map((index) => (
+          <div
+            key={`${index.code}-${index.name}`}
+            style={{
+              background: c.nestedBg,
+              borderRadius: t.radius.sm,
+              padding: `${t.space[2]} ${t.space[3]}`,
+              display: "grid",
+              gap: 2,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", gap: t.space[2], flexWrap: "wrap" }}>
+              <Text strong style={{ fontSize: t.font.sm }}>{index.name || "指数"}</Text>
+              <ChangeValue value={index.change_30d} />
+              <Text type="secondary" style={{ fontSize: t.font.xs }}>近30日</Text>
+            </div>
+            {index.stocks.length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", columnGap: t.space[3], rowGap: 2 }}>
+                {index.stocks.slice(0, 5).map((stock) => (
+                  <span key={stock.code} style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[1] }}>
+                    <StockExternalLink code={stock.code} name={stock.name}>
+                      {stock.name}
+                    </StockExternalLink>
+                    <ChangeValue value={stock.change_30d} />
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function DashboardMainlineSection() {
+  const c = useColors();
+  const t = useTokens();
+  const query = useMarketMainline();
+  const chances = useMemo(() => query.data?.items ?? [], [query.data?.items]);
+
+  return (
+    <section aria-label="今日主线" style={{ marginTop: t.space[4] }}>
+      <Text strong style={{ fontSize: t.font.base, color: c.textPrimary }}>今日主线</Text>
+      <SectionDataState
+        isLoading={query.isLoading}
+        error={query.error}
+        onRetry={() => query.refetch()}
+        isEmpty={!query.isLoading && !query.error && chances.length === 0}
+        emptyText="暂无今日主线数据"
+        errorTitle="今日主线加载失败"
+        skeletonRows={4}
+        minHeight={160}
+      >
+        <div style={{ marginTop: t.space[2], display: "grid", gap: t.space[3] }}>
+          {chances.map((chance) => (
+            <MainlineChanceCard key={chance.title} chance={chance} />
+          ))}
+          {query.data?.style ? <MainlineStyleCard style={query.data.style} /> : null}
+        </div>
+      </SectionDataState>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const { data: marketData, isLoading, error, refetch } = useMarketIndices();
   const c = useColors();
-  const { cardStyle, pageContainerStyle } = useStyles();
+  const t = useTokens();
+  const { pageContainerStyle, rowGutter } = useStyles();
+  const [activeIndexCode, setActiveIndexCode] = useState("000001");
 
-  const mainIndices = INDEX_NAMES.map(
-    (name) => (marketData?.indices || []).find((item) => item.name === name)
-  ).filter((item) => item != null);
+  const mainIndices = useMemo(
+    () => INDEX_NAMES.map(
+      (name) => (marketData?.indices || []).find((item) => item.name === name),
+    ).filter((item) => item != null),
+    [marketData],
+  );
+  const activeIndex = mainIndices.find((item) => item.code === activeIndexCode) ?? mainIndices[0];
+
+  useEffect(() => {
+    if (mainIndices.length > 0 && !mainIndices.some((item) => item.code === activeIndexCode)) {
+      setActiveIndexCode(mainIndices[0].code);
+    }
+  }, [activeIndexCode, mainIndices]);
 
   const today = new Date();
   const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
 
   return (
-    <div style={pageContainerStyle}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 0 20px" }}>
-        <span style={{ width: 3, height: 18, borderRadius: 2, background: c.primary, display: "inline-block" }} />
-        <Text style={{ fontSize: 18, fontWeight: 600, color: c.textPrimary, letterSpacing: 0.2 }}>{dateStr} · 市场概览</Text>
+    <div className="dashboard-page" style={pageContainerStyle}>
+      <header className="dashboard-hero">
+        <div className="dashboard-hero__copy">
+          <span className="dashboard-hero__eyebrow">今日市场</span>
+          <h1>市场总览</h1>
+          <p>{dateStr}</p>
+        </div>
+        <div className="dashboard-hero__meta" aria-label="市场概览元数据">
+          <span>当前查看 {activeIndex?.name || "等待行情"} · {activeIndex?.code || "-"}</span>
+          <span>行情源 {marketData?.source || "等待数据"}</span>
+        </div>
+      </header>
+      <div className="dashboard-layout">
+        <section className="dashboard-main" aria-label="市场概览">
+          <SectionDataState
+            isLoading={isLoading}
+            error={error}
+            onRetry={() => refetch()}
+            isEmpty={mainIndices.length === 0}
+            emptyText="暂无市场指数数据"
+            errorTitle="市场指数加载失败"
+            skeletonRows={3}
+            minHeight={180}
+          >
+            <Row gutter={[rowGutter, rowGutter]}>
+              {mainIndices.map((idx) => {
+                const isUp = idx.change_pct != null && idx.change_pct > 0;
+                const isDown = idx.change_pct != null && idx.change_pct < 0;
+                const color = isUp ? c.up : isDown ? c.down : c.textSecondary;
+                return (
+                  <Col xs={24} sm={12} md={8} key={idx.code}>
+                    <button
+                      type="button"
+                      aria-label={`选择${idx.name}分时图`}
+                      aria-pressed={idx.code === activeIndex?.code}
+                      onClick={() => setActiveIndexCode(idx.code)}
+                      className={`dashboard-index-button${idx.code === activeIndex?.code ? " is-active" : ""}`}
+                    >
+                      <div className={`dashboard-index-tile${idx.code === activeIndex?.code ? " is-active" : ""}`} style={{
+                        display: "flex", flexDirection: "column", gap: t.space[1],
+                        background: idx.code === activeIndex?.code ? c.activeBg : c.hoverBg,
+                        borderStyle: "solid", borderWidth: "1px 1px 1px 3px",
+                        borderColor: `${idx.code === activeIndex?.code ? c.primary : c.border} ${idx.code === activeIndex?.code ? c.primary : c.border} ${idx.code === activeIndex?.code ? c.primary : c.border} ${color}`,
+                        borderRadius: t.radius.md, height: "100%", boxSizing: "border-box",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: t.space[2] }}>
+                          <span className="dashboard-index-tile__identity">
+                            <Text style={{ color: c.textSecondary, fontSize: t.font.md, fontWeight: Number(t.weight.medium) }}>{idx.name}</Text>
+                            <Text type="secondary" style={{ fontSize: t.font.xs }}>{idx.code}</Text>
+                          </span>
+                          <Text style={{ color: c.textMuted, fontSize: t.font.sm }}>额 {formatAmount(idx.amount)}</Text>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: t.space[2] }}>
+                          <Text style={{ color, fontSize: t.font["2xl"], fontWeight: Number(t.weight.bold), lineHeight: t.leading.tight }}>{formatIndexPrice(idx.price)}</Text>
+                          <ChangeValue value={idx.change_pct} showIcon style={{ fontSize: t.font.base }} />
+                        </div>
+                      </div>
+                    </button>
+                  </Col>
+                );
+              })}
+            </Row>
+            {activeIndex && (
+              <div style={{ marginTop: t.space[4] }}>
+                <IndexIntradayCard
+                  symbol={activeIndex.code}
+                  name={activeIndex.name}
+                  price={activeIndex.price}
+                  changePct={activeIndex.change_pct}
+                  preClose={activeIndex.pre_close}
+                  height={300}
+                />
+              </div>
+            )}
+          </SectionDataState>
+        </section>
+        <aside className="dashboard-sidebar" aria-label="首页自选栏">
+          <WatchlistPanel />
+          <DashboardMainlineSection />
+        </aside>
       </div>
-      <SectionDataState
-        isLoading={isLoading}
-        error={error}
-        onRetry={() => refetch()}
-        isEmpty={mainIndices.length === 0}
-        emptyText="暂无市场指数数据"
-        errorTitle="市场指数加载失败"
-        skeletonRows={3}
-        minHeight={180}
-      >
-        <Row gutter={[12, 12]} style={{ marginBottom: 24 }}>
-          {mainIndices.map((idx) => {
-            const isUp = idx.change_pct != null && idx.change_pct > 0;
-            const isDown = idx.change_pct != null && idx.change_pct < 0;
-            const color = isUp ? c.up : isDown ? c.down : c.textSecondary;
-            return (
-              <Col xs={24} sm={12} lg={8} key={idx.code}>
-                <div style={{
-                  display: "flex", flexDirection: "column", gap: 4, padding: "14px 16px",
-                  background: c.elevatedBg,
-                  border: `1px solid ${c.border}`, borderLeft: `3px solid ${color}`,
-                  borderRadius: 8, height: "100%",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <Text style={{ color: c.textSecondary, fontSize: 13, fontWeight: 500 }}>{idx.name}</Text>
-                    <Text style={{ color: c.textMuted, fontSize: 11 }}>额 {formatAmount(idx.amount)}</Text>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                    <Text style={{ color, fontSize: 24, fontWeight: 700, lineHeight: 1.2 }}>{formatIndexPrice(idx.price)}</Text>
-                    <ChangeValue value={idx.change_pct} showIcon style={{ fontSize: 14 }} />
-                  </div>
-                </div>
-              </Col>
-            );
-          })}
-        </Row>
-      </SectionDataState>
-      <Row gutter={[16, 16]}>
-        {shortcuts.map((s) => (
-          <Col xs={24} md={8} key={s.title}>
-            <Link to={s.link} aria-label={`${s.title}：${s.desc}`} style={{ display: "block", height: "100%", textDecoration: "none" }}>
-              <Card
-                hoverable
-                className="dash-shortcut"
-                style={{ ...cardStyle, height: "100%" }}
-                styles={{ body: { padding: "20px 24px" } }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: 8, background: `${c.primary}14`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: c.primary, border: `1px solid ${c.primary}33`,
-                  }}>{s.icon}</div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 15, color: c.textPrimary }}>{s.title}</div>
-                    <div style={{ color: c.textSecondary, fontSize: 13, marginTop: 2 }}>{s.desc}</div>
-                  </div>
-                </div>
-              </Card>
-            </Link>
-          </Col>
-        ))}
-      </Row>
     </div>
   );
 }

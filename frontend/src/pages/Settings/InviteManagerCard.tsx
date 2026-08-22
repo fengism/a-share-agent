@@ -6,7 +6,7 @@ import { useCreateInvite, useInvites, useRevokeInvite } from "../../api/queries"
 import { queryKeys } from "../../api/queryKeys";
 import SectionDataState from "../../components/SectionDataState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors, useStyles, semanticTagStyle } from "../../styles/ui";
 import type { InviteItem } from "../../types/auth";
 
 export default function InviteManagerCard() {
@@ -51,9 +51,9 @@ export default function InviteManagerCard() {
   };
 
   const statusTag = (invite: InviteItem) => {
-    if (invite.used) return <Tag color="default">已使用</Tag>;
-    if (invite.expired) return <Tag color="red">已过期</Tag>;
-    return <Tag color="green">未使用</Tag>;
+    if (invite.used) return <Tag>已使用</Tag>;
+    if (invite.expired) return <Tag style={semanticTagStyle("up")}>已过期</Tag>;
+    return <Tag style={semanticTagStyle("down")}>未使用</Tag>;
   };
 
   const inviteControls = (
@@ -107,7 +107,7 @@ export default function InviteManagerCard() {
                 justifyContent: "space-between",
                 gap: 8,
                 padding: "8px 12px",
-                background: colors.elevatedBg,
+                background: colors.hoverBg,
                 border: `1px solid ${colors.border}`,
                 borderRadius: 8,
               }}

@@ -4,6 +4,12 @@ from pydantic import BaseModel
 
 from app.modules.analysis.models import AnalysisResult
 
+ANALYSIS_STAGE_NAMES = {
+    1: "Agent 调研与证据校验",
+    2: "构造结构化请求",
+    3: "AI 综合分析",
+}
+
 
 class AnalysisStage(BaseModel):
     stage: int
@@ -16,6 +22,6 @@ class AnalysisStage(BaseModel):
 class AnalysisProgress(BaseModel):
     type: Literal["stage_started", "stage_completed", "stage_failed", "complete", "error", "cached"]
     stage: AnalysisStage | None = None
-    total_stages: int = 3
+    total_stages: int = len(ANALYSIS_STAGE_NAMES)
     result: AnalysisResult | None = None
     error: str | None = None

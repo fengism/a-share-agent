@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ApartmentOutlined, CloudUploadOutlined, FullscreenOutlined, SendOutlined } from "@ant-design/icons";
-import { Button, Input, Modal, Popover, Skeleton, Tag, Typography } from "antd";
+import { Alert, Button, Input, Modal, Popover, Skeleton, Tag, Typography } from "antd";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors, useStyles } from "../../styles/ui";
 import type { IndustryChainChart, IndustryChainResult } from "../../types/stock";
@@ -42,6 +42,14 @@ export default function IndustryReport({
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const [expandedChart, setExpandedChart] = useState<{ chart: IndustryChainChart; index: number } | null>(null);
   const [feishuReceiver, setFeishuReceiver] = useState(defaultReceiver || "");
+  const scope = result.research_scope;
+  const scopeSummary = scope && Object.keys(scope).length > 0
+    ? [
+      { china: "中国", global: "全球", china_and_global: "中国与全球" }[scope.region] || scope.region,
+      scope.start_date && scope.end_date ? `${scope.start_date} 至 ${scope.end_date}` : "",
+      scope.company_scope === "a_share" ? "A 股公司" : scope.company_scope === "all_public" ? "全部公开公司" : "",
+    ].filter(Boolean).join(" · ")
+    : "";
 
   useEffect(() => {
     if (!defaultReceiver) return;
@@ -137,12 +145,31 @@ export default function IndustryReport({
             {result.aliases.map((alias) => <Tag key={alias} style={{ margin: 0 }}>{alias}</Tag>)}
           </div>
         )}
+        {scopeSummary && (
+          <Text type="secondary" style={{ display: "block", marginBottom: result.positioning ? 12 : 0, fontSize: 12 }}>
+            研究范围：{scopeSummary}
+          </Text>
+        )}
         {result.positioning && (
-          <div style={{ padding: "10px 12px", borderRadius: 8, borderLeft: `3px solid ${colors.primary}`, background: colors.elevatedBg }}>
+          <div style={{ padding: "10px 12px", borderRadius: 8, borderLeft: `3px solid ${colors.primary}`, background: colors.hoverBg }}>
             <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{result.positioning}</Text>
           </div>
         )}
       </div>
+
+      {(result.quality_status === "degraded" || result.archive_status === "failed" || Boolean(result.warnings?.length)) && (
+        <Alert
+          type={result.archive_status === "failed" ? "error" : "warning"}
+          showIcon
+          title={result.archive_status === "failed" ? "报告未保存" : "报告存在质量提示"}
+          description={result.warnings?.length ? (
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {result.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+            </ul>
+          ) : "部分结构化内容未能完整生成，请结合原始来源谨慎使用。"}
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       <IndustryResearchSections result={result} />
 

@@ -8,6 +8,8 @@ export interface StockNews {
   read_count: number;
   comment_count: number;
   image_url: string;
+  category?: string;
+  source_api?: string;
 }
 
 export interface CategorizedStockNews {
@@ -26,6 +28,8 @@ export interface FeedNewsItem {
   read_count: number;
   comment_count: number;
   image_url?: string;
+  category?: string;
+  source_api?: string;
 }
 
 export interface RetailSentimentPost {
@@ -43,6 +47,10 @@ export interface RetailSentiment {
   sample_posts: RetailSentimentPost[];
   summary: string;
   guba_post_count: number;
+  partial?: boolean;
+  unavailable_sections?: string[];
+  field_sources?: Record<string, string>;
+  source_apis?: Record<string, string>;
 }
 
 export interface StockSentiment {
@@ -50,6 +58,10 @@ export interface StockSentiment {
   heat_score: number | null;
   hot_rank: number | null;
   news_count: number | null;
+  partial?: boolean;
+  unavailable_sections?: string[];
+  field_sources?: Record<string, string>;
+  source_apis?: Record<string, string>;
 }
 
 export interface NewsAnalysisRef {

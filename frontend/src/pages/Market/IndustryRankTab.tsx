@@ -1,152 +1,392 @@
-import { useCallback, useMemo } from "react";
-import { Table, Tag } from "antd";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button, DatePicker, Drawer, Space, Table, Tag, Tooltip } from "antd";
 import { AppstoreOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import ChangeValue from "../../components/ChangeValue";
 import DataRefreshIndicator from "../../components/DataRefreshIndicator";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
+import StockExternalLink from "../../components/StockExternalLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useIndustryRankings } from "../../api/queries";
-import type { IndustryRankItem } from "../../types/stock";
-import { useColors, useStyles } from "../../theme/hooks";
+import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
+import { useIndustryRankings, useMarketSectorStocksHistory } from "../../api/queries";
+import type { IndustryRankItem, MarketSectorStocksHistoryItem } from "../../types/stock";
+import { useColors, useStyles, useTokens } from "../../theme/hooks";
+import { normalizeIsoDate } from "../../utils/date";
+import { formatAmount, formatMarketCap } from "../../utils/format";
+import { rankBadge } from "./rankBadge";
 
-function rankBadge(rank: number, colors: { up: string; textSecondary: string }) {
-  let color = colors.textSecondary;
-  let bg = "transparent";
-  if (rank === 1 || rank === 2) {
-    color = "#fff";
-    bg = colors.up;
-  } else if (rank === 3) {
-    color = "#fff";
-    bg = "#eab308";
-  } else if (rank <= 10) {
-    color = "#eab308";
-    bg = "rgba(234,179,8,0.15)";
-  }
+function formatRate(value: number | null) {
+  return value === null ? "-" : `${value.toFixed(2)}%`;
+}
+
+interface DrawerSector {
+  code: string;
+  name: string;
+}
+
+function SectorStocksDrawer({
+  sector,
+  dateText,
+  onClose,
+}: {
+  sector: DrawerSector | null;
+  dateText: string;
+  onClose: () => void;
+}) {
+  const c = useColors();
+  const t = useTokens();
+  const isNarrow = useMediaQuery("(max-width: 768px)");
+  const query = useMarketSectorStocksHistory(sector ? dateText : "", sector?.code ?? "");
+  const items = useMemo(() => query.data?.items ?? [], [query.data?.items]);
+  const hasData = items.length > 0;
+
+  const columns: ColumnsType<MarketSectorStocksHistoryItem> = useMemo(() => {
+    const stockColumn = {
+      title: "股票",
+      key: "stock",
+      fixed: "left" as const,
+      width: 140,
+      render: (_value: unknown, stock: MarketSectorStocksHistoryItem) => (
+        <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
+          <Space orientation="vertical" size={0}>
+            <span style={{ fontWeight: Number(t.weight.medium) }}>{stock.name}</span>
+            <span style={{ color: c.textSecondary, fontSize: t.font.xs }}>{stock.code}</span>
+          </Space>
+        </StockExternalLink>
+      ),
+    };
+    const changeColumn = {
+      title: "涨跌幅",
+      dataIndex: "change_pct",
+      width: 90,
+      align: "right" as const,
+      sorter: (left: MarketSectorStocksHistoryItem, right: MarketSectorStocksHistoryItem) => (
+        (left.change_pct ?? 0) - (right.change_pct ?? 0)
+      ),
+      defaultSortOrder: "descend" as const,
+      render: (value: number | null) => <ChangeValue value={value} />,
+    };
+    const netColumn = {
+      title: "主力净额",
+      dataIndex: "main_net",
+      width: 110,
+      align: "right" as const,
+      sorter: (left: MarketSectorStocksHistoryItem, right: MarketSectorStocksHistoryItem) => (
+        left.main_net - right.main_net
+      ),
+      render: (value: number) => (
+        <span style={{ color: value > 0 ? c.up : value < 0 ? c.down : undefined }}>
+          {formatAmount(value)}
+        </span>
+      ),
+    };
+
+    if (isNarrow) return [stockColumn, changeColumn, netColumn];
+
+    return [
+      stockColumn,
+      {
+        title: "现价",
+        dataIndex: "price",
+        width: 80,
+        align: "right" as const,
+        render: (value: number | null) => (value === null ? "-" : value.toFixed(2)),
+      },
+      changeColumn,
+      {
+        title: "连板标签",
+        dataIndex: "limit_tag",
+        width: 100,
+        align: "center" as const,
+        render: (value: string, stock: MarketSectorStocksHistoryItem) => value ? (
+          <Tag style={{ color: c.up }}>{value}{stock.limit_count > 0 ? ` · ${stock.limit_count}板` : ""}</Tag>
+        ) : "-",
+      },
+      {
+        title: "龙虎榜",
+        dataIndex: "rank_tag",
+        width: 80,
+        align: "center" as const,
+        render: (value: string) => value || "-",
+      },
+      {
+        title: "成交额",
+        dataIndex: "amount",
+        width: 110,
+        align: "right" as const,
+        render: (value: number) => formatAmount(value),
+      },
+      netColumn,
+      {
+        title: "换手率",
+        dataIndex: "turnover_rate",
+        width: 90,
+        align: "right" as const,
+        render: (value: number | null) => formatRate(value),
+      },
+      {
+        title: "近期涨幅",
+        dataIndex: "recent_chg",
+        width: 90,
+        align: "right" as const,
+        render: (value: number | null) => <ChangeValue value={value} />,
+      },
+      {
+        title: "流通市值",
+        dataIndex: "float_amount",
+        width: 120,
+        align: "right" as const,
+        render: (value: number) => formatMarketCap(value),
+      },
+    ];
+  }, [c, isNarrow, t]);
+
+  const renderExpandedRow = useCallback((record: MarketSectorStocksHistoryItem) => (
+    <ResponsiveMetricGrid
+      items={[
+        { key: "price", label: "现价", value: record.price === null ? "-" : record.price.toFixed(2) },
+        { key: "change", label: "涨跌幅", value: <ChangeValue value={record.change_pct} /> },
+        { key: "amount", label: "成交额", value: formatAmount(record.amount) },
+        { key: "main-net", label: "主力净额", value: formatAmount(record.main_net) },
+        { key: "turnover", label: "换手率", value: formatRate(record.turnover_rate) },
+        { key: "float-amount", label: "流通市值", value: formatMarketCap(record.float_amount) },
+        { key: "recent-chg", label: "近期涨幅", value: <ChangeValue value={record.recent_chg} /> },
+        { key: "limit-tag", label: "连板标签", value: record.limit_tag || "-" },
+        { key: "rank-tag", label: "龙虎榜", value: record.rank_tag || "-" },
+        { key: "tags", label: "概念标签", value: record.tags || "-" },
+      ]}
+    />
+  ), []);
 
   return (
-    <span
-      style={{
-        display: "inline-block",
-        width: 28,
-        height: 28,
-        lineHeight: "28px",
-        textAlign: "center",
-        borderRadius: 6,
-        fontWeight: 700,
-        fontSize: 13,
-        color,
-        background: bg,
-      }}
+    <Drawer
+      open={Boolean(sector)}
+      onClose={onClose}
+      size={isNarrow ? "100vw" : "min(860px, 100vw)"}
+      title={`${sector?.name ?? ""} 成分股 · ${dateText}`}
+      destroyOnHidden
     >
-      {rank}
-    </span>
+      <SectionDataState
+        isLoading={query.isLoading && !hasData}
+        error={hasData ? undefined : query.error}
+        onRetry={() => query.refetch()}
+        isEmpty={!query.isLoading && !query.error && !hasData}
+        emptyText={`${dateText} 暂无 ${sector?.name ?? ""} 成分股数据`}
+        errorTitle="成分股加载失败"
+        minHeight={320}
+        skeletonRows={8}
+      >
+        <Table<MarketSectorStocksHistoryItem>
+          rowKey="code"
+          columns={columns}
+          dataSource={items}
+          pagination={{ pageSize: 20, showSizeChanger: false }}
+          expandable={isNarrow ? {
+            expandedRowRender: renderExpandedRow,
+            columnWidth: 36,
+          } : undefined}
+          scroll={{ x: "max-content" }}
+          size="small"
+        />
+      </SectionDataState>
+    </Drawer>
   );
 }
 
 export default function IndustryRankTab() {
   const c = useColors();
+  const t = useTokens();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const { cardStyle } = useStyles();
-  const { data, isLoading, isFetching, error, refetch } = useIndustryRankings();
-  const sectors = data?.sectors ?? [];
+  const today = dayjs().format("YYYY-MM-DD");
+  const [dateParam, setDate] = useUrlSearchParam("industryDate", today, { replace: true });
+  const normalizedDate = normalizeIsoDate(dateParam, today);
+  const dateText = dayjs(normalizedDate).isAfter(dayjs(), "day") ? today : normalizedDate;
+  const selectedDate = dayjs(dateText);
+
+  useEffect(() => {
+    if (dateParam !== dateText) setDate(dateText);
+  }, [dateParam, dateText, setDate]);
+
+  const { data, isLoading, isFetching, error, refetch } = useIndustryRankings(dateText);
+  const sectors = useMemo(() => data?.sectors ?? [], [data?.sectors]);
   const hasData = sectors.length > 0;
+  const source = data?.source || "未知";
+  const isToday = dateText === today;
+  const isKaipanhongSource = source === "开盘红" && (data?.fund_data_available ?? false);
+  const drillDownDisabled = isToday || !isKaipanhongSource;
+  const drillDownTooltip = isToday
+    ? "历史成分股仅支持查询今天之前的日期"
+    : "当前数据来自降级数据源，仅开盘红数据支持查看成分股";
+  const [drawerSector, setDrawerSector] = useState<DrawerSector | null>(null);
 
   const columns: ColumnsType<IndustryRankItem> = useMemo(() => {
-    if (isNarrow) {
-      return [
-        {
-          title: "板块",
-          key: "sector",
-          width: 180,
-          render: (_: unknown, record: IndustryRankItem) => (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {rankBadge(record.rank, c)}
-              <span style={{ minWidth: 0, color: c.textPrimary, fontWeight: 600 }}>{record.name}</span>
-            </div>
-          ),
-        },
-        {
-          title: "涨跌幅",
-          dataIndex: "change_pct",
-          width: 88,
-          align: "right",
-          sorter: (left, right) => (left.change_pct ?? 0) - (right.change_pct ?? 0),
-          defaultSortOrder: "descend",
-          render: (value: number | null) => <ChangeValue value={value} fontWeight={500} />,
-        },
-      ];
-    }
-
-    return [
-    { title: "排名", dataIndex: "rank", width: 60, align: "center", render: (rank: number) => rankBadge(rank, c) },
-    { title: "板块名称", dataIndex: "name", width: 140, ellipsis: true },
-    {
+    const stocksActionColumn = {
+      title: "成分股",
+      key: "stocks-action",
+      width: isNarrow ? 78 : 90,
+      align: "center" as const,
+      render: (_value: unknown, record: IndustryRankItem) => {
+        if (!record.code) return null;
+        if (drillDownDisabled) {
+          return (
+            <Tooltip title={drillDownTooltip}>
+              <Button type="link" size="small" disabled>
+                成分股
+              </Button>
+            </Tooltip>
+          );
+        }
+        return (
+          <Button
+            type="link"
+            size="small"
+            onClick={() => setDrawerSector({ code: record.code, name: record.name })}
+          >
+            成分股
+          </Button>
+        );
+      },
+    };
+    const industryColumn = {
+      title: "行业",
+      dataIndex: "name",
+      width: isNarrow ? 130 : 140,
+      ellipsis: true,
+      render: (value: string, record: IndustryRankItem) => (
+        <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
+          {isNarrow ? rankBadge(record.rank, c, t) : null}
+          <span style={{ minWidth: 0, color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>
+            {value}
+          </span>
+        </div>
+      ),
+    };
+    const changeColumn = {
       title: "涨跌幅",
       dataIndex: "change_pct",
-      width: 90,
-      align: "right",
-      sorter: (a, b) => (a.change_pct ?? 0) - (b.change_pct ?? 0),
-      defaultSortOrder: "descend",
-      render: (value: number) => <ChangeValue value={value} fontWeight={500} />,
-    },
-    {
-      title: "上涨",
-      dataIndex: "up_count",
-      width: 65,
-      align: "right",
-      render: (value: number | null) => (
-        <span style={{ color: c.up }}>{value ?? "-"}</span>
+      width: isNarrow ? 78 : 90,
+      align: "right" as const,
+      sorter: (left: IndustryRankItem, right: IndustryRankItem) => (
+        (left.change_pct ?? 0) - (right.change_pct ?? 0)
       ),
-    },
-    {
-      title: "下跌",
-      dataIndex: "down_count",
-      width: 65,
-      align: "right",
+      defaultSortOrder: "descend" as const,
       render: (value: number | null) => (
-        <span style={{ color: c.down }}>{value ?? "-"}</span>
+        <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />
       ),
-    },
-    { title: "领涨股", dataIndex: "leader", width: 110, ellipsis: true },
-    {
-      title: "领涨幅",
-      dataIndex: "leader_change",
-      width: 90,
-      align: "right",
-      render: (value: number) => <ChangeValue value={value} fontWeight={400} />,
-    },
+    };
+    const netColumn = {
+      title: "净流入",
+      dataIndex: "net_inflow",
+      width: isNarrow ? 96 : 110,
+      align: "right" as const,
+      sorter: (left: IndustryRankItem, right: IndustryRankItem) => (
+        (left.net_inflow ?? 0) - (right.net_inflow ?? 0)
+      ),
+      render: (value: number | null) => (
+        <span style={{ color: value == null ? c.textSecondary : value >= 0 ? c.up : c.down }}>
+          {formatAmount(value)}
+        </span>
+      ),
+    };
+
+    if (isNarrow) return [industryColumn, changeColumn, netColumn, stocksActionColumn];
+
+    return [
+      {
+        title: "排名",
+        dataIndex: "rank",
+        width: 60,
+        align: "center",
+        render: (rank: number | null) => rankBadge(rank, c, t),
+      },
+      industryColumn,
+      changeColumn,
+      {
+        title: "平均涨幅",
+        dataIndex: "avg_change",
+        width: 90,
+        align: "right",
+        render: (value: number | null) => <ChangeValue value={value} />,
+      },
+      { title: "成交额", dataIndex: "amount", width: 110, align: "right", render: formatAmount },
+      netColumn,
+      {
+        title: "主买",
+        dataIndex: "buy_amount",
+        width: 110,
+        align: "right",
+        render: (value: number | null) => <span style={{ color: c.up }}>{formatAmount(value)}</span>,
+      },
+      {
+        title: "主卖",
+        dataIndex: "sell_amount",
+        width: 110,
+        align: "right",
+        render: (value: number | null) => <span style={{ color: c.down }}>{formatAmount(value)}</span>,
+      },
+      { title: "换手率", dataIndex: "turnover_rate", width: 90, align: "right", render: formatRate },
+      { title: "行业市值", dataIndex: "market_cap", width: 120, align: "right", render: formatMarketCap },
+      stocksActionColumn,
     ];
-  }, [c, isNarrow]);
+  }, [c, isNarrow, drillDownDisabled, drillDownTooltip, t]);
 
   const renderExpandedRow = useCallback((record: IndustryRankItem) => (
     <ResponsiveMetricGrid
       items={[
+        { key: "average", label: "平均涨幅", value: <ChangeValue value={record.avg_change} /> },
+        { key: "amount", label: "成交额", value: formatAmount(record.amount) },
+        { key: "buy", label: "主买金额", value: formatAmount(record.buy_amount) },
+        { key: "sell", label: "主卖金额", value: formatAmount(record.sell_amount) },
+        { key: "turnover", label: "换手率", value: formatRate(record.turnover_rate) },
+        { key: "market-cap", label: "行业市值", value: formatMarketCap(record.market_cap) },
         { key: "up", label: "上涨家数", value: record.up_count ?? "-" },
         { key: "down", label: "下跌家数", value: record.down_count ?? "-" },
         { key: "leader", label: "领涨股", value: record.leader || "-" },
-        { key: "leader-change", label: "领涨幅", value: <ChangeValue value={record.leader_change} fontWeight={400} /> },
       ]}
     />
   ), []);
 
   return (
     <div style={{ ...cardStyle, padding: 0 }}>
-      <div style={{ padding: "12px 16px", borderBottom: `1px solid ${c.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+      <div
+        style={{
+          padding: `${t.space[3]} ${t.space[4]}`,
+          borderBottom: `1px solid ${c.border}`,
+          display: "flex",
+          alignItems: "center",
+          gap: t.space[2],
+          flexWrap: "wrap",
+        }}
+      >
         <AppstoreOutlined style={{ color: c.primary }} />
-        <span style={{ color: c.textPrimary, fontWeight: 500 }}>行业板块涨跌幅排名</span>
-        <Tag color="blue" style={{ marginLeft: 4 }}>百度</Tag>
-        <span style={{ marginLeft: "auto" }}>
-          <DataRefreshIndicator active={isFetching && !isLoading} />
+        <span style={{ color: c.textPrimary, fontWeight: Number(t.weight.medium) }}>
+          行业资金与涨跌排行
         </span>
+        <Tag>{source}</Tag>
+        {!data?.fund_data_available ? <Tag color="warning">资金数据降级</Tag> : null}
+        <span style={{ color: c.textSecondary, fontSize: t.font.sm }}>
+          数据日期：{data?.date || dateText}
+        </span>
+        <Space wrap style={{ marginLeft: "auto" }}>
+          <DatePicker
+            aria-label="行业排行日期"
+            value={selectedDate}
+            allowClear={false}
+            disabledDate={(current) => current.isAfter(dayjs(), "day")}
+            onChange={(value) => value && setDate(value.format("YYYY-MM-DD"))}
+          />
+          <DataRefreshIndicator active={isFetching && !isLoading} />
+        </Space>
       </div>
       <SectionDataState
         isLoading={isLoading && !hasData}
         error={hasData ? undefined : error}
         onRetry={() => refetch()}
         isEmpty={!isLoading && !error && !hasData}
-        emptyText="暂无行业排名数据"
+        emptyText={`${dateText} 暂无行业排名数据`}
         errorTitle="行业排名加载失败"
         minHeight={320}
       >
@@ -157,13 +397,18 @@ export default function IndustryRankTab() {
           pagination={false}
           expandable={isNarrow ? {
             expandedRowRender: renderExpandedRow,
-            columnWidth: 38,
+            columnWidth: 36,
           } : undefined}
-          scroll={{ y: 600 }}
+          scroll={{ x: isNarrow ? undefined : "max-content", y: 600 }}
           size="small"
           style={{ background: "transparent" }}
         />
       </SectionDataState>
+      <SectorStocksDrawer
+        sector={drawerSector}
+        dateText={dateText}
+        onClose={() => setDrawerSector(null)}
+      />
     </div>
   );
 }

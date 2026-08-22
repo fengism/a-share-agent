@@ -8,7 +8,7 @@ import type { BotAdminJob, BotAdminJobsResponse, ConfigData, ConfigUpdate } from
 export function useConfig() {
   return useQuery({
     queryKey: queryKeys.settings.config,
-    queryFn: ({ signal }) => apiGet<ConfigData>("/config", undefined, { signal }),
+    queryFn: () => apiGet<ConfigData>("/config"),
     staleTime: 30 * 1000,
   });
 }
@@ -24,10 +24,9 @@ export function useUpdateConfig() {
 export function useBotJobs(enabled: boolean) {
   return useQuery<BotAdminJobsResponse>({
     queryKey: queryKeys.settings.failedBotJobs,
-    queryFn: ({ signal }) => apiGet<BotAdminJobsResponse>(
+    queryFn: () => apiGet<BotAdminJobsResponse>(
       "/bot/jobs",
       { status: "failed", limit: 50 },
-      { signal },
     ),
     enabled,
     staleTime: 10 * 1000,
@@ -43,7 +42,7 @@ export function useRetryBotJob() {
 export function useInvites(enabled: boolean) {
   return useQuery<InviteItem[]>({
     queryKey: queryKeys.settings.invites,
-    queryFn: ({ signal }) => listInvitesApi(signal),
+    queryFn: () => listInvitesApi(),
     enabled,
     staleTime: 30 * 1000,
   });

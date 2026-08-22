@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Alert, Card } from "antd";
 import { useAnalysisStore } from "../../store/analysisStore";
-import { useColors, useStyles } from "../../theme/hooks";
+import { useColors, useStyles, useTokens } from "../../theme/hooks";
 import type { AnalysisResult } from "../../types/stock";
 import AIConclusion from "./AIConclusion";
 import AnalysisProgressSteps from "./AnalysisProgressSteps";
@@ -21,29 +21,20 @@ export default memo(function AnalysisStateSection({
   const stages = useAnalysisStore((state) => state.analysisStages);
   const currentStageIndex = useAnalysisStore((state) => state.currentStageIndex);
   const colors = useColors();
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const t = useTokens();
+  const { cardStyle } = useStyles();
 
   return (
     <>
-      {isAnalyzing && (
-        <Card size="small" style={{ ...cardStyle, marginBottom: 16 }} styles={{ body: sectionCardBodyStyle }}>
-          <AnalysisProgressSteps stages={stages} currentStageIndex={currentStageIndex} />
-        </Card>
+      {(isAnalyzing || error) && stages.length > 0 && (
+        <AnalysisProgressSteps
+          stages={stages}
+          currentStageIndex={currentStageIndex}
+          status={error ? "error" : "running"}
+        />
       )}
       {(result || isAnalyzing) && (
-        <div
-          className="pdf-avoid-break"
-          style={{
-            marginBottom: 12,
-            borderLeft: "4px solid transparent",
-            borderImage: `linear-gradient(180deg, ${colors.primary}, ${colors.accent}) 1`,
-            background: colors.nestedBg,
-            borderRadius: 8,
-            padding: 4,
-          }}
-        >
-          {result ? <AIConclusion result={result} /> : <SkeletonAIConclusion />}
-        </div>
+        result ? <AIConclusion result={result} /> : <SkeletonAIConclusion />
       )}
       {error && !isAnalyzing && (
         <Alert
@@ -51,28 +42,28 @@ export default memo(function AnalysisStateSection({
           type="error"
           showIcon
           closable
-          style={{ marginBottom: 16, borderRadius: 8 }}
+          style={{ marginBottom: t.space[4], borderRadius: t.radius.md }}
         />
       )}
       {result?.technical && (
         <Card
           size="small"
           className="pdf-avoid-break"
-          style={{ ...cardStyle, marginBottom: 12, borderTop: `3px solid ${colors.primary}`, boxShadow: "0 1px 2px rgba(0,0,0,0.18)" }}
-          styles={{ body: { padding: "12px 16px" } }}
+          style={{ ...cardStyle, marginBottom: t.space[3], borderTop: `3px solid ${colors.primary}`, boxShadow: t.shadow.xs }}
+          styles={{ body: { padding: `${t.space[3]} ${t.space[4]}` } }}
         >
-          <div className="metric-grid cols-3v" style={{ gap: 12 }}>
-            <div style={{ padding: "10px 12px", background: colors.elevatedBg, border: `1px solid ${colors.border}`, borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }}>技术结论</div>
-              <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.8 }}>{result.technical.summary}</div>
+          <div className="metric-grid cols-3v" style={{ gap: t.space[3] }}>
+            <div style={{ padding: `${t.space[2]} ${t.space[3]}`, background: colors.hoverBg, border: `1px solid ${colors.border}`, borderRadius: t.radius.md }}>
+              <div style={{ fontSize: t.font.sm, color: colors.textSecondary, marginBottom: t.space[2] }}>技术结论</div>
+              <div style={{ fontSize: t.font.md, color: colors.textSecondary, lineHeight: t.leading.relaxed }}>{result.technical.summary}</div>
             </div>
-            <div style={{ padding: "10px 12px", background: colors.elevatedBg, border: `1px solid ${colors.border}`, borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }}>趋势判断</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: colors.textPrimary }}>{result.technical.trend || "-"}</div>
+            <div style={{ padding: `${t.space[2]} ${t.space[3]}`, background: colors.hoverBg, border: `1px solid ${colors.border}`, borderRadius: t.radius.md }}>
+              <div style={{ fontSize: t.font.sm, color: colors.textSecondary, marginBottom: t.space[2] }}>趋势判断</div>
+              <div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.bold), color: colors.textPrimary }}>{result.technical.trend || "-"}</div>
             </div>
-            <div style={{ padding: "10px 12px", background: colors.elevatedBg, border: `1px solid ${colors.border}`, borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }}>关键位</div>
-              <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.8 }}>
+            <div style={{ padding: `${t.space[2]} ${t.space[3]}`, background: colors.hoverBg, border: `1px solid ${colors.border}`, borderRadius: t.radius.md }}>
+              <div style={{ fontSize: t.font.sm, color: colors.textSecondary, marginBottom: t.space[2] }}>关键位</div>
+              <div style={{ fontSize: t.font.md, color: colors.textSecondary, lineHeight: t.leading.relaxed }}>
                 支撑 {result.technical.support_level?.toFixed(2) ?? "-"} / 压力 {result.technical.resistance_level?.toFixed(2) ?? "-"}
               </div>
             </div>

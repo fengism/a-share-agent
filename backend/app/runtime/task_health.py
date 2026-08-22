@@ -23,6 +23,10 @@ def new_task_health() -> dict:
         "last_duration_ms": None,
         "role": "local",
         "unexpected_exit": False,
+        "restart_count": 0,
+        "consecutive_restarts": 0,
+        "last_restart_at": None,
+        "last_restart_error": None,
     }
 
 
@@ -82,6 +86,10 @@ def task_snapshot() -> dict[str, dict]:
             "last_duration_ms": info.get("last_duration_ms"),
             "role": info.get("role", "local"),
             "unexpected_exit": bool(info.get("unexpected_exit", False)),
+            "restart_count": info.get("restart_count", 0),
+            "consecutive_restarts": info.get("consecutive_restarts", 0),
+            "last_restart_at": info.get("last_restart_at"),
+            "last_restart_error": info.get("last_restart_error"),
         }
         for name, info in background_task_health.items()
     }

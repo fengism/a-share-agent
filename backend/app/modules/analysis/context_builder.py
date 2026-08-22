@@ -120,6 +120,7 @@ def build_analysis_prompt_context(data: AnalysisDataBundle, indicators: dict, an
                 if financial_metrics is not None
                 else {}
             ),
+            "交易所行业": basic_info.exchange_industry,
             "一级行业": basic_info.first_industry.name if basic_info.first_industry else None,
             "二级行业": basic_info.second_industry.name if basic_info.second_industry else None,
             "机构一致预期": _format_institution_forecasts(valuation.institution_forecasts) if valuation else None,

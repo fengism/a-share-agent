@@ -3,7 +3,6 @@
 import logging
 
 import pandas as pd
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.dataframes import normalize_intraday_df, rename_columns
 from app.core.market import normalize_code
@@ -11,9 +10,9 @@ from app.infrastructure.providers.akshare.loader import ak
 from app.infrastructure.providers.sina.quotes import get_last_trade_date
 
 logger = logging.getLogger(__name__)
+_HISTORICAL_REQUEST_TIMEOUT_SECONDS = 10.0
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
 def fetch_stock_kline(
     code: str,
     period: str,
@@ -27,10 +26,10 @@ def fetch_stock_kline(
         start_date=start_date,
         end_date=end_date,
         adjust=adjust,
+        timeout=_HISTORICAL_REQUEST_TIMEOUT_SECONDS,
     )
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
 def fetch_stock_kline_sina(
     code: str,
     start_date: str,
@@ -117,33 +116,17 @@ def fetch_stock_intraday_minute(
     return normalize_intraday_df(frame)
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
-def fetch_stock_basic_info(code: str) -> dict:
-    frame = ak.stock_individual_info_em(symbol=code)
-    if frame.empty:
-        return {}
-    return dict(zip(frame["item"], frame["value"]))
-
-
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
 def fetch_stock_names_sh() -> pd.DataFrame:
     return ak.stock_info_sh_name_code()
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
 def fetch_stock_names_sz() -> pd.DataFrame:
     return ak.stock_info_sz_name_code()
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
 def fetch_stock_names_bj() -> pd.DataFrame:
     return ak.stock_info_bj_name_code()
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=4),
-    reraise=True,
-)
 def fetch_stock_spot_snapshot() -> pd.DataFrame:
     return ak.stock_zh_a_spot_em()

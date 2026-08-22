@@ -3,10 +3,10 @@ import threading
 from datetime import datetime
 
 import pandas as pd
+from mootdx.consts import MARKET_SH, MARKET_SZ
 from mootdx.quotes import Quotes
-from tenacity import retry, stop_after_attempt, wait_exponential
 
-from app.core.market import normalize_code, normalize_index_code
+from app.core.market import normalize_code, normalize_index_code, normalize_index_symbol
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,6 @@ class TdxDataProvider:
             result[category] = self.client.F10(symbol=sym.raw, name=category) or ""
         return result
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
     def fetch_stock_kline(self, code: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:
         """通过通达信本地接口获取个股 K 线并衍生昨收与涨跌幅。
 
@@ -74,7 +73,6 @@ class TdxDataProvider:
         raw_df = self.client.bars(symbol=sym.raw, frequency=self.DAILY_FREQUENCY, offset=offset)
         return self._format_kline_df(raw_df, start_date=start_date, end_date=end_date)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
     def fetch_index_kline(self, symbol: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:
         """通过通达信本地接口获取指数 K 线并衍生昨收与涨跌幅。
 
@@ -85,9 +83,15 @@ class TdxDataProvider:
         Return:
             包含 date、OHLCV、amount、pre_close、change_pct 的 DataFrame
         """
-        raw_symbol = self._normalize_index_symbol(symbol)
+        raw_symbol, market = self._normalize_index_request(symbol)
         offset = self._calculate_offset(start_date, end_date)
-        raw_df = self.client.index(symbol=raw_symbol, frequency=self.DAILY_FREQUENCY, start=0, offset=offset)
+        raw_df = self.client.index(
+            symbol=raw_symbol,
+            market=market,
+            frequency=self.DAILY_FREQUENCY,
+            start=0,
+            offset=offset,
+        )
         return self._format_kline_df(raw_df, start_date=start_date, end_date=end_date, volume_multiplier=100)
 
     def _calculate_offset(self, start_date: str = "", end_date: str = "") -> int:
@@ -109,12 +113,14 @@ class TdxDataProvider:
         return datetime.strptime(normalized, "%Y%m%d")
 
     @staticmethod
-    def _normalize_index_symbol(symbol: str) -> str:
-        """归一化 TDX 指数代码，避免把 000001 误判成深市股票代码。"""
-        raw_symbol = normalize_index_code(symbol.strip().lower())
+    def _normalize_index_request(symbol: str) -> tuple[str, int]:
+        """归一化 TDX 指数代码，并解析 mootdx 所需的沪深市场编号。"""
+        normalized_symbol = normalize_index_symbol(symbol.strip().lower())
+        raw_symbol = normalize_index_code(normalized_symbol)
         if not raw_symbol.isdigit() or len(raw_symbol) != 6:
             raise ValueError(f"无效指数代码: {symbol}，需要6位数字")
-        return raw_symbol
+        market = MARKET_SH if normalized_symbol.startswith("sh") else MARKET_SZ
+        return raw_symbol, market
 
     def _format_kline_df(
         self,

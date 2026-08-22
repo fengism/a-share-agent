@@ -1,0 +1,62 @@
+api_version: quant.strategy/v1
+key: macd_cross
+version: 1.0.0
+enabled: true
+name: MACD 金叉死叉
+description: DIF 上穿 DEA 时入场，下穿时退出，用于识别中期趋势变化。
+scenario: 中长线趋势
+risk_level: medium
+presentation:
+  icon: fund
+parameters:
+  fast_period:
+    type: integer
+    label: 快速 EMA
+    default: 12
+    minimum: 2
+    maximum: 120
+  slow_period:
+    type: integer
+    label: 慢速 EMA
+    default: 26
+    minimum: 3
+    maximum: 250
+  signal_period:
+    type: integer
+    label: 信号周期
+    default: 9
+    minimum: 2
+    maximum: 120
+constraints:
+  - operator: less_than
+    left: $fast_period
+    right: $slow_period
+    message: 快速 EMA 周期必须小于慢速 EMA 周期
+indicators:
+  fast_ema:
+    operator: ema
+    input: close
+    period: $fast_period
+  slow_ema:
+    operator: ema
+    input: close
+    period: $slow_period
+  dif:
+    operator: subtract
+    left: fast_ema
+    right: slow_ema
+  dea:
+    operator: ema
+    input: dif
+    period: $signal_period
+signals:
+  entry:
+    operator: cross_above
+    left: dif
+    right: dea
+  exit:
+    operator: cross_below
+    left: dif
+    right: dea
+position:
+  mode: binary

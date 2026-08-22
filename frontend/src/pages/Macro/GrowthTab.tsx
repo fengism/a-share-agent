@@ -32,6 +32,7 @@ export default function GrowthTab() {
             title="GDP 国内生产总值（季度）"
             latest={gdp?.latest ?? null}
             trend={gdp?.trend ?? []}
+            metadata={gdp}
             fields={GDP_FIELDS(c)}
           />
         </Col>

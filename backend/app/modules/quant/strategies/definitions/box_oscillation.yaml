@@ -1,0 +1,38 @@
+api_version: quant.strategy/v1
+key: box_oscillation
+version: 1.0.0
+enabled: true
+name: 箱体震荡
+description: 价格接近有效箱体下沿时入场，接近上沿或有效跌破下沿时退出。
+scenario: 横盘震荡
+risk_level: medium
+presentation: { icon: radar-chart }
+parameters:
+  lookback_period: { type: integer, label: 箱体周期, default: 60, minimum: 20, maximum: 250 }
+  edge_ratio: { type: number, label: 边界距离, default: 0.05, minimum: 0.01, maximum: 0.15, step: 0.01 }
+  minimum_width: { type: number, label: 最小箱体宽度, default: 0.05, minimum: 0.02, maximum: 0.5, step: 0.01 }
+  stop_ratio: { type: number, label: 跌破止损比例, default: 0.03, minimum: 0.01, maximum: 0.15, step: 0.01 }
+indicators:
+  upper: { operator: rolling_max, input: high, period: $lookback_period }
+  lower: { operator: rolling_min, input: low, period: $lookback_period }
+  width_value: { operator: subtract, left: upper, right: lower }
+  width_ratio: { operator: divide, left: width_value, right: lower, zero_value: 0 }
+  buy_factor: { operator: add, left: 1, right: $edge_ratio }
+  buy_level: { operator: multiply, left: lower, right: buy_factor }
+  sell_factor: { operator: subtract, left: 1, right: $edge_ratio }
+  sell_level: { operator: multiply, left: upper, right: sell_factor }
+  stop_factor: { operator: subtract, left: 1, right: $stop_ratio }
+  stop_level: { operator: multiply, left: lower, right: stop_factor }
+signals:
+  entry:
+    operator: and
+    operands:
+      - { operator: greater_or_equal, left: width_ratio, right: $minimum_width }
+      - { operator: less_or_equal, left: close, right: buy_level }
+      - { operator: greater_or_equal, left: close, right: lower }
+  exit:
+    operator: or
+    operands:
+      - { operator: greater_or_equal, left: close, right: sell_level }
+      - { operator: less_than, left: close, right: stop_level }
+position: { mode: binary }

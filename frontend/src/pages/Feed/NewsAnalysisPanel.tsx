@@ -4,7 +4,7 @@ import { useNewsAnalysis } from "../../api/queries";
 import QueryErrorState from "../../components/QueryErrorState";
 import { useColors } from "../../styles/ui";
 import type { NewsAnalysisItem, NewsAnalysisRef } from "../../types/stock";
-import { getSentimentConfig } from "./feedHelpers";
+import { getSentimentConfig } from "../../features/feed/feedHelpers";
 
 function SummaryItem({ item, index }: { item: NewsAnalysisItem; index: number }) {
   const colors = useColors();

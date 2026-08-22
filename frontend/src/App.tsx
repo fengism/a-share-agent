@@ -1,40 +1,43 @@
 import { lazy, Suspense, useEffect, useLayoutEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ConfigProvider, Spin, theme } from "antd";
+import { ConfigProvider, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
-import { useThemeStore, getAntToken } from "./styles/ui";
+import { useThemeStore, getAntToken, tokensToCssVars } from "./styles/ui";
 import { themes } from "./theme/themes";
 import "./styles/base.css";
 import "./styles/markdown.css";
 import "./styles/analysis-export.css";
 import RequireAuth from "./components/RequireAuth";
 import ErrorBoundary from "./components/ErrorBoundary";
+import RouteLoadingFallback from "./components/RouteLoadingFallback";
 import { useAuthStore } from "./store/authStore";
 import { queryClient } from "./api/queryClient";
+import { pageLoaders, preloadAppRoute } from "./routes/pageLoaders";
+import RoutePreloadProvider from "./routes/RoutePreloadProvider";
 
 // ── 路由级代码分割 ──
-const AppLayout = lazy(() => import("./components/AppLayout"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Market = lazy(() => import("./pages/Market"));
-const Screener = lazy(() => import("./pages/Screener"));
-const Analysis = lazy(() => import("./pages/Analysis"));
-const AnalysisEntry = lazy(() => import("./pages/Analysis/Entry"));
-const DailyReviewPage = lazy(() => import("./pages/DailyReview"));
-const Chat = lazy(() => import("./pages/Chat"));
-const Settings = lazy(() => import("./pages/Settings"));
-const Feed = lazy(() => import("./pages/Feed"));
-const Twitter = lazy(() => import("./pages/Twitter"));
-const IndustryChain = lazy(() => import("./pages/IndustryChain"));
-const Compare = lazy(() => import("./pages/Compare"));
-const Macro = lazy(() => import("./pages/Macro"));
-const Portfolio = lazy(() => import("./pages/Portfolio"));
-const Quant = lazy(() => import("./pages/Quant"));
-const Capabilities = lazy(() => import("./pages/Capabilities"));
-const Login = lazy(() => import("./pages/Login"));
-const Register = lazy(() => import("./pages/Register"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const ForceChangePassword = lazy(() => import("./pages/ForceChangePassword"));
+const AppLayout = lazy(pageLoaders.appLayout);
+const Dashboard = lazy(pageLoaders.dashboard);
+const Market = lazy(pageLoaders.market);
+const Screener = lazy(pageLoaders.screener);
+const Analysis = lazy(pageLoaders.analysis);
+const AnalysisEntry = lazy(pageLoaders.analysisEntry);
+const DailyReviewPage = lazy(pageLoaders.dailyReview);
+const Chat = lazy(pageLoaders.chat);
+const Settings = lazy(pageLoaders.settings);
+const Feed = lazy(pageLoaders.feed);
+const Twitter = lazy(pageLoaders.twitter);
+const IndustryChain = lazy(pageLoaders.industryChain);
+const Compare = lazy(pageLoaders.compare);
+const Macro = lazy(pageLoaders.macro);
+const Portfolio = lazy(pageLoaders.portfolio);
+const Quant = lazy(pageLoaders.quant);
+const Capabilities = lazy(pageLoaders.capabilities);
+const Login = lazy(pageLoaders.login);
+const Register = lazy(pageLoaders.register);
+const ResetPassword = lazy(pageLoaders.resetPassword);
+const ForceChangePassword = lazy(pageLoaders.forceChangePassword);
 
 function AntProvider({ children }: { children: React.ReactNode }) {
   const themeKey = useThemeStore((s) => s.themeKey);
@@ -67,10 +70,13 @@ function AntProvider({ children }: { children: React.ReactNode }) {
       "--c-auth-background": cc.authBackground,
       "--c-auth-hero-gradient": cc.authHeroGradient,
       "--c-card-shadow": cc.cardShadow,
+      "--c-hover-bg": cc.hoverBg,
+      "--c-active-bg": cc.activeBg,
       "--c-primary-soft": `${cc.primary}14`,
       "--c-primary-2": `${cc.primary}26`,
       "--c-primary-3": `${cc.primary}4d`,
       "--c-muted-soft": `${cc.textMuted}14`,
+      ...tokensToCssVars(meta),
     };
     for (const k in vars) root.style.setProperty(k, vars[k]);
   }, [themeKey, meta]);
@@ -83,6 +89,7 @@ function AntProvider({ children }: { children: React.ReactNode }) {
         token: {
           ...token,
           borderRadius: 8,
+          fontSize: 14,
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Helvetica Neue", Arial, sans-serif',
         },
@@ -93,8 +100,32 @@ function AntProvider({ children }: { children: React.ReactNode }) {
             headerBg: meta.colors.nestedBg,
             headerColor: meta.colors.textSecondary,
             borderColor: meta.colors.border,
-            rowHoverBg: meta.colors.elevatedBg,
+            rowHoverBg: meta.colors.hoverBg,
             headerSplitColor: "transparent",
+          },
+          // Keep antd Card elevation aligned with the design-token shadow so
+          // Cards, `.u-card` and inline cardStyle share one shadow scale.
+          Card: {
+            boxShadowTertiary: meta.tokens.shadow.xs,
+          },
+          // On-brand Tab nav: muted inactive labels, brand-primary active text
+          // and ink bar, plus a slightly more breathable gutter/padding so
+          // icon+label tabs (e.g. Market's 7 tabs) don't feel cramped.
+          Tabs: {
+            itemColor: meta.colors.textSecondary,
+            itemHoverColor: meta.colors.textPrimary,
+            itemSelectedColor: meta.colors.primary,
+            inkBarColor: meta.colors.primary,
+            horizontalItemGutter: 16,
+            horizontalItemPadding: "8px 4px",
+            titleFontSize: 14,
+          },
+          // Borderless tags read as quiet inline labels (e.g. "每 60 秒刷新")
+          // instead of light-filled chips — the dark-theme background stays the
+          // card color, with only a hairline border + secondary text.
+          Tag: {
+            defaultBg: "transparent",
+            defaultColor: meta.colors.textSecondary,
           },
         },
       }}
@@ -103,12 +134,6 @@ function AntProvider({ children }: { children: React.ReactNode }) {
     </ConfigProvider>
   );
 }
-
-const PageFallback = (
-  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
-    <Spin size="large" tip="加载中..." />
-  </div>
-);
 
 export default function App() {
   // Validate the HttpOnly cookie session once before protected routes render.
@@ -120,9 +145,10 @@ export default function App() {
     <AntProvider>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <ErrorBoundary>
-            <Suspense fallback={PageFallback}>
-              <Routes>
+          <RoutePreloadProvider preload={preloadAppRoute}>
+            <ErrorBoundary>
+              <Suspense fallback={<RouteLoadingFallback />}>
+                <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
@@ -148,9 +174,10 @@ export default function App() {
                   <Route path="/analysis/:code" element={<ErrorBoundary><Analysis /></ErrorBoundary>} />
                 </Route>
                 </Route>
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
+          </RoutePreloadProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </AntProvider>

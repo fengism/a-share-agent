@@ -1,7 +1,7 @@
 """Agentic 子系统对业务模块开放的稳定入口。"""
 
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 
 from app.agentic.adapters.research import AgentExecutorResearchRuntime
 from app.agentic.contracts import (
@@ -11,6 +11,7 @@ from app.agentic.contracts import (
     AgentResearchSpec,
     AgentRoundResult,
     EvidenceRequirement,
+    agent_evidence_id,
 )
 from app.agentic.events import AgentEvent
 from app.agentic.research import (
@@ -30,13 +31,13 @@ async def run_agentic_research(
     runtime: AgentResearchRuntime | None = None,
     event_callback: Callable[[AgentEvent], Awaitable[None]] | None = None,
 ) -> AgenticResearchResult:
-    return await _run_agentic_research(
+    return cast(AgenticResearchResult, await _run_agentic_research(
         spec,
         message,
         runtime=runtime or _DEFAULT_RUNTIME,
         settings=settings,
         event_callback=event_callback,
-    )
+    ))
 
 
 __all__ = [
@@ -50,4 +51,5 @@ __all__ = [
     "EvidenceRequirement",
     "execute_web_search",
     "run_agentic_research",
+    "agent_evidence_id",
 ]

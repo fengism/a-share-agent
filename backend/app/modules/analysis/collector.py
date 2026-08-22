@@ -5,9 +5,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from app.market_data.market.public import get_indices
-from app.market_data.stock.public import (
-    compute_percentile,
+from app.financial_data.market.public import get_indices
+from app.financial_data.stock.public import (
     get_basic_info,
     get_financial_metrics,
     get_kline,
@@ -73,7 +72,7 @@ async def collect_analysis_data(code: str, start_date: str) -> AnalysisDataBundl
         analysis_sources.basic_info(code),
         analysis_sources.kline(code, period="daily", start_date=start_date),
         analysis_sources.financial_metrics(code),
-        analysis_sources.valuation_detail(code, compute_percentile),
+        analysis_sources.valuation_detail(code),
         analysis_sources.stock_news(code),
         analysis_sources.stock_sentiment(code),
         analysis_sources.retail_sentiment(code),

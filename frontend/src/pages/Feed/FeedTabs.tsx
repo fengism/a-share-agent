@@ -5,8 +5,8 @@ import { useMarketKuaixun, useMarketOtherNews } from "../../api/queries";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useColors } from "../../styles/ui";
 import type { FeedNewsItem } from "../../types/stock";
-import { getSourcePlatform } from "./feedHelpers";
-import PaginatedList from "./PaginatedList";
+import { getSourcePlatform } from "../../features/feed/feedHelpers";
+import PaginatedList from "../../features/feed/PaginatedList";
 
 const { Text } = Typography;
 const KUAIXUN_PAGE_SIZE = 30;

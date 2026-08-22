@@ -1,0 +1,43 @@
+api_version: quant.strategy/v1
+key: volume_price
+version: 1.0.0
+enabled: true
+name: 量价配合
+description: 放量阳线时入场，缩量阴线时退出，观察价格和成交量共振。
+scenario: 放量突破
+risk_level: high
+presentation:
+  icon: bar-chart
+parameters:
+  volume_period:
+    type: integer
+    label: 成交量均线周期
+    default: 5
+    minimum: 2
+    maximum: 120
+indicators:
+  volume_average:
+    operator: sma
+    input: volume
+    period: $volume_period
+signals:
+  entry:
+    operator: and
+    operands:
+      - operator: greater_than
+        left: close
+        right: open
+      - operator: greater_than
+        left: volume
+        right: volume_average
+  exit:
+    operator: and
+    operands:
+      - operator: less_than
+        left: close
+        right: open
+      - operator: less_than
+        left: volume
+        right: volume_average
+position:
+  mode: binary

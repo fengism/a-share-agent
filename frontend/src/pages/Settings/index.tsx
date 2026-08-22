@@ -1,49 +1,38 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { RobotOutlined } from "@ant-design/icons";
-import { Col, message, Row, Tag } from "antd";
+import { message, Tag } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  useChatCapabilities,
-  useChatCapabilityAvailability,
-  useConfig,
-} from "../../api/queries";
+import { useConfig } from "../../api/queries";
 import { queryKeys } from "../../api/queryKeys";
-import AdminResetCard from "../../components/AdminResetCard";
 import ChangePasswordCard from "../../components/ChangePasswordCard";
+import ResponsiveSectionNav from "../../components/ResponsiveSectionNav";
 import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors, useStyles, semanticTagStyle } from "../../styles/ui";
 import type { ConfigUpdate, ProviderDefault } from "../../types/settings";
-import {
-  BotConfigCard,
-  DataSourceCookiesCard,
-  FeishuConfigCard,
-  IwencaiConfigCard,
-  LlmConfigCard,
-  NotionConfigCard,
-  ProviderDefaultsCard,
-  TwitterConfigCard,
-} from "./ConfigCards";
-import BotJobManagerCard from "./BotJobManagerCard";
-import InviteManagerCard from "./InviteManagerCard";
-import SkillAgentConfigCard from "./SkillAgentConfigCard";
 import { useConfigSectionSave } from "./useConfigSectionSave";
+
+const AiSettingsSection = lazy(() => import("./PersonalSettingsSections").then((module) => ({
+  default: module.AiSettingsSection,
+})));
+const IntegrationsSettingsSection = lazy(() => import("./PersonalSettingsSections").then((module) => ({
+  default: module.IntegrationsSettingsSection,
+})));
+const DataSourcesSettingsSection = lazy(() => import("./AdminSettingsSections").then((module) => ({
+  default: module.DataSourcesSettingsSection,
+})));
+const AdminSettingsSection = lazy(() => import("./AdminSettingsSections").then((module) => ({
+  default: module.AdminSettingsSection,
+})));
+
+function SettingsSectionFallback() {
+  return <div role="status" aria-live="polite" style={{ minHeight: 240, padding: 24 }}>正在加载配置模块...</div>;
+}
 
 export default function SettingsPage() {
   const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle } = useStyles();
   const colors = useColors();
   const { data: config, isLoading, error, refetch } = useConfig();
-  const {
-    data: chatCapabilities,
-    isLoading: isLoadingChatCapabilities,
-    error: chatCapabilitiesError,
-    refetch: refetchChatCapabilities,
-  } = useChatCapabilities();
-  const {
-    data: chatCapabilityAvailability,
-    isFetching: isCheckingChatCapabilities,
-    refetch: refetchChatCapabilityAvailability,
-  } = useChatCapabilityAvailability();
   const { save: saveConfig, isSaving } = useConfigSectionSave();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
@@ -52,6 +41,7 @@ export default function SettingsPage() {
   const [form, setForm] = useState<ConfigUpdate>({});
   const [initializedUserId, setInitializedUserId] = useState<number | null>(null);
   const [previousProvider, setPreviousProvider] = useState("");
+  const [activeSection, setActiveSection] = useState("account");
 
   useEffect(() => {
     if (!config || !user || initializedUserId === user.id) return;
@@ -79,8 +69,6 @@ export default function SettingsPage() {
       iwencai_enabled: config.iwencai_enabled,
       iwencai_base_url: config.iwencai_base_url,
       iwencai_api_key: config.iwencai_api_key,
-      disabled_chat_skills: config.disabled_chat_skills,
-      disabled_chat_agents: config.disabled_chat_agents,
       twitter_feeds: config.twitter_feeds,
       eastmoney_cookie: config.eastmoney_cookie,
       baidu_cookie: config.baidu_cookie,
@@ -133,6 +121,12 @@ export default function SettingsPage() {
   }, [config, form.llm_base_url, form.llm_model, previousProvider, updateForm]);
 
   const handleSaveLlm = useCallback(() => {
+    const providerName = form.llm_provider || "openai";
+    const selectedDefaults = config?.provider_defaults?.[providerName] as ProviderDefault | undefined;
+    if (selectedDefaults?.api_key_required && !form.llm_api_key?.trim()) {
+      message.error(`${selectedDefaults.label || providerName} 需要填写 API Key`);
+      return;
+    }
     const patch: ConfigUpdate = {
       llm_provider: form.llm_provider,
       llm_api_mode: form.llm_api_mode,
@@ -145,7 +139,7 @@ export default function SettingsPage() {
       patch.llm_api_key = form.llm_api_key;
     }
     saveConfig(patch, "大模型配置已保存");
-  }, [form, saveConfig]);
+  }, [config?.provider_defaults, form, saveConfig]);
 
   const handleSaveFeishu = useCallback(() => {
     const patch: ConfigUpdate = {
@@ -186,24 +180,6 @@ export default function SettingsPage() {
     }
     saveConfig(patch, "问财数据源配置已保存");
   }, [form, saveConfig]);
-
-  const handleSaveChatCapabilities = useCallback(() => {
-    saveConfig(
-      {
-        disabled_chat_skills: form.disabled_chat_skills ?? [],
-        disabled_chat_agents: form.disabled_chat_agents ?? [],
-      },
-      "Skill 与 Agent 配置已保存",
-      () => {
-        void refetchChatCapabilityAvailability();
-      },
-    );
-  }, [
-    form.disabled_chat_agents,
-    form.disabled_chat_skills,
-    refetchChatCapabilityAvailability,
-    saveConfig,
-  ]);
 
   const handleSaveTwitter = useCallback(() => {
     const cleanedFeeds = (form.twitter_feeds ?? []).map((feed) => feed.trim()).filter(Boolean);
@@ -281,11 +257,6 @@ export default function SettingsPage() {
     );
   }
 
-  const cardProps = {
-    form,
-    onChange: updateForm,
-    isSaving,
-  };
   const sectionTitleStyle = {
     margin: "24px 0 12px",
     color: colors.textPrimary,
@@ -306,78 +277,102 @@ export default function SettingsPage() {
           {user && (
             <span style={{ marginLeft: 8, color: colors.textMuted }}>
               当前账号：<strong style={{ color: colors.textSecondary }}>{user.username}</strong>
-              {user.is_admin && <Tag color="gold" style={{ marginLeft: 6 }}>管理员</Tag>}
+              {user.is_admin && <Tag style={{ ...semanticTagStyle("warning"), marginLeft: 6 }}>管理员</Tag>}
             </span>
           )}
         </p>
       </div>
 
-      <section aria-labelledby="account-settings-title">
-        <h3 id="account-settings-title" style={sectionTitleStyle}>账号与安全</h3>
-        <ChangePasswordCard />
-      </section>
-
-      <section aria-labelledby="ai-settings-title">
-        <h3 id="ai-settings-title" style={sectionTitleStyle}>AI 配置</h3>
-        <LlmConfigCard
-          {...cardProps}
-          providerDefaults={config.provider_defaults || {}}
-          onSave={handleSaveLlm}
-          onProviderChange={handleProviderChange}
-        />
-        <SkillAgentConfigCard
-          capabilities={chatCapabilities}
-          availability={chatCapabilityAvailability}
-          disabledSkillNames={form.disabled_chat_skills ?? []}
-          disabledAgentNames={form.disabled_chat_agents ?? []}
-          onChange={updateForm}
-          onSave={handleSaveChatCapabilities}
-          isSaving={isSaving}
-          isLoading={isLoadingChatCapabilities}
-          error={chatCapabilitiesError}
-          onRetry={() => refetchChatCapabilities()}
-          isCheckingAvailability={isCheckingChatCapabilities}
-          onCheckAvailability={() => refetchChatCapabilityAvailability()}
-        />
-        <ProviderDefaultsCard providerDefaults={config.provider_defaults || {}} />
-      </section>
-
-      <section aria-labelledby="integration-settings-title">
-        <h3 id="integration-settings-title" style={sectionTitleStyle}>内容集成</h3>
-        <FeishuConfigCard {...cardProps} onSave={handleSaveFeishu} />
-        <Row gutter={[16, 0]}>
-          <Col xs={24} lg={12}>
-            <NotionConfigCard {...cardProps} onSave={handleSaveNotion} />
-          </Col>
-          <Col xs={24} lg={12}>
-            <IwencaiConfigCard {...cardProps} onSave={handleSaveIwencai} />
-          </Col>
-        </Row>
-      </section>
-
-      {isAdmin && (
-        <section aria-labelledby="data-source-settings-title">
-          <h3 id="data-source-settings-title" style={sectionTitleStyle}>数据源管理</h3>
-          <Row gutter={[16, 0]}>
-            <Col xs={24} lg={12}>
-              <TwitterConfigCard {...cardProps} onSave={handleSaveTwitter} />
-            </Col>
-            <Col xs={24} lg={12}>
-              <DataSourceCookiesCard {...cardProps} onSave={handleSaveDataSourceCookies} />
-            </Col>
-          </Row>
-        </section>
-      )}
-
-      {isAdmin && (
-        <section aria-labelledby="admin-settings-title">
-          <h3 id="admin-settings-title" style={sectionTitleStyle}>管理员工具</h3>
-          <BotConfigCard {...cardProps} onSave={handleSaveBot} />
-          <BotJobManagerCard />
-          <InviteManagerCard />
-          <AdminResetCard />
-        </section>
-      )}
+      <ResponsiveSectionNav
+        items={[
+          {
+            key: "account",
+            label: "账号与安全",
+            group: "个人",
+            children: (
+              <section aria-labelledby="account-settings-title">
+                <h3 id="account-settings-title" style={sectionTitleStyle}>账号与安全</h3>
+                <ChangePasswordCard />
+              </section>
+            ),
+          },
+          {
+            key: "ai",
+            label: "AI 配置",
+            group: "个人",
+            children: (
+              <Suspense fallback={<SettingsSectionFallback />}>
+                <AiSettingsSection
+                  form={form}
+                  onChange={updateForm}
+                  isSaving={isSaving}
+                  sectionTitleStyle={sectionTitleStyle}
+                  providerDefaults={config.provider_defaults || {}}
+                  onSave={handleSaveLlm}
+                  onProviderChange={handleProviderChange}
+                />
+              </Suspense>
+            ),
+          },
+          {
+            key: "integrations",
+            label: "内容集成",
+            group: "个人",
+            children: (
+              <Suspense fallback={<SettingsSectionFallback />}>
+                <IntegrationsSettingsSection
+                  form={form}
+                  onChange={updateForm}
+                  isSaving={isSaving}
+                  sectionTitleStyle={sectionTitleStyle}
+                  onSaveFeishu={handleSaveFeishu}
+                  onSaveNotion={handleSaveNotion}
+                  onSaveIwencai={handleSaveIwencai}
+                />
+              </Suspense>
+            ),
+          },
+          ...(isAdmin ? [
+            {
+              key: "data-sources",
+              label: "数据源管理",
+              group: "管理员",
+              children: (
+                <Suspense fallback={<SettingsSectionFallback />}>
+                  <DataSourcesSettingsSection
+                    form={form}
+                    onChange={updateForm}
+                    isSaving={isSaving}
+                    sectionTitleStyle={sectionTitleStyle}
+                    onSaveTwitter={handleSaveTwitter}
+                    onSaveDataSourceCookies={handleSaveDataSourceCookies}
+                  />
+                </Suspense>
+              ),
+            },
+            {
+              key: "admin",
+              label: "管理员工具",
+              group: "管理员",
+              children: (
+                <Suspense fallback={<SettingsSectionFallback />}>
+                  <AdminSettingsSection
+                    form={form}
+                    onChange={updateForm}
+                    isSaving={isSaving}
+                    sectionTitleStyle={sectionTitleStyle}
+                    onSaveBot={handleSaveBot}
+                  />
+                </Suspense>
+              ),
+            },
+          ] : []),
+        ]}
+        activeKey={activeSection}
+        onChange={setActiveSection}
+        ariaLabel="系统配置分类"
+        desktopMode="rail"
+      />
     </div>
   );
 }

@@ -1,18 +1,19 @@
 import { ReloadOutlined } from "@ant-design/icons";
-import { Alert, Button, Card, Skeleton, Space, Tag, Typography, message } from "antd";
+import { Alert, Button, Card, Skeleton, Space, Typography, message } from "antd";
 import { usePortfolio } from "../../api/queries";
 import DataRefreshIndicator from "../../components/DataRefreshIndicator";
 import QueryErrorState from "../../components/QueryErrorState";
-import { useColors, useStyles } from "../../styles/ui";
-import AddPositionCard from "./AddPositionCard";
+import { useStyles } from "../../styles/ui";
 import PortfolioSummaryCards from "./PortfolioSummaryCards";
 import PortfolioTables from "./PortfolioTables";
+import PortfolioQuoteStatus from "./PortfolioQuoteStatus";
+import PortfolioRiskPanel from "./PortfolioRiskPanel";
+import TransactionEntryCard from "./TransactionEntryCard";
 import { errorMessage, formatTime } from "./portfolioFormatters";
 
-const { Paragraph, Text, Title } = Typography;
+const { Paragraph, Title } = Typography;
 
 export default function PortfolioPage() {
-  const colors = useColors();
   const { cardStyle, pageContainerStyle, pageDescriptionStyle, pageTitleStyle } = useStyles();
   const {
     data,
@@ -41,14 +42,19 @@ export default function PortfolioPage() {
         marginBottom: 20,
       }}>
         <div>
-          <Title level={3} style={pageTitleStyle}>仓位管理</Title>
+          <div className="u-page-title u-page-title--compact">
+            <Title level={3} style={pageTitleStyle}>仓位管理</Title>
+          </div>
           <Paragraph style={{ ...pageDescriptionStyle, marginBottom: 0 }}>
-            记录每笔买入，按实时行情自动计算持仓市值、浮动盈亏与账户汇总。
+            记录买卖交易，按 FIFO 成本自动计算当前持仓、已实现盈亏与综合收益。
           </Paragraph>
         </div>
         <Space wrap>
-          <Tag color="blue">30 秒自动刷新</Tag>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>行情时间：{quotedAt}</Text>
+          <PortfolioQuoteStatus
+            quotedAt={quotedAt}
+            source={data?.quote_source ?? ""}
+            stale={Boolean(data?.quote_stale)}
+          />
           <DataRefreshIndicator active={isFetching && !isLoading} label="刷新行情" />
           <Button
             icon={<ReloadOutlined />}
@@ -60,7 +66,7 @@ export default function PortfolioPage() {
         </Space>
       </div>
 
-      <AddPositionCard />
+      <TransactionEntryCard stocks={data?.stocks ?? []} />
 
       {isError && !data ? (
         <Card style={{ ...cardStyle, marginBottom: 16 }}>
@@ -85,7 +91,13 @@ export default function PortfolioPage() {
       ) : data ? (
         <>
           <PortfolioSummaryCards summary={data.summary} />
-          <PortfolioTables positions={data.positions} stocks={data.stocks} />
+          <PortfolioRiskPanel risk={data.risk} />
+          <PortfolioTables
+            positions={data.positions}
+            stocks={data.stocks}
+            transactions={data.transactions}
+            closedPositions={data.closed_positions}
+          />
         </>
       ) : null}
     </div>

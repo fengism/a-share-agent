@@ -1,5 +1,5 @@
 import { Tag } from "antd";
-import { useColors } from "../styles/ui";
+import { useColors, useTokens } from "../styles/ui";
 
 interface Props {
   signal: string;
@@ -7,26 +7,27 @@ interface Props {
 
 export default function SignalBadge({ signal }: Props) {
   const c = useColors();
+  const t = useTokens();
 
   const SIGNAL_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-    strong_buy: { label: "强烈买入", color: c.up, bg: `${c.up}1a` },
-    buy: { label: "买入", color: "#b65c00", bg: "rgba(182,92,0,0.10)" },
-    hold: { label: "持有", color: c.primary, bg: `${c.primary}1a` },
-    sell: { label: "卖出", color: "#206a5d", bg: "rgba(32,106,93,0.10)" },
-    strong_sell: { label: "强烈卖出", color: c.down, bg: `${c.down}1a` },
+    strong_buy: { label: "重点关注", color: c.success, bg: `${c.success}1a` },
+    buy: { label: "关注", color: c.success, bg: `${c.success}1a` },
+    hold: { label: "观察", color: c.primary, bg: `${c.primary}1a` },
+    sell: { label: "谨慎", color: c.up, bg: `${c.up}1a` },
+    strong_sell: { label: "回避", color: c.up, bg: `${c.up}1a` },
   };
 
-  const config = SIGNAL_CONFIG[signal] || { label: signal, color: c.textSecondary, bg: "rgba(156,163,175,0.12)" };
+  const config = SIGNAL_CONFIG[signal] || { label: signal, color: c.textSecondary, bg: `${c.textSecondary}1f` };
   return (
     <Tag
       style={{
         color: config.color,
         background: config.bg,
         border: `1px solid ${config.color}33`,
-        borderRadius: 16,
-        paddingInline: 12,
-        fontWeight: 600,
-        fontSize: 13,
+        borderRadius: t.radius.lg,
+        paddingInline: t.space[3],
+        fontWeight: Number(t.weight.semibold),
+        fontSize: t.font.md,
       }}
     >
       {config.label}

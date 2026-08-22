@@ -17,6 +17,9 @@ from app.agentic.contracts import (
 )
 from app.agentic.events import AgentEvent
 from app.agentic.research import AgentEventCallback, build_research_system_prompt
+from app.agentic.runtime.context import AgentExecutionContext
+from app.agentic.tools.serialization import has_meaningful_tool_content
+from app.configuration import get_effective_settings
 from app.infrastructure.llm.runtime import borrow_async_openai_chat_runtime
 
 
@@ -29,7 +32,14 @@ def _collect_round_evidence(events: list[AgentEvent]) -> tuple[AgentEvidence, ..
                 delta.tool_call.function.name,
                 delta.tool_call.function.arguments,
             )
-        elif delta.type == "tool_result" and delta.tool_result is not None and not delta.tool_result.is_error:
+        elif (
+            delta.type == "tool_result"
+            and delta.tool_result is not None
+            and (
+                delta.tool_result.is_error
+                or has_meaningful_tool_content(delta.tool_result.content)
+            )
+        ):
             tool_name, arguments = calls.get(
                 delta.tool_result.tool_call_id,
                 (delta.tool_result.name, "{}"),
@@ -39,6 +49,7 @@ def _collect_round_evidence(events: list[AgentEvent]) -> tuple[AgentEvidence, ..
                 tool_name=tool_name,
                 arguments=arguments[:MAX_EVIDENCE_ARGUMENT_LENGTH],
                 content=delta.tool_result.content[:MAX_EVIDENCE_ITEM_LENGTH],
+                is_error=delta.tool_result.is_error,
             ))
     return tuple(evidence)
 
@@ -50,7 +61,7 @@ class _ResearchExecutionCompleted:
 
 @dataclass(frozen=True)
 class _ResearchExecutionFailed:
-    error: BaseException
+    exception: BaseException
 
 
 @dataclass
@@ -60,6 +71,7 @@ class _AgentExecutorResearchSession:
     client: Any
     model: str
     temperature: float
+    execution_context: AgentExecutionContext
 
     async def run(
         self,
@@ -83,6 +95,8 @@ class _AgentExecutorResearchSession:
                     event_queue=event_queue,
                     allowed_tool_names=allowed_tool_names,
                     temperature=self.temperature,
+                    require_tool_evidence=True,
+                    execution_context=self.execution_context,
                 )
                 await event_queue.put(_ResearchExecutionCompleted(result))
             except BaseException as error:
@@ -93,7 +107,7 @@ class _AgentExecutorResearchSession:
             while True:
                 event = await event_queue.get()
                 if isinstance(event, _ResearchExecutionFailed):
-                    raise event.error
+                    raise event.exception
                 if isinstance(event, _ResearchExecutionCompleted):
                     result = event.result
                     break
@@ -119,6 +133,7 @@ class AgentExecutorResearchRuntime:
         settings: Any = None,
     ) -> AsyncIterator[_AgentExecutorResearchSession]:
         register_all_capabilities()
+        effective_settings = settings or get_effective_settings()
         profile = AgentProfile(
             name=spec.name,
             display_name=spec.display_name,
@@ -127,12 +142,14 @@ class AgentExecutorResearchRuntime:
             tool_names=spec.tool_names,
             max_rounds=spec.max_rounds,
         )
-        temperature = getattr(settings, "llm_temperature", 0.1)
-        async with borrow_async_openai_chat_runtime(settings) as runtime:
+        temperature = effective_settings.llm_temperature
+        execution_context = AgentExecutionContext.from_current(effective_settings)
+        async with borrow_async_openai_chat_runtime(effective_settings) as runtime:
             yield _AgentExecutorResearchSession(
                 profile=profile,
                 executor=agent_executor,
                 client=runtime.client,
                 model=runtime.model,
                 temperature=temperature,
+                execution_context=execution_context,
             )

@@ -1,7 +1,9 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
+
+from app.domain.prompting import PromptTrace
 
 
 class IndexSnapshotItem(TypedDict, total=False):
@@ -84,6 +86,10 @@ class MarketBreadthSnapshot(TypedDict, total=False):
     limit_up_stocks: list[dict[str, Any]]
     limit_down_stocks: list[dict[str, Any]]
     stock_pct_distribution: list[dict[str, Any]]
+    partial: bool
+    unavailable_sections: list[str]
+    field_sources: dict[str, str]
+    source_apis: dict[str, str]
 
 
 class MarketVolumeSnapshot(TypedDict, total=False):
@@ -99,7 +105,19 @@ class DailyReviewSection(BaseModel):
     bullets: list[str] = Field(default_factory=list)
 
 
+class DailyReviewSourceStatus(BaseModel):
+    status: Literal["complete", "partial", "unavailable"] = "unavailable"
+    requested_date: str = ""
+    data_date: str = ""
+    provider: str = ""
+    is_realtime: bool = False
+    error: str = ""
+
+
 class DailyReviewDataSnapshot(BaseModel):
+    requested_date: str = ""
+    effective_date: str = ""
+    source_status: dict[str, DailyReviewSourceStatus] = Field(default_factory=dict)
     indices: list[IndexSnapshotItem] = Field(default_factory=list)
     hot_stocks: list[HotRankSnapshotItem] = Field(default_factory=list)
     hot_concepts: list[HotRankSnapshotItem] = Field(default_factory=list)
@@ -114,7 +132,21 @@ class DailyReviewDataSnapshot(BaseModel):
 
 
 class DailyReviewResult(BaseModel):
+    schema_version: int = 3
     date: str
+    requested_date: str = ""
+    effective_date: str = ""
+    session_status: Literal["completed", "adjusted"] = "completed"
+    quality_status: Literal["complete", "degraded"] = "complete"
+    generation_status: Literal["llm", "fallback"] = "fallback"
+    warnings: list[str] = Field(default_factory=list)
+    source_errors: dict[str, str] = Field(default_factory=dict)
+    llm_error: str = ""
+    market_state: Literal["attack", "balanced", "defensive", "unknown"] = "unknown"
+    position_range: str = ""
+    invalid_conditions: list[str] = Field(default_factory=list)
+    data_gaps: list[str] = Field(default_factory=list)
+    prompt_trace: PromptTrace | None = None
     title: str
     generated_at: str
     market_summary: str

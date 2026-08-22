@@ -4,10 +4,10 @@ import time
 
 import feedparser
 
-from app.contracts.search import NewsSearchItem
 from app.core.market import contains_stock_reference
 from app.core.news import parse_timestamp
-from app.infrastructure.http.client import request
+from app.domain.news import NewsSearchItem
+from app.infrastructure.http.client import provider_request as request
 
 logger = logging.getLogger(__name__)
 

@@ -19,7 +19,7 @@ import threading
 from collections.abc import Callable
 from typing import TypeVar, cast
 
-from app.contracts.auth import UserRecord
+from app.domain.identity import UserRecord
 
 T = TypeVar("T")
 _UNSET = object()

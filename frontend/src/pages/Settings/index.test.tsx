@@ -12,8 +12,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../api/queries", () => ({
   useConfig: () => ({ data: config, isLoading: false, error: null, refetch: vi.fn() }),
   useUpdateConfig: () => ({ mutate: mocks.mutateConfig, isPending: false }),
-  useChatCapabilities: () => ({ data: undefined, isLoading: false, error: null, refetch: vi.fn() }),
-  useChatCapabilityAvailability: () => ({ data: undefined, isFetching: false, refetch: vi.fn() }),
 }));
 
 vi.mock("./ConfigCards", () => ({
@@ -33,7 +31,6 @@ vi.mock("./ConfigCards", () => ({
 
 vi.mock("./BotJobManagerCard", () => ({ default: () => null }));
 vi.mock("./InviteManagerCard", () => ({ default: () => null }));
-vi.mock("./SkillAgentConfigCard", () => ({ default: () => null }));
 vi.mock("../../components/AdminResetCard", () => ({ default: () => null }));
 vi.mock("../../components/ChangePasswordCard", () => ({ default: () => null }));
 
@@ -119,7 +116,10 @@ describe("SettingsPage Bot config", () => {
       </QueryClientProvider>,
     );
 
-    const saveButton = screen.getByRole("button", { name: "保存 Bot 配置" });
+    expect(screen.queryByText("账号能力配置")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存 Bot 配置" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "管理员工具" }));
+    const saveButton = await screen.findByRole("button", { name: "保存 Bot 配置" });
     await waitFor(() => expect(saveButton).toHaveAttribute("data-prefix", "/"));
     fireEvent.click(saveButton);
 

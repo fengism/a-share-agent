@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from typing import Any
 
 from app.agentic.events import AgentEvent
@@ -10,6 +13,90 @@ from app.agentic.public import (
     EvidenceRequirement,
     run_agentic_research,
 )
+from app.domain.industry_chain import (
+    IndustryChainResearchScope,
+    render_industry_chain_scope,
+    resolve_industry_chain_scope,
+)
+
+_HTTP_URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
+_A_SHARE_CODE_PATTERN = re.compile(r"(?<!\d)(?:00|30|60|68|43|83|87|92)\d{4}(?!\d)")
+
+
+def _decoded_content(evidence) -> Any:
+    try:
+        value = json.loads(evidence.content)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return evidence.content
+    if isinstance(value, dict) and value.get("ok") is True and "data" in value:
+        return value["data"]
+    return value
+
+
+def _flatten_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return "\n".join(_flatten_text(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return "\n".join(_flatten_text(item) for item in value)
+    return str(value) if value is not None else ""
+
+
+def _count_urls(value: Any) -> int:
+    return len(set(_HTTP_URL_PATTERN.findall(_flatten_text(value))))
+
+
+def _has_market_context(evidence) -> bool:
+    text = _flatten_text(_decoded_content(evidence)).strip()
+    dimensions = ("市场", "产业", "行业", "上游", "中游", "下游", "产品", "规模", "竞争")
+    return len(text) >= 120 and sum(dimension in text for dimension in dimensions) >= 2
+
+
+def _has_company_records(evidence) -> bool:
+    text = _flatten_text(_decoded_content(evidence))
+    return len(set(_A_SHARE_CODE_PATTERN.findall(text))) >= 2
+
+
+def _has_public_company_records(evidence) -> bool:
+    value = _decoded_content(evidence)
+    records = value if isinstance(value, list) else value.get("items", []) if isinstance(value, dict) else []
+    if not isinstance(records, list):
+        return False
+    name_keys = ("name", "company", "公司", "名称", "股票简称")
+    names = {
+        str(record.get(key)).strip()
+        for record in records
+        if isinstance(record, dict)
+        for key in name_keys
+        if record.get(key)
+    }
+    return len(names) >= 2
+
+
+def _has_public_sources(evidence) -> bool:
+    return _count_urls(_decoded_content(evidence)) >= 2
+
+
+def _body_records(value: Any) -> list[tuple[str, str]]:
+    if isinstance(value, list):
+        return [record for item in value for record in _body_records(item)]
+    if not isinstance(value, dict):
+        return []
+    content = value.get("content")
+    url = str(value.get("url") or "")
+    records = [(url, content)] if isinstance(content, str) else []
+    for key, item in value.items():
+        if key not in {"content", "url"}:
+            records.extend(_body_records(item))
+    return records
+
+
+def _has_web_body(evidence) -> bool:
+    return any(
+        url.startswith(("http://", "https://")) and len(content.strip()) >= 300
+        for url, content in _body_records(_decoded_content(evidence))
+    )
 
 INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
     name="industry-chain-research",
@@ -36,28 +123,31 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
         "web_search",
         "fetch_url",
         "fetch_urls",
-        "get_hot_rank",
     ),
     requirements=(
         EvidenceRequirement(
             "market_boundary",
             "市场与产业边界",
             ("iwencai_query", "web_search"),
+            validator=_has_market_context,
         ),
         EvidenceRequirement(
             "companies",
             "相关公司",
             ("iwencai_select_stock", "iwencai_query"),
+            validator=_has_company_records,
         ),
         EvidenceRequirement(
             "public_sources",
             "研报与公开来源",
             ("iwencai_search", "web_search"),
+            validator=_has_public_sources,
         ),
         EvidenceRequirement(
             "web_content",
             "网页正文证据",
             ("fetch_url", "fetch_urls"),
+            validator=_has_web_body,
         ),
     ),
 )
@@ -67,10 +157,25 @@ async def research_industry_chain(
     name: str,
     settings: Any = None,
     event_callback: Callable[[AgentEvent], Awaitable[None]] | None = None,
+    *,
+    scope: IndustryChainResearchScope | None = None,
 ) -> AgenticResearchResult:
+    resolved_scope = resolve_industry_chain_scope(scope)
+    scope_text = render_industry_chain_scope(resolved_scope)
+    spec = INDUSTRY_CHAIN_RESEARCH_SPEC
+    if resolved_scope.company_scope == "all_public":
+        spec = replace(
+            spec,
+            requirements=tuple(
+                replace(requirement, validator=_has_public_company_records)
+                if requirement.key == "companies"
+                else requirement
+                for requirement in spec.requirements
+            ),
+        )
     return await run_agentic_research(
-        INDUSTRY_CHAIN_RESEARCH_SPEC,
-        f"请对「{name}」开展产业链动态调研，形成可追溯的事实证据和研究摘要。",
+        spec,
+        f"请对「{name}」开展产业链动态调研。{scope_text}。形成可追溯的事实证据和研究摘要。",
         settings=settings,
         event_callback=event_callback,
     )

@@ -1,14 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Card, Col, Row, Segmented, Statistic, Typography } from "antd";
 import { useMarketIndexKline, useMarketIndices } from "../../api/queries";
-import KlineChart from "../../charts/KlineChart";
+import LazyKlineChart from "../../charts/LazyKlineChart";
 import ChangeValue from "../../components/ChangeValue";
+import IndexIntradayCard from "../../components/IndexIntradayCard";
 import SectionDataState from "../../components/SectionDataState";
-import { useColors } from "../../styles/ui";
+import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
+import { useColors, useTokens } from "../../styles/ui";
 import type { ThemeColors } from "../../styles/ui";
 
 const { Text } = Typography;
-const INDEX_CODES = ["000001", "399001", "399006", "000688", "000300", "000905"];
+const INDEX_CODES = ["000001", "399001", "399006", "000688", "000300", "000905"] as const;
+const KLINE_PERIODS = ["daily", "weekly", "monthly"] as const;
 
 function getChangeColor(changePct: number | null, c: ThemeColors) {
   if (changePct == null) return c.textSecondary;
@@ -26,8 +29,13 @@ function formatAmount(value: number | null | undefined) {
 
 export default function AIndexTab() {
   const c = useColors();
-  const [activeSymbol, setActiveSymbol] = useState("000001");
-  const [period, setPeriod] = useState("daily");
+  const t = useTokens();
+  const [activeSymbol, setActiveSymbol] = useUrlSearchParam("index", "000001", {
+    allowedValues: INDEX_CODES,
+  });
+  const [period, setPeriod] = useUrlSearchParam("period", "daily", {
+    allowedValues: KLINE_PERIODS,
+  });
   const {
     data: marketData,
     isLoading: indicesLoading,
@@ -45,13 +53,21 @@ export default function AIndexTab() {
     () => INDEX_CODES.map((code) => (marketData?.indices || []).find((item) => item.code === code)).filter((item) => item != null),
     [marketData],
   );
+  const desktopSpan = mainIndices.length > 0 ? Math.max(4, Math.floor(24 / mainIndices.length)) : 4;
   const klineItems = klineData?.items ?? [];
   const hasKlineData = klineItems.length > 0;
   const activeIndex = mainIndices.find((item) => item.code === activeSymbol) || mainIndices[0];
 
+  useEffect(() => {
+    if (indicesLoading || mainIndices.length === 0) return;
+    if (!mainIndices.some((item) => item.code === activeSymbol)) {
+      setActiveSymbol(mainIndices[0].code);
+    }
+  }, [activeSymbol, indicesLoading, mainIndices, setActiveSymbol]);
+
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: t.space[4] }}>
         <SectionDataState
           isLoading={indicesLoading && mainIndices.length === 0}
           error={mainIndices.length > 0 ? undefined : indicesError}
@@ -63,7 +79,7 @@ export default function AIndexTab() {
         >
           <Row gutter={[16, 16]}>
             {mainIndices.map((idx) => (
-              <Col xs={24} sm={12} lg={4} key={idx.code}>
+              <Col xs={12} sm={8} lg={desktopSpan} key={idx.code}>
                 <button
                   type="button"
                   onClick={() => setActiveSymbol(idx.code)}
@@ -80,24 +96,30 @@ export default function AIndexTab() {
                   <Card
                     hoverable
                     style={{
-                      borderRadius: 8,
+                      borderRadius: t.radius.md,
                       border: `1px solid ${idx.code === activeSymbol ? c.primary : c.border}`,
-                      boxShadow: "none",
+                      boxShadow: t.shadow.xs,
                     }}
-                    styles={{ body: { padding: 16 } }}
+                    styles={{ body: { padding: t.space[4] } }}
                   >
                     <Statistic
-                      title={<span style={{ color: c.textSecondary, fontSize: 13 }}>{idx.name}</span>}
+                      title={<span style={{ color: c.textSecondary, fontSize: t.font.md }}>{idx.name}</span>}
                       value={idx.price ?? undefined}
                       precision={2}
-                      valueStyle={{ color: getChangeColor(idx.change_pct, c), fontSize: 24, fontWeight: 700 }}
+                      styles={{
+                        content: {
+                          color: getChangeColor(idx.change_pct, c),
+                          fontSize: t.font["3xl"],
+                          fontWeight: Number(t.weight.bold),
+                        },
+                      }}
                     />
-                    <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ marginTop: t.space[2], display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <ChangeValue value={idx.change_pct} showIcon />
-                      <Text type="secondary" style={{ fontSize: 12 }}>{idx.code}</Text>
+                      <Text type="secondary" style={{ fontSize: t.font.sm }}>{idx.code}</Text>
                     </div>
-                    <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                      <Text type="secondary" style={{ fontSize: 12 }}>额 {formatAmount(idx.amount)}</Text>
+                    <div style={{ marginTop: t.space[2], display: "flex", alignItems: "center" }}>
+                      <Text type="secondary" style={{ fontSize: t.font.sm }}>成交额 {formatAmount(idx.amount)}</Text>
                     </div>
                   </Card>
                 </button>
@@ -107,11 +129,25 @@ export default function AIndexTab() {
         </SectionDataState>
       </div>
 
+      {activeIndex && (
+        <div style={{ marginBottom: t.space[4] }}>
+          <IndexIntradayCard
+            symbol={activeIndex.code}
+            name={activeIndex.name}
+            price={activeIndex.price}
+            changePct={activeIndex.change_pct}
+            preClose={activeIndex.pre_close}
+            height={360}
+          />
+        </div>
+      )}
+
       <Card
         size="small"
-        title={<span style={{ fontWeight: 600 }}>{activeIndex?.name || "大盘指数"} K线</span>}
+        title={<span style={{ fontWeight: Number(t.weight.semibold) }}>{activeIndex?.name || "大盘指数"} K线</span>}
         extra={
           <Segmented
+            aria-label="K线周期"
             options={[
               { label: "日K", value: "daily" },
               { label: "周K", value: "weekly" },
@@ -121,7 +157,7 @@ export default function AIndexTab() {
             onChange={(value) => setPeriod(String(value))}
           />
         }
-        style={{ borderRadius: 8, border: `1px solid ${c.border}`, boxShadow: "none" }}
+        style={{ borderRadius: t.radius.md, border: `1px solid ${c.border}`, boxShadow: t.shadow.xs }}
       >
         <SectionDataState
           isLoading={klineLoading && !hasKlineData}
@@ -133,7 +169,7 @@ export default function AIndexTab() {
           minHeight={420}
           skeletonRows={8}
         >
-          <KlineChart
+          <LazyKlineChart
             data={klineItems}
             height={420}
             viewKey={`${activeSymbol}:${period}`}

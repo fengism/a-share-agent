@@ -4,8 +4,8 @@ import requests
 
 from app.configuration import get_settings
 from app.constants.http import BROWSER_USER_AGENT
-from app.contracts.search import NewsSearchItem
 from app.core.news import parse_timestamp
+from app.domain.news import NewsSearchItem
 
 logger = logging.getLogger(__name__)
 

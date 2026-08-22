@@ -5,7 +5,7 @@ export interface ToolCallFunction {
 
 export interface ToolCallInfo {
   id: string;
-  type: string;
+  type: "function";
   function: ToolCallFunction;
 }
 
@@ -22,6 +22,8 @@ export type AgentPlanStepStatus =
   | "completed"
   | "failed"
   | "cancelled";
+
+export type AgentExecutionStatus = "completed" | "partial" | "failed";
 
 export interface AgentPlanStep {
   id: string;
@@ -64,6 +66,8 @@ export interface ChatStreamDelta {
   tool_result?: ToolResultInfo | null;
   error?: string | null;
   reasoning_content?: string | null;
+  status?: AgentExecutionStatus | null;
+  warnings?: string[];
 }
 
 export interface ChatMessage {

@@ -1,9 +1,8 @@
 """AkShare 新闻与人气排名能力。"""
 
 import pandas as pd
-from tenacity import retry, stop_after_attempt, wait_exponential
 
-from app.contracts.search import NewsSearchItem
+from app.domain.news import NewsSearchItem
 from app.infrastructure.providers.akshare.loader import ak
 
 
@@ -28,6 +27,5 @@ def fetch_stock_news(code: str) -> list[NewsSearchItem]:
     return results
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
 def fetch_hot_rank_detail(symbol: str) -> pd.DataFrame:
     return ak.stock_hot_rank_detail_em(symbol=symbol)

@@ -10,8 +10,8 @@ STARTUP_TIMEOUT ?= 90
 RUN_ENV = BACKEND_HOST="$(BACKEND_HOST)" BACKEND_PORT="$(BACKEND_PORT)" FRONTEND_HOST="$(FRONTEND_HOST)" FRONTEND_PORT="$(FRONTEND_PORT)" STARTUP_TIMEOUT="$(STARTUP_TIMEOUT)"
 
 .PHONY: help setup start stop restart status logs dev prod pack check test \
-	backend-sync backend-dev backend-lint backend-test backend-db-init backend-reset-accounts \
-	frontend-install frontend-dev frontend-test frontend-build frontend-lint \
+	backend-sync backend-browser-install backend-dev backend-lint backend-type backend-test backend-db-init backend-reset-accounts \
+	frontend-install frontend-dev frontend-api-check frontend-test frontend-e2e frontend-build frontend-lint \
 	export-industry-mapping docker-up docker-down docker-restart docker-build docker-logs docker-status
 
 help: ## 显示可用命令
@@ -45,7 +45,7 @@ logs: ## 持续查看前后端日志
 
 test: backend-test frontend-test ## 运行前后端测试
 
-check: backend-lint backend-test frontend-test frontend-lint frontend-build ## 运行完整质量检查
+check: backend-lint backend-type backend-test frontend-api-check frontend-test frontend-lint frontend-build ## 运行完整质量检查
 
 pack: ## 打包源码（排除密钥、依赖、数据库和日志）
 	tar czf stock-agent.tar.gz \
@@ -80,11 +80,17 @@ pack: ## 打包源码（排除密钥、依赖、数据库和日志）
 backend-sync: ## 同步后端锁定依赖
 	cd backend && uv sync --frozen
 
+backend-browser-install: ## 安装主进程浏览器抓取所需 Chromium
+	cd backend && uv run --frozen patchright install chromium
+
 backend-dev: ## 单独启动后端
 	cd backend && uv run --frozen uvicorn app.main:app --reload --host "$(BACKEND_HOST)" --port "$(BACKEND_PORT)"
 
 backend-lint: ## 检查后端代码规范
-	cd backend && uvx --from ruff==0.12.11 ruff check --config pyproject.toml app tests
+	cd backend && uv run --frozen ruff check --config pyproject.toml app tests
+
+backend-type: ## 检查后端静态类型
+	cd backend && uv run --frozen mypy
 
 backend-test: ## 运行后端测试
 	cd backend && uv run --frozen pytest -q
@@ -101,8 +107,14 @@ frontend-install: ## 按 lockfile 安装前端依赖
 frontend-dev: ## 单独启动前端
 	cd frontend && VITE_API_PROXY_TARGET="http://127.0.0.1:$(BACKEND_PORT)" npm run dev -- --host "$(FRONTEND_HOST)" --port "$(FRONTEND_PORT)" --strictPort
 
+frontend-api-check: ## 校验 OpenAPI 生成产物
+	cd frontend && npm run api:check
+
 frontend-test: ## 运行前端测试
 	cd frontend && npm test
+
+frontend-e2e: ## 运行前端浏览器 smoke 测试
+	cd frontend && npm run test:e2e
 
 frontend-build: ## 构建前端
 	cd frontend && npm run build
@@ -111,7 +123,7 @@ frontend-lint: ## 运行前端 lint
 	cd frontend && npm run lint
 
 export-industry-mapping: ## 更新行业映射文件
-	cd backend && uv run --frozen python -c 'from app.modules.screener.industry.service import update_industry_mapping_sw_second_file; update_industry_mapping_sw_second_file()'
+	cd backend && uv run --frozen python -c 'from app.financial_data.stock.public import update_industry_mapping_sw_files; update_industry_mapping_sw_files()'
 
 docker-up: ## 启动 Docker 服务
 	docker compose up -d

@@ -1,6 +1,7 @@
 import time
 
 from app.infrastructure.persistence.connection import get_connection
+from app.infrastructure.persistence.retention import PurgeResult, purge_rows_in_batches
 
 
 def acquire_task_lease(
@@ -62,11 +63,15 @@ def release_task_lease(task_name: str, owner_id: str) -> bool:
 
 
 def purge_expired_task_leases(*, now: float | None = None) -> int:
+    return purge_expired_task_leases_with_status(now=now).deleted
+
+
+def purge_expired_task_leases_with_status(*, now: float | None = None) -> PurgeResult:
     current_time = time.time() if now is None else now
-    conn = get_connection()
-    cursor = conn.execute(
-        "DELETE FROM background_task_leases WHERE lease_until <= ?",
-        (current_time,),
+    return purge_rows_in_batches(
+        get_connection(),
+        table_name="background_task_leases",
+        predicate_sql="lease_until <= ?",
+        parameters=(current_time,),
+        order_by="lease_until, rowid",
     )
-    conn.commit()
-    return cursor.rowcount

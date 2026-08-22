@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from app.agentic.protocol import ToolCallInfo, ToolResultInfo
 
 AgentPlanStepStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
+AgentExecutionStatus = Literal["completed", "partial", "failed"]
 
 
 class AgentPlanStep(BaseModel):
@@ -49,3 +50,5 @@ class AgentEvent(BaseModel):
     tool_result: ToolResultInfo | None = None
     error: str | None = None
     reasoning_content: str | None = None
+    status: AgentExecutionStatus | None = None
+    warnings: list[str] = Field(default_factory=list, max_length=16)

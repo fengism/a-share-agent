@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from app.contracts.content import ContentBlock
+from app.domain.content import ContentBlock
 from app.modules.analysis.public import AnalysisResult, FactorAnalysis
 from app.modules.daily_review.public import DailyReviewResult, DailyReviewSection
 
@@ -80,6 +80,9 @@ def _build_daily_review(review: DailyReviewResult) -> list[ContentBlock]:
     Return:
         按章节顺序排列的 ContentBlock 列表
     """
+    if review.schema_version >= 3 and review.llm_review.strip():
+        return _parse_markdown_blocks(review.llm_review)
+
     blocks: list[ContentBlock] = [
         ContentBlock(type="heading", level=2, text="市场摘要"),
         ContentBlock(type="paragraph", text=review.market_summary),
@@ -157,6 +160,10 @@ def _build_industry_chain(result) -> list[ContentBlock]:
             return result.get(key, default)
         return getattr(result, key, default)
 
+    llm_review = _get("llm_review", "").strip()
+    if int(_get("schema_version", 1) or 1) >= 7 and llm_review:
+        return _parse_markdown_blocks(llm_review)
+
     blocks: list[ContentBlock] = [
         ContentBlock(type="heading", level=2, text=f"{_get('name', '产业链')} 产业链分析"),
     ]
@@ -199,7 +206,6 @@ def _build_industry_chain(result) -> list[ContentBlock]:
                 text = str(stock)
             blocks.append(ContentBlock(type="bullet", text=text))
 
-    llm_review = _get("llm_review", "").strip()
     if llm_review:
         blocks.append(ContentBlock(type="heading", level=2, text="AI 复盘报告"))
         blocks.extend(_parse_markdown_blocks(llm_review))

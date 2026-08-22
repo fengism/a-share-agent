@@ -5,6 +5,16 @@ export interface DailyReviewSection {
 }
 
 export interface DailyReviewDataSnapshot {
+  requested_date?: string;
+  effective_date?: string;
+  source_status?: Record<string, {
+    status: "complete" | "partial" | "unavailable";
+    requested_date?: string;
+    data_date?: string;
+    provider?: string;
+    is_realtime?: boolean;
+    error?: string;
+  }>;
   indices: Record<string, unknown>[];
   hot_stocks: Record<string, unknown>[];
   hot_concepts: Record<string, unknown>[];
@@ -19,7 +29,21 @@ export interface DailyReviewDataSnapshot {
 }
 
 export interface DailyReviewResult {
+  schema_version?: number;
   date: string;
+  requested_date?: string;
+  effective_date?: string;
+  session_status?: "completed" | "adjusted";
+  quality_status?: "complete" | "degraded";
+  generation_status?: "llm" | "fallback";
+  warnings?: string[];
+  source_errors?: Record<string, string>;
+  llm_error?: string;
+  market_state?: "attack" | "balanced" | "defensive" | "unknown";
+  position_range?: string;
+  invalid_conditions?: string[];
+  data_gaps?: string[];
+  prompt_trace?: Record<string, unknown> | null;
   title: string;
   generated_at: string;
   market_summary: string;

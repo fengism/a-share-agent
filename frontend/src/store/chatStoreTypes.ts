@@ -6,6 +6,7 @@ import type {
   ToolCallInfo,
 } from "../types/chat";
 import type { SessionData, SessionMeta } from "./chatPersistence";
+import type { PersistedChatState } from "./chatPersistence";
 import type { ChatRegenerationRequest } from "./chatStoreHelpers";
 
 export interface ChatState {
@@ -18,6 +19,7 @@ export interface ChatState {
   sessions: SessionMeta[];
   activeSessionId: string | null;
   sessionData: Record<string, SessionData>;
+  hydrateSessions: (snapshot: PersistedChatState) => void;
   createSession: () => string;
   setActiveSession: (sessionId: string) => void;
   setAgentNames: (agentNames: string[] | null) => void;

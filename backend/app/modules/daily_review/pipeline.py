@@ -1,176 +1,184 @@
-import asyncio
 import logging
-import time
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import date, datetime
+from typing import Literal, cast
+from zoneinfo import ZoneInfo
 
 from app.configuration import get_effective_settings
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
-from app.core.retry import RetryPolicy
-from app.infrastructure.llm.sync_client import llm_chat
-from app.market_data.market.public import (
-    get_dragon_tiger_list,
-    get_hot_stocks,
-    get_indices,
-    get_macro_data,
-    get_market_news,
-    get_market_statistics,
-    get_realtime_market_volume,
-    get_ths_hot_concept,
-    get_ths_hot_industry,
-)
+from app.domain.llm import LLMConfigurationError
+from app.financial_data.market.public import get_completed_market_date, get_market_date_on_or_before
+from app.infrastructure.llm.prompting import PromptExecutionError, run_structured_prompt
 from app.modules.daily_review import review_builder
-from app.modules.daily_review.formatter import normalize_llm_review
+from app.modules.daily_review.collector import collect_daily_review_data
 from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult
 from app.modules.daily_review.persistence.repository import load_daily_review, save_daily_review
-from app.modules.daily_review.prompts import MARKET_SYSTEM_PROMPT, MARKET_USER_PROMPT
+from app.modules.daily_review.prompts import DAILY_REVIEW_PROMPT_SPEC, MARKET_USER_PROMPT
+from app.modules.daily_review.report_renderer import render_daily_review_markdown
 from app.modules.daily_review.schemas import DailyReviewRequest
 
 logger = logging.getLogger(__name__)
+_MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
-_LLM_RETRY_POLICY = RetryPolicy(
-    max_attempts=3,
-    base_delay_seconds=2.0,
-    max_elapsed_seconds=15.0,
-    jitter_seconds=0.25,
-)
+@dataclass(frozen=True)
+class DailyReviewDateResolution:
+    requested_date: date
+    effective_date: date
+    session_status: Literal["completed", "adjusted"]
+    use_realtime: bool
 
 
-def _build_fallback_review(date: str, snapshot: DailyReviewDataSnapshot) -> DailyReviewResult:
-    return review_builder.build_fallback_review(
-        date,
-        snapshot,
-        generated_at=datetime.now().isoformat(),
+def _local_now() -> datetime:
+    return datetime.now(_MARKET_TIMEZONE)
+
+
+async def resolve_daily_review_date(
+    requested_date: date | None,
+    *,
+    now: datetime | None = None,
+) -> DailyReviewDateResolution:
+    local_now = (now or _local_now()).astimezone(_MARKET_TIMEZONE)
+    requested = requested_date or local_now.date()
+    if requested > local_now.date():
+        raise ValueError("复盘日期不能晚于今天")
+    if requested == local_now.date():
+        effective = await get_completed_market_date(requested, now=local_now)
+    else:
+        effective = await get_market_date_on_or_before(requested)
+    return DailyReviewDateResolution(
+        requested_date=requested,
+        effective_date=effective,
+        session_status="completed" if effective == requested else "adjusted",
+        use_realtime=effective == local_now.date(),
     )
 
 
-def _build_prompt(date: str, snapshot: DailyReviewDataSnapshot) -> str:
-    return review_builder.build_prompt(date, snapshot, MARKET_USER_PROMPT)
+def _build_prompt(date_text: str, snapshot: DailyReviewDataSnapshot) -> str:
+    return cast(str, review_builder.build_prompt(date_text, snapshot, MARKET_USER_PROMPT))
 
 
 def _build_snapshot(
-    indices,
-    hot_stocks,
-    hot_concepts,
-    hot_industries,
-    dragon_tiger,
-    market_statistics,
-    market_news,
-    market_volume,
-    macro_data,
+    values: dict,
+    *,
+    requested_date: str,
+    effective_date: str,
+    source_status: dict,
 ) -> DailyReviewDataSnapshot:
-    return review_builder.build_snapshot(
-        indices,
-        hot_stocks,
-        hot_concepts,
-        hot_industries,
-        dragon_tiger,
-        market_statistics,
-        market_news,
-        market_volume,
-        macro_data,
-    )
+    return cast(DailyReviewDataSnapshot, review_builder.build_snapshot(
+        values.get("indices"),
+        values.get("hot_stocks"),
+        values.get("hot_concepts"),
+        values.get("hot_industries"),
+        values.get("dragon_tiger"),
+        values.get("market_statistics"),
+        values.get("market_news"),
+        values.get("market_volume"),
+        values.get("macro_data"),
+        requested_date=requested_date,
+        effective_date=effective_date,
+        source_status=source_status,
+    ))
+
+
+def _quality(
+    snapshot: DailyReviewDataSnapshot,
+) -> tuple[Literal["complete", "degraded"], list[str], dict[str, str]]:
+    errors = {
+        name: status.error
+        for name, status in snapshot.source_status.items()
+        if status.status == "unavailable" and status.error
+    }
+    partial = [name for name, status in snapshot.source_status.items() if status.status == "partial"]
+    warnings = [f"{name}：{error}" for name, error in errors.items()]
+    warnings.extend(f"{name}：数据部分可用" for name in partial)
+    core_missing = [
+        name
+        for name in ("indices", "market_statistics", "market_volume")
+        if snapshot.source_status.get(name) is None
+        or snapshot.source_status[name].status == "unavailable"
+    ]
+    if core_missing:
+        warnings.insert(0, f"核心复盘数据缺失：{'、'.join(core_missing)}")
+    return ("degraded" if warnings else "complete"), warnings, errors
 
 
 async def generate_daily_review(request: DailyReviewRequest, user_id: int) -> DailyReviewResult:
-    """生成每日复盘报告：优先读取缓存，否则并行采集数据并调用 LLM 生成分析。"""
-    date = request.date or datetime.now().strftime("%Y-%m-%d")
+    """Generate a date-consistent daily review with explicit source quality."""
+    resolution = await resolve_daily_review_date(request.date)
+    requested_text = resolution.requested_date.isoformat()
+    effective_text = resolution.effective_date.isoformat()
     if not request.force:
         cached = await call_blocking(
             load_daily_review,
-            date,
+            effective_text,
             user_id,
             semaphore=misc_semaphore,
         )
         if cached is not None:
-            return cached
+            cached_review = cached if isinstance(cached, DailyReviewResult) else DailyReviewResult.model_validate(cached)
+            return cast(DailyReviewResult, cached_review.model_copy(update={"requested_date": requested_text}))
 
-    (
-        indices,
-        hot_stocks,
-        hot_concepts,
-        hot_industries,
-        dragon_tiger,
-        market_statistics,
-        market_news,
-        market_volume,
-        macro_data,
-    ) = await asyncio.gather(
-        get_indices(),
-        get_hot_stocks(),
-        get_ths_hot_concept(),
-        get_ths_hot_industry(),
-        get_dragon_tiger_list(date),
-        get_market_statistics(date),
-        get_market_news(),
-        get_realtime_market_volume(),
-        get_macro_data(),
-        return_exceptions=True,
+    collection = await collect_daily_review_data(
+        resolution.effective_date,
+        use_realtime=resolution.use_realtime,
     )
-
     snapshot = _build_snapshot(
-        indices=indices,
-        hot_stocks=hot_stocks,
-        hot_concepts=hot_concepts,
-        hot_industries=hot_industries,
-        dragon_tiger=dragon_tiger,
-        market_statistics=market_statistics,
-        market_news=market_news,
-        market_volume=market_volume,
-        macro_data=macro_data,
+        collection.values,
+        requested_date=requested_text,
+        effective_date=effective_text,
+        source_status=collection.source_status,
     )
-    llm_review = ""
-    last_error: Exception | None = None
-    settings = get_effective_settings()
-    user_content = _build_prompt(date, snapshot)
-    started_at = time.monotonic()
-    for attempt in range(1, _LLM_RETRY_POLICY.max_attempts + 1):
-        try:
-            logger.info(
-                "生成复盘报告: date=%s, prompt_length=%s, attempt=%s/%s",
-                date,
-                len(user_content),
-                attempt,
-                _LLM_RETRY_POLICY.max_attempts,
-            )
-            llm_review = normalize_llm_review(
-                (
-                    await llm_chat(
-                        [
-                            {"role": "system", "content": MARKET_SYSTEM_PROMPT},
-                            {"role": "user", "content": user_content},
-                        ],
-                        temperature=settings.llm_temperature,
-                    )
-                ).strip()
-            )
-            break
-        except Exception as exc:
-            last_error = exc
-            logger.warning(
-                "生成复盘报告失败 (attempt %s/%s): date=%s",
-                attempt,
-                _LLM_RETRY_POLICY.max_attempts,
-                date,
-                exc_info=True,
-            )
-            delay = _LLM_RETRY_POLICY.delay_seconds(attempt)
-            if not _LLM_RETRY_POLICY.can_retry(
-                attempt_number=attempt,
-                elapsed_seconds=time.monotonic() - started_at,
-                delay_seconds=delay,
-            ):
-                break
-            await asyncio.sleep(delay)
-    if last_error is not None and not llm_review:
-        logger.error(
-            "生成复盘报告失败: date=%s attempts=%s error_type=%s",
-            date,
-            attempt,
-            type(last_error).__name__,
-        )
+    quality_status, warnings, source_errors = _quality(snapshot)
 
-    review = _build_fallback_review(date, snapshot)
-    review.llm_review = llm_review
+    settings = get_effective_settings()
+    user_content = _build_prompt(effective_text, snapshot)
+    review = cast(DailyReviewResult, review_builder.build_fallback_review(
+        effective_text,
+        snapshot,
+        generated_at=_local_now().isoformat(timespec="seconds"),
+    ))
+    generation_status: Literal["llm", "fallback"] = "fallback"
+    llm_error = ""
+    try:
+        prompt_run = await run_structured_prompt(
+            DAILY_REVIEW_PROMPT_SPEC,
+            {"prompt": user_content},
+            settings=settings,
+        )
+        output = prompt_run.value
+        generation_status = "llm"
+        review.market_state = output.market_state
+        review.market_summary = output.market_summary
+        review.index_review = output.index_review
+        review.hotspot_review = output.hotspot_review
+        review.dragon_tiger_review = output.dragon_tiger_review
+        review.risk_alerts = output.risk_alerts
+        review.opportunities = output.opportunities
+        review.strategy_notes = output.strategy_notes
+        review.position_range = output.position_range
+        review.invalid_conditions = output.invalid_conditions
+        review.data_gaps = output.data_gaps
+        review.prompt_trace = prompt_run.trace
+    except Exception as error:
+        quality_status = "degraded"
+        llm_error = str(error) or type(error).__name__
+        warnings.append(f"AI 复盘生成失败，已使用确定性兜底：{llm_error}")
+        if isinstance(error, PromptExecutionError):
+            review.prompt_trace = error.trace
+        if isinstance(error, LLMConfigurationError):
+            logger.warning("结构化复盘未调用 LLM，配置不可用: date=%s error=%s", effective_text, error)
+        else:
+            logger.warning("结构化复盘生成失败，使用确定性兜底: date=%s", effective_text, exc_info=True)
+
+    review.requested_date = requested_text
+    review.effective_date = effective_text
+    review.session_status = resolution.session_status
+    review.quality_status = quality_status
+    review.generation_status = generation_status
+    review.warnings = warnings
+    review.source_errors = source_errors
+    review.llm_error = llm_error
+    review.llm_review = render_daily_review_markdown(review)
     await call_blocking(
         save_daily_review,
         review,

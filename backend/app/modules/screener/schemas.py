@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from app.contracts.stock import StockConcept
+from app.domain.stock import StockConcept
 
 
 class ScreenerFilter(BaseModel):
@@ -35,6 +35,10 @@ class ScreenerItem(BaseModel):
     market_cap: float | None = None  # 亿元
     turnover_pct: float | None = None
     volume: float | None = None
+    exchange: str | None = None
+    board: str | None = None
+    listing_date: str | None = None
+    exchange_industry: str | None = None
     second_industry: StockConcept | None = None
 
 
@@ -44,6 +48,9 @@ class ScreenerResult(BaseModel):
     total: int
     page: int
     page_size: int
+    sw_industry_coverage: float = Field(default=0, ge=0, le=1)
+    exchange_industry_coverage: float = Field(default=0, ge=0, le=1)
+    stock_master_complete: bool = False
 
 
 class ValuationPercentileRequest(BaseModel):
@@ -62,3 +69,53 @@ class ValuationPercentileItem(BaseModel):
 class ValuationPercentileResult(BaseModel):
     """Purpose: 估值百分位批量查询的返回结果。"""
     items: list[ValuationPercentileItem]
+
+class ScreenerStrategyParameter(BaseModel):
+    key: str
+    type: str
+    label: str
+    description: str = ""
+    default: int | float | bool | str
+    minimum: float | None = None
+    maximum: float | None = None
+    step: float | None = None
+
+
+class ScreenerStrategyPreset(BaseModel):
+    key: str
+    name: str
+    description: str
+    scenario: str
+    risk_level: str
+    parameters: dict[str, int | float | bool | str]
+    parameter_definitions: list[ScreenerStrategyParameter]
+
+
+class ScreenerStrategyRequest(BaseModel):
+    strategy_key: str = Field(min_length=1, max_length=64)
+    version: str | None = None
+    parameters: dict[str, int | float | bool | str] = Field(default_factory=dict, max_length=64)
+    codes: list[str] = Field(min_length=1, max_length=200)
+    lookback_days: int = Field(default=400, ge=60, le=1000)
+
+
+class ScreenerStrategyMatch(BaseModel):
+    code: str
+    signal_date: str
+    target_position: int
+    data_source: str = ""
+    data_hash: str = ""
+    used_fallback: bool = False
+
+
+class ScreenerStrategyResult(BaseModel):
+    strategy_key: str
+    strategy_name: str
+    strategy_version: str
+    definition_hash: str
+    parameters: dict[str, int | float | bool | str]
+    matches: list[ScreenerStrategyMatch]
+    matched_codes: list[str]
+    evaluated: int
+    failed: dict[str, str] = Field(default_factory=dict)
+    fallback_count: int = 0

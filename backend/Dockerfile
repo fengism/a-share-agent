@@ -2,8 +2,7 @@
 
 FROM python:3.11-slim AS build
 
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install uv==0.9.1
+COPY --from=ghcr.io/astral-sh/uv:0.9.1 /uv /uvx /bin/
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy
@@ -21,6 +20,7 @@ ARG APP_GID=1000
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
@@ -29,6 +29,9 @@ RUN groupadd --gid "${APP_GID}" app \
     && useradd --uid "${APP_UID}" --gid app --create-home --home-dir /home/app app
 
 COPY --chown=app:app --from=build /app/.venv /app/.venv
+
+RUN /app/.venv/bin/patchright install --with-deps chromium \
+    && chown -R app:app /ms-playwright
 
 COPY --chown=app:app app/ app/
 

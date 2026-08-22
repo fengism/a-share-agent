@@ -1,5 +1,8 @@
 import "@testing-library/jest-dom";
 
+const getComputedStyle = window.getComputedStyle.bind(window);
+window.getComputedStyle = ((element: Element) => getComputedStyle(element)) as typeof window.getComputedStyle;
+
 // jsdom lacks a few browser APIs that Ant Design components probe for.
 // Provide inert polyfills so component tests can render.
 if (!window.matchMedia) {

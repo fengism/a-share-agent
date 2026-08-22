@@ -1,20 +1,26 @@
 import json
 import logging
 import re
+from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from typing import cast
 
 import pandas as pd
 import requests
 
 from app.constants.http import SINA_FINANCE_HEADERS
 from app.constants.market import (
+    SINA_CN_RANK_URL,
+    SINA_INDEX_INTRADAY_URL,
     SINA_INDEX_QUOTE_URL,
     SINA_MARKET_HQ_URL,
     SINA_STOCK_KLINE_URL,
 )
 from app.core.cache import cache, dated_cache_key
 from app.core.dataframes import coerce_numeric_columns, normalize_intraday_df, rename_and_keep_columns, rename_columns
-from app.core.market import normalize_code
+from app.core.market import normalize_code, normalize_index_symbol, normalize_stock_name, safe_float
+from app.infrastructure.providers.sina import industry as sina_industry
 from app.infrastructure.providers.sina.parsing import parse_jsonp
 
 logger = logging.getLogger(__name__)
@@ -25,6 +31,11 @@ class SinaDataProvider:
     HQ_PAGE_SIZE = 80
     HQ_MAX_PAGES = 80
     HQ_RETRY_DELAY_SECONDS = 0.3
+    RANK_PAGE_SIZE = 30
+    RANK_BATCH_SIZE = 8
+    RANK_WORKERS = 8
+    RANK_MAX_PAGES = 200
+    RANK_MIN_RECORDS = 4000
     NAMES_CACHE_TTL = 86400  # 全市场名称代码，1 天
     SNAPSHOT_CACHE_TTL = 60  # 实时行情，1 分钟
     name = "sina"
@@ -102,6 +113,54 @@ class SinaDataProvider:
         return df
 
 
+    def fetch_index_intraday(self, symbol: str) -> pd.DataFrame:
+        """Fetch and normalize the current-session minute line for a market index."""
+        response = self._session.get(
+            SINA_INDEX_INTRADAY_URL,
+            params={
+                "symbol": normalize_index_symbol(symbol.strip().lower()),
+                "version": "7.11.0",
+                "dpc": "1",
+            },
+            headers=SINA_FINANCE_HEADERS,
+            timeout=10,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        result = payload.get("result") if isinstance(payload, Mapping) else None
+        status = result.get("status") if isinstance(result, Mapping) else None
+        rows = result.get("data") if isinstance(result, Mapping) else None
+        if (
+            not isinstance(status, Mapping)
+            or status.get("code") != 0
+            or not isinstance(rows, list)
+        ):
+            raise RuntimeError("新浪指数分时接口返回错误")
+
+        normalized_by_time: dict[str, dict[str, float | str | None]] = {}
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            time_text = str(row.get("m") or "").strip()
+            if re.fullmatch(r"\d{2}:\d{2}:\d{2}", time_text) is None:
+                continue
+            price = safe_float(row.get("p"))
+            if price is None or price <= 0:
+                continue
+            normalized_by_time[time_text] = {
+                "time": time_text,
+                "price": price,
+                "avg_price": safe_float(row.get("avg_p")),
+                "volume": safe_float(row.get("v")),
+                "total_volume": safe_float(row.get("tot_v")),
+            }
+
+        return pd.DataFrame(
+            [normalized_by_time[key] for key in sorted(normalized_by_time)],
+            columns=["time", "price", "avg_price", "volume", "total_volume"],
+        )
+
+
     def fetch_market_indices(self) -> pd.DataFrame:
         """新浪沪深重要指数实时行情并合并为一张 DataFrame
         https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple?page=1&num=40&sort=symbol&asc=1&node=dpzs&_s_r_a=init
@@ -128,6 +187,125 @@ class SinaDataProvider:
         big_df = big_df[["代码", "名称", "最新价", "涨跌额", "涨跌幅", "昨收", "今开", "最高", "最低", "成交量", "成交额"]]
         return coerce_numeric_columns(big_df, ["最新价", "涨跌额", "涨跌幅", "昨收", "今开", "最高", "最低", "成交量", "成交额"])
 
+
+    @staticmethod
+    def _is_cnrank_a_share_code(code: str) -> bool:
+        return code.startswith(
+            ("600", "601", "603", "605", "688", "689", "000", "001", "002", "003", "300", "301")
+        ) or code.startswith(("4", "8", "920"))
+
+    @staticmethod
+    def _normalize_cnrank_rows(rows: list[dict]) -> pd.DataFrame:
+        normalized_rows: list[dict] = []
+        seen_codes: set[str] = set()
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            code = str(row.get("code") or "").strip()
+            name = normalize_stock_name(row.get("name"))
+            if (
+                len(code) != 6
+                or not code.isdigit()
+                or not SinaDataProvider._is_cnrank_a_share_code(code)
+                or not name
+                or code in seen_codes
+            ):
+                continue
+            seen_codes.add(code)
+
+            def number(field: str, scale: float = 1.0) -> float | None:
+                value = safe_float(row.get(field))
+                return value * scale if value is not None else None
+
+            normalized_rows.append(
+                {
+                    "代码": code,
+                    "名称": name,
+                    "最新价": number("price"),
+                    "涨跌幅": number("percent"),
+                    "振幅": number("amplitude"),
+                    "成交量": number("totalVolume"),
+                    "成交额": number("totalAmount"),
+                    "换手率": number("turnOver"),
+                    "市盈率-动态": number("pe", 10_000),
+                    "市净率": number("pb"),
+                    "总市值": number("totalShare", 10_000),
+                    "流通市值": number("cirValue", 10_000),
+                }
+            )
+        return pd.DataFrame(normalized_rows)
+
+    def _fetch_cnrank_page(self, page: int) -> list[dict]:
+        try:
+            response = self._session.get(
+                SINA_CN_RANK_URL,
+                params={
+                    "sort": "percent",
+                    "num": self.RANK_PAGE_SIZE,
+                    "hnew": "1",
+                    "hcnew": "1",
+                    "asc": "0",
+                    "node": "hs",
+                    "page": page,
+                },
+                headers={**SINA_FINANCE_HEADERS, "Referer": "https://finance.sina.cn/"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as error:
+            raise RuntimeError(f"新浪 cnrank 第 {page} 页请求失败: {error}") from error
+        rows = payload.get("data") if isinstance(payload, Mapping) else None
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("code") != 0
+            or not isinstance(rows, list)
+        ):
+            raise RuntimeError(f"新浪 cnrank 第 {page} 页返回格式无效")
+        return [dict(row) for row in rows if isinstance(row, Mapping)]
+
+    def fetch_stock_rank_snapshot(self) -> pd.DataFrame:
+        first_page = self._fetch_cnrank_page(1)
+        records = list(first_page)
+        terminal = len(first_page) < self.RANK_PAGE_SIZE
+
+        if not terminal:
+            with ThreadPoolExecutor(
+                max_workers=max(1, self.RANK_WORKERS),
+                thread_name_prefix="sina-cnrank",
+            ) as executor:
+                for start_page in range(2, self.RANK_MAX_PAGES + 1, self.RANK_BATCH_SIZE):
+                    page_numbers = list(
+                        range(
+                            start_page,
+                            min(start_page + self.RANK_BATCH_SIZE, self.RANK_MAX_PAGES + 1),
+                        )
+                    )
+                    futures = {
+                        page: executor.submit(self._fetch_cnrank_page, page)
+                        for page in page_numbers
+                    }
+                    for page in page_numbers:
+                        page_rows = futures[page].result()
+                        records.extend(page_rows)
+                        if len(page_rows) < self.RANK_PAGE_SIZE:
+                            terminal = True
+                            break
+                    if terminal:
+                        break
+
+        if not terminal:
+            raise RuntimeError(f"新浪 cnrank 未在 {self.RANK_MAX_PAGES} 页内结束")
+        frame = self._normalize_cnrank_rows(records)
+        if len(frame.index) < self.RANK_MIN_RECORDS:
+            raise RuntimeError(
+                f"新浪 cnrank A 股快照不足: {len(frame.index)} < {self.RANK_MIN_RECORDS}"
+            )
+        return frame
+
+    def fetch_sw_industry_mappings(self) -> sina_industry.SwMappingMap:
+        """获取申万一级、二级分类及完整 A 股成分映射。"""
+        return sina_industry.fetch_sw_industry_mappings(self._session)
 
     def fetch_stock_names(self) -> list[dict]:
         """获取全市场 A 股的名称代码对照表（新浪行情列表分页拉取，按日缓存）。
@@ -207,7 +385,7 @@ class SinaDataProvider:
         if cache_key is not None:
             cached = cache.get(cache_key)
             if cached is not None:
-                return cached
+                return cast(list[dict], cached)
 
         records: list[dict] = []
         page = 1

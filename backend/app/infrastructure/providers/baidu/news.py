@@ -4,8 +4,8 @@ from collections.abc import Callable
 from typing import Any
 
 from app.constants.http import BD_HEADERS
-from app.contracts.search import NewsSearchItem
 from app.core.market import contains_stock_reference
+from app.domain.news import NewsSearchItem
 from app.infrastructure.providers.baidu.transport import BaiduTransport, check_result_code
 
 

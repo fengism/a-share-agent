@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
 from app.configuration.schema import Settings
+from app.domain.llm import LLMConfigurationError
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,11 @@ def resolve_llm_client_spec(settings: Settings) -> LLMClientSpec:
         raise ValueError(f"Unsupported LLM API mode: {api_mode}")
 
     api_key = str(getattr(settings, "llm_api_key", "") or "")
+    if not api_key and defaults.get("api_key_required", True):
+        label = str(defaults.get("label") or provider)
+        raise LLMConfigurationError(
+            f"{label} 缺少 API Key，请在设置页填写 API Key 或配置 LLM_API_KEY"
+        )
     if not api_key and not defaults.get("api_key_required", True):
         api_key = "local"
     return LLMClientSpec(

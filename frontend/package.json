@@ -4,15 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "api:check": "npm run api:generate && git diff --exit-code -- src/api/generated/openapi.json src/api/generated/schema.ts",
-    "api:export": "cd ../backend && uv run python -m app.scripts.export_openapi ../frontend/src/api/generated/openapi.json",
+    "api:check": "node scripts/check-api-generated.mjs",
+    "api:export": "cd ../backend && uv run --frozen python -m app.scripts.export_openapi ../frontend/src/api/generated/openapi.json",
     "api:generate": "npm run api:export && npm run api:generate:types",
-    "api:generate:types": "openapi-typescript src/api/generated/openapi.json -o src/api/generated/schema.ts",
+    "api:generate:types": "openapi-typescript src/api/generated/openapi.json -o src/api/generated/schema.ts && openapi-typescript src/api/generated/openapi.json -o src/api/generated/request-schema.ts --default-non-nullable false",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . && node scripts/check-page-boundaries.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@eslint/js": "^9.13.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

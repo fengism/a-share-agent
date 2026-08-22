@@ -31,6 +31,9 @@ export interface ToolPolicyInfo {
   cache_ttl_seconds: number;
   freshness: ToolFreshness;
   scope: ToolScope;
+  timeout_seconds?: number | null;
+  max_parallel_calls?: number | null;
+  max_result_characters: number;
 }
 
 export interface ToolCapabilityInfo {
@@ -56,6 +59,7 @@ export interface AgentCapabilityInfo {
   display_name: string;
   description: string;
   tool_names: string[];
+  skill_names: string[];
   max_rounds: number;
 }
 

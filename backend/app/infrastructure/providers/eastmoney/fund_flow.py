@@ -3,6 +3,7 @@ import time
 
 from app.constants.market import EASTMONEY_UT_TOKEN, EASTMONEY_UT_TOKEN_ALT
 from app.core.market import safe_float
+from app.infrastructure.providers.eastmoney.symbols import build_stock_secid
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +69,9 @@ class FundFlowMixin:
                 - large_net (float): 大单净流入（元）
                 - super_net (float): 超大单净流入（元）
         """
-        market_code = 1 if code.startswith("6") else 0
         url = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
         params = {
-            "secid": f"{market_code}.{code}",
+            "secid": build_stock_secid(code),
             "fields1": "f1,f2,f3,f7",
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
             "lmt": "120",
@@ -79,9 +79,9 @@ class FundFlowMixin:
         try:
             r = self.em_get_response(url, params=params, headers=self.eastmoney_headers, timeout=15)
             d = r.json()
-        except Exception as e:
-            logger.warning("东方财富个股资金流请求失败: code=%s, error=%s", code, e)
-            return []
+        except Exception:
+            logger.debug("东方财富个股资金流请求失败，交由 ProviderGateway 处理: code=%s", code)
+            raise
         klines = d.get("data", {}).get("klines", [])
         return self._parse_fund_flow_klines(klines)
 

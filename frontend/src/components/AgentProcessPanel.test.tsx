@@ -31,11 +31,31 @@ describe("AgentProcessPanel", () => {
 
     expect(screen.getByText("Agent 执行过程")).toBeInTheDocument();
     expect(screen.getByText("市场与产业边界")).toBeInTheDocument();
-    expect(screen.getByText("网页搜索")).toBeInTheDocument();
+    expect(screen.getByText("web_search")).toBeInTheDocument();
+    expect(screen.queryByText("网页搜索")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("网页搜索"));
+    fireEvent.click(screen.getByText("web_search"));
 
     expect(screen.getByText(/AI服务器/)).toBeInTheDocument();
-    expect(screen.getByText(/"count": 3/)).toBeInTheDocument();
+    expect(screen.queryByText(/"count": 3/)).not.toBeInTheDocument();
+    expect(screen.queryByText("执行结果")).not.toBeInTheDocument();
+  });
+
+  it("shows cancelled tools as stopped", () => {
+    render(
+      <AgentProcessPanel
+        status=""
+        toolCalls={[{
+          id: "call-2",
+          name: "fetch_url",
+          arguments: "{}",
+          isExecuting: false,
+          isCancelled: true,
+        }]}
+        isRunning={false}
+      />,
+    );
+
+    expect(screen.getAllByText("已停止")).toHaveLength(2);
   });
 });

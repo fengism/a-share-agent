@@ -2,7 +2,7 @@ import type { ChatDisplayMessage, ChatMessage } from "../types/chat";
 import { loadPersistedChat } from "./chatPersistence";
 import type { PersistedChatState } from "./chatPersistence";
 
-interface UserChatState extends PersistedChatState {
+export interface UserChatState extends PersistedChatState {
   messages: ChatDisplayMessage[];
   history: ChatMessage[];
   agentNames: string[] | null;
@@ -26,8 +26,7 @@ export function nextChatMessageId() {
   return `msg-${messageCounter}`;
 }
 
-export function loadUserChatState(storage: Storage, userId: number | null): UserChatState {
-  const persisted = loadPersistedChat(storage, userId);
+export function normalizePersistedChatState(persisted: PersistedChatState): UserChatState {
   const sessions = [...persisted.sessions];
   const sessionData = { ...persisted.sessionData };
   let activeSessionId = persisted.activeSessionId;
@@ -58,6 +57,10 @@ export function loadUserChatState(storage: Storage, userId: number | null): User
     agentNames: activeData.agentNames ?? null,
     skillNames: activeData.skillNames ?? null,
   };
+}
+
+export function loadUserChatState(storage: Storage, userId: number | null): UserChatState {
+  return normalizePersistedChatState(loadPersistedChat(storage, userId));
 }
 
 export function updateMessageById(

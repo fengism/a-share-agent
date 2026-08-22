@@ -87,10 +87,6 @@ def _ensure_history_index() -> None:
     )
 
 
-def _mark_history_index_dirty() -> None:
-    _HISTORY_INDEX.mark_dirty()
-
-
 def save_industry_chain(
     name: str,
     result: IndustryChainResult,
@@ -99,24 +95,28 @@ def save_industry_chain(
 ) -> str:
     """将产业链分析结果以 JSON 格式原子写入当前用户存档。"""
     resolved_archive_id = _archive_id(archive_id)
-    path, payload = archive_store.save_archive(
-        _DATA_DIR,
-        name,
-        result,
-        user_id,
-        resolved_archive_id,
-        _safe_name,
-    )
-    try:
-        _upsert_history_item(
+    result.archive_id = resolved_archive_id
+    result.archive_status = "saved"
+    with _HISTORY_INDEX.mutation() as mutation:
+        path, payload = archive_store.save_archive(
+            _DATA_DIR,
+            name,
+            result,
             user_id,
-            _safe_name(name),
-            path,
-            _history_item_from_payload(payload, path.parent, resolved_archive_id),
+            resolved_archive_id,
+            _safe_name,
         )
-    except Exception:
-        _mark_history_index_dirty()
-        logger.warning("写入产业链历史索引失败: %s", path, exc_info=True)
+        try:
+            _upsert_history_item(
+                user_id,
+                _safe_name(name),
+                path,
+                _history_item_from_payload(payload, path.parent, resolved_archive_id),
+            )
+        except Exception:
+            logger.warning("写入产业链历史索引失败: %s", path, exc_info=True)
+        else:
+            mutation.complete()
     return resolved_archive_id
 
 
@@ -146,12 +146,14 @@ def delete_industry_chain(
         if not path.is_file():
             return False
 
-    path.unlink()
-    try:
-        history_store.delete_history_item(_HISTORY_INDEX, scope_user_id, safe_name, archive_id)
-    except Exception:
-        _mark_history_index_dirty()
-        logger.warning("删除产业链历史索引失败: %s", path, exc_info=True)
+    with _HISTORY_INDEX.mutation() as mutation:
+        path.unlink()
+        try:
+            history_store.delete_history_item(_HISTORY_INDEX, scope_user_id, safe_name, archive_id)
+        except Exception:
+            logger.warning("删除产业链历史索引失败: %s", path, exc_info=True)
+        else:
+            mutation.complete()
     logger.info("产业链存档已删除: user_id=%s, scope_user_id=%s, path=%s", user_id, scope_user_id, path)
     return True
 
@@ -170,6 +172,11 @@ def rebuild_industry_chain_history_index() -> None:
 def ensure_industry_chain_history_index() -> None:
     """确保当前产业链目录已完成旧文件索引回填。"""
     _ensure_history_index()
+
+
+def industry_chain_history_index_snapshot() -> dict[str, object]:
+    """返回有界的产业链历史索引恢复状态。"""
+    return _HISTORY_INDEX.snapshot()
 
 
 def list_industry_chains(
@@ -200,5 +207,6 @@ __all__ = [
     "delete_industry_chain",
     "list_industry_chains",
     "ensure_industry_chain_history_index",
+    "industry_chain_history_index_snapshot",
     "rebuild_industry_chain_history_index",
 ]

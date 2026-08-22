@@ -8,8 +8,8 @@ from typing import Any, Literal
 
 from app.configuration import get_effective_settings
 from app.configuration.schema import Settings
-from app.contracts.search import NewsSearchItem
-from app.infrastructure.http.client import get_session as _get_session
+from app.domain.news import NewsSearchItem
+from app.infrastructure.http.client import get_provider_session as _get_session
 
 logger = logging.getLogger(__name__)
 

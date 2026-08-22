@@ -1,6 +1,43 @@
 """Portfolio 模块对其他业务模块开放的稳定入口。"""
 
-from app.modules.portfolio.schemas import PortfolioResponse
+from app.modules.portfolio.positions import add_position, delete_position, list_held_stock_codes
+from app.modules.portfolio.schemas import (
+    PortfolioPosition,
+    PortfolioPositionCreate,
+    PortfolioResponse,
+    PortfolioTransaction,
+    PortfolioTransactionCreate,
+    PortfolioTransactionPreview,
+)
 from app.modules.portfolio.service import get_portfolio
+from app.modules.portfolio.transactions import (
+    InsufficientSharesError,
+    PortfolioTransactionNotFoundError,
+    UnknownPortfolioStockError,
+    create_transaction,
+    delete_transaction,
+    preview_transaction,
+    preview_transaction_update,
+    update_transaction,
+)
 
-__all__ = ["PortfolioResponse", "get_portfolio"]
+__all__ = [
+    "InsufficientSharesError",
+    "PortfolioTransactionNotFoundError",
+    "UnknownPortfolioStockError",
+    "PortfolioPosition",
+    "PortfolioPositionCreate",
+    "PortfolioResponse",
+    "PortfolioTransaction",
+    "PortfolioTransactionCreate",
+    "PortfolioTransactionPreview",
+    "add_position",
+    "create_transaction",
+    "delete_position",
+    "delete_transaction",
+    "get_portfolio",
+    "list_held_stock_codes",
+    "preview_transaction",
+    "preview_transaction_update",
+    "update_transaction",
+]

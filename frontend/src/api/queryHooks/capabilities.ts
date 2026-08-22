@@ -9,7 +9,7 @@ import type {
 export function useChatCapabilities() {
   return useQuery({
     queryKey: queryKeys.capabilities.catalog,
-    queryFn: ({ signal }) => apiGet<ChatCapabilitiesResponse>("/chat/capabilities", undefined, { signal }),
+    queryFn: () => apiGet<ChatCapabilitiesResponse>("/chat/capabilities"),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -17,11 +17,7 @@ export function useChatCapabilities() {
 export function useChatCapabilityAvailability() {
   return useQuery({
     queryKey: queryKeys.capabilities.availability,
-    queryFn: ({ signal }) => apiGet<ChatCapabilityAvailabilityResponse>(
-      "/chat/capabilities/availability",
-      undefined,
-      { signal },
-    ),
+    queryFn: () => apiGet<ChatCapabilityAvailabilityResponse>("/chat/capabilities/availability"),
     staleTime: 30 * 1000,
   });
 }

@@ -1,32 +1,18 @@
-import { Steps } from "antd";
-import {
-  CloudDownloadOutlined,
-  LineChartOutlined,
-  FormOutlined,
-  RobotOutlined,
-} from "@ant-design/icons";
 import type { AnalysisStage } from "../../api/sse";
-import { useColors } from "../../theme/hooks";
+import WorkflowProgressPanel, { type WorkflowProgressStatus } from "../../components/workflows/WorkflowProgressPanel";
 
 interface Props {
-  stages: AnalysisStage[];
+  stages: Array<AnalysisStage | null>;
   currentStageIndex: number;
+  status: WorkflowProgressStatus;
 }
 
-const STAGE_ICONS = [
-  <CloudDownloadOutlined key="1" />,
-  <LineChartOutlined key="2" />,
-  <FormOutlined key="3" />,
-  <RobotOutlined key="4" />,
-];
-
-export default function AnalysisProgressSteps({ stages, currentStageIndex }: Props) {
-  const c = useColors();
-
-  const items = STAGE_ICONS.map((icon, i) => {
-    const stage = stages[i];
+export default function AnalysisProgressSteps({ stages, currentStageIndex, status }: Props) {
+  const items = stages.map((stage, index) => {
     const status =
-      !stage || stage.status === "started"
+      !stage
+        ? ("wait" as const)
+        : stage.status === "started"
         ? ("process" as const)
         : stage.status === "completed"
           ? ("finish" as const)
@@ -41,28 +27,17 @@ export default function AnalysisProgressSteps({ stages, currentStageIndex }: Pro
         : undefined);
 
     return {
-      title: stage?.name || `Stage ${i + 1}`,
+      title: stage?.name || `阶段 ${index + 1}`,
       status,
-      icon,
       description,
     };
   });
 
   return (
-    <div
-      style={{
-        padding: "16px 18px",
-        borderRadius: 10,
-        background: c.elevatedBg,
-        border: `1px solid ${c.border}`,
-      }}
-    >
-      <Steps
-        current={currentStageIndex}
-        items={items}
-        size="small"
-        style={{ padding: "4px 0" }}
-      />
-    </div>
+    <WorkflowProgressPanel
+      current={currentStageIndex}
+      items={items}
+      status={status}
+    />
   );
 }

@@ -1,0 +1,227 @@
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import Dashboard from "./index";
+
+const mocks = vi.hoisted(() => ({
+  intraday: vi.fn(),
+  mainlineQuery: {
+    data: {
+      source: "财联社",
+      fetched_at: "2026-08-21T10:30:00+08:00",
+      style: {
+        title: "高位科技抱团逐步瓦解，市场风格或转向均衡轮动",
+        interpret: "资金配置重心逐步向外扩散。",
+        indexes: [
+          {
+            code: "000001",
+            name: "上证指数",
+            change_30d: -2.28,
+            stocks: [
+              { code: "603580", name: "艾艾精工", change_30d: 163.3 },
+            ],
+          },
+        ],
+      },
+      items: [
+        {
+          title: "创新药",
+          description: "龙头药明康德公告全面上调全年业绩指引。",
+          continued_days: 4,
+          hot: 4,
+          plates: [
+            {
+              code: "cls80044",
+              name: "创新药",
+              reason: "药明康德公告业绩指引上调。",
+              rise_count: 4,
+              change_pct: -4.05,
+              article_title: "市场再现缩量修复",
+              faucets: [
+                { code: "600721", name: "百花医药", change_pct: -3, reason: "16天涨超90%" },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    isLoading: false,
+    error: null as unknown,
+    refetch: vi.fn(),
+  },
+}));
+
+function resetMainlineQuery() {
+  mocks.mainlineQuery.data = {
+    source: "财联社",
+    fetched_at: "2026-08-21T10:30:00+08:00",
+    style: {
+      title: "高位科技抱团逐步瓦解，市场风格或转向均衡轮动",
+      interpret: "资金配置重心逐步向外扩散。",
+      indexes: [
+        {
+          code: "000001",
+          name: "上证指数",
+          change_30d: -2.28,
+          stocks: [
+            { code: "603580", name: "艾艾精工", change_30d: 163.3 },
+          ],
+        },
+      ],
+    },
+    items: [
+      {
+        title: "创新药",
+        description: "龙头药明康德公告全面上调全年业绩指引。",
+        continued_days: 4,
+        hot: 4,
+        plates: [
+          {
+            code: "cls80044",
+            name: "创新药",
+            reason: "药明康德公告业绩指引上调。",
+            rise_count: 4,
+            change_pct: -4.05,
+            article_title: "市场再现缩量修复",
+            faucets: [
+              { code: "600721", name: "百花医药", change_pct: -3, reason: "16天涨超90%" },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  mocks.mainlineQuery.isLoading = false;
+  mocks.mainlineQuery.error = null;
+}
+
+vi.mock("../../api/queries", () => ({
+  useMarketIndices: () => ({
+    data: { source: "腾讯", indices: [
+      { code: "000001", name: "上证指数", price: 3200, change_pct: 0.5, amount: 100000000 },
+      { code: "399001", name: "深证成指", price: 11000, change_pct: -0.2, amount: 200000000 },
+    ] },
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useMarketIndexIntraday: (symbol: string) => {
+    mocks.intraday(symbol);
+    return {
+      data: { code: symbol, source: "sina_direct", prev_close: null, items: [{ time: "09:30:00", price: 3200, avg_price: 3199, volume: 10 }] },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  },
+  useMarketMainline: () => mocks.mainlineQuery,
+}));
+
+vi.mock("../../charts/IntradayChart", () => ({ default: () => <div>首页指数分时图</div> }));
+
+vi.mock("./WatchlistPanel", () => ({
+  default: () => <div data-testid="watchlist-panel">我的自选</div>,
+}));
+
+describe("Dashboard", () => {
+  beforeEach(() => {
+    resetMainlineQuery();
+  });
+
+  it("keeps the watchlist in the right rail and removes duplicate shortcuts", () => {
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
+
+    const rail = screen.getByRole("complementary", { name: "首页自选栏" });
+    expect(within(rail).getByTestId("watchlist-panel")).toBeInTheDocument();
+    expect(screen.queryByText("市场行情")).not.toBeInTheDocument();
+    expect(screen.queryByText("对话")).not.toBeInTheDocument();
+    expect(screen.queryByText("AI 分析")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "市场总览" })).toBeInTheDocument();
+    expect(screen.getByText("当前查看 上证指数 · 000001")).toBeInTheDocument();
+    expect(screen.getByText("行情源 腾讯")).toBeInTheDocument();
+    const selectedIndex = screen.getByRole("button", { name: /上证指数/ });
+    expect(selectedIndex).toHaveClass("dashboard-index-button", "is-active");
+    expect(selectedIndex).toHaveAttribute("aria-pressed", "true");
+    expect(within(selectedIndex).getByText("000001")).toBeInTheDocument();
+    expect(screen.getByText("首页指数分时图")).toBeInTheDocument();
+    expect(mocks.intraday).toHaveBeenCalledWith("000001");
+  });
+
+  it("renders today's mainline chances with plates and faucet stocks", () => {
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
+
+    const section = screen.getByRole("region", { name: "今日主线" });
+    expect(within(section).getAllByText("创新药").length).toBeGreaterThan(0);
+    expect(within(section).getByText("持续 4 天")).toBeInTheDocument();
+    expect(within(section).getByText("热度 4")).toBeInTheDocument();
+    expect(within(section).getByText(/药明康德公告全面上调/)).toBeInTheDocument();
+    expect(within(section).getByText("4 家上涨")).toBeInTheDocument();
+    const faucetLink = within(section).getByRole("link", { name: /百花医药/ });
+    expect(faucetLink).toHaveAttribute("href", expect.stringContaining("600721"));
+    expect(within(section).getByText("风格判断")).toBeInTheDocument();
+    expect(within(section).getByText("高位科技抱团逐步瓦解，市场风格或转向均衡轮动")).toBeInTheDocument();
+    expect(within(section).getAllByRole("link", { name: /艾艾精工/ })[0]).toHaveAttribute(
+      "href",
+      expect.stringContaining("603580"),
+    );
+  });
+
+  it("shows the mainline error state without affecting indices or watchlist", () => {
+    mocks.mainlineQuery.data = null;
+    mocks.mainlineQuery.error = new Error("upstream failed");
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
+
+    const section = screen.getByRole("region", { name: "今日主线" });
+    expect(within(section).getByText("今日主线加载失败")).toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: /重\s*试/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /上证指数/ })).toBeInTheDocument();
+  });
+
+  it("shows the mainline empty state when no chances are available", () => {
+    mocks.mainlineQuery.data = {
+      source: "财联社",
+      fetched_at: "2026-08-21T10:30:00+08:00",
+      style: null,
+      items: [],
+    };
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
+
+    const section = screen.getByRole("region", { name: "今日主线" });
+    expect(within(section).getByText("暂无今日主线数据")).toBeInTheDocument();
+    expect(within(section).queryByText("风格判断")).not.toBeInTheDocument();
+  });
+
+  it("switches the home intraday chart from the index tiles", async () => {
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
+
+    const shenzhen = screen.getByRole("button", { name: /深证成指/ });
+    fireEvent.click(shenzhen);
+    await waitFor(() => expect(mocks.intraday).toHaveBeenCalledWith("399001"));
+    expect(shenzhen).toHaveClass("is-active");
+    expect(shenzhen).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("当前查看 深证成指 · 399001")).toBeInTheDocument();
+  });
+});

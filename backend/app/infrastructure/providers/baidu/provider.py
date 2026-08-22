@@ -67,8 +67,11 @@ class BaiduDataProvider:
     def fetch_stock_concept_blocks(self, code: str) -> dict:
         return stock.fetch_stock_concept_blocks(self._transport, code)
 
-    def fetch_stock_fund_flow(self, code: str) -> list[dict]:
+    def fetch_stock_fund_flow(self, code: str) -> dict:
         return fund_flow.fetch_stock_fund_flow(self._transport, code)
+
+    def fetch_stock_fund_flow_history(self, code: str, limit: int = 120) -> list[dict]:
+        return fund_flow.fetch_stock_fund_flow_history(self._transport, code, limit)
 
     def fetch_market_kuaixun(self, code: str = "", code_name: str = ""):
         return news.fetch_market_kuaixun(

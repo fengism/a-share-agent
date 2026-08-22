@@ -1,20 +1,24 @@
 from __future__ import annotations
 
-import json
 import re
 from collections.abc import Collection
 from dataclasses import dataclass
 
 from openai import AsyncOpenAI
+from pydantic import BaseModel, Field
 
 from app.agentic.runtime.llm import create_chat_completion
-from app.modules.chat.prompts import ORCHESTRATOR_CLASSIFY_PROMPT
+from app.infrastructure.llm.prompting.parsing import extract_json_object
+from app.modules.chat.prompts import (
+    ORCHESTRATOR_CLASSIFY_PROMPT,
+    ORCHESTRATOR_CLASSIFY_PROMPT_REF,
+)
 
 DEFAULT_AGENT_NAMES = ("technical", "fundamental", "news", "risk", "macro")
 
 _KEYWORD_MAP: dict[str, tuple[str, ...]] = {
     "technical": (
-        "K线", "MACD", "RSI", "KDJ", "布林", "技术面", "均线", "趋势",
+        "K线", "K 线", "MACD", "RSI", "KDJ", "布林", "技术面", "均线", "趋势",
         "支撑", "压力", "量价", "金叉", "死叉", "k线",
     ),
     "fundamental": (
@@ -43,6 +47,11 @@ class RoutingDecision:
     agents: list[str]
     needs_llm_classification: bool = False
     reasoning: str = ""
+
+
+class _RoutingOutput(BaseModel):
+    agents: list[str] = Field(default_factory=list, max_length=5)
+    reasoning: str = Field(default="模型完成分析维度路由", max_length=500)
 
 
 def is_url_message(message: str) -> bool:
@@ -110,18 +119,16 @@ async def classify_with_llm(
         temperature=0.0,
         max_tokens=512,
         stream=False,
+        response_format={"type": "json_object"},
+        metric_stage=ORCHESTRATOR_CLASSIFY_PROMPT_REF,
     )
     content = response.choices[0].message.content or "{}"
-    json_match = re.search(r"\{.*\}", content, re.S)
-    if not json_match:
-        raise ValueError(f"No JSON in LLM response: {content[:200]}")
-
-    data = json.loads(json_match.group())
+    data = _RoutingOutput.model_validate_json(extract_json_object(content))
     agent_names = list(available_agents)
-    agents = [agent for agent in data.get("agents", []) if agent in agent_names]
+    agents = [agent for agent in data.agents if agent in agent_names]
     if not agents:
         agents = agent_names
     return RoutingDecision(
         agents=agents,
-        reasoning=str(data.get("reasoning", "模型完成分析维度路由")),
+        reasoning=data.reasoning,
     )

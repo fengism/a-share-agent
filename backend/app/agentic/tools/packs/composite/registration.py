@@ -13,37 +13,80 @@ _HIGH_REALTIME_POLICY = ToolPolicy(
     cost="high",
     cache_ttl_seconds=60,
     freshness="near_realtime",
+    timeout_seconds=30,
+    max_parallel_calls=2,
 )
 _HIGH_DAILY_POLICY = ToolPolicy(cost="high", cache_ttl_seconds=900, freshness="daily")
+_ANALYZE_SECTION_TIMEOUTS = {
+    "info": 8.0,
+    "valuation": 15.0,
+    "technical": 15.0,
+    "news": 12.0,
+    "sentiment": 12.0,
+}
+
+_RESEARCH_POLICY = ToolPolicy(
+    cost="high",
+    cache_ttl_seconds=60,
+    freshness="near_realtime",
+    timeout_seconds=180,
+    max_parallel_calls=2,
+)
 
 
-async def _gather_labeled(tasks: dict[str, Any]) -> dict[str, Any]:
-    """并行执行一组带标签的协程任务，异常转为 error 字符串。
+async def _gather_labeled(
+    tasks: dict[str, Any],
+    timeout_seconds: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    """Run labeled sections concurrently with independent timeout/error degradation."""
+    section_timeouts = timeout_seconds or {}
 
-    Param:
-        tasks: 任务名到协程的映射字典
-    Return:
-        任务名到结果的字典，异常任务的结果为 {"error": str(exc)}
-    """
-    labels = list(tasks.keys())
-    results = await asyncio.gather(*tasks.values(), return_exceptions=True)
-    return {
-        label: {"error": str(result)} if isinstance(result, Exception) else result
-        for label, result in zip(labels, results)
-    }
+    async def run_section(label: str, awaitable: Any) -> Any:
+        try:
+            timeout = section_timeouts.get(label)
+            if timeout is None:
+                return await awaitable
+            async with asyncio.timeout(timeout):
+                return await awaitable
+        except TimeoutError:
+            return {"status": "timeout", "error": f"{label} 加载超时"}
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            return {
+                "status": "failed",
+                "error": str(error) or type(error).__name__,
+            }
+
+    labels = list(tasks)
+    results = await asyncio.gather(
+        *(run_section(label, tasks[label]) for label in labels)
+    )
+    return dict(zip(labels, results, strict=True))
 
 
 async def _analyze_stock(code: str) -> Any:
     """组合技能：一键获取个股全维度数据（信息+估值+技术+新闻+情绪）。"""
-    return {
-        "code": code,
-        **await _gather_labeled({
+    sections = await _gather_labeled(
+        {
             "info": helpers.get_stock_info(code),
             "valuation": helpers.get_stock_valuation_detail(code),
             "technical": helpers.get_stock_technical_indicators(code),
             "news": helpers.get_stock_news(code),
             "sentiment": helpers.get_stock_sentiment(code),
-        }),
+        },
+        _ANALYZE_SECTION_TIMEOUTS,
+    )
+    unavailable_sections = [
+        label
+        for label, result in sections.items()
+        if isinstance(result, dict) and result.get("error")
+    ]
+    return {
+        "code": code,
+        "partial": bool(unavailable_sections),
+        "unavailable_sections": unavailable_sections,
+        **sections,
     }
 
 
@@ -61,12 +104,7 @@ async def _get_hot_rank(type: str = "industries") -> Any:
     Return:
         对应类型的热门排名数据
     """
-    from app.market_data.market.public import get_hot_stocks, get_ths_hot_concept, get_ths_hot_industry
-    if type == "concepts":
-        return await get_ths_hot_concept()
-    if type == "industries":
-        return await get_ths_hot_industry()
-    return await get_hot_stocks()
+    return await get_application_tool_handlers().get_hot_rank(type=type)
 
 
 async def _compare_stocks(codes: list[str] | str) -> Any:
@@ -127,7 +165,7 @@ def register_composite_tools():
             },
             "required": ["name"],
         },
-        policy=_HIGH_REALTIME_POLICY,
+        policy=_RESEARCH_POLICY,
         executor=_sector_analysis,
     ))
 

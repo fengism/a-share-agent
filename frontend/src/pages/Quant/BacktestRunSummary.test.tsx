@@ -15,12 +15,9 @@ const run: QuantBacktestRun = {
     universe: { source: "portfolio", codes: [] },
     strategy: {
       type: "rsi_reversion",
-      fast_period: 5,
-      slow_period: 20,
-      lookback_period: 20,
-      rsi_period: 14,
-      buy_threshold: 30,
-      sell_threshold: 70,
+      version: "1.0.0",
+      name: "RSI 均值回归",
+      parameters: { rsi_period: 14, buy_threshold: 30, sell_threshold: 70 },
     },
     start_date: "2025-01-01",
     end_date: "2026-01-01",
@@ -45,7 +42,8 @@ describe("BacktestRunSummary", () => {
     expect(screen.getByText("当前回测")).toBeInTheDocument();
     expect(screen.getByText("持仓 RSI 回测")).toBeInTheDocument();
     expect(screen.getByText("运行中")).toBeInTheDocument();
-    expect(screen.getByText("RSI 均值回归")).toBeInTheDocument();
+    expect(screen.getByText("RSI 均值回归 · rsi_reversion@1.0.0")).toBeInTheDocument();
+    expect(screen.getByText("rsi_period=14 · buy_threshold=30 · sell_threshold=70")).toBeInTheDocument();
     expect(screen.getByText("当前持仓")).toBeInTheDocument();
     expect(screen.getByText("2025-01-01 至 2026-01-01")).toBeInTheDocument();
     expect(screen.getByText("2 次")).toBeInTheDocument();

@@ -146,13 +146,15 @@ export default function ComparePage() {
   return (
     <div style={pageContainerStyle}>
       <div style={pageHeaderStyle}>
-        <Title level={3} style={pageTitleStyle}>个股对比</Title>
+        <div className="u-page-title u-page-title--compact">
+          <Title level={3} style={pageTitleStyle}>个股对比</Title>
+        </div>
         <Text style={pageDescriptionStyle}>横向对比多只股票的关键财务和估值指标，辅助投资决策。</Text>
       </div>
 
       {/* Search & selected tags */}
       <Card size="small" style={{ ...cardStyle, marginBottom: 16 }} styles={{ body: { padding: "14px 18px" } }}>
-        <Space direction="vertical" style={{ width: "100%" }}>
+        <Space orientation="vertical" style={{ width: "100%" }}>
           <AutoComplete
             style={{ width: "100%" }}
             options={searchOptions}

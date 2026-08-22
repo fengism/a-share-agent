@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildBacktestRequest,
   dateRangeValidationError,
-  movingAverageValidationError,
   parseStockCodes,
-  rsiValidationError,
+  strategyConstraintDependencies,
+  strategyConstraintValidationError,
   stockCodesValidationError,
   strategyFormValues,
   strategyOptions,
@@ -45,8 +45,6 @@ describe("quant form helpers", () => {
     expect(stockCodesValidationError("custom", " ")).toBe("请输入股票代码");
     expect(stockCodesValidationError("custom", elevenCodes)).toBe("股票池最多支持 10 只股票");
     expect(stockCodesValidationError("portfolio", "")).toBeUndefined();
-    expect(movingAverageValidationError(20, 20)).toBe("短周期必须小于长周期");
-    expect(rsiValidationError(70, 30)).toBe("买入阈值必须小于卖出阈值");
     expect(dateRangeValidationError([dayjs("2026-01-01"), dayjs("2026-01-01")])).toBe("开始日期必须早于结束日期");
     expect(dateRangeValidationError([dayjs("2020-01-01"), dayjs("2026-01-02")])).toBe("回测周期不能超过 5 年");
   });
@@ -54,31 +52,78 @@ describe("quant form helpers", () => {
   it("uses API presets and exposes their complete form config", () => {
     const [option] = strategyOptions([{
       key: "rsi_reversion",
+      version: "2.0.0",
+      definition_hash: "sha256:custom",
       name: "定制 RSI",
       description: "定制阈值",
+      scenario: "定制震荡",
+      risk_level: "low",
+      presentation: { icon: "dashboard" },
+      constraints: [{
+        operator: "less_than",
+        left: "$buy_threshold",
+        right: "$sell_threshold",
+        message: "买入阈值必须小于卖出阈值",
+      }],
+      parameters: [
+        { key: "rsi_period", type: "integer", label: "RSI 周期", description: "", default: 9, minimum: 2, maximum: 100 },
+        { key: "buy_threshold", type: "number", label: "买入阈值", description: "", default: 25, minimum: 0, maximum: 100 },
+        { key: "sell_threshold", type: "number", label: "卖出阈值", description: "", default: 75, minimum: 0, maximum: 100 },
+      ],
       config: {
         type: "rsi_reversion",
-        fast_period: 5,
-        slow_period: 20,
-        lookback_period: 20,
-        rsi_period: 9,
-        buy_threshold: 25,
-        sell_threshold: 75,
+        version: "2.0.0",
+        parameters: { rsi_period: 9, buy_threshold: 25, sell_threshold: 75 },
       },
     }]);
 
     expect(option.description).toBe("定制阈值");
     expect(option).toEqual(expect.objectContaining({
-      scenario: "震荡行情",
-      risk: "中等",
-      riskColor: "gold",
-      parameterSummary: "RSI 9 · 25 / 75",
+      scenario: "定制震荡",
+      risk: "较低",
+      riskColor: "success",
+      parameterSummary: "RSI 周期 9 · 买入阈值 25 · 卖出阈值 75",
     }));
     expect(strategyFormValues(option.config)).toEqual(expect.objectContaining({
       strategyType: "rsi_reversion",
-      rsiPeriod: 9,
-      buyThreshold: 25,
-      sellThreshold: 75,
+      strategyVersion: "2.0.0",
+      strategyParameters: { rsi_period: 9, buy_threshold: 25, sell_threshold: 75 },
     }));
+  });
+
+  it("evaluates descriptor constraints without strategy-specific branches", () => {
+    const constraints = [
+      {
+        operator: "less_than" as const,
+        left: "$fast_period",
+        right: "$slow_period",
+        message: "短周期必须小于长周期",
+      },
+      {
+        operator: "greater_or_equal" as const,
+        left: "$slow_period",
+        right: 10,
+        message: "长周期不能小于 10",
+      },
+    ];
+
+    expect(strategyConstraintDependencies("fast_period", constraints)).toEqual([
+      ["strategyParameters", "slow_period"],
+    ]);
+    expect(strategyConstraintValidationError(
+      "fast_period",
+      constraints,
+      { fast_period: 20, slow_period: 10 },
+    )).toBe("短周期必须小于长周期");
+    expect(strategyConstraintValidationError(
+      "slow_period",
+      constraints,
+      { fast_period: 5, slow_period: 8 },
+    )).toBe("长周期不能小于 10");
+    expect(strategyConstraintValidationError(
+      "slow_period",
+      constraints,
+      { fast_period: 5, slow_period: 20 },
+    )).toBeUndefined();
   });
 });

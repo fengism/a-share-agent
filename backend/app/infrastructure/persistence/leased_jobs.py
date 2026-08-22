@@ -6,9 +6,15 @@ import re
 import sqlite3
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from app.infrastructure.persistence.connection import unit_of_work
+from app.infrastructure.persistence.retention import (
+    DEFAULT_PURGE_BATCH_SIZE,
+    DEFAULT_PURGE_MAX_BATCHES,
+    PurgeResult,
+    purge_rows_in_batches,
+)
 
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -117,10 +123,13 @@ class LeasedJobStateStore:
             )
             if cursor.rowcount != 1:
                 return None
-            return connection.execute(
-                f"SELECT * FROM {table_name} WHERE id = ?",
-                (row["id"],),
-            ).fetchone()
+            return cast(
+                sqlite3.Row | None,
+                connection.execute(
+                    f"SELECT * FROM {table_name} WHERE id = ?",
+                    (row["id"],),
+                ).fetchone(),
+            )
 
     def renew_lease(
         self,
@@ -267,17 +276,42 @@ class LeasedJobStateStore:
         connection.commit()
         return cursor.rowcount == 1
 
-    def purge_completed(self, retention_seconds: float, *, now: float) -> int:
+    def purge_completed_with_status(
+        self,
+        retention_seconds: float,
+        *,
+        now: float,
+        batch_size: int = DEFAULT_PURGE_BATCH_SIZE,
+        max_batches: int = DEFAULT_PURGE_MAX_BATCHES,
+    ) -> PurgeResult:
         placeholders = ", ".join("?" for _ in self._spec.terminal_statuses)
-        connection = self._connection_provider()
-        cursor = connection.execute(
-            f"""
-            DELETE FROM {self.table_name}
-            WHERE status IN ({placeholders})
-              AND completed_at IS NOT NULL
-              AND completed_at <= ?
+        return purge_rows_in_batches(
+            self._connection_provider(),
+            table_name=self.table_name,
+            predicate_sql=f"""
+                status IN ({placeholders})
+                AND completed_at IS NOT NULL
+                AND completed_at <= ?
             """,
-            (*self._spec.terminal_statuses, now - max(0.0, retention_seconds)),
+            parameters=(*self._spec.terminal_statuses, now - max(0.0, retention_seconds)),
+            order_by="completed_at, rowid",
+            batch_size=batch_size,
+            max_batches=max_batches,
         )
-        connection.commit()
-        return cursor.rowcount
+
+    def purge_completed(
+        self,
+        retention_seconds: float,
+        *,
+        now: float,
+        batch_size: int = DEFAULT_PURGE_BATCH_SIZE,
+        max_batches: int = DEFAULT_PURGE_MAX_BATCHES,
+    ) -> int:
+        return int(
+            self.purge_completed_with_status(
+                retention_seconds,
+                now=now,
+                batch_size=batch_size,
+                max_batches=max_batches,
+            ).deleted
+        )

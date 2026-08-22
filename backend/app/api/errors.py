@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
+import httpx
+import requests
+import urllib3
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -75,6 +79,23 @@ class NotFoundError(ApiError):
 class ConflictError(ApiError):
     def __init__(self, message: str, *, code: str = "conflict") -> None:
         super().__init__(status_code=409, code=code, message=message)
+
+
+class TooManyRequestsError(ApiError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "rate_limited",
+        retry_after_seconds: int | None = None,
+    ) -> None:
+        headers = {"Retry-After": str(retry_after_seconds)} if retry_after_seconds is not None else None
+        super().__init__(status_code=429, code=code, message=message, headers=headers)
+
+
+class ServiceUnavailableError(ApiError):
+    def __init__(self, message: str, *, code: str = "service_unavailable") -> None:
+        super().__init__(status_code=503, code=code, message=message)
 
 
 _STATUS_CODES = {
@@ -227,6 +248,25 @@ async def lookup_error_handler(request: Request, exc: LookupError) -> JSONRespon
     )
 
 
+async def upstream_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    error_id, message = build_internal_error("上游服务暂时不可用，请稍后重试")
+    logger.warning(
+        "上游请求失败 error_id=%s: %s %s error_type=%s",
+        error_id,
+        request.method,
+        request.url.path,
+        type(exc).__name__,
+    )
+    return _response(
+        request,
+        status_code=503,
+        code="upstream_unavailable",
+        message=message,
+        headers={"X-Error-ID": error_id},
+        error_id=error_id,
+    )
+
+
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     error_id, message = build_internal_error("服务器内部错误，请稍后重试")
     logger.error(
@@ -252,6 +292,15 @@ def register_error_handlers(application: FastAPI) -> None:
     application.add_exception_handler(ApplicationError, application_error_handler)
     application.add_exception_handler(StarletteHTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, validation_error_handler)
+    for exception_type in (
+        requests.RequestException,
+        httpx.HTTPError,
+        urllib3.exceptions.HTTPError,
+        json.JSONDecodeError,
+        TimeoutError,
+        ConnectionError,
+    ):
+        application.add_exception_handler(exception_type, upstream_exception_handler)
     application.add_exception_handler(ValueError, value_error_handler)
     application.add_exception_handler(LookupError, lookup_error_handler)
     application.add_exception_handler(Exception, global_exception_handler)

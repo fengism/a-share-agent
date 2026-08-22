@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
@@ -13,9 +12,9 @@ from app.configuration import get_settings
 from app.configuration.schema import Settings
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
 from app.core.metrics import metrics
-from app.modules.bot.models import BotMessage, BotResponse
+from app.modules.bot.job_execution import execute_bot_job
+from app.modules.bot.models import BotMessage
 from app.modules.bot.persistence import jobs as job_store
-from app.modules.bot.platforms.base import BotPlatform
 from app.modules.bot.platforms.registry import get_bot_platform
 from app.modules.bot.service import get_bot_service
 
@@ -33,7 +32,6 @@ _COMMAND_ALIASES = {
     "任务": "task",
     "进度": "task",
 }
-_PROGRESS_COMMANDS = frozenset({"analyze", "market", "batch"})
 
 
 def _serialize_message(message: BotMessage) -> dict[str, Any]:
@@ -165,73 +163,14 @@ async def process_next_bot_job(
     )
     try:
         message = _deserialize_message(job.message_payload)
-        platform: BotPlatform = platform_provider(message.platform)
-
-        async def report_progress(progress_response: BotResponse) -> None:
-            try:
-                await platform.send_response(message, progress_response)
-            except Exception:
-                metrics.record_bot_event("progress_send_failed")
-                logger.exception(
-                    "Bot 任务进度回发失败: job_id=%s event_id=%s",
-                    job.id,
-                    job.event_id,
-                )
-
-        if job.response_payload is None:
-            if job.command_name in _PROGRESS_COMMANDS:
-                await report_progress(
-                    BotResponse(
-                        text=(
-                            f"任务 `{job.id[:8]}` 已开始执行。\n"
-                            f"可发送 `/task {job.id[:8]}` 查询状态。"
-                        ),
-                        title="任务已受理",
-                    )
-                )
-            response = await service_provider().dispatch(
-                message,
-                job_id=job.id,
-                progress_reporter=report_progress,
-            )
-            if response is None:
-                completed = await blocking_runner(
-                    job_store.complete,
-                    job.id,
-                    owner_id,
-                    semaphore=database_semaphore,
-                )
-                if not completed:
-                    raise RuntimeError("Bot 空响应任务完成状态更新失败")
-                metrics.record_bot_event("succeeded")
-                return True
-            response_payload = asdict(response)
-            saved = await blocking_runner(
-                job_store.save_response,
-                job.id,
-                owner_id,
-                response_payload,
-                semaphore=database_semaphore,
-            )
-            if not saved:
-                raise RuntimeError("Bot 任务响应持久化失败")
-        else:
-            response = BotResponse(**job.response_payload)
-
-        try:
-            await platform.send_response(message, response)
-        except Exception:
-            metrics.record_bot_event("response_send_failed")
-            raise
-        completed = await blocking_runner(
-            job_store.complete,
-            job.id,
+        await execute_bot_job(
+            job,
             owner_id,
-            semaphore=database_semaphore,
+            message,
+            platform_provider(message.platform),
+            service_provider(),
+            blocking_runner=blocking_runner,
         )
-        if not completed:
-            raise RuntimeError("Bot 任务完成状态更新失败")
-        metrics.record_bot_event("succeeded")
     except asyncio.CancelledError:
         await blocking_runner(
             job_store.release,

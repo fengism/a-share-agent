@@ -4,8 +4,8 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from app.core.market import normalize_index_symbol_v2
-from app.infrastructure.http.client import get_session
+from app.core.market import normalize_code
+from app.infrastructure.http.client import get_provider_session as get_session
 
 
 def get_last_trade_date(
@@ -13,7 +13,7 @@ def get_last_trade_date(
     *,
     session_provider: Callable[[], Any] = get_session,
 ) -> str:
-    symbol = normalize_index_symbol_v2(code)
+    symbol = normalize_code(code).prefixed_lower
     response = session_provider().get(
         f"https://hq.sinajs.cn/list={symbol}",
         headers={

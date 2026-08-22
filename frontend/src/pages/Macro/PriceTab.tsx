@@ -41,6 +41,7 @@ export default function PriceTab() {
             title="CPI 居民消费价格指数"
             latest={cpi?.latest ?? null}
             trend={cpi?.trend ?? []}
+            metadata={cpi}
             fields={CPI_FIELDS(c)}
           />
         </Col>
@@ -49,6 +50,7 @@ export default function PriceTab() {
             title="PPI 工业生产者出厂价格指数"
             latest={ppi?.latest ?? null}
             trend={ppi?.trend ?? []}
+            metadata={ppi}
             fields={PPI_FIELDS(c)}
           />
         </Col>

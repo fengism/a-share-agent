@@ -12,6 +12,22 @@
   min-width: 0;
 }
 
+.responsive-section-nav__panel {
+  min-width: 0;
+}
+
+.responsive-section-nav__tabs {
+  min-width: 0;
+}
+
+.responsive-section-nav__tabs .ant-tabs-nav-wrap {
+  min-width: 0;
+}
+
+.responsive-section-nav__tabs .ant-tabs-tab-btn {
+  white-space: nowrap;
+}
+
 .responsive-section-nav--rail {
   display: grid;
   grid-template-columns: 176px minmax(0, 1fr);

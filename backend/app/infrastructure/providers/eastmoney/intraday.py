@@ -6,6 +6,7 @@ import pandas as pd
 from app.constants.market import EASTMONEY_API_TOKEN, EASTMONEY_UT_TRADE
 from app.core.dataframes import normalize_intraday_df
 from app.infrastructure.http.sse import event_stream
+from app.infrastructure.providers.eastmoney.symbols import build_stock_secid
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,6 @@ class IntradayMixin:
         Return:
             pd.DataFrame: 包含列: 时间, 成交价, 成交量, 成交额, 买卖盘性质
         """
-        market_code = 1 if code.startswith("6") else 0
         url = "https://61.push2delay.eastmoney.com/api/qt/stock/details/sse"
         params = {
             "fields1": "f1,f2,f3,f4",
@@ -33,7 +33,7 @@ class IntradayMixin:
             "ut": EASTMONEY_UT_TRADE,
             "fltt": "2",
             "pos": "-0",
-            "secid": f"{market_code}.{code}",
+            "secid": build_stock_secid(code),
             "wbp2u": "|0|0|0|web",
         }
 
@@ -71,7 +71,6 @@ class IntradayMixin:
         Return:
             pd.DataFrame: 包含列: 时间, 成交价, 手数, 成交额
         """
-        market_code = 1 if code.startswith("6") else 0
         url = "https://69.push2.eastmoney.com/api/qt/stock/trends2/sse"
         params = {
             "fields1": "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f17",
@@ -81,7 +80,7 @@ class IntradayMixin:
             "ndays": "1",
             "iscr": "0",
             "iscca": "0",
-            "secid": f"{market_code}.{code}",
+            "secid": build_stock_secid(code),
             "wbp2u": "1849325530509956|0|1|0|web",
         }
 

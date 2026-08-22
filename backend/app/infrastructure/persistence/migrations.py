@@ -1,9 +1,19 @@
+import hashlib
+import inspect
 import logging
 import sqlite3
+import textwrap
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.infrastructure.persistence.connection import unit_of_work
+from app.infrastructure.persistence.ddl import (
+    PORTFOLIO_TRANSACTION_STATEMENTS,
+    QUANT_ACTIVE_USER_INDEX,
+    QUANT_STRATEGY_DRAFT_STATEMENTS,
+    WORKFLOW_ACTIVE_USER_INDEX,
+    WORKFLOW_JOB_STATEMENTS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +21,7 @@ MIGRATION_TABLE = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
     version    INTEGER PRIMARY KEY,
     name       TEXT    NOT NULL,
+    checksum   TEXT,
     applied_at TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
 )
 """
@@ -21,6 +32,12 @@ class Migration:
     version: int
     name: str
     apply: Callable[[sqlite3.Connection], None]
+
+    @property
+    def checksum(self) -> str:
+        source = textwrap.dedent(inspect.getsource(self.apply)).strip()
+        payload = f"{self.version}\n{self.name}\n{source}".encode()
+        return hashlib.sha256(payload).hexdigest()
 
 
 def _add_must_change_password(conn: sqlite3.Connection) -> None:
@@ -279,6 +296,226 @@ def _add_quant_backtest_runs(conn: sqlite3.Connection) -> None:
     )
 
 
+def _add_workflow_jobs(conn: sqlite3.Connection) -> None:
+    for statement in WORKFLOW_JOB_STATEMENTS:
+        conn.execute(statement)
+
+
+def _add_workflow_retention_index(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_workflow_jobs_retention
+        ON workflow_jobs(status, completed_at)
+        """
+    )
+
+
+def _add_portfolio_transactions(conn: sqlite3.Connection) -> None:
+    for statement in PORTFOLIO_TRANSACTION_STATEMENTS:
+        conn.execute(statement)
+    legacy_table = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'portfolio_positions'"
+    ).fetchone()
+    if legacy_table is None:
+        return
+    conn.execute(
+        """
+        INSERT INTO portfolio_transactions(
+            id, user_id, stock_code, stock_name, side, trade_price,
+            trade_time, shares, fee, note, created_at
+        )
+        SELECT id, user_id, stock_code, stock_name, 'buy', buy_price,
+               buy_time, shares, 0, '', created_at
+        FROM portfolio_positions
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM portfolio_transactions AS transaction_record
+            WHERE transaction_record.id = portfolio_positions.id
+        )
+        ORDER BY id
+        """
+    )
+
+
+def _remove_legacy_portfolio_positions(conn: sqlite3.Connection) -> None:
+    legacy_table = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'portfolio_positions'"
+    ).fetchone()
+    if legacy_table is None:
+        return
+    backfill_applied = conn.execute("SELECT 1 FROM schema_migrations WHERE version = 10").fetchone()
+    if backfill_applied is None:
+        raise RuntimeError("旧持仓清理前未完成交易流水回填")
+    conn.execute("DROP INDEX IF EXISTS idx_portfolio_positions_user_time")
+    conn.execute("DROP TABLE portfolio_positions")
+
+
+def _add_watchlist(conn: sqlite3.Connection) -> None:
+    from app.infrastructure.persistence.ddl import WATCHLIST_STATEMENTS
+
+    for statement in WATCHLIST_STATEMENTS:
+        conn.execute(statement)
+
+
+def _add_chat_state(conn: sqlite3.Connection) -> None:
+    from app.infrastructure.persistence.ddl import CHAT_STATE_STATEMENTS
+
+    for statement in CHAT_STATE_STATEMENTS:
+        conn.execute(statement)
+
+
+def _add_chat_state_payload_hash(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(chat_states)").fetchall()}
+    if "payload_hash" not in columns:
+        conn.execute("ALTER TABLE chat_states ADD COLUMN payload_hash TEXT NOT NULL DEFAULT ''")
+    rows = conn.execute(
+        "SELECT user_id, payload_json FROM chat_states WHERE payload_hash = ''"
+    ).fetchall()
+    conn.executemany(
+        "UPDATE chat_states SET payload_hash = ? WHERE user_id = ?",
+        [
+            (hashlib.sha256(str(row[1]).encode("utf-8")).hexdigest(), int(row[0]))
+            for row in rows
+        ],
+    )
+
+
+def _add_chat_state_revision(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(chat_states)").fetchall()}
+    if "revision" not in columns:
+        conn.execute("ALTER TABLE chat_states ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+
+
+def _add_quant_strategy_drafts(conn: sqlite3.Connection) -> None:
+    for statement in QUANT_STRATEGY_DRAFT_STATEMENTS:
+        conn.execute(statement)
+
+
+def _add_active_job_quota_indexes(conn: sqlite3.Connection) -> None:
+    conn.execute(WORKFLOW_ACTIVE_USER_INDEX)
+    conn.execute(QUANT_ACTIVE_USER_INDEX)
+
+
+def _add_screener_strategy_workflow_kind(conn: sqlite3.Connection) -> None:
+    table = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'workflow_jobs'"
+    ).fetchone()
+    if table is None:
+        for statement in WORKFLOW_JOB_STATEMENTS:
+            conn.execute(statement)
+        conn.execute(WORKFLOW_ACTIVE_USER_INDEX)
+        _add_workflow_retention_index(conn)
+        return
+    if "screener_strategy" in str(table[0]):
+        return
+
+    has_events = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'workflow_job_events'"
+    ).fetchone() is not None
+    if has_events:
+        conn.execute("ALTER TABLE workflow_job_events RENAME TO workflow_job_events_v17")
+    conn.execute("ALTER TABLE workflow_jobs RENAME TO workflow_jobs_v17")
+    for index_name in (
+        "idx_workflow_jobs_active_key",
+        "idx_workflow_jobs_claim",
+        "idx_workflow_jobs_retention",
+        "idx_workflow_jobs_active_user",
+        "idx_workflow_job_events_read",
+    ):
+        conn.execute(f'DROP INDEX IF EXISTS "{index_name}"')
+
+    for statement in WORKFLOW_JOB_STATEMENTS:
+        conn.execute(statement)
+    conn.execute(
+        """
+        INSERT INTO workflow_jobs(
+            id, kind, user_id, dedupe_key, request_json, status,
+            attempts, max_attempts, available_at, lease_owner, lease_until,
+            last_error, created_at, updated_at, completed_at
+        )
+        SELECT
+            id, kind, user_id, dedupe_key, request_json, status,
+            attempts, max_attempts, available_at, lease_owner, lease_until,
+            last_error, created_at, updated_at, completed_at
+        FROM workflow_jobs_v17
+        """
+    )
+    if has_events:
+        conn.execute(
+            """
+            INSERT INTO workflow_job_events(
+                job_id, attempt, sequence, event_type, payload_json, created_at
+            )
+            SELECT job_id, attempt, sequence, event_type, payload_json, created_at
+            FROM workflow_job_events_v17
+            """
+        )
+        conn.execute("DROP TABLE workflow_job_events_v17")
+    conn.execute("DROP TABLE workflow_jobs_v17")
+    conn.execute(WORKFLOW_ACTIVE_USER_INDEX)
+    _add_workflow_retention_index(conn)
+
+
+def _add_daily_review_workflow_kind(conn: sqlite3.Connection) -> None:
+    table = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'workflow_jobs'"
+    ).fetchone()
+    if table is None:
+        for statement in WORKFLOW_JOB_STATEMENTS:
+            conn.execute(statement)
+        conn.execute(WORKFLOW_ACTIVE_USER_INDEX)
+        _add_workflow_retention_index(conn)
+        return
+    if "daily_review" in str(table[0]):
+        return
+
+    has_events = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'workflow_job_events'"
+    ).fetchone() is not None
+    if has_events:
+        conn.execute("ALTER TABLE workflow_job_events RENAME TO workflow_job_events_v19")
+    conn.execute("ALTER TABLE workflow_jobs RENAME TO workflow_jobs_v19")
+    for index_name in (
+        "idx_workflow_jobs_active_key",
+        "idx_workflow_jobs_claim",
+        "idx_workflow_jobs_retention",
+        "idx_workflow_jobs_active_user",
+        "idx_workflow_job_events_read",
+    ):
+        conn.execute(f'DROP INDEX IF EXISTS "{index_name}"')
+
+    for statement in WORKFLOW_JOB_STATEMENTS:
+        conn.execute(statement)
+    conn.execute(
+        """
+        INSERT INTO workflow_jobs(
+            id, kind, user_id, dedupe_key, request_json, status,
+            attempts, max_attempts, available_at, lease_owner, lease_until,
+            last_error, created_at, updated_at, completed_at
+        )
+        SELECT
+            id, kind, user_id, dedupe_key, request_json, status,
+            attempts, max_attempts, available_at, lease_owner, lease_until,
+            last_error, created_at, updated_at, completed_at
+        FROM workflow_jobs_v19
+        """
+    )
+    if has_events:
+        conn.execute(
+            """
+            INSERT INTO workflow_job_events(
+                job_id, attempt, sequence, event_type, payload_json, created_at
+            )
+            SELECT job_id, attempt, sequence, event_type, payload_json, created_at
+            FROM workflow_job_events_v19
+            """
+        )
+        conn.execute("DROP TABLE workflow_job_events_v19")
+    conn.execute("DROP TABLE workflow_jobs_v19")
+    conn.execute(WORKFLOW_ACTIVE_USER_INDEX)
+    _add_workflow_retention_index(conn)
+
+
 USER_MIGRATIONS = (
     Migration(1, "add users.must_change_password", _add_must_change_password),
     Migration(2, "add authentication lookup indexes", _add_auth_indexes),
@@ -287,6 +524,18 @@ USER_MIGRATIONS = (
     Migration(5, "add bot job lookup fields", _add_bot_job_lookup_fields),
     Migration(6, "add user config key index", _add_user_config_key_index),
     Migration(7, "add quant research", _add_quant_backtest_runs),
+    Migration(8, "add durable workflow jobs", _add_workflow_jobs),
+    Migration(9, "add workflow retention index", _add_workflow_retention_index),
+    Migration(10, "add portfolio transactions", _add_portfolio_transactions),
+    Migration(11, "remove legacy portfolio positions", _remove_legacy_portfolio_positions),
+    Migration(12, "add user watchlists and alerts", _add_watchlist),
+    Migration(13, "add synchronized chat state", _add_chat_state),
+    Migration(14, "add active job quota indexes", _add_active_job_quota_indexes),
+    Migration(15, "add synchronized chat state payload hash", _add_chat_state_payload_hash),
+    Migration(16, "add synchronized chat state revision", _add_chat_state_revision),
+    Migration(17, "add quant strategy drafts", _add_quant_strategy_drafts),
+    Migration(18, "add screener strategy workflow kind", _add_screener_strategy_workflow_kind),
+    Migration(19, "add daily review workflow kind", _add_daily_review_workflow_kind),
 )
 
 MARKET_MIGRATIONS = (
@@ -306,10 +555,26 @@ def apply_migrations(
 ) -> None:
     """按版本顺序事务化执行尚未应用的 SQLite 迁移。"""
     conn.execute(MIGRATION_TABLE)
+    migration_columns = {row[1] for row in conn.execute("PRAGMA table_info(schema_migrations)").fetchall()}
+    if "checksum" not in migration_columns:
+        conn.execute("ALTER TABLE schema_migrations ADD COLUMN checksum TEXT")
     conn.commit()
-    applied = {row["version"] for row in conn.execute("SELECT version FROM schema_migrations").fetchall()}
+    applied = {
+        int(row["version"]): row
+        for row in conn.execute("SELECT version, name, checksum FROM schema_migrations").fetchall()
+    }
     for migration in migrations:
-        if migration.version in applied:
+        existing = applied.get(migration.version)
+        if existing is not None:
+            stored_checksum = existing["checksum"]
+            if stored_checksum and stored_checksum != migration.checksum:
+                raise RuntimeError(f"数据库迁移校验失败: version={migration.version} name={migration.name}")
+            if not stored_checksum:
+                conn.execute(
+                    "UPDATE schema_migrations SET checksum = ? WHERE version = ?",
+                    (migration.checksum, migration.version),
+                )
+                conn.commit()
             continue
         with unit_of_work(connection=conn, immediate=True) as work:
             already_applied = work.connection.execute(
@@ -320,7 +585,7 @@ def apply_migrations(
                 continue
             migration.apply(work.connection)
             work.connection.execute(
-                "INSERT INTO schema_migrations(version, name) VALUES (?, ?)",
-                (migration.version, migration.name),
+                "INSERT INTO schema_migrations(version, name, checksum) VALUES (?, ?, ?)",
+                (migration.version, migration.name, migration.checksum),
             )
         logger.info("数据库迁移完成: version=%s name=%s", migration.version, migration.name)

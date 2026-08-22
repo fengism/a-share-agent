@@ -1,6 +1,5 @@
 from typing import cast
 
-from app.contracts.auth import UserRecord
 from app.core.security import (
     SESSION_RENEW_THRESHOLD_DAYS,
     generate_session_token,
@@ -8,7 +7,9 @@ from app.core.security import (
     now_ts,
     session_expiry,
 )
+from app.domain.identity import UserRecord
 from app.infrastructure.persistence.connection import get_connection
+from app.infrastructure.persistence.retention import PurgeResult, purge_rows_in_batches
 
 
 def _connection():
@@ -71,15 +72,24 @@ def delete_session(token: str) -> None:
 
 
 def purge_expired() -> dict[str, int]:
+    return {name: result.deleted for name, result in purge_expired_with_status().items()}
+
+
+def purge_expired_with_status() -> dict[str, PurgeResult]:
     connection = _connection()
     current_time = now_ts()
-    sessions = connection.execute(
-        "DELETE FROM auth_sessions WHERE expires_at <= ?",
-        (current_time,),
-    ).rowcount
-    resets = connection.execute(
-        "DELETE FROM password_resets WHERE expires_at <= ? OR used_at IS NOT NULL",
-        (current_time,),
-    ).rowcount
-    connection.commit()
+    sessions = purge_rows_in_batches(
+        connection,
+        table_name="auth_sessions",
+        predicate_sql="expires_at <= ?",
+        parameters=(current_time,),
+        order_by="expires_at, rowid",
+    )
+    resets = purge_rows_in_batches(
+        connection,
+        table_name="password_resets",
+        predicate_sql="expires_at <= ? OR used_at IS NOT NULL",
+        parameters=(current_time,),
+        order_by="expires_at, rowid",
+    )
     return {"auth_sessions": sessions, "password_resets": resets}

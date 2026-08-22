@@ -8,11 +8,19 @@ INDEX_FALLBACKS = [
 ]
 
 SINA_INDEX_QUOTE_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple"
+SINA_INDEX_INTRADAY_URL = "https://cn.finance.sina.com.cn/minline/getMinlineData"
 SINA_MARKET_HQ_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData"
+SINA_MARKET_NODES_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodes"
+SINA_CN_RANK_URL = "https://cnrank.finance.sina.cn/getSymRankByNode"
 SINA_STOCK_KLINE_URL = "https://quotes.sina.cn/cn/api/jsonp_v2.php/=/CN_MarketDataService.getKLineData"
 
 EASTMONEY_STOCK_KLINE_URL = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
 EASTMONEY_CLIST_URL = "http://push2.eastmoney.com/api/qt/clist/get"
+EASTMONEY_STOCK_PROFILE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
+
+TENCENT_STOCK_CONCEPT_URL = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/stockinfo/plateNew"
+TENCENT_STOCK_QUOTE_URL = "https://qt.gtimg.cn/q="
+BAIDU_STOCK_NAMES_URL = "https://finance.pae.baidu.com/selfselect/getmarketrank"
 
 EASTMONEY_SEARCH_SUGGEST_URL = "https://searchapi.eastmoney.com/api/suggest/get"
 EASTMONEY_SEARCH_SUGGEST_TOKEN = "D43BF722C8E33BDC906FB84D85E326E8"

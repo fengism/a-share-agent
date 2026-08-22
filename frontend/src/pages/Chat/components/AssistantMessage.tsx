@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   CheckOutlined,
   CopyOutlined,
@@ -9,8 +9,13 @@ import { Button, Tooltip } from "antd";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatDisplayMessage } from "../../../types/chat";
+import {
+  extractChatResultContext,
+  type ChatResultActionHandler,
+} from "../chatResultActions";
 import { AssistantProcess } from "./AssistantProcess";
 import { BlinkingCursor } from "./BlinkingCursor";
+import { ChatResultActions } from "./ChatResultActions";
 
 const markdownPlugins = [remarkGfm];
 
@@ -18,17 +23,20 @@ interface AssistantMessageProps {
   message: ChatDisplayMessage;
   onPush?: (messageId: string, content: string) => void;
   onRegenerate?: () => void;
+  onResultAction?: ChatResultActionHandler;
 }
 
 export const AssistantMessage = React.memo(function AssistantMessage({
   message,
   onPush,
   onRegenerate,
+  onResultAction,
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
   const hasContent = !!message.content;
   const isStreaming = message.isStreaming;
   const normalizedContent = message.content.replace(/\n{3,}/g, "\n\n");
+  const resultContext = useMemo(() => extractChatResultContext(message), [message]);
 
   const handleCopy = async () => {
     try {
@@ -56,6 +64,10 @@ export const AssistantMessage = React.memo(function AssistantMessage({
           {isStreaming && <BlinkingCursor />}
         </div>
       )}
+
+      {!isStreaming && onResultAction ? (
+        <ChatResultActions context={resultContext} onAction={onResultAction} />
+      ) : null}
 
       {!isStreaming && (hasContent || onRegenerate) && (
         <div className="chat-message-actions">

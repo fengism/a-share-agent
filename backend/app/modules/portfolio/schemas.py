@@ -1,6 +1,7 @@
 """Portfolio API 与领域数据模型。"""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -17,6 +18,63 @@ class PortfolioPositionCreate(BaseModel):
     @classmethod
     def validate_stock_code(cls, value: str) -> str:
         return normalize_code(value).raw
+
+
+class PortfolioTransactionCreate(BaseModel):
+    stock_code: str
+    side: Literal["buy", "sell"]
+    trade_price: float = Field(gt=0, le=1_000_000)
+    trade_time: datetime
+    shares: int = Field(gt=0, le=1_000_000_000)
+    fee: float = Field(default=0, ge=0, le=1_000_000_000)
+    note: str = Field(default="", max_length=500)
+
+    @field_validator("stock_code")
+    @classmethod
+    def validate_stock_code(cls, value: str) -> str:
+        return normalize_code(value).raw
+
+    @field_validator("note")
+    @classmethod
+    def normalize_note(cls, value: str) -> str:
+        return value.strip()
+
+
+class PortfolioLotMatch(BaseModel):
+    buy_transaction_id: int
+    buy_time: str
+    buy_price: float
+    shares: int
+    unit_cost: float
+    matched_cost: float
+
+
+class PortfolioTransaction(BaseModel):
+    id: int
+    stock_code: str
+    stock_name: str
+    side: Literal["buy", "sell"]
+    trade_price: float
+    trade_time: str
+    shares: int
+    fee: float
+    note: str
+    created_at: str
+    matched_cost: float | None = None
+    realized_profit_amount: float | None = None
+    matches: list[PortfolioLotMatch] = Field(default_factory=list)
+
+
+class PortfolioTransactionPreview(BaseModel):
+    stock_code: str
+    side: Literal["buy", "sell"]
+    trade_time: str
+    available_shares: int
+    shares_after_trade: int
+    current_shares_after: int
+    matched_cost: float | None = None
+    realized_profit_amount: float | None = None
+    matches: list[PortfolioLotMatch] = Field(default_factory=list)
 
 
 class PortfolioPosition(BaseModel):
@@ -46,29 +104,62 @@ class PortfolioStockSummary(BaseModel):
     market_value: float | None = None
     profit_amount: float | None = None
     profit_pct: float | None = None
+    realized_profit_amount: float
+    total_profit_amount: float | None = None
+    allocation_pct: float | None = None
+    profit_contribution_pct: float | None = None
 
 
 class PortfolioSummary(BaseModel):
     stock_count: int
     position_count: int
+    transaction_count: int
     total_cost: float
     priced_cost: float
     total_market_value: float
     total_profit_amount: float
     total_profit_pct: float | None = None
+    unrealized_profit_amount: float
+    realized_profit_amount: float
+    combined_profit_amount: float
     profitable_count: int
     losing_count: int
     unpriced_count: int
 
 
+class PortfolioClosedPosition(BaseModel):
+    stock_code: str
+    stock_name: str
+    transaction_count: int
+    buy_count: int
+    sell_count: int
+    total_shares: int
+    matched_cost: float
+    realized_profit_amount: float
+    realized_profit_pct: float | None = None
+    first_trade_time: str
+    last_trade_time: str
+    holding_days: int
+
+
+class PortfolioRiskSummary(BaseModel):
+    largest_position_stock_code: str | None = None
+    largest_position_stock_name: str | None = None
+    max_single_stock_pct: float | None = None
+    top3_concentration_pct: float | None = None
+    concentration_level: Literal["low", "medium", "high", "unknown"]
+    priced_stock_count: int
+    unpriced_stock_count: int
+    warnings: list[str] = Field(default_factory=list)
+
+
 class PortfolioResponse(BaseModel):
     positions: list[PortfolioPosition]
     stocks: list[PortfolioStockSummary]
+    transactions: list[PortfolioTransaction]
+    closed_positions: list[PortfolioClosedPosition]
     summary: PortfolioSummary
+    risk: PortfolioRiskSummary
     quoted_at: str
     quote_source: str = "tencent"
     quote_stale: bool = False
-
-
-class PortfolioDeleteResponse(BaseModel):
-    deleted: bool

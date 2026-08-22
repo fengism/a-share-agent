@@ -8,14 +8,22 @@ from app.core.market import safe_float
 from app.infrastructure.providers.ths.transport import ThsTransport
 
 
+def _tag_text(value) -> str:
+    if isinstance(value, dict):
+        value = list(value.values())
+    if isinstance(value, (list, tuple, set)):
+        return ";".join(str(item) for item in value if item)
+    return str(value or "")
+
+
 def normalize_items(items: list[dict], *, plate: bool = False) -> list[dict]:
     result = []
     for item in items or []:
         tag_info = item.get("tag") or {}
         if plate:
             tags = {
-                "hot_tag": item.get("hot_tag", ""),
-                "tag": item.get("tag", ""),
+                "hot_tag": _tag_text(item.get("hot_tag")),
+                "tag": _tag_text(item.get("tag")),
             }
         else:
             tags = {

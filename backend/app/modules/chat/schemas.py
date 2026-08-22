@@ -1,3 +1,4 @@
+import json
 import re
 from typing import Any, Literal
 
@@ -11,6 +12,10 @@ __all__ = [
     "ChatCapabilityAvailabilityInfo",
     "ChatCapabilityAvailabilityResponse",
     "ChatRequest",
+    "ChatSessionData",
+    "ChatSessionMeta",
+    "ChatStateResponse",
+    "ChatStateSnapshot",
     "ChatSkillCapabilityInfo",
     "ChatToolCapabilityInfo",
     "ChatToolPolicyInfo",
@@ -19,6 +24,7 @@ __all__ = [
 MAX_CHAT_MESSAGE_LENGTH = 10_000
 MAX_CHAT_HISTORY_MESSAGES = 100
 MAX_CHAT_HISTORY_CHARACTERS = 100_000
+MAX_CHAT_STATE_CHARACTERS = 1_000_000
 
 
 class ChatRequest(BaseModel):
@@ -57,12 +63,61 @@ class ChatRequest(BaseModel):
         return self
 
 
+class ChatSessionMeta(BaseModel):
+    id: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=100)
+    created_at: int = Field(ge=0)
+    updated_at: int = Field(ge=0)
+
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        return value.strip()
+
+
+class ChatSessionData(BaseModel):
+    messages: list[dict[str, Any]] = Field(default_factory=list, max_length=200)
+    history: list[AgentMessage] = Field(default_factory=list, max_length=MAX_CHAT_HISTORY_MESSAGES)
+    agent_names: list[str] | None = Field(default=None, max_length=16)
+    skill_names: list[str] | None = Field(default=None, max_length=32)
+
+
+class ChatStateSnapshot(BaseModel):
+    revision: int = Field(ge=0)
+    sessions: list[ChatSessionMeta] = Field(max_length=30)
+    session_data: dict[str, ChatSessionData]
+    active_session_id: str | None = Field(default=None, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_snapshot(self) -> "ChatStateSnapshot":
+        session_ids = [session.id for session in self.sessions]
+        if len(session_ids) != len(set(session_ids)):
+            raise ValueError("会话 ID 不可重复")
+        unknown_data = set(self.session_data) - set(session_ids)
+        if unknown_data:
+            raise ValueError("会话数据包含未知会话")
+        if self.active_session_id is not None and self.active_session_id not in session_ids:
+            raise ValueError("当前会话不存在")
+        payload = json.dumps(self.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":"))
+        if len(payload) > MAX_CHAT_STATE_CHARACTERS:
+            raise ValueError("会话快照过大")
+        return self
+
+
+class ChatStateResponse(BaseModel):
+    state: ChatStateSnapshot | None = None
+    updated_at: float | None = None
+
+
 class ChatToolPolicyInfo(BaseModel):
     """Purpose: 前端展示的工具运行策略。"""
     cost: Literal["low", "medium", "high"]
     cache_ttl_seconds: float = Field(ge=0)
     freshness: Literal["realtime", "near_realtime", "daily", "static"]
     scope: Literal["public", "user"]
+    timeout_seconds: float | None = None
+    max_parallel_calls: int | None = None
+    max_result_characters: int
 
 
 class ChatToolCapabilityInfo(BaseModel):
@@ -91,6 +146,7 @@ class ChatAgentCapabilityInfo(BaseModel):
     display_name: str
     description: str
     tool_names: list[str]
+    skill_names: list[str]
     max_rounds: int = Field(ge=1)
 
 

@@ -6,6 +6,7 @@ import { useAuthStore } from "../../store/authStore";
 import { needsSetupApi } from "../../api/auth";
 import AuthHeader from "../../components/AuthHeader";
 import AuthShell from "../../components/AuthShell";
+import { semanticTagStyle } from "../../styles/ui";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -88,7 +89,7 @@ export default function RegisterPage() {
         title="创建账号"
         description={
           needsSetup === true ? (
-            <Tag color="gold">首位注册用户将成为管理员</Tag>
+            <Tag style={semanticTagStyle("warning")}>首位注册用户将成为管理员</Tag>
           ) : needsSetup === false ? (
             "使用管理员提供的邀请码完成注册"
           ) : (

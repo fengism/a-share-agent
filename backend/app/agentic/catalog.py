@@ -13,6 +13,7 @@ import app.agentic.tools.validation as tool_validation
 from app.agentic.protocol import ToolCallInfo, ToolResultInfo
 
 if TYPE_CHECKING:
+    from app.agentic.runtime.context import AgentExecutionContext
     from app.agentic.skills.contracts import Skill
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ class CapabilityCatalog:
         self,
         call: ToolCallInfo,
         allowed_names: Collection[str] | None = None,
+        execution_context: AgentExecutionContext | None = None,
     ) -> ToolResultInfo:
         if allowed_names is not None and call.function.name not in allowed_names:
             return ToolResultInfo(
@@ -83,7 +85,7 @@ class CapabilityCatalog:
                 ),
                 is_error=True,
             )
-        return await tool.execute(call)
+        return await tool.execute(call, execution_context=execution_context)
 
     def register_skill(self, skill: Skill) -> Skill:
         if any(existing.name == skill.name for existing in self._skills):

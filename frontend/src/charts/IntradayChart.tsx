@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { AreaSeries, ColorType, HistogramSeries, LineStyle, createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import type { IntradayItem } from "../types/stock";
 import { useColors } from "../styles/ui";
-import { shouldFitChartContent } from "./chartLifecycle";
+import { buildIntradayVisibleRange } from "./intradayTimeRange";
 import { hexToRgba } from "./utils";
 
 type Props = {
@@ -21,7 +21,7 @@ function toTimestamp(time: string): UTCTimestamp | null {
   return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)) / 1000 as UTCTimestamp;
 }
 
-export default function IntradayChart({ data, prevClose, height = 320, viewKey = "default" }: Props) {
+export default function IntradayChart({ data, prevClose, height = 320 }: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
   colorsRef.current = c;
@@ -31,7 +31,6 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey =
   const avgSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const priceLineRef = useRef<ReturnType<ISeriesApi<"Area">["createPriceLine"]> | null>(null);
-  const fittedViewKeyRef = useRef<string | null>(null);
   const rows = useMemo(
     () => data
       .map((item) => {
@@ -66,11 +65,10 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey =
         vertLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
         horzLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
       },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
-      handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
+      handleScroll: false,
+      handleScale: { mouseWheel: false, pinch: false, axisPressedMouseMove: { time: false, price: true } },
     });
     chartRef.current = chart;
-    fittedViewKeyRef.current = null;
 
     const priceSeries = chart.addSeries(AreaSeries, {
       lineColor: colors.primary,
@@ -162,11 +160,11 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey =
       });
     }
 
-    if (rows.length > 0 && shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
-      chart.timeScale().fitContent();
-      fittedViewKeyRef.current = viewKey;
+    if (rows.length > 0) {
+      const visibleRange = buildIntradayVisibleRange(rows[0].time);
+      if (visibleRange) chart.timeScale().setVisibleRange(visibleRange);
     }
-  }, [c.down, c.textMuted, c.up, height, prevClose, rows, viewKey]);
+  }, [c.down, c.textMuted, c.up, height, prevClose, rows]);
 
   useEffect(() => {
     const chart = chartRef.current;

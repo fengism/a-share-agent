@@ -34,17 +34,18 @@ def fetch_hsgt_realtime(
     trade_date: str,
 ) -> pd.DataFrame:
     resolved_date = trade_date or pd.Timestamp.now().strftime("%Y-%m-%d")
+    headers = transport.headers()
+    headers.update(
+        {
+            "Accept": "application/json, text/plain, */*",
+            "Host": "data.hexin.cn",
+            "Referer": "https://data.hexin.cn/market/hsgt/",
+        }
+    )
     data = transport.request_json(
         "GET",
         "https://data.hexin.cn/market/hsgtApi/method/dayChart/",
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "Chrome/117.0.0.0 Safari/537.36"
-            ),
-            "Host": "data.hexin.cn",
-            "Referer": "https://data.hexin.cn/",
-        },
+        headers=headers,
         timeout=10,
     )
     times = list(data.get("time") or [])

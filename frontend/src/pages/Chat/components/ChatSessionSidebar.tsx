@@ -1,7 +1,7 @@
 import { Button } from "antd";
 import { DeleteOutlined, MessageOutlined, PlusOutlined } from "@ant-design/icons";
 import { useChatStore } from "../../../store/chatStore";
-import { useColors } from "../../../styles/ui";
+import { useColors, useTokens } from "../../../styles/ui";
 
 interface ChatSessionSidebarProps {
   onNewSession: () => void;
@@ -18,9 +18,11 @@ export function ChatSessionSidebar({
   const activeSessionId = useChatStore((state) => state.activeSessionId);
   const isStreaming = useChatStore((state) => state.isStreaming);
   const colors = useColors();
+  const t = useTokens();
 
   return (
     <div
+      className="chat-session-sidebar"
       style={{
         width: 220,
         flexShrink: 0,
@@ -28,13 +30,13 @@ export function ChatSessionSidebar({
         top: 0,
         background: colors.nestedBg,
         border: `1px solid ${colors.border}`,
-        borderRadius: 12,
-        padding: 12,
+        borderRadius: t.radius.lg,
+        padding: t.space[3],
         maxHeight: "calc(100vh - 120px)",
         overflowY: "auto",
         display: "flex",
         flexDirection: "column",
-        gap: 8,
+        gap: t.space[2],
       }}
     >
       <Button
@@ -42,7 +44,7 @@ export function ChatSessionSidebar({
         block
         icon={<PlusOutlined />}
         onClick={onNewSession}
-        style={{ borderRadius: 8 }}
+        style={{ borderRadius: t.radius.md }}
       >
         新对话
       </Button>
@@ -52,7 +54,7 @@ export function ChatSessionSidebar({
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
-          gap: 2,
+          gap: t.space[1],
         }}
       >
         {sessions.map((session) => {
@@ -64,14 +66,14 @@ export function ChatSessionSidebar({
               style={{
                 display: "flex",
                 alignItems: "center",
-                borderRadius: 8,
+                borderRadius: t.radius.md,
                 background: isActive ? `${colors.primary}20` : "transparent",
                 border: isActive
                   ? `1px solid ${colors.primary}40`
                   : "1px solid transparent",
                 transition: "all 0.15s ease",
                 color: isActive ? colors.primary : colors.textSecondary,
-                fontSize: 13,
+                fontSize: t.font.md,
               }}
             >
               <button
@@ -82,8 +84,8 @@ export function ChatSessionSidebar({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
-                  padding: "8px 10px",
+                  gap: t.space[2],
+                  padding: `${t.space[2]} ${t.space[3]}`,
                   minWidth: 0,
                   flex: 1,
                   border: 0,
@@ -94,7 +96,7 @@ export function ChatSessionSidebar({
                   font: "inherit",
                 }}
               >
-                <MessageOutlined style={{ fontSize: 14, flexShrink: 0 }} />
+                <MessageOutlined style={{ fontSize: t.font.base, flexShrink: 0 }} />
                 <span
                   style={{
                     flex: 1,
@@ -117,11 +119,11 @@ export function ChatSessionSidebar({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    marginRight: 8,
-                    padding: 4,
+                    marginRight: t.space[2],
+                    padding: t.space[1],
                     border: 0,
                     background: "transparent",
-                    fontSize: 12,
+                    fontSize: t.font.sm,
                     color: colors.textMuted,
                     cursor: isStreaming ? "not-allowed" : "pointer",
                     flexShrink: 0,

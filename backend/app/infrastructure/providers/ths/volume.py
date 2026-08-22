@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
-from app.contracts.market import MarketVolume
+from app.domain.market import MarketVolume
 from app.infrastructure.providers.ths.transport import ThsTransport
 
 logger = logging.getLogger(__name__)

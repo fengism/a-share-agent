@@ -42,6 +42,7 @@ export default function MonetaryTab() {
             title="货币供应量 M0/M1/M2"
             latest={moneySupply?.latest ?? null}
             trend={moneySupply?.trend ?? []}
+            metadata={moneySupply}
             fields={MONEY_SUPPLY_FIELDS(c)}
           />
         </Col>
@@ -50,6 +51,7 @@ export default function MonetaryTab() {
             title="社会融资规模"
             latest={socialFin?.latest ?? null}
             trend={socialFin?.trend ?? []}
+            metadata={socialFin}
             fields={SOCIAL_FIN_FIELDS(c)}
           />
         </Col>

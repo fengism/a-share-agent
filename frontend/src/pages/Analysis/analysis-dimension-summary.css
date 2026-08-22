@@ -1,0 +1,117 @@
+.analysis-dimension-card > .ant-card-body {
+  padding: 0 !important;
+}
+
+.analysis-dimension-summary {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  min-width: 0;
+  align-items: stretch;
+}
+
+.analysis-dimension-summary > * {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.analysis-dimension-summary__score {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--c-space-2);
+  min-height: 190px;
+  padding: var(--c-space-4);
+  border-right: 1px solid var(--c-border);
+  background: var(--c-hover-bg);
+  text-align: center;
+}
+
+.analysis-dimension-summary__score > strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+}
+
+.analysis-dimension-summary__score-empty {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border: 2px solid var(--c-border);
+  border-radius: 50%;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-2xl);
+  font-weight: var(--c-weight-bold);
+}
+
+.analysis-dimension-summary__content {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--c-space-3);
+  padding: var(--c-space-4);
+}
+
+.analysis-dimension-summary__description {
+  min-width: 0;
+  margin: 0 !important;
+  color: var(--c-text-secondary);
+  line-height: var(--c-leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.analysis-dimension-summary__groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--c-space-3);
+}
+
+.analysis-dimension-summary__group {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--c-space-2);
+}
+
+.analysis-dimension-summary__tags {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--c-space-2);
+}
+
+.analysis-dimension-summary__tags .ant-tag {
+  max-width: 100%;
+  margin: 0 !important;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.analysis-dimension-summary__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--c-space-3);
+}
+
+@container analysis-page (max-width: 900px) {
+  .analysis-dimension-summary__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container analysis-page (max-width: 760px) {
+  .analysis-dimension-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .analysis-dimension-summary__score {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--c-border);
+  }
+
+  .analysis-dimension-summary__groups,
+  .analysis-dimension-summary__metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

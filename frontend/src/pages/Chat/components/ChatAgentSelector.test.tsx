@@ -9,6 +9,7 @@ const agents: AgentCapabilityInfo[] = [
     display_name: "技术面分析",
     description: "分析趋势",
     tool_names: ["get_stock_kline"],
+    skill_names: ["stock_analysis"],
     max_rounds: 3,
   },
   {
@@ -16,6 +17,7 @@ const agents: AgentCapabilityInfo[] = [
     display_name: "风险评估",
     description: "分析风险",
     tool_names: ["get_stock_risk_data"],
+    skill_names: ["stock_analysis"],
     max_rounds: 3,
   },
 ];

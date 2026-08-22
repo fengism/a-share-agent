@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Select, Tabs } from "antd";
 import type { SelectProps } from "antd";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -10,6 +10,8 @@ export interface ResponsiveSectionNavItem {
   mobileLabel?: ReactNode;
   group?: string;
   children: ReactNode;
+  onIntent?: () => void;
+  preserve?: boolean;
 }
 
 interface ResponsiveSectionNavProps {
@@ -20,6 +22,9 @@ interface ResponsiveSectionNavProps {
   desktopMode?: "tabs" | "rail";
   size?: "small" | "middle" | "large";
   tabBarStyle?: CSSProperties;
+  tabBarGutter?: number;
+  collapseQuery?: string;
+  preserveVisited?: boolean;
 }
 
 function buildSelectOptions(items: ResponsiveSectionNavItem[]): NonNullable<SelectProps<string>["options"]> {
@@ -54,24 +59,66 @@ export default function ResponsiveSectionNav({
   desktopMode = "tabs",
   size = "large",
   tabBarStyle,
+  tabBarGutter,
+  collapseQuery = "(max-width: 767px)",
+  preserveVisited = false,
 }: ResponsiveSectionNavProps) {
-  const isMobile = useMediaQuery("(max-width: 767px)");
+  const isMobile = useMediaQuery(collapseQuery);
   const activeItem = items.find((item) => item.key === activeKey) ?? items[0];
+  const activeItemKey = activeItem?.key;
+  const [visitedKeys, setVisitedKeys] = useState<ReadonlySet<string>>(
+    () => new Set(activeItemKey ? [activeItemKey] : []),
+  );
+
+  useEffect(() => {
+    if (!preserveVisited || !activeItemKey || activeItem?.preserve === false) return;
+    setVisitedKeys((current) => {
+      if (current.has(activeItemKey)) return current;
+      const next = new Set(current);
+      next.add(activeItemKey);
+      return next;
+    });
+  }, [activeItem?.preserve, activeItemKey, preserveVisited]);
+
+  const handleChange = (key: string) => {
+    items.find((item) => item.key === key)?.onIntent?.();
+    if (preserveVisited && items.find((item) => item.key === key)?.preserve !== false) {
+      setVisitedKeys((current) => {
+        if (current.has(key)) return current;
+        const next = new Set(current);
+        next.add(key);
+        return next;
+      });
+    }
+    onChange(key);
+  };
 
   if (!activeItem) return null;
+
+  const sectionContent = preserveVisited ? items
+    .filter((item) => item.key === activeItem.key || (item.preserve !== false && visitedKeys.has(item.key)))
+    .map((item) => (
+      <div
+        key={item.key}
+        className="responsive-section-nav__panel"
+        hidden={item.key !== activeItem.key}
+      >
+        {item.children}
+      </div>
+    )) : activeItem.children;
 
   if (isMobile) {
     return (
       <section className="responsive-section-nav__mobile" aria-label={ariaLabel}>
         <Select
           value={activeItem.key}
-          onChange={onChange}
+          onChange={handleChange}
           options={buildSelectOptions(items)}
           size="large"
           className="responsive-section-nav__select"
           aria-label={ariaLabel}
         />
-        <div className="responsive-section-nav__content">{activeItem.children}</div>
+        <div className="responsive-section-nav__content">{sectionContent}</div>
       </section>
     );
   }
@@ -95,7 +142,10 @@ export default function ResponsiveSectionNav({
                   key={item.key}
                   className="responsive-section-nav__rail-item"
                   aria-current={item.key === activeItem.key ? "page" : undefined}
-                  onClick={() => onChange(item.key)}
+                  onPointerEnter={item.onIntent}
+                  onTouchStart={item.onIntent}
+                  onFocus={item.onIntent}
+                  onClick={() => handleChange(item.key)}
                 >
                   {item.label}
                 </button>
@@ -103,7 +153,7 @@ export default function ResponsiveSectionNav({
             </div>
           ))}
         </nav>
-        <div className="responsive-section-nav__content">{activeItem.children}</div>
+        <div className="responsive-section-nav__content">{sectionContent}</div>
       </section>
     );
   }
@@ -111,11 +161,20 @@ export default function ResponsiveSectionNav({
   return (
     <Tabs
       activeKey={activeItem.key}
-      onChange={onChange}
+      onChange={handleChange}
       size={size}
-      items={items.map(({ key, label, children }) => ({ key, label, children }))}
-      destroyOnHidden
+      tabBarGutter={tabBarGutter}
+      items={items.map(({ key, label, children, onIntent, preserve }) => ({
+        key,
+        label: onIntent ? (
+          <span onPointerEnter={onIntent} onTouchStart={onIntent}>{label}</span>
+        ) : label,
+        children,
+        destroyOnHidden: preserveVisited && preserve === false,
+      }))}
+      destroyOnHidden={!preserveVisited}
       tabBarStyle={tabBarStyle}
+      className="responsive-section-nav__tabs"
       style={{ background: "transparent" }}
     />
   );

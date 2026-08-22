@@ -4,8 +4,8 @@ from app.constants.market import (
     EASTMONEY_SEARCH_SUGGEST_URL,
     EASTMONEY_UT_TRADE,
 )
-from app.contracts.stock import StockSearchItem
 from app.core.market import classify_exchange
+from app.domain.stock import StockSearchItem
 
 
 class SearchMixin:

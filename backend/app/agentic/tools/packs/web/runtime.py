@@ -2,10 +2,7 @@
 
 from app.agentic.catalog import registry
 from app.agentic.tools.packs.web import content, fetcher, pdf, registration, search, twitter
-from app.agentic.tools.packs.web.url_security import (
-    assert_url_safe,
-    is_twitter_url,
-)
+from app.agentic.tools.packs.web.url_security import is_twitter_url
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 
 _WEB_FETCH_POLICY = registration.WEB_FETCH_POLICY
@@ -26,32 +23,23 @@ async def _fetch_tweet(url: str):
     return await twitter.fetch_tweet(url, truncate_func=_smart_truncate)
 
 
-async def _scrapling_fallback(url: str):
-    return await fetcher.scrapling_fallback(
-        url,
-        cache=_fetch_cache,
-        truncate_func=_smart_truncate,
-    )
-
-
-async def _fetch_url(url: str):
+async def _fetch_url(url: str, mode: fetcher.FetchMode = "auto"):
     return await fetcher.fetch_url(
         url,
+        mode=mode,
         cache=_fetch_cache,
         fetch_tweet_func=_fetch_tweet,
         is_twitter_url_func=is_twitter_url,
-        assert_url_safe_func=assert_url_safe,
         http_get_func=_http_get_with_retry,
         content_type_detector=_detect_content_type,
         pdf_handler=_handle_pdf_response,
         text_extractor=_extract_text,
-        fallback_func=_scrapling_fallback,
         truncate_func=_smart_truncate,
     )
 
 
-async def _fetch_urls(urls: list[str]):
-    return await fetcher.fetch_urls(urls, fetch_one=_fetch_url)
+async def _fetch_urls(urls: list[str], mode: fetcher.FetchMode = "auto"):
+    return await fetcher.fetch_urls(urls, mode=mode, fetch_one=_fetch_url)
 
 
 async def _execute_web_search(

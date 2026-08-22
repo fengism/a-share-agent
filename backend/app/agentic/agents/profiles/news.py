@@ -14,5 +14,6 @@ PROFILE = AgentProfile(
         "fetch_url",
         "fetch_urls",
     ),
+    skill_names=("stock_analysis",),
     max_rounds=3,
 )

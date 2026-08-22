@@ -11,5 +11,6 @@ PROFILE = AgentProfile(
         "get_stock_technical_indicators",
         "get_stock_valuation_detail",
     ),
+    skill_names=("stock_analysis",),
     max_rounds=3,
 )

@@ -42,6 +42,7 @@ export default function RatesTab() {
             title="LPR 贷款市场报价利率"
             latest={lpr?.latest ?? null}
             trend={lpr?.trend ?? []}
+            metadata={lpr}
             fields={LPR_FIELDS(c)}
           />
         </Col>
@@ -50,6 +51,7 @@ export default function RatesTab() {
             title="SHIBOR 上海银行间同业拆放利率"
             latest={shibor?.latest ?? null}
             trend={shibor?.trend ?? []}
+            metadata={shibor}
             fields={SHIBOR_FIELDS(c)}
           />
         </Col>

@@ -65,7 +65,7 @@ export default function HistoryPanel({
         skeletonRows={5}
         minHeight={240}
       >
-        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        <ul aria-label="产业链历史记录" style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {history.map((item) => {
             const itemKey = `${item.name}-${item.archive_id}`;
             const isActive = item.name === activeName && item.archive_id === archiveId;
@@ -89,7 +89,7 @@ export default function HistoryPanel({
                       borderLeft: isActive ? `3px solid ${colors.primary}` : "3px solid transparent",
                       borderRadius: 4,
                       cursor: loadingArchiveKey ? "wait" : "pointer",
-                      background: isActive ? colors.elevatedBg : "transparent",
+                      background: isActive ? colors.activeBg : "transparent",
                       opacity: loadingArchiveKey && !isLoadingArchive ? 0.6 : 1,
                       transition: "background 0.15s, border-color 0.15s",
                       textAlign: "left",

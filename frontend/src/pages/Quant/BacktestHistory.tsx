@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { DeleteOutlined, ReloadOutlined } from "@ant-design/icons";
+import { ClockCircleOutlined, DeleteOutlined, FilterOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Button, Card, Input, Popconfirm, Select, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import type { QuantBacktestRun } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
-import { useStyles } from "../../styles/ui";
-import { QUANT_RUN_STATUS_META, quantUniverseLabel } from "./quantRun";
+import { useStyles, semanticTagStyle } from "../../styles/ui";
+import { QUANT_RUN_STATUS_META, quantStrategyLabel, quantUniverseLabel } from "./quantRun";
 
 const { Text } = Typography;
 type StatusFilter = "all" | QuantBacktestRun["status"];
@@ -16,9 +16,12 @@ interface BacktestHistoryProps {
   isLoading: boolean;
   isFetching: boolean;
   error?: unknown;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
   retryingRunId?: string;
   deletingRunId?: string;
   onRefresh: () => void;
+  onLoadMore?: () => void;
   onSelect: (runId: string) => void;
   onRetryRun: (runId: string) => void;
   onDeleteRun: (runId: string) => void;
@@ -30,9 +33,12 @@ export default function BacktestHistory({
   isLoading,
   isFetching,
   error,
+  hasMore,
+  isLoadingMore,
   retryingRunId,
   deletingRunId,
   onRefresh,
+  onLoadMore,
   onSelect,
   onRetryRun,
   onDeleteRun,
@@ -40,20 +46,45 @@ export default function BacktestHistory({
   const { cardStyle } = useStyles();
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [strategyFilter, setStrategyFilter] = useState("all");
+  const [isFiltersOpen, setIsFiltersOpen] = useState(() => runs.length > 8);
+  const strategyOptions = useMemo(() => {
+    const labels = new Map<string, string>();
+    runs.forEach((run) => {
+      const strategy = run.request.strategy ?? { type: "ma_cross" };
+      labels.set(strategy.type, quantStrategyLabel(strategy));
+    });
+    return Array.from(labels, ([value, label]) => ({ value, label }))
+      .sort((left, right) => left.label.localeCompare(right.label, "zh-CN"));
+  }, [runs]);
   const filteredRuns = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
     return runs.filter((run) => {
+      const strategy = run.request.strategy ?? { type: "ma_cross" };
+      const strategyLabel = quantStrategyLabel(strategy).toLowerCase();
       if (statusFilter !== "all" && run.status !== statusFilter) return false;
+      if (strategyFilter !== "all" && strategy.type !== strategyFilter) return false;
       if (!normalizedKeyword) return true;
       const codes = (run.request.universe.codes ?? []).join(" ").toLowerCase();
-      return run.name.toLowerCase().includes(normalizedKeyword) || codes.includes(normalizedKeyword);
+      return run.name.toLowerCase().includes(normalizedKeyword)
+        || strategy.type.toLowerCase().includes(normalizedKeyword)
+        || strategyLabel.includes(normalizedKeyword)
+        || codes.includes(normalizedKeyword);
     });
-  }, [keyword, runs, statusFilter]);
+  }, [keyword, runs, statusFilter, strategyFilter]);
+  const activeFilterCount = Number(Boolean(keyword.trim()))
+    + Number(statusFilter !== "all")
+    + Number(strategyFilter !== "all");
 
   return (
-    <Card title="历史回测" size="small" style={cardStyle} className="quant-history-card">
+    <Card
+      title={<span className="quant-history-card-title"><ClockCircleOutlined />历史回测</span>}
+      size="small"
+      style={cardStyle}
+      className="quant-history-card"
+    >
       <div className="quant-history-toolbar">
-        <div className="quant-history-filters">
+        {isFiltersOpen ? <div className="quant-history-filters">
           <Input
             aria-label="搜索历史回测"
             placeholder="搜索名称或股票代码"
@@ -70,8 +101,24 @@ export default function BacktestHistory({
               ...Object.entries(QUANT_RUN_STATUS_META).map(([value, meta]) => ({ value: value as StatusFilter, label: meta.label })),
             ]}
           />
-        </div>
+          <Select
+            aria-label="历史策略"
+            value={strategyFilter}
+            onChange={setStrategyFilter}
+            options={[{ value: "all", label: "全部策略" }, ...strategyOptions]}
+          />
+        </div> : null}
         <div className="quant-history-toolbar-actions">
+          <Button
+            size="small"
+            type={activeFilterCount > 0 ? "primary" : "default"}
+            icon={<FilterOutlined />}
+            aria-label="筛选历史回测"
+            aria-expanded={isFiltersOpen}
+            onClick={() => setIsFiltersOpen((current) => !current)}
+          >
+            筛选{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+          </Button>
           <Text type="secondary">{filteredRuns.length}/{runs.length} 条</Text>
           <Button size="small" icon={<ReloadOutlined />} loading={isFetching} onClick={onRefresh}>刷新</Button>
         </div>
@@ -90,6 +137,7 @@ export default function BacktestHistory({
             const status = QUANT_RUN_STATUS_META[run.status];
             const isSelected = selectedRunId === run.id;
             const codes = quantUniverseLabel(run);
+            const strategy = quantStrategyLabel(run.request.strategy ?? { type: "ma_cross" });
             return (
               <li key={run.id} className={isSelected ? "quant-history-item is-selected" : "quant-history-item"}>
                 <button
@@ -101,10 +149,10 @@ export default function BacktestHistory({
                 >
                   <span className="quant-history-title-row">
                     <span className="quant-history-name">{run.name}</span>
-                    <Tag color={status.color}>{status.label}</Tag>
+                    <Tag style={semanticTagStyle(status.color)}>{status.label}</Tag>
                   </span>
                   <Text type="secondary" className="quant-history-meta">
-                    {codes} · {run.request.start_date} 至 {run.request.end_date} · {dayjs.unix(run.created_at).format("MM-DD HH:mm")}
+                    {strategy} · {codes} · {run.request.start_date} 至 {run.request.end_date} · {dayjs.unix(run.created_at).format("MM-DD HH:mm")}
                   </Text>
                 </button>
                 <div className="quant-history-actions">
@@ -144,6 +192,17 @@ export default function BacktestHistory({
             );
           })}
         </ul>
+        {hasMore ? (
+          <div className="quant-history-load-more">
+            <Button
+              size="small"
+              loading={isLoadingMore}
+              onClick={onLoadMore}
+            >
+              加载更多
+            </Button>
+          </div>
+        ) : null}
       </SectionDataState>
     </Card>
   );

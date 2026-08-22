@@ -1,7 +1,8 @@
-"""产业链 HTTP 列表响应模型。"""
+"""产业链 HTTP 请求与列表响应模型。"""
 
 from pydantic import BaseModel
 
+from app.domain.industry_chain import IndustryChainResearchScope
 from app.modules.industry_chain.events import IndustryChainProgress
 from app.modules.industry_chain.models import (
     IndustryChainChart,
@@ -21,6 +22,7 @@ __all__ = [
     "IndustryChainHistoryItem",
     "IndustryChainInsight",
     "IndustryChainLatestResponse",
+    "IndustryChainResearchScope",
     "IndustryChainMetric",
     "IndustryChainNode",
     "IndustryChainProgress",

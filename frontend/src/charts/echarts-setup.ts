@@ -6,7 +6,7 @@
  */
 
 import * as echarts from "echarts/core";
-import { BarChart, LineChart, TreeChart } from "echarts/charts";
+import { BarChart, LineChart } from "echarts/charts";
 import {
   TitleComponent,
   TooltipComponent,
@@ -21,7 +21,6 @@ echarts.use([
   // Chart types
   BarChart,
   LineChart,
-  TreeChart,
   // Components
   TitleComponent,
   TooltipComponent,

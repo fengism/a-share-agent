@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { Button, Card, Col, DatePicker, Empty, Modal, Row, Table, Tag } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
-import { Link } from "react-router-dom";
 import type { ColumnsType } from "antd/es/table";
 import { useDragonTigerDetail, useDragonTigerList } from "../../api/queries";
 import ChangeValue from "../../components/ChangeValue";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
+import StockExternalLink from "../../components/StockExternalLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { DragonTigerDetail, DragonTigerItem } from "../../types/stock";
 import {
@@ -16,7 +16,7 @@ import {
   formatSignedPercent,
   formatWanAmount,
 } from "../../utils/format";
-import { useColors } from "../../styles/ui";
+import { useColors, useTokens } from "../../styles/ui";
 
 function DetailModal({
   code,
@@ -32,11 +32,11 @@ function DetailModal({
   onClose: () => void;
 }) {
   const c = useColors();
+  const t = useTokens();
   const { data, isLoading, error, refetch } = useDragonTigerDetail(code, reportDate);
   const hasData = (data?.length ?? 0) > 0;
   const buyItems = useMemo(() => (data || []).filter((item) => item.side === "buy").slice(0, 5), [data]);
   const sellItems = useMemo(() => (data || []).filter((item) => item.side === "sell").slice(0, 5), [data]);
-
   const buyColumns: ColumnsType<DragonTigerDetail> = useMemo(() => [
     { title: "买入营业部", dataIndex: "operate_name", ellipsis: true, width: 220 },
     {
@@ -74,7 +74,7 @@ function DetailModal({
 
   return (
     <Modal
-      title={<span>龙虎榜明细 — <Link to={`/analysis/${code}`}>{name}</Link> ({code}) {reportDate}</span>}
+      title={<span>龙虎榜明细 — <StockExternalLink code={code} name={name}>{name}</StockExternalLink> ({code}) {reportDate}</span>}
       open={open}
       onCancel={onClose}
       footer={null}
@@ -91,7 +91,7 @@ function DetailModal({
       >
         <Row gutter={[16, 20]}>
           <Col span={24}>
-            <div style={{ fontWeight: 600, marginBottom: 8, color: c.up }}>
+            <div style={{ fontWeight: Number(t.weight.semibold), marginBottom: t.space[2], color: c.up }}>
               买入前5
             </div>
             <Table
@@ -107,7 +107,7 @@ function DetailModal({
             />
           </Col>
           <Col span={24}>
-            <div style={{ fontWeight: 600, marginBottom: 8, color: c.down }}>
+            <div style={{ fontWeight: Number(t.weight.semibold), marginBottom: t.space[2], color: c.down }}>
               卖出前5
             </div>
             <Table
@@ -130,6 +130,7 @@ function DetailModal({
 
 export function DragonTigerContent({ embedded = false }: { embedded?: boolean }) {
   const c = useColors();
+  const t = useTokens();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const [date, setDate] = useState<Dayjs>(dayjs().subtract(1, "day"));
   const reportDate = date.format("YYYY-MM-DD");
@@ -151,10 +152,10 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
           key: "stock",
           width: 132,
           render: (_: unknown, record: DragonTigerItem) => (
-            <Link to={`/analysis/${record.code}`} style={{ display: "block", color: c.primary }}>
-              <span style={{ display: "block", color: c.textPrimary, fontWeight: 600 }}>{record.name}</span>
-              <span style={{ display: "block", color: c.textMuted, fontSize: 11 }}>{record.code}</span>
-            </Link>
+            <StockExternalLink code={record.code} name={record.name} style={{ display: "block", color: c.primary }}>
+              <span style={{ display: "block", color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
+              <span style={{ display: "block", color: c.textMuted, fontSize: t.font.xs }}>{record.code}</span>
+            </StockExternalLink>
           ),
         },
         {
@@ -162,7 +163,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
           dataIndex: "change_pct",
           width: 82,
           align: "right",
-          render: (value: number | null) => <ChangeValue value={value} fontWeight={500} />,
+          render: (value: number | null) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
         },
         {
           title: "净额(万)",
@@ -170,7 +171,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
           width: 88,
           align: "right",
           render: (value: number | null) => value == null ? "-" : (
-            <span style={{ color: changeColor(value, c), fontWeight: 600 }}>
+            <span style={{ color: changeColor(value, c), fontWeight: Number(t.weight.semibold) }}>
               {value > 0 ? "+" : ""}{value.toFixed(0)}
             </span>
           ),
@@ -184,9 +185,9 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       dataIndex: "code",
       width: 85,
       render: (code: string) => (
-        <Link to={`/analysis/${code}`} style={{ color: c.primary, fontWeight: 500 }}>
+        <StockExternalLink code={code} style={{ color: c.primary, fontWeight: Number(t.weight.medium) }}>
           {code}
-        </Link>
+        </StockExternalLink>
       ),
     },
     { title: "名称", dataIndex: "name", width: 90, ellipsis: true },
@@ -202,14 +203,14 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       dataIndex: "change_pct",
       width: 80,
       align: "right",
-      render: (value: number | null) => <ChangeValue value={value} fontWeight={500} />,
+      render: (value: number | null) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
     },
     {
       title: "上榜原因",
       dataIndex: "reason",
       width: 160,
       ellipsis: true,
-      render: (value: string) => value ? <Tag style={{ fontSize: 11 }}>{value}</Tag> : "-",
+      render: (value: string) => value ? <Tag style={{ fontSize: t.font.xs }}>{value}</Tag> : "-",
     },
     {
       title: "买入额(万)",
@@ -238,7 +239,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
         value == null ? (
           "-"
         ) : (
-          <span style={{ color: changeColor(value, c), fontWeight: 600 }}>
+          <span style={{ color: changeColor(value, c), fontWeight: Number(t.weight.semibold) }}>
             {value > 0 ? "+" : ""}{value.toFixed(0)}
           </span>
         ),
@@ -269,21 +270,21 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       dataIndex: "d1_chg",
       width: 70,
       align: "right",
-      render: (value: number | null) => <ChangeValue value={value} fontWeight={400} />,
+      render: (value: number | null) => <ChangeValue value={value} fontWeight={Number(t.weight.normal)} />,
     },
     {
       title: "2日后",
       dataIndex: "d2_chg",
       width: 70,
       align: "right",
-      render: (value: number | null) => <ChangeValue value={value} fontWeight={400} />,
+      render: (value: number | null) => <ChangeValue value={value} fontWeight={Number(t.weight.normal)} />,
     },
     {
       title: "5日后",
       dataIndex: "d5_chg",
       width: 70,
       align: "right",
-      render: (value: number | null) => <ChangeValue value={value} fontWeight={400} />,
+      render: (value: number | null) => <ChangeValue value={value} fontWeight={Number(t.weight.normal)} />,
     },
     {
       title: "明细",
@@ -301,7 +302,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       ),
     },
     ];
-  }, [c, isNarrow, openDetail]);
+  }, [c, t, isNarrow, openDetail]);
 
   const renderExpandedRow = useCallback((record: DragonTigerItem) => (
     <ResponsiveMetricGrid
@@ -313,9 +314,9 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
         { key: "deal", label: "成交额", value: formatWanAmount(record.deal_amount) },
         { key: "deal-rate", label: "占成交比", value: formatRatioPercent(record.deal_amount_rate) },
         { key: "turnover", label: "换手率", value: formatSignedPercent(record.turnover_pct).replace("+", "") },
-        { key: "d1", label: "次日后", value: <ChangeValue value={record.d1_chg} fontWeight={400} /> },
-        { key: "d2", label: "2日后", value: <ChangeValue value={record.d2_chg} fontWeight={400} /> },
-        { key: "d5", label: "5日后", value: <ChangeValue value={record.d5_chg} fontWeight={400} /> },
+        { key: "d1", label: "次日后", value: <ChangeValue value={record.d1_chg} fontWeight={Number(t.weight.normal)} /> },
+        { key: "d2", label: "2日后", value: <ChangeValue value={record.d2_chg} fontWeight={Number(t.weight.normal)} /> },
+        { key: "d5", label: "5日后", value: <ChangeValue value={record.d5_chg} fontWeight={Number(t.weight.normal)} /> },
         {
           key: "detail",
           label: "营业部明细",
@@ -323,24 +324,24 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
         },
       ]}
     />
-  ), [openDetail]);
+  ), [t, openDetail]);
 
   return (
     <>
       <Card
         size="small"
         style={{
-          marginBottom: embedded ? 12 : 16,
-          borderRadius: 10,
+          marginBottom: embedded ? t.space[3] : t.space[4],
+          borderRadius: t.radius.lg,
           border: "none",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: t.shadow.xs,
         }}
-        styles={{ body: { padding: embedded ? undefined : isNarrow ? "12px" : "16px 24px" } }}
+        styles={{ body: { padding: embedded ? undefined : isNarrow ? t.space[3] : `${t.space[4]} ${t.space[6]}` } }}
       >
         <Row justify="space-between" align="middle" gutter={[12, 8]}>
           <Col xs={24} sm={12}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>报告日期：</span>
+            <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
+            <span style={{ fontWeight: Number(t.weight.medium), whiteSpace: "nowrap" }}>报告日期：</span>
             <DatePicker
               value={date}
               onChange={(value) => value && setDate(value)}
@@ -351,8 +352,8 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
             </div>
           </Col>
           <Col xs={24} sm={12} style={{ textAlign: isNarrow ? "left" : "right" }}>
-            {embedded && <Tag color="orange">东方财富</Tag>}
-            <span style={{ color: c.textSecondary, fontSize: 12, marginLeft: embedded ? 8 : 0 }}>
+            {embedded && <Tag>东方财富</Tag>}
+            <span style={{ color: c.textSecondary, fontSize: t.font.sm, marginLeft: embedded ? t.space[2] : 0 }}>
               {data ? `共 ${data.length} 只股票上榜` : "等待榜单数据"}
             </span>
           </Col>
@@ -361,11 +362,11 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
       <Card
         size="small"
         style={{
-          borderRadius: 10,
+          borderRadius: t.radius.lg,
           border: "none",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: t.shadow.xs,
         }}
-        styles={{ body: { padding: "8px 16px" } }}
+        styles={{ body: { padding: `${t.space[2]} ${t.space[4]}` } }}
       >
         <SectionDataState
           isLoading={isLoading && !hasData}

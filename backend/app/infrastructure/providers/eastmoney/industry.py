@@ -2,7 +2,7 @@ import logging
 
 import pandas as pd
 
-from app.constants.market import EASTMONEY_UT_TRADE
+from app.constants.market import EASTMONEY_CLIST_URL, EASTMONEY_UT_TRADE
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,9 @@ class IndustryMixin:
             board_name = str(row["板块名称"])
             try:
                 cons_df = self.fetch_industry_components(board_code)
+                if self.em_cooldown_remaining(EASTMONEY_CLIST_URL) > 0:
+                    logger.info("东方财富行业成分进入冷却，停止剩余板块请求")
+                    break
                 if "代码" not in cons_df.columns:
                     continue
                 for code in cons_df["代码"]:

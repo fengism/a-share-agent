@@ -17,93 +17,49 @@ from app.agentic.agents.contracts import (
 from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent
 from app.agentic.messages import build_messages
-from app.agentic.protocol import AgentMessage, ToolCallFunction, ToolCallInfo, ToolResultInfo
+from app.agentic.protocol import (
+    AgentMessage,
+    ToolCallFunction,
+    ToolCallInfo,
+    ToolResultInfo,
+)
+from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.runtime.llm import create_chat_completion, stream_chat_completion
+from app.agentic.tools.cache import SharedToolCache
 from app.agentic.tools.calls import (
     build_assistant_tool_message,
     extract_pseudo_tool_calls,
     tool_call_infos_from_stream,
 )
-from app.agentic.tools.contracts import ToolPolicy
-from app.agentic.tools.serialization import tool_call_cache_key
-from app.core.errors import log_internal_error
+from app.agentic.tools.serialization import (
+    has_meaningful_tool_content,
+    serialize_context_result,
+    serialize_error,
+    tool_call_cache_key,
+)
+from app.configuration import get_settings
+from app.core.errors import build_internal_error, log_internal_error
+from app.core.metrics import metrics
+from app.infrastructure.llm.adapters import LLMRetryableError
 
 logger = logging.getLogger(__name__)
+_OUTPUT_TRUNCATED_WARNING = "模型输出达到长度上限，回答可能不完整"
+_EMPTY_OUTPUT_ERROR = "模型未生成有效回答，请稍后重试"
+_STREAM_INTERRUPTED_WARNING = "模型流式响应中断，已保留已生成内容"
 
 
-@dataclass
-class _SharedToolCacheEntry:
-    future: asyncio.Future[ToolResultInfo]
-    expires_at: float | None = None
-
-
-class SharedToolCache:
-    """跨子 Agent 共享的工具结果缓存：name+arguments 相同的调用只执行一次。
-
-    用 in-flight future 缓存：先到的调用占位并执行，后到的（含并发）直接 await 同一结果。
-    单线程事件循环下「查缓存→建 future」之间无 await，故 check-and-set 原子，能真正去重并发调用。
-    """
-
-    def __init__(self) -> None:
-        self._cache: dict[str, _SharedToolCacheEntry] = {}
-
-    @staticmethod
-    def _key(call: ToolCallInfo) -> str:
-        return tool_call_cache_key(call)
-
-    async def execute(
-        self,
-        call: ToolCallInfo,
-        allowed_names: Collection[str] | None = None,
-    ) -> ToolResultInfo:
-        """执行工具调用并缓存结果，命中时用本次 tool_call_id 重新封装返回。
-
-        Param:
-            call: 工具调用信息
-        Return:
-            ToolResultInfo，tool_call_id 始终对应本次调用
-        """
-        if allowed_names is not None and call.function.name not in allowed_names:
-            return await registry.execute_tool(call, allowed_names=allowed_names)
-
-        policy = registry.get_tool_policy(call.function.name) or ToolPolicy()
-        if policy.cache_ttl_seconds == 0:
-            if allowed_names is None:
-                return await registry.execute_tool(call)
-            return await registry.execute_tool(call, allowed_names=allowed_names)
-
-        key = self._key(call)
-        existing = self._cache.get(key)
-        if existing is not None:
-            if existing.expires_at is None or existing.expires_at > time.monotonic():
-                cached = await existing.future
-                return ToolResultInfo(
-                    tool_call_id=call.id, name=cached.name,
-                    content=cached.content, is_error=cached.is_error,
-                )
-            self._cache.pop(key, None)
-
-        loop = asyncio.get_event_loop()
-        fut: asyncio.Future[ToolResultInfo] = loop.create_future()
-        entry = _SharedToolCacheEntry(future=fut)
-        self._cache[key] = entry
-        try:
-            if allowed_names is None:
-                result = await registry.execute_tool(call)
-            else:
-                result = await registry.execute_tool(call, allowed_names=allowed_names)
-        except BaseException:
-            # registry.execute_tool 正常不抛异常，但兜底：失败不缓存，避免毒化
-            self._cache.pop(key, None)
-            if not fut.done():
-                fut.cancel()
-            raise
-        if result.is_error:
-            self._cache.pop(key, None)
-        else:
-            entry.expires_at = time.monotonic() + policy.cache_ttl_seconds
-        fut.set_result(result)
-        return result
+def _log_agent_llm_error(operation: str, exc: Exception, public_message: str) -> tuple[str, str]:
+    if isinstance(exc, LLMRetryableError):
+        error_id, detail = build_internal_error("模型服务暂时不可用，请稍后重试")
+        logger.warning(
+            "%s临时失败 error_id=%s error_type=%s",
+            operation,
+            error_id,
+            type(exc).__name__,
+        )
+        return error_id, detail
+    error_id, detail = log_internal_error(logger, operation, exc, public_message)
+    return str(error_id), str(detail)
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +67,7 @@ class _AgentTurn:
     content: str
     reasoning_content: str
     tool_calls: tuple[ToolCallInfo, ...]
+    finish_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,7 +77,7 @@ class _ExecutionCompleted:
 
 @dataclass(frozen=True, slots=True)
 class _ExecutionFailed:
-    error: BaseException
+    exception: BaseException
 
 
 @dataclass(slots=True)
@@ -130,9 +87,13 @@ class _ExecutionState:
     effective_tool_names: list[str]
     tool_definitions: list[dict]
     tool_cache: SharedToolCache
+    max_tool_context_characters: int
+    tool_context_characters: int = 0
+    seen_tool_call_keys: set[str] = field(default_factory=set)
     tools_called: list[str] = field(default_factory=list)
     tool_results: list[ToolExecutionSummary] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 class AgentExecutor:
@@ -143,6 +104,7 @@ class AgentExecutor:
         history: list[AgentMessage] | None,
         allowed_tool_names: Collection[str] | None,
         tool_cache: SharedToolCache | None,
+        execution_context: AgentExecutionContext | None,
         max_history_messages: int,
         tool_selection_prompt: str,
     ) -> _ExecutionState:
@@ -163,7 +125,14 @@ class AgentExecutor:
             ),
             effective_tool_names=effective_tool_names,
             tool_definitions=registry.get_tool_definitions_for(effective_tool_names),
-            tool_cache=tool_cache or SharedToolCache(),
+            tool_cache=tool_cache or (
+                execution_context.tool_cache if execution_context is not None else SharedToolCache()
+            ),
+            max_tool_context_characters=(
+                execution_context.settings.chat_max_tool_context_characters
+                if execution_context is not None
+                else get_settings().chat_max_tool_context_characters
+            ),
         )
 
     @staticmethod
@@ -182,9 +151,25 @@ class AgentExecutor:
             tools_called=state.tools_called,
             tool_results=state.tool_results,
             errors=state.errors,
+            warnings=state.warnings,
             duration_ms=int((time.monotonic() - state.started_at) * 1000),
             reasoning_content=reasoning_content,
         )
+
+    @staticmethod
+    def _record_turn_completion(state: _ExecutionState, turn: _AgentTurn) -> None:
+        if (
+            turn.finish_reason == "length"
+            and _OUTPUT_TRUNCATED_WARNING not in state.warnings
+        ):
+            metrics.record_agentic_event("llm_output_truncated")
+            state.warnings.append(_OUTPUT_TRUNCATED_WARNING)
+        if (
+            turn.finish_reason == "stream_error"
+            and _STREAM_INTERRUPTED_WARNING not in state.warnings
+        ):
+            metrics.record_agentic_event("llm_stream_interrupted")
+            state.warnings.append(_STREAM_INTERRUPTED_WARNING)
 
     async def _execute_tool_calls(
         self,
@@ -193,33 +178,100 @@ class AgentExecutor:
         tool_calls: list[ToolCallInfo],
         assistant_content: str,
         emit: Callable[[AgentEvent], Awaitable[None]],
+        execution_context: AgentExecutionContext | None,
     ) -> None:
         state.messages.append(build_assistant_tool_message(tool_calls, assistant_content))
         for tool_call in tool_calls:
             state.tools_called.append(tool_call.function.name)
             await emit(AgentEvent(type="tool_call", tool_call=tool_call))
 
-        tool_results = await asyncio.gather(
+        settings = (
+            execution_context.settings
+            if execution_context is not None
+            else get_settings()
+        )
+        tool_results: list[ToolResultInfo | None] = [None] * len(tool_calls)
+        unique_calls: list[tuple[int, ToolCallInfo]] = []
+        for index, tool_call in enumerate(tool_calls):
+            cache_key = tool_call_cache_key(tool_call)
+            if cache_key in state.seen_tool_call_keys:
+                metrics.record_agentic_event("duplicate_tool_call")
+                tool_results[index] = ToolResultInfo(
+                    tool_call_id=tool_call.id,
+                    name=tool_call.function.name,
+                    content=serialize_error(
+                        "duplicate_tool_call",
+                        "本 Agent 已调用过相同工具和参数，请基于已有结果继续分析",
+                    ),
+                    is_error=True,
+                )
+                continue
+            state.seen_tool_call_keys.add(cache_key)
+            unique_calls.append((index, tool_call))
+
+        accepted_count = min(
+            len(unique_calls),
+            settings.chat_max_tool_calls_per_round,
+        )
+        if execution_context is not None:
+            accepted_count = await execution_context.reserve_tool_calls(accepted_count)
+        accepted_calls = unique_calls[:accepted_count]
+        rejected_calls = unique_calls[accepted_count:]
+
+        accepted_results = await asyncio.gather(
             *(
                 state.tool_cache.execute(
                     tool_call,
                     allowed_names=state.effective_tool_names,
+                    execution_context=execution_context,
                 )
-                for tool_call in tool_calls
+                for _, tool_call in accepted_calls
             )
         )
-        for tool_call, result in zip(tool_calls, tool_results):
+        for (index, _), result in zip(accepted_calls, accepted_results):
+            tool_results[index] = result
+        for index, tool_call in rejected_calls:
+            metrics.record_agentic_event("tool_budget_rejected")
+            tool_results[index] = ToolResultInfo(
+                tool_call_id=tool_call.id,
+                name=tool_call.function.name,
+                content=serialize_error(
+                    "tool_budget_exceeded",
+                    "本轮或本次请求的工具调用预算已用尽，请基于已有结果完成回答",
+                ),
+                is_error=True,
+            )
+        resolved_results = [result for result in tool_results if result is not None]
+        if len(resolved_results) != len(tool_calls):
+            raise RuntimeError("工具调用结果数量与请求不一致")
+        for tool_call, result in zip(tool_calls, resolved_results):
             await emit(AgentEvent(type="tool_result", tool_result=result))
+            has_evidence = (
+                not result.is_error
+                and has_meaningful_tool_content(result.content)
+            )
             state.tool_results.append(
                 ToolExecutionSummary(
                     name=tool_call.function.name,
                     is_error=result.is_error,
+                    has_evidence=has_evidence,
                 )
             )
+            remaining_context = max(
+                0,
+                state.max_tool_context_characters - state.tool_context_characters,
+            )
+            context_content = serialize_context_result(
+                result.content,
+                remaining_context,
+            )
+            if context_content != result.content:
+                metrics.record_agentic_event("tool_context_truncated")
+            state.tool_context_characters += len(context_content)
             state.messages.append({
                 "role": "tool",
                 "tool_call_id": result.tool_call_id,
-                "content": result.content,
+                "content": context_content,
             })
             if result.is_error:
                 state.errors.append(f"{tool_call.function.name}: {result.content}")
@@ -239,6 +291,7 @@ class AgentExecutor:
         temperature: float,
         stream_response: bool,
         emit: Callable[[AgentEvent], Awaitable[None]],
+        execution_context: AgentExecutionContext,
     ) -> AgentExecutionResult:
         generation_failed = False
         reasoning_content = ""
@@ -252,13 +305,16 @@ class AgentExecutor:
                 temperature=temperature,
                 stream_response=stream_response,
                 emit=emit,
+                max_completion_tokens=(
+                    execution_context.settings.chat_max_completion_tokens
+                ),
             )
             analysis = turn.content
             reasoning_content = turn.reasoning_content
+            self._record_turn_completion(state, turn)
         except Exception as exc:
             generation_failed = True
-            _, analysis = log_internal_error(
-                logger,
+            _, analysis = _log_agent_llm_error(
                 f"Agent {profile.name} 最终分析",
                 exc,
                 "最终分析生成失败",
@@ -267,10 +323,15 @@ class AgentExecutor:
             if stream_response:
                 await emit(AgentEvent(type="error", error=analysis))
 
+        if not generation_failed and not analysis.strip():
+            state.errors.append(_EMPTY_OUTPUT_ERROR)
+            if stream_response:
+                await emit(AgentEvent(type="error", error=_EMPTY_OUTPUT_ERROR))
+
         status: Literal["completed", "partial", "failed"]
         if generation_failed or not analysis.strip():
             status = "failed"
-        elif state.errors:
+        elif state.errors or state.warnings:
             status = "partial"
         else:
             status = "completed"
@@ -293,6 +354,7 @@ class AgentExecutor:
         temperature: float,
         stream_response: bool,
         emit: Callable[[AgentEvent], Awaitable[None]],
+        max_completion_tokens: int | None = None,
     ) -> _AgentTurn:
         kwargs = {
             "model": model,
@@ -305,7 +367,12 @@ class AgentExecutor:
             kwargs["tool_choice"] = tool_choice
 
         if not stream_response:
-            response = await create_chat_completion(llm_client, **kwargs)
+            response = await create_chat_completion(
+                llm_client,
+                metric_stage=("agent.final@v1" if tool_choice == "none" else "agent.round@v1"),
+                max_completion_tokens=max_completion_tokens,
+                **kwargs,
+            )
             message = response.choices[0].message
             tool_calls = tuple(
                 ToolCallInfo(
@@ -322,42 +389,59 @@ class AgentExecutor:
                 content=message.content or "",
                 reasoning_content=getattr(message, "reasoning_content", "") or "",
                 tool_calls=tool_calls,
+                finish_reason=getattr(response.choices[0], "finish_reason", None),
             )
 
         content = ""
         reasoning_content = ""
+        finish_reason: str | None = None
         tool_calls_accumulator: dict[int, dict[str, str]] = {}
         stream_text_immediately = tool_choice == "none"
-        stream = stream_chat_completion(llm_client, **kwargs)
-        async for chunk in stream:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
-            if delta.content:
-                content += delta.content
-                if stream_text_immediately:
-                    await emit(AgentEvent(type="text", content=delta.content))
-            delta_reasoning = getattr(delta, "reasoning_content", "") or ""
-            if delta_reasoning:
-                reasoning_content += delta_reasoning
-                await emit(AgentEvent(type="reasoning", content=delta_reasoning))
-            for tool_call_delta in delta.tool_calls or []:
-                accumulator = tool_calls_accumulator.setdefault(
-                    tool_call_delta.index,
-                    {"id": "", "name": "", "arguments": ""},
-                )
-                if tool_call_delta.id:
-                    accumulator["id"] = tool_call_delta.id
-                if tool_call_delta.function:
-                    if tool_call_delta.function.name:
-                        accumulator["name"] = tool_call_delta.function.name
-                    if tool_call_delta.function.arguments:
-                        accumulator["arguments"] += tool_call_delta.function.arguments
+        stream = stream_chat_completion(
+            llm_client,
+            metric_stage=("agent.final@v1" if tool_choice == "none" else "agent.round@v1"),
+            max_completion_tokens=max_completion_tokens,
+            **kwargs,
+        )
+        try:
+            async for chunk in stream:
+                if not chunk.choices:
+                    continue
+                choice = chunk.choices[0]
+                chunk_finish_reason = getattr(choice, "finish_reason", None)
+                if chunk_finish_reason is not None:
+                    finish_reason = chunk_finish_reason
+                delta = choice.delta
+                if delta.content:
+                    content += delta.content
+                    if stream_text_immediately:
+                        await emit(AgentEvent(type="text", content=delta.content))
+                delta_reasoning = getattr(delta, "reasoning_content", "") or ""
+                if delta_reasoning:
+                    reasoning_content += delta_reasoning
+                    await emit(AgentEvent(type="reasoning", content=delta_reasoning))
+                for tool_call_delta in delta.tool_calls or []:
+                    accumulator = tool_calls_accumulator.setdefault(
+                        tool_call_delta.index,
+                        {"id": "", "name": "", "arguments": ""},
+                    )
+                    if tool_call_delta.id:
+                        accumulator["id"] = tool_call_delta.id
+                    if tool_call_delta.function:
+                        if tool_call_delta.function.name:
+                            accumulator["name"] = tool_call_delta.function.name
+                        if tool_call_delta.function.arguments:
+                            accumulator["arguments"] += tool_call_delta.function.arguments
+        except LLMRetryableError:
+            if not content.strip():
+                raise
+            finish_reason = "stream_error"
 
         return _AgentTurn(
             content=content,
             reasoning_content=reasoning_content,
             tool_calls=tuple(tool_call_infos_from_stream(tool_calls_accumulator)),
+            finish_reason=finish_reason,
         )
 
     async def run(
@@ -369,11 +453,13 @@ class AgentExecutor:
         model: str,
         event_queue: asyncio.Queue | None = None,
         tool_cache: "SharedToolCache | None" = None,
+        execution_context: AgentExecutionContext | None = None,
         allowed_tool_names: Collection[str] | None = None,
         temperature: float = 0.1,
         tool_selection_prompt: str = "",
         max_history_messages: int = 10,
         require_tool_first_round: bool = True,
+        require_tool_evidence: bool = False,
         stream_response: bool = False,
     ) -> AgentExecutionResult:
         """使用统一执行引擎运行一个 AgentProfile。
@@ -388,12 +474,16 @@ class AgentExecutor:
         Return:
             AgentExecutionResult，包含最终分析文本、调用过的工具和耗时
         """
+        execution_context = execution_context or AgentExecutionContext.from_current(
+            get_settings()
+        )
         state = self._build_execution_state(
             profile,
             message,
             history,
             allowed_tool_names,
             tool_cache,
+            execution_context,
             max_history_messages,
             tool_selection_prompt,
         )
@@ -404,6 +494,7 @@ class AgentExecutor:
                 await event_queue.put(delta)
 
         for round_num in range(profile.max_rounds):
+            metrics.record_agentic_event("agent_round")
             tool_choice = (
                 "required"
                 if round_num == 0 and state.tool_definitions and require_tool_first_round
@@ -421,10 +512,12 @@ class AgentExecutor:
                     temperature=temperature,
                     stream_response=stream_response,
                     emit=emit,
+                    max_completion_tokens=(
+                        execution_context.settings.chat_max_completion_tokens
+                    ),
                 )
             except Exception as exc:
-                _, detail = log_internal_error(
-                    logger,
+                _, detail = _log_agent_llm_error(
                     f"Agent {profile.name} 模型调用",
                     exc,
                     "模型调用失败",
@@ -435,6 +528,8 @@ class AgentExecutor:
                     return self._build_result(profile, state, "", "failed")
                 break
 
+            self._record_turn_completion(state, turn)
+
             tool_calls = list(turn.tool_calls)
             if not tool_calls and state.tool_definitions:
                 tool_calls = extract_pseudo_tool_calls(
@@ -443,13 +538,32 @@ class AgentExecutor:
                     allowed_names=state.effective_tool_names,
                 )
             if not tool_calls:
+                if require_tool_evidence and not any(
+                    result.has_evidence for result in state.tool_results
+                ):
+                    detail = "未获取有效工具证据，无法生成可靠结论"
+                    state.errors.append(detail)
+                    if stream_response:
+                        await emit(AgentEvent(type="error", error=detail))
+                    return self._build_result(profile, state, "", "failed", turn.reasoning_content)
+                if not turn.content.strip():
+                    state.errors.append(_EMPTY_OUTPUT_ERROR)
+                    if stream_response:
+                        await emit(AgentEvent(type="error", error=_EMPTY_OUTPUT_ERROR))
+                    return self._build_result(
+                        profile,
+                        state,
+                        "",
+                        "failed",
+                        turn.reasoning_content,
+                    )
                 if stream_response and turn.content and tool_choice != "none":
                     await emit(AgentEvent(type="text", content=turn.content))
                 return self._build_result(
                     profile,
                     state,
                     turn.content,
-                    "partial" if state.errors else "completed",
+                    "partial" if state.errors or state.warnings else "completed",
                     turn.reasoning_content,
                 )
 
@@ -459,7 +573,17 @@ class AgentExecutor:
                 tool_calls,
                 turn.content,
                 emit,
+                execution_context,
             )
+
+        if require_tool_evidence and not any(
+            result.has_evidence for result in state.tool_results
+        ):
+            detail = "未获取有效工具证据，无法生成可靠结论"
+            state.errors.append(detail)
+            if stream_response:
+                await emit(AgentEvent(type="error", error=detail))
+            return self._build_result(profile, state, "", "failed")
 
         return await self._complete_final_result(
             profile,
@@ -469,6 +593,7 @@ class AgentExecutor:
             temperature,
             stream_response,
             emit,
+            execution_context,
         )
 
     async def stream(
@@ -484,6 +609,8 @@ class AgentExecutor:
         tool_selection_prompt: str = "",
         max_history_messages: int = 10,
         require_tool_first_round: bool = False,
+        require_tool_evidence: bool = False,
+        execution_context: AgentExecutionContext | None = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         queue: asyncio.Queue[AgentEvent | _ExecutionCompleted | _ExecutionFailed]
         queue = asyncio.Queue()
@@ -502,6 +629,8 @@ class AgentExecutor:
                     tool_selection_prompt=tool_selection_prompt,
                     max_history_messages=max_history_messages,
                     require_tool_first_round=require_tool_first_round,
+                    require_tool_evidence=require_tool_evidence,
+                    execution_context=execution_context,
                     stream_response=True,
                 )
                 await queue.put(_ExecutionCompleted(result))
@@ -513,13 +642,14 @@ class AgentExecutor:
             while True:
                 event = await queue.get()
                 if isinstance(event, _ExecutionFailed):
-                    raise event.error
+                    raise event.exception
                 if isinstance(event, _ExecutionCompleted):
-                    if event.result.status != "failed":
-                        yield AgentEvent(
-                            type="done",
-                            reasoning_content=event.result.reasoning_content or None,
-                        )
+                    yield AgentEvent(
+                        type="done",
+                        reasoning_content=event.result.reasoning_content or None,
+                        status=event.result.status,
+                        warnings=event.result.warnings,
+                    )
                     break
                 yield event
         finally:

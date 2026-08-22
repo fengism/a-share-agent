@@ -7,9 +7,13 @@ from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent
 from app.agentic.protocol import AgentMessage
+from app.agentic.runtime.context import AgentExecutionContext
 from app.configuration import get_effective_settings
+from app.core.metrics import metrics
+from app.modules.chat.capability_plan import build_chat_capability_plan
 from app.modules.chat.general_agent import stream_general_agent
 from app.modules.chat.orchestrator import Orchestrator
+from app.modules.chat.routing import RoutingDecision
 
 
 async def run_chat_agent(
@@ -32,7 +36,6 @@ async def run_chat_agent(
         enabled_skill_names = [
             name for name in enabled_skill_names if name in requested_skills
         ]
-    tool_names = registry.get_tool_names_for_skills(enabled_skill_names)
     disabled_agents = set(settings.disabled_chat_agents)
     enabled_agent_names = [
         profile.name
@@ -44,20 +47,39 @@ async def run_chat_agent(
         enabled_agent_names = [
             name for name in enabled_agent_names if name in requested_agents
         ]
-    if settings.multi_agent_enabled and enabled_agent_names:
+    plan = build_chat_capability_plan(
+        message,
+        enabled_skill_names=enabled_skill_names,
+        enabled_agent_names=enabled_agent_names,
+    )
+    metrics.record_agentic_event("capability_plan")
+    execution_context = AgentExecutionContext.from_current(
+        settings,
+        total_timeout_seconds=settings.chat_total_timeout_seconds,
+    )
+    if settings.multi_agent_enabled and plan.candidate_agent_names:
         orchestrator = Orchestrator(
-            agent_names=enabled_agent_names,
-            skill_names=enabled_skill_names,
-            allowed_tool_names=tool_names,
+            agent_names=plan.candidate_agent_names,
+            skill_names=plan.active_skill_names,
+            allowed_tool_names=plan.tool_names,
+            require_tool_evidence=plan.requires_tool_evidence,
+            execution_context=execution_context,
         )
-        async for delta in orchestrator.run(message, history):
+        decision = RoutingDecision(
+            agents=list(plan.candidate_agent_names),
+            needs_llm_classification=plan.needs_llm_classification,
+            reasoning=plan.reasoning,
+        )
+        async for delta in orchestrator.run(message, history, initial_decision=decision):
             yield delta
         return
 
     async for delta in stream_general_agent(
         message,
         history,
-        tool_names=tool_names,
-        skill_names=enabled_skill_names,
+        tool_names=plan.tool_names,
+        skill_names=plan.active_skill_names,
+        require_tool_evidence=plan.requires_tool_evidence,
+        execution_context=execution_context,
     ):
         yield delta

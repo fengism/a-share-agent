@@ -1,43 +1,43 @@
 /**
  * Analysis 页面导出 PDF 及 Tab 样式。
  *
- * 需要以下 CSS 自定义属性（由 theme 系统在祖先元素上设置）：
- *   --theme-text-primary, --theme-primary, --theme-nested-bg,
- *   --theme-border, --theme-text-secondary, --theme-elevated-bg,
- *   --theme-card-bg, --theme-page-bg
+ * 依赖以下 CSS 自定义属性（由 theme 系统在 <html> 上设置，见 theme/hooks.ts）：
+ *   --c-text-primary, --c-primary, --c-nested-bg,
+ *   --c-border, --c-text-secondary, --c-elevated-bg,
+ *   --c-card-bg, --c-page-bg
  */
 
 .terminal-table-row td {
   font-size: 12px;
-  color: var(--theme-text-secondary);
+  color: var(--c-text-secondary);
   padding-top: 8px !important;
   padding-bottom: 8px !important;
-  border-bottom: 1px solid var(--theme-border) !important;
+  border-bottom: 1px solid var(--c-border) !important;
 }
 
 .ant-tabs .ant-tabs-tab {
   padding: 10px 14px;
   border-radius: 8px 8px 0 0;
-  color: var(--theme-text-secondary);
+  color: var(--c-text-secondary);
   transition: all 0.2s ease;
 }
 
 .ant-tabs .ant-tabs-tab:hover {
-  color: var(--theme-primary);
-  background: var(--theme-elevated-bg);
+  color: var(--c-primary);
+  background: var(--c-elevated-bg);
 }
 
 .ant-tabs .ant-tabs-tab.ant-tabs-tab-active {
-  background: var(--theme-nested-bg);
+  background: var(--c-nested-bg);
 }
 
 .ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
-  color: var(--theme-primary);
+  color: var(--c-primary);
   font-weight: 700;
 }
 
 .ant-tabs .ant-tabs-ink-bar {
-  background: var(--theme-primary);
+  background: var(--c-primary);
   height: 3px;
   border-radius: 999px;
 }
@@ -59,22 +59,22 @@
 
 .pdf-exporting .ant-card {
   box-shadow: none !important;
-  border-color: var(--theme-border) !important;
-  background: var(--theme-card-bg) !important;
+  border-color: var(--c-border) !important;
+  background: var(--c-card-bg) !important;
 }
 
 .pdf-exporting {
   max-width: 1100px !important;
   padding: 0 !important;
-  background: var(--theme-page-bg) !important;
-  color: var(--theme-text-primary) !important;
+  background: var(--c-page-bg) !important;
+  color: var(--c-text-primary) !important;
 }
 
 .pdf-exporting .ant-card-head {
   min-height: 40px !important;
   padding-inline: 16px !important;
-  background: var(--theme-card-bg) !important;
-  border-bottom-color: var(--theme-border) !important;
+  background: var(--c-card-bg) !important;
+  border-bottom-color: var(--c-border) !important;
 }
 
 .pdf-exporting .ant-card-body {
@@ -83,9 +83,9 @@
 }
 
 .pdf-exporting .ant-tag {
-  border-color: var(--theme-border) !important;
-  background: var(--theme-elevated-bg) !important;
-  color: var(--theme-text-primary) !important;
+  border-color: var(--c-border) !important;
+  background: var(--c-elevated-bg) !important;
+  color: var(--c-text-primary) !important;
 }
 
 .pdf-exporting .pdf-metric-card {
@@ -100,7 +100,7 @@
 
 .pdf-exporting .pdf-section-title {
   padding-bottom: 6px;
-  border-bottom: 1px solid var(--theme-border);
+  border-bottom: 1px solid var(--c-border);
 }
 
 .pdf-exporting .pdf-list-item {

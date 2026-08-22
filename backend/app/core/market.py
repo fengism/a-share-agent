@@ -19,14 +19,13 @@ class SymbolFormats:
 def classify_exchange(code: str) -> str:
     """Classify the exchange of a six-digit stock code."""
     code = code.strip()
-    if not code:
-        raise ValueError("股票代码为空")
-    first = code[0]
-    if first in ("6", "9"):
+    if not code.isdigit() or len(code) != 6:
+        raise ValueError(f"无效股票代码: {code}，需要6位数字")
+    if code.startswith("6") or code.startswith("900"):
         return "SH"
-    if first in ("0", "3"):
+    if code.startswith(("0", "2", "3")):
         return "SZ"
-    if first == "8":
+    if code.startswith(("4", "8", "920")):
         return "BJ"
     raise ValueError(f"无法识别交易所: {code}")
 
@@ -58,15 +57,6 @@ def normalize_index_symbol(symbol: str) -> str:
     if symbol.startswith(("sh", "sz")):
         return symbol
     if symbol.startswith("0"):
-        return f"sh{symbol}"
-    return f"sz{symbol}"
-
-
-def normalize_index_symbol_v2(symbol: str) -> str:
-    """Add a market prefix based on whether a symbol starts with six."""
-    if symbol.startswith(("sh", "sz")):
-        return symbol
-    if symbol.startswith("6"):
         return f"sh{symbol}"
     return f"sz{symbol}"
 

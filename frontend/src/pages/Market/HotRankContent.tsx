@@ -5,12 +5,12 @@ import {
   FireOutlined,
   RiseOutlined,
 } from "@ant-design/icons";
-import { Link } from "react-router-dom";
 import type { ColumnsType } from "antd/es/table";
 import ChangeValue from "../../components/ChangeValue";
 import DataRefreshIndicator from "../../components/DataRefreshIndicator";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
+import StockExternalLink from "../../components/StockExternalLink";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import {
   useThsHotConcept,
@@ -19,8 +19,8 @@ import {
 } from "../../api/queries";
 import type { ThsHotPlate, ThsHotStock } from "../../types/stock";
 import { formatHotValue } from "../../utils/format";
-import { useColors } from "../../styles/ui";
-import type { ThemeColors } from "../../theme/themes";
+import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
+import { rankBadge } from "./rankBadge";
 
 type TabKey = "stock" | "concept" | "industry";
 
@@ -30,42 +30,9 @@ const TAB_OPTIONS = [
   { label: <span><AppstoreOutlined /> 行业榜</span>, value: "industry" as TabKey },
 ];
 
-function rankBadge(rank: number, c: ThemeColors) {
-  let color = c.textSecondary;
-  let bg = "transparent";
-  if (rank === 1 || rank === 2) {
-    color = "#fff";
-    bg = c.up;
-  } else if (rank === 3) {
-    color = "#fff";
-    bg = "#eab308";
-  } else if (rank <= 10) {
-    color = "#eab308";
-    bg = "rgba(234,179,8,0.15)";
-  }
-
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        width: 28,
-        height: 28,
-        lineHeight: "28px",
-        textAlign: "center",
-        borderRadius: 6,
-        fontWeight: 700,
-        fontSize: 13,
-        color,
-        background: bg,
-      }}
-    >
-      {rank}
-    </span>
-  );
-}
-
 function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number }) {
   const c = useColors();
+  const t = useTokens();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const { data, isLoading, isFetching, error, refetch } = useThsHotRank(enabled);
   const hasData = (data?.length ?? 0) > 0;
@@ -78,12 +45,12 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
           key: "stock",
           width: 150,
           render: (_: unknown, record: ThsHotStock) => (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {rankBadge(record.rank, c)}
-              <Link to={`/analysis/${record.code}`} style={{ minWidth: 0, color: c.primary }}>
-                <span style={{ display: "block", color: c.textPrimary, fontWeight: 600 }}>{record.name}</span>
-                <span style={{ display: "block", color: c.textMuted, fontSize: 11 }}>{record.code}</span>
-              </Link>
+            <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
+              {rankBadge(record.rank, c, t)}
+              <StockExternalLink code={record.code} name={record.name} style={{ minWidth: 0, color: c.primary }}>
+                <span style={{ display: "block", color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
+                <span style={{ display: "block", color: c.textMuted, fontSize: t.font.xs }}>{record.code}</span>
+              </StockExternalLink>
             </div>
           ),
         },
@@ -92,28 +59,28 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
           dataIndex: "change_pct",
           width: 82,
           align: "right",
-          render: (value: number) => <ChangeValue value={value} fontWeight={500} />,
+          render: (value: number | null) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
         },
         {
           title: "热度",
           dataIndex: "hot_value",
           width: 70,
           align: "right",
-          render: (value: number | null) => <span style={{ fontWeight: 600, color: c.up }}>{formatHotValue(value)}</span>,
+          render: (value: number | null) => <span style={{ fontWeight: Number(t.weight.semibold), color: c.up }}>{formatHotValue(value)}</span>,
         },
       ];
     }
 
     return [
-    { title: "排名", dataIndex: "rank", width: 60, align: "center", render: (rank: number) => rankBadge(rank, c) },
+    { title: "排名", dataIndex: "rank", width: 60, align: "center", render: (rank: number | null) => rankBadge(rank, c, t) },
     {
       title: "代码",
       dataIndex: "code",
       width: 90,
       render: (code: string) => (
-        <Link to={`/analysis/${code}`} style={{ color: c.primary, fontWeight: 500 }}>
+        <StockExternalLink code={code} style={{ color: c.primary, fontWeight: Number(t.weight.medium) }}>
           {code}
-        </Link>
+        </StockExternalLink>
       ),
     },
     { title: "名称", dataIndex: "name", width: 100, ellipsis: true },
@@ -122,7 +89,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
       dataIndex: "change_pct",
       width: 85,
       align: "right",
-      render: (value: number) => <ChangeValue value={value} fontWeight={500} />,
+      render: (value: number) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
     },
     {
       title: "热度",
@@ -130,7 +97,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
       width: 80,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ fontWeight: 600, color: c.up }}>
+        <span style={{ fontWeight: Number(t.weight.semibold), color: c.up }}>
           {formatHotValue(value)}
         </span>
       ),
@@ -145,14 +112,14 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
               .split(";")
               .slice(0, 3)
               .map((tag, index) => (
-                <Tag key={index} style={{ fontSize: 11, marginBottom: 2 }}>
+                <Tag key={index} style={{ fontSize: t.font.xs, marginBottom: t.space[1] }}>
                   {tag}
                 </Tag>
               ))
           : "-",
     },
     ];
-  }, [c, isNarrow]);
+  }, [c, t, isNarrow]);
 
   const renderExpandedRow = useCallback((record: ThsHotStock) => (
     <ResponsiveMetricGrid
@@ -196,6 +163,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
 
 function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: boolean }) {
   const c = useColors();
+  const t = useTokens();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const hook = type === "concept" ? useThsHotConcept : useThsHotIndustry;
   const { data, isLoading, isFetching, error, refetch } = hook(enabled);
@@ -209,9 +177,9 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
           key: "plate",
           width: 150,
           render: (_: unknown, record: ThsHotPlate) => (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {rankBadge(record.rank, c)}
-              <span style={{ minWidth: 0, color: c.textPrimary, fontWeight: 600 }}>{record.name}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
+              {rankBadge(record.rank, c, t)}
+              <span style={{ minWidth: 0, color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
             </div>
           ),
         },
@@ -220,33 +188,33 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
           dataIndex: "change_pct",
           width: 82,
           align: "right",
-          render: (value: number) => <ChangeValue value={value} fontWeight={500} />,
+          render: (value: number) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
         },
         {
           title: "热度",
           dataIndex: "hot_value",
           width: 70,
           align: "right",
-          render: (value: number | null) => <span style={{ fontWeight: 600, color: c.up }}>{formatHotValue(value)}</span>,
+          render: (value: number | null) => <span style={{ fontWeight: Number(t.weight.semibold), color: c.up }}>{formatHotValue(value)}</span>,
         },
       ];
     }
 
     return [
-    { title: "排名", dataIndex: "rank", width: 60, align: "center", render: (rank: number) => rankBadge(rank, c) },
+    { title: "排名", dataIndex: "rank", width: 60, align: "center", render: (rank: number) => rankBadge(rank, c, t) },
     {
       title: type === "concept" ? "概念名称" : "行业名称",
       dataIndex: "name",
       width: 160,
       ellipsis: true,
-      render: (name: string) => <span style={{ fontWeight: 500 }}>{name}</span>,
+      render: (name: string) => <span style={{ fontWeight: Number(t.weight.medium) }}>{name}</span>,
     },
     {
       title: "涨跌幅",
       dataIndex: "change_pct",
       width: 85,
       align: "right",
-      render: (value: number) => <ChangeValue value={value} fontWeight={500} />,
+      render: (value: number) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
     },
     {
       title: "热度",
@@ -254,7 +222,7 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
       width: 80,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ fontWeight: 600, color: c.up }}>
+        <span style={{ fontWeight: Number(t.weight.semibold), color: c.up }}>
           {formatHotValue(value)}
         </span>
       ),
@@ -264,17 +232,17 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
       dataIndex: "hot_tag",
       width: 140,
       render: (tag: string) =>
-        tag ? <Tag color="blue" style={{ fontSize: 11 }}>{tag}</Tag> : "-",
+        tag ? <Tag style={{ ...semanticTagStyle("primary"), fontSize: t.font.xs }}>{tag}</Tag> : "-",
     },
     {
       title: "涨跌停",
       dataIndex: "tag",
       width: 110,
       render: (tag: string) =>
-        tag ? <Tag color="volcano" style={{ fontSize: 11 }}>{tag}</Tag> : "-",
+        tag ? <Tag style={{ ...semanticTagStyle("warning"), fontSize: t.font.xs }}>{tag}</Tag> : "-",
     },
     ];
-  }, [c, isNarrow, type]);
+  }, [c, t, isNarrow, type]);
 
   const renderExpandedRow = useCallback((record: ThsHotPlate) => (
     <ResponsiveMetricGrid
@@ -321,6 +289,7 @@ interface HotRankContentProps {
 
 export function HotRankContent({ embedded = false }: HotRankContentProps) {
   const c = useColors();
+  const t = useTokens();
   const [tab, setTab] = useState<TabKey>("stock");
   const stockScrollY = embedded ? 580 : 600;
 
@@ -329,12 +298,12 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
       <Card
         size="small"
         style={{
-          marginBottom: embedded ? 12 : 16,
-          borderRadius: 10,
+          marginBottom: embedded ? t.space[3] : t.space[4],
+          borderRadius: t.radius.lg,
           border: "none",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: t.shadow.xs,
         }}
-        styles={{ body: { padding: embedded ? undefined : "16px 24px" } }}
+        styles={{ body: { padding: embedded ? undefined : `${t.space[4]} ${t.space[6]}` } }}
       >
         <Row justify="space-between" align="middle">
           <Col>
@@ -345,8 +314,8 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
             />
           </Col>
           <Col>
-            <Tag color="red">同花顺</Tag>
-            <span style={{ color: c.textSecondary, fontSize: 12, marginLeft: 8 }}>
+            <Tag>同花顺</Tag>
+            <span style={{ color: c.textSecondary, fontSize: t.font.sm, marginLeft: t.space[2] }}>
               {embedded ? "每分钟自动更新" : "数据来源: 同花顺 | 5分钟更新"}
             </span>
           </Col>
@@ -355,11 +324,11 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
       <Card
         size="small"
         style={{
-          borderRadius: 10,
+          borderRadius: t.radius.lg,
           border: "none",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: t.shadow.xs,
         }}
-        styles={{ body: { padding: "8px 16px" } }}
+        styles={{ body: { padding: `${t.space[2]} ${t.space[4]}` } }}
       >
         {tab === "stock" && <StockTable enabled={tab === "stock"} scrollY={stockScrollY} />}
         {tab === "concept" && <PlateTable type="concept" enabled={tab === "concept"} />}

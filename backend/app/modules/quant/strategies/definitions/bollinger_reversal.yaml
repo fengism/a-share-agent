@@ -1,0 +1,56 @@
+api_version: quant.strategy/v1
+key: bollinger_reversal
+version: 1.0.0
+enabled: true
+name: 布林带反转
+description: 收盘价触及下轨时入场，触及上轨时退出，适合震荡回归行情。
+scenario: 横盘震荡
+risk_level: medium
+presentation:
+  icon: radar-chart
+parameters:
+  period:
+    type: integer
+    label: 统计周期
+    default: 20
+    minimum: 2
+    maximum: 250
+  multiplier:
+    type: number
+    label: 标准差倍数
+    default: 2.0
+    minimum: 0.1
+    maximum: 5.0
+    step: 0.1
+indicators:
+  middle:
+    operator: sma
+    input: close
+    period: $period
+  deviation:
+    operator: rolling_std
+    input: close
+    period: $period
+  width:
+    operator: multiply
+    left: deviation
+    right: $multiplier
+  upper:
+    operator: add
+    left: middle
+    right: width
+  lower:
+    operator: subtract
+    left: middle
+    right: width
+signals:
+  entry:
+    operator: less_or_equal
+    left: close
+    right: lower
+  exit:
+    operator: greater_or_equal
+    left: close
+    right: upper
+position:
+  mode: binary

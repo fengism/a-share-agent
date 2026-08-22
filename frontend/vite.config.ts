@@ -27,6 +27,11 @@ export default defineConfig(({ mode }) => {
             // ECharts depends one-way on zrender; separating them keeps both
             // route-only chunks below the warning threshold without cycles.
             if (id.includes("/zrender/")) return "vendor-zrender";
+            if (
+              id.includes("/echarts/lib/chart/tree/")
+              || id.endsWith("/echarts/lib/data/Tree.js")
+            )
+              return "vendor-echarts-tree";
             if (id.includes("/echarts/")) return "vendor-echarts";
             if (id.includes("lightweight-charts")) return "vendor-charts";
             if (

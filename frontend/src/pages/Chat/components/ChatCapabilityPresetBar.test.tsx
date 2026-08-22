@@ -39,6 +39,7 @@ const capabilities: ChatCapabilitiesResponse = {
       display_name: "技术面分析",
       description: "分析趋势",
       tool_names: ["get_stock_kline"],
+      skill_names: ["stock_analysis"],
       max_rounds: 3,
     },
     {
@@ -46,6 +47,7 @@ const capabilities: ChatCapabilitiesResponse = {
       display_name: "资讯分析",
       description: "分析资讯",
       tool_names: ["web_search"],
+      skill_names: ["stock_analysis"],
       max_rounds: 3,
     },
   ],

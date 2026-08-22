@@ -57,7 +57,6 @@ export function applyIndustryAgentEvent(
         item.id === toolResult.tool_call_id
           ? {
               ...item,
-              result: toolResult.content,
               isError: toolResult.is_error,
               isExecuting: false,
             }

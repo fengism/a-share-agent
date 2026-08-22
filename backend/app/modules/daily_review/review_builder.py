@@ -1,29 +1,43 @@
 import json
 
-from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection
+from app.modules.daily_review.models import (
+    DailyReviewDataSnapshot,
+    DailyReviewResult,
+    DailyReviewSection,
+    DailyReviewSourceStatus,
+)
 
 
 def _index_move_counts(snapshot: DailyReviewDataSnapshot) -> tuple[int, int]:
-    rising_count = sum(
-        1
-        for item in snapshot.indices
-        if isinstance(item.get("change_pct"), (int, float)) and item.get("change_pct", 0) > 0
-    )
-    weak_count = sum(
-        1
-        for item in snapshot.indices
-        if isinstance(item.get("change_pct"), (int, float)) and item.get("change_pct", 0) < 0
-    )
+    rising_count = 0
+    weak_count = 0
+    for item in snapshot.indices:
+        change_pct = item.get("change_pct")
+        if not isinstance(change_pct, (int, float)):
+            continue
+        if change_pct > 0:
+            rising_count += 1
+        elif change_pct < 0:
+            weak_count += 1
     return rising_count, weak_count
 
 
 def _market_summary(snapshot: DailyReviewDataSnapshot, prefix: str) -> str:
     market_statistics = snapshot.market_statistics or {}
     rising_count, weak_count = _index_move_counts(snapshot)
+    statistics_status = snapshot.source_status.get("market_statistics")
+    breadth = (
+        "市场宽度数据缺失"
+        if statistics_status is not None and statistics_status.status == "unavailable"
+        else (
+            f"全市场上涨 {market_statistics.get('up_count', 0)} 家、下跌 {market_statistics.get('down_count', 0)} 家、"
+            f"平盘 {market_statistics.get('flat_count', 0)} 家；涨停 {market_statistics.get('limit_up_count', 0)} 家、"
+            f"跌停 {market_statistics.get('limit_down_count', 0)} 家"
+        )
+    )
     return (
         f"{prefix} {len(snapshot.indices)} 个核心指数，其中上涨 {rising_count} 个、下跌 {weak_count} 个；"
-        f"全市场上涨 {market_statistics.get('up_count', 0)} 家、下跌 {market_statistics.get('down_count', 0)} 家、平盘 {market_statistics.get('flat_count', 0)} 家；"
-        f"涨停 {market_statistics.get('limit_up_count', 0)} 家、跌停 {market_statistics.get('limit_down_count', 0)} 家。"
+        f"{breadth}。"
     )
 
 
@@ -38,6 +52,7 @@ def build_fallback_review(
         if item.get("name")
     ]
     market_statistics = snapshot.market_statistics or {}
+    breadth_available = snapshot.source_status.get("market_statistics", DailyReviewSourceStatus()).status != "unavailable"
     hot_concept_bullets = [
         f"{item.get('name', '')}：热度 {item.get('hot_value', '-')}, 涨跌幅 {item.get('change_pct', '-') }%"
         for item in snapshot.hot_concepts[:5]
@@ -70,17 +85,25 @@ def build_fallback_review(
             bullets=dragon_bullets,
         ),
         risk_alerts=[
+            "市场宽度数据缺失，无法判断真实赚钱效应。"
+            if not breadth_available
+            else
             "若跌停家数抬升且下跌家数明显多于上涨家数，需警惕情绪退潮。"
             if market_statistics.get("down_count", 0) > market_statistics.get("up_count", 0)
             else "若强势板块集中且龙虎榜净买入不持续，需防范次日冲高回落。"
         ],
         opportunities=[
+            "核心数据不足，暂不生成方向性机会判断。"
+            if not breadth_available
+            else
             "优先关注指数相对强势背景下，涨幅居前且有龙头股带动的板块。"
             if market_statistics.get("up_count", 0) >= market_statistics.get("down_count", 0)
             else "若指数分化但板块龙头延续，可关注局部主线的低吸机会。"
         ],
         strategy_notes=[
-            f"先判断指数强弱，再看板块扩散，最后结合龙虎榜确认资金方向；当前涨停/跌停为 {market_statistics.get('limit_up_count', 0)}/{market_statistics.get('limit_down_count', 0)}。"
+            "先补齐市场宽度和成交额数据，再制定次日交易计划。"
+            if not breadth_available
+            else f"先判断指数强弱，再看板块扩散，最后结合龙虎榜确认资金方向；当前涨停/跌停为 {market_statistics.get('limit_up_count', 0)}/{market_statistics.get('limit_down_count', 0)}。"
         ],
         data_snapshot=snapshot,
     )
@@ -190,6 +213,10 @@ def build_prompt(
         bottom_sectors_placeholder=bottom_sector_bullets or json.dumps(snapshot.bottom_sectors[:10], ensure_ascii=False),
         market_volume_placeholder=_market_volume_summary(snapshot) or json.dumps(snapshot.market_volume, ensure_ascii=False),
         macro_data_placeholder=_macro_summary(snapshot),
+        source_status_placeholder=json.dumps(
+            {name: status.model_dump() for name, status in snapshot.source_status.items()},
+            ensure_ascii=False,
+        ),
     )
 
 
@@ -203,6 +230,10 @@ def build_snapshot(
     market_news,
     market_volume,
     macro_data,
+    *,
+    requested_date: str = "",
+    effective_date: str = "",
+    source_status: dict[str, DailyReviewSourceStatus] | None = None,
 ) -> DailyReviewDataSnapshot:
     market_statistics_data = (
         {}
@@ -214,6 +245,9 @@ def build_snapshot(
     market_statistics_data.pop("top_sectors", None)
     market_statistics_data.pop("bottom_sectors", None)
     snapshot_data = {
+        "requested_date": requested_date,
+        "effective_date": effective_date,
+        "source_status": source_status or {},
         "indices": []
         if isinstance(indices, Exception) or indices is None
         else [item.model_dump() for item in indices.indices],

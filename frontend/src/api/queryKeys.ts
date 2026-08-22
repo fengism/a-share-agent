@@ -1,13 +1,22 @@
 export const queryKeys = {
   market: {
     indices: ["marketIndices"] as const,
+    emotion: ["marketEmotion"] as const,
+    limitUpLadder: (date: string) => ["marketLimitUpLadder", date] as const,
+    limitHistory: (date: string, category: string) => ["marketLimitHistory", date, category] as const,
+    sectorStocksHistory: (date: string, plateId: string) =>
+      ["marketSectorStocksHistory", date, plateId] as const,
+    wind: ["marketWind"] as const,
+    mainline: ["marketMainline"] as const,
+    windStocks: (plateCode: string) => ["marketWindStocks", plateCode] as const,
     indexKline: (symbol: string, period: string, startDate: string) =>
       ["marketIndexKline", symbol, period, startDate] as const,
+    indexIntraday: (symbol: string) => ["marketIndexIntraday", symbol] as const,
     hsgtFlow: ["hsgtFlow"] as const,
     thsHotRank: ["thsHotRank"] as const,
     thsHotConcept: ["thsHotConcept"] as const,
     thsHotIndustry: ["thsHotIndustry"] as const,
-    industryRankings: ["industryRankings"] as const,
+    industryRankings: (date: string) => ["industryRankings", date] as const,
     dragonTiger: (reportDate: string) => ["dragonTiger", reportDate] as const,
     dragonTigerDetail: (code: string, reportDate: string) =>
       ["dragonTigerDetail", code, reportDate] as const,
@@ -18,11 +27,13 @@ export const queryKeys = {
     twitterAnalysis: (username: string) => ["marketTwitterAnalysis", username] as const,
     newsAnalysis: ["newsAnalysis"] as const,
     macroAll: ["macroAllData"] as const,
+    macroUs: ["macroUsData"] as const,
   },
   stock: {
     search: (query: string) => ["stockSearch", query] as const,
-    kline: (code: string, period: string, adjust: string, startDate: string) =>
-      ["kline", code, period, adjust, startDate] as const,
+    kline: (code: string, period: string, adjust: string, startDate: string, endDate = "") =>
+      ["kline", code, period, adjust, startDate, endDate] as const,
+    intraday: (code: string) => ["stockIntraday", code] as const,
     financial: (code: string, type: string) => ["financial", code, type] as const,
     valuationDetail: (code: string) => ["valuationDetail", code] as const,
     indicators: (code: string) => ["indicators", code] as const,
@@ -36,6 +47,7 @@ export const queryKeys = {
   screener: {
     screen: (filters: unknown) => ["screener", filters] as const,
     industries: ["industries"] as const,
+    strategies: ["screener-strategies"] as const,
   },
   settings: {
     config: ["config"] as const,
@@ -43,10 +55,14 @@ export const queryKeys = {
     invites: ["invites"] as const,
   },
   portfolio: ["portfolio"] as const,
+  watchlist: ["watchlist"] as const,
   quant: {
     presets: ["quant", "strategy-presets"] as const,
+    registry: ["quant", "strategy-registry"] as const,
+    drafts: ["quant", "strategy-drafts"] as const,
     strategies: ["quant", "strategies"] as const,
     runs: ["quant", "backtests"] as const,
+    runsHistory: (pageSize: number) => ["quant", "backtests", "infinite", pageSize] as const,
     run: (runId: string) => ["quant", "backtests", runId] as const,
   },
   workflows: {
@@ -54,6 +70,7 @@ export const queryKeys = {
     dailyReviewHistory: (pageSize: number) => ["dailyReviewHistory", "infinite", pageSize] as const,
     dailyReview: (date: string) => ["dailyReview", date] as const,
     analysisHistory: (pageSize: number) => ["allAnalysisHistory", "infinite", pageSize] as const,
+    analysisHistorySnapshot: (code: string, date: string) => ["analysisHistory", code, date] as const,
     industryChainHistoryRoot: ["industryChainHistory"] as const,
     industryChainHistory: (name: string, pageSize: number) =>
       ["industryChainHistory", "infinite", name, pageSize] as const,

@@ -1,86 +1,113 @@
-"""URL 工具函数：链接判断、安全校验、短链解析等通用 URL 操作。
-
-被 Web Tool Pack 和 AgentExecutor 复用。
-"""
+"""URL classification and SSRF-safe DNS resolution helpers."""
 
 from __future__ import annotations
 
 import ipaddress
 import re
 import socket
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from urllib.parse import urlparse
+
+Resolver = Callable[..., Sequence[tuple]]
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedUrlTarget:
+    """One URL origin whose complete DNS answer set has been validated."""
+
+    scheme: str
+    hostname: str
+    port: int
+    addresses: tuple[str, ...]
+
+    @property
+    def host_header(self) -> str:
+        host = f"[{self.hostname}]" if ":" in self.hostname else self.hostname
+        default_port = _DEFAULT_PORTS[self.scheme]
+        return host if self.port == default_port else f"{host}:{self.port}"
 
 
 def is_twitter_url(url: str) -> bool:
-    """判断 URL 是否为 X/Twitter 链接（按主机名匹配 x.com / twitter.com）。
-
-    Param:
-        url: 待判断的 URL
-    Return:
-        True 表示是 X/Twitter 链接
-    """
+    """Return whether a URL belongs to X/Twitter."""
     host = (urlparse(url).hostname or "").lower()
-    return (
-        host in ("x.com", "twitter.com")
-        or host.endswith(".x.com")
-        or host.endswith(".twitter.com")
-    )
+    return host in ("x.com", "twitter.com") or host.endswith(".x.com") or host.endswith(".twitter.com")
 
 
 def parse_tweet_url(url: str) -> tuple[str, str]:
-    """从 X/Twitter URL 中提取用户名和推文 ID。
-
-    Param:
-        url: X/Twitter 推文链接
-    Return:
-        (username, tweet_id) 元组
-    Raises:
-        ValueError: URL 格式无法匹配推文链接模式
-    """
-    match = re.search(r'(?:x\.com|twitter\.com)/(\w+)/status/(\d+)', url)
+    """Extract a username and tweet ID from an X/Twitter status URL."""
+    match = re.search(r"(?:x\.com|twitter\.com)/(\w+)/status/(\d+)", url)
     if match:
         return match.group(1), match.group(2)
     raise ValueError(f"Cannot parse tweet URL: {url}")
 
 
 class UnsafeUrlError(ValueError):
-    """URL 指向私网/环回/元数据地址等不安全目标时抛出。"""
+    """Raised when an outbound URL cannot be proven to target the public Internet."""
+
+
+def _normalize_public_address(host: str, raw_address: str) -> str:
+    try:
+        address = ipaddress.ip_address(raw_address)
+    except ValueError as error:
+        raise UnsafeUrlError(f"主机名返回无效地址: {host} -> {raw_address}") from error
+    if not address.is_global:
+        raise UnsafeUrlError(f"拒绝访问非公网地址: {host} -> {address.compressed}")
+    return address.compressed
+
+
+def validate_url_syntax(url: str) -> tuple[str, str, int]:
+    """Validate browser-safe HTTP(S) URL syntax without performing DNS I/O."""
+    parsed = urlparse(url)
+    scheme = parsed.scheme.lower()
+    if scheme not in _DEFAULT_PORTS:
+        raise UnsafeUrlError(f"仅支持 http/https，拒绝 scheme={parsed.scheme!r}")
+    if parsed.username is not None or parsed.password is not None:
+        raise UnsafeUrlError("URL 不允许包含用户名或密码")
+    raw_hostname = parsed.hostname
+    if not raw_hostname:
+        raise UnsafeUrlError("URL 缺少主机名")
+    try:
+        hostname = raw_hostname.encode("idna").decode("ascii").lower()
+        port = parsed.port or _DEFAULT_PORTS[scheme]
+    except (UnicodeError, ValueError) as error:
+        raise UnsafeUrlError("URL 主机名或端口无效") from error
+    return scheme, hostname, port
+
+
+def resolve_url_target(url: str, *, resolver: Resolver = socket.getaddrinfo) -> ResolvedUrlTarget:
+    """Resolve and validate every address for a URL before a connection is attempted.
+
+    The returned addresses are the exact addresses that the transport must use. A
+    caller must not resolve ``hostname`` again after this function returns.
+    """
+    scheme, hostname, port = validate_url_syntax(url)
+
+    try:
+        addr_infos = resolver(hostname, port, type=socket.SOCK_STREAM)
+    except socket.gaierror as error:
+        raise UnsafeUrlError(f"主机名解析失败: {hostname}") from error
+
+    addresses: list[str] = []
+    for info in addr_infos:
+        sockaddr = info[4]
+        if not sockaddr:
+            continue
+        address = _normalize_public_address(hostname, str(sockaddr[0]))
+        if address not in addresses:
+            addresses.append(address)
+    if not addresses:
+        raise UnsafeUrlError(f"主机名未解析到可用公网地址: {hostname}")
+
+    return ResolvedUrlTarget(
+        scheme=scheme,
+        hostname=hostname,
+        port=port,
+        addresses=tuple(addresses),
+    )
 
 
 def assert_url_safe(url: str) -> None:
-    """校验 URL 安全性：仅允许 http/https 且目标主机不解析到私网/环回/元数据地址（SSRF 防护）。
-
-    Param:
-        url: 待校验的 URL
-    Return:
-        无返回；不安全时抛出 UnsafeUrlError
-    """
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        raise UnsafeUrlError(f"仅支持 http/https，拒绝 scheme={parsed.scheme!r}")
-
-    host = parsed.hostname
-    if not host:
-        raise UnsafeUrlError("URL 缺少主机名")
-
-    # 解析主机名到所有 IP，逐一校验，避免 DNS 指向内网或云元数据地址
-    try:
-        addr_infos = socket.getaddrinfo(host, None)
-    except socket.gaierror:
-        raise UnsafeUrlError(f"主机名解析失败: {host}")
-
-    for info in addr_infos:
-        ip_str = info[4][0]
-        try:
-            ip = ipaddress.ip_address(ip_str)
-        except ValueError:
-            continue
-        if (
-            ip.is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_reserved
-            or ip.is_multicast
-            or ip.is_unspecified
-        ):
-            raise UnsafeUrlError(f"拒绝访问内网/保留地址: {host} -> {ip_str}")
+    """Validate that a URL resolves exclusively to public HTTP(S) addresses."""
+    resolve_url_target(url)

@@ -31,6 +31,32 @@ describe("analysisStore user scope", () => {
     expect(state.currentStageIndex).toBe(0);
     expect(state.analysisError).toBeNull();
     expect(state.cancelAnalysis).toBeNull();
-    expect(state.analysisStages).toHaveLength(4);
+    expect(state.analysisStages).toHaveLength(0);
+  });
+
+  it("sizes progress from the backend stage count", () => {
+    useAnalysisStore.getState().updateAnalysisStage(
+      { stage: 1, name: "Agent 调研与证据校验", status: "started" },
+      3,
+      true,
+    );
+
+    let state = useAnalysisStore.getState();
+    expect(state.analysisStages).toHaveLength(3);
+    expect(state.analysisStages[0]?.name).toBe("Agent 调研与证据校验");
+    expect(state.analysisStages[1]).toBeNull();
+    expect(state.analysisStages[2]).toBeNull();
+    expect(state.currentStageIndex).toBe(0);
+
+    useAnalysisStore.getState().updateAnalysisStage(
+      { stage: 3, name: "AI 综合分析", status: "started" },
+      3,
+      true,
+    );
+
+    state = useAnalysisStore.getState();
+    expect(state.analysisStages).toHaveLength(3);
+    expect(state.analysisStages[2]?.name).toBe("AI 综合分析");
+    expect(state.currentStageIndex).toBe(2);
   });
 });

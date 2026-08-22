@@ -6,10 +6,19 @@ from typing import Any
 from app.agentic.catalog import CapabilityCatalog, registry
 from app.agentic.tools.contracts import Tool, ToolPolicy
 
-WEB_FETCH_POLICY = ToolPolicy(cost="medium", cache_ttl_seconds=300)
-WEB_BATCH_POLICY = ToolPolicy(cost="high", cache_ttl_seconds=300)
+WEB_FETCH_POLICY = ToolPolicy(
+    cost="high", cache_ttl_seconds=300, timeout_seconds=90, max_parallel_calls=2
+)
+WEB_BATCH_POLICY = ToolPolicy(
+    cost="high", cache_ttl_seconds=300, timeout_seconds=120, max_parallel_calls=1
+)
 WEB_SEARCH_POLICY = ToolPolicy(cost="medium", cache_ttl_seconds=300)
-TWITTER_ANALYSIS_POLICY = ToolPolicy(cost="high", cache_ttl_seconds=900)
+TWITTER_ANALYSIS_POLICY = ToolPolicy(
+    cost="high",
+    cache_ttl_seconds=900,
+    timeout_seconds=120,
+    max_parallel_calls=2,
+)
 
 
 def register_web_tools(
@@ -100,6 +109,12 @@ def register_web_tools(
                         "maxLength": 2048,
                         "description": "要抓取的网页 URL 地址，如 https://finance.sina.com.cn/...",
                     },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["auto", "http", "stealth", "dynamic"],
+                        "default": "auto",
+                        "description": "抓取模式：auto 自动降级，http 仅安全 HTTP，stealth 反爬浏览器，dynamic JS 渲染浏览器。",
+                    },
                 },
                 "required": ["url"],
             },
@@ -125,6 +140,12 @@ def register_web_tools(
                         "maxItems": 10,
                         "uniqueItems": True,
                         "description": "要抓取的 URL 列表，如 [\"https://...\", \"https://...\"]",
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["auto", "http", "stealth", "dynamic"],
+                        "default": "auto",
+                        "description": "抓取模式：auto 自动降级，http 仅安全 HTTP，stealth 反爬浏览器，dynamic JS 渲染浏览器。",
                     },
                 },
                 "required": ["urls"],

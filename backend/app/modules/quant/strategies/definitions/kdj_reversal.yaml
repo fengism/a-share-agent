@@ -1,0 +1,113 @@
+api_version: quant.strategy/v1
+key: kdj_reversal
+version: 1.0.0
+enabled: true
+name: KDJ 低位金叉
+description: K 上穿 D 且 J 位于低位时入场，K 下穿 D 且 J 位于高位时退出。
+scenario: 短线震荡
+risk_level: high
+presentation:
+  icon: node-index
+parameters:
+  lookback_period:
+    type: integer
+    label: RSV 周期
+    default: 9
+    minimum: 2
+    maximum: 120
+  k_period:
+    type: integer
+    label: K 平滑周期
+    default: 5
+    minimum: 2
+    maximum: 30
+  d_period:
+    type: integer
+    label: D 平滑周期
+    default: 5
+    minimum: 2
+    maximum: 30
+  buy_threshold:
+    type: number
+    label: J 买入阈值
+    default: 20
+    minimum: -100
+    maximum: 100
+  sell_threshold:
+    type: number
+    label: J 卖出阈值
+    default: 80
+    minimum: 0
+    maximum: 200
+constraints:
+  - operator: less_than
+    left: $buy_threshold
+    right: $sell_threshold
+    message: J 买入阈值必须小于卖出阈值
+indicators:
+  low_n:
+    operator: rolling_min
+    input: low
+    period: $lookback_period
+  high_n:
+    operator: rolling_max
+    input: high
+    period: $lookback_period
+  range_n:
+    operator: subtract
+    left: high_n
+    right: low_n
+  close_distance:
+    operator: subtract
+    left: close
+    right: low_n
+  rsv_ratio:
+    operator: divide
+    left: close_distance
+    right: range_n
+    zero_value: 0.5
+  rsv:
+    operator: multiply
+    left: rsv_ratio
+    right: 100
+  k:
+    operator: ema
+    input: rsv
+    period: $k_period
+  d:
+    operator: ema
+    input: k
+    period: $d_period
+  three_k:
+    operator: multiply
+    left: k
+    right: 3
+  two_d:
+    operator: multiply
+    left: d
+    right: 2
+  j:
+    operator: subtract
+    left: three_k
+    right: two_d
+signals:
+  entry:
+    operator: and
+    operands:
+      - operator: cross_above
+        left: k
+        right: d
+      - operator: less_than
+        left: j
+        right: $buy_threshold
+  exit:
+    operator: and
+    operands:
+      - operator: cross_below
+        left: k
+        right: d
+      - operator: greater_than
+        left: j
+        right: $sell_threshold
+position:
+  mode: binary

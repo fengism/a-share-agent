@@ -39,7 +39,7 @@ vi.mock("../../api/queries", () => ({
   }),
 }));
 
-vi.mock("../Feed/PaginatedList", () => ({
+vi.mock("../../features/feed/PaginatedList", () => ({
   default: ({ items }: { items: Array<{ title: string }> }) => <div>资讯数量：{items.length}</div>,
 }));
 

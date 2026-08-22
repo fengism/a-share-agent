@@ -2,7 +2,7 @@ import { ReloadOutlined, RetweetOutlined, WarningOutlined } from "@ant-design/ic
 import { Button, Card, Space, Tag, message } from "antd";
 import { useBotJobs, useRetryBotJob } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
-import { useColors, useStyles } from "../../styles/ui";
+import { useColors, useStyles, semanticTagStyle } from "../../styles/ui";
 import type { BotAdminJob } from "../../types/settings";
 
 export default function BotJobManagerCard() {
@@ -39,10 +39,10 @@ export default function BotJobManagerCard() {
       styles={{ body: sectionCardBodyStyle }}
     >
       <Space wrap style={{ marginBottom: 12 }}>
-        <Tag color="blue">等待 {data?.counts.pending ?? 0}</Tag>
-        <Tag color="processing">执行中 {data?.counts.running ?? 0}</Tag>
-        <Tag color="green">成功 {data?.counts.succeeded ?? 0}</Tag>
-        <Tag color="red">失败 {data?.counts.failed ?? 0}</Tag>
+        <Tag style={semanticTagStyle("info")}>等待 {data?.counts.pending ?? 0}</Tag>
+        <Tag style={semanticTagStyle("primary")}>执行中 {data?.counts.running ?? 0}</Tag>
+        <Tag style={semanticTagStyle("down")}>成功 {data?.counts.succeeded ?? 0}</Tag>
+        <Tag style={semanticTagStyle("up")}>失败 {data?.counts.failed ?? 0}</Tag>
       </Space>
       <SectionDataState
         isLoading={isLoading && jobs.length === 0}
@@ -65,14 +65,14 @@ export default function BotJobManagerCard() {
                 padding: "10px 12px",
                 borderRadius: 8,
                 border: `1px solid ${colors.border}`,
-                background: colors.elevatedBg,
+                background: colors.hoverBg,
               }}
             >
               <div style={{ minWidth: 0 }}>
                 <div style={{ color: colors.textPrimary }}>
                   <code>{job.id.slice(0, 8)}</code>
                   <span style={{ marginLeft: 8 }}>/ {job.command_name || "unknown"}</span>
-                  <Tag color="red" style={{ marginLeft: 8 }}>失败</Tag>
+                  <Tag style={{ ...semanticTagStyle("up"), marginLeft: 8 }}>失败</Tag>
                 </div>
                 <div style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
                   用户 {job.request_user_id || "未知"} · 尝试 {job.attempts}/{job.max_attempts}

@@ -1,4 +1,4 @@
-import { Drawer, Layout, Menu, Typography } from "antd";
+import { lazy, Suspense } from "react";
 import {
   ApartmentOutlined,
   ApiOutlined,
@@ -17,12 +17,13 @@ import {
   SettingOutlined,
   TwitterOutlined,
 } from "@ant-design/icons";
-import { useColors } from "../styles/ui";
+import { useColors, useTokens } from "../styles/ui";
 import { themes } from "../theme/themes";
 import type { ThemeKey } from "../styles/ui";
+import { useRoutePreload } from "../routes/RoutePreloadContext";
+import { loadMobileSidebarDrawer } from "./mobileSidebarDrawerLoader";
 
-const { Sider } = Layout;
-const { Title } = Typography;
+const MobileSidebarDrawer = lazy(loadMobileSidebarDrawer);
 
 const NAV_GROUPS = [
   {
@@ -30,8 +31,8 @@ const NAV_GROUPS = [
     label: "常用",
     items: [
       { key: "/", icon: <HomeOutlined />, label: "首页" },
-      { key: "/chat", icon: <MessageOutlined />, label: "对话" },
       { key: "/market", icon: <FundOutlined />, label: "市场" },
+      { key: "/chat", icon: <MessageOutlined />, label: "对话" },
       { key: "/feed", icon: <ClockCircleOutlined />, label: "资讯" },
     ],
   },
@@ -39,7 +40,7 @@ const NAV_GROUPS = [
     key: "research",
     label: "研究",
     items: [
-      { key: "/analysis", icon: <LineChartOutlined />, label: "分析" },
+      { key: "/analysis", icon: <LineChartOutlined />, label: "个股" },
       { key: "/screener", icon: <FilterOutlined />, label: "选股" },
       { key: "/quant", icon: <ExperimentOutlined />, label: "量化" },
       { key: "/compare", icon: <LineChartOutlined />, label: "对比" },
@@ -87,174 +88,124 @@ export default function AppSidebar({
   onMobileNavClose,
   onNavigate,
 }: AppSidebarProps) {
+  const preloadAppRoute = useRoutePreload();
   const colors = useColors();
+  const t = useTokens();
 
   const renderContent = (isCollapsed: boolean) => {
-    const navItems = isCollapsed
-      ? NAV_GROUPS.flatMap((group) => group.items)
-      : NAV_GROUPS.map((group) => ({
-          key: group.key,
-          type: "group" as const,
-          label: group.label,
-          children: group.items,
-        }));
+    const renderRoute = (item: (typeof NAV_GROUPS)[number]["items"][number]) => (
+      <button
+        key={item.key}
+        type="button"
+        className="app-sidebar-nav__item"
+        aria-current={activeKey === item.key ? "page" : undefined}
+        aria-label={isCollapsed ? item.label : undefined}
+        title={isCollapsed ? item.label : undefined}
+        onPointerEnter={() => void preloadAppRoute(item.key)}
+        onFocus={() => void preloadAppRoute(item.key)}
+        onClick={() => onNavigate(item.key)}
+      >
+        <span className="app-sidebar-nav__icon" aria-hidden="true">{item.icon}</span>
+        {!isCollapsed && <span className="app-sidebar-nav__label">{item.label}</span>}
+      </button>
+    );
 
     return (
       <>
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        height: 56,
-        borderBottom: `1px solid ${colors.border}`,
-      }}>
-        {isCollapsed ? (
-          <button
-            type="button"
-            aria-label="展开侧边栏"
-            className="al-collapse-btn"
-            onClick={() => onCollapse(false)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "100%",
-              height: "100%",
-              border: 0,
-              background: "transparent",
-              cursor: "pointer",
-              fontSize: 17,
-            }}
-          >
-            <MenuUnfoldOutlined />
-          </button>
-        ) : (
-          <>
+        <div className="app-sidebar-brand" style={{ borderBottomColor: colors.border }}>
+          {isCollapsed ? (
             <button
               type="button"
-              aria-label="返回首页"
-              onClick={() => onNavigate("/")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                flex: 1,
-                minWidth: 0,
-                gap: 10,
-                padding: "0 8px 0 18px",
-                border: 0,
-                background: "transparent",
-                cursor: "pointer",
-                font: "inherit",
-                textAlign: "left",
-              }}
+              aria-label="展开侧边栏"
+              className="al-collapse-btn app-sidebar-brand__expand"
+              onClick={() => onCollapse(false)}
             >
-              <span style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                flexShrink: 0,
-                background: colors.logoGradient,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}>
-                <LineChartOutlined style={{ color: "#fff", fontSize: 16 }} />
-              </span>
-              <Title level={4} style={{ margin: 0, color: colors.textPrimary, whiteSpace: "nowrap", fontSize: 15 }}>
-                A股智能分析
-              </Title>
+              <MenuUnfoldOutlined />
             </button>
-            {!isMobile && (
+          ) : (
+            <>
               <button
                 type="button"
-                aria-label="收起侧边栏"
-                className="al-collapse-btn"
-                onClick={() => onCollapse(true)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 34,
-                  height: 34,
-                  marginRight: 8,
-                  border: 0,
-                  borderRadius: 8,
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontSize: 16,
-                  flexShrink: 0,
-                }}
+                aria-label="返回首页"
+                className="app-sidebar-brand__home"
+                onPointerEnter={() => void preloadAppRoute("/")}
+                onFocus={() => void preloadAppRoute("/")}
+                onClick={() => onNavigate("/")}
               >
-                <MenuFoldOutlined />
+                <span
+                  className="app-sidebar-brand__logo"
+                  style={{ borderRadius: t.radius.md, background: colors.logoGradient }}
+                >
+                  <LineChartOutlined style={{ color: colors.onPrimary, fontSize: 16 }} />
+                </span>
+                <span className="app-sidebar-brand__title" style={{ color: colors.textPrimary, fontSize: t.font.lg }}>
+                  A股智能分析
+                </span>
               </button>
-            )}
-          </>
-        )}
-      </div>
+              {!isMobile && (
+                <button
+                  type="button"
+                  aria-label="收起侧边栏"
+                  className="al-collapse-btn app-sidebar-brand__collapse"
+                  onClick={() => onCollapse(true)}
+                >
+                  <MenuFoldOutlined />
+                </button>
+              )}
+            </>
+          )}
+        </div>
 
-      <Menu
-        className="app-sidebar-menu"
-        mode="inline"
-        selectedKeys={[activeKey]}
-        items={navItems}
-        onClick={({ key }) => onNavigate(key)}
-        style={{
-          border: "none",
-          background: "transparent",
-          flex: 1,
-          minHeight: 0,
-          marginTop: 4,
-          overflowY: "auto",
-          overflowX: "hidden",
-        }}
-      />
+        <nav className={`app-sidebar-nav${isCollapsed ? " app-sidebar-nav--collapsed" : ""}`} aria-label="主导航">
+          {isCollapsed
+            ? NAV_GROUPS.flatMap((group) => group.items).map(renderRoute)
+            : NAV_GROUPS.map((group) => (
+                <div className="app-sidebar-nav__group" key={group.key}>
+                  <div className="app-sidebar-nav__group-title">{group.label}</div>
+                  {group.items.map(renderRoute)}
+                </div>
+              ))}
+        </nav>
       </>
     );
   };
 
   if (isMobile) {
     return (
-      <Drawer
-        placement="left"
-        open={mobileNavOpen}
-        onClose={onMobileNavClose}
-        width={240}
-        closable={false}
-        styles={{
-          body: {
-            padding: 0,
-            display: "flex",
-            flexDirection: "column",
-            background: themes[themeKey].siderBg,
-          },
-          header: { display: "none" },
-        }}
-      >
-        {renderContent(false)}
-      </Drawer>
+      <Suspense fallback={null}>
+        <MobileSidebarDrawer
+          open={mobileNavOpen}
+          onClose={onMobileNavClose}
+          themeKey={themeKey}
+        >
+          {renderContent(false)}
+        </MobileSidebarDrawer>
+      </Suspense>
     );
   }
 
   return (
-    <Sider
-      collapsible
-      collapsed={collapsed}
-      onCollapse={onCollapse}
-      width={200}
-      collapsedWidth={64}
+    <aside
+      aria-label="应用侧栏"
       style={{
+        width: collapsed ? 68 : 184,
+        minWidth: collapsed ? 68 : 184,
+        maxWidth: collapsed ? 68 : 184,
         background: themes[themeKey].siderBg,
         borderRight: `1px solid ${colors.border}`,
         position: "fixed",
         left: 0,
         top: 0,
         bottom: 0,
-        zIndex: 110,
+        zIndex: Number(t.z.sidebar),
         display: "flex",
         flexDirection: "column",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        transition: "width 0.2s, min-width 0.2s, max-width 0.2s",
       }}
-      trigger={null}
     >
       {renderContent(collapsed)}
-    </Sider>
+    </aside>
   );
 }

@@ -14,19 +14,19 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
       style={{
         textAlign: "center",
         color: c.textMuted,
-        paddingTop: 80,
-        fontSize: 14,
+        paddingTop: "var(--c-space-8)",
+        fontSize: "var(--c-font-base)",
       }}
     >
       <RobotOutlined
-        style={{ fontSize: 40, marginBottom: 12, display: "block" }}
+        style={{ fontSize: 40, marginBottom: "var(--c-space-3)", display: "block" }}
       />
       输入问题开始对话，例如：
       <div
         style={{
-          marginTop: 12,
+          marginTop: "var(--c-space-3)",
           display: "flex",
-          gap: 8,
+          gap: "var(--c-space-2)",
           justifyContent: "center",
           flexWrap: "wrap",
         }}
@@ -38,7 +38,7 @@ export function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
             size="small"
             shape="round"
             style={{
-              background: c.elevatedBg,
+              background: c.hoverBg,
               border: `1px solid ${c.border}`,
               color: c.textSecondary,
             }}

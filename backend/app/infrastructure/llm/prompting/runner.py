@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Generic, TypeVar
@@ -8,10 +9,11 @@ from typing import Generic, TypeVar
 from pydantic import BaseModel
 
 from app.configuration import Settings
+from app.core.metrics import metrics
+from app.domain.prompting import PromptTrace
 from app.infrastructure.llm.adapters import LLMClient
-from app.infrastructure.llm.prompting.schemas import PromptTrace
 from app.infrastructure.llm.prompting.spec import PromptContext, PromptSpec
-from app.infrastructure.llm.sync_client import create_llm_client, llm_chat
+from app.infrastructure.llm.sync_client import create_llm_client, llm_chat_result
 
 logger = logging.getLogger(__name__)
 OutputT = TypeVar("OutputT", bound=BaseModel)
@@ -62,6 +64,8 @@ async def run_structured_prompt(
     trace = _trace(spec, messages, client, effective_temperature)
     raw_response = ""
     parse_error: Exception | None = None
+    prompt_tokens = 0
+    completion_tokens = 0
 
     for attempt in range(spec.repair_attempts + 1):
         request_messages = messages
@@ -78,16 +82,48 @@ async def run_structured_prompt(
                     ),
                 },
             ]
-        raw_response = await llm_chat(
-            request_messages,
-            temperature=request_temperature,
-            json_format=True,
-            settings=settings,
-            client=client,
-        )
+        started_at = time.perf_counter()
+        try:
+            completion = await llm_chat_result(
+                request_messages,
+                temperature=request_temperature,
+                json_format=True,
+                settings=settings,
+                client=client,
+            )
+            raw_response = completion.text
+        except Exception as error:
+            metrics.record_llm_prompt(
+                spec.ref,
+                trace.model,
+                success=False,
+                duration_ms=(time.perf_counter() - started_at) * 1000,
+                error_type=type(error).__name__,
+            )
+            raise
+        duration_ms = (time.perf_counter() - started_at) * 1000
+        usage = completion.usage
+        attempt_prompt_tokens = getattr(usage, "prompt_tokens", None)
+        attempt_completion_tokens = getattr(usage, "completion_tokens", None)
+        prompt_tokens += attempt_prompt_tokens or 0
+        completion_tokens += attempt_completion_tokens or 0
         try:
             value = spec.parse(raw_response)
-            completed_trace = trace.model_copy(update={"attempts": attempt + 1})
+            metrics.record_llm_prompt(
+                spec.ref,
+                trace.model,
+                success=True,
+                duration_ms=duration_ms,
+                prompt_tokens=attempt_prompt_tokens,
+                completion_tokens=attempt_completion_tokens,
+            )
+            completed_trace = trace.model_copy(
+                update={
+                    "attempts": attempt + 1,
+                    "prompt_tokens": prompt_tokens or None,
+                    "completion_tokens": completion_tokens or None,
+                }
+            )
             logger.info(
                 "Prompt 执行成功: prompt=%s model=%s attempts=%s digest=%s",
                 spec.ref,
@@ -98,9 +134,24 @@ async def run_structured_prompt(
             return PromptRun(value=value, trace=completed_trace)
         except (TypeError, ValueError) as exc:
             parse_error = exc
+            metrics.record_llm_prompt(
+                spec.ref,
+                trace.model,
+                success=False,
+                duration_ms=duration_ms,
+                prompt_tokens=attempt_prompt_tokens,
+                completion_tokens=attempt_completion_tokens,
+                error_type=type(exc).__name__,
+            )
             logger.warning("Prompt 输出校验失败: prompt=%s attempt=%s error=%s", spec.ref, attempt + 1, exc)
 
-    failed_trace = trace.model_copy(update={"attempts": spec.repair_attempts + 1})
+    failed_trace = trace.model_copy(
+        update={
+            "attempts": spec.repair_attempts + 1,
+            "prompt_tokens": prompt_tokens or None,
+            "completion_tokens": completion_tokens or None,
+        }
+    )
     raise PromptExecutionError(
         f"Prompt 输出在 {failed_trace.attempts} 次尝试后仍未通过校验: {parse_error}",
         raw_response=raw_response,

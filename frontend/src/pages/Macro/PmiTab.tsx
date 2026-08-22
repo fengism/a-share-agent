@@ -33,6 +33,7 @@ export default function PmiTab() {
             title="PMI 采购经理人指数"
             latest={pmi?.latest ?? null}
             trend={pmi?.trend ?? []}
+            metadata={pmi}
             fields={PMI_FIELDS(c)}
           />
         </Col>

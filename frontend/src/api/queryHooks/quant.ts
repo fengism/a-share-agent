@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiDelete, apiGet, apiPost } from "../client";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { API_TIMEOUTS, apiDelete, apiGet, apiPost, apiPut } from "../client";
 import type { components } from "../generated/schema";
 import { queryKeys } from "../queryKeys";
 
@@ -9,21 +9,128 @@ export type QuantBacktestResult = components["schemas"]["QuantBacktestResult"];
 export type QuantStrategyPreset = components["schemas"]["QuantStrategyPreset"];
 export type QuantSavedStrategy = components["schemas"]["QuantSavedStrategy"];
 export type QuantStrategyConfig = components["schemas"]["QuantStrategyConfig"];
+export type QuantStrategyDraft = components["schemas"]["QuantStrategyDraft"];
+export type QuantStrategyDraftBacktestRequest = components["schemas"]["QuantStrategyDraftBacktestRequest"];
+export type QuantStrategyDraftUpdateRequest = components["schemas"]["QuantStrategyDraftUpdateRequest"];
+export type QuantStrategyDefinitionInput = components["schemas"]["StrategyDefinition-Input"];
+export type QuantStrategyRegistryStatus = components["schemas"]["QuantStrategyRegistryStatus"];
+type DeleteResponse = components["schemas"]["DeleteResponse"];
 
 const isActive = (status?: string) => status === "pending" || status === "running";
 
 export function useQuantStrategyPresets() {
   return useQuery({
     queryKey: queryKeys.quant.presets,
-    queryFn: ({ signal }) => apiGet<QuantStrategyPreset[]>("/quant/strategy-presets", undefined, { signal }),
-    staleTime: Infinity,
+    queryFn: () => apiGet<QuantStrategyPreset[]>("/quant/strategy-presets"),
+    staleTime: 60_000,
+    refetchInterval: 10 * 60_000,
+    refetchIntervalInBackground: false,
+  });
+}
+
+export function useQuantStrategyRegistryStatus() {
+  return useQuery({
+    queryKey: queryKeys.quant.registry,
+    queryFn: () => apiGet<QuantStrategyRegistryStatus>("/quant/strategy-registry"),
+  });
+}
+
+export function useQuantStrategyDrafts() {
+  return useQuery({
+    queryKey: queryKeys.quant.drafts,
+    queryFn: () => apiGet<QuantStrategyDraft[]>("/quant/strategy-drafts"),
+    refetchInterval: (query) => query.state.data?.some((draft) => draft.status === "testing") ? 1_000 : false,
+  });
+}
+
+async function cacheQuantStrategyDraft(
+  queryClient: ReturnType<typeof useQueryClient>,
+  draft: QuantStrategyDraft,
+) {
+  await queryClient.cancelQueries({ queryKey: queryKeys.quant.drafts });
+  queryClient.setQueryData<QuantStrategyDraft[]>(queryKeys.quant.drafts, (drafts = []) => [
+    draft,
+    ...drafts.filter((item) => item.id !== draft.id),
+  ]);
+}
+
+function invalidateQuantDrafts(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.quant.drafts });
+}
+
+export function useGenerateQuantStrategyDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (prompt: string) => apiPost<QuantStrategyDraft>(
+      "/quant/strategy-drafts/generate",
+      { prompt },
+      { timeoutMs: API_TIMEOUTS.LONG_RUNNING },
+    ),
+    onSuccess: (draft) => cacheQuantStrategyDraft(queryClient, draft),
+  });
+}
+
+export function useUpdateQuantStrategyDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ draftId, expectedDefinitionHash, definition }: {
+      draftId: string;
+      expectedDefinitionHash: string;
+      definition: QuantStrategyDefinitionInput;
+    }) => apiPut<QuantStrategyDraft>(`/quant/strategy-drafts/${draftId}`, {
+      definition,
+      expected_definition_hash: expectedDefinitionHash,
+    }),
+    onSuccess: (draft) => cacheQuantStrategyDraft(queryClient, draft),
+  });
+}
+
+export function useValidateQuantStrategyDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (draftId: string) => apiPost<QuantStrategyDraft>(
+      `/quant/strategy-drafts/${draftId}/validate`,
+    ),
+    onSuccess: (draft) => cacheQuantStrategyDraft(queryClient, draft),
+  });
+}
+
+export function useBacktestQuantStrategyDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ draftId, request }: {
+      draftId: string;
+      request: QuantStrategyDraftBacktestRequest;
+    }) => apiPost<QuantBacktestRun>(`/quant/strategy-drafts/${draftId}/backtest`, request),
+    onSuccess: (run) => {
+      invalidateQuantDrafts(queryClient);
+      queryClient.invalidateQueries({ queryKey: queryKeys.quant.runs });
+      queryClient.setQueryData(queryKeys.quant.run(run.id), run);
+    },
+  });
+}
+
+export function usePublishQuantStrategyDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ draftId, expectedDefinitionHash }: {
+      draftId: string;
+      expectedDefinitionHash: string;
+    }) => apiPost<QuantStrategyDraft>(`/quant/strategy-drafts/${draftId}/publish`, {
+      expected_definition_hash: expectedDefinitionHash,
+    }),
+    onSuccess: async (draft) => {
+      await cacheQuantStrategyDraft(queryClient, draft);
+      queryClient.invalidateQueries({ queryKey: queryKeys.quant.registry });
+      queryClient.invalidateQueries({ queryKey: queryKeys.quant.presets });
+    },
   });
 }
 
 export function useSavedQuantStrategies() {
   return useQuery({
     queryKey: queryKeys.quant.strategies,
-    queryFn: ({ signal }) => apiGet<QuantSavedStrategy[]>("/quant/strategies", undefined, { signal }),
+    queryFn: () => apiGet<QuantSavedStrategy[]>("/quant/strategies"),
   });
 }
 
@@ -40,29 +147,38 @@ export function useSaveQuantStrategy() {
 export function useDeleteQuantStrategy() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (strategyId: number) => apiDelete<components["schemas"]["QuantDeleteResponse"]>(
+    mutationFn: (strategyId: number) => apiDelete<DeleteResponse>(
       `/quant/strategies/${strategyId}`,
     ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.quant.strategies }),
   });
 }
 
-export function useQuantBacktests() {
-  return useQuery({
-    queryKey: queryKeys.quant.runs,
-    queryFn: ({ signal }) => apiGet<components["schemas"]["QuantBacktestList"]>(
-      "/quant/backtests",
-      undefined,
-      { signal },
+export function useQuantBacktests(pageSize = 50) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.quant.runsHistory(pageSize),
+    queryFn: ({ pageParam }) => apiGet<components["schemas"]["QuantBacktestList"]>("/quant/backtests", {
+      limit: pageSize,
+      offset: pageParam,
+    }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) => (
+      lastPage.items.length < pageSize
+        ? undefined
+        : pages.reduce((count, page) => count + page.items.length, 0)
     ),
-    refetchInterval: (query) => query.state.data?.items.some((run) => isActive(run.status)) ? 1_000 : false,
+    refetchInterval: (query) => (
+      query.state.data?.pages.some((page) => page.items.some((run) => isActive(run.status)))
+        ? 2_000
+        : false
+    ),
   });
 }
 
 export function useQuantBacktest(runId?: string) {
   return useQuery({
     queryKey: queryKeys.quant.run(runId ?? ""),
-    queryFn: ({ signal }) => apiGet<QuantBacktestRun>(`/quant/backtests/${runId}`, undefined, { signal }),
+    queryFn: () => apiGet<QuantBacktestRun>(`/quant/backtests/${runId}`),
     enabled: Boolean(runId),
     refetchInterval: (query) => isActive(query.state.data?.status) ? 1_000 : false,
   });
@@ -101,7 +217,7 @@ export function useRetryQuantBacktest() {
 }
 
 export function useDeleteQuantBacktest() {
-  return useRunMutation((runId) => apiDelete<components["schemas"]["QuantDeleteResponse"]>(
+  return useRunMutation((runId) => apiDelete<DeleteResponse>(
     `/quant/backtests/${runId}`,
   ));
 }

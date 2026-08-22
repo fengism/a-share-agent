@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from "react";
+import { StrictMode, type PropsWithChildren } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,40 +9,51 @@ import {
   useDeleteIndustryChainArchive,
   useInfiniteIndustryChainHistory,
   useKlineData,
+  useGenerateQuantStrategyDraft,
+  usePublishQuantStrategyDraft,
   useScreenerScreen,
+  useUpdateQuantStrategyDraft,
+  type QuantStrategyDraft,
+  type QuantStrategyDefinitionInput,
 } from "./queries";
-import { apiDelete, apiGet, apiPost } from "./client";
+import { apiDelete, apiGet, apiPost, apiPut } from "./client";
+import { queryKeys } from "./queryKeys";
 import type { ScreenerFilter, ScreenerResult } from "../types/stock";
 
 vi.mock("./client", async () => {
   const actual = await vi.importActual<typeof import("./client")>("./client");
-  return { ...actual, apiDelete: vi.fn(), apiGet: vi.fn(), apiPost: vi.fn() };
+  return { ...actual, apiDelete: vi.fn(), apiGet: vi.fn(), apiPost: vi.fn(), apiPut: vi.fn() };
 });
 
-describe("query request cancellation", () => {
+describe("query request lifecycle", () => {
   afterEach(() => {
     vi.mocked(apiDelete).mockReset();
     vi.mocked(apiGet).mockReset();
     vi.mocked(apiPost).mockReset();
+    vi.mocked(apiPut).mockReset();
   });
 
-  it("passes TanStack's abort signal into the API client", async () => {
-    let requestSignal: AbortSignal | undefined;
-    vi.mocked(apiGet).mockImplementation((_path, _params, options) => {
-      requestSignal = options?.signal;
-      return new Promise(() => undefined);
+  it("reuses an in-flight cacheable request across StrictMode remounts", async () => {
+    let resolveRequest: ((value: unknown) => void) | undefined;
+    vi.mocked(apiGet).mockImplementation(() => {
+      return new Promise((resolve) => {
+        resolveRequest = resolve;
+      });
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = ({ children }: PropsWithChildren) => (
-      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      <StrictMode>
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      </StrictMode>
     );
 
-    const { unmount } = renderHook(() => useAnalysisPageData("600519"), { wrapper });
-    await waitFor(() => expect(requestSignal).toBeDefined());
+    const { result } = renderHook(() => useAnalysisPageData("600519"), { wrapper });
 
-    unmount();
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
 
-    expect(requestSignal?.aborted).toBe(true);
+    await act(async () => resolveRequest?.({ code: "600519" }));
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
     client.clear();
   });
 
@@ -65,7 +76,7 @@ describe("query request cancellation", () => {
     expect(apiGet).toHaveBeenCalledWith(
       "/stock/600519/kline",
       expect.objectContaining({ period: "weekly", adjust: "hfq" }),
-      { signal: expect.any(AbortSignal) },
+      undefined,
     );
     client.clear();
   });
@@ -90,7 +101,7 @@ describe("query request cancellation", () => {
       1,
       "/industry-chain/history",
       { name: "AI", limit: 2, offset: 0 },
-      { signal: expect.any(AbortSignal) },
+      undefined,
     );
 
     await act(async () => {
@@ -101,7 +112,7 @@ describe("query request cancellation", () => {
       2,
       "/industry-chain/history",
       { name: "AI", limit: 2, offset: 2 },
-      { signal: expect.any(AbortSignal) },
+      undefined,
     );
     await waitFor(() => expect(result.current.data?.pages).toHaveLength(2));
     expect(result.current.data?.pages.flat()).toHaveLength(3);
@@ -131,6 +142,88 @@ describe("query request cancellation", () => {
       "/industry-chain/AI%20%E8%8A%AF%E7%89%87/archive/20260807_120000",
     );
     expect(apiDelete).toHaveBeenNthCalledWith(3, "/daily-review/2026-08-07");
+    client.clear();
+  });
+
+  it("sends the current definition hash when updating a strategy draft", async () => {
+    const original = { id: "draft-one", status: "validated" } as QuantStrategyDraft;
+    const updated = { id: "draft-one", status: "draft" } as QuantStrategyDraft;
+    vi.mocked(apiPut).mockResolvedValue(updated);
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    client.setQueryData(queryKeys.quant.drafts, [original]);
+    const cancel = vi.spyOn(client, "cancelQueries");
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const updateDraft = renderHook(() => useUpdateQuantStrategyDraft(), { wrapper });
+    const definition = {} as QuantStrategyDefinitionInput;
+
+    await act(async () => {
+      await updateDraft.result.current.mutateAsync({
+        draftId: "draft-one",
+        expectedDefinitionHash: `sha256:${"a".repeat(64)}`,
+        definition,
+      });
+    });
+
+    expect(apiPut).toHaveBeenCalledWith(
+      "/quant/strategy-drafts/draft-one",
+      {
+        definition,
+        expected_definition_hash: `sha256:${"a".repeat(64)}`,
+      },
+    );
+    expect(client.getQueryData(queryKeys.quant.drafts)).toEqual([updated]);
+    expect(cancel).toHaveBeenCalledWith({ queryKey: queryKeys.quant.drafts });
+    expect(invalidate).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it("prepends a generated strategy draft without refetching the list", async () => {
+    const existing = { id: "draft-existing", status: "validated" } as QuantStrategyDraft;
+    const generated = { id: "draft-generated", status: "validated" } as QuantStrategyDraft;
+    vi.mocked(apiPost).mockResolvedValue(generated);
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    client.setQueryData(queryKeys.quant.drafts, [existing]);
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const generateDraft = renderHook(() => useGenerateQuantStrategyDraft(), { wrapper });
+
+    await act(async () => {
+      await generateDraft.result.current.mutateAsync("生成一个二十日均线趋势策略");
+    });
+
+    expect(client.getQueryData(queryKeys.quant.drafts)).toEqual([generated, existing]);
+    expect(invalidate).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it("updates the published draft cache and refreshes only registry dependencies", async () => {
+    const backtested = { id: "draft-one", status: "backtested" } as QuantStrategyDraft;
+    const published = { id: "draft-one", status: "published" } as QuantStrategyDraft;
+    vi.mocked(apiPost).mockResolvedValue(published);
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    client.setQueryData(queryKeys.quant.drafts, [backtested]);
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const publishDraft = renderHook(() => usePublishQuantStrategyDraft(), { wrapper });
+
+    await act(async () => {
+      await publishDraft.result.current.mutateAsync({
+        draftId: "draft-one",
+        expectedDefinitionHash: `sha256:${"a".repeat(64)}`,
+      });
+    });
+
+    expect(client.getQueryData(queryKeys.quant.drafts)).toEqual([published]);
+    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.quant.registry });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.quant.presets });
     client.clear();
   });
 

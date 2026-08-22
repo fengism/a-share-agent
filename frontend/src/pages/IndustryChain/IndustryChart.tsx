@@ -1,5 +1,5 @@
 import ReactECharts from "echarts-for-react/lib/core";
-import echarts from "../../charts/echarts-setup";
+import echarts from "../../charts/echarts-tree-setup";
 
 interface IndustryChartProps {
   option: Record<string, unknown>;

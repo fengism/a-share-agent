@@ -5,10 +5,17 @@ from typing import Protocol
 
 
 class AgentDescriptor(Protocol):
-    name: str
-    display_name: str
-    description: str
-    tool_names: tuple[str, ...]
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def display_name(self) -> str: ...
+
+    @property
+    def description(self) -> str: ...
+
+    @property
+    def tool_names(self) -> tuple[str, ...]: ...
 
 
 @dataclass(frozen=True, slots=True)

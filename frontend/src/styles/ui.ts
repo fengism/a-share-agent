@@ -5,9 +5,10 @@
  */
 
 // ── Hook-based (reactive) ───────────────────────────────
-export { useColors, useStyles } from "../theme/hooks";
+export { useColors, useStyles, useTokens, tokensToCssVars, semanticTagStyle } from "../theme/hooks";
+export type { SemanticTagColor } from "../theme/hooks";
 export { useThemeStore } from "../theme/store";
 export { THEME_LIST } from "../theme/themes";
-export type { ThemeKey, ThemeColors } from "../theme/themes";
+export type { ThemeKey, ThemeColors, DesignTokens, ThemeMeta } from "../theme/themes";
 export { getAntToken } from "../theme/store";
 export { getColors } from "../theme/store";

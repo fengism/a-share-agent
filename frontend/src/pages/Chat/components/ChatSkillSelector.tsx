@@ -1,5 +1,6 @@
 import { BranchesOutlined } from "@ant-design/icons";
 import { Segmented, Select, Space, Tag, Typography } from "antd";
+import { semanticTagStyle } from "../../../styles/ui";
 import type {
   ChatCapabilityAvailabilityResponse,
   SkillCapabilityInfo,
@@ -76,7 +77,7 @@ export function ChatSkillSelector({
           const info = availability?.skills[skill.name];
           return (
             <span key={skill.name}>
-              <Tag color={info?.status === "degraded" ? "gold" : "cyan"}>
+              <Tag style={semanticTagStyle(info?.status === "degraded" ? "warning" : "info")}>
                 {skill.description}
               </Tag>
               {info?.status === "degraded" && <Text type="secondary">{info.reason}</Text>}

@@ -7,6 +7,7 @@ from app.agentic.agents.service import stream_agent
 from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent
 from app.agentic.protocol import AgentMessage
+from app.agentic.runtime.context import AgentExecutionContext
 from app.modules.chat.prompts import SYSTEM_PROMPT
 
 _MAX_ROUNDS = 5
@@ -19,6 +20,8 @@ async def stream_general_agent(
     *,
     tool_names: Collection[str] | None = None,
     skill_names: Collection[str] | None = None,
+    require_tool_evidence: bool = False,
+    execution_context: AgentExecutionContext | None = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     effective_tool_names = (
         tuple(tool.name for tool in registry.list_tools())
@@ -40,5 +43,8 @@ async def stream_general_agent(
         allowed_tool_names=effective_tool_names,
         tool_selection_prompt=registry.get_skill_prompt(skill_names),
         max_history_messages=_MAX_HISTORY_MESSAGES,
+        require_tool_first_round=require_tool_evidence,
+        require_tool_evidence=require_tool_evidence,
+        execution_context=execution_context,
     ):
         yield event

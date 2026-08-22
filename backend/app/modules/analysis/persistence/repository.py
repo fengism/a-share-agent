@@ -104,19 +104,17 @@ def _ensure_history_index() -> None:
     _HISTORY_INDEX.ensure(_rebuild_analysis_history_index_locked)
 
 
-def _mark_history_index_dirty() -> None:
-    _HISTORY_INDEX.mark_dirty()
-
-
 def save_analysis(result: AnalysisResult, user_id: int) -> Path:
     """将分析结果原子写入当前用户的股票日期文件。"""
     filepath = _user_stock_dir(user_id, result.stock_code) / f"{result.analysis_date}.json"
-    archive_store.save_result(filepath, result)
-    try:
-        _upsert_history_summary(user_id, filepath, archive_store.result_summary(result))
-    except Exception:
-        _mark_history_index_dirty()
-        logger.warning("写入分析历史索引失败: %s", filepath, exc_info=True)
+    with _HISTORY_INDEX.mutation() as mutation:
+        archive_store.save_result(filepath, result)
+        try:
+            _upsert_history_summary(user_id, filepath, archive_store.result_summary(result))
+        except Exception:
+            logger.warning("写入分析历史索引失败: %s", filepath, exc_info=True)
+        else:
+            mutation.complete()
     logger.info("分析结果已保存: user_id=%s, path=%s", user_id, filepath)
     return filepath
 
@@ -149,12 +147,14 @@ def delete_analysis(
         if not filepath.is_file():
             return False
 
-    filepath.unlink()
-    try:
-        history_store.delete_history_row(_HISTORY_INDEX, scope_user_id, code, date)
-    except Exception:
-        _mark_history_index_dirty()
-        logger.warning("删除分析历史索引失败: %s", filepath, exc_info=True)
+    with _HISTORY_INDEX.mutation() as mutation:
+        filepath.unlink()
+        try:
+            history_store.delete_history_row(_HISTORY_INDEX, scope_user_id, code, date)
+        except Exception:
+            logger.warning("删除分析历史索引失败: %s", filepath, exc_info=True)
+        else:
+            mutation.complete()
 
     if scope_user_id == 0:
         cache.clear()
@@ -197,6 +197,11 @@ def rebuild_analysis_history_index() -> None:
 def ensure_analysis_history_index() -> None:
     """确保当前分析目录已完成旧文件索引回填。"""
     _ensure_history_index()
+
+
+def analysis_history_index_snapshot() -> dict[str, object]:
+    """返回有界的分析历史索引恢复状态。"""
+    return _HISTORY_INDEX.snapshot()
 
 
 def _query_history(

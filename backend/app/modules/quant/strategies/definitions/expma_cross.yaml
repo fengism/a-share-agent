@@ -1,0 +1,50 @@
+api_version: quant.strategy/v1
+key: expma_cross
+version: 1.0.0
+enabled: true
+name: EXPMA 指数均线交叉
+description: 短期指数均线上穿长期指数均线时入场，下穿时退出，对近期价格更敏感。
+scenario: 单边趋势
+risk_level: medium
+presentation:
+  icon: line-chart
+parameters:
+  fast_period:
+    type: integer
+    label: 快线周期
+    description: 短期 EMA 周期
+    default: 12
+    minimum: 2
+    maximum: 120
+  slow_period:
+    type: integer
+    label: 慢线周期
+    description: 长期 EMA 周期
+    default: 50
+    minimum: 3
+    maximum: 250
+constraints:
+  - operator: less_than
+    left: $fast_period
+    right: $slow_period
+    message: 快线周期必须小于慢线周期
+indicators:
+  fast_ema:
+    operator: ema
+    input: close
+    period: $fast_period
+  slow_ema:
+    operator: ema
+    input: close
+    period: $slow_period
+signals:
+  entry:
+    operator: cross_above
+    left: fast_ema
+    right: slow_ema
+  exit:
+    operator: cross_below
+    left: fast_ema
+    right: slow_ema
+position:
+  mode: binary

@@ -2,6 +2,7 @@ from app.agentic.catalog import CapabilityCatalog, registry
 from app.agentic.skills.contracts import Skill
 from app.agentic.skills.packs.industry import SKILLS as INDUSTRY_SKILLS
 from app.agentic.skills.packs.market import SKILLS as MARKET_SKILLS
+from app.agentic.skills.packs.quant import SKILLS as QUANT_SKILLS
 from app.agentic.skills.packs.stock import SKILLS as STOCK_SKILLS
 from app.agentic.skills.packs.web import SKILLS as WEB_SKILLS
 
@@ -10,6 +11,7 @@ SKILL_PACKS = (
     STOCK_SKILLS,
     INDUSTRY_SKILLS,
     MARKET_SKILLS,
+    QUANT_SKILLS,
 )
 
 

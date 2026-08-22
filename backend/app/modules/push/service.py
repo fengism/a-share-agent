@@ -4,14 +4,14 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.configuration import get_effective_settings
-from app.contracts.content import ContentBlock
+from app.domain.content import ContentBlock
 from app.infrastructure.integrations.feishu.adapter import to_feishu_card, to_feishu_doc_blocks
 from app.infrastructure.integrations.feishu.client import feishu_client
 from app.infrastructure.integrations.feishu.errors import FeishuConfigError
 from app.infrastructure.integrations.notion.adapter import to_notion_blocks
 from app.infrastructure.integrations.notion.client import notion_client
 from app.infrastructure.integrations.notion.errors import NotionConfigError
-from app.modules.analysis.public import get_latest_analysis
+from app.modules.analysis.public import get_analysis_by_date, get_latest_analysis
 from app.modules.daily_review.public import load_daily_review
 from app.modules.industry_chain.public import load_industry_chain
 from app.modules.push.content import build_content
@@ -66,10 +66,11 @@ def _resolve_content(request: PushRequest, user_id: int) -> ResolvedPushContent:
         )
 
     if request.type == "analysis":
-        data = get_latest_analysis(
-            request.code,
-            user_id,
-            cache_ttl=get_effective_settings().cache_ttl_analysis,
+        cache_ttl = get_effective_settings().cache_ttl_analysis
+        data = (
+            get_analysis_by_date(request.code, request.date, user_id, cache_ttl=cache_ttl)
+            if request.date
+            else get_latest_analysis(request.code, user_id, cache_ttl=cache_ttl)
         )
         if data is None:
             raise LookupError("暂无分析结果，请先生成")

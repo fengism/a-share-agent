@@ -1,5 +1,9 @@
 """每日复盘 HTTP 请求与列表响应模型。"""
 
+from __future__ import annotations
+
+from datetime import date as Date
+
 from pydantic import BaseModel
 
 from app.modules.daily_review.models import (
@@ -19,7 +23,7 @@ __all__ = [
 
 class DailyReviewRequest(BaseModel):
     """Purpose: 每日复盘接口的请求参数。"""
-    date: str | None = None
+    date: Date | None = None
     force: bool = False
 
 

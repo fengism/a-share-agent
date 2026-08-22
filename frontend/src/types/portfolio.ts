@@ -1,57 +1,13 @@
-export interface PortfolioPositionCreate {
-  stock_code: string;
-  buy_price: number;
-  buy_time: string;
-  shares: number;
-}
+import type { components } from "../api/generated/schema";
 
-export interface PortfolioPosition {
-  id: number;
-  stock_code: string;
-  stock_name: string;
-  buy_price: number;
-  buy_time: string;
-  shares: number;
-  current_price: number | null;
-  change_pct: number | null;
-  cost_value: number;
-  market_value: number | null;
-  profit_amount: number | null;
-  profit_pct: number | null;
-}
-
-export interface PortfolioStockSummary {
-  stock_code: string;
-  stock_name: string;
-  position_count: number;
-  total_shares: number;
-  average_cost: number;
-  current_price: number | null;
-  change_pct: number | null;
-  cost_value: number;
-  market_value: number | null;
-  profit_amount: number | null;
-  profit_pct: number | null;
-}
-
-export interface PortfolioSummary {
-  stock_count: number;
-  position_count: number;
-  total_cost: number;
-  priced_cost: number;
-  total_market_value: number;
-  total_profit_amount: number;
-  total_profit_pct: number | null;
-  profitable_count: number;
-  losing_count: number;
-  unpriced_count: number;
-}
-
-export interface PortfolioResponse {
-  positions: PortfolioPosition[];
-  stocks: PortfolioStockSummary[];
-  summary: PortfolioSummary;
-  quoted_at: string;
-  quote_source: string;
-  quote_stale: boolean;
-}
+export type PortfolioPositionCreate = components["schemas"]["PortfolioPositionCreate"];
+export type PortfolioPosition = components["schemas"]["PortfolioPosition"];
+export type PortfolioStockSummary = components["schemas"]["PortfolioStockSummary"];
+export type PortfolioSummary = components["schemas"]["PortfolioSummary"];
+export type PortfolioRiskSummary = components["schemas"]["PortfolioRiskSummary"];
+export type PortfolioClosedPosition = components["schemas"]["PortfolioClosedPosition"];
+export type PortfolioLotMatch = components["schemas"]["PortfolioLotMatch"];
+export type PortfolioTransactionCreate = components["schemas"]["PortfolioTransactionCreate"];
+export type PortfolioTransaction = components["schemas"]["PortfolioTransaction"];
+export type PortfolioTransactionPreview = components["schemas"]["PortfolioTransactionPreview"];
+export type PortfolioResponse = components["schemas"]["PortfolioResponse"];

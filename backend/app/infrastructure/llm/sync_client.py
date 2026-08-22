@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from typing import cast
 
 import httpx
 from openai import OpenAI
@@ -14,6 +15,8 @@ from app.infrastructure.llm.pool import SyncResourcePool
 logger = logging.getLogger(__name__)
 
 _POOL_MAXSIZE = 16
+_TRANSIENT_RESPONSE_MAX_ATTEMPTS = 3
+_TRANSIENT_RESPONSE_RETRY_BASE_SECONDS = 0.25
 
 
 class _OpenAICompatibleClient(adapters.OpenAICompatibleClient):
@@ -68,20 +71,23 @@ class _PooledLLMClient(adapters.LLMClient):
         self._spec = client_spec
         self.model = client_spec.model
 
-    def chat(
+    def chat_result(
         self,
         messages: list[dict],
         temperature: float = 0.1,
         json_format: bool = False,
-    ) -> str:
+    ) -> adapters.LLMCompletion:
         with _llm_client_pool.borrow(
             self._spec.key,
             lambda: _build_llm_client(self._spec),
         ) as client:
-            return client.chat(
-                messages,
-                temperature=temperature,
-                json_format=json_format,
+            return cast(
+                adapters.LLMCompletion,
+                client.chat_result(
+                    messages,
+                    temperature=temperature,
+                    json_format=json_format,
+                ),
             )
 
 
@@ -98,14 +104,54 @@ async def llm_chat(
     settings: Settings | None = None,
     client: adapters.LLMClient | None = None,
 ) -> str:
+    return (
+        await llm_chat_result(
+            messages,
+            temperature=temperature,
+            json_format=json_format,
+            settings=settings,
+            client=client,
+        )
+    ).text
+
+
+async def llm_chat_result(
+    messages: list[dict],
+    temperature: float = 0.1,
+    json_format: bool = False,
+    settings: Settings | None = None,
+    client: adapters.LLMClient | None = None,
+) -> adapters.LLMCompletion:
     if client is None:
         client = create_llm_client(settings)
-    return await asyncio.to_thread(
-        client.chat,
-        messages,
-        temperature=temperature,
-        json_format=json_format,
-    )
+    for attempt in range(1, _TRANSIENT_RESPONSE_MAX_ATTEMPTS + 1):
+        try:
+            return await asyncio.to_thread(
+                client.chat_result,
+                messages,
+                temperature=temperature,
+                json_format=json_format,
+            )
+        except adapters.LLMRetryableError as error:
+            if attempt >= _TRANSIENT_RESPONSE_MAX_ATTEMPTS:
+                logger.warning(
+                    "LLM临时响应错误重试耗尽: model=%s attempts=%s error=%s",
+                    getattr(client, "model", "unknown"),
+                    attempt,
+                    error,
+                )
+                raise
+            delay = _TRANSIENT_RESPONSE_RETRY_BASE_SECONDS * (2 ** (attempt - 1))
+            logger.warning(
+                "LLM临时响应错误，准备重试: model=%s attempt=%s/%s delay=%.2fs error=%s",
+                getattr(client, "model", "unknown"),
+                attempt,
+                _TRANSIENT_RESPONSE_MAX_ATTEMPTS,
+                delay,
+                error,
+            )
+            await asyncio.sleep(delay)
+    raise RuntimeError("LLM retry loop exited unexpectedly")
 
 
 def close_llm_client_pool() -> None:

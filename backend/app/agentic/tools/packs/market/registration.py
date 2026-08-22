@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from app.agentic.catalog import registry
@@ -17,24 +16,15 @@ _REVIEW_POLICY = ToolPolicy(
     cache_ttl_seconds=300,
     freshness="daily",
     scope="user",
+    timeout_seconds=180,
+    max_parallel_calls=2,
 )
 _MACRO_POLICY = ToolPolicy(cost="medium", cache_ttl_seconds=3600, freshness="daily")
 
 
 async def _get_market_overview() -> Any:
     """获取大盘概览，并行获取主要指数行情和两市成交额。"""
-    from app.market_data.market.public import get_indices, get_market_volume
-    indices, volume = await asyncio.gather(
-        get_indices(),
-        get_market_volume(),
-        return_exceptions=True,
-    )
-    result: dict[str, Any] = {}
-    if not isinstance(indices, Exception) and indices is not None:
-        result["indices"] = indices.model_dump()
-    if not isinstance(volume, Exception) and volume is not None:
-        result["volume"] = volume
-    return result
+    return await get_application_tool_handlers().get_market_overview()
 
 
 async def _get_hot_rank(type: str = "stocks") -> Any:
@@ -45,12 +35,7 @@ async def _get_hot_rank(type: str = "stocks") -> Any:
     Return:
         对应类型的热门排名数据
     """
-    from app.market_data.market.public import get_hot_stocks, get_ths_hot_concept, get_ths_hot_industry
-    if type == "concepts":
-        return await get_ths_hot_concept()
-    if type == "industries":
-        return await get_ths_hot_industry()
-    return await get_hot_stocks()
+    return await get_application_tool_handlers().get_hot_rank(type=type)
 
 
 async def _get_dragon_tiger(date: str | None = None) -> Any:
@@ -61,8 +46,7 @@ async def _get_dragon_tiger(date: str | None = None) -> Any:
     Return:
         龙虎榜列表数据
     """
-    from app.market_data.market.public import get_dragon_tiger_list
-    return await get_dragon_tiger_list(date)
+    return await get_application_tool_handlers().get_dragon_tiger(date=date)
 
 
 async def _get_daily_review(date: str | None = None, force: bool = False) -> Any:
@@ -110,13 +94,48 @@ async def _get_macro_data() -> Any:
     Return:
         包含 cpi/ppi/pmi/money_supply 四个板块的字典
     """
-    from app.market_data.market.public import get_macro_data
-    return await get_macro_data()
+    return await get_application_tool_handlers().get_macro_data()
 
 
-def register_market_tools():
-    """注册市场相关技能：get_market_overview、get_hot_rank、get_dragon_tiger、get_daily_review、get_macro_data。"""
-    registry.register_tool(Tool(
+async def _get_market_mainline() -> Any:
+    """获取财联社今日主线机会与风格判断。
+
+    Return:
+        主线机会列表（含板块涨跌与龙头股）和风格判断
+    """
+    return await get_application_tool_handlers().get_market_mainline()
+
+
+async def _get_industry_rankings(date: str | None = None) -> Any:
+    """获取行业板块涨跌与资金排行（含开盘红板块代码）。
+
+    Param:
+        date: 日期，格式 YYYY-MM-DD；省略则查询当天
+    Return:
+        行业板块排行列表（rank/code/name/change_pct/net_inflow 等）
+    """
+    return await get_application_tool_handlers().get_industry_rankings(date=date)
+
+
+async def _get_sector_stocks_history(date: str, plate_id: str) -> Any:
+    """获取开盘红板块在指定历史日期的成分股。
+
+    Param:
+        date: 历史日期，格式 YYYY-MM-DD，必须早于今天
+        plate_id: 开盘红板块 ID，如 881169
+    Return:
+        板块成分股列表（含涨跌幅、主力资金、连板标签）
+    """
+    return await get_application_tool_handlers().get_sector_stocks_history(
+        date=date,
+        plate_id=plate_id,
+    )
+
+
+def register_market_tools(target_registry=None):
+    """注册市场相关技能：get_market_overview、get_hot_rank、get_dragon_tiger、get_daily_review、get_macro_data、get_market_mainline、get_sector_stocks_history。"""
+    target = target_registry or registry
+    target.register_tool(Tool(
         name="get_market_overview",
         description="获取大盘概览，包括主要指数（上证、深证、创业板等）实时行情和两市成交额。当用户问'大盘怎么样''指数行情''市场情况'时调用。",
         parameters={"type": "object", "properties": {}},
@@ -124,7 +143,7 @@ def register_market_tools():
         executor=_get_market_overview,
     ))
 
-    registry.register_tool(Tool(
+    target.register_tool(Tool(
         name="get_hot_rank",
         description="获取热门排名数据。当用户问'最近什么火''热门股''热门概念''热门行业'时调用，通过type参数指定查询类型。",
         parameters={
@@ -142,7 +161,7 @@ def register_market_tools():
         executor=_get_hot_rank,
     ))
 
-    registry.register_tool(Tool(
+    target.register_tool(Tool(
         name="get_dragon_tiger",
         description="获取龙虎榜数据，查看游资和机构席位动向。",
         parameters={
@@ -159,7 +178,7 @@ def register_market_tools():
         executor=_get_dragon_tiger,
     ))
 
-    registry.register_tool(Tool(
+    target.register_tool(Tool(
         name="get_daily_review",
         description="生成每日大盘复盘报告，包含指数表现、热点题材、龙虎榜、风险提示、机会展望和策略建议。当用户问'今天大盘怎么样''复盘''市场总结'时调用。",
         parameters={
@@ -176,10 +195,57 @@ def register_market_tools():
         executor=_get_daily_review,
     ))
 
-    registry.register_tool(Tool(
+    target.register_tool(Tool(
         name="get_macro_data",
         description="获取最新常用宏观指标汇总，包括CPI、PPI、PMI和货币供应量M0/M1/M2。指定历史区间、口径或单项查询时使用 iwencai_market_macro。",
         parameters={"type": "object", "properties": {}},
         policy=_MACRO_POLICY,
         executor=_get_macro_data,
+    ))
+
+    target.register_tool(Tool(
+        name="get_industry_rankings",
+        description="获取行业板块涨跌与资金排行，包括排名、板块代码、涨跌幅、成交额和主力净流入。当用户问'哪些板块领涨''板块资金''行业排行'时调用；板块代码可作为 get_sector_stocks_history 的 plate_id 查询历史成分股。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "日期，格式 YYYY-MM-DD；省略则查询当天",
+                },
+            },
+        },
+        policy=_MARKET_DAILY_POLICY,
+        executor=_get_industry_rankings,
+    ))
+
+    target.register_tool(Tool(
+        name="get_market_mainline",
+        description="获取财联社今日主线机会与市场风格判断，包括主线题材、持续天数、热度、关联板块涨跌、龙头股和风格解读。当用户问'今天主线''主线机会''什么题材在走''市场风格'时调用。",
+        parameters={"type": "object", "properties": {}},
+        policy=_MARKET_DAILY_POLICY,
+        executor=_get_market_mainline,
+    ))
+
+    target.register_tool(Tool(
+        name="get_sector_stocks_history",
+        description="获取开盘红板块在指定历史日期的成分股明细，包括每只股票的涨跌幅、成交额、主力净额、连板标签和龙虎榜标签。仅支持今天之前的日期；先用 get_industry_rankings 获取板块代码（code 字段）作为 plate_id。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "历史日期，格式 YYYY-MM-DD，必须早于今天",
+                },
+                "plate_id": {
+                    "type": "string",
+                    "description": "开盘红板块 ID，例如 881169",
+                },
+            },
+            "required": ["date", "plate_id"],
+        },
+        policy=_MARKET_DAILY_POLICY,
+        executor=_get_sector_stocks_history,
     ))

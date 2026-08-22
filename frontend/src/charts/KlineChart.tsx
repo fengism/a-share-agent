@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createChart, CandlestickSeries, HistogramSeries, ColorType, type IChartApi, type ISeriesApi, type BusinessDay } from "lightweight-charts";
+import { createChart, createSeriesMarkers, CandlestickSeries, HistogramSeries, ColorType, type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type BusinessDay, type Time } from "lightweight-charts";
 import type { KlineItem } from "../types/stock";
 import { useColors } from "../styles/ui";
 import { shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
+import { buildKlineTradeMarkers, type KlineTradeMarker } from "./klineMarkers";
 
-type Props = { data: KlineItem[]; height?: number; viewKey?: string };
+type Props = { data: KlineItem[]; height?: number; viewKey?: string; tradeMarkers?: KlineTradeMarker[] };
 type ChartItem = Omit<KlineItem, "date"> & { date: BusinessDay };
 
-export default function KlineChart({ data, height = 500, viewKey = "default" }: Props) {
+export default function KlineChart({ data, height = 500, viewKey = "default", tradeMarkers = [] }: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
   colorsRef.current = c;
@@ -18,6 +19,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default" }: 
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const tradeMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const fittedViewKeyRef = useRef<string | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const rows = useMemo<ChartItem[]>(
@@ -59,6 +61,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default" }: 
       priceScaleId: "right",
     });
     candleSeriesRef.current = candle;
+    tradeMarkersRef.current = createSeriesMarkers(candle, []);
     chart.priceScale("right").applyOptions({
       visible: true, borderColor: colors.border,
       scaleMargins: { top: 0.05, bottom: 0.22 },
@@ -145,6 +148,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default" }: 
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
+      tradeMarkersRef.current = null;
     };
   }, [height]);
 
@@ -167,12 +171,18 @@ export default function KlineChart({ data, height = 500, viewKey = "default" }: 
       color: item.close >= item.open ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
     })));
 
+    tradeMarkersRef.current?.setMarkers(buildKlineTradeMarkers(
+      tradeMarkers,
+      { buy: c.up, sell: c.down },
+      new Set(data.map((item) => item.date)),
+    ));
+
     if (rows.length > 0 && shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
       chart.timeScale().fitContent();
       fittedViewKeyRef.current = viewKey;
       setIsZoomed(false);
     }
-  }, [c.down, c.up, height, rows, viewKey]);
+  }, [c.down, c.up, data, height, rows, tradeMarkers, viewKey]);
 
   useEffect(() => {
     const chart = chartRef.current;

@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.infrastructure.llm.prompting.schemas import PromptTrace
+from app.domain.prompting import PromptTrace
 
 
 class FactorAnalysis(BaseModel):

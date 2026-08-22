@@ -5,6 +5,12 @@ SKILLS = (
         name="stock_analysis",
         description="个股识别、查询与分析",
         triggers=("股票名称或6位代码", "个股估值、技术面、财报、风险或多股对比"),
+        activation_keywords=(
+            "股票", "个股", "股价", "估值", "市盈率", "市净率", "pe", "pb",
+            "财报", "财务", "roe", "营收", "净利润", "k线", "macd", "rsi", "kdj",
+            "技术面", "基本面", "新闻", "公告", "舆情", "情绪", "风险", "止损", "仓位",
+            "目标价", "支撑位", "压力位", "走势",
+        ),
         tool_names=(
             "search_stocks",
             "get_stock_info",
@@ -31,6 +37,7 @@ SKILLS = (
         name="stock_screening",
         description="条件选股与固定维度筛选",
         triggers=("选股、筛选股票", "市盈率、市净率、涨跌幅、行业等条件组合"),
+        activation_keywords=("选股", "筛选", "哪些股票", "股票池"),
         tool_names=("iwencai_select_stock", "screen_stocks", "get_industries"),
         rules=(
             "自然语言或复杂条件优先用 iwencai_select_stock。",

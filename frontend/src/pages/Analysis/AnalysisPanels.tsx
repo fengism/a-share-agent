@@ -18,6 +18,10 @@ const SentimentPanel = lazy(loadSentimentPanel);
 const FundFlowPanel = lazy(loadFundFlowPanel);
 const ANALYSIS_PANEL_KEYS = ["fundamental", "technical", "valuation", "sentiment", "fundflow"] as const;
 
+function preload(loader: () => Promise<unknown>) {
+  void loader().catch(() => undefined);
+}
+
 function PanelFallback() {
   return (
     <div aria-label="分析面板加载中" style={{ minHeight: 360, padding: 16 }}>
@@ -42,16 +46,16 @@ export default function AnalysisPanels({
   });
   const panelItems = [
     { key: "fundamental", label: "基本面", children: code ? <FundamentalPanel code={code} analysis={result} /> : null },
-    { key: "technical", label: "技术面", children: code ? <Suspense fallback={<PanelFallback />}><TechnicalPanel code={code} analysis={result} /></Suspense> : null },
-    { key: "valuation", label: "估值面", children: code ? <Suspense fallback={<PanelFallback />}><ValuationPanel code={code} analysis={result} /></Suspense> : null },
-    { key: "sentiment", label: "情绪面", children: code ? <Suspense fallback={<PanelFallback />}><SentimentPanel code={code} analysis={result} /></Suspense> : null },
-    { key: "fundflow", label: "资金流向", children: code ? <Suspense fallback={<PanelFallback />}><FundFlowPanel code={code} /></Suspense> : null },
+    { key: "technical", label: "技术面", onIntent: () => preload(loadTechnicalPanel), children: code ? <Suspense fallback={<PanelFallback />}><TechnicalPanel code={code} analysis={result} /></Suspense> : null },
+    { key: "valuation", label: "估值面", onIntent: () => preload(loadValuationPanel), children: code ? <Suspense fallback={<PanelFallback />}><ValuationPanel code={code} analysis={result} /></Suspense> : null },
+    { key: "sentiment", label: "情绪面", onIntent: () => preload(loadSentimentPanel), children: code ? <Suspense fallback={<PanelFallback />}><SentimentPanel code={code} analysis={result} /></Suspense> : null },
+    { key: "fundflow", label: "资金流向", onIntent: () => preload(loadFundFlowPanel), children: code ? <Suspense fallback={<PanelFallback />}><FundFlowPanel code={code} /></Suspense> : null },
   ];
 
   return (
     <Card
       size="small"
-      style={{ ...cardStyle, borderTop: `3px solid ${colors.primary}`, boxShadow: "0 1px 2px rgba(0,0,0,0.18)" }}
+      style={{ ...cardStyle, borderTop: `3px solid ${colors.primary}` }}
       styles={{ body: { padding: "10px 16px 14px", background: colors.nestedBg, borderRadius: 8 } }}
     >
       {isExportingPdf ? panelItems.map((item) => (

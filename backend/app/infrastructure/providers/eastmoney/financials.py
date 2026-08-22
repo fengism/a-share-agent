@@ -1,4 +1,6 @@
 from app.constants.http import COMMON_HEADERS
+from app.constants.market import EASTMONEY_STOCK_PROFILE_URL
+from app.infrastructure.providers.eastmoney.symbols import build_stock_secid
 
 
 class FinancialsMixin:
@@ -21,26 +23,30 @@ class FinancialsMixin:
                 - mcap (int): 总市值（元）
                 - float_mcap (int): 流通市值（元）
                 - list_date (str): 上市日期（YYYYMMDD）
-                - price (int): 最新价（分）
+                - price (float): 最新价（元）
         """
-        market_code = 1 if code.startswith("6") else 0
-        url = "https://push2.eastmoney.com/api/qt/stock/get"
         params = {
-            "fltt": "2", "invt": "2",
+            "fltt": "2",
+            "invt": "2",
             "fields": "f57,f58,f84,f85,f127,f116,f117,f189,f43",
-            "secid": f"{market_code}.{code}",
+            "secid": build_stock_secid(code),
         }
 
-        r = self.em_get_response(url, params=params, headers=COMMON_HEADERS, timeout=10)
-        d = r.json().get("data", {})
+        response = self.em_get_response(
+            EASTMONEY_STOCK_PROFILE_URL,
+            params=params,
+            headers=COMMON_HEADERS,
+            timeout=10,
+        )
+        data = response.json().get("data") or {}
         return {
-            "code": d.get("f57", ""),
-            "name": d.get("f58", ""),
-            "industry": d.get("f127", ""),       # 所属行业
-            "total_shares": d.get("f84", 0),     # 总股本(股)
-            "float_shares": d.get("f85", 0),     # 流通股(股)
-            "mcap": d.get("f116", 0),            # 总市值(元)
-            "float_mcap": d.get("f117", 0),      # 流通市值(元)
-            "list_date": str(d.get("f189", "")), # 上市日期 YYYYMMDD
-            "price": d.get("f43", 0),
+            "code": data.get("f57", ""),
+            "name": data.get("f58", ""),
+            "industry": data.get("f127", ""),
+            "total_shares": data.get("f84", 0),
+            "float_shares": data.get("f85", 0),
+            "mcap": data.get("f116", 0),
+            "float_mcap": data.get("f117", 0),
+            "list_date": str(data.get("f189", "")),
+            "price": data.get("f43", 0),
         }

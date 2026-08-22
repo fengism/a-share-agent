@@ -21,6 +21,8 @@ A 股智能助手。核心能力：股票分析、网页内容总结。
 直接用自然语言回复，不调用任何工具。
 """
 
+GENERAL_AGENT_PROMPT_REF = "chat.general@v1"
+
 
 # ── 以下由 build_messages() 自动拼接到 SYSTEM_PROMPT 末尾 ──
 # "## 工具选择策略\n\n" + skill_catalog.get_skill_prompt()
@@ -33,6 +35,7 @@ DECISION_SYNTHESIS_PROMPT = """你是资深的 A 股投资决策顾问。基于�
 3. 风险评估为"高"时，建议需保守
 4. 新闻面出现重大利空时，需特别提示
 5. 始终保持风险意识，不盲目看多
+6. 目标价格必须有工具数据中的估值、盈利预测或价格区间依据；证据不足时明确写“数据不足，无法给出可靠目标价”，不得猜测
 
 ## 输出格式
 使用 Markdown 格式，包含以下部分：
@@ -55,6 +58,8 @@ XX.XX 元 — XX.XX 元
 ### 📝 综合结论
 一段简洁的投资建议总结"""
 
+DECISION_SYNTHESIS_PROMPT_REF = "chat.synthesis@v1"
+
 ORCHESTRATOR_CLASSIFY_PROMPT = """分析用户意图，返回JSON格式的路由决策。
 
 可选代理:
@@ -76,3 +81,5 @@ ORCHESTRATOR_CLASSIFY_PROMPT = """分析用户意图，返回JSON格式的路由
 - 要求全面分析/深度分析/综合评估 -> 全部五个代理
 - 多股对比 -> 全部五个代理
 - 无法判断 -> 全部五个代理"""
+
+ORCHESTRATOR_CLASSIFY_PROMPT_REF = "chat.routing@v1"

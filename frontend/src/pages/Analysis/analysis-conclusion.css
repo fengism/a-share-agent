@@ -1,0 +1,48 @@
+.analysis-conclusion {
+  overflow: hidden;
+  border-top: 3px solid var(--analysis-accent) !important;
+}
+.analysis-conclusion__title { color: var(--c-text-primary); font-size: var(--c-font-lg); font-weight: 600; letter-spacing: .1px; }
+.analysis-conclusion__hero { padding: 20px 24px; background: var(--analysis-accent-soft); border-bottom: 1px solid color-mix(in srgb, var(--analysis-accent) 22%, var(--c-border)); }
+.analysis-conclusion__decision-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.analysis-conclusion__decision-copy { min-width: 0; max-width: 820px; }
+.analysis-conclusion__eyebrow { display: block; margin-bottom: 8px; color: var(--analysis-accent); font-size: var(--c-font-sm); font-weight: 600; }
+.analysis-conclusion__summary { margin: 0; color: var(--c-text-primary); font-size: var(--c-font-lg); font-weight: 500; line-height: var(--c-leading-relaxed); overflow-wrap: anywhere; }
+.analysis-conclusion__signal-cluster { display: flex; flex: none; align-items: center; gap: 14px; }
+.analysis-conclusion__signal-meta { display: grid; min-width: 120px; gap: 7px; color: var(--c-text-secondary); font-size: var(--c-font-sm); }
+.analysis-conclusion__content { display: grid; gap: 20px; padding: 20px 24px 24px; }
+.analysis-conclusion__metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.analysis-conclusion__metric { display: flex; min-width: 0; min-height: 92px; flex-direction: column; justify-content: center; gap: 5px; padding: 14px 16px; border: 1px solid var(--c-border); border-radius: var(--c-radius-lg); background: var(--c-hover-bg); }
+.analysis-conclusion__metric > span { color: var(--c-text-secondary); font-size: var(--c-font-sm); font-weight: 500; }
+.analysis-conclusion__metric strong { color: var(--c-text-primary); font-size: var(--c-font-2xl); font-weight: 700; line-height: var(--c-leading-tight); }
+.analysis-conclusion__metric small { color: var(--c-text-secondary); font-size: var(--c-font-sm); }
+.analysis-conclusion__metric em { margin-left: 8px; font-size: var(--c-font-md); font-style: normal; font-weight: 600; }
+.analysis-conclusion__metric em.is-positive { color: var(--c-up); }
+.analysis-conclusion__metric em.is-negative { color: var(--c-down); }
+.analysis-conclusion__decision-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: stretch; }
+.analysis-conclusion__factor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.analysis-conclusion__score-panel, .analysis-conclusion__factor-card { min-width: 0; box-sizing: border-box; padding: 16px; border: 1px solid var(--c-border); border-radius: var(--c-radius-lg); background: var(--c-hover-bg); }
+.analysis-conclusion__score-panel h3, .analysis-conclusion__factor-card h3 { margin: 0 0 12px; color: var(--c-text-primary); font-size: var(--c-font-base); font-weight: 600; }
+.analysis-conclusion__score-list { display: grid; gap: 14px; }
+.analysis-conclusion__score-row { display: grid; gap: 5px; }
+.analysis-conclusion__score-heading { display: flex; align-items: baseline; justify-content: space-between; color: var(--c-text-primary); font-size: var(--c-font-md); }
+.analysis-conclusion__score-heading strong { font-size: var(--c-font-lg); font-weight: 700; }
+.analysis-conclusion__score-row p { margin: 0; color: var(--c-text-secondary); font-size: var(--c-font-sm); line-height: var(--c-leading-normal); }
+.analysis-conclusion__factor-card.is-positive { border-color: color-mix(in srgb, var(--c-up) 28%, var(--c-border)); background: color-mix(in srgb, var(--c-up) 7%, var(--c-hover-bg)); }
+.analysis-conclusion__factor-card.is-negative { border-color: color-mix(in srgb, var(--c-down) 28%, var(--c-border)); background: color-mix(in srgb, var(--c-down) 7%, var(--c-hover-bg)); }
+.analysis-conclusion__factor-card.is-positive h3, .analysis-conclusion__factor-card.is-positive li > span { color: var(--c-up); }
+.analysis-conclusion__factor-card.is-negative h3, .analysis-conclusion__factor-card.is-negative li > span { color: var(--c-down); }
+.analysis-conclusion__factor-card .analysis-factor-list li { min-width: 0; overflow-wrap: anywhere; }
+@container analysis-page (max-width: 1000px) {
+  .analysis-conclusion__decision-grid { grid-template-columns: minmax(0, 1fr); }
+  .analysis-conclusion__metrics { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .analysis-conclusion__hero, .analysis-conclusion__content { padding: 16px; }
+  .analysis-conclusion__decision-row { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .analysis-conclusion__signal-cluster { width: 100%; justify-content: space-between; }
+  .analysis-conclusion__summary { font-size: var(--c-font-base); }
+  .analysis-conclusion__metric { min-height: 78px; }
+  .analysis-conclusion__metric strong { font-size: var(--c-font-xl); }
+  .analysis-conclusion__factor-grid { grid-template-columns: minmax(0, 1fr); }
+}

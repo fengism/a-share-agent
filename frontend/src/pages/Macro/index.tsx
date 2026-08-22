@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Button, Typography, message } from "antd";
 import { DollarOutlined, LineChartOutlined, BankOutlined, FundOutlined, BarChartOutlined, GlobalOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useForceRefreshMacroAllData } from "../../api/queries";
@@ -12,7 +13,8 @@ import { useStyles } from "../../styles/ui";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 
 const { Title, Paragraph } = Typography;
-const MACRO_TABS = ["prices", "pmi", "monetary", "rates", "growth", "trade"] as const;
+const UsMacroTab = lazy(() => import("./UsMacroTab"));
+const MACRO_TABS = ["prices", "pmi", "monetary", "rates", "growth", "trade", "us"] as const;
 
 export default function Macro() {
   const { pageContainerStyle, pageDescriptionStyle, pageHeaderStyle, pageTitleStyle } = useStyles();
@@ -30,7 +32,9 @@ export default function Macro() {
     <div style={pageContainerStyle}>
       <div style={{ ...pageHeaderStyle, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <Title level={3} style={pageTitleStyle}>宏观经济</Title>
+          <div className="u-page-title u-page-title--compact">
+            <Title level={3} style={pageTitleStyle}>宏观经济</Title>
+          </div>
           <Paragraph style={pageDescriptionStyle}>
             物价、景气、货币、利率、增速、外贸六大类宏观指标一览。
           </Paragraph>
@@ -76,6 +80,13 @@ export default function Macro() {
             mobileLabel: "外贸",
             group: "经济运行",
             children: <TradeTab />,
+          },
+          {
+            key: "us",
+            label: <span><GlobalOutlined /> 美国宏观</span>,
+            mobileLabel: "美国宏观",
+            group: "全球市场",
+            children: <Suspense fallback={<div>正在加载美国宏观数据…</div>}><UsMacroTab /></Suspense>,
           },
           {
             key: "monetary",

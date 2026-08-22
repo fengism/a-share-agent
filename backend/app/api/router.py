@@ -4,27 +4,32 @@ from typing import Any
 
 from fastapi import APIRouter
 
-import app.modules.portfolio.router as portfolio
-import app.modules.quant.router as quant
-import app.modules.screener.router as screener
 from app.api.errors import OPENAPI_ERROR_RESPONSES
-from app.modules.analysis import page_router as analysis_page
-from app.modules.analysis import router as analysis
-from app.modules.auth import router as auth
-from app.modules.bot import admin_router as bot_admin
-from app.modules.bot import router as bot
-from app.modules.chat import router as chat
-from app.modules.daily_review import router as daily_review
-from app.modules.industry_chain import router as industry_chain
-from app.modules.market import router as market
-from app.modules.push import router as push
-from app.modules.settings import router as config
-from app.modules.stock import router as stock
+from app.api.routes import (
+    analysis,
+    analysis_page,
+    auth,
+    bot,
+    bot_admin,
+    chat,
+    daily_review,
+    industry_chain,
+    portfolio,
+    push,
+    quant,
+    screener,
+    watchlist,
+    workflows,
+)
+from app.api.routes import market as market_routes
+from app.api.routes import settings as config
+from app.api.routes import stock as stock_routes
 
 _PROTECTED_ROUTERS = (
-    (stock.router, "/stock", ["stock"]),
-    (market.router, "/market", ["market"]),
+    (stock_routes.router, "/stock", ["stock"]),
+    (market_routes.router, "/market", ["market"]),
     (portfolio.router, "/portfolio", ["portfolio"]),
+    (watchlist.router, "/watchlist", ["watchlist"]),
     (quant.router, "/quant", ["quant"]),
     (analysis.router, "/analysis", ["analysis"]),
     (screener.router, "/screener", ["screener"]),
@@ -33,9 +38,10 @@ _PROTECTED_ROUTERS = (
     (chat.router, "/chat", ["chat"]),
     (config.router, "/config", ["config"]),
     (industry_chain.router, "/industry-chain", ["industry-chain"]),
-    (market.macro_router, "/macro", ["macro"]),
+    (market_routes.macro_router, "/macro", ["macro"]),
     (analysis_page.router, "/stock", ["stock"]),
     (bot_admin.router, "/bot", ["bot-admin"]),
+    (workflows.router, "/workflows", ["workflows"]),
 )
 
 

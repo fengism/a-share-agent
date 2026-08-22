@@ -1,0 +1,69 @@
+api_version: quant.strategy/v1
+key: obv_trend
+version: 1.0.0
+enabled: true
+name: OBV 能量潮趋势
+description: OBV 超过均线缓冲带且均线趋势向上时入场，OBV 跌破均线时退出。
+scenario: 资金持续流入趋势
+risk_level: medium
+presentation:
+  icon: stock
+parameters:
+  ma_period:
+    type: integer
+    label: OBV 均线周期
+    default: 30
+    minimum: 2
+    maximum: 250
+  trend_lookback:
+    type: integer
+    label: 趋势回溯周期
+    default: 20
+    minimum: 1
+    maximum: 250
+  buffer:
+    type: number
+    label: 入场缓冲
+    description: OBV 超过均线的比例缓冲
+    default: 0.02
+    minimum: 0
+    maximum: 1
+    step: 0.01
+indicators:
+  obv:
+    operator: obv
+    input: close
+    volume_input: volume
+  maobv:
+    operator: sma
+    input: obv
+    period: $ma_period
+  maobv_previous:
+    operator: sma
+    input: maobv
+    period: 1
+    offset: $trend_lookback
+  buffer_factor:
+    operator: add
+    left: 1
+    right: $buffer
+  entry_threshold:
+    operator: multiply
+    left: maobv
+    right: buffer_factor
+signals:
+  entry:
+    operator: and
+    operands:
+      - operator: greater_than
+        left: obv
+        right: entry_threshold
+      - operator: greater_than
+        left: maobv
+        right: maobv_previous
+  exit:
+    operator: less_than
+    left: obv
+    right: maobv
+position:
+  mode: binary

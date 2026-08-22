@@ -17,6 +17,7 @@ def register_api(
     readiness_handler: Callable[[], Awaitable[JSONResponse]],
     health_handler: Callable[[], Awaitable[JSONResponse]],
     metrics_access_dependency: Callable,
+    operational_snapshot_provider: system.OperationalSnapshotProvider,
 ) -> None:
     errors.register_error_handlers(application)
     application.include_router(
@@ -27,4 +28,5 @@ def register_api(
         readiness_handler=readiness_handler,
         health_handler=health_handler,
         metrics_access_dependency=metrics_access_dependency,
+        operational_snapshot_provider=operational_snapshot_provider,
     )

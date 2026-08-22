@@ -1,0 +1,133 @@
+/** Responsive adjustments shared by the Quant page modules. */
+@media (max-width: 980px) {
+  .quant-task-columns { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .quant-saved-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .quant-saved-toolbar-controls {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .quant-form-card .ant-card-body {
+    padding: var(--c-space-3);
+  }
+
+  .quant-saved-toolbar-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .quant-saved-select {
+    width: 100%;
+  }
+
+  .quant-saved-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .quant-form-section-copy {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .quant-strategy-preset-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quant-strategy-description {
+    min-height: 0;
+  }
+
+  .quant-submit-bar {
+    position: sticky;
+    z-index: 5;
+    bottom: max(0px, env(safe-area-inset-bottom));
+    align-items: stretch;
+    flex-direction: column;
+    margin: 0 calc(var(--c-space-3) * -1) calc(var(--c-space-3) * -1);
+    padding: var(--c-space-3);
+    border-top: 1px solid var(--c-border);
+    background: color-mix(in srgb, var(--c-card-bg) 94%, transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  .quant-submit-bar > .ant-btn {
+    width: 100%;
+  }
+
+  .quant-selected-strategy-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .quant-side-header,
+  .quant-run-status,
+  .quant-run-summary-card,
+  .quant-history-card {
+    grid-column: auto;
+  }
+
+  .quant-run-status .ant-alert-content {
+    min-width: 0;
+  }
+
+  .quant-run-status .ant-alert-actions {
+    margin-inline-start: var(--c-space-2);
+  }
+
+  .quant-history-item {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .quant-history-actions {
+    justify-content: flex-end;
+  }
+
+  .quant-history-meta {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .quant-section-heading {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 540px) {
+  .quant-saved-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .quant-saved-actions .ant-btn {
+    width: 100%;
+  }
+
+  .quant-form-section {
+    padding-inline: var(--c-space-3);
+  }
+
+  .quant-run-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quant-run-summary-wide {
+    grid-column: 1 / -1;
+  }
+
+  .quant-history-filters {
+    flex-direction: column;
+  }
+
+  .quant-history-filters .ant-select {
+    width: 100%;
+  }
+}

@@ -1,0 +1,141 @@
+"""个股历史资金流向服务。"""
+
+import asyncio
+import logging
+from dataclasses import dataclass
+from typing import cast
+
+from app.core.cache import cache, dated_cache_key, dated_cache_key_no_day
+from app.core.concurrency.rate_limiter import baidu_semaphore, eastmoney_semaphore
+from app.core.concurrency.singleflight import AsyncSingleFlight
+from app.core.exceptions import UpstreamUnavailableError
+from app.core.market import normalize_code
+from app.financial_data.stock.insights.schemas import StockFundFlowItem
+from app.financial_data.stock.insights.sources import (
+    BAIDU_FUND_FLOW_API,
+    BAIDU_FUND_FLOW_SOURCE_ID,
+    EASTMONEY_FUND_FLOW_API,
+    EASTMONEY_FUND_FLOW_SOURCE_ID,
+)
+from app.infrastructure.providers.provider_gateway import provider_gateway
+from app.infrastructure.providers.registry import get_provider
+
+logger = logging.getLogger(__name__)
+_fund_flow_singleflight: AsyncSingleFlight[list[StockFundFlowItem]] = AsyncSingleFlight()
+_FUND_FLOW_FAILURE_TTL_SECONDS = 30
+_FUND_FLOW_LAST_GOOD_TTL_SECONDS = 24 * 60 * 60
+_FUND_FLOW_UNAVAILABLE = object()
+
+
+@dataclass(frozen=True)
+class _FundFlowAttempt:
+    provider: str
+    operation: str
+    method: str
+    source_id: str
+    source_api: str
+    semaphore: asyncio.Semaphore
+
+
+_FUND_FLOW_ATTEMPTS = (
+    _FundFlowAttempt(
+        provider="baidu",
+        operation="stock_fund_flow_history",
+        method="fetch_stock_fund_flow_history",
+        source_id=BAIDU_FUND_FLOW_SOURCE_ID,
+        source_api=BAIDU_FUND_FLOW_API,
+        semaphore=baidu_semaphore,
+    ),
+    _FundFlowAttempt(
+        provider="eastmoney",
+        operation="stock_fund_flow",
+        method="fetch_stock_fund_flow",
+        source_id=EASTMONEY_FUND_FLOW_SOURCE_ID,
+        source_api=EASTMONEY_FUND_FLOW_API,
+        semaphore=eastmoney_semaphore,
+    ),
+)
+
+
+async def _fetch_remote_stock_fund_flow(code: str) -> list[StockFundFlowItem]:
+    last_error: Exception | None = None
+    for index, attempt in enumerate(_FUND_FLOW_ATTEMPTS):
+        provider = get_provider(attempt.provider)
+        try:
+            rows = await provider_gateway.call_blocking(
+                attempt.provider,
+                attempt.operation,
+                getattr(provider, attempt.method),
+                code,
+                semaphore=attempt.semaphore,
+                is_fallback_attempt=index > 0,
+            )
+            result = [
+                StockFundFlowItem.model_validate(row).model_copy(
+                    update={"source": attempt.source_id, "source_api": attempt.source_api}
+                )
+                for row in rows
+            ]
+            if not result:
+                raise ValueError(f"{attempt.provider} 个股历史资金流为空")
+            result.sort(key=lambda item: item.date, reverse=True)
+            return result
+        except Exception as error:
+            last_error = error
+            logger.info(
+                "个股历史资金流数据源失败: provider=%s code=%s error=%s",
+                attempt.provider,
+                code,
+                error,
+            )
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("个股历史资金流数据源为空")
+
+
+async def _load_stock_fund_flow(
+    code: str,
+    cache_key: str,
+    last_good_key: str,
+) -> list[StockFundFlowItem]:
+    try:
+        result = await _fetch_remote_stock_fund_flow(code)
+    except Exception as error:
+        stale = cache.get(last_good_key)
+        if stale is not None:
+            result = [
+                StockFundFlowItem.model_validate(item).model_copy(update={"is_stale": True})
+                for item in stale
+            ]
+            cache.set(cache_key, result, ttl=_FUND_FLOW_FAILURE_TTL_SECONDS)
+            logger.warning(
+                "个股资金流上游不可用，使用最近成功缓存: code=%s error_type=%s",
+                code,
+                type(error).__name__,
+            )
+            return result
+        cache.set(cache_key, _FUND_FLOW_UNAVAILABLE, ttl=_FUND_FLOW_FAILURE_TTL_SECONDS)
+        raise UpstreamUnavailableError("个股资金流上游暂时不可用，请稍后重试") from error
+
+    cache.set(cache_key, result, ttl=300)
+    cache.set(last_good_key, result, ttl=_FUND_FLOW_LAST_GOOD_TTL_SECONDS)
+    return result
+
+
+async def get_stock_fund_flow(code: str) -> list[StockFundFlowItem]:
+    """获取股票最近最多 120 个交易日的分级资金净流入。"""
+    sym = normalize_code(code)
+    cache_key = dated_cache_key("stock_fund_flow", sym.raw)
+    last_good_key = dated_cache_key_no_day("stock_fund_flow_last_good", sym.raw)
+    cached = cache.get(cache_key)
+    if cached is _FUND_FLOW_UNAVAILABLE:
+        raise UpstreamUnavailableError("个股资金流上游暂时不可用，请稍后重试")
+    if cached is not None:
+        return [StockFundFlowItem.model_validate(item) for item in cached]
+    return cast(
+        list[StockFundFlowItem],
+        await _fund_flow_singleflight.do(
+            cache_key,
+            lambda: _load_stock_fund_flow(sym.raw, cache_key, last_good_key),
+        ),
+    )

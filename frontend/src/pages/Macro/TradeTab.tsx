@@ -39,6 +39,7 @@ export default function TradeTab() {
             title="进出口同比增速"
             latest={exportsImports?.latest ?? null}
             trend={exportsImports?.trend ?? []}
+            metadata={exportsImports}
             fields={EXPORTS_IMPORTS_FIELDS(c)}
           />
         </Col>
@@ -47,6 +48,7 @@ export default function TradeTab() {
             title="贸易差额"
             latest={balance?.latest ?? null}
             trend={balance?.trend ?? []}
+            metadata={balance}
             fields={BALANCE_FIELDS(c)}
           />
         </Col>

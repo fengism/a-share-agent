@@ -2,7 +2,6 @@ import logging
 from dataclasses import dataclass
 from enum import StrEnum
 
-from app.contracts.auth import UserRecord
 from app.core.security import (
     expiry_in_hours,
     generate_invite_code,
@@ -11,6 +10,7 @@ from app.core.security import (
     invite_expiry,
     verify_password,
 )
+from app.domain.identity import UserRecord
 from app.infrastructure.persistence import account_store, invite_store, session_store
 from app.modules.auth import throttle as login_throttle
 
@@ -112,6 +112,10 @@ def login(username: str, password: str, client_ip: str) -> AuthSession:
     for key in throttle_keys:
         login_throttle.reset(key)
     return AuthSession(token=session_store.create_session(user["id"]), user=user)
+
+
+def get_user_by_token(token: str) -> UserRecord | None:
+    return session_store.get_user_by_token(token)
 
 
 def logout(token: str | None) -> None:

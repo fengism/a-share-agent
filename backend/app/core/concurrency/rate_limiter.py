@@ -4,14 +4,17 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial, wraps
 from threading import Lock
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+T = TypeVar("T")
 
 _semaphore = asyncio.Semaphore(2)
 
 # ── 按数据源拆分的信号量，避免互相争抢 ──
 eastmoney_semaphore = asyncio.Semaphore(1)
+exchange_semaphore = asyncio.Semaphore(2)
 akshare_semaphore = asyncio.Semaphore(2)
 tencent_semaphore = asyncio.Semaphore(2)
 sina_semaphore = asyncio.Semaphore(2)
@@ -19,6 +22,7 @@ ths_semaphore = asyncio.Semaphore(2)
 iwencai_semaphore = asyncio.Semaphore(1)
 baidu_semaphore = asyncio.Semaphore(2)
 cls_semaphore = asyncio.Semaphore(2)
+kaipanhong_semaphore = asyncio.Semaphore(1)
 tdx_semaphore = asyncio.Semaphore(2)
 misc_semaphore = asyncio.Semaphore(4)
 database_semaphore = asyncio.Semaphore(8)
@@ -49,7 +53,7 @@ def shutdown_blocking_executor() -> None:
         executor.shutdown(wait=True, cancel_futures=True)
 
 
-async def _run_blocking(func: Callable, *args: Any, **kwargs: Any) -> Any:
+async def _run_blocking(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     with _blocking_executor_lock:
         executor = _blocking_executor
     if executor is None:
@@ -58,7 +62,12 @@ async def _run_blocking(func: Callable, *args: Any, **kwargs: Any) -> Any:
     return await loop.run_in_executor(executor, partial(func, *args, **kwargs))
 
 
-async def call_blocking(func: Callable, *args: Any, semaphore: asyncio.Semaphore | None = None, **kwargs: Any) -> Any:
+async def call_blocking(
+    func: Callable[..., T],
+    *args: Any,
+    semaphore: asyncio.Semaphore | None = None,
+    **kwargs: Any,
+) -> T:
     """Run a blocking function in a thread under an asyncio semaphore.
 
     Param:

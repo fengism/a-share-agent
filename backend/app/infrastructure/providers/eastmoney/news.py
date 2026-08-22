@@ -6,8 +6,8 @@ import time
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from app.contracts.search import NewsSearchItem
 from app.core.market import contains_stock_reference
+from app.domain.news import NewsSearchItem
 
 logger = logging.getLogger(__name__)
 

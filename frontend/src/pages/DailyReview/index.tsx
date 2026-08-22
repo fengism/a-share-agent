@@ -1,19 +1,25 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "../../api/queryKeys";
-import { DeleteOutlined } from "@ant-design/icons";
-import { Button, Card, DatePicker, Divider, List, Row, Col, message, Popconfirm, Skeleton, Space, Tag, Typography } from "antd";
+import { DeleteOutlined, FileTextOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, DatePicker, Divider, message, Popconfirm, Skeleton, Space, Tag, Typography } from "antd";
 import ReactMarkdown from "react-markdown";
 import dayjs from "dayjs";
-// html2canvas & jsPDF are loaded lazily inside handleExportPdf (kept out of the initial bundle)
-import { useDailyReview, useDeleteDailyReview, useGenerateDailyReview, useInfiniteDailyReviewHistory, usePush } from "../../api/queries";
+import { useDailyReview, useDeleteDailyReview, useInfiniteDailyReviewHistory } from "../../api/queries";
+import { streamDailyReview, type DailyReviewProgress } from "../../api/sse";
 import { ApiError } from "../../api/client";
 import PushModal from "../../components/PushModal";
 import QueryErrorState from "../../components/QueryErrorState";
 import SectionDataState from "../../components/SectionDataState";
-import { useMediaQuery } from "../../hooks/useMediaQuery";
+import WorkflowPageHeader from "../../components/workflows/WorkflowPageHeader";
+import WorkflowProgressPanel from "../../components/workflows/WorkflowProgressPanel";
+import WorkflowWorkspace from "../../components/workflows/WorkflowWorkspace";
+import { usePdfExport } from "../../hooks/usePdfExport";
+import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
+import { useWorkflowPush } from "../../hooks/useWorkflowPush";
 import type { PushRequest } from "../../types/stock";
 import { useColors, useStyles } from "../../styles/ui";
+import { normalizeIsoDate } from "../../utils/date";
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -79,9 +85,10 @@ function renderReviewContent(value: string) {
 export default function DailyReviewPage() {
   const { cardStyle, pageContainerStyle } = useStyles();
   const c = useColors();
-  const isNarrow = useMediaQuery("(max-width: 768px)");
-  const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(dayjs());
-  const date = formatDate(selectedDate);
+  const defaultDate = dayjs().format("YYYY-MM-DD");
+  const [dateParam, setDate] = useUrlSearchParam("date", defaultDate, { replace: true });
+  const date = normalizeIsoDate(dateParam, defaultDate);
+  const selectedDate = dayjs(date);
   const exportRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const {
@@ -101,11 +108,33 @@ export default function DailyReviewPage() {
     error: reviewError,
     refetch: retryReview,
   } = useDailyReview(date);
-  const generateMutation = useGenerateDailyReview();
   const deleteMutation = useDeleteDailyReview();
-  const pushMutation = usePush();
+  const { push, isPushing } = useWorkflowPush();
   const [pushModalOpen, setPushModalOpen] = useState(false);
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationMessage, setGenerationMessage] = useState("");
+  const cancelGenerationRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (dateParam !== date) setDate(date);
+  }, [date, dateParam, setDate]);
+
+  useEffect(() => () => {
+    cancelGenerationRef.current?.();
+    cancelGenerationRef.current = null;
+  }, []);
+
+  const { exportPdf: handleExportPdf, isExporting: isExportingPdf } = usePdfExport({
+    targetRef: exportRef,
+    filename: () => `每日复盘-${date}.pdf`,
+    backgroundColor: c.pageBg,
+    onStart: () => message.loading({ content: "正在生成 PDF...", key: "daily-review-export" }),
+    onSuccess: () => message.success({ content: "PDF 导出成功", key: "daily-review-export" }),
+    onError: (error) => {
+      console.error("[DailyReview] PDF 导出失败", error);
+      message.error({ content: "PDF 导出失败，请稍后重试", key: "daily-review-export" });
+    },
+  });
 
   const historyItems = historyPages?.pages.flat() ?? [];
 
@@ -114,16 +143,35 @@ export default function DailyReviewPage() {
       message.warning("请先选择复盘日期");
       return;
     }
+    cancelGenerationRef.current?.();
+    setIsGenerating(true);
+    setGenerationMessage("正在提交每日复盘任务");
     try {
-      await generateMutation.mutateAsync({ date, force });
+      const stream = streamDailyReview({ date, force }, (event: DailyReviewProgress) => {
+        if (event.message) setGenerationMessage(event.message);
+      });
+      cancelGenerationRef.current = stream.cancel;
+      const generated = await stream.promise;
+      if (generated.date !== date) {
+        setDate(generated.date);
+        message.info(`所选日期不是已完成交易日，已生成 ${generated.date} 复盘`);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.workflows.dailyReviewHistoryRoot }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.workflows.dailyReview(date) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.workflows.dailyReview(generated.date) }),
       ]);
       message.success(force ? "已重新生成复盘" : "已生成复盘");
     } catch (error) {
       message.error(`生成失败: ${String(error)}`);
+    } finally {
+      cancelGenerationRef.current = null;
+      setIsGenerating(false);
     }
+  };
+
+  const handleCancelGeneration = () => {
+    cancelGenerationRef.current?.();
+    setGenerationMessage("正在取消每日复盘任务");
   };
 
   const handleDelete = async (deleteDate: string) => {
@@ -132,7 +180,7 @@ export default function DailyReviewPage() {
       queryClient.removeQueries({ queryKey: queryKeys.workflows.dailyReview(deleteDate), exact: true });
       if (deleteDate === date) {
         const nextItem = historyItems.find((item) => item.date !== deleteDate);
-        setSelectedDate(nextItem ? dayjs(nextItem.date) : null);
+        setDate(nextItem?.date || defaultDate);
       }
       await queryClient.invalidateQueries({ queryKey: queryKeys.workflows.dailyReviewHistoryRoot });
       message.success("复盘记录已删除");
@@ -142,236 +190,219 @@ export default function DailyReviewPage() {
   };
 
   const handlePush = async (req: PushRequest) => {
-    try {
-      const result = await pushMutation.mutateAsync(req);
-      if (result.target === "notion") {
-        message.success(
-          <span>
-            已转存 Notion：<a href={result.url} target="_blank" rel="noreferrer">{result.title}</a>
-          </span>
-        );
-      } else {
-        message.success(`已推送到飞书：${result.message || result.title}`);
-      }
-    } catch (error) {
-      message.error(`推送失败: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setPushModalOpen(false);
-    }
-  };
-
-  const handleExportPdf = async () => {
-    if (!exportRef.current || !review || isExportingPdf) return;
-    setIsExportingPdf(true);
-    message.loading({ content: "正在生成 PDF...", key: "daily-review-export" });
-    try {
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import("html2canvas"),
-        import("jspdf"),
-      ]);
-      const canvas = await html2canvas(exportRef.current, { scale: 2, useCORS: true, backgroundColor: c.pageBg });
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-      const imgData = canvas.toDataURL("image/png");
-
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      pdf.save(`每日复盘-${date}.pdf`);
-      message.success({ content: "PDF 导出成功", key: "daily-review-export" });
-    } catch (error) {
-      console.error("[DailyReview] PDF 导出失败", error);
-      message.error({ content: "PDF 导出失败，请稍后重试", key: "daily-review-export" });
-    } finally {
-      setIsExportingPdf(false);
-    }
+    const response = await push(req);
+    if (!response) return false;
+    setPushModalOpen(false);
+    return true;
   };
 
   return (
     <div style={pageContainerStyle}>
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
-        <Row justify="space-between" align="middle" gutter={[16, 16]}>
-          <Col>
-            <Title level={3} style={{ margin: 0 }}>每日复盘</Title>
-            <Paragraph type="secondary" style={{ margin: 0 }}>按日期生成并保存市场复盘历史</Paragraph>
-          </Col>
-          <Col style={{ width: isNarrow ? "100%" : undefined }}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isNarrow ? "repeat(2, minmax(0, 1fr))" : "repeat(5, max-content)",
-                gap: 8,
-                justifyContent: isNarrow ? "stretch" : "end",
-              }}
-            >
-              <DatePicker
-                value={selectedDate}
-                disabled={generateMutation.isPending || isExportingPdf}
-                onChange={setSelectedDate}
-                style={{ width: "100%", gridColumn: isNarrow ? "1 / -1" : undefined }}
-              />
-              <Button block={isNarrow} type="primary" loading={generateMutation.isPending} disabled={isExportingPdf} onClick={() => handleGenerate(false)}>生成复盘</Button>
-              <Button block={isNarrow} loading={generateMutation.isPending} disabled={isExportingPdf} onClick={() => handleGenerate(true)}>重新生成</Button>
-              <Button block={isNarrow} loading={isExportingPdf} onClick={handleExportPdf} disabled={!review || generateMutation.isPending}>导出 PDF</Button>
-              <Button block={isNarrow} onClick={() => setPushModalOpen(true)} disabled={!review || generateMutation.isPending || isExportingPdf}>推送</Button>
-              <PushModal
-                open={pushModalOpen}
-                type="daily_review"
-                date={date}
-                onConfirm={handlePush}
-                onCancel={() => setPushModalOpen(false)}
-                loading={pushMutation.isPending}
-              />
-            </div>
-          </Col>
-        </Row>
+      <WorkflowPageHeader
+        title="每日复盘"
+        description="按日期生成并保存市场复盘历史"
+        icon={<FileTextOutlined />}
+        actions={(
+          <Space wrap>
+            <DatePicker
+              value={selectedDate}
+              allowClear={false}
+              disabled={isGenerating || isExportingPdf}
+              onChange={(value) => setDate(formatDate(value))}
+              disabledDate={(value) => value.startOf("day").isAfter(dayjs().startOf("day"))}
+            />
+            <Button type="primary" loading={isGenerating} disabled={isExportingPdf} onClick={() => handleGenerate(false)}>生成复盘</Button>
+            <Button loading={isGenerating} disabled={isExportingPdf} onClick={() => handleGenerate(true)}>重新生成</Button>
+            {isGenerating && <Button danger onClick={handleCancelGeneration}>取消任务</Button>}
+            <Button loading={isExportingPdf} onClick={handleExportPdf} disabled={!review || isGenerating}>导出 PDF</Button>
+            <Button onClick={() => setPushModalOpen(true)} disabled={!review || isGenerating || isExportingPdf}>推送</Button>
+            <PushModal
+              open={pushModalOpen}
+              type="daily_review"
+              date={date}
+              onConfirm={handlePush}
+              onCancel={() => setPushModalOpen(false)}
+              loading={isPushing}
+            />
+          </Space>
+        )}
+      />
 
-        <Row gutter={[16, 16]}>
-          <Col xs={24} lg={7}>
-            <Card title="历史复盘" style={cardStyle}>
-              <SectionDataState
-                isLoading={isHistoryLoading && historyItems.length === 0}
-                error={isHistoryError && historyItems.length === 0 ? historyError : undefined}
-                onRetry={() => retryHistory()}
-                isEmpty={!isHistoryLoading && !isHistoryError && historyItems.length === 0}
-                emptyText="暂无历史复盘"
-                errorTitle="历史复盘加载失败"
-                skeletonRows={5}
-                minHeight={240}
-              >
-                <List
-                  dataSource={historyItems}
-                  footer={hasNextPage ? (
-                    <Button block loading={isFetchingNextPage} onClick={() => fetchNextPage()}>
-                      加载更多
-                    </Button>
-                  ) : null}
-                  renderItem={(item) => (
-                    <List.Item style={{ display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedDate(dayjs(item.date))}
-                        aria-pressed={item.date === date}
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          textAlign: "left",
-                          padding: "12px 8px",
-                          cursor: "pointer",
-                          background: item.date === date ? c.elevatedBg : "transparent",
-                          border: 0,
-                          borderLeft: item.date === date ? `3px solid ${c.primary}` : "3px solid transparent",
-                          borderRadius: 4,
+      {isGenerating ? (
+        <WorkflowProgressPanel
+          current={0}
+          status="running"
+          message={generationMessage || "正在汇总市场数据并生成复盘报告"}
+          items={[{ title: "生成每日复盘", status: "process" }]}
+        />
+      ) : null}
+
+      <WorkflowWorkspace
+        historyTitle="历史复盘"
+        historyButtonLabel="历史复盘"
+        historyVersion={date}
+        history={(
+          <SectionDataState
+            isLoading={isHistoryLoading && historyItems.length === 0}
+            error={isHistoryError && historyItems.length === 0 ? historyError : undefined}
+            onRetry={() => retryHistory()}
+            isEmpty={!isHistoryLoading && !isHistoryError && historyItems.length === 0}
+            emptyText="暂无历史复盘"
+            errorTitle="历史复盘加载失败"
+            skeletonRows={5}
+            minHeight={240}
+          >
+            <ul aria-label="复盘历史记录" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {historyItems.map((item) => (
+                <li key={item.date} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <button
+                    type="button"
+                    onClick={() => setDate(item.date)}
+                    aria-pressed={item.date === date}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      textAlign: "left",
+                      padding: "12px 8px",
+                      cursor: "pointer",
+                      background: item.date === date ? c.activeBg : "transparent",
+                      border: 0,
+                      borderLeft: item.date === date ? `3px solid ${c.primary}` : "3px solid transparent",
+                      borderRadius: 4,
+                    }}
+                  >
+                    <span style={{ display: "block", fontWeight: 500 }}>{item.title}</span>
+                    <Text type="secondary">{item.date}</Text>
+                  </button>
+                  {item.can_delete ? (
+                    <Popconfirm
+                      title="删除这条复盘记录？"
+                      description="删除后无法恢复"
+                      okText="删除"
+                      cancelText="取消"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => handleDelete(item.date)}
+                    >
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        loading={deleteMutation.isPending && deleteMutation.variables === item.date}
+                        aria-label={`删除 ${item.date} 复盘记录`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
                         }}
-                      >
-                        <List.Item.Meta title={item.title} description={<Text type="secondary">{item.date}</Text>} />
-                      </button>
-                      {item.can_delete ? (
-                        <Popconfirm
-                          title="删除这条复盘记录？"
-                          description="删除后无法恢复"
-                          okText="删除"
-                          cancelText="取消"
-                          okButtonProps={{ danger: true }}
-                          onConfirm={() => handleDelete(item.date)}
-                        >
-                          <Button
-                            type="text"
-                            danger
-                            size="small"
-                            icon={<DeleteOutlined />}
-                            loading={deleteMutation.isPending && deleteMutation.variables === item.date}
-                            aria-label={`删除 ${item.date} 复盘记录`}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                            }}
-                          />
-                        </Popconfirm>
-                      ) : null}
-                    </List.Item>
+                      />
+                    </Popconfirm>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {hasNextPage ? (
+              <Button block loading={isFetchingNextPage} onClick={() => fetchNextPage()} style={{ marginTop: 12 }}>
+                加载更多
+              </Button>
+            ) : null}
+          </SectionDataState>
+        )}
+      >
+        <div ref={exportRef}>
+          {isReviewLoading ? (
+            <Card style={cardStyle}>
+              <div aria-label="复盘内容加载中" style={{ minHeight: 420, padding: 16 }}>
+                <Skeleton active paragraph={{ rows: 10 }} />
+              </div>
+            </Card>
+          ) : isReviewError && !(reviewError instanceof ApiError && reviewError.status === 404) ? (
+            <QueryErrorState error={reviewError} onRetry={() => retryReview()} title="复盘内容加载失败" />
+          ) : review ? (
+            <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+              {(review.quality_status === "degraded" || review.session_status === "adjusted" || Boolean(review.warnings?.length)) && (
+                <Alert
+                  type={review.quality_status === "degraded" ? "warning" : "info"}
+                  showIcon
+                  title={review.quality_status === "degraded" ? "复盘数据或生成过程不完整" : "复盘日期已调整"}
+                  description={(
+                    <div>
+                      {review.requested_date && review.effective_date && review.requested_date !== review.effective_date && (
+                        <div>请求日期 {review.requested_date}，实际复盘交易日 {review.effective_date}</div>
+                      )}
+                      {review.warnings?.length ? <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>{review.warnings.map((item) => <li key={item}>{item}</li>)}</ul> : null}
+                    </div>
                   )}
                 />
-              </SectionDataState>
-            </Card>
-          </Col>
-          <Col xs={24} lg={17}>
-            <div ref={exportRef}>
-              {isReviewLoading ? (
-                <Card style={cardStyle}>
-                  <div aria-label="复盘内容加载中" style={{ minHeight: 420, padding: 16 }}>
-                    <Skeleton active paragraph={{ rows: 10 }} />
-                  </div>
-                </Card>
-              ) : isReviewError && !(reviewError instanceof ApiError && reviewError.status === 404) ? (
-                <QueryErrorState error={reviewError} onRetry={() => retryReview()} title="复盘内容加载失败" />
-              ) : review ? (
-                <Space direction="vertical" size={16} style={{ width: "100%" }}>
-                  <Card style={cardStyle}>
-                    <Title level={4} style={{ marginTop: 0 }}>{review.title}</Title>
-                    <Paragraph>{review.market_summary}</Paragraph>
-                    <Paragraph><Text strong>市场情绪结论：</Text>{buildMoodSummary(review)}</Paragraph>
-                    <Space wrap>
-                      <Tag style={{ background: `${c.primary}26`, color: c.primary, border: "none" }}>指数 {review.data_snapshot.indices.length}</Tag>
-                      <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none" }}>热股 {review.data_snapshot.hot_stocks.length}</Tag>
-                      <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none" }}>概念 {review.data_snapshot.hot_concepts.length}</Tag>
-                      <Tag style={{ background: `${c.down}26`, color: c.down, border: "none" }}>行业 {review.data_snapshot.hot_industries.length}</Tag>
-                      <Tag style={{ background: `${c.up}26`, color: c.up, border: "none" }}>龙虎榜 {review.data_snapshot.dragon_tiger.length}</Tag>
-                    </Space>
-                    <div style={{ marginTop: 8 }}>
-                      <Text type="secondary">生成时间：{review.generated_at}</Text>
-                    </div>
-                  </Card>
-                  {review.llm_review ? (
-                    <Card title="AI 复盘报告" style={{ ...cardStyle, background: c.nestedBg }}>
-                      <ReactMarkdown>{renderReviewContent(review.llm_review)}</ReactMarkdown>
-                    </Card>
-                  ) : (
-                    <>
-                      {[review.index_review, review.hotspot_review, review.dragon_tiger_review].map((section) => (
-                        <Card key={section.title} title={section.title} style={cardStyle}>
-                          <Paragraph>{section.summary}</Paragraph>
-                          <ul>
-                            {section.bullets.map((item) => <li key={item}>{item}</li>)}
-                          </ul>
-                        </Card>
-                      ))}
-                      <Card title="机会与风险" style={cardStyle}>
-                        <Paragraph><Text strong>机会：</Text>{review.opportunities.join("；") || "-"}</Paragraph>
-                        <Paragraph><Text strong>风险：</Text>{review.risk_alerts.join("；") || "-"}</Paragraph>
-                        <Paragraph><Text strong>策略：</Text>{review.strategy_notes.join("；") || "-"}</Paragraph>
-                      </Card>
-                      <Card title="原始数据快照" style={cardStyle}>
-                        <Paragraph><Text strong>指数样本：</Text>{review.data_snapshot.indices.slice(0, 3).map((item) => String(item.name || item.code || "")).join("、") || "-"}</Paragraph>
-                        <Divider style={{ margin: "12px 0" }} />
-                        <Paragraph><Text strong>领涨板块：</Text>{review.data_snapshot.top_sectors?.slice(0, 5).map((item: Record<string, unknown>) => `${String(item.name || "")}(${String(item.change_pct ?? "-") }%)`).join("、") || "-"}</Paragraph>
-                        <Divider style={{ margin: "12px 0" }} />
-                        <Paragraph><Text strong>领跌板块：</Text>{review.data_snapshot.bottom_sectors?.slice(0, 5).map((item: Record<string, unknown>) => `${String(item.name || "")}(${String(item.change_pct ?? "-") }%)`).join("、") || "-"}</Paragraph>
-                        <Divider style={{ margin: "12px 0" }} />
-                        <Paragraph><Text strong>热点概念样本：</Text>{review.data_snapshot.hot_concepts.slice(0, 5).map((item) => String(item.name || item.code || "")).join("、") || "-"}</Paragraph>
-                        <Divider style={{ margin: "12px 0" }} />
-                        <Paragraph><Text strong>龙虎榜样本：</Text>{review.data_snapshot.dragon_tiger.slice(0, 5).map((item) => String(item.name || item.code || "")).join("、") || "-"}</Paragraph>
-                      </Card>
-                    </>
-                  )}
-                </Space>
-              ) : (
-                <Card style={cardStyle}><Paragraph type="secondary">请选择日期后生成复盘。</Paragraph></Card>
               )}
-            </div>
-          </Col>
-        </Row>
-      </Space>
+              <Card style={cardStyle}>
+                <Title level={4} style={{ marginTop: 0 }}>{review.title}</Title>
+                <Paragraph>{review.market_summary}</Paragraph>
+                <Paragraph><Text strong>市场情绪结论：</Text>{buildMoodSummary(review)}</Paragraph>
+                <Space wrap>
+                  <Tag style={{ background: `${c.primary}26`, color: c.primary, border: "none" }}>指数 {review.data_snapshot.indices.length}</Tag>
+                  <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none" }}>热股 {review.data_snapshot.hot_stocks.length}</Tag>
+                  <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none" }}>概念 {review.data_snapshot.hot_concepts.length}</Tag>
+                  <Tag style={{ background: `${c.down}26`, color: c.down, border: "none" }}>行业 {review.data_snapshot.hot_industries.length}</Tag>
+                  <Tag style={{ background: `${c.up}26`, color: c.up, border: "none" }}>龙虎榜 {review.data_snapshot.dragon_tiger.length}</Tag>
+                </Space>
+                <div style={{ marginTop: 8 }}>
+                  <Text type="secondary">生成时间：{review.generated_at}</Text>
+                </div>
+                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <Tag color={review.quality_status === "degraded" ? "warning" : "success"}>质量：{review.quality_status === "degraded" ? "降级" : "完整"}</Tag>
+                  <Tag color={review.generation_status === "fallback" ? "warning" : "processing"}>报告：{review.generation_status === "fallback" ? "确定性兜底" : "AI 生成"}</Tag>
+                </div>
+              </Card>
+              {review.data_snapshot.source_status && (
+                <Card title="复盘数据状态" style={cardStyle}>
+                  <Space wrap>
+                    {Object.entries(review.data_snapshot.source_status).map(([name, status]) => (
+                      <Tag key={name} color={status.status === "complete" ? "success" : status.status === "partial" ? "warning" : "error"}>
+                        {name}：{status.status === "complete" ? "完整" : status.status === "partial" ? "部分" : "不可用"}
+                        {status.data_date ? ` (${status.data_date})` : ""}
+                      </Tag>
+                    ))}
+                  </Space>
+                </Card>
+              )}
+              {review.llm_review ? (
+                <Card title="复盘报告" style={{ ...cardStyle, background: c.nestedBg }}>
+                  <ReactMarkdown>{renderReviewContent(review.llm_review)}</ReactMarkdown>
+                </Card>
+              ) : (
+                <>
+                  {[review.index_review, review.hotspot_review, review.dragon_tiger_review].map((section) => (
+                    <Card key={section.title} title={section.title} style={cardStyle}>
+                      <Paragraph>{section.summary}</Paragraph>
+                      <ul>
+                        {section.bullets.map((item) => <li key={item}>{item}</li>)}
+                      </ul>
+                    </Card>
+                  ))}
+                  <Card title="机会与风险" style={cardStyle}>
+                    <Paragraph><Text strong>机会：</Text>{review.opportunities.join("；") || "-"}</Paragraph>
+                    <Paragraph><Text strong>风险：</Text>{review.risk_alerts.join("；") || "-"}</Paragraph>
+                    <Paragraph><Text strong>策略：</Text>{review.strategy_notes.join("；") || "-"}</Paragraph>
+                  </Card>
+                  <Card title="原始数据快照" style={cardStyle}>
+                    <Paragraph><Text strong>指数样本：</Text>{review.data_snapshot.indices.slice(0, 3).map((item) => String(item.name || item.code || "")).join("、") || "-"}</Paragraph>
+                    <Divider style={{ margin: "12px 0" }} />
+                    <Paragraph><Text strong>领涨板块：</Text>{review.data_snapshot.top_sectors?.slice(0, 5).map((item: Record<string, unknown>) => `${String(item.name || "")}(${String(item.change_pct ?? "-") }%)`).join("、") || "-"}</Paragraph>
+                    <Divider style={{ margin: "12px 0" }} />
+                    <Paragraph><Text strong>领跌板块：</Text>{review.data_snapshot.bottom_sectors?.slice(0, 5).map((item: Record<string, unknown>) => `${String(item.name || "")}(${String(item.change_pct ?? "-") }%)`).join("、") || "-"}</Paragraph>
+                    <Divider style={{ margin: "12px 0" }} />
+                    <Paragraph><Text strong>热点概念样本：</Text>{review.data_snapshot.hot_concepts.slice(0, 5).map((item) => String(item.name || item.code || "")).join("、") || "-"}</Paragraph>
+                    <Divider style={{ margin: "12px 0" }} />
+                    <Paragraph><Text strong>龙虎榜样本：</Text>{review.data_snapshot.dragon_tiger.slice(0, 5).map((item) => String(item.name || item.code || "")).join("、") || "-"}</Paragraph>
+                  </Card>
+                </>
+              )}
+            </Space>
+          ) : (
+            <Card style={cardStyle}><Paragraph type="secondary">请选择日期后生成复盘。</Paragraph></Card>
+          )}
+        </div>
+      </WorkflowWorkspace>
     </div>
   );
 }

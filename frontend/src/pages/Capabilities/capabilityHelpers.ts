@@ -41,3 +41,9 @@ export function formatCacheTtl(seconds: number): string {
   if (seconds < 3600) return `${Math.round(seconds / 60)} 分钟`;
   return `${Math.round(seconds / 3600)} 小时`;
 }
+
+export function formatToolTimeout(seconds?: number | null): string {
+  if (seconds == null) return "跟随全局";
+  if (seconds < 60) return `${seconds} 秒`;
+  return `${Math.round(seconds / 60)} 分钟`;
+}

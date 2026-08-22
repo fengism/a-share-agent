@@ -7,12 +7,12 @@ export interface FactorAnalysis {
   summary: string;
   strengths: string[];
   risks: string[];
-  trend?: string;
+  trend?: string | null;
   support_level?: number | null;
   resistance_level?: number | null;
   key_signals?: string[];
-  market_mood?: string;
-  heat_level?: string;
+  market_mood?: string | null;
+  heat_level?: string | null;
 }
 
 export interface AnalysisResult {
@@ -33,6 +33,13 @@ export interface AnalysisResult {
   confidence: number;
   key_factors: string[];
   risk_warnings: string[];
+  prompt_trace?: {
+    prompt_id?: string;
+    prompt_version?: string;
+    model?: string;
+    generated_at?: string;
+    attempts?: number;
+  } | null;
 }
 
 export interface AnalysisHistoryItem {
@@ -52,4 +59,6 @@ export interface AnalysisPageData {
   intraday: IntradayData | null;
   valuation: StockValuation | null;
   cached_analysis: AnalysisResult | null;
+  partial?: boolean;
+  unavailable_sections?: Array<"stock_info" | "kline" | "intraday" | "valuation" | "cached_analysis">;
 }

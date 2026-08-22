@@ -7,7 +7,7 @@ import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from app.contracts.market import KlineItem
+from app.domain.market import KlineItem
 from app.modules.quant.schemas import (
     QuantBacktestResult,
     QuantEquityPoint,
@@ -17,8 +17,12 @@ from app.modules.quant.schemas import (
     QuantStrategyConfig,
     QuantTrade,
 )
+from app.modules.quant.strategies.compiler import compile_strategy
+from app.modules.quant.strategies.contracts import StrategySnapshot
+from app.modules.quant.strategies.evaluator import evaluate_target_positions
+from app.modules.quant.strategies.registry import get_strategy_registry
 
-ENGINE_VERSION = "2026-08-08-v1"
+ENGINE_VERSION = "2026-08-18-v3"
 
 
 @dataclass(slots=True)
@@ -31,47 +35,56 @@ class _PortfolioState:
     trades: list[QuantTrade] = field(default_factory=list)
 
 
-def _moving_average(values: list[float], period: int, index: int) -> float | None:
-    if index + 1 < period:
-        return None
-    return sum(values[index - period + 1 : index + 1]) / period
+def build_target_positions(
+    items: list[KlineItem],
+    strategy: QuantStrategyConfig | StrategySnapshot,
+) -> list[int]:
+    snapshot = (
+        strategy
+        if isinstance(strategy, StrategySnapshot)
+        else get_strategy_registry().resolve(strategy.type, strategy.version, strategy.parameters)
+    )
+    compiled = compile_strategy(snapshot.definition, snapshot.definition_hash)
+    return evaluate_target_positions(items, compiled, snapshot.parameters)
 
 
-def _rsi(values: list[float], period: int, index: int) -> float | None:
-    if index < period:
-        return None
-    changes = [values[position] - values[position - 1] for position in range(index - period + 1, index + 1)]
-    gains = sum(max(change, 0) for change in changes) / period
-    losses = sum(max(-change, 0) for change in changes) / period
-    if losses == 0:
-        return 100.0
-    return 100 - 100 / (1 + gains / losses)
+def strategy_warmup_bars(strategy: QuantStrategyConfig | StrategySnapshot) -> int:
+    snapshot = (
+        strategy
+        if isinstance(strategy, StrategySnapshot)
+        else get_strategy_registry().resolve(strategy.type, strategy.version, strategy.parameters)
+    )
+    compiled = compile_strategy(snapshot.definition, snapshot.definition_hash)
+    warmup: dict[str, int] = {name: 0 for name in ("open", "high", "low", "close", "volume")}
 
+    def argument(value: int | str | None, default: int = 0) -> int:
+        if value is None:
+            return default
+        if isinstance(value, str) and value.startswith("$"):
+            return int(snapshot.parameters[value[1:]])
+        return int(value)
 
-def build_target_positions(items: list[KlineItem], strategy: QuantStrategyConfig) -> list[int]:
-    closes = [item.close for item in items]
-    targets: list[int] = []
-    current = 0
-    for index, close_price in enumerate(closes):
-        if strategy.type == "ma_cross":
-            fast = _moving_average(closes, strategy.fast_period, index)
-            slow = _moving_average(closes, strategy.slow_period, index)
-            current = int(fast is not None and slow is not None and fast > slow)
-        elif strategy.type == "momentum_breakout":
-            if index >= strategy.lookback_period:
-                previous = closes[index - strategy.lookback_period : index]
-                if close_price >= max(previous):
-                    current = 1
-                elif close_price < sum(previous) / len(previous):
-                    current = 0
+    def operand(value) -> int:
+        if not isinstance(value, str) or value.startswith("$"):
+            return 0
+        return warmup.get(value, 0)
+
+    for name in compiled.indicator_order:
+        indicator = compiled.definition.indicators[name]
+        offset = argument(indicator.offset)
+        if indicator.operator in {"add", "subtract", "multiply", "divide"}:
+            required = max(operand(indicator.left), operand(indicator.right))
+        elif indicator.operator == "obv":
+            required = max(warmup.get(indicator.input or "", 0), warmup.get(indicator.volume_input or "", 0))
         else:
-            rsi = _rsi(closes, strategy.rsi_period, index)
-            if rsi is not None and rsi <= strategy.buy_threshold:
-                current = 1
-            elif rsi is not None and rsi >= strategy.sell_threshold:
-                current = 0
-        targets.append(current)
-    return targets
+            period = argument(indicator.period, 1)
+            input_warmup = warmup.get(indicator.input or "", 0)
+            if indicator.operator in {"rsi", "shift"}:
+                required = input_warmup + period
+            else:
+                required = input_warmup + max(0, period - 1)
+        warmup[name] = required + offset
+    return max(warmup.values(), default=0)
 
 
 def _commission(amount: float, execution: QuantExecutionConfig) -> float:
@@ -346,11 +359,13 @@ def _build_equity_point(
 def run_backtest(
     bars_by_code: dict[str, list[KlineItem]],
     benchmark_items: list[KlineItem],
-    strategy: QuantStrategyConfig,
+    strategy: QuantStrategyConfig | StrategySnapshot,
     execution: QuantExecutionConfig,
     *,
     data_hashes: list[str],
     data_sources: list[str],
+    evaluation_start_date: str | None = None,
+    evaluation_end_date: str | None = None,
 ) -> QuantBacktestResult:
     if not bars_by_code:
         raise ValueError("股票池没有可用行情")
@@ -369,7 +384,12 @@ def run_backtest(
         peak_equity=execution.initial_cash,
     )
     points: list[QuantEquityPoint] = []
-    all_dates = sorted({item.date for items in bars_by_code.values() for item in items})
+    all_dates = sorted(
+        day
+        for day in {item.date for items in bars_by_code.values() for item in items}
+        if (evaluation_start_date is None or day >= evaluation_start_date)
+        and (evaluation_end_date is None or day <= evaluation_end_date)
+    )
     benchmark_map = {item.date: item.close for item in benchmark_items}
     benchmark_start = next((benchmark_map[day] for day in all_dates if day in benchmark_map), None)
     rebalance_days_remaining = 0

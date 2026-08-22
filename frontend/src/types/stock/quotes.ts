@@ -15,6 +15,8 @@ export interface KlineData {
   code: string;
   period: string;
   adjust: string;
+  source?: string | null;
+  adjustment_verified?: boolean;
   items: KlineItem[];
 }
 
@@ -29,6 +31,7 @@ export interface IntradayItem {
 
 export interface IntradayData {
   code: string;
+  source: string;
   prev_close: number | null;
   items: IntradayItem[];
 }
@@ -66,4 +69,7 @@ export interface StockFundFlowItem {
   mid_net: number | null;
   large_net: number | null;
   super_net: number | null;
+  source: string;
+  source_api: string;
+  is_stale?: boolean;
 }

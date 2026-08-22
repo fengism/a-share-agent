@@ -13,6 +13,7 @@ class Skill:
     name: str
     description: str
     triggers: tuple[str, ...]
+    activation_keywords: tuple[str, ...]
     tool_names: tuple[str, ...]
     rules: tuple[str, ...]
     priority: int = 100
@@ -25,6 +26,8 @@ class Skill:
             raise ValueError(f"Skill '{self.name}' 缺少 description")
         if not self.triggers:
             raise ValueError(f"Skill '{self.name}' 至少需要一个触发条件")
+        if not self.activation_keywords:
+            raise ValueError(f"Skill '{self.name}' 至少需要一个激活关键词")
         if not self.tool_names:
             raise ValueError(f"Skill '{self.name}' 至少需要一个工具")
         if not self.rules:
@@ -35,12 +38,25 @@ class Skill:
             raise ValueError(f"Skill '{self.name}' 包含重复工具")
         for field_name, values in (
             ("triggers", self.triggers),
+            ("activation_keywords", self.activation_keywords),
             ("tool_names", self.tool_names),
             ("rules", self.rules),
             ("exclusions", self.exclusions),
         ):
             if any(not value.strip() for value in values):
                 raise ValueError(f"Skill '{self.name}' 的 {field_name} 包含空值")
+
+    def matches(self, message: str) -> bool:
+        normalized = message.lower()
+        for keyword in self.activation_keywords:
+            normalized_keyword = keyword.lower()
+            if normalized_keyword.isascii() and normalized_keyword.isalnum():
+                pattern = rf"(?<![a-z0-9]){re.escape(normalized_keyword)}(?![a-z0-9])"
+                if re.search(pattern, normalized):
+                    return True
+            elif normalized_keyword in normalized:
+                return True
+        return False
 
     def render_prompt(self, index: int) -> str:
         lines = [

@@ -1,5 +1,6 @@
 import json
 import threading
+from collections.abc import Callable
 from typing import Any
 
 import requests
@@ -9,11 +10,44 @@ from urllib3.util.retry import Retry
 from app.configuration import get_settings
 
 _session: requests.Session | None = None
+_provider_session: requests.Session | None = None
 _session_lock = threading.Lock()
 
 
+def _integration_retry_policy() -> Retry:
+    return Retry(
+        total=2,
+        connect=2,
+        read=2,
+        backoff_factor=0.3,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset({"GET", "HEAD", "OPTIONS"}),
+        raise_on_status=False,
+    )
+
+
+def _provider_retry_policy() -> Retry:
+    return Retry(
+        total=0,
+        connect=0,
+        read=0,
+        redirect=0,
+        status=0,
+        raise_on_status=False,
+    )
+
+
+def _build_session(retry_policy: Retry) -> requests.Session:
+    session = requests.Session()
+    session.trust_env = get_settings().http_trust_env
+    adapter = HTTPAdapter(max_retries=retry_policy, pool_connections=20, pool_maxsize=50)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
 def _get_session() -> requests.Session:
-    """Get or lazily create a shared requests.Session respecting http_trust_env setting.
+    """Get or lazily create the shared integration session.
 
     Param:
         None
@@ -25,21 +59,7 @@ def _get_session() -> requests.Session:
         return _session
     with _session_lock:
         if _session is None:
-            session = requests.Session()
-            session.trust_env = get_settings().http_trust_env
-            retry = Retry(
-                total=2,
-                connect=2,
-                read=2,
-                backoff_factor=0.3,
-                status_forcelist=(429, 500, 502, 503, 504),
-                allowed_methods=frozenset({"GET", "HEAD", "OPTIONS"}),
-                raise_on_status=False,
-            )
-            adapter = HTTPAdapter(max_retries=retry, pool_connections=20, pool_maxsize=50)
-            session.mount("http://", adapter)
-            session.mount("https://", adapter)
-            _session = session
+            _session = _build_session(_integration_retry_policy())
     return _session
 
 
@@ -47,19 +67,58 @@ get_session = _get_session
 """Public alias for _get_session."""
 
 
-def _reset_session() -> None:
-    """Reset the cached session; call after http_trust_env is changed at runtime."""
+def get_provider_session() -> requests.Session:
+    """Get the pooled Provider session whose retries are owned by ProviderGateway."""
+    global _provider_session
+    if _provider_session is not None:
+        return _provider_session
+    with _session_lock:
+        if _provider_session is None:
+            _provider_session = _build_session(_provider_retry_policy())
+    return _provider_session
+
+
+def reset_session() -> None:
+    """Reset both cached sessions after runtime HTTP settings change."""
     close_session()
 
 
 def close_session() -> None:
-    """关闭共享 HTTP 会话并释放连接池。"""
-    global _session
+    """关闭共享 HTTP 会话并释放全部连接池。"""
+    global _provider_session, _session
     with _session_lock:
-        session = _session
+        sessions = (_session, _provider_session)
         _session = None
-    if session is not None:
-        session.close()
+        _provider_session = None
+    for session in sessions:
+        if session is not None:
+            session.close()
+
+
+def _request_with_session(
+    session_provider: Callable[[], requests.Session],
+    method: str,
+    url: str,
+    *,
+    params: dict | None = None,
+    data: Any = None,
+    json_body: Any = None,
+    headers: dict | None = None,
+    timeout: int | float = 10,
+    allow_redirects: bool = True,
+) -> requests.Response:
+    request_options: dict[str, Any] = {
+        "params": params,
+        "data": data,
+        "json": json_body,
+        "headers": headers,
+        "timeout": timeout,
+    }
+    if not allow_redirects:
+        request_options["allow_redirects"] = False
+    response = session_provider().request(method, url, **request_options)
+    response.raise_for_status()
+    return response
 
 
 def request(
@@ -86,18 +145,17 @@ def request(
     Return:
         the requests.Response object with a successful status
     """
-    request_options = {
-        "params": params,
-        "data": data,
-        "json": json_body,
-        "headers": headers,
-        "timeout": timeout,
-    }
-    if not allow_redirects:
-        request_options["allow_redirects"] = False
-    response = _get_session().request(method, url, **request_options)
-    response.raise_for_status()
-    return response
+    return _request_with_session(
+        get_session,
+        method,
+        url,
+        params=params,
+        data=data,
+        json_body=json_body,
+        headers=headers,
+        timeout=timeout,
+        allow_redirects=allow_redirects,
+    )
 
 
 def get(url: str, **kwargs) -> requests.Response:
@@ -122,6 +180,21 @@ def post(url: str, **kwargs) -> requests.Response:
         the requests.Response object
     """
     return request("POST", url, **kwargs)
+
+
+def provider_request(method: str, url: str, **kwargs) -> requests.Response:
+    """Send one Provider transport attempt; ProviderGateway owns retries."""
+    return _request_with_session(get_provider_session, method, url, **kwargs)
+
+
+def provider_get(url: str, **kwargs) -> requests.Response:
+    """Send one Provider GET transport attempt."""
+    return provider_request("GET", url, **kwargs)
+
+
+def provider_post(url: str, **kwargs) -> requests.Response:
+    """Send one Provider POST transport attempt."""
+    return provider_request("POST", url, **kwargs)
 
 
 def parse_text_json(response: requests.Response) -> Any:

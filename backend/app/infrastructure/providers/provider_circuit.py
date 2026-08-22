@@ -2,6 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from threading import Lock
 
+from app.core.operational import ProviderCircuitSnapshot, ProviderCircuitStatus
 from app.infrastructure.providers.provider_policy import ProviderCircuitOpenError
 
 
@@ -57,11 +58,11 @@ class ProviderCircuitBreaker:
             if state is not None:
                 state.half_open_in_flight = False
 
-    def snapshot(self, open_seconds: float, now: float) -> dict[str, dict]:
+    def snapshot(self, open_seconds: float, now: float) -> dict[str, ProviderCircuitSnapshot]:
         with self.lock:
-            result = {}
+            result: dict[str, ProviderCircuitSnapshot] = {}
             for (provider, operation), state in sorted(self.circuits.items()):
-                status = "closed"
+                status: ProviderCircuitStatus = "closed"
                 retry_in_seconds = 0.0
                 if state.opened_at is not None:
                     elapsed = now - state.opened_at

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from app import configuration as config
 from app.configuration.effective import is_masked_secret
 from app.core.request_context import invalidate_settings_cache
+from app.infrastructure.llm.spec import resolve_llm_client_spec
 from app.infrastructure.persistence import global_config_store, user_config_store
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,14 @@ def update_user_settings(
 
     values_to_store = {key: value for key, value in private_patch.items() if not is_masked_secret(key, value)}
     global_values_to_store = {key: value for key, value in global_patch.items() if not is_masked_secret(key, value)}
+    if {
+        "llm_provider", "llm_api_mode", "llm_api_version", "llm_api_key",
+        "llm_base_url", "llm_model",
+    } & private_patch.keys():
+        candidate = get_user_settings(user_id).model_copy(deep=True)
+        for key, value in values_to_store.items():
+            setattr(candidate, key, value)
+        resolve_llm_client_spec(candidate)
     if values_to_store:
         user_config_store.set_user_config(user_id, values_to_store)
         invalidate_settings_cache()

@@ -6,34 +6,38 @@ const mocks = vi.hoisted(() => ({
   createRun: vi.fn(),
   saveStrategy: vi.fn(),
   deleteStrategy: vi.fn(),
+  presets: [] as Array<Record<string, unknown>>,
   savedStrategies: [] as Array<{
     id: number;
     name: string;
     config: {
-      type: "ma_cross" | "momentum_breakout" | "rsi_reversion";
-      fast_period: number;
-      slow_period: number;
-      lookback_period: number;
-      rsi_period: number;
-      buy_threshold: number;
-      sell_threshold: number;
+      type: string;
+      version?: string;
+      parameters: Record<string, number | boolean | string>;
     };
   }>,
 }));
 
 vi.mock("../../api/queries", () => ({
-  useQuantStrategyPresets: () => ({ data: [] }),
+  useQuantStrategyPresets: () => ({ data: mocks.presets }),
   useSavedQuantStrategies: () => ({ data: mocks.savedStrategies, isLoading: false }),
   useSaveQuantStrategy: () => ({ mutateAsync: mocks.saveStrategy, isPending: false }),
   useDeleteQuantStrategy: () => ({ mutateAsync: mocks.deleteStrategy, isPending: false }),
   useCreateQuantBacktest: () => ({ mutateAsync: mocks.createRun, isPending: false }),
 }));
 
+function selectStrategy(name: RegExp) {
+  const changeButton = screen.queryByRole("button", { name: "更换策略" });
+  if (changeButton) fireEvent.click(changeButton);
+  fireEvent.click(screen.getByRole("radio", { name }));
+}
+
 describe("BacktestForm", () => {
   beforeEach(() => {
     mocks.createRun.mockReset().mockResolvedValue({ id: "new-run" });
     mocks.saveStrategy.mockReset();
     mocks.deleteStrategy.mockReset();
+    mocks.presets.length = 0;
     mocks.savedStrategies.length = 0;
   });
 
@@ -45,15 +49,20 @@ describe("BacktestForm", () => {
     expect(screen.getByText("3. 执行设置")).toBeInTheDocument();
     expect(screen.getByLabelText("短均线")).toBeInTheDocument();
 
-    const rsiPreset = screen.getByRole("radio", { name: /RSI 均值回归/ });
-    fireEvent.click(rsiPreset);
+    selectStrategy(/RSI 均值回归/);
 
     expect(await screen.findByLabelText("RSI 周期")).toBeInTheDocument();
-    expect(rsiPreset).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByText("RSI 进入超卖区间后买入，进入超买区间后退出。")).toBeInTheDocument();
+    expect(screen.getByText("当前策略：RSI 均值回归")).toBeInTheDocument();
     expect(screen.getByLabelText("买入阈值")).toBeInTheDocument();
     expect(screen.getByLabelText("卖出阈值")).toBeInTheDocument();
     expect(screen.queryByLabelText("短均线")).not.toBeInTheDocument();
+  });
+
+  it("prefills a custom universe from selected screener stocks", () => {
+    render(<BacktestForm initialCodes={["600519", "000001"]} onCreated={vi.fn()} />);
+
+    expect(screen.getByPlaceholderText("600519, 000001")).toHaveValue("600519, 000001");
+    expect(screen.getByPlaceholderText("例如：消费龙头双均线")).toHaveValue("双均线趋势 · 2只股票回测");
   });
 
   it("disables custom codes when the current portfolio is selected", async () => {
@@ -78,7 +87,11 @@ describe("BacktestForm", () => {
     expect(mocks.createRun).toHaveBeenCalledWith(expect.objectContaining({
       name: "消费策略",
       universe: { source: "custom", codes: ["600519", "000001"] },
-      strategy: expect.objectContaining({ type: "ma_cross", fast_period: 5, slow_period: 20 }),
+      strategy: {
+        type: "ma_cross",
+        version: "1.0.0",
+        parameters: { fast_period: 5, slow_period: 20 },
+      },
       execution: expect.objectContaining({
         initial_cash: 1_000_000,
         commission_rate: 0.0003,
@@ -109,10 +122,69 @@ describe("BacktestForm", () => {
     render(<BacktestForm onCreated={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText("回测名称"), { target: { value: "临时配置" } });
+    fireEvent.click(screen.getByRole("button", { name: /策略配置管理/ }));
     fireEvent.click(screen.getByRole("button", { name: "恢复默认参数" }));
 
-    expect(screen.getByLabelText("回测名称")).toHaveValue("双均线回测");
+    expect(screen.getByLabelText("回测名称")).toHaveValue("双均线趋势 · 600519回测");
     expect(screen.getByLabelText("股票代码")).toHaveValue("600519");
+  });
+
+  it("renders parameter controls from an API strategy descriptor", async () => {
+    mocks.presets.push({
+      key: "volume_filter",
+      version: "1.0.0",
+      definition_hash: "sha256:custom",
+      name: "成交量过滤",
+      description: "按成交量条件过滤信号",
+      scenario: "放量行情",
+      risk_level: "medium",
+      presentation: { icon: "unknown" },
+      constraints: [],
+      parameters: [
+        { key: "enabled", type: "boolean", label: "启用过滤", description: "", default: true },
+        { key: "mode", type: "string", label: "过滤模式", description: "", default: "strict", choices: ["strict", "loose"] },
+      ],
+      config: { type: "volume_filter", version: "1.0.0", parameters: { enabled: true, mode: "strict" } },
+    });
+    render(<BacktestForm onCreated={vi.fn()} />);
+
+    selectStrategy(/成交量过滤/);
+
+    expect(await screen.findByLabelText("启用过滤")).toBeChecked();
+    expect(screen.getByRole("combobox", { name: "过滤模式" })).toBeInTheDocument();
+  });
+
+  it("blocks submission using constraints from a custom strategy descriptor", async () => {
+    mocks.presets.push({
+      key: "custom_window",
+      version: "1.0.0",
+      definition_hash: "sha256:custom-window",
+      name: "自定义窗口",
+      description: "验证动态参数关系",
+      scenario: "测试行情",
+      risk_level: "medium",
+      presentation: { icon: "unknown" },
+      parameters: [
+        { key: "entry_window", type: "integer", label: "入场窗口", description: "", default: 5, minimum: 1, maximum: 100 },
+        { key: "exit_window", type: "integer", label: "离场窗口", description: "", default: 20, minimum: 1, maximum: 100 },
+      ],
+      constraints: [{
+        operator: "less_than",
+        left: "$entry_window",
+        right: "$exit_window",
+        message: "入场窗口必须小于离场窗口",
+      }],
+      config: { type: "custom_window", version: "1.0.0", parameters: { entry_window: 5, exit_window: 20 } },
+    });
+    render(<BacktestForm onCreated={vi.fn()} />);
+
+    selectStrategy(/自定义窗口/);
+    fireEvent.change(await screen.findByLabelText("入场窗口"), { target: { value: "30" } });
+    fireEvent.change(screen.getByLabelText("离场窗口"), { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("button", { name: "开始回测" }));
+
+    expect((await screen.findAllByText("入场窗口必须小于离场窗口")).length).toBeGreaterThan(0);
+    expect(mocks.createRun).not.toHaveBeenCalled();
   });
 
   it("reveals advanced execution assumptions on demand", () => {
@@ -127,6 +199,8 @@ describe("BacktestForm", () => {
     expect(screen.getByLabelText("过户费（BP）")).toHaveDisplayValue("0.10");
     expect(screen.getByLabelText("交易单位（股）")).toHaveValue("100");
     expect(screen.getByLabelText("无风险利率（%）")).toHaveDisplayValue("1.5");
+    expect(screen.getByLabelText("佣金（BP）").closest(".quant-advanced-execution-fields"))
+      .toHaveClass("ant-row-bottom");
   });
 
   it("confirms before deleting a saved strategy", async () => {
@@ -135,17 +209,14 @@ describe("BacktestForm", () => {
       name: "已保存 RSI",
       config: {
         type: "rsi_reversion",
-        fast_period: 5,
-        slow_period: 20,
-        lookback_period: 20,
-        rsi_period: 9,
-        buy_threshold: 25,
-        sell_threshold: 75,
+        version: "1.0.0",
+        parameters: { rsi_period: 9, buy_threshold: 25, sell_threshold: 75 },
       },
     });
     mocks.deleteStrategy.mockResolvedValue({ deleted: true });
     render(<BacktestForm onCreated={vi.fn()} />);
 
+    fireEvent.click(screen.getByRole("button", { name: /策略配置管理/ }));
     fireEvent.mouseDown(screen.getByRole("combobox", { name: "已保存策略" }));
     fireEvent.click(await screen.findByText("已保存 RSI"));
     fireEvent.click(screen.getByRole("button", { name: "删除已保存策略" }));
@@ -155,4 +226,57 @@ describe("BacktestForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /^删\s*除$/ }));
     await waitFor(() => expect(mocks.deleteStrategy).toHaveBeenCalledWith(7));
   });
+
+  it("submits the selected non-default strategy instead of ma_cross", async () => {
+    render(<BacktestForm onCreated={vi.fn()} />);
+
+    selectStrategy(/RSI 均值回归/);
+    expect(await screen.findByLabelText("RSI 周期")).toBeInTheDocument();
+    expect(screen.getByLabelText("回测名称")).toHaveValue("RSI 均值回归 · 600519回测");
+    fireEvent.click(screen.getByRole("button", { name: "开始回测" }));
+
+    await waitFor(() => expect(mocks.createRun).toHaveBeenCalledTimes(1));
+    expect(mocks.createRun).toHaveBeenCalledWith(expect.objectContaining({
+      name: "RSI 均值回归 · 600519回测",
+      strategy: {
+        type: "rsi_reversion",
+        version: "1.0.0",
+        parameters: { rsi_period: 14, buy_threshold: 30, sell_threshold: 70 },
+      },
+    }));
+  });
+
+
+  it("preserves a user-entered run name when switching presets", async () => {
+    render(<BacktestForm onCreated={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText("回测名称"), { target: { value: "我的震荡实验" } });
+    selectStrategy(/RSI 均值回归/);
+
+    expect(await screen.findByLabelText("RSI 周期")).toBeInTheDocument();
+    expect(screen.getByLabelText("回测名称")).toHaveValue("我的震荡实验");
+  });
+
+  it("keeps saved strategy management collapsed by default and reflects edited parameters", async () => {
+    mocks.savedStrategies.push({
+      id: 8,
+      name: "已保存 RSI 参数",
+      config: {
+        type: "rsi_reversion",
+        version: "1.0.0",
+        parameters: { rsi_period: 9, buy_threshold: 25, sell_threshold: 75 },
+      },
+    });
+    render(<BacktestForm onCreated={vi.fn()} />);
+
+    expect(screen.queryByRole("combobox", { name: "已保存策略" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /策略配置管理/ }));
+    expect(screen.getByRole("combobox", { name: "已保存策略" })).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "已保存策略" }));
+    fireEvent.click(await screen.findByText("已保存 RSI 参数"));
+
+    expect(await screen.findByText("实际参数：RSI 周期 9 · 买入阈值 25 · 卖出阈值 75")).toBeInTheDocument();
+    expect(screen.getByText("已修改")).toBeInTheDocument();
+  });
+
 });

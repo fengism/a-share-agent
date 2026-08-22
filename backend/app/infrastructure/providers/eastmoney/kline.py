@@ -10,6 +10,7 @@ from app.constants.market import (
     EASTMONEY_UT_HISTORY,
     INDEX_FALLBACKS,
 )
+from app.infrastructure.providers.eastmoney.symbols import build_stock_secid
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,6 @@ class KlineMixin:
         Return:
             pd.DataFrame: 包含列: 日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 振幅, 涨跌幅, 涨跌额, 换手率
         """
-        se_cid = 1 if code.startswith("6") else 0
         k_type_map = {"daily": "101", "weekly": "102", "monthly": "103"}
         klt = k_type_map.get(period, "101")
         fqt_map = {"qfq": 1, "hfq": 2, "": 0}
@@ -41,7 +41,7 @@ class KlineMixin:
             "ut": EASTMONEY_UT_HISTORY,
             "klt": klt,
             "fqt": fqt,
-            "secid": f"{se_cid}.{code}",
+            "secid": build_stock_secid(code),
             "beg": start_date,
             "end": end_date,
             "_": "1623766962675",

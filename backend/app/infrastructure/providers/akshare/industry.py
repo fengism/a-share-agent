@@ -5,18 +5,19 @@ import math
 
 import pandas as pd
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential
 
-from app.infrastructure.http.client import get_session
+from app.infrastructure.http.client import get_provider_session as get_session
 from app.infrastructure.providers.akshare.loader import ak
 
 logger = logging.getLogger(__name__)
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
-def fetch_sw_index_realtime() -> pd.DataFrame:
+def fetch_sw_index_realtime(level: int = 2) -> pd.DataFrame:
+    if level not in (1, 2):
+        raise ValueError(f"不支持的申万行业级别: {level}")
+    industry_type = "一级行业" if level == 1 else "二级行业"
     try:
-        return ak.index_realtime_sw(symbol="二级行业")
+        return ak.index_realtime_sw(symbol=industry_type)
     except requests.RequestException as exc:
         logger.warning("申万行业指数接口连接失败，跳过同源直连并使用备用数据: %s", exc)
         return pd.DataFrame()
@@ -30,7 +31,7 @@ def fetch_sw_index_realtime() -> pd.DataFrame:
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
             ),
         }
-        params: dict = {"page": "1", "page_size": "50", "indextype": "二级行业"}
+        params: dict = {"page": "1", "page_size": "50", "indextype": industry_type}
         response = get_session().get(url, params=params, headers=headers, timeout=(3.05, 10))
         response.raise_for_status()
         data = response.json().get("data", {})
@@ -73,7 +74,6 @@ def fetch_sw_index_realtime() -> pd.DataFrame:
         return pd.DataFrame()
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
 def fetch_sw_index_components(symbol: str) -> pd.DataFrame:
     try:
         return ak.index_component_sw(symbol=symbol)

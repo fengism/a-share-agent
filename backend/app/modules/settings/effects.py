@@ -4,9 +4,9 @@ import asyncio
 import logging
 
 from app.configuration.schema import Settings
-from app.infrastructure.http.client import _reset_session
+from app.financial_data.market.public import refresh_twitter_feeds, refresh_twitter_feeds_sync
+from app.infrastructure.http.client import reset_session
 from app.infrastructure.integrations.feishu.auth import clear_token_cache
-from app.market_data.market.public import refresh_twitter_feeds, refresh_twitter_feeds_sync
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ def apply_update_side_effects(updated: Settings, patch: dict) -> None:
         clear_token_cache()
 
     if "http_trust_env" in patch:
-        _reset_session()
+        reset_session()
 
     if "twitter_feeds" not in patch:
         return

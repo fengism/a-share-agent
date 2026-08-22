@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 async def refresh_industry_mapping_file_daily() -> None:
-    from app.market_data.stock.public import update_industry_mapping_sw_second_file
+    from app.financial_data.stock.public import update_industry_mapping_sw_second_file
 
     async def iteration():
         await call_blocking(update_industry_mapping_sw_second_file)
@@ -25,9 +25,8 @@ async def refresh_industry_mapping_file_daily() -> None:
 
 
 async def periodic_wal_checkpoint() -> None:
-    from app.infrastructure.persistence.connection import checkpoint_wal
-    from app.infrastructure.persistence.session_store import purge_expired
-    from app.runtime.maintenance import purge_expired_runtime_data
+    from app.infrastructure.persistence.connection import checkpoint_wal, optimize_databases
+    from app.runtime.maintenance import purge_expired_auth_data, purge_expired_runtime_data
 
     async def iteration():
         settings = get_settings()
@@ -36,14 +35,18 @@ async def periodic_wal_checkpoint() -> None:
             bot_job_retention_seconds=settings.bot_event_dedup_ttl_seconds,
             bot_rate_limit_window_seconds=settings.bot_rate_limit_window,
             twitter_post_retention_days=settings.twitter_post_retention_days,
+            workflow_job_retention_seconds=settings.workflow_job_retention_seconds,
             semaphore=database_semaphore,
         )
-        await call_blocking(checkpoint_wal, semaphore=database_semaphore)
-        auth_purged = await call_blocking(purge_expired, semaphore=database_semaphore)
+        auth_purged = await call_blocking(purge_expired_auth_data, semaphore=database_semaphore)
+        optimized = await call_blocking(optimize_databases, semaphore=database_semaphore)
+        checkpointed = await call_blocking(checkpoint_wal, semaphore=database_semaphore)
         logger.info(
-            "WAL checkpoint 完成，过期数据已清理: auth=%s runtime=%s",
+            "SQLite 周期维护完成: auth=%s runtime=%s optimize=%s checkpoint=%s",
             auth_purged,
             runtime_purged,
+            optimized,
+            checkpointed,
         )
 
     await task_scheduler.run_periodic(
@@ -54,9 +57,34 @@ async def periodic_wal_checkpoint() -> None:
     )
 
 
+async def periodic_database_backup() -> None:
+    from app.infrastructure.persistence.operations import create_online_backups
+
+    async def iteration():
+        settings = get_settings()
+        if not settings.database_backup_enabled:
+            return
+        created = await call_blocking(
+            create_online_backups,
+            settings.database_backup_dir or settings.app_data_dir / "backups",
+            retention_count=settings.database_backup_retention_count,
+            mirror_dir=settings.database_backup_mirror_dir,
+            semaphore=database_semaphore,
+        )
+        logger.info("SQLite 在线备份完成: files=%s", [str(path) for path in created])
+
+    settings = get_settings()
+    await task_scheduler.run_periodic(
+        name="database_backup",
+        coro_factory=iteration,
+        interval_seconds=settings.database_backup_interval_seconds,
+        leader_election=True,
+    )
+
+
 async def refresh_twitter_feed_periodic() -> None:
+    from app.financial_data.market.public import refresh_twitter_feeds
     from app.infrastructure.persistence.twitter_store import TWITTER_REFRESH_INTERVAL_SECONDS, get_stale_authors
-    from app.market_data.market.public import refresh_twitter_feeds
 
     async def iteration():
         feeds = get_settings().twitter_feeds

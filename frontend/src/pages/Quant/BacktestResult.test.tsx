@@ -5,6 +5,9 @@ import type { QuantBacktestResult } from "../../api/queries";
 import BacktestResult from "./BacktestResult";
 
 vi.mock("../../hooks/useMediaQuery", () => ({ useMediaQuery: () => true }));
+vi.mock("./results/BacktestTradeKline", () => ({
+  default: () => <div data-testid="backtest-trade-kline">交易点位K线</div>,
+}));
 vi.mock("echarts-for-react/lib/core", () => ({
   default: (props: ComponentProps<"div"> & { "data-testid"?: string }) => (
     <div data-testid={props["data-testid"]} style={props.style} />
@@ -61,6 +64,11 @@ describe("BacktestResult", () => {
     render(<BacktestResult result={makeResult()} />);
 
     expect(screen.getByRole("region", { name: "回测结果" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "回测结果导航" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "核心指标" })).toHaveAttribute("href", "#quant-result-metrics");
+    expect(screen.getByRole("link", { name: "净值与回撤" })).toHaveAttribute("href", "#quant-result-charts");
+    expect(screen.getByRole("link", { name: "交易点位" })).toHaveAttribute("href", "#quant-result-trades-chart");
+    expect(screen.getByRole("link", { name: "收益与成交" })).toHaveAttribute("href", "#quant-result-details");
     expect(screen.getByText("总收益")).toBeInTheDocument();
     expect(screen.getByText("总收益").closest(".ant-statistic")).toHaveTextContent("12.34%");
     expect(screen.getByText("基准收益")).toBeInTheDocument();
@@ -69,6 +77,7 @@ describe("BacktestResult", () => {
     expect(screen.getByText("v1")).toBeInTheDocument();
     expect(screen.getByTestId("equity-chart")).toHaveStyle({ height: "260px" });
     expect(screen.getByTestId("drawdown-chart")).toHaveStyle({ height: "260px" });
+    expect(screen.getByTestId("backtest-trade-kline")).toBeInTheDocument();
     expect(screen.getByText("2026-01")).toBeInTheDocument();
     expect(screen.getByText("买入")).toBeInTheDocument();
   });
@@ -82,4 +91,31 @@ describe("BacktestResult", () => {
     expect(screen.getByText("暂无成交记录")).toBeInTheDocument();
     expect(screen.queryByTestId("equity-chart")).not.toBeInTheDocument();
   });
+
+  it("warns when a legacy result has no benchmark return", () => {
+    const result = makeResult();
+    result.metrics.benchmark_return = null;
+    result.metrics.excess_return = null;
+
+    render(<BacktestResult result={result} />);
+
+    expect(screen.getByText("该回测没有可用的基准收益")).toBeInTheDocument();
+    expect(screen.getByText(/建议重新创建回测/)).toBeInTheDocument();
+  });
+
+  it("labels the exact strategy used for the result", () => {
+    render(<BacktestResult
+      result={makeResult()}
+      strategy={{
+        type: "bias_reversal",
+        version: "1.0.0",
+        name: "BIAS 乖离率反转",
+        parameters: { period: 6, buy_threshold: -3, sell_threshold: 3 },
+      }}
+    />);
+
+    expect(screen.getByLabelText("本次执行策略")).toHaveTextContent("BIAS 乖离率反转 · bias_reversal@1.0.0");
+    expect(screen.getByLabelText("本次执行策略")).toHaveTextContent("period=6 · buy_threshold=-3 · sell_threshold=3");
+  });
+
 });

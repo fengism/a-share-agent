@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.contracts.content import ContentBlock
+from app.domain.content import ContentBlock
 
 
 def _text_element(content: str) -> dict:

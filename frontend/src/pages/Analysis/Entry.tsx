@@ -1,13 +1,18 @@
-import { Button, Card, message, Popconfirm, Tag, Typography } from "antd";
-import { DeleteOutlined, HistoryOutlined, RobotOutlined } from "@ant-design/icons";
-import { Link } from "react-router-dom";
-import SearchBar from "../Dashboard/SearchBar";
+import { useMemo, useState } from "react";
+import { Button, Card, Empty, Input, message, Popconfirm, Tag, Typography } from "antd";
+import { DeleteOutlined, RobotOutlined, SearchOutlined } from "@ant-design/icons";
+import SearchBar from "../../features/stock-search/SearchBar";
 import { useDeleteAnalysisHistory, useInfiniteAllAnalysisHistory } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
+import WorkflowPageHeader from "../../components/workflows/WorkflowPageHeader";
+import WorkflowWorkspace from "../../components/workflows/WorkflowWorkspace";
 import type { AnalysisHistoryItem } from "../../types/stock";
-import { useColors } from "../../styles/ui";
+import { useColors, useStyles, useTokens } from "../../styles/ui";
+import { filterAnalysisHistory } from "./analysisHistoryFilter";
+import { buildAnalysisHistoryUrl } from "./analysisHistoryUrl";
+import PreloadLink from "../../components/PreloadLink";
 
-const { Title, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 function signalColor(c_up: string, c_down: string, c_default: string, signal: string | null) {
   if (signal === "strong_buy" || signal === "buy") return c_up;
@@ -38,6 +43,8 @@ function groupByStock(items: AnalysisHistoryItem[]): Record<string, AnalysisHist
 
 export default function AnalysisEntry() {
   const c = useColors();
+  const t = useTokens();
+  const { pageContainerStyle } = useStyles();
   const {
     data: historyPages,
     isLoading,
@@ -49,9 +56,13 @@ export default function AnalysisEntry() {
     isFetchingNextPage,
   } = useInfiniteAllAnalysisHistory();
   const deleteMutation = useDeleteAnalysisHistory();
-  const allHistory = historyPages?.pages.flat() ?? [];
-
-  const grouped = groupByStock(allHistory);
+  const [historyFilter, setHistoryFilter] = useState("");
+  const allHistory = useMemo(() => historyPages?.pages.flat() ?? [], [historyPages]);
+  const filteredHistory = useMemo(
+    () => filterAnalysisHistory(allHistory, historyFilter),
+    [allHistory, historyFilter],
+  );
+  const grouped = useMemo(() => groupByStock(filteredHistory), [filteredHistory]);
 
   const handleDelete = async (item: AnalysisHistoryItem) => {
     try {
@@ -64,20 +75,26 @@ export default function AnalysisEntry() {
   };
 
   return (
-    <div className="two-pane" style={{ display: "flex", gap: 20, minHeight: "calc(100vh - 120px)" }}>
-      {/* Left: History Panel */}
-      <div className="pane-side" style={{ width: 280, flexShrink: 0 }}>
-        <Card
-          style={{ background: c.cardBg, border: `1px solid ${c.border}`, borderRadius: 10, height: "100%" }}
-          styles={{ body: { padding: 0 } }}
-        >
-          <div style={{ padding: "14px 16px 10px", borderBottom: `1px solid ${c.border}` }}>
-            <span style={{ fontWeight: 600, color: c.textPrimary, fontSize: 14 }}>
-              <HistoryOutlined style={{ marginRight: 8, color: c.primary }} />
-              分析历史
-            </span>
-          </div>
-          <div style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto", padding: "8px 10px" }}>
+    <div style={pageContainerStyle}>
+      <WorkflowPageHeader
+        title="AI 智能分析"
+        description="输入股票代码或名称，查看基本面、技术面、情绪面与 AI 结论"
+        icon={<RobotOutlined />}
+      />
+      <WorkflowWorkspace
+        historyTitle="分析历史"
+        historyButtonLabel="分析历史"
+        history={(
+          <div>
+            <Input
+              aria-label="筛选分析历史"
+              placeholder="按股票代码或名称筛选"
+              prefix={<SearchOutlined />}
+              value={historyFilter}
+              allowClear
+              onChange={(event) => setHistoryFilter(event.target.value)}
+              style={{ marginBottom: t.space[3] }}
+            />
             <SectionDataState
               isLoading={isLoading && allHistory.length === 0}
               error={isError && allHistory.length === 0 ? error : undefined}
@@ -89,87 +106,95 @@ export default function AnalysisEntry() {
               minHeight={260}
             >
               <>
-                {Object.entries(grouped).map(([code, items]) => (
-                  <div key={code} style={{ marginBottom: 10 }}>
-                    {items.map((item) => {
-                      const dateStr = item.analysis_date;
-                      const displayDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
-                      const sc = signalColor(c.up, c.down, c.textPrimary, item.signal);
-                      const itemKey = `${code}-${dateStr}`;
-                      const isDeleting = deleteMutation.isPending
-                        && `${deleteMutation.variables?.code}-${deleteMutation.variables?.date}` === itemKey;
-                      return (
-                        <div
-                          key={itemKey}
-                          className="hover-row"
-                          style={{
-                            display: "flex", justifyContent: "space-between", alignItems: "center",
-                            padding: "0 4px 0 0", marginBottom: 4,
-                            borderRadius: 8,
-                          }}
-                        >
-                          <Link
-                            to={`/analysis/${code}`}
-                            style={{
-                              display: "flex", flex: 1, minWidth: 0, justifyContent: "space-between", alignItems: "center",
-                              padding: "8px 6px 8px 10px", color: "inherit", textDecoration: "none",
-                            }}
-                          >
-                            <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <span style={{ fontSize: 12, color: c.primary, fontFamily: "monospace", fontWeight: 600 }}>{item.stock_code}</span>
-                                <span style={{ fontSize: 12, color: c.textPrimary, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.stock_name}</span>
-                              </div>
-                              <span style={{ fontSize: 11, color: c.textSecondary }}>{displayDate}</span>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                              {item.overall_rating != null && (
-                                <span style={{ fontSize: 12, fontWeight: 700, color: item.overall_rating >= 7 ? c.up : item.overall_rating <= 3 ? c.down : c.textPrimary }}>
-                                  {item.overall_rating}
-                                </span>
-                              )}
-                              {item.signal && (
-                                <Tag style={{ color: sc, background: "transparent", border: `1px solid ${sc}33`, fontSize: 11, margin: 0, padding: "0 4px" }}>
-                                  {signalLabel(item.signal)}
-                                </Tag>
-                              )}
-                            </div>
-                          </Link>
-                          {item.can_delete ? (
-                            <Popconfirm
-                              title="删除这条分析记录？"
-                              description="删除后无法恢复"
-                              okText="删除"
-                              cancelText="取消"
-                              okButtonProps={{ danger: true }}
-                              onConfirm={() => handleDelete(item)}
+                {filteredHistory.length === 0 ? (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未找到匹配的分析记录" />
+                ) : (
+                  <div role="list" aria-label="个股分析历史记录">
+                    {Object.entries(grouped).map(([code, items]) => (
+                      <div key={code} role="group" aria-label={`${code} 分析历史`} style={{ marginBottom: t.space[3] }}>
+                        {items.map((item) => {
+                          const dateStr = item.analysis_date;
+                          const displayDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
+                          const sc = signalColor(c.up, c.down, c.textPrimary, item.signal);
+                          const itemKey = `${code}-${dateStr}`;
+                          const isDeleting = deleteMutation.isPending
+                            && `${deleteMutation.variables?.code}-${deleteMutation.variables?.date}` === itemKey;
+                          return (
+                            <div
+                              key={itemKey}
+                              role="listitem"
+                              className="hover-row"
+                              style={{
+                                display: "flex", justifyContent: "space-between", alignItems: "center",
+                                padding: `0 ${t.space[1]} 0 0`, marginBottom: t.space[1],
+                                borderRadius: t.radius.md,
+                              }}
                             >
-                              <Button
-                                type="text"
-                                danger
-                                size="small"
-                                icon={<DeleteOutlined />}
-                                loading={isDeleting}
-                                aria-label={`删除 ${item.stock_code} ${displayDate} 分析记录`}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
+                              <PreloadLink
+                                to={buildAnalysisHistoryUrl(code, dateStr)}
+                                aria-label={`查看 ${item.stock_name || code} ${displayDate} 分析记录`}
+                                style={{
+                                  display: "flex", flex: 1, minWidth: 0, justifyContent: "space-between", alignItems: "center",
+                                  padding: `${t.space[2]} ${t.space[2]} ${t.space[2]} ${t.space[3]}`, color: "inherit", textDecoration: "none",
                                 }}
-                              />
-                            </Popconfirm>
-                          ) : null}
-                        </div>
-                      );
-                    })}
+                              >
+                                <div style={{ display: "flex", flexDirection: "column", gap: t.space[1], minWidth: 0 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
+                                    <span style={{ fontSize: t.font.sm, color: c.primary, fontFamily: "monospace", fontWeight: Number(t.weight.semibold) }}>{item.stock_code}</span>
+                                    <span style={{ fontSize: t.font.sm, color: c.textPrimary, fontWeight: Number(t.weight.medium), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.stock_name}</span>
+                                  </div>
+                                  <span style={{ fontSize: t.font.xs, color: c.textSecondary }}>{displayDate}</span>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: t.space[2], flexShrink: 0 }}>
+                                  {item.overall_rating != null && (
+                                    <span style={{ fontSize: t.font.sm, fontWeight: Number(t.weight.bold), color: item.overall_rating >= 7 ? c.up : item.overall_rating <= 3 ? c.down : c.textPrimary }}>
+                                      {item.overall_rating}
+                                    </span>
+                                  )}
+                                  {item.signal && (
+                                    <Tag style={{ color: sc, background: "transparent", border: `1px solid ${sc}33`, fontSize: t.font.xs, margin: 0, padding: `0 ${t.space[1]}` }}>
+                                      {signalLabel(item.signal)}
+                                    </Tag>
+                                  )}
+                                </div>
+                              </PreloadLink>
+                              {item.can_delete ? (
+                                <Popconfirm
+                                  title="删除这条分析记录？"
+                                  description="删除后无法恢复"
+                                  okText="删除"
+                                  cancelText="取消"
+                                  okButtonProps={{ danger: true }}
+                                  onConfirm={() => handleDelete(item)}
+                                >
+                                  <Button
+                                    type="text"
+                                    danger
+                                    size="small"
+                                    icon={<DeleteOutlined />}
+                                    loading={isDeleting}
+                                    aria-label={`删除 ${item.stock_code} ${displayDate} 分析记录`}
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                    }}
+                                  />
+                                </Popconfirm>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
                 {hasNextPage && (
                   <Button
                     block
                     size="small"
                     loading={isFetchingNextPage}
                     onClick={() => fetchNextPage()}
-                    style={{ marginTop: 8 }}
+                    style={{ marginTop: t.space[2] }}
                   >
                     加载更多
                   </Button>
@@ -177,31 +202,29 @@ export default function AnalysisEntry() {
               </>
             </SectionDataState>
           </div>
-        </Card>
-      </div>
-
-      {/* Right: Search / Landing */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 24px" }}>
-        <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>
-            <RobotOutlined style={{ color: c.accent, marginRight: 12 }} />
+        )}
+      >
+        <div style={{ minHeight: "calc(100vh - 260px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: `${t.space[8]} ${t.space[6]}` }}>
+          <div style={{ textAlign: "center", marginBottom: t.space[7] }}>
+            <div style={{ fontSize: t.font.display, marginBottom: t.space[2] }}>
+              <RobotOutlined style={{ color: c.accent }} />
+            </div>
+            <Paragraph style={{ fontSize: t.font.lg, margin: 0, color: c.textSecondary }}>
+              选择一只股票，进入独立分析页
+            </Paragraph>
           </div>
-          <Title level={2} style={{ margin: 0, color: c.textPrimary }}>AI 智能分析</Title>
-          <Paragraph style={{ fontSize: 16, marginTop: 8, color: c.textSecondary }}>
-            输入股票代码或名称，进入独立分析页，查看基本面、技术面、情绪面与 AI 结论
-          </Paragraph>
+          <Card
+            style={{
+              borderRadius: t.radius.lg, boxShadow: t.shadow.xs,
+              padding: `${t.space[2]} 0`, width: "100%", maxWidth: 560,
+              background: c.cardBg, border: `1px solid ${c.border}`,
+            }}
+            styles={{ body: { padding: `${t.space[6]} ${t.space[6]} ${t.space[4]}`, display: "flex", justifyContent: "center" } }}
+          >
+            <SearchBar />
+          </Card>
         </div>
-        <Card
-          style={{
-            borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.18)",
-            padding: "8px 0", width: "100%", maxWidth: 560,
-            background: c.cardBg, border: `1px solid ${c.border}`,
-          }}
-          styles={{ body: { padding: "24px 24px 16px", display: "flex", justifyContent: "center" } }}
-        >
-          <SearchBar />
-        </Card>
-      </div>
+      </WorkflowWorkspace>
     </div>
   );
 }

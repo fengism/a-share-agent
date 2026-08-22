@@ -2,13 +2,18 @@ import json
 from datetime import datetime
 
 import pandas as pd
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.constants.http import TENCENT_FINANCE_HEADERS
-from app.contracts.stock import StockConcept, StockConceptInfo
+from app.constants.market import INDEX_FALLBACKS, TENCENT_STOCK_CONCEPT_URL, TENCENT_STOCK_QUOTE_URL
 from app.core.dataframes import rename_columns
-from app.core.market import normalize_code, normalize_index_symbol_v2
-from app.infrastructure.http.client import get_session as _get_session
+from app.core.market import normalize_code, safe_float
+from app.domain.stock import StockConcept, StockConceptInfo
+from app.infrastructure.http.client import get_provider_session as _get_session
+
+
+def _quote_number(value: str, multiplier: float = 1) -> float | None:
+    number = safe_float(value)
+    return number * multiplier if number is not None else None
 
 
 class TencentDataProvider:
@@ -24,9 +29,9 @@ class TencentDataProvider:
         Return:
             StockConceptInfo 对象；无数据时返回 None
         """
-        normalized_code = normalize_index_symbol_v2(code).lower()
+        normalized_code = normalize_code(code).prefixed_lower
         response = _get_session().get(
-            "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/stockinfo/plateNew",
+            TENCENT_STOCK_CONCEPT_URL,
             params={"code": normalized_code, "app": "wzq", "zdf": 1},
             headers=TENCENT_FINANCE_HEADERS,
             timeout=5,
@@ -46,7 +51,6 @@ class TencentDataProvider:
                 second_concept = StockConcept(code=plate["code"], name=plate["name"])
         return StockConceptInfo(concepts=concepts, first_concept=first_concept, second_concept=second_concept)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
     def fetch_stock_kline(self, code: str, start_date: str, end_date: str, adjust: str="qfq") -> pd.DataFrame:
         """按年分片拉取腾讯个股 K 线，合并后计算振幅并重命名列。
 
@@ -193,33 +197,32 @@ class TencentDataProvider:
         return {
             "code": code,
             "name": vals[1],
-            "price": float(vals[3]) if vals[3] else 0,
-            "last_close": float(vals[4]) if vals[4] else 0,
-            "open": float(vals[5]) if vals[5] else 0,
-            "change_amt": float(vals[31]) if vals[31] else 0,
-            "change_pct": float(vals[32]) if vals[32] else 0,
-            "high": float(vals[33]) if vals[33] else 0,
-            "low": float(vals[34]) if vals[34] else 0,
-            "amount": 10000 * float(vals[37]) if vals[37] else 0,
-            "turnover_pct": float(vals[38]) if vals[38] else 0,
-            "pe_ttm": float(vals[39]) if vals[39] else 0,
-            "amplitude_pct": float(vals[43]) if vals[43] else 0,
-            "float_mcap": 100000000 * float(vals[44]) if vals[44] else 0,
-            "mcap": 100000000 * float(vals[45]) if vals[45] else 0,
-            "pb": float(vals[46]) if vals[46] else 0,
-            "limit_up": float(vals[47]) if vals[47] else 0,
-            "limit_down": float(vals[48]) if vals[48] else 0,
-            "vol_ratio": float(vals[49]) if vals[49] else 0,
-            "pe_static": float(vals[52]) if vals[52] else 0,
+            "price": _quote_number(vals[3]),
+            "last_close": _quote_number(vals[4]),
+            "open": _quote_number(vals[5]),
+            "volume": _quote_number(vals[6]),
+            "change_amt": _quote_number(vals[31]),
+            "change_pct": _quote_number(vals[32]),
+            "high": _quote_number(vals[33]),
+            "low": _quote_number(vals[34]),
+            "amount": _quote_number(vals[37], 10000),
+            "turnover_pct": _quote_number(vals[38]),
+            "pe_ttm": _quote_number(vals[39]),
+            "amplitude_pct": _quote_number(vals[43]),
+            "float_mcap": _quote_number(vals[44], 100000000),
+            "mcap": _quote_number(vals[45], 100000000),
+            "pb": _quote_number(vals[46]),
+            "limit_up": _quote_number(vals[47]),
+            "limit_down": _quote_number(vals[48]),
+            "vol_ratio": _quote_number(vals[49]),
+            "pe_static": _quote_number(vals[52]),
             "quoted_at": quoted_at,
         }
 
-    def fetch_stock_quotes(self, codes: list[str]) -> dict[str, dict]:
-        """批量拉取腾讯股票实时行情。"""
-        symbols = [normalize_code(code) for code in dict.fromkeys(codes)]
+    def _fetch_quotes(self, symbols: list[str]) -> dict[str, dict]:
         if not symbols:
             return {}
-        url = "https://qt.gtimg.cn/q=" + ",".join(symbol.prefixed_lower for symbol in symbols)
+        url = TENCENT_STOCK_QUOTE_URL + ",".join(symbols)
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
@@ -232,6 +235,40 @@ class TencentDataProvider:
             if quote.get("code"):
                 quotes[quote["code"]] = quote
         return quotes
+
+    def fetch_market_indices(self) -> pd.DataFrame:
+        """批量拉取页面关注的大盘指数实时行情。"""
+        symbols = [f"{'sh' if secid.startswith('1.') else 'sz'}{code}" for code, _name, secid in INDEX_FALLBACKS]
+        quotes = self._fetch_quotes(symbols)
+        rows = []
+        for code, fallback_name, _secid in INDEX_FALLBACKS:
+            quote = quotes.get(code)
+            if quote is None:
+                continue
+            rows.append(
+                {
+                    "代码": code,
+                    "名称": quote.get("name") or fallback_name,
+                    "最新价": quote.get("price"),
+                    "涨跌幅": quote.get("change_pct"),
+                    "成交量": quote.get("volume"),
+                    "成交额": quote.get("amount"),
+                    "今开": quote.get("open"),
+                    "最高": quote.get("high"),
+                    "最低": quote.get("low"),
+                    "振幅": quote.get("amplitude_pct"),
+                    "昨收": quote.get("last_close"),
+                }
+            )
+        return pd.DataFrame(
+            rows,
+            columns=["代码", "名称", "最新价", "涨跌幅", "成交量", "成交额", "今开", "最高", "最低", "振幅", "昨收"],
+        )
+
+    def fetch_stock_quotes(self, codes: list[str]) -> dict[str, dict]:
+        """批量拉取腾讯股票实时行情。"""
+        symbols = [normalize_code(code) for code in dict.fromkeys(codes)]
+        return self._fetch_quotes([symbol.prefixed_lower for symbol in symbols])
 
     def fetch_stock_quote(self, code: str) -> dict:
         """拉取单只股票的腾讯实时行情。

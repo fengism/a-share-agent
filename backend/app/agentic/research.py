@@ -17,6 +17,7 @@ from app.agentic.contracts import (
     render_agent_evidence,
 )
 from app.agentic.events import AgentEvent, AgentPlan, AgentPlanStep, AgentPlanStepUpdate
+from app.agentic.tools.serialization import has_meaningful_tool_content
 
 AgentEventCallback = Callable[[AgentEvent], Awaitable[None]]
 _MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
@@ -84,11 +85,10 @@ def _missing_requirements(
     requirements: tuple[EvidenceRequirement, ...],
     evidence: list[AgentEvidence],
 ) -> list[EvidenceRequirement]:
-    successful_tools = {item.tool_name for item in evidence}
     return [
         requirement
         for requirement in requirements
-        if not successful_tools.intersection(requirement.tool_names)
+        if not any(requirement.accepts(item) for item in evidence)
     ]
 
 
@@ -148,6 +148,7 @@ class _ResearchProgress:
     callback: AgentEventCallback | None
     step_status: dict[str, str] = field(init=False)
     requirements_by_tool: dict[str, tuple[EvidenceRequirement, ...]] = field(init=False)
+    tool_arguments: dict[str, str] = field(init=False)
 
     def __post_init__(self) -> None:
         self.step_status = {
@@ -162,6 +163,7 @@ class _ResearchProgress:
             )
             for tool_name in self.spec.tool_names
         }
+        self.tool_arguments = {}
 
     async def start(self) -> None:
         await _emit(self.callback, AgentEvent(
@@ -187,6 +189,7 @@ class _ResearchProgress:
     async def forward_event(self, event: AgentEvent) -> None:
         if event.type == "tool_call" and event.tool_call is not None:
             tool_name = event.tool_call.function.name
+            self.tool_arguments[event.tool_call.id] = event.tool_call.function.arguments
             for requirement in self.requirements_by_tool.get(tool_name, ()):
                 if self.step_status[requirement.key] == "pending":
                     self.step_status[requirement.key] = "running"
@@ -199,10 +202,21 @@ class _ResearchProgress:
                         ),
                     ))
         await _emit(self.callback, event)
-        if event.type == "tool_result" and event.tool_result is not None and not event.tool_result.is_error:
+        if (
+            event.type == "tool_result"
+            and event.tool_result is not None
+            and not event.tool_result.is_error
+            and has_meaningful_tool_content(event.tool_result.content)
+        ):
             tool_name = event.tool_result.name
+            candidate = AgentEvidence(
+                tool_call_id=event.tool_result.tool_call_id,
+                tool_name=tool_name,
+                arguments=self.tool_arguments.get(event.tool_result.tool_call_id, "{}"),
+                content=event.tool_result.content,
+            )
             for requirement in self.requirements_by_tool.get(tool_name, ()):
-                if self.step_status[requirement.key] != "completed":
+                if self.step_status[requirement.key] != "completed" and requirement.accepts(candidate):
                     self.step_status[requirement.key] = "completed"
                     await _emit(self.callback, AgentEvent(
                         type="plan_step",
@@ -214,11 +228,10 @@ class _ResearchProgress:
                     ))
 
     async def sync_completed_steps(self, evidence: list[AgentEvidence]) -> None:
-        successful_tools = {item.tool_name for item in evidence}
         for requirement in self.spec.requirements:
             if (
                 self.step_status[requirement.key] != "completed"
-                and successful_tools.intersection(requirement.tool_names)
+                and any(requirement.accepts(item) for item in evidence)
             ):
                 self.step_status[requirement.key] = "completed"
                 await _emit(self.callback, AgentEvent(

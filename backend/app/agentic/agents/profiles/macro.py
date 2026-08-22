@@ -7,5 +7,6 @@ PROFILE = AgentProfile(
     description="分析宏观环境及其对相关股票或板块的影响",
     system_prompt=MACRO_AGENT_PROMPT,
     tool_names=("get_macro_data",),
+    skill_names=("market_data",),
     max_rounds=3,
 )

@@ -8,11 +8,13 @@ from dataclasses import dataclass
 from openai import AsyncOpenAI
 
 from app.agentic.agents.contracts import AgentExecutionResult, AgentProfile
-from app.agentic.agents.executor import SharedToolCache, agent_executor
+from app.agentic.agents.executor import agent_executor
 from app.agentic.events import AgentEvent
 from app.agentic.orchestration.contracts import AgentTask, ExecutionPlan
 from app.agentic.orchestration.progress import build_task_progress_event
 from app.agentic.protocol import AgentMessage
+from app.agentic.runtime.context import AgentExecutionContext
+from app.agentic.tools.cache import SharedToolCache
 from app.core.errors import log_internal_error
 
 logger = logging.getLogger(__name__)
@@ -58,9 +60,14 @@ async def stream_execution_plan(
     temperature: float = 0.1,
     *,
     attempt: int = 1,
+    execution_context: AgentExecutionContext | None = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     queue: asyncio.Queue[AgentEvent | _TaskCompleted] = asyncio.Queue()
-    tool_cache = SharedToolCache()
+    tool_cache = (
+        execution_context.tool_cache
+        if execution_context is not None
+        else SharedToolCache()
+    )
     pending = {task.task_id: task for task in plan.tasks}
     running: dict[str, asyncio.Task] = {}
     completed: set[str] = set()
@@ -81,6 +88,8 @@ async def stream_execution_plan(
                 tool_cache=tool_cache,
                 allowed_tool_names=task.allowed_tools,
                 temperature=temperature,
+                require_tool_evidence=bool(task.allowed_tools),
+                execution_context=execution_context,
             )
         except asyncio.CancelledError:
             raise
@@ -147,7 +156,7 @@ async def stream_execution_plan(
                 continue
             yield event
     finally:
-        for task in running.values():
-            if not task.done():
-                task.cancel()
+        for running_task in running.values():
+            if not running_task.done():
+                running_task.cancel()
         await asyncio.gather(*running.values(), return_exceptions=True)

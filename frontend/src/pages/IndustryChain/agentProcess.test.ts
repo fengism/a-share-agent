@@ -6,7 +6,7 @@ import {
 } from "./agentProcess";
 
 describe("industry chain agent process", () => {
-  it("tracks plans, steps, and tool execution results", () => {
+  it("tracks plans, steps, and tool execution status", () => {
     const events: ChatStreamDelta[] = [
       {
         type: "plan",
@@ -68,9 +68,9 @@ describe("industry chain agent process", () => {
     }));
     expect(state.toolCalls[0]).toEqual(expect.objectContaining({
       name: "web_search",
-      result: '{"count":3}',
       isExecuting: false,
       isError: false,
     }));
+    expect(state.toolCalls[0]).not.toHaveProperty("result");
   });
 });

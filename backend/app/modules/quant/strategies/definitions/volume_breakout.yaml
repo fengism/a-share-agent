@@ -1,0 +1,29 @@
+api_version: quant.strategy/v1
+key: volume_breakout
+version: 1.0.0
+enabled: true
+name: 放量突破
+description: 收盘突破前期高点且成交量显著高于均量、收盘位置强势时入场。
+scenario: 趋势突破
+risk_level: high
+presentation: { icon: rocket }
+parameters:
+  breakout_period: { type: integer, label: 突破周期, default: 20, minimum: 5, maximum: 120 }
+  volume_period: { type: integer, label: 均量周期, default: 5, minimum: 2, maximum: 30 }
+  volume_ratio: { type: number, label: 放量倍数, default: 2.0, minimum: 1, maximum: 10, step: 0.1 }
+indicators:
+  previous_high: { operator: rolling_max, input: high, period: $breakout_period, offset: 1 }
+  volume_average: { operator: sma, input: volume, period: $volume_period, offset: 1 }
+  volume_threshold: { operator: multiply, left: volume_average, right: $volume_ratio }
+  daily_range: { operator: subtract, left: high, right: low }
+  close_position_value: { operator: subtract, left: close, right: low }
+  close_position: { operator: divide, left: close_position_value, right: daily_range, zero_value: 0.5 }
+signals:
+  entry:
+    operator: and
+    operands:
+      - { operator: greater_than, left: close, right: previous_high }
+      - { operator: greater_than, left: volume, right: volume_threshold }
+      - { operator: greater_or_equal, left: close_position, right: 0.7 }
+  exit: { operator: less_than, left: close, right: previous_high }
+position: { mode: binary }

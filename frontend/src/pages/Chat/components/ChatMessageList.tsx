@@ -2,8 +2,9 @@ import React, { useLayoutEffect, useRef, useState, type RefObject } from "react"
 import { RobotOutlined } from "@ant-design/icons";
 import { Button } from "antd";
 import type { ChatDisplayMessage } from "../../../types/chat";
+import type { ChatResultActionHandler } from "../chatResultActions";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
-import { useColors, useStyles } from "../../../theme/hooks";
+import { useColors, useStyles, useTokens } from "../../../theme/hooks";
 import {
   getNextVisibleCount,
   getVisibleMessageStart,
@@ -19,6 +20,7 @@ interface ChatMessageListProps {
   onPush: (messageId: string, content: string) => void;
   onRegenerate: () => void;
   onSelectPrompt: (prompt: string) => void;
+  onResultAction: ChatResultActionHandler;
 }
 
 export const ChatMessageList = React.memo(function ChatMessageList({
@@ -27,8 +29,10 @@ export const ChatMessageList = React.memo(function ChatMessageList({
   onPush,
   onRegenerate,
   onSelectPrompt,
+  onResultAction,
 }: ChatMessageListProps) {
   const c = useColors();
+  const t = useTokens();
   const { cardStyle } = useStyles();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_MESSAGES);
@@ -57,7 +61,7 @@ export const ChatMessageList = React.memo(function ChatMessageList({
       style={{
         ...cardStyle,
         padding: 0,
-        marginBottom: 12,
+        marginBottom: t.space[3],
         height: isNarrow ? "calc(100dvh - 220px)" : "calc(100vh - 260px)",
         minHeight: isNarrow ? 320 : 400,
         display: "flex",
@@ -71,7 +75,7 @@ export const ChatMessageList = React.memo(function ChatMessageList({
         style={{
           flex: 1,
           overflowY: "auto",
-          padding: isNarrow ? "12px" : "16px 20px",
+          padding: isNarrow ? t.space[3] : `${t.space[4]} ${t.space[5]}`,
         }}
       >
         {messages.length === 0 && (
@@ -79,7 +83,7 @@ export const ChatMessageList = React.memo(function ChatMessageList({
         )}
 
         {visibleStart > 0 && (
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: t.space[4] }}>
             <Button size="small" onClick={handleLoadEarlier}>
               加载更早消息（剩余 {visibleStart} 条）
             </Button>
@@ -92,8 +96,8 @@ export const ChatMessageList = React.memo(function ChatMessageList({
             style={{
               display: "flex",
               justifyContent: message.role === "user" ? "flex-end" : "flex-start",
-              gap: 10,
-              marginBottom: isNarrow ? 16 : 20,
+              gap: t.space[3],
+              marginBottom: isNarrow ? t.space[4] : t.space[5],
               contentVisibility: "auto",
               containIntrinsicSize: "120px",
             }}
@@ -108,10 +112,10 @@ export const ChatMessageList = React.memo(function ChatMessageList({
                   flex: "0 0 28px",
                   alignItems: "center",
                   justifyContent: "center",
-                  marginTop: 18,
-                  borderRadius: 9,
+                  marginTop: t.space[5],
+                  borderRadius: t.radius.md,
                   background: c.primary,
-                  color: "#fff",
+                  color: c.onPrimary,
                   boxShadow: `0 4px 12px color-mix(in srgb, ${c.primary} 28%, transparent)`,
                 }}
               >
@@ -127,9 +131,9 @@ export const ChatMessageList = React.memo(function ChatMessageList({
             >
               <div
                 style={{
-                  fontSize: 11,
+                  fontSize: t.font.xs,
                   color: c.textMuted,
-                  marginBottom: 4,
+                  marginBottom: t.space[1],
                   textAlign: message.role === "user" ? "right" : "left",
                 }}
               >
@@ -145,6 +149,7 @@ export const ChatMessageList = React.memo(function ChatMessageList({
                   message={message}
                   onPush={onPush}
                   onRegenerate={message.id === regeneratableMessageId ? onRegenerate : undefined}
+                  onResultAction={onResultAction}
                 />
               )}
             </div>

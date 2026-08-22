@@ -15,11 +15,17 @@ from __future__ import annotations
 import logging
 import re
 import time
+from collections.abc import Sequence
 from http.cookies import SimpleCookie
 from uuid import uuid4
 
 from starlette.responses import Response
 
+from app.api.auth.cookies import (
+    CSRF_COOKIE_NAME,
+    SESSION_COOKIE_NAME,
+    set_auth_cookies,
+)
 from app.configuration import get_effective_settings, get_settings
 from app.configuration.crypto import ConfigEncryptionError
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
@@ -31,11 +37,6 @@ from app.core.request_context import (
     reset_settings_cache,
     set_current_request_id,
     set_current_user,
-)
-from app.modules.auth.cookies import (
-    CSRF_COOKIE_NAME,
-    SESSION_COOKIE_NAME,
-    set_auth_cookies,
 )
 
 logger = logging.getLogger(__name__)
@@ -162,7 +163,9 @@ class RequestObservabilityMiddleware:
             reset_current_request_id(request_id_reset)
 
 
-def _extract_auth_context(headers) -> tuple[str | None, bool, str | None]:
+def _extract_auth_context(
+    headers: Sequence[tuple[bytes, bytes]],
+) -> tuple[str | None, bool, str | None]:
     """Pull the preferred auth token and cookie metadata from ASGI headers."""
     for key, value in headers:
         if key.lower() == b"authorization":
@@ -188,12 +191,12 @@ def _extract_auth_context(headers) -> tuple[str | None, bool, str | None]:
     return token or None, bool(token), csrf_token or None
 
 
-def _sets_session_cookie(headers) -> bool:
+def _sets_session_cookie(headers: Sequence[tuple[bytes, bytes]]) -> bool:
     prefix = f"{SESSION_COOKIE_NAME}=".encode()
     return any(key.lower() == b"set-cookie" and value.lstrip().startswith(prefix) for key, value in headers)
 
 
-def _request_id_from_headers(headers) -> str:
+def _request_id_from_headers(headers: Sequence[tuple[bytes, bytes]]) -> str:
     for key, value in headers:
         if key.lower() != b"x-request-id":
             continue

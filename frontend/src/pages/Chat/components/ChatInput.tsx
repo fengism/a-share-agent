@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 import { SendOutlined } from "@ant-design/icons";
 import { Button, Input } from "antd";
-import { useColors} from "../../../styles/ui";
+import { useColors, useTokens } from "../../../styles/ui";
 
 interface ChatInputProps {
   value: string;
@@ -19,6 +19,7 @@ export function ChatInput({
   onStop,
 }: ChatInputProps) {
   const c = useColors();
+  const t = useTokens();
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -30,7 +31,7 @@ export function ChatInput({
     <div
       style={{
         display: "flex",
-        gap: 8,
+        gap: t.space[2],
         alignItems: "flex-end",
       }}
     >
@@ -43,15 +44,15 @@ export function ChatInput({
         disabled={isStreaming}
         style={{
           flex: 1,
-          borderRadius: 10,
-          background: c.elevatedBg,
+          borderRadius: t.radius.lg,
+          background: c.hoverBg,
         }}
       />
       {isStreaming ? (
         <Button
           onClick={onStop}
           danger
-          style={{ borderRadius: 10, minWidth: 80, height: 40 }}
+          style={{ borderRadius: t.radius.lg, minWidth: 80, height: 40 }}
         >
           停止
         </Button>
@@ -61,7 +62,7 @@ export function ChatInput({
           icon={<SendOutlined />}
           onClick={onSend}
           disabled={!value.trim()}
-          style={{ borderRadius: 10, minWidth: 80, height: 40 }}
+          style={{ borderRadius: t.radius.lg, minWidth: 80, height: 40 }}
         >
           发送
         </Button>

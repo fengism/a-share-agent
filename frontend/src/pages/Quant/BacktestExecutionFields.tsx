@@ -1,3 +1,4 @@
+import { InfoCircleOutlined, PlayCircleOutlined } from "@ant-design/icons";
 import { Button, Col, Collapse, DatePicker, Form, Input, InputNumber, Row, Typography } from "antd";
 import dayjs from "dayjs";
 import { FormSectionHeader } from "./BacktestFormSections";
@@ -8,7 +9,7 @@ const { RangePicker } = DatePicker;
 
 function AdvancedExecutionFields() {
   return (
-    <Row gutter={[14, 0]}>
+    <Row gutter={[14, 0]} align="bottom" className="quant-advanced-execution-fields">
       <Col xs={12} sm={8} md={4}>
         <Form.Item
           name="commissionBps"
@@ -101,21 +102,14 @@ export default function BacktestExecutionFields({ isSubmitting }: { isSubmitting
             <Input maxLength={8} />
           </Form.Item>
         </Col>
-        <Col xs={12} sm={8} md={5}>
+        <Col xs={12} sm={8} md={7}>
           <Form.Item name="initialCash" label="初始资金" rules={[{ required: true, message: "请输入初始资金" }]}>
             <InputNumber min={10_000} max={1_000_000_000} step={100_000} style={{ width: "100%" }} />
           </Form.Item>
         </Col>
-        <Col xs={12} sm={8} md={3}>
+        <Col xs={12} sm={8} md={5}>
           <Form.Item name="slippageBps" label="滑点 BP" rules={[{ required: true, message: "请输入滑点" }]}>
             <InputNumber min={0} max={500} style={{ width: "100%" }} />
-          </Form.Item>
-        </Col>
-        <Col xs={12} sm={8} md={4}>
-          <Form.Item label=" ">
-            <Button type="primary" htmlType="submit" loading={isSubmitting} block>
-              开始回测
-            </Button>
           </Form.Item>
         </Col>
       </Row>
@@ -129,9 +123,25 @@ export default function BacktestExecutionFields({ isSubmitting }: { isSubmitting
           children: <AdvancedExecutionFields />,
         }]}
       />
-      <Text type="secondary" className="quant-execution-note">
-        信号按 T 日收盘计算，在 T+1 开盘执行；成本费率使用 BP，1 BP = 0.01%。
-      </Text>
+      <div className="quant-submit-bar">
+        <div className="quant-execution-note">
+          <InfoCircleOutlined />
+          <span>
+            <strong>执行规则</strong>
+            <Text type="secondary">信号按 T 日收盘计算，T+1 开盘执行；1 BP = 0.01%。</Text>
+          </span>
+        </div>
+        <Button
+          type="primary"
+          size="large"
+          icon={<PlayCircleOutlined />}
+          htmlType="submit"
+          loading={isSubmitting}
+          aria-label="开始回测"
+        >
+          开始回测
+        </Button>
+      </div>
     </section>
   );
 }

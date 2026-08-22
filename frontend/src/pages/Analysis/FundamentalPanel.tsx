@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Card, Table, Segmented, Row, Col, Tag, Typography } from "antd";
+import { Card, Table, Segmented, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useFinancial } from "../../api/queries";
 import type { AnalysisResult } from "../../types/stock";
-import RatingBadge from "../../components/RatingBadge";
+import AnalysisDimensionSummary from "./AnalysisDimensionSummary";
 import SectionDataState from "../../components/SectionDataState";
-import { useColors, useStyles } from "../../theme/hooks";
+import { useColors, useStyles, semanticTagStyle } from "../../theme/hooks";
+import type { SemanticTagColor } from "../../theme/hooks";
 import { financialFieldLabels } from "../../utils/financialFieldLabels";
 
 interface Props {
@@ -99,13 +100,13 @@ function formatFinancialFieldLabel(key: string) {
   return [...translated, ...suffixLabels].join("");
 }
 
-function renderTags(items: string[] | undefined, color: string, tagStyle: React.CSSProperties) {
+function renderTags(items: string[] | undefined, color: SemanticTagColor, tagStyle: React.CSSProperties) {
   if (!items || items.length === 0) {
     return <Text type="secondary">暂无</Text>;
   }
 
   return items.map((item) => (
-    <Tag key={item} color={color} style={tagStyle}>
+    <Tag key={item} style={{ ...semanticTagStyle(color), ...tagStyle }}>
       {item}
     </Tag>
   ));
@@ -206,32 +207,28 @@ export default function FundamentalPanel({ code, analysis }: Props) {
       {analysis?.fundamental && (
         <Card
           size="small"
-          style={{ ...cardStyle, marginBottom: 16, borderTop: `3px solid ${c.primary}55` }}
-          styles={{ body: { padding: 16 } }}
+          className="analysis-dimension-card"
+          style={{ ...cardStyle, borderTop: `3px solid ${c.primary}55` }}
         >
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} sm={6} style={{ textAlign: "center" }}>
-              <RatingBadge score={analysis.fundamental.score} size={64} />
-              <div style={{ marginTop: 8, fontWeight: 600, color: c.textPrimary }}>基本面评分</div>
-            </Col>
-            <Col xs={24} sm={18}>
-              <Paragraph style={{ marginBottom: 12, color: c.textSecondary, lineHeight: 1.8 }}>
-                {analysis.fundamental.summary}
-              </Paragraph>
-              <div style={tagStyle}>
-                <Text strong style={{ color: c.primary }}>核心优势：</Text>
+          <AnalysisDimensionSummary label="基本面" score={analysis.fundamental.score}>
+            <Paragraph className="analysis-dimension-summary__description">
+              {analysis.fundamental.summary}
+            </Paragraph>
+            <div className="analysis-dimension-summary__groups">
+              <div className="analysis-dimension-summary__group">
+                <Text strong style={{ color: c.primary }}>核心优势</Text>
+                <div className="analysis-dimension-summary__tags">
+                  {renderTags(analysis.fundamental.strengths, "primary", { ...tagStyle, margin: 0 })}
+                </div>
               </div>
-              <div style={{ marginBottom: 12 }}>
-                {renderTags(analysis.fundamental.strengths, "blue", tagStyle)}
+              <div className="analysis-dimension-summary__group">
+                <Text strong style={{ color: c.up }}>主要风险</Text>
+                <div className="analysis-dimension-summary__tags">
+                  {renderTags(analysis.fundamental.risks, "up", { ...tagStyle, margin: 0 })}
+                </div>
               </div>
-              <div style={tagStyle}>
-                <Text strong style={{ color: c.up }}>主要风险：</Text>
-              </div>
-              <div>
-                {renderTags(analysis.fundamental.risks, "red", tagStyle)}
-              </div>
-            </Col>
-          </Row>
+            </div>
+          </AnalysisDimensionSummary>
         </Card>
       )}
 

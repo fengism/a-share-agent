@@ -1,5 +1,6 @@
 import { RobotOutlined } from "@ant-design/icons";
 import { Segmented, Select, Space, Tag, Typography } from "antd";
+import { semanticTagStyle } from "../../../styles/ui";
 import type {
   AgentCapabilityInfo,
   ChatCapabilityAvailabilityResponse,
@@ -76,7 +77,7 @@ export function ChatAgentSelector({
           const info = availability?.agents[agent.name];
           return (
             <span key={agent.name}>
-              <Tag color={info?.status === "degraded" ? "gold" : "blue"}>
+              <Tag style={semanticTagStyle(info?.status === "degraded" ? "warning" : "primary")}>
                 {agent.display_name}
               </Tag>
               {info?.status === "degraded" && <Text type="secondary">{info.reason}</Text>}
