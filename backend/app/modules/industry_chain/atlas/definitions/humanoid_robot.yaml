@@ -1,0 +1,48 @@
+slug: humanoid-robot
+name: 人形机器人
+category: 高端制造
+summary: 特斯拉 Optimus 等引领的人形机器人产业化，核心在执行器（减速器/丝杠/电机）、传感器与运控。
+aliases: [机器人, 具身智能]
+tags: [机器人, 具身智能, 制造]
+drivers:
+  - 特斯拉 Optimus 量产节奏
+  - 国内主机厂与车企入局
+  - 核心部件降本与国产化
+layers:
+  - key: upstream
+    name: 上游 · 核心零部件
+    segments:
+      - name: 减速器与丝杠
+        companies:
+          - { name: 绿的谐波, code: "688017", note: 谐波减速器龙头 }
+          - { name: 双环传动, code: "002472", note: 齿轮与减速器 }
+          - { name: 恒立液压, code: "601100", note: 线性驱动器与丝杠 }
+          - { name: 贝斯特, code: "300580", note: 滚珠丝杠 }
+      - name: 电机
+        companies:
+          - { name: 鸣志电器, code: "603728", note: 步进与空心杯电机 }
+          - { name: 江苏雷利, code: "300660", note: 微特电机 }
+      - name: 传感器
+        companies:
+          - { name: 柯力传感, code: "603662", note: 力传感器 }
+          - { name: 汉威科技, code: "300007", note: 柔性触觉传感 }
+          - { name: 奥比中光, code: "688322", note: 3D 视觉 }
+  - key: midstream
+    name: 中游 · 控制与执行总成
+    segments:
+      - name: 控制器与驱动
+        companies:
+          - { name: 汇川技术, code: "300124", note: 工控平台 }
+          - { name: 雷赛智能, code: "002979", note: 运动控制 }
+          - { name: 禾川科技, code: "688320", note: 伺服系统 }
+      - name: 灵巧手与总成
+        companies:
+          - { name: 兆威机电, code: "003021", note: 微型传动与灵巧手 }
+  - key: downstream
+    name: 下游 · 本体与应用
+    segments:
+      - name: 机器人本体
+        companies:
+          - { name: 埃斯顿, code: "002747", note: 国产工业机器人龙头 }
+          - { name: 埃夫特, code: "688165", note: 工业机器人 }
+          - { name: 新时达, code: "002527", note: 机器人与运控 }

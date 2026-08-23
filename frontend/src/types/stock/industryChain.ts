@@ -164,3 +164,54 @@ export interface IndustryChainHistoryItem {
   summary: string;
   can_delete: boolean;
 }
+
+// ── 产业链知识库（Atlas）──
+
+export interface AtlasCompany {
+  name: string;
+  code: string;
+  note?: string;
+}
+
+export interface AtlasSegment {
+  name: string;
+  description?: string;
+  companies: AtlasCompany[];
+}
+
+export interface AtlasLayer {
+  key: "upstream" | "midstream" | "downstream";
+  name: string;
+  segments: AtlasSegment[];
+}
+
+export interface AtlasChain {
+  slug: string;
+  name: string;
+  category: string;
+  summary: string;
+  source?: "builtin" | "imported" | "mined";
+  aliases?: string[];
+  tags?: string[];
+  drivers?: string[];
+  layers: AtlasLayer[];
+}
+
+export interface AtlasChainSummary {
+  slug: string;
+  name: string;
+  category: string;
+  summary: string;
+  source?: "builtin" | "imported" | "mined";
+  aliases?: string[];
+  tags?: string[];
+  segment_count: number;
+  company_count: number;
+}
+
+export interface AtlasCatalog {
+  categories: string[];
+  chains: AtlasChainSummary[];
+  total_chains: number;
+  total_companies: number;
+}

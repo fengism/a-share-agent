@@ -1,0 +1,63 @@
+slug: semiconductor
+name: 半导体
+category: 半导体
+summary: 覆盖设备、材料、制造、封测与设计环节的集成电路产业链，国产化替代是核心主线。
+aliases: [集成电路, 芯片]
+tags: [国产替代, 集成电路, 科技]
+drivers:
+  - 先进制程与先进封装需求
+  - 设备材料国产化替代
+  - AI/汽车电子拉动芯片需求
+layers:
+  - key: upstream
+    name: 上游 · 设备与材料
+    segments:
+      - name: 设备
+        companies:
+          - { name: 北方华创, code: "002371", note: 刻蚀/薄膜/炉管平台型 }
+          - { name: 中微公司, code: "688012", note: 刻蚀设备 }
+          - { name: 拓荆科技, code: "688072", note: 薄膜沉积设备 }
+          - { name: 华海清科, code: "688120", note: CMP 设备 }
+          - { name: 盛美上海, code: "688082", note: 清洗设备 }
+          - { name: 长川科技, code: "300604", note: 测试机与分选机 }
+      - name: 材料
+        companies:
+          - { name: 沪硅产业, code: "688126", note: 大硅片 }
+          - { name: 雅克科技, code: "002409", note: 前驱体+电子特气 }
+          - { name: 南大光电, code: "300346", note: 光刻胶+特气 }
+          - { name: 安集科技, code: "688019", note: CMP 抛光液 }
+          - { name: 鼎龙股份, code: "300054", note: CMP 抛光垫 }
+  - key: midstream
+    name: 中游 · 制造、封测与存储
+    segments:
+      - name: 晶圆制造
+        companies:
+          - { name: 中芯国际, code: "688981", note: 内地代工龙头 }
+          - { name: 华虹公司, code: "688347", note: 特色工艺代工 }
+      - name: 封装测试
+        companies:
+          - { name: 长电科技, code: "600584", note: 封测龙头 }
+          - { name: 通富微电, code: "002156", note: 先进封装 }
+          - { name: 华天科技, code: "002185", note: 封测 }
+      - name: 存储芯片
+        companies:
+          - { name: 兆易创新, code: "603986", note: NOR Flash+MCU }
+          - { name: 北京君正, code: "300223", note: 车规存储 }
+          - { name: 江波龙, code: "301308", note: 存储模组 }
+  - key: downstream
+    name: 下游 · 芯片设计
+    segments:
+      - name: 模拟与射频
+        companies:
+          - { name: 圣邦股份, code: "300661", note: 模拟芯片 }
+          - { name: 卓胜微, code: "300782", note: 射频前端 }
+          - { name: 纳芯微, code: "688052", note: 隔离与传感 }
+      - name: 数字与接口
+        companies:
+          - { name: 韦尔股份, code: "603501", note: CIS 图像传感 }
+          - { name: 澜起科技, code: "688008", note: 内存接口芯片 }
+      - name: 功率半导体
+        companies:
+          - { name: 斯达半导, code: "603290", note: IGBT/SiC 模块 }
+          - { name: 时代电气, code: "688187", note: IGBT+轨交装备 }
+          - { name: 士兰微, code: "600460", note: IDM 功率 }

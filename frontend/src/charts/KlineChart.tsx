@@ -1,15 +1,50 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createChart, createSeriesMarkers, CandlestickSeries, HistogramSeries, ColorType, type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type BusinessDay, type Time } from "lightweight-charts";
+import { createChart, createSeriesMarkers, CandlestickSeries, HistogramSeries, LineSeries, ColorType, LineStyle, type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type SeriesMarker, type Time, type BusinessDay } from "lightweight-charts";
 import type { KlineItem } from "../types/stock";
+import type { ChanlunResult, MmdType } from "../utils/chanlun";
 import { useColors } from "../styles/ui";
 import { shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
 import { buildKlineTradeMarkers, type KlineTradeMarker } from "./klineMarkers";
 
-type Props = { data: KlineItem[]; height?: number; viewKey?: string; tradeMarkers?: KlineTradeMarker[] };
+type Props = {
+  data: KlineItem[];
+  height?: number;
+  viewKey?: string;
+  tradeMarkers?: KlineTradeMarker[];
+  /** 缠论分析结果：叠加笔、中枢区间与买卖点标记 */
+  chanlun?: ChanlunResult | null;
+};
 type ChartItem = Omit<KlineItem, "date"> & { date: BusinessDay };
 
-export default function KlineChart({ data, height = 500, viewKey = "default", tradeMarkers = [] }: Props) {
+const MMD_MARKER_TEXT: Record<MmdType, string> = {
+  "1buy": "①买", "2buy": "②买", "3buy": "③买",
+  "1sell": "①卖", "2sell": "②卖", "3sell": "③卖",
+};
+
+function buildChanlunMarkers(
+  chanlun: ChanlunResult,
+  colors: { up: string; down: string },
+  validDates: Set<string>,
+): SeriesMarker<Time>[] {
+  const markers: SeriesMarker<Time>[] = [];
+  for (const mmd of chanlun.mmds) {
+    const time = toBusinessDay(mmd.date);
+    if (!time || !validDates.has(mmd.date)) continue;
+    const isBuy = mmd.mmdType.endsWith("buy");
+    markers.push({
+      time,
+      position: isBuy ? "belowBar" : "aboveBar",
+      shape: isBuy ? "arrowUp" : "arrowDown",
+      color: isBuy ? colors.up : colors.down,
+      text: MMD_MARKER_TEXT[mmd.mmdType],
+      size: 1,
+    });
+  }
+  return markers;
+}
+
+export default function KlineChart({ data, height = 500, viewKey = "default", tradeMarkers = [], chanlun = null }: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
   colorsRef.current = c;
@@ -20,6 +55,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const tradeMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const chanlunSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const fittedViewKeyRef = useRef<string | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const rows = useMemo<ChartItem[]>(
@@ -149,6 +185,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
       tradeMarkersRef.current = null;
+      chanlunSeriesRef.current = [];
     };
   }, [height]);
 
@@ -171,18 +208,80 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       color: item.close >= item.open ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
     })));
 
-    tradeMarkersRef.current?.setMarkers(buildKlineTradeMarkers(
+    const validDates = new Set(data.map((item) => item.date));
+    const tradeMarkerList = buildKlineTradeMarkers(
       tradeMarkers,
       { buy: c.up, sell: c.down },
-      new Set(data.map((item) => item.date)),
-    ));
+      validDates,
+    );
+    const chanlunMarkerList = chanlun
+      ? buildChanlunMarkers(chanlun, { up: c.up, down: c.down }, validDates)
+      : [];
+    const timeKey = (time: Time) => {
+      const day = time as BusinessDay;
+      return `${day.year ?? 0}-${String(day.month ?? 0).padStart(2, "0")}-${String(day.day ?? 0).padStart(2, "0")}`;
+    };
+    tradeMarkersRef.current?.setMarkers(
+      [...tradeMarkerList, ...chanlunMarkerList].sort((a, b) => (timeKey(a.time) < timeKey(b.time) ? -1 : 1)),
+    );
 
     if (rows.length > 0 && shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
       chart.timeScale().fitContent();
       fittedViewKeyRef.current = viewKey;
       setIsZoomed(false);
     }
-  }, [c.down, c.up, data, height, rows, tradeMarkers, viewKey]);
+  }, [c.down, c.up, data, height, rows, tradeMarkers, viewKey, chanlun]);
+
+  // 缠论图层：笔折线 + 中枢上下沿虚线（买卖点标记在上面的 markers 中合并）
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    for (const series of chanlunSeriesRef.current) {
+      chart.removeSeries(series);
+    }
+    chanlunSeriesRef.current = [];
+    if (!chanlun || chanlun.bis.length === 0) return;
+
+    const baseOptions = {
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+      pointMarkersVisible: false,
+    };
+
+    const biPoints: { time: BusinessDay; value: number }[] = [];
+    const firstTime = toBusinessDay(chanlun.bis[0].start.mid.date);
+    if (firstTime) {
+      biPoints.push({ time: firstTime, value: chanlun.bis[0].start.val });
+    }
+    for (const bi of chanlun.bis) {
+      const time = toBusinessDay(bi.end.mid.date);
+      if (time) biPoints.push({ time, value: bi.end.val });
+    }
+    if (biPoints.length >= 2) {
+      const biSeries = chart.addSeries(LineSeries, {
+        color: c.accent, lineWidth: 2, ...baseOptions,
+      });
+      biSeries.setData(biPoints);
+      chanlunSeriesRef.current.push(biSeries);
+    }
+
+    for (const zs of chanlun.zss) {
+      const startTime = toBusinessDay(zs.startDate);
+      const endTime = toBusinessDay(zs.endDate);
+      if (!startTime || !endTime) continue;
+      for (const value of [zs.zg, zs.zd]) {
+        const series = chart.addSeries(LineSeries, {
+          color: c.info, lineWidth: 1, lineStyle: LineStyle.Dashed, ...baseOptions,
+        });
+        series.setData([
+          { time: startTime, value },
+          { time: endTime, value },
+        ]);
+        chanlunSeriesRef.current.push(series);
+      }
+    }
+  }, [chanlun, c.accent, c.info, height]);
 
   useEffect(() => {
     const chart = chartRef.current;

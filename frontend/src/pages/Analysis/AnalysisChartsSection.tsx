@@ -1,5 +1,5 @@
-import { memo, useState } from "react";
-import { Card, Segmented } from "antd";
+import { memo, useMemo, useState } from "react";
+import { Card, Segmented, Switch, Tooltip } from "antd";
 import { useKlineData, useStockIntraday } from "../../api/queries";
 import IndicatorSubCharts from "../../charts/IndicatorSubCharts";
 import IntradayChart from "../../charts/IntradayChart";
@@ -7,6 +7,7 @@ import LazyKlineChart from "../../charts/LazyKlineChart";
 import DataRefreshIndicator from "../../components/DataRefreshIndicator";
 import SectionDataState from "../../components/SectionDataState";
 import { useColors, useStyles } from "../../theme/hooks";
+import { analyzeChanlun, MMD_LABELS } from "../../utils/chanlun";
 import type { AnalysisPageData } from "../../types/stock";
 
 export default memo(function AnalysisChartsSection({ code, pageData }: { code?: string; pageData?: AnalysisPageData }) {
@@ -14,6 +15,7 @@ export default memo(function AnalysisChartsSection({ code, pageData }: { code?: 
   const { cardStyle } = useStyles();
   const [period, setPeriod] = useState("daily");
   const [adjust, setAdjust] = useState("qfq");
+  const [chanlunEnabled, setChanlunEnabled] = useState(true);
   const intradayQuery = useStockIntraday(code || "", pageData?.intraday);
   const intradayData = Array.isArray(intradayQuery.data?.items)
     ? intradayQuery.data
@@ -21,6 +23,17 @@ export default memo(function AnalysisChartsSection({ code, pageData }: { code?: 
   const isDefaultKline = period === "daily" && adjust === "qfq";
   const remoteKline = useKlineData(code || "", period, adjust, Boolean(code) && !isDefaultKline);
   const klineData = isDefaultKline ? pageData?.kline : remoteKline.data;
+  const klineItems = useMemo(() => klineData?.items ?? [], [klineData]);
+  const chanlunResult = useMemo(
+    () => (chanlunEnabled && klineItems.length >= 10 ? analyzeChanlun(klineItems) : null),
+    [chanlunEnabled, klineItems],
+  );
+  const lastBi = chanlunResult?.bis[chanlunResult.bis.length - 1];
+  const lastZs = chanlunResult?.zss[chanlunResult.zss.length - 1];
+  const lastMmds = useMemo(
+    () => (chanlunResult ? chanlunResult.mmds.slice(-3).reverse() : []),
+    [chanlunResult],
+  );
   const intradayItems = intradayData?.items ?? [];
   const latestIntraday = intradayItems.length > 0 ? intradayItems[intradayItems.length - 1] : undefined;
 
@@ -89,7 +102,51 @@ export default memo(function AnalysisChartsSection({ code, pageData }: { code?: 
             value={adjust}
             onChange={(value) => setAdjust(String(value))}
           />
+          <Tooltip title="缠论：笔（青色折线）、中枢上下沿（蓝色虚线）、三类买卖点（①②③箭头）">
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: colors.textSecondary, cursor: "pointer" }}>
+              缠论
+              <Switch size="small" checked={chanlunEnabled} onChange={setChanlunEnabled} />
+            </label>
+          </Tooltip>
         </div>
+        {chanlunResult && (
+          <div
+            aria-label="缠论摘要"
+            style={{
+              display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center",
+              padding: "8px 12px", marginBottom: 8, fontSize: 12,
+              background: colors.hoverBg, border: `1px solid ${colors.border}`, borderRadius: 8,
+            }}
+          >
+            <span style={{ color: colors.textSecondary }}>
+              笔：
+              <strong style={{ color: lastBi?.direction === "up" ? colors.up : colors.down }}>
+                {lastBi ? `${lastBi.direction === "up" ? "向上" : "向下"} ${lastBi.low.toFixed(2)}–${lastBi.high.toFixed(2)}` : "-"}
+              </strong>
+            </span>
+            <span style={{ color: colors.textSecondary }}>
+              最近中枢：
+              <strong style={{ color: colors.info }}>
+                {lastZs ? `${lastZs.zd.toFixed(2)}–${lastZs.zg.toFixed(2)}（${lastZs.lineCount} 笔${lastZs.done ? "" : "，未完成"}）` : "暂无"}
+              </strong>
+            </span>
+            <span style={{ color: colors.textSecondary }}>
+              最近信号：
+              {lastMmds.length > 0 ? lastMmds.map((mmd) => (
+                <Tooltip key={`${mmd.date}-${mmd.mmdType}`} title={`${mmd.date} ${mmd.msg}`}>
+                  <span
+                    style={{
+                      marginLeft: 8, fontWeight: 600,
+                      color: mmd.mmdType.endsWith("buy") ? colors.up : colors.down,
+                    }}
+                  >
+                    {MMD_LABELS[mmd.mmdType]}·{mmd.date.slice(5)}
+                  </span>
+                </Tooltip>
+              )) : <strong style={{ color: colors.textMuted }}>暂无</strong>}
+            </span>
+          </div>
+        )}
         <SectionDataState
           isLoading={!isDefaultKline && remoteKline.isLoading}
           error={!isDefaultKline ? remoteKline.error : undefined}
@@ -103,6 +160,7 @@ export default memo(function AnalysisChartsSection({ code, pageData }: { code?: 
           <LazyKlineChart
             data={klineData?.items || []}
             viewKey={`${code || "analysis"}:${period}:${adjust}`}
+            chanlun={chanlunResult}
           />
         </SectionDataState>
       </Card>

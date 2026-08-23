@@ -1,7 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { ApartmentOutlined, CloudUploadOutlined, FullscreenOutlined, SendOutlined } from "@ant-design/icons";
-import { Alert, Button, Input, Modal, Popover, Skeleton, Tag, Typography } from "antd";
+import { ApartmentOutlined, CloudUploadOutlined, DatabaseOutlined, FullscreenOutlined, SendOutlined } from "@ant-design/icons";
+import { Alert, Button, Input, message, Modal, Popover, Skeleton, Tag, Typography } from "antd";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { queryKeys } from "../../api/queryKeys";
+import { useMineIndustryChainAtlas } from "../../api/queryHooks/workflows";
 import { useColors, useStyles } from "../../styles/ui";
 import type { IndustryChainChart, IndustryChainResult } from "../../types/stock";
 import IndustryResearchSections from "./IndustryResearchSections";
@@ -26,6 +29,35 @@ interface IndustryReportProps {
   isPushing: boolean;
   pushResult: IndustryPushResult | null;
   onPush: (target: "feishu" | "notion", feishuReceiver?: string) => Promise<void>;
+}
+
+function MineToAtlasButton({ name, archiveId }: { name: string; archiveId: string }) {
+  const queryClient = useQueryClient();
+  const mineMutation = useMineIndustryChainAtlas();
+  return (
+    <Button
+      icon={<DatabaseOutlined />}
+      size="small"
+      loading={mineMutation.isPending}
+      disabled={!archiveId}
+      onClick={() => {
+        mineMutation.mutate(
+          { name, archive_id: archiveId },
+          {
+            onSuccess: async (chain) => {
+              message.success(`已沉淀到知识库：${chain.name}`);
+              await queryClient.invalidateQueries({
+                queryKey: queryKeys.workflows.industryChainAtlasCatalog,
+              });
+            },
+            onError: (error: Error) => message.error(error.message),
+          },
+        );
+      }}
+    >
+      沉淀到知识库
+    </Button>
+  );
 }
 
 export default function IndustryReport({
@@ -135,6 +167,7 @@ export default function IndustryReport({
               推送
             </Button>
           </Popover>
+          <MineToAtlasButton name={activeName} archiveId={archiveId} />
         </div>
 
         {result.summary && (

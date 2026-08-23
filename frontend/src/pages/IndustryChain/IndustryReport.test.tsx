@@ -1,11 +1,21 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+});
+
+function renderReport(ui: React.ReactElement) {
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 import type { IndustryChainResult } from "../../types/stock";
 import IndustryReport from "./IndustryReport";
 
 vi.mock("@ant-design/icons", () => ({
   ApartmentOutlined: () => <span />,
   CloudUploadOutlined: () => <span />,
+  DatabaseOutlined: () => <span />,
   FullscreenOutlined: () => <span />,
   SendOutlined: () => <span />,
 }));
@@ -30,7 +40,7 @@ const result: IndustryChainResult = {
 describe("IndustryReport", () => {
   it("passes the edited Feishu receiver to the push action", async () => {
     const onPush = vi.fn().mockResolvedValue(undefined);
-    render(
+    renderReport(
       <IndustryReport
         result={result}
         activeName="AI 芯片"
@@ -107,7 +117,7 @@ describe("IndustryReport", () => {
       }],
     };
 
-    render(
+    renderReport(
       <IndustryReport
         result={structuredResult}
         activeName="AI 服务器"
@@ -138,7 +148,7 @@ describe("IndustryReport", () => {
   });
 
   it("shows degraded quality and archive warnings", () => {
-    render(
+    renderReport(
       <IndustryReport
         result={{
           ...result,

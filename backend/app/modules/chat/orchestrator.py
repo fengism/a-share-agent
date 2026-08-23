@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator, Collection
 
@@ -39,7 +40,7 @@ from app.modules.chat.routing import (
     classify_with_llm,
     extract_stock_codes,
     is_greeting_message,
-    is_url_message,
+    is_url_only_message,
 )
 
 logger = logging.getLogger(__name__)
@@ -71,7 +72,9 @@ class Orchestrator:
         self.execution_context = execution_context
 
     def _early_general_tool_names(self, message: str) -> list[str] | None:
-        if is_url_message(message):
+        # 仅当消息本身就是链接时才走通用 Agent 快速路径；链接+问题的混合消息
+        # 交由正常路由，避免专业 Agent 被整体跳过
+        if is_url_only_message(message):
             return [
                 name
                 for name in ("web_search", "fetch_url", "fetch_urls", "analyze_twitter_user")
@@ -126,6 +129,7 @@ class Orchestrator:
         llm_client: AsyncOpenAI,
         model: str,
         temperature: float,
+        stock_context: str = "",
     ) -> AsyncGenerator[AgentEvent, None]:
         plan = build_execution_plan(
             decision.agents,
@@ -150,7 +154,6 @@ class Orchestrator:
         yield build_plan_event(plan)
         yield AgentEvent(type="status", content="正在进行多维度分析…")
 
-        stock_context = await self._resolve_stocks(message)
         enriched_message = (stock_context + "\n\n" + message) if stock_context else message
 
         results: dict[str, AgentExecutionResult] = {}
@@ -229,7 +232,11 @@ class Orchestrator:
         async with borrow_async_openai_chat_runtime(settings) as runtime:
             llm_client = runtime.client
             model = runtime.model
-            decision = await self._refine_decision(message, decision, llm_client, model)
+            # 路由精调（一次 LLM 调用）与股票上下文解析（网络请求）并行执行
+            decision, stock_context = await asyncio.gather(
+                self._refine_decision(message, decision, llm_client, model),
+                self._resolve_stocks(message),
+            )
             async for delta in self._stream_orchestrated_response(
                 message,
                 history,
@@ -237,11 +244,16 @@ class Orchestrator:
                 llm_client,
                 model,
                 settings.llm_temperature,
+                stock_context=stock_context,
             ):
                 yield delta
 
     async def _resolve_stocks(self, message: str) -> str:
-        resolved = await resolve_stock_context(message, extract_stock_codes(message))
+        try:
+            resolved = await resolve_stock_context(message, extract_stock_codes(message))
+        except Exception:
+            logger.warning("股票上下文解析失败，使用原始消息继续", exc_info=True)
+            return ""
         return str(resolved)
 
     def _keyword_classify(self, message: str) -> RoutingDecision:

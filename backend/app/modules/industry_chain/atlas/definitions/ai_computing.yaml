@@ -1,0 +1,57 @@
+slug: ai-computing
+name: AI 算力
+category: 算力与AI
+summary: 从算力芯片、光互连到服务器、数据中心与云应用的 AI 基础设施产业链，是本轮全球 AI 建设的核心底座。
+aliases: [算力, AI基础设施, AIDC]
+tags: [人工智能, 云计算, 基础设施]
+drivers:
+  - 大模型训练与推理算力需求
+  - 国产算力芯片替代
+  - 800G/1.6T 光模块升级周期
+layers:
+  - key: upstream
+    name: 上游 · 算力芯片与光器件
+    segments:
+      - name: 国产算力芯片
+        companies:
+          - { name: 海光信息, code: "688041", note: 国产 CPU/DCU }
+          - { name: 寒武纪, code: "688256", note: AI 加速芯片 }
+          - { name: 龙芯中科, code: "688047", note: 自研指令集 CPU }
+      - name: 光芯片与器件
+        companies:
+          - { name: 源杰科技, code: "688498", note: 高速激光器芯片 }
+          - { name: 光迅科技, code: "002281", note: 光器件与模块 }
+          - { name: 仕佳光子, code: "688313", note: 光芯片与器件 }
+  - key: midstream
+    name: 中游 · 服务器、光模块与算力板
+    segments:
+      - name: 服务器与整机
+        companies:
+          - { name: 浪潮信息, code: "000977", note: AI 服务器龙头 }
+          - { name: 工业富联, code: "601138", note: GPU 服务器代工 }
+          - { name: 中科曙光, code: "603019", note: 高性能计算 }
+          - { name: 紫光股份, code: "000938", note: 服务器+网络设备 }
+      - name: 光模块
+        companies:
+          - { name: 中际旭创, code: "300308", note: 全球光模块龙头 }
+          - { name: 新易盛, code: "300502", note: 高速光模块 }
+          - { name: 天孚通信, code: "300394", note: 光器件平台 }
+          - { name: 华工科技, code: "000988", note: 光模块+激光装备 }
+      - name: 算力 PCB
+        companies:
+          - { name: 沪电股份, code: "002463", note: 高多层算力板 }
+          - { name: 胜宏科技, code: "300476", note: AI 加速卡 PCB }
+          - { name: 深南电路, code: "002916", note: 高端 PCB }
+  - key: downstream
+    name: 下游 · 数据中心与应用
+    segments:
+      - name: IDC 与温控
+        companies:
+          - { name: 润泽科技, code: "300442", note: 智算中心 }
+          - { name: 光环新网, code: "300383", note: IDC+云计算 }
+          - { name: 奥飞数据, code: "300738", note: 智算 IDC }
+          - { name: 英维克, code: "002837", note: 数据中心温控 }
+      - name: 模型与应用
+        companies:
+          - { name: 科大讯飞, code: "002230", note: 语音与大模型 }
+          - { name: 金山办公, code: "688111", note: AI 办公 }

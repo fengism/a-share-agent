@@ -1,0 +1,35 @@
+slug: baijiu
+name: 白酒
+category: 消费
+summary: 高端与次高端白酒酿造、品牌矩阵与渠道产业链，商业模式以品牌与提价能力为核心。
+aliases: [白酒产业链]
+tags: [消费, 高端消费]
+drivers:
+  - 宴席与商务需求恢复
+  - 高端化与批价体系
+  - 库存周期与费用投放
+layers:
+  - key: midstream
+    name: 中游 · 酿造与品牌
+    segments:
+      - name: 高端白酒
+        companies:
+          - { name: 贵州茅台, code: "600519", note: 高端白酒绝对龙头 }
+          - { name: 五粮液, code: "000858", note: 浓香龙头 }
+          - { name: 泸州老窖, code: "000568", note: 国窖1573 }
+      - name: 次高端与区域酒
+        companies:
+          - { name: 山西汾酒, code: "600809", note: 汾酒全国化 }
+          - { name: 洋河股份, code: "002304", note: 苏酒龙头 }
+          - { name: 古井贡酒, code: "000596", note: 徽酒龙头 }
+          - { name: 今世缘, code: "603369", note: 苏北区域龙头 }
+          - { name: 迎驾贡酒, code: "603198", note: 徽酒 }
+  - key: downstream
+    name: 下游 · 渠道与包材
+    segments:
+      - name: 流通渠道
+        companies:
+          - { name: 华致酒行, code: "300755", note: 酒类流通 }
+      - name: 包材
+        companies:
+          - { name: 裕同科技, code: "002831", note: 高端纸质包装 }

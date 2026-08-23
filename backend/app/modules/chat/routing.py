@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
 from openai import AsyncOpenAI
@@ -34,12 +34,50 @@ _KEYWORD_MAP: dict[str, tuple[str, ...]] = {
 }
 
 _FULL_ANALYSIS_KEYWORDS = ("分析", "综合", "评估", "深度", "全面", "诊断")
-_STOCK_CODE_PATTERN = re.compile(r"\d{6}")
+# 边界 + A股板块前缀，避免金额、日期等任意 6 位数字被当成股票代码
+_STOCK_CODE_PATTERN = re.compile(
+    r"(?<![0-9])(?:(?:60|68|00|30|43|83|87|88)\d{4}|(?:200|920)\d{3})(?![0-9])"
+)
 _URL_PATTERN = re.compile(r"https?://\S+", re.IGNORECASE)
+_URL_ONLY_PATTERN = re.compile(r"^\s*(?:https?://\S+\s*)+$", re.IGNORECASE)
 _GREETING_PATTERN = re.compile(
     r"^(你好|hi|hello|hey|嗨|谢谢|感谢|好的|ok|再见|拜拜|嗯|哦|啊|是的|对的|知道了|收到|辛苦了|麻烦了)[!！。.?\s]*$",
     re.IGNORECASE,
 )
+
+
+def build_keyword_matcher(keywords: Collection[str]) -> Callable[[str], bool]:
+    """英文缩写（PE/ROE/MACD 等）用 ASCII 词边界匹配，中文关键词用子串匹配。"""
+    ascii_keywords = sorted(
+        {keyword for keyword in keywords if keyword.isascii() and keyword.isalnum()}
+    )
+    text_keywords = sorted(
+        {keyword for keyword in keywords if keyword not in ascii_keywords}
+    )
+    pattern = (
+        re.compile(
+            "(?<![A-Za-z0-9])(?:"
+            + "|".join(re.escape(keyword) for keyword in ascii_keywords)
+            + ")(?![A-Za-z0-9])",
+            re.IGNORECASE,
+        )
+        if ascii_keywords
+        else None
+    )
+
+    def matches(message: str) -> bool:
+        if pattern is not None and pattern.search(message):
+            return True
+        lowered = message.lower()
+        return any(keyword.lower() in lowered for keyword in text_keywords)
+
+    return matches
+
+
+_KEYWORD_MATCHERS: dict[str, Callable[[str], bool]] = {
+    agent_name: build_keyword_matcher(keywords)
+    for agent_name, keywords in _KEYWORD_MAP.items()
+}
 
 
 @dataclass
@@ -58,6 +96,10 @@ def is_url_message(message: str) -> bool:
     return _URL_PATTERN.search(message) is not None
 
 
+def is_url_only_message(message: str) -> bool:
+    return _URL_ONLY_PATTERN.match(message) is not None
+
+
 def is_greeting_message(message: str) -> bool:
     return _GREETING_PATTERN.match(message.strip()) is not None
 
@@ -70,12 +112,11 @@ def classify_message(
     message: str,
     available_agents: Collection[str] = DEFAULT_AGENT_NAMES,
 ) -> RoutingDecision:
-    message_lower = message.lower()
     available = set(available_agents)
     matched_domains = [
         agent_name
-        for agent_name, keywords in _KEYWORD_MAP.items()
-        if any(keyword.lower() in message_lower for keyword in keywords)
+        for agent_name, matches in _KEYWORD_MATCHERS.items()
+        if matches(message)
     ]
     matched_agents = [agent_name for agent_name in matched_domains if agent_name in available]
     agent_names = [name for name in DEFAULT_AGENT_NAMES if name in available]

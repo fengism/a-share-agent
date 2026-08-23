@@ -1,0 +1,49 @@
+slug: consumer-electronics
+name: 消费电子
+category: 高端制造
+summary: 以智能手机为核心的面板、零组件、组装与品牌终端产业链，创新周期与大客户新品节奏决定景气度。
+aliases: [果链, 电子制造]
+tags: [消费电子, 果链, 硬件]
+drivers:
+  - 智能手机换机周期与 AI 手机
+  - 大客户新品创新
+  - VR/AR 与可穿戴新品类
+layers:
+  - key: upstream
+    name: 上游 · 面板与元件
+    segments:
+      - name: 显示面板
+        companies:
+          - { name: 京东方A, code: "000725", note: 全球面板龙头 }
+          - { name: TCL科技, code: "000100", note: 面板+光伏 }
+          - { name: 维信诺, code: "002387", note: OLED }
+      - name: 被动元件与结构件
+        companies:
+          - { name: 顺络电子, code: "002138", note: 片式电感 }
+          - { name: 三环集团, code: "300408", note: 陶瓷件与 MLCC }
+          - { name: 蓝思科技, code: "300433", note: 玻璃盖板 }
+      - name: 消费 IC
+        companies:
+          - { name: 恒玄科技, code: "688608", note: 可穿戴 SoC }
+          - { name: 晶晨股份, code: "688099", note: 智能终端 SoC }
+          - { name: 瑞芯微, code: "603893", note: 端侧 AIoC SoC }
+  - key: midstream
+    name: 中游 · 零组件与组装
+    segments:
+      - name: 精密零组件与组装
+        companies:
+          - { name: 立讯精密, code: "002475", note: 连接器+整机组装 }
+          - { name: 歌尔股份, code: "002241", note: 声学与 VR 代工 }
+          - { name: 东山精密, code: "002384", note: FPC 与结构件 }
+          - { name: 领益智造, code: "002600", note: 精密功能件 }
+      - name: PCB/FPC
+        companies:
+          - { name: 鹏鼎控股, code: "002938", note: 全球 FPC 龙头 }
+  - key: downstream
+    name: 下游 · 品牌终端
+    segments:
+      - name: 品牌与出海
+        companies:
+          - { name: 传音控股, code: "688036", note: 新兴市场手机 }
+          - { name: 安克创新, code: "300866", note: 消费电子品牌出海 }
+          - { name: 石头科技, code: "688169", note: 智能清洁机器人 }

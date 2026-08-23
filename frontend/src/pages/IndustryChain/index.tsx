@@ -5,7 +5,7 @@ import {
   LoadingOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Input, message } from "antd";
+import { Input, Tabs, message } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "../../api/queryKeys";
 import { useNavigate, useParams } from "react-router-dom";
@@ -25,6 +25,7 @@ import { useWorkflowPush } from "../../hooks/useWorkflowPush";
 import { useColors, useStyles } from "../../styles/ui";
 import type { IndustryChainHistoryItem, IndustryChainResearchScope, IndustryChainResult } from "../../types/stock";
 import HistoryPanel from "./HistoryPanel";
+import IndustryAtlas from "./IndustryAtlas";
 import IndustryReport, { type IndustryPushResult } from "./IndustryReport";
 import {
   applyIndustryAgentEvent,
@@ -49,6 +50,7 @@ export default function IndustryChain() {
   const activeName = urlName ? decodeURIComponent(urlName) : "";
 
   const [inputValue, setInputValue] = useState(activeName);
+  const [activeTab, setActiveTab] = useState<"atlas" | "analysis">(activeName ? "analysis" : "atlas");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentStage, setCurrentStage] = useState(-1);
   const [stageMessage, setStageMessage] = useState("");
@@ -145,6 +147,7 @@ export default function IndustryChain() {
   const handleLoadArchive = useCallback(async (item: IndustryChainHistoryItem) => {
     try {
       const data = await archiveMutation.mutateAsync({ name: item.name, archiveId: item.archive_id });
+      setActiveTab("analysis");
       setResult(data);
       setArchiveId(item.archive_id);
       setCurrentStage(-1);
@@ -199,6 +202,11 @@ export default function IndustryChain() {
     }
   }, [activeName, archiveId, push, result]);
 
+  const handleAnalyzeFromAtlas = useCallback((name: string) => {
+    setActiveTab("analysis");
+    handleAnalyze(name);
+  }, [handleAnalyze]);
+
   const historyPanelProps = {
     history,
     filter: historyFilter,
@@ -225,7 +233,7 @@ export default function IndustryChain() {
     <div style={pageContainerStyle}>
       <WorkflowPageHeader
         title="产业链分析"
-        description="输入产业关键词，AI 自动搜索数据并生成完整产业链分析报告"
+        description="浏览产业链知识库图谱（上/中/下游与代表公司），或输入关键词让 AI 生成深度产业链分析报告"
         icon={<ApartmentOutlined />}
       />
 
@@ -235,64 +243,84 @@ export default function IndustryChain() {
         historyVersion={archiveId}
         history={<HistoryPanel {...historyPanelProps} embedded />}
       >
-        <div style={{ ...cardStyle, padding: "16px 20px", marginBottom: 20 }}>
-          <Search
-            placeholder="输入产业链名称，如：锂电池、AI芯片、光伏..."
-            enterButton={<span><SearchOutlined /> 开始分析</span>}
-            size="large"
-            loading={isAnalyzing}
-            value={inputValue}
-            onChange={(event) => setInputValue(event.target.value)}
-            onSearch={handleAnalyze}
-            disabled={isAnalyzing}
-          />
-          <IndustryResearchScopeControls
-            value={researchScope}
-            disabled={isAnalyzing}
-            onChange={setResearchScope}
-          />
-        </div>
+        <Tabs
+          activeKey={activeTab}
+          onChange={(key) => setActiveTab(key === "atlas" ? "atlas" : "analysis")}
+          style={{ marginBottom: 16 }}
+          items={[
+            {
+              key: "atlas",
+              label: "知识库图谱",
+              children: <IndustryAtlas onAnalyze={handleAnalyzeFromAtlas} />,
+            },
+            {
+              key: "analysis",
+              label: "AI 分析",
+              children: (
+                <>
+                  <div style={{ ...cardStyle, padding: "16px 20px", marginBottom: 20 }}>
+                    <Search
+                      placeholder="输入产业链名称，如：锂电池、AI芯片、光伏..."
+                      enterButton={<span><SearchOutlined /> 开始分析</span>}
+                      size="large"
+                      loading={isAnalyzing}
+                      value={inputValue}
+                      onChange={(event) => setInputValue(event.target.value)}
+                      onSearch={handleAnalyze}
+                      disabled={isAnalyzing}
+                    />
+                    <IndustryResearchScopeControls
+                      value={researchScope}
+                      disabled={isAnalyzing}
+                      onChange={setResearchScope}
+                    />
+                  </div>
 
-        {(isAnalyzing || currentStage >= 0 || error || agentProcess.plan || agentProcess.toolCalls.length > 0) && (
-          <WorkflowProgressPanel
-            current={currentStage}
-            status={error ? "error" : isAnalyzing ? "running" : "success"}
-            message={error || stageMessage}
-            items={INDUSTRY_CHAIN_STAGES.map((stage, index) => ({
-              title: stage.title,
-              icon: currentStage === index
-                ? <LoadingOutlined />
-                : currentStage > index
-                  ? <CheckCircleOutlined />
-                  : undefined,
-            }))}
-          >
-            <AgentProcessPanel
-              plan={agentProcess.plan}
-              status={agentProcess.status}
-              toolCalls={agentProcess.toolCalls}
-              isRunning={isAnalyzing && currentStage === 0}
-            />
-          </WorkflowProgressPanel>
-        )}
+                  {(isAnalyzing || currentStage >= 0 || error || agentProcess.plan || agentProcess.toolCalls.length > 0) && (
+                    <WorkflowProgressPanel
+                      current={currentStage}
+                      status={error ? "error" : isAnalyzing ? "running" : "success"}
+                      message={error || stageMessage}
+                      items={INDUSTRY_CHAIN_STAGES.map((stage, index) => ({
+                        title: stage.title,
+                        icon: currentStage === index
+                          ? <LoadingOutlined />
+                          : currentStage > index
+                            ? <CheckCircleOutlined />
+                            : undefined,
+                      }))}
+                    >
+                      <AgentProcessPanel
+                        plan={agentProcess.plan}
+                        status={agentProcess.status}
+                        toolCalls={agentProcess.toolCalls}
+                        isRunning={isAnalyzing && currentStage === 0}
+                      />
+                    </WorkflowProgressPanel>
+                  )}
 
-        {result && (
-          <IndustryReport
-            result={result}
-            activeName={activeName}
-            archiveId={archiveId}
-            defaultReceiver={config?.feishu_default_receiver}
-            isPushing={isPushing}
-            pushResult={pushResult}
-            onPush={handlePush}
-          />
-        )}
-        {!result && !isAnalyzing && !error && (
-          <div style={{ ...cardStyle, padding: 60, textAlign: "center" }}>
-            <ApartmentOutlined style={{ fontSize: 48, color: colors.textMuted, marginBottom: 16 }} />
-            <div style={{ color: colors.textMuted, fontSize: 14 }}>输入产业关键词，开始 AI 产业链分析</div>
-          </div>
-        )}
+                  {result && (
+                    <IndustryReport
+                      result={result}
+                      activeName={activeName}
+                      archiveId={archiveId}
+                      defaultReceiver={config?.feishu_default_receiver}
+                      isPushing={isPushing}
+                      pushResult={pushResult}
+                      onPush={handlePush}
+                    />
+                  )}
+                  {!result && !isAnalyzing && !error && (
+                    <div style={{ ...cardStyle, padding: 60, textAlign: "center" }}>
+                      <ApartmentOutlined style={{ fontSize: 48, color: colors.textMuted, marginBottom: 16 }} />
+                      <div style={{ color: colors.textMuted, fontSize: 14 }}>输入产业关键词，开始 AI 产业链分析</div>
+                    </div>
+                  )}
+                </>
+              ),
+            },
+          ]}
+        />
       </WorkflowWorkspace>
     </div>
   );

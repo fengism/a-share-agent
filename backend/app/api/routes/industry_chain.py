@@ -3,13 +3,29 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from app.api.auth.dependencies import require_active_user
-from app.api.errors import NotFoundError, TooManyRequestsError
+from app.api.auth.dependencies import require_active_user, require_admin
+from app.api.errors import (
+    BadRequestError,
+    ConflictError,
+    NotFoundError,
+    TooManyRequestsError,
+)
 from app.api.schemas import DeleteResponse
 from app.api.streaming import SSE_RESPONSES
 from app.domain.identity import AuthenticatedUser
+from app.modules.industry_chain.atlas import (
+    AtlasCatalog,
+    AtlasChain,
+    AtlasImportError,
+    build_atlas_catalog,
+    delete_imported_chain,
+    get_atlas_chain,
+    import_atlas_chains,
+    mine_and_save_atlas_chain,
+)
 from app.modules.industry_chain.public import (
     IndustryChainHistoryItem,
     IndustryChainLatestResponse,
@@ -23,6 +39,91 @@ from app.modules.industry_chain.public import (
 )
 
 router = APIRouter()
+
+
+@router.get("/atlas/chains", response_model=AtlasCatalog)
+async def get_industry_chain_atlas_catalog(
+    user: AuthenticatedUser = Depends(require_active_user),
+) -> AtlasCatalog:
+    """产业链知识库目录：分类、链条摘要与规模统计。"""
+    return build_atlas_catalog()
+
+
+@router.get("/atlas/chains/{slug}", response_model=AtlasChain)
+async def get_industry_chain_atlas_chain(
+    slug: str,
+    user: AuthenticatedUser = Depends(require_active_user),
+) -> AtlasChain:
+    """按 slug 获取单条产业链的上/中/下游完整图谱。"""
+    chain = get_atlas_chain(slug)
+    if chain is None:
+        raise NotFoundError(f"产业链知识库中不存在: {slug}")
+    return chain
+
+
+class AtlasImportRequest(BaseModel):
+    """外部导入产业链：YAML 或 JSON 文本，支持单条 / 数组 / {chains: [...]}。"""
+
+    content: str = Field(min_length=1)
+    overwrite: bool = False
+
+
+class AtlasMineRequest(BaseModel):
+    """从已存档的 AI 分析结果挖掘知识库条目。"""
+
+    name: str = Field(min_length=1)
+    archive_id: str = ""
+
+
+@router.post("/atlas/mine", response_model=AtlasChain)
+async def mine_industry_chain_atlas(
+    request: AtlasMineRequest,
+    user: AuthenticatedUser = Depends(require_active_user),
+) -> AtlasChain:
+    """把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目。"""
+    archive_id = request.archive_id
+    if not archive_id:
+        latest = await get_latest_industry_chain_archive(
+            request.name, user["id"], can_delete_legacy=bool(user["is_admin"]),
+        )
+        archive_id = (latest.archive_id or "") if latest is not None else ""
+    if not archive_id:
+        raise NotFoundError(f"没有可挖掘的产业链分析存档: {request.name}")
+    result = await load_industry_chain_archive(request.name, archive_id, user["id"])
+    if result is None:
+        raise NotFoundError("产业链存档不存在")
+    chain = await mine_and_save_atlas_chain(result)
+    if chain is None:
+        raise BadRequestError("分析结果可挖掘内容不足（至少 2 个环节、3 家公司），未入库")
+    return chain
+
+
+@router.post("/atlas/import", response_model=list[AtlasChain])
+async def import_industry_chain_atlas(
+    request: AtlasImportRequest,
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> list[AtlasChain]:
+    """导入外部产业链定义（管理员），校验通过后写入导入目录并立即生效。"""
+    try:
+        return import_atlas_chains(request.content, overwrite=request.overwrite)
+    except AtlasImportError as exc:
+        message = str(exc)
+        if "已存在" in message:
+            raise ConflictError(message) from exc
+        raise BadRequestError(message) from exc
+
+
+@router.delete("/atlas/chains/{slug}", response_model=DeleteResponse)
+async def delete_industry_chain_atlas_import(
+    slug: str,
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> DeleteResponse:
+    """删除一条外部导入的产业链（管理员）；内置链条不可删除。"""
+    if get_atlas_chain(slug) is None:
+        raise NotFoundError(f"产业链知识库中不存在: {slug}")
+    if not delete_imported_chain(slug):
+        raise BadRequestError(f"内置产业链不可删除: {slug}")
+    return DeleteResponse()
 
 
 @router.get("/history", response_model=list[IndustryChainHistoryItem])

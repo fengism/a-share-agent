@@ -1,0 +1,58 @@
+slug: solar-pv
+name: 光伏
+category: 新能源
+summary: 硅料—硅片—电池片—组件的制造主链，辅以逆变器、设备与辅材，终端为集中式与分布式电站。
+aliases: [光伏产业链, 太阳能]
+tags: [新能源, 绿电, 制造]
+drivers:
+  - 全球装机需求与组件出口
+  - 电池技术迭代（TOPCon/HJT/BC）
+  - 产能出清与盈利修复
+layers:
+  - key: upstream
+    name: 上游 · 硅料与硅片
+    segments:
+      - name: 多晶硅料
+        companies:
+          - { name: 通威股份, code: "600438", note: 硅料+电池片 }
+          - { name: 大全能源, code: "688303", note: 高纯多晶硅 }
+      - name: 硅片
+        companies:
+          - { name: 隆基绿能, code: "601012", note: 单晶硅片+组件 }
+          - { name: TCL中环, code: "002129", note: 单晶硅片 }
+          - { name: 双良节能, code: "600481", note: 硅片+还原炉 }
+  - key: midstream
+    name: 中游 · 电池片、组件与辅材
+    segments:
+      - name: 电池片
+        companies:
+          - { name: 钧达股份, code: "002865", note: N型电池专业化 }
+          - { name: 爱旭股份, code: "600732", note: ABC 电池 }
+      - name: 组件
+        companies:
+          - { name: 晶澳科技, code: "002459", note: 一体化组件 }
+          - { name: 天合光能, code: "688599", note: 组件+支架 }
+          - { name: 晶科能源, code: "688223", note: 组件出货龙头之一 }
+          - { name: 阿特斯, code: "688472", note: 组件+储能 }
+      - name: 辅材
+        companies:
+          - { name: 福斯特, code: "603806", note: EVA/POE 胶膜 }
+          - { name: 福莱特, code: "601865", note: 光伏玻璃 }
+  - key: downstream
+    name: 下游 · 逆变器、设备与电站
+    segments:
+      - name: 逆变器
+        companies:
+          - { name: 阳光电源, code: "300274", note: 逆变器+储能系统 }
+          - { name: 锦浪科技, code: "300763", note: 组串式逆变器 }
+          - { name: 德业股份, code: "605117", note: 户用逆变器 }
+          - { name: 固德威, code: "688390", note: 组串式逆变器 }
+      - name: 设备
+        companies:
+          - { name: 迈为股份, code: "300751", note: HJT 串焊/丝网印刷 }
+          - { name: 捷佳伟创, code: "300724", note: 电池片设备 }
+          - { name: 奥特维, code: "688516", note: 串焊机 }
+      - name: 电站运营
+        companies:
+          - { name: 三峡能源, code: "600905", note: 集中式新能源运营 }
+          - { name: 太阳能, code: "000591", note: 光伏电站运营 }

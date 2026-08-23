@@ -1043,3 +1043,21 @@ body,
   max-width: 100%;
   overflow-x: clip;
 }
+
+/* ── 产业链知识库（Atlas）交互态 ── */
+.atlas-chain-card {
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.atlas-chain-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--c-primary-2);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.18));
+}
+.atlas-category-chip:hover {
+  color: var(--c-primary);
+  border-color: var(--c-primary-2);
+}
+.atlas-company-chip:hover {
+  border-color: var(--c-primary);
+  background: var(--c-hover-bg);
+}

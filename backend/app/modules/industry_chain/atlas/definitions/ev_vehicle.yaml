@@ -1,0 +1,52 @@
+slug: ev-vehicle
+name: 新能源整车
+category: 新能源
+summary: 整车电动化与智能化带动的三电、热管理、轻量化与智驾产业链。
+aliases: [新能源汽车, 电动车]
+tags: [新能源车, 智能驾驶]
+drivers:
+  - 电动化渗透率与新车周期
+  - 智能驾驶平权
+  - 出海与混动增量
+layers:
+  - key: upstream
+    name: 上游 · 热管理与轻量化
+    segments:
+      - name: 热管理
+        companies:
+          - { name: 三花智控, code: "002050", note: 热管理阀件龙头 }
+          - { name: 拓普集团, code: "601689", note: 平台化汽零+机器人 }
+      - name: 轻量化与底盘
+        companies:
+          - { name: 旭升集团, code: "603305", note: 铝压铸 }
+          - { name: 伯特利, code: "603596", note: 线控制动 }
+  - key: midstream
+    name: 中游 · 三电与智能化
+    segments:
+      - name: 电驱动
+        companies:
+          - { name: 汇川技术, code: "300124", note: 电控龙头 }
+      - name: 动力电池
+        companies:
+          - { name: 宁德时代, code: "300750", note: 全球动力电池龙头 }
+          - { name: 亿纬锂能, code: "300014", note: 动力+储能电池 }
+      - name: 智能驾驶
+        companies:
+          - { name: 德赛西威, code: "002920", note: 智驾域控 }
+          - { name: 经纬恒润, code: "688326", note: 汽车电子 }
+          - { name: 中科创达, code: "300496", note: 智能座舱 OS }
+          - { name: 保隆科技, code: "603197", note: 空气悬架与传感 }
+  - key: downstream
+    name: 下游 · 整车与补能
+    segments:
+      - name: 整车
+        companies:
+          - { name: 比亚迪, code: "002594", note: 新能源整车龙头 }
+          - { name: 赛力斯, code: "601127", note: 问界智选车 }
+          - { name: 长城汽车, code: "601633", note: SUV 与越野 }
+          - { name: 长安汽车, code: "000625", note: 自主品牌 }
+          - { name: 上汽集团, code: "600104", note: 综合车企 }
+      - name: 充电与补能
+        companies:
+          - { name: 特锐德, code: "300001", note: 特来电充电网 }
+          - { name: 盛弘股份, code: "300693", note: 充电设备 }

@@ -100,6 +100,10 @@ class Settings(BaseSettings):
     portfolio_quote_stale_ttl_seconds: int = 300
     quant_strategy_dir: Path = BACKEND_DIR / "app" / "modules" / "quant" / "strategies" / "definitions"
     quant_strategy_reload_seconds: float = Field(default=5.0, ge=1.0, le=3600.0)
+    # 产业链知识库外部导入目录：导入的链条以 YAML 文件落盘，随内置定义一起热加载合并
+    industry_atlas_import_dir: Path = BACKEND_DIR / "data" / "industry_chains"
+    # AI 产业链分析完成后是否自动挖掘进知识库（同名链稳定覆盖）
+    industry_atlas_auto_mining: bool = True
 
     max_concurrent_chat_per_user: int = 2
     max_concurrent_chat_total: int = 8

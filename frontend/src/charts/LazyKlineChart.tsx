@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Skeleton } from "antd";
 import type { KlineItem } from "../types/stock";
+import type { ChanlunResult } from "../utils/chanlun";
 import type { KlineTradeMarker } from "./klineMarkers";
 
 const KlineChart = lazy(() => import("./KlineChart"));
@@ -10,9 +11,10 @@ interface LazyKlineChartProps {
   height?: number;
   viewKey?: string;
   tradeMarkers?: KlineTradeMarker[];
+  chanlun?: ChanlunResult | null;
 }
 
-export default function LazyKlineChart({ data, height = 500, viewKey, tradeMarkers }: LazyKlineChartProps) {
+export default function LazyKlineChart({ data, height = 500, viewKey, tradeMarkers, chanlun }: LazyKlineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(() => typeof IntersectionObserver === "undefined");
 
@@ -32,7 +34,7 @@ export default function LazyKlineChart({ data, height = 500, viewKey, tradeMarke
     <div ref={containerRef} style={{ minHeight: height }}>
       {shouldRender ? (
         <Suspense fallback={<Skeleton active paragraph={{ rows: 8 }} />}>
-          <KlineChart data={data} height={height} viewKey={viewKey} tradeMarkers={tradeMarkers} />
+          <KlineChart data={data} height={height} viewKey={viewKey} tradeMarkers={tradeMarkers} chanlun={chanlun} />
         </Suspense>
       ) : (
         <div aria-label="K线图即将加载" style={{ minHeight: height }}>

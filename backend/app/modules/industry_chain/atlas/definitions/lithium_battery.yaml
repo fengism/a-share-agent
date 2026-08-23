@@ -1,0 +1,62 @@
+slug: lithium-battery
+name: 锂电池
+category: 新能源
+summary: 从锂钴镍资源到正负极、隔膜、电解液四大主材，再到电芯制造与锂电设备的完整动力/储能电池产业链。
+aliases: [动力电池, 锂电]
+tags: [新能源车, 储能, 电池]
+drivers:
+  - 新能源车渗透率持续提升
+  - 储能装机高增长
+  - 电池技术迭代（磷酸铁锂、快充、固态）
+layers:
+  - key: upstream
+    name: 上游 · 资源与材料
+    segments:
+      - name: 锂资源
+        companies:
+          - { name: 赣锋锂业, code: "002460", note: 锂矿与锂盐 }
+          - { name: 天齐锂业, code: "002466", note: 锂精矿+锂盐 }
+          - { name: 盐湖股份, code: "000792", note: 盐湖提锂+钾肥 }
+      - name: 钴镍资源
+        companies:
+          - { name: 华友钴业, code: "603799", note: 钴镍冶炼+前驱体 }
+          - { name: 寒锐钴业, code: "300618", note: 钴粉钴盐 }
+  - key: midstream
+    name: 中游 · 四大主材与结构件
+    segments:
+      - name: 正极材料及前驱体
+        companies:
+          - { name: 容百科技, code: "688005", note: 高镍三元正极 }
+          - { name: 当升科技, code: "300073", note: 三元正极 }
+          - { name: 德方纳米, code: "300769", note: 磷酸铁锂正极 }
+          - { name: 中伟股份, code: "300919", note: 三元前驱体 }
+      - name: 负极材料
+        companies:
+          - { name: 璞泰来, code: "603659", note: 负极+涂覆一体化 }
+          - { name: 中科电气, code: "300035", note: 人造石墨负极 }
+          - { name: 尚太科技, code: "001301", note: 一体化负极 }
+      - name: 隔膜
+        companies:
+          - { name: 恩捷股份, code: "002812", note: 湿法隔膜龙头 }
+          - { name: 星源材质, code: "300568", note: 干法+湿法隔膜 }
+      - name: 电解液
+        companies:
+          - { name: 天赐材料, code: "002709", note: 电解液+六氟磷酸锂 }
+          - { name: 新宙邦, code: "300037", note: 电解液 }
+      - name: 结构件
+        companies:
+          - { name: 科达利, code: "002850", note: 壳体与盖板 }
+  - key: downstream
+    name: 下游 · 电芯与设备
+    segments:
+      - name: 电芯制造
+        companies:
+          - { name: 宁德时代, code: "300750", note: 全球动力电池龙头 }
+          - { name: 比亚迪, code: "002594", note: 刀片电池+整车 }
+          - { name: 亿纬锂能, code: "300014", note: 动力+储能电池 }
+          - { name: 国轩高科, code: "002074", note: 磷酸铁锂电池 }
+          - { name: 欣旺达, code: "300207", note: 消费+动力电池 }
+      - name: 锂电设备
+        companies:
+          - { name: 先导智能, code: "300450", note: 卷绕机等核心设备 }
+          - { name: 杭可科技, code: "688006", note: 后段化成分容 }

@@ -82,6 +82,8 @@ export const queryKeys = {
     industryChainHistory: (name: string, pageSize: number) =>
       ["industryChainHistory", "infinite", name, pageSize] as const,
     industryChainLatest: (name: string) => ["industryChainLatest", name] as const,
+    industryChainAtlasCatalog: ["industryChainAtlas", "catalog"] as const,
+    industryChainAtlasChain: (slug: string) => ["industryChainAtlas", "chain", slug] as const,
   },
   capabilities: {
     catalog: ["chat-capabilities"] as const,

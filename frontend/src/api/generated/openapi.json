@@ -405,6 +405,301 @@
         "title": "AnalysisResult",
         "type": "object"
       },
+      "AtlasCatalog": {
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "chains": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasChainSummary"
+            },
+            "title": "Chains",
+            "type": "array"
+          },
+          "total_chains": {
+            "title": "Total Chains",
+            "type": "integer"
+          },
+          "total_companies": {
+            "title": "Total Companies",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "categories",
+          "chains",
+          "total_chains",
+          "total_companies"
+        ],
+        "title": "AtlasCatalog",
+        "type": "object"
+      },
+      "AtlasChain": {
+        "additionalProperties": false,
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "drivers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Drivers",
+            "type": "array"
+          },
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasLayer"
+            },
+            "minItems": 1,
+            "title": "Layers",
+            "type": "array"
+          },
+          "mined": {
+            "default": false,
+            "title": "Mined",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source": {
+            "default": "builtin",
+            "enum": [
+              "builtin",
+              "imported",
+              "mined"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "category",
+          "summary",
+          "layers"
+        ],
+        "title": "AtlasChain",
+        "type": "object"
+      },
+      "AtlasChainSummary": {
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "company_count": {
+            "title": "Company Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "segment_count": {
+            "title": "Segment Count",
+            "type": "integer"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source": {
+            "default": "builtin",
+            "enum": [
+              "builtin",
+              "imported",
+              "mined"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "category",
+          "summary",
+          "segment_count",
+          "company_count"
+        ],
+        "title": "AtlasChainSummary",
+        "type": "object"
+      },
+      "AtlasCompany": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "code"
+        ],
+        "title": "AtlasCompany",
+        "type": "object"
+      },
+      "AtlasImportRequest": {
+        "description": "外部导入产业链：YAML 或 JSON 文本，支持单条 / 数组 / {chains: [...]}。",
+        "properties": {
+          "content": {
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "AtlasImportRequest",
+        "type": "object"
+      },
+      "AtlasLayer": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "enum": [
+              "upstream",
+              "midstream",
+              "downstream"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasSegment"
+            },
+            "minItems": 1,
+            "title": "Segments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "segments"
+        ],
+        "title": "AtlasLayer",
+        "type": "object"
+      },
+      "AtlasMineRequest": {
+        "description": "从已存档的 AI 分析结果挖掘知识库条目。",
+        "properties": {
+          "archive_id": {
+            "default": "",
+            "title": "Archive Id",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "AtlasMineRequest",
+        "type": "object"
+      },
+      "AtlasSegment": {
+        "additionalProperties": false,
+        "properties": {
+          "companies": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasCompany"
+            },
+            "minItems": 1,
+            "title": "Companies",
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "companies"
+        ],
+        "title": "AtlasSegment",
+        "type": "object"
+      },
       "AuthResponse": {
         "properties": {
           "token": {
@@ -15917,6 +16212,235 @@
           }
         },
         "summary": "Readiness"
+      }
+    },
+    "/api/industry-chain/atlas/chains": {
+      "get": {
+        "description": "产业链知识库目录：分类、链条摘要与规模统计。",
+        "operationId": "get_industry_chain_atlas_catalog_api_industry_chain_atlas_chains_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtlasCatalog"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Industry Chain Atlas Catalog",
+        "tags": [
+          "industry-chain"
+        ]
+      }
+    },
+    "/api/industry-chain/atlas/chains/{slug}": {
+      "delete": {
+        "description": "删除一条外部导入的产业链（管理员）；内置链条不可删除。",
+        "operationId": "delete_industry_chain_atlas_import_api_industry_chain_atlas_chains__slug__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Industry Chain Atlas Import",
+        "tags": [
+          "industry-chain"
+        ]
+      },
+      "get": {
+        "description": "按 slug 获取单条产业链的上/中/下游完整图谱。",
+        "operationId": "get_industry_chain_atlas_chain_api_industry_chain_atlas_chains__slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtlasChain"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Industry Chain Atlas Chain",
+        "tags": [
+          "industry-chain"
+        ]
+      }
+    },
+    "/api/industry-chain/atlas/import": {
+      "post": {
+        "description": "导入外部产业链定义（管理员），校验通过后写入导入目录并立即生效。",
+        "operationId": "import_industry_chain_atlas_api_industry_chain_atlas_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtlasImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AtlasChain"
+                  },
+                  "title": "Response Import Industry Chain Atlas Api Industry Chain Atlas Import Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Import Industry Chain Atlas",
+        "tags": [
+          "industry-chain"
+        ]
+      }
+    },
+    "/api/industry-chain/atlas/mine": {
+      "post": {
+        "description": "把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目。",
+        "operationId": "mine_industry_chain_atlas_api_industry_chain_atlas_mine_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtlasMineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtlasChain"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mine Industry Chain Atlas",
+        "tags": [
+          "industry-chain"
+        ]
       }
     },
     "/api/industry-chain/history": {

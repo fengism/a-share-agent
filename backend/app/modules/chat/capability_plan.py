@@ -8,7 +8,12 @@ from app.agentic.agents.catalog import list_agent_profiles
 from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
 from app.financial_data.stock.profile.name_map import contains_known_stock_name
-from app.modules.chat.routing import classify_message, extract_stock_codes, is_url_message
+from app.modules.chat.routing import (
+    build_keyword_matcher,
+    classify_message,
+    extract_stock_codes,
+    is_url_message,
+)
 
 _URL_PATTERN = re.compile(r"https?://[^\s<>()]+", re.I)
 _SCREENING_COMPATIBLE_STOCK_KEYWORDS = (
@@ -16,6 +21,7 @@ _SCREENING_COMPATIBLE_STOCK_KEYWORDS = (
     "rsi", "kdj", "技术面", "基本面", "新闻", "公告", "舆情", "情绪", "风险",
     "止损", "仓位", "目标价", "支撑位", "压力位", "走势", "对比",
 )
+_SCREENING_KEYWORD_MATCHER = build_keyword_matcher(_SCREENING_COMPATIBLE_STOCK_KEYWORDS)
 @dataclass(frozen=True, slots=True)
 class ChatCapabilityPlan:
     enabled_skill_names: tuple[str, ...]
@@ -39,10 +45,7 @@ def _detect_skill_names(message: str) -> set[str]:
     if extract_stock_codes(message_without_urls) or contains_known_stock_name(message_without_urls):
         detected.add("stock_analysis")
     has_stock_code = bool(extract_stock_codes(message_without_urls))
-    has_explicit_stock_analysis = any(
-        keyword in message_without_urls.lower()
-        for keyword in _SCREENING_COMPATIBLE_STOCK_KEYWORDS
-    )
+    has_explicit_stock_analysis = _SCREENING_KEYWORD_MATCHER(message_without_urls)
     if (
         "stock_screening" in detected
         and not has_stock_code

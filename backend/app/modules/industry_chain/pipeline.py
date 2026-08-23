@@ -24,6 +24,7 @@ from app.domain.industry_chain import (
 )
 from app.infrastructure.llm.prompting import PromptExecutionError, run_structured_prompt
 from app.modules.industry_chain import research as industry_research
+from app.modules.industry_chain.atlas.miner import auto_mine_from_result
 from app.modules.industry_chain.events import IndustryChainProgress
 from app.modules.industry_chain.evidence import (
     build_evidence_catalog,
@@ -344,6 +345,9 @@ async def run_industry_chain_analysis(
             result.archive_status = "failed"
             _add_warning(result.warnings, "报告已生成，但保存失败；当前结果无法推送，请重新分析")
             logger.warning("产业链存档失败: name=%s, error=%s", name, save_exc)
+
+        if result.archive_status == "saved":
+            await auto_mine_from_result(result)
 
         message = "分析完成" if result.quality_status == "complete" else "分析完成，但报告存在质量提示"
         if result.archive_status == "failed":

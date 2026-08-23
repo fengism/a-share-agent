@@ -11,6 +11,8 @@ import type { DailyReviewHistoryItem, DailyReviewRequest, DailyReviewResult } fr
 import type {
   AnalysisHistoryItem,
   AnalysisResult,
+  AtlasCatalog,
+  AtlasChain,
   IndustryChainHistoryItem,
   IndustryChainResult,
   PushRequest,
@@ -144,6 +146,59 @@ export function useIndustryChainLatest(name: string) {
     }),
     enabled: !!name,
     staleTime: 0,
+  });
+}
+
+export function useIndustryChainAtlasCatalog() {
+  return useQuery({
+    queryKey: queryKeys.workflows.industryChainAtlasCatalog,
+    queryFn: () => openApiGet("/api/industry-chain/atlas/chains"),
+    select: asApiModel<AtlasCatalog>(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useIndustryChainAtlasChain(slug: string) {
+  return useQuery({
+    queryKey: queryKeys.workflows.industryChainAtlasChain(slug),
+    queryFn: () => openApiGet("/api/industry-chain/atlas/chains/{slug}", {
+      path: { slug },
+    }),
+    select: asApiModel<AtlasChain>(),
+    enabled: !!slug,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useImportIndustryChainAtlas() {
+  return useMutation({
+    mutationFn: (request: { content: string; overwrite?: boolean }) => openApiPost(
+      "/api/industry-chain/atlas/import",
+      {
+        body: request,
+        options: { timeoutMs: API_TIMEOUTS.LONG_RUNNING },
+      },
+    ).then(asApiModel<AtlasChain[]>()),
+  });
+}
+
+export function useMineIndustryChainAtlas() {
+  return useMutation({
+    mutationFn: (request: { name: string; archive_id?: string }) => openApiPost(
+      "/api/industry-chain/atlas/mine",
+      {
+        body: request,
+        options: { timeoutMs: API_TIMEOUTS.LONG_RUNNING },
+      },
+    ).then(asApiModel<AtlasChain>()),
+  });
+}
+
+export function useDeleteIndustryChainAtlasChain() {
+  return useMutation({
+    mutationFn: (slug: string) => openApiDelete("/api/industry-chain/atlas/chains/{slug}", {
+      path: { slug },
+    }),
   });
 }
 

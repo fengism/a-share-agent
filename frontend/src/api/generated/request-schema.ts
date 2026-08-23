@@ -675,6 +675,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/industry-chain/atlas/chains": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Industry Chain Atlas Catalog
+         * @description 产业链知识库目录：分类、链条摘要与规模统计。
+         */
+        get: operations["get_industry_chain_atlas_catalog_api_industry_chain_atlas_chains_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-chain/atlas/chains/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Industry Chain Atlas Chain
+         * @description 按 slug 获取单条产业链的上/中/下游完整图谱。
+         */
+        get: operations["get_industry_chain_atlas_chain_api_industry_chain_atlas_chains__slug__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Industry Chain Atlas Import
+         * @description 删除一条外部导入的产业链（管理员）；内置链条不可删除。
+         */
+        delete: operations["delete_industry_chain_atlas_import_api_industry_chain_atlas_chains__slug__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-chain/atlas/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Industry Chain Atlas
+         * @description 导入外部产业链定义（管理员），校验通过后写入导入目录并立即生效。
+         */
+        post: operations["import_industry_chain_atlas_api_industry_chain_atlas_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-chain/atlas/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mine Industry Chain Atlas
+         * @description 把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目。
+         */
+        post: operations["mine_industry_chain_atlas_api_industry_chain_atlas_mine_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/industry-chain/history": {
         parameters: {
             query?: never;
@@ -2548,6 +2632,134 @@ export interface components {
             technical: components["schemas"]["FactorAnalysis"];
             /** Valuation View */
             valuation_view?: string | null;
+        };
+        /** AtlasCatalog */
+        AtlasCatalog: {
+            /** Categories */
+            categories: string[];
+            /** Chains */
+            chains: components["schemas"]["AtlasChainSummary"][];
+            /** Total Chains */
+            total_chains: number;
+            /** Total Companies */
+            total_companies: number;
+        };
+        /** AtlasChain */
+        AtlasChain: {
+            /** Aliases */
+            aliases?: string[];
+            /** Category */
+            category: string;
+            /** Drivers */
+            drivers?: string[];
+            /** Layers */
+            layers: components["schemas"]["AtlasLayer"][];
+            /**
+             * Mined
+             * @default false
+             */
+            mined?: boolean;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Source
+             * @default builtin
+             * @enum {string}
+             */
+            source?: "builtin" | "imported" | "mined";
+            /** Summary */
+            summary: string;
+            /** Tags */
+            tags?: string[];
+        };
+        /** AtlasChainSummary */
+        AtlasChainSummary: {
+            /** Aliases */
+            aliases?: string[];
+            /** Category */
+            category: string;
+            /** Company Count */
+            company_count: number;
+            /** Name */
+            name: string;
+            /** Segment Count */
+            segment_count: number;
+            /** Slug */
+            slug: string;
+            /**
+             * Source
+             * @default builtin
+             * @enum {string}
+             */
+            source?: "builtin" | "imported" | "mined";
+            /** Summary */
+            summary: string;
+            /** Tags */
+            tags?: string[];
+        };
+        /** AtlasCompany */
+        AtlasCompany: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note?: string;
+        };
+        /**
+         * AtlasImportRequest
+         * @description 外部导入产业链：YAML 或 JSON 文本，支持单条 / 数组 / {chains: [...]}。
+         */
+        AtlasImportRequest: {
+            /** Content */
+            content: string;
+            /**
+             * Overwrite
+             * @default false
+             */
+            overwrite?: boolean;
+        };
+        /** AtlasLayer */
+        AtlasLayer: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "upstream" | "midstream" | "downstream";
+            /** Name */
+            name: string;
+            /** Segments */
+            segments: components["schemas"]["AtlasSegment"][];
+        };
+        /**
+         * AtlasMineRequest
+         * @description 从已存档的 AI 分析结果挖掘知识库条目。
+         */
+        AtlasMineRequest: {
+            /**
+             * Archive Id
+             * @default
+             */
+            archive_id?: string;
+            /** Name */
+            name: string;
+        };
+        /** AtlasSegment */
+        AtlasSegment: {
+            /** Companies */
+            companies: components["schemas"]["AtlasCompany"][];
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Name */
+            name: string;
         };
         /** AuthResponse */
         AuthResponse: {
@@ -8903,6 +9115,163 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    get_industry_chain_atlas_catalog_api_industry_chain_atlas_chains_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtlasCatalog"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_industry_chain_atlas_chain_api_industry_chain_atlas_chains__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtlasChain"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_industry_chain_atlas_import_api_industry_chain_atlas_chains__slug__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    import_industry_chain_atlas_api_industry_chain_atlas_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtlasImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtlasChain"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mine_industry_chain_atlas_api_industry_chain_atlas_mine_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtlasMineRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtlasChain"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
