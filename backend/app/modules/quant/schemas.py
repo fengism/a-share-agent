@@ -68,6 +68,8 @@ class QuantExecutionConfig(BaseModel):
     slippage_bps: float = Field(default=5, ge=0, le=500)
     lot_size: int = Field(default=100, ge=1, le=10_000)
     risk_free_rate: float = Field(default=0.015, ge=-0.1, le=0.5)
+    # 信号变化/无法成交后的重平衡重试窗口（交易日）
+    rebalance_window_days: int = Field(default=3, ge=1, le=10)
 
 
 class QuantBacktestCreate(BaseModel):
@@ -117,6 +119,16 @@ class QuantTrade(BaseModel):
     realized_pnl: float | None = None
 
 
+class QuantOpenPosition(BaseModel):
+    """回测结束时仍未平仓的持仓（如跌停无法卖出），用于暴露尾部风险敞口。"""
+    code: str
+    shares: int
+    average_cost: float
+    last_price: float
+    market_value: float
+    unrealized_pnl: float
+
+
 class QuantMarketSnapshot(BaseModel):
     code: str
     source: str
@@ -147,6 +159,7 @@ class QuantBacktestResult(BaseModel):
     equity_curve: list[QuantEquityPoint]
     monthly_returns: list[QuantMonthlyReturn]
     trades: list[QuantTrade]
+    open_positions: list[QuantOpenPosition] = Field(default_factory=list)
     market_snapshots: list[QuantMarketSnapshot] = Field(default_factory=list)
 
 

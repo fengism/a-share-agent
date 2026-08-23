@@ -3,7 +3,7 @@ import { Card, Segmented } from "antd";
 import { useKlineData, useStockIntraday } from "../../api/queries";
 import IndicatorSubCharts from "../../charts/IndicatorSubCharts";
 import IntradayChart from "../../charts/IntradayChart";
-import KlineChart from "../../charts/KlineChart";
+import LazyKlineChart from "../../charts/LazyKlineChart";
 import DataRefreshIndicator from "../../components/DataRefreshIndicator";
 import SectionDataState from "../../components/SectionDataState";
 import { useColors, useStyles } from "../../theme/hooks";
@@ -100,7 +100,7 @@ export default memo(function AnalysisChartsSection({ code, pageData }: { code?: 
           skeletonRows={8}
           minHeight={500}
         >
-          <KlineChart
+          <LazyKlineChart
             data={klineData?.items || []}
             viewKey={`${code || "analysis"}:${period}:${adjust}`}
           />

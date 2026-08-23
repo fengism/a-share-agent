@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.domain.stock import StockConcept
+
+SCREENER_MARKETS = frozenset({"主板", "科创板", "创业板", "北交所"})
 
 
 class ScreenerFilter(BaseModel):
@@ -18,6 +20,25 @@ class ScreenerFilter(BaseModel):
     turnover_pct_min: float | None = None
     turnover_pct_max: float | None = None
     industries: list[str] | None = None
+    # 市场板块筛选：主板/科创板/创业板/北交所，None 表示全部市场
+    markets: list[str] | None = Field(default=None, max_length=4)
+
+    @field_validator("markets")
+    @classmethod
+    def _validate_markets(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        normalized = [item.strip() for item in value if item.strip()]
+        invalid = [item for item in normalized if item not in SCREENER_MARKETS]
+        if invalid:
+            raise ValueError(f"不支持的市场: {invalid}，可选值: {sorted(SCREENER_MARKETS)}")
+        return normalized or None
+    # 风控过滤（可选，默认全部关闭，调用方按需开启）：剔除 ST/*ST/退市风险股
+    exclude_st: bool = False
+    # 上市不满 N 天的新股波动与数据完整性风险高，None 表示不过滤
+    min_listing_days: int | None = Field(default=None, ge=0)
+    # 当日成交额下限（亿元），过滤流动性不足的标的，None 表示不过滤
+    min_amount_yi: float | None = Field(default=None, ge=0)
     sort_by: str = "market_cap"
     sort_order: str = "desc"
     page: int = Field(default=1, ge=1)
@@ -51,6 +72,10 @@ class ScreenerResult(BaseModel):
     sw_industry_coverage: float = Field(default=0, ge=0, le=1)
     exchange_industry_coverage: float = Field(default=0, ge=0, le=1)
     stock_master_complete: bool = False
+    # 风控过滤剔除的数量，便于调用方了解口径
+    risk_excluded_st: int = 0
+    risk_excluded_new_listing: int = 0
+    risk_excluded_low_liquidity: int = 0
 
 
 class ValuationPercentileRequest(BaseModel):

@@ -78,7 +78,7 @@ describe("FundFlowTab", () => {
     expect(chart).toHaveAttribute("data-line-colors", "#f79009,#f5222d,#52c41a");
     expect(chart).toHaveAttribute("data-item-colors", "#f79009,#f5222d,#52c41a");
     expect(chart).toHaveAttribute("data-series-lengths", "3,3,3");
-    expect(screen.getByText(/数据源：同花顺 data\.hexin\.cn 原始接口/)).toHaveTextContent("沪股通 3/3 点，深股通 3/3 点");
+    expect(screen.getByText(/沪股通 3\/3 点/)).toHaveTextContent("沪股通 3/3 点，深股通 3/3 点");
 
     expect(screen.getByTestId("northbound-total").querySelector(".ant-statistic-content")).toHaveStyle({ color: "#f79009" });
     expect(screen.getByTestId("northbound-shanghai").querySelector(".ant-statistic-content")).toHaveStyle({ color: "#f5222d" });

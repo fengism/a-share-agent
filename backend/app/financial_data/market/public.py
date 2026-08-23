@@ -23,6 +23,7 @@ from app.financial_data.market.quotes.indices import get_indices
 from app.financial_data.market.quotes.limit_history import get_limit_history
 from app.financial_data.market.quotes.limit_up_ladder import get_limit_up_ladder
 from app.financial_data.market.quotes.mainline import get_market_mainline
+from app.financial_data.market.quotes.margin import get_market_margin
 from app.financial_data.market.quotes.schemas import (
     DragonTigerDetail,
     DragonTigerItem,
@@ -47,6 +48,8 @@ from app.financial_data.market.quotes.schemas import (
     MarketMainlineStyle,
     MarketMainlineStyleIndex,
     MarketMainlineStyleIndexStock,
+    MarketMarginItem,
+    MarketMarginResponse,
     MarketSectorStocksHistoryItem,
     MarketSectorStocksHistoryResponse,
     MarketStatistics,
@@ -58,13 +61,18 @@ from app.financial_data.market.quotes.schemas import (
     MarketWindStocksResponse,
     ThsHotPlate,
     ThsHotStock,
+    TradingCalendarResponse,
 )
 from app.financial_data.market.quotes.sector import get_industry_rankings
 from app.financial_data.market.quotes.sector_stocks_history import get_sector_stocks_history
 from app.financial_data.market.quotes.statistic import get_market_statistics
 from app.financial_data.market.quotes.volume import get_market_volume, get_realtime_market_volume
 from app.financial_data.market.quotes.wind import get_market_wind, get_market_wind_stocks
-from app.financial_data.market.trading_session import get_completed_market_date, get_market_date_on_or_before
+from app.financial_data.market.trading_session import (
+    get_completed_market_date,
+    get_market_date_on_or_before,
+    get_trading_calendar_view,
+)
 from app.financial_data.market.twitter import (
     get_twitter_feed,
     get_twitter_user_articles,
@@ -81,6 +89,7 @@ __all__ = [
     "get_dragon_tiger_list",
     "get_hot_stocks",
     "get_completed_market_date",
+    "get_trading_calendar_view",
     "get_hsgt_flow",
     "get_hsgt_flow_history",
     "get_index_intraday",
@@ -96,6 +105,7 @@ __all__ = [
     "get_market_emotion",
     "get_market_kuaixun",
     "get_market_mainline",
+    "get_market_margin",
     "get_limit_up_ladder",
     "get_limit_history",
     "get_market_news",
@@ -133,6 +143,8 @@ __all__ = [
     "MarketLimitUpLadderSector",
     "MarketLimitUpLadderStock",
     "MarketMainlineChance",
+    "MarketMarginItem",
+    "MarketMarginResponse",
     "MarketMainlineFaucetStock",
     "MarketMainlinePlate",
     "MarketMainlineResponse",
@@ -147,5 +159,6 @@ __all__ = [
     "refresh_twitter_feeds",
     "refresh_twitter_feeds_sync",
     "ThsHotPlate",
+    "TradingCalendarResponse",
     "ThsHotStock",
 ]

@@ -77,7 +77,7 @@ describe("PortfolioTables", () => {
     expect(screen.getAllByText("¥1,010.00").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /贵州茅台/ })[0]).toHaveAttribute(
       "href",
-      "https://data.eastmoney.com/stockdata/600519.html",
+      "/analysis/600519",
     );
 
     const expandButton = container.querySelector<HTMLButtonElement>(".ant-table-row-expand-icon");

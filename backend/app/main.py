@@ -41,6 +41,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         wal_checkpoint=background_tasks.periodic_wal_checkpoint,
         database_backup=background_tasks.periodic_database_backup,
         twitter_feed_refresh=background_tasks.refresh_twitter_feed_periodic,
+        potential_stock_daily=background_tasks.refresh_potential_stocks_daily,
         bot_job_worker=job_workers.run_bot_job_worker,
         quant_strategy_reload=quant_strategy_reload,
         quant_job_worker=job_workers.run_quant_job_worker,

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckOutlined,
   CopyOutlined,
@@ -33,16 +33,27 @@ export const AssistantMessage = React.memo(function AssistantMessage({
   onResultAction,
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<number | null>(null);
   const hasContent = !!message.content;
   const isStreaming = message.isStreaming;
   const normalizedContent = message.content.replace(/\n{3,}/g, "\n\n");
   const resultContext = useMemo(() => extractChatResultContext(message), [message]);
 
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    };
+  }, []);
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(message.content);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = window.setTimeout(() => {
+        copyTimerRef.current = null;
+        setCopied(false);
+      }, 1600);
     } catch {
       setCopied(false);
     }

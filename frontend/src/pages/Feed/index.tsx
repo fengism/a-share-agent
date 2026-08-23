@@ -16,7 +16,7 @@ export default function Feed() {
       <section className="feed-paper">
         <header className="feed-masthead">
           <span className="feed-masthead-kicker">A-SHARE INTELLIGENCE</span>
-          <h1>市场资讯日报</h1>
+          <h1>市场资讯</h1>
           <div className="feed-masthead-meta">
             A 股资讯 · {dayjs().format("YYYY 年 MM 月 DD 日")} · 24 小时滚动更新
           </div>

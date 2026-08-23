@@ -6666,6 +6666,111 @@
         "title": "MarketMainlineStyleIndexStock",
         "type": "object"
       },
+      "MarketMarginItem": {
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "rqye": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rqye"
+          },
+          "rzche": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rzche"
+          },
+          "rzjme": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rzjme"
+          },
+          "rzmre": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rzmre"
+          },
+          "rzrqye": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rzrqye"
+          },
+          "rzye": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rzye"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "title": "MarketMarginItem",
+        "type": "object"
+      },
+      "MarketMarginResponse": {
+        "properties": {
+          "fetched_at": {
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MarketMarginItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "source": {
+            "const": "东方财富",
+            "default": "东方财富",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fetched_at"
+        ],
+        "title": "MarketMarginResponse",
+        "type": "object"
+      },
       "MarketNewsSnapshotItem": {
         "properties": {
           "author": {
@@ -8155,6 +8260,149 @@
         "title": "PortfolioTransactionPreview",
         "type": "object"
       },
+      "PotentialDailyResult": {
+        "description": "一个交易日的潜力股挖掘结果。",
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "evaluated": {
+            "default": 0,
+            "title": "Evaluated",
+            "type": "integer"
+          },
+          "failed_count": {
+            "default": 0,
+            "title": "Failed Count",
+            "type": "integer"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PotentialStockItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "universe_size": {
+            "default": 0,
+            "title": "Universe Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "generated_at"
+        ],
+        "title": "PotentialDailyResult",
+        "type": "object"
+      },
+      "PotentialStockItem": {
+        "description": "每日潜力股挖掘结果中的单只股票。",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "score": {
+            "default": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "signal_age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal Age Days"
+          },
+          "signal_date": {
+            "default": "",
+            "title": "Signal Date",
+            "type": "string"
+          },
+          "strategies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Strategies",
+            "type": "array"
+          },
+          "turnover_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnover Pct"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "title": "PotentialStockItem",
+        "type": "object"
+      },
       "PromptTrace": {
         "description": "Purpose: 记录生成结果所使用的 Prompt 与模型配置，便于回溯。",
         "properties": {
@@ -8458,6 +8706,13 @@
             "title": "Monthly Returns",
             "type": "array"
           },
+          "open_positions": {
+            "items": {
+              "$ref": "#/components/schemas/QuantOpenPosition"
+            },
+            "title": "Open Positions",
+            "type": "array"
+          },
           "trades": {
             "items": {
               "$ref": "#/components/schemas/QuantTrade"
@@ -8623,6 +8878,13 @@
             "minimum": 0.0,
             "title": "Minimum Commission",
             "type": "number"
+          },
+          "rebalance_window_days": {
+            "default": 3,
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Rebalance Window Days",
+            "type": "integer"
           },
           "risk_free_rate": {
             "default": 0.015,
@@ -8795,6 +9057,45 @@
           "return_pct"
         ],
         "title": "QuantMonthlyReturn",
+        "type": "object"
+      },
+      "QuantOpenPosition": {
+        "description": "回测结束时仍未平仓的持仓（如跌停无法卖出），用于暴露尾部风险敞口。",
+        "properties": {
+          "average_cost": {
+            "title": "Average Cost",
+            "type": "number"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "last_price": {
+            "title": "Last Price",
+            "type": "number"
+          },
+          "market_value": {
+            "title": "Market Value",
+            "type": "number"
+          },
+          "shares": {
+            "title": "Shares",
+            "type": "integer"
+          },
+          "unrealized_pnl": {
+            "title": "Unrealized Pnl",
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "shares",
+          "average_cost",
+          "last_price",
+          "market_value",
+          "unrealized_pnl"
+        ],
+        "title": "QuantOpenPosition",
         "type": "object"
       },
       "QuantSavedStrategy": {
@@ -9909,6 +10210,11 @@
             ],
             "title": "Change Pct Min"
           },
+          "exclude_st": {
+            "default": false,
+            "title": "Exclude St",
+            "type": "boolean"
+          },
           "industries": {
             "anyOf": [
               {
@@ -9944,6 +10250,45 @@
               }
             ],
             "title": "Market Cap Min"
+          },
+          "markets": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 4,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markets"
+          },
+          "min_amount_yi": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Amount Yi"
+          },
+          "min_listing_days": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Listing Days"
           },
           "page": {
             "default": 1,
@@ -10233,6 +10578,21 @@
           },
           "page_size": {
             "title": "Page Size",
+            "type": "integer"
+          },
+          "risk_excluded_low_liquidity": {
+            "default": 0,
+            "title": "Risk Excluded Low Liquidity",
+            "type": "integer"
+          },
+          "risk_excluded_new_listing": {
+            "default": 0,
+            "title": "Risk Excluded New Listing",
+            "type": "integer"
+          },
+          "risk_excluded_st": {
+            "default": 0,
+            "title": "Risk Excluded St",
             "type": "integer"
           },
           "stock_master_complete": {
@@ -11540,7 +11900,8 @@
               "subtract",
               "multiply",
               "divide",
-              "obv"
+              "obv",
+              "shift"
             ],
             "title": "Operator",
             "type": "string"
@@ -12586,6 +12947,74 @@
           "function"
         ],
         "title": "ToolCallInfo",
+        "type": "object"
+      },
+      "TradingCalendarResponse": {
+        "description": "A 股交易日历区间视图。",
+        "properties": {
+          "count": {
+            "default": 0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "degraded": {
+            "default": false,
+            "title": "Degraded",
+            "type": "boolean"
+          },
+          "end_date": {
+            "title": "End Date",
+            "type": "string"
+          },
+          "next_trading_day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Trading Day"
+          },
+          "previous_trading_day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Trading Day"
+          },
+          "start_date": {
+            "title": "Start Date",
+            "type": "string"
+          },
+          "today": {
+            "title": "Today",
+            "type": "string"
+          },
+          "today_is_trading_day": {
+            "default": false,
+            "title": "Today Is Trading Day",
+            "type": "boolean"
+          },
+          "trade_dates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trade Dates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "start_date",
+          "end_date",
+          "today"
+        ],
+        "title": "TradingCalendarResponse",
         "type": "object"
       },
       "TwitterAnalysisReference": {
@@ -16694,6 +17123,57 @@
         ]
       }
     },
+    "/api/market/margin": {
+      "get": {
+        "description": "获取沪深两市融资融券历史合计（日级，单位亿元）。",
+        "operationId": "get_market_margin_api_market_margin_get",
+        "parameters": [
+          {
+            "description": "返回的交易日数量，30-500",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 240,
+              "description": "返回的交易日数量，30-500",
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketMarginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Market Margin",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/api/market/news-analysis": {
       "get": {
         "description": "获取由 LLM 生成的市场资讯综合分析。",
@@ -16915,6 +17395,83 @@
           }
         ],
         "summary": "Get Market Wind Stocks",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/trading-calendar": {
+      "get": {
+        "description": "获取 A 股交易日历（区间列表与今日交易状态）。",
+        "operationId": "get_trading_calendar_api_market_trading_calendar_get",
+        "parameters": [
+          {
+            "description": "起始日期 YYYY-MM-DD",
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "起始日期 YYYY-MM-DD",
+              "title": "Start Date"
+            }
+          },
+          {
+            "description": "结束日期 YYYY-MM-DD",
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "结束日期 YYYY-MM-DD",
+              "title": "End Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingCalendarResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Trading Calendar",
         "tags": [
           "market"
         ]
@@ -17497,6 +18054,179 @@
         ]
       }
     },
+    "/api/potential/dates": {
+      "get": {
+        "description": "列出可用结果的日期索引。",
+        "operationId": "get_potential_dates_api_potential_dates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 90,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Potential Dates",
+        "tags": [
+          "potential"
+        ]
+      }
+    },
+    "/api/potential/latest": {
+      "get": {
+        "description": "获取最近（或指定日期）的潜力股挖掘结果。",
+        "operationId": "get_latest_potential_api_potential_latest_get",
+        "parameters": [
+          {
+            "description": "日期 YYYY-MM-DD，缺省取最近一份",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "日期 YYYY-MM-DD，缺省取最近一份",
+              "title": "Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PotentialDailyResult"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Latest Potential Api Potential Latest Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Latest Potential",
+        "tags": [
+          "potential"
+        ]
+      }
+    },
+    "/api/potential/run": {
+      "post": {
+        "description": "手动触发一次潜力股挖掘（后台每日任务之外的即时入口）。",
+        "operationId": "trigger_potential_mining_api_potential_run_post",
+        "parameters": [
+          {
+            "description": "当天已有结果时是否强制重跑",
+            "in": "query",
+            "name": "force",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "当天已有结果时是否强制重跑",
+              "title": "Force",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PotentialDailyResult"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Trigger Potential Mining Api Potential Run Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Trigger Potential Mining",
+        "tags": [
+          "potential"
+        ]
+      }
+    },
     "/api/push": {
       "post": {
         "description": "将分析结果、复盘或聊天内容推送到 Notion 或飞书。\n\nParam:\n    request: PushRequest 请求体，包含 target、type、receiver 及内容字段。\nReturn:\n    PushResponse: 推送结果，含目标、文档 URL、标题和提示信息。",
@@ -17557,6 +18287,17 @@
               "maximum": 100,
               "minimum": 1,
               "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
               "type": "integer"
             }
           }

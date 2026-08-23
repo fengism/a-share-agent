@@ -44,12 +44,14 @@ class StrategyDirectoryWatcher:
             fingerprint = strategy_directories_fingerprint(self.registry.source_directories)
             if fingerprint == self._fingerprint:
                 return False
-            self._fingerprint = fingerprint
             state = await call_blocking(self.registry.reload, semaphore=misc_semaphore)
         except Exception as error:
+            # 指纹仅在重载成功后更新：半写的 YAML 导致失败时，
+            # 下次轮询仍会检测到变化并重试
             self.registry.record_reload_failure(error)
             logger.warning("量化策略热加载失败，继续使用上一版本", exc_info=True)
             return False
+        self._fingerprint = fingerprint
         logger.info(
             "量化策略热加载完成: strategies=%s",
             len(state.strategies),

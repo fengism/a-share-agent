@@ -592,9 +592,17 @@ body {
 
 .dashboard-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+  grid-template-columns: minmax(0, 1fr) minmax(400px, 440px);
   gap: var(--c-space-4);
   align-items: start;
+}
+
+/* 今日主线机会卡片：宽栏下自适应多列，窄屏退回单列 */
+.dashboard-mainline-grid {
+  display: grid;
+  gap: var(--c-space-3);
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-items: stretch;
 }
 
 .dashboard-main,

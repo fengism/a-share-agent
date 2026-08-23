@@ -192,7 +192,6 @@ export default function MarketEmotionTab() {
       <div className="market-emotion">
         <div className="emotion-toolbar">
           <Space size={12} wrap>
-            <span>数据来源：{data?.source || "财联社"}</span>
             <span>更新时间：{formatFetchedAt(data?.fetched_at)}</span>
             <RefreshBadge />
           </Space>

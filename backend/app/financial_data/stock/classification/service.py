@@ -143,11 +143,6 @@ def _build_industry_mapping_sw_index_akshare(level: int) -> tuple[dict[str, str]
     )
 
 
-def _build_industry_mapping_sw_second_index_akshare() -> tuple[dict[str, str], list[str]]:
-    """Compatibility wrapper for the established level-two AkShare operation."""
-    return _build_industry_mapping_sw_index_akshare(2)
-
-
 def _load_industry_mappings_sina() -> dict[int, tuple[dict[str, str], list[str]]]:
     return cast(
         dict[int, tuple[dict[str, str], list[str]]],

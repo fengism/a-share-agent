@@ -14,8 +14,8 @@ def create_application(
         CORSMiddleware,
         allow_origins=cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
     )
     application.add_middleware(UserContextMiddleware)
     application.add_middleware(RequestObservabilityMiddleware)

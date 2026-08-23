@@ -1,6 +1,6 @@
 import type { ChatStateContent, ChatStateSnapshot } from "../api/chatSessions";
-import type { ChatDisplayMessage, ChatMessage } from "../types/chat";
 import type { PersistedChatState, SessionData } from "./chatPersistence";
+import { sanitizeDisplayMessages, sanitizeHistoryMessages } from "./chatMessageGuards";
 import type { ChatState } from "./chatStoreTypes";
 
 export function toServerChatState(state: ChatState): ChatStateContent {
@@ -37,8 +37,8 @@ export function fromServerChatState(state: ChatStateSnapshot): PersistedChatStat
   const sessionData: Record<string, SessionData> = {};
   for (const [sessionId, data] of Object.entries(state.session_data)) {
     sessionData[sessionId] = {
-      messages: (data.messages ?? []) as unknown as ChatDisplayMessage[],
-      history: (data.history ?? []) as ChatMessage[],
+      messages: sanitizeDisplayMessages(data.messages),
+      history: sanitizeHistoryMessages(data.history),
       agentNames: data.agent_names ?? null,
       skillNames: data.skill_names ?? null,
     };

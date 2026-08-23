@@ -17,6 +17,7 @@ from app.agentic.agents.contracts import (
 from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent
 from app.agentic.messages import build_messages
+from app.agentic.orchestration.opinions import parse_opinion_block
 from app.agentic.protocol import (
     AgentMessage,
     ToolCallFunction,
@@ -143,10 +144,16 @@ class AgentExecutor:
         status: Literal["completed", "partial", "failed"],
         reasoning_content: str = "",
     ) -> AgentExecutionResult:
+        cleaned_analysis, opinion = parse_opinion_block(
+            profile.name,
+            profile.display_name,
+            analysis,
+        )
         return AgentExecutionResult(
             agent_name=profile.name,
             display_name=profile.display_name,
-            analysis=analysis,
+            analysis=cleaned_analysis,
+            opinion=opinion,
             status=status,
             tools_called=state.tools_called,
             tool_results=state.tool_results,

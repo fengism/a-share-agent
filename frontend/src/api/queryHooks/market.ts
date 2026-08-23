@@ -19,6 +19,7 @@ import type {
   MarketLimitHistoryCategory,
   MarketLimitUpLadder,
   MarketMainline,
+  MarketMargin,
   MarketSectorStocksHistory,
   MarketWind,
   MarketWindStocks,
@@ -28,6 +29,7 @@ import type {
   NewsAnalysis,
   ThsHotPlate,
   ThsHotStock,
+  TradingCalendar,
 } from "../../types/stock";
 
 export function marketIndicesQueryOptions(refetchInterval: number | false = false) {
@@ -185,6 +187,30 @@ export function useHsgtFlow(enabled = true, autoRefresh = true) {
     enabled,
     staleTime: 60 * 1000,
     refetchInterval: enabled && autoRefresh && isTradingSession ? 60 * 1000 : false,
+  });
+}
+
+export function useMarketMargin(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.market.margin,
+    queryFn: () => openApiGet("/api/market/margin", {
+      query: { days: 240 },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<MarketMargin>(),
+    enabled,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useTradingCalendar(year: number) {
+  return useQuery({
+    queryKey: queryKeys.market.tradingCalendar(String(year)),
+    queryFn: () => openApiGet("/api/market/trading-calendar", {
+      query: { start_date: `${year}-01-01`, end_date: `${year}-12-31` },
+    }),
+    select: asApiModel<TradingCalendar>(),
+    staleTime: 24 * 60 * 60 * 1000,
   });
 }
 

@@ -13,6 +13,8 @@ export const queryKeys = {
       ["marketIndexKline", symbol, period, startDate] as const,
     indexIntraday: (symbol: string) => ["marketIndexIntraday", symbol] as const,
     hsgtFlow: ["hsgtFlow"] as const,
+    margin: ["marketMargin"] as const,
+    tradingCalendar: (year: string) => ["tradingCalendar", year] as const,
     thsHotRank: ["thsHotRank"] as const,
     thsHotConcept: ["thsHotConcept"] as const,
     thsHotIndustry: ["thsHotIndustry"] as const,
@@ -43,6 +45,11 @@ export const queryKeys = {
     compare: (codes: string) => ["stockCompare", codes] as const,
     fundFlow: (code: string) => ["stockFundFlow", code] as const,
     analysisPage: (code: string) => ["analysisPage", code] as const,
+  },
+  potential: {
+    latest: ["potentialLatest"] as const,
+    byDate: (date: string) => ["potentialDaily", date] as const,
+    dates: ["potentialDates"] as const,
   },
   screener: {
     screen: (filters: unknown) => ["screener", filters] as const,

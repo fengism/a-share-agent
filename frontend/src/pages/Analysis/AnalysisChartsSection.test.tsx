@@ -13,7 +13,7 @@ vi.mock("../../api/queries", () => ({
   useStockIntraday: mocks.useStockIntraday,
 }));
 
-vi.mock("../../charts/KlineChart", () => ({
+vi.mock("../../charts/LazyKlineChart", () => ({
   default: ({ data, viewKey }: { data: Array<{ close: number }>; viewKey: string }) => (
     <div data-testid="kline-chart" data-view-key={viewKey}>{data[0]?.close}</div>
   ),

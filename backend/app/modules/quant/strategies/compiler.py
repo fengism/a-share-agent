@@ -12,6 +12,17 @@ from app.modules.quant.strategies.contracts import (
 from app.modules.quant.strategies.loader import canonical_definition_hash
 
 DATA_FIELDS = frozenset({"open", "high", "low", "close", "volume"})
+
+# 持仓路径依赖的运行时序列：由 evaluator 在扫描持仓状态时填充，
+# 仅在持仓中有值（空仓时为 None，信号比较按 False 处理），用于表达跟踪止损类退出条件
+ARITHMETIC_OPERATORS = frozenset({"add", "subtract", "multiply", "divide"})
+
+RUNTIME_SERIES = frozenset({
+    "entry_price",          # 本轮持仓的入场价
+    "holding_bars",         # 本轮持仓已持有的 bar 数（入场当日为 1）
+    "highest_since_entry",  # 本轮持仓期间的最高 high
+    "lowest_since_entry",   # 本轮持仓期间的最低 low
+})
 MAX_EXPRESSION_DEPTH = 12
 
 
@@ -20,6 +31,8 @@ class CompiledStrategy:
     definition: StrategyDefinition
     definition_hash: str
     indicator_order: tuple[str, ...]
+    # 传递依赖运行时序列的算术指标：在持仓扫描时逐 bar 求值
+    runtime_indicators: tuple[str, ...] = ()
 
 
 def _parameter_name(value: int | str) -> str | None:
@@ -55,7 +68,7 @@ def _validate_operand(definition: StrategyDefinition, value: SignalOperand, labe
         if parameter.type not in {"integer", "number"}:
             raise ValueError(f"{label} 只能引用数值参数: {value[1:]}")
         return
-    if value not in DATA_FIELDS and value not in definition.indicators:
+    if value not in DATA_FIELDS and value not in RUNTIME_SERIES and value not in definition.indicators:
         raise ValueError(f"{label} 引用了未知数据或指标: {value}")
 
 
@@ -104,7 +117,7 @@ def _indicator_order(definition: StrategyDefinition) -> tuple[str, ...]:
         for dependency in dependencies(name):
             if dependency in definition.indicators:
                 visit(dependency)
-            elif dependency not in DATA_FIELDS:
+            elif dependency not in DATA_FIELDS and dependency not in RUNTIME_SERIES:
                 raise ValueError(f"指标 {name} 引用了未知输入: {dependency}")
         visiting.remove(name)
         visited.add(name)
@@ -149,8 +162,24 @@ def compile_strategy(
         _validate_operand(definition, constraint.right, "约束 right")
         if any(isinstance(operand, str) and not operand.startswith("$") for operand in (constraint.left, constraint.right)):
             raise ValueError("参数约束只能引用参数或数值字面量")
+    runtime_indicators = _runtime_dependent_indicators(definition, order)
     return CompiledStrategy(
         definition=definition,
         definition_hash=definition_hash or canonical_definition_hash(definition),
         indicator_order=order,
+        runtime_indicators=runtime_indicators,
     )
+
+
+def _runtime_dependent_indicators(definition: StrategyDefinition, order: tuple[str, ...]) -> tuple[str, ...]:
+    """找出（传递）依赖运行时序列的指标，仅允许算术算子（逐 bar 求值）。"""
+    dependent: set[str] = set()
+    for name in order:
+        indicator = definition.indicators[name]
+        values = (indicator.input, indicator.volume_input, indicator.left, indicator.right, indicator.zero_value)
+        deps = {v for v in values if isinstance(v, str) and not v.startswith("$")}
+        if any(dep in RUNTIME_SERIES or dep in dependent for dep in deps):
+            if indicator.operator not in ARITHMETIC_OPERATORS:
+                raise ValueError(f"指标 {name} 依赖运行时序列，只支持算术算子")
+            dependent.add(name)
+    return tuple(name for name in order if name in dependent)

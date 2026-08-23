@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { AimOutlined } from "@ant-design/icons";
 import { Card, Col, Row, Tag, Typography } from "antd";
 import { useMarketIndices, useMarketMainline } from "../../api/queries";
 import ChangeValue from "../../components/ChangeValue";
@@ -8,6 +10,8 @@ import StockExternalLink from "../../components/StockExternalLink";
 import { useColors, useStyles, useTokens } from "../../styles/ui";
 import type { MarketMainlineChance, MarketMainlineStyle } from "../../types/stock";
 import { formatAmount } from "../../utils/format";
+import { HotRankContent as HotRankBoard } from "../../components/HotRankBoard";
+import MarketWindBoard from "../../components/MarketWindBoard";
 import WatchlistPanel from "./WatchlistPanel";
 
 const { Text } = Typography;
@@ -17,6 +21,17 @@ const INDEX_NAMES = ["上证指数", "深证成指", "创业板指", "科创50",
 function formatIndexPrice(value: number | string | null | undefined) {
   const numericValue = typeof value === "number" ? value : Number(value);
   return Number.isFinite(numericValue) ? numericValue.toFixed(2) : "-";
+}
+
+function SectionHeading({ icon, title }: { icon: ReactNode; title: string }) {
+  const c = useColors();
+  const t = useTokens();
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
+      <span style={{ color: c.primary, fontSize: t.font.lg, display: "inline-flex" }}>{icon}</span>
+      <Text strong style={{ fontSize: t.font.lg, color: c.textPrimary }}>{title}</Text>
+    </div>
+  );
 }
 
 function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
@@ -96,7 +111,18 @@ function MainlineStyleCard({ style }: { style: MarketMainlineStyle }) {
   const c = useColors();
   const t = useTokens();
   return (
-    <Card size="small" title="风格判断" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+    <Card
+      size="small"
+      title="风格判断"
+      style={{
+        borderRadius: t.radius.md,
+        boxShadow: t.shadow.xs,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
+      styles={{ body: { flex: 1, minHeight: 0 } }}
+    >
       <div style={{ display: "grid", gap: t.space[2] }}>
         <div style={{ display: "grid", gap: 2 }}>
           {style.title ? (
@@ -123,7 +149,7 @@ function MainlineStyleCard({ style }: { style: MarketMainlineStyle }) {
               <Text type="secondary" style={{ fontSize: t.font.xs }}>近30日</Text>
             </div>
             {index.stocks.length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", columnGap: t.space[3], rowGap: 2 }}>
+              <div style={{ display: "grid", gap: 2 }}>
                 {index.stocks.slice(0, 5).map((stock) => (
                   <span key={stock.code} style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[1] }}>
                     <StockExternalLink code={stock.code} name={stock.name}>
@@ -142,14 +168,13 @@ function MainlineStyleCard({ style }: { style: MarketMainlineStyle }) {
 }
 
 function DashboardMainlineSection() {
-  const c = useColors();
   const t = useTokens();
   const query = useMarketMainline();
   const chances = useMemo(() => query.data?.items ?? [], [query.data?.items]);
 
   return (
     <section aria-label="今日主线" style={{ marginTop: t.space[4] }}>
-      <Text strong style={{ fontSize: t.font.base, color: c.textPrimary }}>今日主线</Text>
+      <SectionHeading icon={<AimOutlined />} title="今日主线" />
       <SectionDataState
         isLoading={query.isLoading}
         error={query.error}
@@ -160,7 +185,7 @@ function DashboardMainlineSection() {
         skeletonRows={4}
         minHeight={160}
       >
-        <div style={{ marginTop: t.space[2], display: "grid", gap: t.space[3] }}>
+        <div className="dashboard-mainline-grid" style={{ marginTop: t.space[2] }}>
           {chances.map((chance) => (
             <MainlineChanceCard key={chance.title} chance={chance} />
           ))}
@@ -205,7 +230,6 @@ export default function Dashboard() {
         </div>
         <div className="dashboard-hero__meta" aria-label="市场概览元数据">
           <span>当前查看 {activeIndex?.name || "等待行情"} · {activeIndex?.code || "-"}</span>
-          <span>行情源 {marketData?.source || "等待数据"}</span>
         </div>
       </header>
       <div className="dashboard-layout">
@@ -271,10 +295,14 @@ export default function Dashboard() {
               </div>
             )}
           </SectionDataState>
-        </section>
-        <aside className="dashboard-sidebar" aria-label="首页自选栏">
-          <WatchlistPanel />
           <DashboardMainlineSection />
+          <section aria-label="今日风口" style={{ marginTop: t.space[4] }}>
+            <MarketWindBoard embedded />
+          </section>
+        </section>
+        <aside className="dashboard-sidebar" aria-label="首页榜单与自选栏">
+          <HotRankBoard embedded />
+          <WatchlistPanel />
         </aside>
       </div>
     </div>

@@ -31,6 +31,7 @@ const run: QuantBacktestRun = {
       slippage_bps: 5,
       lot_size: 100,
       risk_free_rate: 0.015,
+      rebalance_window_days: 3,
     },
   },
 };

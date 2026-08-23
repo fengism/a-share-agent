@@ -7,3 +7,4 @@ export * from "./queryHooks/portfolio";
 export * from "./queryHooks/capabilities";
 export * from "./queryHooks/quant";
 export * from "./queryHooks/watchlist";
+export * from "./queryHooks/potential";

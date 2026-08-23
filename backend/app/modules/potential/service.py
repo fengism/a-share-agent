@@ -1,0 +1,246 @@
+"""每日潜力股挖掘：多策略信号融合 + 风控过滤，按日持久化。"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import UTC, datetime
+
+import pandas as pd
+
+from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
+from app.financial_data.stock.public import (
+    get_exchange_stock_master,
+    get_historical_bars,
+    get_spot_snapshot,
+)
+from app.modules.potential.persistence import repository
+from app.modules.potential.schemas import (
+    PotentialDailyResult,
+    PotentialDateItem,
+    PotentialStockItem,
+)
+from app.modules.quant.engine import build_target_positions
+from app.modules.quant.public import get_strategy_registry
+from app.modules.screener.strategy_screening import SCREENER_STRATEGY_KEYS
+
+logger = logging.getLogger(__name__)
+
+# 候选池：剔除风控隐患后按成交额取头部
+_MAX_CANDIDATES = 300
+_MIN_AMOUNT_YI = 2.0
+_MIN_LISTING_DAYS = 365
+_MAX_OUTPUT = 50
+_MAX_CONCURRENCY = 6
+_HISTORY_DAYS = 420
+
+# 策略权重：形态/底部类罕见信号权重更高
+_STRATEGY_WEIGHTS: dict[str, float] = {
+    "bull_trend": 1.0,
+    "ma_golden_cross": 1.2,
+    "volume_breakout": 1.2,
+    "shrink_pullback": 1.0,
+    "bottom_volume": 1.5,
+    "one_yang_three_yin": 1.5,
+    "box_oscillation": 1.0,
+}
+# 信号新鲜度加成：3 个交易日内触发的信号额外 +50% 权重
+_FRESH_SIGNAL_DAYS = 3
+
+
+def _normalize_code(value: object) -> str:
+    text = str(value or "").strip()
+    if text[:2].upper() in {"SH", "SZ", "BJ"}:
+        text = text[2:]
+    return text.zfill(6) if text.isdigit() else text
+
+
+def _select_candidates(
+    df: pd.DataFrame | None,
+    master_records: list,
+) -> list[dict]:
+    """从全市场快照筛出风控合格的候选池（按成交额降序取头部）。"""
+    if df is None or df.empty:
+        return []
+    frame = df.copy()
+    frame["代码"] = frame["代码"].map(_normalize_code)
+    frame = frame.drop_duplicates(subset=["代码"], keep="first")
+
+    by_code = {record.code: record for record in master_records}
+    frame["board"] = frame["代码"].map({code: record.board for code, record in by_code.items()})
+    frame["listing_date"] = frame["代码"].map({code: record.listing_date for code, record in by_code.items()})
+    frame["amount_yi"] = pd.to_numeric(frame.get("成交额"), errors="coerce") / 1e8
+
+    name_text = frame["名称"].astype(str)
+    mask = ~(name_text.str.upper().str.contains("ST", na=False) | name_text.str.contains("退", na=False))
+    mask &= frame["amount_yi"].notna() & (frame["amount_yi"] >= _MIN_AMOUNT_YI)
+    listing_days = (pd.Timestamp.now() - pd.to_datetime(frame["listing_date"], errors="coerce")).dt.days
+    mask &= listing_days.isna() | (listing_days >= _MIN_LISTING_DAYS)
+    frame = frame[mask]
+
+    frame = frame.sort_values(by="amount_yi", ascending=False).head(_MAX_CANDIDATES)
+    return [
+        {
+            "code": str(row["代码"]),
+            "name": str(row["名称"]),
+            "price": pd.to_numeric(row.get("最新价"), errors="coerce"),
+            "change_pct": pd.to_numeric(row.get("涨跌幅"), errors="coerce"),
+            "market_cap": pd.to_numeric(row.get("总市值"), errors="coerce") / 1e8,
+            "turnover_pct": pd.to_numeric(row.get("换手率"), errors="coerce"),
+            "amount": row["amount_yi"],
+        }
+        for _, row in frame.iterrows()
+    ]
+
+
+def _float_or_none(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if pd.notna(number) else None
+
+
+def _latest_entry_index(positions: list[int]) -> int | None:
+    for index in range(len(positions) - 1, -1, -1):
+        if positions[index] == 1 and (index == 0 or positions[index - 1] != 1):
+            return index
+    return None
+
+
+def _evaluate_strategies(
+    bars_items: list,
+    strategy_snapshots: dict,
+) -> tuple[list[str], str, int | None, float]:
+    """对单只股票的全部策略求信号（同步，在线程池中执行）。"""
+    hits: list[str] = []
+    latest_signal_date = ""
+    signal_age: int | None = None
+    score = 0.0
+    for key, snapshot in strategy_snapshots.items():
+        try:
+            positions = build_target_positions(bars_items, snapshot)
+        except Exception:
+            continue
+        if not positions or positions[-1] != 1:
+            continue
+        entry_index = _latest_entry_index(positions)
+        age = len(positions) - 1 - entry_index if entry_index is not None else None
+        weight = _STRATEGY_WEIGHTS.get(key, 1.0)
+        if age is not None and age <= _FRESH_SIGNAL_DAYS:
+            weight *= 1.5
+        score += weight
+        hits.append(snapshot.definition.name)
+        if entry_index is not None and (signal_age is None or age < signal_age):
+            signal_age = age
+            latest_signal_date = bars_items[entry_index].date
+    return hits, latest_signal_date, signal_age, score
+
+
+async def mine_potential_stocks() -> PotentialDailyResult:
+    """执行一轮挖掘：候选筛选 → 多策略信号 → 融合评分。"""
+    from datetime import date as date_type
+    from datetime import timedelta
+
+    df, master = await asyncio.gather(
+        get_spot_snapshot(),
+        get_exchange_stock_master(),
+    )
+    candidates = await call_blocking(
+        _select_candidates,
+        df,
+        master.records if master is not None else [],
+        semaphore=misc_semaphore,
+    )
+    registry = get_strategy_registry()
+    strategy_snapshots = {
+        key: registry.resolve(key, None, {}) for key in sorted(SCREENER_STRATEGY_KEYS)
+    }
+
+    semaphore = asyncio.Semaphore(_MAX_CONCURRENCY)
+    start_date = date_type.today() - timedelta(days=_HISTORY_DAYS)
+    end_date = date_type.today()
+    items: list[PotentialStockItem] = []
+    failed = 0
+
+    async def evaluate(candidate: dict) -> None:
+        nonlocal failed
+        code = candidate["code"]
+        async with semaphore:
+            try:
+                bars = await get_historical_bars(
+                    code, start_date, end_date, period="daily", adjust="qfq",
+                )
+            except Exception as error:
+                failed += 1
+                logger.debug("潜力股评估行情获取失败 %s: %s", code, error)
+                return
+            if not bars.items:
+                failed += 1
+                return
+
+        hits, latest_signal_date, signal_age, score = await call_blocking(
+            _evaluate_strategies,
+            bars.items,
+            strategy_snapshots,
+            semaphore=misc_semaphore,
+        )
+        if not hits:
+            return
+        items.append(
+            PotentialStockItem(
+                code=code,
+                name=candidate["name"],
+                price=_float_or_none(candidate.get("price")),
+                change_pct=_float_or_none(candidate.get("change_pct")),
+                market_cap=_float_or_none(candidate.get("market_cap")),
+                turnover_pct=_float_or_none(candidate.get("turnover_pct")),
+                amount=_float_or_none(candidate.get("amount")),
+                strategies=hits,
+                signal_date=latest_signal_date,
+                signal_age_days=signal_age,
+                score=round(score, 2),
+            )
+        )
+
+    await asyncio.gather(*(evaluate(candidate) for candidate in candidates))
+    items.sort(key=lambda item: (-item.score, -(item.amount or 0)))
+
+    return PotentialDailyResult(
+        date=end_date.isoformat(),
+        generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
+        universe_size=len(candidates),
+        evaluated=len(candidates) - failed,
+        failed_count=failed,
+        items=items[:_MAX_OUTPUT],
+    )
+
+
+async def run_daily_mining(force: bool = False) -> PotentialDailyResult | None:
+    """每日挖掘入口：当天已有结果则跳过（force 可强制重跑）。"""
+    today = datetime.now(UTC).astimezone().date().isoformat()
+    if not force and repository.has_potential_result(today):
+        return repository.load_potential_result(today)
+    result = await mine_potential_stocks()
+    await call_blocking(repository.save_potential_result, result, semaphore=misc_semaphore)
+    logger.info(
+        "潜力股挖掘完成: date=%s universe=%s evaluated=%s hits=%s",
+        result.date, result.universe_size, result.evaluated, len(result.items),
+    )
+    return result
+
+
+async def get_potential_result(date: str | None = None) -> PotentialDailyResult | None:
+    """获取指定日期结果；未指定时返回最近一份。"""
+    if date is not None:
+        return await call_blocking(repository.load_potential_result, date, semaphore=misc_semaphore)
+    dates = await call_blocking(repository.list_potential_dates, 1, semaphore=misc_semaphore)
+    if not dates:
+        return None
+    return await call_blocking(repository.load_potential_result, dates[0], semaphore=misc_semaphore)
+
+
+async def list_potential_date_items(limit: int = 30) -> list[PotentialDateItem]:
+    """列出可用结果日期与各自命中数量。"""
+    summaries = await call_blocking(repository.list_potential_summaries, limit, semaphore=misc_semaphore)
+    return [PotentialDateItem(date=date, count=count) for date, count in summaries]

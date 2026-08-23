@@ -8,18 +8,38 @@ def get_news_field(item, field: str) -> str:
     return str(getattr(item, field, "") or "").strip()
 
 
+def _normalize_title(title: str) -> str:
+    """Normalize a news title for fuzzy equality: drop spaces and punctuation
+    (half- or full-width) and case, so the same headline syndicated across
+    sources with minor formatting differences collapses to one key."""
+    return "".join(ch for ch in title.strip().casefold() if ch.isalnum())
+
+
 def dedupe_news_items(items: list) -> list:
-    """Remove duplicate news items while preserving their order."""
-    seen: set[tuple[str, str, str]] = set()
+    """Remove duplicate news items while preserving their order.
+
+    Duplicates are detected by normalized title (cross-source syndication of
+    the same headline collapses to the first occurrence); items without a
+    usable title fall back to a (source, time) key instead of being dropped.
+    """
+    seen_titles: set[str] = set()
+    seen_fallback: set[tuple[str, str]] = set()
     result: list = []
     for item in items:
         title = get_news_field(item, "title")
         source = get_news_field(item, "source")
         time_text = get_news_field(item, "publish_time") or get_news_field(item, "time")
-        key = (title, source, time_text)
-        if title and key in seen:
+        if not title:
+            fallback_key = (source, time_text)
+            if fallback_key in seen_fallback:
+                continue
+            seen_fallback.add(fallback_key)
+            result.append(item)
             continue
-        seen.add(key)
+        normalized = _normalize_title(title)
+        if not normalized or normalized in seen_titles:
+            continue
+        seen_titles.add(normalized)
         result.append(item)
     return result
 

@@ -1154,6 +1154,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/margin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Margin
+         * @description 获取沪深两市融资融券历史合计（日级，单位亿元）。
+         */
+        get: operations["get_market_margin_api_market_margin_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/news-analysis": {
         parameters: {
             query?: never;
@@ -1246,6 +1266,26 @@ export interface paths {
          * @description 获取指定风口板块的龙头股。
          */
         get: operations["get_market_wind_stocks_api_market_today_wind__plate_code__stocks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/trading-calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Trading Calendar
+         * @description 获取 A 股交易日历（区间列表与今日交易状态）。
+         */
+        get: operations["get_trading_calendar_api_market_trading_calendar_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1433,6 +1473,66 @@ export interface paths {
         post?: never;
         /** Delete Position */
         delete: operations["delete_position_api_portfolio__position_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/potential/dates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Potential Dates
+         * @description 列出可用结果的日期索引。
+         */
+        get: operations["get_potential_dates_api_potential_dates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/potential/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Latest Potential
+         * @description 获取最近（或指定日期）的潜力股挖掘结果。
+         */
+        get: operations["get_latest_potential_api_potential_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/potential/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger Potential Mining
+         * @description 手动触发一次潜力股挖掘（后台每日任务之外的即时入口）。
+         */
+        post: operations["trigger_potential_mining_api_potential_run_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4953,6 +5053,36 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** MarketMarginItem */
+        MarketMarginItem: {
+            /** Date */
+            date: string;
+            /** Rqye */
+            rqye?: number | null;
+            /** Rzche */
+            rzche?: number | null;
+            /** Rzjme */
+            rzjme?: number | null;
+            /** Rzmre */
+            rzmre?: number | null;
+            /** Rzrqye */
+            rzrqye?: number | null;
+            /** Rzye */
+            rzye?: number | null;
+        };
+        /** MarketMarginResponse */
+        MarketMarginResponse: {
+            /** Fetched At */
+            fetched_at: string;
+            /** Items */
+            items?: components["schemas"]["MarketMarginItem"][];
+            /**
+             * Source
+             * @default 东方财富
+             * @constant
+             */
+            source: "东方财富";
+        };
         /** MarketNewsSnapshotItem */
         MarketNewsSnapshotItem: {
             /** Author */
@@ -5544,6 +5674,67 @@ export interface components {
             trade_time: string;
         };
         /**
+         * PotentialDailyResult
+         * @description 一个交易日的潜力股挖掘结果。
+         */
+        PotentialDailyResult: {
+            /** Date */
+            date: string;
+            /**
+             * Evaluated
+             * @default 0
+             */
+            evaluated: number;
+            /**
+             * Failed Count
+             * @default 0
+             */
+            failed_count: number;
+            /** Generated At */
+            generated_at: string;
+            /** Items */
+            items?: components["schemas"]["PotentialStockItem"][];
+            /**
+             * Universe Size
+             * @default 0
+             */
+            universe_size: number;
+        };
+        /**
+         * PotentialStockItem
+         * @description 每日潜力股挖掘结果中的单只股票。
+         */
+        PotentialStockItem: {
+            /** Amount */
+            amount?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Market Cap */
+            market_cap?: number | null;
+            /** Name */
+            name: string;
+            /** Price */
+            price?: number | null;
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+            /** Signal Age Days */
+            signal_age_days?: number | null;
+            /**
+             * Signal Date
+             * @default
+             */
+            signal_date: string;
+            /** Strategies */
+            strategies?: string[];
+            /** Turnover Pct */
+            turnover_pct?: number | null;
+        };
+        /**
          * PromptTrace
          * @description Purpose: 记录生成结果所使用的 Prompt 与模型配置，便于回溯。
          */
@@ -5712,6 +5903,8 @@ export interface components {
             metrics: components["schemas"]["QuantMetrics"];
             /** Monthly Returns */
             monthly_returns: components["schemas"]["QuantMonthlyReturn"][];
+            /** Open Positions */
+            open_positions?: components["schemas"]["QuantOpenPosition"][];
             /** Trades */
             trades: components["schemas"]["QuantTrade"][];
         };
@@ -5775,6 +5968,11 @@ export interface components {
              * @default 5
              */
             minimum_commission: number;
+            /**
+             * Rebalance Window Days
+             * @default 3
+             */
+            rebalance_window_days: number;
             /**
              * Risk Free Rate
              * @default 0.015
@@ -5841,6 +6039,24 @@ export interface components {
             month: string;
             /** Return Pct */
             return_pct: number;
+        };
+        /**
+         * QuantOpenPosition
+         * @description 回测结束时仍未平仓的持仓（如跌停无法卖出），用于暴露尾部风险敞口。
+         */
+        QuantOpenPosition: {
+            /** Average Cost */
+            average_cost: number;
+            /** Code */
+            code: string;
+            /** Last Price */
+            last_price: number;
+            /** Market Value */
+            market_value: number;
+            /** Shares */
+            shares: number;
+            /** Unrealized Pnl */
+            unrealized_pnl: number;
         };
         /** QuantSavedStrategy */
         QuantSavedStrategy: {
@@ -6228,12 +6444,23 @@ export interface components {
             change_pct_max?: number | null;
             /** Change Pct Min */
             change_pct_min?: number | null;
+            /**
+             * Exclude St
+             * @default false
+             */
+            exclude_st: boolean;
             /** Industries */
             industries?: string[] | null;
             /** Market Cap Max */
             market_cap_max?: number | null;
             /** Market Cap Min */
             market_cap_min?: number | null;
+            /** Markets */
+            markets?: string[] | null;
+            /** Min Amount Yi */
+            min_amount_yi?: number | null;
+            /** Min Listing Days */
+            min_listing_days?: number | null;
             /**
              * Page
              * @default 1
@@ -6320,6 +6547,21 @@ export interface components {
             page: number;
             /** Page Size */
             page_size: number;
+            /**
+             * Risk Excluded Low Liquidity
+             * @default 0
+             */
+            risk_excluded_low_liquidity: number;
+            /**
+             * Risk Excluded New Listing
+             * @default 0
+             */
+            risk_excluded_new_listing: number;
+            /**
+             * Risk Excluded St
+             * @default 0
+             */
+            risk_excluded_st: number;
             /**
              * Stock Master Complete
              * @default false
@@ -6761,7 +7003,7 @@ export interface components {
              * Operator
              * @enum {string}
              */
-            operator: "sma" | "ema" | "rsi" | "rolling_max" | "rolling_min" | "rolling_std" | "add" | "subtract" | "multiply" | "divide" | "obv";
+            operator: "sma" | "ema" | "rsi" | "rolling_max" | "rolling_min" | "rolling_std" | "add" | "subtract" | "multiply" | "divide" | "obv" | "shift";
             /** Period */
             period?: number | string | null;
             /** Right */
@@ -7046,6 +7288,39 @@ export interface components {
              * @constant
              */
             type: "function";
+        };
+        /**
+         * TradingCalendarResponse
+         * @description A 股交易日历区间视图。
+         */
+        TradingCalendarResponse: {
+            /**
+             * Count
+             * @default 0
+             */
+            count: number;
+            /**
+             * Degraded
+             * @default false
+             */
+            degraded: boolean;
+            /** End Date */
+            end_date: string;
+            /** Next Trading Day */
+            next_trading_day?: string | null;
+            /** Previous Trading Day */
+            previous_trading_day?: string | null;
+            /** Start Date */
+            start_date: string;
+            /** Today */
+            today: string;
+            /**
+             * Today Is Trading Day
+             * @default false
+             */
+            today_is_trading_day: boolean;
+            /** Trade Dates */
+            trade_dates?: string[];
         };
         /**
          * TwitterAnalysisReference
@@ -9375,6 +9650,38 @@ export interface operations {
             };
         };
     };
+    get_market_margin_api_market_margin_get: {
+        parameters: {
+            query?: {
+                /** @description 返回的交易日数量，30-500 */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketMarginResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_news_analysis_api_market_news_analysis_get: {
         parameters: {
             query?: never;
@@ -9514,6 +9821,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MarketWindStocksResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_trading_calendar_api_market_trading_calendar_get: {
+        parameters: {
+            query?: {
+                /** @description 起始日期 YYYY-MM-DD */
+                start_date?: string | null;
+                /** @description 结束日期 YYYY-MM-DD */
+                end_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradingCalendarResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -9911,6 +10252,101 @@ export interface operations {
             };
         };
     };
+    get_potential_dates_api_potential_dates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_latest_potential_api_potential_latest_get: {
+        parameters: {
+            query?: {
+                /** @description 日期 YYYY-MM-DD，缺省取最近一份 */
+                date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PotentialDailyResult"] | null;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    trigger_potential_mining_api_potential_run_post: {
+        parameters: {
+            query?: {
+                /** @description 当天已有结果时是否强制重跑 */
+                force?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PotentialDailyResult"] | null;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     push_content_api_push_post: {
         parameters: {
             query?: never;
@@ -9948,6 +10384,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;

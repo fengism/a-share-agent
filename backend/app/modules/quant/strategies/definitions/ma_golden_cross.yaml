@@ -1,6 +1,6 @@
 api_version: quant.strategy/v1
 key: ma_golden_cross
-version: 1.0.0
+version: 1.1.0
 enabled: true
 name: 均线金叉
 description: MA5 上穿 MA10 且量能高于 5 日均量、价格乖离率可控时入场。
@@ -13,7 +13,7 @@ parameters:
 indicators:
   ma5: { operator: sma, input: close, period: 5 }
   ma10: { operator: sma, input: close, period: 10 }
-  volume_ma5: { operator: sma, input: volume, period: 5 }
+  volume_ma5: { operator: sma, input: volume, period: 5, offset: 1 }
   volume_threshold: { operator: multiply, left: volume_ma5, right: $volume_ratio }
   distance: { operator: subtract, left: close, right: ma5 }
   bias_ratio: { operator: divide, left: distance, right: ma5, zero_value: 0 }

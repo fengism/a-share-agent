@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getEastmoneyStockUrl, normalizeAshareStockCode } from "./stockLinks";
+import { normalizeAshareStockCode } from "./stockLinks";
 
 describe("stockLinks", () => {
   it.each([
@@ -11,13 +11,7 @@ describe("stockLinks", () => {
     expect(normalizeAshareStockCode(input)).toBe(expected);
   });
 
-  it("builds an Eastmoney stock data URL", () => {
-    expect(getEastmoneyStockUrl("SH601991")).toBe(
-      "https://data.eastmoney.com/stockdata/601991.html",
-    );
-  });
-
   it("rejects unsupported stock codes", () => {
-    expect(getEastmoneyStockUrl("invalid")).toBeNull();
+    expect(normalizeAshareStockCode("invalid")).toBeNull();
   });
 });

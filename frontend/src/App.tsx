@@ -1,9 +1,9 @@
-import { lazy, Suspense, useEffect, useLayoutEffect } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
-import { useThemeStore, getAntToken, tokensToCssVars } from "./styles/ui";
+import { useThemeStore, tokensToCssVars } from "./styles/ui";
 import { themes } from "./theme/themes";
 import "./styles/base.css";
 import "./styles/markdown.css";
@@ -24,6 +24,7 @@ const Screener = lazy(pageLoaders.screener);
 const Analysis = lazy(pageLoaders.analysis);
 const AnalysisEntry = lazy(pageLoaders.analysisEntry);
 const DailyReviewPage = lazy(pageLoaders.dailyReview);
+const PotentialPage = lazy(pageLoaders.potential);
 const Chat = lazy(pageLoaders.chat);
 const Settings = lazy(pageLoaders.settings);
 const Feed = lazy(pageLoaders.feed);
@@ -42,7 +43,7 @@ const ForceChangePassword = lazy(pageLoaders.forceChangePassword);
 function AntProvider({ children }: { children: React.ReactNode }) {
   const themeKey = useThemeStore((s) => s.themeKey);
   const meta = themes[themeKey];
-  const token = getAntToken();
+  const token = meta.antToken;
 
   // Expose the active theme's colors as CSS custom properties on <html>,
   // so CSS :hover rules (see base.css) can react to theme changes without
@@ -81,54 +82,59 @@ function AntProvider({ children }: { children: React.ReactNode }) {
     for (const k in vars) root.style.setProperty(k, vars[k]);
   }, [themeKey, meta]);
 
+  const antTheme = useMemo(
+    () => ({
+      algorithm: meta.isLight ? theme.defaultAlgorithm : theme.darkAlgorithm,
+      token: {
+        ...token,
+        borderRadius: 8,
+        fontSize: 14,
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Helvetica Neue", Arial, sans-serif',
+      },
+      components: {
+        // Institutional/terminal table feel: subtle header band, crisp
+        // hairline separators, quiet row hover — applied app-wide.
+        Table: {
+          headerBg: meta.colors.nestedBg,
+          headerColor: meta.colors.textSecondary,
+          borderColor: meta.colors.border,
+          rowHoverBg: meta.colors.hoverBg,
+          headerSplitColor: "transparent",
+        },
+        // Keep antd Card elevation aligned with the design-token shadow so
+        // Cards, `.u-card` and inline cardStyle share one shadow scale.
+        Card: {
+          boxShadowTertiary: meta.tokens.shadow.xs,
+        },
+        // On-brand Tab nav: muted inactive labels, brand-primary active text
+        // and ink bar, plus a slightly more breathable gutter/padding so
+        // icon+label tabs (e.g. Market's 7 tabs) don't feel cramped.
+        Tabs: {
+          itemColor: meta.colors.textSecondary,
+          itemHoverColor: meta.colors.textPrimary,
+          itemSelectedColor: meta.colors.primary,
+          inkBarColor: meta.colors.primary,
+          horizontalItemGutter: 16,
+          horizontalItemPadding: "8px 4px",
+          titleFontSize: 14,
+        },
+        // Borderless tags read as quiet inline labels (e.g. "每 60 秒刷新")
+        // instead of light-filled chips — the dark-theme background stays the
+        // card color, with only a hairline border + secondary text.
+        Tag: {
+          defaultBg: "transparent",
+          defaultColor: meta.colors.textSecondary,
+        },
+      },
+    }),
+    [meta, token],
+  );
+
   return (
     <ConfigProvider
       locale={zhCN}
-      theme={{
-        algorithm: meta.isLight ? theme.defaultAlgorithm : theme.darkAlgorithm,
-        token: {
-          ...token,
-          borderRadius: 8,
-          fontSize: 14,
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Helvetica Neue", Arial, sans-serif',
-        },
-        components: {
-          // Institutional/terminal table feel: subtle header band, crisp
-          // hairline separators, quiet row hover — applied app-wide.
-          Table: {
-            headerBg: meta.colors.nestedBg,
-            headerColor: meta.colors.textSecondary,
-            borderColor: meta.colors.border,
-            rowHoverBg: meta.colors.hoverBg,
-            headerSplitColor: "transparent",
-          },
-          // Keep antd Card elevation aligned with the design-token shadow so
-          // Cards, `.u-card` and inline cardStyle share one shadow scale.
-          Card: {
-            boxShadowTertiary: meta.tokens.shadow.xs,
-          },
-          // On-brand Tab nav: muted inactive labels, brand-primary active text
-          // and ink bar, plus a slightly more breathable gutter/padding so
-          // icon+label tabs (e.g. Market's 7 tabs) don't feel cramped.
-          Tabs: {
-            itemColor: meta.colors.textSecondary,
-            itemHoverColor: meta.colors.textPrimary,
-            itemSelectedColor: meta.colors.primary,
-            inkBarColor: meta.colors.primary,
-            horizontalItemGutter: 16,
-            horizontalItemPadding: "8px 4px",
-            titleFontSize: 14,
-          },
-          // Borderless tags read as quiet inline labels (e.g. "每 60 秒刷新")
-          // instead of light-filled chips — the dark-theme background stays the
-          // card color, with only a hairline border + secondary text.
-          Tag: {
-            defaultBg: "transparent",
-            defaultColor: meta.colors.textSecondary,
-          },
-        },
-      }}
+      theme={antTheme}
     >
       {children}
     </ConfigProvider>
@@ -159,6 +165,7 @@ export default function App() {
                   <Route path="/market" element={<ErrorBoundary><Market /></ErrorBoundary>} />
                   <Route path="/screener" element={<ErrorBoundary><Screener /></ErrorBoundary>} />
                   <Route path="/daily-review" element={<ErrorBoundary><DailyReviewPage /></ErrorBoundary>} />
+                <Route path="/potential" element={<ErrorBoundary><PotentialPage /></ErrorBoundary>} />
                   <Route path="/feed" element={<ErrorBoundary><Feed /></ErrorBoundary>} />
                   <Route path="/twitter" element={<ErrorBoundary><Twitter /></ErrorBoundary>} />
                   <Route path="/analysis" element={<ErrorBoundary><AnalysisEntry /></ErrorBoundary>} />

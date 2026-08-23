@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Dashboard from "./index";
+import type { MarketMainline } from "../../types/stock/market";
 
 const mocks = vi.hoisted(() => ({
   intraday: vi.fn(),
@@ -45,7 +46,7 @@ const mocks = vi.hoisted(() => ({
           ],
         },
       ],
-    },
+    } as MarketMainline | null,
     isLoading: false,
     error: null as unknown,
     refetch: vi.fn(),
@@ -53,7 +54,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 function resetMainlineQuery() {
-  mocks.mainlineQuery.data = {
+  mocks.mainlineQuery.data = mainlineSnapshot();
+  mocks.mainlineQuery.isLoading = false;
+  mocks.mainlineQuery.error = null;
+}
+
+function mainlineSnapshot(): MarketMainline {
+  return {
     source: "财联社",
     fetched_at: "2026-08-21T10:30:00+08:00",
     style: {
@@ -92,8 +99,6 @@ function resetMainlineQuery() {
       },
     ],
   };
-  mocks.mainlineQuery.isLoading = false;
-  mocks.mainlineQuery.error = null;
 }
 
 vi.mock("../../api/queries", () => ({
@@ -116,6 +121,41 @@ vi.mock("../../api/queries", () => ({
     };
   },
   useMarketMainline: () => mocks.mainlineQuery,
+  useMarketWind: () => ({
+    data: { source: "财联社", fetched_at: "2026-08-21T10:30:00+08:00", items: [] },
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useMarketWindStocks: (_plateCode: string) => ({
+    data: { source: "财联社", plate_code: _plateCode, items: [] },
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useThsHotRank: () => ({
+    data: [],
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useThsHotConcept: () => ({
+    data: [],
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useThsHotIndustry: () => ({
+    data: [],
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock("../../charts/IntradayChart", () => ({ default: () => <div>首页指数分时图</div> }));
@@ -136,14 +176,14 @@ describe("Dashboard", () => {
       </MemoryRouter>,
     );
 
-    const rail = screen.getByRole("complementary", { name: "首页自选栏" });
+    const rail = screen.getByRole("complementary", { name: "首页榜单与自选栏" });
     expect(within(rail).getByTestId("watchlist-panel")).toBeInTheDocument();
+    expect(within(rail).getByText("热股榜")).toBeInTheDocument();
     expect(screen.queryByText("市场行情")).not.toBeInTheDocument();
     expect(screen.queryByText("对话")).not.toBeInTheDocument();
     expect(screen.queryByText("AI 分析")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "市场总览" })).toBeInTheDocument();
     expect(screen.getByText("当前查看 上证指数 · 000001")).toBeInTheDocument();
-    expect(screen.getByText("行情源 腾讯")).toBeInTheDocument();
     const selectedIndex = screen.getByRole("button", { name: /上证指数/ });
     expect(selectedIndex).toHaveClass("dashboard-index-button", "is-active");
     expect(selectedIndex).toHaveAttribute("aria-pressed", "true");

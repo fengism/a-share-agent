@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
+import { API_TIMEOUTS } from "../client";
 import { asApiModel, openApiGet } from "../openapiClient";
 import { queryKeys } from "../queryKeys";
 import { oneYearAgoDate } from "../../utils/date";
@@ -74,6 +75,7 @@ export function useFinancial(code: string, type = "balance") {
     queryFn: () => openApiGet("/api/stock/{code}/financial", {
       path: { code },
       query: { type },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<Record<string, unknown>[]>(),
     enabled: !!code,

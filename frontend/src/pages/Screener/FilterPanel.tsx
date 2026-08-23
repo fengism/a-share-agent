@@ -66,7 +66,16 @@ export default function FilterPanel({
       </Row>
 
       <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
-        <Col xs={24} sm={12}>
+        <Col xs={24} sm={12} md={6}>
+          <div style={fieldLabelStyle}>市场板块</div>
+          <Select mode="multiple" style={{ width: "100%" }} placeholder="全部市场" value={filters.markets || []} onChange={(v) => set({ markets: v.length > 0 ? v : null, page: 1 })} options={[
+            { label: "主板", value: "主板" },
+            { label: "创业板", value: "创业板" },
+            { label: "科创板", value: "科创板" },
+            { label: "北交所", value: "北交所" },
+          ]} size="small" maxTagCount={4} allowClear />
+        </Col>
+        <Col xs={24} sm={12} md={6}>
           <div style={fieldLabelStyle}>行业板块</div>
           <Select mode="multiple" style={{ width: "100%" }} placeholder="选择行业（可多选）" value={filters.industries || []} onChange={(v) => set({ industries: v.length > 0 ? v : null })} options={industries.map((n) => ({ label: n, value: n }))} size="small" maxTagCount={3} allowClear />
         </Col>

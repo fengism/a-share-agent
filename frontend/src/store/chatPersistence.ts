@@ -1,4 +1,5 @@
 import type { ChatDisplayMessage, ChatMessage } from "../types/chat";
+import { sanitizeDisplayMessages, sanitizeHistoryMessages } from "./chatMessageGuards";
 
 export const CHAT_STORAGE_LIMIT = 4 * 1024 * 1024;
 
@@ -88,8 +89,8 @@ function parseSessionData(value: unknown): Record<string, SessionData> {
       ? entry.skillNames.filter((name: unknown): name is string => typeof name === "string")
       : null;
     parsed[sessionId] = {
-      messages: messages as ChatDisplayMessage[],
-      history: history as ChatMessage[],
+      messages: sanitizeDisplayMessages(messages),
+      history: sanitizeHistoryMessages(history),
       agentNames,
       skillNames,
     };

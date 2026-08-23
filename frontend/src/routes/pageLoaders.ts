@@ -6,6 +6,7 @@ export const pageLoaders = {
   analysis: () => import("../pages/Analysis"),
   analysisEntry: () => import("../pages/Analysis/Entry"),
   dailyReview: () => import("../pages/DailyReview"),
+  potential: () => import("../pages/Potential"),
   chat: () => import("../pages/Chat"),
   settings: () => import("../pages/Settings"),
   feed: () => import("../pages/Feed"),

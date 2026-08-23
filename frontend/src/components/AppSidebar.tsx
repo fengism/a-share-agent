@@ -4,6 +4,7 @@ import {
   ApiOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
+  RadarChartOutlined,
   FilterOutlined,
   FundOutlined,
   GlobalOutlined,
@@ -55,6 +56,7 @@ const NAV_GROUPS = [
     items: [
       { key: "/portfolio", icon: <PieChartOutlined />, label: "仓位" },
       { key: "/daily-review", icon: <FileTextOutlined />, label: "复盘" },
+      { key: "/potential", icon: <RadarChartOutlined />, label: "潜力股" },
     ],
   },
   {

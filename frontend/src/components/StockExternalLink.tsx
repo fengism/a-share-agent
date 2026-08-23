@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
-import { getEastmoneyStockUrl, normalizeAshareStockCode } from "../utils/stockLinks";
+import { Link } from "react-router-dom";
+import { normalizeAshareStockCode } from "../utils/stockLinks";
 
 interface StockExternalLinkProps {
   code: string;
@@ -16,24 +17,21 @@ export default function StockExternalLink({
   className,
   style,
 }: StockExternalLinkProps) {
-  const href = getEastmoneyStockUrl(code);
-  if (!href) {
+  const normalizedCode = normalizeAshareStockCode(code);
+  if (!normalizedCode) {
     return <span className={className} style={style}>{children}</span>;
   }
 
-  const normalizedCode = normalizeAshareStockCode(code);
   const stockLabel = name ? `${name}（${normalizedCode}）` : normalizedCode;
 
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={`在东方财富查看${stockLabel}`}
+    <Link
+      to={`/analysis/${normalizedCode}`}
+      title={`查看${stockLabel}个股详情`}
       className={className}
       style={style}
     >
       {children}
-    </a>
+    </Link>
   );
 }

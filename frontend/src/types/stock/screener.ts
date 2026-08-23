@@ -14,6 +14,7 @@ export interface ScreenerFilter {
   turnover_pct_min?: number | null;
   turnover_pct_max?: number | null;
   industries?: string[] | null;
+  markets?: string[] | null;
   sort_by: string;
   sort_order: "asc" | "desc";
   page: number;

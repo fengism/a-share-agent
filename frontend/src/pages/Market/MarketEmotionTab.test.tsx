@@ -77,6 +77,5 @@ describe("MarketEmotionTab", () => {
     expect(screen.getByText("下跌 3202")).toBeInTheDocument();
     expect(screen.getByText("连板梯队")).toBeInTheDocument();
     expect(screen.getByText("高度板")).toBeInTheDocument();
-    expect(screen.getByText("数据来源：财联社")).toBeInTheDocument();
   });
 });

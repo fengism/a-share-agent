@@ -7,6 +7,34 @@ logger = logging.getLogger(__name__)
 class MiscMixin:
     """东方财富 misc 数据接口。"""
 
+    def fetch_market_margin_summary(self, page_size: int = 240) -> list[dict]:
+        """
+        沪深两市融资融券历史合计（日级）。
+        Param:
+            page_size: 每页条数（约等于返回的交易日数），默认 240（约一年）
+        Return:
+            按日期升序的 [{date, rzye(融资余额,亿), rqye(融券余额,亿), rzrqye(两融余额,亿), rzmre(融资买入额,亿), rzche(融资偿还额,亿), rzjme(融资净买入,亿)}]
+        """
+        data = self.fetch_datacenter_report(
+            "RPTA_RZRQ_LSHJ",
+            columns="ALL",
+            page_size=page_size,
+            sort_columns="DIM_DATE", sort_types="-1",
+        )
+        rows = []
+        for row in data:
+            rows.append({
+                "date": str(row.get("DIM_DATE", ""))[:10],
+                "rzye": row.get("RZYE", 0),
+                "rqye": row.get("RQYE", 0),
+                "rzrqye": row.get("RZRQYE", 0),
+                "rzmre": row.get("RZMRE", 0),
+                "rzche": row.get("RZCHE", 0),
+                "rzjme": row.get("RZJME", 0),
+            })
+        rows.reverse()
+        return rows
+
     def fetch_margin_trading(self, code: str, page_size: int = 30) -> list[dict]:
         """
         融资融券明细（日级）。

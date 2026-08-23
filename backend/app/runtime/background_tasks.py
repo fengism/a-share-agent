@@ -125,3 +125,23 @@ async def twitter_health_check() -> bool:
         return True
     except Exception:
         return False
+
+
+async def refresh_potential_stocks_daily() -> None:
+    """每日收盘后自动挖掘潜力股（当天已有结果则跳过）。"""
+    from datetime import datetime as dt
+
+    from app.modules.potential.public import run_daily_mining
+
+    async def iteration():
+        # 收盘后窗口内执行（15:10 起到当日结束），其他时段跳过
+        if not (15 <= dt.now().hour and (dt.now().hour > 15 or dt.now().minute >= 10)):
+            return
+        await run_daily_mining(force=False)
+
+    await task_scheduler.run_periodic(
+        name="potential_stock_daily",
+        coro_factory=iteration,
+        interval_seconds=1800,
+        leader_election=True,
+    )

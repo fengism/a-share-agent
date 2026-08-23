@@ -21,7 +21,7 @@ function toTimestamp(time: string): UTCTimestamp | null {
   return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)) / 1000 as UTCTimestamp;
 }
 
-export default function IntradayChart({ data, prevClose, height = 320 }: Props) {
+export default function IntradayChart({ data, prevClose, height = 320, viewKey }: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
   colorsRef.current = c;
@@ -31,6 +31,10 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
   const avgSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const priceLineRef = useRef<ReturnType<ISeriesApi<"Area">["createPriceLine"]> | null>(null);
+  // Tracks what was last pushed into the series so a poll that only appends
+  // recent rows can use series.update() instead of a full setData, which would
+  // also discard any visible range the chart recreates from scratch.
+  const appliedRef = useRef<{ viewKey: string; firstTime: UTCTimestamp | null; length: number } | null>(null);
   const rows = useMemo(
     () => data
       .map((item) => {
@@ -123,6 +127,7 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
       avgSeriesRef.current = null;
       volumeSeriesRef.current = null;
       priceLineRef.current = null;
+      appliedRef.current = null;
     };
   }, [height]);
 
@@ -133,17 +138,45 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
     const volumeSeries = volumeSeriesRef.current;
     if (!chart || !priceSeries || !avgSeries || !volumeSeries) return;
 
-    priceSeries.setData(rows.map((item) => ({ time: item.time, value: item.price })));
-    avgSeries.setData(rows
-      .filter((item) => item.avg_price != null)
-      .map((item) => ({ time: item.time, value: item.avg_price as number })));
-    volumeSeries.setData(rows.map((item) => ({
+    const effectiveViewKey = viewKey ?? "";
+    const firstTime = rows.length > 0 ? rows[0].time : null;
+    const applied = appliedRef.current;
+    // Append-only refresh (typical 30s poll during trading hours): rewrite only
+    // the trailing rows so the user's zoom/pan state survives.
+    const canAppend = applied !== null
+      && applied.viewKey === effectiveViewKey
+      && applied.firstTime !== null
+      && applied.firstTime === firstTime
+      && rows.length >= applied.length
+      && rows.length - applied.length <= 120;
+
+    const volumePoint = (item: IntradayItem & { time: UTCTimestamp }) => ({
       time: item.time,
       value: item.volume ?? 0,
       color: prevClose != null && item.price < prevClose
         ? hexToRgba(c.down, 0.24)
         : hexToRgba(c.up, 0.24),
-    })));
+    });
+
+    if (canAppend && applied) {
+      for (let i = Math.max(0, applied.length - 1); i < rows.length; i++) {
+        priceSeries.update({ time: rows[i].time, value: rows[i].price });
+        volumeSeries.update(volumePoint(rows[i]));
+      }
+    } else {
+      priceSeries.setData(rows.map((item) => ({ time: item.time, value: item.price })));
+      volumeSeries.setData(rows.map(volumePoint));
+      if (rows.length > 0) {
+        const visibleRange = buildIntradayVisibleRange(rows[0].time);
+        if (visibleRange) chart.timeScale().setVisibleRange(visibleRange);
+      }
+    }
+    // The average line is sparse (nulls filtered out) and cheap to rebuild.
+    avgSeries.setData(rows
+      .filter((item) => item.avg_price != null)
+      .map((item) => ({ time: item.time, value: item.avg_price as number })));
+
+    appliedRef.current = { viewKey: effectiveViewKey, firstTime, length: rows.length };
 
     if (priceLineRef.current) {
       priceSeries.removePriceLine(priceLineRef.current);
@@ -159,12 +192,7 @@ export default function IntradayChart({ data, prevClose, height = 320 }: Props) 
         title: "昨收",
       });
     }
-
-    if (rows.length > 0) {
-      const visibleRange = buildIntradayVisibleRange(rows[0].time);
-      if (visibleRange) chart.timeScale().setVisibleRange(visibleRange);
-    }
-  }, [c.down, c.textMuted, c.up, height, prevClose, rows]);
+  }, [c.down, c.up, c.textMuted, height, prevClose, rows, viewKey]);
 
   useEffect(() => {
     const chart = chartRef.current;

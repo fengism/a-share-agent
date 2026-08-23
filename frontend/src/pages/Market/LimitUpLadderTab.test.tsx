@@ -66,12 +66,11 @@ describe("LimitUpLadderTab", () => {
     expect(screen.getByText("涨停板")).toBeInTheDocument();
     expect(screen.getAllByText("涨停天梯").length).toBeGreaterThan(0);
     expect(screen.getByText("历史复盘")).toBeInTheDocument();
-    expect(screen.getByText("数据来源：开盘红")).toBeInTheDocument();
     expect(screen.getByText("数据日期：2026-08-12")).toBeInTheDocument();
     expect(screen.getByText("百花医药")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /百花医药/ })).toHaveAttribute(
       "href",
-      "https://data.eastmoney.com/stockdata/600721.html",
+      "/analysis/600721",
     );
     expect(screen.getByText("7连板")).toBeInTheDocument();
     expect(screen.getAllByText("大单一字").length).toBeGreaterThan(0);

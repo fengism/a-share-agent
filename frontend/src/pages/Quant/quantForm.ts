@@ -270,6 +270,7 @@ export function buildBacktestRequest(values: QuantFormValues): QuantBacktestCrea
       slippage_bps: values.slippageBps,
       lot_size: values.lotSize,
       risk_free_rate: values.riskFreeRatePercent / 100,
+      rebalance_window_days: 3,
     },
     start_date: values.dateRange[0].format("YYYY-MM-DD"),
     end_date: values.dateRange[1].format("YYYY-MM-DD"),

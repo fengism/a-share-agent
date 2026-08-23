@@ -136,14 +136,16 @@ async def screen_candidates_by_strategy(
         await asyncio.gather(*(evaluate(code) for code in normalized_codes))
         if len(failed) == len(normalized_codes):
             raise RuntimeError("全部候选股票历史数据获取失败")
+        # 信号新鲜度排序：最新触发的信号排前面，选股结果按可操作性呈现
+        ordered_matches = sorted(matches, key=lambda match: match.signal_date, reverse=True)
         result = ScreenerStrategyResult(
             strategy_key=snapshot.key,
             strategy_name=snapshot.definition.name,
             strategy_version=snapshot.version,
             definition_hash=snapshot.definition_hash,
             parameters=dict(snapshot.parameters),
-            matches=[match for code in normalized_codes for match in matches if match.code == code],
-            matched_codes=[code for code in normalized_codes if code in {match.code for match in matches}],
+            matches=ordered_matches,
+            matched_codes=[match.code for match in ordered_matches],
             evaluated=len(normalized_codes),
             failed=failed,
             fallback_count=sum(1 for match in matches if match.used_fallback),

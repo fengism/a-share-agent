@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import MarketWindTab from "./MarketWindTab";
+import MarketWindBoard from "./MarketWindBoard";
 
 const mocks = vi.hoisted(() => ({
   stocks: vi.fn(),
 }));
 
-vi.mock("../../api/queries", () => ({
+vi.mock("../api/queries", () => ({
   useMarketWind: () => ({
     data: {
       source: "财联社",
@@ -25,7 +25,7 @@ vi.mock("../../api/queries", () => ({
   useMarketWindStocks: (plateCode: string) => mocks.stocks(plateCode),
 }));
 
-describe("MarketWindTab", () => {
+describe("MarketWindBoard", () => {
   beforeEach(() => {
     mocks.stocks.mockImplementation((plateCode: string) => ({
       data: {
@@ -50,7 +50,7 @@ describe("MarketWindTab", () => {
 
     render(
       <MemoryRouter initialEntries={["/market?tab=today-wind"]}>
-        <MarketWindTab />
+        <MarketWindBoard />
         <LocationProbe />
       </MemoryRouter>,
     );
@@ -60,14 +60,13 @@ describe("MarketWindTab", () => {
     expect(screen.getByText("当前聚焦")).toBeInTheDocument();
     expect(screen.getAllByText("创新药投融资逐步修复。").length).toBeGreaterThan(0);
     expect(await screen.findByText("南模生物")).toBeInTheDocument();
-    expect(screen.getByText("数据来源：财联社")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "选择风口 创新药" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("最高涨幅")).toBeInTheDocument();
     expect(screen.getByText("20.01%")).toBeInTheDocument();
     expect(screen.getByText("2 板")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /南模生物/ })).toHaveAttribute(
       "href",
-      "https://data.eastmoney.com/stockdata/688265.html",
+      "/analysis/688265",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "选择风口 IDC电源" }));

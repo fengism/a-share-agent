@@ -1,6 +1,6 @@
 api_version: quant.strategy/v1
 key: one_yang_three_yin
-version: 1.0.0
+version: 1.2.0
 enabled: true
 name: 一阳夹三阴
 description: 大阳线后三根缩量阴线守住阳线实体，第五日阳线突破首日收盘时入场。
@@ -9,23 +9,26 @@ risk_level: high
 presentation: { icon: bar-chart }
 parameters:
   first_body_ratio: { type: number, label: 首日阳线实体比例, default: 0.02, minimum: 0.005, maximum: 0.1, step: 0.005 }
+  hold_tolerance: { type: number, label: 低点容忍度, default: 0.01, minimum: 0, maximum: 0.05, step: 0.005 }
 indicators:
-  open_1: { operator: sma, input: open, period: 1, offset: 4 }
-  close_1: { operator: sma, input: close, period: 1, offset: 4 }
-  low_2: { operator: sma, input: low, period: 1, offset: 3 }
-  open_2: { operator: sma, input: open, period: 1, offset: 3 }
-  close_2: { operator: sma, input: close, period: 1, offset: 3 }
-  volume_2: { operator: sma, input: volume, period: 1, offset: 3 }
-  low_3: { operator: sma, input: low, period: 1, offset: 2 }
-  open_3: { operator: sma, input: open, period: 1, offset: 2 }
-  close_3: { operator: sma, input: close, period: 1, offset: 2 }
-  volume_3: { operator: sma, input: volume, period: 1, offset: 2 }
-  low_4: { operator: sma, input: low, period: 1, offset: 1 }
-  open_4: { operator: sma, input: open, period: 1, offset: 1 }
-  close_4: { operator: sma, input: close, period: 1, offset: 1 }
-  volume_4: { operator: sma, input: volume, period: 1, offset: 1 }
+  open_1: { operator: shift, input: open, period: 4 }
+  close_1: { operator: shift, input: close, period: 4 }
+  low_2: { operator: shift, input: low, period: 3 }
+  open_2: { operator: shift, input: open, period: 3 }
+  close_2: { operator: shift, input: close, period: 3 }
+  volume_2: { operator: shift, input: volume, period: 3 }
+  low_3: { operator: shift, input: low, period: 2 }
+  open_3: { operator: shift, input: open, period: 2 }
+  close_3: { operator: shift, input: close, period: 2 }
+  volume_3: { operator: shift, input: volume, period: 2 }
+  low_4: { operator: shift, input: low, period: 1 }
+  open_4: { operator: shift, input: open, period: 1 }
+  close_4: { operator: shift, input: close, period: 1 }
+  volume_4: { operator: shift, input: volume, period: 1 }
   first_factor: { operator: add, left: 1, right: $first_body_ratio }
   first_body_threshold: { operator: multiply, left: open_1, right: first_factor }
+  hold_factor: { operator: subtract, left: 1, right: $hold_tolerance }
+  low_floor: { operator: multiply, left: open_1, right: hold_factor }
   ma5: { operator: sma, input: close, period: 5 }
   ma10: { operator: sma, input: close, period: 10 }
   ma20: { operator: sma, input: close, period: 20 }
@@ -37,14 +40,12 @@ signals:
       - { operator: less_than, left: close_2, right: open_2 }
       - { operator: less_than, left: close_3, right: open_3 }
       - { operator: less_than, left: close_4, right: open_4 }
-      - { operator: greater_or_equal, left: low_2, right: open_1 }
-      - { operator: greater_or_equal, left: low_3, right: open_1 }
-      - { operator: greater_or_equal, left: low_4, right: open_1 }
+      - { operator: greater_or_equal, left: low_2, right: low_floor }
+      - { operator: greater_or_equal, left: low_3, right: low_floor }
+      - { operator: greater_or_equal, left: low_4, right: low_floor }
       - { operator: less_than, left: volume_3, right: volume_2 }
-      - { operator: less_than, left: volume_4, right: volume_3 }
+      - { operator: less_than, left: volume_4, right: volume_2 }
       - { operator: greater_than, left: close, right: open }
       - { operator: greater_than, left: close, right: close_1 }
-      - { operator: greater_than, left: ma5, right: ma10 }
-      - { operator: greater_than, left: ma10, right: ma20 }
   exit: { operator: less_than, left: close, right: ma20 }
 position: { mode: binary }

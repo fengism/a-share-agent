@@ -140,6 +140,37 @@ async def screen_stocks(filters: ScreenerFilter) -> ScreenerResult:
         mask &= df["turnover_pct_num"] <= filters.turnover_pct_max
     if filters.industries:
         mask &= df["second_industry"].isin(filters.industries)
+    # 市场板块筛选（board 来自交易所 master；master 缺失时不生效，避免误杀全市场）
+    if filters.markets and df["board"].notna().any():
+        mask &= df["board"].isin(filters.markets)
+
+    # ── 风控过滤（参考多 Agent 决策链路的强制风控 gate）──
+    name_text = df["名称"].astype(str)
+    st_mask = name_text.str.upper().str.contains("ST", na=False) | name_text.str.contains("退", na=False)
+    risk_excluded_st = int((mask & st_mask).sum())
+    if filters.exclude_st:
+        mask &= ~st_mask
+
+    listing_mask = pd.Series(False, index=df.index)
+    if filters.min_listing_days is not None and filters.min_listing_days > 0:
+        listing_dates = pd.to_datetime(df["listing_date"], errors="coerce")
+        listing_days = (pd.Timestamp.now() - listing_dates).dt.days
+        # 上市日期缺失时不过滤，避免数据源缺元数据时误杀全市场
+        listing_mask = mask & (listing_days.notna() & (listing_days < filters.min_listing_days))
+        risk_excluded_new_listing = int(listing_mask.sum())
+        mask &= ~listing_mask
+    else:
+        risk_excluded_new_listing = 0
+
+    amount_mask = pd.Series(False, index=df.index)
+    if filters.min_amount_yi is not None and filters.min_amount_yi > 0:
+        if "成交额" in df.columns:
+            amount_yi = pd.to_numeric(df["成交额"], errors="coerce") / 1e8
+            amount_mask = mask & (amount_yi.notna() & (amount_yi < filters.min_amount_yi))
+            risk_excluded_low_liquidity = int(amount_mask.sum())
+            mask &= ~amount_mask
+    else:
+        risk_excluded_low_liquidity = 0
 
     filtered = df[mask].copy()
     filtered["second_industry"] = filtered["second_industry"].map(safe_string)
@@ -192,4 +223,7 @@ async def screen_stocks(filters: ScreenerFilter) -> ScreenerResult:
         sw_industry_coverage=sw_industry_coverage,
         exchange_industry_coverage=exchange_industry_coverage,
         stock_master_complete=bool(exchange_master and exchange_master.complete),
+        risk_excluded_st=risk_excluded_st,
+        risk_excluded_new_listing=risk_excluded_new_listing,
+        risk_excluded_low_liquidity=risk_excluded_low_liquidity,
     )

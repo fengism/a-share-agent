@@ -234,6 +234,22 @@ export interface MarketWind {
   items: MarketWindPlate[];
 }
 
+export interface MarketMarginItem {
+  date: string;
+  rzye: number | null;
+  rqye: number | null;
+  rzrqye: number | null;
+  rzmre: number | null;
+  rzche: number | null;
+  rzjme: number | null;
+}
+
+export interface MarketMargin {
+  source: "东方财富";
+  fetched_at: string;
+  items: MarketMarginItem[];
+}
+
 export interface MarketWindStock {
   code: string;
   name: string;
@@ -358,4 +374,16 @@ export interface MacroAllData {
   rates: MacroCategory;
   growth: MacroCategory;
   trade: MacroCategory;
+}
+
+export interface TradingCalendar {
+  start_date: string;
+  end_date: string;
+  trade_dates: string[];
+  count: number;
+  today: string;
+  today_is_trading_day: boolean;
+  previous_trading_day: string | null;
+  next_trading_day: string | null;
+  degraded: boolean;
 }

@@ -128,7 +128,7 @@ export default function FundFlowTab() {
               更新时间：{data?.updated_at || "-"}，单位：{data?.unit || "亿元"}，自动刷新：交易时段每 60 秒，盘外暂停，可手动刷新
             </Text>
             <Text type="secondary" className="market-fund-flow__disclosure-note">
-              数据源：同花顺 data.hexin.cn 原始接口；沪股通 {hgtPointCount}/{points.length} 点，深股通 {sgtPointCount}/{points.length} 点，缺失数据不补造。
+              沪股通 {hgtPointCount}/{points.length} 点，深股通 {sgtPointCount}/{points.length} 点，缺失数据不补造。
             </Text>
           </div>
           <ReactECharts echarts={echarts} option={option} className="market-fund-flow__chart" style={{ height: 420, width: "100%" }} notMerge />

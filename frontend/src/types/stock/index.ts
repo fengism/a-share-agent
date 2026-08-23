@@ -2,6 +2,7 @@ export * from "./analysis";
 export * from "./compare";
 export * from "./industryChain";
 export * from "./market";
+export * from "./potential";
 export * from "./news";
 export * from "./profile";
 export * from "./push";

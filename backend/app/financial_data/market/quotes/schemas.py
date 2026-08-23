@@ -199,6 +199,35 @@ class MarketWindStocksResponse(BaseModel):
     items: list[MarketWindStock] = Field(default_factory=list)
 
 
+class TradingCalendarResponse(BaseModel):
+    """A 股交易日历区间视图。"""
+    start_date: str
+    end_date: str
+    trade_dates: list[str] = Field(default_factory=list)
+    count: int = 0
+    today: str
+    today_is_trading_day: bool = False
+    previous_trading_day: str | None = None
+    next_trading_day: str | None = None
+    degraded: bool = False
+
+
+class MarketMarginItem(BaseModel):
+    date: str
+    rzye: float | None = None
+    rqye: float | None = None
+    rzrqye: float | None = None
+    rzmre: float | None = None
+    rzche: float | None = None
+    rzjme: float | None = None
+
+
+class MarketMarginResponse(BaseModel):
+    source: Literal["东方财富"] = "东方财富"
+    fetched_at: str
+    items: list[MarketMarginItem] = Field(default_factory=list)
+
+
 class MarketMainlineFaucetStock(BaseModel):
     code: str
     name: str

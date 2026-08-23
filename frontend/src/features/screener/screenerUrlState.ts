@@ -69,6 +69,12 @@ export function parseScreenerUrlState(params: URLSearchParams): ScreenerUrlState
     .filter(Boolean);
   if (industries?.length) filters.industries = Array.from(new Set(industries));
 
+  const markets = params.get("markets")
+    ?.split(",")
+    .map((market) => market.trim())
+    .filter(Boolean);
+  if (markets?.length) filters.markets = Array.from(new Set(markets));
+
   const sortBy = params.get("sort");
   if (sortBy && SORT_FIELDS.has(sortBy)) filters.sort_by = sortBy;
   filters.sort_order = params.get("order") === "asc" ? "asc" : "desc";
@@ -92,6 +98,9 @@ export function serializeScreenerUrlState(state: ScreenerUrlState): URLSearchPar
 
   if (state.filters.industries?.length) {
     params.set("industries", Array.from(new Set(state.filters.industries)).join(","));
+  }
+  if (state.filters.markets?.length) {
+    params.set("markets", Array.from(new Set(state.filters.markets)).join(","));
   }
   if (state.filters.sort_by !== DEFAULT_SCREENER_FILTERS.sort_by) params.set("sort", state.filters.sort_by);
   if (state.filters.sort_order !== DEFAULT_SCREENER_FILTERS.sort_order) params.set("order", state.filters.sort_order);

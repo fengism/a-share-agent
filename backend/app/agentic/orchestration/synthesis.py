@@ -8,6 +8,7 @@ from openai import AsyncOpenAI
 
 from app.agentic.agents.contracts import AgentExecutionResult
 from app.agentic.events import AgentEvent
+from app.agentic.orchestration.opinions import build_synthesis_guidance
 from app.agentic.runtime.llm import stream_chat_completion
 from app.core.errors import build_internal_error, log_internal_error
 from app.core.metrics import metrics
@@ -79,6 +80,9 @@ async def stream_synthesis(
         results,
         max_characters=max_input_characters,
     )
+    guidance = build_synthesis_guidance(results)
+    if guidance:
+        synthesis_input = f"{guidance}\n\n{synthesis_input}"
     warnings = list(dict.fromkeys(
         warning.strip()
         for result in results.values()

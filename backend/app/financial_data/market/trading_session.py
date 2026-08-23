@@ -224,3 +224,62 @@ def market_date_on_or_before(
 async def get_market_date_on_or_before(requested_date: date) -> date:
     calendar = await _get_trading_calendar()
     return market_date_on_or_before(requested_date, trading_dates=calendar.trading_dates)
+
+async def get_trading_calendar_view(
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> "TradingCalendarResponse":  # noqa: F821
+    """公开的交易日历查询：区间列表 + 今日状态 + 前后交易日。"""
+    from app.financial_data.market.quotes.schemas import TradingCalendarResponse
+
+    snapshot = await _get_trading_calendar()
+    trading_dates = snapshot.trading_dates
+    today = _normalize_now(None).date()
+
+    if trading_dates is None:
+        # 日历源不可用时按工作日近似并标记降级
+        fallback: list[date] = []
+        cursor = start_date or today
+        bound = end_date or (today + timedelta(days=365))
+        while cursor <= bound and len(fallback) <= 8000:
+            if cursor.weekday() < 5:
+                fallback.append(cursor)
+            cursor += timedelta(days=1)
+        dates = fallback
+        degraded = True
+    else:
+        dates = sorted(
+            day
+            for day in trading_dates
+            if (start_date is None or day >= start_date)
+            and (end_date is None or day <= end_date)
+        )
+        degraded = False
+
+    def _previous(day: date) -> str | None:
+        if trading_dates is None:
+            probe = day - timedelta(days=1)
+            while probe.weekday() >= 5:
+                probe -= timedelta(days=1)
+            return probe.isoformat()
+        return max((d for d in trading_dates if d < day), default=None).isoformat() if any(d < day for d in trading_dates) else None
+
+    def _next(day: date) -> str | None:
+        if trading_dates is None:
+            probe = day + timedelta(days=1)
+            while probe.weekday() >= 5:
+                probe += timedelta(days=1)
+            return probe.isoformat()
+        return min((d for d in trading_dates if d > day), default=None).isoformat() if any(d > day for d in trading_dates) else None
+
+    return TradingCalendarResponse(
+        start_date=(start_date or (dates[0] if dates else today)).isoformat(),
+        end_date=(end_date or (dates[-1] if dates else today)).isoformat(),
+        trade_dates=[day.isoformat() for day in dates],
+        count=len(dates),
+        today=today.isoformat(),
+        today_is_trading_day=_is_trading_date(today, trading_dates),
+        previous_trading_day=_previous(today),
+        next_trading_day=_next(today),
+        degraded=degraded,
+    )

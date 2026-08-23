@@ -1,7 +1,7 @@
 export const loadFundFlowTab = () => import("./FundFlowTab");
+export const loadMarginTab = () => import("./MarginTab");
 export const loadMarketEmotionTab = () => import("./MarketEmotionTab");
-export const loadMarketWindTab = () => import("./MarketWindTab");
 export const loadLimitUpLadderTab = () => import("./LimitUpLadderTab");
 export const loadIndustryRankTab = () => import("./IndustryRankTab");
-export const loadHotRankTab = () => import("./HotRankTab");
+export const loadTradingCalendarTab = () => import("./TradingCalendarTab");
 export const loadDragonTigerTab = () => import("./DragonTigerTab");

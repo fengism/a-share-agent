@@ -6,20 +6,20 @@ import {
   RiseOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
-import ChangeValue from "../../components/ChangeValue";
-import DataRefreshIndicator from "../../components/DataRefreshIndicator";
-import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
-import SectionDataState from "../../components/SectionDataState";
-import StockExternalLink from "../../components/StockExternalLink";
-import { useMediaQuery } from "../../hooks/useMediaQuery";
+import ChangeValue from "./ChangeValue";
+import DataRefreshIndicator from "./DataRefreshIndicator";
+import ResponsiveMetricGrid from "./ResponsiveMetricGrid";
+import SectionDataState from "./SectionDataState";
+import StockExternalLink from "./StockExternalLink";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import {
   useThsHotConcept,
   useThsHotIndustry,
   useThsHotRank,
-} from "../../api/queries";
-import type { ThsHotPlate, ThsHotStock } from "../../types/stock";
-import { formatHotValue } from "../../utils/format";
-import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
+} from "../api/queries";
+import type { ThsHotPlate, ThsHotStock } from "../types/stock";
+import { formatHotValue } from "../utils/format";
+import { useColors, useTokens, semanticTagStyle } from "../styles/ui";
 import { rankBadge } from "./rankBadge";
 
 type TabKey = "stock" | "concept" | "industry";
@@ -150,11 +150,12 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
           rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
           size="small"
           pagination={false}
+          virtual
           expandable={isNarrow ? {
             expandedRowRender: renderExpandedRow,
             columnWidth: 38,
           } : undefined}
-          scroll={{ y: scrollY }}
+          scroll={{ x: "max-content", y: scrollY }}
         />
       </SectionDataState>
     </div>
@@ -273,6 +274,7 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
           rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
           size="small"
           pagination={false}
+          scroll={{ x: "max-content" }}
           expandable={isNarrow ? {
             expandedRowRender: renderExpandedRow,
             columnWidth: 38,
@@ -314,9 +316,8 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
             />
           </Col>
           <Col>
-            <Tag>同花顺</Tag>
-            <span style={{ color: c.textSecondary, fontSize: t.font.sm, marginLeft: t.space[2] }}>
-              {embedded ? "每分钟自动更新" : "数据来源: 同花顺 | 5分钟更新"}
+            <span style={{ color: c.textSecondary, fontSize: t.font.sm }}>
+              {embedded ? "每分钟自动更新" : "5分钟更新"}
             </span>
           </Col>
         </Row>

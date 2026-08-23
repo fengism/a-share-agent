@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from app.agentic.orchestration.opinions import AgentOpinion
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,3 +52,4 @@ class AgentExecutionResult:
     warnings: list[str] = field(default_factory=list)
     duration_ms: int = 0
     reasoning_content: str = ""
+    opinion: "AgentOpinion | None" = None

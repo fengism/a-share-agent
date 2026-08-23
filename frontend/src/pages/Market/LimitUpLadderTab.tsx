@@ -122,7 +122,6 @@ function LimitUpLadderContent() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: t.space[4], marginBottom: t.space[4], flexWrap: "wrap" }}>
           <Space size={parseFloat(t.space[3])} wrap>
             <Title level={4} style={{ margin: 0 }}><FireOutlined style={{ color: colors.up }} /> 涨停板</Title>
-            <Text type="secondary">数据来源：{query.data?.source || "开盘红"}</Text>
             <Text type="secondary">数据日期：{query.data?.date || dateText}</Text>
             <Text type="secondary">更新时间：{formatFetchedAt(query.data?.fetched_at)}</Text>
             <RefreshBadge />

@@ -15,7 +15,7 @@ import type { IndustryRankItem, MarketSectorStocksHistoryItem } from "../../type
 import { useColors, useStyles, useTokens } from "../../theme/hooks";
 import { normalizeIsoDate } from "../../utils/date";
 import { formatAmount, formatMarketCap } from "../../utils/format";
-import { rankBadge } from "./rankBadge";
+import { rankBadge } from "../../components/rankBadge";
 
 function formatRate(value: number | null) {
   return value === null ? "-" : `${value.toFixed(2)}%`;
@@ -395,6 +395,7 @@ export default function IndustryRankTab() {
           dataSource={sectors}
           rowKey="code"
           pagination={false}
+          virtual
           expandable={isNarrow ? {
             expandedRowRender: renderExpandedRow,
             columnWidth: 36,

@@ -19,14 +19,14 @@ function pushErrorMessage(error: unknown) {
 }
 
 export function useWorkflowPush() {
-  const mutation = usePush();
+  const { mutateAsync, isPending } = usePush();
   const isPushingRef = useRef(false);
 
   const push = useCallback(async (request: PushRequest): Promise<PushResponse | null> => {
     if (isPushingRef.current) return null;
     isPushingRef.current = true;
     try {
-      const result = await mutation.mutateAsync(request);
+      const result = await mutateAsync(request);
       if (result.target === "notion") {
         message.success(`已转存 Notion：${result.title}`);
       } else {
@@ -39,7 +39,7 @@ export function useWorkflowPush() {
     } finally {
       isPushingRef.current = false;
     }
-  }, [mutation]);
+  }, [mutateAsync]);
 
-  return { push, isPushing: mutation.isPending };
+  return { push, isPushing: isPending };
 }

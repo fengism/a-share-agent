@@ -191,7 +191,6 @@ export default function LimitHistoryPanel() {
           <Space orientation="vertical" size={4}>
             <Title level={4} style={{ margin: 0 }}>{categoryLabel}</Title>
             <Space size={parseFloat(t.space[3])} wrap>
-              <Text type="secondary">数据来源：{query.data?.source || "开盘红"}</Text>
               <Text type="secondary">数据日期：{query.data?.date || dateText}</Text>
               <Text type="secondary">更新时间：{formatFetchedAt(query.data?.fetched_at)}</Text>
               <Text type="secondary">共 {query.data?.total ?? items.length} 家</Text>

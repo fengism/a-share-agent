@@ -1,4 +1,4 @@
-import type { ThemeColors, DesignTokens } from "../../theme/themes";
+import type { ThemeColors, DesignTokens } from "../theme/themes";
 
 /**
  * Shared rank badge used by IndustryRankTab and HotRankContent.

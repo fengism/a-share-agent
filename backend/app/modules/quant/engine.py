@@ -14,15 +14,16 @@ from app.modules.quant.schemas import (
     QuantExecutionConfig,
     QuantMetrics,
     QuantMonthlyReturn,
+    QuantOpenPosition,
     QuantStrategyConfig,
     QuantTrade,
 )
-from app.modules.quant.strategies.compiler import compile_strategy
+from app.modules.quant.strategies.compiler import CompiledStrategy, compile_strategy
 from app.modules.quant.strategies.contracts import StrategySnapshot
 from app.modules.quant.strategies.evaluator import evaluate_target_positions
 from app.modules.quant.strategies.registry import get_strategy_registry
 
-ENGINE_VERSION = "2026-08-18-v3"
+ENGINE_VERSION = "2026-08-23-v4"
 
 
 @dataclass(slots=True)
@@ -44,8 +45,24 @@ def build_target_positions(
         if isinstance(strategy, StrategySnapshot)
         else get_strategy_registry().resolve(strategy.type, strategy.version, strategy.parameters)
     )
-    compiled = compile_strategy(snapshot.definition, snapshot.definition_hash)
+    compiled = _compile_cached(snapshot)
     return evaluate_target_positions(items, compiled, snapshot.parameters)
+
+
+# 同一回测对每只股票重复调用 build_target_positions 时，编译与校验只需做一次。
+_compiled_cache: dict[str, CompiledStrategy] = {}
+_COMPILED_CACHE_LIMIT = 64
+
+
+def _compile_cached(snapshot: StrategySnapshot) -> CompiledStrategy:
+    cached = _compiled_cache.get(snapshot.definition_hash)
+    if cached is not None:
+        return cached
+    compiled = compile_strategy(snapshot.definition, snapshot.definition_hash)
+    if len(_compiled_cache) >= _COMPILED_CACHE_LIMIT:
+        _compiled_cache.clear()
+    _compiled_cache[snapshot.definition_hash] = compiled
+    return compiled
 
 
 def strategy_warmup_bars(strategy: QuantStrategyConfig | StrategySnapshot) -> int:
@@ -81,6 +98,9 @@ def strategy_warmup_bars(strategy: QuantStrategyConfig | StrategySnapshot) -> in
             input_warmup = warmup.get(indicator.input or "", 0)
             if indicator.operator in {"rsi", "shift"}:
                 required = input_warmup + period
+            elif indicator.operator == "ema":
+                # EMA 以 SMA 种子起步，需要约 2 倍周期才收敛到稳态
+                required = input_warmup + 2 * period
             else:
                 required = input_warmup + max(0, period - 1)
         warmup[name] = required + offset
@@ -404,10 +424,10 @@ def run_backtest(
             previous_targets,
             execution_targets,
         ):
-            rebalance_days_remaining = 3
+            rebalance_days_remaining = execution.rebalance_window_days
 
-        for code, item in available_bars.items():
-            state.last_prices[code] = item.open
+        # last_prices 始终为最近收盘价（_build_equity_point 收盘时更新），
+        # 当日开盘价仅在成交函数内使用，避免混合估值导致等权目标偏差
 
         if rebalance_days_remaining > 0:
             unresolved = _rebalance_portfolio(
@@ -445,4 +465,19 @@ def run_backtest(
         equity_curve=points,
         monthly_returns=_monthly_returns(points),
         trades=state.trades,
+        open_positions=[
+            QuantOpenPosition(
+                code=code,
+                shares=shares,
+                average_cost=round(state.average_cost[code], 4),
+                last_price=round(state.last_prices.get(code, state.average_cost[code]), 4),
+                market_value=round(shares * state.last_prices.get(code, state.average_cost[code]), 2),
+                unrealized_pnl=round(
+                    shares * (state.last_prices.get(code, state.average_cost[code]) - state.average_cost[code]),
+                    2,
+                ),
+            )
+            for code, shares in sorted(state.holdings.items())
+            if shares > 0
+        ],
     )

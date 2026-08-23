@@ -1,6 +1,6 @@
 api_version: quant.strategy/v1
 key: bottom_volume
-version: 1.0.0
+version: 1.2.0
 enabled: true
 name: 底部放量
 description: 价格较 20 日高点显著回撤后出现放量阳线时捕捉反转候选。
@@ -9,10 +9,10 @@ risk_level: high
 presentation: { icon: dashboard }
 parameters:
   lookback_period: { type: integer, label: 回看周期, default: 20, minimum: 5, maximum: 120 }
-  drawdown_ratio: { type: number, label: 最低回撤比例, default: 0.15, minimum: 0.05, maximum: 0.6, step: 0.01 }
-  volume_ratio: { type: number, label: 放量倍数, default: 3.0, minimum: 1, maximum: 10, step: 0.1 }
+  drawdown_ratio: { type: number, label: 最低回撤比例, default: 0.08, minimum: 0.03, maximum: 0.6, step: 0.01 }
+  volume_ratio: { type: number, label: 放量倍数, default: 1.8, minimum: 1, maximum: 10, step: 0.1 }
 indicators:
-  period_high: { operator: rolling_max, input: high, period: $lookback_period }
+  period_high: { operator: rolling_max, input: high, period: $lookback_period, offset: 1 }
   previous_low: { operator: rolling_min, input: low, period: $lookback_period, offset: 1 }
   volume_ma5: { operator: sma, input: volume, period: 5, offset: 1 }
   volume_threshold: { operator: multiply, left: volume_ma5, right: $volume_ratio }
@@ -24,6 +24,5 @@ signals:
     operands:
       - { operator: less_or_equal, left: close, right: drawdown_price }
       - { operator: greater_than, left: volume, right: volume_threshold }
-      - { operator: greater_than, left: close, right: open }
   exit: { operator: less_than, left: close, right: previous_low }
 position: { mode: binary }

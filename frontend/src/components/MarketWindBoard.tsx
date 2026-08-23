@@ -8,14 +8,14 @@ import {
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
-import { useMarketWind, useMarketWindStocks } from "../../api/queries";
-import ChangeValue from "../../components/ChangeValue";
-import RefreshBadge from "../../components/RefreshBadge";
-import SectionDataState from "../../components/SectionDataState";
-import StockExternalLink from "../../components/StockExternalLink";
-import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
-import { semanticTagStyle } from "../../styles/ui";
-import type { MarketWindStock } from "../../types/stock";
+import { useMarketWind, useMarketWindStocks } from "../api/queries";
+import ChangeValue from "./ChangeValue";
+import RefreshBadge from "./RefreshBadge";
+import SectionDataState from "./SectionDataState";
+import StockExternalLink from "./StockExternalLink";
+import { useUrlSearchParam } from "../hooks/useUrlSearchParam";
+import { semanticTagStyle } from "../styles/ui";
+import type { MarketWindStock } from "../types/stock";
 import "./market-wind.css";
 
 function formatFetchedAt(value: string | undefined) {
@@ -36,7 +36,7 @@ function strongestChange(stocks: MarketWindStock[]) {
   }, null);
 }
 
-export default function MarketWindTab() {
+export default function MarketWindBoard({ embedded = false }: { embedded?: boolean }) {
   const windQuery = useMarketWind();
   const plates = useMemo(() => windQuery.data?.items ?? [], [windQuery.data?.items]);
   const [plateParam, setPlateParam] = useUrlSearchParam("plate", "", { replace: true });
@@ -117,43 +117,59 @@ export default function MarketWindTab() {
       skeletonRows={10}
     >
       <div className="market-wind">
-        <div className="wind-toolbar">
-          <Space size={12} wrap>
-            <span>数据来源：{windQuery.data?.source || "财联社"}</span>
-            <span>更新时间：{formatFetchedAt(windQuery.data?.fetched_at)}</span>
-            <RefreshBadge />
-          </Space>
-          <Button
-            icon={<ReloadOutlined />}
-            loading={windQuery.isFetching || stocksQuery.isFetching}
-            onClick={() => {
-              void windQuery.refetch();
-              if (selectedPlateCode) void stocksQuery.refetch();
-            }}
-          >
-            刷新
-          </Button>
-        </div>
-
-        <section className="wind-hero">
-          <div className="wind-hero__summary">
-            <div className="wind-kicker"><ThunderboltOutlined /> 今日主线速览</div>
-            <h2>今日风口</h2>
-            <p>聚焦盘中正在发酵的题材催化，切换风口即可查看对应龙头股表现。</p>
-            <Space size={[8, 8]} wrap>
+        {embedded ? (
+          <div className="wind-section-heading" style={{ marginBottom: 16 }}>
+            <span className="wind-section-heading__icon"><ThunderboltOutlined /></span>
+            <span>
+              <strong>今日风口</strong>
+              <small>当前聚焦：{selectedPlate?.plate_name || "等待选择"}{selectedPlate?.catalyst ? ` · ${selectedPlate.catalyst}` : ""}</small>
+            </span>
+            <Space size={[8, 8]} wrap style={{ marginLeft: "auto" }}>
               <Tag style={semanticTagStyle("primary")}>{plates.length} 个风口</Tag>
               <Tag style={semanticTagStyle("up")}>{stockMetricValue} 只龙头</Tag>
+              <RefreshBadge />
             </Space>
           </div>
-          <div className="wind-hero__focus">
-            <span className="wind-hero__focus-icon"><FireOutlined /></span>
-            <span className="wind-hero__focus-content">
-              <small>当前聚焦</small>
-              <strong>{selectedPlate?.plate_name || "等待选择"}</strong>
-              <span>{selectedPlate?.catalyst || "选择风口后查看催化逻辑"}</span>
-            </span>
-          </div>
-        </section>
+        ) : (
+          <>
+            <div className="wind-toolbar">
+              <Space size={12} wrap>
+                <span>更新时间：{formatFetchedAt(windQuery.data?.fetched_at)}</span>
+                <RefreshBadge />
+              </Space>
+              <Button
+                icon={<ReloadOutlined />}
+                loading={windQuery.isFetching || stocksQuery.isFetching}
+                onClick={() => {
+                  void windQuery.refetch();
+                  if (selectedPlateCode) void stocksQuery.refetch();
+                }}
+              >
+                刷新
+              </Button>
+            </div>
+
+            <section className="wind-hero">
+              <div className="wind-hero__summary">
+                <div className="wind-kicker"><ThunderboltOutlined /> 今日主线速览</div>
+                <h2>今日风口</h2>
+                <p>聚焦盘中正在发酵的题材催化，切换风口即可查看对应龙头股表现。</p>
+                <Space size={[8, 8]} wrap>
+                  <Tag style={semanticTagStyle("primary")}>{plates.length} 个风口</Tag>
+                  <Tag style={semanticTagStyle("up")}>{stockMetricValue} 只龙头</Tag>
+                </Space>
+              </div>
+              <div className="wind-hero__focus">
+                <span className="wind-hero__focus-icon"><FireOutlined /></span>
+                <span className="wind-hero__focus-content">
+                  <small>当前聚焦</small>
+                  <strong>{selectedPlate?.plate_name || "等待选择"}</strong>
+                  <span>{selectedPlate?.catalyst || "选择风口后查看催化逻辑"}</span>
+                </span>
+              </div>
+            </section>
+          </>
+        )}
 
         <section className="wind-plate-section" aria-labelledby="wind-plate-title">
           <div className="wind-section-heading">
@@ -199,11 +215,9 @@ export default function MarketWindTab() {
               <span className="wind-section-heading__icon"><RiseOutlined /></span>
               <span>
                 <strong>{selectedPlate?.plate_name || "风口"}龙头股</strong>
-                <small>龙头股名称可直接打开东方财富详情</small>
               </span>
             </div>
           )}
-          extra={<Tag>{stocksQuery.data?.source || "财联社"}</Tag>}
         >
           <div className="wind-leader-summary">
             <span><small>龙头数量</small><strong>{stockMetricValue}</strong></span>
