@@ -6,13 +6,25 @@ import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import AnalysisDimensionSummary from "./AnalysisDimensionSummary";
 import SectionDataState from "../../components/SectionDataState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import type { AnalysisResult, DCFValuationResult, InstitutionForecast, StockValuationPeer, ValuationMethodResult } from "../../types/stock";
+import type {
+  AnalysisResult,
+  DCFValuationResult,
+  InstitutionForecast,
+  StockValuationPeer,
+  ValuationMethodResult,
+} from "../../types/stock";
 import { useColors, useStyles, useTokens, semanticTagStyle } from "../../theme/hooks";
 import type { SemanticTagColor } from "../../theme/hooks";
 
 interface Props {
   code: string;
   analysis?: AnalysisResult | null;
+}
+
+interface SensitivityRow {
+  key: string;
+  discountRate: number;
+  values: Record<string, number>;
 }
 
 const { Paragraph, Text } = Typography;
@@ -58,8 +70,37 @@ function formatConfidence(value: number | null | undefined) {
   return `${(value * 100).toFixed(0)}%`;
 }
 
+function formatRate(value: number | null | undefined) {
+  if (value == null) return "-";
+  return `${(value * 100).toFixed(1)}%`;
+}
+
 function formatTableNumber(value: number | null | undefined) {
   return value != null ? value.toFixed(2) : "-";
+}
+
+function qualityGradeLabel(value: string | null | undefined) {
+  if (value === "high") return "高";
+  if (value === "medium") return "中";
+  return "低";
+}
+
+function qualityGradeTone(value: string | null | undefined): SemanticTagColor {
+  if (value === "high") return "down";
+  if (value === "medium") return "warning";
+  return "up";
+}
+
+function sourceLabel(value: string | null | undefined) {
+  const labels: Record<string, string> = {
+    reported_ttm: "财报 TTM",
+    reported_annual: "完整年报",
+    annualized_fallback: "年化回退",
+    market_implied: "市场反推",
+    reported_fcfe: "披露现金流",
+    cashflow_proxy: "现金流代理",
+  };
+  return value ? (labels[value] ?? value) : "-";
 }
 
 function forecastMetricLabel(value: string) {
@@ -88,6 +129,7 @@ function renderMethodCard(title: string, item: ValuationMethodResult | DCFValuat
       <div style={{ display: "flex", justifyContent: "center", gap: t.space[2], flexWrap: "wrap", marginTop: t.space[2] }}>
         <Tag style={{ ...tagStyle, ...semanticTagStyle("primary"), marginBottom: 0 }}>权重 {formatWeight(item?.weight)}</Tag>
         <Tag style={{ ...tagStyle, ...semanticTagStyle("accent"), marginBottom: 0 }}>置信 {formatConfidence(item?.confidence_score)}</Tag>
+        <Tag style={{ ...tagStyle, ...semanticTagStyle("info"), marginBottom: 0 }}>数据 {formatConfidence(item?.data_quality_score)}</Tag>
       </div>
       <Paragraph style={{ margin: `${t.space[2]} 0 0`, fontSize: t.font.sm, color: c.textSecondary }}>
         {item?.available ? `相对现价 ${formatPercent(item.upside_pct)}` : item?.applicability}
@@ -112,6 +154,40 @@ export default function ValuationPanel({ code, analysis }: Props) {
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const { cardStyle, sectionHeaderStyle, tagStyle, sectionCardBodyStyle, metricTileStyle, metricValueEmphasisStyle } = useStyles();
   const { data: detail, isLoading, error, refetch } = useValuationDetail(code);
+  const dcf = detail?.fair_values.dcf as DCFValuationResult | undefined;
+
+  const sensitivityTable = useMemo(() => {
+    const points = dcf?.sensitivity ?? [];
+    const terminalRates = [...new Set(points.map((point) => point.terminal_growth_rate))].sort((a, b) => a - b);
+    const discountRates = [...new Set(points.map((point) => point.discount_rate))].sort((a, b) => a - b);
+    const rows: SensitivityRow[] = discountRates.map((discountRate) => ({
+      key: discountRate.toFixed(6),
+      discountRate,
+      values: Object.fromEntries(
+        points
+          .filter((point) => point.discount_rate === discountRate)
+          .map((point) => [point.terminal_growth_rate.toFixed(6), point.per_share_value]),
+      ),
+    }));
+    const columns: ColumnsType<SensitivityRow> = [
+      {
+        title: "折现率 / 永续增长",
+        dataIndex: "discountRate",
+        key: "discountRate",
+        render: (value: number) => formatRate(value),
+      },
+      ...terminalRates.map((terminalRate) => {
+        const key = terminalRate.toFixed(6);
+        return {
+          title: formatRate(terminalRate),
+          key,
+          align: "right" as const,
+          render: (_: unknown, record: SensitivityRow) => `¥${formatTableNumber(record.values[key])}`,
+        };
+      }),
+    ];
+    return { rows, columns };
+  }, [dcf]);
 
   const forecastColumns: ColumnsType<InstitutionForecast> = useMemo(() => {
     if (isNarrow) {
@@ -343,6 +419,24 @@ export default function ValuationPanel({ code, analysis }: Props) {
         {detail?.valuation_summary && (
           <Paragraph style={{ margin: `${t.space[4]} 0 0`, color: c.textSecondary }}>{detail.valuation_summary}</Paragraph>
         )}
+        {detail?.data_quality && (
+          <div style={{ borderTop: `1px solid ${c.border}`, marginTop: t.space[4], paddingTop: t.space[4] }}>
+            <div style={{ display: "flex", alignItems: "center", gap: t.space[2], flexWrap: "wrap" }}>
+              <Text strong style={{ color: c.textPrimary }}>数据质量</Text>
+              <Tag style={{ ...tagStyle, ...semanticTagStyle(qualityGradeTone(detail.data_quality.grade)), margin: 0 }}>
+                {qualityGradeLabel(detail.data_quality.grade)} · {formatConfidence(detail.data_quality.score)}
+              </Tag>
+              <Tag style={{ ...tagStyle, margin: 0 }}>盈利口径 {sourceLabel(detail.data_quality.ttm_source)}</Tag>
+              <Tag style={{ ...tagStyle, margin: 0 }}>现金流 {sourceLabel(detail.data_quality.cashflow_source)}</Tag>
+              <Tag style={{ ...tagStyle, margin: 0 }}>同行可信度 {formatConfidence(detail.data_quality.peer_confidence)}</Tag>
+            </div>
+            {detail.data_quality.limitations.map((limitation) => (
+              <Paragraph key={limitation} style={{ margin: `${t.space[2]} 0 0`, color: c.textSecondary }}>
+                {limitation}
+              </Paragraph>
+            ))}
+          </div>
+        )}
       </Card>
 
       <div style={sectionHeaderStyle}>
@@ -355,9 +449,61 @@ export default function ValuationPanel({ code, analysis }: Props) {
           <Col xs={24} md={8}>{renderMethodCard("PB 估值法", detail?.fair_values.pb as ValuationMethodResult | undefined, c, tagStyle, t)}</Col>
           <Col xs={24} md={8}>{renderMethodCard("PS 估值法", detail?.fair_values.ps as ValuationMethodResult | undefined, c, tagStyle, t)}</Col>
           <Col xs={24} md={8}>{renderMethodCard("PEG 估值法", detail?.fair_values.peg as ValuationMethodResult | undefined, c, tagStyle, t)}</Col>
-          <Col xs={24} md={8}>{renderMethodCard("DCF 估值法", detail?.fair_values.dcf as DCFValuationResult | undefined, c, tagStyle, t)}</Col>
+          <Col xs={24} md={8}>{renderMethodCard("DCF 估值法", dcf, c, tagStyle, t)}</Col>
         </Row>
       </Card>
+
+      {dcf?.available && (
+        <>
+          <div style={sectionHeaderStyle}>
+            <Text strong style={{ color: c.textPrimary, fontSize: t.font.md }}>DCF 情景分析</Text>
+            <Text type="secondary" style={{ fontSize: t.font.sm }}>{dcf.fcfe_source ?? "现金流折现"}</Text>
+          </div>
+          <Card size="small" title="情景、敏感性与市场隐含预期" style={{ ...cardStyle, marginBottom: t.space[4] }} styles={{ body: sectionCardBodyStyle }}>
+            <Row gutter={[t.space[3], t.space[3]]}>
+              {dcf.scenarios.map((scenario) => (
+                <Col xs={24} md={8} key={scenario.name}>
+                  <div style={metricTileStyle}>
+                    <Text strong style={{ color: c.textPrimary }}>{scenario.label}</Text>
+                    <div style={{ ...metricValueEmphasisStyle, margin: `${t.space[1]} 0` }}>¥{scenario.per_share_value.toFixed(2)}</div>
+                    <Text type="secondary">
+                      增长 {formatRate(scenario.growth_rate)} · 折现 {formatRate(scenario.discount_rate)} · 永续 {formatRate(scenario.terminal_growth_rate)}
+                    </Text>
+                    <div style={{ marginTop: t.space[2] }}>
+                      <Tag style={{ ...tagStyle, ...semanticTagStyle(scenario.upside_pct != null && scenario.upside_pct >= 0 ? "down" : "up"), margin: 0 }}>
+                        相对现价 {formatPercent(scenario.upside_pct)}
+                      </Tag>
+                    </div>
+                  </div>
+                </Col>
+              ))}
+            </Row>
+            {sensitivityTable.rows.length > 0 && (
+              <div style={{ marginTop: t.space[4] }}>
+                <Text strong style={{ color: c.textPrimary }}>每股价值敏感性</Text>
+                <Table<SensitivityRow>
+                  dataSource={sensitivityTable.rows}
+                  columns={sensitivityTable.columns}
+                  size="small"
+                  pagination={false}
+                  style={{ marginTop: t.space[2] }}
+                  scroll={isNarrow ? { x: "max-content" } : undefined}
+                />
+              </div>
+            )}
+            <div style={{ borderTop: `1px solid ${c.border}`, marginTop: t.space[4], paddingTop: t.space[3] }}>
+              <Text strong style={{ color: c.textPrimary }}>反向 DCF</Text>
+              {dcf.reverse_dcf.available ? (
+                <Text style={{ marginLeft: t.space[2], color: c.textSecondary }}>
+                  当前价格隐含未来五年初始增长率 {formatRate(dcf.reverse_dcf.implied_growth_rate)}
+                </Text>
+              ) : (
+                <Text style={{ marginLeft: t.space[2] }} type="secondary">{dcf.reverse_dcf.reason ?? "暂不可用"}</Text>
+              )}
+            </div>
+          </Card>
+        </>
+      )}
 
       <div style={sectionHeaderStyle}>
         <Text strong style={{ color: c.textPrimary, fontSize: t.font.md }}>财务基础与关键假设</Text>
@@ -371,9 +517,10 @@ export default function ValuationPanel({ code, analysis }: Props) {
           <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>经营现金流</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatAmount(detail?.fundamentals.operating_cashflow)}</div></div></Col>
         </Row>
         <Row gutter={[t.space[4], t.space[4]]} style={{ marginTop: t.space[4] }}>
-          <Col xs={24} md={8}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>营收同比</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatPercent(detail?.fundamentals.revenue_yoy)}</div></div></Col>
-          <Col xs={24} md={8}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>净利润同比</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatPercent(detail?.fundamentals.net_profit_yoy)}</div></div></Col>
-          <Col xs={24} md={8}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>扣非净利润同比</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatPercent(detail?.fundamentals.non_net_profit_yoy)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>资本开支</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatAmount(detail?.fundamentals.capital_expenditure)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>营收同比</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatPercent(detail?.fundamentals.revenue_yoy)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>净利润同比</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatPercent(detail?.fundamentals.net_profit_yoy)}</div></div></Col>
+          <Col xs={24} md={6}><div style={metricTileStyle}><div style={{ color: c.textSecondary, fontSize: t.font.sm }}>扣非净利润同比</div><div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.semibold) }}>{formatPercent(detail?.fundamentals.non_net_profit_yoy)}</div></div></Col>
         </Row>
         {detail?.notes?.length ? (
           <div style={{ marginTop: t.space[4] }}>
@@ -424,6 +571,14 @@ export default function ValuationPanel({ code, analysis }: Props) {
         style={cardStyle}
         styles={{ body: { padding: isNarrow ? `${t.space[2]}` : `${t.space[2]} ${t.space[4]}` } }}
       >
+        <ResponsiveMetricGrid
+          items={[
+            { key: "peer-count", label: "同行总数", value: detail?.peer_summary.peer_count ?? 0 },
+            { key: "pe-sample", label: "PE 有效 / 剔除", value: `${detail?.peer_summary.pe_stats.sample_size ?? 0} / ${detail?.peer_summary.pe_stats.excluded_count ?? 0}` },
+            { key: "pb-sample", label: "PB 有效 / 剔除", value: `${detail?.peer_summary.pb_stats.sample_size ?? 0} / ${detail?.peer_summary.pb_stats.excluded_count ?? 0}` },
+            { key: "ps-sample", label: "PS 有效 / 剔除", value: `${detail?.peer_summary.ps_stats.sample_size ?? 0} / ${detail?.peer_summary.ps_stats.excluded_count ?? 0}` },
+          ]}
+        />
         <Table<StockValuationPeer>
           dataSource={detail?.peer_summary.peers ?? []}
           columns={peerColumns}

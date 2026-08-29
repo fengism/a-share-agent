@@ -21,6 +21,14 @@ function formatNet(value: number | null, colors: NetColors): { text: string; col
   return { text: formatAmount(value), color: colors.muted };
 }
 
+function fundFlowDateIdentity(value: string) {
+  const text = value.trim();
+  const compact = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`;
+  const separated = text.match(/^(\d{4})[-/](\d{2})[-/](\d{2})(?:\D.*)?$/);
+  return separated ? `${separated[1]}-${separated[2]}-${separated[3]}` : text;
+}
+
 function FlowTile({ label, value, colors }: { label: string; value: number | null; colors: { textSecondary: string; hoverBg: string; border: string } & NetColors }) {
   const fmt = formatNet(value, colors);
   return (
@@ -31,7 +39,7 @@ function FlowTile({ label, value, colors }: { label: string; value: number | nul
   );
 }
 
-export default function FundFlowPanel({ code }: { code: string }) {
+export default function FundFlowPanel({ code, isExportingPdf = false }: { code: string; isExportingPdf?: boolean }) {
   const c = useColors();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const { cardStyle } = useStyles();
@@ -41,11 +49,22 @@ export default function FundFlowPanel({ code }: { code: string }) {
     [c.down, c.textMuted, c.up],
   );
 
-  const latest = useMemo(() => data?.[0] ?? null, [data]);
-  const isStale = useMemo(() => Boolean(data?.some((item) => item.is_stale)), [data]);
+  const recentData = useMemo(() => {
+    const uniqueByDate = new Map<string, StockFundFlowItem>();
+    for (const item of data ?? []) {
+      const dateIdentity = fundFlowDateIdentity(item.date);
+      if (!uniqueByDate.has(dateIdentity)) uniqueByDate.set(dateIdentity, item);
+    }
+    return Array.from(uniqueByDate.entries())
+      .sort(([leftDate], [rightDate]) => rightDate.localeCompare(leftDate))
+      .map(([, item]) => item)
+      .slice(0, 60);
+  }, [data]);
+  const latest = recentData[0] ?? null;
+  const isStale = useMemo(() => recentData.some((item) => item.is_stale), [recentData]);
   const chartOption = useMemo(() => {
-    if (!data || data.length === 0) return null;
-    const recent = data.slice(0, 60).reverse();
+    if (recentData.length === 0) return null;
+    const recent = [...recentData].reverse();
     const dates = recent.map((d) => d.date.slice(5));
     const mainNets = recent.map((d) => d.main_net === null ? null : +(d.main_net / 1e8).toFixed(2));
     return {
@@ -64,7 +83,7 @@ export default function FundFlowPanel({ code }: { code: string }) {
         },
       ],
     };
-  }, [data, c.textSecondary, c.up, c.down]);
+  }, [recentData, c.textSecondary, c.up, c.down]);
 
   const tileColors = { textSecondary: c.textSecondary, hoverBg: c.hoverBg, border: c.border, up: c.up, down: c.down, muted: c.textMuted };
 
@@ -190,10 +209,10 @@ export default function FundFlowPanel({ code }: { code: string }) {
       {/* Data table */}
       <Card size="small" style={cardStyle} styles={{ body: { padding: 0 } }}>
         <Table
-          dataSource={data ?? []}
+          dataSource={recentData}
           columns={columns}
           rowKey="date"
-          pagination={{ pageSize: 15, showSizeChanger: false, simple: true }}
+          pagination={isExportingPdf ? false : { pageSize: 15, showSizeChanger: false, simple: true }}
           size="small"
           expandable={isNarrow ? {
             expandedRowRender: renderExpandedRow,

@@ -1,27 +1,52 @@
-import { useState } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import {
   DownloadOutlined,
+  FileSearchOutlined,
   HistoryOutlined,
   PlusOutlined,
+  SendOutlined,
   StarFilled,
   StopOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Button, Col, Row, Typography } from "antd";
+import { Button, Typography } from "antd";
 import PushModal from "../../components/PushModal";
-import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useColors, useStyles, useTokens } from "../../theme/hooks";
-import type { AnalysisPageData, AnalysisResult, PushRequest } from "../../types/stock";
+import { useColors, useStyles } from "../../theme/hooks";
+import type { AnalysisPageData, AnalysisResult, IntradayData, PushRequest } from "../../types/stock";
 import { formatAmountWanYi, formatMarketCap } from "../../utils/format";
 
 const { Title } = Typography;
 
+function StockMetric({
+  label,
+  value,
+  emphasis = false,
+  color,
+}: {
+  label: string;
+  value: ReactNode;
+  emphasis?: boolean;
+  color?: string;
+}) {
+  return (
+    <div
+      className={`analysis-header-card__metric${emphasis ? " is-emphasis" : ""}`}
+      style={{ "--analysis-metric-color": color } as CSSProperties}
+    >
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
 interface AnalysisHeaderCardProps {
   code?: string;
   pageData?: AnalysisPageData;
+  intradayData?: IntradayData | null;
   result: AnalysisResult | null | undefined;
   analysisDate?: string;
   isAnalyzing: boolean;
+  isCancelling?: boolean;
   isPushing: boolean;
   isWatched: boolean;
   isWatchlistPending: boolean;
@@ -30,15 +55,18 @@ interface AnalysisHeaderCardProps {
   onCancel: () => void;
   onExportPdf: () => void;
   onShowHistory: () => void;
+  onOpenResearchReport: () => void;
   onPush: (request: PushRequest) => Promise<boolean>;
 }
 
 export default function AnalysisHeaderCard({
   code,
   pageData,
+  intradayData,
   result,
   analysisDate,
   isAnalyzing,
+  isCancelling = false,
   isPushing,
   isWatched,
   isWatchlistPending,
@@ -47,23 +75,33 @@ export default function AnalysisHeaderCard({
   onCancel,
   onExportPdf,
   onShowHistory,
+  onOpenResearchReport,
   onPush,
 }: AnalysisHeaderCardProps) {
   const colors = useColors();
-  const t = useTokens();
-  const { cardStyle, gradientHeaderStyle, rowGutter } = useStyles();
-  const isNarrow = useMediaQuery("(max-width: 1040px)");
+  const { cardStyle, gradientHeaderStyle } = useStyles();
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const info = pageData?.stock_info;
   const valuation = pageData?.valuation;
   const klineItems = pageData?.kline?.items ?? [];
   const latestKline = klineItems.length > 0 ? klineItems[klineItems.length - 1] : null;
-  const latestPrice = latestKline?.close ?? null;
-  const latestChangePct = latestKline?.change_pct ?? null;
+  const liveIntradayItems = intradayData?.items ?? [];
+  const activeIntraday = liveIntradayItems.length > 0 ? intradayData : pageData?.intraday;
+  const activeIntradayItems = activeIntraday?.items ?? [];
+  const latestIntraday = activeIntradayItems.length > 0
+    ? activeIntradayItems[activeIntradayItems.length - 1]
+    : null;
+  const latestPrice = latestIntraday?.price ?? latestKline?.close ?? null;
+  const latestChangePct = latestIntraday?.change_pct
+    ?? (
+      latestIntraday?.price != null && activeIntraday?.prev_close
+        ? (latestIntraday.price - activeIntraday.prev_close) / activeIntraday.prev_close * 100
+        : latestKline?.change_pct
+    )
+    ?? null;
   const marketCap = info?.market_cap ?? null;
   const peTtm = typeof valuation?.pe_ttm === "number" ? valuation.pe_ttm : null;
   const pb = typeof valuation?.pb === "number" ? valuation.pb : null;
-  const isDown = (latestChangePct ?? 0) < 0;
   const changeColor = latestChangePct == null
     ? colors.textPrimary
     : latestChangePct > 0
@@ -81,24 +119,15 @@ export default function AnalysisHeaderCard({
   return (
     <div
       className="analysis-header-card"
-      style={{ ...cardStyle, ...gradientHeaderStyle, padding: `${t.space[6]} ${t.space[6]} ${t.space[5]}` }}
+      style={{ ...cardStyle, ...gradientHeaderStyle }}
     >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: isNarrow ? "column" : "row",
-          justifyContent: "space-between",
-          alignItems: isNarrow ? "stretch" : "flex-start",
-          gap: t.space[4],
-          marginBottom: t.space[4],
-        }}
-      >
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: t.space[3], flexWrap: "wrap" }}>
-            <Title level={3} style={{ margin: 0, color: colors.textPrimary, letterSpacing: 0.2 }}>
+      <div className="analysis-header-card__top">
+        <div className="analysis-header-card__identity">
+          <div className="analysis-header-card__title-row">
+            <Title level={3} style={{ margin: 0, color: colors.textPrimary }}>
               {info?.name || code}
             </Title>
-            <span style={{ fontSize: t.font.base, color: colors.textSecondary, fontWeight: Number(t.weight.medium) }}>{info?.code}</span>
+            <span className="analysis-header-card__code">{info?.code}</span>
             <Button
               type={isWatched ? "default" : "text"}
               size="small"
@@ -116,59 +145,52 @@ export default function AnalysisHeaderCard({
               size="small"
               icon={<HistoryOutlined />}
               className="pdf-hide"
-              aria-label="分析历史"
+              aria-label="研究历史"
               onClick={onShowHistory}
-              style={{ paddingInline: 0 }}
             >
-              分析历史
+              研究历史
             </Button>
+            {result ? (
+              <Button
+                type="link"
+                size="small"
+                icon={<FileSearchOutlined />}
+                className="pdf-hide"
+                aria-label="打开报告模式"
+                onClick={onOpenResearchReport}
+              >
+                报告模式
+              </Button>
+            ) : null}
           </div>
-          <div style={{ marginTop: t.space[2], display: "flex", gap: t.space[3], flexWrap: "wrap", alignItems: "center" }}>
+          <div className="analysis-header-card__meta">
             {info?.exchange_industry && (
-              <span style={{ fontSize: t.font.sm, color: colors.textSecondary, background: colors.hoverBg, border: `1px solid ${colors.border}`, padding: `${t.space[1]} ${t.space[3]}`, borderRadius: t.radius.pill }}>
-                交易所行业 · {info.exchange_industry}
-              </span>
+              <span>交易所行业 · {info.exchange_industry}</span>
             )}
             {info?.first_industry && (
-              <span style={{ fontSize: t.font.sm, color: colors.textSecondary, background: colors.hoverBg, border: `1px solid ${colors.border}`, padding: `${t.space[1]} ${t.space[3]}`, borderRadius: t.radius.pill }}>
-                {info.first_industry.name}
-              </span>
+              <span>{info.first_industry.name}</span>
             )}
             {info?.second_industry && (
-              <span style={{ fontSize: t.font.sm, color: colors.textSecondary, background: colors.hoverBg, border: `1px solid ${colors.border}`, padding: `${t.space[1]} ${t.space[3]}`, borderRadius: t.radius.pill }}>
-                {info.second_industry.name}
-              </span>
+              <span>{info.second_industry.name}</span>
             )}
             {info?.listing_date && (
-              <span style={{ fontSize: t.font.sm, color: colors.textSecondary }}>上市日期 {info.listing_date}</span>
+              <span>上市日期 {info.listing_date}</span>
             )}
           </div>
         </div>
-        <div
-          className="pdf-hide"
-          style={{
-            display: "grid",
-            gridTemplateColumns: isNarrow ? "repeat(2, minmax(0, 1fr))" : "repeat(3, max-content)",
-            gap: t.space[3],
-            width: isNarrow ? "100%" : undefined,
-          }}
-        >
+        <div className="analysis-header-card__actions pdf-hide">
           <Button
-            block={isNarrow}
-            size="large"
             icon={<DownloadOutlined />}
             onClick={onExportPdf}
             disabled={!result}
-            style={{ borderRadius: t.radius.md, height: 42, fontWeight: Number(t.weight.semibold) }}
           >
             导出 PDF
           </Button>
           <Button
-            block={isNarrow}
-            size="large"
+            icon={<SendOutlined />}
+            aria-label="推送"
             onClick={() => setPushModalOpen(true)}
             disabled={!result}
-            style={{ borderRadius: t.radius.md, height: 42, fontWeight: Number(t.weight.semibold) }}
           >
             推送
           </Button>
@@ -183,91 +205,55 @@ export default function AnalysisHeaderCard({
           />
           {isAnalyzing ? (
             <Button
-              block={isNarrow}
-              size="large"
               danger
               icon={<StopOutlined />}
+              loading={isCancelling}
+              disabled={isCancelling}
+              aria-label={isCancelling ? "正在停止研究" : "停止研究"}
               onClick={onCancel}
-              style={{ borderRadius: t.radius.md, height: 42, fontWeight: Number(t.weight.semibold), gridColumn: isNarrow ? "1 / -1" : undefined }}
             >
-              取消分析
+              {isCancelling ? "正在停止" : "停止研究"}
             </Button>
           ) : (
             <Button
-              block={isNarrow}
               type="primary"
-              size="large"
               icon={<ThunderboltOutlined />}
+              aria-label={result ? "更新研究" : "开始研究"}
               onClick={onAnalyze}
-              style={{ borderRadius: t.radius.md, height: 42, paddingInline: t.space[6], fontWeight: Number(t.weight.semibold), gridColumn: isNarrow ? "1 / -1" : undefined }}
             >
-              智能分析
+              {result ? "更新研究" : "开始研究"}
             </Button>
           )}
         </div>
       </div>
 
-      <div style={{ display: "grid", gap: t.space[4] }}>
-        <Row gutter={[rowGutter, rowGutter]} align="stretch">
-          <Col xs={12} md={6}>
-            <div className="pdf-metric-card pdf-metric-card-primary" style={{ padding: `${t.space[3]} ${t.space[4]}`, background: isDown ? colors.downCardGradient : colors.upCardGradient, border: `1px solid ${isDown ? `${colors.down}40` : `${colors.up}40`}`, borderRadius: t.radius.lg, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ color: colors.textSecondary, fontSize: t.font.sm, marginBottom: t.space[2] }}>最新股价</div>
-              <div style={{ fontSize: t.font.display, fontWeight: Number(t.weight.heavy), color: changeColor, letterSpacing: 0.2 }}>
-                {latestPrice != null ? `¥${latestPrice.toFixed(2)}` : "-"}
-              </div>
-            </div>
-          </Col>
-          <Col xs={12} md={6}>
-            <div className="pdf-metric-card pdf-metric-card-primary" style={{ padding: `${t.space[3]} ${t.space[4]}`, background: isDown ? colors.downCardGradient : colors.upCardGradient, border: `1px solid ${isDown ? `${colors.down}40` : `${colors.up}40`}`, borderRadius: t.radius.lg, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ color: colors.textSecondary, fontSize: t.font.sm, marginBottom: t.space[2] }}>单日涨跌幅</div>
-              <div style={{ fontSize: t.font["3xl"], fontWeight: Number(t.weight.heavy), color: changeColor }}>
-                {latestChangePct != null ? `${latestChangePct > 0 ? "+" : ""}${latestChangePct.toFixed(2)}%` : "-"}
-              </div>
-            </div>
-          </Col>
-          <Col xs={12} md={6}>
-            <div className="pdf-metric-card pdf-metric-card-primary" style={{ padding: `${t.space[3]} ${t.space[4]}`, background: peTtm != null && peTtm > 30 ? colors.upCardGradient : colors.hoverBg, border: `1px solid ${peTtm != null && peTtm > 30 ? `${colors.up}40` : colors.border}`, borderRadius: t.radius.lg, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ color: colors.textSecondary, fontSize: t.font.sm, marginBottom: t.space[2] }}>市盈率(TTM)</div>
-              <div style={{ fontSize: t.font["2xl"], fontWeight: Number(t.weight.heavy), color: peTtm != null && peTtm > 30 ? colors.up : colors.textPrimary }}>
-                {peTtm != null ? peTtm.toFixed(2) : "-"}
-              </div>
-            </div>
-          </Col>
-          <Col xs={12} md={6}>
-            <div style={{ padding: `${t.space[3]} ${t.space[4]}`, background: pb != null && pb > 3 ? colors.upCardGradient : colors.hoverBg, border: `1px solid ${pb != null && pb > 3 ? `${colors.up}40` : colors.border}`, borderRadius: t.radius.lg, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ color: colors.textSecondary, fontSize: t.font.sm, marginBottom: t.space[2] }}>市净率</div>
-              <div style={{ fontSize: t.font["2xl"], fontWeight: Number(t.weight.heavy), color: pb != null && pb > 3 ? colors.up : colors.textPrimary }}>
-                {pb != null ? pb.toFixed(2) : "-"}
-              </div>
-            </div>
-          </Col>
-        </Row>
-        <Row gutter={[rowGutter, rowGutter]} align="stretch">
-          <Col xs={12} md={6}>
-            <div className="pdf-metric-card" style={{ padding: `${t.space[3]}`, background: colors.hoverBg, border: `1px solid ${colors.border}`, borderRadius: t.radius.lg, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ color: colors.textSecondary, fontSize: t.font.sm, marginBottom: t.space[2] }}>成交额</div>
-              <div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.bold), color: colors.textPrimary }}>{formatAmountWanYi(latestKline?.amount)}</div>
-            </div>
-          </Col>
-          <Col xs={12} md={6}>
-            <div className="pdf-metric-card" style={{ padding: `${t.space[3]}`, background: colors.hoverBg, border: `1px solid ${colors.border}`, borderRadius: t.radius.lg, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ color: colors.textSecondary, fontSize: t.font.sm, marginBottom: t.space[2] }}>换手率</div>
-              <div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.bold), color: colors.textPrimary }}>
-                {latestKline?.turnover_pct != null
-                  ? `${latestKline.turnover_pct.toFixed(2)}%`
-                  : info?.turnover_pct != null
-                    ? `${info.turnover_pct.toFixed(2)}%`
-                    : "-"}
-              </div>
-            </div>
-          </Col>
-          <Col xs={12} md={6}>
-            <div className="pdf-metric-card" style={{ padding: `${t.space[3]}`, background: colors.hoverBg, border: `1px solid ${colors.border}`, borderRadius: t.radius.lg, minHeight: 96, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div style={{ color: colors.textSecondary, fontSize: t.font.sm, marginBottom: t.space[2] }}>总市值</div>
-              <div style={{ fontSize: t.font.xl, fontWeight: Number(t.weight.bold), color: colors.textPrimary }}>{formatMarketCap(marketCap)}</div>
-            </div>
-          </Col>
-        </Row>
+      <div className="analysis-header-card__metrics" aria-label="股票行情摘要">
+        <StockMetric
+          label="最新股价"
+          value={latestPrice != null ? `¥${latestPrice.toFixed(2)}` : "-"}
+          emphasis
+          color={changeColor}
+        />
+        <StockMetric
+          label="单日涨跌"
+          value={latestChangePct != null ? `${latestChangePct > 0 ? "+" : ""}${latestChangePct.toFixed(2)}%` : "-"}
+          emphasis
+          color={changeColor}
+        />
+        <StockMetric label="市盈率 TTM" value={peTtm != null ? peTtm.toFixed(2) : "-"} />
+        <StockMetric label="市净率" value={pb != null ? pb.toFixed(2) : "-"} />
+        <StockMetric label="成交额" value={formatAmountWanYi(latestKline?.amount)} />
+        <StockMetric
+          label="换手率"
+          value={
+            latestKline?.turnover_pct != null
+              ? `${latestKline.turnover_pct.toFixed(2)}%`
+              : info?.turnover_pct != null
+                ? `${info.turnover_pct.toFixed(2)}%`
+                : "-"
+          }
+        />
+        <StockMetric label="总市值" value={formatMarketCap(marketCap)} />
       </div>
     </div>
   );

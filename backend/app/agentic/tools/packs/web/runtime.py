@@ -1,5 +1,7 @@
 """Web search, fetch, and Twitter tool orchestration."""
 
+from typing import cast
+
 from app.agentic.catalog import registry
 from app.agentic.tools.packs.web import content, fetcher, pdf, registration, search, twitter
 from app.agentic.tools.packs.web.url_security import is_twitter_url
@@ -44,7 +46,7 @@ async def _fetch_urls(urls: list[str], mode: fetcher.FetchMode = "auto"):
 
 async def _execute_web_search(
     query: str,
-    engine: search.SearchEngineName = "baidu",
+    engine: search.SearchEngineName = search.DEFAULT_SEARCH_ENGINE,
     max_results: int = 5,
     time_range: search.SearchTimeRange = "half_year",
     language: search.SearchLanguage = "zh",
@@ -61,7 +63,7 @@ async def _execute_web_search(
 
 
 async def _execute_twitter_analyze(username: str) -> str:
-    return await twitter.execute_twitter_analyze(username)
+    return cast(str, await twitter.execute_twitter_analyze(username))
 
 
 def register_web_tools() -> None:

@@ -5,6 +5,7 @@ const generatedFiles = [
   "src/api/generated/openapi.json",
   "src/api/generated/request-schema.ts",
   "src/api/generated/schema.ts",
+  "src/api/generated/financialFieldLabels.ts",
 ];
 const before = new Map(generatedFiles.map((file) => [file, readFileSync(file)]));
 const command = process.platform === "win32" ? "npm.cmd" : "npm";

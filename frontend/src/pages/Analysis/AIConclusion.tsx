@@ -10,9 +10,10 @@ const { Text } = Typography;
 
 interface Props {
   result: AnalysisResult;
+  embedded?: boolean;
 }
 
-export default function AIConclusion({ result }: Props) {
+export default function AIConclusion({ result, embedded = false }: Props) {
   const c = useColors();
   const t = useTokens();
   const { cardStyle } = useStyles();
@@ -52,20 +53,14 @@ export default function AIConclusion({ result }: Props) {
     : "暂无公允区间";
 
   const conclusionStyle = {
-    ...cardStyle,
-    marginBottom: t.space[4],
+    ...(embedded ? {} : cardStyle),
+    marginBottom: embedded ? 0 : t.space[4],
     "--analysis-accent": accent,
     "--analysis-accent-soft": accentSoft,
   } as CSSProperties;
 
-  return (
-    <Card
-      size="small"
-      className="analysis-conclusion pdf-avoid-break"
-      title={<span className="analysis-conclusion__title">AI 综合研判</span>}
-      style={conclusionStyle}
-      styles={{ body: { padding: 0 } }}
-    >
+  const content = (
+    <>
       <section className="analysis-conclusion__hero pdf-avoid-break" aria-label="综合研判">
         <div className="analysis-conclusion__decision-row">
           <div className="analysis-conclusion__decision-copy">
@@ -146,6 +141,34 @@ export default function AIConclusion({ result }: Props) {
           </div>
         </div>
       </div>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <section
+        className="analysis-conclusion analysis-conclusion--embedded"
+        data-pdf-capture
+        aria-labelledby="analysis-conclusion-title"
+        style={conclusionStyle}
+      >
+        <header className="analysis-conclusion__section-header">
+          <h2 id="analysis-conclusion-title">综合研判</h2>
+        </header>
+        {content}
+      </section>
+    );
+  }
+
+  return (
+    <Card
+      size="small"
+      className="analysis-conclusion pdf-avoid-break"
+      title={<span className="analysis-conclusion__title">AI 综合研判</span>}
+      style={conclusionStyle}
+      styles={{ body: { padding: 0 } }}
+    >
+      {content}
     </Card>
   );
 }

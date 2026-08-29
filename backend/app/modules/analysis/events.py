@@ -2,6 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.agentic.events import AgentEvent
 from app.modules.analysis.models import AnalysisResult
 
 ANALYSIS_STAGE_NAMES = {
@@ -20,8 +21,17 @@ class AnalysisStage(BaseModel):
 
 
 class AnalysisProgress(BaseModel):
-    type: Literal["stage_started", "stage_completed", "stage_failed", "complete", "error", "cached"]
+    type: Literal[
+        "stage_started",
+        "stage_completed",
+        "stage_failed",
+        "agent_event",
+        "complete",
+        "error",
+        "cached",
+    ]
     stage: AnalysisStage | None = None
     total_stages: int = len(ANALYSIS_STAGE_NAMES)
+    agent_event: AgentEvent | None = None
     result: AnalysisResult | None = None
     error: str | None = None

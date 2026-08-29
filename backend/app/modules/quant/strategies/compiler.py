@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from app.modules.quant.strategies.contracts import (
+    ParameterValue,
     SignalOperand,
     StrategyDefinition,
     StrategySignalExpression,
@@ -18,12 +20,15 @@ DATA_FIELDS = frozenset({"open", "high", "low", "close", "volume"})
 ARITHMETIC_OPERATORS = frozenset({"add", "subtract", "multiply", "divide"})
 
 RUNTIME_SERIES = frozenset({
-    "entry_price",          # 本轮持仓的入场价
-    "holding_bars",         # 本轮持仓已持有的 bar 数（入场当日为 1）
-    "highest_since_entry",  # 本轮持仓期间的最高 high
-    "lowest_since_entry",   # 本轮持仓期间的最低 low
+    # 这些是信号状态而非组合成交状态：入场信号 bar 当日即开始计数。
+    "entry_price",          # 入场信号 bar 的 close，不是次日开盘实际成交价
+    "holding_bars",         # 入场信号 bar 为 1
+    "highest_since_entry",  # 含入场信号 bar 的最高 high
+    "lowest_since_entry",   # 含入场信号 bar 的最低 low
 })
 MAX_EXPRESSION_DEPTH = 12
+# OBV is cumulative, so anchor it to a stable bounded prehistory window.
+OBV_WARMUP_BARS = 250
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +38,47 @@ class CompiledStrategy:
     indicator_order: tuple[str, ...]
     # 传递依赖运行时序列的算术指标：在持仓扫描时逐 bar 求值
     runtime_indicators: tuple[str, ...] = ()
+    obv_indicators: tuple[str, ...] = ()
+
+    def warmup_bars(self, parameters: Mapping[str, ParameterValue]) -> int:
+        """Resolve the required history length for one parameter set."""
+        warmup: dict[str, int] = {name: 0 for name in DATA_FIELDS}
+
+        def argument(value: int | str | None, default: int = 0) -> int:
+            if value is None:
+                return default
+            if isinstance(value, str) and value.startswith("$"):
+                return int(parameters[value[1:]])
+            return int(value)
+
+        def operand(value: SignalOperand | None) -> int:
+            if not isinstance(value, str) or value.startswith("$"):
+                return 0
+            return warmup.get(value, 0)
+
+        for name in self.indicator_order:
+            indicator = self.definition.indicators[name]
+            offset = argument(indicator.offset)
+            if indicator.operator in ARITHMETIC_OPERATORS:
+                required = max(operand(indicator.left), operand(indicator.right))
+            elif indicator.operator == "obv":
+                required = max(
+                    warmup.get(indicator.input or "", 0),
+                    warmup.get(indicator.volume_input or "", 0),
+                    OBV_WARMUP_BARS,
+                )
+            else:
+                period = argument(indicator.period, 1)
+                input_warmup = warmup.get(indicator.input or "", 0)
+                if indicator.operator in {"rsi", "shift"}:
+                    required = input_warmup + period
+                elif indicator.operator == "ema":
+                    # EMA 以 SMA 种子起步，需要约 2 倍周期才收敛到稳态。
+                    required = input_warmup + 2 * period
+                else:
+                    required = input_warmup + max(0, period - 1)
+            warmup[name] = required + offset
+        return max(warmup.values(), default=0)
 
 
 def _parameter_name(value: int | str) -> str | None:
@@ -163,11 +209,20 @@ def compile_strategy(
         if any(isinstance(operand, str) and not operand.startswith("$") for operand in (constraint.left, constraint.right)):
             raise ValueError("参数约束只能引用参数或数值字面量")
     runtime_indicators = _runtime_dependent_indicators(definition, order)
+    for name in runtime_indicators:
+        offset = definition.indicators[name].offset
+        if offset != 0:
+            raise ValueError(f"运行时指标 {name} 不支持 offset")
     return CompiledStrategy(
         definition=definition,
         definition_hash=definition_hash or canonical_definition_hash(definition),
         indicator_order=order,
         runtime_indicators=runtime_indicators,
+        obv_indicators=tuple(
+            name
+            for name in order
+            if definition.indicators[name].operator == "obv"
+        ),
     )
 
 

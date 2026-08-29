@@ -32,6 +32,7 @@ describe("analysis history snapshot query", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(openApiGet).toHaveBeenCalledWith("/api/analysis/{code}/history/{date}", {
       path: { code: "600519", date: "20260807" },
+      options: { signal: expect.any(AbortSignal) },
     });
     queryClient.clear();
   });

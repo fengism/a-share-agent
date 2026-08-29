@@ -15,6 +15,7 @@ from app.agentic.contracts import (
 )
 from app.agentic.events import AgentEvent
 from app.agentic.research import (
+    AgentEventCallback,
     AgentResearchRuntime,
     AgentResearchSession,
 )
@@ -43,6 +44,7 @@ async def run_agentic_research(
 __all__ = [
     "AgentEvidence",
     "AgentEvidenceInsufficientError",
+    "AgentEventCallback",
     "AgenticResearchResult",
     "AgentResearchRuntime",
     "AgentResearchSession",

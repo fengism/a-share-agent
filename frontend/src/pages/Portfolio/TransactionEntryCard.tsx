@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
 import {
   AutoComplete,
   Button,
@@ -40,10 +40,16 @@ interface TransactionEntryCardProps {
   stocks: PortfolioStockSummary[];
 }
 
-export default function TransactionEntryCard({ stocks }: TransactionEntryCardProps) {
+export interface TransactionEntryCardHandle {
+  startSell: (stock: PortfolioStockSummary) => void;
+}
+
+const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionEntryCardProps>(
+  function TransactionEntryCard({ stocks }, ref) {
   const colors = useColors();
   const { cardStyle } = useStyles();
   const isMobile = useMediaQuery("(max-width: 768px)");
+  const containerRef = useRef<HTMLDivElement>(null);
   const [form] = Form.useForm<TransactionFormValues>();
   const side = Form.useWatch("side", form) ?? "buy";
   const sellStockCode = Form.useWatch("sell_stock_code", form);
@@ -61,6 +67,24 @@ export default function TransactionEntryCard({ stocks }: TransactionEntryCardPro
   } = useStockSearchController();
   const createMutation = useCreatePortfolioTransaction();
   const previewMutation = usePreviewPortfolioTransaction();
+  const resetPreview = previewMutation.reset;
+
+  useImperativeHandle(ref, () => ({
+    startSell: (stock) => {
+      clearSearch();
+      resetPreview();
+      form.setFieldsValue({
+        side: "sell",
+        sell_stock_code: stock.stock_code,
+        trade_price: stock.current_price ?? undefined,
+        trade_time: dayjs(),
+        shares: undefined,
+        fee: 0,
+        note: "",
+      });
+      containerRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    },
+  }), [clearSearch, form, resetPreview]);
 
   const searchOptions = useMemo(() => currentResults.map((item) => ({
     value: item.code,
@@ -141,12 +165,13 @@ export default function TransactionEntryCard({ stocks }: TransactionEntryCardPro
   };
 
   return (
-    <Card
-      title="记录交易流水"
-      size="small"
-      style={{ ...cardStyle, marginBottom: 16 }}
-      styles={{ body: { padding: isMobile ? "16px 14px 4px" : "18px 20px 4px" } }}
-    >
+    <div ref={containerRef}>
+      <Card
+        title="记录交易流水"
+        size="small"
+        style={{ ...cardStyle, marginBottom: 16 }}
+        styles={{ body: { padding: isMobile ? "16px 14px 4px" : "18px 20px 4px" } }}
+      >
       <Form<TransactionFormValues>
         form={form}
         layout="vertical"
@@ -296,6 +321,9 @@ export default function TransactionEntryCard({ stocks }: TransactionEntryCardPro
           </div>
         ) : null}
       </Form>
-    </Card>
+      </Card>
+    </div>
   );
-}
+});
+
+export default TransactionEntryCard;

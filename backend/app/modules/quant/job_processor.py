@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from typing import cast
 
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
 from app.modules.quant.persistence import runs as run_store
@@ -45,7 +46,7 @@ async def process_next_quant_job(owner_id: str) -> bool:
     async def execute() -> tuple[dict, dict]:
         request = QuantBacktestPayload.model_validate(job.request)
         async with asyncio.timeout(QUANT_JOB_TIMEOUT_SECONDS):
-            return await execute_backtest(request)
+            return cast(tuple[dict, dict], await execute_backtest(request))
 
     execution = asyncio.create_task(execute(), name=f"quant_job_execution:{job.id}")
     heartbeat = asyncio.create_task(
@@ -57,7 +58,7 @@ async def process_next_quant_job(owner_id: str) -> bool:
             {execution, heartbeat},
             return_when=asyncio.FIRST_COMPLETED,
         )
-        if heartbeat in done:
+        if heartbeat in done and execution not in done:
             execution.cancel()
             await asyncio.gather(execution, return_exceptions=True)
             heartbeat.result()
@@ -79,32 +80,40 @@ async def process_next_quant_job(owner_id: str) -> bool:
     except asyncio.CancelledError:
         execution.cancel()
         await asyncio.gather(execution, return_exceptions=True)
-        await call_blocking(
-            run_store.release,
+        cancelled = await call_blocking(
+            run_store.cancel_owned,
             job.id,
             owner_id,
-            "CancelledError",
+            "服务关闭，任务已取消",
             semaphore=database_semaphore,
         )
+        if cancelled:
+            logger.info("服务关闭，量化任务已取消: run_id=%s", job.id)
         raise
     except TimeoutError:
-        logger.error("量化回测执行超时: run_id=%s timeout=%ss", job.id, QUANT_JOB_TIMEOUT_SECONDS)
-        await call_blocking(
+        status = await call_blocking(
             run_store.fail,
             job.id,
             owner_id,
             "量化回测执行超时",
             semaphore=database_semaphore,
         )
+        if status is None:
+            logger.info("量化任务租约失效，丢弃超时状态: run_id=%s", job.id)
+        else:
+            logger.error("量化回测执行超时: run_id=%s timeout=%ss", job.id, QUANT_JOB_TIMEOUT_SECONDS)
     except Exception as error:
-        logger.exception("量化回测执行失败: run_id=%s", job.id)
-        await call_blocking(
+        status = await call_blocking(
             run_store.fail,
             job.id,
             owner_id,
             str(error),
             semaphore=database_semaphore,
         )
+        if status is None:
+            logger.info("量化任务租约失效，丢弃失败状态: run_id=%s", job.id)
+        else:
+            logger.exception("量化回测执行失败: run_id=%s", job.id)
     finally:
         execution.cancel()
         heartbeat.cancel()

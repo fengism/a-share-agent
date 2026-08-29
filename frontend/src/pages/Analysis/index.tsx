@@ -1,42 +1,50 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, message, Skeleton } from "antd";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  ensureFundamentalData,
   useAddWatchlistItem,
   useAnalysisHistorySnapshot,
   useAnalysisPageData,
   useDeleteWatchlistItem,
+  useStockIntraday,
   useWatchlist,
 } from "../../api/queries";
-import { streamAnalysis, type AnalysisProgress, type AnalysisStage } from "../../api/sse";
 import QueryErrorState from "../../components/QueryErrorState";
+import { loadKlineChart } from "../../charts/klineChartLoader";
 import { usePdfExport } from "../../hooks/usePdfExport";
 import { useWorkflowPush } from "../../hooks/useWorkflowPush";
-import { useAnalysisStore } from "../../store/analysisStore";
 import { useColors, useStyles, useTokens } from "../../theme/hooks";
-import type { AnalysisResult, PushRequest } from "../../types/stock";
+import type { FundamentalExportData, PushRequest } from "../../types/stock";
 import AnalysisChartsSection from "./AnalysisChartsSection";
 import AnalysisDataStatus from "./AnalysisDataStatus";
 import AnalysisHeaderCard from "./AnalysisHeaderCard";
-import AnalysisHistoryRail from "./AnalysisHistoryRail";
-import AnalysisContextSummary from "./AnalysisContextSummary";
-import AnalysisDecisionBoard from "./AnalysisDecisionBoard";
+import AnalysisHistoryRail from "../../features/investment-research/AnalysisHistoryRail";
 import AnalysisPanels from "./AnalysisPanels";
 import AnalysisStateSection from "./AnalysisStateSection";
-import { formatAnalysisDate, normalizeAnalysisDate } from "./analysisHistoryUrl";
+import {
+  formatAnalysisDate,
+  normalizeAnalysisDate,
+  parseAnalysisDate,
+} from "../../features/investment-research/analysisHistoryUrl";
 import { preloadAnalysisPanelModules } from "./analysisPanelLoaders";
+import { useAnalysisWorkflowController } from "../../hooks/useAnalysisWorkflowController";
 import "./analysis-workspace.css";
 
 export default function Analysis() {
   const colors = useColors();
   const t = useTokens();
+  const queryClient = useQueryClient();
   const { pageContainerStyle } = useStyles();
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const historyDate = normalizeAnalysisDate(searchParams.get("date"));
+  const dateState = parseAnalysisDate(searchParams.get("date"));
+  const historyDate = dateState.date;
   const [messageApi, contextHolder] = message.useMessage();
   const exportRef = useRef<HTMLDivElement>(null);
+  const [financialExportData, setFinancialExportData] = useState<FundamentalExportData>();
   const {
     data: pageData,
     isLoading: pageLoading,
@@ -44,6 +52,7 @@ export default function Analysis() {
     error: pageError,
     refetch: retryPageData,
   } = useAnalysisPageData(code || "");
+  const { data: liveIntradayData } = useStockIntraday(code || "");
   const {
     data: historicalResult,
     isLoading: isHistoricalLoading,
@@ -55,80 +64,59 @@ export default function Analysis() {
   const watchlist = useWatchlist();
   const addWatchlistItem = useAddWatchlistItem();
   const deleteWatchlistItem = useDeleteWatchlistItem();
-  const isAnalyzing = useAnalysisStore((state) => state.isAnalyzing);
-  const setIsAnalyzing = useAnalysisStore((state) => state.setIsAnalyzing);
-  const analysisResult = useAnalysisStore((state) => state.analysisResult);
-  const setAnalysisResult = useAnalysisStore((state) => state.setAnalysisResult);
-  const updateAnalysisStage = useAnalysisStore((state) => state.updateAnalysisStage);
-  const analysisError = useAnalysisStore((state) => state.analysisError);
-  const setAnalysisError = useAnalysisStore((state) => state.setAnalysisError);
-  const cancelAnalysis = useAnalysisStore((state) => state.cancelAnalysis);
-  const setCancelAnalysis = useAnalysisStore((state) => state.setCancelAnalysis);
-  const resetAnalysisProgress = useAnalysisStore((state) => state.resetAnalysisProgress);
-
-  const displayResult = analysisResult || historicalResult || (!historyDate ? pageData?.cached_analysis : null);
+  const {
+    displayResult,
+    isAnalyzing,
+    isCancelling,
+    analysisError,
+    stages,
+    currentStageIndex,
+    agentProcess,
+    runAnalysis,
+    cancelAnalysis,
+  } = useAnalysisWorkflowController({
+    code,
+    historyDate,
+    cachedResult: pageData?.cached_analysis,
+    historicalResult,
+    onSuccess: () => messageApi.success("研究完成"),
+    onError: (error) => messageApi.error(`研究失败: ${error.message}`),
+    onCancelled: (result) => messageApi.info(
+      result === "cancelled"
+        ? "已停止研究"
+        : result === "completed"
+          ? "任务已完成，正在刷新结果"
+          : "已停止等待，后台共享任务仍在运行",
+    ),
+  });
   const isWatched = Boolean(code && watchlist.data?.items.some((item) => item.stock_code === code));
+  const pendingAnalysisRef = useRef(false);
 
   useEffect(() => {
-    const state = useAnalysisStore.getState();
-    state.cancelAnalysis?.();
-    state.setIsAnalyzing(false);
-    state.setCancelAnalysis(null);
-    state.setAnalysisResult(null);
-    state.setAnalysisError(null);
-    state.resetAnalysisProgress();
-  }, [code, historyDate]);
+    if (dateState.kind !== "invalid") return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("date");
+    setSearchParams(nextParams, { replace: true });
+    messageApi.warning("历史日期无效，已返回最新分析");
+  }, [dateState.kind, messageApi, searchParams, setSearchParams]);
 
-  useEffect(() => () => {
-    cancelAnalysis?.();
-  }, [cancelAnalysis]);
-
-  const handleProgress = useCallback((progress: AnalysisProgress) => {
-    switch (progress.type) {
-      case "stage_started":
-        if (progress.stage) updateAnalysisStage(progress.stage as AnalysisStage, progress.total_stages, true);
-        break;
-      case "stage_completed":
-      case "stage_failed":
-        if (progress.stage) updateAnalysisStage(progress.stage as AnalysisStage, progress.total_stages);
-        break;
-      case "complete":
-      case "cached":
-        if (progress.result) setAnalysisResult(progress.result);
-        break;
-      case "error":
-        setAnalysisError(progress.error || "分析失败");
-        break;
-    }
-  }, [setAnalysisError, setAnalysisResult, updateAnalysisStage]);
+  useEffect(() => {
+    if (!pendingAnalysisRef.current || historyDate) return;
+    pendingAnalysisRef.current = false;
+    void runAnalysis({ force: true });
+  }, [historyDate, runAnalysis]);
 
   const handleAnalyze = useCallback(async () => {
     if (!code) return;
     if (historyDate) {
+      pendingAnalysisRef.current = true;
       const nextParams = new URLSearchParams(searchParams);
       nextParams.delete("date");
       setSearchParams(nextParams, { replace: true });
+      return;
     }
-    resetAnalysisProgress();
-    setAnalysisResult(null);
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-
-    try {
-      const { promise, cancel } = streamAnalysis(code, handleProgress);
-      setCancelAnalysis(cancel);
-      const result: AnalysisResult = await promise;
-      setAnalysisResult(result);
-      messageApi.success("分析完成");
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "未知错误";
-      setAnalysisError(errorMessage);
-      messageApi.error(`分析失败: ${errorMessage}`);
-    } finally {
-      setIsAnalyzing(false);
-      setCancelAnalysis(null);
-    }
-  }, [code, handleProgress, historyDate, messageApi, resetAnalysisProgress, searchParams, setAnalysisError, setAnalysisResult, setCancelAnalysis, setIsAnalyzing, setSearchParams]);
+    await runAnalysis({ force: Boolean(displayResult) });
+  }, [code, displayResult, historyDate, runAnalysis, searchParams, setSearchParams]);
 
   const handleShowLatest = useCallback(() => {
     const nextParams = new URLSearchParams(searchParams);
@@ -140,13 +128,11 @@ export default function Analysis() {
     navigate("/analysis");
   }, [navigate]);
 
-  const handleCancelAnalysis = useCallback(() => {
-    if (!cancelAnalysis) return;
-    cancelAnalysis();
-    setIsAnalyzing(false);
-    setCancelAnalysis(null);
-    messageApi.info("已取消分析");
-  }, [cancelAnalysis, messageApi, setCancelAnalysis, setIsAnalyzing]);
+  const handleOpenResearchReport = useCallback(() => {
+    if (!code) return;
+    const suffix = historyDate ? `?date=${encodeURIComponent(historyDate)}` : "";
+    navigate(`/investment-research/${encodeURIComponent(code)}${suffix}`);
+  }, [code, historyDate, navigate]);
 
   const handlePush = useCallback(async (request: PushRequest) => {
     return Boolean(await push(request));
@@ -171,15 +157,52 @@ export default function Analysis() {
     targetRef: exportRef,
     filename: () => {
       const dateText = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      return `${code}-分析报告-${dateText}.pdf`;
+      return `${code}-个股研究-${dateText}.pdf`;
     },
     backgroundColor: colors.pageBg,
-    beforeCapture: preloadAnalysisPanelModules,
-    onStart: () => messageApi.loading({ content: "正在生成 PDF...", key: "export-pdf" }),
-    onSuccess: () => messageApi.success({ content: "PDF 导出成功", key: "export-pdf" }),
+    captureSelector: "[data-pdf-group]",
+    sectionSelector: "[data-pdf-capture], [data-pdf-section]",
+    preferredScale: 2,
+    imageFormat: "PNG",
+    pageMargin: 8,
+    showPageNumbers: true,
+    isCaptureReady: () => {
+      const root = exportRef.current;
+      if (!root) return false;
+      const financialPanel = root.querySelector<HTMLElement>("[data-pdf-financial-ready]");
+      const revenueBreakdown = root.querySelector<HTMLElement>("[data-pdf-revenue-ready]");
+      const keyFinancialMetrics = root.querySelector<HTMLElement>(
+        "[data-testid='pdf-key-financial-metrics']",
+      );
+      const chartHosts = Array.from(root.querySelectorAll<HTMLElement>("[data-pdf-chart]"));
+      return financialPanel?.dataset.pdfFinancialReady === "true"
+        && revenueBreakdown?.dataset.pdfRevenueReady === "true"
+        && Number(revenueBreakdown.dataset.pdfRevenueRowCount) > 0
+        && Number(keyFinancialMetrics?.dataset.pdfRowCount) > 0
+        && chartHosts.every((host) => host.querySelector("canvas"));
+    },
+    beforeCapture: async () => {
+      await Promise.all([
+        preloadAnalysisPanelModules(),
+        loadKlineChart(),
+      ]);
+      if (code) {
+        setFinancialExportData(await ensureFundamentalData(queryClient, code));
+      }
+    },
+    onStart: () => {
+      setFinancialExportData(undefined);
+      messageApi.loading({ content: "正在生成 PDF...", key: "export-pdf" });
+    },
+    onSuccess: () => {
+      setFinancialExportData(undefined);
+      messageApi.success({ content: "PDF 导出成功", key: "export-pdf" });
+    },
     onError: (error) => {
+      setFinancialExportData(undefined);
       console.error("[Analysis] PDF 导出失败", error);
-      messageApi.error({ content: "PDF 导出失败", key: "export-pdf" });
+      const detail = error instanceof Error ? `：${error.message}` : "";
+      messageApi.error({ content: `PDF 导出失败${detail}`, key: "export-pdf" });
     },
   });
 
@@ -227,22 +250,28 @@ export default function Analysis() {
         className={`analysis-page${isExportingPdf ? " pdf-exporting" : ""}`}
       >
         <div className="analysis-workspace">
-          <AnalysisHistoryRail currentCode={code} currentDate={historyDate || undefined} />
-          <div className="analysis-workspace__header">
+          <AnalysisHistoryRail
+            currentCode={code}
+            currentDate={normalizeAnalysisDate(displayResult?.analysis_date) || historyDate || undefined}
+          />
+          <div className="analysis-workspace__header" data-pdf-capture data-pdf-group>
             <AnalysisHeaderCard
               code={code}
               pageData={pageData}
+              intradayData={liveIntradayData}
               result={displayResult}
               analysisDate={historyDate || undefined}
               isAnalyzing={isAnalyzing}
+              isCancelling={isCancelling}
               isPushing={isPushing}
               isWatched={isWatched}
               isWatchlistPending={addWatchlistItem.isPending || deleteWatchlistItem.isPending}
               onToggleWatchlist={handleToggleWatchlist}
               onAnalyze={handleAnalyze}
-              onCancel={handleCancelAnalysis}
+              onCancel={() => void cancelAnalysis()}
               onExportPdf={handleExportPdf}
               onShowHistory={handleShowHistory}
+              onOpenResearchReport={handleOpenResearchReport}
               onPush={handlePush}
             />
           </div>
@@ -265,15 +294,24 @@ export default function Analysis() {
             <AnalysisDataStatus pageData={pageData} result={displayResult} />
             <AnalysisStateSection
               isAnalyzing={isAnalyzing}
-              result={displayResult}
               error={analysisError}
+              stages={stages}
+              currentStageIndex={currentStageIndex}
+              agentProcess={agentProcess}
             />
-            {displayResult ? <AnalysisDecisionBoard result={displayResult} /> : null}
-            <AnalysisContextSummary pageData={pageData} result={displayResult} />
           </div>
           <div className="analysis-workspace__details">
-            <AnalysisChartsSection code={code} pageData={pageData} />
-            <AnalysisPanels code={code} result={displayResult} isExportingPdf={isExportingPdf} />
+            <AnalysisChartsSection
+              code={code}
+              pageData={pageData}
+              isExportingPdf={isExportingPdf}
+            />
+            <AnalysisPanels
+              code={code}
+              result={displayResult}
+              isExportingPdf={isExportingPdf}
+              financialExportData={financialExportData}
+            />
           </div>
         </div>
       </div>

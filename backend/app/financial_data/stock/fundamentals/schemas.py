@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FinancialStatementRow(BaseModel):
@@ -13,6 +15,33 @@ class FinancialMetrics(BaseModel):
     code: str
     latest_report_date: str | None = None
     metrics: dict[str, float | None]
+
+
+class RevenueBreakdownItem(BaseModel):
+    """单个产品、业务或地区的营收与毛利构成。"""
+
+    id: str | None = None
+    class_name: str
+    is_sub_item: bool | None = None
+    revenue: float | None = None
+    cost: float | None = None
+    gross_profit: float | None = None
+    revenue_share_pct: float | None = None
+    gross_margin_pct: float | None = None
+
+
+class RevenueBreakdown(BaseModel):
+    """新浪最新披露口径下的营收与毛利构成；上游不提供报告期。"""
+
+    code: str
+    symbol: str
+    name: str = ""
+    source: Literal["sina"] = "sina"
+    amount_unit: Literal["CNY_yuan"] = "CNY_yuan"
+    amount_unit_inferred: bool = True
+    by_product: list[RevenueBreakdownItem] = Field(default_factory=list)
+    by_business: list[RevenueBreakdownItem] = Field(default_factory=list)
+    by_region: list[RevenueBreakdownItem] = Field(default_factory=list)
 
 
 class StockCompareItem(BaseModel):

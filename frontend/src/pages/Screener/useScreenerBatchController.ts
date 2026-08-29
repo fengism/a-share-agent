@@ -43,7 +43,7 @@ export function useScreenerBatchController() {
         (completed, total) => setAnalysisProgress(`分析中 ${completed}/${total}`),
       );
       if (result.failed.length === 0) {
-        message.success(`已完成 ${result.succeeded.length} 只股票分析，可在分析历史中查看`);
+        message.success(`已完成 ${result.succeeded.length} 只股票研究，可在研究历史中查看`);
       } else {
         message.warning(`完成 ${result.succeeded.length} 只，失败 ${result.failed.length} 只`);
       }

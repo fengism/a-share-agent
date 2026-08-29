@@ -58,6 +58,17 @@
   margin-bottom: 0;
 }
 
+.quant-authoring-gate-heading {
+  grid-column: 1 / -1;
+  padding-top: var(--c-space-2);
+  border-top: 1px solid var(--c-border);
+}
+
+.quant-quality-gate-summary {
+  display: grid;
+  gap: var(--c-space-1);
+}
+
 @media (max-width: 1199px) {
   .quant-authoring-backtest-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));

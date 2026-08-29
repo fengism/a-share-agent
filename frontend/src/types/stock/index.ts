@@ -1,5 +1,6 @@
 export * from "./analysis";
 export * from "./compare";
+export * from "./fundamentals";
 export * from "./industryChain";
 export * from "./market";
 export * from "./potential";

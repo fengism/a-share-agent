@@ -1,27 +1,27 @@
 import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RobotOutlined } from "@ant-design/icons";
-import { Tag } from "antd";
 import { semanticTagStyle, useStyles } from "../../styles/ui";
+import { Tag } from "antd";
 import { ChatActionDialogs } from "./components/ChatActionDialogs";
 import { ChatAgentSelector } from "./components/ChatAgentSelector";
 import { ChatCapabilityPresetBar } from "./components/ChatCapabilityPresetBar";
 import { ChatClearButton, ChatConversation } from "./components/ChatConversation";
+import { useChatStore } from "../../store/chatStore";
 import { ChatInput } from "./components/ChatInput";
 import { ChatSessionSidebar } from "./components/ChatSessionSidebar";
 import { ChatSkillSelector } from "./components/ChatSkillSelector";
 import { useChatCapabilitySelection } from "./useChatCapabilitySelection";
 import { useChatController } from "./useChatController";
 import { useChatResultActionController } from "./useChatResultActionController";
-import { useChatSessionSync } from "./useChatSessionSync";
 import "./chat.css";
 
 export default function ChatPage() {
   const [searchParams] = useSearchParams();
   const [inputValue, setInputValue] = useState(() => searchParams.get("prompt")?.trim() || "");
-  const syncStatus = useChatSessionSync();
   const resultActions = useChatResultActionController();
   const chat = useChatController({ inputValue, setInputValue });
+  const syncStatus = useChatStore((state) => state.syncStatus);
   const {
     agentNames,
     chatCapabilities,
@@ -32,6 +32,11 @@ export default function ChatPage() {
     skillNames,
   } = useChatCapabilitySelection();
   const { pageDescriptionStyle, pageHeaderStyle, pageTitleStyle } = useStyles();
+  const syncTag = syncStatus === "synced"
+    ? <Tag style={semanticTagStyle("down")}>会话已同步</Tag>
+    : syncStatus === "loading"
+      ? <Tag style={semanticTagStyle("primary")}>会话同步中</Tag>
+      : <Tag style={semanticTagStyle("warning")}>本地缓存模式</Tag>;
 
   const handleApplyCapabilityPreset = useCallback((
     nextSkillNames: string[],
@@ -40,12 +45,6 @@ export default function ChatPage() {
     setSkillNames(nextSkillNames);
     setAgentNames(nextAgentNames);
   }, [setAgentNames, setSkillNames]);
-
-  const syncTag = syncStatus === "synced"
-    ? <Tag style={semanticTagStyle("down")}>会话已同步</Tag>
-    : syncStatus === "loading"
-      ? <Tag style={semanticTagStyle("primary")}>会话同步中</Tag>
-      : <Tag style={semanticTagStyle("warning")}>本地缓存模式</Tag>;
 
   return (
     <>

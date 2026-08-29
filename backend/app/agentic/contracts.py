@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from app.agentic.events import AgentEvent
 from app.agentic.tools.serialization import has_meaningful_tool_content
 
 MAX_AGENT_SUMMARY_LENGTH = 12_000
@@ -20,6 +21,7 @@ class EvidenceRequirement:
     label: str
     tool_names: tuple[str, ...]
     validator: Callable[[AgentEvidence], bool] | None = None
+    fatal: bool = True
 
     def accepts(self, evidence: AgentEvidence) -> bool:
         if (
@@ -80,17 +82,23 @@ class AgentRoundResult:
 class AgenticResearchResult:
     summary: str
     evidence: tuple[AgentEvidence, ...]
+    evidence_gaps: tuple[str, ...] = ()
+    execution_trace: tuple[AgentEvent, ...] = ()
 
-    def render_prompt_context(self) -> dict[str, str]:
+    def render_prompt_context(self) -> dict[str, Any]:
         return {
             "agent_summary": self.summary[:MAX_AGENT_SUMMARY_LENGTH],
             "agent_evidence": render_agent_evidence(self.evidence),
+            "agent_evidence_gaps": "、".join(self.evidence_gaps) or "无",
+            "agent_evidence_gap_labels": self.evidence_gaps,
         }
 
     def as_tool_payload(self) -> dict[str, Any]:
         return {
             "summary": self.summary[:MAX_AGENT_SUMMARY_LENGTH],
             "evidence": [asdict(item) for item in self.evidence],
+            "evidence_gaps": list(self.evidence_gaps),
+            "execution_trace": [item.model_dump(mode="json") for item in self.execution_trace],
         }
 
 

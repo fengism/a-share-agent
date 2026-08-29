@@ -5,6 +5,7 @@ export const pageLoaders = {
   screener: () => import("../pages/Screener"),
   analysis: () => import("../pages/Analysis"),
   analysisEntry: () => import("../pages/Analysis/Entry"),
+  investmentResearch: () => import("../pages/InvestmentResearch"),
   dailyReview: () => import("../pages/DailyReview"),
   potential: () => import("../pages/Potential"),
   chat: () => import("../pages/Chat"),
@@ -30,6 +31,7 @@ const routeLoaders: Record<string, PageLoader> = {
   "/market": pageLoaders.market,
   "/screener": pageLoaders.screener,
   "/analysis": pageLoaders.analysisEntry,
+  "/investment-research": pageLoaders.analysisEntry,
   "/daily-review": pageLoaders.dailyReview,
   "/chat": pageLoaders.chat,
   "/settings": pageLoaders.settings,
@@ -55,14 +57,18 @@ const preloadCache = new Map<string, Promise<void>>();
 export function preloadAppRoute(pathname: string): Promise<void> | undefined {
   const routeKey = pathname.startsWith("/analysis/")
     ? "/analysis/:code"
-    : pathname.startsWith("/industry-chain/")
-      ? "/industry-chain/:name"
-      : pathname;
+    : pathname.startsWith("/investment-research/")
+      ? "/investment-research/:code"
+      : pathname.startsWith("/industry-chain/")
+        ? "/industry-chain/:name"
+        : pathname;
   const loader = routeKey === "/analysis/:code"
     ? pageLoaders.analysis
-    : routeKey === "/industry-chain/:name"
-      ? pageLoaders.industryChain
-      : routeIntentLoaders[routeKey] ?? routeLoaders[routeKey];
+    : routeKey === "/investment-research/:code"
+      ? pageLoaders.investmentResearch
+      : routeKey === "/industry-chain/:name"
+        ? pageLoaders.industryChain
+        : routeIntentLoaders[routeKey] ?? routeLoaders[routeKey];
   if (!loader) return undefined;
   const cached = preloadCache.get(routeKey);
   if (cached) return cached;

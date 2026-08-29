@@ -39,6 +39,10 @@ async def _backtest_quant_strategy_draft(
     benchmark: str = "000300",
     minimum_trade_count: int = 1,
     maximum_drawdown_pct: float = 80,
+    minimum_sharpe_ratio: float | None = None,
+    minimum_holdout_trade_count: int | None = None,
+    maximum_holdout_drawdown_pct: float | None = None,
+    minimum_holdout_sharpe_ratio: float | None = None,
 ) -> Any:
     return await get_application_tool_handlers().backtest_quant_strategy_draft(
         draft_id=draft_id,
@@ -48,6 +52,10 @@ async def _backtest_quant_strategy_draft(
         benchmark=benchmark,
         minimum_trade_count=minimum_trade_count,
         maximum_drawdown_pct=maximum_drawdown_pct,
+        minimum_sharpe_ratio=minimum_sharpe_ratio,
+        minimum_holdout_trade_count=minimum_holdout_trade_count,
+        maximum_holdout_drawdown_pct=maximum_holdout_drawdown_pct,
+        minimum_holdout_sharpe_ratio=minimum_holdout_sharpe_ratio,
     )
 
 
@@ -102,7 +110,7 @@ def register_quant_tools(target_registry: CapabilityCatalog = registry) -> None:
     ))
     target_registry.register_tool(Tool(
         name="backtest_quant_strategy_draft",
-        description="以草稿当前不可变快照创建历史回测，并记录交易次数和最大回撤质量门禁。仅管理员可用。",
+        description="以草稿当前不可变快照创建历史回测，并按收益风险与后段样本表现执行质量门禁。仅管理员可用。",
         parameters={
             "type": "object",
             "properties": {
@@ -132,6 +140,30 @@ def register_quant_tools(target_registry: CapabilityCatalog = registry) -> None:
                     "exclusiveMinimum": 0,
                     "maximum": 80,
                     "default": 80,
+                },
+                "minimum_sharpe_ratio": {
+                    "type": ["number", "null"],
+                    "minimum": -20,
+                    "maximum": 20,
+                    "default": None,
+                },
+                "minimum_holdout_trade_count": {
+                    "type": ["integer", "null"],
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "default": None,
+                },
+                "maximum_holdout_drawdown_pct": {
+                    "type": ["number", "null"],
+                    "exclusiveMinimum": 0,
+                    "maximum": 80,
+                    "default": None,
+                },
+                "minimum_holdout_sharpe_ratio": {
+                    "type": ["number", "null"],
+                    "minimum": -20,
+                    "maximum": 20,
+                    "default": None,
                 },
             },
             "required": ["draft_id", "codes", "start_date", "end_date"],

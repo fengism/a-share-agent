@@ -1,5 +1,6 @@
+import { InfoCircleOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Card, InputNumber, message, Progress, Radio, Space, Tag, Typography } from "antd";
+import { Alert, Button, Card, InputNumber, message, Modal, Progress, Radio, Space, Tag, Tooltip, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useIndustries, useRunScreenerStrategy, useScreenerScreen, useScreenerStrategies } from "../../api/queries";
 import DataRefreshIndicator from "../../components/DataRefreshIndicator";
@@ -31,7 +32,62 @@ const PRESET_STRATEGIES: PresetStrategy[] = [
 
 const { Title, Paragraph } = Typography;
 
+const STRATEGY_SETTINGS_STORAGE_KEY = "screener-strategy-settings";
+
+interface StoredStrategySettings {
+  strategyKey?: string;
+  parameters: Record<string, number | boolean | string>;
+  maxSignalAgeBars: number | null;
+  scanLimit: 50 | 200;
+}
+
+function loadStrategySettings(): StoredStrategySettings {
+  const defaults: StoredStrategySettings = {
+    parameters: {},
+    maxSignalAgeBars: 20,
+    scanLimit: 50,
+  };
+  if (typeof window === "undefined") return defaults;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(STRATEGY_SETTINGS_STORAGE_KEY) ?? "null");
+    if (!parsed || typeof parsed !== "object") return defaults;
+    return {
+      strategyKey: typeof parsed.strategyKey === "string" ? parsed.strategyKey : undefined,
+      parameters: parsed.parameters && typeof parsed.parameters === "object" && !Array.isArray(parsed.parameters)
+        ? parsed.parameters
+        : {},
+      maxSignalAgeBars: parsed.maxSignalAgeBars === null
+        ? null
+        : Number.isInteger(parsed.maxSignalAgeBars) && parsed.maxSignalAgeBars >= 0 && parsed.maxSignalAgeBars <= 250
+          ? parsed.maxSignalAgeBars
+          : defaults.maxSignalAgeBars,
+      scanLimit: parsed.scanLimit === 200 ? 200 : 50,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+function restoreStrategyParameters(
+  strategy: ScreenerStrategyPreset,
+  stored: Record<string, number | boolean | string>,
+) {
+  return Object.fromEntries(strategy.parameter_definitions.map((definition) => {
+    const saved = stored[definition.key];
+    const isValidNumber = typeof saved === "number"
+      && Number.isFinite(saved)
+      && (definition.type !== "integer" || Number.isInteger(saved))
+      && (definition.minimum == null || saved >= definition.minimum)
+      && (definition.maximum == null || saved <= definition.maximum);
+    const isValidValue = typeof definition.default === "number"
+      ? isValidNumber
+      : typeof saved === typeof definition.default;
+    return [definition.key, isValidValue ? saved : definition.default];
+  }));
+}
+
 export default function Screener() {
+  const [initialStrategySettings] = useState(loadStrategySettings);
   const navigate = useNavigate();
   const filters = useScreenerFilterController();
   const batch = useScreenerBatchController();
@@ -44,17 +100,24 @@ export default function Screener() {
     matchedCodes: string[];
     matchedItems: ScreenerItem[];
     signalDates: Map<string, string>;
+    signalAges: Map<string, number>;
+    returnsSinceSignal: Map<string, number | null>;
+    averageAmounts: Map<string, number | null>;
     dataSources: Map<string, string>;
     fallbackCodes: Set<string>;
     evaluated: number;
     failed: number;
+    excluded: Record<string, string>;
     fallbackCount: number;
   }>();
   const [showMatchedOnly, setShowMatchedOnly] = useState(false);
+  const [excludedDetailsOpen, setExcludedDetailsOpen] = useState(false);
   const [selectedStrategyKey, setSelectedStrategyKey] = useState<string>();
   const [strategyParameters, setStrategyParameters] = useState<Record<string, number | boolean | string>>({});
-  const [scanLimit, setScanLimit] = useState<50 | 200>(50);
-  const [strategyProgress, setStrategyProgress] = useState<{ completed: number; total: number; matched: number; failed: number }>();
+  const [maxSignalAgeBars, setMaxSignalAgeBars] = useState<number | null>(initialStrategySettings.maxSignalAgeBars);
+  const [scanLimit, setScanLimit] = useState<50 | 200>(initialStrategySettings.scanLimit);
+  const [strategyProgress, setStrategyProgress] = useState<{ completed: number; total: number; matched: number; excluded: number; failed: number }>();
+  const [strategySettingsRestored, setStrategySettingsRestored] = useState(false);
   const [cancelStrategy, setCancelStrategy] = useState<(() => void)>();
   const { data: industries = [], error: industriesError, refetch: refetchIndustries } = useIndustries();
   const {
@@ -68,6 +131,27 @@ export default function Screener() {
   const activeStrategyRunRef = useRef(0);
   const appliedFilterSignature = JSON.stringify(filters.appliedState.filters);
   const previousFilterSignatureRef = useRef(appliedFilterSignature);
+
+  useEffect(() => {
+    if (strategySettingsRestored || !strategies.data) return;
+    const savedStrategy = strategies.data.find((strategy) => strategy.key === initialStrategySettings.strategyKey);
+    if (savedStrategy) {
+      setSelectedStrategyKey(savedStrategy.key);
+      setStrategyParameters(restoreStrategyParameters(savedStrategy, initialStrategySettings.parameters));
+    }
+    setStrategySettingsRestored(true);
+  }, [initialStrategySettings, strategies.data, strategySettingsRestored]);
+
+  useEffect(() => {
+    if (!strategySettingsRestored || typeof window === "undefined") return;
+    const settings: StoredStrategySettings = {
+      strategyKey: selectedStrategyKey,
+      parameters: strategyParameters,
+      maxSignalAgeBars,
+      scanLimit,
+    };
+    window.localStorage.setItem(STRATEGY_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  }, [maxSignalAgeBars, scanLimit, selectedStrategyKey, strategyParameters, strategySettingsRestored]);
 
   useEffect(() => {
     if (previousFilterSignatureRef.current === appliedFilterSignature) return;
@@ -110,6 +194,7 @@ export default function Screener() {
       const result = await runStrategy.mutateAsync({
         strategy_key: strategy.key,
         parameters: strategyParameters,
+        max_signal_age_bars: maxSignalAgeBars,
         codes,
         candidate_items: screenerResult?.items ?? [],
         scan_limit: scanLimit,
@@ -119,6 +204,7 @@ export default function Screener() {
             completed: event.completed ?? 0,
             total: event.total ?? 0,
             matched: event.matched ?? 0,
+            excluded: event.excluded ?? 0,
             failed: event.failed ?? 0,
           });
         },
@@ -129,7 +215,7 @@ export default function Screener() {
           }
           activeStrategyCancelRef.current = cancel;
           setCancelStrategy(() => cancel);
-          setStrategyProgress({ completed: 0, total: 0, matched: 0, failed: 0 });
+          setStrategyProgress({ completed: 0, total: 0, matched: 0, excluded: 0, failed: 0 });
         },
       });
       if (activeStrategyRunRef.current !== runId) return;
@@ -141,10 +227,14 @@ export default function Screener() {
         matchedCodes: result.matched_codes,
         matchedItems: result.matched_items,
         signalDates: new Map(result.matches.map((match) => [match.code, match.signal_date])),
+        signalAges: new Map(result.matches.map((match) => [match.code, match.signal_age_bars])),
+        returnsSinceSignal: new Map(result.matches.map((match) => [match.code, match.return_since_signal_pct])),
+        averageAmounts: new Map(result.matches.map((match) => [match.code, match.average_amount_20d_yi])),
         dataSources: new Map(result.matches.map((match) => [match.code, match.data_source || "-"])),
         fallbackCodes: new Set(result.matches.filter((match) => match.used_fallback).map((match) => match.code)),
         evaluated: result.evaluated,
         failed: Object.keys(result.failed).length,
+        excluded: result.excluded ?? {},
         fallbackCount: result.fallback_count || 0,
       });
       setShowMatchedOnly(true);
@@ -250,6 +340,25 @@ export default function Screener() {
                       />
                     </label>
                   ))}
+                  <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
+                    <span>
+                      最大信号年龄（交易日K线）{" "}
+                      <Tooltip title="从最近一次入场信号到最新交易日的 K 线根数；清空后不限制">
+                        <InfoCircleOutlined aria-label="最大信号年龄说明" style={{ color: "var(--c-text-muted)" }} />
+                      </Tooltip>
+                    </span>
+                    <InputNumber
+                      aria-label="最大信号年龄"
+                      value={maxSignalAgeBars}
+                      min={0}
+                      max={250}
+                      step={1}
+                      suffix="根"
+                      placeholder="不限制"
+                      disabled={strategyControlsDisabled}
+                      onChange={setMaxSignalAgeBars}
+                    />
+                  </label>
                   <Radio.Group disabled={strategyControlsDisabled} value={scanLimit} onChange={(event) => setScanLimit(event.target.value)}>
                     <Radio.Button value={50}>当前页 {screenerResult?.items.length ?? 0}</Radio.Button>
                     <Radio.Button value={200}>前 200 候选</Radio.Button>
@@ -298,7 +407,7 @@ export default function Screener() {
       {strategyProgress ? (
         <Alert
           title={strategyProgress.total
-            ? `策略扫描中：${strategyProgress.completed}/${strategyProgress.total}，命中 ${strategyProgress.matched}，失败 ${strategyProgress.failed}`
+            ? `策略扫描中：${strategyProgress.completed}/${strategyProgress.total}，命中 ${strategyProgress.matched}，排除 ${strategyProgress.excluded}，失败 ${strategyProgress.failed}`
             : "正在准备策略扫描候选股票"}
           description={<Progress percent={strategyProgress.total ? Math.round(strategyProgress.completed / strategyProgress.total * 100) : 0} size="small" />}
           action={<Button danger size="small" onClick={() => cancelStrategy?.()}>取消扫描</Button>}
@@ -309,18 +418,46 @@ export default function Screener() {
       ) : null}
       {strategyResult ? (
         <Alert
-          title={`${strategyResult.name}@${strategyResult.version}：命中 ${strategyResult.matchedCodes.length}/${strategyResult.evaluated} 只${strategyResult.failed ? `，${strategyResult.failed} 只数据失败` : ""}`}
+          title={`${strategyResult.name}@${strategyResult.version}：命中 ${strategyResult.matchedCodes.length}/${strategyResult.evaluated} 只${Object.keys(strategyResult.excluded).length ? `，排除 ${Object.keys(strategyResult.excluded).length} 只` : ""}${strategyResult.failed ? `，${strategyResult.failed} 只数据失败` : ""}`}
           description={strategyResult.matchedCodes.length
             ? `策略快照 ${strategyResult.hash.slice(0, 20)}… · ${strategyResult.matchedCodes.length > 10 ? "前 10 只命中股票" : "命中股票"}已自动勾选${strategyResult.fallbackCount ? ` · ${strategyResult.fallbackCount} 只使用 K 线 fallback` : ""}`
             : `策略快照 ${strategyResult.hash.slice(0, 20)}… · 当前候选中没有目标仓位为持有的股票`}
-          action={<Button size="small" onClick={() => setShowMatchedOnly((value) => !value)}>{showMatchedOnly ? "显示全部" : "只看命中"}</Button>}
-          type={strategyResult.failed || strategyResult.fallbackCount ? "warning" : "success"}
+          action={(
+            <Space size={6} wrap>
+              {Object.keys(strategyResult.excluded).length ? (
+                <Button size="small" onClick={() => setExcludedDetailsOpen(true)}>查看排除明细</Button>
+              ) : null}
+              <Button size="small" onClick={() => setShowMatchedOnly((value) => !value)}>{showMatchedOnly ? "显示全部" : "只看命中"}</Button>
+            </Space>
+          )}
+          type={strategyResult.failed || Object.keys(strategyResult.excluded).length || strategyResult.fallbackCount ? "warning" : "success"}
           showIcon
           closable
-          onClose={() => { setStrategyResult(undefined); setShowMatchedOnly(false); }}
+          onClose={() => { setStrategyResult(undefined); setShowMatchedOnly(false); setExcludedDetailsOpen(false); }}
           style={{ marginBottom: 16, borderRadius: 8 }}
         />
       ) : null}
+      <Modal
+        title={`排除明细（${Object.keys(strategyResult?.excluded ?? {}).length}）`}
+        open={excludedDetailsOpen}
+        footer={<Button type="primary" onClick={() => setExcludedDetailsOpen(false)}>关闭</Button>}
+        onCancel={() => setExcludedDetailsOpen(false)}
+        width={560}
+      >
+        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          {Object.entries(strategyResult?.excluded ?? {}).map(([code, reason]) => {
+            const stockName = screenerResult?.items.find((item) => item.code === code)?.name;
+            return (
+              <li key={code} style={{ padding: "8px 0" }}>
+                <Space align="start">
+                  <Typography.Text code>{stockName ? `${code} ${stockName}` : code}</Typography.Text>
+                  <Typography.Text>{reason}</Typography.Text>
+                </Space>
+              </li>
+            );
+          })}
+        </ul>
+      </Modal>
       {filters.showPercentile && percentiles.isPending && (
         <Alert
           title="正在计算估值百分位，请稍候..."
@@ -331,7 +468,13 @@ export default function Screener() {
       )}
       <Card
         size="small"
-        title={<span style={{ fontWeight: 600 }}>筛选结果 {screenerResult ? `(${screenerResult.total} 只)` : ""}</span>}
+        title={(
+          <span style={{ fontWeight: 600 }}>
+            {showMatchedOnly && strategyResult
+              ? `策略命中 (${strategyResult.matchedItems.length} 只)`
+              : `筛选结果${screenerResult ? ` (${screenerResult.total} 只)` : ""}`}
+          </span>
+        )}
         extra={(
           <Space size={6} wrap>
             {screenerResult ? (
@@ -380,6 +523,9 @@ export default function Screener() {
             selectedCodes={batch.selectedCodes}
             onSelectedCodesChange={batch.setSelectedCodes}
             strategySignalDates={strategyResult?.signalDates}
+            strategySignalAges={strategyResult?.signalAges}
+            strategyReturnsSinceSignal={strategyResult?.returnsSinceSignal}
+            strategyAverageAmounts={strategyResult?.averageAmounts}
             strategyDataSources={strategyResult?.dataSources}
             strategyFallbackCodes={strategyResult?.fallbackCodes}
           />

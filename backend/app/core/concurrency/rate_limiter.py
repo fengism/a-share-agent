@@ -2,6 +2,7 @@
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from functools import partial, wraps
 from threading import Lock
 from typing import Any, Callable, TypeVar
@@ -59,7 +60,9 @@ async def _run_blocking(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     if executor is None:
         return await asyncio.to_thread(func, *args, **kwargs)
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(executor, partial(func, *args, **kwargs))
+    context = copy_context()
+    call = partial(func, *args, **kwargs)
+    return await loop.run_in_executor(executor, context.run, call)
 
 
 async def call_blocking(

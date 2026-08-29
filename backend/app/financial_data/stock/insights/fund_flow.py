@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import cast
 
 from app.core.cache import cache, dated_cache_key, dated_cache_key_no_day
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 _fund_flow_singleflight: AsyncSingleFlight[list[StockFundFlowItem]] = AsyncSingleFlight()
 _FUND_FLOW_FAILURE_TTL_SECONDS = 30
 _FUND_FLOW_LAST_GOOD_TTL_SECONDS = 24 * 60 * 60
+_FUND_FLOW_MAX_DAYS = 60
 _FUND_FLOW_UNAVAILABLE = object()
 
 
@@ -57,6 +59,45 @@ _FUND_FLOW_ATTEMPTS = (
 )
 
 
+def _parse_fund_flow_date(value: str) -> date | None:
+    text = value.strip()
+    for date_format in ("%Y-%m-%d", "%Y%m%d", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(text, date_format).date()
+        except ValueError:
+            continue
+    try:
+        return datetime.fromisoformat(text).date()
+    except ValueError:
+        return None
+
+
+def _normalize_fund_flow(items: object) -> list[StockFundFlowItem]:
+    result = [StockFundFlowItem.model_validate(item) for item in cast(list[object], items)]
+    decorated = [
+        (item, index, _parse_fund_flow_date(item.date))
+        for index, item in enumerate(result)
+    ]
+    decorated.sort(
+        key=lambda entry: (
+            0 if entry[2] is not None else 1,
+            -entry[2].toordinal() if entry[2] is not None else 0,
+            entry[1],
+        )
+    )
+    unique_result: list[StockFundFlowItem] = []
+    seen_dates: set[str] = set()
+    for item, _, parsed_date in decorated:
+        date_identity = parsed_date.isoformat() if parsed_date is not None else item.date.strip()
+        if date_identity in seen_dates:
+            continue
+        seen_dates.add(date_identity)
+        unique_result.append(item)
+        if len(unique_result) == _FUND_FLOW_MAX_DAYS:
+            break
+    return unique_result
+
+
 async def _fetch_remote_stock_fund_flow(code: str) -> list[StockFundFlowItem]:
     last_error: Exception | None = None
     for index, attempt in enumerate(_FUND_FLOW_ATTEMPTS):
@@ -78,8 +119,7 @@ async def _fetch_remote_stock_fund_flow(code: str) -> list[StockFundFlowItem]:
             ]
             if not result:
                 raise ValueError(f"{attempt.provider} 个股历史资金流为空")
-            result.sort(key=lambda item: item.date, reverse=True)
-            return result
+            return _normalize_fund_flow(result)
         except Exception as error:
             last_error = error
             logger.info(
@@ -103,10 +143,10 @@ async def _load_stock_fund_flow(
     except Exception as error:
         stale = cache.get(last_good_key)
         if stale is not None:
-            result = [
+            result = _normalize_fund_flow([
                 StockFundFlowItem.model_validate(item).model_copy(update={"is_stale": True})
                 for item in stale
-            ]
+            ])
             cache.set(cache_key, result, ttl=_FUND_FLOW_FAILURE_TTL_SECONDS)
             logger.warning(
                 "个股资金流上游不可用，使用最近成功缓存: code=%s error_type=%s",
@@ -123,7 +163,7 @@ async def _load_stock_fund_flow(
 
 
 async def get_stock_fund_flow(code: str) -> list[StockFundFlowItem]:
-    """获取股票最近最多 120 个交易日的分级资金净流入。"""
+    """获取股票最近最多 60 个交易日的分级资金净流入。"""
     sym = normalize_code(code)
     cache_key = dated_cache_key("stock_fund_flow", sym.raw)
     last_good_key = dated_cache_key_no_day("stock_fund_flow_last_good", sym.raw)
@@ -131,7 +171,7 @@ async def get_stock_fund_flow(code: str) -> list[StockFundFlowItem]:
     if cached is _FUND_FLOW_UNAVAILABLE:
         raise UpstreamUnavailableError("个股资金流上游暂时不可用，请稍后重试")
     if cached is not None:
-        return [StockFundFlowItem.model_validate(item) for item in cached]
+        return _normalize_fund_flow(cached)
     return cast(
         list[StockFundFlowItem],
         await _fund_flow_singleflight.do(

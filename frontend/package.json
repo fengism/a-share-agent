@@ -6,8 +6,9 @@
   "scripts": {
     "api:check": "node scripts/check-api-generated.mjs",
     "api:export": "cd ../backend && uv run --frozen python -m app.scripts.export_openapi ../frontend/src/api/generated/openapi.json",
-    "api:generate": "npm run api:export && npm run api:generate:types",
+    "api:generate": "npm run api:export && npm run api:generate:types && npm run api:generate:financial-labels",
     "api:generate:types": "openapi-typescript src/api/generated/openapi.json -o src/api/generated/schema.ts && openapi-typescript src/api/generated/openapi.json -o src/api/generated/request-schema.ts --default-non-nullable false",
+    "api:generate:financial-labels": "node scripts/generate-financial-field-labels.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint . && node scripts/check-page-boundaries.mjs",

@@ -1,3 +1,4 @@
+import { useCallback, useRef } from "react";
 import { ReloadOutlined } from "@ant-design/icons";
 import { Alert, Button, Card, Skeleton, Space, Typography, message } from "antd";
 import { usePortfolio } from "../../api/queries";
@@ -8,12 +9,14 @@ import PortfolioSummaryCards from "./PortfolioSummaryCards";
 import PortfolioTables from "./PortfolioTables";
 import PortfolioQuoteStatus from "./PortfolioQuoteStatus";
 import PortfolioRiskPanel from "./PortfolioRiskPanel";
-import TransactionEntryCard from "./TransactionEntryCard";
+import TransactionEntryCard, { type TransactionEntryCardHandle } from "./TransactionEntryCard";
+import type { PortfolioStockSummary } from "../../types/portfolio";
 import { errorMessage, formatTime } from "./portfolioFormatters";
 
 const { Paragraph, Title } = Typography;
 
 export default function PortfolioPage() {
+  const transactionEntryRef = useRef<TransactionEntryCardHandle>(null);
   const { cardStyle, pageContainerStyle, pageDescriptionStyle, pageTitleStyle } = useStyles();
   const {
     data,
@@ -30,6 +33,9 @@ export default function PortfolioPage() {
   };
 
   const quotedAt = data?.quoted_at ? formatTime(data.quoted_at) : "尚未获取";
+  const handleSell = useCallback((stock: PortfolioStockSummary) => {
+    transactionEntryRef.current?.startSell(stock);
+  }, []);
 
   return (
     <div style={pageContainerStyle}>
@@ -66,7 +72,7 @@ export default function PortfolioPage() {
         </Space>
       </div>
 
-      <TransactionEntryCard stocks={data?.stocks ?? []} />
+      <TransactionEntryCard ref={transactionEntryRef} stocks={data?.stocks ?? []} />
 
       {isError && !data ? (
         <Card style={{ ...cardStyle, marginBottom: 16 }}>
@@ -97,6 +103,7 @@ export default function PortfolioPage() {
             stocks={data.stocks}
             transactions={data.transactions}
             closedPositions={data.closed_positions}
+            onSell={handleSell}
           />
         </>
       ) : null}

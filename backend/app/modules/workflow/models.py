@@ -30,6 +30,10 @@ class WorkflowSubmissionSnapshot:
     attached: bool
 
 
+class WorkflowRequestConflictError(RuntimeError):
+    """An active deduplicated workflow has incompatible request semantics."""
+
+
 class WorkflowCapacityError(RuntimeError):
     def __init__(self, scope: Literal["user", "global"], limit: int) -> None:
         super().__init__(f"Workflow capacity reached: scope={scope} limit={limit}")
@@ -48,6 +52,7 @@ __all__ = [
     "WorkflowExecutionError",
     "WorkflowJobSnapshot",
     "WorkflowKind",
+    "WorkflowRequestConflictError",
     "WorkflowStatus",
     "WorkflowSubmissionSnapshot",
 ]

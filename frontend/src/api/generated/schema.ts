@@ -2285,6 +2285,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stock/{code}/revenue-breakdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Revenue Breakdown
+         * @description 获取个股最新披露的营收与毛利构成。
+         */
+        get: operations["get_revenue_breakdown_api_stock__code__revenue_breakdown_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stock/{code}/sentiment": {
         parameters: {
             query?: never;
@@ -2414,6 +2434,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workflows/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Active Workflow Jobs */
+        get: operations["get_active_workflow_jobs_api_workflows_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workflows/analysis/{code}": {
         parameters: {
             query?: never;
@@ -2531,6 +2568,29 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** AgentEvent */
+        AgentEvent: {
+            /** Content */
+            content?: string | null;
+            /** Error */
+            error?: string | null;
+            plan?: components["schemas"]["AgentPlan"] | null;
+            plan_step?: components["schemas"]["AgentPlanStepUpdate"] | null;
+            /** Reasoning Content */
+            reasoning_content?: string | null;
+            /** Status */
+            status?: ("completed" | "partial" | "failed") | null;
+            tool_call?: components["schemas"]["ToolCallInfo"] | null;
+            tool_result?: components["schemas"]["ToolResultInfo"] | null;
+            tool_result_summary?: components["schemas"]["AgentToolResultSummary"] | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "status" | "plan" | "plan_step" | "text" | "reasoning" | "tool_call" | "tool_result" | "error" | "done";
+            /** Warnings */
+            warnings?: string[];
+        };
         /** AgentMessage */
         AgentMessage: {
             /** Content */
@@ -2548,6 +2608,88 @@ export interface components {
             tool_call_id?: string | null;
             /** Tool Calls */
             tool_calls?: components["schemas"]["ToolCallInfo"][] | null;
+        };
+        /** AgentPlan */
+        AgentPlan: {
+            /** Steps */
+            steps?: components["schemas"]["AgentPlanStep"][];
+            /** Summary */
+            summary?: string | null;
+        };
+        /** AgentPlanStep */
+        AgentPlanStep: {
+            /** Agent Name */
+            agent_name?: string | null;
+            /**
+             * Attempt
+             * @default 0
+             */
+            attempt: number;
+            /** Dependencies */
+            dependencies?: string[];
+            /** Description */
+            description?: string | null;
+            /** Detail */
+            detail?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Status
+             * @default pending
+             * @enum {string}
+             */
+            status: "pending" | "running" | "completed" | "degraded" | "failed" | "cancelled";
+            /** Title */
+            title: string;
+        };
+        /** AgentPlanStepUpdate */
+        AgentPlanStepUpdate: {
+            /**
+             * Attempt
+             * @default 1
+             */
+            attempt: number;
+            /** Detail */
+            detail?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "running" | "completed" | "degraded" | "failed" | "cancelled";
+            /** Step Id */
+            step_id: string;
+        };
+        /** AgentToolResultSummary */
+        AgentToolResultSummary: {
+            /** Metadata */
+            metadata?: {
+                [key: string]: string;
+            };
+            /** Sources */
+            sources?: components["schemas"]["AgentToolSource"][];
+            /**
+             * Status
+             * @default success
+             * @enum {string}
+             */
+            status: "success" | "error" | "skipped";
+            /** Summary */
+            summary: string;
+        };
+        /** AgentToolSource */
+        AgentToolSource: {
+            /**
+             * Domain
+             * @default
+             */
+            domain: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Url */
+            url: string;
         };
         /**
          * AnalysisHistoryItem
@@ -2591,6 +2733,8 @@ export interface components {
         };
         /** AnalysisResult */
         AnalysisResult: {
+            /** Agent Trace */
+            agent_trace?: components["schemas"]["AgentEvent"][];
             /** Analysis Date */
             analysis_date: string;
             /** Blended Fair Value */
@@ -2617,6 +2761,7 @@ export interface components {
             /** Overall Summary */
             overall_summary: string;
             prompt_trace?: components["schemas"]["PromptTrace"] | null;
+            research_framework?: components["schemas"]["InvestmentResearchFramework"] | null;
             /** Risk Warnings */
             risk_warnings?: string[];
             sentiment: components["schemas"]["FactorAnalysis"];
@@ -2805,6 +2950,32 @@ export interface components {
             };
             /** Jobs */
             jobs: components["schemas"]["BotAdminJobItem"][];
+        };
+        /** BusinessModelResearch */
+        BusinessModelResearch: {
+            /** Concerns */
+            concerns?: string[];
+            /**
+             * Earnings Quality
+             * @default
+             */
+            earnings_quality: string;
+            /**
+             * Economic Engine
+             * @default
+             */
+            economic_engine: string;
+            /**
+             * Operating Leverage
+             * @default
+             */
+            operating_leverage: string;
+            /** Revenue Drivers */
+            revenue_drivers?: string[];
+            /** Segment Quality */
+            segment_quality?: components["schemas"]["SegmentQuality"][];
+            /** Strengths */
+            strengths?: string[];
         };
         /**
          * CategorizedStockNews
@@ -3267,6 +3438,40 @@ export interface components {
             expires_in_days?: number | null;
         };
         /**
+         * DCFScenario
+         * @description Purpose: DCF 单一情景的核心假设与估值结果。
+         */
+        DCFScenario: {
+            /** Discount Rate */
+            discount_rate: number;
+            /** Equity Value */
+            equity_value: number;
+            /** Growth Rate */
+            growth_rate: number;
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
+            /** Per Share Value */
+            per_share_value: number;
+            /** Terminal Growth Rate */
+            terminal_growth_rate: number;
+            /** Upside Pct */
+            upside_pct?: number | null;
+        };
+        /**
+         * DCFSensitivityPoint
+         * @description Purpose: DCF 折现率与永续增长率组合下的估值结果。
+         */
+        DCFSensitivityPoint: {
+            /** Discount Rate */
+            discount_rate: number;
+            /** Per Share Value */
+            per_share_value: number;
+            /** Terminal Growth Rate */
+            terminal_growth_rate: number;
+        };
+        /**
          * DCFValuationResult
          * @description Purpose: DCF（现金流折现）估值方法的结果。
          */
@@ -3283,10 +3488,17 @@ export interface components {
             confidence?: string | null;
             /** Confidence Score */
             confidence_score?: number | null;
+            /**
+             * Data Quality Score
+             * @default 1
+             */
+            data_quality_score: number;
             /** Discount Rate */
             discount_rate?: number | null;
             /** Equity Value */
             equity_value?: number | null;
+            /** Fcfe Source */
+            fcfe_source?: string | null;
             /**
              * Forecast Years
              * @default 5
@@ -3301,6 +3513,11 @@ export interface components {
             per_share_value?: number | null;
             /** Reason */
             reason?: string | null;
+            reverse_dcf?: components["schemas"]["ReverseDCFResult"];
+            /** Scenarios */
+            scenarios?: components["schemas"]["DCFScenario"][];
+            /** Sensitivity */
+            sensitivity?: components["schemas"]["DCFSensitivityPoint"][];
             /** Terminal Growth Rate */
             terminal_growth_rate?: number | null;
             /** Upside Pct */
@@ -3506,6 +3723,26 @@ export interface components {
              * @enum {string}
              */
             status: "complete" | "partial" | "unavailable";
+        };
+        /** DataGap */
+        DataGap: {
+            /**
+             * Decision Impact
+             * @default
+             */
+            decision_impact: string;
+            /**
+             * Follow Up
+             * @default
+             */
+            follow_up: string;
+            /**
+             * Missing Data
+             * @default
+             */
+            missing_data: string;
+            /** Topic */
+            topic: string;
         };
         /** DeleteResponse */
         DeleteResponse: {
@@ -4327,6 +4564,8 @@ export interface components {
         };
         /** IndustryChainResult */
         IndustryChainResult: {
+            /** Agent Trace */
+            agent_trace?: components["schemas"]["AgentEvent"][];
             /** Aliases */
             aliases?: string[];
             /**
@@ -4445,6 +4684,35 @@ export interface components {
              */
             url: string;
         };
+        /** IndustryPosition */
+        IndustryPosition: {
+            /**
+             * Competitive Position
+             * @default
+             */
+            competitive_position: string;
+            /** Concentration Risks */
+            concentration_risks?: string[];
+            /** Confidence */
+            confidence?: number | null;
+            /** Growth Drivers */
+            growth_drivers?: string[];
+            /**
+             * Secular Context
+             * @default
+             */
+            secular_context: string;
+            /**
+             * Technology Or Obsolescence Risk
+             * @default
+             */
+            technology_or_obsolescence_risk: string;
+            /**
+             * Value Chain Position
+             * @default
+             */
+            value_chain_position: string;
+        };
         /** IndustryRankItem */
         IndustryRankItem: {
             /** Amount */
@@ -4519,6 +4787,31 @@ export interface components {
              */
             total: number;
         };
+        /** InformationQuality */
+        InformationQuality: {
+            /**
+             * Coverage Summary
+             * @default
+             */
+            coverage_summary: string;
+            /** Evidence Confidence */
+            evidence_confidence?: number | null;
+            /**
+             * Grade
+             * @default unknown
+             * @enum {string}
+             */
+            grade: "A" | "B" | "C" | "unknown";
+            /**
+             * Grade Rationale
+             * @default
+             */
+            grade_rationale: string;
+            /** Investment Certainty */
+            investment_certainty?: number | null;
+            /** Limitations */
+            limitations?: string[];
+        };
         /**
          * InstitutionForecast
          * @description Purpose: 机构对某项财务指标的预测统计（最小值/均值/最大值及机构数）。
@@ -4575,6 +4868,64 @@ export interface components {
             time: string;
             /** Volume */
             volume?: number | null;
+        };
+        /** InversionAnalysis */
+        InversionAnalysis: {
+            /**
+             * Bear Case
+             * @default
+             */
+            bear_case: string;
+            /** Bias Checks */
+            bias_checks?: string[];
+            /** Risks */
+            risks?: components["schemas"]["RiskCase"][];
+        };
+        /** InvestmentResearchFramework */
+        InvestmentResearchFramework: {
+            actions?: components["schemas"]["InvestorActionPlan"];
+            business_model?: components["schemas"]["BusinessModelResearch"];
+            /** Data Gaps */
+            data_gaps?: components["schemas"]["DataGap"][];
+            industry_position?: components["schemas"]["IndustryPosition"];
+            information_quality?: components["schemas"]["InformationQuality"];
+            inversion?: components["schemas"]["InversionAnalysis"];
+            management?: components["schemas"]["ManagementAssessment"];
+            moat?: components["schemas"]["MoatAssessment"];
+            valuation?: components["schemas"]["ValuationFramework"];
+        };
+        /** InvestorActionPlan */
+        InvestorActionPlan: {
+            /** Add Triggers */
+            add_triggers?: string[];
+            /** Buy Or Add Range */
+            buy_or_add_range?: [
+                number,
+                number
+            ] | null;
+            /**
+             * Holder Action
+             * @default insufficient_evidence
+             * @enum {string}
+             */
+            holder_action: "hold" | "add" | "reduce" | "exit" | "insufficient_evidence";
+            /** Monitoring Metrics */
+            monitoring_metrics?: string[];
+            /**
+             * New Investor Action
+             * @default insufficient_evidence
+             * @enum {string}
+             */
+            new_investor_action: "buy" | "watch" | "avoid" | "insufficient_evidence";
+            /**
+             * Rationale
+             * @default
+             */
+            rationale: string;
+            /** Sell Triggers */
+            sell_triggers?: string[];
+            /** Thesis Breakers */
+            thesis_breakers?: string[];
         };
         /** InviteOut */
         InviteOut: {
@@ -4738,6 +5089,35 @@ export interface components {
             refreshing: boolean;
             /** Updated At */
             updated_at?: string | null;
+        };
+        /** ManagementAssessment */
+        ManagementAssessment: {
+            /**
+             * Capital Allocation
+             * @default
+             */
+            capital_allocation: string;
+            /** Concerns */
+            concerns?: string[];
+            /** Confidence */
+            confidence?: number | null;
+            /**
+             * Shareholder Alignment
+             * @default
+             */
+            shareholder_alignment: string;
+            /** Strengths */
+            strengths?: string[];
+            /**
+             * Succession Or Key Person Risk
+             * @default
+             */
+            succession_or_key_person_risk: string;
+            /**
+             * Track Record
+             * @default
+             */
+            track_record: string;
         };
         /** MarketBreadthSnapshot */
         MarketBreadthSnapshot: {
@@ -5512,6 +5892,51 @@ export interface components {
              */
             source: "财联社";
         };
+        /** MoatAssessment */
+        MoatAssessment: {
+            /** Key Threats */
+            key_threats?: string[];
+            /** Moats */
+            moats?: components["schemas"]["MoatItem"][];
+            /**
+             * Overall Durability
+             * @default
+             */
+            overall_durability: string;
+        };
+        /** MoatItem */
+        MoatItem: {
+            /** Confidence */
+            confidence?: number | null;
+            /** Counterevidence */
+            counterevidence?: string[];
+            /**
+             * Direction
+             * @default unclear
+             * @enum {string}
+             */
+            direction: "strengthening" | "stable" | "weakening" | "unclear";
+            /**
+             * Durability
+             * @default
+             */
+            durability: string;
+            /** Evidence */
+            evidence?: string[];
+            /**
+             * Moat Type
+             * @enum {string}
+             */
+            moat_type: "brand_pricing" | "switching_cost" | "network_effect" | "scale_advantage" | "technology_ip" | "other";
+            /**
+             * Strength
+             * @default unclear
+             * @enum {string}
+             */
+            strength: "strong" | "moderate" | "weak" | "unclear";
+            /** Threats */
+            threats?: string[];
+        };
         /** NeedsSetupResponse */
         NeedsSetupResponse: {
             /** Needs Setup */
@@ -5605,6 +6030,27 @@ export interface components {
              * @default true
              */
             ok: boolean;
+        };
+        /**
+         * PeerMetricStats
+         * @description Purpose: 单项同行估值倍数的清洗及可信度统计。
+         */
+        PeerMetricStats: {
+            /**
+             * Confidence Score
+             * @default 0
+             */
+            confidence_score: number;
+            /**
+             * Excluded Count
+             * @default 0
+             */
+            excluded_count: number;
+            /**
+             * Sample Size
+             * @default 0
+             */
+            sample_size: number;
         };
         /** PortfolioClosedPosition */
         PortfolioClosedPosition: {
@@ -6110,6 +6556,7 @@ export interface components {
             engine_version: string;
             /** Equity Curve */
             equity_curve: components["schemas"]["QuantEquityPoint"][];
+            holdout_validation?: components["schemas"]["QuantHoldoutValidation"] | null;
             /** Market Snapshots */
             market_snapshots?: components["schemas"]["QuantMarketSnapshot"][];
             metrics: components["schemas"]["QuantMetrics"];
@@ -6206,6 +6653,24 @@ export interface components {
              */
             transfer_fee_rate: number;
         };
+        /** QuantHoldoutValidation */
+        QuantHoldoutValidation: {
+            /** End Date */
+            end_date: string;
+            /**
+             * Method
+             * @default holdout
+             * @constant
+             */
+            method: "holdout";
+            metrics: components["schemas"]["QuantMetrics"];
+            /** Observation Count */
+            observation_count: number;
+            /** Start Date */
+            start_date: string;
+            /** Training Ratio */
+            training_ratio: number;
+        };
         /** QuantMarketSnapshot */
         QuantMarketSnapshot: {
             /** Code */
@@ -6228,16 +6693,26 @@ export interface components {
             annualized_volatility: number;
             /** Benchmark Return */
             benchmark_return?: number | null;
+            /** Calmar Ratio */
+            calmar_ratio?: number | null;
+            /** Downside Volatility */
+            downside_volatility?: number | null;
             /** Excess Return */
             excess_return?: number | null;
+            /** Information Ratio */
+            information_ratio?: number | null;
             /** Max Drawdown */
             max_drawdown: number;
             /** Profit Loss Ratio */
             profit_loss_ratio?: number | null;
             /** Sharpe Ratio */
             sharpe_ratio?: number | null;
+            /** Sortino Ratio */
+            sortino_ratio?: number | null;
             /** Total Return */
             total_return: number;
+            /** Tracking Error */
+            tracking_error?: number | null;
             /** Trade Count */
             trade_count: number;
             /** Turnover Rate */
@@ -6361,6 +6836,14 @@ export interface components {
              * @default 80
              */
             maximum_drawdown_pct: number;
+            /** Maximum Holdout Drawdown Pct */
+            maximum_holdout_drawdown_pct?: number | null;
+            /** Minimum Holdout Sharpe Ratio */
+            minimum_holdout_sharpe_ratio?: number | null;
+            /** Minimum Holdout Trade Count */
+            minimum_holdout_trade_count?: number | null;
+            /** Minimum Sharpe Ratio */
+            minimum_sharpe_ratio?: number | null;
             /**
              * Minimum Trade Count
              * @default 1
@@ -6391,6 +6874,12 @@ export interface components {
             definition_hash: string;
             /** Errors */
             errors?: string[];
+            /** Holdout Max Drawdown */
+            holdout_max_drawdown?: number | null;
+            /** Holdout Sharpe Ratio */
+            holdout_sharpe_ratio?: number | null;
+            /** Holdout Trade Count */
+            holdout_trade_count?: number | null;
             /** Max Drawdown */
             max_drawdown?: number | null;
             /**
@@ -6398,6 +6887,14 @@ export interface components {
              * @default 80
              */
             maximum_drawdown_pct: number;
+            /** Maximum Holdout Drawdown Pct */
+            maximum_holdout_drawdown_pct?: number | null;
+            /** Minimum Holdout Sharpe Ratio */
+            minimum_holdout_sharpe_ratio?: number | null;
+            /** Minimum Holdout Trade Count */
+            minimum_holdout_trade_count?: number | null;
+            /** Minimum Sharpe Ratio */
+            minimum_sharpe_ratio?: number | null;
             /**
              * Minimum Trade Count
              * @default 1
@@ -6410,6 +6907,8 @@ export interface components {
              * @default pending
              */
             run_status: string;
+            /** Sharpe Ratio */
+            sharpe_ratio?: number | null;
             /** Trade Count */
             trade_count?: number | null;
         };
@@ -6648,6 +7147,120 @@ export interface components {
             text: string;
         };
         /**
+         * RevenueBreakdown
+         * @description 新浪最新披露口径下的营收与毛利构成；上游不提供报告期。
+         */
+        RevenueBreakdown: {
+            /**
+             * Amount Unit
+             * @default CNY_yuan
+             * @constant
+             */
+            amount_unit: "CNY_yuan";
+            /**
+             * Amount Unit Inferred
+             * @default true
+             */
+            amount_unit_inferred: boolean;
+            /** By Business */
+            by_business?: components["schemas"]["RevenueBreakdownItem"][];
+            /** By Product */
+            by_product?: components["schemas"]["RevenueBreakdownItem"][];
+            /** By Region */
+            by_region?: components["schemas"]["RevenueBreakdownItem"][];
+            /** Code */
+            code: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Source
+             * @default sina
+             * @constant
+             */
+            source: "sina";
+            /** Symbol */
+            symbol: string;
+        };
+        /**
+         * RevenueBreakdownItem
+         * @description 单个产品、业务或地区的营收与毛利构成。
+         */
+        RevenueBreakdownItem: {
+            /** Class Name */
+            class_name: string;
+            /** Cost */
+            cost?: number | null;
+            /** Gross Margin Pct */
+            gross_margin_pct?: number | null;
+            /** Gross Profit */
+            gross_profit?: number | null;
+            /** Id */
+            id?: string | null;
+            /** Is Sub Item */
+            is_sub_item?: boolean | null;
+            /** Revenue */
+            revenue?: number | null;
+            /** Revenue Share Pct */
+            revenue_share_pct?: number | null;
+        };
+        /**
+         * ReverseDCFResult
+         * @description Purpose: 由当前股价反推市场隐含增长率。
+         */
+        ReverseDCFResult: {
+            /**
+             * Available
+             * @default false
+             */
+            available: boolean;
+            /** Implied Growth Rate */
+            implied_growth_rate?: number | null;
+            /** Market Equity Value */
+            market_equity_value?: number | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** RiskCase */
+        RiskCase: {
+            /**
+             * Failure Path
+             * @default
+             */
+            failure_path: string;
+            /**
+             * Impact
+             * @default unknown
+             * @enum {string}
+             */
+            impact: "high" | "medium" | "low" | "unknown";
+            /** Leading Indicators */
+            leading_indicators?: string[];
+            /** Mitigants */
+            mitigants?: string[];
+            /**
+             * Probability
+             * @default unknown
+             * @enum {string}
+             */
+            probability: "high" | "medium" | "low" | "unknown";
+            /** Risk */
+            risk: string;
+            /**
+             * Scenario
+             * @default cross_scenario
+             * @enum {string}
+             */
+            scenario: "bull" | "base" | "bear" | "cross_scenario";
+            /**
+             * Time Horizon
+             * @default
+             */
+            time_horizon: string;
+        };
+        /**
          * ScreenerFilter
          * @description Purpose: 股票筛选接口的过滤条件参数。
          */
@@ -6789,6 +7402,8 @@ export interface components {
         };
         /** ScreenerStrategyMatch */
         ScreenerStrategyMatch: {
+            /** Average Amount 20D Yi */
+            average_amount_20d_yi?: number | null;
             /** Code */
             code: string;
             /**
@@ -6801,6 +7416,17 @@ export interface components {
              * @default
              */
             data_source: string;
+            /** Entry Price */
+            entry_price?: number | null;
+            /** Latest Price */
+            latest_price?: number | null;
+            /** Return Since Signal Pct */
+            return_since_signal_pct?: number | null;
+            /**
+             * Signal Age Bars
+             * @default 0
+             */
+            signal_age_bars: number;
             /** Signal Date */
             signal_date: string;
             /** Target Position */
@@ -6861,6 +7487,11 @@ export interface components {
              * @default 400
              */
             lookback_days: number;
+            /**
+             * Max Signal Age Bars
+             * @default 20
+             */
+            max_signal_age_bars: number | null;
             /** Parameters */
             parameters?: {
                 [key: string]: number | boolean | string;
@@ -6876,6 +7507,10 @@ export interface components {
             definition_hash: string;
             /** Evaluated */
             evaluated: number;
+            /** Excluded */
+            excluded?: {
+                [key: string]: string;
+            };
             /** Failed */
             failed?: {
                 [key: string]: string;
@@ -6914,6 +7549,33 @@ export interface components {
             leading_stock?: string;
             /** Name */
             name?: string;
+        };
+        /** SegmentQuality */
+        SegmentQuality: {
+            /** Evidence Confidence */
+            evidence_confidence?: number | null;
+            /**
+             * Growth Quality
+             * @default
+             */
+            growth_quality: string;
+            /**
+             * Profitability Quality
+             * @default
+             */
+            profitability_quality: string;
+            /**
+             * Recurrence
+             * @default
+             */
+            recurrence: string;
+            /**
+             * Role
+             * @default
+             */
+            role: string;
+            /** Segment */
+            segment: string;
         };
         /**
          * StockBasicInfo
@@ -7501,6 +8163,20 @@ export interface components {
              */
             type: "function";
         };
+        /** ToolResultInfo */
+        ToolResultInfo: {
+            /** Content */
+            content: string;
+            /**
+             * Is Error
+             * @default false
+             */
+            is_error: boolean;
+            /** Name */
+            name: string;
+            /** Tool Call Id */
+            tool_call_id: string;
+        };
         /**
          * TradingCalendarResponse
          * @description A 股交易日历区间视图。
@@ -7683,6 +8359,33 @@ export interface components {
             username: string;
         };
         /**
+         * ValuationDataQuality
+         * @description Purpose: 估值输入数据的完整性、口径和限制说明。
+         */
+        ValuationDataQuality: {
+            /** Cashflow Source */
+            cashflow_source?: string | null;
+            /**
+             * Grade
+             * @default low
+             */
+            grade: string;
+            /** Limitations */
+            limitations?: string[];
+            /**
+             * Peer Confidence
+             * @default 0
+             */
+            peer_confidence: number;
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+            /** Ttm Source */
+            ttm_source?: string | null;
+        };
+        /**
          * ValuationDetail
          * @description Purpose: 估值分析详情，整合估值倍数、百分位、基本面、同业、多种估值方法结果及机构预测。
          */
@@ -7693,6 +8396,7 @@ export interface components {
             code: string;
             /** Current Price */
             current_price?: number | null;
+            data_quality?: components["schemas"]["ValuationDataQuality"];
             /** Fair Value Range */
             fair_value_range?: number[] | null;
             /** Fair Values */
@@ -7725,11 +8429,36 @@ export interface components {
             /** Valuation View */
             valuation_view?: string | null;
         };
+        /** ValuationFramework */
+        ValuationFramework: {
+            /** Assumptions */
+            assumptions?: string[];
+            /**
+             * Current Valuation
+             * @default
+             */
+            current_valuation: string;
+            /** Limitations */
+            limitations?: string[];
+            /**
+             * Margin Of Safety
+             * @default
+             */
+            margin_of_safety: string;
+            /**
+             * Method Summary
+             * @default
+             */
+            method_summary: string;
+            scenarios?: components["schemas"]["ValuationScenarios"] | null;
+        };
         /**
          * ValuationFundamentals
          * @description Purpose: 估值分析所引用的基本面财务数据。
          */
         ValuationFundamentals: {
+            /** Capital Expenditure */
+            capital_expenditure?: number | null;
             /** Net Profit */
             net_profit?: number | null;
             /** Net Profit Yoy */
@@ -7762,6 +8491,11 @@ export interface components {
             confidence?: string | null;
             /** Confidence Score */
             confidence_score?: number | null;
+            /**
+             * Data Quality Score
+             * @default 1
+             */
+            data_quality_score: number;
             /** Equity Value */
             equity_value?: number | null;
             /** Method */
@@ -7816,8 +8550,10 @@ export interface components {
         ValuationPeerSummary: {
             /** Pb Median */
             pb_median?: number | null;
+            pb_stats?: components["schemas"]["PeerMetricStats"];
             /** Pe Median */
             pe_median?: number | null;
+            pe_stats?: components["schemas"]["PeerMetricStats"];
             /**
              * Peer Count
              * @default 0
@@ -7827,6 +8563,7 @@ export interface components {
             peers?: components["schemas"]["ValuationPeer"][];
             /** Ps Median */
             ps_median?: number | null;
+            ps_stats?: components["schemas"]["PeerMetricStats"];
         };
         /**
          * ValuationPercentileItem
@@ -7887,6 +8624,36 @@ export interface components {
             label: string;
             /** Rationale */
             rationale?: string[];
+        };
+        /** ValuationScenario */
+        ValuationScenario: {
+            /** Assumptions */
+            assumptions?: string[];
+            /** Fair Value Range */
+            fair_value_range?: [
+                number,
+                number
+            ] | null;
+            /** Invalidating Conditions */
+            invalidating_conditions?: string[];
+            /** Key Drivers */
+            key_drivers?: string[];
+            /**
+             * Scenario
+             * @enum {string}
+             */
+            scenario: "bull" | "base" | "bear";
+            /**
+             * Valuation View
+             * @default
+             */
+            valuation_view: string;
+        };
+        /** ValuationScenarios */
+        ValuationScenarios: {
+            base: components["schemas"]["ValuationScenario"];
+            bear: components["schemas"]["ValuationScenario"];
+            bull: components["schemas"]["ValuationScenario"];
         };
         /** WatchlistAlert */
         WatchlistAlert: {
@@ -7990,6 +8757,10 @@ export interface components {
             last_error: string | null;
             /** Max Attempts */
             max_attempts: number;
+            /** Request */
+            request: {
+                [key: string]: unknown;
+            };
             /**
              * Status
              * @enum {string}
@@ -8018,6 +8789,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -11954,6 +12726,37 @@ export interface operations {
             };
         };
     };
+    get_revenue_breakdown_api_stock__code__revenue_breakdown_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevenueBreakdown"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_sentiment_api_stock__code__sentiment_get: {
         parameters: {
             query?: never;
@@ -12206,9 +13009,41 @@ export interface operations {
             };
         };
     };
-    submit_analysis_job_api_workflows_analysis__code__post: {
+    get_active_workflow_jobs_api_workflows_active_get: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowJobResponse"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_analysis_job_api_workflows_analysis__code__post: {
+        parameters: {
+            query?: {
+                /** @description 是否跳过当天缓存并重新生成 */
+                force?: boolean;
+            };
             header?: never;
             path: {
                 code: string;
@@ -12272,7 +13107,10 @@ export interface operations {
     };
     submit_industry_chain_job_api_workflows_industry_chain__name__post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 是否跳过同范围缓存并重新生成 */
+                force?: boolean;
+            };
             header?: never;
             path: {
                 name: string;

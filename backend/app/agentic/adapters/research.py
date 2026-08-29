@@ -10,7 +10,6 @@ from app.agentic.agents.executor import AgentExecutor, agent_executor
 from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.contracts import (
     MAX_EVIDENCE_ARGUMENT_LENGTH,
-    MAX_EVIDENCE_ITEM_LENGTH,
     AgentEvidence,
     AgentResearchSpec,
     AgentRoundResult,
@@ -48,7 +47,7 @@ def _collect_round_evidence(events: list[AgentEvent]) -> tuple[AgentEvidence, ..
                 tool_call_id=delta.tool_result.tool_call_id,
                 tool_name=tool_name,
                 arguments=arguments[:MAX_EVIDENCE_ARGUMENT_LENGTH],
-                content=delta.tool_result.content[:MAX_EVIDENCE_ITEM_LENGTH],
+                content=delta.tool_result.content,
                 is_error=delta.tool_result.is_error,
             ))
     return tuple(evidence)
@@ -78,6 +77,7 @@ class _AgentExecutorResearchSession:
         message: str,
         allowed_tool_names: tuple[str, ...],
         event_callback: AgentEventCallback | None = None,
+        tool_call_reserve: int = 0,
     ) -> AgentRoundResult:
         event_queue: asyncio.Queue[
             AgentEvent | _ResearchExecutionCompleted | _ResearchExecutionFailed
@@ -97,6 +97,7 @@ class _AgentExecutorResearchSession:
                     temperature=self.temperature,
                     require_tool_evidence=True,
                     execution_context=self.execution_context,
+                    tool_call_reserve=tool_call_reserve,
                 )
                 await event_queue.put(_ResearchExecutionCompleted(result))
             except BaseException as error:

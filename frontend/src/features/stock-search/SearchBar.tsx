@@ -6,7 +6,17 @@ import QueryErrorState from "../../components/QueryErrorState";
 import { useStockSearchController } from "../../hooks/useStockSearchController";
 import { useColors } from "../../styles/ui";
 
-export default function SearchBar() {
+interface SearchBarProps {
+  buildTarget?: (code: string) => string;
+  ariaLabel?: string;
+}
+
+const buildDefaultTarget = (code: string) => `/analysis/${encodeURIComponent(code)}`;
+
+export default function SearchBar({
+  buildTarget = buildDefaultTarget,
+  ariaLabel = "搜索股票",
+}: SearchBarProps) {
   const {
     inputValue,
     normalizedInput,
@@ -38,10 +48,10 @@ export default function SearchBar() {
 
   const handleSelect = useCallback(
     (val: string) => {
-      navigate(`/analysis/${val}`);
+      navigate(buildTarget(val));
       clear();
     },
-    [clear, navigate]
+    [buildTarget, clear, navigate]
   );
 
   // 回车直接跳转（输入6位代码时）
@@ -49,9 +59,9 @@ export default function SearchBar() {
     (e: React.KeyboardEvent) => {
       if (e.key !== "Enter") return;
       const code = resolveCode(inputValue);
-      if (code) navigate(`/analysis/${code}`);
+      if (code) navigate(buildTarget(code));
     },
-    [inputValue, navigate, resolveCode]
+    [buildTarget, inputValue, navigate, resolveCode]
   );
 
   return (
@@ -72,9 +82,11 @@ export default function SearchBar() {
     >
       <Input
         size="large"
+        aria-label={ariaLabel}
+        aria-busy={isPending}
         placeholder="输入股票代码或名称，如 600519 或 贵州茅台"
         prefix={<SearchOutlined />}
-        suffix={isPending ? <span style={{ color: c.textMuted, fontSize: 12 }}>搜索中...</span> : null}
+        suffix={isPending ? <span role="status" aria-live="polite" style={{ color: c.textMuted, fontSize: 12 }}>搜索中...</span> : null}
         allowClear
         onKeyDown={handleKeyDown}
       />

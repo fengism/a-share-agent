@@ -33,6 +33,7 @@ async def list_all_analysis_history(
     limit: int,
     offset: int,
     can_delete_legacy: bool,
+    query: str | None = None,
 ) -> list[dict]:
     return await call_blocking(
         repository.list_all_analyses,
@@ -40,6 +41,7 @@ async def list_all_analysis_history(
         limit,
         offset,
         can_delete_legacy,
+        query,
         semaphore=misc_semaphore,
     )
 

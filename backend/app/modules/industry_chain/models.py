@@ -2,6 +2,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.agentic.events import AgentEvent
 from app.domain.prompting import PromptTrace
 
 
@@ -156,3 +157,4 @@ class IndustryChainResult(BaseModel):
     coverage: IndustryChainCoverage = Field(default_factory=IndustryChainCoverage)
     missing_evidence: list[str] = Field(default_factory=list)
     conflicts: list[IndustryChainConflict] = Field(default_factory=list)
+    agent_trace: list[AgentEvent] = Field(default_factory=list)

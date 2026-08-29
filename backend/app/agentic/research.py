@@ -16,12 +16,19 @@ from app.agentic.contracts import (
     EvidenceRequirement,
     render_agent_evidence,
 )
-from app.agentic.events import AgentEvent, AgentPlan, AgentPlanStep, AgentPlanStepUpdate
+from app.agentic.events import (
+    AgentEvent,
+    AgentPlan,
+    AgentPlanStep,
+    AgentPlanStepUpdate,
+    auditable_agent_event,
+)
 from app.agentic.tools.serialization import has_meaningful_tool_content
 
 AgentEventCallback = Callable[[AgentEvent], Awaitable[None]]
 _MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 _DEFAULT_RECENCY_DAYS = 183
+_FOLLOWUP_TOOL_CALL_RESERVE = 8
 
 
 def build_research_system_prompt(
@@ -70,6 +77,7 @@ class AgentResearchSession(Protocol):
         message: str,
         allowed_tool_names: tuple[str, ...],
         event_callback: AgentEventCallback | None = None,
+        tool_call_reserve: int = 0,
     ) -> AgentRoundResult: ...
 
 
@@ -101,6 +109,9 @@ def _gap_tool_names(
         for requirement in missing
         for tool_name in requirement.tool_names
     }
+    discovery_tools = {"web_search", "iwencai_search"}
+    if required_tools.intersection({"fetch_url", "fetch_urls"}):
+        required_tools.update(discovery_tools.intersection(spec.tool_names))
     return tuple(tool_name for tool_name in spec.tool_names if tool_name in required_tools)
 
 
@@ -132,13 +143,20 @@ async def _run_round(
     message: str,
     allowed_tool_names: tuple[str, ...],
     event_callback: AgentEventCallback | None,
+    *,
+    tool_call_reserve: int = 0,
 ) -> AgentRoundResult:
     if event_callback is None:
-        return await session.run(message, allowed_tool_names)
+        return await session.run(
+            message,
+            allowed_tool_names,
+            tool_call_reserve=tool_call_reserve,
+        )
     return await session.run(
         message,
         allowed_tool_names,
         event_callback=event_callback,
+        tool_call_reserve=tool_call_reserve,
     )
 
 
@@ -149,6 +167,7 @@ class _ResearchProgress:
     step_status: dict[str, str] = field(init=False)
     requirements_by_tool: dict[str, tuple[EvidenceRequirement, ...]] = field(init=False)
     tool_arguments: dict[str, str] = field(init=False)
+    audit_events: list[AgentEvent] = field(init=False)
 
     def __post_init__(self) -> None:
         self.step_status = {
@@ -164,9 +183,17 @@ class _ResearchProgress:
             for tool_name in self.spec.tool_names
         }
         self.tool_arguments = {}
+        self.audit_events = []
+
+    async def emit(self, event: AgentEvent) -> None:
+        public_event = auditable_agent_event(event)
+        if public_event is None:
+            return
+        self.audit_events.append(public_event)
+        await _emit(self.callback, public_event)
 
     async def start(self) -> None:
-        await _emit(self.callback, AgentEvent(
+        await self.emit(AgentEvent(
             type="plan",
             plan=AgentPlan(
                 summary=f"{self.spec.display_name}将按证据维度推进调研",
@@ -181,7 +208,7 @@ class _ResearchProgress:
                 ],
             ),
         ))
-        await _emit(self.callback, AgentEvent(
+        await self.emit(AgentEvent(
             type="status",
             content=f"{self.spec.display_name}正在规划并调用工具收集证据…",
         ))
@@ -193,7 +220,7 @@ class _ResearchProgress:
             for requirement in self.requirements_by_tool.get(tool_name, ()):
                 if self.step_status[requirement.key] == "pending":
                     self.step_status[requirement.key] = "running"
-                    await _emit(self.callback, AgentEvent(
+                    await self.emit(AgentEvent(
                         type="plan_step",
                         plan_step=AgentPlanStepUpdate(
                             step_id=requirement.key,
@@ -201,7 +228,7 @@ class _ResearchProgress:
                             detail=f"正在调用 {tool_name}",
                         ),
                     ))
-        await _emit(self.callback, event)
+        await self.emit(event)
         if (
             event.type == "tool_result"
             and event.tool_result is not None
@@ -218,7 +245,7 @@ class _ResearchProgress:
             for requirement in self.requirements_by_tool.get(tool_name, ()):
                 if self.step_status[requirement.key] != "completed" and requirement.accepts(candidate):
                     self.step_status[requirement.key] = "completed"
-                    await _emit(self.callback, AgentEvent(
+                    await self.emit(AgentEvent(
                         type="plan_step",
                         plan_step=AgentPlanStepUpdate(
                             step_id=requirement.key,
@@ -234,7 +261,7 @@ class _ResearchProgress:
                 and any(requirement.accepts(item) for item in evidence)
             ):
                 self.step_status[requirement.key] = "completed"
-                await _emit(self.callback, AgentEvent(
+                await self.emit(AgentEvent(
                     type="plan_step",
                     plan_step=AgentPlanStepUpdate(
                         step_id=requirement.key,
@@ -246,12 +273,24 @@ class _ResearchProgress:
     async def mark_failed(self, missing: list[EvidenceRequirement]) -> None:
         for requirement in missing:
             self.step_status[requirement.key] = "failed"
-            await _emit(self.callback, AgentEvent(
+            await self.emit(AgentEvent(
                 type="plan_step",
                 plan_step=AgentPlanStepUpdate(
                     step_id=requirement.key,
                     status="failed",
                     detail="未获取到满足要求的工具证据",
+                ),
+            ))
+
+    async def mark_degraded(self, missing: list[EvidenceRequirement]) -> None:
+        for requirement in missing:
+            self.step_status[requirement.key] = "degraded"
+            await self.emit(AgentEvent(
+                type="plan_step",
+                plan_step=AgentPlanStepUpdate(
+                    step_id=requirement.key,
+                    status="degraded",
+                    detail="未获取到满足门槛的正文证据，已按数据缺口降级",
                 ),
             ))
 
@@ -279,7 +318,7 @@ async def run_agentic_research(
     summaries: list[str] = []
     progress = _ResearchProgress(spec, event_callback)
     await progress.start()
-    round_callback = progress.forward_event if event_callback is not None else None
+    round_callback = progress.forward_event
 
     async with runtime.open_session(spec, settings=settings) as session:
         first_result = await _run_round(
@@ -287,12 +326,13 @@ async def run_agentic_research(
             message,
             spec.tool_names,
             round_callback,
+            tool_call_reserve=_FOLLOWUP_TOOL_CALL_RESERVE,
         )
         await _collect_round_result(first_result, evidence, summaries, progress)
 
         missing = _missing_requirements(spec.requirements, evidence)
         if missing:
-            await _emit(event_callback, AgentEvent(
+            await progress.emit(AgentEvent(
                 type="status",
                 content=f"首轮证据仍缺少 {'、'.join(item.label for item in missing)}，正在补充调研…",
             ))
@@ -305,14 +345,29 @@ async def run_agentic_research(
             await _collect_round_result(gap_result, evidence, summaries, progress)
 
     missing = _missing_requirements(spec.requirements, evidence)
-    if missing:
-        await progress.mark_failed(missing)
-        labels = "、".join(item.label for item in missing)
+    fatal_missing = [item for item in missing if item.fatal]
+    degraded_missing = [item for item in missing if not item.fatal]
+    if fatal_missing:
+        await progress.mark_failed(fatal_missing)
+    if degraded_missing:
+        await progress.mark_degraded(degraded_missing)
+    if fatal_missing:
+        labels = "、".join(item.label for item in fatal_missing)
         raise AgentEvidenceInsufficientError(f"Agent 调研证据不足：{labels}")
+    if missing:
+        await progress.emit(AgentEvent(
+            type="status",
+            content=(
+                f"未能核验 {'、'.join(item.label for item in missing)}，"
+                "将按证据不足降级生成并记录数据缺口。"
+            ),
+        ))
 
-    await _emit(event_callback, AgentEvent(type="done"))
+    await progress.emit(AgentEvent(type="done"))
 
     return AgenticResearchResult(
         summary="\n\n".join(summaries)[:MAX_AGENT_SUMMARY_LENGTH],
         evidence=tuple(evidence),
+        evidence_gaps=tuple(item.label for item in missing),
+        execution_trace=tuple(progress.audit_events),
     )

@@ -66,6 +66,7 @@ class StrategyParameterDefinition(BaseModel):
 class StrategyIndicatorDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    # rsi 为 Cutler RSI（简单滚动平均）；obv 输出为累计成交量 / 10_000。
     operator: Literal[
         "sma",
         "ema",

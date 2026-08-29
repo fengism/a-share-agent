@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { createElement, useCallback, useRef } from "react";
 import { message } from "antd";
 import { usePush } from "../api/queries";
 import type { PushRequest, PushResponse } from "../types/stock";
@@ -18,6 +18,20 @@ function pushErrorMessage(error: unknown) {
   return "未知错误";
 }
 
+function feedbackContent(text: string, url: string, linkText: string) {
+  if (!url) return text;
+  return createElement(
+    "span",
+    null,
+    `${text} `,
+    createElement("a", {
+      href: url,
+      target: "_blank",
+      rel: "noreferrer",
+    }, linkText),
+  );
+}
+
 export function useWorkflowPush() {
   const { mutateAsync, isPending } = usePush();
   const isPushingRef = useRef(false);
@@ -27,11 +41,24 @@ export function useWorkflowPush() {
     isPushingRef.current = true;
     try {
       const result = await mutateAsync(request);
-      if (result.target === "notion") {
-        message.success(`已转存 Notion：${result.title}`);
-      } else {
-        message.success(`已推送到飞书：${result.message || result.title}`);
+      if (!result.success) {
+        message.warning({
+          content: feedbackContent(
+            result.message || "推送未完全完成",
+            result.url,
+            "打开文档",
+          ),
+          duration: 8,
+        });
+        return result;
       }
+      const successText = result.target === "notion"
+        ? `已转存 Notion：${result.title}`
+        : `已推送到飞书：${result.message || result.title}`;
+      message.success({
+        content: feedbackContent(successText, result.url, "打开"),
+        duration: result.url ? 6 : 3,
+      });
       return result;
     } catch (error) {
       message.error(`推送失败: ${pushErrorMessage(error)}`);

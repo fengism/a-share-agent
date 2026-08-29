@@ -31,6 +31,12 @@ export default function StrategyDraftOverviewCard({
   onSelectDraft,
 }: StrategyDraftOverviewCardProps) {
   const status = selectedDraft ? STRATEGY_DRAFT_STATUS_META[selectedDraft.status] : null;
+  const qualityGate = selectedDraft?.quality_gate;
+  const hasHoldoutMetrics = qualityGate && (
+    qualityGate.holdout_trade_count != null
+    || qualityGate.holdout_max_drawdown != null
+    || qualityGate.holdout_sharpe_ratio != null
+  );
 
   return (
     <Card className="quant-authoring-card" title={<Space><RobotOutlined />生成与草稿</Space>}>
@@ -79,13 +85,29 @@ export default function StrategyDraftOverviewCard({
         </div>
       ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚无在线策略草稿" />}
 
-      {selectedDraft?.quality_gate ? (
+      {qualityGate ? (
         <Alert
-          type={selectedDraft.quality_gate.passed ? "success" : selectedDraft.status === "testing" ? "info" : "warning"}
+          type={qualityGate.passed ? "success" : selectedDraft.status === "testing" ? "info" : "warning"}
           showIcon
-          title={selectedDraft.quality_gate.passed ? "回测质量门禁已通过" : `回测状态：${selectedDraft.quality_gate.run_status}`}
-          description={selectedDraft.quality_gate.errors?.join("；") || (
-            `交易 ${selectedDraft.quality_gate.trade_count ?? "-"} 次，最大回撤 ${selectedDraft.quality_gate.max_drawdown ?? "-"}%`
+          title={qualityGate.passed ? "回测质量门禁已通过" : `回测状态：${qualityGate.run_status}`}
+          description={(
+            <div className="quant-quality-gate-summary">
+              <span>
+                全样本：交易 {qualityGate.trade_count ?? "-"} 次 ·
+                最大回撤 {qualityGate.max_drawdown ?? "-"}% ·
+                夏普 {qualityGate.sharpe_ratio ?? "-"}
+              </span>
+              {hasHoldoutMetrics ? (
+                <span>
+                  后段样本：交易 {qualityGate.holdout_trade_count ?? "-"} 次 ·
+                  最大回撤 {qualityGate.holdout_max_drawdown ?? "-"}% ·
+                  夏普 {qualityGate.holdout_sharpe_ratio ?? "-"}
+                </span>
+              ) : null}
+              {qualityGate.errors?.length ? (
+                <Text type="danger">{qualityGate.errors.join("；")}</Text>
+              ) : null}
+            </div>
           )}
         />
       ) : null}

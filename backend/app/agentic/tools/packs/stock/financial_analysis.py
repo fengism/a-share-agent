@@ -217,18 +217,60 @@ def _build_key_indicators(
     }
 
 
+def _compact_revenue_breakdown(value: Any) -> dict[str, Any]:
+    if isinstance(value, Exception) or not isinstance(value, dict):
+        return {"status": "unavailable"}
+    dimensions = {}
+    for source_key, target_key in (
+        ("by_product", "product"),
+        ("by_business", "business"),
+        ("by_region", "region"),
+    ):
+        source_items = value.get(source_key)
+        items = source_items if isinstance(source_items, list) else []
+        compact_items = []
+        for item in items[:8]:
+            if not isinstance(item, dict):
+                continue
+            compact_items.append({
+                key: item[key]
+                for key in (
+                    "class_name", "is_sub_item", "revenue", "cost", "gross_profit",
+                    "revenue_share_pct", "gross_margin_pct",
+                )
+                if item.get(key) is not None
+            })
+        dimensions[target_key] = {
+            "total_items": len(items),
+            "returned_items": len(compact_items),
+            "truncated": len(items) > len(compact_items),
+            "items": compact_items,
+        }
+    status = "available" if any(dimension["total_items"] for dimension in dimensions.values()) else "empty"
+    return {
+        "status": status,
+        "source": "sina",
+        "report_date": None,
+        "amount_unit": value.get("amount_unit", "CNY_yuan"),
+        "amount_unit_inferred": bool(value.get("amount_unit_inferred", True)),
+        "dimensions": dimensions,
+        "caveats": ["上游未提供报告期", "不同维度或条目可能重叠，不可直接加总"],
+    }
+
+
 async def analyze_financials(code: str) -> Any:
     gathered = cast(
-        tuple[Any, Any, Any, Any],
+        tuple[Any, Any, Any, Any, Any],
         await asyncio.gather(
             helpers.get_stock_financial(code, indicator="balance"),
             helpers.get_stock_financial(code, indicator="profit"),
             helpers.get_stock_financial(code, indicator="cashflow"),
             helpers.get_stock_financial_metrics(code),
+            helpers.get_stock_revenue_breakdown(code),
             return_exceptions=True,
         ),
     )
-    balance_value, profit_value, cashflow_value, metrics_value = gathered
+    balance_value, profit_value, cashflow_value, metrics_value, breakdown_value = gathered
     balance = _as_rows(balance_value)
     profit = _as_rows(profit_value)
     cashflow = _as_rows(cashflow_value)
@@ -244,4 +286,36 @@ async def analyze_financials(code: str) -> Any:
     result.update(_build_balance_sections(balance))
     result.update(_build_cashflow_sections(cashflow))
     result.update(_build_key_indicators(balance, profit, metrics))
+    result["revenue_breakdown"] = _compact_revenue_breakdown(breakdown_value)
+    unavailable_sections = [
+        name
+        for name, value in (
+            ("balance", balance_value),
+            ("profit", profit_value),
+            ("cashflow", cashflow_value),
+            ("metrics", metrics_value),
+            ("revenue_breakdown", breakdown_value),
+        )
+        if isinstance(value, Exception)
+    ]
+    result["partial"] = bool(unavailable_sections)
+    result["unavailable_sections"] = unavailable_sections
+    core_sections = {
+        "balance": bool(balance),
+        "profit": bool(profit),
+        "cashflow": bool(cashflow),
+        "metrics": bool(metrics),
+    }
+    result["data_quality"] = {
+        "core_sections": core_sections,
+        "common_report_date": metrics.get("latest_report_date") if metrics else None,
+        "revenue_breakdown_status": result["revenue_breakdown"]["status"],
+        "partial": bool(unavailable_sections),
+        "unavailable_sections": unavailable_sections,
+        "warnings": (
+            ["营收与毛利构成上游未提供报告期"]
+            if result["revenue_breakdown"]["status"] == "available"
+            else []
+        ),
+    }
     return result

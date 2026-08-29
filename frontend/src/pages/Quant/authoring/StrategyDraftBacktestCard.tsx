@@ -1,5 +1,5 @@
 import { ExperimentOutlined } from "@ant-design/icons";
-import { Button, Card, DatePicker, Form, Input, InputNumber, Space } from "antd";
+import { Button, Card, DatePicker, Form, Input, InputNumber, Space, Typography } from "antd";
 import dayjs from "dayjs";
 import { parseDraftStockCodes, type DraftBacktestValues } from "../strategyAuthoring";
 
@@ -61,6 +61,21 @@ export default function StrategyDraftBacktestCard({
           </Form.Item>
           <Form.Item name="maximumDrawdownPct" label="最大允许回撤（%）">
             <InputNumber min={0.01} max={80} step={1} style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="minimumSharpeRatio" label="整体最低夏普比率（可选）">
+            <InputNumber min={-20} max={20} step={0.1} placeholder="不限制" style={{ width: "100%" }} />
+          </Form.Item>
+          <Typography.Text strong className="quant-authoring-gate-heading">
+            后段样本门禁
+          </Typography.Text>
+          <Form.Item name="minimumHoldoutTradeCount" label="后段最低交易次数（可选）">
+            <InputNumber min={0} max={10_000} precision={0} placeholder="不限制" style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="maximumHoldoutDrawdownPct" label="后段最大允许回撤（可选，%）">
+            <InputNumber min={0.01} max={80} step={1} placeholder="不限制" style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="minimumHoldoutSharpeRatio" label="后段最低夏普比率（可选）">
+            <InputNumber min={-20} max={20} step={0.1} placeholder="不限制" style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item label=" ">
             <Button

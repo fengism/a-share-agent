@@ -11,6 +11,9 @@ import type { ChatStoreGet, ChatStoreSet, PersistChatStore } from "./chatStoreSl
 type ChatMessageSlice = Pick<
   ChatState,
   | "isStreaming"
+  | "activeRunSessionId"
+  | "activeRunLabel"
+  | "syncStatus"
   | "abortController"
   | "addUserMessage"
   | "addAssistantMessage"
@@ -23,6 +26,8 @@ type ChatMessageSlice = Pick<
   | "appendToReasoning"
   | "setAssistantStatus"
   | "setStreaming"
+  | "setActiveRun"
+  | "setSyncStatus"
   | "setAbortController"
   | "clearChat"
   | "regenerateLastAssistant"
@@ -36,6 +41,9 @@ export function createChatMessageSlice(
 ): ChatMessageSlice {
   return {
     isStreaming: false,
+    activeRunSessionId: null,
+    activeRunLabel: null,
+    syncStatus: "loading",
     abortController: null,
 
     addUserMessage: (content) => {
@@ -98,14 +106,21 @@ export function createChatMessageSlice(
       }));
     },
 
-    updateToolResult: (messageId, toolCallId, result, isError) => {
+    updateToolResult: (messageId, toolCallId, result, isError, resultSummary) => {
       const displayResult = result.length > 4000 ? `${result.slice(0, 4000)}…` : result;
       set((state) => ({
         messages: updateMessageById(state.messages, messageId, (message) => ({
           ...message,
           toolCalls: (message.toolCalls || []).map((toolCall) => (
             toolCall.id === toolCallId
-              ? { ...toolCall, result: displayResult, isError, isExecuting: false }
+              ? {
+                  ...toolCall,
+                  result: displayResult,
+                  resultSummary,
+                  isError: isError && resultSummary?.status !== "skipped",
+                  isSkipped: resultSummary?.status === "skipped",
+                  isExecuting: false,
+                }
               : toolCall
           )),
         })),
@@ -178,10 +193,20 @@ export function createChatMessageSlice(
     },
 
     setStreaming: (isStreaming) => set({ isStreaming }),
+    setActiveRun: (activeRunSessionId, activeRunLabel) => set({ activeRunSessionId, activeRunLabel }),
+    setSyncStatus: (syncStatus) => set({ syncStatus }),
     setAbortController: (abortController) => set({ abortController }),
 
     clearChat: () => {
-      set({ messages: [], history: [], isStreaming: false, abortController: null });
+      set({
+        messages: [],
+        history: [],
+        isStreaming: false,
+        activeRunSessionId: null,
+        activeRunLabel: null,
+        syncStatus: "loading",
+        abortController: null,
+      });
       persist();
     },
 

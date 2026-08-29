@@ -1,6 +1,5 @@
 import { memo, useEffect, useState } from "react";
 import {
-  BulbOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
@@ -8,19 +7,20 @@ import {
   LoadingOutlined,
   ProfileOutlined,
   StopOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import type {
   AgentPlanStep,
   AgentPlanStepStatus,
   ChatDisplayMessage,
 } from "../../../types/chat";
-import { BlinkingCursor } from "./BlinkingCursor";
 import { ToolCallCard } from "./ToolCallCard";
 
 const PLAN_STATUS_LABELS: Record<AgentPlanStepStatus, string> = {
   pending: "等待执行",
   running: "执行中",
   completed: "已完成",
+  degraded: "数据缺口",
   failed: "执行失败",
   cancelled: "已停止",
 };
@@ -31,6 +31,8 @@ function PlanStatusIcon({ status }: { status: AgentPlanStepStatus }) {
       return <LoadingOutlined spin />;
     case "completed":
       return <CheckCircleOutlined />;
+    case "degraded":
+      return <WarningOutlined />;
     case "failed":
       return <CloseCircleOutlined />;
     case "cancelled":
@@ -53,12 +55,11 @@ export const AssistantProcess = memo(function AssistantProcess({
 }) {
   const toolCalls = message.toolCalls || [];
   const planSteps = message.plan?.steps || [];
-  const hasReasoning = Boolean(message.reasoningContent);
-  const hasPlan = planSteps.length > 0;
+  const hasPlan = Boolean(message.plan);
   const hasTools = toolCalls.length > 0;
   const hasContent = Boolean(message.content);
   const isStreaming = Boolean(message.isStreaming);
-  const hasProcess = hasPlan || hasReasoning || hasTools
+  const hasProcess = hasPlan || hasTools
     || (isStreaming && (Boolean(message.status) || !hasContent));
   const runningTool = toolCalls.find((toolCall) => toolCall.isExecuting);
   const runningPlanStep = planSteps.find((step) => step.status === "running");
@@ -66,8 +67,12 @@ export const AssistantProcess = memo(function AssistantProcess({
     (step) => step.status !== "pending" && step.status !== "running",
   ).length;
   const hasPlanFailure = planSteps.some((step) => step.status === "failed");
+  const hasPlanDegradation = planSteps.some((step) => step.status === "degraded");
+  const degradedPlanSteps = planSteps.filter((step) => step.status === "degraded");
+  const regularPlanSteps = planSteps.filter((step) => step.status !== "degraded");
   const hasPlanCancellation = planSteps.some((step) => step.status === "cancelled");
   const hasToolError = toolCalls.some((toolCall) => toolCall.isError);
+  const hasSkippedTool = toolCalls.some((toolCall) => toolCall.isSkipped);
   const hasCancelledTool = toolCalls.some((toolCall) => toolCall.isCancelled);
   const [expanded, setExpanded] = useState(isStreaming);
 
@@ -86,17 +91,19 @@ export const AssistantProcess = memo(function AssistantProcess({
       ? `正在调用 ${runningTool.name}`
       : runningPlanStep
         ? `正在执行 ${runningPlanStep.title}`
-        : message.status || (hasReasoning ? "正在思考" : "正在准备回答")
+        : message.status || "正在准备回答"
     : hasPlanCancellation || hasCancelledTool
         ? "处理已停止"
         : hasPlanFailure
           ? "处理完成，部分步骤失败"
           : hasToolError
             ? "处理完成，部分工具失败"
+            : hasPlanDegradation || hasSkippedTool
+              ? "处理完成，存在数据缺口"
             : "已完成处理";
   const detail = isStreaming && hasPlan
     ? `${settledPlanSteps}/${planSteps.length} 个步骤已处理`
-    : [hasPlan ? `${planSteps.length} 个规划步骤` : "", hasReasoning ? "包含思考过程" : "", hasTools ? `${toolCalls.length} 次工具调用` : ""]
+    : [hasPlan ? `${planSteps.length} 个规划步骤` : "", hasTools ? `${toolCalls.length} 次工具调用` : ""]
         .filter(Boolean)
         .join(" · ");
 
@@ -126,7 +133,7 @@ export const AssistantProcess = memo(function AssistantProcess({
                 <ProfileOutlined />
               </span>
               <div className="chat-process-step-content">
-                <div className="chat-process-step-title">执行计划</div>
+                <div className="chat-process-step-title">思路与计划</div>
                 <div className="chat-process-step-description">
                   {message.plan?.summary || `已拆分为 ${planSteps.length} 个专业分析步骤`}
                 </div>
@@ -134,7 +141,7 @@ export const AssistantProcess = memo(function AssistantProcess({
             </div>
           )}
 
-          {planSteps.map((step) => (
+          {regularPlanSteps.map((step) => (
             <div className="chat-process-step" key={step.id}>
               <span
                 className={`chat-process-step-icon is-${step.status}`}
@@ -156,26 +163,29 @@ export const AssistantProcess = memo(function AssistantProcess({
             </div>
           ))}
 
-          {hasReasoning && (
+          {degradedPlanSteps.length > 0 ? (
             <div className="chat-process-step">
-              <span className="chat-process-step-icon is-reasoning" aria-hidden="true">
-                <BulbOutlined />
+              <span className="chat-process-step-icon is-degraded" aria-hidden="true">
+                <WarningOutlined />
               </span>
               <div className="chat-process-step-content">
-                <div className="chat-process-step-title">思考过程</div>
-                <div className="chat-reasoning-content">
-                  {message.reasoningContent}
-                  {isStreaming && !hasTools && !hasContent && <BlinkingCursor />}
+                <div className="chat-process-step-title">数据缺口</div>
+                <div className="chat-process-step-description">
+                  {degradedPlanSteps.map((step) => (
+                    <div key={step.id}>
+                      {step.title}{step.detail || step.description ? ` · ${step.detail || step.description}` : ""}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
 
           {toolCalls.map((toolCall) => (
             <ToolCallCard key={toolCall.id} toolCall={toolCall} />
           ))}
 
-          {isStreaming && !hasPlan && !hasReasoning && !hasTools && (
+          {isStreaming && !hasPlan && !hasTools && (
             <div className="chat-process-step">
               <span className="chat-process-step-icon" aria-hidden="true">
                 <LoadingOutlined spin />

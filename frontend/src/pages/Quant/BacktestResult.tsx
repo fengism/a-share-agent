@@ -27,6 +27,7 @@ export default function BacktestResult({ result, strategy }: { result: QuantBack
           dataSources={result.data_sources}
           engineVersion={result.engine_version}
           metrics={result.metrics}
+          holdoutValidation={result.holdout_validation}
         />
       </div>
       <div id="quant-result-charts" className="quant-result-anchor">

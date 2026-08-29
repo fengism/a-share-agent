@@ -1,13 +1,14 @@
 """量化回测应用服务。"""
 
 import asyncio
+from dataclasses import replace
 from datetime import date, timedelta
 from typing import Any
 
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore, misc_semaphore
 from app.core.market import normalize_code, normalize_index_code
 from app.financial_data.market.public import get_completed_market_date, get_index_kline
-from app.financial_data.stock.public import get_historical_bars, historical_bar_hash
+from app.financial_data.stock.public import HistoricalBarSet, get_historical_bars, historical_bar_hash
 from app.modules.portfolio.public import list_held_stock_codes
 from app.modules.quant.engine import run_backtest, strategy_warmup_bars
 from app.modules.quant.persistence import runs as run_store
@@ -138,17 +139,61 @@ async def delete_user_strategy(strategy_id: int, user_id: int) -> bool:
     )
 
 
+def _item_date(item: Any) -> str:
+    value = item.get("date") if isinstance(item, dict) else getattr(item, "date", "")
+    return str(value or "")
+
+
+def _items_in_range(items: list[Any], start_date: str, end_date: str) -> list[Any]:
+    return [
+        item
+        for item in items
+        if (not start_date or _item_date(item) >= start_date)
+        and (not end_date or _item_date(item) <= end_date)
+    ]
+
+
+def _normalize_bar_sets(
+    bar_sets: list[HistoricalBarSet],
+    start_date: str,
+    warmup_bars: int,
+) -> list[HistoricalBarSet]:
+    required_prestart = warmup_bars + 1
+    normalized = []
+    for bar_set in bar_sets:
+        by_date = {item.date: item for item in bar_set.items}
+        ordered = [by_date[day] for day in sorted(by_date)]
+        prestart = [item for item in ordered if item.date < start_date]
+        if len(prestart) < required_prestart:
+            raise ValueError(
+                f"{bar_set.code} 预热行情不足: 需要 {required_prestart} 根，实际 {len(prestart)} 根"
+            )
+        items = [*prestart[-required_prestart:], *(item for item in ordered if item.date >= start_date)]
+        normalized.append(replace(
+            bar_set,
+            data_hash=historical_bar_hash(bar_set.code, bar_set.period, bar_set.adjust, items),
+            items=items,
+        ))
+    return normalized
+
+
 def _result_with_market_snapshots(row: run_store.QuantRunRow) -> dict[str, Any] | None:
     if row.result is None:
         return None
     result = dict(row.result)
-    if result.get("market_snapshots") or not row.input_snapshot:
+    if not row.input_snapshot:
         return result
     stocks = row.input_snapshot.get("stocks")
     if not isinstance(stocks, dict):
         return result
     metadata = row.input_snapshot.get("stock_metadata")
     metadata = metadata if isinstance(metadata, dict) else {}
+    existing_snapshots = result.get("market_snapshots")
+    existing_by_code = {
+        str(item.get("code")): item
+        for item in existing_snapshots
+        if isinstance(item, dict) and item.get("code")
+    } if isinstance(existing_snapshots, list) else {}
     start_date = str(row.request.get("start_date") or "")
     end_date = str(row.request.get("end_date") or "")
     requested_codes = (row.request.get("universe") or {}).get("codes") or []
@@ -156,15 +201,21 @@ def _result_with_market_snapshots(row: run_store.QuantRunRow) -> dict[str, Any] 
     result["market_snapshots"] = [
         {
             "code": code,
-            "source": str((metadata.get(code) or {}).get("source") or "backtest-input-snapshot"),
-            "data_hash": str((metadata.get(code) or {}).get("data_hash") or ""),
-            "items": [
-                item
-                for item in stocks.get(code, [])
-                if isinstance(item, dict)
-                and (not start_date or str(item.get("date") or "") >= start_date)
-                and (not end_date or str(item.get("date") or "") <= end_date)
-            ],
+            "source": str(
+                (metadata.get(code) or {}).get("source")
+                or (existing_by_code.get(code) or {}).get("source")
+                or "backtest-input-snapshot"
+            ),
+            "data_hash": str(
+                (metadata.get(code) or {}).get("data_hash")
+                or (existing_by_code.get(code) or {}).get("data_hash")
+                or ""
+            ),
+            "items": _items_in_range(
+                [item for item in stocks.get(code, []) if isinstance(item, dict)],
+                start_date,
+                end_date,
+            ),
         }
         for code in code_order
         if isinstance(stocks.get(code), list)
@@ -272,8 +323,9 @@ async def execute_backtest(request: QuantBacktestCreate | QuantBacktestPayload) 
     payload = _as_backtest_payload(request)
     strategy_snapshot = payload.strategy_snapshot or _resolve_strategy(payload.strategy)
     warmup_bars = strategy_warmup_bars(strategy_snapshot)
+    required_prestart_bars = warmup_bars + 1
     stock_history_start = payload.start_date - timedelta(
-        days=warmup_bars * 2 + 14 if warmup_bars > 0 else 0,
+        days=required_prestart_bars * 2 + 14,
     )
     stock_history_task = asyncio.gather(
         *(
@@ -296,6 +348,7 @@ async def execute_backtest(request: QuantBacktestCreate | QuantBacktestPayload) 
         )
     )
     bar_sets, benchmark = await asyncio.gather(stock_history_task, benchmark_task)
+    bar_sets = _normalize_bar_sets(bar_sets, payload.start_date.isoformat(), warmup_bars)
     benchmark_hash = historical_bar_hash(payload.benchmark, "daily", "", benchmark.items)
     result = await call_blocking(
         run_backtest,

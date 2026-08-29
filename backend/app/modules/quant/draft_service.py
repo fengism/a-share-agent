@@ -68,6 +68,10 @@ def evaluate_quality_gate(
     expected_definition_hash: str,
     minimum_trade_count: int,
     maximum_drawdown_pct: float,
+    minimum_sharpe_ratio: float | None = None,
+    minimum_holdout_trade_count: int | None = None,
+    maximum_holdout_drawdown_pct: float | None = None,
+    minimum_holdout_sharpe_ratio: float | None = None,
 ) -> QuantStrategyDraftQualityGate:
     snapshot = run.request.get("strategy_snapshot")
     actual_hash = snapshot.get("definition_hash") if isinstance(snapshot, dict) else None
@@ -77,12 +81,30 @@ def evaluate_quality_gate(
     metrics = run.result.get("metrics") if isinstance(run.result, dict) else None
     trade_count = metrics.get("trade_count") if isinstance(metrics, dict) else None
     max_drawdown = metrics.get("max_drawdown") if isinstance(metrics, dict) else None
-    valid_trade_count = type(trade_count) is int and trade_count >= 0
-    valid_max_drawdown = (
-        type(max_drawdown) in (int, float)
-        and math.isfinite(float(max_drawdown))
-        and float(max_drawdown) <= 0
+    sharpe_ratio = metrics.get("sharpe_ratio") if isinstance(metrics, dict) else None
+    holdout = run.result.get("holdout_validation") if isinstance(run.result, dict) else None
+    holdout_metrics = holdout.get("metrics") if isinstance(holdout, dict) else None
+    holdout_trade_count = (
+        holdout_metrics.get("trade_count") if isinstance(holdout_metrics, dict) else None
     )
+    holdout_max_drawdown = (
+        holdout_metrics.get("max_drawdown") if isinstance(holdout_metrics, dict) else None
+    )
+    holdout_sharpe_ratio = (
+        holdout_metrics.get("sharpe_ratio") if isinstance(holdout_metrics, dict) else None
+    )
+    valid_trade_count = type(trade_count) is int and trade_count >= 0
+    valid_holdout_trade_count = type(holdout_trade_count) is int and holdout_trade_count >= 0
+
+    def finite_number(value: object) -> bool:
+        return type(value) in (int, float) and math.isfinite(float(value))
+
+    valid_max_drawdown = finite_number(max_drawdown) and float(max_drawdown) <= 0
+    valid_sharpe = finite_number(sharpe_ratio)
+    valid_holdout_max_drawdown = (
+        finite_number(holdout_max_drawdown) and float(holdout_max_drawdown) <= 0
+    )
+    valid_holdout_sharpe = finite_number(holdout_sharpe_ratio)
     if run.status != "succeeded":
         errors.append(f"回测未成功完成: {run.status}")
     elif not valid_trade_count or trade_count < minimum_trade_count:
@@ -97,14 +119,97 @@ def evaluate_quality_gate(
             if valid_max_drawdown
             else "最大回撤指标无效"
         )
+    if run.status == "succeeded" and minimum_sharpe_ratio is not None and (
+        not valid_sharpe or float(sharpe_ratio) < minimum_sharpe_ratio
+    ):
+        errors.append(
+            f"夏普比率低于 {minimum_sharpe_ratio:g}"
+            if valid_sharpe
+            else "夏普比率指标无效"
+        )
+    holdout_required = any(
+        value is not None
+        for value in (
+            minimum_holdout_trade_count,
+            maximum_holdout_drawdown_pct,
+            minimum_holdout_sharpe_ratio,
+        )
+    )
+    if run.status == "succeeded" and holdout_required and not isinstance(holdout_metrics, dict):
+        errors.append("回测区间不足，未生成后段样本验证")
+    elif run.status == "succeeded" and isinstance(holdout_metrics, dict):
+        if minimum_holdout_trade_count is not None and (
+            not valid_holdout_trade_count
+            or holdout_trade_count < minimum_holdout_trade_count
+        ):
+            actual_trades = holdout_trade_count if valid_holdout_trade_count else 0
+            errors.append(
+                f"后段样本交易次数 {actual_trades} 少于最低要求 {minimum_holdout_trade_count}"
+            )
+        if maximum_holdout_drawdown_pct is not None and (
+            not valid_holdout_max_drawdown
+            or float(holdout_max_drawdown) < -maximum_holdout_drawdown_pct
+        ):
+            errors.append(
+                f"后段样本最大回撤超过 {maximum_holdout_drawdown_pct:g}%"
+                if valid_holdout_max_drawdown
+                else "后段样本最大回撤指标无效"
+            )
+        if minimum_holdout_sharpe_ratio is not None and (
+            not valid_holdout_sharpe
+            or float(holdout_sharpe_ratio) < minimum_holdout_sharpe_ratio
+        ):
+            errors.append(
+                f"后段样本夏普比率低于 {minimum_holdout_sharpe_ratio:g}"
+                if valid_holdout_sharpe
+                else "后段样本夏普比率指标无效"
+            )
+    if run.status == "succeeded":
+        metric_groups = (
+            (
+                metrics,
+                "",
+            ),
+            (
+                holdout_metrics,
+                "后段样本",
+            ),
+        )
+        for metric_group, label_prefix in metric_groups:
+            if not isinstance(metric_group, dict):
+                continue
+            for key, label in (
+                ("downside_volatility", "下行波动率"),
+                ("sharpe_ratio", "夏普比率"),
+                ("sortino_ratio", "索提诺比率"),
+                ("calmar_ratio", "卡玛比率"),
+                ("tracking_error", "跟踪误差"),
+                ("information_ratio", "信息比率"),
+            ):
+                value = metric_group.get(key)
+                error = f"{label_prefix}{label}指标无效"
+                if value is not None and not finite_number(value) and error not in errors:
+                    errors.append(error)
     return QuantStrategyDraftQualityGate(
         passed=not errors,
         run_status=run.status,
         definition_hash=expected_definition_hash,
         minimum_trade_count=minimum_trade_count,
         maximum_drawdown_pct=maximum_drawdown_pct,
+        minimum_sharpe_ratio=minimum_sharpe_ratio,
+        minimum_holdout_trade_count=minimum_holdout_trade_count,
+        maximum_holdout_drawdown_pct=maximum_holdout_drawdown_pct,
+        minimum_holdout_sharpe_ratio=minimum_holdout_sharpe_ratio,
         trade_count=trade_count if valid_trade_count else None,
         max_drawdown=float(max_drawdown) if valid_max_drawdown else None,
+        sharpe_ratio=float(sharpe_ratio) if valid_sharpe else None,
+        holdout_trade_count=holdout_trade_count if valid_holdout_trade_count else None,
+        holdout_max_drawdown=(
+            float(holdout_max_drawdown) if valid_holdout_max_drawdown else None
+        ),
+        holdout_sharpe_ratio=(
+            float(holdout_sharpe_ratio) if valid_holdout_sharpe else None
+        ),
         errors=errors,
     )
 
@@ -148,11 +253,19 @@ async def _sync_draft(row: draft_store.StrategyDraftRow) -> draft_store.Strategy
         return row
     minimum_trade_count = int(row.quality_gate.get("minimum_trade_count", 1))
     maximum_drawdown_pct = float(row.quality_gate.get("maximum_drawdown_pct", 80))
+    minimum_sharpe_ratio = row.quality_gate.get("minimum_sharpe_ratio")
+    minimum_holdout_trade_count = row.quality_gate.get("minimum_holdout_trade_count")
+    maximum_holdout_drawdown_pct = row.quality_gate.get("maximum_holdout_drawdown_pct")
+    minimum_holdout_sharpe_ratio = row.quality_gate.get("minimum_holdout_sharpe_ratio")
     report = evaluate_quality_gate(
         run,
         expected_definition_hash=row.definition_hash,
         minimum_trade_count=minimum_trade_count,
         maximum_drawdown_pct=maximum_drawdown_pct,
+        minimum_sharpe_ratio=minimum_sharpe_ratio,
+        minimum_holdout_trade_count=minimum_holdout_trade_count,
+        maximum_holdout_drawdown_pct=maximum_holdout_drawdown_pct,
+        minimum_holdout_sharpe_ratio=minimum_holdout_sharpe_ratio,
     )
     try:
         return await call_blocking(
@@ -295,6 +408,10 @@ async def backtest_strategy_draft(
         definition_hash=row.definition_hash,
         minimum_trade_count=request.minimum_trade_count,
         maximum_drawdown_pct=request.maximum_drawdown_pct,
+        minimum_sharpe_ratio=request.minimum_sharpe_ratio,
+        minimum_holdout_trade_count=request.minimum_holdout_trade_count,
+        maximum_holdout_drawdown_pct=request.maximum_holdout_drawdown_pct,
+        minimum_holdout_sharpe_ratio=request.minimum_holdout_sharpe_ratio,
     )
     try:
         await call_blocking(

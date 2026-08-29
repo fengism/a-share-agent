@@ -128,16 +128,27 @@ const completedResult = {
   strategy_version: "1.0.0",
   definition_hash: "sha256:1234567890abcdef1234567890",
   parameters: { fast_period: 12 },
-  matches: [{ code: "600519", signal_date: "2026-08-17", target_position: 1 }],
+  matches: [{
+    code: "600519",
+    signal_date: "2026-08-17",
+    target_position: 1,
+    signal_age_bars: 3,
+    entry_price: 1400,
+    latest_price: 1500,
+    return_since_signal_pct: 7.142857,
+    average_amount_20d_yi: 12.5,
+  }],
   matched_codes: ["600519"],
   evaluated: 2,
   failed: {},
+  excluded: { "000001": "信号年龄 21 根，超过上限 20 根" },
   matched_items: [candidates.items[0]],
 };
 
 describe("Screener strategy workflow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     currentFilters = filters;
     mocks.useRunStrategy.mockReturnValue({ mutateAsync: mocks.mutateAsync, isPending: false });
     mocks.useScreen.mockReturnValue({
@@ -153,7 +164,7 @@ describe("Screener strategy workflow", () => {
     const execution = deferred<typeof completedResult>();
     mocks.mutateAsync.mockImplementation((request) => {
       request.onStarted(mocks.cancel);
-      request.onProgress({ type: "progress", completed: 1, total: 2, matched: 1, failed: 0 });
+      request.onProgress({ type: "progress", completed: 1, total: 2, matched: 1, excluded: 1, failed: 0 });
       return execution.promise;
     });
     render(<MemoryRouter><Screener /></MemoryRouter>);
@@ -164,23 +175,32 @@ describe("Screener strategy workflow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "多头趋势" }));
     fireEvent.change(screen.getByRole("spinbutton", { name: "快速周期" }), { target: { value: "12" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "最大信号年龄" }), { target: { value: "30" } });
     fireEvent.click(screen.getByRole("button", { name: "执行策略选股" }));
 
     expect(mocks.mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
       strategy_key: "bull_trend",
       parameters: { fast_period: 12 },
+      max_signal_age_bars: 30,
       codes: ["600519", "000001"],
       scan_limit: 50,
       candidate_items: candidates.items,
     }));
-    expect(await screen.findByText(/策略扫描中：1\/2，命中 1，失败 0/)).toBeInTheDocument();
+    expect(await screen.findByText(/策略扫描中：1\/2，命中 1，排除 1，失败 0/)).toBeInTheDocument();
 
     execution.resolve(completedResult);
     expect(await screen.findByText(/多头趋势@1.0.0：命中 1\/2 只/)).toBeInTheDocument();
+    expect(screen.getByText("策略命中 (1 只)")).toBeInTheDocument();
+    expect(screen.getByText(/排除 1 只/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "查看排除明细" }));
+    expect(screen.getByText("000001 平安银行")).toBeInTheDocument();
+    expect(screen.getByText("信号年龄 21 根，超过上限 20 根")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /关\s*闭/ }));
     expect(mocks.setSelectedCodes).toHaveBeenCalledWith(["600519"]);
     expect(screen.getByTestId("result-codes")).toHaveTextContent("600519");
 
     fireEvent.click(screen.getByRole("button", { name: "显示全部" }));
+    expect(screen.getByText("筛选结果 (2 只)")).toBeInTheDocument();
     expect(screen.getByTestId("result-codes")).toHaveTextContent("600519,000001");
   });
 
@@ -237,13 +257,46 @@ describe("Screener strategy workflow", () => {
     await waitFor(() => expect(mocks.mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
       scan_limit: 200,
       candidate_filters: filters,
+      max_signal_age_bars: 20,
     })));
+  });
+
+  it("restores valid strategy settings from local storage", async () => {
+    const firstView = render(<MemoryRouter><Screener /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "多头趋势" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "快速周期" }), { target: { value: "12" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "最大信号年龄" }), { target: { value: "30" } });
+    fireEvent.click(screen.getByRole("radio", { name: "前 200 候选" }));
+
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem("screener-strategy-settings") ?? "{}")).toEqual({
+      strategyKey: "bull_trend",
+      parameters: { fast_period: 12 },
+      maxSignalAgeBars: 30,
+      scanLimit: 200,
+    }));
+
+    firstView.unmount();
+    render(<MemoryRouter><Screener /></MemoryRouter>);
+
+    expect(await screen.findByRole("button", { name: "多头趋势" })).toHaveClass("ant-btn-primary");
+    expect(screen.getByRole("spinbutton", { name: "快速周期" })).toHaveValue("12");
+    expect(screen.getByRole("spinbutton", { name: "最大信号年龄" })).toHaveValue("30");
+    expect(screen.getByRole("radio", { name: "前 200 候选" })).toBeChecked();
   });
 
   it("shows matches from the full 200-candidate scope even when they are outside the current page", async () => {
     mocks.mutateAsync.mockResolvedValue({
       ...completedResult,
-      matches: [{ code: "300750", signal_date: "2026-08-16", target_position: 1 }],
+      matches: [{
+        code: "300750",
+        signal_date: "2026-08-16",
+        target_position: 1,
+        signal_age_bars: 2,
+        entry_price: 280,
+        latest_price: 300,
+        return_since_signal_pct: 7.142857,
+      }],
       matched_codes: ["300750"],
       matched_items: [{ code: "300750", name: "宁德时代" }],
     });

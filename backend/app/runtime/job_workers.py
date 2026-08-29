@@ -138,10 +138,13 @@ async def run_quant_job_worker() -> None:
         raise
 
 
-async def _run_workflow_job_worker_slot(owner_id: str) -> None:
+async def _run_workflow_job_worker_slot(owner_id: str, shutdown_event: asyncio.Event) -> None:
     while True:
         try:
-            processed = await process_next_workflow_job(owner_id)
+            processed = await process_next_workflow_job(
+                owner_id,
+                shutdown_event=shutdown_event,
+            )
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -154,6 +157,7 @@ async def _run_workflow_job_worker_slot(owner_id: str) -> None:
 
 async def run_workflow_job_worker() -> None:
     workers: dict[int, asyncio.Task[None]] = {}
+    shutdown_event = asyncio.Event()
     health = background_task_health.setdefault(WORKFLOW_JOB_HEALTH_NAME, new_task_health())
     health["status"] = "running"
     try:
@@ -169,13 +173,17 @@ async def run_workflow_job_worker() -> None:
             for index in range(1, concurrency + 1):
                 if index not in workers:
                     workers[index] = asyncio.create_task(
-                        _run_workflow_job_worker_slot(f"{WORKFLOW_JOB_OWNER_ID}:{index}"),
+                        _run_workflow_job_worker_slot(
+                            f"{WORKFLOW_JOB_OWNER_ID}:{index}",
+                            shutdown_event,
+                        ),
                         name=f"workflow_job_worker:{index}",
                     )
             health["status"] = "running"
             health["last_error"] = None
             await asyncio.sleep(1)
     except asyncio.CancelledError:
+        shutdown_event.set()
         health["status"] = "stopped"
         raise
     except Exception as error:

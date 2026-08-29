@@ -34,4 +34,38 @@ describe("AnalysisDecisionBoard", () => {
     expect(screen.getByTestId("location").textContent).toContain("/chat?prompt=");
     expect(decodeURIComponent(screen.getByTestId("location").textContent || "")).toContain("贵州茅台当前结论的失效条件是什么");
   });
+
+  it("prefers role-specific research actions while retaining timing levels", () => {
+    const result = {
+      stock_code: "600519",
+      stock_name: "贵州茅台",
+      signal: "buy",
+      current_price: 1520,
+      technical: { support_level: 1450, resistance_level: 1650 },
+      research_framework: {
+        actions: {
+          new_investor_action: "avoid",
+          holder_action: "reduce",
+          rationale: "当前估值没有覆盖主要下行情景",
+          buy_or_add_range: null,
+          add_triggers: [],
+          sell_triggers: ["现金流恶化"],
+          thesis_breakers: ["品牌定价权持续削弱"],
+          monitoring_metrics: [],
+        },
+      },
+    } as unknown as AnalysisResult;
+
+    render(
+      <MemoryRouter>
+        <AnalysisDecisionBoard result={result} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("暂时回避")).toBeInTheDocument();
+    expect(screen.getByText("当前估值没有覆盖主要下行情景")).toBeInTheDocument();
+    expect(screen.getByText(/已持有者：/)).toHaveTextContent("考虑减持");
+    expect(screen.getByText(/首要失效条件/)).toHaveTextContent("品牌定价权持续削弱");
+    expect(screen.getByLabelText("短期择时参考")).toBeInTheDocument();
+  });
 });

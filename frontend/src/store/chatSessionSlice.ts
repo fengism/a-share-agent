@@ -39,6 +39,7 @@ export function createChatSessionSlice(
     sessionData: scopedState.sessionData,
 
     hydrateSessions: (snapshot) => {
+      if (get().isStreaming) return;
       const hydrated = normalizePersistedChatState(snapshot);
       set({
         messages: hydrated.messages,
@@ -46,6 +47,9 @@ export function createChatSessionSlice(
         agentNames: hydrated.agentNames,
         skillNames: hydrated.skillNames,
         isStreaming: false,
+        activeRunSessionId: null,
+        activeRunLabel: null,
+        syncStatus: "synced",
         abortController: null,
         sessions: hydrated.sessions,
         activeSessionId: hydrated.activeSessionId,

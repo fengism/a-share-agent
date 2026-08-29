@@ -35,10 +35,15 @@ function makeResult(overrides: Partial<QuantBacktestResult> = {}): QuantBacktest
       annualized_return: 11.2,
       annualized_volatility: 10,
       benchmark_return: 8,
+      calmar_ratio: 2.15,
+      downside_volatility: 7.5,
       excess_return: 4.34,
+      information_ratio: 0.72,
       max_drawdown: -5.2,
       profit_loss_ratio: 1.8,
       sharpe_ratio: 1.1,
+      sortino_ratio: 1.46,
+      tracking_error: 6.03,
       turnover_rate: 100,
       trade_count: 1,
       win_rate: 60,
@@ -72,6 +77,11 @@ describe("BacktestResult", () => {
     expect(screen.getByText("总收益")).toBeInTheDocument();
     expect(screen.getByText("总收益").closest(".ant-statistic")).toHaveTextContent("12.34%");
     expect(screen.getByText("基准收益")).toBeInTheDocument();
+    expect(screen.getByText("索提诺比率").closest(".ant-statistic")).toHaveTextContent("1.46");
+    expect(screen.getByText("卡玛比率").closest(".ant-statistic")).toHaveTextContent("2.15");
+    expect(screen.getByText("信息比率").closest(".ant-statistic")).toHaveTextContent("0.72");
+    expect(screen.getByText("下行波动").closest("tr")).toHaveTextContent("7.50%");
+    expect(screen.getByText("跟踪误差").closest("tr")).toHaveTextContent("6.03%");
     expect(screen.getByText("1 次")).toBeInTheDocument();
     expect(screen.getByText("akshare")).toBeInTheDocument();
     expect(screen.getByText("v1")).toBeInTheDocument();
@@ -101,6 +111,41 @@ describe("BacktestResult", () => {
 
     expect(screen.getByText("该回测没有可用的基准收益")).toBeInTheDocument();
     expect(screen.getByText(/建议重新创建回测/)).toBeInTheDocument();
+  });
+
+  it("renders independent holdout validation metrics when available", () => {
+    render(<BacktestResult result={makeResult({
+      holdout_validation: {
+        method: "holdout",
+        start_date: "2025-09-01",
+        end_date: "2025-12-31",
+        training_ratio: 2 / 3,
+        observation_count: 20,
+        metrics: {
+          total_return: 3.4,
+          annualized_return: 9.2,
+          annualized_volatility: 11,
+          benchmark_return: 2.5,
+          calmar_ratio: 1.7,
+          downside_volatility: 6.8,
+          excess_return: 0.9,
+          information_ratio: 0.4,
+          max_drawdown: -2,
+          profit_loss_ratio: 1.4,
+          sharpe_ratio: 0.8,
+          sortino_ratio: 1.2,
+          tracking_error: 4,
+          turnover_rate: 30,
+          trade_count: 2,
+          win_rate: 50,
+        },
+      },
+    })} />);
+
+    expect(screen.getByText("后段样本验证")).toBeInTheDocument();
+    expect(screen.getByText("独立资金")).toBeInTheDocument();
+    expect(screen.getByText("2025-09-01 至 2025-12-31")).toBeInTheDocument();
+    expect(screen.getByText("20 个")).toBeInTheDocument();
   });
 
   it("labels the exact strategy used for the result", () => {

@@ -35,6 +35,7 @@ SYSTEM_PROMPT = """你是一位严谨的产业研究分析师。请把输入的�
 - 区分全球与中国、事实与判断、行业公司与 A 股上市公司。
 - 只生成结构化事实和判断；Markdown 报告与图表由后端根据校验后的结构化字段确定性生成。
 - 重点标的只说明产业链角色、受益逻辑与风险，不给出无依据的买卖建议。
+- 必须逐项检查公共数据中的 `chain_data` 和 `driver_risk_data`：前者优先用于上中下游映射，后者优先用于驱动和风险；证据为空时记录缺口，不得跳过整个维度。
 
 ## 数量与内容约束
 - 所有数量都是上限而不是最低要求；证据不足时宁可少输出，并把缺口写入 `missing_evidence`，禁止为了凑数补写。
@@ -81,6 +82,8 @@ def build_user_prompt(
     public_evidence_id: str = "",
     company_scope: str = "a_share",
     evidence_compaction_note: str = "",
+    agent_evidence_gaps: str = "无",
+    evidence_inventory: str = "",
 ) -> str:
     """使用 Agent 摘要和原始工具证据构造产业链分析提示词。"""
     company_instruction = (
@@ -97,6 +100,10 @@ def build_user_prompt(
 ## Agent 调研摘要
 {agent_summary}
 
+## 证据覆盖清单
+{evidence_inventory or "未提供证据数量清单"}
+Agent 尚缺维度：{agent_evidence_gaps or "无"}
+
 ## Agent 工具证据
 压缩说明：{evidence_compaction_note or "无"}
 {agent_evidence}
@@ -105,7 +112,7 @@ def build_user_prompt(
 证据 ID：{public_evidence_id or "无"}
 {public_data}
 
-请交叉核对公共结构化数据、Agent 摘要与工具证据，按系统消息定义的 JSON 结构输出，并确保结构化摘要与 Markdown 报告一致。无法确认的市场规模、份额、公司代码和事件必须留空。"""
+请交叉核对公共结构化数据、Agent 摘要与工具证据，逐项检查市场、竞争、技术、上中下游、公司、事件、驱动和风险后，按系统消息定义的 JSON 结构输出。Agent 尚缺维度只能写入 `missing_evidence`，不得用常识补齐。无法确认的市场规模、份额、公司代码和事件必须留空。"""
 
 
 def _build_from_context(context) -> str:
@@ -118,13 +125,15 @@ def _build_from_context(context) -> str:
         str(context.get("public_evidence_id") or ""),
         str(context.get("company_scope") or "a_share"),
         str(context.get("evidence_compaction_note") or ""),
+        str(context.get("agent_evidence_gaps") or "无"),
+        str(context.get("evidence_inventory") or ""),
     )
 
 
 INDUSTRY_CHAIN_PROMPT_SPEC = prompt_registry.register(
     PromptSpec(
         id="industry_chain_analysis",
-        version="3.7.0",
+        version="3.8.0",
         system_prompt=SYSTEM_PROMPT,
         user_builder=_build_from_context,
         output_model=IndustryChainPromptOutput,

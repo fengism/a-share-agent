@@ -313,7 +313,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
         position: "absolute", top: 0, bottom: 0, display: "none", pointerEvents: "none",
         background: hexToRgba(c.primary, 0.12), border: `1px solid ${hexToRgba(c.primary, 0.35)}`,
       }} />
-      <div style={{ position: "absolute", right: 12, top: 12, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+      <div className="pdf-hide" style={{ position: "absolute", right: 12, top: 12, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
         <div style={{
           padding: "6px 10px", fontSize: 12, color: c.textSecondary,
           background: hexToRgba(c.pageBg, 0.96), border: `1px solid ${c.border}`,

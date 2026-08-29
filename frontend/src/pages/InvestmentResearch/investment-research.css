@@ -1,0 +1,117 @@
+.investment-research-page {
+  container-name: investment-research-page;
+  container-type: inline-size;
+}
+
+.investment-research-content {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.investment-research-report {
+  width: min(100%, 1120px);
+  min-width: 0;
+  margin-inline: auto;
+  padding: 24px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-lg);
+  background: var(--c-card-bg);
+  box-shadow: var(--c-shadow-sm);
+}
+
+.investment-research-report__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 24px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.investment-research-report__header > span {
+  grid-column: 1;
+  color: var(--c-accent);
+  font-size: var(--stock-research-label-size);
+  font-weight: var(--c-weight-semibold);
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.investment-research-report__header h2 {
+  grid-column: 1;
+  margin: 0;
+  font-size: var(--stock-research-title-size);
+  font-weight: var(--c-weight-bold);
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.investment-research-report__header > div {
+  display: flex;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  flex-wrap: wrap;
+  align-content: end;
+  justify-content: flex-end;
+  gap: 12px;
+  font-size: var(--stock-research-label-size);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.investment-research-report__financial > h3 {
+  margin: 0 0 var(--c-space-4);
+  font-size: 22px;
+  font-weight: var(--c-weight-semibold);
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.investment-research-no-report {
+  display: flex;
+  min-height: 360px;
+  padding: 32px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.analysis-history-rail {
+  min-width: 0;
+}
+
+
+@container investment-research-page (max-width: 700px) {
+  .investment-research-report {
+    padding: 16px;
+  }
+  .investment-research-report__header {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px 12px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+  }
+  .investment-research-report__header > div {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: flex-start;
+  }
+  .investment-research-report__header h2 { font-size: var(--stock-research-title-size); }
+}
+
+@media (max-width: 480px) {
+  .investment-research-report {
+    padding: 12px;
+  }
+}
+
+@media print {
+  .investment-research-report {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+}

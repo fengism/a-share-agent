@@ -134,7 +134,7 @@ def register_composite_tools():
 
     registry.register_tool(Tool(
         name="analyze_financials",
-        description="一键获取个股完整财报数据，包括资产负债表、利润表、现金流量表（最近4期）、关键财务指标汇总和原始财务数据。当用户要求'分析财报''财务分析''看下财报''利润表''资产负债表''现金流量表'时调用。",
+        description="一键获取个股完整财报数据，包括资产负债表、利润表、现金流量表（最近4期）、关键指标，以及分产品/业务/地区的营收与毛利构成。当用户要求财报、财务、主营构成、产品构成、地区构成或毛利分析时调用。",
         parameters={
             "type": "object",
             "properties": {

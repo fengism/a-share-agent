@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
@@ -23,6 +23,7 @@ const Market = lazy(pageLoaders.market);
 const Screener = lazy(pageLoaders.screener);
 const Analysis = lazy(pageLoaders.analysis);
 const AnalysisEntry = lazy(pageLoaders.analysisEntry);
+const InvestmentResearch = lazy(pageLoaders.investmentResearch);
 const DailyReviewPage = lazy(pageLoaders.dailyReview);
 const PotentialPage = lazy(pageLoaders.potential);
 const Chat = lazy(pageLoaders.chat);
@@ -169,6 +170,8 @@ export default function App() {
                   <Route path="/feed" element={<ErrorBoundary><Feed /></ErrorBoundary>} />
                   <Route path="/twitter" element={<ErrorBoundary><Twitter /></ErrorBoundary>} />
                   <Route path="/analysis" element={<ErrorBoundary><AnalysisEntry /></ErrorBoundary>} />
+                  <Route path="/investment-research" element={<Navigate to="/analysis" replace />} />
+                  <Route path="/investment-research/:code" element={<ErrorBoundary><InvestmentResearch /></ErrorBoundary>} />
                   <Route path="/macro" element={<ErrorBoundary><Macro /></ErrorBoundary>} />
                   <Route path="/compare" element={<ErrorBoundary><Compare /></ErrorBoundary>} />
                   <Route path="/portfolio" element={<ErrorBoundary><Portfolio /></ErrorBoundary>} />

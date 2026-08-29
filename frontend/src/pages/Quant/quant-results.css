@@ -59,8 +59,13 @@
   margin-bottom: var(--c-space-4);
 }
 
-.quant-result-overview .ant-descriptions-item-content {
+.quant-result-overview .ant-descriptions-item-content,
+.quant-holdout-card .ant-descriptions-item-content {
   overflow-wrap: anywhere;
+}
+
+.quant-holdout-card {
+  margin-bottom: var(--c-space-4);
 }
 
 .quant-chart-card {

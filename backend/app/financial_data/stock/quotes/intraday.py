@@ -19,9 +19,10 @@ from app.infrastructure.providers.sina.quotes import get_last_trade_date
 logger = logging.getLogger(__name__)
 
 _intraday_singleflight: AsyncSingleFlight[IntradayData] = AsyncSingleFlight()
-_DIRECT_SOURCE_TIMEOUT_SECONDS = 2.0
-_SECONDARY_SOURCE_TIMEOUT_SECONDS = 1.5
-_FALLBACK_SOURCE_TIMEOUT_SECONDS = 1.5
+_TRADE_DATE_TIMEOUT_SECONDS = 0.75
+_DIRECT_SOURCE_TIMEOUT_SECONDS = 1.5
+_SECONDARY_SOURCE_TIMEOUT_SECONDS = 1.0
+_FALLBACK_SOURCE_TIMEOUT_SECONDS = 1.0
 
 
 def _get_akshare_provider():
@@ -69,6 +70,7 @@ async def _safe_fetch_intraday(source_name: str, fetcher, code: str, date: str |
             provider_name,
             "stock_intraday",
             lambda: call_blocking(fetcher, code=code, date=date, semaphore=semaphore),
+            max_attempts=1,
         )
     except Exception as exc:
         logger.info(f"{source_name}分时数据不可用，尝试下一数据源: code={code}, error={exc}")
@@ -186,7 +188,14 @@ async def get_intraday(code: str) -> IntradayData:
         IntradayData 模型对象，包含逐分钟成交点
     """
     sym = normalize_code(code)
-    date = await asyncio.to_thread(get_last_trade_date, code)
+    try:
+        date = await asyncio.wait_for(
+            asyncio.to_thread(get_last_trade_date, code),
+            timeout=_TRADE_DATE_TIMEOUT_SECONDS,
+        )
+    except Exception as error:
+        logger.info("最近交易日查询不可用，分时源自行确定日期: code=%s, error=%s", sym.raw, error)
+        date = ""
     cache_key = dated_cache_key("intraday", sym.raw, date)
     cached = cache.get(cache_key)
     if isinstance(cached, IntradayData):

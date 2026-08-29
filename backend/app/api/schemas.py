@@ -37,6 +37,7 @@ class WorkflowJobResponse(BaseModel):
     id: str
     kind: Literal["analysis", "industry_chain", "screener_strategy", "daily_review"]
     dedupe_key: str
+    request: dict[str, Any]
     status: Literal["pending", "running", "succeeded", "failed", "cancelled"]
     attempts: int
     max_attempts: int

@@ -10,7 +10,15 @@ import { useColors, useStyles } from "../../theme/hooks";
 import { analyzeChanlun, MMD_LABELS } from "../../utils/chanlun";
 import type { AnalysisPageData } from "../../types/stock";
 
-export default memo(function AnalysisChartsSection({ code, pageData }: { code?: string; pageData?: AnalysisPageData }) {
+export default memo(function AnalysisChartsSection({
+  code,
+  pageData,
+  isExportingPdf = false,
+}: {
+  code?: string;
+  pageData?: AnalysisPageData;
+  isExportingPdf?: boolean;
+}) {
   const colors = useColors();
   const { cardStyle } = useStyles();
   const [period, setPeriod] = useState("daily");
@@ -41,6 +49,8 @@ export default memo(function AnalysisChartsSection({ code, pageData }: { code?: 
     <section className="analysis-charts-section" aria-label="个股行情图表">
       {intradayData?.items.length ? (
         <Card
+          data-pdf-capture
+          data-pdf-group
           size="small"
           className="analysis-chart-card pdf-avoid-break"
           title={<span style={{ fontWeight: 700, color: colors.textPrimary }}>最新分时图</span>}
@@ -77,6 +87,8 @@ export default memo(function AnalysisChartsSection({ code, pageData }: { code?: 
       ) : null}
 
       <Card
+        data-pdf-capture
+        data-pdf-group
         size="small"
         className="analysis-chart-card analysis-kline-card pdf-avoid-break"
         title={<span style={{ fontWeight: 700, color: colors.textPrimary }}>K线图</span>}
@@ -157,11 +169,14 @@ export default memo(function AnalysisChartsSection({ code, pageData }: { code?: 
           skeletonRows={8}
           minHeight={500}
         >
-          <LazyKlineChart
-            data={klineData?.items || []}
-            viewKey={`${code || "analysis"}:${period}:${adjust}`}
-            chanlun={chanlunResult}
-          />
+          <div data-pdf-chart="kline">
+            <LazyKlineChart
+              data={klineData?.items || []}
+              viewKey={`${code || "analysis"}:${period}:${adjust}`}
+              chanlun={chanlunResult}
+              forceRender={isExportingPdf}
+            />
+          </div>
         </SectionDataState>
       </Card>
 

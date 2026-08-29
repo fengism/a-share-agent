@@ -7,6 +7,7 @@ import json
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from app.agentic.events import auditable_agent_event
 from app.api.auth.dependencies import require_active_user
 from app.api.errors import ApiError, ConflictError
 from app.api.streaming import SSE_RESPONSES
@@ -94,7 +95,14 @@ async def chat(request: ChatRequest, user: AuthenticatedUser = Depends(require_a
                     continue
                 if update.agent_event is None:
                     continue
-                data = json.dumps(update.agent_event.model_dump(), ensure_ascii=False, default=str)
+                public_event = auditable_agent_event(
+                    update.agent_event,
+                    include_text=True,
+                    strip_tool_content=False,
+                )
+                if public_event is None:
+                    continue
+                data = json.dumps(public_event.model_dump(), ensure_ascii=False, default=str)
                 yield f"data: {data}\n\n"
         finally:
             await session.aclose()

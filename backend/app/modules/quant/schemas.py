@@ -142,12 +142,26 @@ class QuantMetrics(BaseModel):
     benchmark_return: float | None = None
     excess_return: float | None = None
     annualized_volatility: float
+    downside_volatility: float | None = None
     sharpe_ratio: float | None = None
+    sortino_ratio: float | None = None
+    calmar_ratio: float | None = None
+    tracking_error: float | None = None
+    information_ratio: float | None = None
     max_drawdown: float
     win_rate: float | None = None
     profit_loss_ratio: float | None = None
     turnover_rate: float
     trade_count: int
+
+
+class QuantHoldoutValidation(BaseModel):
+    method: Literal["holdout"] = "holdout"
+    training_ratio: float = Field(ge=0, le=1)
+    start_date: str
+    end_date: str
+    observation_count: int = Field(ge=1)
+    metrics: QuantMetrics
 
 
 class QuantBacktestResult(BaseModel):
@@ -161,6 +175,7 @@ class QuantBacktestResult(BaseModel):
     trades: list[QuantTrade]
     open_positions: list[QuantOpenPosition] = Field(default_factory=list)
     market_snapshots: list[QuantMarketSnapshot] = Field(default_factory=list)
+    holdout_validation: QuantHoldoutValidation | None = None
 
 
 class QuantBacktestRun(BaseModel):
@@ -240,8 +255,16 @@ class QuantStrategyDraftQualityGate(BaseModel):
     definition_hash: str
     minimum_trade_count: int = 1
     maximum_drawdown_pct: float = Field(default=80, gt=0, le=80)
+    minimum_sharpe_ratio: float | None = Field(default=None, ge=-20, le=20)
+    minimum_holdout_trade_count: int | None = Field(default=None, ge=0, le=10_000)
+    maximum_holdout_drawdown_pct: float | None = Field(default=None, gt=0, le=80)
+    minimum_holdout_sharpe_ratio: float | None = Field(default=None, ge=-20, le=20)
     trade_count: int | None = None
     max_drawdown: float | None = None
+    sharpe_ratio: float | None = None
+    holdout_trade_count: int | None = None
+    holdout_max_drawdown: float | None = None
+    holdout_sharpe_ratio: float | None = None
     errors: list[str] = Field(default_factory=list)
 
 
@@ -280,6 +303,10 @@ class QuantStrategyDraftBacktestRequest(BaseModel):
     benchmark: str = Field(default="000300", min_length=6, max_length=8)
     minimum_trade_count: int = Field(default=1, ge=1, le=10_000)
     maximum_drawdown_pct: float = Field(default=80, gt=0, le=80)
+    minimum_sharpe_ratio: float | None = Field(default=None, ge=-20, le=20)
+    minimum_holdout_trade_count: int | None = Field(default=None, ge=0, le=10_000)
+    maximum_holdout_drawdown_pct: float | None = Field(default=None, gt=0, le=80)
+    minimum_holdout_sharpe_ratio: float | None = Field(default=None, ge=-20, le=20)
 
     @model_validator(mode="after")
     def validate_period(self):

@@ -16,7 +16,7 @@ import { streamScreenerStrategy } from "../sse";
 import { useRunScreenerStrategy, useScreenerScreen } from "./screener";
 import type { ScreenerStrategyResult } from "../../types/stock";
 
-const strategyResult = {
+const strategyResult: ScreenerStrategyResult = {
   strategy_key: "bull_trend",
   strategy_name: "多头趋势",
   strategy_version: "1.0.0",
@@ -26,6 +26,7 @@ const strategyResult = {
   matched_codes: [],
   evaluated: 0,
   failed: {},
+  excluded: {},
 };
 
 const candidateStock = {
@@ -82,11 +83,22 @@ describe("useRunScreenerStrategy", () => {
     vi.mocked(streamScreenerStrategy).mockReturnValue({
       promise: Promise.resolve({
         ...strategyResult,
-        matches: [{ code: "688836", signal_date: "2026-08-20", target_position: 1 }],
+        matches: [{
+          code: "688836",
+          signal_date: "2026-08-20",
+          target_position: 1,
+          signal_age_bars: 1,
+          entry_price: 10,
+          latest_price: 11,
+          return_since_signal_pct: 10,
+          average_amount_20d_yi: 2,
+        }],
         matched_codes: ["688836"],
         evaluated: 1,
       }),
+      started: Promise.resolve({ job: { id: "job" }, attached: false }),
       cancel: vi.fn(),
+      detach: vi.fn(),
     });
     const { result } = renderHook(() => useRunScreenerStrategy(), { wrapper: createWrapper() });
 
@@ -111,7 +123,9 @@ describe("useRunScreenerStrategy", () => {
     vi.clearAllMocks();
     vi.mocked(streamScreenerStrategy).mockReturnValue({
       promise: Promise.resolve(strategyResult),
+      started: Promise.resolve({ job: { id: "job" }, attached: false }),
       cancel: vi.fn(),
+      detach: vi.fn(),
     });
   });
 
@@ -124,13 +138,17 @@ describe("useRunScreenerStrategy", () => {
         strategy_key: "bull_trend",
         codes: ["600519", "000001"],
         scan_limit: 50,
+        max_signal_age_bars: 30,
         onProgress,
       });
     });
 
     expect(apiPost).not.toHaveBeenCalled();
     expect(streamScreenerStrategy).toHaveBeenCalledWith(
-      expect.objectContaining({ codes: ["600519", "000001"] }),
+      expect.objectContaining({
+        codes: ["600519", "000001"],
+        max_signal_age_bars: 30,
+      }),
       onProgress,
     );
   });
@@ -181,11 +199,22 @@ describe("useRunScreenerStrategy", () => {
     vi.mocked(streamScreenerStrategy).mockReturnValue({
       promise: Promise.resolve({
         ...strategyResult,
-        matches: [{ code: "000001", signal_date: "2026-08-16", target_position: 1 }],
+        matches: [{
+          code: "000001",
+          signal_date: "2026-08-16",
+          target_position: 1,
+          signal_age_bars: 2,
+          entry_price: 10,
+          latest_price: 12,
+          return_since_signal_pct: 20,
+          average_amount_20d_yi: 2,
+        }],
         matched_codes: ["000001"],
         evaluated: 1,
       }),
+      started: Promise.resolve({ job: { id: "job" }, attached: false }),
       cancel: vi.fn(),
+      detach: vi.fn(),
     });
     const { result } = renderHook(() => useRunScreenerStrategy(), { wrapper: createWrapper() });
 

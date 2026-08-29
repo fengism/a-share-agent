@@ -153,12 +153,7 @@ async def compute_percentiles(codes: list[str], indicator: str = "市盈率(TTM)
             logger.warning(f"计算估值百分位失败: {original_code}, {e}")
             return key, None
 
-    pairs = await asyncio.gather(
-        *(compute_one(key, unique_codes[key]) for key in ordered_keys)
-    )
+    pairs = await asyncio.gather(*(compute_one(key, unique_codes[key]) for key in ordered_keys))
     percentile_by_key = dict(pairs)
 
-    return [
-        {"code": code, "percentile": percentile_by_key.get(key)}
-        for code, key in zip(codes, code_keys)
-    ]
+    return [{"code": code, "percentile": percentile_by_key.get(key)} for code, key in zip(codes, code_keys)]

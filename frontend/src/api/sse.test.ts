@@ -101,7 +101,7 @@ describe("durable workflow SSE", () => {
       region: "china",
       time_range: "one_year",
       company_scope: "a_share",
-    });
+    }, { force: true });
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(250);
 
@@ -113,7 +113,7 @@ describe("durable workflow SSE", () => {
       warnings: ["证据覆盖不足"],
     });
     expect(apiPost).toHaveBeenCalledWith(
-      `/workflows/industry-chain/${encodeURIComponent("人工智能")}`,
+      `/workflows/industry-chain/${encodeURIComponent("人工智能")}?force=true`,
       {
         region: "china",
         time_range: "one_year",
@@ -146,13 +146,55 @@ describe("durable workflow SSE", () => {
 
     const stream = streamAnalysis("600519", vi.fn());
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    stream.cancel();
+    const cancellation = stream.cancel();
+    await vi.waitFor(() => expect(apiDelete).toHaveBeenCalledWith("/workflows/job-1"));
 
-    expect(apiDelete).toHaveBeenCalledWith("/workflows/job-1");
     expect(lifecycle).toEqual(["delete"]);
     resolveDelete?.();
+    await expect(cancellation).resolves.toBe("cancelled");
     await expect(stream.promise).rejects.toThrow("已取消");
     expect(lifecycle).toEqual(["delete", "abort"]);
+  });
+
+  it("detaches from an attached job without cancelling the shared task", async () => {
+    vi.mocked(apiPost).mockResolvedValue({ job: { id: "shared-job" }, attached: true });
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const stream = streamAnalysis("600519", vi.fn());
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    await expect(stream.cancel()).resolves.toBe("detached");
+    await expect(stream.promise).rejects.toThrow("已停止等待");
+    expect(apiDelete).not.toHaveBeenCalled();
+  });
+
+  it("sends force refresh through the analysis submission query", async () => {
+    mockSubmission();
+    const result = { stock_code: "600519" };
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse(
+      `id: 1:1\ndata: ${JSON.stringify({ type: "complete", result })}\n\n`,
+    )));
+
+    const stream = streamAnalysis("600519", vi.fn(), { force: true });
+
+    await expect(stream.promise).resolves.toEqual(result);
+    expect(apiPost).toHaveBeenCalledWith("/workflows/analysis/600519?force=true");
+  });
+
+  it("reports completion when the server wins a cancellation race", async () => {
+    mockSubmission();
+    vi.mocked(apiDelete).mockResolvedValue({ status: "succeeded" });
+    vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+    })));
+    const stream = streamAnalysis("600519", vi.fn());
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    await expect(stream.cancel()).resolves.toBe("completed");
+    expect(apiDelete).toHaveBeenCalledWith("/workflows/job-1");
   });
 
   it("keeps cancellation authoritative when a complete event races with it", async () => {
@@ -170,7 +212,7 @@ describe("durable workflow SSE", () => {
     const stream = streamAnalysis("600519", progress);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
-    stream.cancel();
+    const cancellation = stream.cancel();
     resolveFetch?.(sseResponse(
       `id: 1:1\nevent: complete\ndata: ${JSON.stringify({
         type: "complete",
@@ -181,6 +223,7 @@ describe("durable workflow SSE", () => {
     await vi.waitFor(() => expect(progress).toHaveBeenCalledWith(expect.objectContaining({ type: "complete" })));
     resolveDelete?.();
 
+    await expect(cancellation).resolves.toBe("cancelled");
     await expect(stream.promise).rejects.toThrow("已取消");
   });
 });

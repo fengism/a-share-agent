@@ -3,7 +3,7 @@
 import json
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
@@ -108,7 +108,7 @@ def create_run(
                 current_time,
             ),
         )
-    return get_run(user_id, run_id)
+    return cast(QuantRunRow, get_run(user_id, run_id))
 
 
 def get_run(user_id: int, run_id: str) -> QuantRunRow | None:
@@ -181,6 +181,17 @@ def release(
     return _RUN_STATE.release(run_id, owner_id, reason, now=current_time)
 
 
+def cancel_owned(
+    run_id: str,
+    owner_id: str,
+    reason: str = "服务关闭，任务已取消",
+    *,
+    now: float | None = None,
+) -> bool:
+    current_time = time.time() if now is None else now
+    return cast(bool, _RUN_STATE.cancel_owned(run_id, owner_id, reason, now=current_time))
+
+
 def complete(
     run_id: str,
     owner_id: str,
@@ -234,7 +245,7 @@ def cancel(user_id: int, run_id: str, *, now: float | None = None) -> bool:
         (current_time, current_time, run_id, user_id),
     )
     connection.commit()
-    return cursor.rowcount == 1
+    return bool(cursor.rowcount == 1)
 
 
 def retry_failed(user_id: int, run_id: str, *, now: float | None = None) -> bool:
@@ -256,7 +267,7 @@ def delete_run(user_id: int, run_id: str) -> bool:
         (run_id, user_id),
     )
     connection.commit()
-    return cursor.rowcount == 1
+    return bool(cursor.rowcount == 1)
 
 
 def purge_completed(*, retention_seconds: int = QUANT_RUN_RETENTION_SECONDS, now: float | None = None) -> int:

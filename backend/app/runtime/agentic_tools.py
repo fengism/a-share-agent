@@ -75,6 +75,12 @@ async def _get_stock_financial_metrics(code: str) -> Any:
     return (await stock_data.get_financial_metrics(code)).model_dump()
 
 
+async def _get_stock_revenue_breakdown(code: str) -> Any:
+    from app.financial_data.stock import public as stock_data
+
+    return (await stock_data.get_revenue_breakdown(code)).model_dump(mode="json", exclude_none=True)
+
+
 async def _get_stock_news(code: str) -> Any:
     from app.financial_data.stock import public as stock_data
 
@@ -271,6 +277,10 @@ async def _backtest_quant_strategy_draft(
     benchmark: str = "000300",
     minimum_trade_count: int = 1,
     maximum_drawdown_pct: float = 80,
+    minimum_sharpe_ratio: float | None = None,
+    minimum_holdout_trade_count: int | None = None,
+    maximum_holdout_drawdown_pct: float | None = None,
+    minimum_holdout_sharpe_ratio: float | None = None,
 ) -> Any:
     user_id = _require_quant_admin_id()
     run = await backtest_strategy_draft(
@@ -282,6 +292,10 @@ async def _backtest_quant_strategy_draft(
             benchmark=benchmark,
             minimum_trade_count=minimum_trade_count,
             maximum_drawdown_pct=maximum_drawdown_pct,
+            minimum_sharpe_ratio=minimum_sharpe_ratio,
+            minimum_holdout_trade_count=minimum_holdout_trade_count,
+            maximum_holdout_drawdown_pct=maximum_holdout_drawdown_pct,
+            minimum_holdout_sharpe_ratio=minimum_holdout_sharpe_ratio,
         ),
         user_id=user_id,
     )
@@ -318,6 +332,7 @@ def configure_application_tools() -> None:
             get_sector_stocks_history=_get_sector_stocks_history,
             get_stock_financial=_get_stock_financial,
             get_stock_financial_metrics=_get_stock_financial_metrics,
+            get_stock_revenue_breakdown=_get_stock_revenue_breakdown,
             get_stock_info=_get_stock_info,
             get_stock_kline=_get_stock_kline,
             get_stock_news=_get_stock_news,

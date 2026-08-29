@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Table, Tag, Spin, Empty } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import ChangeValue from "../../components/ChangeValue";
@@ -19,11 +19,15 @@ interface Props {
   selectedCodes: string[];
   onSelectedCodesChange: (codes: string[]) => void;
   strategySignalDates?: ReadonlyMap<string, string>;
+  strategySignalAges?: ReadonlyMap<string, number>;
+  strategyReturnsSinceSignal?: ReadonlyMap<string, number | null>;
+  strategyAverageAmounts?: ReadonlyMap<string, number | null>;
   strategyDataSources?: ReadonlyMap<string, string>;
   strategyFallbackCodes?: ReadonlySet<string>;
 }
 
 type SortableKey = "price" | "change_pct" | "pe" | "pb" | "market_cap" | "turnover_pct" | "volume";
+type LocalStrategySortKey = "strategy_signal_age" | "strategy_return_since_signal" | "strategy_average_amount_20d";
 
 const SORT_FIELD_MAP: Record<string, SortableKey> = {
   price: "price",
@@ -34,6 +38,26 @@ const SORT_FIELD_MAP: Record<string, SortableKey> = {
   turnover_pct: "turnover_pct",
   volume: "volume",
 };
+
+const LOCAL_STRATEGY_SORT_KEYS = new Set<LocalStrategySortKey>([
+  "strategy_signal_age",
+  "strategy_return_since_signal",
+  "strategy_average_amount_20d",
+]);
+
+function isLocalStrategySortKey(value: string): value is LocalStrategySortKey {
+  return LOCAL_STRATEGY_SORT_KEYS.has(value as LocalStrategySortKey);
+}
+
+function compareOptionalNumbers(
+  left: number | null | undefined,
+  right: number | null | undefined,
+  order: "ascend" | "descend",
+) {
+  if (left == null) return right == null ? 0 : 1;
+  if (right == null) return -1;
+  return order === "ascend" ? left - right : right - left;
+}
 
 export default function ResultsTable({
   data,
@@ -46,19 +70,40 @@ export default function ResultsTable({
   selectedCodes,
   onSelectedCodesChange,
   strategySignalDates,
+  strategySignalAges,
+  strategyReturnsSinceSignal,
+  strategyAverageAmounts,
   strategyDataSources,
   strategyFallbackCodes,
 }: Props) {
   const c = useColors();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const currentSortOrder = filters.sort_order === "asc" ? "ascend" : "descend";
+  const [localSort, setLocalSort] = useState<{
+    key: LocalStrategySortKey;
+    order: "ascend" | "descend";
+  }>();
+  const serverSortOrder = localSort ? null : currentSortOrder;
 
-  const handleTableChange = useCallback<NonNullable<TableProps<ScreenerItem>["onChange"]>>((pagination, _tableFilters, sorter) => {
+  useEffect(() => {
+    if (!strategySignalDates?.size) {
+      setLocalSort(undefined);
+    }
+  }, [strategySignalDates]);
+
+  const handleTableChange = useCallback<NonNullable<TableProps<ScreenerItem>["onChange"]>>((pagination, _tableFilters, sorter, extra) => {
     const sorterConfig = Array.isArray(sorter) ? sorter[0] : sorter;
-    const field = typeof sorterConfig?.field === "string" ? SORT_FIELD_MAP[sorterConfig.field] : undefined;
+    const columnKey = typeof sorterConfig?.columnKey === "string" ? sorterConfig.columnKey : undefined;
     const order = sorterConfig?.order;
+    if (extra.action === "sort" && columnKey && isLocalStrategySortKey(columnKey)) {
+      setLocalSort(order ? { key: columnKey, order } : undefined);
+      return;
+    }
+
+    const field = typeof sorterConfig?.field === "string" ? SORT_FIELD_MAP[sorterConfig.field] : undefined;
 
     if (field && order) {
+      setLocalSort(undefined);
       onSortChange(field, order === "ascend" ? "asc" : "desc");
       return;
     }
@@ -70,6 +115,7 @@ export default function ResultsTable({
 
   const columns: ColumnsType<ScreenerItem & { pe_percentile?: number | null; pb_percentile?: number | null }> = useMemo(() => {
     if (isNarrow) {
+      const hasStrategyResult = Boolean(strategySignalDates?.size);
       return [
         {
           title: "股票",
@@ -84,24 +130,49 @@ export default function ResultsTable({
             </PreloadLink>
           ),
         },
-        {
-          title: "价格",
-          dataIndex: "price",
-          width: 72,
-          align: "right",
-          sorter: true,
-          sortOrder: filters.sort_by === "price" ? currentSortOrder : null,
-          render: (value: number | null) => value?.toFixed(2) ?? "-",
-        },
-        {
-          title: "涨跌幅",
-          dataIndex: "change_pct",
-          width: 82,
-          align: "right",
-          sorter: true,
-          sortOrder: filters.sort_by === "change_pct" ? currentSortOrder : null,
-          render: (value: number | null) => <ChangeValue value={value} />,
-        },
+        hasStrategyResult
+          ? {
+              title: "信号年龄",
+              key: "strategy_signal_age",
+              width: 82,
+              align: "right",
+              sorter: true,
+              sortOrder: localSort?.key === "strategy_signal_age" ? localSort.order : null,
+              render: (_: unknown, record: ScreenerItem) => {
+                const age = strategySignalAges?.get(record.code);
+                return age == null ? "-" : `${age} 根`;
+              },
+            }
+          : {
+              title: "价格",
+              dataIndex: "price",
+              width: 72,
+              align: "right",
+              sorter: true,
+              sortOrder: filters.sort_by === "price" ? serverSortOrder : null,
+              render: (value: number | null) => value?.toFixed(2) ?? "-",
+            },
+        hasStrategyResult
+          ? {
+              title: "信号收益",
+              key: "strategy_return_since_signal",
+              width: 88,
+              align: "right",
+              sorter: true,
+              sortOrder: localSort?.key === "strategy_return_since_signal" ? localSort.order : null,
+              render: (_: unknown, record: ScreenerItem) => (
+                <ChangeValue value={strategyReturnsSinceSignal?.get(record.code)} />
+              ),
+            }
+          : {
+              title: "涨跌幅",
+              dataIndex: "change_pct",
+              width: 82,
+              align: "right",
+              sorter: true,
+              sortOrder: filters.sort_by === "change_pct" ? serverSortOrder : null,
+              render: (value: number | null) => <ChangeValue value={value} />,
+            },
       ];
     }
 
@@ -133,7 +204,7 @@ export default function ResultsTable({
       width: 80,
       align: "right",
       sorter: true,
-      sortOrder: filters.sort_by === "price" ? currentSortOrder : null,
+      sortOrder: filters.sort_by === "price" ? serverSortOrder : null,
       render: (v: number | null) => v?.toFixed(2) ?? "-",
     },
     {
@@ -142,7 +213,7 @@ export default function ResultsTable({
       width: 80,
       align: "right",
       sorter: true,
-      sortOrder: filters.sort_by === "change_pct" ? currentSortOrder : null,
+      sortOrder: filters.sort_by === "change_pct" ? serverSortOrder : null,
       render: (value: number | null) => <ChangeValue value={value} fontWeight={500} />,
     },
     {
@@ -151,7 +222,7 @@ export default function ResultsTable({
       width: 80,
       align: "right",
       sorter: true,
-      sortOrder: filters.sort_by === "pe" ? currentSortOrder : null,
+      sortOrder: filters.sort_by === "pe" ? serverSortOrder : null,
       render: (v: number | null) => v?.toFixed(1) ?? "-",
     },
     {
@@ -160,7 +231,7 @@ export default function ResultsTable({
       width: 70,
       align: "right",
       sorter: true,
-      sortOrder: filters.sort_by === "pb" ? currentSortOrder : null,
+      sortOrder: filters.sort_by === "pb" ? serverSortOrder : null,
       render: (v: number | null) => v?.toFixed(2) ?? "-",
     },
     {
@@ -169,7 +240,7 @@ export default function ResultsTable({
       width: 90,
       align: "right",
       sorter: true,
-      sortOrder: filters.sort_by === "market_cap" ? currentSortOrder : null,
+      sortOrder: filters.sort_by === "market_cap" ? serverSortOrder : null,
       render: (v: number | null) => {
         if (v == null) return "-";
         if (v >= 10000) return `${(v / 10000).toFixed(1)}万`;
@@ -182,7 +253,7 @@ export default function ResultsTable({
       width: 70,
       align: "right",
       sorter: true,
-      sortOrder: filters.sort_by === "turnover_pct" ? currentSortOrder : null,
+      sortOrder: filters.sort_by === "turnover_pct" ? serverSortOrder : null,
       render: (v: number | null) => v != null ? `${v.toFixed(2)}%` : "-",
     },
     {
@@ -191,7 +262,7 @@ export default function ResultsTable({
       width: 90,
       align: "right",
       sorter: true,
-      sortOrder: filters.sort_by === "volume" ? currentSortOrder : null,
+      sortOrder: filters.sort_by === "volume" ? serverSortOrder : null,
       render: (v: number | null) => {
         if (v == null) return "-";
         if (v >= 1e8) return `${(v / 1e8).toFixed(2)}亿`;
@@ -223,6 +294,40 @@ export default function ResultsTable({
         render: (_: unknown, record: ScreenerItem) => strategySignalDates.get(record.code) ?? "-",
       });
       nextColumns.splice(3, 0, {
+        title: "信号年龄",
+        key: "strategy_signal_age",
+        width: 90,
+        align: "right",
+        sorter: true,
+        sortOrder: localSort?.key === "strategy_signal_age" ? localSort.order : null,
+        render: (_: unknown, record: ScreenerItem) => {
+          const age = strategySignalAges?.get(record.code);
+          return age == null ? "-" : `${age} 根`;
+        },
+      });
+      nextColumns.splice(4, 0, {
+        title: "信号后收益",
+        key: "strategy_return_since_signal",
+        width: 110,
+        align: "right",
+        sorter: true,
+        sortOrder: localSort?.key === "strategy_return_since_signal" ? localSort.order : null,
+        render: (_: unknown, record: ScreenerItem) => (
+          <ChangeValue value={strategyReturnsSinceSignal?.get(record.code)} fontWeight={500} />
+        ),
+      });
+      nextColumns.splice(5, 0, {
+        title: "20日均成交额（亿）",
+        key: "strategy_average_amount_20d",
+        width: 110,
+        align: "right",
+        sorter: true,
+        sortOrder: localSort?.key === "strategy_average_amount_20d" ? localSort.order : null,
+        render: (_: unknown, record: ScreenerItem) => (
+          strategyAverageAmounts?.get(record.code)?.toFixed(2) ?? "-"
+        ),
+      });
+      nextColumns.splice(6, 0, {
         title: "K线源",
         key: "strategy_data_source",
         width: 150,
@@ -262,7 +367,22 @@ export default function ResultsTable({
       );
     }
     return nextColumns;
-  }, [c, currentSortOrder, filters.sort_by, isNarrow, percentileMap, showPercentile, strategyDataSources, strategyFallbackCodes, strategySignalDates]);
+  }, [c, filters.sort_by, isNarrow, localSort, percentileMap, serverSortOrder, showPercentile, strategyAverageAmounts, strategyDataSources, strategyFallbackCodes, strategyReturnsSinceSignal, strategySignalAges, strategySignalDates]);
+
+  const displayedItems = useMemo(() => {
+    const items = data?.items ?? [];
+    if (!localSort) return items;
+    const values = localSort.key === "strategy_signal_age"
+      ? strategySignalAges
+      : localSort.key === "strategy_return_since_signal"
+        ? strategyReturnsSinceSignal
+        : strategyAverageAmounts;
+    return [...items].sort((left, right) => compareOptionalNumbers(
+      values?.get(left.code),
+      values?.get(right.code),
+      localSort.order,
+    ));
+  }, [data?.items, localSort, strategyAverageAmounts, strategyReturnsSinceSignal, strategySignalAges]);
 
   const renderExpandedRow = useCallback((record: ScreenerItem) => {
     const pePercentile = percentileMap.get(record.code);
@@ -302,6 +422,23 @@ export default function ResultsTable({
             label: "策略信号日",
             value: strategySignalDates.get(record.code) ?? "-",
           }] : []),
+          ...(strategySignalAges?.size ? [{
+            key: "strategy-signal-age",
+            label: "信号年龄",
+            value: strategySignalAges.get(record.code) == null
+              ? "-"
+              : `${strategySignalAges.get(record.code)} 根`,
+          }] : []),
+          ...(strategyReturnsSinceSignal?.size ? [{
+            key: "strategy-return-since-signal",
+            label: "信号后收益",
+            value: <ChangeValue value={strategyReturnsSinceSignal.get(record.code)} fontWeight={500} />,
+          }] : []),
+          ...(strategyAverageAmounts?.size ? [{
+            key: "strategy-average-amount-20d",
+            label: "20日均成交额（亿）",
+            value: strategyAverageAmounts.get(record.code)?.toFixed(2) ?? "-",
+          }] : []),
           ...(strategyDataSources?.size ? [{
             key: "strategy-data-source",
             label: "K线源",
@@ -314,12 +451,12 @@ export default function ResultsTable({
         ]}
       />
     );
-  }, [percentileMap, showPercentile, strategyDataSources, strategyFallbackCodes, strategySignalDates]);
+  }, [percentileMap, showPercentile, strategyAverageAmounts, strategyDataSources, strategyFallbackCodes, strategyReturnsSinceSignal, strategySignalAges, strategySignalDates]);
 
   return (
     <Table
       columns={columns}
-      dataSource={data?.items || []}
+      dataSource={displayedItems}
       rowKey="code"
       rowSelection={{
         selectedRowKeys: selectedCodes,

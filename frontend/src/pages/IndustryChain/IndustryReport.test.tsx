@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,11 +13,16 @@ import type { IndustryChainResult } from "../../types/stock";
 import IndustryReport from "./IndustryReport";
 
 vi.mock("@ant-design/icons", () => ({
+  AimOutlined: () => <span />,
   ApartmentOutlined: () => <span />,
+  BankOutlined: () => <span />,
   CloudUploadOutlined: () => <span />,
   DatabaseOutlined: () => <span />,
+  FileTextOutlined: () => <span />,
   FullscreenOutlined: () => <span />,
+  RiseOutlined: () => <span />,
   SendOutlined: () => <span />,
+  WarningOutlined: () => <span />,
 }));
 
 vi.mock("../../hooks/useMediaQuery", () => ({
@@ -75,10 +80,23 @@ describe("IndustryReport", () => {
       upstream: [{ name: "算力芯片", companies: ["海光信息"], source: "公司公告", source_url: "https://example.com/chip" }],
       midstream: [{ name: "服务器集成", companies: ["浪潮信息"] }],
       downstream: [{ name: "云计算", companies: ["阿里云"] }],
-      trends: [{ title: "机架级交付", detail: "整机向系统交付升级" }],
+      trends: [
+        { title: "机架级交付", detail: "整机向系统交付升级" },
+        { title: "液冷渗透", detail: "高密度机柜加速液冷采用" },
+        { title: "高速互连", detail: "集群规模提升网络价值量" },
+        { title: "算电协同", detail: "能源系统成为扩容约束" },
+      ],
       capital_moves: [{ title: "扩产", detail: "头部厂商扩建产线" }],
       key_events: [{ date: "2026-01", title: "运营商集采", impact: "拉动国产服务器需求" }],
-      key_stocks: [{ name: "浪潮信息", code: "000977", description: "整机龙头" }],
+      key_stocks: [
+        { name: "浪潮信息", code: "000977", description: "整机龙头" },
+        { name: "中科曙光", code: "603019", description: "服务器厂商" },
+        { name: "海光信息", code: "688041", description: "国产算力芯片" },
+        { name: "工业富联", code: "601138", description: "AI服务器制造" },
+        { name: "中际旭创", code: "300308", description: "高速光模块" },
+        { name: "新易盛", code: "300502", description: "高速光模块" },
+        { name: "英维克", code: "002837", description: "液冷温控" },
+      ],
       drivers: ["算力资本开支增长"],
       risks: ["上游芯片供应波动"],
       sources: [{ title: "服务器市场报告", publisher: "IDC", date: "2025" }],
@@ -132,7 +150,9 @@ describe("IndustryReport", () => {
     expect(screen.getByText("竞争格局")).toBeInTheDocument();
     expect(screen.getByText("产业链地图")).toBeInTheDocument();
     expect(screen.getByText("关键趋势与催化剂")).toBeInTheDocument();
+    expect(screen.getByText("算电协同")).toBeInTheDocument();
     expect(screen.getByText("运营商集采")).toBeInTheDocument();
+    expect(screen.getByText("英维克")).toBeInTheDocument();
     expect(screen.getByText("数据来源与口径")).toBeInTheDocument();
     expect(screen.getByText(/研究范围：全球 · 2026-02-16 至 2026-08-18 · 全部公开公司/)).toBeInTheDocument();
     expect(screen.getByText("重点公司")).toBeInTheDocument();
@@ -145,6 +165,86 @@ describe("IndustryReport", () => {
     expect(screen.getByText("服务器产业白皮书")).toBeInTheDocument();
     expect(screen.getByText("ev_report")).toBeInTheDocument();
     expect(screen.getByText(/共 8 次调用 · 去重后 6 条 · 合成使用 4 条/)).toBeInTheDocument();
+
+    const detailedResearch = screen.getByRole("region", { name: "详细分析" });
+    expect(detailedResearch.querySelectorAll(".ant-card")).toHaveLength(0);
+    expect(detailedResearch.querySelector(".industry-chain-flow")).toBeInTheDocument();
+    expect(detailedResearch.querySelectorAll(".industry-chain-node.is-framed")).toHaveLength(7);
+    const moreDisclosures = detailedResearch.querySelectorAll("details.industry-research-more");
+    expect(moreDisclosures).toHaveLength(0);
+
+    const researchAudit = screen.getByRole("region", { name: "研究依据" });
+    const auditDisclosures = researchAudit.querySelectorAll("details.industry-research-audit");
+    expect(auditDisclosures).toHaveLength(3);
+    auditDisclosures.forEach((disclosure) => expect(disclosure).not.toHaveAttribute("open"));
+  });
+
+  it("organizes the decision summary before detailed research", () => {
+    const structuredResult: IndustryChainResult = {
+      ...result,
+      positioning: "连接上游算力芯片与下游云厂商",
+      market_metrics: [
+        { label: "全球市场规模", value: "2050 亿美元", growth: "+30%" },
+      ],
+      driver_insights: [{
+        title: "资本开支持续扩张",
+        detail: "云厂商继续增加基础设施投入",
+        confidence: "high",
+      }],
+      risk_insights: [{
+        title: "利用率不及预期",
+        detail: "供需错配可能压低资产回报",
+        confidence: "medium",
+      }],
+      key_stocks: [{
+        name: "浪潮信息",
+        code: "000977",
+        role: "服务器整机",
+      }],
+      coverage: {
+        market: "complete",
+        competition: "partial",
+        technology: "partial",
+        chain: "complete",
+        companies: "complete",
+        events: "partial",
+      },
+    };
+
+    const { container } = renderReport(
+      <IndustryReport
+        result={structuredResult}
+        activeName="AI 芯片"
+        archiveId="archive-3"
+        isPushing={false}
+        pushResult={null}
+        onPush={vi.fn()}
+      />,
+    );
+
+    const conclusion = screen.getByRole("region", { name: "产业链结论摘要" });
+    expect(within(conclusion).getByRole("heading", { name: "结论摘要" })).toBeInTheDocument();
+    expect(within(conclusion).getByText("01 · 产业研判")).toBeInTheDocument();
+    expect(within(conclusion).getByText("产业链摘要")).toBeInTheDocument();
+    expect(within(conclusion).getByText("全球市场规模")).toBeInTheDocument();
+    expect(within(conclusion).getByText("资本开支持续扩张")).toBeInTheDocument();
+    expect(within(conclusion).getByText("利用率不及预期")).toBeInTheDocument();
+    expect(within(conclusion).getByText("浪潮信息")).toBeInTheDocument();
+    expect(within(conclusion).getByText("证据部分覆盖")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "详细分析" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "研究依据" })).toBeInTheDocument();
+    expect(screen.getByText(/项要点/)).toBeInTheDocument();
+    expect(screen.getAllByText(/个模块/)).toHaveLength(2);
+
+    const chapterNav = screen.getByRole("navigation", { name: "报告章节导航" });
+    expect(within(chapterNav).getByRole("link", { name: /01.*产业研判/ })).toHaveAttribute("href", "#industry-judgment");
+    expect(within(chapterNav).getByRole("link", { name: /02.*详细分析/ })).toHaveAttribute("href", "#industry-detail");
+    expect(within(chapterNav).getByRole("link", { name: /03.*研究依据/ })).toHaveAttribute("href", "#industry-audit");
+    expect(within(chapterNav).getByRole("link", { name: /04.*完整正文/ })).toHaveAttribute("href", "#industry-full-report");
+
+    const fullReport = screen.getByText("04 · 完整研究正文").closest(".ant-collapse-item");
+    expect(fullReport).not.toHaveClass("ant-collapse-item-active");
+    expect(container.querySelector(".industry-conclusion")).toBeInTheDocument();
   });
 
   it("shows degraded quality and archive warnings", () => {

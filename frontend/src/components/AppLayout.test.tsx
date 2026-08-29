@@ -10,6 +10,8 @@ vi.mock("../styles/ui", () => ({
 }));
 vi.mock("./AppHeader", () => ({ default: () => <header>顶部栏</header> }));
 vi.mock("./AppSidebar", () => ({ default: () => <aside>侧边栏</aside> }));
+vi.mock("./ChatSessionSyncBridge", () => ({ default: () => null }));
+vi.mock("./WorkflowRuntimeBridge", () => ({ default: () => null }));
 
 describe("AppLayout", () => {
   beforeEach(() => {

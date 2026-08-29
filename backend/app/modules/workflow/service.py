@@ -17,6 +17,7 @@ from app.domain.industry_chain import IndustryChainResearchScope, resolve_indust
 from app.infrastructure.persistence.workflow_jobs import (
     WorkflowJob,
     WorkflowQueueFullError,
+    WorkflowRequestMismatchError,
     workflow_job_store,
 )
 from app.modules.workflow.models import (
@@ -24,6 +25,7 @@ from app.modules.workflow.models import (
     WorkflowExecutionError,
     WorkflowJobSnapshot,
     WorkflowKind,
+    WorkflowRequestConflictError,
     WorkflowSubmissionSnapshot,
 )
 
@@ -74,16 +76,23 @@ async def submit_workflow(
         )
     except WorkflowQueueFullError as error:
         raise WorkflowCapacityError(error.scope, error.limit) from error
+    except WorkflowRequestMismatchError as error:
+        raise WorkflowRequestConflictError(str(error)) from error
     metrics.record_workflow_event(kind, "attached" if submission.attached else "submitted")
     return WorkflowSubmissionSnapshot(job=_snapshot(submission.job), attached=submission.attached)
 
 
-async def submit_analysis_workflow(code: str, user_id: int) -> WorkflowSubmissionSnapshot:
+async def submit_analysis_workflow(
+    code: str,
+    user_id: int,
+    *,
+    force: bool = False,
+) -> WorkflowSubmissionSnapshot:
     return await submit_workflow(
         "analysis",
         user_id=user_id,
         dedupe_key=code,
-        request={"code": code},
+        request={"code": code, "force": force},
     )
 
 
@@ -91,6 +100,8 @@ async def submit_industry_chain_workflow(
     name: str,
     user_id: int,
     scope: IndustryChainResearchScope | dict[str, Any] | None = None,
+    *,
+    force: bool = False,
 ) -> WorkflowSubmissionSnapshot:
     validated_scope = scope if isinstance(scope, IndustryChainResearchScope) else IndustryChainResearchScope.model_validate(scope or {})
     resolved_scope = resolve_industry_chain_scope(validated_scope, today=_industry_today())
@@ -102,7 +113,7 @@ async def submit_industry_chain_workflow(
         "industry_chain",
         user_id=user_id,
         dedupe_key=f"{name}:{scope_digest}",
-        request={"name": name, "scope": scope_payload},
+        request={"name": name, "scope": scope_payload, "force": force},
     )
 
 
@@ -125,6 +136,15 @@ async def submit_screener_strategy_workflow(request: dict[str, Any], user_id: in
         dedupe_key=hashlib.sha256(payload.encode()).hexdigest(),
         request=request,
     )
+
+
+async def list_active_workflows(user_id: int) -> list[WorkflowJobSnapshot]:
+    jobs = await call_blocking(
+        workflow_job_store.list_active,
+        user_id=user_id,
+        semaphore=database_semaphore,
+    )
+    return [_snapshot(job) for job in jobs]
 
 
 async def get_workflow(job_id: str, user_id: int) -> WorkflowJobSnapshot | None:
@@ -269,6 +289,7 @@ __all__ = [
     "cancel_workflow",
     "create_workflow_event_generator",
     "get_workflow",
+    "list_active_workflows",
     "submit_analysis_workflow",
     "submit_daily_review_workflow",
     "submit_industry_chain_workflow",

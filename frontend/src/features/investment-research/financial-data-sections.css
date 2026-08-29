@@ -1,0 +1,125 @@
+.financial-data-sections {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: var(--c-space-4);
+  overflow-x: hidden;
+}
+
+.financial-data-section {
+  display: grid;
+  gap: 10px;
+}
+
+.financial-data-section__header-title {
+  color: var(--c-text-primary);
+  font-size: var(--stock-research-body-size);
+  font-weight: var(--c-weight-semibold);
+  line-height: 1.5;
+}
+
+.financial-data-section__header-note,
+.financial-data-section__metadata {
+  color: var(--c-text-secondary);
+  font-size: var(--stock-research-label-size);
+  line-height: 1.55;
+}
+
+.financial-data-section__empty {
+  padding: var(--c-space-4);
+  color: var(--c-text-secondary);
+  font-size: var(--stock-research-support-size);
+}
+
+.financial-statement-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.financial-data-section__metadata {
+  display: flex;
+  margin-bottom: var(--c-space-2);
+  flex-wrap: wrap;
+  gap: var(--c-space-2) 10px;
+}
+
+.financial-data-section__metadata-item {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.financial-data-sections .ant-table {
+  font-size: var(--stock-research-table-size);
+  line-height: 1.55;
+}
+
+.financial-data-sections .ant-table-thead > tr > th {
+  font-size: var(--stock-research-label-size);
+  font-weight: var(--c-weight-semibold);
+  line-height: 1.5;
+}
+
+.financial-data-sections .terminal-table-row td,
+.financial-data-sections .ant-table-tbody > tr > td {
+  font-size: var(--stock-research-table-size);
+  line-height: 1.55;
+}
+
+.financial-statement-table__metric,
+.financial-statement-table__period,
+.financial-statement-table__value {
+  white-space: nowrap;
+}
+
+.financial-statement-table__value,
+.financial-data-table__number {
+  font-variant-numeric: tabular-nums;
+}
+
+.financial-statement-tabs {
+  margin-bottom: var(--c-space-3);
+}
+
+.financial-statement-section {
+  margin-bottom: 18px;
+}
+
+.financial-metric-group + .financial-metric-group {
+  margin-top: 18px;
+}
+
+.financial-statement-section__title {
+  display: block;
+  margin-bottom: var(--c-space-2);
+  font-size: var(--stock-research-body-size);
+  font-weight: var(--c-weight-semibold);
+  line-height: 1.5;
+}
+
+.financial-revenue-card .ant-card-body {
+  padding: var(--c-space-3);
+}
+
+.financial-revenue-card__tabs {
+  margin-bottom: var(--c-space-3);
+}
+
+.financial-revenue-dimension {
+  margin-top: var(--c-space-3);
+}
+
+.financial-revenue-dimension__title {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--stock-research-support-size);
+  font-weight: var(--c-weight-semibold);
+  line-height: 1.5;
+}
+
+.financial-data-section__footnote {
+  display: block;
+  margin-top: 10px;
+  color: var(--c-text-secondary);
+  font-size: var(--stock-research-label-size);
+  line-height: 1.6;
+}

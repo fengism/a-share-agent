@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { AimOutlined } from "@ant-design/icons";
-import { Card, Col, Row, Tag, Typography } from "antd";
+import { AimOutlined, ReloadOutlined } from "@ant-design/icons";
+import { Button, Card, Col, Row, Tag, Typography } from "antd";
 import { useMarketIndices, useMarketMainline } from "../../api/queries";
 import ChangeValue from "../../components/ChangeValue";
 import IndexIntradayCard from "../../components/IndexIntradayCard";
@@ -21,6 +21,13 @@ const INDEX_NAMES = ["上证指数", "深证成指", "创业板指", "科创50",
 function formatIndexPrice(value: number | string | null | undefined) {
   const numericValue = typeof value === "number" ? value : Number(value);
   return Number.isFinite(numericValue) ? numericValue.toFixed(2) : "-";
+}
+
+function formatFetchedAt(value: string | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", { hour12: false });
 }
 
 function SectionHeading({ icon, title }: { icon: ReactNode; title: string }) {
@@ -174,7 +181,23 @@ function DashboardMainlineSection() {
 
   return (
     <section aria-label="今日主线" style={{ marginTop: t.space[4] }}>
-      <SectionHeading icon={<AimOutlined />} title="今日主线" />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: t.space[2] }}>
+        <SectionHeading icon={<AimOutlined />} title="今日主线" />
+        <div style={{ display: "flex", alignItems: "center", gap: t.space[1] }}>
+          <Text type="secondary" style={{ fontSize: t.font.xs }}>
+            更新时间：{formatFetchedAt(query.data?.fetched_at)}
+          </Text>
+          <Button
+            type="text"
+            size="small"
+            icon={<ReloadOutlined />}
+            loading={query.isFetching}
+            aria-label="刷新今日主线"
+            title="刷新今日主线"
+            onClick={() => void query.refetch()}
+          />
+        </div>
+      </div>
       <SectionDataState
         isLoading={query.isLoading}
         error={query.error}

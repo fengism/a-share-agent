@@ -1,5 +1,5 @@
 import type { AnalysisStage } from "../../api/sse";
-import WorkflowProgressPanel, { type WorkflowProgressStatus } from "../../components/workflows/WorkflowProgressPanel";
+import WorkflowProgressPanel, { type WorkflowProgressStatus } from "./WorkflowProgressPanel";
 
 interface Props {
   stages: Array<AnalysisStage | null>;

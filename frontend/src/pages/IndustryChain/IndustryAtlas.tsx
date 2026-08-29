@@ -457,7 +457,7 @@ function ChainAtlasDetail({
       </div>
 
       <div style={{ color: colors.textMuted, fontSize: 12, marginTop: 16, textAlign: "center" }}>
-        点击公司节点可跳转个股分析 · 数据为静态策划知识库，深度分析请使用 AI 分析
+        点击公司节点可跳转个股研究 · 数据为静态策划知识库，深度结论请使用个股研究
       </div>
     </div>
   );

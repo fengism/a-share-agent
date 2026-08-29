@@ -4,14 +4,18 @@ import hashlib
 import json
 import math
 import statistics
-from collections import defaultdict
+import threading
+from collections import OrderedDict, defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Literal
 
 from app.domain.market import KlineItem
 from app.modules.quant.schemas import (
     QuantBacktestResult,
     QuantEquityPoint,
     QuantExecutionConfig,
+    QuantHoldoutValidation,
     QuantMetrics,
     QuantMonthlyReturn,
     QuantOpenPosition,
@@ -23,7 +27,16 @@ from app.modules.quant.strategies.contracts import StrategySnapshot
 from app.modules.quant.strategies.evaluator import evaluate_target_positions
 from app.modules.quant.strategies.registry import get_strategy_registry
 
-ENGINE_VERSION = "2026-08-23-v4"
+ENGINE_VERSION = "2026-08-29-v9"
+HOLDOUT_TRAINING_RATIO = 0.7
+MIN_TRAINING_OBSERVATIONS = 40
+MIN_HOLDOUT_OBSERVATIONS = 20
+
+
+@dataclass(frozen=True, slots=True)
+class _DeferredIntent:
+    target: int
+    side: Literal["buy", "sell"]
 
 
 @dataclass(slots=True)
@@ -39,6 +52,8 @@ class _PortfolioState:
 def build_target_positions(
     items: list[KlineItem],
     strategy: QuantStrategyConfig | StrategySnapshot,
+    *,
+    evaluation_start_date: str | None = None,
 ) -> list[int]:
     snapshot = (
         strategy
@@ -46,22 +61,36 @@ def build_target_positions(
         else get_strategy_registry().resolve(strategy.type, strategy.version, strategy.parameters)
     )
     compiled = _compile_cached(snapshot)
-    return evaluate_target_positions(items, compiled, snapshot.parameters)
+    return evaluate_target_positions(
+        items,
+        compiled,
+        snapshot.parameters,
+        evaluation_start_date=evaluation_start_date,
+    )
 
 
 # 同一回测对每只股票重复调用 build_target_positions 时，编译与校验只需做一次。
-_compiled_cache: dict[str, CompiledStrategy] = {}
+# run_backtest 在线程池中执行，多回测可能并发访问，用锁保护并按 LRU 逐条驱逐。
+_compiled_cache: OrderedDict[str, CompiledStrategy] = OrderedDict()
 _COMPILED_CACHE_LIMIT = 64
+_compiled_cache_lock = threading.Lock()
 
 
 def _compile_cached(snapshot: StrategySnapshot) -> CompiledStrategy:
-    cached = _compiled_cache.get(snapshot.definition_hash)
-    if cached is not None:
-        return cached
+    with _compiled_cache_lock:
+        cached = _compiled_cache.get(snapshot.definition_hash)
+        if cached is not None:
+            _compiled_cache.move_to_end(snapshot.definition_hash)
+            return cached
     compiled = compile_strategy(snapshot.definition, snapshot.definition_hash)
-    if len(_compiled_cache) >= _COMPILED_CACHE_LIMIT:
-        _compiled_cache.clear()
-    _compiled_cache[snapshot.definition_hash] = compiled
+    with _compiled_cache_lock:
+        cached = _compiled_cache.get(snapshot.definition_hash)
+        if cached is not None:
+            _compiled_cache.move_to_end(snapshot.definition_hash)
+            return cached
+        if len(_compiled_cache) >= _COMPILED_CACHE_LIMIT:
+            _compiled_cache.popitem(last=False)
+        _compiled_cache[snapshot.definition_hash] = compiled
     return compiled
 
 
@@ -71,40 +100,7 @@ def strategy_warmup_bars(strategy: QuantStrategyConfig | StrategySnapshot) -> in
         if isinstance(strategy, StrategySnapshot)
         else get_strategy_registry().resolve(strategy.type, strategy.version, strategy.parameters)
     )
-    compiled = compile_strategy(snapshot.definition, snapshot.definition_hash)
-    warmup: dict[str, int] = {name: 0 for name in ("open", "high", "low", "close", "volume")}
-
-    def argument(value: int | str | None, default: int = 0) -> int:
-        if value is None:
-            return default
-        if isinstance(value, str) and value.startswith("$"):
-            return int(snapshot.parameters[value[1:]])
-        return int(value)
-
-    def operand(value) -> int:
-        if not isinstance(value, str) or value.startswith("$"):
-            return 0
-        return warmup.get(value, 0)
-
-    for name in compiled.indicator_order:
-        indicator = compiled.definition.indicators[name]
-        offset = argument(indicator.offset)
-        if indicator.operator in {"add", "subtract", "multiply", "divide"}:
-            required = max(operand(indicator.left), operand(indicator.right))
-        elif indicator.operator == "obv":
-            required = max(warmup.get(indicator.input or "", 0), warmup.get(indicator.volume_input or "", 0))
-        else:
-            period = argument(indicator.period, 1)
-            input_warmup = warmup.get(indicator.input or "", 0)
-            if indicator.operator in {"rsi", "shift"}:
-                required = input_warmup + period
-            elif indicator.operator == "ema":
-                # EMA 以 SMA 种子起步，需要约 2 倍周期才收敛到稳态
-                required = input_warmup + 2 * period
-            else:
-                required = input_warmup + max(0, period - 1)
-        warmup[name] = required + offset
-    return max(warmup.values(), default=0)
+    return _compile_cached(snapshot).warmup_bars(snapshot.parameters)
 
 
 def _commission(amount: float, execution: QuantExecutionConfig) -> float:
@@ -122,7 +118,10 @@ def _is_tradeable(item: KlineItem, side: str) -> bool:
     if item.volume <= 0 or min(item.open, item.high, item.low) <= 0:
         return False
     one_price = math.isclose(item.open, item.high) and math.isclose(item.open, item.low)
-    if one_price and item.pre_close not in (None, 0):
+    if one_price:
+        # pre_close 缺失时按一字板保守处理：双向拒单，避免跌停误买入/涨停误卖出
+        if item.pre_close in (None, 0):
+            return False
         if side == "buy" and item.open > item.pre_close:
             return False
         if side == "sell" and item.open < item.pre_close:
@@ -132,6 +131,22 @@ def _is_tradeable(item: KlineItem, side: str) -> bool:
 
 def _daily_returns(values: list[float]) -> list[float]:
     return [values[index] / values[index - 1] - 1 for index in range(1, len(values)) if values[index - 1] > 0]
+
+
+def _aligned_returns(points: list[QuantEquityPoint]) -> tuple[list[float], list[float]]:
+    strategy_returns: list[float] = []
+    benchmark_returns: list[float] = []
+    for previous, current in zip(points, points[1:]):
+        if (
+            previous.equity <= 0
+            or previous.benchmark is None
+            or current.benchmark is None
+            or previous.benchmark <= 0
+        ):
+            continue
+        strategy_returns.append(current.equity / previous.equity - 1)
+        benchmark_returns.append(current.benchmark / previous.benchmark - 1)
+    return strategy_returns, benchmark_returns
 
 
 def _annualized_return(total_return: float, observations: int) -> float:
@@ -144,12 +159,12 @@ def _percent(value: float) -> float:
     return round(value * 100, 6)
 
 
-def _monthly_returns(points: list[QuantEquityPoint]) -> list[QuantMonthlyReturn]:
+def _monthly_returns(points: list[QuantEquityPoint], initial_cash: float) -> list[QuantMonthlyReturn]:
     month_values: dict[str, list[float]] = defaultdict(list)
     for point in points:
         month_values[point.date[:7]].append(point.equity)
     result = []
-    previous_close = points[0].equity if points else 0
+    previous_close = initial_cash
     for month in sorted(month_values):
         values = month_values[month]
         month_return = values[-1] / previous_close - 1 if previous_close else 0
@@ -167,9 +182,37 @@ def _build_metrics(
     equities = [point.equity for point in points]
     total_return = equities[-1] / initial_cash - 1 if equities else 0
     returns = _daily_returns(equities)
-    volatility = statistics.pstdev(returns) * math.sqrt(252) if len(returns) > 1 else 0
+    daily_volatility = statistics.pstdev(returns) if len(returns) > 1 else 0
+    volatility = daily_volatility * math.sqrt(252)
     excess_daily = (statistics.fmean(returns) - risk_free_rate / 252) if returns else 0
-    sharpe = excess_daily / statistics.pstdev(returns) * math.sqrt(252) if len(returns) > 1 and statistics.pstdev(returns) > 0 else None
+    sharpe = excess_daily / daily_volatility * math.sqrt(252) if daily_volatility > 0 else None
+    downside_returns = [min(value - risk_free_rate / 252, 0) for value in returns]
+    downside_daily = (
+        math.sqrt(statistics.fmean(value * value for value in downside_returns))
+        if len(downside_returns) > 1
+        else 0
+    )
+    downside_volatility = downside_daily * math.sqrt(252) if downside_daily > 0 else None
+    sortino = excess_daily / downside_daily * math.sqrt(252) if downside_daily > 0 else None
+    annualized_return = _annualized_return(total_return, len(equities))
+    max_drawdown = min((point.drawdown for point in points), default=0)
+    calmar = annualized_return / abs(max_drawdown) if max_drawdown < 0 else None
+    strategy_returns, benchmark_returns = _aligned_returns(points)
+    active_returns = [
+        strategy_return - benchmark_return
+        for strategy_return, benchmark_return in zip(strategy_returns, benchmark_returns)
+    ]
+    active_daily_volatility = statistics.pstdev(active_returns) if len(active_returns) > 1 else None
+    tracking_error = (
+        active_daily_volatility * math.sqrt(252)
+        if active_daily_volatility is not None
+        else None
+    )
+    information_ratio = (
+        statistics.fmean(active_returns) / active_daily_volatility * math.sqrt(252)
+        if active_daily_volatility is not None and active_daily_volatility > 0
+        else None
+    )
     realized = [trade.realized_pnl for trade in trades if trade.side == "sell" and trade.realized_pnl is not None]
     wins = [value for value in realized if value > 0]
     losses = [value for value in realized if value < 0]
@@ -183,12 +226,17 @@ def _build_metrics(
     benchmark_return = benchmark_values[-1] / benchmark_values[0] - 1 if len(benchmark_values) > 1 else None
     return QuantMetrics(
         total_return=_percent(total_return),
-        annualized_return=_percent(_annualized_return(total_return, len(equities))),
+        annualized_return=_percent(annualized_return),
         benchmark_return=_percent(benchmark_return) if benchmark_return is not None else None,
         excess_return=_percent(total_return - benchmark_return) if benchmark_return is not None else None,
         annualized_volatility=_percent(volatility),
+        downside_volatility=_percent(downside_volatility) if downside_volatility is not None else None,
         sharpe_ratio=round(sharpe, 6) if sharpe is not None else None,
-        max_drawdown=_percent(min((point.drawdown for point in points), default=0)),
+        sortino_ratio=round(sortino, 6) if sortino is not None else None,
+        calmar_ratio=round(calmar, 6) if calmar is not None else None,
+        tracking_error=_percent(tracking_error) if tracking_error is not None else None,
+        information_ratio=round(information_ratio, 6) if information_ratio is not None else None,
+        max_drawdown=_percent(max_drawdown),
         win_rate=_percent(win_rate) if win_rate is not None else None,
         profit_loss_ratio=round(profit_loss_ratio, 6) if profit_loss_ratio is not None else None,
         turnover_rate=_percent(turnover),
@@ -215,21 +263,35 @@ def _update_execution_targets(
     return changed
 
 
+def _allocation_prices(
+    codes: Iterable[str],
+    available_bars: dict[str, KlineItem],
+    state: _PortfolioState,
+) -> dict[str, float]:
+    return {
+        code: available_bars[code].open
+        if code in available_bars and available_bars[code].open > 0
+        else state.last_prices.get(code, state.average_cost[code])
+        for code in codes
+    }
+
+
 def _build_desired_shares(
     codes: dict[str, list[KlineItem]],
     execution_targets: dict[str, int],
+    allocation_prices: dict[str, float],
     state: _PortfolioState,
     execution: QuantExecutionConfig,
 ) -> tuple[list[str], dict[str, int]]:
     active_codes = [code for code, target in execution_targets.items() if target == 1]
     open_equity = state.cash + sum(
-        state.holdings[code] * state.last_prices.get(code, state.average_cost[code])
+        state.holdings[code] * allocation_prices.get(code, state.average_cost[code])
         for code in state.holdings
     )
     target_value = open_equity / len(active_codes) if active_codes else 0
     desired_shares = {}
     for code in codes:
-        reference_price = state.last_prices.get(code)
+        reference_price = allocation_prices.get(code)
         desired_shares[code] = (
             int(target_value / reference_price / execution.lot_size) * execution.lot_size
             if execution_targets[code] == 1 and reference_price
@@ -276,11 +338,19 @@ def _buy_shortfall_positions(
     current_date: str,
     active_codes: list[str],
     available_bars: dict[str, KlineItem],
+    allocation_prices: dict[str, float],
     desired_shares: dict[str, int],
     state: _PortfolioState,
     execution: QuantExecutionConfig,
 ) -> None:
-    for code in active_codes:
+    # 现金不足时按缺口市值降序买入，同市值按代码升序，避免 universe 顺序偏差；
+    # 全程确定，同一输入永远得到同一成交序列
+    def shortfall_value(code: str) -> tuple[float, str]:
+        shares = desired_shares[code] - state.holdings[code]
+        reference_price = allocation_prices.get(code) or 0.0
+        return (-max(shares, 0) * reference_price, code)
+
+    for code in sorted(active_codes, key=shortfall_value):
         shares = desired_shares[code] - state.holdings[code]
         if shares <= 0 or code not in available_bars or not _is_tradeable(available_bars[code], "buy"):
             continue
@@ -316,13 +386,15 @@ def _rebalance_portfolio(
     current_date: str,
     bars_by_code: dict[str, list[KlineItem]],
     available_bars: dict[str, KlineItem],
+    allocation_prices: dict[str, float],
     execution_targets: dict[str, int],
     state: _PortfolioState,
     execution: QuantExecutionConfig,
-) -> bool:
+) -> tuple[bool, dict[str, _DeferredIntent]]:
     active_codes, desired_shares = _build_desired_shares(
         bars_by_code,
         execution_targets,
+        allocation_prices,
         state,
         execution,
     )
@@ -338,16 +410,147 @@ def _rebalance_portfolio(
         current_date,
         active_codes,
         available_bars,
+        allocation_prices,
         desired_shares,
         state,
         execution,
     )
-    return any(
-        (execution_targets[code] == 0 and state.holdings[code] > 0)
-        or (execution_targets[code] == 1 and code not in available_bars and state.holdings[code] == 0)
-        or abs(state.holdings[code] - desired_shares[code]) >= execution.lot_size
-        for code in bars_by_code
+    _, remaining_desired_shares = _build_desired_shares(
+        bars_by_code,
+        execution_targets,
+        allocation_prices,
+        state,
+        execution,
     )
+    retryable_now, blocked = _classify_unresolved_rebalance(
+        bars_by_code,
+        available_bars,
+        allocation_prices,
+        execution_targets,
+        remaining_desired_shares,
+        state,
+        execution,
+    )
+    return retryable_now, blocked
+
+
+def _required_trade_side(
+    code: str,
+    target: int,
+    desired_shares: dict[str, int],
+    state: _PortfolioState,
+    execution: QuantExecutionConfig,
+) -> Literal["buy", "sell"] | None:
+    difference = desired_shares[code] - state.holdings[code]
+    if difference >= execution.lot_size:
+        return "buy"
+    if difference <= -execution.lot_size:
+        return "sell"
+    if target == 1 and state.holdings[code] == 0:
+        return "buy"
+    return None
+
+
+def _can_buy_lot(
+    item: KlineItem,
+    state: _PortfolioState,
+    execution: QuantExecutionConfig,
+) -> bool:
+    price = item.open * (1 + execution.slippage_bps / 10_000)
+    amount = price * execution.lot_size
+    return bool(amount + _trade_fee(amount, "buy", execution) <= state.cash)
+
+
+def _classify_unresolved_rebalance(
+    codes: Iterable[str],
+    available_bars: dict[str, KlineItem],
+    allocation_prices: dict[str, float],
+    execution_targets: dict[str, int],
+    desired_shares: dict[str, int],
+    state: _PortfolioState,
+    execution: QuantExecutionConfig,
+) -> tuple[bool, dict[str, _DeferredIntent]]:
+    retryable_now = False
+    deferred: dict[str, _DeferredIntent] = {}
+    for code in codes:
+        side = _required_trade_side(
+            code,
+            execution_targets[code],
+            desired_shares,
+            state,
+            execution,
+        )
+        if side is None:
+            continue
+        item = available_bars.get(code)
+        retryable_now = True
+        if item is None or not _is_tradeable(item, side):
+            deferred[code] = _DeferredIntent(target=execution_targets[code], side=side)
+        elif side == "buy" and (
+            desired_shares[code] < execution.lot_size
+            or not _can_buy_lot(item, state, execution)
+        ):
+            deferred[code] = _DeferredIntent(target=execution_targets[code], side=side)
+    return retryable_now, deferred
+
+
+def _retry_deferred_buys(
+    current_date: str,
+    bars_by_code: dict[str, list[KlineItem]],
+    available_bars: dict[str, KlineItem],
+    allocation_prices: dict[str, float],
+    execution_targets: dict[str, int],
+    deferred_intents: dict[str, _DeferredIntent],
+    state: _PortfolioState,
+    execution: QuantExecutionConfig,
+) -> None:
+    active_codes, desired_shares = _build_desired_shares(
+        bars_by_code,
+        execution_targets,
+        allocation_prices,
+        state,
+        execution,
+    )
+    wakeable: list[str] = []
+    for code in sorted(deferred_intents):
+        intent = deferred_intents[code]
+        if execution_targets[code] != intent.target or execution_targets[code] != 1:
+            del deferred_intents[code]
+            continue
+        if intent.side != "buy":
+            continue
+        shortfall = desired_shares[code] - state.holdings[code]
+        if shortfall < execution.lot_size:
+            if state.holdings[code] > 0:
+                del deferred_intents[code]
+            continue
+        item = available_bars.get(code)
+        if item is None or not _is_tradeable(item, "buy") or not _can_buy_lot(item, state, execution):
+            continue
+        wakeable.append(code)
+
+    if not wakeable:
+        return
+    active_order = [code for code in active_codes if code in wakeable]
+    _buy_shortfall_positions(
+        current_date,
+        active_order,
+        available_bars,
+        allocation_prices,
+        desired_shares,
+        state,
+        execution,
+    )
+    _, remaining_desired = _build_desired_shares(
+        bars_by_code,
+        execution_targets,
+        allocation_prices,
+        state,
+        execution,
+    )
+    for code in wakeable:
+        if state.holdings[code] > 0 and remaining_desired[code] - state.holdings[code] < execution.lot_size:
+            deferred_intents.pop(code, None)
 
 
 def _build_equity_point(
@@ -376,7 +579,7 @@ def _build_equity_point(
     )
 
 
-def run_backtest(
+def _run_backtest_once(
     bars_by_code: dict[str, list[KlineItem]],
     benchmark_items: list[KlineItem],
     strategy: QuantStrategyConfig | StrategySnapshot,
@@ -394,7 +597,14 @@ def run_backtest(
         code: {item.date: index for index, item in enumerate(items)}
         for code, items in bars_by_code.items()
     }
-    targets = {code: build_target_positions(items, strategy) for code, items in bars_by_code.items()}
+    targets = {
+        code: build_target_positions(
+            items,
+            strategy,
+            evaluation_start_date=evaluation_start_date,
+        )
+        for code, items in bars_by_code.items()
+    }
     previous_targets = {code: 0 for code in bars_by_code}
     execution_targets = {code: 0 for code in bars_by_code}
     state = _PortfolioState(
@@ -404,41 +614,107 @@ def run_backtest(
         peak_equity=execution.initial_cash,
     )
     points: list[QuantEquityPoint] = []
-    all_dates = sorted(
+    stock_dates = {
+        item.date
+        for items in bars_by_code.values()
+        for item in items
+        if (evaluation_start_date is None or item.date >= evaluation_start_date)
+        and (evaluation_end_date is None or item.date <= evaluation_end_date)
+    }
+    if not stock_dates:
+        raise ValueError("回测区间没有共同交易数据")
+    benchmark_map = {item.date: item.close for item in benchmark_items}
+    benchmark_dates = {
         day
-        for day in {item.date for items in bars_by_code.values() for item in items}
+        for day in benchmark_map
         if (evaluation_start_date is None or day >= evaluation_start_date)
         and (evaluation_end_date is None or day <= evaluation_end_date)
-    )
-    benchmark_map = {item.date: item.close for item in benchmark_items}
+    }
+    all_dates = sorted(stock_dates | benchmark_dates)
     benchmark_start = next((benchmark_map[day] for day in all_dates if day in benchmark_map), None)
+    if evaluation_start_date is not None:
+        for code, items in bars_by_code.items():
+            prior_close = next(
+                (item.close for item in reversed(items) if item.date < evaluation_start_date),
+                None,
+            )
+            if prior_close is not None:
+                state.last_prices[code] = prior_close
+
     rebalance_days_remaining = 0
+    deferred_intents: dict[str, _DeferredIntent] = {}
 
     for current_date in all_dates:
         available_bars = {code: bar_maps[code][current_date] for code in bars_by_code if current_date in bar_maps[code]}
-        if _update_execution_targets(
+        targets_changed = _update_execution_targets(
             current_date,
             bars_by_code,
             date_indexes,
             targets,
             previous_targets,
             execution_targets,
-        ):
+        )
+        allocation_prices = _allocation_prices(bars_by_code, available_bars, state)
+        _, desired_shares = _build_desired_shares(
+            bars_by_code,
+            execution_targets,
+            allocation_prices,
+            state,
+            execution,
+        )
+        if targets_changed:
+            deferred_intents.clear()
             rebalance_days_remaining = execution.rebalance_window_days
+        else:
+            resumed_sell = False
+            for code, intent in list(deferred_intents.items()):
+                if execution_targets[code] != intent.target:
+                    del deferred_intents[code]
+                    continue
+                if intent.side != "sell":
+                    continue
+                side = _required_trade_side(
+                    code,
+                    execution_targets[code],
+                    desired_shares,
+                    state,
+                    execution,
+                )
+                if side != "sell":
+                    del deferred_intents[code]
+                    continue
+                item = available_bars.get(code)
+                if item is not None and _is_tradeable(item, "sell"):
+                    del deferred_intents[code]
+                    resumed_sell = True
+            if resumed_sell:
+                rebalance_days_remaining = execution.rebalance_window_days
 
         # last_prices 始终为最近收盘价（_build_equity_point 收盘时更新），
-        # 当日开盘价仅在成交函数内使用，避免混合估值导致等权目标偏差
+        # allocation_prices 则使用同一时点的开盘价做目标仓位计算。
 
         if rebalance_days_remaining > 0:
-            unresolved = _rebalance_portfolio(
+            retryable_now, deferred_intents = _rebalance_portfolio(
                 current_date,
                 bars_by_code,
                 available_bars,
+                allocation_prices,
                 execution_targets,
                 state,
                 execution,
             )
-            rebalance_days_remaining = rebalance_days_remaining - 1 if unresolved else 0
+            rebalance_days_remaining = rebalance_days_remaining - 1 if retryable_now else 0
+        elif deferred_intents:
+            _retry_deferred_buys(
+                current_date,
+                bars_by_code,
+                available_bars,
+                allocation_prices,
+                execution_targets,
+                deferred_intents,
+                state,
+                execution,
+            )
 
         points.append(
             _build_equity_point(
@@ -463,7 +739,7 @@ def run_backtest(
         codes=sorted(bars_by_code),
         metrics=_build_metrics(points, state.trades, execution.initial_cash, execution.risk_free_rate),
         equity_curve=points,
-        monthly_returns=_monthly_returns(points),
+        monthly_returns=_monthly_returns(points, execution.initial_cash),
         trades=state.trades,
         open_positions=[
             QuantOpenPosition(
@@ -481,3 +757,68 @@ def run_backtest(
             if shares > 0
         ],
     )
+
+
+def _holdout_start_date(bars_by_code: dict[str, list[KlineItem]]) -> tuple[str, int] | None:
+    trading_dates = sorted({item.date for items in bars_by_code.values() for item in items})
+    total = len(trading_dates)
+    if total < MIN_TRAINING_OBSERVATIONS + MIN_HOLDOUT_OBSERVATIONS:
+        return None
+    split_index = round(total * HOLDOUT_TRAINING_RATIO)
+    split_index = max(MIN_TRAINING_OBSERVATIONS, split_index)
+    split_index = min(total - MIN_HOLDOUT_OBSERVATIONS, split_index)
+    return trading_dates[split_index], split_index
+
+
+def run_backtest(
+    bars_by_code: dict[str, list[KlineItem]],
+    benchmark_items: list[KlineItem],
+    strategy: QuantStrategyConfig | StrategySnapshot,
+    execution: QuantExecutionConfig,
+    *,
+    data_hashes: list[str],
+    data_sources: list[str],
+    evaluation_start_date: str | None = None,
+    evaluation_end_date: str | None = None,
+) -> QuantBacktestResult:
+    result = _run_backtest_once(
+        bars_by_code,
+        benchmark_items,
+        strategy,
+        execution,
+        data_hashes=data_hashes,
+        data_sources=data_sources,
+        evaluation_start_date=evaluation_start_date,
+        evaluation_end_date=evaluation_end_date,
+    )
+    if evaluation_start_date is not None or evaluation_end_date is not None:
+        return result
+
+    holdout_split = _holdout_start_date(bars_by_code)
+    if holdout_split is None:
+        return result
+    holdout_start_date, training_observations = holdout_split
+    holdout_result = _run_backtest_once(
+        bars_by_code,
+        benchmark_items,
+        strategy,
+        execution,
+        data_hashes=data_hashes,
+        data_sources=data_sources,
+        evaluation_start_date=holdout_start_date,
+    )
+    result.holdout_validation = QuantHoldoutValidation(
+        training_ratio=training_observations / (
+            training_observations + len({
+                item.date
+                for items in bars_by_code.values()
+                for item in items
+                if item.date >= holdout_start_date
+            })
+        ),
+        start_date=holdout_start_date,
+        end_date=holdout_result.equity_curve[-1].date,
+        observation_count=len(holdout_result.equity_curve),
+        metrics=holdout_result.metrics,
+    )
+    return result

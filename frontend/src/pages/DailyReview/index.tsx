@@ -113,14 +113,17 @@ export default function DailyReviewPage() {
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
-  const cancelGenerationRef = useRef<(() => void) | null>(null);
+  const cancelGenerationRef = useRef<(() => Promise<unknown>) | null>(null);
+  const detachGenerationRef = useRef<(() => void) | null>(null);
+  const cancellationRequestedRef = useRef(false);
 
   useEffect(() => {
     if (dateParam !== date) setDate(date);
   }, [date, dateParam, setDate]);
 
   useEffect(() => () => {
-    cancelGenerationRef.current?.();
+    detachGenerationRef.current?.();
+    detachGenerationRef.current = null;
     cancelGenerationRef.current = null;
   }, []);
 
@@ -143,7 +146,8 @@ export default function DailyReviewPage() {
       message.warning("请先选择复盘日期");
       return;
     }
-    cancelGenerationRef.current?.();
+    if (cancelGenerationRef.current) await cancelGenerationRef.current();
+    cancellationRequestedRef.current = false;
     setIsGenerating(true);
     setGenerationMessage("正在提交每日复盘任务");
     try {
@@ -151,6 +155,7 @@ export default function DailyReviewPage() {
         if (event.message) setGenerationMessage(event.message);
       });
       cancelGenerationRef.current = stream.cancel;
+      detachGenerationRef.current = stream.detach;
       const generated = await stream.promise;
       if (generated.date !== date) {
         setDate(generated.date);
@@ -162,16 +167,27 @@ export default function DailyReviewPage() {
       ]);
       message.success(force ? "已重新生成复盘" : "已生成复盘");
     } catch (error) {
+      if (cancellationRequestedRef.current && error instanceof Error
+        && (error.message === "已取消" || error.message === "已停止等待")) {
+        return;
+      }
       message.error(`生成失败: ${String(error)}`);
     } finally {
       cancelGenerationRef.current = null;
+      detachGenerationRef.current = null;
       setIsGenerating(false);
     }
   };
 
   const handleCancelGeneration = () => {
-    cancelGenerationRef.current?.();
+    cancellationRequestedRef.current = true;
     setGenerationMessage("正在取消每日复盘任务");
+    void cancelGenerationRef.current?.().then((result) => {
+      message.info(result === "detached" ? "已停止等待，后台共享任务仍在运行" : "已取消每日复盘任务");
+    }).catch((error) => {
+      cancellationRequestedRef.current = false;
+      message.error(error instanceof Error ? error.message : "取消每日复盘失败");
+    });
   };
 
   const handleDelete = async (deleteDate: string) => {

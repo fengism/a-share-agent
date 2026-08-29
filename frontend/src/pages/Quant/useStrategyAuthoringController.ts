@@ -104,6 +104,10 @@ export function useStrategyAuthoringController(
           benchmark: values.benchmark.trim(),
           minimum_trade_count: values.minimumTradeCount,
           maximum_drawdown_pct: values.maximumDrawdownPct,
+          minimum_sharpe_ratio: values.minimumSharpeRatio,
+          minimum_holdout_trade_count: values.minimumHoldoutTradeCount,
+          maximum_holdout_drawdown_pct: values.maximumHoldoutDrawdownPct,
+          minimum_holdout_sharpe_ratio: values.minimumHoldoutSharpeRatio,
         },
       });
       onBacktestCreated(run);

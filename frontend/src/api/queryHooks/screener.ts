@@ -91,12 +91,12 @@ export function useRunScreenerStrategy() {
     mutationFn: async (request: ScreenerStrategyExecutionRequest) => {
       const candidateController = new AbortController();
       let cancelRequested = false;
-      const cancellation: { stream?: () => void } = {};
+      const cancellation: { stream?: () => Promise<unknown> } = {};
       const cancel = () => {
         if (cancelRequested) return;
         cancelRequested = true;
         candidateController.abort();
-        cancellation.stream?.();
+        void cancellation.stream?.();
       };
       request.onStarted?.(cancel);
 
@@ -127,11 +127,12 @@ export function useRunScreenerStrategy() {
         version: request.version,
         parameters: request.parameters,
         lookback_days: request.lookback_days,
+        max_signal_age_bars: request.max_signal_age_bars,
         codes,
       }, request.onProgress ?? (() => undefined));
       cancellation.stream = stream.cancel;
       if (cancelRequested) {
-        stream.cancel();
+        void stream.cancel();
         throw new Error("已取消");
       }
       const result = await stream.promise;

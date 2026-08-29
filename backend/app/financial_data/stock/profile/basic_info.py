@@ -57,6 +57,8 @@ _EXCHANGE_LISTING_FAILURE_CACHE_TTL_SECONDS = 5 * 60
 _EXCHANGE_LISTING_TIMEOUT_SECONDS = 3.0
 _EXCHANGE_LISTING_SNAPSHOT_MAX_STALE_SECONDS = 7 * 24 * 60 * 60
 _EXCHANGE_LISTING_SNAPSHOT_PATH = DATA_DIR / "exchange_stock_listing_sz.json"
+_PRIMARY_SOURCE_TIMEOUT_SECONDS = 2.5
+_PROFILE_FALLBACK_TIMEOUT_SECONDS = 1.5
 
 _EMPTY_STOCK_CONCEPT = StockConceptInfo(
     concepts=[],
@@ -411,22 +413,35 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
         tdx_finance_result,
     ) = await asyncio.gather(
         _load_basic_info_spot_df(),
-        asyncio.wait_for(_fetch_exchange_basic_row(sym.raw), timeout=_EXCHANGE_LISTING_TIMEOUT_SECONDS),
-        get_stock_name_map_snapshot(),
-        _fetch_cached_tencent_concepts(sym.raw),
-        _fetch_provider_blocking(
-            TENCENT_STOCK_QUOTE.provider,
-            TENCENT_STOCK_QUOTE.operation,
-            _get_tencent_provider().fetch_stock_quote,
-            sym.raw,
-            semaphore=tencent_semaphore,
+        asyncio.wait_for(_fetch_exchange_basic_row(sym.raw), timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS),
+        asyncio.wait_for(get_stock_name_map_snapshot(), timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS),
+        asyncio.wait_for(
+            _fetch_cached_tencent_concepts(sym.raw),
+            timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS,
         ),
-        _fetch_optional_tdx_http(
-            TDX_HTTP_STOCK_QUOTE,
-            "fetch_stock_quote",
-            sym.raw,
+        asyncio.wait_for(
+            _fetch_provider_blocking(
+                TENCENT_STOCK_QUOTE.provider,
+                TENCENT_STOCK_QUOTE.operation,
+                _get_tencent_provider().fetch_stock_quote,
+                sym.raw,
+                semaphore=tencent_semaphore,
+                gateway_max_attempts=1,
+            ),
+            timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS,
         ),
-        _fetch_cached_tdx_finance(sym.raw),
+        asyncio.wait_for(
+            _fetch_optional_tdx_http(
+                TDX_HTTP_STOCK_QUOTE,
+                "fetch_stock_quote",
+                sym.raw,
+            ),
+            timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS,
+        ),
+        asyncio.wait_for(
+            _fetch_cached_tdx_finance(sym.raw),
+            timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS,
+        ),
         return_exceptions=True,
     )
 
@@ -467,7 +482,10 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
     missing_fields = missing_eastmoney_profile_fields(result)
     if missing_fields:
         try:
-            profile_result = await _fetch_cached_eastmoney_profile(sym.raw)
+            profile_result = await asyncio.wait_for(
+                _fetch_cached_eastmoney_profile(sym.raw),
+                timeout=_PROFILE_FALLBACK_TIMEOUT_SECONDS,
+            )
         except Exception as error:
             logger.info(
                 "东方财富个股资料备用源不可用: code=%s, missing=%s, error=%s",

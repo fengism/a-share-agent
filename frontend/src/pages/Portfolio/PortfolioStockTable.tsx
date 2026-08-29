@@ -1,4 +1,5 @@
-import { Empty, Table, Tooltip } from "antd";
+import { MinusCircleOutlined } from "@ant-design/icons";
+import { Button, Empty, Table, Tooltip } from "antd";
 import type { TableColumnsType } from "antd";
 import { memo, useMemo } from "react";
 import ChangeValue from "../../components/ChangeValue";
@@ -16,9 +17,10 @@ import type { PortfolioTableRenderers } from "./portfolioTableRenderers";
 interface PortfolioStockTableProps {
   stocks: PortfolioStockSummary[];
   renderers: PortfolioTableRenderers;
+  onSell: (stock: PortfolioStockSummary) => void;
 }
 
-function PortfolioStockTable({ stocks, renderers }: PortfolioStockTableProps) {
+function PortfolioStockTable({ stocks, renderers, onSell }: PortfolioStockTableProps) {
   const { colors, isMobile, renderProfit, renderStock } = renderers;
   const columns = useMemo<TableColumnsType<PortfolioStockSummary>>(() => [
     {
@@ -115,7 +117,24 @@ function PortfolioStockTable({ stocks, renderers }: PortfolioStockTableProps) {
       align: "right",
       render: (value: number | null) => renderProfit(value),
     },
-  ], [colors, isMobile, renderProfit, renderStock]);
+    {
+      title: "操作",
+      key: "actions",
+      width: 88,
+      fixed: isMobile ? undefined : "right",
+      render: (_, record) => (
+        <Button
+          type="link"
+          size="small"
+          icon={<MinusCircleOutlined />}
+          aria-label={`卖出 ${record.stock_name}`}
+          onClick={() => onSell(record)}
+        >
+          卖出
+        </Button>
+      ),
+    },
+  ], [colors, isMobile, onSell, renderProfit, renderStock]);
 
   return (
     <PortfolioTableCard title="当前持仓汇总" stacked>
@@ -125,7 +144,7 @@ function PortfolioStockTable({ stocks, renderers }: PortfolioStockTableProps) {
         dataSource={stocks}
         pagination={PORTFOLIO_TABLE_PAGINATION}
         size="middle"
-        scroll={{ x: 1_350 }}
+        scroll={{ x: 1_438 }}
         locale={{ emptyText: <Empty description="当前没有持仓" /> }}
       />
     </PortfolioTableCard>

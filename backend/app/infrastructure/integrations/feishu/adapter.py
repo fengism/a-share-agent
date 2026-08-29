@@ -60,6 +60,36 @@ def to_feishu_doc_blocks(content: list[ContentBlock]) -> list[dict]:
     return blocks
 
 
+def _first_after_heading(
+    content: list[ContentBlock],
+    heading: str,
+    block_type: str,
+) -> str:
+    in_section = False
+    for block in content:
+        if block.type == "heading":
+            if in_section:
+                return ""
+            in_section = block.text == heading
+            continue
+        if in_section and block.type == block_type and block.text.strip():
+            return block.text.strip()
+    return ""
+
+
+def _markdown_element(content: str) -> dict:
+    return {"tag": "div", "text": {"tag": "lark_md", "content": content}}
+
+
+def _truncate_card_text(text: str, limit: int = 3000) -> str:
+    if len(text) <= limit:
+        return text
+    boundary = text.rfind("\n", 0, limit - 1)
+    if boundary < limit // 2:
+        boundary = limit - 1
+    return f"{text[:boundary].rstrip()}\n…"
+
+
 def to_feishu_card(data_type: str, title: str, content: list[ContentBlock], doc_url: str) -> dict:
     """根据数据类型构造飞书消息卡片 payload。
 
@@ -87,11 +117,14 @@ def to_feishu_card(data_type: str, title: str, content: list[ContentBlock], doc_
                 lines.append(f"- {b.text}")
             else:
                 lines.append(b.text)
-        body_text = "\n".join(lines)[:3000]
+        body_text = _truncate_card_text("\n".join(lines))
         card = {
-            "header": {"title": {"tag": "plain_text", "content": f"{icon} {title}"}},
+            "header": {
+                "template": "blue",
+                "title": {"tag": "plain_text", "content": f"{icon} {title}"},
+            },
             "elements": [
-                {"tag": "div", "text": {"tag": "lark_md", "content": body_text}},
+                _markdown_element(body_text),
             ],
         }
         return card
@@ -105,18 +138,31 @@ def to_feishu_card(data_type: str, title: str, content: list[ContentBlock], doc_
         strategy_bullets = [b.text for b in content if b.type == "bullet"]
         strategy_text = strategy_bullets[0] if strategy_bullets else ""
         if second_line:
-            extra_elements.append({"tag": "div", "text": {"tag": "lark_md", "content": second_line}})
+            extra_elements.append(_markdown_element(second_line))
         if strategy_text:
-            extra_elements.append({"tag": "div", "text": {"tag": "lark_md", "content": f"**策略:** {strategy_text}"}})
+            extra_elements.append(_markdown_element(f"**策略：** {strategy_text}"))
+    elif data_type == "analysis":
+        metrics = paragraphs[1] if len(paragraphs) > 1 else ""
+        action = _first_after_heading(content, "行动与持续跟踪", "paragraph")
+        risk = _first_after_heading(content, "风险提示", "bullet")
+        if metrics:
+            extra_elements.append(_markdown_element(f"**关键指标**\n{metrics}"))
+        if action:
+            extra_elements.append(_markdown_element(f"**行动建议**\n{action}"))
+        if risk:
+            extra_elements.append(_markdown_element(f"**首要风险**\n{risk}"))
     else:
         second_line = paragraphs[1] if len(paragraphs) > 1 else ""
         if second_line:
-            extra_elements.append({"tag": "div", "text": {"tag": "lark_md", "content": second_line}})
+            extra_elements.append(_markdown_element(second_line))
 
     card = {
-        "header": {"title": {"tag": "plain_text", "content": f"{icon} {title}"}},
+        "header": {
+            "template": "blue",
+            "title": {"tag": "plain_text", "content": f"{icon} {title}"},
+        },
         "elements": [
-            {"tag": "div", "text": {"tag": "lark_md", "content": summary}},
+            _markdown_element(f"**核心结论**\n{summary}" if data_type == "analysis" else summary),
             *extra_elements,
             {"tag": "action", "actions": [
                 {"tag": "button", "text": {"tag": "plain_text", "content": "📄 查看完整报告"}, "url": doc_url, "type": "primary"},

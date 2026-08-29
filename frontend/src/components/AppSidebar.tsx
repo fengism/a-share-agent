@@ -3,6 +3,7 @@ import {
   ApartmentOutlined,
   ApiOutlined,
   ClockCircleOutlined,
+  FileSearchOutlined,
   FileTextOutlined,
   RadarChartOutlined,
   FilterOutlined,
@@ -41,7 +42,7 @@ const NAV_GROUPS = [
     key: "research",
     label: "研究",
     items: [
-      { key: "/analysis", icon: <LineChartOutlined />, label: "个股" },
+      { key: "/analysis", icon: <FileSearchOutlined />, label: "个股研究" },
       { key: "/screener", icon: <FilterOutlined />, label: "选股" },
       { key: "/quant", icon: <ExperimentOutlined />, label: "量化" },
       { key: "/compare", icon: <LineChartOutlined />, label: "对比" },

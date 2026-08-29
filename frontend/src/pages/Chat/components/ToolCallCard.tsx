@@ -6,14 +6,19 @@ import {
   LoadingOutlined,
   StopOutlined,
   ToolOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import type { ToolCallDisplay } from "../../../types/chat";
 import { formatToolArguments } from "../../../utils/toolCall";
+import { toolDisplayName } from "../../../features/agent-process/toolPresentation";
+import ToolResultSummary from "../../../features/agent-process/ToolResultSummary";
 
 export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
   const [expanded, setExpanded] = useState(false);
   const status = toolCall.isExecuting
     ? "执行中"
+    : toolCall.isSkipped
+      ? "已跳过"
     : toolCall.isError
       ? "失败"
       : toolCall.isCancelled
@@ -21,6 +26,8 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
         : "已完成";
   const statusClass = toolCall.isExecuting
     ? "is-running"
+    : toolCall.isSkipped
+      ? "is-skipped"
     : toolCall.isError
       ? "is-error"
       : toolCall.isCancelled
@@ -28,6 +35,8 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
         : "is-success";
   const StatusIcon = toolCall.isExecuting
     ? LoadingOutlined
+    : toolCall.isSkipped
+      ? WarningOutlined
     : toolCall.isError
       ? CloseCircleFilled
       : toolCall.isCancelled
@@ -47,7 +56,8 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
           onClick={() => setExpanded((current) => !current)}
         >
           <span className="chat-tool-heading">
-            <code>{toolCall.name}</code>
+            <span>{toolDisplayName(toolCall.name)}</span>
+            {toolDisplayName(toolCall.name) !== toolCall.name ? <code>{toolCall.name}</code> : null}
           </span>
           <span className={`chat-tool-status ${statusClass}`}>
             <StatusIcon spin={Boolean(toolCall.isExecuting)} />
@@ -60,6 +70,7 @@ export function ToolCallCard({ toolCall }: { toolCall: ToolCallDisplay }) {
           <div className="chat-tool-details">
             <div className="chat-tool-detail-label">调用参数</div>
             <pre>{formatToolArguments(toolCall.arguments)}</pre>
+            <ToolResultSummary value={toolCall.resultSummary} />
           </div>
         )}
       </div>

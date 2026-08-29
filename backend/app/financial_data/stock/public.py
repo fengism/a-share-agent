@@ -10,10 +10,16 @@ from app.financial_data.stock.classification.service import (
     update_industry_mapping_sw_files,
     update_industry_mapping_sw_second_file,
 )
-from app.financial_data.stock.fundamentals.financials import get_financial, get_financial_metrics
+from app.financial_data.stock.fundamentals.financials import (
+    get_financial,
+    get_financial_metrics,
+    get_revenue_breakdown,
+)
 from app.financial_data.stock.fundamentals.schemas import (
     FinancialMetrics,
     FinancialStatementRow,
+    RevenueBreakdown,
+    RevenueBreakdownItem,
     StockCompareItem,
 )
 from app.financial_data.stock.insights.fund_flow import get_stock_fund_flow
@@ -73,6 +79,7 @@ __all__ = [
     "get_industry_mapping",
     "get_kline",
     "get_retail_sentiment",
+    "get_revenue_breakdown",
     "get_stock_fund_flow",
     "get_stock_name_map",
     "get_stock_news",
@@ -86,6 +93,8 @@ __all__ = [
     "IntradayData",
     "HistoricalBarSet",
     "RetailSentiment",
+    "RevenueBreakdown",
+    "RevenueBreakdownItem",
     "search_stocks",
     "StockBasicInfo",
     "StockCompareItem",

@@ -7,6 +7,52 @@ const user = {
   must_change_password: false,
 };
 
+const draft = {
+  id: "draft-one",
+  created_by: 7,
+  prompt: "生成一个双均线策略",
+  definition_hash: `sha256:${"a".repeat(64)}`,
+  status: "backtested",
+  definition: {
+    api_version: "quant.strategy/v1",
+    key: "generated_ma_cross",
+    version: "1.0.0",
+    enabled: true,
+    name: "在线双均线",
+    description: "短期均线上穿长期均线时入场，下穿时退出",
+    scenario: "趋势行情",
+    risk_level: "medium",
+    parameters: {},
+    constraints: [],
+    indicators: {},
+    signals: {
+      entry: { operator: "greater_than", left: "close", right: 0, operands: [] },
+      exit: { operator: "less_than", left: "close", right: 0, operands: [] },
+    },
+  },
+  validation: { valid: true, definition_hash: `sha256:${"a".repeat(64)}`, warnings: [] },
+  quality_gate: {
+    passed: true,
+    run_status: "succeeded",
+    definition_hash: `sha256:${"a".repeat(64)}`,
+    minimum_trade_count: 1,
+    maximum_drawdown_pct: 80,
+    minimum_sharpe_ratio: 0.5,
+    minimum_holdout_trade_count: 2,
+    maximum_holdout_drawdown_pct: 20,
+    minimum_holdout_sharpe_ratio: 0.2,
+    trade_count: 4,
+    max_drawdown: -12,
+    sharpe_ratio: 1.1,
+    holdout_trade_count: 2,
+    holdout_max_drawdown: -8,
+    holdout_sharpe_ratio: 0.7,
+    errors: [],
+  },
+  created_at: 1,
+  updated_at: 2,
+};
+
 const run = {
   id: "run-one",
   name: "消费龙头回测",
@@ -38,10 +84,15 @@ const run = {
       annualized_return: 11.2,
       annualized_volatility: 10,
       benchmark_return: 8,
+      calmar_ratio: 2.15,
+      downside_volatility: 7.5,
       excess_return: 4.34,
+      information_ratio: 0.72,
       max_drawdown: -5.2,
       profit_loss_ratio: 1.8,
       sharpe_ratio: 1.1,
+      sortino_ratio: 1.46,
+      tracking_error: 6.03,
       turnover_rate: 100,
       trade_count: 1,
       win_rate: 60,
@@ -49,15 +100,44 @@ const run = {
     equity_curve: [],
     monthly_returns: [],
     trades: [],
+    holdout_validation: {
+      method: "holdout",
+      start_date: "2025-09-01",
+      end_date: "2025-12-31",
+      training_ratio: 2 / 3,
+      observation_count: 20,
+      metrics: {
+        total_return: 3.4,
+        annualized_return: 9.2,
+        annualized_volatility: 11,
+        benchmark_return: 2.5,
+        calmar_ratio: 1.7,
+        downside_volatility: 6.8,
+        excess_return: 0.9,
+        information_ratio: 0.4,
+        max_drawdown: -2,
+        profit_loss_ratio: 1.4,
+        sharpe_ratio: 0.8,
+        sortino_ratio: 1.2,
+        tracking_error: 4,
+        turnover_rate: 30,
+        trade_count: 2,
+        win_rate: 50,
+      },
+    },
   },
 };
 
-async function mockQuantApi(page: Page) {
+async function mockQuantApi(page: Page, options: { isAdmin?: boolean } = {}) {
   await page.route(/^http:\/\/127\.0\.0\.1:4173\/api\//, async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
   await page.route("**/api/auth/me", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(user) });
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ...user, is_admin: options.isAdmin ?? false }),
+    });
   });
   await page.route("**/api/quant/strategy-presets", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
@@ -65,7 +145,7 @@ async function mockQuantApi(page: Page) {
   await page.route(/^http:\/\/127\.0\.0\.1:4173\/api\/quant\/strategies$/, async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
-  await page.route(/^http:\/\/127\.0\.0\.1:4173\/api\/quant\/backtests$/, async (route) => {
+  await page.route(/^http:\/\/127\.0\.0\.1:4173\/api\/quant\/backtests(?:\?.*)?$/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -74,6 +154,16 @@ async function mockQuantApi(page: Page) {
   });
   await page.route("**/api/quant/backtests/run-one", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(run) });
+  });
+  await page.route("**/api/quant/strategy-registry", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ generation: 3, published_directory: "/data/quant-strategies-published" }),
+    });
+  });
+  await page.route("**/api/quant/strategy-drafts", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([draft]) });
   });
 }
 
@@ -96,6 +186,12 @@ test("splits the desktop quant workflow and keeps task cards aligned", async ({ 
   await expect(page.getByRole("region", { name: "回测结果分析" })).toBeVisible();
   await expect(page.getByText("当前结果", { exact: true })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "回测结果导航" })).toBeVisible();
+  await expect(page.getByText("索提诺比率").first()).toBeVisible();
+  await expect(page.getByText("信息比率").first()).toBeVisible();
+  await expect(page.getByText("下行波动")).toBeVisible();
+  await expect(page.getByText("跟踪误差")).toBeVisible();
+  await expect(page.getByText("后段样本验证")).toBeVisible();
+  await expect(page.getByText("独立资金")).toBeVisible();
 
   await page.getByRole("tab", { name: /配置回测/ }).click();
   await expect(page.getByRole("region", { name: "量化回测配置" })).toBeVisible();
@@ -125,4 +221,18 @@ test("uses one-panel mobile navigation without horizontal overflow", async ({ pa
     (element) => getComputedStyle(element).position,
   );
   expect(submitBarPosition).toBe("sticky");
+});
+
+test("shows full-sample and holdout gates in the strategy authoring workspace", async ({ page }) => {
+  await mockQuantApi(page, { isAdmin: true });
+  await page.goto("/quant?view=authoring");
+
+  await expect(page.getByRole("region", { name: "在线策略生成工作台" })).toBeVisible();
+  await expect(page.getByText(/全样本：交易 4 次/)).toContainText("夏普 1.1");
+  await expect(page.getByText(/后段样本：交易 2 次/)).toContainText("最大回撤 -8%");
+  await expect(page.getByRole("spinbutton", { name: "整体最低夏普比率（可选）" })).toBeVisible();
+  await expect(page.getByRole("spinbutton", { name: "后段最低交易次数（可选）" })).toBeVisible();
+  await expect(page.getByRole("spinbutton", { name: "后段最大允许回撤（可选，%）" })).toBeVisible();
+  await expect(page.getByRole("spinbutton", { name: "后段最低夏普比率（可选）" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });

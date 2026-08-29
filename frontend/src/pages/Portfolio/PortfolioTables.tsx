@@ -16,6 +16,7 @@ interface PortfolioTablesProps {
   stocks: PortfolioStockSummary[];
   transactions: PortfolioTransaction[];
   closedPositions: PortfolioClosedPosition[];
+  onSell: (stock: PortfolioStockSummary) => void;
 }
 
 function PortfolioTables({
@@ -23,12 +24,13 @@ function PortfolioTables({
   stocks,
   transactions,
   closedPositions,
+  onSell,
 }: PortfolioTablesProps) {
   const renderers = usePortfolioTableRenderers();
 
   return (
     <>
-      <PortfolioStockTable stocks={stocks} renderers={renderers} />
+      <PortfolioStockTable stocks={stocks} renderers={renderers} onSell={onSell} />
       <PortfolioClosedPositionTable closedPositions={closedPositions} renderers={renderers} />
       <PortfolioLotTable positions={positions} renderers={renderers} />
       <PortfolioTransactionTable transactions={transactions} renderers={renderers} />

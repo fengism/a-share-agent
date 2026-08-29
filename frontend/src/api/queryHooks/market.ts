@@ -127,8 +127,12 @@ export function useMarketMainline() {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<MarketMainline>(),
-    staleTime: 60 * 1000,
-    refetchInterval: isTradingSession ? 60 * 1000 : false,
+    staleTime: QUERY_CACHE_POLICIES.marketMainline.staleMs,
+    refetchInterval: isTradingSession
+      ? QUERY_CACHE_POLICIES.marketMainline.activePollMs
+      : QUERY_CACHE_POLICIES.marketMainline.idlePollMs,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }
 

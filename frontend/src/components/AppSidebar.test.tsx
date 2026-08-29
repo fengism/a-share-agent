@@ -129,7 +129,7 @@ describe("AppSidebar", () => {
     expect(onNavigate).toHaveBeenCalledWith("/quant");
   });
 
-  it("labels the analysis route as individual stock and preserves its route", () => {
+  it("uses one unified stock research entry", () => {
     const onNavigate = vi.fn();
     render(
       <AppSidebar
@@ -144,11 +144,31 @@ describe("AppSidebar", () => {
       />,
     );
 
-    const stockItem = screen.getByRole("button", { name: "个股" });
+    const stockItem = screen.getByRole("button", { name: "个股研究" });
     expect(stockItem).toHaveAttribute("aria-current", "page");
-    expect(screen.queryByRole("button", { name: "分析" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "投资研究" })).not.toBeInTheDocument();
     fireEvent.click(stockItem);
     expect(onNavigate).toHaveBeenCalledWith("/analysis");
+  });
+
+  it("does not expose a second investment research navigation item", () => {
+    render(
+      <AppSidebar
+        activeKey="/analysis"
+        collapsed={false}
+        isMobile={false}
+        mobileNavOpen={false}
+        themeKey="stellar-blue"
+        onCollapse={vi.fn()}
+        onMobileNavClose={vi.fn()}
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    const navigation = within(screen.getByRole("navigation", { name: "主导航" }));
+    const labels = navigation.getAllByRole("button").map((item) => item.textContent);
+    expect(labels).toContain("个股研究");
+    expect(labels).not.toContain("投资研究");
   });
 
   it("keeps collapsed routes accessible without visible labels", () => {

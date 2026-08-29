@@ -7,6 +7,7 @@ SCREENER_MARKETS = frozenset({"主板", "科创板", "创业板", "北交所"})
 
 class ScreenerFilter(BaseModel):
     """Purpose: 股票筛选接口的过滤条件参数。"""
+
     pe_min: float | None = None
     pe_max: float | None = None
     pb_min: float | None = None
@@ -33,6 +34,7 @@ class ScreenerFilter(BaseModel):
         if invalid:
             raise ValueError(f"不支持的市场: {invalid}，可选值: {sorted(SCREENER_MARKETS)}")
         return normalized or None
+
     # 风控过滤（可选，默认全部关闭，调用方按需开启）：剔除 ST/*ST/退市风险股
     exclude_st: bool = False
     # 上市不满 N 天的新股波动与数据完整性风险高，None 表示不过滤
@@ -47,6 +49,7 @@ class ScreenerFilter(BaseModel):
 
 class ScreenerItem(BaseModel):
     """Purpose: 股票筛选结果中的单只股票信息。"""
+
     code: str
     name: str
     price: float | None = None
@@ -65,6 +68,7 @@ class ScreenerItem(BaseModel):
 
 class ScreenerResult(BaseModel):
     """Purpose: 股票筛选的分页结果。"""
+
     items: list[ScreenerItem]
     total: int
     page: int
@@ -80,6 +84,7 @@ class ScreenerResult(BaseModel):
 
 class ValuationPercentileRequest(BaseModel):
     """Purpose: 估值百分位查询接口的请求参数。"""
+
     codes: list[str]
     period: str = "近三年"
     indicator: str = "市盈率(TTM)"
@@ -87,13 +92,16 @@ class ValuationPercentileRequest(BaseModel):
 
 class ValuationPercentileItem(BaseModel):
     """Purpose: 单只股票的估值百分位结果。"""
+
     code: str
     percentile: float | None = None
 
 
 class ValuationPercentileResult(BaseModel):
     """Purpose: 估值百分位批量查询的返回结果。"""
+
     items: list[ValuationPercentileItem]
+
 
 class ScreenerStrategyParameter(BaseModel):
     key: str
@@ -122,12 +130,18 @@ class ScreenerStrategyRequest(BaseModel):
     parameters: dict[str, int | float | bool | str] = Field(default_factory=dict, max_length=64)
     codes: list[str] = Field(min_length=1, max_length=200)
     lookback_days: int = Field(default=400, ge=60, le=1000)
+    max_signal_age_bars: int | None = Field(default=20, ge=0, le=250)
 
 
 class ScreenerStrategyMatch(BaseModel):
     code: str
     signal_date: str
     target_position: int
+    signal_age_bars: int = 0
+    entry_price: float | None = None
+    latest_price: float | None = None
+    return_since_signal_pct: float | None = None
+    average_amount_20d_yi: float | None = None
     data_source: str = ""
     data_hash: str = ""
     used_fallback: bool = False
@@ -143,4 +157,5 @@ class ScreenerStrategyResult(BaseModel):
     matched_codes: list[str]
     evaluated: int
     failed: dict[str, str] = Field(default_factory=dict)
+    excluded: dict[str, str] = Field(default_factory=dict)
     fallback_count: int = 0

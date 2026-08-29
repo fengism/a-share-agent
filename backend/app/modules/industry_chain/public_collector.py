@@ -7,6 +7,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.agentic.public import execute_web_search
+from app.core.news import parse_news_time
+from app.domain.industry_chain import (
+    IndustryChainResearchScope,
+    resolve_industry_chain_scope,
+)
 from app.financial_data.industry.public import call_industry_data
 from app.financial_data.market.public import get_market_news
 from app.financial_data.stock.public import search_stocks
@@ -133,6 +138,24 @@ def _select_relevant_news(name: str, sectors: list[dict], value: Any, limit: int
     return selected
 
 
+def _filter_news_by_scope(
+    values: list[dict],
+    scope: IndustryChainResearchScope,
+) -> list[dict]:
+    if scope.start_date is None or scope.end_date is None:
+        return values
+    filtered = []
+    for item in values:
+        published_at = parse_news_time(
+            str(item.get("publish_time") or item.get("time") or "")
+        )
+        if published_at.year <= 1:
+            continue
+        if scope.start_date <= published_at.date() <= scope.end_date:
+            filtered.append(item)
+    return filtered
+
+
 def _select_relevant_flows(name: str, sectors: list[dict], values: list[Any]) -> list[dict]:
     topic = _normalize_topic(name)
     sector_names = {_normalize_topic(item.get("name")) for item in sectors}
@@ -161,40 +184,67 @@ async def _industry_call(operation: str, *args):
     return await call_industry_data(operation, *args)
 
 
-async def collect_public_industry_data(name: str) -> dict:
+def _scope_search_options(scope: IndustryChainResearchScope) -> tuple[str, str, str, str]:
+    region = {
+        "china": "中国",
+        "global": "全球",
+        "china_and_global": "中国 全球 对比",
+    }[scope.region]
+    date_range = f"{scope.start_date} 至 {scope.end_date} 基准日 {scope.as_of_date}"
+    time_range = "half_year" if scope.time_range == "half_year" else "any"
+    language = "zh" if scope.region == "china" else "any"
+    return region, date_range, time_range, language
+
+
+async def collect_public_industry_data(
+    name: str,
+    scope: IndustryChainResearchScope | None = None,
+) -> dict:
     """使用免配置行情与资讯源补充产业链研究材料。"""
+    resolved_scope = resolve_industry_chain_scope(scope)
+    region, date_range, time_range, language = _scope_search_options(resolved_scope)
+    company_terms = (
+        "A股 上市公司"
+        if resolved_scope.company_scope == "a_share"
+        else "全球主要公司 上市公司 非上市公司"
+    )
+    stock_search = (
+        public_data.stock_search(f"{name}产业链 A股 上中下游")
+        if resolved_scope.company_scope == "a_share"
+        else asyncio.sleep(0, result=[])
+    )
+
+    def web_search(topic: str, *, search_time_range: str | None = None):
+        return public_data.web_search(
+            f"{name}产业链 {topic} {region} {date_range}",
+            engine="bing_cn",
+            max_results=8,
+            time_range=search_time_range or time_range,
+            language=language,
+        )
+
     results = await asyncio.gather(
-        public_data.stock_search(name),
+        stock_search,
         _industry_call("industry_rankings", 100),
         _industry_call("concept_rankings", 100),
         _industry_call("industry_fund_flow"),
         _industry_call("concept_fund_flow"),
         public_data.market_news(),
-        public_data.web_search(
-            f"{name} 产业链 市场规模 增长率", engine="baidu", max_results=8,
-            time_range="half_year", language="zh",
-        ),
-        public_data.web_search(
-            f"{name} 产业链 竞争格局 龙头公司", engine="baidu", max_results=8,
-            time_range="half_year", language="zh",
-        ),
-        public_data.web_search(
-            f"{name} 产业链 核心技术 商业模式", engine="baidu", max_results=8,
-            time_range="half_year", language="zh",
-        ),
-        public_data.web_search(
-            f"{name} 产业链 研报", engine="baidu", max_results=8,
-            time_range="half_year", language="zh",
-        ),
-        public_data.web_search(
-            f"{name} 政策 扩产 并购 最新", engine="baidu", max_results=8,
-            time_range="half_year", language="zh",
-        ),
+        web_search("市场规模 增长率"),
+        web_search(f"竞争格局 {company_terms}"),
+        web_search("核心技术 商业模式"),
+        web_search("上游原材料 核心设备 供应商", search_time_range="any"),
+        web_search("中游制造 核心产品 商业模式", search_time_range="any"),
+        web_search("下游应用 需求客户 场景", search_time_range="any"),
+        web_search("需求驱动 增长催化 供应约束 行业风险"),
+        web_search("研报 白皮书"),
+        web_search("政策 扩产 并购 最新事件"),
         return_exceptions=True,
     )
     (
         stock_search, industry_rankings, concept_rankings, industry_flow, concept_flow,
-        news, market_web, competition_web, technology_web, reports_web, events_web,
+        news, market_web, competition_web, technology_web, upstream_web, midstream_web,
+        downstream_web, driver_risk_web, reports_web, events_web,
     ) = results
     sector_rows = [
         *_ranking_rows(industry_rankings, "industry"),
@@ -237,10 +287,13 @@ async def collect_public_industry_data(name: str) -> dict:
             )
 
     relevant_flows = _select_relevant_flows(name, matched_sectors, [industry_flow, concept_flow])
-    public_events = _dedupe_records(
-        [*_select_relevant_news(name, matched_sectors, news), *_web_results(events_web)]
+    relevant_news = _filter_news_by_scope(
+        _select_relevant_news(name, matched_sectors, news),
+        resolved_scope,
     )
+    public_events = _dedupe_records([*relevant_news, *_web_results(events_web)])
     return {
+        "research_scope": resolved_scope.model_dump(mode="json", exclude_none=True),
         "stocks": stocks,
         "market_data": {
             "matched_sectors": matched_sectors,
@@ -249,6 +302,12 @@ async def collect_public_industry_data(name: str) -> dict:
         },
         "competition_data": [*competition_data, *_web_results(competition_web)],
         "technology_data": _web_results(technology_web),
+        "chain_data": {
+            "upstream": _web_results(upstream_web),
+            "midstream": _web_results(midstream_web),
+            "downstream": _web_results(downstream_web),
+        },
+        "driver_risk_data": _web_results(driver_risk_web),
         "reports": _web_results(reports_web),
         "events": public_events,
         "rankings": matched_sectors,

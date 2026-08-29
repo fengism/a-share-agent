@@ -16,6 +16,7 @@ from app.agentic.tools.serialization import (
 from app.agentic.tools.validation import ToolArgumentsError, validate_value
 from app.configuration import get_settings
 from app.core.errors import log_internal_error
+from app.core.exceptions import ApplicationError, UpstreamUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,23 @@ class Tool:
                 tool_call_id=call.id,
                 name=call.function.name,
                 content=serialize_error("invalid_arguments", f"工具参数无效：{error}"),
+                is_error=True,
+            )
+        except ApplicationError as error:
+            logger.warning(
+                "Chat 工具 %s 返回业务错误 code=%s: %s",
+                self.name,
+                error.code,
+                error.message,
+            )
+            return ToolResultInfo(
+                tool_call_id=call.id,
+                name=call.function.name,
+                content=serialize_error(
+                    error.code,
+                    error.message,
+                    retryable=isinstance(error, UpstreamUnavailableError),
+                ),
                 is_error=True,
             )
         except Exception as error:

@@ -20,6 +20,7 @@ from app.constants.market import (
 from app.core.cache import cache, dated_cache_key
 from app.core.dataframes import coerce_numeric_columns, normalize_intraday_df, rename_and_keep_columns, rename_columns
 from app.core.market import normalize_code, normalize_index_symbol, normalize_stock_name, safe_float
+from app.infrastructure.providers.sina import financials as sina_financials
 from app.infrastructure.providers.sina import industry as sina_industry
 from app.infrastructure.providers.sina.parsing import parse_jsonp
 
@@ -302,6 +303,25 @@ class SinaDataProvider:
                 f"新浪 cnrank A 股快照不足: {len(frame.index)} < {self.RANK_MIN_RECORDS}"
             )
         return frame
+
+    def fetch_revenue_breakdown(self, code: str) -> dict[str, object]:
+        """获取新浪最新披露的营收与毛利构成。"""
+        return cast(dict[str, object], sina_financials.fetch_revenue_breakdown(self._session, code))
+
+    def fetch_stock_financials(
+        self,
+        code: str,
+        indicator: str,
+        *,
+        num: int = 4,
+    ) -> pd.DataFrame:
+        """获取新浪资产负债表、利润表或现金流量表。"""
+        return sina_financials.fetch_stock_financials(
+            self._session,
+            code,
+            indicator,
+            num=num,
+        )
 
     def fetch_sw_industry_mappings(self) -> sina_industry.SwMappingMap:
         """获取申万一级、二级分类及完整 A 股成分映射。"""

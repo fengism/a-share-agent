@@ -7,6 +7,7 @@ import { themes } from "../theme/themes";
 import DeferredAppHeaderSearch from "./DeferredAppHeaderSearch";
 import ThemeSelector from "./ThemeSelector";
 import AppUserMenu from "./AppUserMenu";
+import GlobalTaskIndicator from "./GlobalTaskIndicator";
 import type { ThemeKey } from "../styles/ui";
 
 interface AppHeaderProps {
@@ -52,6 +53,7 @@ export default function AppHeader({ isMobile, themeKey, onMobileNavOpen }: AppHe
         <DeferredAppHeaderSearch isMobile={isMobile} />
       </div>
 
+      <GlobalTaskIndicator compact={isMobile} />
       <ThemeSelector iconOnly />
 
       {user && (

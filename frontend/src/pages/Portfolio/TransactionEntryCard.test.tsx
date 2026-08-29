@@ -1,6 +1,7 @@
+import { act, createRef } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import TransactionEntryCard from "./TransactionEntryCard";
+import TransactionEntryCard, { type TransactionEntryCardHandle } from "./TransactionEntryCard";
 
 const mocks = vi.hoisted(() => ({
   createTransaction: vi.fn(),
@@ -123,5 +124,32 @@ describe("TransactionEntryCard", () => {
       fee: 0,
       note: "",
     }));
+  });
+
+  it("opens a selected holding for sale and prefills its current price", async () => {
+    const ref = createRef<TransactionEntryCardHandle>();
+    const stock = {
+      stock_code: "600519",
+      stock_name: "贵州茅台",
+      position_count: 1,
+      total_shares: 60,
+      average_cost: 10.1,
+      current_price: 11,
+      change_pct: 1,
+      cost_value: 606,
+      market_value: 660,
+      profit_amount: 54,
+      profit_pct: 8.91,
+      realized_profit_amount: 74,
+      total_profit_amount: 128,
+    };
+    render(<TransactionEntryCard ref={ref} stocks={[stock]} />);
+
+    act(() => ref.current?.startSell(stock));
+
+    await waitFor(() => expect(screen.getByRole("radio", { name: "卖出" })).toBeChecked());
+    expect(screen.getByRole("combobox", { name: "持仓股票" })).toBeInTheDocument();
+    expect(screen.getByText(/贵州茅台.*可卖 60 股/)).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "卖出价" })).toHaveValue("11.0000");
   });
 });

@@ -1,10 +1,11 @@
 import asyncio
 import json
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from typing import Any, Literal, cast
 
-from app.agentic.events import AgentEvent
+from app.agentic.events import AgentEvent, auditable_agent_event
 from app.agentic.public import (
     AgentEvidence,
     AgentEvidenceInsufficientError,
@@ -45,26 +46,45 @@ from app.modules.industry_chain.report_renderer import render_industry_markdown
 logger = logging.getLogger(__name__)
 
 _research_industry_chain: Callable[..., Awaitable[AgenticResearchResult]] = industry_research.research_industry_chain
-_collect_public_industry_data: Callable[[str], Awaitable[dict[str, Any]]] = collect_public_industry_data
+_collect_public_industry_data: Callable[..., Awaitable[dict[str, Any]]] = collect_public_industry_data
 _result_from_payload: Callable[[str, dict[str, Any]], IndustryChainResult] = result_from_payload
 
 _RESEARCH_STAGE = "research"
 _SYNTHESIS_STAGE = "synthesis"
 _MAX_PUBLIC_CONTEXT_LENGTH = 20_000
+_RESULT_CACHE_TTL_SECONDS = 24 * 60 * 60
+_A_SHARE_CODE_PATTERN = re.compile(r"^(?:00|30|60|68|43|83|87|92)\d{4}$")
+_PUBLIC_DATA_KEYS = (
+    "stocks",
+    "market_data",
+    "competition_data",
+    "technology_data",
+    "chain_data",
+    "driver_risk_data",
+    "reports",
+    "events",
+    "rankings",
+)
 
 
-def _has_public_data(value: Any) -> bool:
+def _has_meaningful_value(value: Any) -> bool:
     if value is None or isinstance(value, Exception):
         return False
     if isinstance(value, dict):
         if value.get("error"):
             return False
-        return any(_has_public_data(item) for item in value.values())
+        return any(_has_meaningful_value(item) for item in value.values())
     if isinstance(value, (list, tuple, set)):
-        return any(_has_public_data(item) for item in value)
+        return any(_has_meaningful_value(item) for item in value)
     if isinstance(value, str):
         return bool(value.strip())
     return bool(value)
+
+
+def _has_public_data(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    return any(_has_meaningful_value(value.get(key)) for key in _PUBLIC_DATA_KEYS)
 
 
 def _add_warning(warnings: list[str], warning: str) -> None:
@@ -72,7 +92,44 @@ def _add_warning(warnings: list[str], warning: str) -> None:
         warnings.append(warning)
 
 
-def _apply_quality_gate(result: IndustryChainResult) -> None:
+def _add_missing_evidence(result: IndustryChainResult, message: str) -> None:
+    if message and message not in result.missing_evidence:
+        result.missing_evidence.append(message)
+
+
+def _collection_item_count(value: Any) -> int:
+    if isinstance(value, list):
+        return len(value)
+    if isinstance(value, dict):
+        return sum(_collection_item_count(item) for item in value.values())
+    return 0
+
+
+def _evidence_inventory(
+    public_data: dict[str, Any],
+    *,
+    agent_evidence_count: int,
+) -> str:
+    public_counts = "；".join(
+        f"{key} {_collection_item_count(public_data.get(key))} 条"
+        for key in _PUBLIC_DATA_KEYS
+    )
+    return f"Agent 工具证据 {agent_evidence_count} 条；{public_counts}"
+
+
+def _load_cached_result(cache_key: str, *, force: bool) -> IndustryChainResult | None:
+    if force:
+        return None
+    cached = cache.get(cache_key)
+    if cached is None:
+        return None
+    return cached if isinstance(cached, IndustryChainResult) else IndustryChainResult.model_validate(cached)
+
+
+def _apply_quality_gate(
+    result: IndustryChainResult,
+    scope: IndustryChainResearchScope | None = None,
+) -> None:
     missing: list[str] = []
     if not result.summary.strip():
         missing.append("核心摘要")
@@ -96,6 +153,98 @@ def _apply_quality_gate(result: IndustryChainResult) -> None:
     if result.evidence_catalog and result.summary.strip() and not result.summary_evidence_ids:
         result.quality_status = "degraded"
         _add_warning(result.warnings, "核心摘要尚未关联到具体工具证据 ID")
+
+    missing_tiers = [
+        label
+        for nodes, label in (
+            (result.upstream, "上游"),
+            (result.midstream, "中游"),
+            (result.downstream, "下游"),
+        )
+        if not nodes
+    ]
+    if missing_tiers and len(missing_tiers) < 3:
+        result.quality_status = "degraded"
+        if result.coverage.chain == "complete":
+            result.coverage.chain = "partial"
+        _add_warning(result.warnings, f"产业链环节缺失：{'、'.join(missing_tiers)}")
+
+    if scope is not None and scope.company_scope == "a_share":
+        invalid_key_stocks = [
+            item
+            for item in result.key_stocks
+            if item.code and not _A_SHARE_CODE_PATTERN.fullmatch(item.code.strip())
+        ]
+        if invalid_key_stocks:
+            result.key_stocks = [
+                item for item in result.key_stocks if item not in invalid_key_stocks
+            ]
+            result.quality_status = "degraded"
+            _add_warning(result.warnings, "重点公司包含无法确认的 A 股代码，已从结果中移除")
+
+    density_gaps: list[str] = []
+    if result.coverage.market != "missing" and len(result.market_metrics) < 2:
+        density_gaps.append("市场研究需要至少 2 项市场指标及对应统计口径")
+    covered_tiers = [
+        (label, nodes)
+        for label, nodes in (
+            ("上游", result.upstream),
+            ("中游", result.midstream),
+            ("下游", result.downstream),
+        )
+        if nodes
+    ]
+    if result.coverage.chain != "missing" and any(
+        len(nodes) < 2 for _, nodes in covered_tiers
+    ):
+        sparse_tiers = "、".join(
+            label for label, nodes in covered_tiers if len(nodes) < 2
+        )
+        density_gaps.append(f"产业链每个环节至少 2 个节点，当前不足：{sparse_tiers}")
+    if scope is not None and scope.company_scope == "a_share":
+        valid_codes = {
+            item.code.strip()
+            for item in result.key_stocks
+            if item.code and _A_SHARE_CODE_PATTERN.fullmatch(item.code.strip())
+        }
+        if len(valid_codes) < 4:
+            density_gaps.append("重点公司需要至少 4 家有效 A 股公司及产业链角色证据")
+    driver_count = len({
+        item.strip()
+        for item in [
+            *result.drivers,
+            *(insight.title for insight in result.driver_insights),
+        ]
+        if item.strip()
+    })
+    if driver_count < 2:
+        density_gaps.append("驱动因素需要至少 2 项行业驱动及事实依据")
+    risk_count = len({
+        item.strip()
+        for item in [
+            *result.risks,
+            *(insight.title for insight in result.risk_insights),
+        ]
+        if item.strip()
+    })
+    if risk_count < 2:
+        density_gaps.append("风险分析需要至少 2 项风险及触发条件")
+    if len(result.sources) < 4:
+        density_gaps.append("来源目录需要至少 4 条可追溯来源")
+    has_body_evidence = any(
+        item.status == "success"
+        and item.tool_name in {"fetch_url", "fetch_urls"}
+        and bool(item.content_preview.strip())
+        and bool(item.source_urls)
+        for item in result.evidence_catalog
+    )
+    if result.evidence_catalog and not has_body_evidence:
+        density_gaps.append("关键结论需要至少 1 条可追溯的网页正文证据")
+    if density_gaps:
+        result.quality_status = "degraded"
+        for gap in density_gaps:
+            _add_missing_evidence(result, gap)
+        _add_warning(result.warnings, f"报告证据密度不足，仍有 {len(density_gaps)} 项待补充")
 
     traceable_items = [
         *result.market_metrics,
@@ -149,6 +298,7 @@ async def run_industry_chain_analysis(
     progress_callback=None,
     *,
     scope: IndustryChainResearchScope | None = None,
+    force: bool = False,
 ) -> IndustryChainResult:
     """执行产业链数据采集、结构化生成和结果存档。"""
     progress = ProgressEmitter(progress_callback)
@@ -159,9 +309,8 @@ async def run_industry_chain_analysis(
         name,
         resolved_scope.model_dump_json(),
     )
-    cached = cache.get(cache_key)
-    if cached is not None:
-        cached_result = cached if isinstance(cached, IndustryChainResult) else IndustryChainResult.model_validate(cached)
+    cached_result = _load_cached_result(cache_key, force=force)
+    if cached_result is not None:
         await progress.emit(_event(
             event_type="complete",
             stage="cached",
@@ -180,11 +329,14 @@ async def run_industry_chain_analysis(
         ))
 
         async def emit_agent_event(event: AgentEvent) -> None:
+            public_event = auditable_agent_event(event)
+            if public_event is None:
+                return
             await progress.emit(_event(
                 event_type="agent_event",
                 stage=_RESEARCH_STAGE,
                 message="",
-                agent_event=event,
+                agent_event=public_event,
             ))
 
         outcomes = await asyncio.gather(
@@ -194,7 +346,7 @@ async def run_industry_chain_analysis(
                 scope=resolved_scope,
                 event_callback=emit_agent_event if progress_callback is not None else None,
             ),
-            _collect_public_industry_data(name),
+            _collect_public_industry_data(name, resolved_scope),
             return_exceptions=True,
         )
         research_outcome = cast(AgenticResearchResult | Exception, outcomes[0])
@@ -273,6 +425,11 @@ async def run_industry_chain_analysis(
             f"共 {evidence_stats.total_count} 次工具/公共数据调用，去重后 {evidence_stats.unique_count} 条，"
             f"最终向合成模型提供 {evidence_stats.selected_count} 条，省略 {evidence_stats.omitted_count} 条。"
         )
+        agent_evidence_gaps = (
+            "、".join(research_outcome.evidence_gaps)
+            if not isinstance(research_outcome, Exception) and research_outcome.evidence_gaps
+            else "无"
+        )
 
         prompt_context = {
             "name": name,
@@ -282,6 +439,11 @@ async def run_industry_chain_analysis(
             "public_evidence_id": public_evidence_id,
             "company_scope": resolved_scope.company_scope,
             "evidence_compaction_note": evidence_compaction_note,
+            "agent_evidence_gaps": agent_evidence_gaps,
+            "evidence_inventory": _evidence_inventory(
+                public_data,
+                agent_evidence_count=evidence_stats.selected_count - (1 if public_data else 0),
+            ),
         }
         await progress.emit(_event(
             event_type="stage_started",
@@ -311,8 +473,15 @@ async def run_industry_chain_analysis(
             logger.warning("产业链 Prompt 校验失败，生成确定性降级报告, name=%s", name)
 
         result.research_scope = resolved_scope.model_dump(mode="json", exclude_none=True)
+        if not isinstance(research_outcome, Exception):
+            result.agent_trace = list(research_outcome.execution_trace)
         result.evidence_catalog = evidence_catalog
         result.evidence_stats = evidence_stats
+        if not isinstance(research_outcome, Exception):
+            for gap in research_outcome.evidence_gaps:
+                _add_missing_evidence(result, f"Agent 调研仍缺少「{gap}」证据")
+            if research_outcome.evidence_gaps:
+                result.quality_status = "degraded"
         unknown_evidence_ids = validate_result_evidence_ids(result, evidence_catalog)
         if unknown_evidence_ids:
             result.quality_status = "degraded"
@@ -321,7 +490,7 @@ async def run_industry_chain_analysis(
         if mismatched_source_urls:
             result.quality_status = "degraded"
             _add_warning(result.warnings, "部分来源链接不属于所引用的工具证据，已自动移除")
-        _apply_quality_gate(result)
+        _apply_quality_gate(result, resolved_scope)
         if structured_prompt_succeeded:
             result.llm_review = render_industry_markdown(result)
         await progress.emit(_event(
@@ -348,6 +517,7 @@ async def run_industry_chain_analysis(
 
         if result.archive_status == "saved":
             await auto_mine_from_result(result)
+            cache.set(cache_key, result, ttl=_RESULT_CACHE_TTL_SECONDS)
 
         message = "分析完成" if result.quality_status == "complete" else "分析完成，但报告存在质量提示"
         if result.archive_status == "failed":

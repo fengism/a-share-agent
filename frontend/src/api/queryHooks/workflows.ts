@@ -1,4 +1,10 @@
-import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { API_TIMEOUTS } from "../client";
 import {
   asApiModel,
@@ -8,8 +14,10 @@ import {
 } from "../openapiClient";
 import { queryKeys } from "../queryKeys";
 import type { DailyReviewHistoryItem, DailyReviewRequest, DailyReviewResult } from "../../types/dailyReview";
+import type { components } from "../generated/schema";
 import type {
   AnalysisHistoryItem,
+  AnalysisPageData,
   AnalysisResult,
   AtlasCatalog,
   AtlasChain,
@@ -18,6 +26,31 @@ import type {
   PushRequest,
   PushResponse,
 } from "../../types/stock";
+
+export type WorkflowJob = components["schemas"]["WorkflowJobResponse"];
+
+export function useActiveWorkflows() {
+  return useQuery({
+    queryKey: queryKeys.workflows.active,
+    queryFn: ({ signal }) => openApiGet("/api/workflows/active", { options: { signal } }),
+    select: asApiModel<WorkflowJob[]>(),
+    refetchInterval: (query) => {
+      const jobs = query.state.data as WorkflowJob[] | undefined;
+      return jobs?.length ? 2_000 : 10_000;
+    },
+    staleTime: 1_000,
+  });
+}
+
+export function useCancelWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => openApiDelete("/api/workflows/{job_id}", {
+      path: { job_id: jobId },
+    }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active }),
+  });
+}
 
 export function useInfiniteDailyReviewHistory(pageSize = 50) {
   return useInfiniteQuery({
@@ -77,11 +110,17 @@ export function usePush() {
   });
 }
 
-export function useInfiniteAllAnalysisHistory(pageSize = 50) {
+export function useInfiniteAllAnalysisHistory(
+  pageSize = 50,
+  query = "",
+  initialData?: InfiniteData<AnalysisHistoryItem[]>,
+) {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
   return useInfiniteQuery({
-    queryKey: queryKeys.workflows.analysisHistory(pageSize),
-    queryFn: ({ pageParam }) => openApiGet("/api/analysis/history/all", {
-      query: { limit: pageSize, offset: pageParam },
+    queryKey: queryKeys.workflows.analysisHistory(pageSize, normalizedQuery),
+    queryFn: ({ pageParam, signal }) => openApiGet("/api/analysis/history/all", {
+      query: { limit: pageSize, offset: Number(pageParam), q: normalizedQuery || undefined },
+      options: { signal },
     }),
     select: (data) => ({
       ...data,
@@ -93,6 +132,7 @@ export function useInfiniteAllAnalysisHistory(pageSize = 50) {
         ? undefined
         : pages.reduce((count, page) => count + page.length, 0)
     ),
+    initialData: normalizedQuery ? undefined : initialData,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -100,8 +140,9 @@ export function useInfiniteAllAnalysisHistory(pageSize = 50) {
 export function useAnalysisHistorySnapshot(code: string, date: string) {
   return useQuery({
     queryKey: queryKeys.workflows.analysisHistorySnapshot(code, date),
-    queryFn: () => openApiGet("/api/analysis/{code}/history/{date}", {
+    queryFn: ({ signal }) => openApiGet("/api/analysis/{code}/history/{date}", {
       path: { code, date },
+      options: { signal },
     }),
     select: asApiModel<AnalysisResult>(),
     enabled: !!code && !!date,
@@ -110,11 +151,37 @@ export function useAnalysisHistorySnapshot(code: string, date: string) {
 }
 
 export function useDeleteAnalysisHistory() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ code, date }: { code: string; date: string }) => openApiDelete(
       "/api/analysis/{code}/history/{date}",
       { path: { code, date } },
     ),
+    onSuccess: async (_response, { code, date }) => {
+      queryClient.removeQueries({
+        queryKey: queryKeys.workflows.analysisHistorySnapshot(code, date),
+        exact: true,
+      });
+      queryClient.setQueriesData<InfiniteData<AnalysisHistoryItem[]>>(
+        { queryKey: queryKeys.workflows.analysisHistoryRoot },
+        (current) => current ? {
+          ...current,
+          pages: current.pages.map((page) => page.filter((item) => !(
+            item.stock_code === code && item.analysis_date.replace(/-/g, "") === date
+          ))),
+        } : current,
+      );
+      queryClient.setQueryData<AnalysisPageData>(
+        queryKeys.stock.analysisPage(code),
+        (current) => current?.cached_analysis?.analysis_date.replace(/-/g, "") === date
+          ? { ...current, cached_analysis: null }
+          : current,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.workflows.analysisHistoryRoot }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.stock.analysisPage(code) }),
+      ]);
+    },
   });
 }
 

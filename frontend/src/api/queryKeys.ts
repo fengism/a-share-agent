@@ -37,6 +37,7 @@ export const queryKeys = {
       ["kline", code, period, adjust, startDate, endDate] as const,
     intraday: (code: string) => ["stockIntraday", code] as const,
     financial: (code: string, type: string) => ["financial", code, type] as const,
+    revenueBreakdown: (code: string) => ["revenueBreakdown", code] as const,
     valuationDetail: (code: string) => ["valuationDetail", code] as const,
     indicators: (code: string) => ["indicators", code] as const,
     categorizedNews: (code: string) => ["categorizedNews", code] as const,
@@ -73,10 +74,12 @@ export const queryKeys = {
     run: (runId: string) => ["quant", "backtests", runId] as const,
   },
   workflows: {
+    active: ["activeWorkflows"] as const,
     dailyReviewHistoryRoot: ["dailyReviewHistory"] as const,
+    analysisHistoryRoot: ["allAnalysisHistory"] as const,
     dailyReviewHistory: (pageSize: number) => ["dailyReviewHistory", "infinite", pageSize] as const,
     dailyReview: (date: string) => ["dailyReview", date] as const,
-    analysisHistory: (pageSize: number) => ["allAnalysisHistory", "infinite", pageSize] as const,
+    analysisHistory: (pageSize: number, query = "") => ["allAnalysisHistory", "infinite", pageSize, query] as const,
     analysisHistorySnapshot: (code: string, date: string) => ["analysisHistory", code, date] as const,
     industryChainHistoryRoot: ["industryChainHistory"] as const,
     industryChainHistory: (name: string, pageSize: number) =>

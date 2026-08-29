@@ -1,3 +1,5 @@
+import type { ChatStreamDelta } from "../chat";
+
 export interface IndustryChainChart {
   title: string;
   description?: string;
@@ -154,6 +156,7 @@ export interface IndustryChainResult {
   coverage?: IndustryChainCoverage;
   missing_evidence?: string[];
   conflicts?: IndustryChainConflict[];
+  agent_trace?: ChatStreamDelta[];
 }
 
 export interface IndustryChainHistoryItem {

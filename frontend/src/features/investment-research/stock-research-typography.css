@@ -1,0 +1,37 @@
+.stock-research-report,
+.analysis-research-conclusion,
+.research-framework,
+.financial-data-sections {
+  --stock-research-font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --stock-research-body-size: 15px;
+  --stock-research-body-leading: 1.7;
+  --stock-research-label-size: 12px;
+  --stock-research-table-size: 13px;
+  --stock-research-support-size: 14px;
+  --stock-research-section-size: 18px;
+  --stock-research-metric-size: 20px;
+  --stock-research-title-size: 28px;
+  color: var(--c-text-primary);
+  font-family: var(--stock-research-font-family);
+  font-size: var(--stock-research-body-size);
+  font-weight: var(--c-weight-normal);
+  line-height: var(--stock-research-body-leading);
+  letter-spacing: 0;
+}
+
+.stock-research-report :where(.ant-typography, .ant-table, .ant-tag, .ant-btn, .ant-segmented),
+.analysis-research-conclusion :where(.ant-typography, .ant-table, .ant-tag, .ant-btn, .ant-segmented),
+.research-framework :where(.ant-typography, .ant-table, .ant-tag, .ant-btn, .ant-segmented),
+.financial-data-sections :where(.ant-typography, .ant-table, .ant-tag, .ant-btn, .ant-segmented) {
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+@media (max-width: 767px) {
+  .stock-research-report,
+  .analysis-research-conclusion,
+  .research-framework,
+  .financial-data-sections {
+    --stock-research-title-size: 24px;
+  }
+}

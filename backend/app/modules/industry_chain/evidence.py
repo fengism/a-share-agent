@@ -25,6 +25,14 @@ _PROMPT_TOOL_PRIORITY = {
     "iwencai_search": 2,
     "web_search": 3,
 }
+_EVIDENCE_DIMENSION_TERMS = {
+    "market": ("市场规模", "增速", "增长率", "cagr", "需求", "供给", "价格"),
+    "chain": ("产业链", "上游", "中游", "下游", "原材料", "制造", "应用"),
+    "competition": ("竞争格局", "市场份额", "份额", "集中度", "龙头", "公司", "厂商"),
+    "technology": ("技术路线", "技术", "工艺", "量产", "性能", "迭代"),
+    "events": ("政策", "事件", "公告", "扩产", "并购", "投资", "资本", "订单"),
+    "risks_drivers": ("风险", "驱动", "催化", "约束", "波动"),
+}
 
 
 def _decode(content: str) -> Any:
@@ -110,6 +118,19 @@ def _provider(tool_name: str) -> str:
     return "agent_tool"
 
 
+def _evidence_dimensions(item: AgentEvidence) -> set[str]:
+    text = f"{item.arguments}\n{item.content}".lower()
+    return {
+        dimension
+        for dimension, terms in _EVIDENCE_DIMENSION_TERMS.items()
+        if any(term in text for term in terms)
+    }
+
+
+def _selection_priority(index: int, item: AgentEvidence) -> tuple[int, int]:
+    return _PROMPT_TOOL_PRIORITY.get(item.tool_name, 4), index
+
+
 def build_evidence_catalog(evidence: list[AgentEvidence] | tuple[AgentEvidence, ...]) -> list[IndustryChainEvidence]:
     catalog: list[IndustryChainEvidence] = []
     seen: set[str] = set()
@@ -154,15 +175,39 @@ def compact_industry_evidence(
             failed_count += 1
             continue
         unique.append((index, item))
-    unique.sort(key=lambda pair: (_PROMPT_TOOL_PRIORITY.get(pair[1].tool_name, 4), pair[0]))
+    unique.sort(key=lambda pair: _selection_priority(*pair))
 
+    available_dimensions = {
+        dimension
+        for _, item in unique
+        for dimension in _evidence_dimensions(item)
+    }
+    coverage_candidates: list[tuple[int, AgentEvidence]] = []
+    for dimension in _EVIDENCE_DIMENSION_TERMS:
+        if dimension not in available_dimensions:
+            continue
+        candidate = next(
+            (pair for pair in unique if dimension in _evidence_dimensions(pair[1])),
+            None,
+        )
+        if candidate is not None and candidate not in coverage_candidates:
+            coverage_candidates.append(candidate)
+    coverage_ids = {agent_evidence_id(item) for _, item in coverage_candidates}
+    ordered = [
+        *coverage_candidates,
+        *(pair for pair in unique if agent_evidence_id(pair[1]) not in coverage_ids),
+    ]
+    effective_item_length = max_item_length
+    if coverage_candidates:
+        per_dimension_budget = max_context_length // len(coverage_candidates) - 512
+        effective_item_length = min(max_item_length, max(128, per_dimension_budget))
     selected: list[AgentEvidence] = []
     rendered = "暂无可用工具证据"
-    for _, item in unique:
+    for _, item in ordered:
         candidate = render_agent_evidence(
             [*selected, item],
             max_context_length=max_context_length,
-            max_item_length=max_item_length,
+            max_item_length=effective_item_length,
         )
         if agent_evidence_id(item) not in candidate:
             continue
@@ -185,6 +230,8 @@ def compact_public_industry_data(value: dict[str, Any]) -> dict[str, Any]:
         "market_data": 12,
         "competition_data": 12,
         "technology_data": 12,
+        "chain_data": 12,
+        "driver_risk_data": 12,
         "reports": 12,
         "events": 12,
         "rankings": 8,

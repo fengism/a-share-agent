@@ -94,7 +94,7 @@ async function mockAnalysisApi(page: Page) {
           prev_close: 1510,
           items: [
             { time: "09:30", price: 1512, avg_price: 1512, volume: 100, amount: 151_200, change_pct: 0.13 },
-            { time: "10:00", price: 1520, avg_price: 1516, volume: 180, amount: 273_600, change_pct: 0.66 },
+            { time: "10:00", price: 1535.2, avg_price: 1516, volume: 180, amount: 276_336, change_pct: 1.67 },
           ],
         },
         valuation: { code: "600519", pe_ttm: 23.1, pb: 7.8, ps_ttm: 9.2, peers: [] },
@@ -229,7 +229,6 @@ async function expectAnalysisGeometry(page: Page) {
     ".analysis-workspace__header > .analysis-header-card",
     ".analysis-workspace__main > .ant-card",
     ".analysis-workspace__main > .u-card",
-    ".analysis-context-summary",
     ".analysis-charts-section > .ant-card",
     ".analysis-workspace__details > .ant-card",
   ].join(","));
@@ -265,35 +264,19 @@ test("renders the desktop terminal command frame without a standalone context ra
   await expect(page.getByRole("button", { name: /数据源/ })).toHaveCount(0);
   await expect(page.getByRole("complementary", { name: "最近分析记录" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "分析上下文" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "分析上下文" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "分析上下文" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "决策重点与 AI 追问" })).toContainText("等待关键支撑确认后再评估");
+  await page.screenshot({ path: "/tmp/analysis-desktop.png", fullPage: true });
 
   const historyBox = await page.getByRole("complementary", { name: "最近分析记录" }).boundingBox();
   const decisionBox = await page.getByRole("region", { name: "决策重点与 AI 追问" }).boundingBox();
-  const contextBox = await page.getByRole("region", { name: "分析上下文" }).boundingBox();
   expect(historyBox).not.toBeNull();
   expect(historyBox!.width).toBeLessThanOrEqual(180);
   const analysisPageBox = await page.locator(".analysis-page").boundingBox();
   expect(analysisPageBox).not.toBeNull();
   expect(historyBox!.x).toBeLessThanOrEqual(analysisPageBox!.x);
   expect(decisionBox).not.toBeNull();
-  expect(contextBox).not.toBeNull();
   expect(historyBox!.x + historyBox!.width).toBeLessThan(decisionBox!.x);
-  expect(Math.abs(decisionBox!.x - contextBox!.x)).toBeLessThanOrEqual(2);
-  expect(contextBox!.y).toBeGreaterThan(decisionBox!.y + decisionBox!.height);
-  const sentimentText = page.locator(".analysis-context-summary__sentiment-copy strong");
-  await expect(sentimentText).toHaveText("温和偏多，机构关注稳定但短线分歧仍在");
-  const sentimentTextBox = await sentimentText.boundingBox();
-  const sentimentPanelBox = await page.locator(".analysis-context-summary__sentiment").boundingBox();
-  expect(sentimentTextBox).not.toBeNull();
-  expect(sentimentPanelBox).not.toBeNull();
-  expect(sentimentTextBox!.x).toBeGreaterThanOrEqual(sentimentPanelBox!.x - 1);
-  expect(sentimentTextBox!.x + sentimentTextBox!.width).toBeLessThanOrEqual(
-    sentimentPanelBox!.x + sentimentPanelBox!.width + 1,
-  );
-  expect(sentimentTextBox!.y + sentimentTextBox!.height).toBeLessThanOrEqual(
-    sentimentPanelBox!.y + sentimentPanelBox!.height + 1,
-  );
   await expect(page.locator(".analysis-sentiment-gauge")).toHaveCount(0);
 
   const valuationBox = await page.locator(".analysis-conclusion__metrics").boundingBox();
@@ -303,6 +286,7 @@ test("renders the desktop terminal command frame without a standalone context ra
   expect(factorSectionBox!.y - valuationBox!.y - valuationBox!.height).toBeGreaterThanOrEqual(16);
 
   const stockCode = page.locator(".analysis-header-card").getByText("600519", { exact: true });
+  await expect(page.locator(".analysis-header-card").getByText("¥1535.20", { exact: true })).toBeVisible();
   const watchlistButton = page.getByRole("button", { name: "加入自选" });
   expect(await stockCode.evaluate((element) => element.parentElement?.contains(
     document.querySelector('[aria-label="加入自选"]'),
@@ -325,7 +309,7 @@ test("renders the desktop terminal command frame without a standalone context ra
   await expectAnalysisGeometry(page);
   await expect(page.locator(".analysis-page")).toHaveCSS("container-type", "inline-size");
   await expect.poll(() => page.locator(".analysis-conclusion").evaluate(
-    (element) => element.parentElement?.classList.contains("analysis-workspace__main"),
+    (element) => element.parentElement?.classList.contains("analysis-research-conclusion"),
   )).toBe(true);
 
   await page.getByRole("button", { name: "加入自选" }).click();
@@ -376,12 +360,12 @@ test("loads a historical snapshot without the informational banner", async ({ pa
   await mockAnalysisApi(page);
   await page.goto("/analysis/600519?date=20260820");
 
-  await expect(page.getByText("AI 综合研判")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "综合研判" })).toBeVisible();
   await expect(page.getByText("正在查看 2026-08-20 的历史分析快照")).toHaveCount(0);
   await expect(page.getByText("AI 结论与评分保持为当日结果")).toHaveCount(0);
 });
 
-test("keeps the mobile workspace decision-first without horizontal overflow", async ({ page }) => {
+test("keeps the mobile workspace ordered without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockAnalysisApi(page);
   await page.goto("/analysis/600519");
@@ -389,15 +373,13 @@ test("keeps the mobile workspace decision-first without horizontal overflow", as
   await expect(page.getByRole("button", { name: "打开导航菜单" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "全局快捷操作" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "决策重点与 AI 追问" })).toBeVisible();
+  await page.screenshot({ path: "/tmp/analysis-mobile.png", fullPage: true });
 
   const decisionBox = await page.getByRole("region", { name: "决策重点与 AI 追问" }).boundingBox();
-  const contextBox = await page.getByRole("region", { name: "分析上下文" }).boundingBox();
   const historyBox = await page.getByRole("complementary", { name: "最近分析记录" }).boundingBox();
   expect(decisionBox).not.toBeNull();
-  expect(contextBox).not.toBeNull();
   expect(historyBox).not.toBeNull();
-  expect(contextBox!.y).toBeGreaterThan(decisionBox!.y);
-  expect(historyBox!.y).toBeGreaterThan(contextBox!.y);
+  expect(historyBox!.y).toBeLessThan(decisionBox!.y);
   await expectAnalysisGeometry(page);
 });
 

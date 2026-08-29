@@ -56,6 +56,7 @@ describe("industry chain agent process", () => {
           attempt: 1,
         },
       },
+      { type: "reasoning", content: "raw internal reasoning" },
       { type: "done" },
     ];
 
@@ -72,5 +73,42 @@ describe("industry chain agent process", () => {
       isError: false,
     }));
     expect(state.toolCalls[0]).not.toHaveProperty("result");
+    expect(state).not.toHaveProperty("reasoningContent");
+  });
+
+  it("maps budget summaries to a skipped tool state", () => {
+    const events: ChatStreamDelta[] = [
+      {
+        type: "tool_call",
+        tool_call: {
+          id: "call-budget",
+          type: "function",
+          function: { name: "web_search", arguments: "{}" },
+        },
+      },
+      {
+        type: "tool_result",
+        tool_result: {
+          tool_call_id: "call-budget",
+          name: "web_search",
+          content: "",
+          is_error: false,
+        },
+        tool_result_summary: {
+          status: "skipped",
+          summary: "工具调用额度已用尽，已基于现有结果继续分析",
+        },
+      },
+    ];
+    const state = events.reduce(
+      applyIndustryAgentEvent,
+      createIndustryAgentProcessState(),
+    );
+
+    expect(state.toolCalls[0]).toEqual(expect.objectContaining({
+      isExecuting: false,
+      isError: false,
+      isSkipped: true,
+    }));
   });
 });

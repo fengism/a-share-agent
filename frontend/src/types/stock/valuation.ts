@@ -36,6 +36,7 @@ export interface ValuationFundamentals {
   non_net_profit_yoy: number | null;
   shareholders_equity: number | null;
   operating_cashflow: number | null;
+  capital_expenditure: number | null;
 }
 
 export interface ValuationProfile {
@@ -53,10 +54,35 @@ export interface ValuationMethodResult {
   upside_pct: number | null;
   confidence: string | null;
   confidence_score: number | null;
+  data_quality_score: number;
   weight: number | null;
   value_range: number[] | null;
   applicability: string | null;
   basis: string | null;
+  reason: string | null;
+}
+
+export interface DCFScenario {
+  name: string;
+  label: string;
+  growth_rate: number;
+  discount_rate: number;
+  terminal_growth_rate: number;
+  equity_value: number;
+  per_share_value: number;
+  upside_pct: number | null;
+}
+
+export interface DCFSensitivityPoint {
+  discount_rate: number;
+  terminal_growth_rate: number;
+  per_share_value: number;
+}
+
+export interface ReverseDCFResult {
+  available: boolean;
+  implied_growth_rate: number | null;
+  market_equity_value: number | null;
   reason: string | null;
 }
 
@@ -72,11 +98,22 @@ export interface DCFValuationResult {
   upside_pct: number | null;
   confidence: string | null;
   confidence_score: number | null;
+  data_quality_score: number;
   weight: number | null;
   value_range: number[] | null;
   applicability: string | null;
   basis: string | null;
   reason: string | null;
+  fcfe_source: string | null;
+  scenarios: DCFScenario[];
+  sensitivity: DCFSensitivityPoint[];
+  reverse_dcf: ReverseDCFResult;
+}
+
+export interface PeerMetricStats {
+  sample_size: number;
+  excluded_count: number;
+  confidence_score: number;
 }
 
 export interface ValuationPeerSummary {
@@ -85,6 +122,18 @@ export interface ValuationPeerSummary {
   ps_median: number | null;
   peer_count: number;
   peers: StockValuationPeer[];
+  pe_stats: PeerMetricStats;
+  pb_stats: PeerMetricStats;
+  ps_stats: PeerMetricStats;
+}
+
+export interface ValuationDataQuality {
+  score: number;
+  grade: string;
+  ttm_source: string | null;
+  cashflow_source: string | null;
+  peer_confidence: number;
+  limitations: string[];
 }
 
 export interface InstitutionForecast {
@@ -116,6 +165,7 @@ export interface StockValuationDetail {
   valuation_summary: string | null;
   profile: ValuationProfile | null;
   method_weights: Record<string, number>;
+  data_quality: ValuationDataQuality;
   notes: string[];
   institution_forecasts: InstitutionForecast[];
 }

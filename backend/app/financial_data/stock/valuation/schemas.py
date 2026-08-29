@@ -49,6 +49,7 @@ class ValuationFundamentals(BaseModel):
     non_net_profit_yoy: float | None = None
     shareholders_equity: float | None = None
     operating_cashflow: float | None = None
+    capital_expenditure: float | None = None
 
 
 class ValuationProfile(BaseModel):
@@ -70,10 +71,41 @@ class ValuationMethodResult(BaseModel):
     upside_pct: float | None = None
     confidence: str | None = None
     confidence_score: float | None = None
+    data_quality_score: float = 1.0
     weight: float | None = None
     value_range: list[float] | None = None
     applicability: str | None = None
     basis: str | None = None
+    reason: str | None = None
+
+
+class DCFScenario(BaseModel):
+    """Purpose: DCF 单一情景的核心假设与估值结果。"""
+
+    name: str
+    label: str
+    growth_rate: float
+    discount_rate: float
+    terminal_growth_rate: float
+    equity_value: float
+    per_share_value: float
+    upside_pct: float | None = None
+
+
+class DCFSensitivityPoint(BaseModel):
+    """Purpose: DCF 折现率与永续增长率组合下的估值结果。"""
+
+    discount_rate: float
+    terminal_growth_rate: float
+    per_share_value: float
+
+
+class ReverseDCFResult(BaseModel):
+    """Purpose: 由当前股价反推市场隐含增长率。"""
+
+    available: bool = False
+    implied_growth_rate: float | None = None
+    market_equity_value: float | None = None
     reason: str | None = None
 
 
@@ -91,11 +123,16 @@ class DCFValuationResult(BaseModel):
     upside_pct: float | None = None
     confidence: str | None = None
     confidence_score: float | None = None
+    data_quality_score: float = 1.0
     weight: float | None = None
     value_range: list[float] | None = None
     applicability: str | None = None
     basis: str | None = None
     reason: str | None = None
+    fcfe_source: str | None = None
+    scenarios: list[DCFScenario] = Field(default_factory=list)
+    sensitivity: list[DCFSensitivityPoint] = Field(default_factory=list)
+    reverse_dcf: ReverseDCFResult = Field(default_factory=ReverseDCFResult)
 
 
 class InstitutionForecast(BaseModel):
@@ -111,6 +148,14 @@ class InstitutionForecast(BaseModel):
     unit: str | None = None
 
 
+class PeerMetricStats(BaseModel):
+    """Purpose: 单项同行估值倍数的清洗及可信度统计。"""
+
+    sample_size: int = 0
+    excluded_count: int = 0
+    confidence_score: float = 0.0
+
+
 class ValuationPeerSummary(BaseModel):
     """Purpose: 同业估值汇总，包括中位数、同业数量和对等公司列表。"""
 
@@ -119,6 +164,20 @@ class ValuationPeerSummary(BaseModel):
     ps_median: float | None = None
     peer_count: int = 0
     peers: list[ValuationPeer] = Field(default_factory=list)
+    pe_stats: PeerMetricStats = Field(default_factory=PeerMetricStats)
+    pb_stats: PeerMetricStats = Field(default_factory=PeerMetricStats)
+    ps_stats: PeerMetricStats = Field(default_factory=PeerMetricStats)
+
+
+class ValuationDataQuality(BaseModel):
+    """Purpose: 估值输入数据的完整性、口径和限制说明。"""
+
+    score: float = 0.0
+    grade: str = "low"
+    ttm_source: str | None = None
+    cashflow_source: str | None = None
+    peer_confidence: float = 0.0
+    limitations: list[str] = Field(default_factory=list)
 
 
 class ValuationDetail(BaseModel):
@@ -141,5 +200,6 @@ class ValuationDetail(BaseModel):
     valuation_summary: str | None = None
     profile: ValuationProfile | None = None
     method_weights: dict[str, float] = Field(default_factory=dict)
+    data_quality: ValuationDataQuality = Field(default_factory=ValuationDataQuality)
     notes: list[str] = Field(default_factory=list)
     institution_forecasts: list[InstitutionForecast] = Field(default_factory=list)

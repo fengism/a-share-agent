@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 from app.configuration import get_effective_settings
 from app.configuration.schema import Settings
+from app.core.exceptions import ApplicationError
 from app.domain.news import NewsSearchItem
 from app.infrastructure.http.client import get_provider_session as _get_session
 
@@ -20,6 +21,21 @@ _REPORT_SEARCH_SKILL_ID = "report-search"
 _BASIC_INFO_SKILL_ID = "hithink-basicinfo-query"
 _STOCK_SELECTOR_SKILL_ID = "hithink-astock-selector"
 _MACRO_QUERY_SKILL_ID = "hithink-macro-query"
+_SKILL_VERSIONS = {
+    _REPORT_SEARCH_SKILL_ID: "1.0.0",
+    _BASIC_INFO_SKILL_ID: "1.0.0",
+    _STOCK_SELECTOR_SKILL_ID: "1.0.0",
+    _MACRO_QUERY_SKILL_ID: "1.0.0",
+}
+
+
+class IwencaiConfigurationError(ApplicationError):
+    default_code = "iwencai_not_configured"
+
+
+class IwencaiAuthenticationError(ApplicationError):
+    default_code = "iwencai_auth_failed"
+
 
 class IwencaiDataProvider:
     """
@@ -67,17 +83,22 @@ class IwencaiDataProvider:
             logger.debug("问财 API Key 读取配置失败，使用环境变量回退: %s", e)
         return os.environ.get("IWENCAI_API_KEY", "")
 
-    def _claw_headers(self, call_type: str = "normal") -> dict:
+    def _claw_headers(self, skill_id: str, call_type: str = "normal") -> dict:
         """构造问财 Claw 协议所需的自定义头（包含 trace_id）。
 
         Param:
+            skill_id: 问财 skill 标识
             call_type: 调用类型标识
         Return:
             包含 X-Claw-* 系列头的字典
         """
+        try:
+            skill_version = _SKILL_VERSIONS[skill_id]
+        except KeyError as error:
+            raise IwencaiConfigurationError(f"问财 Skill {skill_id} 未配置版本") from error
         return {
             "X-Claw-Call-Type": call_type,
-            "X-Claw-Skill-Version": "2.0.0",
+            "X-Claw-Skill-Version": skill_version,
             "X-Claw-Plugin-Id": "none",
             "X-Claw-Plugin-Version": "none",
             "X-Claw-Trace-Id": secrets.token_hex(32),
@@ -91,11 +112,14 @@ class IwencaiDataProvider:
         Return:
             完整的请求头字典
         """
+        api_key = self._api_key.strip()
+        if not api_key:
+            raise IwencaiConfigurationError("问财 API Key 未配置，请在设置中填写后重试")
         return {
-            "Authorization": f"Bearer {self._api_key}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "X-Claw-Skill-Id": skill_id,
-            **self._claw_headers(),
+            **self._claw_headers(skill_id),
         }
 
     @staticmethod
@@ -139,10 +163,20 @@ class IwencaiDataProvider:
             headers=self._request_headers(skill_id),
             timeout=30,
         )
+        if response.status_code in {401, 403}:
+            raise IwencaiAuthenticationError(
+                f"问财鉴权失败（HTTP {response.status_code}），"
+                f"请检查设置中的 API Key 是否有效，并确认当前 Key 已开通 {skill_id}"
+            )
         if response.status_code != 200:
             raise RuntimeError(f"iwencai HTTP {response.status_code}: {response.text[:200]}")
 
         data = response.json()
+        if data.get("status_code") in {401, 403}:
+            raise IwencaiAuthenticationError(
+                f"问财鉴权失败（状态码 {data['status_code']}），"
+                f"请检查设置中的 API Key 是否有效，并确认当前 Key 已开通 {skill_id}"
+            )
         if data.get("status_code", 0) != 0:
             raise RuntimeError(f"iwencai error: {data.get('status_msg', '')}")
         return data

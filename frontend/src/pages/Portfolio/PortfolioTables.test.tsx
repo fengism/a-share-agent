@@ -68,6 +68,7 @@ describe("PortfolioTables", () => {
               matched_cost: 1010,
             }],
           }]}
+          onSell={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -88,5 +89,41 @@ describe("PortfolioTables", () => {
     expect(screen.getByText("#1")).toBeInTheDocument();
     expect(screen.getAllByText("含费单位成本").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /编辑 贵州茅台/ })).toBeInTheDocument();
+  });
+
+  it("starts a sell from the current holding row", () => {
+    const handleSell = vi.fn();
+    render(
+      <MemoryRouter>
+        <PortfolioTables
+          positions={[]}
+          stocks={[{
+            stock_code: "600519",
+            stock_name: "贵州茅台",
+            position_count: 1,
+            total_shares: 60,
+            average_cost: 10.1,
+            current_price: 11,
+            change_pct: 1,
+            cost_value: 606,
+            market_value: 660,
+            profit_amount: 54,
+            profit_pct: 8.91,
+            realized_profit_amount: 74,
+            total_profit_amount: 128,
+          }]}
+          closedPositions={[]}
+          transactions={[]}
+          onSell={handleSell}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "卖出 贵州茅台" }));
+
+    expect(handleSell).toHaveBeenCalledWith(expect.objectContaining({
+      stock_code: "600519",
+      total_shares: 60,
+    }));
   });
 });

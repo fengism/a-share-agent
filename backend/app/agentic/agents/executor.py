@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 _OUTPUT_TRUNCATED_WARNING = "模型输出达到长度上限，回答可能不完整"
 _EMPTY_OUTPUT_ERROR = "模型未生成有效回答，请稍后重试"
 _STREAM_INTERRUPTED_WARNING = "模型流式响应中断，已保留已生成内容"
+_TOOL_BUDGET_WARNING = "工具调用额度已用尽，已基于现有结果继续分析"
 
 
 def _log_agent_llm_error(operation: str, exc: Exception, public_message: str) -> tuple[str, str]:
@@ -186,6 +187,7 @@ class AgentExecutor:
         assistant_content: str,
         emit: Callable[[AgentEvent], Awaitable[None]],
         execution_context: AgentExecutionContext | None,
+        tool_call_reserve: int,
     ) -> None:
         state.messages.append(build_assistant_tool_message(tool_calls, assistant_content))
         for tool_call in tool_calls:
@@ -221,7 +223,10 @@ class AgentExecutor:
             settings.chat_max_tool_calls_per_round,
         )
         if execution_context is not None:
-            accepted_count = await execution_context.reserve_tool_calls(accepted_count)
+            accepted_count = await execution_context.reserve_tool_calls(
+                accepted_count,
+                preserve=tool_call_reserve,
+            )
         accepted_calls = unique_calls[:accepted_count]
         rejected_calls = unique_calls[accepted_count:]
 
@@ -239,6 +244,8 @@ class AgentExecutor:
             tool_results[index] = result
         for index, tool_call in rejected_calls:
             metrics.record_agentic_event("tool_budget_rejected")
+            if _TOOL_BUDGET_WARNING not in state.warnings:
+                state.warnings.append(_TOOL_BUDGET_WARNING)
             tool_results[index] = ToolResultInfo(
                 tool_call_id=tool_call.id,
                 name=tool_call.function.name,
@@ -246,7 +253,7 @@ class AgentExecutor:
                     "tool_budget_exceeded",
                     "本轮或本次请求的工具调用预算已用尽，请基于已有结果完成回答",
                 ),
-                is_error=True,
+                is_error=False,
             )
         resolved_results = [result for result in tool_results if result is not None]
         if len(resolved_results) != len(tool_calls):
@@ -468,6 +475,7 @@ class AgentExecutor:
         require_tool_first_round: bool = True,
         require_tool_evidence: bool = False,
         stream_response: bool = False,
+        tool_call_reserve: int = 0,
     ) -> AgentExecutionResult:
         """使用统一执行引擎运行一个 AgentProfile。
 
@@ -502,11 +510,19 @@ class AgentExecutor:
 
         for round_num in range(profile.max_rounds):
             metrics.record_agentic_event("agent_round")
+            tool_definitions = state.tool_definitions
+            if (
+                tool_definitions
+                and execution_context.tool_calls_available(preserve=tool_call_reserve) <= 0
+            ):
+                tool_definitions = []
+                if _TOOL_BUDGET_WARNING not in state.warnings:
+                    state.warnings.append(_TOOL_BUDGET_WARNING)
             tool_choice = (
                 "required"
-                if round_num == 0 and state.tool_definitions and require_tool_first_round
+                if round_num == 0 and tool_definitions and require_tool_first_round
                 else "auto"
-                if state.tool_definitions
+                if tool_definitions
                 else "none"
             )
             try:
@@ -514,7 +530,7 @@ class AgentExecutor:
                     llm_client,
                     model=model,
                     messages=state.messages,
-                    tool_definitions=state.tool_definitions,
+                    tool_definitions=tool_definitions,
                     tool_choice=tool_choice,
                     temperature=temperature,
                     stream_response=stream_response,
@@ -538,7 +554,7 @@ class AgentExecutor:
             self._record_turn_completion(state, turn)
 
             tool_calls = list(turn.tool_calls)
-            if not tool_calls and state.tool_definitions:
+            if not tool_calls and tool_definitions:
                 tool_calls = extract_pseudo_tool_calls(
                     turn.content,
                     registry,
@@ -581,6 +597,7 @@ class AgentExecutor:
                 turn.content,
                 emit,
                 execution_context,
+                tool_call_reserve,
             )
 
         if require_tool_evidence and not any(

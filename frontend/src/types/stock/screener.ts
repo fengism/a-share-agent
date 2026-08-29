@@ -90,12 +90,18 @@ export interface ScreenerStrategyRequest {
   parameters?: Record<string, number | boolean | string>;
   codes: string[];
   lookback_days?: number;
+  max_signal_age_bars?: number | null;
 }
 
 export interface ScreenerStrategyMatch {
   code: string;
   signal_date: string;
   target_position: number;
+  signal_age_bars: number;
+  entry_price: number | null;
+  latest_price: number | null;
+  return_since_signal_pct: number | null;
+  average_amount_20d_yi: number | null;
   data_source?: string;
   data_hash?: string;
   used_fallback?: boolean;
@@ -111,5 +117,6 @@ export interface ScreenerStrategyResult {
   matched_codes: string[];
   evaluated: number;
   failed: Record<string, string>;
+  excluded: Record<string, string>;
   fallback_count?: number;
 }

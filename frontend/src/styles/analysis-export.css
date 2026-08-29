@@ -42,7 +42,15 @@
   border-radius: 999px;
 }
 
+.revenue-breakdown-pdf {
+  display: none;
+}
+
 /* ── PDF 导出模式 ── */
+
+.pdf-exporting .revenue-breakdown-pdf {
+  display: block;
+}
 
 .pdf-exporting .pdf-hide,
 .pdf-exporting .ant-btn,
@@ -52,7 +60,6 @@
 .pdf-exporting .ant-alert,
 .pdf-exporting .ant-message,
 .pdf-exporting .ant-card-extra,
-.pdf-exporting .ant-spin,
 .pdf-exporting .ant-spin-spinning {
   display: none !important;
 }
@@ -64,10 +71,67 @@
 }
 
 .pdf-exporting {
+  --stock-research-body-size: 16px;
+  --stock-research-body-leading: 1.65;
+  width: 1100px !important;
   max-width: 1100px !important;
   padding: 0 !important;
   background: var(--c-page-bg) !important;
   color: var(--c-text-primary) !important;
+  font-family: var(--stock-research-font-family, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif) !important;
+  font-size: var(--stock-research-body-size) !important;
+  line-height: var(--stock-research-body-leading) !important;
+  letter-spacing: 0 !important;
+  text-rendering: optimizeLegibility;
+}
+
+.pdf-exporting .ant-typography,
+.pdf-exporting .ant-table,
+.pdf-exporting .ant-tag {
+  font-family: inherit !important;
+  letter-spacing: 0 !important;
+}
+
+.pdf-exporting .research-framework,
+.pdf-exporting .financial-data-sections {
+  --stock-research-body-size: 16px;
+  --stock-research-body-leading: 1.65;
+}
+
+.pdf-exporting .terminal-table-row td,
+.pdf-exporting .ant-table-thead > tr > th {
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+.pdf-exporting .pdf-statement-section > .ant-typography {
+  font-size: 16px !important;
+  font-weight: var(--c-weight-semibold);
+  line-height: 1.5 !important;
+}
+
+.pdf-exporting .analysis-workspace {
+  display: block !important;
+}
+
+.pdf-exporting .analysis-workspace__history {
+  display: none !important;
+}
+
+.pdf-exporting .analysis-workspace__main,
+.pdf-exporting .analysis-workspace__header {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.pdf-exporting .pdf-statement-section .ant-table-cell:first-child {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+
+.pdf-exporting .ant-table-content,
+.pdf-exporting .ant-table-container {
+  overflow: visible !important;
 }
 
 .pdf-exporting .ant-card-head {
@@ -101,6 +165,33 @@
 .pdf-exporting .pdf-section-title {
   padding-bottom: 6px;
   border-bottom: 1px solid var(--c-border);
+}
+
+.pdf-exporting .analysis-conclusion__hero {
+  border-block-color: var(--c-border);
+}
+
+.pdf-exporting .analysis-conclusion__factor-card.is-positive,
+.pdf-exporting .analysis-conclusion__factor-card.is-negative {
+  border-color: var(--c-border);
+  background: var(--c-hover-bg);
+}
+
+.pdf-exporting .analysis-follow-ups button {
+  border-color: var(--c-border);
+}
+
+.pdf-exporting .research-evidence-ruler__grade {
+  background: var(--c-nested-bg);
+}
+
+.pdf-exporting .research-reading-toolbar {
+  background: var(--c-card-bg);
+  backdrop-filter: none;
+}
+
+.pdf-exporting .markdown-body code {
+  background: var(--c-nested-bg);
 }
 
 .pdf-exporting .pdf-list-item {

@@ -1,6 +1,15 @@
+import re
+
 from app.modules.industry_chain.charts import build_industry_charts
 from app.modules.industry_chain.models import IndustryChainResult
 from app.modules.industry_chain.report_renderer import render_industry_markdown
+
+_A_SHARE_CODE_PATTERN = re.compile(
+    r"^(?:(?:SH|SZ|BJ)[.:]?)?"
+    r"((?:00|30|60|68|43|83|87|92)\d{4})"
+    r"(?:[.:]?(?:SH|SZ|BJ))?$",
+    re.IGNORECASE,
+)
 
 
 def _string_value(value) -> str:
@@ -13,6 +22,12 @@ def _string_list(value) -> list[str]:
     if not isinstance(value, list):
         return []
     return [text for item in value if (text := _string_value(item))]
+
+
+def _stock_code(value) -> str:
+    code = _string_value(value)
+    match = _A_SHARE_CODE_PATTERN.fullmatch(code)
+    return match.group(1) if match else code
 
 
 def _record_list(value, string_fields: tuple[str, ...]) -> list[dict]:
@@ -45,6 +60,7 @@ def _node_list(value) -> list[dict]:
             "name", "company", "code", "role", "description", "market_share", "metric", "source", "source_url",
         ):
             node[field] = _string_value(node.get(field))
+        node["code"] = _stock_code(node.get("code"))
         node["companies"] = _string_list(node.get("companies"))
         node["evidence_ids"] = _string_list(node.get("evidence_ids"))
         nodes.append(node)

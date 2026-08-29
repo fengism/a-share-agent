@@ -22,6 +22,137 @@
         "title": "AdminResetLinkRequest",
         "type": "object"
       },
+      "AgentEvent": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan_step": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentPlanStepUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reasoning_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Content"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "completed",
+                  "partial",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "tool_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolCallInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tool_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolResultInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tool_result_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentToolResultSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "enum": [
+              "status",
+              "plan",
+              "plan_step",
+              "text",
+              "reasoning",
+              "tool_call",
+              "tool_result",
+              "error",
+              "done"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "AgentEvent",
+        "type": "object"
+      },
       "AgentMessage": {
         "properties": {
           "content": {
@@ -101,6 +232,211 @@
           "role"
         ],
         "title": "AgentMessage",
+        "type": "object"
+      },
+      "AgentPlan": {
+        "properties": {
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPlanStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          }
+        },
+        "title": "AgentPlan",
+        "type": "object"
+      },
+      "AgentPlanStep": {
+        "properties": {
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Name"
+          },
+          "attempt": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "default": "pending",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "degraded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "AgentPlanStep",
+        "type": "object"
+      },
+      "AgentPlanStepUpdate": {
+        "properties": {
+          "attempt": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "degraded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "step_id": {
+            "title": "Step Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_id",
+          "status"
+        ],
+        "title": "AgentPlanStepUpdate",
+        "type": "object"
+      },
+      "AgentToolResultSummary": {
+        "properties": {
+          "metadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/AgentToolSource"
+            },
+            "maxItems": 5,
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "default": "success",
+            "enum": [
+              "success",
+              "error",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "title": "AgentToolResultSummary",
+        "type": "object"
+      },
+      "AgentToolSource": {
+        "properties": {
+          "domain": {
+            "default": "",
+            "title": "Domain",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "AgentToolSource",
         "type": "object"
       },
       "AnalysisHistoryItem": {
@@ -254,6 +590,13 @@
       },
       "AnalysisResult": {
         "properties": {
+          "agent_trace": {
+            "items": {
+              "$ref": "#/components/schemas/AgentEvent"
+            },
+            "title": "Agent Trace",
+            "type": "array"
+          },
           "analysis_date": {
             "title": "Analysis Date",
             "type": "string"
@@ -338,6 +681,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PromptTrace"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "research_framework": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InvestmentResearchFramework"
               },
               {
                 "type": "null"
@@ -827,6 +1180,55 @@
           "jobs"
         ],
         "title": "BotAdminJobsResponse",
+        "type": "object"
+      },
+      "BusinessModelResearch": {
+        "properties": {
+          "concerns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Concerns",
+            "type": "array"
+          },
+          "earnings_quality": {
+            "default": "",
+            "title": "Earnings Quality",
+            "type": "string"
+          },
+          "economic_engine": {
+            "default": "",
+            "title": "Economic Engine",
+            "type": "string"
+          },
+          "operating_leverage": {
+            "default": "",
+            "title": "Operating Leverage",
+            "type": "string"
+          },
+          "revenue_drivers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Revenue Drivers",
+            "type": "array"
+          },
+          "segment_quality": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentQuality"
+            },
+            "title": "Segment Quality",
+            "type": "array"
+          },
+          "strengths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Strengths",
+            "type": "array"
+          }
+        },
+        "title": "BusinessModelResearch",
         "type": "object"
       },
       "CategorizedStockNews": {
@@ -2448,6 +2850,85 @@
         "title": "CreateInviteRequest",
         "type": "object"
       },
+      "DCFScenario": {
+        "description": "Purpose: DCF 单一情景的核心假设与估值结果。",
+        "properties": {
+          "discount_rate": {
+            "title": "Discount Rate",
+            "type": "number"
+          },
+          "equity_value": {
+            "title": "Equity Value",
+            "type": "number"
+          },
+          "growth_rate": {
+            "title": "Growth Rate",
+            "type": "number"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "per_share_value": {
+            "title": "Per Share Value",
+            "type": "number"
+          },
+          "terminal_growth_rate": {
+            "title": "Terminal Growth Rate",
+            "type": "number"
+          },
+          "upside_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upside Pct"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "growth_rate",
+          "discount_rate",
+          "terminal_growth_rate",
+          "equity_value",
+          "per_share_value"
+        ],
+        "title": "DCFScenario",
+        "type": "object"
+      },
+      "DCFSensitivityPoint": {
+        "description": "Purpose: DCF 折现率与永续增长率组合下的估值结果。",
+        "properties": {
+          "discount_rate": {
+            "title": "Discount Rate",
+            "type": "number"
+          },
+          "per_share_value": {
+            "title": "Per Share Value",
+            "type": "number"
+          },
+          "terminal_growth_rate": {
+            "title": "Terminal Growth Rate",
+            "type": "number"
+          }
+        },
+        "required": [
+          "discount_rate",
+          "terminal_growth_rate",
+          "per_share_value"
+        ],
+        "title": "DCFSensitivityPoint",
+        "type": "object"
+      },
       "DCFValuationResult": {
         "description": "Purpose: DCF（现金流折现）估值方法的结果。",
         "properties": {
@@ -2510,6 +2991,11 @@
             ],
             "title": "Confidence Score"
           },
+          "data_quality_score": {
+            "default": 1.0,
+            "title": "Data Quality Score",
+            "type": "number"
+          },
           "discount_rate": {
             "anyOf": [
               {
@@ -2531,6 +3017,17 @@
               }
             ],
             "title": "Equity Value"
+          },
+          "fcfe_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fcfe Source"
           },
           "forecast_years": {
             "default": 5,
@@ -2563,6 +3060,23 @@
               }
             ],
             "title": "Reason"
+          },
+          "reverse_dcf": {
+            "$ref": "#/components/schemas/ReverseDCFResult"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/DCFScenario"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "sensitivity": {
+            "items": {
+              "$ref": "#/components/schemas/DCFSensitivityPoint"
+            },
+            "title": "Sensitivity",
+            "type": "array"
           },
           "terminal_growth_rate": {
             "anyOf": [
@@ -3001,6 +3515,34 @@
           }
         },
         "title": "DailyReviewSourceStatus",
+        "type": "object"
+      },
+      "DataGap": {
+        "properties": {
+          "decision_impact": {
+            "default": "",
+            "title": "Decision Impact",
+            "type": "string"
+          },
+          "follow_up": {
+            "default": "",
+            "title": "Follow Up",
+            "type": "string"
+          },
+          "missing_data": {
+            "default": "",
+            "title": "Missing Data",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "required": [
+          "topic"
+        ],
+        "title": "DataGap",
         "type": "object"
       },
       "DeleteResponse": {
@@ -4986,6 +5528,13 @@
       },
       "IndustryChainResult": {
         "properties": {
+          "agent_trace": {
+            "items": {
+              "$ref": "#/components/schemas/AgentEvent"
+            },
+            "title": "Agent Trace",
+            "type": "array"
+          },
           "aliases": {
             "items": {
               "type": "string"
@@ -5258,6 +5807,59 @@
         "title": "IndustryChainSource",
         "type": "object"
       },
+      "IndustryPosition": {
+        "properties": {
+          "competitive_position": {
+            "default": "",
+            "title": "Competitive Position",
+            "type": "string"
+          },
+          "concentration_risks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Concentration Risks",
+            "type": "array"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "growth_drivers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Growth Drivers",
+            "type": "array"
+          },
+          "secular_context": {
+            "default": "",
+            "title": "Secular Context",
+            "type": "string"
+          },
+          "technology_or_obsolescence_risk": {
+            "default": "",
+            "title": "Technology Or Obsolescence Risk",
+            "type": "string"
+          },
+          "value_chain_position": {
+            "default": "",
+            "title": "Value Chain Position",
+            "type": "string"
+          }
+        },
+        "title": "IndustryPosition",
+        "type": "object"
+      },
       "IndustryRankItem": {
         "additionalProperties": true,
         "properties": {
@@ -5450,6 +6052,66 @@
         "title": "IndustryRankings",
         "type": "object"
       },
+      "InformationQuality": {
+        "properties": {
+          "coverage_summary": {
+            "default": "",
+            "title": "Coverage Summary",
+            "type": "string"
+          },
+          "evidence_confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Confidence"
+          },
+          "grade": {
+            "default": "unknown",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "unknown"
+            ],
+            "title": "Grade",
+            "type": "string"
+          },
+          "grade_rationale": {
+            "default": "",
+            "title": "Grade Rationale",
+            "type": "string"
+          },
+          "investment_certainty": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Investment Certainty"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          }
+        },
+        "title": "InformationQuality",
+        "type": "object"
+      },
       "InstitutionForecast": {
         "description": "Purpose: 机构对某项财务指标的预测统计（最小值/均值/最大值及机构数）。",
         "properties": {
@@ -5634,6 +6296,151 @@
           "price"
         ],
         "title": "IntradayItem",
+        "type": "object"
+      },
+      "InversionAnalysis": {
+        "properties": {
+          "bear_case": {
+            "default": "",
+            "title": "Bear Case",
+            "type": "string"
+          },
+          "bias_checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Bias Checks",
+            "type": "array"
+          },
+          "risks": {
+            "items": {
+              "$ref": "#/components/schemas/RiskCase"
+            },
+            "title": "Risks",
+            "type": "array"
+          }
+        },
+        "title": "InversionAnalysis",
+        "type": "object"
+      },
+      "InvestmentResearchFramework": {
+        "properties": {
+          "actions": {
+            "$ref": "#/components/schemas/InvestorActionPlan"
+          },
+          "business_model": {
+            "$ref": "#/components/schemas/BusinessModelResearch"
+          },
+          "data_gaps": {
+            "items": {
+              "$ref": "#/components/schemas/DataGap"
+            },
+            "title": "Data Gaps",
+            "type": "array"
+          },
+          "industry_position": {
+            "$ref": "#/components/schemas/IndustryPosition"
+          },
+          "information_quality": {
+            "$ref": "#/components/schemas/InformationQuality"
+          },
+          "inversion": {
+            "$ref": "#/components/schemas/InversionAnalysis"
+          },
+          "management": {
+            "$ref": "#/components/schemas/ManagementAssessment"
+          },
+          "moat": {
+            "$ref": "#/components/schemas/MoatAssessment"
+          },
+          "valuation": {
+            "$ref": "#/components/schemas/ValuationFramework"
+          }
+        },
+        "title": "InvestmentResearchFramework",
+        "type": "object"
+      },
+      "InvestorActionPlan": {
+        "properties": {
+          "add_triggers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Add Triggers",
+            "type": "array"
+          },
+          "buy_or_add_range": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Or Add Range"
+          },
+          "holder_action": {
+            "default": "insufficient_evidence",
+            "enum": [
+              "hold",
+              "add",
+              "reduce",
+              "exit",
+              "insufficient_evidence"
+            ],
+            "title": "Holder Action",
+            "type": "string"
+          },
+          "monitoring_metrics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Monitoring Metrics",
+            "type": "array"
+          },
+          "new_investor_action": {
+            "default": "insufficient_evidence",
+            "enum": [
+              "buy",
+              "watch",
+              "avoid",
+              "insufficient_evidence"
+            ],
+            "title": "New Investor Action",
+            "type": "string"
+          },
+          "rationale": {
+            "default": "",
+            "title": "Rationale",
+            "type": "string"
+          },
+          "sell_triggers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sell Triggers",
+            "type": "array"
+          },
+          "thesis_breakers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Thesis Breakers",
+            "type": "array"
+          }
+        },
+        "title": "InvestorActionPlan",
         "type": "object"
       },
       "InviteOut": {
@@ -6051,6 +6858,59 @@
           }
         },
         "title": "MacroUsDataResponse",
+        "type": "object"
+      },
+      "ManagementAssessment": {
+        "properties": {
+          "capital_allocation": {
+            "default": "",
+            "title": "Capital Allocation",
+            "type": "string"
+          },
+          "concerns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Concerns",
+            "type": "array"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "shareholder_alignment": {
+            "default": "",
+            "title": "Shareholder Alignment",
+            "type": "string"
+          },
+          "strengths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Strengths",
+            "type": "array"
+          },
+          "succession_or_key_person_risk": {
+            "default": "",
+            "title": "Succession Or Key Person Risk",
+            "type": "string"
+          },
+          "track_record": {
+            "default": "",
+            "title": "Track Record",
+            "type": "string"
+          }
+        },
+        "title": "ManagementAssessment",
         "type": "object"
       },
       "MarketBreadthSnapshot": {
@@ -7563,6 +8423,113 @@
         "title": "MarketWindStocksResponse",
         "type": "object"
       },
+      "MoatAssessment": {
+        "properties": {
+          "key_threats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Key Threats",
+            "type": "array"
+          },
+          "moats": {
+            "items": {
+              "$ref": "#/components/schemas/MoatItem"
+            },
+            "title": "Moats",
+            "type": "array"
+          },
+          "overall_durability": {
+            "default": "",
+            "title": "Overall Durability",
+            "type": "string"
+          }
+        },
+        "title": "MoatAssessment",
+        "type": "object"
+      },
+      "MoatItem": {
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "counterevidence": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Counterevidence",
+            "type": "array"
+          },
+          "direction": {
+            "default": "unclear",
+            "enum": [
+              "strengthening",
+              "stable",
+              "weakening",
+              "unclear"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "durability": {
+            "default": "",
+            "title": "Durability",
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "moat_type": {
+            "enum": [
+              "brand_pricing",
+              "switching_cost",
+              "network_effect",
+              "scale_advantage",
+              "technology_ip",
+              "other"
+            ],
+            "title": "Moat Type",
+            "type": "string"
+          },
+          "strength": {
+            "default": "unclear",
+            "enum": [
+              "strong",
+              "moderate",
+              "weak",
+              "unclear"
+            ],
+            "title": "Strength",
+            "type": "string"
+          },
+          "threats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Threats",
+            "type": "array"
+          }
+        },
+        "required": [
+          "moat_type"
+        ],
+        "title": "MoatItem",
+        "type": "object"
+      },
       "NeedsSetupResponse": {
         "properties": {
           "needs_setup": {
@@ -7735,6 +8702,28 @@
           }
         },
         "title": "OkResponse",
+        "type": "object"
+      },
+      "PeerMetricStats": {
+        "description": "Purpose: 单项同行估值倍数的清洗及可信度统计。",
+        "properties": {
+          "confidence_score": {
+            "default": 0.0,
+            "title": "Confidence Score",
+            "type": "number"
+          },
+          "excluded_count": {
+            "default": 0,
+            "title": "Excluded Count",
+            "type": "integer"
+          },
+          "sample_size": {
+            "default": 0,
+            "title": "Sample Size",
+            "type": "integer"
+          }
+        },
+        "title": "PeerMetricStats",
         "type": "object"
       },
       "PortfolioClosedPosition": {
@@ -8984,6 +9973,16 @@
             "title": "Equity Curve",
             "type": "array"
           },
+          "holdout_validation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuantHoldoutValidation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "market_snapshots": {
             "items": {
               "$ref": "#/components/schemas/QuantMarketSnapshot"
@@ -9213,6 +10212,47 @@
         "title": "QuantExecutionConfig",
         "type": "object"
       },
+      "QuantHoldoutValidation": {
+        "properties": {
+          "end_date": {
+            "title": "End Date",
+            "type": "string"
+          },
+          "method": {
+            "const": "holdout",
+            "default": "holdout",
+            "title": "Method",
+            "type": "string"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/QuantMetrics"
+          },
+          "observation_count": {
+            "minimum": 1.0,
+            "title": "Observation Count",
+            "type": "integer"
+          },
+          "start_date": {
+            "title": "Start Date",
+            "type": "string"
+          },
+          "training_ratio": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Training Ratio",
+            "type": "number"
+          }
+        },
+        "required": [
+          "training_ratio",
+          "start_date",
+          "end_date",
+          "observation_count",
+          "metrics"
+        ],
+        "title": "QuantHoldoutValidation",
+        "type": "object"
+      },
       "QuantMarketSnapshot": {
         "properties": {
           "code": {
@@ -9264,6 +10304,28 @@
             ],
             "title": "Benchmark Return"
           },
+          "calmar_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calmar Ratio"
+          },
+          "downside_volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Downside Volatility"
+          },
           "excess_return": {
             "anyOf": [
               {
@@ -9274,6 +10336,17 @@
               }
             ],
             "title": "Excess Return"
+          },
+          "information_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Information Ratio"
           },
           "max_drawdown": {
             "title": "Max Drawdown",
@@ -9301,9 +10374,31 @@
             ],
             "title": "Sharpe Ratio"
           },
+          "sortino_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sortino Ratio"
+          },
           "total_return": {
             "title": "Total Return",
             "type": "number"
+          },
+          "tracking_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracking Error"
           },
           "trade_count": {
             "title": "Trade Count",
@@ -9680,6 +10775,58 @@
             "title": "Maximum Drawdown Pct",
             "type": "number"
           },
+          "maximum_holdout_drawdown_pct": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 80.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Holdout Drawdown Pct"
+          },
+          "minimum_holdout_sharpe_ratio": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": -20.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Holdout Sharpe Ratio"
+          },
+          "minimum_holdout_trade_count": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Holdout Trade Count"
+          },
+          "minimum_sharpe_ratio": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": -20.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Sharpe Ratio"
+          },
           "minimum_trade_count": {
             "default": 1,
             "maximum": 10000.0,
@@ -9759,6 +10906,39 @@
             "title": "Errors",
             "type": "array"
           },
+          "holdout_max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdout Max Drawdown"
+          },
+          "holdout_sharpe_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdout Sharpe Ratio"
+          },
+          "holdout_trade_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdout Trade Count"
+          },
           "max_drawdown": {
             "anyOf": [
               {
@@ -9776,6 +10956,58 @@
             "maximum": 80.0,
             "title": "Maximum Drawdown Pct",
             "type": "number"
+          },
+          "maximum_holdout_drawdown_pct": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 80.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Holdout Drawdown Pct"
+          },
+          "minimum_holdout_sharpe_ratio": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": -20.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Holdout Sharpe Ratio"
+          },
+          "minimum_holdout_trade_count": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Holdout Trade Count"
+          },
+          "minimum_sharpe_ratio": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": -20.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Sharpe Ratio"
           },
           "minimum_trade_count": {
             "default": 1,
@@ -9797,6 +11029,17 @@
             "default": "pending",
             "title": "Run Status",
             "type": "string"
+          },
+          "sharpe_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe Ratio"
           },
           "trade_count": {
             "anyOf": [
@@ -10480,6 +11723,274 @@
         "title": "RetailSentimentPost",
         "type": "object"
       },
+      "RevenueBreakdown": {
+        "description": "新浪最新披露口径下的营收与毛利构成；上游不提供报告期。",
+        "properties": {
+          "amount_unit": {
+            "const": "CNY_yuan",
+            "default": "CNY_yuan",
+            "title": "Amount Unit",
+            "type": "string"
+          },
+          "amount_unit_inferred": {
+            "default": true,
+            "title": "Amount Unit Inferred",
+            "type": "boolean"
+          },
+          "by_business": {
+            "items": {
+              "$ref": "#/components/schemas/RevenueBreakdownItem"
+            },
+            "title": "By Business",
+            "type": "array"
+          },
+          "by_product": {
+            "items": {
+              "$ref": "#/components/schemas/RevenueBreakdownItem"
+            },
+            "title": "By Product",
+            "type": "array"
+          },
+          "by_region": {
+            "items": {
+              "$ref": "#/components/schemas/RevenueBreakdownItem"
+            },
+            "title": "By Region",
+            "type": "array"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "const": "sina",
+            "default": "sina",
+            "title": "Source",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "symbol"
+        ],
+        "title": "RevenueBreakdown",
+        "type": "object"
+      },
+      "RevenueBreakdownItem": {
+        "description": "单个产品、业务或地区的营收与毛利构成。",
+        "properties": {
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "gross_margin_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Margin Pct"
+          },
+          "gross_profit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Profit"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "is_sub_item": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Sub Item"
+          },
+          "revenue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue"
+          },
+          "revenue_share_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Share Pct"
+          }
+        },
+        "required": [
+          "class_name"
+        ],
+        "title": "RevenueBreakdownItem",
+        "type": "object"
+      },
+      "ReverseDCFResult": {
+        "description": "Purpose: 由当前股价反推市场隐含增长率。",
+        "properties": {
+          "available": {
+            "default": false,
+            "title": "Available",
+            "type": "boolean"
+          },
+          "implied_growth_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implied Growth Rate"
+          },
+          "market_equity_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Equity Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "ReverseDCFResult",
+        "type": "object"
+      },
+      "RiskCase": {
+        "properties": {
+          "failure_path": {
+            "default": "",
+            "title": "Failure Path",
+            "type": "string"
+          },
+          "impact": {
+            "default": "unknown",
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unknown"
+            ],
+            "title": "Impact",
+            "type": "string"
+          },
+          "leading_indicators": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Leading Indicators",
+            "type": "array"
+          },
+          "mitigants": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mitigants",
+            "type": "array"
+          },
+          "probability": {
+            "default": "unknown",
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unknown"
+            ],
+            "title": "Probability",
+            "type": "string"
+          },
+          "risk": {
+            "title": "Risk",
+            "type": "string"
+          },
+          "scenario": {
+            "default": "cross_scenario",
+            "enum": [
+              "bull",
+              "base",
+              "bear",
+              "cross_scenario"
+            ],
+            "title": "Scenario",
+            "type": "string"
+          },
+          "time_horizon": {
+            "default": "",
+            "title": "Time Horizon",
+            "type": "string"
+          }
+        },
+        "required": [
+          "risk"
+        ],
+        "title": "RiskCase",
+        "type": "object"
+      },
       "ScreenerFilter": {
         "description": "Purpose: 股票筛选接口的过滤条件参数。",
         "properties": {
@@ -10918,6 +12429,17 @@
       },
       "ScreenerStrategyMatch": {
         "properties": {
+          "average_amount_20d_yi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Amount 20D Yi"
+          },
           "code": {
             "title": "Code",
             "type": "string"
@@ -10931,6 +12453,44 @@
             "default": "",
             "title": "Data Source",
             "type": "string"
+          },
+          "entry_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Price"
+          },
+          "latest_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Price"
+          },
+          "return_since_signal_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Since Signal Pct"
+          },
+          "signal_age_bars": {
+            "default": 0,
+            "title": "Signal Age Bars",
+            "type": "integer"
           },
           "signal_date": {
             "title": "Signal Date",
@@ -11113,6 +12673,20 @@
             "title": "Lookback Days",
             "type": "integer"
           },
+          "max_signal_age_bars": {
+            "anyOf": [
+              {
+                "maximum": 250.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 20,
+            "title": "Max Signal Age Bars"
+          },
           "parameters": {
             "additionalProperties": {
               "anyOf": [
@@ -11168,6 +12742,13 @@
           "evaluated": {
             "title": "Evaluated",
             "type": "integer"
+          },
+          "excluded": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Excluded",
+            "type": "object"
           },
           "failed": {
             "additionalProperties": {
@@ -11297,6 +12878,52 @@
           }
         },
         "title": "SectorSnapshotItem",
+        "type": "object"
+      },
+      "SegmentQuality": {
+        "properties": {
+          "evidence_confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Confidence"
+          },
+          "growth_quality": {
+            "default": "",
+            "title": "Growth Quality",
+            "type": "string"
+          },
+          "profitability_quality": {
+            "default": "",
+            "title": "Profitability Quality",
+            "type": "string"
+          },
+          "recurrence": {
+            "default": "",
+            "title": "Recurrence",
+            "type": "string"
+          },
+          "role": {
+            "default": "",
+            "title": "Role",
+            "type": "string"
+          },
+          "segment": {
+            "title": "Segment",
+            "type": "string"
+          }
+        },
+        "required": [
+          "segment"
+        ],
+        "title": "SegmentQuality",
         "type": "object"
       },
       "StockBasicInfo": {
@@ -13244,6 +14871,39 @@
         "title": "ToolCallInfo",
         "type": "object"
       },
+      "ToolResultInfo": {
+        "properties": {
+          "content": {
+            "maxLength": 100000,
+            "title": "Content",
+            "type": "string"
+          },
+          "is_error": {
+            "default": false,
+            "title": "Is Error",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "tool_call_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Tool Call Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool_call_id",
+          "name",
+          "content"
+        ],
+        "title": "ToolResultInfo",
+        "type": "object"
+      },
       "TradingCalendarResponse": {
         "description": "A 股交易日历区间视图。",
         "properties": {
@@ -13585,6 +15245,57 @@
         "title": "UserOut",
         "type": "object"
       },
+      "ValuationDataQuality": {
+        "description": "Purpose: 估值输入数据的完整性、口径和限制说明。",
+        "properties": {
+          "cashflow_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cashflow Source"
+          },
+          "grade": {
+            "default": "low",
+            "title": "Grade",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "peer_confidence": {
+            "default": 0.0,
+            "title": "Peer Confidence",
+            "type": "number"
+          },
+          "score": {
+            "default": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "ttm_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttm Source"
+          }
+        },
+        "title": "ValuationDataQuality",
+        "type": "object"
+      },
       "ValuationDetail": {
         "description": "Purpose: 估值分析详情，整合估值倍数、百分位、基本面、同业、多种估值方法结果及机构预测。",
         "properties": {
@@ -13613,6 +15324,9 @@
               }
             ],
             "title": "Current Price"
+          },
+          "data_quality": {
+            "$ref": "#/components/schemas/ValuationDataQuality"
           },
           "fair_value_range": {
             "anyOf": [
@@ -13763,9 +15477,65 @@
         "title": "ValuationDetail",
         "type": "object"
       },
+      "ValuationFramework": {
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "current_valuation": {
+            "default": "",
+            "title": "Current Valuation",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "margin_of_safety": {
+            "default": "",
+            "title": "Margin Of Safety",
+            "type": "string"
+          },
+          "method_summary": {
+            "default": "",
+            "title": "Method Summary",
+            "type": "string"
+          },
+          "scenarios": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValuationScenarios"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ValuationFramework",
+        "type": "object"
+      },
       "ValuationFundamentals": {
         "description": "Purpose: 估值分析所引用的基本面财务数据。",
         "properties": {
+          "capital_expenditure": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capital Expenditure"
+          },
           "net_profit": {
             "anyOf": [
               {
@@ -13908,6 +15678,11 @@
               }
             ],
             "title": "Confidence Score"
+          },
+          "data_quality_score": {
+            "default": 1.0,
+            "title": "Data Quality Score",
+            "type": "number"
           },
           "equity_value": {
             "anyOf": [
@@ -14118,6 +15893,9 @@
             ],
             "title": "Pb Median"
           },
+          "pb_stats": {
+            "$ref": "#/components/schemas/PeerMetricStats"
+          },
           "pe_median": {
             "anyOf": [
               {
@@ -14128,6 +15906,9 @@
               }
             ],
             "title": "Pe Median"
+          },
+          "pe_stats": {
+            "$ref": "#/components/schemas/PeerMetricStats"
           },
           "peer_count": {
             "default": 0,
@@ -14151,6 +15932,9 @@
               }
             ],
             "title": "Ps Median"
+          },
+          "ps_stats": {
+            "$ref": "#/components/schemas/PeerMetricStats"
           }
         },
         "title": "ValuationPeerSummary",
@@ -14289,6 +16073,91 @@
           "label"
         ],
         "title": "ValuationProfile",
+        "type": "object"
+      },
+      "ValuationScenario": {
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "fair_value_range": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value Range"
+          },
+          "invalidating_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Invalidating Conditions",
+            "type": "array"
+          },
+          "key_drivers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Key Drivers",
+            "type": "array"
+          },
+          "scenario": {
+            "enum": [
+              "bull",
+              "base",
+              "bear"
+            ],
+            "title": "Scenario",
+            "type": "string"
+          },
+          "valuation_view": {
+            "default": "",
+            "title": "Valuation View",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenario"
+        ],
+        "title": "ValuationScenario",
+        "type": "object"
+      },
+      "ValuationScenarios": {
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/ValuationScenario"
+          },
+          "bear": {
+            "$ref": "#/components/schemas/ValuationScenario"
+          },
+          "bull": {
+            "$ref": "#/components/schemas/ValuationScenario"
+          }
+        },
+        "required": [
+          "bull",
+          "base",
+          "bear"
+        ],
+        "title": "ValuationScenarios",
         "type": "object"
       },
       "WatchlistAlert": {
@@ -14543,6 +16412,11 @@
             "title": "Max Attempts",
             "type": "integer"
           },
+          "request": {
+            "additionalProperties": true,
+            "title": "Request",
+            "type": "object"
+          },
           "status": {
             "enum": [
               "pending",
@@ -14563,6 +16437,7 @@
           "id",
           "kind",
           "dedupe_key",
+          "request",
           "status",
           "attempts",
           "max_attempts",
@@ -14631,6 +16506,23 @@
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
             }
           }
         ],
@@ -20690,6 +22582,54 @@
         ]
       }
     },
+    "/api/stock/{code}/revenue-breakdown": {
+      "get": {
+        "description": "获取个股最新披露的营收与毛利构成。",
+        "operationId": "get_revenue_breakdown_api_stock__code__revenue_breakdown_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevenueBreakdown"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Revenue Breakdown",
+        "tags": [
+          "stock"
+        ]
+      }
+    },
     "/api/stock/{code}/sentiment": {
       "get": {
         "description": "获取个股情绪数据。",
@@ -21065,6 +23005,46 @@
         ]
       }
     },
+    "/api/workflows/active": {
+      "get": {
+        "operationId": "get_active_workflow_jobs_api_workflows_active_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkflowJobResponse"
+                  },
+                  "title": "Response Get Active Workflow Jobs Api Workflows Active Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Active Workflow Jobs",
+        "tags": [
+          "workflows"
+        ]
+      }
+    },
     "/api/workflows/analysis/{code}": {
       "post": {
         "operationId": "submit_analysis_job_api_workflows_analysis__code__post",
@@ -21077,6 +23057,18 @@
               "pattern": "^\\d{6}$",
               "title": "Code",
               "type": "string"
+            }
+          },
+          {
+            "description": "是否跳过当天缓存并重新生成",
+            "in": "query",
+            "name": "force",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "是否跳过当天缓存并重新生成",
+              "title": "Force",
+              "type": "boolean"
             }
           }
         ],
@@ -21172,6 +23164,18 @@
               "minLength": 1,
               "title": "Name",
               "type": "string"
+            }
+          },
+          {
+            "description": "是否跳过同范围缓存并重新生成",
+            "in": "query",
+            "name": "force",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "是否跳过同范围缓存并重新生成",
+              "title": "Force",
+              "type": "boolean"
             }
           }
         ],

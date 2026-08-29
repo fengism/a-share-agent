@@ -1,0 +1,55 @@
+.analysis-history-manager__group {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.analysis-history-manager__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--c-radius-md);
+}
+
+.analysis-history-manager__item > a {
+  display: flex;
+  min-width: 0;
+  padding: 10px 8px 10px 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-left: 3px solid transparent;
+  border-radius: var(--c-radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+
+.analysis-history-manager__item > a:hover,
+.analysis-history-manager__item > a:focus-visible {
+  background: var(--c-hover-bg);
+}
+
+.analysis-history-manager__item > a.is-active {
+  border-left-color: var(--c-primary);
+  background: var(--c-active-bg);
+}
+
+.analysis-history-manager__item > a > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.analysis-history-manager__item > a strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-history-manager__metrics {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}

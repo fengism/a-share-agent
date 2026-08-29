@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
 from app.agentic.tools.packs.web.search_engines import (
@@ -14,12 +14,21 @@ from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 SearchEngineName = Literal["baidu", "bing_cn", "google"]
 SearchTimeRange = Literal["day", "week", "month", "half_year", "any"]
 SearchLanguage = Literal["zh", "any"]
+DEFAULT_SEARCH_ENGINE: SearchEngineName = "bing_cn"
+_BAIJIAHAO_HOST = "baijiahao.baidu.com"
+_BAIJIAHAO_EXCLUSION = f"-site:{_BAIJIAHAO_HOST}"
 
 _SEARCH_ENGINE_CLASSES = {
     "baidu": BaiduSearchNoApi,
     "bing_cn": BingCnSearchNoAPI,
     "google": GoogleSearchNoAPI,
 }
+
+
+def _engine_query(query: str, engine: SearchEngineName) -> str:
+    if engine != "baidu" or _BAIJIAHAO_EXCLUSION in query.lower():
+        return query
+    return f"{query} {_BAIJIAHAO_EXCLUSION}"
 
 
 def _run_search(
@@ -31,12 +40,12 @@ def _run_search(
 ) -> list[dict[str, Any]]:
     search_engine = _SEARCH_ENGINE_CLASSES[engine]()
     try:
-        return search_engine.search(
-            query,
+        return cast(list[dict[str, Any]], search_engine.search(
+            _engine_query(query, engine),
             max_results=min(max_results * 2, 20),
             time_range=time_range,
             language=language,
-        )
+        ))
     finally:
         search_engine.session.close()
 
@@ -53,8 +62,15 @@ def _normalize_results(
         title = str(item.get("title") or "").strip()
         url = str(item.get("href") or "").strip()
         try:
-            scheme = urlsplit(url).scheme
+            parsed_url = urlsplit(url)
         except ValueError:
+            continue
+        scheme = parsed_url.scheme
+        hostname = (parsed_url.hostname or "").lower().rstrip(".")
+        if engine == "baidu" and (
+            hostname == _BAIJIAHAO_HOST
+            or hostname.endswith(f".{_BAIJIAHAO_HOST}")
+        ):
             continue
         if not title or scheme not in {"http", "https"} or url in seen_urls:
             continue
@@ -79,7 +95,7 @@ def _normalize_results(
 
 async def execute_web_search(
     query: str,
-    engine: SearchEngineName = "baidu",
+    engine: SearchEngineName = DEFAULT_SEARCH_ENGINE,
     max_results: int = 5,
     time_range: SearchTimeRange = "half_year",
     language: SearchLanguage = "zh",

@@ -1,47 +1,110 @@
 import { create } from "zustand";
 import type { AnalysisResult } from "../types/stock";
-import type { AnalysisStage } from "../api/sse";
+import type { AnalysisStage, WorkflowStream } from "../api/sse";
+import {
+  applyAgentEvent,
+  createAgentProcessState,
+  type AgentProcessState,
+} from "../features/agent-process/agentProcess";
+import type { ChatStreamDelta } from "../types/chat";
 import { registerUserScopeHandler } from "./userScope";
+
+export interface AnalysisRunIdentity {
+  ownerId: string;
+  runId: string;
+  code: string;
+}
+
+export type AnalysisEntryRoute = "analysis" | "investment-research";
 
 interface AnalysisState {
   currentCode: string;
+  jobId: string;
+  preferredRoute: AnalysisEntryRoute;
+  activeRun: AnalysisRunIdentity | null;
   analysisResult: AnalysisResult | null;
   isAnalyzing: boolean;
+  isCancelling: boolean;
   analysisStages: Array<AnalysisStage | null>;
   currentStageIndex: number;
+  agentProcess: AgentProcessState;
   analysisError: string | null;
-  cancelAnalysis: (() => void) | null;
-  setCurrentCode: (code: string) => void;
-  setAnalysisResult: (result: AnalysisResult | null) => void;
-  setIsAnalyzing: (loading: boolean) => void;
-  setAnalysisStages: (stages: Array<AnalysisStage | null>) => void;
-  updateAnalysisStage: (stage: AnalysisStage, totalStages: number, setCurrent?: boolean) => void;
-  setCurrentStageIndex: (index: number) => void;
-  setAnalysisError: (error: string | null) => void;
-  setCancelAnalysis: (cancel: (() => void) | null) => void;
-  resetAnalysisProgress: () => void;
+  activeStream: WorkflowStream<AnalysisResult> | null;
+  claimContext: (code: string, preferredRoute?: AnalysisEntryRoute) => void;
+  beginRun: (identity: AnalysisRunIdentity) => void;
+  setRunStream: (identity: AnalysisRunIdentity, stream: WorkflowStream<AnalysisResult>) => void;
+  setRunJobId: (identity: AnalysisRunIdentity, jobId: string) => void;
+  updateRunStage: (
+    identity: AnalysisRunIdentity,
+    stage: AnalysisStage,
+    totalStages: number,
+    setCurrent?: boolean,
+  ) => void;
+  applyRunAgentEvent: (identity: AnalysisRunIdentity, event: ChatStreamDelta) => void;
+  setRunResult: (identity: AnalysisRunIdentity, result: AnalysisResult) => void;
+  setRunError: (identity: AnalysisRunIdentity, error: string | null) => void;
+  setRunCancelling: (identity: AnalysisRunIdentity, cancelling: boolean) => void;
+  cancelActiveRun: () => Promise<"cancelled" | "detached" | "completed" | null>;
+  finishRun: (identity: AnalysisRunIdentity) => void;
   resetAnalysis: () => void;
 }
 
 function initialAnalysisState() {
   return {
     currentCode: "",
+    jobId: "",
+    preferredRoute: "analysis" as AnalysisEntryRoute,
+    activeRun: null,
     analysisResult: null,
     isAnalyzing: false,
+    isCancelling: false,
     analysisStages: [] as Array<AnalysisStage | null>,
     currentStageIndex: 0,
+    agentProcess: createAgentProcessState(),
     analysisError: null,
-    cancelAnalysis: null,
+    activeStream: null as WorkflowStream<AnalysisResult> | null,
   };
+}
+
+function ownsRun(active: AnalysisRunIdentity | null, identity: AnalysisRunIdentity) {
+  return active?.ownerId === identity.ownerId
+    && active.runId === identity.runId
+    && active.code === identity.code;
 }
 
 export const useAnalysisStore = create<AnalysisState>((set, get) => ({
   ...initialAnalysisState(),
-  setCurrentCode: (code) => set({ currentCode: code }),
-  setAnalysisResult: (result) => set({ analysisResult: result }),
-  setIsAnalyzing: (loading) => set({ isAnalyzing: loading }),
-  setAnalysisStages: (stages) => set({ analysisStages: stages }),
-  updateAnalysisStage: (stage, totalStages, setCurrent = false) => set((state) => {
+  claimContext: (code, preferredRoute) => set((state) => {
+    if (state.activeRun) {
+      return preferredRoute ? { preferredRoute } : state;
+    }
+    if (state.currentCode === code) return preferredRoute ? { preferredRoute } : state;
+    return {
+      ...initialAnalysisState(),
+      currentCode: code,
+      preferredRoute: preferredRoute ?? state.preferredRoute,
+    };
+  }),
+  beginRun: (identity) => set({
+    currentCode: identity.code,
+    activeRun: identity,
+    analysisResult: null,
+    isAnalyzing: true,
+    isCancelling: false,
+    analysisStages: [],
+    currentStageIndex: 0,
+    agentProcess: createAgentProcessState(),
+    analysisError: null,
+    activeStream: null,
+  }),
+  setRunStream: (identity, stream) => set((state) => (
+    ownsRun(state.activeRun, identity) ? { activeStream: stream } : state
+  )),
+  setRunJobId: (identity, jobId) => set((state) => (
+    ownsRun(state.activeRun, identity) ? { jobId } : state
+  )),
+  updateRunStage: (identity, stage, totalStages, setCurrent = false) => set((state) => {
+    if (!ownsRun(state.activeRun, identity)) return state;
     const index = stage.stage - 1;
     const stageCount = Math.max(totalStages, stage.stage, state.analysisStages.length);
     const nextStages = Array.from(
@@ -54,16 +117,46 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       currentStageIndex: setCurrent ? index : state.currentStageIndex,
     };
   }),
-  setCurrentStageIndex: (index) => set({ currentStageIndex: index }),
-  setAnalysisError: (error) => set({ analysisError: error }),
-  setCancelAnalysis: (cancel) => set({ cancelAnalysis: cancel }),
-  resetAnalysisProgress: () => set({
-    analysisStages: [],
-    currentStageIndex: 0,
-    analysisError: null,
-  }),
+  applyRunAgentEvent: (identity, event) => set((state) => (
+    ownsRun(state.activeRun, identity)
+      ? { agentProcess: applyAgentEvent(state.agentProcess, event) }
+      : state
+  )),
+  setRunResult: (identity, result) => set((state) => (
+    ownsRun(state.activeRun, identity) ? { analysisResult: result } : state
+  )),
+  setRunError: (identity, error) => set((state) => (
+    ownsRun(state.activeRun, identity) ? { analysisError: error } : state
+  )),
+  setRunCancelling: (identity, cancelling) => set((state) => (
+    ownsRun(state.activeRun, identity) ? { isCancelling: cancelling } : state
+  )),
+  cancelActiveRun: async () => {
+    const state = get();
+    if (!state.activeRun || !state.activeStream || state.isCancelling) return null;
+    const identity = state.activeRun;
+    set({ isCancelling: true, analysisError: null });
+    try {
+      const result = await state.activeStream.cancel();
+      set((latest) => ownsRun(latest.activeRun, identity)
+        ? { isAnalyzing: false, isCancelling: false, activeStream: null, activeRun: null }
+        : latest);
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "取消失败";
+      set((latest) => ownsRun(latest.activeRun, identity)
+        ? { isCancelling: false, analysisError: message }
+        : latest);
+      throw error;
+    }
+  },
+  finishRun: (identity) => set((state) => (
+    ownsRun(state.activeRun, identity)
+      ? { isAnalyzing: false, isCancelling: false, activeStream: null }
+      : state
+  )),
   resetAnalysis: () => {
-    get().cancelAnalysis?.();
+    get().activeStream?.detach();
     set(initialAnalysisState());
   },
 }));

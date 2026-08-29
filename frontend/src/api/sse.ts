@@ -20,9 +20,10 @@ export interface AnalysisStage {
 }
 
 export interface AnalysisProgress {
-  type: "stage_started" | "stage_completed" | "stage_failed" | "complete" | "error" | "cached";
+  type: "stage_started" | "stage_completed" | "stage_failed" | "agent_event" | "complete" | "error" | "cached";
   stage?: AnalysisStage | null;
   total_stages: number;
+  agent_event?: ChatStreamDelta | null;
   result?: AnalysisResult | null;
   error?: string | null;
 }
@@ -51,6 +52,14 @@ class SSERequestError extends Error {
 interface SSEFrameResult {
   id?: string;
   stop: boolean;
+  handled: boolean;
+}
+
+class SSEPayloadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SSEPayloadError";
+  }
 }
 
 function parseSSEFrame(
@@ -68,15 +77,17 @@ function parseSSEFrame(
     if (field === "id" && !value.includes("\0")) id = value;
     if (field === "data") dataLines.push(value);
   }
-  if (dataLines.length === 0) return { id, stop: false };
+  if (dataLines.length === 0) return { id, stop: false, handled: false };
 
   const payload = dataLines.join("\n");
+  let parsed: unknown;
   try {
-    return { id, stop: onData(JSON.parse(payload)) === true };
+    parsed = JSON.parse(payload);
   } catch (error) {
     if (isDev) console.error("[SSE] JSON解析失败:", payload, error);
-    return { id, stop: false };
+    throw new SSEPayloadError("任务事件格式无效");
   }
+  return { id, stop: onData(parsed) === true, handled: true };
 }
 
 /**
@@ -89,6 +100,8 @@ async function readSSE(
   url: string,
   onData: (obj: unknown) => boolean | void,
   signal: AbortSignal,
+  onCursor: (id: string) => void,
+  onProgress: () => void,
   lastEventId?: string,
 ): Promise<string | undefined> {
   const token = getToken();
@@ -121,7 +134,13 @@ async function readSSE(
   const dispatchFrame = (): boolean => {
     const frame = parseSSEFrame(frameLines, onData);
     frameLines = [];
-    if (frame.id !== undefined) currentEventId = frame.id;
+    if (frame.handled) {
+      onProgress();
+      if (frame.id !== undefined) {
+        currentEventId = frame.id;
+        onCursor(frame.id);
+      }
+    }
     return frame.stop;
   };
 
@@ -174,43 +193,115 @@ type WorkflowTerminal<Result> =
   | { status: "resolved"; result: Result }
   | { status: "rejected"; error: Error };
 
+export type WorkflowCancelResult = "cancelled" | "detached" | "completed";
+
+export interface WorkflowStream<Result> {
+  promise: Promise<Result>;
+  started: Promise<WorkflowSubmission>;
+  cancel: () => Promise<WorkflowCancelResult>;
+  detach: () => void;
+}
+
+interface WorkflowSubmissionOptions {
+  body?: unknown;
+  query?: Record<string, string | number | boolean>;
+  existingSubmission?: WorkflowSubmission;
+}
+
+function submissionPathWithQuery(
+  path: string,
+  query?: Record<string, string | number | boolean>,
+): string {
+  if (!query) return path;
+  const params = new URLSearchParams();
+  Object.entries(query).forEach(([key, value]) => params.set(key, String(value)));
+  const serialized = params.toString();
+  return serialized ? `${path}?${serialized}` : path;
+}
+
 function streamWorkflow<Result, Progress>(
   submissionPath: string,
   onProgress: (event: Progress) => void,
   terminalFromEvent: (event: Progress) => WorkflowTerminal<Result> | null,
-  submissionBody?: unknown,
-): { promise: Promise<Result>; cancel: () => void } {
+  options: WorkflowSubmissionOptions = {},
+): WorkflowStream<Result> {
   const streamController = new AbortController();
+  const submitPath = submissionPathWithQuery(submissionPath, options.query);
   let jobId: string | null = null;
+  let attached = false;
   let cancelRequested = false;
-  let cancellationPromise: Promise<void> | null = null;
+  let detached = false;
+  let cancellationPromise: Promise<WorkflowCancelResult> | null = null;
+  let resolveSubmission: () => void = () => undefined;
+  const submissionReady = new Promise<void>((resolve) => {
+    resolveSubmission = resolve;
+  });
+  const markSubmissionReady = () => {
+    resolveSubmission();
+    resolveSubmission = () => undefined;
+  };
 
-  const requestCancellation = (): Promise<void> => {
-    if (!jobId) return Promise.resolve();
-    if (!cancellationPromise) {
-      cancellationPromise = apiDelete(`/workflows/${encodeURIComponent(jobId)}`)
-        .then(() => undefined)
-        .finally(() => streamController.abort());
-    }
+  const detach = () => {
+    detached = true;
+    streamController.abort();
+  };
+
+  const requestCancellation = async (): Promise<WorkflowCancelResult> => {
+    if (cancellationPromise) return cancellationPromise;
+    cancellationPromise = (async () => {
+      await submissionReady;
+      if (!jobId || attached) {
+        detach();
+        return "detached";
+      }
+      try {
+        const response = await apiDelete<{ status: string }>(`/workflows/${encodeURIComponent(jobId)}`);
+        if (response.status === "succeeded") {
+          cancelRequested = false;
+          return "completed";
+        }
+        if (response.status !== "cancelled") throw new Error("任务取消未被服务端确认");
+        streamController.abort();
+        return "cancelled";
+      } catch (error) {
+        cancelRequested = false;
+        cancellationPromise = null;
+        throw error;
+      }
+    })();
     return cancellationPromise;
   };
+
+  let resolveStarted: ((submission: WorkflowSubmission) => void) | undefined;
+  let rejectStarted: ((error: Error) => void) | undefined;
+  const started = new Promise<WorkflowSubmission>((resolve, reject) => {
+    resolveStarted = resolve;
+    rejectStarted = reject;
+  });
 
   const promise = (async () => {
     let terminal: WorkflowTerminal<Result> | null = null;
     try {
-      const submission = submissionBody === undefined
-        ? await apiPost<WorkflowSubmission>(submissionPath)
-        : await apiPost<WorkflowSubmission>(submissionPath, submissionBody);
+      const submission = options.existingSubmission ?? (options.body === undefined
+        ? await apiPost<WorkflowSubmission>(submitPath)
+        : await apiPost<WorkflowSubmission>(submitPath, options.body));
       jobId = submission.job.id;
+      attached = submission.attached;
+      resolveStarted?.(submission);
+      resolveStarted = undefined;
+      rejectStarted = undefined;
+      markSubmissionReady();
       if (cancelRequested) {
-        await requestCancellation();
-        throw new Error("已取消");
+        const cancellation = await requestCancellation();
+        if (cancellation === "completed") cancelRequested = false;
+        else throw new Error(cancellation === "detached" ? "已停止等待" : "已取消");
       }
 
       const streamUrl = `/api/workflows/${encodeURIComponent(jobId)}/stream`;
       let lastEventId: string | undefined;
       let reconnectAttempts = 0;
       while (!terminal) {
+        let madeProgress = false;
         try {
           lastEventId = await readSSE(
             streamUrl,
@@ -221,15 +312,23 @@ function streamWorkflow<Result, Progress>(
               return terminal !== null;
             },
             streamController.signal,
+            (id) => {
+              lastEventId = id;
+            },
+            () => {
+              madeProgress = true;
+              reconnectAttempts = 0;
+            },
             lastEventId,
           );
         } catch (error) {
-          if (cancelRequested || isAbortError(error)) throw error;
+          if (cancelRequested || detached || isAbortError(error)) throw error;
+          if (error instanceof SSEPayloadError) throw error;
           if (error instanceof SSERequestError && !error.retryable) throw error;
           if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) throw error;
         }
         if (terminal) break;
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        if (!madeProgress && reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
           throw new Error("连接已结束但未返回结果");
         }
         const delay = RECONNECT_BASE_DELAY_MS * (2 ** reconnectAttempts);
@@ -238,47 +337,70 @@ function streamWorkflow<Result, Progress>(
       }
 
       if (cancelRequested) {
-        await requestCancellation();
-        throw new Error("已取消");
+        const cancellation = await requestCancellation();
+        if (cancellation === "completed") cancelRequested = false;
+        else throw new Error(cancellation === "detached" ? "已停止等待" : "已取消");
       }
       const completed = terminal as WorkflowTerminal<Result>;
       if (completed.status === "rejected") throw completed.error;
       return completed.result;
     } catch (error) {
+      if (rejectStarted) rejectStarted(error instanceof Error ? error : new Error(String(error)));
+      resolveStarted = undefined;
+      rejectStarted = undefined;
+      markSubmissionReady();
       if (cancelRequested) {
-        await requestCancellation();
-        throw new Error("已取消");
+        const cancellation = await requestCancellation();
+        if (cancellation === "completed") cancelRequested = false;
+        else throw new Error(cancellation === "detached" ? "已停止等待" : "已取消");
       }
-      if (isAbortError(error)) throw new Error("已取消");
+      if (detached || isAbortError(error)) throw new Error("已停止等待");
       throw error instanceof Error ? error : new Error(String(error));
     }
   })();
 
-  const cancel = () => {
-    if (cancelRequested) return;
+  const cancel = async (): Promise<WorkflowCancelResult> => {
     cancelRequested = true;
-    if (jobId) void requestCancellation().catch(() => undefined);
+    return requestCancellation();
   };
-  return { promise, cancel };
+  return { promise, started, cancel, detach };
+}
+
+export function resumeWorkflow<Result, Progress>(
+  jobId: string,
+  onProgress: (event: Progress) => void,
+  terminalFromEvent: (event: Progress) => WorkflowTerminal<Result> | null,
+): WorkflowStream<Result> {
+  return streamWorkflow("", onProgress, terminalFromEvent, {
+    existingSubmission: { job: { id: jobId }, attached: true },
+  });
+}
+
+function analysisTerminal(event: AnalysisProgress): WorkflowTerminal<AnalysisResult> | null {
+  if ((event.type === "complete" || event.type === "cached") && event.result) {
+    return { status: "resolved", result: event.result };
+  }
+  if (event.type === "error") {
+    return { status: "rejected", error: new Error(event.error || "分析失败") };
+  }
+  return null;
 }
 
 export function streamAnalysis(
   code: string,
   onProgress: ProgressHandler,
-): { promise: Promise<AnalysisResult>; cancel: () => void } {
+  options: { force?: boolean } = {},
+): WorkflowStream<AnalysisResult> {
   return streamWorkflow(
     `/workflows/analysis/${encodeURIComponent(code)}`,
     onProgress,
-    (event) => {
-      if ((event.type === "complete" || event.type === "cached") && event.result) {
-        return { status: "resolved", result: event.result };
-      }
-      if (event.type === "error") {
-        return { status: "rejected", error: new Error(event.error || "分析失败") };
-      }
-      return null;
-    },
+    analysisTerminal,
+    { query: options.force ? { force: true } : undefined },
   );
+}
+
+export function resumeAnalysis(jobId: string, onProgress: ProgressHandler): WorkflowStream<AnalysisResult> {
+  return resumeWorkflow(jobId, onProgress, analysisTerminal);
 }
 
 // ── 产业链分析 SSE ──
@@ -307,7 +429,7 @@ export interface DailyReviewProgress {
 export function streamDailyReview(
   request: DailyReviewRequest,
   onProgress: (event: DailyReviewProgress) => void,
-): { promise: Promise<DailyReviewResult>; cancel: () => void } {
+): WorkflowStream<DailyReviewResult> {
   return streamWorkflow(
     "/workflows/daily-review",
     onProgress,
@@ -316,38 +438,53 @@ export function streamDailyReview(
       if (event.type === "error") return { status: "rejected", error: new Error(event.message || "每日复盘生成失败") };
       return null;
     },
-    request,
+    { body: request },
   );
+}
+
+function industryChainTerminal(
+  event: IndustryChainProgress,
+): WorkflowTerminal<IndustryChainResult> | null {
+  if (event.type === "complete" && event.result) {
+    return {
+      status: "resolved",
+      result: {
+        ...event.result,
+        archive_id: event.archive_id || event.result.archive_id,
+        archive_status: event.archive_status || event.result.archive_status,
+        quality_status: event.quality_status || event.result.quality_status,
+        warnings: event.warnings || event.result.warnings,
+      },
+    };
+  }
+  if (event.type === "error") {
+    return { status: "rejected", error: new Error(event.message || "分析失败") };
+  }
+  return null;
 }
 
 export function streamIndustryChain(
   name: string,
   onProgress: IndustryChainProgressHandler,
   scope?: IndustryChainResearchScope,
-): { promise: Promise<IndustryChainResult>; cancel: () => void } {
+  options: { force?: boolean } = {},
+): WorkflowStream<IndustryChainResult> {
   return streamWorkflow(
     `/workflows/industry-chain/${encodeURIComponent(name)}`,
     onProgress,
-    (event) => {
-      if (event.type === "complete" && event.result) {
-        return {
-          status: "resolved",
-          result: {
-            ...event.result,
-            archive_id: event.archive_id || event.result.archive_id,
-            archive_status: event.archive_status || event.result.archive_status,
-            quality_status: event.quality_status || event.result.quality_status,
-            warnings: event.warnings || event.result.warnings,
-          },
-        };
-      }
-      if (event.type === "error") {
-        return { status: "rejected", error: new Error(event.message || "分析失败") };
-      }
-      return null;
+    industryChainTerminal,
+    {
+      body: scope,
+      query: options.force ? { force: true } : undefined,
     },
-    scope,
   );
+}
+
+export function resumeIndustryChain(
+  jobId: string,
+  onProgress: IndustryChainProgressHandler,
+): WorkflowStream<IndustryChainResult> {
+  return resumeWorkflow(jobId, onProgress, industryChainTerminal);
 }
 
 
@@ -356,6 +493,7 @@ export interface ScreenerStrategyProgress {
   completed?: number;
   total?: number;
   matched?: number;
+  excluded?: number;
   failed?: number;
   result?: ScreenerStrategyResult;
   message?: string;
@@ -364,7 +502,7 @@ export interface ScreenerStrategyProgress {
 export function streamScreenerStrategy(
   request: ScreenerStrategyRequest,
   onProgress: (event: ScreenerStrategyProgress) => void,
-): { promise: Promise<ScreenerStrategyResult>; cancel: () => void } {
+): WorkflowStream<ScreenerStrategyResult> {
   return streamWorkflow(
     "/workflows/screener-strategy",
     onProgress,
@@ -373,6 +511,6 @@ export function streamScreenerStrategy(
       if (event.type === "error") return { status: "rejected", error: new Error(event.message || "策略选股失败") };
       return null;
     },
-    request,
+    { body: request },
   );
 }

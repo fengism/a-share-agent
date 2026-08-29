@@ -147,6 +147,12 @@
   color: var(--c-down);
 }
 
+.chat-process-step-icon.is-degraded {
+  border-color: color-mix(in srgb, var(--c-warning) 45%, var(--c-border));
+  color: var(--c-warning);
+  background: color-mix(in srgb, var(--c-warning) 12%, transparent);
+}
+
 .chat-process-step-icon.is-failed {
   border-color: color-mix(in srgb, var(--c-up) 45%, var(--c-border));
   color: var(--c-up);
@@ -199,6 +205,11 @@
 .chat-plan-step-status.is-completed {
   background: color-mix(in srgb, var(--c-down) 10%, transparent);
   color: var(--c-down);
+}
+
+.chat-plan-step-status.is-degraded {
+  color: var(--c-warning);
+  background: color-mix(in srgb, var(--c-warning) 12%, transparent);
 }
 
 .chat-plan-step-status.is-failed {
@@ -270,6 +281,10 @@
 }
 
 .chat-tool-status.is-cancelled {
+  color: var(--c-warning);
+}
+
+.chat-tool-status.is-skipped {
   color: var(--c-warning);
 }
 

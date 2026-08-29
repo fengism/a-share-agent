@@ -151,12 +151,18 @@ def query_history(
     limit: int,
     offset: int,
     can_delete_legacy: bool,
+    query: str | None = None,
 ) -> list[dict]:
     filters = ["h.storage_root = ?", "h.scope_user_id IN (0, ?)"]
     params: list[object] = [coordinator.storage_root(), user_id]
     if code is not None:
         filters.append("h.stock_code = ?")
         params.append(code)
+    normalized_query = (query or "").strip().casefold()
+    if normalized_query:
+        filters.append("(LOWER(h.stock_code) LIKE ? OR LOWER(h.stock_name) LIKE ?)")
+        pattern = f"%{normalized_query}%"
+        params.extend((pattern, pattern))
     filters.append(
         """(
             h.scope_user_id = ? OR NOT EXISTS (

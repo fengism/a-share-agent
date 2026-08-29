@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from typing import cast
 
 from app.domain.market import KlineItem
-from app.modules.quant.strategies.compiler import CompiledStrategy
+from app.modules.quant.strategies.compiler import OBV_WARMUP_BARS, CompiledStrategy
 from app.modules.quant.strategies.contracts import (
     NumericValue,
     ParameterValue,
@@ -79,7 +79,7 @@ def _ema(values: Sequence[float | None], period: int) -> list[float | None]:
 
 
 def _rsi(values: Sequence[float | None], period: int) -> list[float | None]:
-    # 滚动涨跌幅和实现；窗口内含 None 时结果为 None（与逐窗口切片语义一致）
+    # Cutler RSI：简单滚动平均涨跌幅；窗口内含 None 时结果为 None。
     result: list[float | None] = [None] * len(values)
     if period <= 0:
         return result
@@ -113,7 +113,12 @@ def _rsi(values: Sequence[float | None], period: int) -> list[float | None]:
         if index >= period and window_none == 0:
             avg_gain = gains / period
             avg_loss = losses / period
-            result[index] = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
+            if avg_gain == 0 and avg_loss == 0:
+                result[index] = 50.0
+            elif avg_loss == 0:
+                result[index] = 100.0
+            else:
+                result[index] = 100 - 100 / (1 + avg_gain / avg_loss)
     return result
 
 
@@ -130,10 +135,10 @@ def _rolling(values: Sequence[float | None], period: int, mode: str) -> list[flo
                 window_none += 1
             else:
                 if mode == "rolling_max":
-                    while extrema and float(values[extrema[-1]]) <= float(value):
+                    while extrema and cast(float, values[extrema[-1]]) <= float(value):
                         extrema.pop()
                 else:
-                    while extrema and float(values[extrema[-1]]) >= float(value):
+                    while extrema and cast(float, values[extrema[-1]]) >= float(value):
                         extrema.pop()
                 extrema.append(index)
             leaving_index = index - period
@@ -144,7 +149,7 @@ def _rolling(values: Sequence[float | None], period: int, mode: str) -> list[flo
                 elif extrema and extrema[0] == leaving_index:
                     extrema.popleft()
             if index >= period - 1 and window_none == 0 and extrema:
-                result.append(float(values[extrema[0]]))
+                result.append(cast(float, values[extrema[0]]))
             else:
                 result.append(None)
         return result
@@ -180,10 +185,16 @@ def _rolling(values: Sequence[float | None], period: int, mode: str) -> list[flo
 def _obv(
     closes: Sequence[float | None],
     volumes: Sequence[float | None],
+    *,
+    anchor_index: int = 0,
 ) -> list[float | None]:
-    result: list[float | None] = [0.0] * len(closes)
+    # 从固定历史锚点起累计，并缩放为输入成交量的万单位。
+    result: list[float | None] = [None] * len(closes)
+    if anchor_index >= len(closes):
+        return result
+    result[anchor_index] = 0.0
     current = 0.0
-    for index in range(1, len(closes)):
+    for index in range(anchor_index + 1, len(closes)):
         close = closes[index]
         previous_close = closes[index - 1]
         volume = volumes[index]
@@ -299,7 +310,17 @@ def evaluate_target_positions(
     items: list[KlineItem],
     strategy: CompiledStrategy,
     parameters: dict[str, ParameterValue],
+    *,
+    evaluation_start_date: str | None = None,
 ) -> list[int]:
+    evaluation_start_index = next(
+        (
+            index
+            for index, item in enumerate(items)
+            if evaluation_start_date is None or item.date >= evaluation_start_date
+        ),
+        len(items),
+    )
     series: dict[str, list[float | None]] = {
         "open": [item.open for item in items],
         "high": [item.high for item in items],
@@ -319,7 +340,11 @@ def evaluate_target_positions(
         elif indicator.operator == "obv":
             if indicator.input is None or indicator.volume_input is None:
                 raise ValueError("obv 指标缺少输入")
-            values = _obv(series[indicator.input], series[indicator.volume_input])
+            values = _obv(
+                series[indicator.input],
+                series[indicator.volume_input],
+                anchor_index=max(0, evaluation_start_index - OBV_WARMUP_BARS),
+            )
         else:
             if indicator.input is None or indicator.period is None:
                 raise ValueError(f"指标 {name} 缺少 input 或 period")
@@ -359,6 +384,7 @@ def evaluate_target_positions(
             if left is None or right is None:
                 series[name][index] = None
                 continue
+            value: float | None
             if indicator.operator == "add":
                 value = float(left + right)
             elif indicator.operator == "subtract":

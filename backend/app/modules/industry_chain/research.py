@@ -98,6 +98,62 @@ def _has_web_body(evidence) -> bool:
         for url, content in _body_records(_decoded_content(evidence))
     )
 
+
+def _has_dimension_context(
+    evidence,
+    terms: tuple[str, ...],
+    *,
+    minimum_matches: int = 2,
+) -> bool:
+    text = _flatten_text(_decoded_content(evidence)).strip().lower()
+    return len(text) >= 20 and sum(term.lower() in text for term in terms) >= minimum_matches
+
+
+def _has_chain_topology(evidence) -> bool:
+    return _has_dimension_context(
+        evidence,
+        ("产业链", "上游", "中游", "下游", "原材料", "制造", "应用"),
+        minimum_matches=3,
+    )
+
+
+def _has_competition_context(evidence) -> bool:
+    return _has_dimension_context(
+        evidence,
+        ("竞争", "格局", "份额", "集中度", "龙头", "公司", "厂商"),
+    )
+
+
+def _has_technology_context(evidence) -> bool:
+    return _has_dimension_context(
+        evidence,
+        ("技术", "路线", "工艺", "量产", "产品", "性能", "迭代"),
+    )
+
+
+def _has_event_context(evidence) -> bool:
+    return _has_dimension_context(
+        evidence,
+        ("政策", "事件", "公告", "扩产", "并购", "投资", "资本", "订单"),
+    )
+
+
+def _has_risk_driver_context(evidence) -> bool:
+    return _has_dimension_context(
+        evidence,
+        ("风险", "驱动", "催化", "需求", "约束", "波动", "增长"),
+    )
+
+
+_DISCOVERY_AND_BODY_TOOLS = (
+    "iwencai_query",
+    "iwencai_search",
+    "web_search",
+    "fetch_url",
+    "fetch_urls",
+)
+
+
 INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
     name="industry-chain-research",
     display_name="产业链动态调研",
@@ -130,6 +186,41 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
             "市场与产业边界",
             ("iwencai_query", "web_search"),
             validator=_has_market_context,
+        ),
+        EvidenceRequirement(
+            "chain_topology",
+            "上中下游产业链结构",
+            _DISCOVERY_AND_BODY_TOOLS,
+            validator=_has_chain_topology,
+            fatal=False,
+        ),
+        EvidenceRequirement(
+            "competition",
+            "竞争格局与市场份额",
+            ("iwencai_select_stock", *_DISCOVERY_AND_BODY_TOOLS),
+            validator=_has_competition_context,
+            fatal=False,
+        ),
+        EvidenceRequirement(
+            "technology",
+            "技术路线与量产进展",
+            _DISCOVERY_AND_BODY_TOOLS,
+            validator=_has_technology_context,
+            fatal=False,
+        ),
+        EvidenceRequirement(
+            "events",
+            "近期政策与资本事件",
+            ("iwencai_search", "web_search", "fetch_url", "fetch_urls"),
+            validator=_has_event_context,
+            fatal=False,
+        ),
+        EvidenceRequirement(
+            "risks_drivers",
+            "行业驱动与风险",
+            _DISCOVERY_AND_BODY_TOOLS,
+            validator=_has_risk_driver_context,
+            fatal=False,
         ),
         EvidenceRequirement(
             "companies",

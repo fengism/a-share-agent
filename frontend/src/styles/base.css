@@ -1017,6 +1017,30 @@ body {
   flex: 1 1 420px;
 }
 
+.global-task-indicator__item {
+  display: flex;
+  min-width: 260px;
+  align-items: center;
+  gap: var(--c-space-2);
+}
+
+.global-task-indicator__item > button:first-child {
+  display: flex;
+  min-width: 0;
+  padding: var(--c-space-2);
+  flex: 1;
+  align-items: center;
+  gap: var(--c-space-2);
+  overflow: hidden;
+  border: 0;
+  color: var(--c-text-primary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 [data-theme="stellar-blue"] .app-sidebar-nav__item[aria-current="page"] {
   border: 1px solid color-mix(in srgb, var(--c-accent) 55%, var(--c-border));

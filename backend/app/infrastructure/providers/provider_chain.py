@@ -16,6 +16,8 @@ class ProviderAttempt(Generic[T]):
     label: str
     loader: Callable[[], Awaitable[T]]
     on_error: str | None = None
+    max_attempts: int | None = None
+    retry_budget_seconds: float | None = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,8 @@ class BaseProviderChain(Generic[T]):
                     self.operation,
                     attempt.loader,
                     is_fallback_attempt=attempt_index > 0,
+                    max_attempts=attempt.max_attempts,
+                    retry_budget_seconds=attempt.retry_budget_seconds,
                 )
             except Exception as exc:
                 elapsed_ms = round((time.perf_counter() - start) * 1000, 2)

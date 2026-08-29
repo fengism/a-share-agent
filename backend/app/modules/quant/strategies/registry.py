@@ -184,13 +184,15 @@ class StrategyRegistry:
 
     @property
     def state(self) -> StrategyRegistryState:
-        return self._state
+        with self._lock:
+            return self._state
 
     @property
     def source_directories(self) -> tuple[Path, ...]:
-        if self.published_directory is None:
-            return (self.directory,)
-        return self.directory, self.published_directory
+        with self._lock:
+            if self.published_directory is None:
+                return (self.directory,)
+            return self.directory, self.published_directory
 
     @property
     def status(self) -> StrategyRegistryStatus:
@@ -247,12 +249,14 @@ class StrategyRegistry:
             self._last_attempt_at = time.time()
             self._last_error = str(error) or type(error).__name__
 
-    def ensure_loaded(self) -> None:
-        if self._state.strategies:
-            return
+    def _loaded_state(self) -> StrategyRegistryState:
         with self._lock:
             if not self._state.strategies:
                 self.reload()
+            return self._state
+
+    def ensure_loaded(self) -> None:
+        self._loaded_state()
 
     def reload(self) -> StrategyRegistryState:
         with self._lock:
@@ -309,15 +313,15 @@ class StrategyRegistry:
         snapshot = build_strategy_snapshot(validated)
         if not validated.enabled:
             raise ValueError("发布策略必须启用")
-        if self.published_directory is None:
-            raise ValueError("量化策略发布目录未配置")
-        destination = self.published_directory / f"{validated.key}-{validated.version}.yaml"
         serialized = yaml.safe_dump(
             validated.model_dump(mode="json"),
             allow_unicode=True,
             sort_keys=False,
         )
         with self._lock:
+            if self.published_directory is None:
+                raise ValueError("量化策略发布目录未配置")
+            destination = self.published_directory / f"{validated.key}-{validated.version}.yaml"
             if destination.exists():
                 existing = yaml.safe_load(destination.read_text(encoding="utf-8"))
                 existing_definition = StrategyDefinition.model_validate(existing)
@@ -361,10 +365,10 @@ class StrategyRegistry:
         return snapshot
 
     def descriptors(self) -> list[CompiledStrategy]:
-        self.ensure_loaded()
+        state = self._loaded_state()
         return [
-            self._state.strategies[(key, version)]
-            for key, version in sorted(self._state.latest_versions.items())
+            state.strategies[(key, version)]
+            for key, version in sorted(state.latest_versions.items())
         ]
 
     def resolve(
@@ -373,9 +377,9 @@ class StrategyRegistry:
         version: str | None,
         parameters: dict[str, ParameterValue],
     ) -> StrategySnapshot:
-        self.ensure_loaded()
-        resolved_version = version or self._state.latest_versions.get(key)
-        strategy = self._state.strategies.get((key, resolved_version or ""))
+        state = self._loaded_state()
+        resolved_version = version or state.latest_versions.get(key)
+        strategy = state.strategies.get((key, resolved_version or ""))
         if strategy is None:
             suffix = f"@{version}" if version else ""
             raise ValueError(f"量化策略不存在或未启用: {key}{suffix}")

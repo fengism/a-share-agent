@@ -40,4 +40,21 @@ describe("LazyKlineChart", () => {
 
     expect(await screen.findByText("已加载K线图")).toBeInTheDocument();
   });
+
+  it("renders immediately when an export requires the chart", async () => {
+    globalThis.IntersectionObserver = class {
+      readonly root = null;
+      readonly rootMargin = "240px 0px";
+      readonly thresholds = [0];
+      disconnect() {}
+      observe() {}
+      takeRecords() { return []; }
+      unobserve() {}
+    };
+
+    render(<LazyKlineChart data={[]} height={420} forceRender />);
+
+    expect(await screen.findByText("已加载K线图")).toBeInTheDocument();
+    expect(screen.queryByLabelText("K线图即将加载")).not.toBeInTheDocument();
+  });
 });

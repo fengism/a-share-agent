@@ -257,7 +257,11 @@ describe("market emotion query", () => {
     queryClient.clear();
   });
 
-  it("requests CLS mainline chances with sixty-second refresh", async () => {
+  it.each([
+    [true, 60_000],
+    [false, 5 * 60_000],
+  ])("refreshes CLS mainline chances throughout the day (trading=%s)", async (isTrading, interval) => {
+    mocks.isTradingSession = isTrading;
     vi.mocked(apiGet).mockResolvedValue({
       source: "财联社",
       fetched_at: "2026-08-21T10:30:00+08:00",
@@ -278,8 +282,15 @@ describe("market emotion query", () => {
     );
     const options = queryClient.getQueryCache().find({
       queryKey: queryKeys.market.mainline,
-    })?.options as { refetchInterval?: unknown; staleTime?: unknown } | undefined;
-    expect(options?.refetchInterval).toBe(60_000);
+    })?.options as {
+      refetchInterval?: unknown;
+      refetchOnMount?: unknown;
+      refetchOnWindowFocus?: unknown;
+      staleTime?: unknown;
+    } | undefined;
+    expect(options?.refetchInterval).toBe(interval);
+    expect(options?.refetchOnMount).toBe("always");
+    expect(options?.refetchOnWindowFocus).toBe(true);
     expect(options?.staleTime).toBe(60_000);
     queryClient.clear();
   });

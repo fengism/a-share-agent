@@ -1,6 +1,7 @@
 """估值结果加权与汇总。"""
 
 import logging
+import math
 
 from app.financial_data.stock.valuation.schemas import (
     DCFValuationResult,
@@ -29,8 +30,11 @@ def _base_method_weights(profile: ValuationProfile) -> dict[str, float]:
     }
     return weights_by_category.get(profile.category, weights_by_category["general"])
 
-def _adjust_method_weights(fair_values: dict[str, ValuationMethodResult | DCFValuationResult], base_weights: dict[str, float]) -> dict[str, float]:
-    """根据置信度调整估值方法权重并归一化。
+
+def _adjust_method_weights(
+    fair_values: dict[str, ValuationMethodResult | DCFValuationResult], base_weights: dict[str, float]
+) -> dict[str, float]:
+    """根据置信度、数据质量和方法一致性调整权重并归一化。
 
     Param:
         fair_values: 方法名到估值结果的字典
@@ -38,17 +42,69 @@ def _adjust_method_weights(fair_values: dict[str, ValuationMethodResult | DCFVal
     Return:
         归一化后的权重字典
     """
-    raw_weights = {
-        method: base_weights.get(method, 0) * (item.confidence_score or 0.5)
+    eligible_items = {
+        method: item
         for method, item in fair_values.items()
-        if item.available and item.per_share_value is not None and base_weights.get(method, 0) > 0
+        if item.available
+        and item.per_share_value is not None
+        and math.isfinite(item.per_share_value)
+        and item.per_share_value > 0
+        and math.isfinite(base_weights.get(method, 0))
+        and base_weights.get(method, 0) > 0
     }
-    total = sum(raw_weights.values())
-    if total <= 0:
-        return {}
-    return {method: round(weight / total, 4) for method, weight in raw_weights.items()}
+    positive_values = sorted(
+        item.per_share_value
+        for item in eligible_items.values()
+        if item.per_share_value is not None and item.per_share_value > 0
+    )
+    consensus_median = None
+    if len(positive_values) >= 3:
+        mid = len(positive_values) // 2
+        consensus_median = (
+            positive_values[mid] if len(positive_values) % 2 else (positive_values[mid - 1] + positive_values[mid]) / 2
+        )
 
-def _apply_weights(fair_values: dict[str, ValuationMethodResult | DCFValuationResult], weights: dict[str, float]) -> None:
+    raw_weights = {}
+    for method, item in eligible_items.items():
+        confidence = 0.5 if item.confidence_score is None else item.confidence_score
+        if not math.isfinite(confidence):
+            confidence = 0.0
+        confidence = max(0.0, min(confidence, 1.0))
+        data_quality = item.data_quality_score
+        if not math.isfinite(data_quality):
+            data_quality = 0.0
+        data_quality = max(0.0, min(data_quality, 1.0))
+        consensus_penalty = 1.0
+        if consensus_median is not None:
+            if item.per_share_value is None or item.per_share_value <= 0:
+                consensus_penalty = 0.25
+            else:
+                ratio = max(
+                    item.per_share_value / consensus_median,
+                    consensus_median / item.per_share_value,
+                )
+                if ratio > 2:
+                    consensus_penalty = max(0.25, 2 / ratio)
+        raw_weight = base_weights[method] * confidence * data_quality * consensus_penalty
+        raw_weights[method] = raw_weight if math.isfinite(raw_weight) else 0.0
+
+    total = sum(raw_weights.values())
+    if not math.isfinite(total) or total <= 0:
+        return {}
+
+    normalized = {method: weight / total for method, weight in raw_weights.items()}
+    rounded = {method: round(weight, 4) for method, weight in normalized.items()}
+    largest_method = max(sorted(normalized), key=normalized.__getitem__)
+    rounded[largest_method] = round(
+        rounded[largest_method] + (1.0 - sum(rounded.values())),
+        4,
+    )
+    return rounded
+
+
+def _apply_weights(
+    fair_values: dict[str, ValuationMethodResult | DCFValuationResult], weights: dict[str, float]
+) -> None:
     """将权重写回各估值方法对象。
 
     Param:
@@ -60,7 +116,10 @@ def _apply_weights(fair_values: dict[str, ValuationMethodResult | DCFValuationRe
     for method, item in fair_values.items():
         item.weight = weights.get(method)
 
-def _build_blended_value(fair_values: dict[str, ValuationMethodResult | DCFValuationResult], weights: dict[str, float]) -> float | None:
+
+def _build_blended_value(
+    fair_values: dict[str, ValuationMethodResult | DCFValuationResult], weights: dict[str, float]
+) -> float | None:
     """按权重加权得到综合公允每股价值。
 
     Param:
@@ -71,9 +130,30 @@ def _build_blended_value(fair_values: dict[str, ValuationMethodResult | DCFValua
     """
     if not weights:
         return None
-    return round(sum((fair_values[method].per_share_value or 0) * weight for method, weight in weights.items()), 2)
+    weighted_values = []
+    for method, weight in weights.items():
+        if not math.isfinite(weight):
+            return None
+        if weight <= 0:
+            continue
+        item = fair_values.get(method)
+        if (
+            item is None
+            or not item.available
+            or item.per_share_value is None
+            or not math.isfinite(item.per_share_value)
+        ):
+            return None
+        weighted_values.append(item.per_share_value * weight)
+    if not weighted_values:
+        return None
+    blended_value = sum(weighted_values)
+    return round(blended_value, 2) if math.isfinite(blended_value) else None
 
-def _build_blended_range(fair_values: dict[str, ValuationMethodResult | DCFValuationResult], weights: dict[str, float]) -> list[float] | None:
+
+def _build_blended_range(
+    fair_values: dict[str, ValuationMethodResult | DCFValuationResult], weights: dict[str, float]
+) -> list[float] | None:
     """按权重加权得到综合公允区间。
 
     Param:
@@ -84,17 +164,32 @@ def _build_blended_range(fair_values: dict[str, ValuationMethodResult | DCFValua
     """
     ranges = []
     for method, weight in weights.items():
-        value_range = fair_values[method].value_range
+        if not math.isfinite(weight):
+            return None
+        if weight <= 0:
+            continue
+        item = fair_values.get(method)
+        if item is None or not item.available:
+            return None
+        value_range = item.value_range
         if value_range is None or len(value_range) != 2:
             return None
-        ranges.append((value_range, weight))
+        if not all(math.isfinite(endpoint) for endpoint in value_range):
+            return None
+        low, high = sorted(value_range)
+        ranges.append(((low, high), weight))
     if not ranges:
         return None
     low = sum(value_range[0] * weight for value_range, weight in ranges)
     high = sum(value_range[1] * weight for value_range, weight in ranges)
+    if not math.isfinite(low) or not math.isfinite(high):
+        return None
     return [round(low, 2), round(high, 2)]
 
-def _build_valuation_view(fair_value_range: list[float] | None, blended_fair_value: float | None, current_price: float | None) -> str | None:
+
+def _build_valuation_view(
+    fair_value_range: list[float] | None, blended_fair_value: float | None, current_price: float | None
+) -> str | None:
     """根据当前价与公允区间判断估值倾向。
 
     Param:
@@ -104,16 +199,20 @@ def _build_valuation_view(fair_value_range: list[float] | None, blended_fair_val
     Return:
         高估/低估/基本合理 文本，缺失数据时返回 None
     """
-    if current_price in (None, 0):
+    if current_price is None or not math.isfinite(current_price) or current_price <= 0:
         return None
-    if fair_value_range is not None and len(fair_value_range) == 2:
-        low, high = fair_value_range
+    if (
+        fair_value_range is not None
+        and len(fair_value_range) == 2
+        and all(math.isfinite(endpoint) for endpoint in fair_value_range)
+    ):
+        low, high = sorted(fair_value_range)
         if current_price < low * 0.9:
             return "低估"
         if current_price > high * 1.1:
             return "高估"
         return "基本合理"
-    if blended_fair_value is None:
+    if blended_fair_value is None or not math.isfinite(blended_fair_value):
         return None
     diff_pct = (blended_fair_value - current_price) / current_price * 100
     if diff_pct >= 15:
@@ -122,7 +221,10 @@ def _build_valuation_view(fair_value_range: list[float] | None, blended_fair_val
         return "高估"
     return "基本合理"
 
-def _build_valuation_summary(profile: ValuationProfile, fair_value_range: list[float] | None, valuation_view: str | None) -> str | None:
+
+def _build_valuation_summary(
+    profile: ValuationProfile, fair_value_range: list[float] | None, valuation_view: str | None
+) -> str | None:
     """构造一句话估值摘要文本。
 
     Param:

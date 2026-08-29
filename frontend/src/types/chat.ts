@@ -16,10 +16,24 @@ export interface ToolResultInfo {
   is_error: boolean;
 }
 
+export interface AgentToolSource {
+  title?: string;
+  url: string;
+  domain?: string;
+}
+
+export interface AgentToolResultSummary {
+  summary: string;
+  status?: "success" | "error" | "skipped";
+  sources?: AgentToolSource[];
+  metadata?: Record<string, string>;
+}
+
 export type AgentPlanStepStatus =
   | "pending"
   | "running"
   | "completed"
+  | "degraded"
   | "failed"
   | "cancelled";
 
@@ -64,6 +78,7 @@ export interface ChatStreamDelta {
   plan_step?: AgentPlanStepUpdate | null;
   tool_call?: ToolCallInfo | null;
   tool_result?: ToolResultInfo | null;
+  tool_result_summary?: AgentToolResultSummary | null;
   error?: string | null;
   reasoning_content?: string | null;
   status?: AgentExecutionStatus | null;
@@ -84,7 +99,9 @@ export interface ToolCallDisplay {
   name: string;
   arguments: string;
   result?: string;
+  resultSummary?: AgentToolResultSummary;
   isError?: boolean;
+  isSkipped?: boolean;
   isExecuting?: boolean;
   isCancelled?: boolean;
 }

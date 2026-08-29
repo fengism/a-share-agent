@@ -1,0 +1,99 @@
+.analysis-rail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+}
+
+.analysis-rail__header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.analysis-rail__header small {
+  color: var(--c-text-muted);
+  font-weight: var(--c-weight-normal);
+}
+
+.analysis-history-list {
+  display: grid;
+  gap: 7px;
+}
+
+.analysis-history-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 8px;
+  padding: 10px 10px 9px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  color: var(--c-text-secondary);
+  background: var(--c-nested-bg);
+  text-decoration: none;
+  transition: border-color .16s ease, background .16s ease;
+}
+
+.analysis-history-item:hover {
+  border-color: var(--c-primary);
+  background: var(--c-hover-bg);
+}
+
+.analysis-history-item.is-active {
+  border-color: color-mix(in srgb, var(--c-accent) 65%, var(--c-border));
+  background: color-mix(in srgb, var(--c-accent) 9%, var(--c-nested-bg));
+  box-shadow: inset 3px 0 var(--c-accent), 0 0 18px color-mix(in srgb, var(--c-accent) 7%, transparent);
+}
+
+.analysis-history-item__name {
+  overflow: hidden;
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-history-item__score {
+  color: var(--c-warning);
+  font-size: var(--c-font-xs);
+}
+
+.analysis-history-item__meta {
+  grid-column: 1 / -1;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.analysis-history-item__signal {
+  width: max-content;
+  padding: 1px 6px;
+  border-radius: var(--c-radius-pill);
+  font-size: var(--c-font-xs);
+}
+
+.analysis-history-item__signal.is-关注 {
+  color: var(--c-success);
+  background: color-mix(in srgb, var(--c-success) 12%, transparent);
+}
+
+.analysis-history-item__signal.is-谨慎 {
+  color: var(--c-up);
+  background: color-mix(in srgb, var(--c-up) 12%, transparent);
+}
+
+.analysis-history-item__signal.is-观察 {
+  color: var(--c-accent);
+  background: color-mix(in srgb, var(--c-accent) 12%, transparent);
+}
+
+.analysis-rail__more {
+  display: block;
+  margin-top: 10px;
+  color: var(--c-primary);
+  font-size: var(--c-font-sm);
+  text-align: center;
+}

@@ -101,6 +101,11 @@ async def get_stock_financial_metrics(code: str) -> Any:
     return await get_application_tool_handlers().get_stock_financial_metrics(code)
 
 
+async def get_stock_revenue_breakdown(code: str) -> Any:
+    """获取股票分产品、业务和地区的营收与毛利构成。"""
+    return await get_application_tool_handlers().get_stock_revenue_breakdown(code)
+
+
 async def get_stock_news(code: str) -> Any:
     """获取股票相关新闻列表。
 

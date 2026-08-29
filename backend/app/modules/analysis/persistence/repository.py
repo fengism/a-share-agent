@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from app.configuration.paths import DATA_DIR
 from app.core.cache import cache
@@ -17,6 +18,7 @@ from app.modules.analysis.persistence import history_index as history_store
 from app.modules.analysis.prompts import ANALYSIS_PROMPT_SPEC
 
 logger = logging.getLogger(__name__)
+_MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 _DATA_DIR = DATA_DIR / "analyses"
 _USERS_DIR_NAME = "users"
@@ -184,9 +186,15 @@ def get_analysis_by_date(
 
 
 def get_latest_analysis(code: str, user_id: int, *, cache_ttl: int = 14400) -> AnalysisResult | None:
-    """读取当前用户指定股票当天的最新分析结果。"""
-    today = datetime.now().strftime("%Y%m%d")
-    return get_analysis_by_date(code, today, user_id, cache_ttl=cache_ttl)
+    """读取当前用户可见的指定股票最新分析结果。"""
+    today = datetime.now(_MARKET_TIMEZONE).strftime("%Y%m%d")
+    today_result = get_analysis_by_date(code, today, user_id, cache_ttl=cache_ttl)
+    if today_result is not None:
+        return today_result
+    latest = _query_history(user_id, code, 1, 0, False)
+    if not latest:
+        return None
+    return get_analysis_by_date(code, str(latest[0]["analysis_date"]), user_id, cache_ttl=cache_ttl)
 
 
 def rebuild_analysis_history_index() -> None:
@@ -210,9 +218,18 @@ def _query_history(
     limit: int,
     offset: int,
     can_delete_legacy: bool,
+    query: str | None = None,
 ) -> list[dict]:
     _ensure_history_index()
-    return history_store.query_history(_HISTORY_INDEX, user_id, code, limit, offset, can_delete_legacy)
+    return history_store.query_history(
+        _HISTORY_INDEX,
+        user_id,
+        code,
+        limit,
+        offset,
+        can_delete_legacy,
+        query,
+    )
 
 
 def list_analyses(
@@ -231,6 +248,7 @@ def list_all_analyses(
     limit: int = 100,
     offset: int = 0,
     can_delete_legacy: bool = False,
+    query: str | None = None,
 ) -> list[dict]:
     """列出当前用户全部历史，并只读兼容旧全局历史。"""
-    return _query_history(user_id, None, limit, offset, can_delete_legacy)
+    return _query_history(user_id, None, limit, offset, can_delete_legacy, query)

@@ -132,6 +132,7 @@ class FeishuDocumentClient:
                 )
             except RuntimeError as exc:
                 logger.warning(str(exc))
+                raise
 
     def create_wiki_node(
         self,
@@ -180,3 +181,4 @@ class FeishuDocumentClient:
             self._transport.parse_response(response, "飞书文档权限授予失败")
         except RuntimeError as exc:
             logger.warning(str(exc))
+            raise

@@ -5,6 +5,7 @@ from typing import Any
 
 from app.agentic.catalog import CapabilityCatalog, registry
 from app.agentic.tools.contracts import Tool, ToolPolicy
+from app.agentic.tools.packs.web.search import DEFAULT_SEARCH_ENGINE
 
 WEB_FETCH_POLICY = ToolPolicy(
     cost="high", cache_ttl_seconds=300, timeout_seconds=90, max_parallel_calls=2
@@ -38,7 +39,7 @@ def register_web_tools(
             description=(
                 "搜索公开互联网网页，返回标题、URL 和摘要。"
                 "当用户要求搜索网页、查找公开资料，或尚未提供具体 URL 时调用。"
-                "默认使用百度、优先中文结果并限定最近半年，可选 Bing 中国或 Google。"
+                "默认使用 Bing 中国、优先中文结果并限定最近半年，可选百度或 Google。"
                 "搜索结果不是网页全文；用户需要详细内容时，必须使用返回的 URL 继续调用 fetch_url，"
                 "需要阅读多个结果时调用 fetch_urls。"
             ),
@@ -58,7 +59,7 @@ def register_web_tools(
                     "engine": {
                         "type": "string",
                         "enum": ["baidu", "bing_cn", "google"],
-                        "default": "baidu",
+                        "default": DEFAULT_SEARCH_ENGINE,
                         "description": "搜索引擎；Google 通常需要配置代理。",
                     },
                     "max_results": {

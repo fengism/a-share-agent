@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Header, Path, status
+from fastapi import APIRouter, Body, Depends, Header, Path, Query, status
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.auth.dependencies import require_active_user
-from app.api.errors import BadRequestError, NotFoundError, TooManyRequestsError
+from app.api.errors import BadRequestError, ConflictError, NotFoundError, TooManyRequestsError
 from app.api.schemas import WorkflowJobResponse, WorkflowSubmissionResponse
 from app.api.streaming import SSE_RESPONSES
 from app.domain.identity import AuthenticatedUser
@@ -18,10 +18,12 @@ from app.modules.screener.public import ScreenerStrategyRequest, validate_screen
 from app.modules.workflow.public import (
     WorkflowCapacityError,
     WorkflowJobSnapshot,
+    WorkflowRequestConflictError,
     WorkflowSubmissionSnapshot,
     cancel_workflow,
     create_workflow_event_generator,
     get_workflow,
+    list_active_workflows,
     submit_analysis_workflow,
     submit_daily_review_workflow,
     submit_industry_chain_workflow,
@@ -36,6 +38,7 @@ def _job_response(job: WorkflowJobSnapshot) -> WorkflowJobResponse:
         id=job.id,
         kind=job.kind,
         dedupe_key=job.dedupe_key,
+        request=job.request,
         status=job.status,
         attempts=job.attempts,
         max_attempts=job.max_attempts,
@@ -68,10 +71,16 @@ def _capacity_error(error: WorkflowCapacityError) -> TooManyRequestsError:
 )
 async def submit_analysis_job(
     code: Annotated[str, Path(pattern=r"^\d{6}$")],
+    force: Annotated[bool, Query(description="是否跳过当天缓存并重新生成")] = False,
     user: AuthenticatedUser = Depends(require_active_user),
 ) -> WorkflowSubmissionResponse:
     try:
-        return _submission_response(await submit_analysis_workflow(code, user["id"]))
+        return _submission_response(await submit_analysis_workflow(code, user["id"], force=force))
+    except WorkflowRequestConflictError as error:
+        raise ConflictError(
+            "该股票已有不同刷新模式的分析任务，请等待其完成或取消后重试",
+            code="workflow.request_conflict",
+        ) from error
     except WorkflowCapacityError as error:
         raise _capacity_error(error) from error
 
@@ -89,6 +98,11 @@ async def submit_daily_review_job(
         return _submission_response(
             await submit_daily_review_workflow(request.model_dump(mode="json"), user["id"])
         )
+    except WorkflowRequestConflictError as error:
+        raise ConflictError(
+            "该日期已有不同刷新模式的复盘任务，请等待其完成或取消后重试",
+            code="workflow.request_conflict",
+        ) from error
     except WorkflowCapacityError as error:
         raise _capacity_error(error) from error
 
@@ -100,11 +114,19 @@ async def submit_daily_review_job(
 )
 async def submit_industry_chain_job(
     name: Annotated[str, Path(min_length=1, max_length=100)],
+    force: Annotated[bool, Query(description="是否跳过同范围缓存并重新生成")] = False,
     user: AuthenticatedUser = Depends(require_active_user),
     scope: Annotated[IndustryChainResearchScope | None, Body()] = None,
 ) -> WorkflowSubmissionResponse:
     try:
-        return _submission_response(await submit_industry_chain_workflow(name.strip(), user["id"], scope))
+        return _submission_response(
+            await submit_industry_chain_workflow(name.strip(), user["id"], scope, force=force)
+        )
+    except WorkflowRequestConflictError as error:
+        raise ConflictError(
+            "该产业链已有不同刷新模式的任务，请等待其完成或取消后重试",
+            code="workflow.request_conflict",
+        ) from error
     except ValueError as error:
         raise BadRequestError(str(error), code="industry_chain.invalid_scope") from error
     except WorkflowCapacityError as error:
@@ -127,6 +149,13 @@ async def submit_screener_strategy_job(
         raise BadRequestError(str(error), code="screener.invalid_strategy") from error
     except WorkflowCapacityError as error:
         raise _capacity_error(error) from error
+
+
+@router.get("/active", response_model=list[WorkflowJobResponse])
+async def get_active_workflow_jobs(
+    user: AuthenticatedUser = Depends(require_active_user),
+) -> list[WorkflowJobResponse]:
+    return [_job_response(job) for job in await list_active_workflows(user["id"])]
 
 
 @router.get("/{job_id}", response_model=WorkflowJobResponse)

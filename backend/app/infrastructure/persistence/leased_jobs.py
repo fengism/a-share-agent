@@ -145,8 +145,9 @@ class LeasedJobStateStore:
             UPDATE {self.table_name}
             SET lease_until = ?, updated_at = ?
             WHERE id = ? AND status = 'running' AND lease_owner = ?
+              AND lease_until > ?
             """,
-            (now + max(1.0, lease_seconds), now, job_id, owner_id),
+            (now + max(1.0, lease_seconds), now, job_id, owner_id, now),
         )
         connection.commit()
         return cursor.rowcount == 1
@@ -202,6 +203,27 @@ class LeasedJobStateStore:
             WHERE id = ? AND status = 'running' AND lease_owner = ?
             """,
             (now, reason[:1000], now, job_id, owner_id),
+        )
+        connection.commit()
+        return cursor.rowcount == 1
+
+    def cancel_owned(
+        self,
+        job_id: str,
+        owner_id: str,
+        reason: str,
+        *,
+        now: float,
+    ) -> bool:
+        connection = self._connection_provider()
+        cursor = connection.execute(
+            f"""
+            UPDATE {self.table_name}
+            SET status = 'cancelled', completed_at = ?, updated_at = ?,
+                lease_owner = NULL, lease_until = NULL, last_error = ?
+            WHERE id = ? AND status = 'running' AND lease_owner = ?
+            """,
+            (now, now, reason[:1000], job_id, owner_id),
         )
         connection.commit()
         return cursor.rowcount == 1

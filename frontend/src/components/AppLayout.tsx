@@ -3,6 +3,8 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useColors, useThemeStore } from "../styles/ui";
 import AppHeader from "./AppHeader";
+import ChatSessionSyncBridge from "./ChatSessionSyncBridge";
+import WorkflowRuntimeBridge from "./WorkflowRuntimeBridge";
 import AppSidebar from "./AppSidebar";
 import RouteLoadingFallback from "./RouteLoadingFallback";
 
@@ -31,6 +33,8 @@ export default function AppLayout() {
 
   return (
     <>
+      <ChatSessionSyncBridge />
+      <WorkflowRuntimeBridge />
       <a className="app-skip-link" href="#main-content">跳到主要内容</a>
       <div style={{ minHeight: "100vh", background: colors.pageBg }}>
         <AppSidebar
@@ -89,6 +93,7 @@ function getActiveKey(pathname: string): string {
   if (pathname.startsWith("/screener")) return "/screener";
   if (pathname.startsWith("/chat")) return "/chat";
   if (pathname.startsWith("/daily-review")) return "/daily-review";
+  if (pathname.startsWith("/investment-research")) return "/analysis";
   if (pathname.startsWith("/analysis")) return "/analysis";
   if (pathname.startsWith("/industry-chain")) return "/industry-chain";
   if (pathname.startsWith("/capabilities")) return "/capabilities";

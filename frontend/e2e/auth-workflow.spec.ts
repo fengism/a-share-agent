@@ -83,6 +83,25 @@ test("reconnects a durable workflow and cancels it remotely", async ({ page }) =
   await page.route("**/api/workflows/job-1/stream", async (route) => {
     cursors.push(route.request().headers()["last-event-id"]);
     const sequence = cursors.length;
+    const agentPlanFrame = sequence === 1
+      ? `id: 1:2\nevent: agent_event\ndata: ${JSON.stringify({
+          type: "agent_event",
+          total_stages: 3,
+          agent_event: {
+            type: "plan",
+            plan: {
+              summary: "先核验财务与估值，再检查风险",
+              steps: [{
+                id: "fundamental",
+                title: "核验基本面",
+                dependencies: [],
+                status: "running",
+                attempt: 1,
+              }],
+            },
+          },
+        })}\n\n`
+      : "";
     await route.fulfill({
       status: 200,
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
@@ -90,7 +109,7 @@ test("reconnects a durable workflow and cancels it remotely", async ({ page }) =
         type: "stage_started",
         stage: { stage: sequence, name: `阶段 ${sequence}`, status: "started" },
         total_stages: 7,
-      })}\n\n`,
+      })}\n\n${agentPlanFrame}`,
     });
   });
 
@@ -105,14 +124,17 @@ test("reconnects a durable workflow and cancels it remotely", async ({ page }) =
   });
 
   await page.goto("/analysis/600519");
-  await page.getByRole("button", { name: "智能分析" }).click();
+  await page.getByRole("button", { name: "开始研究" }).click();
   await expect.poll(() => cursors.length).toBeGreaterThanOrEqual(2);
   expect(cursors[0]).toBeUndefined();
-  expect(cursors[1]).toBe("1:1");
+  expect(cursors[1]).toBe("1:2");
+  await expect(page.getByText("Agent 思考与执行")).toBeVisible();
+  await page.getByRole("button", { name: /Agent 思考与执行/ }).click();
+  await expect(page.getByText("先核验财务与估值，再检查风险")).toBeVisible();
 
-  await page.getByRole("button", { name: "取消分析" }).click();
+  await page.getByRole("button", { name: "停止研究" }).click();
   await expect.poll(() => cancelled).toBe(true);
-  await expect(page.getByText("已取消分析")).toBeVisible();
+  await expect(page.getByText("已停止研究")).toBeVisible();
 });
 
 test("records a sell transaction from the current portfolio", async ({ page }) => {
@@ -215,9 +237,10 @@ test("records a sell transaction from the current portfolio", async ({ page }) =
 
   await page.goto("/portfolio");
   await expect(page.getByRole("heading", { name: "仓位管理" })).toBeVisible();
-  await page.locator("label").filter({ hasText: /^卖出$/ }).click();
-  await page.getByRole("combobox", { name: "持仓股票" }).click();
-  await page.getByText(/贵州茅台.*可卖 60 股/).click();
+  await page.getByRole("button", { name: "卖出 贵州茅台" }).click();
+  await expect(page.getByRole("radio", { name: "卖出" })).toBeChecked();
+  await expect(page.getByText(/贵州茅台.*可卖 60 股/).first()).toBeVisible();
+  await expect(page.getByRole("spinbutton", { name: "卖出价" })).toHaveValue("11.0000");
   await page.getByRole("spinbutton", { name: "卖出价" }).fill("12");
   await page.getByRole("spinbutton", { name: /股数/ }).fill("40");
   await page.getByRole("button", { name: /记录卖出/ }).click();

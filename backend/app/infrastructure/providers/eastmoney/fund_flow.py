@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 class FundFlowMixin:
     """东方财富 fund_flow 数据接口。"""
 
+    @staticmethod
     def _parse_fund_flow_klines(klines: list[str]) -> list[dict]:
         """解析资金流向 kline 字符串列表为结构化字典列表。
 
@@ -33,6 +34,7 @@ class FundFlowMixin:
                 })
         return rows
 
+    @staticmethod
     def _parse_fund_flow_items(items: list[dict]) -> list[dict]:
         """解析 clist 接口返回的资金流向 item 列表。
 

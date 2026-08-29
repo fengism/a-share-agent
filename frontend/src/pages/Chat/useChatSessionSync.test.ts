@@ -31,6 +31,8 @@ const remoteState = {
 
 describe("useChatSessionSync", () => {
   beforeEach(() => {
+    useChatStore.getState().abortController?.abort();
+    useChatStore.setState({ isStreaming: false, activeRunSessionId: null, activeRunLabel: null, abortController: null });
     mocks.getChatState.mockReset().mockResolvedValue({ state: remoteState, updated_at: 2 });
     mocks.saveChatState.mockReset().mockResolvedValue({
       state: { ...remoteState, revision: 3 },

@@ -5,11 +5,13 @@ from fastapi import APIRouter, Query
 from app.financial_data.stock.public import (
     FinancialMetrics,
     FinancialStatementRow,
+    RevenueBreakdown,
     StockValuation,
     ValuationDetail,
 )
 from app.financial_data.stock.public import get_financial as get_financial_service
 from app.financial_data.stock.public import get_financial_metrics as get_financial_metrics_service
+from app.financial_data.stock.public import get_revenue_breakdown as get_revenue_breakdown_service
 from app.financial_data.stock.public import get_valuation as get_valuation_service
 from app.financial_data.stock.public import get_valuation_detail as get_valuation_detail_service
 
@@ -29,6 +31,12 @@ async def get_financial(
 async def get_financial_metrics(code: str):
     """获取个股关键财务指标汇总。"""
     return await get_financial_metrics_service(code)
+
+
+@router.get("/{code}/revenue-breakdown", response_model=RevenueBreakdown)
+async def get_revenue_breakdown(code: str):
+    """获取个股最新披露的营收与毛利构成。"""
+    return await get_revenue_breakdown_service(code)
 
 
 @router.get("/{code}/valuation", response_model=StockValuation)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -16,6 +18,9 @@ from app.modules.daily_review.public import load_daily_review
 from app.modules.industry_chain.public import load_industry_chain
 from app.modules.push.content import build_content
 from app.modules.push.schemas import PushRequest, PushResponse
+
+logger = logging.getLogger(__name__)
+_FEISHU_RECEIVER_PATTERN = re.compile(r"^(?:oc_|ou_)[A-Za-z0-9_-]+$")
 
 
 @dataclass(frozen=True)
@@ -34,9 +39,11 @@ class PushIntegrationNotConfiguredError(RuntimeError):
 def _resolve_feishu_receiver(request: PushRequest) -> str:
     """解析飞书接收人，优先请求参数，其次系统默认配置。"""
     receiver = request.feishu_receiver.strip()
-    if receiver:
-        return receiver
-    return get_effective_settings().feishu_default_receiver.strip()
+    if not receiver:
+        receiver = get_effective_settings().feishu_default_receiver.strip()
+    if receiver and not _FEISHU_RECEIVER_PATTERN.fullmatch(receiver):
+        raise ValueError("飞书接收人 ID 必须以 oc_ 或 ou_ 开头")
+    return receiver
 
 
 def _resolve_content(request: PushRequest, user_id: int) -> ResolvedPushContent:
@@ -75,7 +82,7 @@ def _resolve_content(request: PushRequest, user_id: int) -> ResolvedPushContent:
         if data is None:
             raise LookupError("暂无分析结果，请先生成")
         return ResolvedPushContent(
-            title=f"股票分析 - {data.stock_code} - {data.stock_name} - {data.analysis_date}",
+            title=f"个股研究 - {data.stock_code} - {data.stock_name} - {data.analysis_date}",
             content=build_content("analysis", data),
             receiver=receiver,
         )
@@ -134,21 +141,51 @@ def _push_to_feishu(request: PushRequest, resolved: ResolvedPushContent) -> Push
     )
     doc_url = result["url"]
     node_token = result["node_token"]
-    if node_token:
-        feishu_client.grant_doc_edit_permission(
-            node_token,
+    try:
+        if node_token:
+            feishu_client.grant_doc_edit_permission(
+                node_token,
+                resolved.receiver,
+                doc_type="wiki",
+            )
+        else:
+            feishu_client.grant_doc_edit_permission(
+                doc_url.rsplit("/", 1)[-1],
+                resolved.receiver,
+            )
+    except Exception:
+        logger.exception(
+            "飞书文档已创建但权限授予失败: title=%s receiver=%s url=%s",
+            resolved.title,
             resolved.receiver,
-            doc_type="wiki",
+            doc_url,
         )
-    else:
-        feishu_client.grant_doc_edit_permission(
-            doc_url.rsplit("/", 1)[-1],
+        return PushResponse(
+            success=False,
+            target="feishu",
+            url=doc_url,
+            title=resolved.title,
+            message="文档已创建，但接收人权限授予失败",
+        )
+    try:
+        feishu_client.send_card(
             resolved.receiver,
+            to_feishu_card(request.type, resolved.title, resolved.content, doc_url),
         )
-    feishu_client.send_card(
-        resolved.receiver,
-        to_feishu_card(request.type, resolved.title, resolved.content, doc_url),
-    )
+    except Exception:
+        logger.exception(
+            "飞书文档已创建但消息通知失败: title=%s receiver=%s url=%s",
+            resolved.title,
+            resolved.receiver,
+            doc_url,
+        )
+        return PushResponse(
+            success=False,
+            target="feishu",
+            url=doc_url,
+            title=resolved.title,
+            message="文档已创建，但消息通知失败",
+        )
     return PushResponse(
         success=True,
         target="feishu",

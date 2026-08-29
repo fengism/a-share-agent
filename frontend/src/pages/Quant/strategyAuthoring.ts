@@ -7,6 +7,10 @@ export interface DraftBacktestValues {
   benchmark: string;
   minimumTradeCount: number;
   maximumDrawdownPct: number;
+  minimumSharpeRatio?: number;
+  minimumHoldoutTradeCount?: number;
+  maximumHoldoutDrawdownPct?: number;
+  minimumHoldoutSharpeRatio?: number;
 }
 
 export const STRATEGY_DRAFT_STATUS_META: Record<

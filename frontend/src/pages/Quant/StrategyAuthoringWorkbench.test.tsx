@@ -41,8 +41,16 @@ const draft = {
     definition_hash: `sha256:${"a".repeat(64)}`,
     minimum_trade_count: 1,
     maximum_drawdown_pct: 80,
+    minimum_sharpe_ratio: 0.5,
+    minimum_holdout_trade_count: 2,
+    maximum_holdout_drawdown_pct: 20,
+    minimum_holdout_sharpe_ratio: 0.2,
     trade_count: 4,
     max_drawdown: -12,
+    sharpe_ratio: 1.1,
+    holdout_trade_count: 2,
+    holdout_max_drawdown: -8,
+    holdout_sharpe_ratio: 0.7,
     errors: [],
   },
   created_at: 1,
@@ -67,6 +75,7 @@ describe("StrategyAuthoringWorkbench", () => {
     mocks.generate.mockResolvedValue(draft);
     mocks.update.mockResolvedValue(draft);
     mocks.validate.mockResolvedValue(draft);
+    mocks.backtest.mockResolvedValue({ id: "run-one" });
     mocks.publish.mockResolvedValue({ ...draft, status: "published" });
     mocks.drafts = [draft];
   });
@@ -130,5 +139,42 @@ describe("StrategyAuthoringWorkbench", () => {
     await waitFor(() => expect(mocks.generate).toHaveBeenCalledWith(
       "生成一个 20 日均线上穿 60 日均线后买入的策略",
     ));
+  });
+
+  it("shows full-sample and holdout quality gate results", async () => {
+    render(<StrategyAuthoringWorkbench onBacktestCreated={vi.fn()} />);
+
+    expect(await screen.findByText(/全样本：交易 4 次/)).toHaveTextContent("夏普 1.1");
+    expect(screen.getByText(/后段样本：交易 2 次/)).toHaveTextContent("最大回撤 -8%");
+  });
+
+  it("sends optional full-sample and holdout gates to the backtest request", async () => {
+    const onBacktestCreated = vi.fn();
+    render(<StrategyAuthoringWorkbench onBacktestCreated={onBacktestCreated} />);
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "整体最低夏普比率（可选）" }), {
+      target: { value: "0.6" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "后段最低交易次数（可选）" }), {
+      target: { value: "3" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "后段最大允许回撤（可选，%）" }), {
+      target: { value: "15" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "后段最低夏普比率（可选）" }), {
+      target: { value: "0.3" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /使用当前快照试跑/ }));
+
+    await waitFor(() => expect(mocks.backtest).toHaveBeenCalledWith({
+      draftId: draft.id,
+      request: expect.objectContaining({
+        minimum_sharpe_ratio: 0.6,
+        minimum_holdout_trade_count: 3,
+        maximum_holdout_drawdown_pct: 15,
+        minimum_holdout_sharpe_ratio: 0.3,
+      }),
+    }));
+    expect(onBacktestCreated).toHaveBeenCalledWith({ id: "run-one" });
   });
 });

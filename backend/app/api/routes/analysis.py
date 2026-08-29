@@ -25,6 +25,7 @@ router = APIRouter()
 async def get_all_analysis_history(
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
+    q: Annotated[str | None, Query(max_length=100)] = None,
     user: AuthenticatedUser = Depends(require_active_user),
 ):
     """获取所有股票的历史 AI 分析记录列表。
@@ -37,6 +38,7 @@ async def get_all_analysis_history(
         limit=limit,
         offset=offset,
         can_delete_legacy=bool(user["is_admin"]),
+        query=q,
     )
 
 

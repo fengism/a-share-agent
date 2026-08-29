@@ -79,7 +79,7 @@ async def compare_stocks(codes: Sequence[str] | str) -> list[StockCompareItem]:
             metric_values = metrics.metrics if metrics.metrics else {}
             result.update(
                 {
-                    "revenue": metric_values.get("营业收入"),
+                    "revenue": metric_values.get("营收"),
                     "net_profit": metric_values.get("净利润"),
                     "roe": metric_values.get("净资产收益率"),
                 }

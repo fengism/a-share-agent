@@ -39,7 +39,7 @@ async def trigger_analysis(code: str, user: AuthenticatedUser = Depends(require_
 
     logger.info("触发AI分析: code=%s, user_id=%s", code, user["id"])
     try:
-        submission = await submit_analysis_workflow(code, user["id"])
+        submission = await submit_analysis_workflow(code, user["id"], force=False)
     except WorkflowCapacityError as error:
         raise TooManyRequestsError(
             "分析任务队列已满，请等待已有任务完成",

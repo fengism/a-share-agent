@@ -1,4 +1,5 @@
 import type {
+  AgentToolResultSummary,
   AgentPlan,
   AgentPlanStepUpdate,
   ChatDisplayMessage,
@@ -9,12 +10,17 @@ import type { SessionData, SessionMeta } from "./chatPersistence";
 import type { PersistedChatState } from "./chatPersistence";
 import type { ChatRegenerationRequest } from "./chatStoreHelpers";
 
+export type ChatSyncStatus = "loading" | "synced" | "error";
+
 export interface ChatState {
   messages: ChatDisplayMessage[];
   history: ChatMessage[];
   agentNames: string[] | null;
   skillNames: string[] | null;
   isStreaming: boolean;
+  activeRunSessionId: string | null;
+  activeRunLabel: string | null;
+  syncStatus: ChatSyncStatus;
   abortController: AbortController | null;
   sessions: SessionMeta[];
   activeSessionId: string | null;
@@ -36,6 +42,7 @@ export interface ChatState {
     toolCallId: string,
     result: string,
     isError: boolean,
+    resultSummary?: AgentToolResultSummary,
   ) => void;
   setAssistantPlan: (messageId: string, plan: AgentPlan) => void;
   updateAssistantPlanStep: (messageId: string, update: AgentPlanStepUpdate) => void;
@@ -43,6 +50,8 @@ export interface ChatState {
   appendToReasoning: (messageId: string, text: string) => void;
   setAssistantStatus: (messageId: string, status: string) => void;
   setStreaming: (streaming: boolean) => void;
+  setActiveRun: (sessionId: string | null, label: string | null) => void;
+  setSyncStatus: (status: ChatSyncStatus) => void;
   setAbortController: (controller: AbortController | null) => void;
   clearChat: () => void;
   finalizeMessage: (messageId: string) => void;

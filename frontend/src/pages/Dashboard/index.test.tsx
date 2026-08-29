@@ -48,6 +48,7 @@ const mocks = vi.hoisted(() => ({
       ],
     } as MarketMainline | null,
     isLoading: false,
+    isFetching: false,
     error: null as unknown,
     refetch: vi.fn(),
   },
@@ -56,7 +57,9 @@ const mocks = vi.hoisted(() => ({
 function resetMainlineQuery() {
   mocks.mainlineQuery.data = mainlineSnapshot();
   mocks.mainlineQuery.isLoading = false;
+  mocks.mainlineQuery.isFetching = false;
   mocks.mainlineQuery.error = null;
+  mocks.mainlineQuery.refetch.mockReset();
 }
 
 function mainlineSnapshot(): MarketMainline {
@@ -209,6 +212,9 @@ describe("Dashboard", () => {
     expect(faucetLink).toHaveAttribute("href", expect.stringContaining("600721"));
     expect(within(section).getByText("风格判断")).toBeInTheDocument();
     expect(within(section).getByText("高位科技抱团逐步瓦解，市场风格或转向均衡轮动")).toBeInTheDocument();
+    expect(within(section).getByText(/更新时间/)).toBeInTheDocument();
+    fireEvent.click(within(section).getByRole("button", { name: "刷新今日主线" }));
+    expect(mocks.mainlineQuery.refetch).toHaveBeenCalledOnce();
     expect(within(section).getAllByRole("link", { name: /艾艾精工/ })[0]).toHaveAttribute(
       "href",
       expect.stringContaining("603580"),

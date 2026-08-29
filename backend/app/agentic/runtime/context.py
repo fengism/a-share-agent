@@ -46,11 +46,20 @@ class AgentExecutionContext:
             return timeout_seconds
         return max(0.001, min(timeout_seconds, self.deadline - time.monotonic()))
 
-    async def reserve_tool_calls(self, requested: int) -> int:
+    def tool_calls_available(self, *, preserve: int = 0) -> int:
+        preserved_calls = min(
+            max(0, int(preserve)),
+            max(0, self.settings.chat_max_tool_calls_total // 2),
+        )
+        return max(0, self.tool_calls_remaining - preserved_calls)
+
+    async def reserve_tool_calls(self, requested: int, *, preserve: int = 0) -> int:
         requested_calls = max(0, int(requested))
         async with self._tool_budget_lock:
-            remaining = self.tool_calls_remaining
-            accepted = min(requested_calls, remaining)
+            accepted = min(
+                requested_calls,
+                self.tool_calls_available(preserve=preserve),
+            )
             self._tool_calls_used += accepted
             return accepted
 

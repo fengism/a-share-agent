@@ -2,9 +2,10 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Skeleton } from "antd";
 import type { KlineItem } from "../types/stock";
 import type { ChanlunResult } from "../utils/chanlun";
+import { loadKlineChart } from "./klineChartLoader";
 import type { KlineTradeMarker } from "./klineMarkers";
 
-const KlineChart = lazy(() => import("./KlineChart"));
+const KlineChart = lazy(loadKlineChart);
 
 interface LazyKlineChartProps {
   data: KlineItem[];
@@ -12,14 +13,23 @@ interface LazyKlineChartProps {
   viewKey?: string;
   tradeMarkers?: KlineTradeMarker[];
   chanlun?: ChanlunResult | null;
+  forceRender?: boolean;
 }
 
-export default function LazyKlineChart({ data, height = 500, viewKey, tradeMarkers, chanlun }: LazyKlineChartProps) {
+export default function LazyKlineChart({
+  data,
+  height = 500,
+  viewKey,
+  tradeMarkers,
+  chanlun,
+  forceRender = false,
+}: LazyKlineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(() => typeof IntersectionObserver === "undefined");
+  const renderChart = forceRender || shouldRender;
 
   useEffect(() => {
-    if (shouldRender || !containerRef.current || typeof IntersectionObserver === "undefined") return;
+    if (renderChart || !containerRef.current || typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
         setShouldRender(true);
@@ -28,11 +38,11 @@ export default function LazyKlineChart({ data, height = 500, viewKey, tradeMarke
     }, { rootMargin: "240px 0px" });
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [shouldRender]);
+  }, [renderChart]);
 
   return (
     <div ref={containerRef} style={{ minHeight: height }}>
-      {shouldRender ? (
+      {renderChart ? (
         <Suspense fallback={<Skeleton active paragraph={{ rows: 8 }} />}>
           <KlineChart data={data} height={height} viewKey={viewKey} tradeMarkers={tradeMarkers} chanlun={chanlun} />
         </Suspense>
