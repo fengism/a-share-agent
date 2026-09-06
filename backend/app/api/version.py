@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 HUB_TAGS_URL = "https://hub.docker.com/v2/repositories/{namespace}/{repo}/tags/"
 HUB_NAMESPACE = os.environ.get("UPDATE_HUB_NAMESPACE", "fengliu1989")
 HUB_REPO = os.environ.get("UPDATE_HUB_REPO", "a-share-backend")
-UPDATER_URL = os.environ.get("UPDATER_HTTP_URL", "http://updater:8080/v1/update")
 
 _CACHE_TTL_SECONDS = 300.0
 _cache: dict[str, Any] = {"at": 0.0, "latest": None}
@@ -82,22 +81,26 @@ async def version_check() -> VersionCheckResponse:
 
 
 async def trigger_update() -> dict[str, str]:
-    import httpx as _httpx
+    """写入更新请求标记文件，由 updater 容器轮询执行 docker compose 更新。"""
+    import json
+    from datetime import datetime
 
+    from app.api.errors import ApiError
     from app.configuration.runtime import get_settings
 
-    token = get_settings().updater_http_token
+    marker = get_settings().app_data_dir / "update-request.json"
     try:
-        async with _httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                UPDATER_URL,
-                headers={"Authorization": f"Bearer {token}"} if token else {},
-            )
-            response.raise_for_status()
-    except Exception as exc:
-        logger.warning("触发在线更新失败: %s", exc)
-        from app.api.errors import ApiError
-
+        marker.write_text(
+            json.dumps(
+                {
+                    "requested_at": datetime.now().isoformat(timespec="seconds"),
+                    "target_version": "latest",
+                }
+            ),
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        logger.warning("写入更新请求失败: %s", exc)
         raise ApiError(
             status_code=503,
             code="system.update_unavailable",

@@ -119,18 +119,29 @@ services:
         condition: service_healthy
 
   updater:
-    image: containrrr/watchtower
-    restart: unless-stopped
-    # 在线更新执行器：仅响应后端管理员触发的手动更新，不自动轮询。
+    # 在线更新执行器：轮询 data 卷里的更新请求标记文件（由后端管理员触发时写入），
+    # 检测到后拉取新镜像并重建 backend/frontend。不自动定时更新。
     # 挂载 docker.sock 等价于宿主机 root 权限，故只在内网、不暴露端口。
+    # HOST_PROJECT_DIR 必须设为本 compose 文件所在目录的宿主机绝对路径，
+    # 保证容器内运行的 docker compose 解析 ./data 等相对路径时与宿主机一致。
+    image: docker:cli
+    restart: unless-stopped
+    working_dir: ${HOST_PROJECT_DIR:-/project}
+    command: >
+      sh -c 'while true; do
+        if [ -f "$${HOST_PROJECT_DIR}/data/update-request.json" ]; then
+          rm -f "$${HOST_PROJECT_DIR}/data/update-request.json";
+          cd "$${HOST_PROJECT_DIR}" &&
+          docker compose pull backend frontend &&
+          docker compose up -d backend frontend;
+        fi;
+        sleep 5;
+      done'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - .:${HOST_PROJECT_DIR:-/project}
     environment:
-      WATCHTOWER_HTTP_API_TOKEN: "${UPDATER_HTTP_TOKEN:-}"
-      WATCHTOWER_HTTP_API_PERIODIC_POLL: "false"
-      WATCHTOWER_LABEL_ENABLE: "true"
-      WATCHTOWER_CLEANUP: "true"
-      TZ: "${TZ:-Asia/Shanghai}"
+      HOST_PROJECT_DIR: ${HOST_PROJECT_DIR:-/project}
     deploy:
       resources:
         limits:

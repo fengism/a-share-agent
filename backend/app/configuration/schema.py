@@ -101,7 +101,6 @@ class Settings(BaseSettings):
     app_data_dir: Path = BACKEND_DIR / "data"
     portfolio_quote_cache_ttl_seconds: int = Field(default=10, ge=1)
     portfolio_quote_stale_ttl_seconds: int = Field(default=300, ge=1)
-    updater_http_token: str = ""
     quant_strategy_dir: Path = BACKEND_DIR / "app" / "modules" / "quant" / "strategies" / "definitions"
     quant_strategy_reload_seconds: float = Field(default=5.0, ge=1.0, le=3600.0)
     # 产业链知识库外部导入目录：与用户存档根目录（data/industry_chains）分离，
