@@ -32,6 +32,7 @@ services:
       retries: 3
 
   backend:
+    image: ${BACKEND_IMAGE:-fengliu1989/a-share-backend:main}
     build:
       context: ./backend
       args:
@@ -81,6 +82,7 @@ services:
       retries: 3
 
   frontend:
+    image: ${FRONTEND_IMAGE:-fengliu1989/a-share-frontend:main}
     build: ./frontend
     restart: unless-stopped
     stop_grace_period: 10s
