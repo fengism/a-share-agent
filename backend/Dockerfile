@@ -17,14 +17,14 @@ FROM python:3.11-slim AS runtime
 
 ARG APP_UID=1000
 ARG APP_GID=1000
+# 版本号（git commit sha）由 CI 构建参数注入；ARG 必须先于 ENV 声明才能被引用
+ARG APP_VERSION=dev
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     APP_VERSION=${APP_VERSION} \
     PATH="/app/.venv/bin:$PATH"
-
-ARG APP_VERSION=dev
 
 WORKDIR /app
 

@@ -32,6 +32,23 @@ WORKFLOW_JOB_SCHEMA = ";\n".join(
 ) + ";"
 
 
+def _next_event_sequence(
+    connection: sqlite3.Connection, job_id: str, attempt: int
+) -> int:
+    """事件序号按 (job_id, attempt) 递增；调用方须已持有写事务。"""
+    return int(
+        connection.execute(
+            """
+            SELECT COALESCE(MAX(sequence), 0) + 1
+            FROM workflow_job_events
+            WHERE job_id = ? AND attempt = ?
+            """,
+            (job_id, attempt),
+        ).fetchone()[0]
+    )
+
+
+
 class WorkflowLeaseLostError(RuntimeError):
     pass
 
@@ -245,16 +262,7 @@ class WorkflowJobStore:
                 (now,),
             ).fetchall()
             for row in rows:
-                sequence = int(
-                    connection.execute(
-                        """
-                        SELECT COALESCE(MAX(sequence), 0) + 1
-                        FROM workflow_job_events
-                        WHERE job_id = ? AND attempt = ?
-                        """,
-                        (row["id"], int(row["attempts"])),
-                    ).fetchone()[0]
-                )
+                sequence = _next_event_sequence(connection, row["id"], int(row["attempts"]))
                 connection.execute(
                     """
                     INSERT INTO workflow_job_events(
@@ -400,15 +408,7 @@ class WorkflowJobStore:
             if job is None:
                 raise WorkflowLeaseLostError(f"Workflow Job 租约已失效: {job_id}")
             attempt = int(job["attempts"])
-            row = connection.execute(
-                """
-                SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence
-                FROM workflow_job_events
-                WHERE job_id = ? AND attempt = ?
-                """,
-                (job_id, attempt),
-            ).fetchone()
-            sequence = int(row["next_sequence"])
+            sequence = _next_event_sequence(connection, job_id, attempt)
             serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
             connection.execute(
                 """
@@ -474,16 +474,7 @@ class WorkflowJobStore:
                 return False
             if completion_event is not None:
                 event_type, payload = completion_event
-                sequence = int(
-                    connection.execute(
-                        """
-                        SELECT COALESCE(MAX(sequence), 0) + 1
-                        FROM workflow_job_events
-                        WHERE job_id = ? AND attempt = ?
-                        """,
-                        (job_id, int(row["attempts"])),
-                    ).fetchone()[0]
-                )
+                sequence = _next_event_sequence(connection, job_id, int(row["attempts"]))
                 connection.execute(
                     """
                     INSERT INTO workflow_job_events(
@@ -536,16 +527,7 @@ class WorkflowJobStore:
             status = "pending" if retrying else "failed"
             if not retrying and terminal_event is not None:
                 event_type, payload = terminal_event
-                next_sequence = int(
-                    connection.execute(
-                        """
-                        SELECT COALESCE(MAX(sequence), 0) + 1
-                        FROM workflow_job_events
-                        WHERE job_id = ? AND attempt = ?
-                        """,
-                        (job_id, int(row["attempts"])),
-                    ).fetchone()[0]
-                )
+                next_sequence = _next_event_sequence(connection, job_id, int(row["attempts"]))
                 connection.execute(
                     """
                     INSERT INTO workflow_job_events(
@@ -613,16 +595,7 @@ class WorkflowJobStore:
             ).fetchone()
             if row is None:
                 return False
-            sequence = int(
-                connection.execute(
-                    """
-                    SELECT COALESCE(MAX(sequence), 0) + 1
-                    FROM workflow_job_events
-                    WHERE job_id = ? AND attempt = ?
-                    """,
-                    (job_id, int(row["attempts"])),
-                ).fetchone()[0]
-            )
+            sequence = _next_event_sequence(connection, job_id, int(row["attempts"]))
             cursor = connection.execute(
                 """
                 UPDATE workflow_jobs
@@ -671,16 +644,7 @@ class WorkflowJobStore:
                 return None
             if row["status"] in {"pending", "running"}:
                 attempt = int(row["attempts"])
-                sequence = int(
-                    connection.execute(
-                        """
-                        SELECT COALESCE(MAX(sequence), 0) + 1
-                        FROM workflow_job_events
-                        WHERE job_id = ? AND attempt = ?
-                        """,
-                        (job_id, attempt),
-                    ).fetchone()[0]
-                )
+                sequence = _next_event_sequence(connection, job_id, attempt)
                 connection.execute(
                     """
                     UPDATE workflow_jobs

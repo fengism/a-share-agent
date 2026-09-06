@@ -26,6 +26,10 @@ class WatchlistItemNotFoundError(LookupError):
     pass
 
 
+class WatchlistAlertLimitError(RuntimeError):
+    pass
+
+
 def storage_stock_code(market: WatchlistMarket, stock_code: str) -> str:
     return f"{_HK_STORAGE_PREFIX}{stock_code}" if market == "hk" else stock_code
 
@@ -257,14 +261,17 @@ async def add_watchlist_alert(stock_code: str, request: WatchlistAlertCreate, us
     )
     if item is None:
         raise WatchlistItemNotFoundError(public_code)
-    row = await call_blocking(
-        watchlist_store.add_alert,
-        user_id,
-        storage_code,
-        request.condition,
-        request.threshold,
-        semaphore=database_semaphore,
-    )
+    try:
+        row = await call_blocking(
+            watchlist_store.add_alert,
+            user_id,
+            storage_code,
+            request.condition,
+            request.threshold,
+            semaphore=database_semaphore,
+        )
+    except ValueError as exc:
+        raise WatchlistAlertLimitError(str(exc)) from exc
     return WatchlistAlert(
         id=int(row["id"]),
         stock_code=public_code,

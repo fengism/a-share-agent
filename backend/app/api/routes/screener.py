@@ -79,7 +79,7 @@ async def compute_percentiles(request: ValuationPercentileRequest):
     """
     if len(request.codes) > 50:
         raise BadRequestError("单次最多50只股票", code="screener.too_many_codes")
-    logger.info(f"计算估值百分位: {len(request.codes)} 只, indicator={request.indicator}")
+    logger.debug("计算估值百分位: %s 只, indicator=%s", len(request.codes), request.indicator)
 
     items = await compute_percentiles_service(
         codes=request.codes,

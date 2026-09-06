@@ -16,6 +16,7 @@ vi.mock("./AppSidebar", () => ({
 }));
 vi.mock("./ChatSessionSyncBridge", () => ({ default: () => null }));
 vi.mock("./WorkflowRuntimeBridge", () => ({ default: () => null }));
+vi.mock("./UpdateBanner", () => ({ default: () => null }));
 
 describe("AppLayout", () => {
   beforeEach(() => {

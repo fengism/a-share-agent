@@ -68,17 +68,20 @@ def delete_item(user_id: int, stock_code: str, *, connection=None) -> bool:
     return result.rowcount == 1
 
 
+ALERTS_MAX_PER_USER = 200
+
+
 def list_alerts(user_id: int, stock_code: str | None = None, *, connection=None) -> list[dict[str, Any]]:
     target = connection or get_connection()
     if stock_code is None:
         rows = target.execute(
-            "SELECT * FROM watchlist_alerts WHERE user_id = ? ORDER BY id",
-            (user_id,),
+            "SELECT * FROM watchlist_alerts WHERE user_id = ? ORDER BY id LIMIT ?",
+            (user_id, ALERTS_MAX_PER_USER),
         ).fetchall()
     else:
         rows = target.execute(
-            "SELECT * FROM watchlist_alerts WHERE user_id = ? AND stock_code = ? ORDER BY id",
-            (user_id, stock_code),
+            "SELECT * FROM watchlist_alerts WHERE user_id = ? AND stock_code = ? ORDER BY id LIMIT ?",
+            (user_id, stock_code, ALERTS_MAX_PER_USER),
         ).fetchall()
     return [dict(row) for row in rows]
 
@@ -93,6 +96,12 @@ def add_alert(
 ) -> dict[str, Any]:
     target = connection or get_connection()
     with unit_of_work(connection=target, immediate=True) as work:
+        existing = work.connection.execute(
+            "SELECT COUNT(*) FROM watchlist_alerts WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()[0]
+        if existing >= ALERTS_MAX_PER_USER:
+            raise ValueError(f"每个用户的告警数量上限为 {ALERTS_MAX_PER_USER}")
         cursor = work.connection.execute(
             """
             INSERT INTO watchlist_alerts(user_id, stock_code, condition, threshold)

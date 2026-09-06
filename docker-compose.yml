@@ -40,6 +40,7 @@ services:
       args:
         APP_UID: "${APP_UID:-1000}"
         APP_GID: "${APP_GID:-1000}"
+        APP_VERSION: "${APP_VERSION:-main}"
     init: true
     restart: unless-stopped
     stop_grace_period: 30s
@@ -121,7 +122,8 @@ services:
   updater:
     # 在线更新执行器：轮询 data 卷里的更新请求标记文件（由后端管理员触发时写入），
     # 检测到后拉取新镜像并重建 backend/frontend。不自动定时更新。
-    # 挂载 docker.sock 等价于宿主机 root 权限，故只在内网、不暴露端口。
+    # 挂载 docker.sock 等价于宿主机 root 权限，故只在内网、不暴露端口；
+    # 项目目录只读挂载，仅 data 目录可写（写更新请求标记）。
     # HOST_PROJECT_DIR 必须设为本 compose 文件所在目录的宿主机绝对路径，
     # 保证容器内运行的 docker compose 解析 ./data 等相对路径时与宿主机一致。
     image: docker:cli
@@ -135,13 +137,19 @@ services:
           docker compose pull backend frontend &&
           docker compose up -d backend frontend;
         fi;
-        sleep 5;
+        sleep 15;
       done'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - .:${HOST_PROJECT_DIR:-/project}
-    environment:
-      HOST_PROJECT_DIR: ${HOST_PROJECT_DIR:-/project}
+      - .:${HOST_PROJECT_DIR:-/project}:ro
+      - ./data:${HOST_PROJECT_DIR:-/project}/data
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "sh", "-c", "kill -0 1"]
+      interval: 60s
+      timeout: 3s
+      retries: 3
     deploy:
       resources:
         limits:

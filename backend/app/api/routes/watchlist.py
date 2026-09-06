@@ -12,6 +12,7 @@ from app.modules.watchlist.public import (
     WatchlistAlertCreate,
     WatchlistItem,
     WatchlistItemCreate,
+    WatchlistAlertLimitError,
     WatchlistItemNotFoundError,
     WatchlistResponse,
     add_watchlist_alert,
@@ -61,6 +62,8 @@ async def create_watchlist_alert(
         return await add_watchlist_alert(stock_code, request, user["id"])
     except WatchlistItemNotFoundError as error:
         raise NotFoundError("请先添加自选股", code="watchlist.item_not_found") from error
+    except WatchlistAlertLimitError as error:
+        raise BadRequestError(str(error), code="watchlist.alert_limit") from error
 
 
 @router.delete("/alerts/{alert_id}", response_model=DeleteResponse)

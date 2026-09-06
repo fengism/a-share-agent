@@ -11,7 +11,7 @@ vi.mock("../../api/queries", () => ({
   useSgeGoldHistory: mocks.useSgeGoldHistory,
 }));
 
-vi.mock("echarts-for-react", () => ({
+vi.mock("echarts-for-react/lib/core", () => ({
   default: mocks.chart,
 }));
 

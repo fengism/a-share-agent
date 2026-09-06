@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Alert, Card, Radio, Tag } from "antd";
-import ReactECharts from "echarts-for-react";
+import ReactECharts from "echarts-for-react/lib/core";
 import dayjs from "dayjs";
 import { useSgeGoldHistory } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { useColors } from "../../styles/ui";
+import echarts from "../../charts/echarts-setup";
 
 const SGE_SYMBOLS = [
   ["Au99.99", "黄金 Au99.99"],
@@ -222,6 +223,7 @@ export default function SgeGoldTab() {
                 />
               </div>
               <ReactECharts
+                echarts={echarts}
                 className="sge-gold-chart__canvas"
                 option={chartOption}
                 notMerge

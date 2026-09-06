@@ -143,6 +143,14 @@ class ProviderGateway:
 
         self._record_failure(circuit_key, last_category, threshold, half_open)
         if last_error is not None:
+            logger.warning(
+                "provider call exhausted retries provider=%s operation=%s attempts=%s category=%s error_type=%s",
+                provider,
+                operation,
+                attempt_number,
+                last_category.value,
+                type(last_error).__name__,
+            )
             raise last_error
         raise RuntimeError(f"provider call failed without an exception: {provider}.{operation}")
 
@@ -204,7 +212,7 @@ class ProviderGateway:
                     fallback=is_fallback_attempt,
                     error_type=type(exc).__name__,
                 )
-                logger.warning(
+                logger.debug(
                     "provider call failed provider=%s operation=%s attempt=%s category=%s error_type=%s",
                     provider,
                     operation,
@@ -237,6 +245,14 @@ class ProviderGateway:
 
         self._record_failure(circuit_key, last_category, threshold, half_open)
         if last_error is not None:
+            logger.warning(
+                "provider call exhausted retries provider=%s operation=%s attempts=%s category=%s error_type=%s",
+                provider,
+                operation,
+                attempt_number,
+                last_category.value,
+                type(last_error).__name__,
+            )
             raise last_error
         raise RuntimeError(f"provider call failed without an exception: {provider}.{operation}")
 

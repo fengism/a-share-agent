@@ -1,11 +1,12 @@
 """版本检查与在线更新 API 端点。
 
 版本号在镜像构建时通过 APP_VERSION 注入（git commit sha）；本地开发为 "dev"。
-更新执行由 compose 内的 Watchtower updater 服务完成，见 docker-compose.yml。
+更新执行由 compose 内的 updater 服务完成（轮询 data 卷中的标记文件），见 docker-compose.yml。
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -14,17 +15,18 @@ from typing import Any
 import httpx
 from fastapi import Depends, FastAPI
 
-from app.api.schemas import VersionCheckResponse
 from app.api.auth.dependencies import require_admin
+from app.api.schemas import VersionCheckResponse
 
 logger = logging.getLogger(__name__)
 
 HUB_TAGS_URL = "https://hub.docker.com/v2/repositories/{namespace}/{repo}/tags/"
-HUB_NAMESPACE = os.environ.get("UPDATE_HUB_NAMESPACE", "fengliu1989")
-HUB_REPO = os.environ.get("UPDATE_HUB_REPO", "a-share-backend")
 
-_CACHE_TTL_SECONDS = 300.0
-_cache: dict[str, Any] = {"at": 0.0, "latest": None}
+_OK_TTL_SECONDS = 300.0
+_FAIL_TTL_SECONDS = 30.0
+_hub_lock = asyncio.Lock()
+_cache: dict[str, Any] = {"at": 0.0, "latest": None, "ok": False}
+_http_client: httpx.AsyncClient | None = None
 
 
 def current_version() -> str:
@@ -44,25 +46,51 @@ def _pick_latest_sha_tag(tags: list[dict[str, Any]]) -> str | None:
     return None
 
 
+def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=10.0)
+    return _http_client
+
+
 async def fetch_latest_version() -> str | None:
-    """查询 Docker Hub 上最新的 sha- 版本；失败返回 None 并记录日志。"""
-    now = time.monotonic()
-    if now - float(_cache["at"]) < _CACHE_TTL_SECONDS:
+    """查询 Docker Hub 上最新的 sha- 版本。
+
+    成功结果缓存 300 秒；失败结果只缓存 30 秒，避免瞬时故障掩盖真实更新。
+    single-flight 锁保证缓存过期时的并发请求只触发一次 Hub 调用。
+    """
+    if _cache["at"] + (
+        _OK_TTL_SECONDS if _cache["ok"] else _FAIL_TTL_SECONDS
+    ) > time.monotonic():
         return _cache["latest"]
-    latest: str | None = None
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                HUB_TAGS_URL.format(namespace=HUB_NAMESPACE, repo=HUB_REPO),
+
+    async with _hub_lock:
+        # 持锁期间可能已被前一个请求刷新
+        if _cache["at"] + (
+            _OK_TTL_SECONDS if _cache["ok"] else _FAIL_TTL_SECONDS
+        ) > time.monotonic():
+            return _cache["latest"]
+
+        from app.configuration.runtime import get_settings
+
+        settings = get_settings()
+        latest: str | None = None
+        try:
+            response = await _get_http_client().get(
+                HUB_TAGS_URL.format(
+                    namespace=settings.update_hub_namespace,
+                    repo=settings.update_hub_repo,
+                ),
                 params={"page_size": 25},
             )
             response.raise_for_status()
             latest = _pick_latest_sha_tag(response.json().get("results") or [])
-    except Exception:
-        logger.warning("查询 Docker Hub 最新版本失败", exc_info=True)
-    _cache["at"] = now
-    _cache["latest"] = latest
-    return latest
+        except Exception:
+            logger.warning("查询 Docker Hub 最新版本失败", exc_info=True)
+        _cache["at"] = time.monotonic()
+        _cache["latest"] = latest
+        _cache["ok"] = True
+        return latest
 
 
 async def version_check() -> VersionCheckResponse:
