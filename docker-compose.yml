@@ -52,7 +52,6 @@ services:
       TRUST_PROXY_HEADERS: "true"
       TDX_HTTP_ENABLED: "true"
       TDX_HTTP_BASE_URL: "http://tdx-api:18080"
-      QUANT_STRATEGY_DIR: "/app/data/quant-strategies"
     depends_on:
       tdx-api:
         condition: service_healthy
