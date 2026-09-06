@@ -21,9 +21,9 @@ def history_index_snapshots() -> dict[str, dict[str, object]]:
 
 
 def check_database() -> bool:
-    from app.infrastructure.persistence.connection import get_connection
+    from app.infrastructure.persistence.connection import ALL_DATABASES, get_connection
 
-    for database in ("market", "user"):
+    for database in ALL_DATABASES:
         try:
             get_connection(database).execute("SELECT 1")
         except Exception:
@@ -44,9 +44,9 @@ def check_config_encryption() -> str:
 
 async def operational_snapshots() -> OperationalSnapshot:
     from app.configuration import get_settings
-    from app.core.cache import cache
+    from app.core.cache import analysis_cache, cache, market_cache, reference_cache, series_cache
     from app.core.metrics import metrics
-    from app.infrastructure.persistence.connection import database_storage_snapshot
+    from app.infrastructure.persistence.connection import database_storage_snapshot, default_backup_dir
     from app.infrastructure.persistence.operations import backup_freshness_snapshot
     from app.infrastructure.persistence.workflow_jobs import workflow_job_store
     from app.infrastructure.providers.provider_gateway import provider_gateway
@@ -59,7 +59,7 @@ async def operational_snapshots() -> OperationalSnapshot:
     )
     backups = await call_blocking(
         backup_freshness_snapshot,
-        settings.database_backup_dir or settings.app_data_dir / "backups",
+        settings.database_backup_dir or default_backup_dir(),
         semaphore=database_semaphore,
     )
     databases = await call_blocking(
@@ -81,6 +81,10 @@ async def operational_snapshots() -> OperationalSnapshot:
         workflow_queue=workflow_queue,
         backups=backups,
         global_cache=cache.snapshot(),
+        market_cache=market_cache.snapshot(),
+        reference_cache=reference_cache.snapshot(),
+        analysis_cache=analysis_cache.snapshot(),
+        series_cache=series_cache.snapshot(),
         provider_circuits=provider_gateway.snapshot(),
     )
 

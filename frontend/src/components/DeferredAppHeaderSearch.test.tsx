@@ -33,4 +33,16 @@ describe("DeferredAppHeaderSearch", () => {
     const input = await screen.findByRole("textbox", { name: "搜索股票" });
     expect(input).toHaveFocus();
   });
+
+  it("activates search on Cmd+K keyboard shortcut", async () => {
+    render(<DeferredAppHeaderSearch isMobile={false} />);
+
+    expect(screen.queryByRole("textbox", { name: "搜索股票" })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+
+    expect(mocks.loadAppHeaderSearch).toHaveBeenCalled();
+    const input = await screen.findByRole("textbox", { name: "搜索股票" });
+    expect(input).toHaveFocus();
+  });
 });

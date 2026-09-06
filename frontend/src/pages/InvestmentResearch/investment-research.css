@@ -34,7 +34,7 @@
   color: var(--c-accent);
   font-size: var(--stock-research-label-size);
   font-weight: var(--c-weight-semibold);
-  line-height: 1.5;
+  line-height: var(--c-leading-normal);
   letter-spacing: 0;
 }
 
@@ -43,7 +43,7 @@
   margin: 0;
   font-size: var(--stock-research-title-size);
   font-weight: var(--c-weight-bold);
-  line-height: 1.25;
+  line-height: var(--c-leading-tight);
   letter-spacing: 0;
 }
 
@@ -56,15 +56,15 @@
   justify-content: flex-end;
   gap: 12px;
   font-size: var(--stock-research-label-size);
-  line-height: 1.5;
+  line-height: var(--c-leading-normal);
   font-variant-numeric: tabular-nums;
 }
 
 .investment-research-report__financial > h3 {
   margin: 0 0 var(--c-space-4);
-  font-size: 22px;
+  font-size: var(--c-font-xl);
   font-weight: var(--c-weight-semibold);
-  line-height: 1.35;
+  line-height: var(--c-leading-tight);
   letter-spacing: 0;
 }
 

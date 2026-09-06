@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { message } from "antd";
-import Twitter from ".";
+import TwitterFeed from "./TwitterFeed";
 
 const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
@@ -39,7 +39,7 @@ vi.mock("../../api/queries", () => ({
   }),
 }));
 
-vi.mock("../../features/feed/PaginatedList", () => ({
+vi.mock("./PaginatedList", () => ({
   default: ({ items }: { items: Array<{ title: string }> }) => <div>资讯数量：{items.length}</div>,
 }));
 
@@ -55,19 +55,18 @@ vi.mock("antd", async () => {
   };
 });
 
-describe("Twitter page", () => {
+describe("Twitter feed content", () => {
   afterEach(() => vi.clearAllMocks());
 
-  it("renders as a standalone feed and supports manual refresh", () => {
+  it("renders the Twitter column content and supports manual refresh", () => {
     mocks.refresh.mockImplementation((_variables, options) => options.onSuccess());
     render(
       <MemoryRouter>
-        <Twitter />
+        <TwitterFeed searchQuery="" />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "Twitter 财经动态" })).toBeInTheDocument();
-    expect(screen.getAllByText(/每 12 小时自动/).length).toBeGreaterThan(0);
+    expect(screen.getByText("每 12 小时更新")).toBeInTheDocument();
     expect(screen.getByText("资讯数量：1")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /AI 大 V 解读/ })).toBeInTheDocument();
     expect(screen.getByText("长期看多科技创新。")).toBeInTheDocument();

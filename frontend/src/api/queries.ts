@@ -8,3 +8,9 @@ export * from "./queryHooks/capabilities";
 export * from "./queryHooks/quant";
 export * from "./queryHooks/watchlist";
 export * from "./queryHooks/potential";
+
+export * from "./queryHooks/hk";
+
+export * from "./queryHooks/industryClassification";
+export * from "./queryHooks/stockConcept";
+export * from "./queryHooks/stockProfile";

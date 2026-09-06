@@ -9,6 +9,8 @@ const pageData: AnalysisPageData = {
   intraday: null,
   valuation: null,
   cached_analysis: null,
+  key_levels: null,
+  chip_distribution: null,
 };
 
 describe("AnalysisHeaderCard", () => {

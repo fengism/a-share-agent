@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../client";
+import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { queryKeys } from "../queryKeys";
 import type { PotentialDailyResult, PotentialDateItem } from "../../types/stock";
 
@@ -10,7 +11,7 @@ export function usePotentialDaily(date: string | null) {
       "/potential/latest",
       date ? { date } : undefined,
     ),
-    staleTime: 10 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.potentialResults.staleMs,
   });
 }
 
@@ -18,7 +19,7 @@ export function usePotentialDates() {
   return useQuery({
     queryKey: queryKeys.potential.dates,
     queryFn: () => apiGet<PotentialDateItem[]>("/potential/dates"),
-    staleTime: 10 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.potentialResults.staleMs,
   });
 }
 

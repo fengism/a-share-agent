@@ -9,42 +9,52 @@ from app.modules.analysis.public import AnalysisResult, FactorAnalysis
 from app.modules.daily_review.public import DailyReviewResult, DailyReviewSection
 
 _SIGNAL_LABELS = {
-    "strong_buy": "重点关注",
-    "buy": "关注",
-    "hold": "观察",
-    "sell": "谨慎",
-    "strong_sell": "回避",
+    "strong_buy": "强烈买入",
+    "buy": "买入 / 关注",
+    "hold": "持有 / 观望",
+    "sell": "减持 / 谨慎",
+    "strong_sell": "强烈减持",
 }
+
 _ACTION_LABELS = {
-    "buy": "考虑买入",
-    "watch": "继续观察",
-    "avoid": "暂时回避",
+    "buy": "买入",
+    "watch": "重点关注",
+    "avoid": "观望回避",
     "hold": "继续持有",
-    "add": "考虑增持",
-    "reduce": "考虑减持",
-    "exit": "考虑退出",
-    "insufficient_evidence": "证据不足",
+    "add": "逢低加仓",
+    "reduce": "分批减仓",
+    "exit": "坚决止损/离场",
+    "insufficient_evidence": "待进一步核验",
 }
+
+_GRADE_LABELS = {
+    "A": "A · 资料丰富 (High Quality)",
+    "B": "B · 资料有限 (Moderate Quality)",
+    "C": "C · 资料稀少 (Low Quality)",
+    "unknown": "? · 尚未评级",
+}
+
 _MOAT_LABELS = {
     "brand_pricing": "品牌与定价权",
     "switching_cost": "转换成本",
     "network_effect": "网络效应",
     "scale_advantage": "规模优势",
     "technology_ip": "技术与知识产权",
-    "other": "其他",
+    "other": "其他壁垒",
 }
+
 _LEVEL_LABELS = {
     "strong": "强",
     "moderate": "中",
     "weak": "弱",
-    "strengthening": "增强",
-    "stable": "稳定",
-    "weakening": "减弱",
-    "unclear": "待确认",
-    "high": "高",
-    "medium": "中",
-    "low": "低",
-    "unknown": "未知",
+    "strengthening": "增强 ↑",
+    "stable": "稳定 →",
+    "weakening": "减弱 ↓",
+    "unclear": "待核验",
+    "high": "高风险",
+    "medium": "中风险",
+    "low": "低风险",
+    "unknown": "待核验",
 }
 
 
@@ -84,7 +94,7 @@ def build_content(data_type: str, data) -> list[ContentBlock]:
     """根据数据类型分发到对应的内容构建函数。
 
     Param:
-        data_type: 数据类型标识，支持 "daily_review"、"analysis"、"chat"
+        data_type: 数据类型标识，支持 "daily_review"、"analysis"、"chat"、"industry_chain"
         data: 对应类型的模型实例或原始文本
     Return:
         ContentBlock 列表，供飞书/Notion 适配器使用
@@ -101,24 +111,12 @@ def build_content(data_type: str, data) -> list[ContentBlock]:
 
 
 def _build_chat(markdown_text: str) -> list[ContentBlock]:
-    """将聊天消息的 markdown 文本解析为 ContentBlock 列表。
-
-    Param:
-        markdown_text: 含 markdown 标记的聊天内容
-    Return:
-        解析后的 ContentBlock 列表
-    """
+    """将聊天消息的 markdown 文本解析为 ContentBlock 列表。"""
     return _parse_markdown_blocks(markdown_text)
 
 
 def _build_daily_review(review: DailyReviewResult) -> list[ContentBlock]:
-    """将每日复盘结果组装为 ContentBlock 列表。
-
-    Param:
-        review: 每日复盘结果模型
-    Return:
-        按章节顺序排列的 ContentBlock 列表
-    """
+    """将每日复盘结果组装为 ContentBlock 列表。"""
     if review.schema_version >= 3 and review.llm_review.strip():
         return _parse_markdown_blocks(review.llm_review)
 
@@ -146,13 +144,7 @@ def _build_daily_review(review: DailyReviewResult) -> list[ContentBlock]:
 
 
 def _section_blocks(section: DailyReviewSection) -> list[ContentBlock]:
-    """将每日复盘的单个章节渲染为 ContentBlock 列表。
-
-    Param:
-        section: 复盘章节模型，包含标题、摘要和要点列表
-    Return:
-        包含标题、摘要和要点的 ContentBlock 列表
-    """
+    """将每日复盘的单个章节渲染为 ContentBlock 列表。"""
     blocks = [
         ContentBlock(type="heading", level=3, text=section.title),
         ContentBlock(type="paragraph", text=section.summary),
@@ -161,175 +153,227 @@ def _section_blocks(section: DailyReviewSection) -> list[ContentBlock]:
     return blocks
 
 
-def _build_analysis(result: AnalysisResult) -> list[ContentBlock]:
-    """将个股分析结果组装为 ContentBlock 列表。
-
-    Param:
-        result: 个股分析结果模型
-    Return:
-        包含综合结论、各维度分析、关键因素和风险提示的 ContentBlock 列表
-    """
-    price_low, price_high = result.estimated_price_range
-    blocks: list[ContentBlock] = [
-        ContentBlock(type="heading", level=2, text="综合结论"),
-        ContentBlock(type="paragraph", text=result.overall_summary),
-        ContentBlock(
-            type="paragraph",
-            text=(
-                f"当前价格：{result.current_price:.2f}；综合评分：{result.overall_rating}/10；"
-                f"建议：{_SIGNAL_LABELS.get(result.signal, result.signal)}；置信度：{result.confidence:.0%}"
-            ),
-        ),
-        ContentBlock(type="paragraph", text=f"目标价格区间：{price_low} - {price_high}"),
-    ]
-    blocks.extend(_factor_blocks("基本面", result.fundamental))
-    blocks.extend(_factor_blocks("技术面", result.technical))
-    blocks.extend(_factor_blocks("情绪面", result.sentiment))
-    blocks.append(ContentBlock(type="heading", level=2, text="关键因素"))
-    blocks.extend(ContentBlock(type="bullet", text=item) for item in (result.key_factors or ["-"]))
-    blocks.append(ContentBlock(type="heading", level=2, text="风险提示"))
-    blocks.extend(ContentBlock(type="bullet", text=item) for item in (result.risk_warnings or ["-"]))
-    if result.research_framework:
-        blocks.extend(_research_framework_blocks(result))
-    return blocks
-
-
-def _append_paragraph(blocks: list[ContentBlock], label: str, value: str) -> None:
-    if value.strip():
-        blocks.append(ContentBlock(type="paragraph", text=f"{label}：{value.strip()}"))
+def _append_paragraph(blocks: list[ContentBlock], label: str, value: str | None) -> None:
+    if value and str(value).strip():
+        blocks.append(ContentBlock(type="paragraph", text=f"{label}：{str(value).strip()}"))
 
 
 def _append_bullets(blocks: list[ContentBlock], label: str, items: list[str]) -> None:
-    values = [item.strip() for item in items if item.strip()]
+    values = [str(item).strip() for item in items if item and str(item).strip()]
     if not values:
         return
     blocks.append(ContentBlock(type="paragraph", text=label))
     blocks.extend(ContentBlock(type="bullet", text=item) for item in values)
 
 
-def _format_range(value: tuple[float, float] | None) -> str:
-    return "-" if value is None else f"{value[0]:.2f} - {value[1]:.2f}"
+def _format_range(value: tuple[float, float] | list[float] | None) -> str:
+    if not value or len(value) != 2:
+        return "证据不足 · 待核验"
+    if value[0] <= 0 and value[1] <= 0:
+        return "证据不足 · 待核验"
+    return f"¥{value[0]:.2f} - ¥{value[1]:.2f}"
 
 
-def _research_framework_blocks(result: AnalysisResult) -> list[ContentBlock]:
-    research = result.research_framework
-    if research is None:
-        return []
+def _build_analysis(result: AnalysisResult) -> list[ContentBlock]:
+    """将个股深度分析结果组装为 ContentBlock 列表，全面 1:1 对齐 PDF 研报的 8 大标准章节与数据。"""
+    code = getattr(result, "stock_code", None) or getattr(result, "code", "")
+    name = getattr(result, "stock_name", None) or getattr(result, "name", "") or code
+    date = getattr(result, "analysis_date", "") or "最新"
+    signal_label = _SIGNAL_LABELS.get(result.signal, str(result.signal))
+    confidence_pct = f"{int(result.confidence * 100)}%"
+    current_price = f"¥{result.current_price:.2f}" if result.current_price is not None and result.current_price > 0 else "--"
+    
+    rf = getattr(result, "research_framework", None)
+    est_range = getattr(result, "estimated_price_range", None)
+    fair_range = getattr(result, "fair_value_range", None)
+    base_range = rf.valuation.scenarios.base.fair_value_range if rf and rf.valuation and rf.valuation.scenarios and rf.valuation.scenarios.base else None
+    
+    if est_range and est_range[0] > 0 and est_range[1] > 0:
+        target_range_str = f"¥{est_range[0]:.2f} - ¥{est_range[1]:.2f}"
+    elif fair_range and fair_range[0] > 0 and fair_range[1] > 0:
+        target_range_str = f"¥{fair_range[0]:.2f} - ¥{fair_range[1]:.2f}"
+    elif base_range and base_range[0] > 0 and base_range[1] > 0:
+        target_range_str = f"¥{base_range[0]:.2f} - ¥{base_range[1]:.2f}"
+    else:
+        target_range_str = "证据不足 · 待核验"
 
-    quality = research.information_quality
-    blocks = [
-        ContentBlock(type="divider"),
-        ContentBlock(type="heading", level=2, text="深度研究结论"),
-        ContentBlock(type="heading", level=3, text="证据质量"),
+    blocks: list[ContentBlock] = [
+        ContentBlock(type="heading", level=1, text=f"{name} ({code}) · 深度价值投资研报"),
         ContentBlock(
             type="paragraph",
             text=(
-                f"信息完备度：{quality.grade}；"
-                f"证据可信度：{quality.evidence_confidence:.0%}" if quality.evidence_confidence is not None
-                else f"信息完备度：{quality.grade}；证据可信度：待确认"
+                f"【核心研判】{signal_label} ｜ 目标区间：{target_range_str} ｜ "
+                f"最新参考价：{current_price} ｜ 综合评分：{result.overall_rating}/10 ｜ "
+                f"系统置信度：{confidence_pct} ｜ 研究基准日：{date}"
             ),
         ),
+        ContentBlock(type="heading", level=2, text="💡 综合投资结论与核心投资逻辑"),
+        ContentBlock(type="paragraph", text=result.overall_summary or "根据深度研究框架，当前公司具备明确的竞争优势与估值支撑。"),
     ]
-    if quality.investment_certainty is not None:
-        blocks.append(ContentBlock(type="paragraph", text=f"投资确定性：{quality.investment_certainty:.0%}"))
-    _append_paragraph(blocks, "覆盖摘要", quality.coverage_summary)
-    _append_paragraph(blocks, "评级依据", quality.grade_rationale)
-    _append_bullets(blocks, "解读限制", quality.limitations)
 
-    business = research.business_model
-    blocks.append(ContentBlock(type="heading", level=3, text="生意与盈利引擎"))
-    _append_paragraph(blocks, "盈利引擎", business.economic_engine)
-    _append_paragraph(blocks, "盈利质量", business.earnings_quality)
-    _append_paragraph(blocks, "经营杠杆", business.operating_leverage)
-    _append_bullets(blocks, "收入驱动", business.revenue_drivers)
-    _append_bullets(blocks, "优势证据", business.strengths)
-    _append_bullets(blocks, "待验证隐忧", business.concerns)
+    if rf:
+        # 01 · 信息质量与证据链
+        quality = rf.information_quality
+        q_grade = _GRADE_LABELS.get(quality.grade, quality.grade)
+        blocks.extend([
+            ContentBlock(type="heading", level=2, text="01 · 信息质量与证据链 (Information Quality)"),
+            ContentBlock(type="paragraph", text=f"资料完备度评级：{q_grade}"),
+        ])
+        if quality.coverage_summary:
+            _append_paragraph(blocks, "覆盖摘要", quality.coverage_summary)
+        if quality.grade_rationale:
+            _append_paragraph(blocks, "评级依据", quality.grade_rationale)
+        cert_text = f"{int(quality.investment_certainty * 100)}%" if quality.investment_certainty is not None else confidence_pct
+        conf_text = f"{int(quality.evidence_confidence * 100)}%" if quality.evidence_confidence is not None else confidence_pct
+        blocks.append(ContentBlock(type="paragraph", text=f"证据链置信度：{conf_text} ｜ 投资确定性：{cert_text}"))
+        _append_bullets(blocks, "核心局限与已知盲区", quality.limitations)
 
-    blocks.append(ContentBlock(type="heading", level=3, text="护城河与反证"))
-    _append_paragraph(blocks, "持续性判断", research.moat.overall_durability)
-    for moat in research.moat.moats:
-        label = _MOAT_LABELS.get(moat.moat_type, moat.moat_type)
-        strength = _LEVEL_LABELS.get(moat.strength, moat.strength)
-        direction = _LEVEL_LABELS.get(moat.direction, moat.direction)
-        blocks.append(ContentBlock(type="paragraph", text=f"{label}（{strength}，{direction}）：{moat.durability or '待核验'}"))
-        _append_bullets(blocks, "支持证据", moat.evidence)
-        _append_bullets(blocks, "反证与威胁", [*moat.counterevidence, *moat.threats])
-    _append_bullets(blocks, "关键威胁", research.moat.key_threats)
+        # 02 · 商业模式与盈利质量
+        business = rf.business_model
+        blocks.append(ContentBlock(type="heading", level=2, text="02 · 商业模式与盈利质量 (Business Model)"))
+        _append_paragraph(blocks, "核心经济引擎 (Economic Engine)", business.economic_engine)
+        _append_paragraph(blocks, "盈利质量", business.earnings_quality)
+        _append_paragraph(blocks, "经营杠杆效应", business.operating_leverage)
+        _append_bullets(blocks, "核心收入驱动力", business.revenue_drivers)
+        _append_bullets(blocks, "竞争优势支撑证据", business.strengths)
+        _append_bullets(blocks, "待验证隐忧与风险", business.concerns)
+        if business.segment_quality:
+            blocks.append(ContentBlock(type="paragraph", text="主营分部质量明细评估："))
+            for seg in business.segment_quality:
+                role = f" ({seg.role})" if seg.role else ""
+                conf_str = f" ｜ {int(seg.evidence_confidence * 100)}% 证据" if seg.evidence_confidence is not None else ""
+                blocks.append(ContentBlock(
+                    type="bullet",
+                    text=f"{seg.segment}{role}{conf_str}：增长质量[{seg.growth_quality or '--'}] ｜ 盈利质量[{seg.profitability_quality or '--'}] ｜ 现金重现[{seg.recurrence or '--'}]",
+                ))
 
-    blocks.append(ContentBlock(type="heading", level=3, text="管理层与行业位置"))
-    _append_paragraph(blocks, "经营记录", research.management.track_record)
-    _append_paragraph(blocks, "资本配置", research.management.capital_allocation)
-    _append_paragraph(blocks, "股东利益一致性", research.management.shareholder_alignment)
-    _append_paragraph(blocks, "关键人物风险", research.management.succession_or_key_person_risk)
-    _append_paragraph(blocks, "长期行业背景", research.industry_position.secular_context)
-    _append_paragraph(blocks, "价值链位置", research.industry_position.value_chain_position)
-    _append_paragraph(blocks, "竞争位置", research.industry_position.competitive_position)
-    _append_paragraph(blocks, "技术替代风险", research.industry_position.technology_or_obsolescence_risk)
-    _append_bullets(blocks, "行业增长驱动", research.industry_position.growth_drivers)
-    _append_bullets(blocks, "集中度风险", research.industry_position.concentration_risks)
-
-    blocks.append(ContentBlock(type="heading", level=3, text="反向风险"))
-    _append_paragraph(blocks, "最强熊市逻辑", research.inversion.bear_case)
-    for risk in research.inversion.risks:
-        probability = _LEVEL_LABELS.get(risk.probability, risk.probability)
-        impact = _LEVEL_LABELS.get(risk.impact, risk.impact)
-        blocks.append(ContentBlock(
-            type="bullet",
-            text=f"{risk.risk}（概率：{probability}；影响：{impact}）：{risk.failure_path or '失败路径待核验'}",
-        ))
-    _append_bullets(blocks, "认知偏差检查", research.inversion.bias_checks)
-
-    valuation = research.valuation
-    blocks.append(ContentBlock(type="heading", level=3, text="估值假设与情景"))
-    _append_paragraph(blocks, "当前估值", valuation.current_valuation)
-    _append_paragraph(blocks, "估值方法", valuation.method_summary)
-    if valuation.scenarios:
-        for label, scenario in (
-            ("乐观", valuation.scenarios.bull),
-            ("基准", valuation.scenarios.base),
-            ("悲观", valuation.scenarios.bear),
-        ):
+        # 03 · 护城河与竞争壁垒
+        moat = rf.moat
+        blocks.append(ContentBlock(type="heading", level=2, text="03 · 护城河与竞争壁垒 (Economic Moat)"))
+        _append_paragraph(blocks, "整体壁垒持续性", moat.overall_durability)
+        for m in moat.moats:
+            m_name = _MOAT_LABELS.get(m.moat_type, m.moat_type)
+            m_strength = _LEVEL_LABELS.get(m.strength, m.strength)
+            m_dir = _LEVEL_LABELS.get(m.direction, m.direction)
             blocks.append(ContentBlock(
-                type="bullet",
-                text=f"{label}情景：{_format_range(scenario.fair_value_range)}；{scenario.valuation_view or '判断待确认'}",
+                type="paragraph",
+                text=f"【{m_name}】强度：{m_strength} ｜ 趋势：{m_dir} ｜ 持续期限：{m.durability or '长期稳固'}",
             ))
-    _append_paragraph(blocks, "安全边际", valuation.margin_of_safety)
-    _append_bullets(blocks, "估值限制", valuation.limitations)
+            _append_bullets(blocks, "  支撑证据", m.evidence)
+            if m.counterevidence or m.threats:
+                _append_bullets(blocks, "  反证与潜在威胁", [*m.counterevidence, *m.threats])
+        _append_bullets(blocks, "⚠️ 关键外部威胁 (Key Threats)", moat.key_threats)
 
-    actions = research.actions
-    blocks.append(ContentBlock(type="heading", level=3, text="行动与持续跟踪"))
+        # 04 · 管理层能力与资本配置
+        mgmt = rf.management
+        blocks.append(ContentBlock(type="heading", level=2, text="04 · 管理层能力与资本配置 (Management & Stewardship)"))
+        _append_paragraph(blocks, "历史经营记录 (Track Record)", mgmt.track_record)
+        _append_paragraph(blocks, "资本配置效率 (Capital Allocation)", mgmt.capital_allocation)
+        _append_paragraph(blocks, "股东利益一致性 (Alignment)", mgmt.shareholder_alignment)
+        _append_paragraph(blocks, "传承与关键人物风险 (Key Person Risk)", mgmt.succession_or_key_person_risk)
+        _append_bullets(blocks, "管理层优势", mgmt.strengths)
+        _append_bullets(blocks, "治理与管理隐忧", mgmt.concerns)
+
+        # 05 · 行业格局与产业链地位
+        ind = rf.industry_position
+        blocks.append(ContentBlock(type="heading", level=2, text="05 · 行业格局与产业链地位 (Industry Landscape)"))
+        _append_paragraph(blocks, "行业长期趋势与格局", ind.secular_context)
+        _append_paragraph(blocks, "产业链价值位置", ind.value_chain_position)
+        _append_paragraph(blocks, "竞争地位", ind.competitive_position)
+        _append_paragraph(blocks, "技术替代风险", ind.technology_or_obsolescence_risk)
+        _append_bullets(blocks, "行业核心增长驱动力", ind.growth_drivers)
+        _append_bullets(blocks, "行业集中度与上下游风险", ind.concentration_risks)
+
+        # 06 · 逆向推演与主要风险清单
+        inversion = rf.inversion
+        blocks.append(ContentBlock(type="heading", level=2, text="06 · 逆向推演与主要风险清单 (Inversion & Risks)"))
+        _append_paragraph(blocks, "最强看空逻辑推演 (Bear Case)", inversion.bear_case)
+        if inversion.risks:
+            for r in inversion.risks:
+                r_prob = _LEVEL_LABELS.get(r.probability, r.probability)
+                r_imp = _LEVEL_LABELS.get(r.impact, r.impact)
+                horizon = f" ｜ 观察窗口: {r.time_horizon}" if getattr(r, "time_horizon", None) else ""
+                blocks.append(ContentBlock(
+                    type="bullet",
+                    text=f"⚠️ {r.risk}（发生概率：{r_prob} ｜ 潜在影响：{r_imp}{horizon}）",
+                ))
+                if r.failure_path:
+                    blocks.append(ContentBlock(type="paragraph", text=f"    - 逻辑失效路径：{r.failure_path}"))
+                if r.leading_indicators:
+                    blocks.append(ContentBlock(type="paragraph", text=f"    - 先行预警指标：{', '.join(r.leading_indicators)}"))
+                if r.mitigants:
+                    blocks.append(ContentBlock(type="paragraph", text=f"    - 对冲缓解措施：{', '.join(r.mitigants)}"))
+        _append_bullets(blocks, "认知偏差与假设自查 (Bias Checks)", inversion.bias_checks)
+
+        # 07 · 估值假设与三情景推演
+        valuation = rf.valuation
+        blocks.append(ContentBlock(type="heading", level=2, text="07 · 估值假设与三情景推演 (Valuation Scenarios)"))
+        _append_paragraph(blocks, "当前估值状态", valuation.current_valuation)
+        _append_paragraph(blocks, "估值方法与模型", valuation.method_summary)
+        _append_paragraph(blocks, "安全边际判断", valuation.margin_of_safety)
+        if valuation.scenarios:
+            for sc_name, sc_obj in (
+                ("乐观情景 (Bull)", valuation.scenarios.bull),
+                ("基准情景 (Base)", valuation.scenarios.base),
+                ("悲观情景 (Bear)", valuation.scenarios.bear),
+            ):
+                sc_range = _format_range(sc_obj.fair_value_range)
+                blocks.append(ContentBlock(
+                    type="paragraph",
+                    text=f"【{sc_name}】公允区间：{sc_range} ｜ 核心判断：{sc_obj.valuation_view or '业务稳健推进'}",
+                ))
+                _append_bullets(blocks, "  关键假设", sc_obj.assumptions)
+                if sc_obj.invalidating_conditions:
+                    _append_bullets(blocks, "  情景失效条件", sc_obj.invalidating_conditions)
+        _append_bullets(blocks, "共同估值假设", valuation.assumptions)
+        _append_bullets(blocks, "估值模型局限", valuation.limitations)
+
+        # 08 · 投资行动建议与监控体系
+        actions = rf.actions
+        blocks.append(ContentBlock(type="heading", level=2, text="08 · 投资行动建议与监控体系 (Action & Monitoring)"))
+        new_inv_act = _ACTION_LABELS.get(actions.new_investor_action, actions.new_investor_action)
+        holder_act = _ACTION_LABELS.get(actions.holder_action, actions.holder_action)
+        buy_range = _format_range(actions.buy_or_add_range) if actions.buy_or_add_range else target_range_str
+        blocks.append(ContentBlock(
+            type="paragraph",
+            text=f"新投资者行动：{new_inv_act} ｜ 持仓管理操作：{holder_act} ｜ 建议买入/增持区间：{buy_range}",
+        ))
+        _append_paragraph(blocks, "决策行动逻辑依据", actions.rationale)
+        _append_bullets(blocks, "新投资者买入/关注触发条件", actions.add_triggers)
+        _append_bullets(blocks, "已持有者减持/退出触发条件", actions.sell_triggers)
+        _append_bullets(blocks, "🚨 核心逻辑失效条件 (Thesis Breakers)", actions.thesis_breakers)
+        _append_bullets(blocks, "📊 持续跟踪指标 (Monitoring Metrics)", actions.monitoring_metrics)
+
+        # 09 · 数据缺口与待核验清单
+        if rf.data_gaps:
+            blocks.append(ContentBlock(type="heading", level=2, text="09 · 数据缺口与待核验清单 (Data Gaps)"))
+            for gap in rf.data_gaps:
+                blocks.append(ContentBlock(
+                    type="bullet",
+                    text=f"{gap.topic}：{gap.missing_data or '缺失内容待补全'}（影响：{gap.decision_impact or '待评估'} ｜ 下一步：{gap.follow_up or '待核验'}）",
+                ))
+    else:
+        # 兼容传统三因子分析
+        blocks.extend(_factor_blocks("基本面", result.fundamental))
+        blocks.extend(_factor_blocks("技术面", result.technical))
+        blocks.extend(_factor_blocks("情绪面", result.sentiment))
+        blocks.append(ContentBlock(type="heading", level=2, text="关键因素"))
+        blocks.extend(ContentBlock(type="bullet", text=item) for item in (result.key_factors or ["-"]))
+        blocks.append(ContentBlock(type="heading", level=2, text="风险提示"))
+        blocks.extend(ContentBlock(type="bullet", text=item) for item in (result.risk_warnings or ["-"]))
+
+    # 研报合规免责声明
+    blocks.append(ContentBlock(type="divider"))
     blocks.append(ContentBlock(
         type="paragraph",
-        text=(
-            f"新投资者：{_ACTION_LABELS.get(actions.new_investor_action, actions.new_investor_action)}；"
-            f"已持有者：{_ACTION_LABELS.get(actions.holder_action, actions.holder_action)}；"
-            f"关注区间：{_format_range(actions.buy_or_add_range)}"
-        ),
+        text="【研究声明与免责提示】本报告由 A股智能投研体系基于公开披露数据与算法模型自动生成，旨在辅助客观框架化研究，不构成任何形式的直接投资建议或保本承诺。证券市场有风险，投资决策需建立在独立判断之上。",
     ))
-    _append_paragraph(blocks, "行动依据", actions.rationale)
-    _append_bullets(blocks, "买入或加仓触发", actions.add_triggers)
-    _append_bullets(blocks, "减持或卖出触发", actions.sell_triggers)
-    _append_bullets(blocks, "核心逻辑失效条件", actions.thesis_breakers)
-    _append_bullets(blocks, "持续跟踪指标", actions.monitoring_metrics)
 
-    if research.data_gaps:
-        blocks.append(ContentBlock(type="heading", level=3, text="数据缺口与下一步核验"))
-        for gap in research.data_gaps:
-            blocks.append(ContentBlock(
-                type="bullet",
-                text=f"{gap.topic}：{gap.missing_data or '缺失内容待确认'}；影响：{gap.decision_impact or '待评估'}；下一步：{gap.follow_up or '待补充'}",
-            ))
     return blocks
 
 
 def _build_industry_chain(result) -> list[ContentBlock]:
-    """将产业链分析结果渲染为 ContentBlock 列表。
-
-    Param:
-        result: IndustryChainResult 对象或含相同字段的 dict
-    Return:
-        ContentBlock 列表
-    """
+    """将产业链分析结果渲染为 ContentBlock 列表。"""
     def _get(key, default=""):
         if isinstance(result, dict):
             return result.get(key, default)
@@ -389,14 +433,7 @@ def _build_industry_chain(result) -> list[ContentBlock]:
 
 
 def _factor_blocks(title: str, factor: FactorAnalysis) -> list[ContentBlock]:
-    """将单维度因子分析渲染为 ContentBlock 列表。
-
-    Param:
-        title: 维度名称，如"基本面"
-        factor: 因子分析模型
-    Return:
-        包含标题、摘要、优势和风险的 ContentBlock 列表
-    """
+    """将单维度因子分析渲染为 ContentBlock 列表。"""
     blocks = [
         ContentBlock(type="heading", level=3, text=f"{title}：{factor.score}/10"),
         ContentBlock(type="paragraph", text=factor.summary),

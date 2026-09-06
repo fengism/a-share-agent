@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api.auth.dependencies import require_active_user
 from app.api.errors import BadRequestError, NotFoundError
@@ -41,9 +43,10 @@ async def create_watchlist_item(
 @router.delete("/{stock_code}", response_model=DeleteResponse)
 async def delete_watchlist_item(
     stock_code: str,
+    market: Literal["cn", "hk"] = Query(default="cn"),
     user: AuthenticatedUser = Depends(require_active_user),
 ):
-    if not await remove_watchlist_item(stock_code, user["id"]):
+    if not await remove_watchlist_item(stock_code, user["id"], market):
         raise NotFoundError("自选股不存在", code="watchlist.item_not_found")
     return DeleteResponse()
 

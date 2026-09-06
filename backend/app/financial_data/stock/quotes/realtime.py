@@ -15,6 +15,7 @@ from app.core.metrics import metrics
 from app.financial_data.stock.quotes.realtime_cache import (
     QuoteCacheEntry,
     build_quote_batch,
+    evict_oldest_quotes,
     expire_stale_quotes,
     missing_codes,
     normalized_codes,
@@ -226,6 +227,11 @@ async def fetch_realtime_quote_set(codes: list[str]) -> RealtimeQuoteSet:
             stale_ttl=stale_ttl,
         ):
             metrics.record_cache_event("realtime_quotes", "expiration", size=cache_size)
+        for cache_size in evict_oldest_quotes(
+            _quote_cache,
+            maxsize=REALTIME_STOCK_QUOTES.maxsize,
+        ):
+            metrics.record_cache_event("realtime_quotes", "eviction", size=cache_size)
         result = _cached_quote_set(normalized, now=cached_at)
         metrics.record_cache_event("realtime_quotes", "set", size=len(_quote_cache))
         return result

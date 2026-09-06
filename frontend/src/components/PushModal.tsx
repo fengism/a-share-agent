@@ -80,7 +80,7 @@ export default function PushModal({ open, type, date, code, onConfirm, onCancel,
       <Space orientation="vertical" style={{ width: "100%" }}>
         {!isChat && (
           <div>
-            <label htmlFor={`${receiverInputId}-target`} style={{ display: "block", fontWeight: 600, marginBottom: 8 }}>
+            <label htmlFor={`${receiverInputId}-target`} style={{ display: "block", fontWeight: "var(--c-weight-semibold)", marginBottom: 8 }}>
               推送目标
             </label>
             <Segmented
@@ -98,7 +98,7 @@ export default function PushModal({ open, type, date, code, onConfirm, onCancel,
         )}
         {(isChat || target === "feishu") && (
           <div>
-            <label htmlFor={receiverInputId} style={{ display: "block", fontWeight: 600 }}>接收人</label>
+            <label htmlFor={receiverInputId} style={{ display: "block", fontWeight: "var(--c-weight-semibold)" }}>接收人</label>
             <Text id={receiverHelpId} type="secondary" style={{ display: "block", marginBottom: 4 }}>
               群聊 ID（oc_）或用户 Open ID（ou_）；留空使用系统默认接收人
             </Text>

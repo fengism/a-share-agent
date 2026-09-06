@@ -1,5 +1,5 @@
 import { DeleteOutlined, HistoryOutlined, ReloadOutlined, SaveOutlined, SettingOutlined } from "@ant-design/icons";
-import { Button, Col, Form, Input, InputNumber, Popconfirm, Row, Select, Switch, Typography } from "antd";
+import { Button, Col, Form, Input, InputNumber, Popconfirm, Row, Select, Switch, Tag, Typography } from "antd";
 import { useState } from "react";
 import {
   stockCodesValidationError,
@@ -99,7 +99,30 @@ export function FormSectionHeader({ title, description }: { title: string; descr
   );
 }
 
+const QUICK_STOCK_PRESETS = [
+  { label: "贵州茅台", code: "600519" },
+  { label: "宁德时代", code: "300750" },
+  { label: "招商银行", code: "600036" },
+  { label: "中国平安", code: "601318" },
+  { label: "中芯国际", code: "688981" },
+  { label: "长江电力", code: "600900" },
+];
+
 export function UniverseFields({ source }: { source: QuantFormValues["source"] }) {
+  const form = Form.useFormInstance<QuantFormValues>();
+
+  const handleQuickCode = (code: string) => {
+    const current = (form.getFieldValue("codes") || "").trim();
+    if (!current) {
+      form.setFieldValue("codes", code);
+      return;
+    }
+    const list = current.split(/[,\s，]+/).map((s: string) => s.trim()).filter(Boolean);
+    if (!list.includes(code) && list.length < 10) {
+      form.setFieldValue("codes", `${current}, ${code}`);
+    }
+  };
+
   return (
     <section className="quant-form-section" aria-labelledby="quant-universe-title">
       <div id="quant-universe-title">
@@ -133,6 +156,20 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
           >
             <Input disabled={source === "portfolio"} placeholder="600519, 000001" />
           </Form.Item>
+          {source === "custom" ? (
+            <div className="quant-quick-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "-12px", marginBottom: "12px" }}>
+              <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)", alignSelf: "center" }}>快捷添加:</span>
+              {QUICK_STOCK_PRESETS.map((preset) => (
+                <Tag
+                  key={preset.code}
+                  style={{ cursor: "pointer", fontSize: "var(--c-font-xs)", marginInlineEnd: 0 }}
+                  onClick={() => handleQuickCode(preset.code)}
+                >
+                  {preset.label}
+                </Tag>
+              ))}
+            </div>
+          ) : null}
         </Col>
       </Row>
     </section>

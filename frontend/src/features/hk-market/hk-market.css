@@ -1,0 +1,354 @@
+.hk-market-page {
+  max-width: 1600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hk-market-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hk-market-header--embedded {
+  margin-bottom: 4px;
+}
+
+.hk-market-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hk-live-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+.hk-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-primary, #1677ff);
+  animation: hk-pulse 1.8s infinite;
+}
+
+@keyframes hk-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(22, 119, 255, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 5px rgba(22, 119, 255, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(22, 119, 255, 0);
+  }
+}
+
+/* ── 指数卡片 ── */
+.hk-index-grid {
+  margin-bottom: 0;
+}
+
+.hk-index-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.hk-index-button .ant-card {
+  border-color: var(--c-border);
+  border-radius: 10px;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+  background: var(--c-card-bg);
+}
+
+.hk-index-button:hover .ant-card {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  border-color: var(--c-primary);
+}
+
+.hk-index-button.is-active .ant-card {
+  border-color: var(--c-primary);
+  border-top: 3px solid var(--c-primary);
+  background: color-mix(in srgb, var(--c-primary) 5%, var(--c-card-bg));
+  box-shadow: 0 4px 16px rgba(22, 119, 255, 0.12);
+}
+
+.hk-index-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.hk-index-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.hk-index-code-badge {
+  font-size: 11px;
+  font-family: var(--c-font-mono, monospace);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+  color: var(--c-text-secondary);
+}
+
+.hk-index-price {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-family: var(--c-font-mono, monospace);
+}
+
+.hk-index-change-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.hk-index-mini-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--c-border);
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.hk-index-mini-stats span {
+  white-space: nowrap;
+}
+
+/* ── 通用板块卡片 ── */
+.hk-section-card {
+  border-color: var(--c-border);
+  border-radius: 10px;
+  box-shadow: var(--c-card-shadow, 0 1px 2px rgba(0, 0, 0, 0.03));
+  background: var(--c-card-bg);
+}
+
+.hk-section-card .ant-card-head {
+  border-bottom-color: var(--c-border);
+  padding: 0 16px;
+  background: var(--c-card-bg);
+}
+
+.hk-section-card .ant-card-body {
+  padding: 16px;
+  background: var(--c-card-bg);
+}
+
+.hk-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── 选中个股专属面板 ── */
+.hk-active-stock-card {
+  border-color: var(--c-primary);
+  border-top: 3px solid var(--c-primary);
+  background: var(--c-card-bg);
+}
+
+.hk-active-stock-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px 16px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+}
+
+.hk-metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hk-metric-label {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.hk-metric-value {
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--c-font-mono, monospace);
+  color: var(--c-text-primary);
+}
+
+/* ── 列表工具栏 ── */
+.hk-toolbar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.hk-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hk-quick-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hk-selection-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  background: var(--c-nested-bg);
+}
+
+.hk-selection-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.hk-selection-summary > .ant-typography {
+  flex: 0 0 auto;
+  line-height: 24px;
+}
+
+.hk-selection-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hk-selection-tags .ant-tag {
+  margin-inline-end: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 表格样式 ── */
+.hk-market-page .ant-table-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.hk-stock-row-selected > td {
+  background: var(--c-primary-soft, rgba(22, 119, 255, 0.08)) !important;
+}
+
+.hk-stock-row-selected > td:first-child {
+  border-left: 3px solid var(--c-primary) !important;
+}
+
+.hk-stock-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hk-stock-name-cell .hk-stock-english-name {
+  font-size: 11px;
+  color: var(--c-text-muted, #8c8c8c);
+  line-height: 1.2;
+}
+
+.hk-pagination {
+  margin-top: 16px;
+  text-align: right;
+}
+
+.hk-stock-search {
+  width: 320px;
+}
+
+.hk-stock-search-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  align-items: center;
+}
+
+.hk-stock-search-option > :last-child:nth-child(3) {
+  grid-column: 1 / -1;
+  font-size: 12px;
+}
+
+/* ── 港股对比卡片 ── */
+.hk-compare-card .ant-card-head-title {
+  color: var(--c-text-primary);
+}
+
+/* ── 响应式适配 ── */
+@media (max-width: 767px) {
+  .hk-market-page .ant-card-head {
+    align-items: flex-start;
+  }
+  .hk-market-page .ant-card-extra {
+    margin-inline-start: 8px;
+    max-width: 70%;
+  }
+  .hk-market-page .ant-segmented {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .hk-index-price {
+    font-size: 22px;
+  }
+  .hk-selection-toolbar,
+  .hk-selection-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+  .hk-selection-toolbar > .ant-space {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .hk-stock-search {
+    width: 100%;
+  }
+  .hk-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

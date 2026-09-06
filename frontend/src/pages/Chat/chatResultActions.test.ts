@@ -10,7 +10,7 @@ describe("extractChatResultContext", () => {
       toolCalls: [{
         id: "tool-1",
         name: "screen_stocks",
-        arguments: JSON.stringify({ pe_max: 15, market_cap_min: 200, sort_by: "pe", sort_order: "asc" }),
+        arguments: JSON.stringify({ pe_max: 15, market_cap_min: 200, concepts: ["低空经济"], sort_by: "pe", sort_order: "asc" }),
         result: JSON.stringify({ items: [{ code: "600519" }, { code: "000001" }] }),
       }],
       isStreaming: false,
@@ -20,6 +20,7 @@ describe("extractChatResultContext", () => {
     expect(context.screenerState?.filters).toMatchObject({
       pe_max: 15,
       market_cap_min: 200,
+      concepts: ["低空经济"],
       sort_by: "pe",
       sort_order: "asc",
       page: 1,

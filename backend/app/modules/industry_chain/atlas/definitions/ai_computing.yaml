@@ -1,57 +1,98 @@
 slug: ai-computing
 name: AI 算力
 category: 算力与AI
-summary: 从算力芯片、光互连到服务器、数据中心与云应用的 AI 基础设施产业链，是本轮全球 AI 建设的核心底座。
-aliases: [算力, AI基础设施, AIDC]
-tags: [人工智能, 云计算, 基础设施]
+summary: 参考全球与国内先进 AI 产业链架构，涵盖底层能源液冷底座、半导体芯片与硬件系统、智算基础设施、网络互连以及垂直落地赋能的全链路核心生态。
+aliases: [算力, AI基础设施, AIDC, 人工智能算力, 智算中心]
+tags: [人工智能, 云计算, 基础设施, 半导体, 光通信, 智算调度]
 drivers:
-  - 大模型训练与推理算力需求
-  - 国产算力芯片替代
-  - 800G/1.6T 光模块升级周期
+  - 大模型预训练与超大规模推理算力爆发
+  - 800G / 1.6T 高速光互联与 CPO/硅光演进周期
+  - 液冷温控、高多层算力 PCB 与高功率能源保障升级
+  - 国产自主可控算力芯片与先进封装供应链重构
 layers:
   - key: upstream
-    name: 上游 · 算力芯片与光器件
+    name: 上游 · 算力芯片、半导体封装与能源液冷底座
     segments:
-      - name: 国产算力芯片
+      - name: 国产算力芯片 (GPU/DCU/NPU)
+        description: 承载大模型并行计算的核心计算引擎，涵盖国产自主架构与加速卡
         companies:
-          - { name: 海光信息, code: "688041", note: 国产 CPU/DCU }
-          - { name: 寒武纪, code: "688256", note: AI 加速芯片 }
-          - { name: 龙芯中科, code: "688047", note: 自研指令集 CPU }
-      - name: 光芯片与器件
+          - { name: 海光信息, code: "688041", note: 国产 x86 CPU/DCU 算力芯片领军者 }
+          - { name: 寒武纪, code: "688256", note: 云端训练与推理 AI 加速芯片 }
+          - { name: 龙芯中科, code: "688047", note: 自研 LoongArch 架构通用 CPU }
+          - { name: 澜起科技, code: "688008", note: 内存接口芯片 DDR5 与 PCIe Retimer 互联 }
+      - name: 先进封装与核心材料 (CoWoS/载板)
+        description: 高密度 2.5D/3D 封装、封装基板与关键制程耗材
         companies:
-          - { name: 源杰科技, code: "688498", note: 高速激光器芯片 }
-          - { name: 光迅科技, code: "002281", note: 光器件与模块 }
-          - { name: 仕佳光子, code: "688313", note: 光芯片与器件 }
+          - { name: 通富微电, code: "002156", note: 先进 2.5D/3D 封测与超大规模算力芯片集成 }
+          - { name: 长电科技, code: "600584", note: 全球前列封测龙头，X-DFO 高密度互连 }
+          - { name: 兴森科技, code: "002436", note: FCBGA 高端算力封装载板 }
+          - { name: 鼎龙股份, code: "300054", note: CMP 抛光垫与半导体光刻胶关键材料 }
+      - name: 高速光芯片与核心光器件
+        description: 光通信信号收发光芯片、激光器与精密光学结构件
+        companies:
+          - { name: 源杰科技, code: "688498", note: 50G/100G EML 高速激光器芯片 }
+          - { name: 光迅科技, code: "002281", note: 光芯片/器件/模块垂直一体化平台 }
+          - { name: 仕佳光子, code: "688313", note: PLC/AWG 无源光芯片与高功率 CW 光源 }
+          - { name: 天孚通信, code: "300394", note: 光引擎与高速精密光器件领军者 }
+      - name: 能源电力供给与液冷温控
+        description: 智算中心高热密度散热系统、冷板式/浸没式液冷与高可靠电网保障
+        companies:
+          - { name: 英维克, code: "002837", note: 算力全链条液冷温控解决方案龙头 }
+          - { name: 申菱环境, code: "301018", note: 数据中心精密空调与工业级液冷系统 }
+          - { name: 高澜股份, code: "300499", note: 服务器液冷板与热管理配电系统 }
+          - { name: 特变电工, code: "600089", note: 算力园区特高压变压器与输配电保障 }
+          - { name: 科华数据, code: "002335", note: 智算中心高可靠 UPS 电源与电力模组 }
   - key: midstream
-    name: 中游 · 服务器、光模块与算力板
+    name: 中游 · 服务器整机、高速光模块、算力PCB与网络交换
     segments:
-      - name: 服务器与整机
+      - name: AI 服务器与整机系统制造
+        description: 集成 GPU/主板/散热/供电的 AI 服务器整机与机柜级系统方案
         companies:
-          - { name: 浪潮信息, code: "000977", note: AI 服务器龙头 }
-          - { name: 工业富联, code: "601138", note: GPU 服务器代工 }
-          - { name: 中科曙光, code: "603019", note: 高性能计算 }
-          - { name: 紫光股份, code: "000938", note: 服务器+网络设备 }
-      - name: 光模块
+          - { name: 工业富联, code: "601138", note: 全球 AI 服务器及 NVLink 架构核心制造龙头 }
+          - { name: 浪潮信息, code: "000977", note: 国内 AI 服务器市占第一，全栈算力软硬件系统 }
+          - { name: 中科曙光, code: "603019", note: 高端高性能计算、整机与浸没液冷系统 }
+          - { name: 紫光股份, code: "000938", note: 新华三 ICT 算力整机与智算全栈方案 }
+      - name: 800G / 1.6T 高速光模块与光互联
+        description: 数据中心交换机与服务器之间超高速数据光电转换核心组件
         companies:
-          - { name: 中际旭创, code: "300308", note: 全球光模块龙头 }
-          - { name: 新易盛, code: "300502", note: 高速光模块 }
-          - { name: 天孚通信, code: "300394", note: 光器件平台 }
-          - { name: 华工科技, code: "000988", note: 光模块+激光装备 }
-      - name: 算力 PCB
+          - { name: 中际旭创, code: "300308", note: 全球 800G/1.6T 高端光模块市占率领头羊 }
+          - { name: 新易盛, code: "300502", note: 高速 800G/1.6T LPO 与硅光光模块核心厂商 }
+          - { name: 华工科技, code: "000988", note: 800G 高速光模块与硅光前沿布局 }
+          - { name: 剑桥科技, code: "603083", note: 高速光收发模块与通信网络硬件 }
+      - name: 算力高多层 PCB 与高频高速板
+        description: 承载 AI 加速卡(OAM)与基板(UBB)的高层数、低损耗印制电路板
         companies:
-          - { name: 沪电股份, code: "002463", note: 高多层算力板 }
-          - { name: 胜宏科技, code: "300476", note: AI 加速卡 PCB }
-          - { name: 深南电路, code: "002916", note: 高端 PCB }
+          - { name: 沪电股份, code: "002463", note: AI 服务器与算力加速卡高多层 PCB 龙头 }
+          - { name: 胜宏科技, code: "300476", note: 全球高阶 AI 显卡 HDI 与高频高速板核心供应 }
+          - { name: 深南电路, code: "002916", note: 通信/数据中心高速 PCB 与封装载板领跑者 }
+          - { name: 生益科技, code: "600183", note: 高频高速覆铜板 (CCL) 基础原材料龙头 }
+      - name: 智算网络架构与高速数据中心交换机
+        description: 应对大规模并行训练的低延迟、无丢包 RoCE/InfiniBand 高密交换机
+        companies:
+          - { name: 中兴通讯, code: "000063", note: 全球通信与数据中心核心 RoCE 高速交换机 }
+          - { name: 锐捷网络, code: "301165", note: 高密 400G/800G 数据中心交换机与白盒解决方案 }
+          - { name: 菲菱科思, code: "301191", note: 智算网络设备与数据中心交换机研发制造 }
   - key: downstream
-    name: 下游 · 数据中心与应用
+    name: 下游 · 智算中心运营、算力调度与 AI 垂直应用
     segments:
-      - name: IDC 与温控
+      - name: 智算中心 (AIDC) 建设与运营
+        description: 建设与运营大规模高算力密度的数据中心园区资产
         companies:
-          - { name: 润泽科技, code: "300442", note: 智算中心 }
-          - { name: 光环新网, code: "300383", note: IDC+云计算 }
-          - { name: 奥飞数据, code: "300738", note: 智算 IDC }
-          - { name: 英维克, code: "002837", note: 数据中心温控 }
-      - name: 模型与应用
+          - { name: 润泽科技, code: "300442", note: 国内领先的大规模园区级智算中心运营商 }
+          - { name: 奥飞数据, code: "300738", note: 全国核心节点智算中心与算力运营 }
+          - { name: 光环新网, code: "300383", note: 一线城市高可用算力中心与云计算生态 }
+          - { name: 宝信软件, code: "600845", note: 工业互联网与特大型智算数据中心 }
+      - name: 算力调度、租赁与运维服务
+        description: 跨区域异构算力调度、大模型算力租赁与算力运维加速
         companies:
-          - { name: 科大讯飞, code: "002230", note: 语音与大模型 }
-          - { name: 金山办公, code: "688111", note: AI 办公 }
+          - { name: 首都在线, code: "300846", note: 弹性异构智算云服务与跨区域算力调度 }
+          - { name: 恒为科技, code: "603496", note: 智算可视化加速与算力网络运维监控 }
+          - { name: 有方科技, code: "688159", note: 分布式云存储与智算中心调度系统 }
+          - { name: 鸿博股份, code: "002229", note: 英博数科算力中心运营与大模型算力服务 }
+      - name: AI 大模型赋能与垂直终端应用
+        description: 将大模型能力深度融合于办公软件、端侧硬件与垂直行业场景
+        companies:
+          - { name: 科大讯飞, code: "002230", note: 星火大模型平台与政企/教育/医疗落地 }
+          - { name: 金山办公, code: "688111", note: WPS AI 办公大模型应用商业化龙头 }
+          - { name: 中科创达, code: "300496", note: 边缘端侧 AI 操作系统与具身智能底座 }
+          - { name: 同花顺, code: "300033", note: 金融问财垂类大模型与 AI 投研决策 }

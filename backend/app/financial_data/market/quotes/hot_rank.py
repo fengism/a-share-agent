@@ -3,7 +3,8 @@
 import logging
 from typing import Any
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import market_cache as cache
 from app.core.cache_policies import THS_HOT_RANK
 from app.core.concurrency.rate_limiter import call_blocking
 from app.infrastructure.providers.provider_gateway import provider_gateway

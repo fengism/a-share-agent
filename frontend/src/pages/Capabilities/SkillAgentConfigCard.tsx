@@ -50,7 +50,7 @@ function AvailabilityStatus({ info }: { info?: CapabilityAvailabilityInfo }) {
   return (
     <Space size={6} wrap>
       {style ? <Tag style={style}>{meta.label}</Tag> : <Tag>{meta.label}</Tag>}
-      <Text style={{ color: "inherit", fontSize: 12 }}>{info.reason}</Text>
+      <Text style={{ color: "inherit", fontSize: "var(--c-font-sm)" }}>{info.reason}</Text>
     </Space>
   );
 }
@@ -85,12 +85,12 @@ export default function SkillAgentConfigCard({
       style={{ ...cardStyle, marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
     >
-      <div style={{ marginBottom: 14, color: colors.textSecondary, lineHeight: 1.7 }}>
+      <div style={{ marginBottom: 14, color: colors.textSecondary, lineHeight: "var(--c-leading-relaxed)" }}>
         控制当前账号可用的 Chat 路由能力。关闭 Skill 会同步限制关联工具；关闭 Agent 后将不再参与多维分析。
       </div>
       {capabilities && (
         <div style={{ marginBottom: 14 }}>
-          <div style={{ marginBottom: 8, color: colors.textMuted, fontSize: 12 }}>能力预设</div>
+          <div style={{ marginBottom: 8, color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>能力预设</div>
           <Space size={[8, 8]} wrap>
             {CAPABILITY_PRESETS.map((preset) => (
               <Button
@@ -173,7 +173,7 @@ export default function SkillAgentConfigCard({
                         <Tag style={semanticTagStyle("primary")}>P{skill.priority}</Tag>
                         <Tag>{skill.tool_names.length} Tools</Tag>
                       </Space>
-                      <div style={{ marginTop: 5, color: colors.textMuted, fontSize: 12 }}>
+                      <div style={{ marginTop: 5, color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
                         {skill.triggers.join("；")}
                       </div>
                       <div style={{ marginTop: 6, color: colors.textMuted }}>
@@ -221,7 +221,7 @@ export default function SkillAgentConfigCard({
                         <Tag style={semanticTagStyle("accent")}>最多 {agent.max_rounds} 轮</Tag>
                         <Tag>{agent.tool_names.length} Tools</Tag>
                       </Space>
-                      <div style={{ marginTop: 5, color: colors.textMuted, fontSize: 12 }}>
+                      <div style={{ marginTop: 5, color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
                         {agent.description}
                       </div>
                       <Space size={[4, 4]} wrap style={{ marginTop: 6 }}>

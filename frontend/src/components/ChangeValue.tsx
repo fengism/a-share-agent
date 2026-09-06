@@ -38,7 +38,11 @@ export default function ChangeValue({
         : null;
 
   return (
-    <span aria-label={formatChangeAriaLabel(value, digits)} style={{ color, fontWeight, ...style }}>
+    <span
+      className="financial-num"
+      aria-label={formatChangeAriaLabel(value, digits)}
+      style={{ color, fontWeight, ...style }}
+    >
       {showIcon && icon ? <>{icon} </> : null}
       {formatSignedPercent(value, digits)}
     </span>

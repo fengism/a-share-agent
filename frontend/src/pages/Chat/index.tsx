@@ -31,6 +31,7 @@ export default function ChatPage() {
     setSkillNames,
     skillNames,
   } = useChatCapabilitySelection();
+  const [isCustomOpen, setIsCustomOpen] = useState(false);
   const { pageDescriptionStyle, pageHeaderStyle, pageTitleStyle } = useStyles();
   const syncTag = syncStatus === "synced"
     ? <Tag style={semanticTagStyle("down")}>会话已同步</Tag>
@@ -79,23 +80,29 @@ export default function ChatPage() {
             agentNames={agentNames}
             onApply={handleApplyCapabilityPreset}
             disabled={chat.isStreaming}
+            isCustomOpen={isCustomOpen}
+            onToggleCustom={() => setIsCustomOpen((open) => !open)}
           />
-          <ChatSkillSelector
-            skills={chatCapabilities?.skills ?? []}
-            disabledSkillNames={config?.disabled_chat_skills ?? []}
-            availability={chatCapabilityAvailability}
-            skillNames={skillNames}
-            onChange={setSkillNames}
-            disabled={chat.isStreaming}
-          />
-          <ChatAgentSelector
-            agents={chatCapabilities?.agents ?? []}
-            disabledAgentNames={config?.disabled_chat_agents ?? []}
-            availability={chatCapabilityAvailability}
-            agentNames={agentNames}
-            onChange={setAgentNames}
-            disabled={chat.isStreaming}
-          />
+          {isCustomOpen ? (
+            <div className="chat-custom-config-pane">
+              <ChatSkillSelector
+                skills={chatCapabilities?.skills ?? []}
+                disabledSkillNames={config?.disabled_chat_skills ?? []}
+                availability={chatCapabilityAvailability}
+                skillNames={skillNames}
+                onChange={setSkillNames}
+                disabled={chat.isStreaming}
+              />
+              <ChatAgentSelector
+                agents={chatCapabilities?.agents ?? []}
+                disabledAgentNames={config?.disabled_chat_agents ?? []}
+                availability={chatCapabilityAvailability}
+                agentNames={agentNames}
+                onChange={setAgentNames}
+                disabled={chat.isStreaming}
+              />
+            </div>
+          ) : null}
           <ChatConversation
             onPush={resultActions.handleOpenPush}
             onRegenerate={chat.handleRegenerate}

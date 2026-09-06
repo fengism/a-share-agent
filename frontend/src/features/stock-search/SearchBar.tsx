@@ -5,13 +5,14 @@ import { useNavigate } from "react-router-dom";
 import QueryErrorState from "../../components/QueryErrorState";
 import { useStockSearchController } from "../../hooks/useStockSearchController";
 import { useColors } from "../../styles/ui";
+import { buildStockProfileUrl } from "../../utils/stockLinks";
 
 interface SearchBarProps {
   buildTarget?: (code: string) => string;
   ariaLabel?: string;
 }
 
-const buildDefaultTarget = (code: string) => `/analysis/${encodeURIComponent(code)}`;
+const buildDefaultTarget = buildStockProfileUrl;
 
 export default function SearchBar({
   buildTarget = buildDefaultTarget,
@@ -86,7 +87,7 @@ export default function SearchBar({
         aria-busy={isPending}
         placeholder="输入股票代码或名称，如 600519 或 贵州茅台"
         prefix={<SearchOutlined />}
-        suffix={isPending ? <span role="status" aria-live="polite" style={{ color: c.textMuted, fontSize: 12 }}>搜索中...</span> : null}
+        suffix={isPending ? <span role="status" aria-live="polite" style={{ color: c.textMuted, fontSize: "var(--c-font-sm)" }}>搜索中...</span> : null}
         allowClear
         onKeyDown={handleKeyDown}
       />

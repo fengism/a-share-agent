@@ -38,7 +38,7 @@ export default function RatingBadge({ score, size = 64 }: Props) {
         flexShrink: 0,
       }}
     >
-      <span style={{ fontSize: size * 0.3, fontWeight: 800, color: getColor(score), lineHeight: 1 }}>
+      <span style={{ fontSize: size * 0.3, fontWeight: "var(--c-weight-heavy)", color: getColor(score), lineHeight: 1 }}>
         {score.toFixed(1)}
       </span>
       <span style={{ fontSize: size * 0.13, color: c.textMuted, marginTop: 2 }}>/ 10</span>

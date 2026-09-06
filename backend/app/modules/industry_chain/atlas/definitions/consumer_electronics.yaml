@@ -1,49 +1,59 @@
 slug: consumer-electronics
-name: 消费电子
-category: 高端制造
-summary: 以智能手机为核心的面板、零组件、组装与品牌终端产业链，创新周期与大客户新品节奏决定景气度。
-aliases: [果链, 电子制造]
-tags: [消费电子, 果链, 硬件]
+name: 消费电子与智能终端
+category: 消费电子与智能硬件
+summary: 覆盖显示面板/OLED、被动元件/结构件、端侧 AI SoC 芯片、声学/光学精密模组、高精密连接器/FPC 与整机组装，以及 AI 手机、PC、XR 穿戴与智能家居品牌终端全链路。
+aliases: [消费电子, 果链, 电子制造, 智能手机, AI手机, 折叠屏, MR]
+tags: [消费电子, 果链, 硬件, AI手机, 折叠屏, 可穿戴, 组装代工]
 drivers:
-  - 智能手机换机周期与 AI 手机
-  - 大客户新品创新
-  - VR/AR 与可穿戴新品类
+  - 端侧 AI (AI 手机、AI PC、AI 穿戴) 推动硬件换机与算力升级
+  - 折叠屏手机铰链、轻薄化钛合金材料与柔性 OLED 渗透率提升
+  - 空间计算、MR/AR 智能眼镜等下一代沉浸式智能终端创新
+  - 消费电子大客户新品创新周期与新兴市场出口增长
 layers:
   - key: upstream
-    name: 上游 · 面板与元件
+    name: 上游 · 显示面板、被动元件、端侧芯片与结构材料
     segments:
-      - name: 显示面板
+      - name: 高阶显示面板与柔性 OLED
+        description: 柔性 OLED 手机屏、Mini-LED、车载及智能穿戴超高清显示模组
         companies:
-          - { name: 京东方A, code: "000725", note: 全球面板龙头 }
-          - { name: TCL科技, code: "000100", note: 面板+光伏 }
-          - { name: 维信诺, code: "002387", note: OLED }
-      - name: 被动元件与结构件
+          - { name: 京东方A, code: "000725", note: 全球半导体显示面板出货量第一绝对龙头 }
+          - { name: TCL科技, code: "000100", note: 华星光电高世代液晶与印刷 OLED 前沿布局 }
+          - { name: 维信诺, code: "002387", note: 专注于柔性 AMOLED 面板与折叠屏显示解决方案 }
+      - name: 被动元件、精密陶瓷与玻璃盖板
+        description: 片式电感、MLCC 多层陶瓷电容器、微晶玻璃盖板与钛合金结构件
         companies:
-          - { name: 顺络电子, code: "002138", note: 片式电感 }
-          - { name: 三环集团, code: "300408", note: 陶瓷件与 MLCC }
-          - { name: 蓝思科技, code: "300433", note: 玻璃盖板 }
-      - name: 消费 IC
+          - { name: 三环集团, code: "300408", note: 电子陶瓷基板、高容 MLCC 与封装外壳领跑者 }
+          - { name: 顺络电子, code: "002138", note: 片式电感出货量全球前三，汽车与通信全覆盖 }
+          - { name: 蓝思科技, code: "300433", note: 消费电子玻璃/蓝宝石/陶瓷/金属结构件一体化巨头 }
+          - { name: 长盈精密, code: "300115", note: 精密电子连接件与折叠屏铰链钛合金结构件 }
+      - name: 端侧 AI 处理器与电源音频 IC
+        description: 边缘端侧 AI SoC、智能穿戴主控芯片、模拟音频功放与快充管理
         companies:
-          - { name: 恒玄科技, code: "688608", note: 可穿戴 SoC }
-          - { name: 晶晨股份, code: "688099", note: 智能终端 SoC }
-          - { name: 瑞芯微, code: "603893", note: 端侧 AIoC SoC }
+          - { name: 恒玄科技, code: "688608", note: 智能 TWS 耳机与可穿戴低功耗边缘 AI SoC 龙头 }
+          - { name: 瑞芯微, code: "603893", note: 端侧 AIoT 与平板/教育/汽车智能视觉 SoC }
+          - { name: 晶晨股份, code: "688099", note: 多媒体智能终端与智能电视主控 SoC }
+          - { name: 艾为电子, code: "688798", note: 音频功放、电源管理芯片与马达驱动 IC }
   - key: midstream
-    name: 中游 · 零组件与组装
+    name: 中游 · 精密模组、FPC柔性板与整机精密制造
     segments:
-      - name: 精密零组件与组装
+      - name: 精密制造、声学模组与整机系统组装
+        description: 连接器、声学组件、微型马达、无线充电与智能手机/手表/MR 整机组装代工
         companies:
-          - { name: 立讯精密, code: "002475", note: 连接器+整机组装 }
-          - { name: 歌尔股份, code: "002241", note: 声学与 VR 代工 }
-          - { name: 东山精密, code: "002384", note: FPC 与结构件 }
-          - { name: 领益智造, code: "002600", note: 精密功能件 }
-      - name: PCB/FPC
+          - { name: 立讯精密, code: "002475", note: 消费电子精密制造与整机组装全球平台龙头 }
+          - { name: 歌尔股份, code: "002241", note: 微型声学、光学零组件与全球 XR/VR 代工龙头 }
+          - { name: 领益智造, code: "002600", note: 消费电子精密功能件与散热/充电模块龙头 }
+          - { name: 东山精密, code: "002384", note: 柔性电路板 FPC 与通信精密金属结构件 }
+      - name: 柔性电路板 (FPC) 与高阶 HDI
+        description: 折叠屏与轻薄化终端内部高密度柔性互连印制板
         companies:
-          - { name: 鹏鼎控股, code: "002938", note: 全球 FPC 龙头 }
+          - { name: 鹏鼎控股, code: "002938", note: 全球 PCB/FPC 产值规模第一，深度配套头部大客户 }
   - key: downstream
-    name: 下游 · 品牌终端
+    name: 下游 · 品牌终端、AI硬件与全球化出海
     segments:
-      - name: 品牌与出海
+      - name: 智能手机、AI 硬件与跨境出海品牌
+        description: 布局新兴市场的智能手机、高端扫地机器人、智能音频与便携储能终端
         companies:
-          - { name: 传音控股, code: "688036", note: 新兴市场手机 }
-          - { name: 安克创新, code: "300866", note: 消费电子品牌出海 }
-          - { name: 石头科技, code: "688169", note: 智能清洁机器人 }
+          - { name: 传音控股, code: "688036", note: 非洲与南亚新兴市场智能手机绝对霸主 }
+          - { name: 安克创新, code: "300866", note: 全球知名消费电子出海品牌 (数码充电/音频/安防) }
+          - { name: 石头科技, code: "688169", note: 高端智能扫地机器人与智能清洁电器国际领跑者 }
+          - { name: 漫步者, code: "002351", note: 拥有自主品牌的声学耳机与智能音箱领军企业 }

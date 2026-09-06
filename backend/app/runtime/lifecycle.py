@@ -63,6 +63,7 @@ def build_background_task_specs(
     supervised_once: SupervisedRunner,
     industry_mapping_prewarm: AsyncTaskFactory,
     stock_name_map_prewarm: AsyncTaskFactory,
+    hk_stock_search_prewarm: AsyncTaskFactory,
     us_macro_prewarm: AsyncTaskFactory,
     industry_mapping_refresh: AsyncTaskFactory,
     wal_checkpoint: AsyncTaskFactory,
@@ -92,6 +93,15 @@ def build_background_task_specs(
                 stock_name_map_prewarm,
             ),
             start_message="股票名称映射预热任务已启动",
+        ),
+        BackgroundTaskSpec(
+            name="hk_stock_search_prewarm",
+            factory=_supervised_task_factory(
+                supervised_once,
+                "hk_stock_search_prewarm",
+                hk_stock_search_prewarm,
+            ),
+            start_message="港股搜索索引预热任务已启动",
         ),
         BackgroundTaskSpec(
             name="us_macro_prewarm",
@@ -198,6 +208,7 @@ async def application_lifespan(
     database_integrity_checker: Callable[[], None] = verify_database_integrity,
     blocking_runner=call_blocking,
 ) -> AsyncIterator[None]:
+    from app.financial_data.hk.search_index import prewarm_hk_stock_search_index
     from app.financial_data.market.public import prewarm_us_macro_data
     from app.financial_data.stock.public import build_industry_mapping, build_stock_name_map
     from app.infrastructure.persistence import init_db
@@ -264,6 +275,7 @@ async def application_lifespan(
         supervised_once=supervised_once,
         industry_mapping_prewarm=build_industry_mapping,
         stock_name_map_prewarm=build_stock_name_map,
+        hk_stock_search_prewarm=prewarm_hk_stock_search_index,
         us_macro_prewarm=prewarm_us_macro_data,
         industry_mapping_refresh=industry_mapping_refresh,
         wal_checkpoint=wal_checkpoint,

@@ -1,8 +1,8 @@
-"""产业链分析 HTTP API。"""
-
+from datetime import datetime
 from typing import Annotated
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
@@ -32,13 +32,79 @@ from app.modules.industry_chain.public import (
     IndustryChainResult,
     WorkflowCapacityError,
     create_industry_chain_event_generator,
+    generate_industry_chain_pdf_html,
     get_latest_industry_chain_archive,
     list_industry_chain_history,
     load_industry_chain_archive,
     remove_industry_chain_archive,
+    render_industry_chain_pdf_bytes,
 )
 
 router = APIRouter()
+
+
+@router.post("/export-pdf")
+async def export_custom_industry_chain_pdf(
+    result: IndustryChainResult,
+    user: AuthenticatedUser = Depends(require_active_user),
+):
+    """基于前端传入的实时产业链分析结果对象直接生成纯矢量投研 PDF。"""
+    html_content = generate_industry_chain_pdf_html(result)
+    pdf_bytes = await render_industry_chain_pdf_bytes(html_content)
+
+    name = result.name or "产业链"
+    report_date = datetime.now().strftime("%Y%m%d")
+    filename = f"{name}_产业链深度研究报告_{report_date}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.get("/{name}/export-pdf")
+async def export_industry_chain_pdf(
+    name: str,
+    archive_id: Annotated[str | None, Query()] = None,
+    user: AuthenticatedUser = Depends(require_active_user),
+):
+    """根据产业链名称与存档 ID，直接生成纯矢量投研 PDF 并下载。"""
+    if archive_id:
+        result = await load_industry_chain_archive(name, archive_id, user["id"])
+    else:
+        latest = await get_latest_industry_chain_archive(
+            name, user["id"], can_delete_legacy=bool(user["is_admin"])
+        )
+        if latest is None or not latest.archive_id:
+            result = None
+        else:
+            result = await load_industry_chain_archive(name, latest.archive_id, user["id"])
+
+    if result is None:
+        raise NotFoundError(
+            f"未找到 {name} 产业链的分析存档，请先执行分析后再导出",
+            code="industry_chain.archive_not_found",
+        )
+
+    html_content = generate_industry_chain_pdf_html(result)
+    pdf_bytes = await render_industry_chain_pdf_bytes(html_content)
+
+    chain_name = result.name or name
+    report_date = datetime.now().strftime("%Y%m%d")
+    filename = f"{chain_name}_产业链深度研究报告_{report_date}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
 
 
 @router.get("/atlas/chains", response_model=AtlasCatalog)
@@ -78,20 +144,22 @@ class AtlasMineRequest(BaseModel):
 @router.post("/atlas/mine", response_model=AtlasChain)
 async def mine_industry_chain_atlas(
     request: AtlasMineRequest,
-    user: AuthenticatedUser = Depends(require_active_user),
+    admin: AuthenticatedUser = Depends(require_admin),
 ) -> AtlasChain:
-    """把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目。"""
+    """把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目（管理员）。"""
     archive_id = request.archive_id
     if not archive_id:
         latest = await get_latest_industry_chain_archive(
-            request.name, user["id"], can_delete_legacy=bool(user["is_admin"]),
+            request.name, admin["id"], can_delete_legacy=True,
         )
         archive_id = (latest.archive_id or "") if latest is not None else ""
     if not archive_id:
         raise NotFoundError(f"没有可挖掘的产业链分析存档: {request.name}")
-    result = await load_industry_chain_archive(request.name, archive_id, user["id"])
+    result = await load_industry_chain_archive(request.name, archive_id, admin["id"])
     if result is None:
         raise NotFoundError("产业链存档不存在")
+    if result.quality_status != "complete":
+        raise BadRequestError("该存档未通过质量门（降级报告），不允许挖掘入库")
     chain = await mine_and_save_atlas_chain(result)
     if chain is None:
         raise BadRequestError("分析结果可挖掘内容不足（至少 2 个环节、3 家公司），未入库")

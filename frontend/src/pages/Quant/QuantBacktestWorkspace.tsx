@@ -43,7 +43,7 @@ export default function QuantBacktestWorkspace({
         ariaLabel="量化回测视图"
         size="middle"
         tabBarGutter={12}
-        tabBarStyle={{ marginBottom: 20, fontWeight: 700 }}
+        tabBarStyle={{ marginBottom: 20, fontWeight: "var(--c-weight-bold)" }}
         preserveVisited
         items={[
           {

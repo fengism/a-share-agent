@@ -13,6 +13,7 @@
 - **每日潜力股**：收盘后自动挖掘潜力标的——按成交额构建候选池（剔除 ST/次新/低流动性），7 个量化策略信号加权融合评分，前端榜单展示命中策略与信号日期，支持历史回看。
 - **24小时资讯**：聚合多源快讯和新闻，AI 智能摘要提炼关键信息并附带引用链接，自动刷新。
 - **产业链分析**：输入产业关键词，AI 自动搜索研报数据并生成完整产业链分析报告，支持历史记录和推送。
+- **港股与全球品种**：港股实时行情、搜索与日 K；SGE 黄金全品种行情、大宗商品与工业品现货价格、美元指数与中美国债收益率/利差、央行政策利率与海关进出口外贸月度数据。
 - **宏观经济**：物价、景气、货币、利率、增速、外贸六大类宏观指标一览，含图表趋势。
 - **每日复盘**：聚合市场、热点、新闻和 LLM 结论，生成结构化复盘。
 - **个股分析**：展示分时、K 线、基本面、营收与毛利构成、估值（含机构一致预期）、技术指标、情绪数据和 AI 结论。营收与毛利构成来自新浪最新披露的产品/业务/地区口径，独立缓存 24 小时；上游不提供报告期与币种声明，各维度或条目可能重叠，因此不做跨维度汇总。该构成数据也会作为有界、可选证据进入 AI 财务分析。三张报表使用最新共同报告期生成汇总指标，并保持稳定 raw key；前端中文列名由后端统一字段字典生成，避免新浪与东方财富字段映射漂移。
@@ -22,6 +23,7 @@
 - **资讯去重**：多源市场资讯按归一化标题跨源去重。
 - **可恢复长任务**：个股分析和产业链分析由 SQLite 持久化 Workflow 执行，支持进度续传、断线重连和远程取消；切换到其他页面后任务继续运行，顶部“运行中”入口可返回任务或直接停止。
 - **AI 选股助手**：对话式智能选股，支持自然语言提问，自动调用工具获取实时数据并分析；专业 Agent 可回答主线、板块资金与历史成分股等问题。同一浏览器标签页内切换页面不会中断当前对话生成，顶部任务入口和对话输入区均可停止；刷新或关闭标签页后的续传暂不支持。
+- **主数据管理**：管理端维护个股资料、个股概念与申万行业分类——支持 Excel/CSV 批量导入（内容无变化的行自动跳过）、CSV 导出（导出文件可直接改后再导入）、联网补充（库中已有主营资料则跳过上游请求）与交易所官方名录同步；港股代码统一 5 位口径。
 - **飞书推送**：将分析结果和每日复盘推送到飞书文档，自动按类型分目录，支持权限授权。聊天结果可推送飞书卡片。
 
 ## 技术栈
@@ -93,6 +95,14 @@ Docker Compose 只会从 `.env` 读取 `CONFIG_ENCRYPTION_KEY`，不会在首次
 
 启动后访问 `http://localhost:8080`。默认拓扑只有一个 `backend` 容器：同一 Uvicorn 进程运行 HTTP 服务、周期维护以及 Bot、Quant 和 Analysis/Industry Chain 持久化任务 Worker；此外还有一个 `frontend` 容器和一个 `tdx-api` sidecar，不会额外启动 `backend-worker`。如端口冲突，可在 `.env` 中设置 `DOCKER_FRONTEND_PORT=8081`，再访问对应端口。`tdx-api` 默认仅绑定宿主机 `127.0.0.1:18080`。
 
+#### Docker Hub 自动发布
+
+仓库内置 GitHub Actions 工作流 [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)：push 到 `main`、推送 `v*` 版本标签或手动触发时，自动构建并发布 backend / frontend 两个镜像到 Docker Hub（PR 只构建验证、不推送）。
+
+- 产物：`<DOCKERHUB_USERNAME>/a-share-agent-backend`、`<DOCKERHUB_USERNAME>/a-share-agent-frontend`；`main` 分支打 `latest` + `sha-xxxxxxx` 标签，`v1.2.3` 标签额外打 `1.2.3`、`1.2`、`1`。
+- 启用前在 GitHub 仓库 Settings → Secrets and variables → Actions 配置 `DOCKERHUB_USERNAME`（Docker Hub 用户名）与 `DOCKERHUB_TOKEN`（Hub → Account Settings → Security → New Access Token 生成的访问令牌）。
+- 镜像仅构建 `linux/amd64`；服务器可直接 `docker pull <用户名>/a-share-agent-backend:latest` 替代本地构建，或在 `docker-compose.yml` 的 `backend`/`frontend` 服务下补一行 `image:` 与 `build:` 并存，实现"本地可构建、线上可拉取"。
+
 #### YAML 量化策略热加载
 
 量化策略使用受限 YAML DSL，默认目录为 `backend/app/modules/quant/strategies/definitions/`。新增 `.yaml` 文件后，后端会按 `QUANT_STRATEGY_RELOAD_SECONDS` 定期扫描；整目录全部校验和编译成功后才原子替换注册表，失败时继续使用上一份有效版本。前端会定期刷新策略描述符，动态渲染数值、布尔、选项参数及跨参数约束。
@@ -162,7 +172,7 @@ docker compose up -d --build
 
 #### Docker 数据备份与恢复
 
-后端默认每天使用 SQLite 在线备份 API 将两个数据库备份到 `data/backups/`，写入后执行 `quick_check` 并生成 SHA-256 校验文件，每个数据库保留最近 7 份。可通过 `DATABASE_BACKUP_ENABLED`、`DATABASE_BACKUP_INTERVAL_SECONDS` 和 `DATABASE_BACKUP_RETENTION_COUNT` 调整。生产环境可设置 `DATABASE_BACKUP_DIR` 使用独立备份盘，并设置 `DATABASE_BACKUP_MIRROR_DIR` 将验证通过的备份同步到另一个已挂载的可写目录；使用 Compose 时需在 override 文件中显式挂载这两个目录。
+后端默认每天使用 SQLite 在线备份 API 将三个数据库（market/user/industry）备份到 `data/backups/`，写入后执行 `quick_check` 并生成 SHA-256 校验文件，每个数据库保留最近 7 份。可通过 `DATABASE_BACKUP_ENABLED`、`DATABASE_BACKUP_INTERVAL_SECONDS` 和 `DATABASE_BACKUP_RETENTION_COUNT` 调整。生产环境可设置 `DATABASE_BACKUP_DIR` 使用独立备份盘，并设置 `DATABASE_BACKUP_MIRROR_DIR` 将验证通过的备份同步到另一个已挂载的可写目录；使用 Compose 时需在 override 文件中显式挂载这两个目录。
 
 执行完整离线归档前仍应暂停后端；归档同时包含在线备份、原始数据和 `.env` 中的加密密钥，请安全保存：
 
@@ -192,8 +202,27 @@ docker compose run --rm --no-deps backend \
   python -m app.scripts.restore_database_backup user \
   /app/data/backups/user-YYYYMMDDTHHMMSSZ.sqlite3 \
   --confirm-backend-stopped
+docker compose run --rm --no-deps backend \
+  python -m app.scripts.restore_database_backup industry \
+  /app/data/backups/industry-YYYYMMDDTHHMMSSZ.sqlite3 \
+  --confirm-backend-stopped
 docker compose up -d
 ```
+
+### 行业数据库与种子
+
+`backend/data/db/industry_data.db` 是运行时可写的行业库（申万行业分类、个股概念映射、个股基础资料），**不提交进 git**。仓库在 `backend/seeds/` 携带一份可 diff 的压缩 CSV 种子（约 0.5 MB），首次启动 `init_db()` 时对空表自动播种；种子陈旧不影响线上数据——行业映射在"从未在线刷新成功"的库上自动走在线优先，小时级刷新成功后回到纯库路径。
+
+```bash
+make backend-db-init        # 初始化数据库并应用结构迁移（空行业库自动播种）
+make backend-seeds-drift    # 只读对比运行库与种子快照的差异
+make backend-export-seeds   # 将当前库状态固化为新种子（提交前执行）
+make backend-seed-hot-stocks  # 为成交额前 50 的热门股抓取经营信息入库（TOP=100 可调）
+```
+
+热门股经营信息是仓库内置的起始种子：`backend-seed-hot-stocks` 复用潜力股候选池口径（剔除 ST/退市/次新/低成交后按成交额取头部），逐只从同花顺/东方财富抓取主营业务、经营范围、产品与公司工商信息入库，使新部署的空库天然带有头部公司的经营画像。
+
+种子应视为资料库的"存档点"：批量导入或人工整理后，确认无误再执行 `backend-export-seeds` 并提交。程序不会自动更新种子，避免运行时数据灌入提交历史。
 
 #### Workflow 进度与取消
 
@@ -268,6 +297,12 @@ make backend-browser-install
 ```
 
 浏览器模式由 `WEB_FETCH_BROWSER_ENABLED` 控制，默认总超时 60 秒；dynamic 等待 DOMContentLoaded 后再稳定 5 秒（`WEB_FETCH_BROWSER_SETTLE_SECONDS`），不等待尾部统计资源触发完整 load；stealth/dynamic 在进程内共享并发上限（`WEB_FETCH_BROWSER_MAX_CONCURRENCY`，默认 2）。主进程方案不能隔离 Chromium 漏洞带来的进程权限风险，面向不可信公网长期运行时仍建议使用独立容器。
+
+#### AI 工具执行安全
+
+- `read_pdf` 仅接受 http/https 在线链接或应用数据目录内的本地 `.pdf` 文件（本地路径越界一律拒绝），避免 Agent 被诱导读取服务器任意文件。
+- Python 计算沙盒（`python_interpreter`）**仅管理员可用**：代码先经正则黑名单与 AST 白名单双重静态检查（仅允许科学计算模块导入、禁止一切 dunder 访问与 eval/exec/getattr 等逃生舱），再在隔离子进程中以最小环境（不继承 API Key 等机密）、一次性临时目录、内存/CPU/文件写入资源限制和 1 MB 输出上限运行。
+- 已知残余风险：预置的 pandas/numpy 本身具备文件读取能力，无法在静态层区分；面向不可信用户长期运行时，与浏览器抓取一样建议容器隔离。
 
 ### 问财数据源配置
 

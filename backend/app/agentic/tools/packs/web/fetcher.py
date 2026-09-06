@@ -20,6 +20,7 @@ from app.agentic.tools.packs.web.url_security import (
 )
 from app.constants.http import USER_AGENTS
 from app.core.cache import TTLCache
+from app.core.cache_policies import AGENT_WEB_FETCH
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.errors import log_internal_error
 from app.core.metrics import metrics
@@ -28,11 +29,11 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-FETCH_CACHE_TTL = 600
+FETCH_CACHE_TTL = AGENT_WEB_FETCH.ttl_seconds
 _BROWSER_TIMEOUT_CLEANUP_SECONDS = 5.0
 MAX_REDIRECTS = 5
 REDIRECT_STATUS_CODES = {301, 302, 303, 307, 308}
-fetch_cache = TTLCache()
+fetch_cache = TTLCache(maxsize=256, name="agent_web_fetch")
 _browser_singleflight: AsyncSingleFlight[dict[str, Any]] = AsyncSingleFlight()
 
 
@@ -176,7 +177,9 @@ async def fetch_url(
     if cached is not None:
         return cast(dict[str, Any], cached)
     if is_twitter_url_func(url):
-        return await fetch_tweet_func(url)
+        tweet_result = await fetch_tweet_func(url)
+        cache.set(cache_key, tweet_result, FETCH_CACHE_TTL)
+        return tweet_result
 
     if browser_timeout_seconds is None:
         from app.configuration import get_settings
@@ -218,21 +221,35 @@ async def fetch_url(
 
         return cast(dict[str, Any], await _browser_singleflight.do((target_url, browser_mode), load))
 
+    async def reject_unsafe_browser_target(target_url: str) -> dict[str, Any] | None:
+        """浏览器路径不做连接级 SSRF 校验，入口统一补 DNS→公网地址检查。
+
+        HTTP 路径被 SSRF 防护拒绝的内网域名，不允许借道浏览器 fallback 渲染。
+        """
+        try:
+            await asyncio.to_thread(resolve_url_target, target_url)
+        except UnsafeUrlError as error:
+            logger.warning("浏览器抓取拒绝不安全 URL %s: %s", target_url, error)
+            return {"url": target_url, "title": "", "content": "", "error": str(error)}
+        return None
+
     async def run_browser_fallback(target_url: str) -> dict[str, Any]:
+        unsafe_response = await reject_unsafe_browser_target(target_url)
+        if unsafe_response is not None:
+            return unsafe_response
         try:
             if fallback_func is not None:
                 return await within_browser_budget(fallback_func(target_url))
-            return await within_browser_budget(
-                scrapling_fallback(target_url, fetch_func=execute_browser)
-            )
+            return await within_browser_budget(scrapling_fallback(target_url, fetch_func=execute_browser))
         except TimeoutError as error:
             return {"url": target_url, "title": "", "content": "", "error": str(error)}
 
     if mode in {"stealth", "dynamic"}:
+        unsafe_response = await reject_unsafe_browser_target(url)
+        if unsafe_response is not None:
+            return unsafe_response
         try:
-            browser_result = await within_browser_budget(
-                execute_browser(url, cast(BrowserMode, mode))
-            )
+            browser_result = await within_browser_budget(execute_browser(url, cast(BrowserMode, mode)))
         except TimeoutError as error:
             return {"url": url, "title": "", "content": "", "error": str(error)}
         if not browser_result.get("error"):
@@ -251,7 +268,8 @@ async def fetch_url(
         content_type = content_type_detector(response.headers.get("content-type"))
         response.encoding = response.apparent_encoding or "utf-8"
         if content_type == "pdf":
-            pdf_result = pdf_handler(response, resolved_url)
+            # PDF 解析是 CPU 密集的同步调用，放线程池避免阻塞事件循环
+            pdf_result = await asyncio.to_thread(pdf_handler, response, resolved_url)
             cache.set(cache_key, pdf_result, FETCH_CACHE_TTL)
             return pdf_result
         meta, (title, content) = text_extractor(response.text)

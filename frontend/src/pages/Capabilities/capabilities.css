@@ -13,10 +13,52 @@
   margin-bottom: 16px;
 }
 
-.capability-summary-card,
+.capability-summary-card {
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  background: var(--c-card-bg);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.capability-summary-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--c-primary);
+}
+
+.capability-summary-card:nth-child(2)::before {
+  background: #1890ff;
+}
+
+.capability-summary-card:nth-child(3)::before {
+  background: #faad14;
+}
+
+.capability-summary-card:nth-child(4)::before {
+  background: #52c41a;
+}
+
+.capability-summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--c-primary) 10%, transparent);
+}
+
 .capability-card {
   border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
   background: var(--c-card-bg);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.capability-card:hover {
+  border-color: color-mix(in srgb, var(--c-primary) 35%, var(--c-border));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--c-primary) 8%, transparent);
 }
 
 .capability-summary-card .ant-card-body {
@@ -74,15 +116,15 @@
   border-radius: 9px;
   color: #fff;
   background: linear-gradient(135deg, var(--c-primary), var(--c-accent));
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-bold);
 }
 
 .capability-title-text {
   display: block;
   overflow: hidden;
   color: var(--c-text-primary);
-  font-size: 15px;
+  font-size: var(--c-font-lg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -91,14 +133,14 @@
   display: inline-block;
   margin-top: 3px;
   color: var(--c-text-muted);
-  font-size: 11px;
+  font-size: var(--c-font-xs);
 }
 
 .capability-label {
   margin-bottom: 7px;
   color: var(--c-text-muted);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -111,7 +153,7 @@
   margin: 0;
   padding-left: 20px;
   color: var(--c-text-secondary);
-  line-height: 1.75;
+  line-height: var(--c-leading-relaxed);
 }
 
 .capability-exclusions {
@@ -121,8 +163,8 @@
   border-radius: 8px;
   color: var(--c-text-secondary);
   background: var(--c-nested-bg);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-normal);
 }
 
 .capability-tool-chip {
@@ -176,7 +218,7 @@
   margin-bottom: 7px;
   overflow: hidden;
   color: var(--c-text-primary);
-  font-size: 13px;
+  font-size: var(--c-font-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -185,7 +227,7 @@
   min-height: 66px;
   margin: 16px 0 14px !important;
   color: var(--c-text-secondary);
-  line-height: 1.6;
+  line-height: var(--c-leading-normal);
 }
 
 .capability-policy-row {
@@ -196,7 +238,7 @@
   padding: 10px 0;
   border-top: 1px solid var(--c-border);
   color: var(--c-text-muted);
-  font-size: 12px;
+  font-size: var(--c-font-sm);
 }
 
 .capability-linked-skills {

@@ -152,3 +152,71 @@ describe("AgentProcessPanel", () => {
     expect(screen.queryByText(/tool_budget_exceeded/)).not.toBeInTheDocument();
   });
 });
+
+describe("AgentProcessPanel research rounds", () => {
+  it("renders structured reasoning summaries and tools for every round", () => {
+    render(
+      <AgentProcessPanel
+        status="Agent 调研完成"
+        toolCalls={[]}
+        rounds={[
+          {
+            roundIndex: 1,
+            roundTotal: 4,
+            status: "completed",
+            objective: "建立行业证据基线",
+            evidenceGaps: ["竞争格局"],
+            toolNames: ["web_search"],
+            toolSelectionReason: "覆盖首轮全部证据维度",
+            evidenceAdded: ["web_search：1 条"],
+            judgmentBasis: ["本轮新增 1 条有效工具证据"],
+            conclusion: "首轮确认市场空间",
+            nextStep: "下一轮聚焦补齐：竞争格局",
+            statusText: "",
+            toolCalls: [{
+              id: "round-call-1",
+              name: "web_search",
+              arguments: '{"query":"行业规模"}',
+              resultSummary: { summary: "返回 3 条记录" },
+              isExecuting: false,
+            }],
+          },
+          {
+            roundIndex: 2,
+            roundTotal: 4,
+            status: "completed",
+            objective: "补齐竞争格局的证据缺口",
+            evidenceGaps: [],
+            toolNames: ["fetch_url"],
+            toolSelectionReason: "定向读取权威来源正文",
+            evidenceAdded: ["fetch_url：1 条"],
+            judgmentBasis: ["全部证据维度已满足"],
+            conclusion: "已确认竞争格局",
+            nextStep: "证据维度已满足，结束自适应调研",
+            statusText: "",
+            toolCalls: [],
+          },
+        ]}
+        isRunning={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Agent 思考与执行/ }));
+    expect(screen.getByText("调研轮次")).toBeInTheDocument();
+    expect(screen.getByText("第 1 轮")).toBeInTheDocument();
+    expect(screen.getByText("第 2 轮")).toBeInTheDocument();
+    expect(screen.getAllByText("研究目标")).toHaveLength(2);
+    expect(screen.getByText("建立行业证据基线")).toBeInTheDocument();
+    expect(screen.getAllByText("工具选择依据")).toHaveLength(2);
+    expect(screen.getAllByText("关键判断依据")).toHaveLength(2);
+    expect(screen.getAllByText("新增证据")).toHaveLength(2);
+    expect(screen.getAllByText("本轮结论")).toHaveLength(2);
+    expect(screen.getByText("首轮确认市场空间")).toBeInTheDocument();
+    expect(screen.getAllByText("下一轮计划")).toHaveLength(2);
+    expect(screen.getByText("下一轮聚焦补齐：竞争格局")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("网页搜索"));
+    expect(screen.getByText(/行业规模/)).toBeInTheDocument();
+    expect(screen.getByText("返回 3 条记录")).toBeInTheDocument();
+  });
+});

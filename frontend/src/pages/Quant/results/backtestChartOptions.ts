@@ -1,4 +1,5 @@
 import type { QuantBacktestResult } from "../../../api/queries";
+import { APP_FONT_FAMILY, APP_FONT_SIZE } from "../../../theme/typography";
 
 interface ChartPalette {
   border: string;
@@ -24,6 +25,7 @@ export function buildEquityChartOption(
 ) {
   return {
     animation: equityCurve.length <= 120,
+    textStyle: { fontFamily: APP_FONT_FAMILY, fontSize: APP_FONT_SIZE.sm },
     tooltip: {
       trigger: "axis",
       axisPointer: { type: "line" },
@@ -35,7 +37,7 @@ export function buildEquityChartOption(
       left: "center",
       itemGap: isNarrow ? 12 : 20,
       itemWidth: isNarrow ? 18 : 25,
-      textStyle: { color: colors.textSecondary },
+      textStyle: { color: colors.textSecondary, fontSize: APP_FONT_SIZE.sm },
     },
     grid: {
       left: isNarrow ? 12 : 16,
@@ -50,6 +52,7 @@ export function buildEquityChartOption(
       data: equityCurve.map((point) => point.date),
       axisLabel: {
         color: colors.textMuted,
+        fontSize: APP_FONT_SIZE.xs,
         hideOverlap: true,
         margin: 12,
         formatter: (value: string) => formatDateLabel(value, isNarrow),
@@ -62,6 +65,7 @@ export function buildEquityChartOption(
       scale: true,
       axisLabel: {
         color: colors.textMuted,
+        fontSize: APP_FONT_SIZE.xs,
         margin: 10,
         formatter: (value: number) => formatValue(value, 2),
       },
@@ -97,6 +101,7 @@ export function buildDrawdownChartOption(
 ) {
   return {
     animation: equityCurve.length <= 120,
+    textStyle: { fontFamily: APP_FONT_FAMILY, fontSize: APP_FONT_SIZE.sm },
     tooltip: {
       trigger: "axis",
       axisPointer: { type: "line" },
@@ -115,6 +120,7 @@ export function buildDrawdownChartOption(
       data: equityCurve.map((point) => point.date),
       axisLabel: {
         color: colors.textMuted,
+        fontSize: APP_FONT_SIZE.xs,
         hideOverlap: true,
         margin: 12,
         formatter: (value: string) => formatDateLabel(value, isNarrow),
@@ -128,6 +134,7 @@ export function buildDrawdownChartOption(
       axisLabel: {
         formatter: (value: number) => formatValue(value, 1, "%"),
         color: colors.textMuted,
+        fontSize: APP_FONT_SIZE.xs,
         margin: 10,
       },
       splitLine: { lineStyle: { color: colors.border } },

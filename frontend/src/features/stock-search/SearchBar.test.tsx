@@ -36,15 +36,15 @@ describe("SearchBar destinations", () => {
     });
   });
 
-  it("uses the analysis route by default when Enter is pressed", () => {
+  it("uses the stock facts route by default when Enter is pressed", () => {
     renderSearch();
     fireEvent.keyDown(screen.getByPlaceholderText(/输入股票代码或名称/), { key: "Enter" });
-    expect(screen.getByTestId("location")).toHaveTextContent("/analysis/600519");
+    expect(screen.getByTestId("location")).toHaveTextContent("/stock/600519");
   });
 
-  it("uses an injected research route when Enter is pressed", () => {
-    renderSearch((code) => `/investment-research/${code}`);
+  it("uses an injected analysis route when Enter is pressed", () => {
+    renderSearch((code) => `/analysis/${encodeURIComponent(code)}`);
     fireEvent.keyDown(screen.getByPlaceholderText(/输入股票代码或名称/), { key: "Enter" });
-    expect(screen.getByTestId("location")).toHaveTextContent("/investment-research/600519");
+    expect(screen.getByTestId("location")).toHaveTextContent("/analysis/600519");
   });
 });

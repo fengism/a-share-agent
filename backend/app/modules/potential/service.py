@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
 
 import pandas as pd
 
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
+from app.financial_data.market.public import get_trading_calendar_view
+from app.financial_data.market.trading_session import SHANGHAI_TIMEZONE
 from app.financial_data.stock.public import (
     get_exchange_stock_master,
     get_historical_bars,
@@ -33,6 +35,8 @@ _MIN_LISTING_DAYS = 365
 _MAX_OUTPUT = 50
 _MAX_CONCURRENCY = 6
 _HISTORY_DAYS = 420
+_TRADING_CALENDAR_LOOKBACK_DAYS = 370
+_DAILY_MINING_CUTOFF = time(15, 10)
 
 # 策略权重：形态/底部类罕见信号权重更高
 _STRATEGY_WEIGHTS: dict[str, float] = {
@@ -137,11 +141,51 @@ def _evaluate_strategies(
     return hits, latest_signal_date, signal_age, score
 
 
-async def mine_potential_stocks() -> PotentialDailyResult:
-    """执行一轮挖掘：候选筛选 → 多策略信号 → 融合评分。"""
-    from datetime import date as date_type
-    from datetime import timedelta
+def _normalize_shanghai_now(now: datetime | None) -> datetime:
+    if now is None:
+        return datetime.now(SHANGHAI_TIMEZONE)
+    if now.tzinfo is None:
+        return now.replace(tzinfo=SHANGHAI_TIMEZONE)
+    return now.astimezone(SHANGHAI_TIMEZONE)
 
+
+async def resolve_potential_market_date(now: datetime | None = None) -> date | None:
+    """解析最近一个已经收盘的真实 A 股交易日。"""
+    local_now = _normalize_shanghai_now(now)
+    latest_candidate = local_now.date()
+    if local_now.time().replace(tzinfo=None) < _DAILY_MINING_CUTOFF:
+        latest_candidate -= timedelta(days=1)
+
+    try:
+        calendar = await get_trading_calendar_view(
+            latest_candidate - timedelta(days=_TRADING_CALENDAR_LOOKBACK_DAYS),
+            latest_candidate,
+        )
+    except Exception:
+        logger.exception("潜力股交易日解析失败: date=%s", latest_candidate)
+        return None
+
+    if calendar.degraded:
+        logger.warning("潜力股任务跳过：交易日历处于降级状态")
+        return None
+
+    trade_dates: list[date] = []
+    for value in calendar.trade_dates:
+        try:
+            trade_date = date.fromisoformat(value)
+        except (TypeError, ValueError):
+            logger.warning("潜力股交易日历包含无效日期: %r", value)
+            continue
+        if trade_date <= latest_candidate:
+            trade_dates.append(trade_date)
+    if not trade_dates:
+        logger.warning("潜力股任务跳过：%s 前没有可用交易日", latest_candidate)
+        return None
+    return max(trade_dates)
+
+
+async def mine_potential_stocks(market_date: date) -> PotentialDailyResult:
+    """按指定交易日执行一轮挖掘：候选筛选 → 多策略信号 → 融合评分。"""
     df, master = await asyncio.gather(
         get_spot_snapshot(),
         get_exchange_stock_master(),
@@ -158,8 +202,8 @@ async def mine_potential_stocks() -> PotentialDailyResult:
     }
 
     semaphore = asyncio.Semaphore(_MAX_CONCURRENCY)
-    start_date = date_type.today() - timedelta(days=_HISTORY_DAYS)
-    end_date = date_type.today()
+    start_date = market_date - timedelta(days=_HISTORY_DAYS)
+    end_date = market_date
     items: list[PotentialStockItem] = []
     failed = 0
 
@@ -216,18 +260,39 @@ async def mine_potential_stocks() -> PotentialDailyResult:
     )
 
 
-async def run_daily_mining(force: bool = False) -> PotentialDailyResult | None:
-    """每日挖掘入口：当天已有结果则跳过（force 可强制重跑）。"""
-    today = datetime.now(UTC).astimezone().date().isoformat()
-    if not force and repository.has_potential_result(today):
-        return repository.load_potential_result(today)
-    result = await mine_potential_stocks()
+async def run_daily_mining(
+    force: bool = False,
+    now: datetime | None = None,
+) -> PotentialDailyResult | None:
+    """挖掘最近已收盘交易日；已有结果时跳过（force 可强制重跑）。"""
+    market_date = await resolve_potential_market_date(now)
+    if market_date is None:
+        return None
+
+    market_date_text = market_date.isoformat()
+    if not force and repository.has_potential_result(market_date_text):
+        return repository.load_potential_result(market_date_text)
+    result = await mine_potential_stocks(market_date)
     await call_blocking(repository.save_potential_result, result, semaphore=misc_semaphore)
     logger.info(
         "潜力股挖掘完成: date=%s universe=%s evaluated=%s hits=%s",
         result.date, result.universe_size, result.evaluated, len(result.items),
     )
     return result
+
+
+async def run_scheduled_daily_mining(
+    now: datetime | None = None,
+) -> PotentialDailyResult | None:
+    """仅在真实交易日的收盘截止时间后执行自动挖掘。"""
+    local_now = _normalize_shanghai_now(now)
+    if local_now.time().replace(tzinfo=None) < _DAILY_MINING_CUTOFF:
+        return None
+
+    market_date = await resolve_potential_market_date(local_now)
+    if market_date is None or market_date != local_now.date():
+        return None
+    return await run_daily_mining(force=False, now=local_now)
 
 
 async def get_potential_result(date: str | None = None) -> PotentialDailyResult | None:

@@ -15,7 +15,7 @@ export default function AnalysisDimensionSummary({ label, score, children }: Pro
         {score == null ? (
           <div className="analysis-dimension-summary__score-empty" aria-label="暂无评分">-</div>
         ) : (
-          <RatingBadge score={score} size={72} />
+          <RatingBadge score={score} size={56} />
         )}
         <strong>{label}</strong>
       </section>

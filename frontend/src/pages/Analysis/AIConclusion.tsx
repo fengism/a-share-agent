@@ -33,8 +33,26 @@ export default function AIConclusion({ result, embedded = false }: Props) {
     current_price,
   } = result;
 
-  const [priceLow, priceHigh] = estimated_price_range;
-  const priceChange = current_price && priceHigh
+  const rf = result.research_framework;
+  const baseFairRange = rf?.valuation?.scenarios?.base?.fair_value_range;
+  const actionBuyRange = rf?.actions?.buy_or_add_range;
+
+  // 优先提取有效 (> 0) 的 12 个月估值目标区间，其次尝试回退至公允价值区间或基准情景
+  const validEstRange = estimated_price_range && estimated_price_range[0] > 0 && estimated_price_range[1] > 0
+    ? estimated_price_range
+    : (fair_value_range && fair_value_range[0] > 0 && fair_value_range[1] > 0
+      ? fair_value_range
+      : (baseFairRange && baseFairRange[0] > 0 && baseFairRange[1] > 0
+        ? baseFairRange
+        : (actionBuyRange && actionBuyRange[0] > 0 && actionBuyRange[1] > 0 ? actionBuyRange : null)));
+
+  const priceLow = validEstRange ? validEstRange[0] : null;
+  const priceHigh = validEstRange ? validEstRange[1] : null;
+  const priceRangeText = priceLow != null && priceHigh != null
+    ? `¥${priceLow.toFixed(2)} – ¥${priceHigh.toFixed(2)}`
+    : "证据不足 · 待核验";
+
+  const priceChange = current_price && current_price > 0 && priceHigh && priceHigh > 0
     ? ((priceHigh - current_price) / current_price * 100).toFixed(1)
     : null;
   const isBuy = signal === "buy" || signal === "strong_buy";
@@ -48,7 +66,7 @@ export default function AIConclusion({ result, embedded = false }: Props) {
     { label: "情绪面", score: sentiment.score, summary: sentiment.summary },
   ];
   const valuationText = valuation_view || "暂无明确结论";
-  const valuationRange = fair_value_range?.[0] != null
+  const valuationRange = fair_value_range?.[0] != null && fair_value_range[0] > 0
     ? `¥${fair_value_range[0].toFixed(2)} – ¥${fair_value_range[1].toFixed(2)}`
     : "暂无公允区间";
 
@@ -68,7 +86,7 @@ export default function AIConclusion({ result, embedded = false }: Props) {
             <p className="analysis-conclusion__summary">{overall_summary}</p>
           </div>
           <div className="analysis-conclusion__signal-cluster">
-            <RatingBadge score={overall_rating} size={72} />
+            <RatingBadge score={overall_rating} size={56} />
             <div className="analysis-conclusion__signal-meta">
               <SignalBadge signal={signal} />
               <span>模型置信度 {Math.round(confidence * 100)}%</span>
@@ -88,18 +106,18 @@ export default function AIConclusion({ result, embedded = false }: Props) {
         <div className="analysis-conclusion__metrics pdf-avoid-break">
           <div className="analysis-conclusion__metric">
             <span>12个月估值区间</span>
-            <strong>¥{priceLow?.toFixed(2)} – ¥{priceHigh?.toFixed(2)}</strong>
+            <strong>{priceRangeText}</strong>
           </div>
           <div className="analysis-conclusion__metric">
             <span>当前价与预期空间</span>
             <strong>
-              ¥{current_price?.toFixed(2) ?? "-"}
+              {current_price && current_price > 0 ? `¥${current_price.toFixed(2)}` : "--"}
               {priceChange ? <em className={Number(priceChange) >= 0 ? "is-positive" : "is-negative"}>{Number(priceChange) >= 0 ? "+" : ""}{priceChange}%</em> : null}
             </strong>
           </div>
-          <div className="analysis-conclusion__metric">
+          <div className="analysis-conclusion__metric analysis-conclusion__metric--valuation">
             <span>估值结论</span>
-            <strong>{valuationText}</strong>
+            <strong className="analysis-conclusion__valuation-text">{valuationText}</strong>
             <small>{valuationRange}</small>
           </div>
         </div>

@@ -8,10 +8,11 @@ from app.infrastructure.providers.eastmoney.industry import IndustryMixin
 from app.infrastructure.providers.eastmoney.intraday import IntradayMixin
 from app.infrastructure.providers.eastmoney.kline import KlineMixin
 from app.infrastructure.providers.eastmoney.limit_pool import LimitPoolMixin
-from app.infrastructure.providers.eastmoney.macro import MacroMixin
+from app.infrastructure.providers.eastmoney.macro import MacroMixin, UsEconMixin
 from app.infrastructure.providers.eastmoney.market import MarketMixin
 from app.infrastructure.providers.eastmoney.misc import MiscMixin
 from app.infrastructure.providers.eastmoney.news import NewsMixin
+from app.infrastructure.providers.eastmoney.price_anomaly import PriceAnomalyMixin
 from app.infrastructure.providers.eastmoney.reports import ReportsMixin
 from app.infrastructure.providers.eastmoney.search import SearchMixin
 
@@ -26,9 +27,11 @@ class EastMoneyDataProvider(
     KlineMixin,
     LimitPoolMixin,
     MacroMixin,
+    UsEconMixin,
     MarketMixin,
     MiscMixin,
     NewsMixin,
+    PriceAnomalyMixin,
     ReportsMixin,
     SearchMixin,
 ):

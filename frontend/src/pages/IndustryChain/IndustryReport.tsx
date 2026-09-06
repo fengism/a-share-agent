@@ -3,6 +3,7 @@ import {
   ApartmentOutlined,
   CloudUploadOutlined,
   DatabaseOutlined,
+  FilePdfOutlined,
   FileTextOutlined,
   FullscreenOutlined,
   SendOutlined,
@@ -11,7 +12,7 @@ import { Alert, Button, Collapse, Input, message, Modal, Popover, Skeleton, Tag,
 import { useQueryClient } from "@tanstack/react-query";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { queryKeys } from "../../api/queryKeys";
-import { useMineIndustryChainAtlas } from "../../api/queryHooks/workflows";
+import { downloadIndustryChainPdfFromData, useMineIndustryChainAtlas } from "../../api/queryHooks/workflows";
 import { useColors, useStyles } from "../../styles/ui";
 import type { IndustryChainChart, IndustryChainResult } from "../../types/stock";
 import IndustryConclusion from "./IndustryConclusion";
@@ -83,6 +84,21 @@ export default function IndustryReport({
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const [expandedChart, setExpandedChart] = useState<{ chart: IndustryChainChart; index: number } | null>(null);
   const [feishuReceiver, setFeishuReceiver] = useState(defaultReceiver || "");
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    try {
+      setIsExportingPdf(true);
+      message.loading({ content: "正在生成产业链 PDF 研报...", key: "export-industry-pdf" });
+      await downloadIndustryChainPdfFromData(result);
+      message.success({ content: "产业链 PDF 研报导出成功", key: "export-industry-pdf" });
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? `: ${err.message}` : "";
+      message.error({ content: `PDF 导出失败${detail}`, key: "export-industry-pdf" });
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
   const scope = result.research_scope;
   const scopeSummary = scope && Object.keys(scope).length > 0
     ? [
@@ -127,7 +143,7 @@ export default function IndustryReport({
     <>
       <div className="industry-report__header">
         <div className="industry-report__title-row">
-          <Text strong style={{ color: colors.textPrimary, fontSize: 15, minWidth: 0, overflowWrap: "anywhere" }}>
+          <Text className="industry-report__title" strong style={{ color: colors.textPrimary, fontSize: "var(--c-font-lg)" }}>
             <ApartmentOutlined style={{ marginRight: 6 }} />
             {result.name || activeName} 产业链
           </Text>
@@ -137,7 +153,7 @@ export default function IndustryReport({
               placement="bottomRight"
               content={(
                 <div style={{ width: isNarrow ? "min(280px, 80vw)" : 280 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 12, display: "block", marginBottom: 8 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: "var(--c-font-sm)", display: "block", marginBottom: 8 }}>
                     飞书接收人 open_id
                   </Text>
                   <Input
@@ -172,13 +188,13 @@ export default function IndustryReport({
                     推送到 Notion
                   </Button>
                   {!archiveId && (
-                    <div style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>
+                    <div style={{ color: colors.textSecondary, fontSize: "var(--c-font-sm)", marginTop: 8 }}>
                       提示：从右侧历史打开的报告可直接推送。
                     </div>
                   )}
                   {pushResult && (
                     <div style={{ marginTop: 12, padding: 10, background: `${colors.down}1a`, borderRadius: 6 }}>
-                      <div style={{ color: colors.down, fontSize: 12, marginBottom: 4 }}>
+                      <div style={{ color: colors.down, fontSize: "var(--c-font-sm)", marginBottom: 4 }}>
                         ✓ 已推送到 {pushResult.target === "feishu" ? "飞书" : "Notion"}
                       </div>
                       {pushResult.url && (
@@ -186,13 +202,13 @@ export default function IndustryReport({
                           href={pushResult.url}
                           target="_blank"
                           rel="noreferrer"
-                          style={{ color: colors.primary, fontSize: 12, wordBreak: "break-all" }}
+                          style={{ color: colors.primary, fontSize: "var(--c-font-sm)", wordBreak: "break-all" }}
                         >
                           {pushResult.url}
                         </a>
                       )}
                       {pushResult.message && (
-                        <div style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>{pushResult.message}</div>
+                        <div style={{ color: colors.textSecondary, fontSize: "var(--c-font-xs)", marginTop: 4 }}>{pushResult.message}</div>
                       )}
                     </div>
                   )}
@@ -203,28 +219,37 @@ export default function IndustryReport({
                 推送
               </Button>
             </Popover>
+            <Button
+              icon={<FilePdfOutlined />}
+              size="small"
+              loading={isExportingPdf}
+              onClick={handleExportPdf}
+            >
+              导出 PDF 研报
+            </Button>
             <MineToAtlasButton name={activeName} archiveId={archiveId} />
           </div>
         </div>
 
         <div className="industry-report__meta">
           {result.aliases && result.aliases.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {result.aliases.map((alias) => <Tag key={alias} style={{ margin: 0 }}>{alias}</Tag>)}
+            <div className="industry-report__aliases" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {result.aliases.map((alias) => <Tag key={alias} className="industry-report__wrap-tag" style={{ margin: 0 }}>{alias}</Tag>)}
             </div>
           )}
-          {scopeSummary && <Text type="secondary">研究范围：{scopeSummary}</Text>}
+          {scopeSummary && <Text className="industry-report__scope-summary" type="secondary">研究范围：{scopeSummary}</Text>}
         </div>
       </div>
 
       {(result.quality_status === "degraded" || result.archive_status === "failed" || Boolean(result.warnings?.length)) && (
         <Alert
+          className="industry-report__alert"
           type={result.archive_status === "failed" ? "error" : "warning"}
           showIcon
           title={result.archive_status === "failed" ? "报告未保存" : "报告存在质量提示"}
           description={result.warnings?.length ? (
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {result.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+              {result.warnings.map((warning) => <li className="industry-report__warning" key={warning}>{warning}</li>)}
             </ul>
           ) : "部分结构化内容未能完整生成，请结合原始来源谨慎使用。"}
           style={{ marginBottom: 16 }}
@@ -269,7 +294,7 @@ export default function IndustryReport({
               return (
                 <div key={index} style={{ ...cardStyle, padding: "16px 20px", marginBottom: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <Text strong style={{ color: colors.textPrimary, fontSize: 14 }}>{chart.title}</Text>
+                    <Text strong style={{ color: colors.textPrimary, fontSize: "var(--c-font-base)" }}>{chart.title}</Text>
                     {hasValidOption && (
                       <Button
                         type="text"
@@ -282,7 +307,7 @@ export default function IndustryReport({
                     )}
                   </div>
                   {chart.description && (
-                    <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 12, display: "block", lineHeight: 1.6 }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: "var(--c-font-md)", marginBottom: 12, display: "block", lineHeight: "var(--c-leading-normal)" }}>
                       {chart.description}
                     </Text>
                   )}
@@ -298,7 +323,7 @@ export default function IndustryReport({
                         alignItems: "center",
                         justifyContent: "center",
                         color: colors.textMuted,
-                        fontSize: 13,
+                        fontSize: "var(--c-font-md)",
                       }}
                     >
                       图表配置不可用

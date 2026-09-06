@@ -166,25 +166,35 @@ export default function BacktestForm({ onCreated, initialCodes = [] }: BacktestF
           setLiveStrategyParameters(values.strategyParameters ?? {});
         }}
       >
-        <SavedStrategyToolbar
-          selectedId={savedStrategyId}
-          options={savedStrategies.data?.map((strategy) => ({ value: strategy.id, label: strategy.name })) ?? []}
-          isLoading={savedStrategies.isLoading}
-          isSaving={saveStrategy.isPending}
-          isDeleting={deleteStrategy.isPending}
-          onSelect={(strategyId) => strategyId == null ? setSavedStrategyId(undefined) : applySavedStrategy(strategyId)}
-          onSave={saveCurrentStrategy}
-          onDelete={deleteCurrentStrategy}
-          onReset={resetForm}
-        />
-        <UniverseFields source={source} />
-        <StrategyFields
-          strategyType={strategyType}
-          strategyOptions={strategyOptions}
-          parameterValues={liveStrategyParameters}
-          onStrategyChange={applyStrategyPreset}
-        />
-        <BacktestExecutionFields isSubmitting={createRun.isPending} />
+        <div className="quant-form-layout">
+          <div className="quant-form-layout__saved">
+            <SavedStrategyToolbar
+              selectedId={savedStrategyId}
+              options={savedStrategies.data?.map((strategy) => ({ value: strategy.id, label: strategy.name })) ?? []}
+              isLoading={savedStrategies.isLoading}
+              isSaving={saveStrategy.isPending}
+              isDeleting={deleteStrategy.isPending}
+              onSelect={(strategyId) => strategyId == null ? setSavedStrategyId(undefined) : applySavedStrategy(strategyId)}
+              onSave={saveCurrentStrategy}
+              onDelete={deleteCurrentStrategy}
+              onReset={resetForm}
+            />
+          </div>
+          <div className="quant-form-layout__universe">
+            <UniverseFields source={source} />
+          </div>
+          <div className="quant-strategy-stage">
+            <StrategyFields
+              strategyType={strategyType}
+              strategyOptions={strategyOptions}
+              parameterValues={liveStrategyParameters}
+              onStrategyChange={applyStrategyPreset}
+            />
+          </div>
+          <div className="quant-form-layout__execution">
+            <BacktestExecutionFields isSubmitting={createRun.isPending} />
+          </div>
+        </div>
       </Form>
     </Card>
   );

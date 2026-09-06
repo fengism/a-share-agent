@@ -30,12 +30,18 @@ SYSTEM_PROMPT = """你是一位严谨的产业研究分析师。请把输入的�
 - 全部内容使用中文；公司和机构的官方英文名称可以保留，但需提供中文语境。
 - 所有具体数字、市场份额、日期和事件都必须来自输入证据，并在对应字段同时写明 `source` 和 `source_url`；没有可靠数据时使用空字符串或空数组，禁止补造。
 - 工具证据通过 `<tool_evidence id="ev_...">` 和公共数据证据 ID 标识；每个结构化事实必须在 `evidence_ids` 中引用实际支持它的证据 ID，禁止编造 ID。
+- `ev_*` 是仅供系统校验使用的内部标识，只能出现在 `evidence_ids` 字段中；summary、positioning、title、detail、role、description、evidence 等自然语言字段禁止出现“证据 ev_*”或裸露的 `ev_*`。
 - `source_url` 必须真实出现在所引用 evidence 的来源 URL 中；每条判断同时填写 `claim_type` 和 `confidence`。
 - 必须如实填写 `coverage`、`missing_evidence` 和 `conflicts`；缺失或冲突不是失败，不得用猜测掩盖。
 - 区分全球与中国、事实与判断、行业公司与 A 股上市公司。
 - 只生成结构化事实和判断；Markdown 报告与图表由后端根据校验后的结构化字段确定性生成。
 - 重点标的只说明产业链角色、受益逻辑与风险，不给出无依据的买卖建议。
 - 必须逐项检查公共数据中的 `chain_data` 和 `driver_risk_data`：前者优先用于上中下游映射，后者优先用于驱动和风险；证据为空时记录缺口，不得跳过整个维度。
+- 上中下游环节拆解要求：
+  * 上游（Upstream）：核心芯片、关键原材料、元器件、晶圆制造与先进封装、基础零部件；
+  * 中游（Midstream）：核心模组/部件、整机制造、系统集成、通信与算力网络、温控/电源基础设施；
+  * 下游（Downstream）：终端客户、应用场景、智算中心/大模型应用生态、行业商业化落地。
+- 每个环节节点（Node）准确提炼出代表公司（companies）、角色定位（role）、毛利率/市场份额指标（metric/market_share）。
 
 ## 数量与内容约束
 - 所有数量都是上限而不是最低要求；证据不足时宁可少输出，并把缺口写入 `missing_evidence`，禁止为了凑数补写。
@@ -84,6 +90,7 @@ def build_user_prompt(
     evidence_compaction_note: str = "",
     agent_evidence_gaps: str = "无",
     evidence_inventory: str = "",
+    atlas_prior: str = "无",
 ) -> str:
     """使用 Agent 摘要和原始工具证据构造产业链分析提示词。"""
     company_instruction = (
@@ -96,6 +103,10 @@ def build_user_prompt(
 ## 本次研究范围
 {research_scope}
 公司输出约束：{company_instruction}
+
+## 已有产业链知识库参考
+{atlas_prior}
+（以上仅作为调研线索与先验假设；所有事实仍必须由本次证据支撑，与证据冲突时以证据为准。）
 
 ## Agent 调研摘要
 {agent_summary}
@@ -127,13 +138,14 @@ def _build_from_context(context) -> str:
         str(context.get("evidence_compaction_note") or ""),
         str(context.get("agent_evidence_gaps") or "无"),
         str(context.get("evidence_inventory") or ""),
+        str(context.get("atlas_prior") or "无"),
     )
 
 
 INDUSTRY_CHAIN_PROMPT_SPEC = prompt_registry.register(
     PromptSpec(
         id="industry_chain_analysis",
-        version="3.8.0",
+        version="3.8.1",
         system_prompt=SYSTEM_PROMPT,
         user_builder=_build_from_context,
         output_model=IndustryChainPromptOutput,

@@ -5,11 +5,19 @@ from fastapi import APIRouter, Query
 from app.domain.news import CategorizedStockNews, NewsSearchItem
 from app.financial_data.market.public import DragonTigerDetail
 from app.financial_data.market.public import get_dragon_tiger_detail as get_dragon_tiger_detail_service
-from app.financial_data.stock.public import RetailSentiment, StockFundFlowItem, StockSentiment
+from app.financial_data.stock.public import (
+    RetailSentiment,
+    StockBulletinPage,
+    StockFundFlowItem,
+    StockReportPage,
+    StockSentiment,
+)
 from app.financial_data.stock.public import get_retail_sentiment as get_retail_sentiment_service
+from app.financial_data.stock.public import get_stock_bulletins as get_stock_bulletins_service
 from app.financial_data.stock.public import get_stock_fund_flow as get_stock_fund_flow_service
 from app.financial_data.stock.public import get_stock_news as get_stock_news_service
 from app.financial_data.stock.public import get_stock_news_categorized as get_stock_news_categorized_service
+from app.financial_data.stock.public import get_stock_reports as get_stock_reports_service
 from app.financial_data.stock.public import get_stock_sentiment as get_stock_sentiment_service
 
 router = APIRouter()
@@ -19,6 +27,25 @@ router = APIRouter()
 async def get_news(code: str):
     """获取个股最新新闻流。"""
     return await get_stock_news_service(code)
+
+
+@router.get("/{code}/bulletins", response_model=StockBulletinPage)
+async def get_bulletins(
+    code: str,
+    page: int = Query(1, ge=1, description="页码，从 1 开始"),
+    page_size: int = Query(10, ge=1, le=30, description="每页条数"),
+):
+    """获取个股公司公告分页列表（新浪财经）。"""
+    return await get_stock_bulletins_service(code, page=page, page_size=page_size)
+
+
+@router.get("/{code}/reports", response_model=StockReportPage)
+async def get_reports(
+    code: str,
+    months: int = Query(6, ge=1, le=24, description="回溯月数，默认最近 6 个月"),
+):
+    """获取个股券商研报评级列表（新浪财经，最近 N 个月）。"""
+    return await get_stock_reports_service(code, months=months)
 
 
 @router.get("/{code}/sentiment", response_model=StockSentiment)

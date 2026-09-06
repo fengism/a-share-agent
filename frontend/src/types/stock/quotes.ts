@@ -20,6 +20,31 @@ export interface KlineData {
   items: KlineItem[];
 }
 
+export interface ChipCostRange {
+  low: number;
+  high: number;
+}
+
+export interface ChipHistogramItem {
+  price: number;
+  ratio: number;
+}
+
+export interface ChipDistribution {
+  code: string;
+  as_of_date: string;
+  source: string;
+  price: number;
+  profit_ratio: number;
+  avg_cost: number;
+  cost_90: ChipCostRange;
+  cost_70: ChipCostRange;
+  concentration_90: number | null;
+  concentration_70: number | null;
+  peak_price: number;
+  histogram: ChipHistogramItem[];
+}
+
 export interface IntradayItem {
   time: string;
   price: number;

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPost } from "../client";
+import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { queryKeys } from "../queryKeys";
 import { useAStockTradingSession } from "../../hooks/useAStockTradingSession";
 import type {
@@ -7,6 +8,7 @@ import type {
   WatchlistAlertCreate,
   WatchlistItem,
   WatchlistItemCreate,
+  WatchlistMarket,
   WatchlistResponse,
 } from "../../types/watchlist";
 
@@ -15,8 +17,8 @@ export function useWatchlist() {
   return useQuery({
     queryKey: queryKeys.watchlist,
     queryFn: () => apiGet<WatchlistResponse>("/watchlist"),
-    staleTime: 30_000,
-    refetchInterval: isTradingSession ? 30_000 : false,
+    staleTime: QUERY_CACHE_POLICIES.watchlistRealtime.staleMs,
+    refetchInterval: isTradingSession ? QUERY_CACHE_POLICIES.watchlistRealtime.pollMs : false,
   });
 }
 
@@ -32,8 +34,15 @@ export function useAddWatchlistItem() {
   return useWatchlistMutation((request: WatchlistItemCreate) => apiPost<WatchlistItem>("/watchlist", request));
 }
 
+type DeleteWatchlistItemInput = string | { stockCode: string; market?: WatchlistMarket };
+
 export function useDeleteWatchlistItem() {
-  return useWatchlistMutation((stockCode: string) => apiDelete(`/watchlist/${encodeURIComponent(stockCode)}`));
+  return useWatchlistMutation((input: DeleteWatchlistItemInput) => {
+    const stockCode = typeof input === "string" ? input : input.stockCode;
+    const market = typeof input === "string" ? undefined : input.market;
+    const query = market === "hk" ? "?market=hk" : "";
+    return apiDelete(`/watchlist/${encodeURIComponent(stockCode)}${query}`);
+  });
 }
 
 export function useAddWatchlistAlert() {

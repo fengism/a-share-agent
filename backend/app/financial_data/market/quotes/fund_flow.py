@@ -1,9 +1,10 @@
 import logging
-from datetime import datetime
+from datetime import date, datetime
 
 import pandas as pd
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, ths_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import safe_float
@@ -13,6 +14,56 @@ from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 _hsgt_flow_singleflight: AsyncSingleFlight[dict] = AsyncSingleFlight()
+
+
+def _point_date(points: list[dict]) -> str:
+    """从第一个带完整日期的分钟点提取数据日期。"""
+    for point in points:
+        time_text = str(point.get("time") or "").strip()
+        if len(time_text) < 10:
+            continue
+        candidate = time_text[:10]
+        try:
+            date.fromisoformat(candidate)
+        except ValueError:
+            continue
+        return candidate
+    return ""
+
+
+def _normalize_hsgt_flow(payload: dict) -> dict:
+    """兼容旧缓存中缺少日期与快照状态的响应。"""
+    result = dict(payload)
+    points = result.get("points")
+    if not isinstance(points, list):
+        points = []
+        result["points"] = points
+    result.setdefault("date", _point_date(points))
+    result.setdefault("updated_at", "")
+    result.setdefault("unit", "亿元")
+    result.setdefault("is_stale", False)
+    return result
+
+
+def _load_latest_persisted_hsgt_flow() -> dict | None:
+    """读取最近一个已落盘交易日，供实时上游不可用时回退。"""
+    from app.infrastructure.persistence.hsgt_store import query_hsgt_dates, query_hsgt_flow
+
+    dates = query_hsgt_dates(limit=1)
+    if not dates:
+        return None
+    latest = dates[0]
+    date_text = str(latest.get("date") or "")
+    points = query_hsgt_flow(date_text)
+    if not date_text or not points:
+        return None
+    return {
+        "date": date_text,
+        "updated_at": latest.get("updated_at") or "",
+        "unit": "亿元",
+        "is_stale": True,
+        "points": points,
+    }
 
 
 def _round_or_none(value: float | None) -> float | None:
@@ -55,8 +106,10 @@ def _build_point(row) -> dict | None:
 
 async def _load_hsgt_flow() -> dict:
     result = {
+        "date": "",
         "updated_at": datetime.now(SHANGHAI_TIMEZONE).strftime("%Y-%m-%d %H:%M:%S"),
         "unit": "亿元",
+        "is_stale": False,
         "points": [],
     }
 
@@ -79,12 +132,13 @@ async def _load_hsgt_flow() -> dict:
             if point is not None:
                 result["points"].append(point)
 
+    result["date"] = _point_date(result["points"])
+
     try:
         from app.infrastructure.persistence.hsgt_store import save_hsgt_flow
 
-        close_points = [point for point in result["points"] if point["time"].endswith("15:00")]
-        if close_points:
-            save_hsgt_flow(close_points[0]["time"][:10], close_points, result["updated_at"])
+        if result["date"] and result["points"]:
+            save_hsgt_flow(result["date"], result["points"], result["updated_at"])
     except Exception as exc:
         logger.warning("北向数据持久化失败: %s", exc)
 
@@ -105,10 +159,36 @@ async def get_hsgt_flow() -> dict:
     if policy.read_cache:
         cached = cache.get(cache_key)
         if cached is not None:
-            return cached
+            return _normalize_hsgt_flow(cached)
 
     async def load_and_cache() -> dict:
-        result = await _load_hsgt_flow()
+        upstream_error: Exception | None = None
+        try:
+            result = await _load_hsgt_flow()
+        except Exception as error:
+            upstream_error = error
+            result = {
+                "date": "",
+                "updated_at": "",
+                "unit": "亿元",
+                "is_stale": False,
+                "points": [],
+            }
+
+        if result["points"]:
+            if policy.write_cache and policy.ttl_seconds is not None:
+                cache.set(cache_key, result, ttl=policy.ttl_seconds)
+            return result
+
+        try:
+            fallback = _load_latest_persisted_hsgt_flow()
+        except Exception as error:
+            logger.warning("北向本地数据读取失败: %s", error)
+            fallback = None
+        if fallback is not None:
+            return fallback
+        if upstream_error is not None:
+            raise upstream_error
         if policy.write_cache and policy.ttl_seconds is not None:
             cache.set(cache_key, result, ttl=policy.ttl_seconds)
         return result

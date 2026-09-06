@@ -5,9 +5,9 @@ import dayjs from "dayjs";
 import { useMarketIndexKline, useTradingCalendar } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { hexToRgba } from "../../charts/utils";
-import { useColors, useTokens } from "../../styles/ui";
+import { useColors, useStyles, useTokens } from "../../styles/ui";
 
-const { Text } = Typography;
+const { Text, Title, Paragraph } = Typography;
 
 const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
 const BENCHMARK_SYMBOL = "000001"; // 上证指数
@@ -149,7 +149,7 @@ function MonthGrid({
             const color = heat.changePct >= 0 ? c.up : c.down;
             background = hexToRgba(color, heatAlpha(heat.changePct));
             content = (
-              <span style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.25 }}>
+              <span style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: "var(--c-leading-tight)" }}>
                 <span style={{ fontSize: t.font.md, color: c.textPrimary }}>{dayjs(iso).date()}</span>
                 <span style={{ fontSize: t.font.xs, fontWeight: Number(t.weight.semibold), color: heat.changePct >= 0 ? c.up : c.down }}>
                   {formatPct(heat.changePct)}
@@ -188,9 +188,10 @@ function MonthGrid({
   );
 }
 
-export default function TradingCalendarTab() {
+export default function TradingCalendar() {
   const t = useTokens();
   const c = useColors();
+  const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle } = useStyles();
   const initial = dayjs();
   const [cursor, setCursor] = useState(() => ({ year: initial.year(), month: initial.month() }));
   const query = useTradingCalendar(cursor.year);
@@ -222,55 +223,66 @@ export default function TradingCalendarTab() {
   };
 
   return (
-    <SectionDataState
-      isLoading={query.isLoading}
-      error={query.error}
-      onRetry={() => query.refetch()}
-      isEmpty={false}
-      errorTitle="交易日历加载失败"
-      skeletonRows={8}
-      minHeight={480}
-    >
-      <Card
-        title={(
-          <span style={{ display: "inline-flex", alignItems: "center", gap: t.space[2] }}>
-            <CalendarOutlined style={{ color: c.primary }} />
-            <span>A 股交易日历</span>
-            <Text type="secondary" style={{ fontSize: t.font.sm, fontWeight: 400 }}>· {BENCHMARK_NAME}涨跌热力</Text>
-          </span>
-        )}
-        extra={
-          query.data ? (
-            <span style={{ display: "inline-flex", gap: t.space[2], alignItems: "center", flexWrap: "wrap" }}>
-              <Tag color={query.data.today_is_trading_day ? "red" : "default"}>
-                今天{query.data.today_is_trading_day ? "交易日" : "休市"}
-              </Tag>
-              {query.data.previous_trading_day ? (
-                <Tag>上一交易日 {query.data.previous_trading_day.slice(5)}</Tag>
-              ) : null}
-              {query.data.next_trading_day ? (
-                <Tag>下一交易日 {query.data.next_trading_day.slice(5)}</Tag>
-              ) : null}
-              {query.data.degraded ? <Tag color="warning">降级：按工作日近似</Tag> : null}
-            </span>
-          ) : null
-        }
+    <div style={pageContainerStyle}>
+      <div style={pageHeaderStyle}>
+        <div className="u-page-title u-page-title--compact">
+          <Title level={3} style={pageTitleStyle}>交易日历</Title>
+        </div>
+        <Paragraph style={pageDescriptionStyle}>查看 A 股交易日安排与上证指数每日涨跌热力。</Paragraph>
+      </div>
+
+      <SectionDataState
+        isLoading={query.isLoading}
+        error={query.error}
+        onRetry={() => query.refetch()}
+        isEmpty={false}
+        errorTitle="交易日历加载失败"
+        skeletonRows={8}
+        minHeight={480}
       >
-        <MonthGrid
-          year={cursor.year}
-          month={cursor.month}
-          tradeDateSet={tradeDateSet}
-          heatMap={heatMap}
-          today={query.data?.today ?? ""}
-          onPrevMonth={() => moveMonth(-1)}
-          onNextMonth={() => moveMonth(1)}
-          yearTotalCount={query.data?.count ?? null}
-        />
-        <Text type="secondary" style={{ fontSize: t.font.xs, display: "block", marginTop: t.space[3] }}>
-          交易日按{BENCHMARK_NAME}当日涨跌着色（较前收盘，hover 查看精确数值）；删除线为休市日；
-          近一年之外的历史月份仅显示交易日无热力。数据源：新浪交易日历 + 指数日K。
-        </Text>
-      </Card>
-    </SectionDataState>
+        <Card
+          title={(
+            <span style={{ display: "inline-flex", alignItems: "center", gap: t.space[2] }}>
+              <CalendarOutlined style={{ color: c.primary }} />
+              <span>A 股交易日历</span>
+              <Text type="secondary" style={{ fontSize: t.font.sm, fontWeight: "var(--c-weight-normal)" }}>
+                · {BENCHMARK_NAME}涨跌热力
+              </Text>
+            </span>
+          )}
+          extra={
+            query.data ? (
+              <span style={{ display: "inline-flex", gap: t.space[2], alignItems: "center", flexWrap: "wrap" }}>
+                <Tag color={query.data.today_is_trading_day ? "red" : "default"}>
+                  今天{query.data.today_is_trading_day ? "交易日" : "休市"}
+                </Tag>
+                {query.data.previous_trading_day ? (
+                  <Tag>上一交易日 {query.data.previous_trading_day.slice(5)}</Tag>
+                ) : null}
+                {query.data.next_trading_day ? (
+                  <Tag>下一交易日 {query.data.next_trading_day.slice(5)}</Tag>
+                ) : null}
+                {query.data.degraded ? <Tag color="warning">降级：按工作日近似</Tag> : null}
+              </span>
+            ) : null
+          }
+        >
+          <MonthGrid
+            year={cursor.year}
+            month={cursor.month}
+            tradeDateSet={tradeDateSet}
+            heatMap={heatMap}
+            today={query.data?.today ?? ""}
+            onPrevMonth={() => moveMonth(-1)}
+            onNextMonth={() => moveMonth(1)}
+            yearTotalCount={query.data?.count ?? null}
+          />
+          <Text type="secondary" style={{ fontSize: t.font.xs, display: "block", marginTop: t.space[3] }}>
+            交易日按{BENCHMARK_NAME}当日涨跌着色（较前收盘，hover 查看精确数值）；删除线为休市日；
+            近一年之外的历史月份仅显示交易日无热力。数据源：新浪交易日历 + 指数日K。
+          </Text>
+        </Card>
+      </SectionDataState>
+    </div>
   );
 }

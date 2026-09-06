@@ -33,8 +33,15 @@ export interface StockBasicInfo {
   exchange_industry?: string | null;
   first_industry: StockConcept | null;
   second_industry: StockConcept | null;
+  third_industry?: StockConcept | null;
   current_price: number | null;
   concepts: StockConcept[] | null;
   data_sources?: StockDataSource[];
   field_sources?: Record<string, string>;
+}
+
+export interface StockBusinessIntro {
+  code: string;
+  source: string;
+  items: Record<string, string>;
 }

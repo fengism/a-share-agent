@@ -240,11 +240,27 @@ async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse
 
 
 async def lookup_error_handler(request: Request, exc: LookupError) -> JSONResponse:
+    # KeyError/IndexError 绝大多数是内部代码缺陷（字段名拼错、列表越界）：
+    # 1) 不回传 str(exc)，避免把内部键名、字典 repr 等细节泄露给客户端；
+    # 2) 映射为 500 而非 404——内部缺陷不应伪装成"资源不存在"误导前端与监控；
+    #    有意为之的"资源不存在"应抛 ResourceNotFoundError（application_error_handler
+    #    会保留其用户可读 message），而不是借道本处理器。
+    error_id, message = build_internal_error(_STATUS_MESSAGES[500])
+    logger.warning(
+        "内部查找失败 error_id=%s: %s %s error_type=%s detail=%r",
+        error_id,
+        request.method,
+        request.url.path,
+        type(exc).__name__,
+        str(exc),
+    )
     return _response(
         request,
-        status_code=404,
-        code="not_found",
-        message=str(exc) or "请求的资源不存在",
+        status_code=500,
+        code="internal_error",
+        message=message,
+        headers={"X-Error-ID": error_id},
+        error_id=error_id,
     )
 
 

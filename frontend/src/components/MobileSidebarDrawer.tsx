@@ -29,6 +29,12 @@ export default function MobileSidebarDrawer({
           display: "flex",
           flexDirection: "column",
           background: themes[themeKey].siderBg,
+          boxShadow: "4px 0 24px rgba(0, 0, 0, 0.35)",
+        },
+        mask: {
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          background: "rgba(0, 0, 0, 0.45)",
         },
         header: { display: "none" },
       }}

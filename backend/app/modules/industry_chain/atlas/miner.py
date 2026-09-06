@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import re
 
 from app.configuration import get_settings
+from app.core.market import is_a_share_code
 from app.financial_data.stock.profile.name_map import get_stock_name_map
 from app.modules.industry_chain.atlas.contracts import AtlasChain
 from app.modules.industry_chain.atlas.loader import (
@@ -23,7 +23,6 @@ from app.modules.industry_chain.models import IndustryChainResult
 
 logger = logging.getLogger(__name__)
 
-_CODE_PATTERN = re.compile(r"^\d{6}$")
 # 低于该规模的分析结果不挖掘，避免低质量条目污染知识库
 _MIN_SEGMENTS = 2
 _MIN_COMPANIES = 3
@@ -43,14 +42,24 @@ def _build_name_to_code(code_to_name: dict[str, str]) -> dict[str, str]:
 
 
 def _resolve_companies(
-    result_node, name_to_code: dict[str, str],
+    result_node, name_to_code: dict[str, str], code_to_name: dict[str, str],
 ) -> list[dict]:
+    """解析节点代表公司；代码与公司名必须能对上名称表，防止幻觉配对污染知识库。"""
     companies: dict[str, dict] = {}
-    code = result_node.code or ""
+    code = str(result_node.code or "").strip()
     company = (result_node.company or "").strip()
-    if company and _CODE_PATTERN.match(code):
+    if company and is_a_share_code(code):
+        if name_to_code.get(company) == code:
+            companies[code] = {
+                "name": company,
+                "code": code,
+                "note": (result_node.role or "")[:40],
+            }
+        # 代码与公司名对不上时丢弃该配对
+    elif not company and is_a_share_code(code) and code in code_to_name:
+        # 仅给出代码时，用名称表反查公司名
         companies[code] = {
-            "name": company,
+            "name": code_to_name[code],
             "code": code,
             "note": (result_node.role or "")[:40],
         }
@@ -81,7 +90,7 @@ async def build_mined_chain(result: IndustryChainResult) -> AtlasChain | None:
     ):
         segments: list[dict] = []
         for node in nodes:
-            companies = _resolve_companies(node, name_to_code)
+            companies = _resolve_companies(node, name_to_code, code_map)
             if not companies:
                 continue
             segment_name = (node.name or node.role or node.company or "").strip()

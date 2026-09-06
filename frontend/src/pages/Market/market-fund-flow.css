@@ -8,6 +8,12 @@
   margin-bottom: 0;
 }
 
+.market-fund-flow__section {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
 .market-fund-flow__metrics .ant-card,
 .market-fund-flow__chart-card.ant-card {
   height: 100%;
@@ -32,7 +38,7 @@
 .market-fund-flow__disclosure-note {
   display: block;
   margin-top: 4px;
-  line-height: 1.6;
+  line-height: var(--c-leading-normal);
 }
 
 .market-fund-flow__chart-card .ant-card-head {
@@ -49,6 +55,11 @@
 
 .market-fund-flow__chart {
   min-width: 0;
+}
+
+.market-fund-flow__history-meta {
+  min-height: 42px;
+  margin-bottom: 8px;
 }
 
 @media (max-width: 575px) {

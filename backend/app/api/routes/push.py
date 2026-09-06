@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from app.api.auth.dependencies import require_active_user
 from app.api.errors import ApiError, BadRequestError, NotFoundError
 from app.core.errors import log_internal_error
+from app.core.exceptions import ResourceNotFoundError
 from app.domain.identity import AuthenticatedUser
 from app.modules.push.public import (
     PushIntegrationNotConfiguredError,
@@ -32,7 +33,7 @@ async def push_content(request: PushRequest, user: AuthenticatedUser = Depends(r
         return await execute_push_request(request, user["id"])
     except ValueError as exc:
         raise BadRequestError(str(exc), code="push.invalid_request") from exc
-    except LookupError as exc:
+    except (LookupError, ResourceNotFoundError) as exc:
         raise NotFoundError(str(exc), code="push.content_not_found") from exc
     except PushIntegrationNotConfiguredError as exc:
         raise BadRequestError(str(exc), code="push.integration_not_configured") from exc

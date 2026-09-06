@@ -42,6 +42,10 @@ describe("Macro page", () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByRole("heading", { name: "宏观经济" })).toBeInTheDocument();
+    expect(screen.getByLabelText("数据覆盖范围")).toHaveTextContent("10 大主题");
+    expect(screen.getByLabelText("数据覆盖范围")).toHaveTextContent("大宗现货 & 海关出海");
+
     fireEvent.click(screen.getByRole("button", { name: /强制刷新/ }));
 
     expect(mocks.refresh).toHaveBeenCalledWith(undefined, expect.objectContaining({

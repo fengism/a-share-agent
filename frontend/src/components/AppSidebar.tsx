@@ -2,7 +2,13 @@ import { lazy, Suspense } from "react";
 import {
   ApartmentOutlined,
   ApiOutlined,
+  AuditOutlined,
+  BulbOutlined,
+  CalendarOutlined,
   ClockCircleOutlined,
+  ControlOutlined,
+  DashboardOutlined,
+  DatabaseOutlined,
   FileSearchOutlined,
   FileTextOutlined,
   RadarChartOutlined,
@@ -17,7 +23,7 @@ import {
   PieChartOutlined,
   ExperimentOutlined,
   SettingOutlined,
-  TwitterOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 import { useColors, useTokens } from "../styles/ui";
 import { themes } from "../theme/themes";
@@ -29,40 +35,53 @@ const MobileSidebarDrawer = lazy(loadMobileSidebarDrawer);
 
 const NAV_GROUPS = [
   {
-    key: "common",
-    label: "常用",
+    key: "market",
+    label: "行情资讯",
+    icon: <DashboardOutlined />,
     items: [
       { key: "/", icon: <HomeOutlined />, label: "首页" },
+      { key: "/watchlist", icon: <StarOutlined />, label: "自选" },
       { key: "/market", icon: <FundOutlined />, label: "市场" },
-      { key: "/chat", icon: <MessageOutlined />, label: "对话" },
       { key: "/feed", icon: <ClockCircleOutlined />, label: "资讯" },
     ],
   },
   {
     key: "research",
-    label: "研究",
+    label: "智能投研",
+    icon: <BulbOutlined />,
     items: [
-      { key: "/analysis", icon: <FileSearchOutlined />, label: "个股研究" },
+      { key: "/chat", icon: <MessageOutlined />, label: "对话" },
+      { key: "/analysis", icon: <FileSearchOutlined />, label: "个股" },
       { key: "/screener", icon: <FilterOutlined />, label: "选股" },
-      { key: "/quant", icon: <ExperimentOutlined />, label: "量化" },
-      { key: "/compare", icon: <LineChartOutlined />, label: "对比" },
-      { key: "/macro", icon: <GlobalOutlined />, label: "宏观" },
+      { key: "/potential", icon: <RadarChartOutlined />, label: "潜力股" },
       { key: "/industry-chain", icon: <ApartmentOutlined />, label: "产业链" },
-      { key: "/twitter", icon: <TwitterOutlined />, label: "Twitter/X" },
+      { key: "/macro", icon: <GlobalOutlined />, label: "宏观" },
+      { key: "/compare", icon: <LineChartOutlined />, label: "对比" },
+      { key: "/quant", icon: <ExperimentOutlined />, label: "量化" },
     ],
   },
   {
-    key: "management",
-    label: "投资管理",
+    key: "trading",
+    label: "交易复盘",
+    icon: <AuditOutlined />,
     items: [
       { key: "/portfolio", icon: <PieChartOutlined />, label: "仓位" },
       { key: "/daily-review", icon: <FileTextOutlined />, label: "复盘" },
-      { key: "/potential", icon: <RadarChartOutlined />, label: "潜力股" },
+      { key: "/trading-calendar", icon: <CalendarOutlined />, label: "交易日历" },
+    ],
+  },
+  {
+    key: "master_data",
+    label: "基础数据",
+    icon: <DatabaseOutlined />,
+    items: [
+      { key: "/master-data", icon: <DatabaseOutlined />, label: "行业与概念" },
     ],
   },
   {
     key: "system",
-    label: "系统",
+    label: "系统设置",
+    icon: <ControlOutlined />,
     items: [
       { key: "/capabilities", icon: <ApiOutlined />, label: "能力" },
       { key: "/settings", icon: <SettingOutlined />, label: "设置" },
@@ -164,7 +183,10 @@ export default function AppSidebar({
             ? NAV_GROUPS.flatMap((group) => group.items).map(renderRoute)
             : NAV_GROUPS.map((group) => (
                 <div className="app-sidebar-nav__group" key={group.key}>
-                  <div className="app-sidebar-nav__group-title">{group.label}</div>
+                  <div className="app-sidebar-nav__group-title">
+                    {group.icon && <span style={{ marginRight: 6, fontSize: 11, opacity: 0.85 }}>{group.icon}</span>}
+                    {group.label}
+                  </div>
                   {group.items.map(renderRoute)}
                 </div>
               ))}

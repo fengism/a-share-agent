@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Table, Tag, Spin, Empty } from "antd";
+import { Table, Tag, Spin, Empty, Tooltip } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import ChangeValue from "../../components/ChangeValue";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import PreloadLink from "../../components/PreloadLink";
+import { buildStockProfileUrl } from "../../utils/stockLinks";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import type { ScreenerFilter, ScreenerItem, ScreenerResult } from "../../types/stock";
 import { useColors } from "../../styles/ui";
@@ -122,9 +123,9 @@ export default function ResultsTable({
           key: "stock",
           width: 132,
           render: (_: unknown, record: ScreenerItem) => (
-            <PreloadLink to={`/analysis/${encodeURIComponent(record.code)}`} style={{ display: "block", color: c.primary }}>
-              <span style={{ display: "block", color: c.textPrimary, fontWeight: 600 }}>{record.name}</span>
-              <span style={{ display: "block", color: c.textMuted, fontSize: 11 }}>
+            <PreloadLink to={buildStockProfileUrl(record.code)} style={{ display: "block", color: c.primary }}>
+              <span style={{ display: "block", color: c.textPrimary, fontWeight: "var(--c-weight-semibold)" }}>{record.name}</span>
+              <span style={{ display: "block", color: c.textMuted, fontSize: "var(--c-font-xs)" }}>
                 {record.code}{record.board || record.exchange ? ` · ${record.board || record.exchange}` : ""}
               </span>
             </PreloadLink>
@@ -182,7 +183,7 @@ export default function ResultsTable({
       dataIndex: "code",
       width: 90,
       render: (code: string) => (
-        <PreloadLink to={`/analysis/${encodeURIComponent(code)}`} style={{ color: c.primary, fontWeight: 500 }}>{code}</PreloadLink>
+        <PreloadLink className="financial-num" to={buildStockProfileUrl(code)} style={{ color: c.primary, fontWeight: "var(--c-weight-medium)" }}>{code}</PreloadLink>
       ),
     },
     {
@@ -205,7 +206,7 @@ export default function ResultsTable({
       align: "right",
       sorter: true,
       sortOrder: filters.sort_by === "price" ? serverSortOrder : null,
-      render: (v: number | null) => v?.toFixed(2) ?? "-",
+      render: (v: number | null) => <span className="financial-num">{v?.toFixed(2) ?? "-"}</span>,
     },
     {
       title: "涨跌幅",
@@ -223,7 +224,7 @@ export default function ResultsTable({
       align: "right",
       sorter: true,
       sortOrder: filters.sort_by === "pe" ? serverSortOrder : null,
-      render: (v: number | null) => v?.toFixed(1) ?? "-",
+      render: (v: number | null) => <span className="financial-num">{v?.toFixed(1) ?? "-"}</span>,
     },
     {
       title: "PB",
@@ -232,7 +233,7 @@ export default function ResultsTable({
       align: "right",
       sorter: true,
       sortOrder: filters.sort_by === "pb" ? serverSortOrder : null,
-      render: (v: number | null) => v?.toFixed(2) ?? "-",
+      render: (v: number | null) => <span className="financial-num">{v?.toFixed(2) ?? "-"}</span>,
     },
     {
       title: "市值(亿)",
@@ -243,8 +244,8 @@ export default function ResultsTable({
       sortOrder: filters.sort_by === "market_cap" ? serverSortOrder : null,
       render: (v: number | null) => {
         if (v == null) return "-";
-        if (v >= 10000) return `${(v / 10000).toFixed(1)}万`;
-        return v.toFixed(1);
+        if (v >= 10000) return <span className="financial-num">{(v / 10000).toFixed(1)}万</span>;
+        return <span className="financial-num">{v.toFixed(1)}</span>;
       },
     },
     {
@@ -254,7 +255,7 @@ export default function ResultsTable({
       align: "right",
       sorter: true,
       sortOrder: filters.sort_by === "turnover_pct" ? serverSortOrder : null,
-      render: (v: number | null) => v != null ? `${v.toFixed(2)}%` : "-",
+      render: (v: number | null) => v != null ? <span className="financial-num">{v.toFixed(2)}%</span> : "-",
     },
     {
       title: "成交量",
@@ -265,9 +266,9 @@ export default function ResultsTable({
       sortOrder: filters.sort_by === "volume" ? serverSortOrder : null,
       render: (v: number | null) => {
         if (v == null) return "-";
-        if (v >= 1e8) return `${(v / 1e8).toFixed(2)}亿`;
-        if (v >= 1e4) return `${(v / 1e4).toFixed(1)}万`;
-        return v.toFixed(0);
+        if (v >= 1e8) return <span className="financial-num">{(v / 1e8).toFixed(2)}亿</span>;
+        if (v >= 1e4) return <span className="financial-num">{(v / 1e4).toFixed(1)}万</span>;
+        return <span className="financial-num">{v.toFixed(0)}</span>;
       },
     },
     {
@@ -275,7 +276,40 @@ export default function ResultsTable({
       dataIndex: "second_industry",
       width: 100,
       ellipsis: true,
-      render: (value: ScreenerItem["second_industry"]) => value?.name || "-",
+      render: (value: ScreenerItem["second_industry"], record: ScreenerItem) => {
+        const fullHierarchy = [
+          record.first_industry?.name,
+          record.second_industry?.name,
+          record.third_industry?.name,
+        ].filter(Boolean).join(" / ");
+        const display = value?.name || record.first_industry?.name || "-";
+        return fullHierarchy ? (
+          <Tooltip title={`申万行业: ${fullHierarchy}`}>
+            <span>{display}</span>
+          </Tooltip>
+        ) : (
+          display
+        );
+      },
+    },
+    {
+      title: "概念题材",
+      dataIndex: "concepts",
+      width: 160,
+      ellipsis: true,
+      render: (concepts: string[] | undefined) => {
+        if (!concepts || concepts.length === 0) return "-";
+        return (
+          <Tooltip title={concepts.join(" · ")}>
+            <span>
+              {concepts.slice(0, 2).map((c) => (
+                <Tag key={c} style={{ marginRight: 4, marginBottom: 2 }}>{c}</Tag>
+              ))}
+              {concepts.length > 2 && <Tag>+{concepts.length - 2}</Tag>}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: "交易所行业",
@@ -349,7 +383,7 @@ export default function ResultsTable({
             const p = percentileMap.get(record.code);
             if (p == null) return <Spin size="small" />;
             const color = p <= 30 ? c.down : p <= 70 ? c.warning : c.up;
-            return <span style={{ color, fontWeight: 500 }}>{p.toFixed(0)}%</span>;
+            return <span style={{ color, fontWeight: "var(--c-weight-medium)" }}>{p.toFixed(0)}%</span>;
           },
         },
         {
@@ -361,7 +395,7 @@ export default function ResultsTable({
             const p = percentileMap.get(record.code + "_pb");
             if (p == null) return <Spin size="small" />;
             const color = p <= 30 ? c.down : p <= 70 ? c.warning : c.up;
-            return <span style={{ color, fontWeight: 500 }}>{p.toFixed(0)}%</span>;
+            return <span style={{ color, fontWeight: "var(--c-weight-medium)" }}>{p.toFixed(0)}%</span>;
           },
         },
       );
@@ -415,7 +449,12 @@ export default function ResultsTable({
           },
           { key: "market", label: "所属市场", value: record.board || record.exchange || "-" },
           { key: "listing-date", label: "上市日期", value: record.listing_date ?? "-" },
-          { key: "sw-industry", label: "申万二级", value: record.second_industry?.name ?? "-" },
+          { key: "sw-industry", label: "申万二级", value: [record.first_industry?.name, record.second_industry?.name, record.third_industry?.name].filter(Boolean).join(" / ") || (record.second_industry?.name ?? record.first_industry?.name ?? "-") },
+          ...(record.concepts && record.concepts.length > 0 ? [{
+            key: "concepts",
+            label: "概念题材",
+            value: record.concepts.slice(0, 4).join(" · ") + (record.concepts.length > 4 ? ` (+${record.concepts.length - 4})` : ""),
+          }] : []),
           { key: "exchange-industry", label: "交易所行业", value: record.exchange_industry ?? "-" },
           ...(strategySignalDates?.size ? [{
             key: "strategy-signal-date",

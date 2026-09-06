@@ -9,6 +9,8 @@ import {
 import { Alert, Button, Card, Empty, message, Skeleton, Space, Typography } from "antd";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  downloadAnalysisPdf,
+  downloadAnalysisPdfFromData,
   ensureFundamentalData,
   useAnalysisHistorySnapshot,
   useAnalysisPageData,
@@ -31,6 +33,7 @@ import { usePdfExport } from "../../hooks/usePdfExport";
 import FinancialDataSections from "../../features/investment-research/FinancialDataSections";
 import { useColors, useStyles, useTokens } from "../../styles/ui";
 import type { FundamentalExportData } from "../../types/stock";
+import { buildStockAnalysisUrl } from "../../utils/stockLinks";
 import "./investment-research.css";
 
 const { Paragraph, Text, Title } = Typography;
@@ -101,7 +104,7 @@ export default function InvestmentResearch() {
     const params = new URLSearchParams();
     if (historyDate) params.set("date", historyDate);
     params.set("panel", "research");
-    navigate(`/analysis/${encodeURIComponent(code)}?${params.toString()}`);
+    navigate(`${buildStockAnalysisUrl(code)}?${params.toString()}`);
   }, [code, historyDate, navigate]);
 
   const openValuation = useCallback(() => {
@@ -109,7 +112,7 @@ export default function InvestmentResearch() {
     const params = new URLSearchParams();
     if (historyDate) params.set("date", historyDate);
     params.set("panel", "valuation");
-    navigate(`/analysis/${encodeURIComponent(code)}?${params.toString()}`);
+    navigate(`${buildStockAnalysisUrl(code)}?${params.toString()}`);
   }, [code, historyDate, navigate]);
 
   const reportDate = normalizeAnalysisDate(displayResult?.analysis_date) || historyDate;
@@ -158,6 +161,24 @@ export default function InvestmentResearch() {
     },
   });
 
+  const handleExportPdf = useCallback(async () => {
+    if (!code) return;
+    const hide = messageApi.loading("正在生成纯矢量投研 PDF 研报...", 0);
+    try {
+      if (displayResult) {
+        await downloadAnalysisPdfFromData(displayResult);
+      } else {
+        await downloadAnalysisPdf(code, reportDate || undefined);
+      }
+      hide();
+      messageApi.success("PDF 研报已生成并开始下载");
+    } catch (backendError) {
+      hide();
+      console.warn("[InvestmentResearch] 后端矢量 PDF 导出受阻，切换至客户端增强模式:", backendError);
+      await exportPdf();
+    }
+  }, [code, displayResult, exportPdf, messageApi, reportDate]);
+
   const historyRail = code ? (
     <AnalysisHistoryRail
       currentCode={code}
@@ -178,7 +199,7 @@ export default function InvestmentResearch() {
         icon={<DownloadOutlined />}
         loading={isExporting}
         disabled={!displayResult || isAnalyzing}
-        onClick={() => void exportPdf()}
+        onClick={() => void handleExportPdf()}
       >
         导出 PDF
       </Button>
@@ -214,7 +235,7 @@ export default function InvestmentResearch() {
                 plan={agentProcess.plan}
                 status={agentProcess.status}
                 toolCalls={agentProcess.toolCalls}
-                isRunning={isAnalyzing && currentStageIndex === 0}
+                isRunning={isAnalyzing}
               />
               {analysisError && !isAnalyzing ? (
                 <Alert

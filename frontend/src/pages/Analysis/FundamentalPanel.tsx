@@ -2,6 +2,7 @@ import { Card, Tag, Typography } from "antd";
 import type { AnalysisResult } from "../../types/stock";
 import AnalysisDimensionSummary from "./AnalysisDimensionSummary";
 import FinancialDataSections from "../../features/investment-research/FinancialDataSections";
+import RevenueBreakdownSection from "../../features/investment-research/RevenueBreakdownSection";
 import { useColors, useStyles, semanticTagStyle } from "../../theme/hooks";
 import type { SemanticTagColor } from "../../theme/hooks";
 import type { FundamentalExportData } from "../../types/stock";
@@ -68,7 +69,11 @@ export default function FundamentalPanel({
         </Card>
       )}
 
-      <FinancialDataSections code={code} isExportingPdf={isExportingPdf} exportData={exportData} />
+      {isExportingPdf ? (
+        <FinancialDataSections code={code} isExportingPdf exportData={exportData} />
+      ) : (
+        <RevenueBreakdownSection code={code} />
+      )}
     </div>
   );
 }

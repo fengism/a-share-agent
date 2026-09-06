@@ -184,7 +184,14 @@ def _register_structured_screening_tools() -> None:
                     "items": {"type": "string", "minLength": 1, "maxLength": 50},
                     "maxItems": 20,
                     "uniqueItems": True,
-                    "description": "行业列表",
+                    "description": "行业列表（支持申万一级、二级、三级行业名称）",
+                },
+                "concepts": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1, "maxLength": 50},
+                    "maxItems": 20,
+                    "uniqueItems": True,
+                    "description": "概念题材列表（支持按个股概念库筛选，如'高股息精选'、'人工智能'等）",
                 },
                 "sort_by": {
                     "type": "string",
@@ -279,6 +286,47 @@ def _register_risk_tool() -> None:
         policy=_HIGH_COST_POLICY,
         executor=helpers.get_stock_risk_data,
     ))
+
+    registry.register_tool(Tool(
+        name="get_restricted_shares_lift",
+        description="获取个股未来与历史限售股解禁日历、解禁类型（首发原股东/定向增发机构配售/股权激励）、解禁股数、市值及占流通盘比例，测算大股东与机构减持抛压风险。个股排雷与风险分析时调用。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+            },
+            "required": ["code"],
+        },
+        policy=_DAILY_POLICY,
+        executor=helpers.get_restricted_shares_lift,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_interactive_qa",
+        description="获取上市公司在深交所互动易、上交所 e 互动官方平台上董秘对投资者提问的权威法定答复。支持按业务关键词（如'特斯拉''华为''机器人''算力''订单'）检索，用于官方实锤订单合作、量产进展与辟谣求证。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+                "keyword": {
+                    "type": "string",
+                    "description": "业务或题材搜索关键词，如'特斯拉'、'华为'、'机器人'、'订单'、'出海'；省略则返回最新问答",
+                    "default": "",
+                },
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "default": 15,
+                    "description": "返回条数，默认15",
+                },
+            },
+            "required": ["code"],
+        },
+        policy=_MEDIUM_QUERY_POLICY,
+        executor=helpers.get_interactive_qa,
+    ))
+
 
 def _register_macro_query_tool() -> None:
     registry.register_tool(Tool(

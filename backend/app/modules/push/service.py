@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.configuration import get_effective_settings
+from app.core.exceptions import ResourceNotFoundError
 from app.domain.content import ContentBlock
 from app.infrastructure.integrations.feishu.adapter import to_feishu_card, to_feishu_doc_blocks
 from app.infrastructure.integrations.feishu.client import feishu_client
@@ -65,7 +66,7 @@ def _resolve_content(request: PushRequest, user_id: int) -> ResolvedPushContent:
     if request.type == "daily_review":
         data = load_daily_review(request.date, user_id)
         if data is None:
-            raise LookupError("暂无复盘记录，请先生成")
+            raise ResourceNotFoundError("暂无复盘记录，请先生成")
         return ResolvedPushContent(
             title=f"每日复盘 - {data.date}",
             content=build_content("daily_review", data),
@@ -80,7 +81,7 @@ def _resolve_content(request: PushRequest, user_id: int) -> ResolvedPushContent:
             else get_latest_analysis(request.code, user_id, cache_ttl=cache_ttl)
         )
         if data is None:
-            raise LookupError("暂无分析结果，请先生成")
+            raise ResourceNotFoundError("暂无分析结果，请先生成")
         return ResolvedPushContent(
             title=f"个股研究 - {data.stock_code} - {data.stock_name} - {data.analysis_date}",
             content=build_content("analysis", data),

@@ -1,48 +1,60 @@
 slug: pharma-cxo
-name: 医药 CXO
-category: 医药
-summary: 服务创新药研发生产外包的 CRO/CDMO 产业链，从试剂耗材到研发服务再到创新药与器械。
-aliases: [CXO, 医药外包]
-tags: [创新药, 外包, 医药]
+name: 创新药与 CXO
+category: 生物医药与生命科学
+summary: 覆盖上游生物试剂/耗材/填料、中游药物发现/临床前安评/临床试验 (CRO) 与工艺生产外包 (CDMO)、下游自研创新药龙头及高端医学诊疗装备的医药研发全链条。
+aliases: [CXO, 创新药, 医药研发外包, 生物医药, CRO, CDMO]
+tags: [创新药, 外包, 医药, 医疗器械, 生物制药, 多肽, ADC]
 drivers:
-  - 创新药投融资景气度
-  - 海外订单与产能转移
-  - 多肽/ADC 等新分子类型
+  - 全球生物医药投融资景气度与重磅药物出海授权 (License-out)
+  - 多肽 GLP-1 靶点减重降糖药与 ADC 抗体偶联药物爆发
+  - 临床前与临床 CRO/CDMO 降本增效与一站式赋能
+  - 医保目录常态化动态调整对高临床价值创新药支持
 layers:
   - key: upstream
-    name: 上游 · 试剂与耗材
+    name: 上游 · 分子砌块、科研试剂与生物耗材填料
     segments:
-      - name: 分子砌块与工具试剂
+      - name: 药物分子砌块与科研工具试剂
+        description: 用于先导化合物合成与高通量筛选的基础化学小分子砌块及生物化学试剂
         companies:
-          - { name: 药石科技, code: "300725", note: 分子砌块 }
-          - { name: 阿拉丁, code: "688179", note: 科研试剂 }
-      - name: 填料与培养基
+          - { name: 药石科技, code: "300725", note: 新药研发分子砌块与绿色化学 CDMO }
+          - { name: 毕得医药, code: "688073", note: 药物研发分子砌块品类齐全平台 }
+          - { name: 阿拉丁, code: "688179", note: 高端科研化学与生物试剂自主品牌龙头 }
+      - name: 色谱填料与生物制药培养基
+        description: 生物药分离纯化关键微球填料、无血清细胞培养基及制药装备
         companies:
-          - { name: 纳微科技, code: "688690", note: 色谱填料 }
-          - { name: 奥浦迈, code: "688293", note: 培养基 }
+          - { name: 纳微科技, code: "688690", note: 单分散纳米微球与色谱层析填料突破海外垄断 }
+          - { name: 奥浦迈, code: "688293", note: 无血清细胞培养基与抗体 CDMO 一体化 }
+          - { name: 东富龙, code: "300171", note: 冻干系统与生物制药前沿工艺设备平台 }
   - key: midstream
-    name: 中游 · CRO 与 CDMO
+    name: 中游 · 药物研发 CRO 与定制生产 CDMO
     segments:
-      - name: CRO 研发服务
+      - name: 综合型研发与临床评价 CRO
+        description: 涵盖靶点发现、先导化合物优化、药物安全性评价 (GLP) 及临床 I~IV 期试验
         companies:
-          - { name: 药明康德, code: "603259", note: 综合性 CXO 龙头 }
-          - { name: 泰格医药, code: "300347", note: 临床 CRO }
-          - { name: 昭衍新药, code: "603127", note: 安评 }
-          - { name: 美迪西, code: "688202", note: 一站式 CRO }
-      - name: CDMO 生产服务
+          - { name: 药明康德, code: "603259", note: 全球前列的端到端一体化小分子/生物药研发服务巨头 }
+          - { name: 康龙化成, code: "300759", note: 全流程医药研发 CRO+CDMO 国际化平台 }
+          - { name: 泰格医药, code: "300347", note: 国内临床试验 CRO 绝对领军企业 }
+          - { name: 昭衍新药, code: "603127", note: 国内临床前药物安全性评价 (GLP) 龙头 }
+      - name: 工艺开发与商业化生产 CDMO
+        description: 小分子原料药、多肽原料药、抗体与 ADC 偶联药物的商业化放大生产
         companies:
-          - { name: 凯莱英, code: "002821", note: 小分子 CDMO }
-          - { name: 博腾股份, code: "300363", note: API CDMO }
-          - { name: 九洲药业, code: "603456", note: CDMO+特色原料药 }
+          - { name: 凯莱英, code: "002821", note: 全球小分子商业化 CDMO 龙头，发力多肽与寡核苷酸 }
+          - { name: 诺泰生物, code: "688076", note: 专注于多肽药物与高级医药中间体快速放量 }
+          - { name: 博腾股份, code: "300363", note: 原料药 CDMO 与基因细胞治疗一站式服务 }
+          - { name: 九洲药业, code: "603456", note: 特色原料药与专利药 CDMO 双轮驱动 }
   - key: downstream
-    name: 下游 · 创新药与器械
+    name: 下游 · 创新药自主研发与高端医疗器械
     segments:
-      - name: 创新药
+      - name: 肿瘤、自免与代谢类创新药自主研发
+        description: 具备自主靶点发现、全球多中心临床与商业化销售能力的创新药企
         companies:
-          - { name: 恒瑞医药, code: "600276", note: 创新药龙头 }
-          - { name: 百济神州, code: "688235", note: 全球化 Biotech }
-          - { name: 荣昌生物, code: "688331", note: ADC 与融合蛋白 }
-      - name: 医疗器械
+          - { name: 恒瑞医药, code: "600276", note: 国内创新药领头羊，多款重磅创新管线与国际出海 }
+          - { name: 百济神州, code: "688235", note: 全球化商业 Biotech 巨头，BTK 抑制剂国际热销 }
+          - { name: 百利天恒, code: "688506", note: 拥有全球重磅双抗 ADC 创新管线与海外大额授权 }
+          - { name: 荣昌生物, code: "688331", note: 专注于 ADC 与自免双靶点融合蛋白原创新药 }
+      - name: 高端医学影像与微创诊疗器械
+        description: 医疗影像诊断 (CT/MR/PET-CT)、手术机器人、生命信息与电生理耗材
         companies:
-          - { name: 迈瑞医疗, code: "300760", note: 器械平台龙头 }
-          - { name: 联影医疗, code: "688271", note: 医学影像 }
+          - { name: 迈瑞医疗, code: "300760", note: 医疗器械绝对龙头，生命信息/体外诊断/医学影像 }
+          - { name: 联影医疗, code: "688271", note: 高端医学影像与放疗设备自主研发领军者 }
+          - { name: 惠泰医疗, code: "688617", note: 电生理与血管介入微创医疗器械高成长龙头 }

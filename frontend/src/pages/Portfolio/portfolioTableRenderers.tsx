@@ -19,8 +19,8 @@ export function usePortfolioTableRenderers() {
       style={{ display: "inline-block", textAlign: "left" }}
     >
       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-        <span style={{ color: colors.textPrimary, fontWeight: 600 }}>{name || code}</span>
-        <span style={{ color: colors.textMuted, fontSize: 12 }}>{code}</span>
+        <span style={{ color: colors.textPrimary, fontWeight: "var(--c-weight-semibold)" }}>{name || code}</span>
+        <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>{code}</span>
       </span>
     </StockExternalLink>
   ), [colors]);
@@ -31,10 +31,10 @@ export function usePortfolioTableRenderers() {
     if (amount == null) return <Text style={{ color: colors.textMuted }}>待获取行情</Text>;
     return (
       <div style={{ whiteSpace: "nowrap" }}>
-        <div style={{ color: changeColor(amount, colors), fontWeight: 600 }}>
+        <div style={{ color: changeColor(amount, colors), fontWeight: "var(--c-weight-semibold)" }}>
           {formatMoney(amount)}
         </div>
-        {percent === undefined ? null : <ChangeValue value={percent} style={{ fontSize: 12 }} />}
+        {percent === undefined ? null : <ChangeValue value={percent} style={{ fontSize: "var(--c-font-sm)" }} />}
       </div>
     );
   }, [colors]);

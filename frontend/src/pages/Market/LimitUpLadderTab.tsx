@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { Button, Card, Col, DatePicker, Row, Segmented, Space, Statistic, Table, Tag, Typography } from "antd";
-import { FireOutlined, ReloadOutlined } from "@ant-design/icons";
+import { FireOutlined, ReloadOutlined, ThunderboltOutlined, TrophyOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { useMarketLimitUpLadder } from "../../api/queries";
@@ -21,6 +21,26 @@ function formatFetchedAt(value: string | undefined) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function getLadderTagStyle(boardCount: number, colors: ReturnType<typeof useColors>) {
+  if (boardCount >= 5) {
+    return {
+      background: "linear-gradient(135deg, rgba(200, 52, 31, 0.15), rgba(247, 144, 9, 0.15))",
+      color: colors.down,
+      borderColor: colors.down,
+      fontWeight: 700,
+    };
+  }
+  if (boardCount >= 3) {
+    return {
+      background: "rgba(200, 52, 31, 0.1)",
+      color: colors.up,
+      borderColor: colors.up,
+      fontWeight: 600,
+    };
+  }
+  return semanticTagStyle("up");
 }
 
 function LimitUpLadderContent() {
@@ -52,8 +72,8 @@ function LimitUpLadderContent() {
       render: (_value: unknown, stock: MarketLimitUpLadderStock) => (
         <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
           <Space orientation="vertical" size={0}>
-            <Text strong>{stock.name}</Text>
-            <Text type="secondary" style={{ fontSize: 12 }}>{stock.code}</Text>
+            <Text strong style={{ fontSize: t.font.md }}>{stock.name}</Text>
+            <Text type="secondary" style={{ fontSize: t.font.xs, fontFamily: "monospace" }}>{stock.code}</Text>
           </Space>
         </StockExternalLink>
       ),
@@ -61,28 +81,36 @@ function LimitUpLadderContent() {
     {
       title: "连板高度",
       dataIndex: "board_count",
-      width: 100,
+      width: 110,
       align: "center",
       defaultSortOrder: "descend",
       sorter: (left, right) => left.board_count - right.board_count,
-      render: (value: number) => <Tag style={semanticTagStyle("up")}>{value}连板</Tag>,
+      render: (value: number) => (
+        <Tag style={getLadderTagStyle(value, colors)}>
+          {value}连板
+        </Tag>
+      ),
     },
     {
       title: "涨停时间",
       dataIndex: "limit_up_time",
       width: 100,
       align: "center",
-      render: (value: string) => value || "-",
+      render: (value: string) => <span style={{ fontFamily: "monospace" }}>{value || "-"}</span>,
     },
     {
       title: "所属板块",
       dataIndex: "sector_name",
-      width: 130,
+      width: 150,
       ellipsis: true,
       render: (value: string, stock) => (
-        <Space size={4}>
-          <span>{value || "其他"}</span>
-          {stock.sector_limit_up_count > 0 ? <Tag>{stock.sector_limit_up_count}只</Tag> : null}
+        <Space size={6}>
+          <span style={{ fontWeight: Number(t.weight.medium) }}>{value || "其他"}</span>
+          {stock.sector_limit_up_count > 0 ? (
+            <Tag style={{ borderRadius: 10, padding: "0 6px", fontSize: t.font.xs }}>
+              {stock.sector_limit_up_count}只
+            </Tag>
+          ) : null}
         </Space>
       ),
     },
@@ -94,7 +122,7 @@ function LimitUpLadderContent() {
         <Space size={[4, 4]} wrap>
           {stock.one_word ? <Tag style={semanticTagStyle("warning")}>大单一字</Tag> : null}
           {stock.popular ? <Tag style={semanticTagStyle("primary")}>人气股</Tag> : null}
-          {!stock.one_word && !stock.popular ? "-" : null}
+          {!stock.one_word && !stock.popular ? <span style={{ color: colors.textMuted }}>-</span> : null}
         </Space>
       ),
     },
@@ -103,9 +131,13 @@ function LimitUpLadderContent() {
       dataIndex: "amount",
       width: 110,
       align: "right",
-      render: (value: number) => formatAmount(value),
+      render: (value: number) => (
+        <span style={{ fontFamily: "monospace", fontWeight: Number(t.weight.medium) }}>
+          {formatAmount(value)}
+        </span>
+      ),
     },
-  ], []);
+  ], [colors, t]);
 
   return (
     <SectionDataState
@@ -121,7 +153,9 @@ function LimitUpLadderContent() {
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: t.space[4], marginBottom: t.space[4], flexWrap: "wrap" }}>
           <Space size={parseFloat(t.space[3])} wrap>
-            <Title level={4} style={{ margin: 0 }}><FireOutlined style={{ color: colors.up }} /> 涨停板</Title>
+            <Title level={4} style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <FireOutlined style={{ color: colors.up }} /> 涨停板
+            </Title>
             <Text type="secondary">数据日期：{query.data?.date || dateText}</Text>
             <Text type="secondary">更新时间：{formatFetchedAt(query.data?.fetched_at)}</Text>
             <RefreshBadge />
@@ -142,44 +176,85 @@ function LimitUpLadderContent() {
 
         <Row gutter={[16, 16]} style={{ marginBottom: t.space[4] }}>
           <Col xs={12} lg={6}>
-            <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
-              <Statistic title="涨停家数" value={query.data?.total ?? stocks.length} suffix="家" styles={{ content: { color: colors.up } }} />
+            <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, boxShadow: t.shadow.xs, borderLeft: `3px solid ${colors.up}` }}>
+              <Statistic
+                title={<span style={{ fontSize: t.font.sm, color: colors.textSecondary }}><FireOutlined /> 涨停家数</span>}
+                value={query.data?.total ?? stocks.length}
+                suffix="家"
+                styles={{ content: { color: colors.up, fontWeight: Number(t.weight.bold) } }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} lg={6}>
+            <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, boxShadow: t.shadow.xs, borderLeft: `3px solid ${colors.accent}` }}>
+              <Statistic
+                title={<span style={{ fontSize: t.font.sm, color: colors.textSecondary }}><TrophyOutlined /> 最高连板</span>}
+                value={maxBoardCount}
+                suffix="板"
+                styles={{ content: { color: colors.up, fontWeight: Number(t.weight.bold) } }}
+              />
             </Card>
           </Col>
           <Col xs={12} lg={6}>
             <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
-              <Statistic title="最高连板" value={maxBoardCount} suffix="板" styles={{ content: { color: colors.up } }} />
+              <Statistic
+                title={<span style={{ fontSize: t.font.sm, color: colors.textSecondary }}><ThunderboltOutlined /> 大单一字</span>}
+                value={oneWordCount}
+                suffix="家"
+                styles={{ content: { color: colors.warning, fontWeight: Number(t.weight.bold) } }}
+              />
             </Card>
           </Col>
           <Col xs={12} lg={6}>
             <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
-              <Statistic title="大单一字" value={oneWordCount} suffix="家" />
-            </Card>
-          </Col>
-          <Col xs={12} lg={6}>
-            <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
-              <Statistic title="人气股" value={popularCount} suffix="家" />
+              <Statistic
+                title={<span style={{ fontSize: t.font.sm, color: colors.textSecondary }}>人气股</span>}
+                value={popularCount}
+                suffix="家"
+                styles={{ content: { color: colors.primary, fontWeight: Number(t.weight.bold) } }}
+              />
             </Card>
           </Col>
         </Row>
 
-        <Card title="板块涨停分布" style={{ marginBottom: t.space[4], borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+        <Card
+          title={<span style={{ fontWeight: Number(t.weight.semibold) }}>板块涨停分布</span>}
+          style={{ marginBottom: t.space[4], borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
+        >
           <Row gutter={[12, 12]}>
-            {sectors.map((sector) => (
+            {sectors.map((sector, index) => (
               <Col xs={12} md={8} xl={6} key={`${sector.sector_code}-${sector.sector_name}`}>
-                <Card size="small" style={{ height: "100%", borderRadius: t.radius.md, background: colors.nestedBg, boxShadow: t.shadow.xs }}>
-                  <Space orientation="vertical" size={4}>
-                    <Text strong>{sector.sector_name}</Text>
-                    <Text style={{ color: colors.up }}>{sector.stock_count} 家涨停</Text>
-                    <Text type="secondary">成交额 {formatAmount(sector.amount)}</Text>
-                  </Space>
+                <Card
+                  size="small"
+                  style={{
+                    height: "100%",
+                    borderRadius: t.radius.md,
+                    background: colors.nestedBg,
+                    border: `1px solid ${colors.border}`,
+                    boxShadow: t.shadow.xs,
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                    <Text strong style={{ fontSize: t.font.md }}>{sector.sector_name}</Text>
+                    <Tag style={{ borderRadius: 10, margin: 0, padding: "0 6px", fontSize: t.font.xs }}>
+                      TOP {index + 1}
+                    </Tag>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={{ color: colors.up, fontWeight: Number(t.weight.bold) }}>{sector.stock_count} 家涨停</Text>
+                    <Text type="secondary" style={{ fontSize: t.font.xs }}>{formatAmount(sector.amount)}</Text>
+                  </div>
                 </Card>
               </Col>
             ))}
           </Row>
         </Card>
 
-        <Card title="涨停天梯" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+        <Card
+          title={<span style={{ fontWeight: Number(t.weight.semibold) }}>涨停天梯</span>}
+          style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
+        >
           <Table<MarketLimitUpLadderStock>
             rowKey="code"
             columns={columns}

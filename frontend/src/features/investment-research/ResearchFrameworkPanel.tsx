@@ -12,6 +12,7 @@ import type {
   ScenarioName,
 } from "../../types/stock";
 import { semanticTagStyle } from "../../theme/hooks";
+import type { SemanticTagColor } from "../../theme/hooks";
 import "./stock-research-typography.css";
 import "./research-framework.css";
 
@@ -67,12 +68,27 @@ const NEW_INVESTOR_LABELS: Record<InvestorActionPlan["new_investor_action"], str
   insufficient_evidence: "证据不足",
 };
 
+const NEW_INVESTOR_TONES: Record<InvestorActionPlan["new_investor_action"], SemanticTagColor> = {
+  buy: "up",
+  watch: "info",
+  avoid: "down",
+  insufficient_evidence: "warning",
+};
+
 const HOLDER_LABELS: Record<InvestorActionPlan["holder_action"], string> = {
   hold: "继续持有并跟踪",
   add: "满足条件后考虑增持",
   reduce: "考虑降低仓位",
   exit: "考虑退出",
   insufficient_evidence: "证据不足",
+};
+
+const HOLDER_TONES: Record<InvestorActionPlan["holder_action"], SemanticTagColor> = {
+  hold: "info",
+  add: "up",
+  reduce: "warning",
+  exit: "down",
+  insufficient_evidence: "warning",
 };
 
 function formatConfidence(value: number | null) {
@@ -169,14 +185,28 @@ function NamedNarrative({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ActionColumn({ title, action, items }: { title: string; action: string; items: Array<{ label: string; values: string[] }> }) {
+function ActionColumn({
+  title,
+  action,
+  actionTone,
+  items,
+}: {
+  title: string;
+  action: string;
+  actionTone: SemanticTagColor;
+  items: Array<{ label: string; values: string[] }>;
+}) {
   return (
     <article className="research-action-column">
-      <span>{title}</span>
-      <strong>{action}</strong>
+      <header className="research-action-column__header">
+        <span className="research-action-column__title">{title}</span>
+        <Tag style={{ ...semanticTagStyle(actionTone), margin: 0, fontWeight: "var(--c-weight-semibold)" }}>
+          {action}
+        </Tag>
+      </header>
       {items.map(({ label, values }) => (
-        <div key={label}>
-          <small>{label}</small>
+        <div key={label} className="research-action-column__triggers">
+          <h5>{label}</h5>
           <TextList items={values} />
         </div>
       ))}
@@ -425,29 +455,62 @@ export default function ResearchFrameworkPanel({
         </div>
         <div className="research-list-columns">
           <div><h5>共同假设</h5><TextList items={research.valuation.assumptions} /></div>
-          <div><h5>安全边际</h5><Paragraph>{research.valuation.margin_of_safety || "证据不足，未形成安全边际判断"}</Paragraph></div>
+          <div>
+            <h5>安全边际</h5>
+            <p className="research-list-columns__text">
+              {research.valuation.margin_of_safety || "证据不足，未形成安全边际判断"}
+            </p>
+          </div>
           <div><h5>估值限制</h5><TextList items={research.valuation.limitations} /></div>
         </div>
       </ResearchSection>
 
-      <ResearchSection id="research-decision" eyebrow="06" title="行动与持续跟踪" compact={compact} summary={research.actions.rationale || "暂不形成行动结论"}>
-        <Paragraph className="research-section__conclusion">{research.actions.rationale || "证据不足，暂不形成行动结论"}</Paragraph>
-        {research.actions.buy_or_add_range ? <Text>关注区间：{formatRange(research.actions.buy_or_add_range)}</Text> : null}
+      <ResearchSection
+        id="research-decision"
+        eyebrow="06"
+        title="行动与持续跟踪"
+        compact={compact}
+        summary={research.actions.rationale || "暂不形成行动结论"}
+      >
+        <div className="research-decision-hero">
+          <div className="research-decision-hero__body">
+            <span className="research-decision-hero__label">行动研判总述</span>
+            <p className="research-decision-hero__text">
+              {research.actions.rationale || "证据不足，暂不形成行动结论"}
+            </p>
+          </div>
+          {research.actions.buy_or_add_range && (
+            <div className="research-decision-hero__range">
+              <span>建议关注 / 加仓区间</span>
+              <strong>{formatRange(research.actions.buy_or_add_range)}</strong>
+            </div>
+          )}
+        </div>
+
         <div className="research-action-grid">
           <ActionColumn
             title="新投资者"
             action={NEW_INVESTOR_LABELS[research.actions.new_investor_action]}
-            items={[{ label: "买入/关注触发", values: research.actions.add_triggers }]}
+            actionTone={NEW_INVESTOR_TONES[research.actions.new_investor_action]}
+            items={[{ label: "买入 / 关注触发条件", values: research.actions.add_triggers }]}
           />
           <ActionColumn
             title="已持有者"
             action={HOLDER_LABELS[research.actions.holder_action]}
-            items={[{ label: "减持/卖出触发", values: research.actions.sell_triggers }]}
+            actionTone={HOLDER_TONES[research.actions.holder_action]}
+            items={[{ label: "减持 / 退出触发条件", values: research.actions.sell_triggers }]}
           />
         </div>
-        <div className="research-list-columns">
-          <div><h5>核心逻辑失效条件</h5><TextList items={research.actions.thesis_breakers} /></div>
-          <div><h5>持续跟踪指标</h5><TextList items={research.actions.monitoring_metrics} /></div>
+
+        <div className="research-two-column research-decision-tracking">
+          <div className="research-decision-tracking-card research-decision-tracking-card--breakers">
+            <h5>核心逻辑失效条件</h5>
+            <TextList items={research.actions.thesis_breakers} empty="暂无明确失效条件" />
+          </div>
+          <div className="research-decision-tracking-card research-decision-tracking-card--metrics">
+            <h5>持续跟踪指标</h5>
+            <TextList items={research.actions.monitoring_metrics} empty="暂无明确跟踪指标" />
+          </div>
         </div>
       </ResearchSection>
 

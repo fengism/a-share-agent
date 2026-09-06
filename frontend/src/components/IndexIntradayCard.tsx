@@ -1,4 +1,6 @@
-import { Card, Typography } from "antd";
+import { useState } from "react";
+import { Button, Card, Modal } from "antd";
+import { FullscreenOutlined } from "@ant-design/icons";
 import { useMarketIndexIntraday } from "../api/queries";
 import IntradayChart from "../charts/IntradayChart";
 import ChangeValue from "./ChangeValue";
@@ -6,8 +8,6 @@ import SectionDataState from "./SectionDataState";
 import { useColors, useTokens } from "../styles/ui";
 import { deriveIndexPrevClose } from "../utils/indexIntraday";
 import "./index-intraday-card.css";
-
-const { Text } = Typography;
 
 interface Props {
   symbol: string;
@@ -24,16 +24,16 @@ export default function IndexIntradayCard({
   price,
   changePct,
   preClose,
-  height = 360,
+  height = 420,
 }: Props) {
   const c = useColors();
   const t = useTokens();
+  const [expanded, setExpanded] = useState(false);
   const query = useMarketIndexIntraday(symbol);
   const items = query.data?.items ?? [];
   const hasData = items.length > 0;
   const latestItem = items.length > 0 ? items[items.length - 1] : undefined;
   const displayPrice = latestItem?.price ?? price;
-  const latestMinute = latestItem?.time?.slice(0, 5);
   const referenceClose = query.data?.prev_close
     ?? preClose
     ?? deriveIndexPrevClose(price, changePct);
@@ -42,22 +42,35 @@ export default function IndexIntradayCard({
     <Card
       size="small"
       className="index-intraday-card"
-      title={<span style={{ fontWeight: Number(t.weight.semibold) }}>{name || symbol} 分时</span>}
-      extra={<Text type="secondary">{query.data?.source === "sina_direct" ? "新浪财经" : "实时分钟线"}</Text>}
-      style={{ borderRadius: t.radius.md, border: `1px solid ${c.border}`, boxShadow: t.shadow.xs }}
+      title={
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontWeight: Number(t.weight.semibold) }}>{name || symbol} 分时</span>
+          {displayPrice != null && (
+            <span style={{
+              fontFamily: "var(--c-font-mono)",
+              fontSize: t.font.sm,
+              fontWeight: Number(t.weight.bold),
+              color: changePct == null || changePct === 0 ? c.textPrimary : changePct > 0 ? c.up : c.down,
+            }}>
+              {displayPrice.toFixed(2)}
+            </span>
+          )}
+          <ChangeValue value={changePct ?? null} showIcon />
+        </div>
+      }
+      extra={
+        <Button
+          type="text"
+          size="small"
+          icon={<FullscreenOutlined />}
+          aria-label="放大分时图"
+          onClick={() => setExpanded(true)}
+          style={{ color: c.textSecondary }}
+        />
+      }
+      style={{ borderRadius: t.radius.md, border: `1px solid ${c.border}`, boxShadow: t.shadow.xs, height: "100%" }}
+      styles={{ body: { padding: "12px 14px" } }}
     >
-      <div className="index-intraday-summary">
-        <div className="index-intraday-summary__quote">
-          <strong>{displayPrice?.toFixed(2) ?? "-"}</strong>
-          <ChangeValue value={changePct ?? null} />
-          <span>{latestMinute ? `更新 ${latestMinute}` : "等待分钟数据"}</span>
-        </div>
-        <div className="index-intraday-summary__legend" aria-label="分时图图例">
-          <span className="is-price">价格</span>
-          <span className="is-average">均价</span>
-          <span className="is-volume">成交量</span>
-        </div>
-      </div>
       <SectionDataState
         isLoading={query.isLoading && !hasData}
         error={hasData ? undefined : query.error}
@@ -75,6 +88,40 @@ export default function IndexIntradayCard({
           viewKey={`index:${symbol}`}
         />
       </SectionDataState>
+
+      <Modal
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontWeight: Number(t.weight.semibold) }}>{name || symbol} 当日分时图（大图模式）</span>
+            {displayPrice != null && (
+              <span style={{
+                fontFamily: "var(--c-font-mono)",
+                fontSize: t.font.base,
+                fontWeight: Number(t.weight.bold),
+                color: changePct == null || changePct === 0 ? c.textPrimary : changePct > 0 ? c.up : c.down,
+              }}>
+                {displayPrice.toFixed(2)}
+              </span>
+            )}
+            <ChangeValue value={changePct ?? null} showIcon />
+          </div>
+        }
+        open={expanded}
+        onCancel={() => setExpanded(false)}
+        footer={null}
+        width="min(1280px, 94vw)"
+        style={{ top: 24 }}
+        destroyOnHidden
+      >
+        <div style={{ padding: "8px 0" }}>
+          <IntradayChart
+            data={items}
+            prevClose={referenceClose}
+            height={560}
+            viewKey={`index-modal:${symbol}`}
+          />
+        </div>
+      </Modal>
     </Card>
   );
 }

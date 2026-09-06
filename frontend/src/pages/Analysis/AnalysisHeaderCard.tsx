@@ -9,7 +9,7 @@ import {
   StopOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Button, Typography } from "antd";
+import { Button, Tag, Tooltip, Typography } from "antd";
 import PushModal from "../../components/PushModal";
 import { useColors, useStyles } from "../../theme/hooks";
 import type { AnalysisPageData, AnalysisResult, IntradayData, PushRequest } from "../../types/stock";
@@ -34,7 +34,7 @@ function StockMetric({
       style={{ "--analysis-metric-color": color } as CSSProperties}
     >
       <span>{label}</span>
-      <strong>{value}</strong>
+      <strong className="financial-num">{value}</strong>
     </div>
   );
 }
@@ -167,16 +167,27 @@ export default function AnalysisHeaderCard({
             {info?.exchange_industry && (
               <span>交易所行业 · {info.exchange_industry}</span>
             )}
-            {info?.first_industry && (
-              <span>{info.first_industry.name}</span>
-            )}
-            {info?.second_industry && (
-              <span>{info.second_industry.name}</span>
+            {(info?.first_industry || info?.second_industry || info?.third_industry) && (
+              <span>
+                申万行业 · {[info.first_industry?.name, info.second_industry?.name, info.third_industry?.name].filter(Boolean).join(" / ")}
+              </span>
             )}
             {info?.listing_date && (
               <span>上市日期 {info.listing_date}</span>
             )}
           </div>
+          {info?.concepts && info.concepts.length > 0 && (
+            <div className="analysis-header-card__concepts" style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {info.concepts.slice(0, 6).map((c) => (
+                <Tag key={c.code || c.name} style={{ margin: 0, fontSize: "var(--c-font-xs)" }}>{c.name}</Tag>
+              ))}
+              {info.concepts.length > 6 && (
+                <Tooltip title={info.concepts.slice(6).map((c) => c.name).join(" · ")}>
+                  <Tag style={{ margin: 0, fontSize: "var(--c-font-xs)", cursor: "pointer" }}>+{info.concepts.length - 6}</Tag>
+                </Tooltip>
+              )}
+            </div>
+          )}
         </div>
         <div className="analysis-header-card__actions pdf-hide">
           <Button

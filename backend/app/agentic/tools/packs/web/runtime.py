@@ -44,6 +44,21 @@ async def _fetch_urls(urls: list[str], mode: fetcher.FetchMode = "auto"):
     return await fetcher.fetch_urls(urls, mode=mode, fetch_one=_fetch_url)
 
 
+async def _read_pdf(
+    url: str,
+    start_page: int = 1,
+    max_pages: int = 20,
+    extract_tables: bool = True,
+):
+    return await pdf.execute_read_pdf(
+        url,
+        start_page=start_page,
+        max_pages=max_pages,
+        extract_tables=extract_tables,
+        http_get_func=_http_get_with_retry,
+    )
+
+
 async def _execute_web_search(
     query: str,
     engine: search.SearchEngineName = search.DEFAULT_SEARCH_ENGINE,
@@ -71,6 +86,7 @@ def register_web_tools() -> None:
         _fetch_url,
         _fetch_urls,
         _execute_web_search,
+        read_pdf_executor=_read_pdf,
         target_registry=registry,
         fetch_policy=_WEB_FETCH_POLICY,
         batch_policy=_WEB_BATCH_POLICY,

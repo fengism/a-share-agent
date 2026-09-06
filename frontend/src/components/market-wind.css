@@ -35,7 +35,7 @@
   margin-bottom: 10px;
   color: var(--c-primary);
   font-size: var(--c-font-md);
-  font-weight: 700;
+  font-weight: var(--c-weight-bold);
   letter-spacing: 0.04em;
 }
 
@@ -43,7 +43,7 @@
   margin: 0 0 8px;
   color: var(--c-text-primary);
   font-size: var(--c-font-2xl);
-  line-height: 1.2;
+  line-height: var(--c-leading-tight);
 }
 
 .wind-hero__summary p {
@@ -51,7 +51,7 @@
   margin: 0 0 18px;
   color: var(--c-text-secondary);
   font-size: var(--c-font-base);
-  line-height: 1.75;
+  line-height: var(--c-leading-relaxed);
 }
 
 .wind-hero__focus {
@@ -102,7 +102,7 @@
 .wind-hero__focus-content > span {
   color: var(--c-text-secondary);
   font-size: var(--c-font-md);
-  line-height: 1.65;
+  line-height: var(--c-leading-relaxed);
 }
 
 .wind-plate-section {
@@ -147,7 +147,7 @@
   margin-top: 2px;
   color: var(--c-text-muted);
   font-size: var(--c-font-sm);
-  font-weight: 400;
+  font-weight: var(--c-weight-normal);
 }
 
 .wind-section-heading > .ant-tag {
@@ -233,14 +233,14 @@
 .wind-plate-card__index {
   color: var(--c-text-muted);
   font-size: var(--c-font-xs);
-  font-weight: 700;
+  font-weight: var(--c-weight-bold);
   letter-spacing: 0.08em;
 }
 
 .wind-plate-card > strong {
   color: var(--c-text-primary);
   font-size: var(--c-font-xl);
-  line-height: 1.25;
+  line-height: var(--c-leading-tight);
 }
 
 .wind-plate-card--selected > strong {
@@ -252,7 +252,7 @@
   overflow: hidden;
   color: var(--c-text-secondary);
   font-size: var(--c-font-md);
-  line-height: 1.65;
+  line-height: var(--c-leading-relaxed);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
@@ -343,7 +343,7 @@
   color: var(--c-text-secondary);
   background: var(--c-nested-bg);
   font-size: var(--c-font-sm);
-  font-weight: 700;
+  font-weight: var(--c-weight-bold);
 }
 
 .wind-stock-rank--top {

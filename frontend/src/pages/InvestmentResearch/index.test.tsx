@@ -101,7 +101,7 @@ function setupController(displayResult: AnalysisResult | null = null) {
     analysisError: null,
     stages: [],
     currentStageIndex: 0,
-    agentProcess: { status: "", toolCalls: [] },
+    agentProcess: { status: "", toolCalls: [], rounds: [] },
     runAnalysis: vi.fn(),
     cancelAnalysis: vi.fn(),
   });
@@ -193,7 +193,7 @@ describe("InvestmentResearch", () => {
       analysisError: null,
       stages: [],
       currentStageIndex: 0,
-      agentProcess: { status: "", toolCalls: [] },
+      agentProcess: { status: "", toolCalls: [], rounds: [] },
       runAnalysis,
       cancelAnalysis: vi.fn(),
     });
@@ -228,7 +228,7 @@ describe("InvestmentResearch", () => {
       analysisError: null,
       stages: [],
       currentStageIndex: 0,
-      agentProcess: { status: "", toolCalls: [] },
+      agentProcess: { status: "", toolCalls: [], rounds: [] },
       runAnalysis,
       cancelAnalysis: vi.fn(),
     });

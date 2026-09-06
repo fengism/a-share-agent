@@ -1,58 +1,72 @@
 slug: solar-pv
-name: 光伏
-category: 新能源
-summary: 硅料—硅片—电池片—组件的制造主链，辅以逆变器、设备与辅材，终端为集中式与分布式电站。
-aliases: [光伏产业链, 太阳能]
-tags: [新能源, 绿电, 制造]
+name: 光伏与绿电
+category: 新能源与绿色电力
+summary: 覆盖工业硅/多晶硅料、大尺寸单晶硅片、TOPCon/HJT/BC 高效电池片、双面双玻光伏组件、胶膜玻璃辅材、光伏逆变器、核心光伏装备以及集中/分布式光伏电站运营的全产业链。
+aliases: [光伏, 光伏产业链, 太阳能, 绿电, 逆变器]
+tags: [新能源, 绿电, 制造, 光伏设备, 逆变器, 储能]
 drivers:
-  - 全球装机需求与组件出口
-  - 电池技术迭代（TOPCon/HJT/BC）
-  - 产能出清与盈利修复
+  - 全球清洁能源转型与主要国家光储平价上网
+  - N 型技术路线（TOPCon / 异质结 HJT / BC 背接触）效率迭代与出清
+  - 逆变器微逆与工商业储能一体化海外高增长
+  - 国内新型电力系统消纳机制与绿电交易市场化
 layers:
   - key: upstream
-    name: 上游 · 硅料与硅片
+    name: 上游 · 高纯晶硅料、单晶硅片与拉晶设备
     segments:
-      - name: 多晶硅料
+      - name: 高纯多晶硅料
+        description: 工业硅经改良西门子法或颗粒硅流化床法提纯为电子级/太阳能级高纯硅料
         companies:
-          - { name: 通威股份, code: "600438", note: 硅料+电池片 }
-          - { name: 大全能源, code: "688303", note: 高纯多晶硅 }
-      - name: 硅片
+          - { name: 通威股份, code: "600438", note: 全球多晶硅料与电池片产能规模双龙头 }
+          - { name: 大全能源, code: "688303", note: 高纯 N 型多晶硅专业化生产领跑者 }
+          - { name: 特变电工, code: "600089", note: 控股新特能源，多晶硅与输变电双主业 }
+      - name: 大尺寸单晶硅片
+        description: 182mm/210mm N 型超薄单晶硅棒拉晶、切片与金刚线切割
         companies:
-          - { name: 隆基绿能, code: "601012", note: 单晶硅片+组件 }
-          - { name: TCL中环, code: "002129", note: 单晶硅片 }
-          - { name: 双良节能, code: "600481", note: 硅片+还原炉 }
+          - { name: 隆基绿能, code: "601012", note: 单晶硅片与 BC 电池组件全球领军企业 }
+          - { name: TCL中环, code: "002129", note: 210mm 大尺寸 N 型超薄硅片技术领跑者 }
+          - { name: 双良节能, code: "600481", note: 多晶硅还原炉设备与大尺寸单晶硅片制造 }
+          - { name: 高测股份, code: "688556", note: 高硬脆材料金刚线切片机与切片代工 }
   - key: midstream
-    name: 中游 · 电池片、组件与辅材
+    name: 中游 · 高效电池片、光伏组件与关键辅材
     segments:
-      - name: 电池片
+      - name: 高效 N 型电池片 (TOPCon / HJT / BC)
+        description: 光电转换效率突破 25%~26% 的高效晶硅电池片生产
         companies:
-          - { name: 钧达股份, code: "002865", note: N型电池专业化 }
-          - { name: 爱旭股份, code: "600732", note: ABC 电池 }
-      - name: 组件
+          - { name: 钧达股份, code: "002865", note: N 型 TOPCon 电池片专业化出货龙头 }
+          - { name: 爱旭股份, code: "600732", note: 拥有自主 ABC 背接触电池全套知识产权 }
+      - name: 光伏组件封装与系统集成
+        description: 串焊层压封装、双面发电、轻质防眩光组件
         companies:
-          - { name: 晶澳科技, code: "002459", note: 一体化组件 }
-          - { name: 天合光能, code: "688599", note: 组件+支架 }
-          - { name: 晶科能源, code: "688223", note: 组件出货龙头之一 }
-          - { name: 阿特斯, code: "688472", note: 组件+储能 }
-      - name: 辅材
+          - { name: 晶科能源, code: "688223", note: N 型 TOPCon 组件全球出货量第一 }
+          - { name: 晶澳科技, code: "002459", note: 垂直一体化高可靠光伏组件头部龙头 }
+          - { name: 天合光能, code: "688599", note: 210 组件与智能跟踪支架一体化解决方案 }
+          - { name: 阿特斯, code: "688472", note: 全球品牌组件与大型公用事业储能系统 }
+      - name: 光伏辅材 (光伏玻璃 / 胶膜 / 银浆)
+        description: 封装胶膜 (EVA/POE)、超白光伏压花玻璃与导电银浆
         companies:
-          - { name: 福斯特, code: "603806", note: EVA/POE 胶膜 }
-          - { name: 福莱特, code: "601865", note: 光伏玻璃 }
+          - { name: 福斯特, code: "603806", note: 光伏封装胶膜全球市占率超 45% 绝对龙头 }
+          - { name: 福莱特, code: "601865", note: 超白光伏玻璃全球双寡头之一 }
+          - { name: 聚和材料, code: "688503", note: 正面导电银浆出货量全球前列 }
   - key: downstream
-    name: 下游 · 逆变器、设备与电站
+    name: 下游 · 逆变器、光伏装备与新能源电站运营
     segments:
-      - name: 逆变器
+      - name: 光伏与储能逆变器
+        description: 集中式、组串式与微型光伏/储能双向变流逆变器
         companies:
-          - { name: 阳光电源, code: "300274", note: 逆变器+储能系统 }
-          - { name: 锦浪科技, code: "300763", note: 组串式逆变器 }
-          - { name: 德业股份, code: "605117", note: 户用逆变器 }
-          - { name: 固德威, code: "688390", note: 组串式逆变器 }
-      - name: 设备
+          - { name: 阳光电源, code: "300274", note: 全球光伏逆变器与储能系统集成出货第一 }
+          - { name: 德业股份, code: "605117", note: 户用储能逆变器与微型逆变器海外高盈利龙头 }
+          - { name: 锦浪科技, code: "300763", note: 组串式光伏逆变器全球领先制造商 }
+          - { name: 固德威, code: "688390", note: 分布式光伏与工商业储能逆变器领跑者 }
+      - name: 光伏核心生产制造设备
+        description: 晶体生长炉、电池片 PECVD/LPCVD/丝网印刷与串焊机
         companies:
-          - { name: 迈为股份, code: "300751", note: HJT 串焊/丝网印刷 }
-          - { name: 捷佳伟创, code: "300724", note: 电池片设备 }
-          - { name: 奥特维, code: "688516", note: 串焊机 }
-      - name: 电站运营
+          - { name: 迈为股份, code: "300751", note: 异质结 (HJT) 整线设备与丝网印刷绝对龙头 }
+          - { name: 捷佳伟创, code: "300724", note: TOPCon/HJT 电池片工艺设备龙头 }
+          - { name: 晶盛机电, code: "300316", note: 单晶硅生长炉与半导体材料装备巨头 }
+          - { name: 奥特维, code: "688516", note: 高速光伏串焊机与硅片分选检测装备 }
+      - name: 新能源电站开发与绿电运营
+        description: 集中式光伏大基地、分布式屋顶光伏投资建设与电力运营
         companies:
-          - { name: 三峡能源, code: "600905", note: 集中式新能源运营 }
-          - { name: 太阳能, code: "000591", note: 光伏电站运营 }
+          - { name: 三峡能源, code: "600905", note: 海上风电与大型沙漠戈壁光伏电站开发龙头 }
+          - { name: 太阳能, code: "000591", note: 国内最早从事光伏电站投资运营的央企平台 }
+          - { name: 晶科科技, code: "601778", note: 专注于工商业及户用分布式光伏电站开发 }

@@ -1,0 +1,35 @@
+.hk-market-page { max-width: 1600px; margin: 0 auto; }
+.hk-market-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.hk-index-grid { margin-bottom: 16px; }
+.hk-index-button { display: block; width: 100%; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.hk-index-button .ant-card { border-color: var(--c-border); transition: border-color .2s, transform .2s; }
+.hk-index-button:hover .ant-card { transform: translateY(-1px); }
+.hk-index-button.is-active .ant-card { border-color: var(--c-primary); box-shadow: 0 0 0 1px var(--c-primary-2); }
+.hk-index-price { font-size: 24px; color: var(--c-text-primary); }
+.hk-section-card { margin-top: 16px; border-color: var(--c-border); }
+.hk-stock-row-selected > td { background: var(--c-primary-soft) !important; }
+.hk-market-page .ant-table-row { cursor: pointer; }
+.hk-pagination { margin-top: 16px; text-align: right; }
+@media (max-width: 767px) {
+  .hk-market-page .ant-card-head { align-items: flex-start; }
+  .hk-market-page .ant-card-extra { margin-inline-start: 8px; max-width: 65%; }
+  .hk-market-page .ant-segmented { max-width: 100%; overflow-x: auto; }
+  .hk-index-price { font-size: 20px; }
+}
+.hk-selection-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; padding: 12px; border: 1px solid var(--c-border); border-radius: 8px; background: var(--c-nested-bg); }
+.hk-selection-summary { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.hk-selection-summary > .ant-typography { flex: 0 0 auto; line-height: 24px; }
+.hk-selection-tags { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.hk-selection-tags .ant-tag { margin-inline-end: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hk-compare-card .ant-card-head-title { color: var(--c-text-primary); }
+@media (max-width: 767px) {
+  .hk-selection-toolbar,
+  .hk-selection-summary { flex-direction: column; width: 100%; }
+  .hk-selection-toolbar > .ant-space { width: 100%; }
+}
+.hk-stock-search { width: 320px; }
+.hk-stock-search-option { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; }
+.hk-stock-search-option > :last-child:nth-child(3) { grid-column: 1 / -1; font-size: 12px; }
+@media (max-width: 767px) {
+  .hk-stock-search { width: min(100%, 280px); }
+}

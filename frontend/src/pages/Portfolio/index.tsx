@@ -72,8 +72,6 @@ export default function PortfolioPage() {
         </Space>
       </div>
 
-      <TransactionEntryCard ref={transactionEntryRef} stocks={data?.stocks ?? []} />
-
       {isError && !data ? (
         <Card style={{ ...cardStyle, marginBottom: 16 }}>
           <QueryErrorState error={error} onRetry={() => refetch()} title="持仓数据加载失败" />
@@ -98,6 +96,7 @@ export default function PortfolioPage() {
         <>
           <PortfolioSummaryCards summary={data.summary} />
           <PortfolioRiskPanel risk={data.risk} />
+          <TransactionEntryCard ref={transactionEntryRef} stocks={data.stocks} />
           <PortfolioTables
             positions={data.positions}
             stocks={data.stocks}
@@ -106,7 +105,9 @@ export default function PortfolioPage() {
             onSell={handleSell}
           />
         </>
-      ) : null}
+      ) : (
+        <TransactionEntryCard ref={transactionEntryRef} stocks={[]} />
+      )}
     </div>
   );
 }

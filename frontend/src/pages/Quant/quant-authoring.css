@@ -6,15 +6,17 @@
 
 .quant-authoring-grid {
   display: grid;
+  min-width: 0;
   grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);
   gap: var(--c-space-4);
 }
 
 .quant-authoring-card.ant-card {
+  min-width: 0;
   border-color: var(--c-border);
-  border-radius: var(--c-radius-lg);
+  border-radius: 2px;
   background: var(--c-card-bg);
-  box-shadow: var(--c-shadow-xs);
+  box-shadow: none;
 }
 
 .quant-authoring-card .ant-card-body {
@@ -32,7 +34,7 @@
   gap: var(--c-space-2);
   padding: var(--c-space-3);
   border: 1px solid var(--c-border);
-  border-radius: var(--c-radius-md);
+  border-radius: 2px;
   background: var(--c-nested-bg);
 }
 
@@ -42,13 +44,14 @@
 }
 
 .quant-definition-editor textarea {
-  font-family: var(--c-font-mono);
-  font-size: var(--c-font-sm);
-  line-height: 1.55;
+  font-family: inherit;
+  font-size: var(--quant-font-body);
+  line-height: var(--c-leading-normal);
 }
 
 .quant-authoring-backtest-grid {
   display: grid;
+  min-width: 0;
   grid-template-columns: 1.2fr 1.3fr repeat(4, minmax(120px, 0.7fr));
   align-items: end;
   gap: 0 var(--c-space-3);

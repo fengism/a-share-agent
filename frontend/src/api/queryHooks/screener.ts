@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../client";
+import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { streamScreenerStrategy, type ScreenerStrategyProgress } from "../sse";
 import { queryKeys } from "../queryKeys";
 import type {
@@ -45,7 +46,7 @@ export function useScreenerScreen(filters: ScreenerFilter, enabled = true) {
       await apiPost<ScreenerResult>("/screener/screen", filters),
     ),
     enabled,
-    staleTime: 2 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.screenerResults.staleMs,
     placeholderData: (previous) => previous,
   });
 }
@@ -54,7 +55,15 @@ export function useIndustries() {
   return useQuery({
     queryKey: queryKeys.screener.industries,
     queryFn: () => apiGet<string[]>("/screener/industries"),
-    staleTime: 24 * 60 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
+  });
+}
+
+export function useScreenerConcepts() {
+  return useQuery({
+    queryKey: queryKeys.screener.concepts,
+    queryFn: () => apiGet<string[]>("/screener/concepts"),
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
   });
 }
 
@@ -70,7 +79,7 @@ export function useScreenerStrategies() {
   return useQuery({
     queryKey: queryKeys.screener.strategies,
     queryFn: () => apiGet<ScreenerStrategyPreset[]>("/screener/strategies"),
-    staleTime: 24 * 60 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
   });
 }
 

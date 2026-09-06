@@ -40,8 +40,10 @@ from app.agentic.tools.serialization import (
 )
 from app.configuration import get_settings
 from app.core.errors import build_internal_error, log_internal_error
+from app.core.exceptions import UpstreamUnavailableError
 from app.core.metrics import metrics
 from app.infrastructure.llm.adapters import LLMRetryableError
+from app.infrastructure.llm.runtime import is_llm_connection_error
 
 logger = logging.getLogger(__name__)
 _OUTPUT_TRUNCATED_WARNING = "模型输出达到长度上限，回答可能不完整"
@@ -82,6 +84,18 @@ class _ExecutionFailed:
     exception: BaseException
 
 
+@dataclass
+class ToolCallDedupe:
+    """跨轮次共享的工具调用去重登记（由调研 session 持有）。
+
+    同一次自适应多轮调研中，后续轮次重发的相同"工具+参数"调用会重放
+    先前成功结果，而不是重新打上游。
+    """
+
+    seen_keys: set[str] = field(default_factory=set)
+    succeeded: dict[str, ToolResultInfo] = field(default_factory=dict)
+
+
 @dataclass(slots=True)
 class _ExecutionState:
     started_at: float
@@ -92,6 +106,7 @@ class _ExecutionState:
     max_tool_context_characters: int
     tool_context_characters: int = 0
     seen_tool_call_keys: set[str] = field(default_factory=set)
+    succeeded_tool_results: dict[str, ToolResultInfo] = field(default_factory=dict)
     tools_called: list[str] = field(default_factory=list)
     tool_results: list[ToolExecutionSummary] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
@@ -109,6 +124,7 @@ class AgentExecutor:
         execution_context: AgentExecutionContext | None,
         max_history_messages: int,
         tool_selection_prompt: str,
+        tool_dedupe: ToolCallDedupe | None = None,
     ) -> _ExecutionState:
         effective_tool_names = list(
             profile.tool_names if allowed_tool_names is None else allowed_tool_names
@@ -129,6 +145,12 @@ class AgentExecutor:
             tool_definitions=registry.get_tool_definitions_for(effective_tool_names),
             tool_cache=tool_cache or (
                 execution_context.tool_cache if execution_context is not None else SharedToolCache()
+            ),
+            seen_tool_call_keys=(
+                tool_dedupe.seen_keys if tool_dedupe is not None else set()
+            ),
+            succeeded_tool_results=(
+                tool_dedupe.succeeded if tool_dedupe is not None else {}
             ),
             max_tool_context_characters=(
                 execution_context.settings.chat_max_tool_context_characters
@@ -194,41 +216,12 @@ class AgentExecutor:
             state.tools_called.append(tool_call.function.name)
             await emit(AgentEvent(type="tool_call", tool_call=tool_call))
 
-        settings = (
-            execution_context.settings
-            if execution_context is not None
-            else get_settings()
+        tool_results, accepted_calls, rejected_calls = await self._classify_tool_calls(
+            state,
+            tool_calls,
+            execution_context=execution_context,
+            tool_call_reserve=tool_call_reserve,
         )
-        tool_results: list[ToolResultInfo | None] = [None] * len(tool_calls)
-        unique_calls: list[tuple[int, ToolCallInfo]] = []
-        for index, tool_call in enumerate(tool_calls):
-            cache_key = tool_call_cache_key(tool_call)
-            if cache_key in state.seen_tool_call_keys:
-                metrics.record_agentic_event("duplicate_tool_call")
-                tool_results[index] = ToolResultInfo(
-                    tool_call_id=tool_call.id,
-                    name=tool_call.function.name,
-                    content=serialize_error(
-                        "duplicate_tool_call",
-                        "本 Agent 已调用过相同工具和参数，请基于已有结果继续分析",
-                    ),
-                    is_error=True,
-                )
-                continue
-            state.seen_tool_call_keys.add(cache_key)
-            unique_calls.append((index, tool_call))
-
-        accepted_count = min(
-            len(unique_calls),
-            settings.chat_max_tool_calls_per_round,
-        )
-        if execution_context is not None:
-            accepted_count = await execution_context.reserve_tool_calls(
-                accepted_count,
-                preserve=tool_call_reserve,
-            )
-        accepted_calls = unique_calls[:accepted_count]
-        rejected_calls = unique_calls[accepted_count:]
 
         accepted_results = await asyncio.gather(
             *(
@@ -240,8 +233,13 @@ class AgentExecutor:
                 for _, tool_call in accepted_calls
             )
         )
-        for (index, _), result in zip(accepted_calls, accepted_results):
+        for (index, tool_call), result in zip(accepted_calls, accepted_results):
             tool_results[index] = result
+            if result.is_error:
+                # 失败调用解除去重标记：上游瞬时可导致失败，相同参数应允许重试
+                state.seen_tool_call_keys.discard(tool_call_cache_key(tool_call))
+            else:
+                state.succeeded_tool_results[tool_call_cache_key(tool_call)] = result
         for index, tool_call in rejected_calls:
             metrics.record_agentic_event("tool_budget_rejected")
             if _TOOL_BUDGET_WARNING not in state.warnings:
@@ -458,6 +456,70 @@ class AgentExecutor:
             finish_reason=finish_reason,
         )
 
+    async def _classify_tool_calls(
+        self,
+        state: _ExecutionState,
+        tool_calls: list[ToolCallInfo],
+        *,
+        execution_context: AgentExecutionContext | None,
+        tool_call_reserve: int,
+    ) -> tuple[list[ToolResultInfo | None], list[tuple[int, ToolCallInfo]], list[tuple[int, ToolCallInfo]]]:
+        """去重分类：成功结果重放 / 同轮重复占位 / 待执行；预算拒绝不计入已见。"""
+        settings = (
+            execution_context.settings
+            if execution_context is not None
+            else get_settings()
+        )
+        tool_results: list[ToolResultInfo | None] = [None] * len(tool_calls)
+        unique_calls: list[tuple[int, ToolCallInfo]] = []
+        for index, tool_call in enumerate(tool_calls):
+            cache_key = tool_call_cache_key(tool_call)
+            previous = state.succeeded_tool_results.get(cache_key)
+            if previous is not None:
+                # 相同工具+参数的成功结果直接重放：模型无需再调，上游零开销
+                metrics.record_agentic_event("duplicate_tool_call")
+                tool_results[index] = ToolResultInfo(
+                    tool_call_id=tool_call.id,
+                    name=tool_call.function.name,
+                    content=(
+                        "[重复调用已拦截] 本会话已用相同参数调用过该工具，以下为先前结果：\n"
+                        + previous.content
+                    ),
+                    is_error=False,
+                )
+                continue
+            if cache_key in state.seen_tool_call_keys:
+                # 同轮并发重复：暂以错误占位
+                metrics.record_agentic_event("duplicate_tool_call")
+                tool_results[index] = ToolResultInfo(
+                    tool_call_id=tool_call.id,
+                    name=tool_call.function.name,
+                    content=serialize_error(
+                        "duplicate_tool_call",
+                        "本 Agent 已调用过相同工具和参数，请基于已有结果继续分析",
+                    ),
+                    is_error=True,
+                )
+                continue
+            state.seen_tool_call_keys.add(cache_key)
+            unique_calls.append((index, tool_call))
+
+        accepted_count = min(
+            len(unique_calls),
+            settings.chat_max_tool_calls_per_round,
+        )
+        if execution_context is not None:
+            accepted_count = await execution_context.reserve_tool_calls(
+                accepted_count,
+                preserve=tool_call_reserve,
+            )
+        accepted_calls = unique_calls[:accepted_count]
+        rejected_calls = unique_calls[accepted_count:]
+        for _index, tool_call in rejected_calls:
+            # 预算拒绝不算"已调用"：后续轮次允许再次发起
+            state.seen_tool_call_keys.discard(tool_call_cache_key(tool_call))
+        return tool_results, accepted_calls, rejected_calls
+
     async def run(
         self,
         profile: AgentProfile,
@@ -476,6 +538,7 @@ class AgentExecutor:
         require_tool_evidence: bool = False,
         stream_response: bool = False,
         tool_call_reserve: int = 0,
+        tool_dedupe: ToolCallDedupe | None = None,
     ) -> AgentExecutionResult:
         """使用统一执行引擎运行一个 AgentProfile。
 
@@ -501,6 +564,7 @@ class AgentExecutor:
             execution_context,
             max_history_messages,
             tool_selection_prompt,
+            tool_dedupe=tool_dedupe,
         )
 
         async def emit(delta: AgentEvent) -> None:
@@ -545,6 +609,12 @@ class AgentExecutor:
                     exc,
                     "模型调用失败",
                 )
+                if is_llm_connection_error(exc):
+                    # LLM 网关不可达是可重试的上游故障：快速失败并保留真实原因，
+                    # 继续空转只会把根因伪装成"调研证据不足"误导排查与监控。
+                    raise UpstreamUnavailableError(
+                        "LLM 服务连接失败，请检查网络或代理配置后重试"
+                    ) from exc
                 state.errors.append(detail)
                 if stream_response:
                     await emit(AgentEvent(type="error", error=detail))

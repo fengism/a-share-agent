@@ -188,3 +188,35 @@ def register_quant_tools(target_registry: CapabilityCatalog = registry) -> None:
         policy=_QUANT_MUTATION_POLICY,
         executor=_publish_quant_strategy_draft,
     ))
+    target_registry.register_tool(Tool(
+        name="python_interpreter",
+        description=(
+            "Python 代码计算沙盒。当需要进行复杂数学计算、CAGR 复合增速拟合、"
+            "DCF 现金流折现、财务比率测算、敏感性分析、统计指标或数据表格矩阵运算时调用。"
+            "沙盒已预置 math/datetime/json/re/numpy/pandas 科学计算库，必须使用 print(...) 打印输出结果。"
+            "仅管理员可用。"
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "要执行的 Python 代码脚本，必须通过 print(...) 输出最终计算结果",
+                },
+            },
+            "required": ["code"],
+        },
+        policy=ToolPolicy(cost="low", cache_ttl_seconds=0),
+        executor=_execute_python_code,
+    ))
+
+
+async def _execute_python_code(code: str) -> Any:
+    from app.core.request_context import get_current_user
+
+    user = get_current_user()
+    if user is None or not bool(user.get("is_admin")):
+        raise PermissionError("仅管理员可以使用 Python 计算沙盒")
+    from app.agentic.tools.packs.quant.interpreter import execute_python_code
+    return await execute_python_code(code=code)
+

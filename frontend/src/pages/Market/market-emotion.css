@@ -9,7 +9,7 @@
   justify-content: space-between;
   gap: 16px;
   color: var(--c-text-secondary);
-  font-size: 13px;
+  font-size: var(--c-font-md);
 }
 
 .emotion-hero {
@@ -44,24 +44,24 @@
   gap: 7px;
   margin-bottom: 12px;
   color: var(--emotion-accent, var(--c-primary));
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-bold);
   letter-spacing: 0.04em;
 }
 
 .emotion-hero__summary h2 {
   margin: 0 0 10px;
   color: var(--c-text-primary);
-  font-size: clamp(25px, 3vw, 34px);
-  line-height: 1.2;
+  font-size: clamp(var(--c-font-3xl), 3vw, var(--c-font-display));
+  line-height: var(--c-leading-tight);
 }
 
 .emotion-hero__summary p {
   max-width: 560px;
   margin: 0 0 18px;
   color: var(--c-text-secondary);
-  font-size: 14px;
-  line-height: 1.75;
+  font-size: var(--c-font-base);
+  line-height: var(--c-leading-relaxed);
 }
 
 .emotion-hero__gauge-column {
@@ -85,21 +85,21 @@
 }
 
 .emotion-gauge__value strong {
-  font-size: 34px;
-  font-weight: 750;
+  font-size: var(--c-font-display);
+  font-weight: var(--c-weight-bold);
 }
 
 .emotion-gauge__value small {
   margin: 0 0 4px 2px;
   color: var(--c-text-muted);
-  font-size: 11px;
+  font-size: var(--c-font-xs);
 }
 
 .emotion-gauge__value span {
   grid-column: 1 / -1;
   margin-top: 7px;
   color: var(--c-text-secondary);
-  font-size: 12px;
+  font-size: var(--c-font-sm);
 }
 
 .emotion-gauge__scale {
@@ -108,7 +108,7 @@
   max-width: 164px;
   margin: 4px auto 0;
   color: var(--c-text-muted);
-  font-size: 10px;
+  font-size: var(--c-font-xs);
 }
 
 .emotion-hero__turnover-column {
@@ -134,18 +134,18 @@
 .emotion-turnover__item > span {
   align-self: center;
   color: var(--c-text-secondary);
-  font-size: 13px;
+  font-size: var(--c-font-md);
 }
 
 .emotion-turnover__item > strong {
   color: var(--c-text-primary);
-  font-size: 22px;
-  line-height: 1.2;
+  font-size: var(--c-font-2xl);
+  line-height: var(--c-leading-tight);
 }
 
 .emotion-turnover__item > small {
   grid-column: 1 / -1;
-  font-size: 12px;
+  font-size: var(--c-font-sm);
 }
 
 .emotion-delta--up { color: var(--c-up); }
@@ -198,15 +198,15 @@
 
 .emotion-section-heading__title {
   color: var(--c-text-primary);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--c-font-lg);
+  font-weight: var(--c-weight-bold);
 }
 
 .emotion-section-heading__description {
   margin-top: 2px;
   color: var(--c-text-muted);
-  font-size: 12px;
-  font-weight: 400;
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-normal);
 }
 
 .emotion-section-heading__extra {
@@ -252,18 +252,22 @@
 }
 
 .emotion-metric > span {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
 }
 
 .emotion-metric > strong {
+  font-family: var(--c-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
   color: var(--metric-color, var(--c-text-primary));
-  font-size: 24px;
-  line-height: 1.15;
+  font-size: clamp(var(--c-font-xl), 2vw, var(--c-font-2xl));
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-tight);
 }
 
 .emotion-metric > small {
-  font-size: 11px;
+  font-size: var(--c-font-xs);
 }
 
 .emotion-breadth {
@@ -289,11 +293,11 @@
 .emotion-breadth__counts small,
 .emotion-breadth__legend {
   color: var(--c-text-secondary);
-  font-size: 12px;
+  font-size: var(--c-font-sm);
 }
 
 .emotion-breadth__counts strong {
-  font-size: 22px;
+  font-size: var(--c-font-2xl);
 }
 
 .emotion-breadth__bar {
@@ -352,7 +356,7 @@
 
 .emotion-distribution__header {
   color: var(--c-text-muted);
-  font-size: 11px;
+  font-size: var(--c-font-xs);
   text-align: center;
 }
 
@@ -367,7 +371,7 @@
 
 .emotion-distribution__side strong {
   min-width: 32px;
-  font-size: 12px;
+  font-size: var(--c-font-sm);
 }
 
 .emotion-distribution__side--down {
@@ -405,7 +409,7 @@
 
 .emotion-distribution__label {
   color: var(--c-text-secondary);
-  font-size: 11px;
+  font-size: var(--c-font-xs);
   text-align: center;
 }
 
@@ -432,8 +436,8 @@
   place-items: center;
   border-radius: 9px;
   color: var(--c-up);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-bold);
   background: color-mix(in srgb, var(--c-up) 10%, transparent);
 }
 
@@ -449,7 +453,7 @@
 .emotion-ladder__name small {
   margin-top: 3px;
   color: var(--c-text-muted);
-  font-size: 11px;
+  font-size: var(--c-font-xs);
 }
 
 .emotion-ladder__count {
@@ -459,7 +463,7 @@
 
 .emotion-ladder__count strong {
   color: var(--c-up);
-  font-size: 24px;
+  font-size: var(--c-font-3xl);
 }
 
 @media (max-width: 1100px) {
@@ -530,6 +534,6 @@
 
   .emotion-distribution__side strong {
     min-width: 26px;
-    font-size: 11px;
+    font-size: var(--c-font-xs);
   }
 }

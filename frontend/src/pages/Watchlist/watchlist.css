@@ -1,0 +1,651 @@
+.watchlist-page {
+  width: 100%;
+  font-family: var(--c-font-sans);
+}
+
+.watchlist-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--c-space-5);
+  margin-bottom: var(--c-space-4);
+  padding: 2px 0 var(--c-space-4);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.watchlist-page__heading {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.watchlist-page__eyebrow {
+  color: var(--c-primary);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-semibold);
+  letter-spacing: .12em;
+}
+
+.watchlist-page__status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--c-space-2);
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+}
+
+.watchlist-page__status > span {
+  padding: 5px 9px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-pill);
+  background: var(--c-nested-bg);
+  white-space: nowrap;
+}
+
+.watchlist-page__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--c-space-3);
+  margin-bottom: var(--c-space-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.watchlist-page__metric {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding: 14px var(--c-space-4) 12px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 15%, var(--c-border));
+  border-radius: var(--c-radius-md);
+  background: var(--c-card-bg);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--c-primary) 4%, transparent);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.watchlist-page__metric:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--c-primary) 10%, transparent);
+}
+
+.watchlist-page__metric::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--c-primary);
+  content: "";
+}
+
+.watchlist-page__metric > span {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-medium);
+  line-height: var(--c-leading-normal);
+}
+
+.watchlist-page__metric > strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-xl);
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-tight);
+}
+
+.watchlist-page__metric > small {
+  overflow: hidden;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  line-height: var(--c-leading-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-page__metric.is-up::before {
+  background: var(--c-up);
+}
+
+.watchlist-page__metric.is-up > strong {
+  color: var(--c-up);
+}
+
+.watchlist-page__metric.is-down::before {
+  background: var(--c-down);
+}
+
+.watchlist-page__metric.is-down > strong {
+  color: var(--c-down);
+}
+
+.watchlist-page__metric.is-flat::before {
+  background: var(--c-text-muted);
+}
+
+.watchlist-page__toolbar-card {
+  margin-bottom: var(--c-space-4);
+}
+
+.watchlist-page__toolbar-card > .ant-card-body {
+  padding: var(--c-space-4);
+}
+
+.watchlist-page__toolbar {
+  display: grid;
+  grid-template-columns: minmax(230px, 1.15fr) minmax(230px, 1fr) minmax(190px, auto);
+  align-items: end;
+  gap: var(--c-space-3);
+}
+
+.watchlist-page__add,
+.watchlist-page__filter,
+.watchlist-page__view-control,
+.watchlist-page__market-filter,
+.watchlist-page__sort-control {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.watchlist-page__add .ant-select,
+.watchlist-page__filter .ant-input-affix-wrapper,
+.watchlist-page__sort-control .ant-select {
+  width: 100%;
+}
+
+.watchlist-page__view-control .ant-segmented {
+  width: 100%;
+}
+
+.watchlist-page__view-control .ant-segmented-group {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) minmax(108px, 1.35fr);
+}
+
+.watchlist-page__filter-bar {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  align-items: end;
+  gap: var(--c-space-3);
+  padding-top: var(--c-space-3);
+  border-top: 1px solid var(--c-border);
+}
+
+.watchlist-page__market-filter {
+  overflow: hidden;
+}
+
+.watchlist-page__market-filter .ant-segmented {
+  max-width: 100%;
+}
+
+.watchlist-page__market-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.watchlist-page__market-count {
+  min-width: 18px;
+  padding-inline: 5px;
+  border-radius: var(--c-radius-pill);
+  color: var(--c-text-muted);
+  background: color-mix(in srgb, var(--c-text-muted) 10%, transparent);
+  font-size: var(--c-font-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  text-align: center;
+}
+
+.watchlist-page__market-filter .ant-segmented-item-selected .watchlist-page__market-count {
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.watchlist-page__sort-control .ant-space-compact {
+  width: 100%;
+}
+
+.watchlist-page__sort-control .ant-btn {
+  flex: none;
+}
+
+.watchlist-page__field-label {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+}
+
+.watchlist-page__search-option {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--c-space-4);
+}
+
+.watchlist-page__content-card > .ant-card-body {
+  padding: 0;
+}
+
+.watchlist-page__content-heading {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--c-space-4);
+  padding: 10px var(--c-space-4);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.watchlist-page__content-title {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.watchlist-page__content-heading strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+  line-height: var(--c-leading-tight);
+}
+
+.watchlist-page__content-title > span {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  line-height: var(--c-leading-normal);
+}
+
+.watchlist-page__content-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--c-space-2);
+}
+
+.watchlist-page__content-actions > .ant-select {
+  width: 180px;
+}
+
+.watchlist-page__visible-count {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-pill);
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-medium);
+  white-space: nowrap;
+}
+
+.watchlist-page__table-wrap {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.watchlist-page__table {
+  font-family: var(--c-font-sans);
+  font-size: var(--c-font-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.watchlist-page__table .ant-table {
+  background: transparent;
+  font-size: var(--c-font-md);
+}
+
+.watchlist-page__table .ant-table-container {
+  border-radius: 0;
+}
+
+.watchlist-page__table .ant-table-thead > tr > th {
+  padding-block: 11px;
+  color: var(--c-text-secondary);
+  background: var(--c-nested-bg);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+  white-space: nowrap;
+}
+
+.watchlist-page__table .ant-table-tbody > tr > td {
+  padding-block: 11px;
+  color: var(--c-text-primary);
+  vertical-align: middle;
+  transition: background-color .16s ease;
+}
+
+.watchlist-page__table .watchlist-page__row > td:first-child {
+  box-shadow: inset 3px 0 transparent;
+}
+
+.watchlist-page__table .watchlist-page__row.is-up > td:first-child {
+  box-shadow: inset 3px 0 var(--c-up);
+}
+
+.watchlist-page__table .watchlist-page__row.is-down > td:first-child {
+  box-shadow: inset 3px 0 var(--c-down);
+}
+
+.watchlist-page__table .watchlist-page__row.is-flat > td:first-child {
+  box-shadow: inset 3px 0 var(--c-text-muted);
+}
+
+.watchlist-page__table .watchlist-page__row.is-up:hover > td {
+  background: var(--c-hover-bg);
+}
+
+.watchlist-page__table .watchlist-page__row.is-down:hover > td {
+  background: var(--c-hover-bg);
+}
+
+.watchlist-page__stock {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.watchlist-page__stock strong {
+  overflow: hidden;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-page__stock span {
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.watchlist-page__stock:hover strong {
+  color: var(--c-primary);
+}
+
+.watchlist-page__price {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
+}
+
+.watchlist-page__price.is-up {
+  color: var(--c-up);
+}
+
+.watchlist-page__price.is-down {
+  color: var(--c-down);
+}
+
+.watchlist-page__price.is-flat {
+  color: var(--c-text-secondary);
+}
+
+.watchlist-page__price.is-unavailable {
+  color: var(--c-text-muted);
+  font-weight: var(--c-weight-normal);
+}
+
+.watchlist-page__concept-tags,
+.watchlist-page__alerts {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.watchlist-page__concept-tags .ant-tag,
+.watchlist-page__alerts .ant-tag {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--c-font-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-page__concept-tags .ant-tag {
+  color: var(--c-primary);
+  border-color: var(--c-border);
+  background: var(--c-primary-soft);
+}
+
+.watchlist-page__concept-tag {
+  max-width: 100%;
+  height: 22px;
+  padding: 0 7px;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-sm);
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+  font-family: var(--c-font-sans);
+  font-size: var(--c-font-xs);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color .16s ease, background-color .16s ease;
+}
+
+.watchlist-page__concept-tag:hover {
+  border-color: var(--c-primary);
+  background: var(--c-hover-bg);
+}
+
+.watchlist-page__concept-tag:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 1px;
+}
+
+.watchlist-page__empty-value {
+  color: var(--c-text-muted);
+}
+
+.watchlist-page__groups {
+  display: grid;
+}
+
+.watchlist-page__group + .watchlist-page__group {
+  border-top: 1px solid var(--c-border);
+}
+
+.watchlist-page__group-header {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: var(--c-space-2);
+  padding: 12px var(--c-space-4);
+  border: 0;
+  color: var(--c-text-primary);
+  background: var(--c-nested-bg);
+  font-family: var(--c-font-sans);
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .16s ease;
+}
+
+.watchlist-page__group-header:hover {
+  background: var(--c-hover-bg);
+}
+
+.watchlist-page__group-header:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline-offset: -2px;
+}
+
+.watchlist-page__group-caret {
+  display: inline-flex;
+  flex: none;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.watchlist-page__group-name {
+  overflow: hidden;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-page__group-breadth {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  margin-left: var(--c-space-2);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.watchlist-page__group-breadth .is-up {
+  color: var(--c-up);
+}
+
+.watchlist-page__group-breadth .is-down {
+  color: var(--c-down);
+}
+
+.watchlist-page__group-breadth .is-flat {
+  color: var(--c-text-muted);
+}
+
+.watchlist-page__group-count {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-pill);
+  color: var(--c-primary);
+  background: var(--c-primary-soft);
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-medium);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .watchlist-page__header {
+    flex-direction: column;
+  }
+
+  .watchlist-page__status {
+    justify-content: flex-start;
+  }
+
+  .watchlist-page__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .watchlist-page__toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .watchlist-page__view-control {
+    grid-column: 1 / -1;
+  }
+
+  .watchlist-page__view-control .ant-segmented {
+    width: auto;
+  }
+
+  .watchlist-page__filter-bar {
+    grid-template-columns: minmax(0, 1fr) 240px;
+  }
+}
+
+@media (max-width: 640px) {
+  .watchlist-page__header {
+    gap: var(--c-space-3);
+    margin-bottom: var(--c-space-4);
+  }
+
+  .watchlist-page__status {
+    width: 100%;
+  }
+
+  .watchlist-page__status > span:nth-of-type(2) {
+    display: none;
+  }
+
+  .watchlist-page__metrics {
+    gap: var(--c-space-2);
+  }
+
+  .watchlist-page__metric {
+    padding: 11px var(--c-space-3) 10px;
+  }
+
+  .watchlist-page__metric > strong {
+    font-size: var(--c-font-lg);
+  }
+
+  .watchlist-page__toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .watchlist-page__view-control .ant-segmented {
+    width: 100%;
+  }
+
+  .watchlist-page__filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .watchlist-page__market-filter .ant-segmented {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .watchlist-page__market-filter .ant-segmented-group {
+    min-width: max-content;
+  }
+
+  .watchlist-page__content-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    min-height: 56px;
+    padding-inline: var(--c-space-3);
+  }
+
+  .watchlist-page__content-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .watchlist-page__content-actions > .ant-select {
+    min-width: 150px;
+    flex: 1;
+  }
+
+  .watchlist-page__group-header {
+    padding-inline: var(--c-space-3);
+  }
+
+  .watchlist-page__group-breadth {
+    gap: 5px;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 430px) {
+  .watchlist-page__metric > small {
+    white-space: normal;
+  }
+
+  .watchlist-page__content-title > span,
+  .watchlist-page__group-breadth {
+    display: none;
+  }
+}

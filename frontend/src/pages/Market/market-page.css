@@ -1,0 +1,23 @@
+.market-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.market-page-header {
+  margin-bottom: 8px;
+}
+
+.market-top-tabs > .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.market-top-tabs > .ant-tabs-nav .ant-tabs-tab {
+  padding: 8px 18px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.market-top-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+  font-weight: 600;
+}

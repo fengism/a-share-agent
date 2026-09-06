@@ -1,0 +1,76 @@
+.stock-concept-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stock-concept-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.stock-concept-header .ant-typography {
+  margin-bottom: 0;
+}
+
+.stock-concept-stat-grid .ant-card {
+  height: 100%;
+  border-color: var(--c-border);
+}
+
+.stock-concept-stat-grid .ant-card-body {
+  padding: 16px;
+}
+
+.stock-concept-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stock-concept-query {
+  width: 260px;
+}
+
+.stock-concept-select {
+  width: 200px;
+}
+
+.stock-concept-tags-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 450px;
+}
+
+.concept-preview {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.concept-preview__title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.concept-preview__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.concept-force-override {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+}

@@ -21,10 +21,13 @@ frontend/dist/
 dist/
 
 # Local runtime data
-data/
 logs/
 *.sqlite
 *.db
+*.db-wal
+*.db-shm
+data/**
+backend/data/**
 
 # macOS metadata
 .DS_Store

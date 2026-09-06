@@ -564,3 +564,164 @@ MARKET_TABLES.extend(
         *INDUSTRY_CHAIN_HISTORY_INDEXES,
     ]
 )
+
+# ── 申万行业基础数据（独立 industry_data.db） ──
+INDUSTRY_TABLES = [
+    """
+    CREATE TABLE IF NOT EXISTS sw_industry_classifications (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        market_group         TEXT NOT NULL CHECK (market_group IN ('A', 'HK', 'OVERSEAS')),
+        exchange_suffix      TEXT NOT NULL,
+        stock_code           TEXT NOT NULL UNIQUE,
+        stock_name           TEXT NOT NULL DEFAULT '',
+        sw_level1_name       TEXT NOT NULL DEFAULT '',
+        sw_level2_name       TEXT NOT NULL DEFAULT '',
+        sw_level3_name       TEXT NOT NULL DEFAULT '',
+        sw_industry_code     TEXT NOT NULL DEFAULT '',
+        source               TEXT NOT NULL DEFAULT 'manual',
+        source_version       TEXT NOT NULL DEFAULT '',
+        effective_date       TEXT,
+        is_manual_override   INTEGER NOT NULL DEFAULT 0 CHECK (is_manual_override IN (0, 1)),
+        created_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at           TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_sw_industry_market ON sw_industry_classifications(market_group)",
+    "CREATE INDEX IF NOT EXISTS idx_sw_industry_exchange ON sw_industry_classifications(exchange_suffix)",
+    "CREATE INDEX IF NOT EXISTS idx_sw_industry_stock_name ON sw_industry_classifications(stock_name)",
+    "CREATE INDEX IF NOT EXISTS idx_sw_industry_level1 ON sw_industry_classifications(sw_level1_name)",
+    "CREATE INDEX IF NOT EXISTS idx_sw_industry_level2 ON sw_industry_classifications(sw_level2_name)",
+    "CREATE INDEX IF NOT EXISTS idx_sw_industry_level3 ON sw_industry_classifications(sw_level3_name)",
+    "CREATE INDEX IF NOT EXISTS idx_sw_industry_code ON sw_industry_classifications(sw_industry_code)",
+    "CREATE INDEX IF NOT EXISTS idx_sw_industry_updated ON sw_industry_classifications(updated_at DESC)",
+    """
+    CREATE TABLE IF NOT EXISTS sw_industry_refresh_state (
+        provider             TEXT PRIMARY KEY,
+        enabled              INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+        interval_seconds     INTEGER NOT NULL DEFAULT 86400,
+        last_started_at      TEXT,
+        last_succeeded_at    TEXT,
+        last_failed_at       TEXT,
+        last_error           TEXT,
+        last_added           INTEGER NOT NULL DEFAULT 0,
+        last_updated         INTEGER NOT NULL DEFAULT 0,
+        last_unchanged       INTEGER NOT NULL DEFAULT 0,
+        updated_at           TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS sw_industry_import_batches (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        import_token         TEXT NOT NULL UNIQUE,
+        content_hash         TEXT NOT NULL,
+        filename             TEXT NOT NULL,
+        source_version       TEXT NOT NULL DEFAULT '',
+        effective_date       TEXT,
+        status               TEXT NOT NULL CHECK (status IN ('previewed', 'committed', 'failed')),
+        total_rows           INTEGER NOT NULL DEFAULT 0,
+        valid_rows           INTEGER NOT NULL DEFAULT 0,
+        added_rows           INTEGER NOT NULL DEFAULT 0,
+        updated_rows         INTEGER NOT NULL DEFAULT 0,
+        unchanged_rows       INTEGER NOT NULL DEFAULT 0,
+        skipped_rows         INTEGER NOT NULL DEFAULT 0,
+        conflict_rows        INTEGER NOT NULL DEFAULT 0,
+        invalid_rows         INTEGER NOT NULL DEFAULT 0,
+        warnings_json        TEXT NOT NULL DEFAULT '[]',
+        created_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        committed_at         TEXT
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_sw_import_hash ON sw_industry_import_batches(content_hash)",
+    "CREATE INDEX IF NOT EXISTS idx_sw_import_created ON sw_industry_import_batches(created_at DESC)",
+    # ── 个股概念数据 ──
+    """
+    CREATE TABLE IF NOT EXISTS stock_concepts (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        name                 TEXT NOT NULL UNIQUE,
+        stock_count          INTEGER NOT NULL DEFAULT 0,
+        created_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at           TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_stock_concepts_name ON stock_concepts(name)",
+    """
+    CREATE TABLE IF NOT EXISTS stock_concept_mappings (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        market_group         TEXT NOT NULL DEFAULT 'A' CHECK (market_group IN ('A', 'HK', 'OVERSEAS')),
+        exchange_suffix      TEXT NOT NULL DEFAULT 'SZ',
+        stock_code           TEXT NOT NULL,
+        stock_name           TEXT NOT NULL DEFAULT '',
+        concepts_json        TEXT NOT NULL DEFAULT '[]',
+        source               TEXT NOT NULL DEFAULT 'manual',
+        source_version       TEXT NOT NULL DEFAULT '',
+        is_manual_override   INTEGER NOT NULL DEFAULT 0 CHECK (is_manual_override IN (0, 1)),
+        created_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        UNIQUE(stock_code)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_concept_map_stock_code ON stock_concept_mappings(stock_code)",
+    "CREATE INDEX IF NOT EXISTS idx_concept_map_stock_name ON stock_concept_mappings(stock_name)",
+    "CREATE INDEX IF NOT EXISTS idx_concept_map_market ON stock_concept_mappings(market_group)",
+    """
+    CREATE TABLE IF NOT EXISTS stock_concept_import_batches (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        import_token         TEXT NOT NULL UNIQUE,
+        content_hash         TEXT NOT NULL,
+        filename             TEXT NOT NULL,
+        source_version       TEXT NOT NULL DEFAULT '',
+        status               TEXT NOT NULL CHECK (status IN ('previewed', 'committed', 'failed')),
+        total_rows           INTEGER NOT NULL DEFAULT 0,
+        valid_rows           INTEGER NOT NULL DEFAULT 0,
+        added_rows           INTEGER NOT NULL DEFAULT 0,
+        updated_rows         INTEGER NOT NULL DEFAULT 0,
+        unchanged_rows       INTEGER NOT NULL DEFAULT 0,
+        skipped_rows         INTEGER NOT NULL DEFAULT 0,
+        invalid_rows         INTEGER NOT NULL DEFAULT 0,
+        warnings_json        TEXT NOT NULL DEFAULT '[]',
+        created_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        committed_at         TEXT
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_concept_import_hash ON stock_concept_import_batches(content_hash)",
+    "CREATE INDEX IF NOT EXISTS idx_concept_import_created ON stock_concept_import_batches(created_at DESC)",
+    # ── 个股基础资料库 ──
+    """
+    CREATE TABLE IF NOT EXISTS stock_basic_profiles (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        market_group         TEXT NOT NULL DEFAULT 'A' CHECK (market_group IN ('A', 'HK', 'OVERSEAS')),
+        exchange             TEXT NOT NULL DEFAULT '',
+        board                TEXT NOT NULL DEFAULT '',
+        stock_code           TEXT NOT NULL UNIQUE,
+        stock_name           TEXT NOT NULL DEFAULT '',
+        listing_date         TEXT,
+        main_business        TEXT NOT NULL DEFAULT '',
+        business_scope       TEXT NOT NULL DEFAULT '',
+        products             TEXT NOT NULL DEFAULT '',
+        industry             TEXT NOT NULL DEFAULT '',
+        sw_level1_name       TEXT NOT NULL DEFAULT '',
+        sw_level2_name       TEXT NOT NULL DEFAULT '',
+        sw_level3_name       TEXT NOT NULL DEFAULT '',
+        city                 TEXT NOT NULL DEFAULT '',
+        province             TEXT NOT NULL DEFAULT '',
+        legal_repr           TEXT NOT NULL DEFAULT '',
+        registered_capital   TEXT NOT NULL DEFAULT '',
+        setup_date           TEXT,
+        website              TEXT NOT NULL DEFAULT '',
+        company_intro        TEXT NOT NULL DEFAULT '',
+        source               TEXT NOT NULL DEFAULT 'exchange',
+        source_version       TEXT NOT NULL DEFAULT '',
+        is_manual_override   INTEGER NOT NULL DEFAULT 0 CHECK (is_manual_override IN (0, 1)),
+        created_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at           TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_market ON stock_basic_profiles(market_group)",
+    "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_exchange ON stock_basic_profiles(exchange)",
+    "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_board ON stock_basic_profiles(board)",
+    "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_code ON stock_basic_profiles(stock_code)",
+    "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_name ON stock_basic_profiles(stock_name)",
+    "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_listing_date ON stock_basic_profiles(listing_date)",
+    "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_updated ON stock_basic_profiles(updated_at DESC)",
+]
+

@@ -6,6 +6,7 @@ import { buildAnalysisHistoryUrl } from "../../features/investment-research/anal
 import WorkflowPageHeader from "../../components/workflows/WorkflowPageHeader";
 import WorkflowWorkspace from "../../components/workflows/WorkflowWorkspace";
 import { useColors, useStyles, useTokens } from "../../styles/ui";
+import { buildStockAnalysisUrl } from "../../utils/stockLinks";
 
 const { Paragraph } = Typography;
 
@@ -17,7 +18,7 @@ export default function AnalysisEntry() {
   return (
     <div style={pageContainerStyle}>
       <WorkflowPageHeader
-        title="个股研究"
+        title="个股"
         description="从投资研究结论出发，深入查看基本面、估值、技术面、情绪与资金流向"
         icon={<FileSearchOutlined />}
       />
@@ -41,7 +42,7 @@ export default function AnalysisEntry() {
             style={{ ...cardStyle, padding: `${t.space[2]} 0`, width: "100%", maxWidth: 560 }}
             styles={{ body: { padding: `${t.space[6]} ${t.space[6]} ${t.space[4]}`, display: "flex", justifyContent: "center" } }}
           >
-            <SearchBar />
+            <SearchBar buildTarget={buildStockAnalysisUrl} />
           </Card>
         </div>
       </WorkflowWorkspace>

@@ -52,7 +52,7 @@ function SectorStocksDrawer({
         <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
           <Space orientation="vertical" size={0}>
             <span style={{ fontWeight: Number(t.weight.medium) }}>{stock.name}</span>
-            <span style={{ color: c.textSecondary, fontSize: t.font.xs }}>{stock.code}</span>
+            <span style={{ color: c.textSecondary, fontSize: t.font.xs, fontFamily: "monospace" }}>{stock.code}</span>
           </Space>
         </StockExternalLink>
       ),
@@ -77,7 +77,7 @@ function SectorStocksDrawer({
         left.main_net - right.main_net
       ),
       render: (value: number) => (
-        <span style={{ color: value > 0 ? c.up : value < 0 ? c.down : undefined }}>
+        <span style={{ color: value > 0 ? c.up : value < 0 ? c.down : undefined, fontFamily: "monospace" }}>
           {formatAmount(value)}
         </span>
       ),
@@ -92,7 +92,7 @@ function SectorStocksDrawer({
         dataIndex: "price",
         width: 80,
         align: "right" as const,
-        render: (value: number | null) => (value === null ? "-" : value.toFixed(2)),
+        render: (value: number | null) => <span style={{ fontFamily: "monospace" }}>{value === null ? "-" : value.toFixed(2)}</span>,
       },
       changeColumn,
       {
@@ -116,7 +116,7 @@ function SectorStocksDrawer({
         dataIndex: "amount",
         width: 110,
         align: "right" as const,
-        render: (value: number) => formatAmount(value),
+        render: (value: number) => <span style={{ fontFamily: "monospace" }}>{formatAmount(value)}</span>,
       },
       netColumn,
       {
@@ -124,7 +124,7 @@ function SectorStocksDrawer({
         dataIndex: "turnover_rate",
         width: 90,
         align: "right" as const,
-        render: (value: number | null) => formatRate(value),
+        render: (value: number | null) => <span style={{ fontFamily: "monospace" }}>{formatRate(value)}</span>,
       },
       {
         title: "近期涨幅",
@@ -138,7 +138,7 @@ function SectorStocksDrawer({
         dataIndex: "float_amount",
         width: 120,
         align: "right" as const,
-        render: (value: number) => formatMarketCap(value),
+        render: (value: number) => <span style={{ fontFamily: "monospace" }}>{formatMarketCap(value)}</span>,
       },
     ];
   }, [c, isNarrow, t]);
@@ -187,7 +187,7 @@ function SectorStocksDrawer({
             expandedRowRender: renderExpandedRow,
             columnWidth: 36,
           } : undefined}
-          scroll={{ x: "max-content" }}
+          scroll={{ x: 800 }}
           size="small"
         />
       </SectionDataState>
@@ -214,7 +214,9 @@ export default function IndustryRankTab() {
   const sectors = useMemo(() => data?.sectors ?? [], [data?.sectors]);
   const hasData = sectors.length > 0;
   const source = data?.source || "未知";
-  const isToday = dateText === today;
+  const actualDate = data?.date || dateText;
+  const dateWasResolved = hasData && actualDate !== dateText;
+  const isToday = actualDate === today;
   const isKaipanhongSource = source === "开盘红" && (data?.fund_data_available ?? false);
   const drillDownDisabled = isToday || !isKaipanhongSource;
   const drillDownTooltip = isToday
@@ -286,7 +288,7 @@ export default function IndustryRankTab() {
         (left.net_inflow ?? 0) - (right.net_inflow ?? 0)
       ),
       render: (value: number | null) => (
-        <span style={{ color: value == null ? c.textSecondary : value >= 0 ? c.up : c.down }}>
+        <span style={{ color: value == null ? c.textSecondary : value >= 0 ? c.up : c.down, fontFamily: "monospace" }}>
           {formatAmount(value)}
         </span>
       ),
@@ -311,24 +313,24 @@ export default function IndustryRankTab() {
         align: "right",
         render: (value: number | null) => <ChangeValue value={value} />,
       },
-      { title: "成交额", dataIndex: "amount", width: 110, align: "right", render: formatAmount },
+      { title: "成交额", dataIndex: "amount", width: 110, align: "right", render: (val) => <span style={{ fontFamily: "monospace" }}>{formatAmount(val)}</span> },
       netColumn,
       {
         title: "主买",
         dataIndex: "buy_amount",
         width: 110,
         align: "right",
-        render: (value: number | null) => <span style={{ color: c.up }}>{formatAmount(value)}</span>,
+        render: (value: number | null) => <span style={{ color: c.up, fontFamily: "monospace" }}>{formatAmount(value)}</span>,
       },
       {
         title: "主卖",
         dataIndex: "sell_amount",
         width: 110,
         align: "right",
-        render: (value: number | null) => <span style={{ color: c.down }}>{formatAmount(value)}</span>,
+        render: (value: number | null) => <span style={{ color: c.down, fontFamily: "monospace" }}>{formatAmount(value)}</span>,
       },
-      { title: "换手率", dataIndex: "turnover_rate", width: 90, align: "right", render: formatRate },
-      { title: "行业市值", dataIndex: "market_cap", width: 120, align: "right", render: formatMarketCap },
+      { title: "换手率", dataIndex: "turnover_rate", width: 90, align: "right", render: (val) => <span style={{ fontFamily: "monospace" }}>{formatRate(val)}</span> },
+      { title: "行业市值", dataIndex: "market_cap", width: 120, align: "right", render: (val) => <span style={{ fontFamily: "monospace" }}>{formatMarketCap(val)}</span> },
       stocksActionColumn,
     ];
   }, [c, isNarrow, drillDownDisabled, drillDownTooltip, t]);
@@ -350,7 +352,7 @@ export default function IndustryRankTab() {
   ), []);
 
   return (
-    <div style={{ ...cardStyle, padding: 0 }}>
+    <div style={{ ...cardStyle, padding: 0, borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
       <div
         style={{
           padding: `${t.space[3]} ${t.space[4]}`,
@@ -367,8 +369,9 @@ export default function IndustryRankTab() {
         </span>
         <Tag>{source}</Tag>
         {!data?.fund_data_available ? <Tag color="warning">资金数据降级</Tag> : null}
+        {dateWasResolved ? <Tag color="warning">已回退至最近交易日</Tag> : null}
         <span style={{ color: c.textSecondary, fontSize: t.font.sm }}>
-          数据日期：{data?.date || dateText}
+          数据日期：{actualDate}
         </span>
         <Space wrap style={{ marginLeft: "auto" }}>
           <DatePicker
@@ -400,14 +403,14 @@ export default function IndustryRankTab() {
             expandedRowRender: renderExpandedRow,
             columnWidth: 36,
           } : undefined}
-          scroll={{ x: isNarrow ? undefined : "max-content", y: 600 }}
+          scroll={{ x: isNarrow ? undefined : 1180, y: 600 }}
           size="small"
           style={{ background: "transparent" }}
         />
       </SectionDataState>
       <SectorStocksDrawer
         sector={drawerSector}
-        dateText={dateText}
+        dateText={actualDate}
         onClose={() => setDrawerSector(null)}
       />
     </div>

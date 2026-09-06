@@ -17,11 +17,16 @@ from app.constants.market import (
     SINA_MARKET_HQ_URL,
     SINA_STOCK_KLINE_URL,
 )
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import reference_cache as cache
+from app.core.cache_policies import SINA_SPOT_SNAPSHOT, SINA_STOCK_NAMES
+from app.core.concurrency.singleflight import SyncSingleFlight
 from app.core.dataframes import coerce_numeric_columns, normalize_intraday_df, rename_and_keep_columns, rename_columns
 from app.core.market import normalize_code, normalize_index_symbol, normalize_stock_name, safe_float
+from app.infrastructure.providers.sina import bulletins as sina_bulletins
 from app.infrastructure.providers.sina import financials as sina_financials
 from app.infrastructure.providers.sina import industry as sina_industry
+from app.infrastructure.providers.sina import reports as sina_reports
 from app.infrastructure.providers.sina.parsing import parse_jsonp
 
 logger = logging.getLogger(__name__)
@@ -29,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 class SinaDataProvider:
     """Purpose: 直接对接新浪财经接口的 K线、指数、快照、分时等数据提供器（备用源）。"""
+
     HQ_PAGE_SIZE = 80
     HQ_MAX_PAGES = 80
     HQ_RETRY_DELAY_SECONDS = 0.3
@@ -37,8 +43,8 @@ class SinaDataProvider:
     RANK_WORKERS = 8
     RANK_MAX_PAGES = 200
     RANK_MIN_RECORDS = 4000
-    NAMES_CACHE_TTL = 86400  # 全市场名称代码，1 天
-    SNAPSHOT_CACHE_TTL = 60  # 实时行情，1 分钟
+    NAMES_CACHE_TTL = SINA_STOCK_NAMES.ttl_seconds
+    SNAPSHOT_CACHE_TTL = SINA_SPOT_SNAPSHOT.ttl_seconds
     name = "sina"
 
     def __init__(self):
@@ -46,9 +52,9 @@ class SinaDataProvider:
         # Sina 接口常常无法通过代理访问，使用独立 session 并禁用代理
         self._session = requests.Session()
         self._session.trust_env = False
+        self._hq_singleflight = SyncSingleFlight[list[dict]]()
 
-
-    def fetch_kline(self, code: str, period: str, start_date: str="", end_date: str="") -> pd.DataFrame:
+    def fetch_kline(self, code: str, period: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:
         """新浪股票 K 线（自行处理 JSONP/范围截取与列重命名）。
         Param:
             code: 6 位股票代码
@@ -113,7 +119,6 @@ class SinaDataProvider:
         df["日期"] = df["日期"].dt.strftime("%Y-%m-%d")
         return df
 
-
     def fetch_index_intraday(self, symbol: str) -> pd.DataFrame:
         """Fetch and normalize the current-session minute line for a market index."""
         response = self._session.get(
@@ -131,11 +136,7 @@ class SinaDataProvider:
         result = payload.get("result") if isinstance(payload, Mapping) else None
         status = result.get("status") if isinstance(result, Mapping) else None
         rows = result.get("data") if isinstance(result, Mapping) else None
-        if (
-            not isinstance(status, Mapping)
-            or status.get("code") != 0
-            or not isinstance(rows, list)
-        ):
+        if not isinstance(status, Mapping) or status.get("code") != 0 or not isinstance(rows, list):
             raise RuntimeError("新浪指数分时接口返回错误")
 
         normalized_by_time: dict[str, dict[str, float | str | None]] = {}
@@ -161,7 +162,6 @@ class SinaDataProvider:
             columns=["time", "price", "avg_price", "volume", "total_volume"],
         )
 
-
     def fetch_market_indices(self) -> pd.DataFrame:
         """新浪沪深重要指数实时行情并合并为一张 DataFrame
         https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple?page=1&num=40&sort=symbol&asc=1&node=dpzs&_s_r_a=init
@@ -181,13 +181,34 @@ class SinaDataProvider:
         response.raise_for_status()
         data_json = json.loads(response.text)
         if not data_json:
-                return big_df
+            return big_df
         big_df = pd.DataFrame(data_json)
-        big_df = coerce_numeric_columns(big_df, ["trade", "pricechange", "changepercent", "buy", "sell", "settlement", "open", "high", "low"])
-        big_df.columns = ["代码", "名称", "最新价", "涨跌额", "涨跌幅", "_", "_", "昨收", "今开", "最高", "最低", "成交量", "成交额", "_", "_"]
-        big_df = big_df[["代码", "名称", "最新价", "涨跌额", "涨跌幅", "昨收", "今开", "最高", "最低", "成交量", "成交额"]]
-        return coerce_numeric_columns(big_df, ["最新价", "涨跌额", "涨跌幅", "昨收", "今开", "最高", "最低", "成交量", "成交额"])
-
+        big_df = coerce_numeric_columns(
+            big_df, ["trade", "pricechange", "changepercent", "buy", "sell", "settlement", "open", "high", "low"]
+        )
+        big_df.columns = [
+            "代码",
+            "名称",
+            "最新价",
+            "涨跌额",
+            "涨跌幅",
+            "_",
+            "_",
+            "昨收",
+            "今开",
+            "最高",
+            "最低",
+            "成交量",
+            "成交额",
+            "_",
+            "_",
+        ]
+        big_df = big_df[
+            ["代码", "名称", "最新价", "涨跌额", "涨跌幅", "昨收", "今开", "最高", "最低", "成交量", "成交额"]
+        ]
+        return coerce_numeric_columns(
+            big_df, ["最新价", "涨跌额", "涨跌幅", "昨收", "今开", "最高", "最低", "成交量", "成交额"]
+        )
 
     @staticmethod
     def _is_cnrank_a_share_code(code: str) -> bool:
@@ -257,11 +278,7 @@ class SinaDataProvider:
         except Exception as error:
             raise RuntimeError(f"新浪 cnrank 第 {page} 页请求失败: {error}") from error
         rows = payload.get("data") if isinstance(payload, Mapping) else None
-        if (
-            not isinstance(payload, Mapping)
-            or payload.get("code") != 0
-            or not isinstance(rows, list)
-        ):
+        if not isinstance(payload, Mapping) or payload.get("code") != 0 or not isinstance(rows, list):
             raise RuntimeError(f"新浪 cnrank 第 {page} 页返回格式无效")
         return [dict(row) for row in rows if isinstance(row, Mapping)]
 
@@ -282,10 +299,7 @@ class SinaDataProvider:
                             min(start_page + self.RANK_BATCH_SIZE, self.RANK_MAX_PAGES + 1),
                         )
                     )
-                    futures = {
-                        page: executor.submit(self._fetch_cnrank_page, page)
-                        for page in page_numbers
-                    }
+                    futures = {page: executor.submit(self._fetch_cnrank_page, page) for page in page_numbers}
                     for page in page_numbers:
                         page_rows = futures[page].result()
                         records.extend(page_rows)
@@ -299,9 +313,7 @@ class SinaDataProvider:
             raise RuntimeError(f"新浪 cnrank 未在 {self.RANK_MAX_PAGES} 页内结束")
         frame = self._normalize_cnrank_rows(records)
         if len(frame.index) < self.RANK_MIN_RECORDS:
-            raise RuntimeError(
-                f"新浪 cnrank A 股快照不足: {len(frame.index)} < {self.RANK_MIN_RECORDS}"
-            )
+            raise RuntimeError(f"新浪 cnrank A 股快照不足: {len(frame.index)} < {self.RANK_MIN_RECORDS}")
         return frame
 
     def fetch_revenue_breakdown(self, code: str) -> dict[str, object]:
@@ -324,8 +336,42 @@ class SinaDataProvider:
         )
 
     def fetch_sw_industry_mappings(self) -> sina_industry.SwMappingMap:
-        """获取申万一级、二级分类及完整 A 股成分映射。"""
+        """获取申万一级、二级、三级分类及完整 A 股成分映射。"""
         return sina_industry.fetch_sw_industry_mappings(self._session)
+
+    def fetch_stock_bulletins(self, code: str, page: int = 1, page_size: int = 10, notice_type: str = "") -> dict:
+        """新浪个股公告列表（CB_AllService.getBulletinList）。
+
+        Return:
+            归一化字典：code、name、page、page_size、total_pages、items
+        """
+        return cast(
+            dict,
+            sina_bulletins.fetch_stock_bulletins(
+                self._session,
+                code,
+                page=page,
+                page_size=page_size,
+                notice_type=notice_type,
+            ),
+        )
+
+    def fetch_stock_reports(self, code: str, page: int = 1, page_size: int = 10) -> dict:
+        """新浪个股研报评级列表（ReportService.getList）。
+
+        Return:
+            归一化字典：code、page、page_size、total_count、total_pages、items
+        """
+        sym = normalize_code(code)
+        return cast(
+            dict,
+            sina_reports.fetch_stock_reports(
+                self._session,
+                sym.prefixed_lower,
+                page=page,
+                page_size=page_size,
+            ),
+        )
 
     def fetch_stock_names(self) -> list[dict]:
         """获取全市场 A 股的名称代码对照表（新浪行情列表分页拉取，按日缓存）。
@@ -392,7 +438,7 @@ class SinaDataProvider:
             df["流通市值"] = pd.to_numeric(df["流通市值"], errors="coerce") * 10000
         return df
 
-    def _fetch_market_hq_records(self, ttl: int | None = None, cache_scope: str = "default") -> list[dict]:
+    def _load_market_hq_records(self, ttl: int | None = None, cache_scope: str = "default") -> list[dict]:
         """分页拉取新浪沪深 A 股行情原始 JSON 记录，带缓存。
 
         Param:
@@ -438,6 +484,23 @@ class SinaDataProvider:
             cache.set(cache_key, records, ttl=ttl)
         return records
 
+    def _fetch_market_hq_records(
+        self,
+        ttl: int | None = None,
+        cache_scope: str = "default",
+    ) -> list[dict]:
+        """合并相同作用域的并发全市场快照请求。"""
+        if ttl is None:
+            return self._load_market_hq_records(ttl=ttl, cache_scope=cache_scope)
+        cache_key = dated_cache_key("sina", "hq_records", cache_scope)
+        return cast(
+            list[dict],
+            self._hq_singleflight.do(
+                cache_key,
+                lambda: self._load_market_hq_records(ttl=ttl, cache_scope=cache_scope),
+            ),
+        )
+
     def fetch_stock_intraday_minute_direct(self, code: str = "000001", date: str | None = None) -> pd.DataFrame:
         """直接拉取新浪个股分时分钟线（解析 JSONP 响应）。
 
@@ -465,14 +528,16 @@ class SinaDataProvider:
         if df.empty:
             return pd.DataFrame()
         trade_date = date or pd.Timestamp.now().strftime("%Y-%m-%d")
-        result_df = pd.DataFrame({
-            "时间": df["m"].map(lambda value: f"{trade_date} {str(value).strip()}"),
-            "成交价": pd.to_numeric(df.get("p"), errors="coerce"),
-            "均价": pd.to_numeric(df.get("avg_p"), errors="coerce"),
-            "成交量": pd.to_numeric(df.get("v"), errors="coerce"),
-            "成交额": pd.to_numeric(df.get("p"), errors="coerce") * pd.to_numeric(df.get("v"), errors="coerce"),
-        })
+        result_df = pd.DataFrame(
+            {
+                "时间": df["m"].map(lambda value: f"{trade_date} {str(value).strip()}"),
+                "成交价": pd.to_numeric(df.get("p"), errors="coerce"),
+                "均价": pd.to_numeric(df.get("avg_p"), errors="coerce"),
+                "成交量": pd.to_numeric(df.get("v"), errors="coerce"),
+                "成交额": pd.to_numeric(df.get("p"), errors="coerce") * pd.to_numeric(df.get("v"), errors="coerce"),
+            }
+        )
         return normalize_intraday_df(result_df)
-    
+
 
 sina_provider = SinaDataProvider()

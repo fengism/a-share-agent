@@ -8,22 +8,25 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   addAlert: vi.fn(),
   search: vi.fn(),
+  items: [] as Array<Record<string, unknown>>,
 }));
+
+const defaultItem = {
+  id: 1,
+  stock_code: "601991",
+  stock_name: "大唐发电",
+  note: "",
+  created_at: "2026-08-13T10:00:00",
+  current_price: 3.25,
+  change_pct: 1.2,
+  quote_source: "tencent",
+  alerts: [],
+};
 
 vi.mock("../../api/queries", () => ({
   useWatchlist: () => ({
     data: {
-      items: [{
-        id: 1,
-        stock_code: "601991",
-        stock_name: "大唐发电",
-        note: "",
-        created_at: "2026-08-13T10:00:00",
-        current_price: 3.25,
-        change_pct: 1.2,
-        quote_source: "tencent",
-        alerts: [],
-      }],
+      items: mocks.items,
       source: "tencent",
       quoted_at: "2026-08-13T10:00:00",
     },
@@ -54,6 +57,7 @@ describe("WatchlistPanel", () => {
   beforeEach(() => {
     mocks.add.mockReset().mockResolvedValue({});
     mocks.remove.mockReset().mockResolvedValue({});
+    mocks.items.splice(0, mocks.items.length, defaultItem);
   });
 
   const renderPanel = () => render(
@@ -85,7 +89,7 @@ describe("WatchlistPanel", () => {
     expect(screen.getByRole("listitem")).toHaveClass("dashboard-watchlist__item", "is-up");
     expect(document.querySelector(".dashboard-watchlist__quote-cluster")).toHaveTextContent("3.25");
     expect(document.querySelector(".dashboard-watchlist__actions")).toHaveClass("dashboard-watchlist__actions--overlay");
-    expect(screen.getByRole("link", { name: /大唐发电/ })).toHaveAttribute("href", "/analysis/601991");
+    expect(screen.getByRole("link", { name: /大唐发电/ })).toHaveAttribute("href", "/stock/601991");
     expect(screen.getByRole("button", { name: "设置大唐发电提醒" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "移除大唐发电" })).toBeInTheDocument();
   });
@@ -95,5 +99,18 @@ describe("WatchlistPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "移除大唐发电" }));
     expect(mocks.remove).toHaveBeenCalledWith("601991");
+  });
+
+  it("keeps Hong Kong stocks on the Hong Kong market page", () => {
+    mocks.items.splice(0, mocks.items.length, {
+      ...defaultItem,
+      stock_code: "00700",
+      stock_name: "腾讯控股",
+      market: "hk",
+    });
+
+    renderPanel();
+
+    expect(screen.getByRole("link", { name: /腾讯控股/ })).toHaveAttribute("href", "/market?market=hk&code=00700");
   });
 });

@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { normalizeAshareStockCode } from "../utils/stockLinks";
+import { buildStockProfileUrl, normalizeAshareStockCode } from "../utils/stockLinks";
 
 interface StockExternalLinkProps {
   code: string;
@@ -26,7 +26,7 @@ export default function StockExternalLink({
 
   return (
     <Link
-      to={`/analysis/${normalizedCode}`}
+      to={buildStockProfileUrl(normalizedCode)}
       title={`查看${stockLabel}个股详情`}
       className={className}
       style={style}

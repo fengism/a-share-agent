@@ -15,6 +15,7 @@ AgentPlanStepStatus = Literal[
     "cancelled",
 ]
 AgentExecutionStatus = Literal["completed", "partial", "failed"]
+AgentResearchRoundStatus = Literal["running", "completed", "degraded"]
 
 
 class AgentToolSource(BaseModel):
@@ -53,10 +54,26 @@ class AgentPlanStepUpdate(BaseModel):
     attempt: int = Field(default=1, ge=1)
 
 
+class AgentResearchRound(BaseModel):
+    round_index: int = Field(ge=1)
+    round_total: int = Field(ge=1)
+    status: AgentResearchRoundStatus
+    objective: str
+    evidence_gaps: list[str] = Field(default_factory=list, max_length=32)
+    tool_names: list[str] = Field(default_factory=list, max_length=32)
+    tool_selection_reason: str = ""
+    evidence_added: list[str] = Field(default_factory=list, max_length=32)
+    judgment_basis: list[str] = Field(default_factory=list, max_length=32)
+    conclusion: str = ""
+    next_step: str = ""
+
+
 class AgentEvent(BaseModel):
     type: Literal[
         "status",
         "plan",
+        "round_started",
+        "round_completed",
         "plan_step",
         "text",
         "reasoning",
@@ -68,6 +85,7 @@ class AgentEvent(BaseModel):
     content: str | None = None
     plan: AgentPlan | None = None
     plan_step: AgentPlanStepUpdate | None = None
+    research_round: AgentResearchRound | None = None
     tool_call: ToolCallInfo | None = None
     tool_result: ToolResultInfo | None = None
     tool_result_summary: AgentToolResultSummary | None = None

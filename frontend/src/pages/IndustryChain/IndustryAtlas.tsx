@@ -21,6 +21,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useColors, useStyles } from "../../styles/ui";
 import type { AtlasLayer } from "../../types/stock";
 import QueryErrorState from "../../components/QueryErrorState";
+import { buildStockProfileUrl } from "../../utils/stockLinks";
 
 const IMPORT_PLACEHOLDER = `slug: my-chain
 name: 我的产业链
@@ -108,7 +109,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
           <ChainAtlasDetail
             chain={chainQuery.data}
             onAnalyze={onAnalyze}
-            onCompanyClick={(code) => navigate(`/analysis/${code}`)}
+            onCompanyClick={(code) => navigate(buildStockProfileUrl(code))}
           />
         )}
       </div>
@@ -127,7 +128,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
             onChange={(event) => setSearch(event.target.value)}
             style={{ maxWidth: 320 }}
           />
-          <span style={{ color: colors.textMuted, fontSize: 13 }}>
+          <span style={{ color: colors.textMuted, fontSize: "var(--c-font-md)" }}>
             {catalog
               ? `${catalog.total_chains} 条产业链 · ${catalog.total_companies} 家公司`
               : "加载中…"}
@@ -202,7 +203,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
               }}
               onClick={() => setSelectedSlug(chain.slug)}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="atlas-chain-card__heading" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span
                   style={{
                     width: 30,
@@ -218,15 +219,15 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
                 >
                   <ApartmentOutlined />
                 </span>
-                <strong style={{ fontSize: 15, color: colors.textPrimary }}>{chain.name}</strong>
+                <strong className="atlas-chain-card__name" style={{ fontSize: "var(--c-font-lg)", color: colors.textPrimary }}>{chain.name}</strong>
                 {chain.source === "mined" && <Tag color="processing">AI 挖掘</Tag>}
                 {chain.source === "imported" && <Tag color="gold">外部导入</Tag>}
-                <Tag style={{ marginLeft: "auto" }}>{chain.category}</Tag>
+                <Tag className="atlas-wrap-tag" style={{ marginLeft: "auto" }}>{chain.category}</Tag>
               </div>
-              <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.6, flex: 1 }}>
+              <div className="atlas-chain-card__summary" style={{ color: colors.textSecondary, fontSize: "var(--c-font-md)", lineHeight: "var(--c-leading-normal)", flex: 1 }}>
                 {chain.summary}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: colors.textMuted }}>
+              <div className="atlas-chain-card__stats" style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
                 <span>{chain.segment_count} 个环节</span>
                 <span>·</span>
                 <span>{chain.company_count} 家公司</span>
@@ -342,8 +343,8 @@ function AtlasImportModal({
         >
           <Button size="small">选择文件（.yaml / .json）</Button>
         </Upload>
-        <span style={{ color: colors.textMuted, fontSize: 12 }}>或直接粘贴内容</span>
-        <label style={{ marginLeft: "auto", fontSize: 13, color: colors.textSecondary, cursor: "pointer" }}>
+        <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>或直接粘贴内容</span>
+        <label style={{ marginLeft: "auto", fontSize: "var(--c-font-md)", color: colors.textSecondary, cursor: "pointer" }}>
           覆盖同名产业链
           <Switch
             size="small"
@@ -358,7 +359,7 @@ function AtlasImportModal({
         onChange={(event) => setContent(event.target.value)}
         placeholder={IMPORT_PLACEHOLDER}
         rows={16}
-        style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 12 }}
+        style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}
       />
     </Modal>
   );
@@ -386,7 +387,7 @@ function CategoryChip({
         color: active ? colors.primary : colors.textSecondary,
         borderRadius: 999,
         padding: "3px 14px",
-        fontSize: 13,
+        fontSize: "var(--c-font-md)",
         cursor: "pointer",
         transition: "all 0.15s ease",
       }}
@@ -411,11 +412,11 @@ function ChainAtlasDetail({
   return (
     <div>
       <div style={{ ...cardStyle, padding: "18px 22px", marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <strong style={{ fontSize: 18, color: colors.textPrimary }}>{chain.name}</strong>
-          <Tag>{chain.category}</Tag>
+        <div className="atlas-detail__heading" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <strong className="atlas-detail__name" style={{ fontSize: "var(--c-font-xl)", color: colors.textPrimary }}>{chain.name}</strong>
+          <Tag className="atlas-wrap-tag">{chain.category}</Tag>
           {(chain.tags ?? []).map((tag) => (
-            <Tag key={tag} color="processing">{tag}</Tag>
+            <Tag key={tag} className="atlas-wrap-tag" color="processing">{tag}</Tag>
           ))}
           <Button
             type="primary"
@@ -426,7 +427,7 @@ function ChainAtlasDetail({
             AI 深度分析
           </Button>
         </div>
-        <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.7, marginTop: 8 }}>
+        <div className="atlas-detail__summary" style={{ color: colors.textSecondary, fontSize: "var(--c-font-md)", lineHeight: "var(--c-leading-relaxed)", marginTop: 8 }}>
           {chain.summary}
         </div>
         {(chain.drivers ?? []).length > 0 && (
@@ -434,8 +435,9 @@ function ChainAtlasDetail({
             {(chain.drivers ?? []).map((driver) => (
               <span
                 key={driver}
+                className="atlas-driver-chip"
                 style={{
-                  fontSize: 12,
+                  fontSize: "var(--c-font-sm)",
                   color: colors.warning,
                   background: `${colors.warning}14`,
                   border: `1px solid ${colors.warning}33`,
@@ -450,13 +452,22 @@ function ChainAtlasDetail({
         )}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {chain.layers.map((layer) => (
-          <AtlasLayerBand key={layer.key} layer={layer} onCompanyClick={onCompanyClick} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {chain.layers.map((layer, index) => (
+          <div key={layer.key}>
+            <AtlasLayerBand layer={layer} onCompanyClick={onCompanyClick} />
+            {index < chain.layers.length - 1 && (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, padding: "8px 0", color: colors.textMuted }}>
+                <span style={{ height: 1, width: 40, background: colors.border }} />
+                <span style={{ fontSize: 12, opacity: 0.7, letterSpacing: 2 }}>↓ 传导流向</span>
+                <span style={{ height: 1, width: 40, background: colors.border }} />
+              </div>
+            )}
+          </div>
         ))}
       </div>
 
-      <div style={{ color: colors.textMuted, fontSize: 12, marginTop: 16, textAlign: "center" }}>
+      <div style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", marginTop: 16, textAlign: "center" }}>
         点击公司节点可跳转个股研究 · 数据为静态策划知识库，深度结论请使用个股研究
       </div>
     </div>
@@ -483,6 +494,7 @@ function AtlasLayerBand({
       }}
     >
       <div
+        className="atlas-layer__heading"
         style={{
           display: "flex",
           alignItems: "center",
@@ -502,8 +514,8 @@ function AtlasLayerBand({
             flexShrink: 0,
           }}
         />
-        <strong style={{ color: colors.textPrimary, fontSize: 14 }}>{layer.name}</strong>
-        <span style={{ color: colors.textMuted, fontSize: 12 }}>
+        <strong className="atlas-layer__name" style={{ color: colors.textPrimary, fontSize: "var(--c-font-base)" }}>{layer.name}</strong>
+        <span className="atlas-layer__count" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
           {layer.segments.length} 个环节
         </span>
       </div>
@@ -518,6 +530,7 @@ function AtlasLayerBand({
         {layer.segments.map((segment) => (
           <div
             key={segment.name}
+            className="atlas-segment"
             style={{
               border: `1px solid ${colors.border}`,
               borderRadius: 10,
@@ -525,9 +538,9 @@ function AtlasLayerBand({
               padding: "10px 12px",
             }}
           >
-            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+            <div className="atlas-segment__heading" style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ width: 3, height: 12, borderRadius: 2, background: accent }} />
-              <strong style={{ fontSize: 13, color: colors.textPrimary }}>{segment.name}</strong>
+              <strong className="atlas-segment__name" style={{ fontSize: "var(--c-font-md)", color: colors.textPrimary }}>{segment.name}</strong>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {segment.companies.map((company) => (
@@ -542,7 +555,7 @@ function AtlasLayerBand({
                     background: colors.cardBg,
                     borderRadius: 8,
                     padding: "4px 9px",
-                    fontSize: 12,
+                    fontSize: "var(--c-font-sm)",
                     color: colors.textPrimary,
                     cursor: "pointer",
                     display: "inline-flex",
@@ -550,8 +563,8 @@ function AtlasLayerBand({
                     gap: 6,
                   }}
                 >
-                  <span>{company.name}</span>
-                  <span style={{ color: accent, fontFamily: "var(--font-mono, monospace)", fontSize: 11 }}>
+                  <span className="atlas-company-chip__name">{company.name}</span>
+                  <span className="financial-num atlas-company-chip__code" style={{ color: accent, fontSize: "var(--c-font-xs)" }}>
                     {company.code}
                   </span>
                 </button>

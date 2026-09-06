@@ -1,8 +1,11 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, eastmoney_semaphore
+from app.core.exceptions import UpstreamUnavailableError
+from app.financial_data.market.trading_session import SHANGHAI_TIMEZONE, get_market_date_on_or_before
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
@@ -14,20 +17,6 @@ def _get_eastmoney_provider():
     return get_provider("eastmoney")
 
 
-
-def _fallback_report_dates(report_date: str, days: int = 5) -> list[str]:
-    """生成龙虎榜日期回退列表，从指定日期往前推 N 天。
-
-    Param:
-        report_date: 起始报告日期，格式 YYYY-MM-DD
-        days: 回退天数
-    Return:
-        逆序日期字符串列表，最近的日期在前
-    """
-    base = datetime.strptime(report_date, "%Y-%m-%d")
-    return [(base - timedelta(days=offset)).strftime("%Y-%m-%d") for offset in range(days)]
-
-
 async def get_dragon_tiger_list(report_date: str | None = None) -> list[dict]:
     """获取指定日期的龙虎榜列表，带日期回退和缓存。
 
@@ -36,31 +25,30 @@ async def get_dragon_tiger_list(report_date: str | None = None) -> list[dict]:
     Return:
         龙虎榜条目字典列表，失败返回空列表
     """
-    if report_date is None:
-        report_date = datetime.now().strftime("%Y-%m-%d")
+    requested_date = (
+        date.fromisoformat(report_date) if report_date is not None else datetime.now(SHANGHAI_TIMEZONE).date()
+    )
+    target_date = await get_market_date_on_or_before(requested_date)
+    target_date_text = target_date.isoformat()
 
-    cache_key = dated_cache_key("dragon_tiger", report_date)
+    cache_key = dated_cache_key("dragon_tiger", target_date_text)
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
-    result = []
     try:
-        for candidate_date in _fallback_report_dates(report_date):
-            data = await provider_gateway.call(
-                "eastmoney",
-                "dragon_tiger_list",
-                lambda candidate_date=candidate_date: call_blocking(
-                    _get_eastmoney_provider().fetch_dragon_tiger_daily_list,
-                    candidate_date,
-                    semaphore=eastmoney_semaphore,
-                ),
-            )
-            if data:
-                result = data
-                break
-    except Exception as e:
-        logger.warning(f"龙虎榜数据获取失败: {e}")
+        result = await provider_gateway.call(
+            "eastmoney",
+            "dragon_tiger_list",
+            lambda: call_blocking(
+                _get_eastmoney_provider().fetch_dragon_tiger_daily_list,
+                target_date_text,
+                semaphore=eastmoney_semaphore,
+            ),
+        )
+    except Exception as error:
+        logger.warning("龙虎榜数据获取失败: %s", error)
+        raise UpstreamUnavailableError("龙虎榜上游暂时不可用") from error
 
     cache.set(cache_key, result, ttl=600)
     return result
@@ -80,7 +68,6 @@ async def get_dragon_tiger_detail(code: str, report_date: str) -> list[dict]:
     if cached is not None:
         return cached
 
-    result = []
     try:
         result = await provider_gateway.call(
             "eastmoney",
@@ -92,8 +79,9 @@ async def get_dragon_tiger_detail(code: str, report_date: str) -> list[dict]:
                 semaphore=eastmoney_semaphore,
             ),
         )
-    except Exception as e:
-        logger.warning(f"龙虎榜明细获取失败: {code}, {e}")
+    except Exception as error:
+        logger.warning("龙虎榜明细获取失败: code=%s error=%s", code, error)
+        raise UpstreamUnavailableError("龙虎榜明细上游暂时不可用") from error
 
     cache.set(cache_key, result, ttl=600)
     return result

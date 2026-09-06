@@ -161,8 +161,29 @@ describe("IndustryRankTab", () => {
     expect(screen.getByText("首板 · 2板")).toBeInTheDocument();
   });
 
+  it("uses the resolved trading date for weekend data and sector drill-down", async () => {
+    mocks.rankingData = {
+      ...baselineRankingData,
+      date: "2026-08-21",
+    };
+    renderTab("/market?tab=industry-rank&industryDate=2026-08-22");
+
+    expect(mocks.query).toHaveBeenCalledWith("2026-08-22");
+    expect(screen.getByText("数据日期：2026-08-21")).toBeInTheDocument();
+    expect(screen.getByText("已回退至最近交易日")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "成分股" })[0]);
+
+    await screen.findByText(/贵金属 成分股 · 2026-08-21/);
+    expect(mocks.stocksQuery).toHaveBeenCalledWith("2026-08-21", "881169");
+  });
+
   it("disables the drill-down action when the selected date is today", () => {
     const today = new Date().toLocaleDateString("sv-SE");
+    mocks.rankingData = {
+      ...baselineRankingData,
+      date: today,
+    };
     renderTab(`/market?tab=industry-rank&industryDate=${today}`);
 
     const actions = screen.getAllByRole("button", { name: "成分股" });

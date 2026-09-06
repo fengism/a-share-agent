@@ -6,7 +6,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from app.configuration.paths import DATA_DIR
-from app.core.cache import cache
+from app.core.cache import analysis_cache as cache
 from app.infrastructure.persistence.ddl import (
     ANALYSIS_HISTORY_INDEXES,
     ANALYSIS_HISTORY_TABLE,
@@ -19,6 +19,7 @@ from app.modules.analysis.prompts import ANALYSIS_PROMPT_SPEC
 
 logger = logging.getLogger(__name__)
 _MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
+_KEY_LEVELS_VERSION = "key-levels-v1"
 
 _DATA_DIR = DATA_DIR / "analyses"
 _USERS_DIR_NAME = "users"
@@ -36,8 +37,8 @@ _SCHEMA_DATABASES = _HISTORY_INDEX.schema_databases
 
 
 def analysis_cache_key(user_id: int, code: str, date: str) -> str:
-    """构造按用户和 Prompt 版本隔离的分析结果缓存 key。"""
-    return ANALYSIS_PROMPT_SPEC.cache_key("user", user_id, code, date)
+    """构造按用户、Prompt 与关键点位算法版本隔离的分析结果缓存 key。"""
+    return ANALYSIS_PROMPT_SPEC.cache_key("user", user_id, code, date, _KEY_LEVELS_VERSION)
 
 
 def _user_stock_dir(user_id: int, code: str) -> Path:
@@ -158,10 +159,12 @@ def delete_analysis(
         else:
             mutation.complete()
 
-    if scope_user_id == 0:
-        cache.clear()
-    else:
-        cache.delete(analysis_cache_key(user_id, code, date))
+    cache.delete_many(
+        {
+            analysis_cache_key(user_id, code, date),
+            analysis_cache_key(scope_user_id, code, date),
+        }
+    )
     logger.info("分析历史已删除: user_id=%s, scope_user_id=%s, path=%s", user_id, scope_user_id, filepath)
     return True
 

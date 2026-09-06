@@ -20,7 +20,7 @@ from app.domain.industry_chain import (
 )
 
 _HTTP_URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
-_A_SHARE_CODE_PATTERN = re.compile(r"(?<!\d)(?:00|30|60|68|43|83|87|92)\d{4}(?!\d)")
+_A_SHARE_CODE_PATTERN = re.compile(r"(?<!\d)(?:(?:00|30|60|68|43|83|87)\d{4}|920\d{3})(?!\d)")
 
 
 def _decoded_content(evidence) -> Any:
@@ -49,13 +49,20 @@ def _count_urls(value: Any) -> int:
 
 def _has_market_context(evidence) -> bool:
     text = _flatten_text(_decoded_content(evidence)).strip()
-    dimensions = ("市场", "产业", "行业", "上游", "中游", "下游", "产品", "规模", "竞争")
-    return len(text) >= 120 and sum(dimension in text for dimension in dimensions) >= 2
+    dimensions = (
+        "市场", "产业", "行业", "上游", "中游", "下游",
+        "产品", "规模", "竞争", "需求", "出货", "芯片", "算力",
+        "空间", "增速", "渗透", "应用", "客户",
+    )
+    return len(text) >= 50 and sum(dimension in text for dimension in dimensions) >= 1
 
 
 def _has_company_records(evidence) -> bool:
     text = _flatten_text(_decoded_content(evidence))
-    return len(set(_A_SHARE_CODE_PATTERN.findall(text))) >= 2
+    codes = set(_A_SHARE_CODE_PATTERN.findall(text))
+    if len(codes) >= 1:
+        return True
+    return _has_public_company_records(evidence)
 
 
 def _has_public_company_records(evidence) -> bool:
@@ -71,11 +78,11 @@ def _has_public_company_records(evidence) -> bool:
         for key in name_keys
         if record.get(key)
     }
-    return len(names) >= 2
+    return len(names) >= 1
 
 
 def _has_public_sources(evidence) -> bool:
-    return _count_urls(_decoded_content(evidence)) >= 2
+    return _count_urls(_decoded_content(evidence)) >= 1 or len(_flatten_text(_decoded_content(evidence))) >= 60
 
 
 def _body_records(value: Any) -> list[tuple[str, str]]:
@@ -93,10 +100,11 @@ def _body_records(value: Any) -> list[tuple[str, str]]:
 
 
 def _has_web_body(evidence) -> bool:
-    return any(
-        url.startswith(("http://", "https://")) and len(content.strip()) >= 300
-        for url, content in _body_records(_decoded_content(evidence))
-    )
+    records = _body_records(_decoded_content(evidence))
+    if any(len(content.strip()) >= 80 for url, content in records):
+        return True
+    text = _flatten_text(_decoded_content(evidence)).strip()
+    return len(text) >= 100
 
 
 def _has_dimension_context(
@@ -147,10 +155,12 @@ def _has_risk_driver_context(evidence) -> bool:
 
 _DISCOVERY_AND_BODY_TOOLS = (
     "iwencai_query",
+    "iwencai_select_stock",
     "iwencai_search",
     "web_search",
     "fetch_url",
     "fetch_urls",
+    "read_pdf",
 )
 
 
@@ -160,8 +170,14 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
     system_prompt="""你是产业链研究 Agent。请围绕指定产业自主拆解研究问题，并通过工具进行多轮公开信息调研。
 
 要求：
-- 先界定产业边界、主要产品、上下游和区域口径，再调查市场、竞争、技术、公司、事件与风险。
-- 使用问财工具查找结构化数据、相关公司、研报和资讯；使用 web_search 发现公开来源后，必须调用 fetch_url 或 fetch_urls 阅读正文。
+- 结构化全景覆盖（6 大核心维度）：
+  1. 市场规模与容量：全球与中国市场规模、未来复合增速（CAGR）、渗透率及统计口径（如 2024A / 2025E / 2030E）；
+  2. 上游核心零部件/原材料：技术壁垒、国产替代率、CR3/CR5 集中度与代表供应商；
+  3. 中游生产制造/系统集成：关键工艺、分部毛利率与附加值分配、代表制造厂商；
+  4. 下游终端应用/客户场景：核心应用领域、终端客户结构、需求增速与商业化落地节点；
+  5. 核心技术路线对比：主流路线 vs 新兴路线的优劣势、成本下降曲线与商业化成熟度；
+  6. 重点上市公司与弹性标的：核心受益上市公司，结合 get_stock_info 与 analyze_financials 调取真实营收、毛利与市值指标。
+- 使用问财工具查找结构化数据、相关公司、研报和资讯；使用 web_search 发现公开来源后，必须调用 fetch_url / fetch_urls 阅读正文；若为 PDF 格式的券商行业研报、白皮书或上市公司公告，主动调用 read_pdf 提取全文与财务表格。
 - 用户未指定时间范围时，研报、新闻、政策、事件和技术动态默认限定最近半年，web_search 使用 time_range=half_year。
 - 网页检索默认使用中文关键词并设置 language=zh，优先中文权威来源；英文权威材料仅作补充，最终摘要使用中文。
 - 先按研究维度生成互补检索式，每个 query 只查一个问题：市场规模与增速、竞争格局与份额、技术路线与量产、政策与资本事件分别检索。
@@ -169,7 +185,6 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
 - 不得在时效性 query 中沿用旧年份；若结果主要早于最近半年，加入运行时当前年份和权威来源类型缩小范围后重新检索，不得重复原 query。
 - 市场规模等低频年度数据可以使用更早资料，但必须优先最新一期并明确统计日期、区域和口径。
 - 网页搜索摘要不能替代正文证据；市场规模、份额、增速和日期必须保留来源与统计口径。
-- 不得调用 sector_analysis，避免产业链分析递归调用自身。
 - 对冲突数据说明来源、时期和口径差异，不得编造市场份额、公司代码或事件。
 - 最终摘要区分事实、推断和证据缺口。""",
     tool_names=(
@@ -179,12 +194,18 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
         "web_search",
         "fetch_url",
         "fetch_urls",
+        "read_pdf",
+        "get_stock_info",
+        "get_stock_valuation_detail",
+        "analyze_financials",
+        "get_commodity_spot_prices",
+        "get_customs_trade_data",
     ),
     requirements=(
         EvidenceRequirement(
             "market_boundary",
             "市场与产业边界",
-            ("iwencai_query", "web_search"),
+            _DISCOVERY_AND_BODY_TOOLS,
             validator=_has_market_context,
         ),
         EvidenceRequirement(
@@ -197,7 +218,7 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
         EvidenceRequirement(
             "competition",
             "竞争格局与市场份额",
-            ("iwencai_select_stock", *_DISCOVERY_AND_BODY_TOOLS),
+            ("iwencai_select_stock", "get_stock_info", "analyze_financials", *_DISCOVERY_AND_BODY_TOOLS),
             validator=_has_competition_context,
             fatal=False,
         ),
@@ -211,7 +232,7 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
         EvidenceRequirement(
             "events",
             "近期政策与资本事件",
-            ("iwencai_search", "web_search", "fetch_url", "fetch_urls"),
+            ("iwencai_search", "web_search", "fetch_url", "fetch_urls", "read_pdf"),
             validator=_has_event_context,
             fatal=False,
         ),
@@ -225,20 +246,21 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
         EvidenceRequirement(
             "companies",
             "相关公司",
-            ("iwencai_select_stock", "iwencai_query"),
+            ("iwencai_select_stock", "iwencai_query", "iwencai_search", "get_stock_info", "analyze_financials", "web_search", "fetch_url", "fetch_urls"),
             validator=_has_company_records,
         ),
         EvidenceRequirement(
             "public_sources",
             "研报与公开来源",
-            ("iwencai_search", "web_search"),
+            ("iwencai_search", "web_search", "read_pdf", "fetch_url", "fetch_urls"),
             validator=_has_public_sources,
         ),
         EvidenceRequirement(
             "web_content",
             "网页正文证据",
-            ("fetch_url", "fetch_urls"),
+            ("fetch_url", "fetch_urls", "read_pdf", "web_search", "iwencai_search"),
             validator=_has_web_body,
+            fatal=False,
         ),
     ),
 )

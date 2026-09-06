@@ -1,7 +1,8 @@
 from datetime import UTC, date, datetime
 from typing import cast
 
-from app.core.cache import cache, dated_cache_key_no_day
+from app.core.cache import dated_cache_key_no_day
+from app.core.cache import market_cache as cache
 from app.core.cache_policies import MARKET_LIMIT_HISTORY
 from app.core.concurrency.rate_limiter import call_blocking, kaipanhong_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight

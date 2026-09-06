@@ -5,7 +5,8 @@ import json
 import logging
 from typing import Any, cast
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import analysis_cache as cache
+from app.core.cache import dated_cache_key
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.financial_data.market.public import get_market_feed
 from app.infrastructure.llm.sync_client import llm_chat

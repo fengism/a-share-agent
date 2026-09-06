@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPost, apiPut } from "../client";
+import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import type { components } from "../generated/schema";
 import { queryKeys } from "../queryKeys";
 import { useAStockTradingSession } from "../../hooks/useAStockTradingSession";
@@ -17,8 +18,8 @@ export function usePortfolio() {
   return useQuery({
     queryKey: queryKeys.portfolio,
     queryFn: () => apiGet<PortfolioResponse>("/portfolio"),
-    staleTime: 15_000,
-    refetchInterval: isTradingSession ? 30_000 : false,
+    staleTime: QUERY_CACHE_POLICIES.portfolioRealtime.staleMs,
+    refetchInterval: isTradingSession ? QUERY_CACHE_POLICIES.portfolioRealtime.pollMs : false,
   });
 }
 

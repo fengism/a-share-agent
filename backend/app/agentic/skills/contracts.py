@@ -18,6 +18,7 @@ class Skill:
     rules: tuple[str, ...]
     priority: int = 100
     exclusions: tuple[str, ...] = ()
+    examples: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if re.fullmatch(r"[a-z][a-z0-9_]{1,63}", self.name) is None:
@@ -42,6 +43,7 @@ class Skill:
             ("tool_names", self.tool_names),
             ("rules", self.rules),
             ("exclusions", self.exclusions),
+            ("examples", self.examples),
         ):
             if any(not value.strip() for value in values):
                 raise ValueError(f"Skill '{self.name}' 的 {field_name} 包含空值")
@@ -66,4 +68,6 @@ class Skill:
         lines.extend(f"- {rule}" for rule in self.rules)
         if self.exclusions:
             lines.append(f"- 避免：{'；'.join(self.exclusions)}")
+        if self.examples:
+            lines.append(f"- 示范：{' | '.join(self.examples)}")
         return "\n".join(lines)

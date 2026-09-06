@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from app.core.cache import cache
+from app.core.cache import analysis_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 from app.modules.analysis.models import AnalysisResult
 from app.modules.analysis.persistence import repository as analysis_storage

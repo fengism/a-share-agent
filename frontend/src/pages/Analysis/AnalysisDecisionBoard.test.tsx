@@ -10,7 +10,7 @@ function LocationProbe() {
 }
 
 describe("AnalysisDecisionBoard", () => {
-  it("renders conditional action, key levels and hands a follow-up to Chat", () => {
+  it("renders a conditional action and hands a follow-up to Chat", () => {
     const result = {
       stock_code: "600519",
       stock_name: "贵州茅台",
@@ -27,15 +27,14 @@ describe("AnalysisDecisionBoard", () => {
     );
 
     expect(screen.getByText("观察")).toBeInTheDocument();
-    expect(screen.getByText("1450.00")).toBeInTheDocument();
-    expect(screen.getByText("1650.00")).toBeInTheDocument();
+    expect(screen.queryByLabelText("关键点位")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /失效条件/ }));
     expect(screen.getByTestId("location").textContent).toContain("/chat?prompt=");
     expect(decodeURIComponent(screen.getByTestId("location").textContent || "")).toContain("贵州茅台当前结论的失效条件是什么");
   });
 
-  it("prefers role-specific research actions while retaining timing levels", () => {
+  it("prefers role-specific research actions", () => {
     const result = {
       stock_code: "600519",
       stock_name: "贵州茅台",
@@ -66,6 +65,5 @@ describe("AnalysisDecisionBoard", () => {
     expect(screen.getByText("当前估值没有覆盖主要下行情景")).toBeInTheDocument();
     expect(screen.getByText(/已持有者：/)).toHaveTextContent("考虑减持");
     expect(screen.getByText(/首要失效条件/)).toHaveTextContent("品牌定价权持续削弱");
-    expect(screen.getByLabelText("短期择时参考")).toBeInTheDocument();
   });
 });

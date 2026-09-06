@@ -36,15 +36,27 @@ export default function PotentialPage() {
       width: 52,
       align: "center",
       render: (_: unknown, __: PotentialStockItem, index: number) => {
-        const isTop3 = index < 3;
+        let rankBg = c.nestedBg;
+        let rankColor = c.textSecondary;
+        if (index === 0) {
+          rankBg = "linear-gradient(135deg, #ffd700, #ffaa00)";
+          rankColor = "#7a4100";
+        } else if (index === 1) {
+          rankBg = "linear-gradient(135deg, #e0e0e0, #b0bec5)";
+          rankColor = "#37474f";
+        } else if (index === 2) {
+          rankBg = "linear-gradient(135deg, #ffcc80, #d7ccc8)";
+          rankColor = "#5d4037";
+        }
         return (
           <span
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
-              width: 22, height: 22, borderRadius: t.radius.sm,
-              fontSize: t.font.xs, fontWeight: Number(t.weight.semibold),
-              color: isTop3 ? "#fff" : c.textSecondary,
-              background: isTop3 ? c.primary : c.nestedBg,
+              width: 24, height: 24, borderRadius: t.radius.sm,
+              fontSize: t.font.xs, fontWeight: Number(t.weight.bold),
+              color: rankColor,
+              background: rankBg,
+              boxShadow: index < 3 ? "0 2px 6px rgba(0,0,0,0.12)" : undefined,
             }}
           >
             {index + 1}

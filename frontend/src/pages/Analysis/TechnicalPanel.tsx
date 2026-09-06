@@ -76,7 +76,7 @@ export default function TechnicalPanel({ code, analysis }: Props) {
   const tileColors = { textSecondary: c.textSecondary, textPrimary: c.textPrimary, hoverBg: c.hoverBg, border: c.border };
   const tileStyles = {
     tile: { padding: "var(--c-space-3) var(--c-space-4)", background: c.hoverBg, border: `1px solid ${c.border}`, borderRadius: "var(--c-radius-md)" },
-    value: { fontSize: "var(--c-font-lg)", fontWeight: 600 },
+    value: { fontSize: "var(--c-font-lg)", fontWeight: "var(--c-weight-semibold)" },
   };
 
   return (

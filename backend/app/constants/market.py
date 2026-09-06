@@ -13,6 +13,8 @@ SINA_MARKET_HQ_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/j
 SINA_MARKET_NODES_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodes"
 SINA_CN_RANK_URL = "https://cnrank.finance.sina.cn/getSymRankByNode"
 SINA_STOCK_KLINE_URL = "https://quotes.sina.cn/cn/api/jsonp_v2.php/=/CN_MarketDataService.getKLineData"
+SINA_BULLETIN_LIST_URL = "https://vip.stock.finance.sina.com.cn/corp/api/openapi.php/CB_AllService.getBulletinList"
+SINA_REPORT_LIST_URL = "https://stock.finance.sina.com.cn/stock/api/openapi.php/ReportService.getList"
 
 EASTMONEY_STOCK_KLINE_URL = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
 EASTMONEY_CLIST_URL = "http://push2.eastmoney.com/api/qt/clist/get"

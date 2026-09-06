@@ -117,9 +117,34 @@ class HsgtFlowPoint(BaseModel):
 
 
 class HsgtFlowResponse(BaseModel):
+    date: str = ""
     updated_at: str = ""
     unit: str = "亿元"
+    is_stale: bool = False
     points: list[HsgtFlowPoint] = Field(default_factory=list)
+
+
+class NorthboundHistoryPoint(BaseModel):
+    date: str
+    north_money: float | None = None
+    sh_connect: float | None = None
+    sz_connect: float | None = None
+    south_money: float | None = None
+    hs300_open: float | None = None
+    hs300_close: float | None = None
+    hs300_high: float | None = None
+    hs300_low: float | None = None
+    hs300_change: float | None = None
+    hs300_change_pct: float | None = None
+
+
+class NorthboundHistoryResponse(BaseModel):
+    source: Literal["乐咕乐股", "东方财富"] = "乐咕乐股"
+    updated_at: str
+    unit: str = "亿元"
+    index_name: str = "沪深300"
+    is_stale: bool = False
+    items: list[NorthboundHistoryPoint] = Field(default_factory=list)
 
 
 class HsgtFlowHistoryItem(BaseModel):
@@ -226,6 +251,53 @@ class MarketMarginResponse(BaseModel):
     source: Literal["东方财富"] = "东方财富"
     fetched_at: str
     items: list[MarketMarginItem] = Field(default_factory=list)
+
+
+class MarketPriceAnomalyItem(BaseModel):
+    code: str
+    name: str
+    market: Literal["SH", "SZ", "BJ"]
+    change_pct: float | None = None
+    deviation: float | None = None
+    days: int | None = None
+    board: int | None = None
+    rule_code: int | None = None
+    rule: str
+    is_today: bool = False
+
+
+class MarketPriceAnomalyResponse(BaseModel):
+    source: Literal["东方财富"] = "东方财富"
+    date: str
+    fetched_at: str
+    page_no: int
+    page_size: int
+    pages: int = 0
+    is_stale: bool = False
+    items: list[MarketPriceAnomalyItem] = Field(default_factory=list)
+
+
+class MarketPriceAnomalyCountItem(BaseModel):
+    code: str
+    name: str
+    market: Literal["SH", "SZ", "BJ"]
+    price: float | None = None
+    change_pct: float | None = None
+    times: int | None = None
+    deviation: float | None = None
+    days: int | None = None
+    board: int | None = None
+
+
+class MarketPriceAnomalyCountResponse(BaseModel):
+    source: Literal["东方财富"] = "东方财富"
+    date: str
+    fetched_at: str
+    page_no: int
+    page_size: int
+    pages: int = 0
+    is_stale: bool = False
+    items: list[MarketPriceAnomalyCountItem] = Field(default_factory=list)
 
 
 class MarketMainlineFaucetStock(BaseModel):

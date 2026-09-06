@@ -17,10 +17,13 @@ from app.financial_data.market.public import (
     MarketLimitUpLadderResponse,
     MarketMainlineResponse,
     MarketMarginResponse,
+    MarketPriceAnomalyCountResponse,
+    MarketPriceAnomalyResponse,
     MarketSectorStocksHistoryResponse,
     MarketVolumeResponse,
     MarketWindResponse,
     MarketWindStocksResponse,
+    NorthboundHistoryResponse,
     ThsHotPlate,
     ThsHotStock,
     TradingCalendarResponse,
@@ -38,9 +41,16 @@ from app.financial_data.market.public import get_limit_up_ladder as get_limit_up
 from app.financial_data.market.public import get_market_emotion as get_market_emotion_service
 from app.financial_data.market.public import get_market_mainline as get_market_mainline_service
 from app.financial_data.market.public import get_market_margin as get_market_margin_service
+from app.financial_data.market.public import (
+    get_market_price_anomaly as get_market_price_anomaly_service,
+)
+from app.financial_data.market.public import (
+    get_market_price_anomaly_count as get_market_price_anomaly_count_service,
+)
 from app.financial_data.market.public import get_market_volume as get_market_volume_service
 from app.financial_data.market.public import get_market_wind as get_market_wind_service
 from app.financial_data.market.public import get_market_wind_stocks as get_market_wind_stocks_service
+from app.financial_data.market.public import get_northbound_history as get_northbound_history_service
 from app.financial_data.market.public import get_sector_stocks_history as get_sector_stocks_history_service
 from app.financial_data.market.public import get_ths_hot_concept as get_ths_hot_concept_service
 from app.financial_data.market.public import get_ths_hot_industry as get_ths_hot_industry_service
@@ -105,6 +115,31 @@ async def get_market_margin(
 ):
     """获取沪深两市融资融券历史合计（日级，单位亿元）。"""
     return await get_market_margin_service(days)
+
+
+@router.get("/price-anomaly", response_model=MarketPriceAnomalyResponse)
+async def get_market_price_anomaly(
+    page_size: int = Query(200, ge=1, le=200, description="每页条数"),
+    page_no: int = Query(1, ge=1, description="页码"),
+):
+    """获取交易所异动明细。"""
+    return await get_market_price_anomaly_service(page_size, page_no)
+
+
+@router.get("/price-anomaly/count", response_model=MarketPriceAnomalyCountResponse)
+async def get_market_price_anomaly_count(
+    page_size: int = Query(50, ge=1, le=200, description="每页条数"),
+    page_no: int = Query(1, ge=1, description="页码"),
+    sort_key: str = Query("", max_length=32, description="排序字段"),
+    sort_dir: str = Query("", pattern=r"^(|asc|desc)$", description="排序方向"),
+):
+    """获取按标的聚合的交易所异动统计。"""
+    return await get_market_price_anomaly_count_service(
+        page_size,
+        page_no,
+        sort_key,
+        sort_dir,
+    )
 
 
 @router.get("/today-wind", response_model=MarketWindResponse)
@@ -205,3 +240,11 @@ async def get_hsgt_flow():
 async def get_hsgt_flow_history(days: int = Query(30, description="查询天数")):
     """读取沪深股通历史分钟流向数据。"""
     return await get_hsgt_flow_history_service(days)
+
+
+@router.get("/northbound-history", response_model=NorthboundHistoryResponse)
+async def get_northbound_history(
+    page_size: int = Query(500, ge=20, le=3000, description="返回最近交易日数量"),
+):
+    """获取北向资金与沪深300历史对照数据。"""
+    return await get_northbound_history_service(page_size)

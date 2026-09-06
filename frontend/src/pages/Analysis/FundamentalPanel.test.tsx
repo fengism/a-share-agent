@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import FundamentalPanel from "./FundamentalPanel";
 
@@ -60,22 +60,12 @@ vi.mock("../../api/queries", () => ({
 }));
 
 describe("FundamentalPanel key financial metrics", () => {
-  it("switches between curated metric groups without exposing arbitrary raw fields", () => {
+  it("leaves raw key financial metrics on the stock profile during normal browsing", () => {
     render(<FundamentalPanel code="600519" />);
-    const table = () => screen.getAllByRole("table")[0];
 
-    expect(within(table()).getByText("营业收入")).toBeInTheDocument();
-    expect(within(table()).getByText("毛利率")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText("资产健康"));
-    expect(within(table()).getByText("总资产")).toBeInTheDocument();
-    expect(within(table()).getByText("流动比率")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText("现金质量"));
-    expect(within(table()).getByText("自由现金流")).toBeInTheDocument();
-    expect(within(table()).getByText("现金利润比")).toBeInTheDocument();
-
-    expect(screen.queryByText(/RAW_(BALANCE|PROFIT|CASH)_FIELD/)).not.toBeInTheDocument();
+    expect(screen.queryByText("关键财务指标")).not.toBeInTheDocument();
+    expect(screen.queryByText("盈利与增长")).not.toBeInTheDocument();
+    expect(screen.queryByText("营业收入")).not.toBeInTheDocument();
   });
 
   it("renders all groups in one key-metrics PDF section", () => {

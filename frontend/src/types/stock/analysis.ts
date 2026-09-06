@@ -1,6 +1,6 @@
 import type { ChatStreamDelta } from "../chat";
 import type { StockBasicInfo } from "./profile";
-import type { IntradayData, KlineData } from "./quotes";
+import type { ChipDistribution, IntradayData, KlineData } from "./quotes";
 import type { StockValuation } from "./valuation";
 
 export interface FactorAnalysis {
@@ -198,12 +198,20 @@ export interface AnalysisHistoryItem {
   can_delete: boolean;
 }
 
+export interface AnalysisKeyLevels {
+  current_price: number | null;
+  support: number | null;
+  resistance: number | null;
+}
+
 export interface AnalysisPageData {
   stock_info: StockBasicInfo | null;
   kline: KlineData | null;
   intraday: IntradayData | null;
   valuation: StockValuation | null;
   cached_analysis: AnalysisResult | null;
+  key_levels: AnalysisKeyLevels | null;
+  chip_distribution: ChipDistribution | null;
   partial?: boolean;
   unavailable_sections?: Array<"stock_info" | "kline" | "intraday" | "valuation" | "cached_analysis">;
 }

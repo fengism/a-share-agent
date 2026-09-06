@@ -11,7 +11,7 @@ from app.infrastructure.persistence.operations import restore_database_backup
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Restore a verified stock-agent SQLite backup")
-    parser.add_argument("database", choices=("market", "user"))
+    parser.add_argument("database", choices=("market", "user", "industry"))
     parser.add_argument("source", type=Path)
     parser.add_argument("--safety-dir", type=Path)
     parser.add_argument(

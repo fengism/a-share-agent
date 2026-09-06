@@ -4,12 +4,14 @@ import { createChart, LineSeries, HistogramSeries, ColorType, type IChartApi, ty
 import { useIndicators } from "../api/queries";
 import type { TechnicalIndicators } from "../types/stock";
 import { useColors } from "../styles/ui";
+import { APP_FONT_SIZE } from "../theme/typography";
 import type { ThemeColors } from "../theme/themes";
 import { shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
 
-type Props = { code: string };
-type IndicatorType = "macd" | "rsi" | "kdj";
+export type IndicatorType = "macd" | "rsi" | "kdj";
+type Props = { code: string; types?: readonly IndicatorType[]; height?: number };
+const DEFAULT_INDICATOR_TYPES: readonly IndicatorType[] = ["macd", "rsi", "kdj"];
 type IndicatorSeries = ISeriesApi<"Line"> | ISeriesApi<"Histogram">;
 
 
@@ -139,16 +141,19 @@ function kdjChart(
   return [kLine, dLine, jLine];
 }
 
-export default function IndicatorSubCharts({ code }: Props) {
+export default function IndicatorSubCharts({ code, types = DEFAULT_INDICATOR_TYPES, height = 180 }: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
   colorsRef.current = c;
-  const [indicatorType, setIndicatorType] = useState<IndicatorType>("macd");
+  const [indicatorType, setIndicatorType] = useState<IndicatorType>(types[0] ?? "macd");
+  const availableTypes = types.length > 0 ? types : DEFAULT_INDICATOR_TYPES;
+  const activeIndicatorType = availableTypes.includes(indicatorType) ? indicatorType : availableTypes[0];
   const { data: indicators, isLoading } = useIndicators(code);
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<IChartApi | null>(null);
   const seriesRefs = useRef<IndicatorSeries[]>([]);
   const fittedViewKeyRef = useRef<string | null>(null);
+  const initialHeightRef = useRef(height);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -156,8 +161,8 @@ export default function IndicatorSubCharts({ code }: Props) {
 
     const chart = createChart(chartRef.current, {
       width: chartRef.current.clientWidth,
-      height: 180,
-      layout: { background: { type: ColorType.Solid, color: colors.cardBg }, textColor: colors.textSecondary, fontSize: 11, attributionLogo: false },
+      height: initialHeightRef.current,
+      layout: { background: { type: ColorType.Solid, color: colors.cardBg }, textColor: colors.textSecondary, fontSize: APP_FONT_SIZE.xs, attributionLogo: false },
       grid: { vertLines: { color: colors.border }, horzLines: { color: colors.border } },
       timeScale: { timeVisible: false, borderColor: colors.border },
       rightPriceScale: { visible: true, borderColor: colors.border },
@@ -186,6 +191,10 @@ export default function IndicatorSubCharts({ code }: Props) {
   }, []);
 
   useEffect(() => {
+    chartInstanceRef.current?.applyOptions({ height });
+  }, [height]);
+
+  useEffect(() => {
     const chart = chartInstanceRef.current;
     if (!chart || !indicators?.series) return;
 
@@ -197,7 +206,7 @@ export default function IndicatorSubCharts({ code }: Props) {
       .filter((date): date is BusinessDay => date !== null) ?? [];
     if (dates.length === 0) return;
 
-    switch (indicatorType) {
+    switch (activeIndicatorType) {
       case "macd":
         seriesRefs.current = macdChart(chart, indicators.series, dates, c);
         break;
@@ -209,12 +218,12 @@ export default function IndicatorSubCharts({ code }: Props) {
         break;
     }
 
-    const viewKey = `${code}:${indicatorType}`;
+    const viewKey = `${code}:${activeIndicatorType}`;
     if (shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
       chart.timeScale().fitContent();
       fittedViewKeyRef.current = viewKey;
     }
-  }, [c, code, indicatorType, indicators]);
+  }, [activeIndicatorType, c, code, indicators]);
 
   useEffect(() => {
     const chart = chartInstanceRef.current;
@@ -233,23 +242,71 @@ export default function IndicatorSubCharts({ code }: Props) {
 
   return (
     <div>
-      <Segmented
-        value={indicatorType}
-        onChange={(val) => setIndicatorType(val as IndicatorType)}
-        options={[
-          { label: "MACD", value: "macd" },
-          { label: "RSI", value: "rsi" },
-          { label: "KDJ", value: "kdj" },
-        ]}
-        style={{ marginBottom: 8 }}
-        size="small"
-      />
-      <div style={{ position: "relative", height: 180 }}>
-        <div ref={chartRef} style={{ height: 180 }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+        {availableTypes.length > 1 ? (
+          <Segmented
+            value={activeIndicatorType}
+            onChange={(val) => setIndicatorType(val as IndicatorType)}
+            options={[
+              { label: "MACD(12,26,9)", value: "macd" as const },
+              { label: "RSI(14)", value: "rsi" as const },
+              { label: "KDJ(9,3,3)", value: "kdj" as const },
+            ].filter((option) => availableTypes.includes(option.value))}
+            size="small"
+          />
+        ) : (
+          <strong className="indicator-subchart__label">
+            {activeIndicatorType === "macd" ? "MACD(12,26,9)" : activeIndicatorType === "rsi" ? "RSI(14)" : "KDJ(9,3,3)"}
+          </strong>
+        )}
+        <div style={{ display: "flex", gap: 12, alignItems: "center", fontSize: "var(--c-font-xs)", color: c.textSecondary }}>
+          {activeIndicatorType === "macd" && (
+            <>
+              <span style={{ color: c.primary, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 2, background: c.primary, display: "inline-block" }} /> DIF
+              </span>
+              <span style={{ color: c.accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} /> DEA
+              </span>
+              <span style={{ color: c.up, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 6, height: 6, background: c.up, display: "inline-block" }} /> MACD柱
+              </span>
+            </>
+          )}
+          {activeIndicatorType === "rsi" && (
+            <>
+              <span style={{ color: c.accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} /> RSI(14)
+              </span>
+              <span style={{ color: c.up, opacity: 0.8, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                ┄ 70超买
+              </span>
+              <span style={{ color: c.down, opacity: 0.8, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                ┄ 30超卖
+              </span>
+            </>
+          )}
+          {activeIndicatorType === "kdj" && (
+            <>
+              <span style={{ color: c.primary, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 2, background: c.primary, display: "inline-block" }} /> K
+              </span>
+              <span style={{ color: c.accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} /> D
+              </span>
+              <span style={{ color: c.textSecondary, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 2, background: c.textSecondary, display: "inline-block" }} /> J
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+      <div style={{ position: "relative", height }}>
+        <div ref={chartRef} style={{ height }} />
         {isLoading && (
           <Skeleton.Node
             active
-            style={{ position: "absolute", inset: 0, width: "100%", height: 180 }}
+            style={{ position: "absolute", inset: 0, width: "100%", height }}
           />
         )}
       </div>

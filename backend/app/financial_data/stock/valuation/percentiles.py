@@ -3,7 +3,8 @@ import logging
 
 import pandas as pd
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import analysis_cache as cache
+from app.core.cache import dated_cache_key
 from app.core.concurrency.rate_limiter import call_blocking
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import normalize_code
@@ -51,18 +52,25 @@ async def compute_percentile(code: str, indicator: str = "市盈率(TTM)", perio
         return cached
 
     sym = normalize_code(code)
-    df = await provider_gateway.call(
-        "akshare",
-        "stock_valuation_percentile",
-        lambda: call_blocking(
-            _get_akshare_provider().fetch_stock_valuation_baidu,
-            symbol=sym.raw,
-            indicator=indicator,
-            period=period,
-        ),
-    )
+    try:
+        df = await provider_gateway.call(
+            "akshare",
+            "stock_valuation_percentile",
+            lambda: call_blocking(
+                _get_akshare_provider().fetch_stock_valuation_baidu,
+                symbol=sym.raw,
+                indicator=indicator,
+                period=period,
+            ),
+        )
+    except Exception as exc:
+        logger.debug(
+            "Failed to fetch stock valuation percentile for %s %s %s: %s",
+            code, indicator, period, exc,
+        )
+        return None
 
-    if df.empty or len(df) < 2:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty or len(df) < 2:
         return None
 
     val_col = df.columns[-1]

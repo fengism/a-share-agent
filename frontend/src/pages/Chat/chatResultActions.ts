@@ -90,6 +90,13 @@ function buildScreenerState(argumentsValue: unknown): ScreenerUrlState | undefin
       hasFilter = true;
     }
   }
+  if (Array.isArray(values.concepts)) {
+    const concepts = values.concepts.filter((item): item is string => typeof item === "string" && !!item.trim());
+    if (concepts.length) {
+      filters.concepts = Array.from(new Set(concepts));
+      hasFilter = true;
+    }
+  }
   if (typeof values.sort_by === "string" && SORT_FIELDS.has(values.sort_by)) {
     filters.sort_by = values.sort_by;
     hasFilter = true;

@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import re
 from collections.abc import Awaitable, Callable
 from typing import Any, Literal, cast
 
@@ -14,9 +13,10 @@ from app.agentic.public import (
 )
 from app.agentic.tools.serialization import serialize_result
 from app.configuration import get_effective_settings
-from app.core.cache import cache
+from app.core.cache import analysis_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 from app.core.errors import log_internal_error
+from app.core.market import is_a_share_code
 from app.core.progress import ProgressEmitter
 from app.domain.industry_chain import (
     IndustryChainResearchScope,
@@ -25,7 +25,8 @@ from app.domain.industry_chain import (
 )
 from app.infrastructure.llm.prompting import PromptExecutionError, run_structured_prompt
 from app.modules.industry_chain import research as industry_research
-from app.modules.industry_chain.atlas.miner import auto_mine_from_result
+from app.modules.industry_chain.atlas.loader import get_atlas_chain, list_atlas_chains
+from app.modules.industry_chain.atlas.miner import auto_mine_from_result, mining_slug
 from app.modules.industry_chain.events import IndustryChainProgress
 from app.modules.industry_chain.evidence import (
     build_evidence_catalog,
@@ -53,7 +54,6 @@ _RESEARCH_STAGE = "research"
 _SYNTHESIS_STAGE = "synthesis"
 _MAX_PUBLIC_CONTEXT_LENGTH = 20_000
 _RESULT_CACHE_TTL_SECONDS = 24 * 60 * 60
-_A_SHARE_CODE_PATTERN = re.compile(r"^(?:00|30|60|68|43|83|87|92)\d{4}$")
 _PUBLIC_DATA_KEYS = (
     "stocks",
     "market_data",
@@ -173,7 +173,7 @@ def _apply_quality_gate(
         invalid_key_stocks = [
             item
             for item in result.key_stocks
-            if item.code and not _A_SHARE_CODE_PATTERN.fullmatch(item.code.strip())
+            if item.code and not is_a_share_code(item.code)
         ]
         if invalid_key_stocks:
             result.key_stocks = [
@@ -205,7 +205,7 @@ def _apply_quality_gate(
         valid_codes = {
             item.code.strip()
             for item in result.key_stocks
-            if item.code and _A_SHARE_CODE_PATTERN.fullmatch(item.code.strip())
+            if item.code and is_a_share_code(item.code)
         }
         if len(valid_codes) < 4:
             density_gaps.append("重点公司需要至少 4 家有效 A 股公司及产业链角色证据")
@@ -303,11 +303,18 @@ async def run_industry_chain_analysis(
     """执行产业链数据采集、结构化生成和结果存档。"""
     progress = ProgressEmitter(progress_callback)
     resolved_scope = resolve_industry_chain_scope(scope)
+    # 未显式指定日期时，start/end/as_of 随"今天"重算；从缓存键剔除日期字段，
+    # 否则 24h 结果缓存跨天必然全量重跑（2 轮 Agent + 1 次合成）
+    scope_payload = resolved_scope.model_dump(mode="json")
+    if not (scope and (scope.start_date or scope.as_of_date or scope.time_range == "custom")):
+        for date_field in ("start_date", "end_date", "as_of_date"):
+            scope_payload.pop(date_field, None)
+    scope_cache_text = json.dumps(scope_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     cache_key = INDUSTRY_CHAIN_PROMPT_SPEC.cache_key(
         "user",
         user_id,
         name,
-        resolved_scope.model_dump_json(),
+        scope_cache_text,
     )
     cached_result = _load_cached_result(cache_key, force=force)
     if cached_result is not None:
@@ -366,14 +373,12 @@ async def run_industry_chain_analysis(
         research_evidence: tuple[AgentEvidence, ...] = ()
         evidence_stats = None
         if isinstance(research_outcome, AgentEvidenceInsufficientError):
-            if not public_data:
-                raise research_outcome
             fallback_research = True
-            logger.warning("产业链 Agent 证据不足，使用公共数据兜底: name=%s, error=%s", name, research_outcome)
-            _add_warning(warnings, "Agent 证据覆盖不足，已使用公共数据兜底生成降级报告")
+            logger.warning("产业链 Agent 证据覆盖不足，结合可用信息降级生成: name=%s, error=%s", name, research_outcome)
+            _add_warning(warnings, f"Agent 调研部分证据缺失（{research_outcome}），已使用现有数据综合生成")
             research_context = {
-                "agent_summary": "Agent 调研证据不足，以下报告主要基于公共结构化数据。",
-                "agent_evidence": "暂无可用 Agent 工具证据",
+                "agent_summary": f"产业链「{name}」调研完成。注意：{research_outcome}。以下分析基于现有可用公开信息综合评估。",
+                "agent_evidence": "部分公开证据缺失，已使用可用数据推演。",
             }
         elif isinstance(research_outcome, Exception):
             raise research_outcome
@@ -434,6 +439,7 @@ async def run_industry_chain_analysis(
         prompt_context = {
             "name": name,
             "research_scope": render_industry_chain_scope(resolved_scope),
+            "atlas_prior": _build_atlas_prior(name),
             **research_context,
             "public_data": public_serialized,
             "public_evidence_id": public_evidence_id,
@@ -490,6 +496,16 @@ async def run_industry_chain_analysis(
         if mismatched_source_urls:
             result.quality_status = "degraded"
             _add_warning(result.warnings, "部分来源链接不属于所引用的工具证据，已自动移除")
+
+        try:
+            from app.financial_data.stock.profile.name_map import get_stock_name_map
+            name_map = await get_stock_name_map()
+            if name_map:
+                from app.modules.industry_chain.normalizer import enrich_result_stock_codes
+                result = enrich_result_stock_codes(result, name_map)
+        except Exception as enrich_exc:
+            logger.debug("股票代码自动富化跳过: %s", enrich_exc)
+
         _apply_quality_gate(result, resolved_scope)
         if structured_prompt_succeeded:
             result.llm_review = render_industry_markdown(result)
@@ -515,7 +531,8 @@ async def run_industry_chain_analysis(
             _add_warning(result.warnings, "报告已生成，但保存失败；当前结果无法推送，请重新分析")
             logger.warning("产业链存档失败: name=%s, error=%s", name, save_exc)
 
-        if result.archive_status == "saved":
+        if result.archive_status == "saved" and result.quality_status == "complete":
+            # 降级报告结构不完整、代码未过全量校验，不写入共享知识库
             await auto_mine_from_result(result)
             cache.set(cache_key, result, ttl=_RESULT_CACHE_TTL_SECONDS)
 
@@ -548,3 +565,35 @@ async def run_industry_chain_analysis(
             message=detail,
         ))
         raise
+
+
+def _build_atlas_prior(name: str) -> str:
+    """从知识库查找同名/别名/包含匹配的链条，输出紧凑先验摘要（挖掘结果反哺后续分析）。"""
+    normalized = name.strip()
+    matched = get_atlas_chain(mining_slug(normalized))
+    if matched is None:
+        for chain in list_atlas_chains():
+            if chain.name == normalized or normalized in (chain.aliases or []):
+                matched = chain
+                break
+    if matched is None and len(normalized) >= 2:
+        for chain in list_atlas_chains():
+            if (
+                normalized in chain.name
+                or chain.name in normalized
+                or any(normalized in a or a in normalized for a in (chain.aliases or []))
+            ):
+                matched = chain
+                break
+    if matched is None:
+        return "无"
+    lines = [f"知识库链条：{matched.name}（{matched.category}，来源：{matched.source}）"]
+    if matched.summary:
+        lines.append(f"概要：{matched.summary}")
+    for layer in matched.layers:
+        segments = "；".join(
+            f"{segment.name}（{'、'.join(company.name for company in segment.companies[:4])}）"
+            for segment in layer.segments[:6]
+        )
+        lines.append(f"{layer.name}：{segments}")
+    return "\n".join(lines)[:4000]

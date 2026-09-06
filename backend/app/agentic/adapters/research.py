@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
 from app.agentic.agents.contracts import AgentExecutionResult, AgentProfile
-from app.agentic.agents.executor import AgentExecutor, agent_executor
+from app.agentic.agents.executor import AgentExecutor, ToolCallDedupe, agent_executor
 from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.contracts import (
     MAX_EVIDENCE_ARGUMENT_LENGTH,
@@ -71,6 +71,7 @@ class _AgentExecutorResearchSession:
     model: str
     temperature: float
     execution_context: AgentExecutionContext
+    tool_dedupe: ToolCallDedupe
 
     async def run(
         self,
@@ -98,6 +99,7 @@ class _AgentExecutorResearchSession:
                     require_tool_evidence=True,
                     execution_context=self.execution_context,
                     tool_call_reserve=tool_call_reserve,
+                    tool_dedupe=self.tool_dedupe,
                 )
                 await event_queue.put(_ResearchExecutionCompleted(result))
             except BaseException as error:
@@ -145,6 +147,7 @@ class AgentExecutorResearchRuntime:
         )
         temperature = effective_settings.llm_temperature
         execution_context = AgentExecutionContext.from_current(effective_settings)
+        tool_dedupe = ToolCallDedupe()
         async with borrow_async_openai_chat_runtime(effective_settings) as runtime:
             yield _AgentExecutorResearchSession(
                 profile=profile,
@@ -153,4 +156,5 @@ class AgentExecutorResearchRuntime:
                 model=runtime.model,
                 temperature=temperature,
                 execution_context=execution_context,
+                tool_dedupe=tool_dedupe,
             )

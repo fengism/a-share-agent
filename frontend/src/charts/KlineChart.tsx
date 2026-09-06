@@ -1,11 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createChart, createSeriesMarkers, CandlestickSeries, HistogramSeries, LineSeries, ColorType, LineStyle, type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type SeriesMarker, type Time, type BusinessDay } from "lightweight-charts";
+import {
+  createChart,
+  createSeriesMarkers,
+  CandlestickSeries,
+  HistogramSeries,
+  LineSeries,
+  ColorType,
+  LineStyle,
+  type IChartApi,
+  type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type SeriesMarker,
+  type Time,
+  type BusinessDay,
+  type MouseEventParams,
+  type CandlestickData,
+} from "lightweight-charts";
 import type { KlineItem } from "../types/stock";
 import type { ChanlunResult, MmdType } from "../utils/chanlun";
 import { useColors } from "../styles/ui";
+import { APP_FONT_FAMILY, APP_FONT_SIZE } from "../theme/typography";
 import { shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
 import { buildKlineTradeMarkers, type KlineTradeMarker } from "./klineMarkers";
+import { calculateMA, calculateMAVOL, calculateBOLL, MA_CONFIGS, MAVOL_CONFIGS } from "./movingAverages";
 
 type Props = {
   data: KlineItem[];
@@ -15,7 +33,27 @@ type Props = {
   /** 缠论分析结果：叠加笔、中枢区间与买卖点标记 */
   chanlun?: ChanlunResult | null;
 };
-type ChartItem = Omit<KlineItem, "date"> & { date: BusinessDay };
+type ChartItem = Omit<KlineItem, "date"> & { date: BusinessDay; rawDate: string };
+
+interface HoverCandleInfo {
+  dateStr: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  changePct: number | null;
+  amount: number | null;
+  ma5: number | null;
+  ma10: number | null;
+  ma20: number | null;
+  ma30: number | null;
+  ma60: number | null;
+  vol5: number | null;
+  vol10: number | null;
+  bollMid: number | null;
+  bollUp: number | null;
+  bollDn: number | null;
+}
 
 const MMD_MARKER_TEXT: Record<MmdType, string> = {
   "1buy": "①买", "2buy": "②买", "3buy": "③买",
@@ -44,6 +82,13 @@ function buildChanlunMarkers(
   return markers;
 }
 
+function formatAmount(val: number | null | undefined): string {
+  if (val == null || isNaN(val)) return "-";
+  if (Math.abs(val) >= 1e8) return `${(val / 1e8).toFixed(2)}亿`;
+  if (Math.abs(val) >= 1e4) return `${(val / 1e4).toFixed(2)}万`;
+  return val.toFixed(0);
+}
+
 export default function KlineChart({ data, height = 500, viewKey = "default", tradeMarkers = [], chanlun = null }: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
@@ -54,19 +99,100 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const maSeriesMapRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
+  const mavolSeriesMapRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
+  const bollSeriesRef = useRef<{ mid?: ISeriesApi<"Line">; upper?: ISeriesApi<"Line">; lower?: ISeriesApi<"Line"> }>({});
   const tradeMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const chanlunSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const fittedViewKeyRef = useRef<string | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [hoverInfo, setHoverInfo] = useState<HoverCandleInfo | null>(null);
+  const [mainOverlay, setMainOverlay] = useState<"MA" | "BOLL">("MA");
+
   const rows = useMemo<ChartItem[]>(
     () => data
       .map((item) => {
         const date = toBusinessDay(item.date);
-        return date ? { ...item, date } : null;
+        return date ? { ...item, date, rawDate: item.date } : null;
       })
       .filter((item): item is ChartItem => item !== null),
     [data]
   );
+
+  // Precompute MA & MAVOL & BOLL maps for fast crosshair lookup
+  const calculations = useMemo(() => {
+    const maMaps = new Map<string, Map<string, number>>();
+    for (const cfg of MA_CONFIGS) {
+      const maPoints = calculateMA(rows, cfg.period);
+      const dateMap = new Map<string, number>();
+      for (const pt of maPoints) {
+        const d = pt.time as BusinessDay;
+        const key = `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
+        dateMap.set(key, pt.value);
+      }
+      maMaps.set(cfg.key, dateMap);
+    }
+
+    const mavolMaps = new Map<string, Map<string, number>>();
+    for (const cfg of MAVOL_CONFIGS) {
+      const volPoints = calculateMAVOL(rows, cfg.period);
+      const dateMap = new Map<string, number>();
+      for (const pt of volPoints) {
+        const d = pt.time as BusinessDay;
+        const key = `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
+        dateMap.set(key, pt.value);
+      }
+      mavolMaps.set(cfg.key, dateMap);
+    }
+
+    const boll = calculateBOLL(rows);
+    const bollMidMap = new Map<string, number>();
+    const bollUpMap = new Map<string, number>();
+    const bollDnMap = new Map<string, number>();
+    for (const pt of boll.mid) {
+      const d = pt.time as BusinessDay;
+      bollMidMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+    for (const pt of boll.upper) {
+      const d = pt.time as BusinessDay;
+      bollUpMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+    for (const pt of boll.lower) {
+      const d = pt.time as BusinessDay;
+      bollDnMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+
+    return { maMaps, mavolMaps, boll, bollMidMap, bollUpMap, bollDnMap };
+  }, [rows]);
+
+  const latestInfo = useMemo<HoverCandleInfo | null>(() => {
+    if (rows.length === 0) return null;
+    const last = rows[rows.length - 1];
+    const prev = rows.length > 1 ? rows[rows.length - 2] : null;
+    const changePct = last.change_pct ?? (prev && prev.close > 0 ? ((last.close - prev.close) / prev.close) * 100 : null);
+    const dateKey = `${last.date.year}-${String(last.date.month).padStart(2, "0")}-${String(last.date.day).padStart(2, "0")}`;
+    return {
+      dateStr: last.rawDate,
+      open: last.open,
+      high: last.high,
+      low: last.low,
+      close: last.close,
+      changePct,
+      amount: last.amount ?? last.volume ?? null,
+      ma5: calculations.maMaps.get("ma5")?.get(dateKey) ?? null,
+      ma10: calculations.maMaps.get("ma10")?.get(dateKey) ?? null,
+      ma20: calculations.maMaps.get("ma20")?.get(dateKey) ?? null,
+      ma30: calculations.maMaps.get("ma30")?.get(dateKey) ?? null,
+      ma60: calculations.maMaps.get("ma60")?.get(dateKey) ?? null,
+      vol5: calculations.mavolMaps.get("vol5")?.get(dateKey) ?? null,
+      vol10: calculations.mavolMaps.get("vol10")?.get(dateKey) ?? null,
+      bollMid: calculations.bollMidMap.get(dateKey) ?? null,
+      bollUp: calculations.bollUpMap.get(dateKey) ?? null,
+      bollDn: calculations.bollDnMap.get(dateKey) ?? null,
+    };
+  }, [rows, calculations]);
+
+  const activeCandle = hoverInfo ?? latestInfo;
 
   useEffect(() => {
     if (!wrapperRef.current || !chartElRef.current || !brushRef.current) return;
@@ -75,11 +201,18 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
 
     const chart = createChart(chartElRef.current, {
       width: chartElRef.current.clientWidth,
-      height,
-      layout: { background: { type: ColorType.Solid, color: colors.cardBg }, textColor: colors.textSecondary, fontSize: 12, attributionLogo: false },
+      height: height - 32,
+      layout: {
+        background: { type: ColorType.Solid, color: colors.cardBg },
+        textColor: colors.textSecondary,
+        fontFamily: APP_FONT_FAMILY,
+        fontSize: APP_FONT_SIZE.sm,
+        attributionLogo: false,
+      },
       grid: { vertLines: { color: colors.border }, horzLines: { color: colors.border } },
       timeScale: { timeVisible: false, borderColor: colors.border },
       rightPriceScale: { visible: true, borderColor: colors.border },
+      leftPriceScale: { visible: true, borderColor: colors.border },
       crosshair: {
         vertLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
         horzLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
@@ -109,17 +242,60 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
         formatter: (value: number) => Math.abs(value) >= 1e8
           ? `${(value / 1e8).toFixed(2)}亿` : `${(value / 1e4).toFixed(2)}万`,
       },
-      priceScaleId: "volume",
+      priceScaleId: "left",
     });
     volumeSeriesRef.current = volume;
-    chart.priceScale("volume").applyOptions({
-      visible: false, scaleMargins: { top: 0.82, bottom: 0 },
+    chart.priceScale("left").applyOptions({
+      visible: true, borderColor: colors.border,
+      scaleMargins: { top: 0.82, bottom: 0 },
     });
+
+    // Initialize MA Line Series
+    const maMap = new Map<string, ISeriesApi<"Line">>();
+    for (const cfg of MA_CONFIGS) {
+      const maLine = chart.addSeries(LineSeries, {
+        color: cfg.color,
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+        priceScaleId: "right",
+      });
+      maMap.set(cfg.key, maLine);
+    }
+    maSeriesMapRef.current = maMap;
+
+    // Initialize MAVOL Line Series
+    const mavolMap = new Map<string, ISeriesApi<"Line">>();
+    for (const cfg of MAVOL_CONFIGS) {
+      const volLine = chart.addSeries(LineSeries, {
+        color: cfg.color,
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+        priceScaleId: "left",
+      });
+      mavolMap.set(cfg.key, volLine);
+    }
+    mavolSeriesMapRef.current = mavolMap;
+
+    // Initialize BOLL Series
+    const bollMid = chart.addSeries(LineSeries, {
+      color: "#f0b90b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    });
+    const bollUp = chart.addSeries(LineSeries, {
+      color: "#ff7a45", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    });
+    const bollDn = chart.addSeries(LineSeries, {
+      color: "#9254de", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    });
+    bollSeriesRef.current = { mid: bollMid, upper: bollUp, lower: bollDn };
 
     const wrapper = wrapperRef.current;
     const brush = brushRef.current;
     const resizeObserver = new ResizeObserver(([entry]) => {
-      chart.applyOptions({ width: Math.floor(entry.contentRect.width) });
+      chart.applyOptions({ width: Math.floor(entry.contentRect.width), height: height - 32 });
     });
     resizeObserver.observe(chartElRef.current);
     let startX: number | null = null;
@@ -164,8 +340,50 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       setIsZoomed(true);
     };
 
-    const handleMouseLeave = () => { startX = null; resetBrush(); wrapper.style.cursor = "default"; };
-    const handleDoubleClick = () => { chart.timeScale().fitContent(); setIsZoomed(false); };
+    const handleMouseLeave = () => {
+      startX = null;
+      resetBrush();
+      wrapper.style.cursor = "default";
+    };
+    const handleDoubleClick = () => {
+      chart.timeScale().fitContent();
+      setIsZoomed(false);
+    };
+
+    const handleCrosshairMove = (param: MouseEventParams<Time>) => {
+      if (!param.time || !param.seriesData) {
+        setHoverInfo(null);
+        return;
+      }
+      const cData = param.seriesData.get(candle) as CandlestickData<BusinessDay> | undefined;
+      const vData = param.seriesData.get(volume) as { value?: number } | undefined;
+      if (cData && typeof param.time === "object" && param.time !== null && "year" in param.time) {
+        const day = param.time as BusinessDay;
+        const dateKey = `${day.year}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`;
+        const changePct = cData.open > 0 ? ((cData.close - cData.open) / cData.open) * 100 : null;
+        setHoverInfo({
+          dateStr: dateKey,
+          open: cData.open,
+          high: cData.high,
+          low: cData.low,
+          close: cData.close,
+          changePct,
+          amount: vData?.value ?? null,
+          ma5: calculations.maMaps.get("ma5")?.get(dateKey) ?? null,
+          ma10: calculations.maMaps.get("ma10")?.get(dateKey) ?? null,
+          ma20: calculations.maMaps.get("ma20")?.get(dateKey) ?? null,
+          ma30: calculations.maMaps.get("ma30")?.get(dateKey) ?? null,
+          ma60: calculations.maMaps.get("ma60")?.get(dateKey) ?? null,
+          vol5: calculations.mavolMaps.get("vol5")?.get(dateKey) ?? null,
+          vol10: calculations.mavolMaps.get("vol10")?.get(dateKey) ?? null,
+          bollMid: calculations.bollMidMap.get(dateKey) ?? null,
+          bollUp: calculations.bollUpMap.get(dateKey) ?? null,
+          bollDn: calculations.bollDnMap.get(dateKey) ?? null,
+        });
+      }
+    };
+
+    chart.subscribeCrosshairMove(handleCrosshairMove);
 
     wrapper.addEventListener("mousedown", handleMouseDown);
     wrapper.addEventListener("mousemove", handleMouseMove);
@@ -175,6 +393,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
 
     return () => {
       resizeObserver.disconnect();
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
       wrapper.removeEventListener("mousedown", handleMouseDown);
       wrapper.removeEventListener("mousemove", handleMouseMove);
       wrapper.removeEventListener("mouseup", handleMouseUp);
@@ -184,10 +403,13 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
+      maSeriesMapRef.current.clear();
+      mavolSeriesMapRef.current.clear();
+      bollSeriesRef.current = {};
       tradeMarkersRef.current = null;
       chanlunSeriesRef.current = [];
     };
-  }, [height]);
+  }, [height, calculations]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -208,6 +430,42 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       color: item.close >= item.open ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
     })));
 
+    // Set MA Lines Data
+    for (const cfg of MA_CONFIGS) {
+      const maLine = maSeriesMapRef.current.get(cfg.key);
+      if (maLine) {
+        if (mainOverlay === "MA") {
+          const maPoints = calculateMA(rows, cfg.period);
+          maLine.setData(maPoints.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        } else {
+          maLine.setData([]);
+        }
+      }
+    }
+
+    // Set MAVOL Data
+    for (const cfg of MAVOL_CONFIGS) {
+      const volLine = mavolSeriesMapRef.current.get(cfg.key);
+      if (volLine) {
+        const volPoints = calculateMAVOL(rows, cfg.period);
+        volLine.setData(volPoints.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+      }
+    }
+
+    // Set BOLL Data
+    const { boll } = calculations;
+    if (bollSeriesRef.current.mid && bollSeriesRef.current.upper && bollSeriesRef.current.lower) {
+      if (mainOverlay === "BOLL") {
+        bollSeriesRef.current.mid.setData(boll.mid.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        bollSeriesRef.current.upper.setData(boll.upper.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        bollSeriesRef.current.lower.setData(boll.lower.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+      } else {
+        bollSeriesRef.current.mid.setData([]);
+        bollSeriesRef.current.upper.setData([]);
+        bollSeriesRef.current.lower.setData([]);
+      }
+    }
+
     const validDates = new Set(data.map((item) => item.date));
     const tradeMarkerList = buildKlineTradeMarkers(
       tradeMarkers,
@@ -226,13 +484,17 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
     );
 
     if (rows.length > 0 && shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
-      chart.timeScale().fitContent();
+      if (rows.length > 80) {
+        chart.timeScale().setVisibleLogicalRange({ from: rows.length - 80, to: rows.length + 2 });
+      } else {
+        chart.timeScale().fitContent();
+      }
       fittedViewKeyRef.current = viewKey;
       setIsZoomed(false);
     }
-  }, [c.down, c.up, data, height, rows, tradeMarkers, viewKey, chanlun]);
+  }, [c.down, c.up, data, height, rows, tradeMarkers, viewKey, chanlun, mainOverlay, calculations]);
 
-  // 缠论图层：笔折线 + 中枢上下沿虚线（买卖点标记在上面的 markers 中合并）
+  // 缠论图层：笔折线 + 中枢上下沿虚线
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -292,6 +554,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
       timeScale: { borderColor: c.border },
       rightPriceScale: { borderColor: c.border },
+      leftPriceScale: { borderColor: c.border },
       crosshair: {
         vertLine: { color: c.textMuted, labelBackgroundColor: c.border },
         horzLine: { color: c.textMuted, labelBackgroundColor: c.border },
@@ -304,33 +567,118 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       wickUpColor: c.up, wickDownColor: c.down,
     });
     chart.priceScale("right").applyOptions({ borderColor: c.border });
+    chart.priceScale("left").applyOptions({ borderColor: c.border });
   }, [c.cardBg, c.border, c.down, c.textMuted, c.textSecondary, c.up, height]);
 
   return (
-    <div ref={wrapperRef} style={{ position: "relative", width: "100%" }}>
-      <div ref={chartElRef} />
-      <div ref={brushRef} style={{
-        position: "absolute", top: 0, bottom: 0, display: "none", pointerEvents: "none",
-        background: hexToRgba(c.primary, 0.12), border: `1px solid ${hexToRgba(c.primary, 0.35)}`,
-      }} />
-      <div className="pdf-hide" style={{ position: "absolute", right: 12, top: 12, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-        <div style={{
-          padding: "6px 10px", fontSize: 12, color: c.textSecondary,
-          background: hexToRgba(c.pageBg, 0.96), border: `1px solid ${c.border}`,
-          borderRadius: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.2)", pointerEvents: "none",
-        }}>
-          左键拖拽框选缩放，双击重置
-        </div>
-        {isZoomed && (
-          <button type="button" onClick={() => { chartRef.current?.timeScale().fitContent(); setIsZoomed(false); }}
-            style={{
-              padding: "8px 12px", fontSize: 12, fontWeight: 600, color: c.primary,
-              background: hexToRgba(c.pageBg, 0.98), border: `1px solid ${c.border}`,
-              borderRadius: 999, cursor: "pointer", boxShadow: `0 4px 12px ${hexToRgba(c.primary, 0.15)}`,
-            }}>
-            返回全视图
-          </button>
+    <div ref={wrapperRef} style={{ position: "relative", width: "100%", height, display: "flex", flexDirection: "column", backgroundColor: c.cardBg }}>
+      {/* Real-time Interactive Candle HUD status bar */}
+      <div style={{
+        minHeight: 28,
+        padding: "4px 8px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        fontSize: "11px",
+        color: c.textSecondary,
+        backgroundColor: c.nestedBg,
+        borderBottom: `1px solid ${c.border}`,
+        fontFamily: "var(--c-font-mono)",
+        userSelect: "none",
+        gap: 8,
+      }}>
+        {activeCandle ? (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "4px 10px",
+            flexWrap: "wrap",
+            flex: "1 1 auto",
+            minWidth: 0,
+            lineHeight: 1.4,
+          }}>
+            <span>日期: <strong style={{ color: c.textPrimary }}>{activeCandle.dateStr}</strong></span>
+            <span>开: <strong style={{ color: activeCandle.close >= activeCandle.open ? c.up : c.down }}>{activeCandle.open.toFixed(2)}</strong></span>
+            <span>高: <strong style={{ color: c.up }}>{activeCandle.high.toFixed(2)}</strong></span>
+            <span>低: <strong style={{ color: c.down }}>{activeCandle.low.toFixed(2)}</strong></span>
+            <span>收: <strong style={{ color: activeCandle.close >= activeCandle.open ? c.up : c.down }}>{activeCandle.close.toFixed(2)}</strong></span>
+            {activeCandle.changePct != null && (
+              <span style={{ color: activeCandle.changePct >= 0 ? c.up : c.down }}>
+                ({activeCandle.changePct >= 0 ? `+${activeCandle.changePct.toFixed(2)}%` : `${activeCandle.changePct.toFixed(2)}%`})
+              </span>
+            )}
+            {activeCandle.amount != null && (
+              <span>额: <strong style={{ color: c.textPrimary }}>{formatAmount(activeCandle.amount)}</strong></span>
+            )}
+            {mainOverlay === "MA" ? (
+              <>
+                <span style={{ color: "#f0b90b" }}>MA5: {activeCandle.ma5 != null ? activeCandle.ma5.toFixed(2) : "-"}</span>
+                <span style={{ color: "#1890ff" }}>MA10: {activeCandle.ma10 != null ? activeCandle.ma10.toFixed(2) : "-"}</span>
+                <span style={{ color: "#9254de" }}>MA20: {activeCandle.ma20 != null ? activeCandle.ma20.toFixed(2) : "-"}</span>
+                <span style={{ color: "#13c2c2" }}>MA30: {activeCandle.ma30 != null ? activeCandle.ma30.toFixed(2) : "-"}</span>
+                <span style={{ color: "#ff7a45" }}>MA60: {activeCandle.ma60 != null ? activeCandle.ma60.toFixed(2) : "-"}</span>
+              </>
+            ) : (
+              <>
+                <span style={{ color: "#f0b90b" }}>MID: {activeCandle.bollMid != null ? activeCandle.bollMid.toFixed(2) : "-"}</span>
+                <span style={{ color: "#ff7a45" }}>UP: {activeCandle.bollUp != null ? activeCandle.bollUp.toFixed(2) : "-"}</span>
+                <span style={{ color: "#9254de" }}>DN: {activeCandle.bollDn != null ? activeCandle.bollDn.toFixed(2) : "-"}</span>
+              </>
+            )}
+            <span style={{ color: "#f0b90b", opacity: 0.9 }}>V5: {formatAmount(activeCandle.vol5)}</span>
+            <span style={{ color: "#1890ff", opacity: 0.9 }}>V10: {formatAmount(activeCandle.vol10)}</span>
+          </div>
+        ) : (
+          <span>等待K线数据...</span>
         )}
+
+        {/* Overlay toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto", marginLeft: 4 }}>
+          <button
+            type="button"
+            onClick={() => setMainOverlay(mainOverlay === "MA" ? "BOLL" : "MA")}
+            style={{
+              padding: "1px 6px",
+              fontSize: "11px",
+              borderRadius: 4,
+              border: `1px solid ${c.border}`,
+              background: hexToRgba(c.primary, 0.08),
+              color: c.primary,
+              cursor: "pointer",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {mainOverlay === "MA" ? "切换BOLL" : "切换MA"}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ position: "relative", flex: 1, width: "100%", minHeight: height - 32, backgroundColor: c.cardBg }}>
+        <div ref={chartElRef} style={{ width: "100%", height: "100%", backgroundColor: c.cardBg }} />
+        <div ref={brushRef} style={{
+          position: "absolute", top: 0, bottom: 0, display: "none", pointerEvents: "none",
+          background: hexToRgba(c.primary, 0.12), border: `1px solid ${hexToRgba(c.primary, 0.35)}`,
+        }} />
+        <div className="pdf-hide" style={{ position: "absolute", right: 12, top: 10, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", zIndex: 5 }}>
+          <div style={{
+            padding: "4px 8px", fontSize: "11px", color: c.textSecondary,
+            background: hexToRgba(c.pageBg, 0.94), border: `1px solid ${c.border}`,
+            borderRadius: 6, boxShadow: "0 1px 3px rgba(0,0,0,0.15)", pointerEvents: "none",
+          }}>
+            拖拽框选缩放 · 双击重置
+          </div>
+          {isZoomed && (
+            <button type="button" onClick={() => { chartRef.current?.timeScale().fitContent(); setIsZoomed(false); }}
+              style={{
+                padding: "6px 12px", fontSize: "var(--c-font-sm)", fontWeight: "var(--c-weight-semibold)", color: c.primary,
+                background: hexToRgba(c.pageBg, 0.98), border: `1px solid ${c.border}`,
+                borderRadius: 999, cursor: "pointer", boxShadow: `0 4px 12px ${hexToRgba(c.primary, 0.15)}`,
+              }}>
+              返回全视图
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

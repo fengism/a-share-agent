@@ -3,8 +3,11 @@ import logging
 import math
 from datetime import date
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import analysis_cache as cache
+from app.core.cache import dated_cache_key
+from app.core.cache_policies import VALUATION_DETAIL
 from app.core.concurrency.rate_limiter import call_blocking, ths_semaphore
+from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import normalize_code, safe_float
 from app.financial_data.stock.fundamentals.financials import get_financial, get_financial_metrics
 from app.financial_data.stock.fundamentals.schemas import FinancialMetrics
@@ -63,6 +66,7 @@ from app.financial_data.stock.valuation.schemas import (
 from app.infrastructure.providers.provider_gateway import provider_gateway
 
 logger = logging.getLogger(__name__)
+_valuation_detail_singleflight = AsyncSingleFlight[ValuationDetail]()
 
 
 async def _fetch_institution_forecasts(code: str) -> list[InstitutionForecast]:
@@ -675,7 +679,7 @@ def _build_weighted_outputs(
     )
 
 
-async def get_valuation_detail(code: str) -> ValuationDetail:
+async def _load_valuation_detail(code: str) -> ValuationDetail:
     """汇总多估值方法的详细结果，带 1 天缓存。
 
     Param:
@@ -763,5 +767,15 @@ async def get_valuation_detail(code: str) -> ValuationDetail:
         notes=_build_detail_notes(profile),
         institution_forecasts=institution_forecasts,
     )
-    cache.set(cache_key, result, ttl=86400)
+    cache.set(cache_key, result, ttl=VALUATION_DETAIL.ttl_seconds)
     return result
+
+
+async def get_valuation_detail(code: str) -> ValuationDetail:
+    """获取详细估值，并合并相同股票的并发缓存未命中请求。"""
+    sym = normalize_code(code)
+    cache_key = dated_cache_key("valuation_detail_v4", sym.raw)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return ValuationDetail.model_validate(cached)
+    return await _valuation_detail_singleflight.do(cache_key, lambda: _load_valuation_detail(code))

@@ -10,7 +10,7 @@ from typing import Any, cast
 import pandas as pd
 
 from app.configuration.paths import DATA_DIR
-from app.core.cache import cache
+from app.core.cache import reference_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, exchange_semaphore, misc_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import safe_float, safe_string

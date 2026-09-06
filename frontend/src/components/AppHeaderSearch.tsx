@@ -1,9 +1,10 @@
-import { useCallback, useMemo } from "react";
-import { AutoComplete, Input } from "antd";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { AutoComplete, Input, type InputRef } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useStockSearchController } from "../hooks/useStockSearchController";
 import { useColors, useTokens } from "../styles/ui";
+import { buildStockProfileUrl } from "../utils/stockLinks";
 import QueryErrorState from "./QueryErrorState";
 
 interface AppHeaderSearchProps {
@@ -12,6 +13,7 @@ interface AppHeaderSearchProps {
 }
 
 export default function AppHeaderSearch({ isMobile, autoFocus = false }: AppHeaderSearchProps) {
+  const inputRef = useRef<InputRef>(null);
   const navigate = useNavigate();
   const {
     inputValue,
@@ -27,12 +29,25 @@ export default function AppHeaderSearch({ isMobile, autoFocus = false }: AppHead
   } = useStockSearchController();
   const colors = useColors();
   const tokens = useTokens();
+
+  // Global Cmd+K / Ctrl+K shortcut listener
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
   const searchOptions = useMemo(() => currentResults.map((item) => ({
     value: item.code,
     label: (
       <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: tokens.space[3] }}>
         <span style={{ display: "flex", alignItems: "center", gap: tokens.space[2], minWidth: 0 }}>
-          <span style={{ color: colors.primary, fontWeight: Number(tokens.weight.semibold), fontSize: tokens.font.md, fontFamily: "monospace" }}>{item.code}</span>
+          <span style={{ color: colors.primary, fontWeight: Number(tokens.weight.semibold), fontSize: tokens.font.md, fontFamily: "var(--c-font-mono)" }}>{item.code}</span>
           <span style={{ color: colors.textPrimary, fontSize: tokens.font.md, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {item.name}
           </span>
@@ -57,7 +72,7 @@ export default function AppHeaderSearch({ isMobile, autoFocus = false }: AppHead
   })), [colors, tokens, currentResults, isMobile]);
 
   const handleSelect = useCallback((code: string) => {
-    navigate(`/analysis/${code}`);
+    navigate(buildStockProfileUrl(code));
     clear();
   }, [clear, navigate]);
 
@@ -83,9 +98,10 @@ export default function AppHeaderSearch({ isMobile, autoFocus = false }: AppHead
       }
     >
       <Input.Search
+        ref={inputRef}
         className="app-header-search"
         size="large"
-        placeholder={isMobile ? "代码 / 名称" : "输入代码或名称，如 600519、贵州茅台、AAPL"}
+        placeholder={isMobile ? "代码 / 名称" : "输入代码或名称 (⌘K / Ctrl+K)"}
         prefix={isMobile ? undefined : <SearchOutlined />}
         allowClear
         enterButton

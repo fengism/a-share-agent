@@ -69,7 +69,7 @@ export function usePdfExport({
         }
       }
       const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import("html2canvas"),
+        import("html2canvas-pro"),
         import("jspdf"),
       ]);
       const pdf = new jsPDF("p", "mm", "a4");
@@ -111,6 +111,83 @@ export function usePdfExport({
           height: captureHeight,
           windowWidth: Math.max(window.innerWidth, captureWidth),
           windowHeight: Math.max(window.innerHeight, captureHeight),
+          onclone: (_clonedDoc, clonedTarget) => {
+            const canvasHelper = document.createElement("canvas");
+            canvasHelper.width = 1;
+            canvasHelper.height = 1;
+            const ctx = canvasHelper.getContext("2d");
+
+            const normalizeColor = (val: string): string => {
+              if (!val) return val;
+              if (
+                !val.includes("color(") &&
+                !val.includes("color-mix(") &&
+                !val.includes("oklch(") &&
+                !val.includes("lab(")
+              ) {
+                return val;
+              }
+              if (!ctx) return "#888888";
+              try {
+                ctx.fillStyle = "#000000";
+                ctx.fillStyle = val;
+                return ctx.fillStyle || "#888888";
+              } catch {
+                return "#888888";
+              }
+            };
+
+            const allElements = Array.from(clonedTarget.querySelectorAll<HTMLElement>("*"));
+            allElements.push(clonedTarget);
+
+            for (const el of allElements) {
+              const style = el.style;
+              if (style) {
+                if (style.borderColor && (style.borderColor.includes("color(") || style.borderColor.includes("color-mix("))) {
+                  style.borderColor = normalizeColor(style.borderColor);
+                }
+                if (style.backgroundColor && (style.backgroundColor.includes("color(") || style.backgroundColor.includes("color-mix("))) {
+                  style.backgroundColor = normalizeColor(style.backgroundColor);
+                }
+                if (style.color && (style.color.includes("color(") || style.color.includes("color-mix("))) {
+                  style.color = normalizeColor(style.color);
+                }
+                if (style.boxShadow && (style.boxShadow.includes("color(") || style.boxShadow.includes("color-mix("))) {
+                  style.boxShadow = "none";
+                }
+              }
+
+              try {
+                const comp = window.getComputedStyle(el);
+                if (comp.color && (comp.color.startsWith("color(") || comp.color.startsWith("color-mix("))) {
+                  el.style.setProperty("color", normalizeColor(comp.color), "important");
+                }
+                if (comp.backgroundColor && (comp.backgroundColor.startsWith("color(") || comp.backgroundColor.startsWith("color-mix("))) {
+                  el.style.setProperty("background-color", normalizeColor(comp.backgroundColor), "important");
+                }
+                if (comp.borderTopColor && (comp.borderTopColor.startsWith("color(") || comp.borderTopColor.startsWith("color-mix("))) {
+                  el.style.setProperty("border-top-color", normalizeColor(comp.borderTopColor), "important");
+                }
+                if (comp.borderBottomColor && (comp.borderBottomColor.startsWith("color(") || comp.borderBottomColor.startsWith("color-mix("))) {
+                  el.style.setProperty("border-bottom-color", normalizeColor(comp.borderBottomColor), "important");
+                }
+                if (comp.borderLeftColor && (comp.borderLeftColor.startsWith("color(") || comp.borderLeftColor.startsWith("color-mix("))) {
+                  el.style.setProperty("border-left-color", normalizeColor(comp.borderLeftColor), "important");
+                }
+                if (comp.borderRightColor && (comp.borderRightColor.startsWith("color(") || comp.borderRightColor.startsWith("color-mix("))) {
+                  el.style.setProperty("border-right-color", normalizeColor(comp.borderRightColor), "important");
+                }
+                if (comp.outlineColor && (comp.outlineColor.startsWith("color(") || comp.outlineColor.startsWith("color-mix("))) {
+                  el.style.setProperty("outline-color", normalizeColor(comp.outlineColor), "important");
+                }
+                if (comp.boxShadow && (comp.boxShadow.includes("color(") || comp.boxShadow.includes("color-mix("))) {
+                  el.style.setProperty("box-shadow", "none", "important");
+                }
+              } catch {
+                // Ignore computed style access error
+              }
+            }
+          },
         });
         const slices = calculatePdfCanvasSlices({
           canvasWidth: canvas.width,

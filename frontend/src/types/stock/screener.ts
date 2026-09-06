@@ -14,6 +14,7 @@ export interface ScreenerFilter {
   turnover_pct_min?: number | null;
   turnover_pct_max?: number | null;
   industries?: string[] | null;
+  concepts?: string[] | null;
   markets?: string[] | null;
   sort_by: string;
   sort_order: "asc" | "desc";
@@ -35,7 +36,10 @@ export interface ScreenerItem {
   board?: string | null;
   listing_date?: string | null;
   exchange_industry?: string | null;
+  first_industry?: StockConcept | null;
   second_industry: StockConcept | null;
+  third_industry?: StockConcept | null;
+  concepts?: string[];
 }
 
 export interface ScreenerResult {

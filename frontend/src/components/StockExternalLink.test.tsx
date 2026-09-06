@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import StockExternalLink from "./StockExternalLink";
 
 describe("StockExternalLink", () => {
-  it("links to the in-app stock analysis page", () => {
+  it("links to the in-app stock profile page", () => {
     render(
       <MemoryRouter>
         <StockExternalLink code="SH601991" name="大唐发电">
@@ -14,7 +14,7 @@ describe("StockExternalLink", () => {
     );
 
     const link = screen.getByRole("link", { name: "大唐发电 601991" });
-    expect(link).toHaveAttribute("href", "/analysis/601991");
+    expect(link).toHaveAttribute("href", "/stock/601991");
     expect(link).toHaveAttribute("title", "查看大唐发电（601991）个股详情");
   });
 

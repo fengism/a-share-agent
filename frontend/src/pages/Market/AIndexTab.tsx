@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from "react";
-import { Card, Col, Row, Segmented, Statistic, Typography } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { Button, Card, Col, Modal, Row, Segmented, Statistic, Typography } from "antd";
+import { FullscreenOutlined } from "@ant-design/icons";
 import { useMarketIndexKline, useMarketIndices } from "../../api/queries";
 import LazyKlineChart from "../../charts/LazyKlineChart";
 import ChangeValue from "../../components/ChangeValue";
@@ -30,6 +31,7 @@ function formatAmount(value: number | null | undefined) {
 export default function AIndexTab() {
   const c = useColors();
   const t = useTokens();
+  const [klineExpanded, setKlineExpanded] = useState(false);
   const [activeSymbol, setActiveSymbol] = useUrlSearchParam("index", "000001", {
     allowedValues: INDEX_CODES,
   });
@@ -78,104 +80,151 @@ export default function AIndexTab() {
           minHeight={180}
         >
           <Row gutter={[16, 16]}>
-            {mainIndices.map((idx) => (
-              <Col xs={12} sm={8} lg={desktopSpan} key={idx.code}>
-                <button
-                  type="button"
-                  onClick={() => setActiveSymbol(idx.code)}
-                  aria-pressed={idx.code === activeSymbol}
-                  style={{
-                    cursor: "pointer",
-                    border: 0,
-                    padding: 0,
-                    width: "100%",
-                    background: "transparent",
-                    textAlign: "left",
-                  }}
-                >
-                  <Card
-                    hoverable
+            {mainIndices.map((idx) => {
+              const isActive = idx.code === activeSymbol;
+              return (
+                <Col xs={12} sm={8} lg={desktopSpan} key={idx.code}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSymbol(idx.code)}
+                    aria-pressed={isActive}
                     style={{
-                      borderRadius: t.radius.md,
-                      border: `1px solid ${idx.code === activeSymbol ? c.primary : c.border}`,
-                      boxShadow: t.shadow.xs,
+                      cursor: "pointer",
+                      border: 0,
+                      padding: 0,
+                      width: "100%",
+                      background: "transparent",
+                      textAlign: "left",
+                      outline: "none",
                     }}
-                    styles={{ body: { padding: t.space[4] } }}
                   >
-                    <Statistic
-                      title={<span style={{ color: c.textSecondary, fontSize: t.font.md }}>{idx.name}</span>}
-                      value={idx.price ?? undefined}
-                      precision={2}
-                      styles={{
-                        content: {
-                          color: getChangeColor(idx.change_pct, c),
-                          fontSize: t.font["3xl"],
-                          fontWeight: Number(t.weight.bold),
-                        },
+                    <Card
+                      hoverable
+                      style={{
+                        borderRadius: t.radius.md,
+                        border: `1px solid ${isActive ? c.primary : c.border}`,
+                        borderTop: isActive ? `3px solid ${c.primary}` : `1px solid ${c.border}`,
+                        background: isActive
+                          ? "color-mix(in srgb, var(--c-primary) 5%, var(--c-card-bg))"
+                          : "var(--c-card-bg)",
+                        boxShadow: isActive ? "0 4px 14px rgba(22, 119, 255, 0.12)" : t.shadow.xs,
+                        transition: "all 0.2s ease",
                       }}
-                    />
-                    <div style={{ marginTop: t.space[2], display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <ChangeValue value={idx.change_pct} showIcon />
-                      <Text type="secondary" style={{ fontSize: t.font.sm }}>{idx.code}</Text>
-                    </div>
-                    <div style={{ marginTop: t.space[2], display: "flex", alignItems: "center" }}>
-                      <Text type="secondary" style={{ fontSize: t.font.sm }}>成交额 {formatAmount(idx.amount)}</Text>
-                    </div>
-                  </Card>
-                </button>
-              </Col>
-            ))}
+                      styles={{ body: { padding: t.space[4] } }}
+                    >
+                      <Statistic
+                        title={
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ color: isActive ? c.primary : c.textSecondary, fontSize: t.font.md, fontWeight: isActive ? 600 : 500 }}>
+                              {idx.name}
+                            </span>
+                            {isActive && (
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: c.primary }} />
+                            )}
+                          </div>
+                        }
+                        value={idx.price ?? undefined}
+                        precision={2}
+                        styles={{
+                          content: {
+                            color: getChangeColor(idx.change_pct, c),
+                            fontSize: t.font["3xl"],
+                            fontWeight: Number(t.weight.bold),
+                          },
+                        }}
+                      />
+                      <div style={{ marginTop: t.space[2], display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <ChangeValue value={idx.change_pct} showIcon />
+                        <Text type="secondary" style={{ fontSize: t.font.sm, fontFamily: "monospace" }}>{idx.code}</Text>
+                      </div>
+                      <div style={{ marginTop: t.space[2], display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <Text type="secondary" style={{ fontSize: t.font.sm }}>成交额 {formatAmount(idx.amount)}</Text>
+                      </div>
+                    </Card>
+                  </button>
+                </Col>
+              );
+            })}
           </Row>
         </SectionDataState>
       </div>
 
-      {activeIndex && (
-        <div style={{ marginBottom: t.space[4] }}>
-          <IndexIntradayCard
-            symbol={activeIndex.code}
-            name={activeIndex.name}
-            price={activeIndex.price}
-            changePct={activeIndex.change_pct}
-            preClose={activeIndex.pre_close}
-            height={360}
-          />
-        </div>
-      )}
+      <Row gutter={[16, 16]}>
+        <Col xs={24} xl={12}>
+          {activeIndex && (
+            <IndexIntradayCard
+              symbol={activeIndex.code}
+              name={activeIndex.name}
+              price={activeIndex.price}
+              changePct={activeIndex.change_pct}
+              preClose={activeIndex.pre_close}
+              height={420}
+            />
+          )}
+        </Col>
+        <Col xs={24} xl={12}>
+          <Card
+            size="small"
+            title={
+              <span style={{ fontWeight: Number(t.weight.semibold) }}>
+                {activeIndex?.name || "大盘指数"} · K线趋势
+              </span>
+            }
+            extra={
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Segmented
+                  aria-label="K线周期"
+                  options={[
+                    { label: "日K", value: "daily" },
+                    { label: "周K", value: "weekly" },
+                    { label: "月K", value: "monthly" },
+                  ]}
+                  value={period}
+                  onChange={(value) => setPeriod(String(value))}
+                />
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<FullscreenOutlined />}
+                  aria-label="放大K线图"
+                  onClick={() => setKlineExpanded(true)}
+                  style={{ color: c.textSecondary }}
+                />
+              </div>
+            }
+            style={{ borderRadius: t.radius.md, border: `1px solid ${c.border}`, boxShadow: t.shadow.xs, height: "100%" }}
+          >
+            <SectionDataState
+              isLoading={klineLoading && !hasKlineData}
+              error={hasKlineData ? undefined : klineError}
+              onRetry={() => refetchKline()}
+              isEmpty={!hasKlineData}
+              emptyText="暂无指数 K 线数据"
+              errorTitle="指数 K 线加载失败"
+              minHeight={360}
+            >
+              <LazyKlineChart
+                data={klineItems}
+                height={360}
+              />
+            </SectionDataState>
+          </Card>
+        </Col>
+      </Row>
 
-      <Card
-        size="small"
-        title={<span style={{ fontWeight: Number(t.weight.semibold) }}>{activeIndex?.name || "大盘指数"} K线</span>}
-        extra={
-          <Segmented
-            aria-label="K线周期"
-            options={[
-              { label: "日K", value: "daily" },
-              { label: "周K", value: "weekly" },
-              { label: "月K", value: "monthly" },
-            ]}
-            value={period}
-            onChange={(value) => setPeriod(String(value))}
-          />
-        }
-        style={{ borderRadius: t.radius.md, border: `1px solid ${c.border}`, boxShadow: t.shadow.xs }}
+      <Modal
+        title={`${activeIndex?.name || "大盘指数"} · ${period === "daily" ? "日K" : period === "weekly" ? "周K" : "月K"}线全屏`}
+        open={klineExpanded}
+        onCancel={() => setKlineExpanded(false)}
+        footer={null}
+        width="90vw"
+        styles={{ body: { height: "75vh" } }}
       >
-        <SectionDataState
-          isLoading={klineLoading && !hasKlineData}
-          error={hasKlineData ? undefined : klineError}
-          onRetry={() => refetchKline()}
-          isEmpty={!hasKlineData}
-          emptyText="暂无指数 K 线数据"
-          errorTitle="指数 K 线加载失败"
-          minHeight={420}
-          skeletonRows={8}
-        >
-          <LazyKlineChart
-            data={klineItems}
-            height={420}
-            viewKey={`${activeSymbol}:${period}`}
-          />
-        </SectionDataState>
-      </Card>
+        <LazyKlineChart
+          data={klineItems}
+          height={580}
+        />
+      </Modal>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { useStyles } from "../../styles/ui";
 import type { WatchlistAlertCondition, WatchlistItem } from "../../types/watchlist";
 import ChangeValue from "../../components/ChangeValue";
 import PreloadLink from "../../components/PreloadLink";
+import { buildWatchlistStockUrl } from "../../utils/stockLinks";
 
 const { Text } = Typography;
 const CONDITION_LABELS: Record<WatchlistAlertCondition, string> = {
@@ -29,6 +30,7 @@ const SOURCE_LABELS: Record<string, string> = {
   sina_direct: "新浪行情",
   eastmoney: "东方财富",
   eastmoney_direct: "东方财富",
+  mixed: "多市场行情",
 };
 
 function sourceLabel(value: string | undefined): string {
@@ -78,7 +80,14 @@ export default function WatchlistPanel() {
   const handleCreateAlert = async () => {
     if (!alertStock || threshold == null) return;
     try {
-      await addAlert.mutateAsync({ stockCode: alertStock.stock_code, request: { condition, threshold } });
+      await addAlert.mutateAsync({
+        stockCode: alertStock.stock_code,
+        request: {
+          condition,
+          threshold,
+          ...(alertStock.market === "hk" ? { market: "hk" as const } : {}),
+        },
+      });
       setAlertStock(null);
       setThreshold(null);
       message.success("提醒规则已添加");
@@ -97,7 +106,10 @@ export default function WatchlistPanel() {
           <span className="dashboard-watchlist__eyebrow">WATCHLIST</span>
           <h2>我的自选</h2>
         </div>
-        <span className="dashboard-watchlist__count">{watchlist.data?.items.length ?? 0} 只</span>
+        <div className="dashboard-watchlist__header-actions">
+          <span className="dashboard-watchlist__count">{watchlist.data?.items.length ?? 0} 只</span>
+          <PreloadLink className="dashboard-watchlist__view-all" to="/watchlist">查看全部</PreloadLink>
+        </div>
       </header>
       <div className="dashboard-watchlist__meta">
         <span>{sourceLabel(watchlist.data?.source)} · {formatQuotedTime(watchlist.data?.quoted_at)}</span>
@@ -132,12 +144,12 @@ export default function WatchlistPanel() {
             {(watchlist.data?.items ?? []).map((item) => (
               <li className={`dashboard-watchlist__item${(item.change_pct ?? 0) > 0 ? " is-up" : (item.change_pct ?? 0) < 0 ? " is-down" : " is-flat"}`} key={item.id}>
                 <div className="dashboard-watchlist__row">
-                  <PreloadLink className="dashboard-watchlist__identity" to={`/analysis/${encodeURIComponent(item.stock_code)}`}>
+                  <PreloadLink className="dashboard-watchlist__identity" to={buildWatchlistStockUrl(item.stock_code, item.market)}>
                     <strong>{item.stock_name}</strong>
-                    <Text type="secondary">{item.stock_code}</Text>
+                    <Text type="secondary" className="financial-num">{item.stock_code}</Text>
                   </PreloadLink>
                   <div className="dashboard-watchlist__quote-cluster">
-                    <strong>{item.current_price?.toFixed(2) ?? "-"}</strong>
+                    <strong className="financial-num">{item.current_price?.toFixed(2) ?? "-"}</strong>
                     <ChangeValue value={item.change_pct} />
                   </div>
                 </div>
@@ -163,7 +175,18 @@ export default function WatchlistPanel() {
                     <Button size="small" type="text" aria-label={`设置${item.stock_name}提醒`} icon={<BellOutlined />} onClick={() => setAlertStock(item)} />
                   </Tooltip>
                   <Tooltip title="移除自选">
-                    <Button size="small" type="text" danger aria-label={`移除${item.stock_name}`} icon={<DeleteOutlined />} onClick={() => deleteItem.mutateAsync(item.stock_code)} />
+                    <Button
+                      size="small"
+                      type="text"
+                      danger
+                      aria-label={`移除${item.stock_name}`}
+                      icon={<DeleteOutlined />}
+                      onClick={() => deleteItem.mutateAsync(
+                        item.market === "hk"
+                          ? { stockCode: item.stock_code, market: "hk" }
+                          : item.stock_code,
+                      )}
+                    />
                   </Tooltip>
                 </div>
               </li>

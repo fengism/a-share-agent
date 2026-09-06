@@ -1,11 +1,30 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "../../api/queryKeys";
-import { DeleteOutlined, FileTextOutlined } from "@ant-design/icons";
+import {
+  ApartmentOutlined,
+  BulbOutlined,
+  CompassOutlined,
+  DeleteOutlined,
+  FileTextOutlined,
+  FireOutlined,
+  LineChartOutlined,
+  RiseOutlined,
+  SwapRightOutlined,
+  ThunderboltOutlined,
+  WarningOutlined,
+} from "@ant-design/icons";
 import { Alert, Button, Card, DatePicker, Divider, message, Popconfirm, Skeleton, Space, Tag, Typography } from "antd";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import dayjs from "dayjs";
-import { useDailyReview, useDeleteDailyReview, useInfiniteDailyReviewHistory } from "../../api/queries";
+import {
+  downloadDailyReviewPdf,
+  useDailyReview,
+  useDeleteDailyReview,
+  useInfiniteDailyReviewHistory,
+} from "../../api/queries";
 import { streamDailyReview, type DailyReviewProgress } from "../../api/sse";
 import { ApiError } from "../../api/client";
 import PushModal from "../../components/PushModal";
@@ -14,12 +33,13 @@ import SectionDataState from "../../components/SectionDataState";
 import WorkflowPageHeader from "../../components/workflows/WorkflowPageHeader";
 import WorkflowProgressPanel from "../../components/workflows/WorkflowProgressPanel";
 import WorkflowWorkspace from "../../components/workflows/WorkflowWorkspace";
-import { usePdfExport } from "../../hooks/usePdfExport";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useWorkflowPush } from "../../hooks/useWorkflowPush";
 import type { PushRequest } from "../../types/stock";
 import { useColors, useStyles } from "../../styles/ui";
 import { normalizeIsoDate } from "../../utils/date";
+import DailyReviewCharts from "./DailyReviewCharts";
+import "./daily-review.css";
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -45,16 +65,34 @@ function unwrapJsonBlock(value: string) {
   return match ? match[1].trim() : text;
 }
 
-function stringifyReviewValue(value: unknown): string {
+function stringifyReviewValue(value: unknown, depth = 0): string {
   if (value == null) return "";
+  if (typeof value === "string") {
+    return value.replace(/\\n/g, "\n").trim();
+  }
   if (Array.isArray(value)) {
     return value
-      .map((item) => typeof item === "string" ? `- ${item}` : `- ${stringifyReviewValue(item)}`)
+      .map((item) => {
+        if (typeof item === "string") {
+          return `- ${item.replace(/\\n/g, "\n").trim()}`;
+        }
+        return `- ${stringifyReviewValue(item, depth + 1)}`;
+      })
       .join("\n");
   }
   if (typeof value === "object") {
     return Object.entries(value as Record<string, unknown>)
-      .map(([key, item]) => `- **${key}**：${stringifyReviewValue(item)}`)
+      .map(([key, item]) => {
+        if (typeof item === "string") {
+          const itemText = item.replace(/\\n/g, "\n").trim();
+          if (itemText.includes("\n")) {
+            const lines = itemText.split("\n").map((line) => line.trim()).filter(Boolean);
+            return `- **${key}**：\n${lines.map((line) => `  - ${line}`).join("\n")}`;
+          }
+          return `- **${key}**：${itemText}`;
+        }
+        return `- **${key}**：\n${stringifyReviewValue(item, depth + 1)}`;
+      })
       .join("\n");
   }
   return String(value);
@@ -68,6 +106,7 @@ function formatReviewTitle(key: string) {
 }
 
 function renderReviewContent(value: string) {
+  if (!value) return "";
   const text = unwrapJsonBlock(value);
   try {
     const parsed = JSON.parse(text) as unknown;
@@ -78,7 +117,7 @@ function renderReviewContent(value: string) {
     }
     return stringifyReviewValue(parsed);
   } catch {
-    return value;
+    return text.replace(/\\n/g, "\n");
   }
 }
 
@@ -89,7 +128,6 @@ export default function DailyReviewPage() {
   const [dateParam, setDate] = useUrlSearchParam("date", defaultDate, { replace: true });
   const date = normalizeIsoDate(dateParam, defaultDate);
   const selectedDate = dayjs(date);
-  const exportRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const {
     data: historyPages,
@@ -112,6 +150,7 @@ export default function DailyReviewPage() {
   const { push, isPushing } = useWorkflowPush();
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
   const cancelGenerationRef = useRef<(() => Promise<unknown>) | null>(null);
   const detachGenerationRef = useRef<(() => void) | null>(null);
@@ -127,17 +166,22 @@ export default function DailyReviewPage() {
     cancelGenerationRef.current = null;
   }, []);
 
-  const { exportPdf: handleExportPdf, isExporting: isExportingPdf } = usePdfExport({
-    targetRef: exportRef,
-    filename: () => `每日复盘-${date}.pdf`,
-    backgroundColor: c.pageBg,
-    onStart: () => message.loading({ content: "正在生成 PDF...", key: "daily-review-export" }),
-    onSuccess: () => message.success({ content: "PDF 导出成功", key: "daily-review-export" }),
-    onError: (error) => {
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true);
+    message.loading({ content: "正在生成 PDF...", key: "daily-review-export" });
+    try {
+      await downloadDailyReviewPdf(date);
+      message.success({ content: "PDF 导出成功", key: "daily-review-export" });
+    } catch (error) {
       console.error("[DailyReview] PDF 导出失败", error);
-      message.error({ content: "PDF 导出失败，请稍后重试", key: "daily-review-export" });
-    },
-  });
+      message.error({
+        content: error instanceof Error ? error.message : "PDF 导出失败，请稍后重试",
+        key: "daily-review-export",
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const historyItems = historyPages?.pages.flat() ?? [];
 
@@ -227,6 +271,20 @@ export default function DailyReviewPage() {
               onChange={(value) => setDate(formatDate(value))}
               disabledDate={(value) => value.startOf("day").isAfter(dayjs().startOf("day"))}
             />
+            <Button.Group size="middle">
+              <Button
+                disabled={isGenerating || isExportingPdf}
+                onClick={() => setDate(dayjs().format("YYYY-MM-DD"))}
+              >
+                今日
+              </Button>
+              <Button
+                disabled={isGenerating || isExportingPdf}
+                onClick={() => setDate(dayjs().subtract(1, "day").format("YYYY-MM-DD"))}
+              >
+                前一日
+              </Button>
+            </Button.Group>
             <Button type="primary" loading={isGenerating} disabled={isExportingPdf} onClick={() => handleGenerate(false)}>生成复盘</Button>
             <Button loading={isGenerating} disabled={isExportingPdf} onClick={() => handleGenerate(true)}>重新生成</Button>
             {isGenerating && <Button danger onClick={handleCancelGeneration}>取消任务</Button>}
@@ -287,7 +345,7 @@ export default function DailyReviewPage() {
                       borderRadius: 4,
                     }}
                   >
-                    <span style={{ display: "block", fontWeight: 500 }}>{item.title}</span>
+                    <span style={{ display: "block", fontWeight: "var(--c-weight-medium)" }}>{item.title}</span>
                     <Text type="secondary">{item.date}</Text>
                   </button>
                   {item.can_delete ? (
@@ -324,7 +382,7 @@ export default function DailyReviewPage() {
           </SectionDataState>
         )}
       >
-        <div ref={exportRef}>
+        <div>
           {isReviewLoading ? (
             <Card style={cardStyle}>
               <div aria-label="复盘内容加载中" style={{ minHeight: 420, padding: 16 }}>
@@ -350,24 +408,35 @@ export default function DailyReviewPage() {
                   )}
                 />
               )}
-              <Card style={cardStyle}>
-                <Title level={4} style={{ marginTop: 0 }}>{review.title}</Title>
-                <Paragraph>{review.market_summary}</Paragraph>
-                <Paragraph><Text strong>市场情绪结论：</Text>{buildMoodSummary(review)}</Paragraph>
-                <Space wrap>
-                  <Tag style={{ background: `${c.primary}26`, color: c.primary, border: "none" }}>指数 {review.data_snapshot.indices.length}</Tag>
-                  <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none" }}>热股 {review.data_snapshot.hot_stocks.length}</Tag>
-                  <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none" }}>概念 {review.data_snapshot.hot_concepts.length}</Tag>
-                  <Tag style={{ background: `${c.down}26`, color: c.down, border: "none" }}>行业 {review.data_snapshot.hot_industries.length}</Tag>
-                  <Tag style={{ background: `${c.up}26`, color: c.up, border: "none" }}>龙虎榜 {review.data_snapshot.dragon_tiger.length}</Tag>
+              <Card style={{ ...cardStyle, borderLeft: `4px solid ${c.primary}`, background: `linear-gradient(135deg, color-mix(in srgb, ${c.primary} 6%, ${c.cardBg}), ${c.cardBg})` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                  <Title level={4} style={{ marginTop: 0, marginBottom: 8 }}>{review.title}</Title>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    <Tag color={review.quality_status === "degraded" ? "warning" : "success"}>质量：{review.quality_status === "degraded" ? "降级" : "完整"}</Tag>
+                    <Tag color={review.generation_status === "fallback" ? "warning" : "processing"}>报告：{review.generation_status === "fallback" ? "确定性兜底" : "AI 生成"}</Tag>
+                  </div>
+                </div>
+                <Paragraph style={{ fontSize: "var(--c-font-base)", lineHeight: "var(--c-leading-relaxed)", color: "var(--c-text-primary)" }}>{review.market_summary}</Paragraph>
+                <div style={{ margin: "12px 0", padding: "10px 14px", borderRadius: "var(--c-radius-md)", background: "color-mix(in srgb, var(--c-primary) 8%, var(--c-card-bg))", border: "1px solid color-mix(in srgb, var(--c-primary) 18%, var(--c-border))" }}>
+                  <Text strong style={{ color: "var(--c-primary)" }}>
+                    <CompassOutlined style={{ marginRight: 6 }} />
+                    市场情绪结论：
+                  </Text>
+                  <Text style={{ marginLeft: 6 }}>{buildMoodSummary(review)}</Text>
+                </div>
+                <Space wrap style={{ marginTop: 8 }}>
+                  <Tag style={{ background: `${c.primary}26`, color: c.primary, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><LineChartOutlined style={{ marginRight: 4 }} />指数 {review.data_snapshot.indices.length}</Tag>
+                  <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><FireOutlined style={{ marginRight: 4 }} />热股 {review.data_snapshot.hot_stocks.length}</Tag>
+                  <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><ThunderboltOutlined style={{ marginRight: 4 }} />概念 {review.data_snapshot.hot_concepts.length}</Tag>
+                  <Tag style={{ background: `${c.down}26`, color: c.down, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><ApartmentOutlined style={{ marginRight: 4 }} />行业 {review.data_snapshot.hot_industries.length}</Tag>
+                  <Tag style={{ background: `${c.up}26`, color: c.up, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><SwapRightOutlined style={{ marginRight: 4 }} />龙虎榜 {review.data_snapshot.dragon_tiger.length}</Tag>
                 </Space>
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary">生成时间：{review.generated_at}</Text>
+                <div style={{ marginTop: 12 }}>
+                  <Text type="secondary" style={{ fontSize: "var(--c-font-xs)" }}>生成时间：{review.generated_at}</Text>
                 </div>
-                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  <Tag color={review.quality_status === "degraded" ? "warning" : "success"}>质量：{review.quality_status === "degraded" ? "降级" : "完整"}</Tag>
-                  <Tag color={review.generation_status === "fallback" ? "warning" : "processing"}>报告：{review.generation_status === "fallback" ? "确定性兜底" : "AI 生成"}</Tag>
-                </div>
+              </Card>
+              <Card title="市场数据图谱" style={cardStyle}>
+                <DailyReviewCharts snapshot={review.data_snapshot} />
               </Card>
               {review.data_snapshot.source_status && (
                 <Card title="复盘数据状态" style={cardStyle}>
@@ -383,7 +452,20 @@ export default function DailyReviewPage() {
               )}
               {review.llm_review ? (
                 <Card title="复盘报告" style={{ ...cardStyle, background: c.nestedBg }}>
-                  <ReactMarkdown>{renderReviewContent(review.llm_review)}</ReactMarkdown>
+                  <div className="daily-review-markdown">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm, remarkBreaks]}
+                      components={{
+                        table: ({ children }) => (
+                          <div className="daily-review-markdown-table-wrap">
+                            <table>{children}</table>
+                          </div>
+                        ),
+                      }}
+                    >
+                      {renderReviewContent(review.llm_review)}
+                    </ReactMarkdown>
+                  </div>
                 </Card>
               ) : (
                 <>
@@ -396,9 +478,20 @@ export default function DailyReviewPage() {
                     </Card>
                   ))}
                   <Card title="机会与风险" style={cardStyle}>
-                    <Paragraph><Text strong>机会：</Text>{review.opportunities.join("；") || "-"}</Paragraph>
-                    <Paragraph><Text strong>风险：</Text>{review.risk_alerts.join("；") || "-"}</Paragraph>
-                    <Paragraph><Text strong>策略：</Text>{review.strategy_notes.join("；") || "-"}</Paragraph>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <div style={{ padding: "10px 14px", borderRadius: "var(--c-radius-md)", background: "color-mix(in srgb, var(--c-up) 8%, var(--c-card-bg))", borderLeft: "3px solid var(--c-up)" }}>
+                        <Text strong style={{ color: "var(--c-up)" }}><RiseOutlined style={{ marginRight: 6 }} />机会：</Text>
+                        <Text style={{ marginLeft: 6 }}>{review.opportunities.join("；") || "-"}</Text>
+                      </div>
+                      <div style={{ padding: "10px 14px", borderRadius: "var(--c-radius-md)", background: "color-mix(in srgb, var(--c-warning) 8%, var(--c-card-bg))", borderLeft: "3px solid var(--c-warning)" }}>
+                        <Text strong style={{ color: "var(--c-warning)" }}><WarningOutlined style={{ marginRight: 6 }} />风险：</Text>
+                        <Text style={{ marginLeft: 6 }}>{review.risk_alerts.join("；") || "-"}</Text>
+                      </div>
+                      <div style={{ padding: "10px 14px", borderRadius: "var(--c-radius-md)", background: "color-mix(in srgb, var(--c-primary) 8%, var(--c-card-bg))", borderLeft: "3px solid var(--c-primary)" }}>
+                        <Text strong style={{ color: "var(--c-primary)" }}><BulbOutlined style={{ marginRight: 6 }} />策略：</Text>
+                        <Text style={{ marginLeft: 6 }}>{review.strategy_notes.join("；") || "-"}</Text>
+                      </div>
+                    </div>
                   </Card>
                   <Card title="原始数据快照" style={cardStyle}>
                     <Paragraph><Text strong>指数样本：</Text>{review.data_snapshot.indices.slice(0, 3).map((item) => String(item.name || item.code || "")).join("、") || "-"}</Paragraph>

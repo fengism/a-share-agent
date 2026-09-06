@@ -28,7 +28,7 @@ export default function DataSourceCookiesCard({
             onChange={(event) => onChange({ eastmoney_cookie: event.target.value })}
             placeholder="留空使用内置默认值"
           />
-          <div style={{ marginTop: 4, fontSize: 12, color: colors.textMuted }}>
+          <div style={{ marginTop: 4, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
             从浏览器 DevTools → Network → 请求头中复制 Cookie 值
           </div>
         </Col>
@@ -39,7 +39,7 @@ export default function DataSourceCookiesCard({
             onChange={(event) => onChange({ baidu_cookie: event.target.value })}
             placeholder="留空使用内置默认值"
           />
-          <div style={{ marginTop: 4, fontSize: 12, color: colors.textMuted }}>
+          <div style={{ marginTop: 4, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
             从浏览器 DevTools → Network → 请求头中复制 Cookie 值
           </div>
         </Col>

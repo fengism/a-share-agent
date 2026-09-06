@@ -112,7 +112,7 @@ const SHARED_SPACE: DesignTokens["space"] = {
 };
 
 const SHARED_FONT: DesignTokens["font"] = {
-  xs: "10px",
+  xs: "11px",
   sm: "12px",
   md: "13px",
   base: "14px",
@@ -145,9 +145,9 @@ const SHARED_Z: DesignTokens["z"] = {
 };
 
 const SHARED_CONTAINER: DesignTokens["container"] = {
-  page: "1280px",
-  feed: "1180px",
-  wide: "1400px",
+  page: "1680px",
+  feed: "1280px",
+  wide: "1800px",
 };
 
 const DARK_TOKENS: DesignTokens = {
@@ -254,8 +254,8 @@ export const themes: Record<ThemeKey, ThemeMeta> = {
       cardBg: "#ffffff",
       elevatedBg: "#fbfcfd",
       nestedBg: "#f8fafc",
-      primary: "#6658be",
-      accent: "#8a79d0",
+      primary: "#087f98",
+      accent: "#0b96b2",
       up: "#d92d20",
       down: "#039855",
       upBg: "rgba(217,45,32,0.08)",
@@ -264,29 +264,29 @@ export const themes: Record<ThemeKey, ThemeMeta> = {
       downCardGradient: "linear-gradient(135deg, rgba(3,152,85,0.09), rgba(3,152,85,0.03))",
       success: "#039855",
       warning: "#dc6803",
-      info: "#3b82f6",
+      info: "#0284c7",
       onPrimary: "#ffffff",
       hoverBg: "#f0f3f7",
       activeBg: "#e9edf3",
       textPrimary: "#182230",
       textSecondary: "#475467",
-      textMuted: "#98a2b3",
+      textMuted: "#64748b",
       border: "#e2e8f0",
       headerGradient: "linear-gradient(135deg, #f8fafc, #f1f4f8)",
-      logoGradient: "linear-gradient(135deg, #6658be, #9484d8)",
-      focusRing: "rgba(102,88,190,0.22)",
+      logoGradient: "linear-gradient(135deg, #087f98, #20c6e5)",
+      focusRing: "rgba(8,127,152,0.22)",
       surfaceOverlay: "rgba(255,255,255,0.97)",
       authBackground:
-        "radial-gradient(circle at 14% 12%, rgba(102,88,190,0.08), transparent 32%), radial-gradient(circle at 86% 82%, rgba(138,121,208,0.05), transparent 28%), #f5f7fa",
+        "radial-gradient(circle at 14% 12%, rgba(8,127,152,0.08), transparent 32%), radial-gradient(circle at 86% 82%, rgba(32,198,229,0.05), transparent 28%), #f5f7fa",
       authHeroGradient: "linear-gradient(145deg, rgba(248,250,252,0.98), rgba(240,243,247,0.92))",
       cardShadow: "0 10px 28px rgba(16,24,40,0.08)",
     },
     antToken: {
-      colorPrimary: "#6658be",
-      colorPrimaryHover: "#584bb0",
-      colorPrimaryActive: "#4b409b",
-      colorPrimaryBg: "#f0eefb",
-      colorInfo: "#3b82f6",
+      colorPrimary: "#087f98",
+      colorPrimaryHover: "#0b96b2",
+      colorPrimaryActive: "#066b82",
+      colorPrimaryBg: "#e0f2fe",
+      colorInfo: "#0284c7",
       colorSuccess: "#039855",
       colorWarning: "#dc6803",
       colorError: "#d92d20",

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Card, Col, Row, Segmented, Table, Tag } from "antd";
 import {
   AppstoreOutlined,
@@ -30,6 +30,74 @@ const TAB_OPTIONS = [
   { label: <span><AppstoreOutlined /> 行业榜</span>, value: "industry" as TabKey },
 ];
 
+interface HorizontalScrollAreaProps {
+  children: ReactNode;
+  contentWidth: number;
+  label: string;
+}
+
+function HorizontalScrollArea({ children, contentWidth, label }: HorizontalScrollAreaProps) {
+  const dragState = useRef({
+    pointerId: -1,
+    startX: 0,
+    startScrollLeft: 0,
+    moved: false,
+  });
+
+  const stopDragging = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragState.current.pointerId !== event.pointerId) return;
+    event.currentTarget.classList.remove("is-dragging");
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragState.current.pointerId = -1;
+  };
+
+  return (
+    <div
+      className="hot-rank-horizontal-scroll"
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+      onPointerDown={(event) => {
+        if (event.pointerType !== "mouse" || event.button !== 0) return;
+        dragState.current = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startScrollLeft: event.currentTarget.scrollLeft,
+          moved: false,
+        };
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        event.currentTarget.classList.add("is-dragging");
+      }}
+      onPointerMove={(event) => {
+        const drag = dragState.current;
+        if (drag.pointerId !== event.pointerId) return;
+        const distance = event.clientX - drag.startX;
+        if (Math.abs(distance) > 3) drag.moved = true;
+        if (!drag.moved) return;
+        event.currentTarget.scrollLeft = drag.startScrollLeft - distance;
+        event.preventDefault();
+      }}
+      onPointerUp={stopDragging}
+      onPointerCancel={stopDragging}
+      onClickCapture={(event) => {
+        if (!dragState.current.moved) return;
+        event.preventDefault();
+        event.stopPropagation();
+        dragState.current.moved = false;
+      }}
+    >
+      <div
+        className="hot-rank-horizontal-scroll__content"
+        style={{ minWidth: contentWidth }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number }) {
   const c = useColors();
   const t = useTokens();
@@ -43,7 +111,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
         {
           title: "股票",
           key: "stock",
-          width: 150,
+          width: 138,
           render: (_: unknown, record: ThsHotStock) => (
             <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
               {rankBadge(record.rank, c, t)}
@@ -57,14 +125,14 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
         {
           title: "涨跌幅",
           dataIndex: "change_pct",
-          width: 82,
+          width: 76,
           align: "right",
           render: (value: number | null) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
         },
         {
           title: "热度",
           dataIndex: "hot_value",
-          width: 70,
+          width: 66,
           align: "right",
           render: (value: number | null) => <span style={{ fontWeight: Number(t.weight.semibold), color: c.up }}>{formatHotValue(value)}</span>,
         },
@@ -144,25 +212,38 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
         errorTitle="热股排行加载失败"
         minHeight={320}
       >
-        <Table
-          columns={columns}
-          dataSource={data || []}
-          rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
-          size="small"
-          pagination={false}
-          virtual
-          expandable={isNarrow ? {
-            expandedRowRender: renderExpandedRow,
-            columnWidth: 38,
-          } : undefined}
-          scroll={{ x: "max-content", y: scrollY }}
-        />
+        <HorizontalScrollArea
+          contentWidth={isNarrow ? 316 : 635}
+          label="热股榜左右滑动区域"
+        >
+          <Table
+            columns={columns}
+            dataSource={data || []}
+            rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
+            size="small"
+            pagination={false}
+            virtual
+            expandable={isNarrow ? {
+              expandedRowRender: renderExpandedRow,
+              columnWidth: 36,
+            } : undefined}
+            scroll={{ x: isNarrow ? 316 : 635, y: scrollY }}
+          />
+        </HorizontalScrollArea>
       </SectionDataState>
     </div>
   );
 }
 
-function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: boolean }) {
+function PlateTable({
+  type,
+  enabled,
+  scrollY,
+}: {
+  type: "concept" | "industry";
+  enabled: boolean;
+  scrollY?: number;
+}) {
   const c = useColors();
   const t = useTokens();
   const isNarrow = useMediaQuery("(max-width: 768px)");
@@ -176,7 +257,7 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
         {
           title: type === "concept" ? "概念" : "行业",
           key: "plate",
-          width: 150,
+          width: 138,
           render: (_: unknown, record: ThsHotPlate) => (
             <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
               {rankBadge(record.rank, c, t)}
@@ -187,14 +268,14 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
         {
           title: "涨跌幅",
           dataIndex: "change_pct",
-          width: 82,
+          width: 76,
           align: "right",
           render: (value: number) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
         },
         {
           title: "热度",
           dataIndex: "hot_value",
-          width: 70,
+          width: 66,
           align: "right",
           render: (value: number | null) => <span style={{ fontWeight: Number(t.weight.semibold), color: c.up }}>{formatHotValue(value)}</span>,
         },
@@ -274,10 +355,10 @@ function PlateTable({ type, enabled }: { type: "concept" | "industry"; enabled: 
           rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
           size="small"
           pagination={false}
-          scroll={{ x: "max-content" }}
+          scroll={{ x: 655, y: scrollY }}
           expandable={isNarrow ? {
             expandedRowRender: renderExpandedRow,
-            columnWidth: 38,
+            columnWidth: 36,
           } : undefined}
         />
       </SectionDataState>
@@ -293,7 +374,7 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
   const c = useColors();
   const t = useTokens();
   const [tab, setTab] = useState<TabKey>("stock");
-  const stockScrollY = embedded ? 580 : 600;
+  const tableScrollY = embedded ? 440 : 600;
 
   return (
     <>
@@ -329,11 +410,31 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
           border: "none",
           boxShadow: t.shadow.xs,
         }}
-        styles={{ body: { padding: `${t.space[2]} ${t.space[4]}` } }}
+        styles={{
+          body: {
+            padding: embedded
+              ? `${t.space[2]} ${t.space[2]}`
+              : `${t.space[2]} ${t.space[4]}`,
+          },
+        }}
       >
-        {tab === "stock" && <StockTable enabled={tab === "stock"} scrollY={stockScrollY} />}
-        {tab === "concept" && <PlateTable type="concept" enabled={tab === "concept"} />}
-        {tab === "industry" && <PlateTable type="industry" enabled={tab === "industry"} />}
+        {tab === "stock" && (
+          <StockTable enabled={tab === "stock"} scrollY={tableScrollY} />
+        )}
+        {tab === "concept" && (
+          <PlateTable
+            type="concept"
+            enabled={tab === "concept"}
+            scrollY={tableScrollY}
+          />
+        )}
+        {tab === "industry" && (
+          <PlateTable
+            type="industry"
+            enabled={tab === "industry"}
+            scrollY={tableScrollY}
+          />
+        )}
       </Card>
     </>
   );

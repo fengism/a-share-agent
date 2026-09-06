@@ -9,7 +9,11 @@ vi.mock("../styles/ui", () => ({
   useThemeStore: (selector: (state: { themeKey: "stellar-blue" }) => unknown) => selector({ themeKey: "stellar-blue" }),
 }));
 vi.mock("./AppHeader", () => ({ default: () => <header>顶部栏</header> }));
-vi.mock("./AppSidebar", () => ({ default: () => <aside>侧边栏</aside> }));
+vi.mock("./AppSidebar", () => ({
+  default: ({ activeKey }: { activeKey: string }) => (
+    <aside data-active-key={activeKey}>侧边栏</aside>
+  ),
+}));
 vi.mock("./ChatSessionSyncBridge", () => ({ default: () => null }));
 vi.mock("./WorkflowRuntimeBridge", () => ({ default: () => null }));
 
@@ -38,5 +42,47 @@ describe("AppLayout", () => {
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
     expect(screen.getByText("侧边栏")).toBeInTheDocument();
     expect(screen.getByText("顶部栏")).toBeInTheDocument();
+  });
+
+  it("keeps the industry classification route under its own navigation item", () => {
+    render(
+      <MemoryRouter initialEntries={["/industry-classification"]}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/industry-classification" element={<div>行业基础数据</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("侧边栏")).toHaveAttribute("data-active-key", "/master-data");
+  });
+
+  it("keeps the stock profile under the stock navigation item", () => {
+    render(
+      <MemoryRouter initialEntries={["/stock/600519"]}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/stock/:code" element={<div>个股资料</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("侧边栏")).toHaveAttribute("data-active-key", "/analysis");
+  });
+
+  it("maps the Hong Kong market route to the market navigation item", () => {
+    render(
+      <MemoryRouter initialEntries={["/hk-market"]}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/hk-market" element={<div>港股市场</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("侧边栏")).toHaveAttribute("data-active-key", "/market");
   });
 });

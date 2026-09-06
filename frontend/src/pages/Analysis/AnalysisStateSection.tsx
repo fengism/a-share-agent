@@ -36,7 +36,7 @@ export default memo(function AnalysisStateSection({
         plan={agentProcess.plan}
         status={agentProcess.status}
         toolCalls={agentProcess.toolCalls}
-        isRunning={isAnalyzing && currentStageIndex === 0}
+        isRunning={isAnalyzing}
       />
       {error && !isAnalyzing && (
         <Alert

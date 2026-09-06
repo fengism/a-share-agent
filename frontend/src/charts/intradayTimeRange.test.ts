@@ -2,16 +2,16 @@ import { describe, expect, it } from "vitest";
 import { buildIntradayVisibleRange } from "./intradayTimeRange";
 
 describe("buildIntradayVisibleRange", () => {
-  it("fixes the selected trading day to 09:00–16:00", () => {
+  it("fixes the selected trading day to 09:30–15:00", () => {
     const point = Date.UTC(2026, 7, 21, 11, 30) / 1000;
 
     const range = buildIntradayVisibleRange(point);
 
     expect(range).toEqual({
-      from: Date.UTC(2026, 7, 21, 9, 0) / 1000,
-      to: Date.UTC(2026, 7, 21, 16, 0) / 1000,
+      from: Date.UTC(2026, 7, 21, 9, 30) / 1000,
+      to: Date.UTC(2026, 7, 21, 15, 0) / 1000,
     });
-    expect(range!.to - range!.from).toBe(7 * 60 * 60);
+    expect(range!.to - range!.from).toBe(5.5 * 60 * 60);
   });
 
   it("rejects invalid timestamps", () => {

@@ -10,7 +10,7 @@ from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app.infrastructure.persistence.connection import DatabaseName, get_connection
+from app.infrastructure.persistence.connection import ALL_DATABASES, DatabaseName, get_connection
 from app.infrastructure.persistence.json_storage import atomic_write_text, durable_replace, durable_unlink
 
 ConnectionProvider = Callable[[DatabaseName], sqlite3.Connection]
@@ -24,7 +24,7 @@ def _quick_check(connection: sqlite3.Connection, *, label: str) -> None:
 
 
 def verify_database_integrity(
-    databases: Iterable[DatabaseName] = ("market", "user"),
+    databases: Iterable[DatabaseName] = ALL_DATABASES,
     *,
     connection_provider: ConnectionProvider = get_connection,
 ) -> None:
@@ -98,7 +98,7 @@ def _backup_created_at(path: Path) -> float:
 def backup_freshness_snapshot(
     backup_dir: Path,
     *,
-    databases: Iterable[DatabaseName] = ("market", "user"),
+    databases: Iterable[DatabaseName] = ALL_DATABASES,
     now: datetime | None = None,
 ) -> dict[str, dict[str, float | bool | str | None]]:
     reference_time = (now or datetime.now(UTC)).astimezone(UTC).timestamp()
@@ -213,7 +213,7 @@ def create_online_backups(
     backup_dir: Path,
     *,
     retention_count: int,
-    databases: Iterable[DatabaseName] = ("market", "user"),
+    databases: Iterable[DatabaseName] = ALL_DATABASES,
     connection_provider: ConnectionProvider = get_connection,
     mirror_dir: Path | None = None,
     now: datetime | None = None,

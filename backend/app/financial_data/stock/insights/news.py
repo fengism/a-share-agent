@@ -3,7 +3,8 @@
 import asyncio
 import logging
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import cls_semaphore, eastmoney_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import normalize_code

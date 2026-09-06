@@ -25,10 +25,10 @@ export function ProviderDefaultsCard({ providerDefaults }: { providerDefaults: R
               background: colors.hoverBg,
               border: `1px solid ${colors.border}`,
               borderRadius: 8,
-              fontSize: 12,
+              fontSize: "var(--c-font-sm)",
             }}
           >
-            <Text strong style={{ color: colors.primary, fontSize: 13 }}>
+            <Text strong style={{ color: colors.primary, fontSize: "var(--c-font-md)" }}>
               {defaults.label || name}
             </Text>
             <div style={{ marginTop: 4, color: colors.textMuted }}>{defaults.description}</div>

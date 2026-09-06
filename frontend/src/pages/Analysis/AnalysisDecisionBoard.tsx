@@ -31,9 +31,6 @@ export default function AnalysisDecisionBoard({
   const structuredAction = researchActions ? NEW_INVESTOR_ACTIONS[researchActions.new_investor_action] : null;
   const action = structuredAction ?? legacyAction;
   const prompts = getAnalysisFollowUps(result);
-  const support = result.technical.support_level;
-  const resistance = result.technical.resistance_level;
-  const current = result.current_price;
 
   return (
     <section
@@ -51,11 +48,6 @@ export default function AnalysisDecisionBoard({
             {researchActions.thesis_breakers[0] ? `；首要失效条件：${researchActions.thesis_breakers[0]}` : ""}
           </p>
         ) : null}
-      </div>
-      <div className="analysis-levels" aria-label="短期择时参考">
-        <div><span>短期支撑</span><strong>{support?.toFixed(2) ?? "-"}</strong><small>跌破后重新检查趋势</small></div>
-        <div><span>当前价格</span><strong>{current?.toFixed(2) ?? "-"}</strong><small>以最新分析快照为准</small></div>
-        <div><span>短期压力</span><strong>{resistance?.toFixed(2) ?? "-"}</strong><small>突破后观察量价确认</small></div>
       </div>
       <div className="analysis-follow-ups">
         <span className="analysis-follow-ups__label"><MessageOutlined /> 追问 AI</span>

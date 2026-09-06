@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Generic, TypeVar
 
-from app.core.cache import cache
+from app.core.cache import reference_cache as cache
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)

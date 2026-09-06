@@ -14,8 +14,8 @@ export default function PortfolioQuoteStatus({ quotedAt, source, stale }: Portfo
     <div>
       <Space size={[6, 6]} wrap>
         <Tag style={semanticTagStyle(stale ? "warning" : "info")}>{stale ? "缓存行情" : "最新行情"}</Tag>
-        <Text type="secondary" style={{ fontSize: 12 }}>来源：{source || "未标注"}</Text>
-        <Text type="secondary" style={{ fontSize: 12 }}>行情时间：{quotedAt}</Text>
+        <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>来源：{source || "未标注"}</Text>
+        <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>行情时间：{quotedAt}</Text>
       </Space>
       {stale ? (
         <Alert

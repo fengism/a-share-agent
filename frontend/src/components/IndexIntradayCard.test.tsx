@@ -30,7 +30,7 @@ describe("IndexIntradayCard", () => {
     expect(deriveIndexPrevClose(3200, -100)).toBeNull();
   });
 
-  it("prioritizes the latest quote and chart legend", () => {
+  it("prioritizes the latest quote and renders the chart without external source badge", () => {
     render(
       <IndexIntradayCard
         symbol="000001"
@@ -43,11 +43,7 @@ describe("IndexIntradayCard", () => {
     expect(screen.getByText("上证指数 分时")).toBeInTheDocument();
     expect(screen.getByText("3202.00")).toBeInTheDocument();
     expect(screen.getByLabelText("上涨 0.50%")).toBeInTheDocument();
-    expect(screen.getByText("更新 09:31")).toBeInTheDocument();
-    expect(screen.getByText("价格")).toBeInTheDocument();
-    expect(screen.getByText("均价")).toBeInTheDocument();
-    expect(screen.getByText("成交量")).toBeInTheDocument();
-    expect(screen.getByText("新浪财经")).toBeInTheDocument();
+    expect(screen.queryByText("新浪财经")).not.toBeInTheDocument();
     expect(screen.getByText("分时图表")).toBeInTheDocument();
   });
 });

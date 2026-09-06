@@ -120,3 +120,22 @@ def expire_stale_quotes(
         cache.pop(code, None)
         remaining_sizes.append(len(cache))
     return remaining_sizes
+
+
+def evict_oldest_quotes(
+    cache: dict[str, QuoteCacheEntry],
+    *,
+    maxsize: int,
+) -> list[int]:
+    """Drop the oldest quote entries until the cache is within its capacity."""
+    if maxsize <= 0:
+        raise ValueError("quote cache maxsize must be positive")
+    overflow = len(cache) - maxsize
+    if overflow <= 0:
+        return []
+    oldest_codes = sorted(cache, key=lambda code: cache[code].cached_at)[:overflow]
+    remaining_sizes = []
+    for code in oldest_codes:
+        cache.pop(code, None)
+        remaining_sizes.append(len(cache))
+    return remaining_sizes

@@ -20,13 +20,21 @@ import type {
   MarketLimitUpLadder,
   MarketMainline,
   MarketMargin,
+  NorthboundHistory,
+  MarketPriceAnomaly,
+  MarketPriceAnomalyCount,
   MarketSectorStocksHistory,
   MarketWind,
   MarketWindStocks,
   MacroAllData,
   MacroUsData,
+  GlobalMacroRatesData,
+  TreasuryYieldsResponse,
+  CommoditiesResponse,
+  CustomsTradeDataResponse,
   MarketIndices,
   NewsAnalysis,
+  SgeGoldResponse,
   ThsHotPlate,
   ThsHotStock,
   TradingCalendar,
@@ -60,8 +68,8 @@ export function useMarketEmotion() {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<MarketEmotion>(),
-    staleTime: 60 * 1000,
-    refetchInterval: isTradingSession ? 60 * 1000 : false,
+    staleTime: QUERY_CACHE_POLICIES.marketRealtime.staleMs,
+    refetchInterval: isTradingSession ? QUERY_CACHE_POLICIES.marketRealtime.pollMs : false,
   });
 }
 
@@ -75,8 +83,8 @@ export function useMarketLimitUpLadder(date: string) {
     }),
     select: asApiModel<MarketLimitUpLadder>(),
     enabled: Boolean(date),
-    staleTime: 60 * 1000,
-    refetchInterval: isTradingSession ? 60 * 1000 : false,
+    staleTime: QUERY_CACHE_POLICIES.marketRealtime.staleMs,
+    refetchInterval: isTradingSession ? QUERY_CACHE_POLICIES.marketRealtime.pollMs : false,
   });
 }
 
@@ -114,8 +122,8 @@ export function useMarketWind() {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<MarketWind>(),
-    staleTime: 60 * 1000,
-    refetchInterval: isTradingSession ? 60 * 1000 : false,
+    staleTime: QUERY_CACHE_POLICIES.marketRealtime.staleMs,
+    refetchInterval: isTradingSession ? QUERY_CACHE_POLICIES.marketRealtime.pollMs : false,
   });
 }
 
@@ -146,8 +154,8 @@ export function useMarketWindStocks(plateCode: string) {
     }),
     select: asApiModel<MarketWindStocks>(),
     enabled: Boolean(plateCode),
-    staleTime: 60 * 1000,
-    refetchInterval: isTradingSession ? 60 * 1000 : false,
+    staleTime: QUERY_CACHE_POLICIES.marketRealtime.staleMs,
+    refetchInterval: isTradingSession ? QUERY_CACHE_POLICIES.marketRealtime.pollMs : false,
   });
 }
 
@@ -176,7 +184,7 @@ export function useMarketIndexKline(symbol: string, period = "daily") {
     }),
     select: asApiModel<KlineData>(),
     enabled: !!symbol,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
   });
 }
 
@@ -189,8 +197,22 @@ export function useHsgtFlow(enabled = true, autoRefresh = true) {
     }),
     select: asApiModel<HsgtFlow>(),
     enabled,
-    staleTime: 60 * 1000,
-    refetchInterval: enabled && autoRefresh && isTradingSession ? 60 * 1000 : false,
+    staleTime: QUERY_CACHE_POLICIES.marketRealtime.staleMs,
+    refetchInterval: enabled && autoRefresh && isTradingSession
+      ? QUERY_CACHE_POLICIES.marketRealtime.pollMs
+      : false,
+  });
+}
+
+export function useNorthboundHistory(pageSize = 500) {
+  return useQuery({
+    queryKey: queryKeys.market.northboundHistory(pageSize),
+    queryFn: () => openApiGet("/api/market/northbound-history", {
+      query: { page_size: pageSize },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<NorthboundHistory>(),
+    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
   });
 }
 
@@ -203,7 +225,44 @@ export function useMarketMargin(enabled = true) {
     }),
     select: asApiModel<MarketMargin>(),
     enabled,
-    staleTime: 10 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
+  });
+}
+
+export function useMarketPriceAnomaly(pageNo = 1, pageSize = 200, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.market.priceAnomaly(pageNo, pageSize),
+    queryFn: () => openApiGet("/api/market/price-anomaly", {
+      query: { page_no: pageNo, page_size: pageSize },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<MarketPriceAnomaly>(),
+    enabled,
+    staleTime: QUERY_CACHE_POLICIES.priceAnomaly.staleMs,
+  });
+}
+
+export function useMarketPriceAnomalyCount(
+  pageNo = 1,
+  pageSize = 50,
+  sortKey = "",
+  sortDir = "",
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: queryKeys.market.priceAnomalyCount(pageNo, pageSize, sortKey, sortDir),
+    queryFn: () => openApiGet("/api/market/price-anomaly/count", {
+      query: {
+        page_no: pageNo,
+        page_size: pageSize,
+        sort_key: sortKey,
+        sort_dir: sortDir,
+      },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<MarketPriceAnomalyCount>(),
+    enabled,
+    staleTime: QUERY_CACHE_POLICIES.priceAnomaly.staleMs,
   });
 }
 
@@ -214,8 +273,23 @@ export function useTradingCalendar(year: number) {
       query: { start_date: `${year}-01-01`, end_date: `${year}-12-31` },
     }),
     select: asApiModel<TradingCalendar>(),
-    staleTime: 24 * 60 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.immutableHistory.staleMs,
   });
+}
+
+/**
+ * 今天是否为 A 股交易日。
+ *
+ * 周末直接判定为非交易日（无需等待日历返回）；工作日依赖后端交易日历，
+ * 日历未加载或失败时返回 null（未知），由调用方自行放行以免误隐藏数据。
+ */
+export function useIsTradingDay(): boolean | null {
+  const now = new Date();
+  const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+  const calendarQuery = useTradingCalendar(now.getFullYear());
+  if (isWeekend) return false;
+  const calendar = calendarQuery.data;
+  return calendar ? calendar.today_is_trading_day : null;
 }
 
 export function useThsHotRank(enabled = true) {
@@ -281,6 +355,7 @@ export function useIndustryRankings(date: string) {
 }
 
 export function useDragonTigerList(reportDate: string) {
+  const isHistorical = reportDate < dayjs().format("YYYY-MM-DD");
   return useQuery({
     queryKey: queryKeys.market.dragonTiger(reportDate),
     queryFn: () => openApiGet("/api/market/dragon-tiger", {
@@ -289,11 +364,14 @@ export function useDragonTigerList(reportDate: string) {
     }),
     select: asApiModel<DragonTigerItem[]>(),
     enabled: !!reportDate,
-    staleTime: 10 * 60 * 1000,
+    staleTime: isHistorical
+      ? QUERY_CACHE_POLICIES.immutableHistory.staleMs
+      : QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
   });
 }
 
 export function useDragonTigerDetail(code: string, reportDate: string) {
+  const isHistorical = reportDate < dayjs().format("YYYY-MM-DD");
   return useQuery({
     queryKey: queryKeys.market.dragonTigerDetail(code, reportDate),
     queryFn: () => openApiGet("/api/stock/{code}/dragon-tiger", {
@@ -303,7 +381,9 @@ export function useDragonTigerDetail(code: string, reportDate: string) {
     }),
     select: asApiModel<DragonTigerDetail[]>(),
     enabled: !!code && !!reportDate,
-    staleTime: 10 * 60 * 1000,
+    staleTime: isHistorical
+      ? QUERY_CACHE_POLICIES.immutableHistory.staleMs
+      : QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
   });
 }
 
@@ -314,8 +394,8 @@ export function useMarketKuaixun() {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<FeedNewsItem[]>(),
-    staleTime: 60 * 1000,
-    refetchInterval: 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketRealtime.staleMs,
+    refetchInterval: QUERY_CACHE_POLICIES.marketRealtime.pollMs,
   });
 }
 
@@ -326,8 +406,8 @@ export function useMarketOtherNews() {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<FeedNewsItem[]>(),
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
+    refetchInterval: QUERY_CACHE_POLICIES.marketMinute.pollMs,
   });
 }
 
@@ -338,8 +418,8 @@ export function useMarketTwitterFeed() {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<FeedNewsItem[]>(),
-    staleTime: 30 * 60 * 1000,
-    refetchInterval: 30 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.socialFeed.staleMs,
+    refetchInterval: QUERY_CACHE_POLICIES.socialFeed.pollMs,
   });
 }
 
@@ -364,8 +444,8 @@ export function useMarketTwitterAnalysis(username: string) {
       options: { timeoutMs: API_TIMEOUTS.LONG_RUNNING },
     }),
     enabled: !!username,
-    staleTime: 12 * 60 * 60 * 1000,
-    gcTime: 12 * 60 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.socialAnalysis.staleMs,
+    gcTime: QUERY_CACHE_POLICIES.socialAnalysis.gcMs,
   });
 }
 
@@ -389,8 +469,8 @@ export function useNewsAnalysis() {
       options: { timeoutMs: API_TIMEOUTS.LONG_RUNNING },
     }),
     select: asApiModel<NewsAnalysis>(),
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
+    refetchInterval: QUERY_CACHE_POLICIES.marketMinute.pollMs,
   });
 }
 
@@ -401,7 +481,7 @@ export function useMacroAllData() {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<MacroAllData>(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.macro.staleMs,
   });
 }
 
@@ -426,6 +506,65 @@ export function useUsMacroData() {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<MacroUsData>(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.macro.staleMs,
+  });
+}
+
+export function useGlobalMacroRates() {
+  return useQuery({
+    queryKey: queryKeys.market.macroGlobalRates,
+    queryFn: () => openApiGet("/api/macro/global-rates", {
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<GlobalMacroRatesData>(),
+    staleTime: QUERY_CACHE_POLICIES.marketRealtime.staleMs,
+  });
+}
+
+export function useCommoditySpotPrices(symbol = "") {
+  return useQuery({
+    queryKey: queryKeys.market.macroCommodities(symbol),
+    queryFn: () => openApiGet("/api/macro/commodities", {
+      query: symbol ? { symbol } : undefined,
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<CommoditiesResponse>(),
+    staleTime: QUERY_CACHE_POLICIES.marketRealtime.staleMs,
+  });
+}
+
+export function useSgeGoldHistory(symbol = "Au99.99") {
+  return useQuery({
+    queryKey: queryKeys.market.macroSgeGold(symbol),
+    queryFn: () => openApiGet("/api/macro/sge-gold", {
+      query: { symbol },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<SgeGoldResponse>(),
+    staleTime: QUERY_CACHE_POLICIES.macro.staleMs,
+  });
+}
+
+export function useCustomsTradeData(commodity = "") {
+  return useQuery({
+    queryKey: queryKeys.market.macroCustomsTrade(commodity),
+    queryFn: () => openApiGet("/api/macro/customs-trade", {
+      query: commodity ? { commodity } : undefined,
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<CustomsTradeDataResponse>(),
+    staleTime: QUERY_CACHE_POLICIES.macro.staleMs,
+  });
+}
+
+export function useTreasuryYieldCurve(pageSize = 300) {
+  return useQuery({
+    queryKey: queryKeys.market.macroTreasuryYields(pageSize),
+    queryFn: () => openApiGet("/api/macro/treasury-yields", {
+      query: { page_size: pageSize },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<TreasuryYieldsResponse>(),
+    staleTime: QUERY_CACHE_POLICIES.macro.staleMs,
   });
 }

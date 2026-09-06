@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,7 @@ import type { MarketMainline } from "../../types/stock/market";
 
 const mocks = vi.hoisted(() => ({
   intraday: vi.fn(),
+  windStocks: vi.fn(),
   mainlineQuery: {
     data: {
       source: "财联社",
@@ -60,6 +61,20 @@ function resetMainlineQuery() {
   mocks.mainlineQuery.isFetching = false;
   mocks.mainlineQuery.error = null;
   mocks.mainlineQuery.refetch.mockReset();
+  mocks.windStocks.mockImplementation((plateCode: string) => ({
+    data: {
+      source: "财联社",
+      fetched_at: "2026-08-21T10:30:00+08:00",
+      plate_code: plateCode,
+      items: plateCode === "cls82580"
+        ? [{ code: "300153", name: "科泰电源", price: 28.5, change_pct: 12.3, limit_up_days: 1 }]
+        : [{ code: "600276", name: "恒瑞医药", price: 62.18, change_pct: 3.21, limit_up_days: 0 }],
+    },
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }));
 }
 
 function mainlineSnapshot(): MarketMainline {
@@ -104,6 +119,21 @@ function mainlineSnapshot(): MarketMainline {
   };
 }
 
+vi.mock("../../components/MarketOverviewBoard", () => ({
+  default: ({
+    onNavigate,
+    showRankings = true,
+  }: {
+    onNavigate: (tab: string) => void;
+    showRankings?: boolean;
+  }) => (
+    <section aria-label="市场看板">
+      <button type="button" onClick={() => onNavigate("emotion")}>查看市场情绪详情</button>
+      {showRankings ? <><span>行业强弱</span><span>热门概念</span></> : null}
+    </section>
+  ),
+}));
+
 vi.mock("../../api/queries", () => ({
   useMarketIndices: () => ({
     data: { source: "腾讯", indices: [
@@ -125,19 +155,20 @@ vi.mock("../../api/queries", () => ({
   },
   useMarketMainline: () => mocks.mainlineQuery,
   useMarketWind: () => ({
-    data: { source: "财联社", fetched_at: "2026-08-21T10:30:00+08:00", items: [] },
+    data: {
+      source: "财联社",
+      fetched_at: "2026-08-21T10:30:00+08:00",
+      items: [
+        { plate_code: "cls80044", plate_name: "创新药", catalyst: "政策与业绩共振" },
+        { plate_code: "cls82580", plate_name: "IDC电源", catalyst: "AI服务器电源需求增长" },
+      ],
+    },
     isLoading: false,
     isFetching: false,
     error: null,
     refetch: vi.fn(),
   }),
-  useMarketWindStocks: (_plateCode: string) => ({
-    data: { source: "财联社", plate_code: _plateCode, items: [] },
-    isLoading: false,
-    isFetching: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
+  useMarketWindStocks: (plateCode: string) => mocks.windStocks(plateCode),
   useThsHotRank: () => ({
     data: [],
     isLoading: false,
@@ -172,27 +203,68 @@ describe("Dashboard", () => {
     resetMainlineQuery();
   });
 
-  it("keeps the watchlist in the right rail and removes duplicate shortcuts", () => {
+  it("keeps market wind and mainline in the middle while hot rank and watchlist stay right", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector(".dashboard-page")).toHaveStyle({
+      width: "100%",
+      maxWidth: "none",
+    });
+    const layout = container.querySelector(".dashboard-layout");
+    const middle = screen.getByRole("region", { name: "首页中间内容" });
+    const rail = screen.getByRole("complementary", { name: "首页热榜与自选栏" });
+    expect(layout?.firstElementChild).toBe(middle);
+    expect(layout?.lastElementChild).toBe(rail);
+    expect(within(middle).getByRole("region", { name: "首页市场看板" })).toBeInTheDocument();
+    expect(within(middle).getByRole("region", { name: "市场风向" })).toBeInTheDocument();
+    expect(within(middle).getByRole("region", { name: "今日主线" })).toBeInTheDocument();
+    expect(within(middle).getByText("政策与业绩共振")).toBeInTheDocument();
+    expect(within(rail).queryByRole("region", { name: "市场风向" })).not.toBeInTheDocument();
+    const hotRank = within(rail).getByRole("region", { name: "热榜" });
+    const watchlist = within(rail).getByTestId("watchlist-panel");
+    expect(hotRank).toBeInTheDocument();
+    expect(watchlist).toBeInTheDocument();
+    expect(rail.firstElementChild).toBe(hotRank);
+    expect(rail.lastElementChild).toBe(watchlist);
+    expect(within(rail).getByText("热股榜")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "指数分时" })).not.toBeInTheDocument();
+    expect(screen.queryByText("首页指数分时图")).not.toBeInTheDocument();
+    expect(mocks.intraday).not.toHaveBeenCalled();
+    expect(screen.queryByText(/当前查看/)).not.toBeInTheDocument();
+    expect(screen.queryByText("市场行情")).not.toBeInTheDocument();
+    expect(screen.queryByText("对话")).not.toBeInTheDocument();
+    expect(screen.queryByText("AI 分析")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "市场总览" })).toBeInTheDocument();
+    expect(screen.queryByText("行业强弱")).not.toBeInTheDocument();
+    expect(screen.queryByText("热门概念")).not.toBeInTheDocument();
+  });
+
+  it("switches the displayed leader stocks when a market wind plate is clicked", async () => {
     render(
       <MemoryRouter>
         <Dashboard />
       </MemoryRouter>,
     );
 
-    const rail = screen.getByRole("complementary", { name: "首页榜单与自选栏" });
-    expect(within(rail).getByTestId("watchlist-panel")).toBeInTheDocument();
-    expect(within(rail).getByText("热股榜")).toBeInTheDocument();
-    expect(screen.queryByText("市场行情")).not.toBeInTheDocument();
-    expect(screen.queryByText("对话")).not.toBeInTheDocument();
-    expect(screen.queryByText("AI 分析")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "市场总览" })).toBeInTheDocument();
-    expect(screen.getByText("当前查看 上证指数 · 000001")).toBeInTheDocument();
-    const selectedIndex = screen.getByRole("button", { name: /上证指数/ });
-    expect(selectedIndex).toHaveClass("dashboard-index-button", "is-active");
-    expect(selectedIndex).toHaveAttribute("aria-pressed", "true");
-    expect(within(selectedIndex).getByText("000001")).toBeInTheDocument();
-    expect(screen.getByText("首页指数分时图")).toBeInTheDocument();
-    expect(mocks.intraday).toHaveBeenCalledWith("000001");
+    const section = screen.getByRole("region", { name: "市场风向" });
+    expect(await within(section).findByText("恒瑞医药")).toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "选择风口 创新药" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.click(within(section).getByRole("button", { name: "选择风口 IDC电源" }));
+
+    expect(await within(section).findByText("科泰电源")).toBeInTheDocument();
+    expect(mocks.windStocks).toHaveBeenCalledWith("cls82580");
+    expect(within(section).getByRole("button", { name: "选择风口 IDC电源" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("renders today's mainline chances with plates and faucet stocks", () => {
@@ -208,11 +280,23 @@ describe("Dashboard", () => {
     expect(within(section).getByText("热度 4")).toBeInTheDocument();
     expect(within(section).getByText(/药明康德公告全面上调/)).toBeInTheDocument();
     expect(within(section).getByText("4 家上涨")).toBeInTheDocument();
-    const faucetLink = within(section).getByRole("link", { name: /百花医药/ });
-    expect(faucetLink).toHaveAttribute("href", expect.stringContaining("600721"));
+
+    expect(within(section).getByText("主线龙头股（1）")).toBeInTheDocument();
+    const faucetTable = within(section).getAllByRole("table")[0];
+    expect(within(faucetTable).getByRole("link", { name: /百花医药/ })).toHaveAttribute(
+      "href",
+      expect.stringContaining("600721"),
+    );
+    expect(within(faucetTable).getByText("16天涨超90%")).toBeInTheDocument();
+
     expect(within(section).getByText("风格判断")).toBeInTheDocument();
     expect(within(section).getByText("高位科技抱团逐步瓦解，市场风格或转向均衡轮动")).toBeInTheDocument();
-    expect(within(section).getByText(/更新时间/)).toBeInTheDocument();
+    expect(within(section).getByText("指数表现")).toBeInTheDocument();
+    expect(within(section).getByText("代表个股")).toBeInTheDocument();
+    // 指数名称出现在"指数表现"表格行与"代表个股"的所属指数列各一次
+    expect(within(section).getAllByText("上证指数")).toHaveLength(2);
+    expect(within(section).getByText("1 条主线")).toBeInTheDocument();
+    expect(within(section).getByRole("status")).toBeInTheDocument();
     fireEvent.click(within(section).getByRole("button", { name: "刷新今日主线" }));
     expect(mocks.mainlineQuery.refetch).toHaveBeenCalledOnce();
     expect(within(section).getAllByRole("link", { name: /艾艾精工/ })[0]).toHaveAttribute(
@@ -234,7 +318,7 @@ describe("Dashboard", () => {
     const section = screen.getByRole("region", { name: "今日主线" });
     expect(within(section).getByText("今日主线加载失败")).toBeInTheDocument();
     expect(within(section).getByRole("button", { name: /重\s*试/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /上证指数/ })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "指数分时" })).not.toBeInTheDocument();
   });
 
   it("shows the mainline empty state when no chances are available", () => {
@@ -256,18 +340,4 @@ describe("Dashboard", () => {
     expect(within(section).queryByText("风格判断")).not.toBeInTheDocument();
   });
 
-  it("switches the home intraday chart from the index tiles", async () => {
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>,
-    );
-
-    const shenzhen = screen.getByRole("button", { name: /深证成指/ });
-    fireEvent.click(shenzhen);
-    await waitFor(() => expect(mocks.intraday).toHaveBeenCalledWith("399001"));
-    expect(shenzhen).toHaveClass("is-active");
-    expect(shenzhen).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("当前查看 深证成指 · 399001")).toBeInTheDocument();
-  });
 });

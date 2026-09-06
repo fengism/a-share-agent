@@ -260,8 +260,8 @@ export default function SettingsPage() {
   const sectionTitleStyle = {
     margin: "24px 0 12px",
     color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: 600,
+    fontSize: "var(--c-font-lg)",
+    fontWeight: "var(--c-weight-semibold)",
   };
 
   return (

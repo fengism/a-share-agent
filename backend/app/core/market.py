@@ -73,6 +73,22 @@ def normalize_stock_name(name: str) -> str:
     return str(name or "").strip().replace(" ", "")
 
 
+_A_SHARE_CODE_PREFIXES = frozenset({"00", "30", "60", "68", "43", "83", "87"})
+A_SHARE_CODE_PATTERN_TEXT = r"(?:(?:00|30|60|68|43|83|87)\d{4})|(?:920\d{3})"
+
+
+def is_a_share_code(code: str) -> bool:
+    """校验 6 位 A 股代码（沪 60/68、深 00/30、北 43/83/87/920）。
+
+    此前产业链等模块各自维护正则，92 前缀口径不一（920 才是北交所新段），
+    统一到本函数。
+    """
+    text = str(code or "").strip()
+    if len(text) != 6 or not text.isdigit():
+        return False
+    return text[:2] in _A_SHARE_CODE_PREFIXES or text[:3] == "920"
+
+
 def contains_stock_reference(text: str, code: str, code_name: str) -> bool:
     """Check whether text references a stock by code or name alias."""
     code_base = normalize_stock_name(code_name)

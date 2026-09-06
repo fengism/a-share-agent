@@ -5,6 +5,7 @@ import { ConfigProvider, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { useThemeStore, tokensToCssVars } from "./styles/ui";
 import { themes } from "./theme/themes";
+import { APP_FONT_FAMILY } from "./theme/typography";
 import "./styles/base.css";
 import "./styles/markdown.css";
 import "./styles/analysis-export.css";
@@ -19,9 +20,12 @@ import RoutePreloadProvider from "./routes/RoutePreloadProvider";
 // ── 路由级代码分割 ──
 const AppLayout = lazy(pageLoaders.appLayout);
 const Dashboard = lazy(pageLoaders.dashboard);
+const Watchlist = lazy(pageLoaders.watchlist);
 const Market = lazy(pageLoaders.market);
+const TradingCalendar = lazy(pageLoaders.tradingCalendar);
 const Screener = lazy(pageLoaders.screener);
 const Analysis = lazy(pageLoaders.analysis);
+const Stock = lazy(pageLoaders.stock);
 const AnalysisEntry = lazy(pageLoaders.analysisEntry);
 const InvestmentResearch = lazy(pageLoaders.investmentResearch);
 const DailyReviewPage = lazy(pageLoaders.dailyReview);
@@ -29,13 +33,13 @@ const PotentialPage = lazy(pageLoaders.potential);
 const Chat = lazy(pageLoaders.chat);
 const Settings = lazy(pageLoaders.settings);
 const Feed = lazy(pageLoaders.feed);
-const Twitter = lazy(pageLoaders.twitter);
 const IndustryChain = lazy(pageLoaders.industryChain);
 const Compare = lazy(pageLoaders.compare);
 const Macro = lazy(pageLoaders.macro);
 const Portfolio = lazy(pageLoaders.portfolio);
 const Quant = lazy(pageLoaders.quant);
 const Capabilities = lazy(pageLoaders.capabilities);
+const MasterData = lazy(pageLoaders.masterData);
 const Login = lazy(pageLoaders.login);
 const Register = lazy(pageLoaders.register);
 const ResetPassword = lazy(pageLoaders.resetPassword);
@@ -59,6 +63,9 @@ function AntProvider({ children }: { children: React.ReactNode }) {
       "--c-card-bg": cc.cardBg,
       "--c-elevated-bg": cc.elevatedBg,
       "--c-nested-bg": cc.nestedBg,
+      "--c-bg-subtle": cc.nestedBg,
+      "--c-bg-soft": cc.nestedBg,
+      "--c-border-subtle": cc.border,
       "--c-primary": cc.primary,
       "--c-accent": cc.accent,
       "--c-up": cc.up,
@@ -78,6 +85,7 @@ function AntProvider({ children }: { children: React.ReactNode }) {
       "--c-primary-2": `${cc.primary}26`,
       "--c-primary-3": `${cc.primary}4d`,
       "--c-muted-soft": `${cc.textMuted}14`,
+      "--c-font-sans": APP_FONT_FAMILY,
       ...tokensToCssVars(meta),
     };
     for (const k in vars) root.style.setProperty(k, vars[k]);
@@ -90,8 +98,12 @@ function AntProvider({ children }: { children: React.ReactNode }) {
         ...token,
         borderRadius: 8,
         fontSize: 14,
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Helvetica Neue", Arial, sans-serif',
+        fontSizeSM: 12,
+        fontSizeLG: 16,
+        fontSizeXL: 20,
+        fontFamily: APP_FONT_FAMILY,
+        fontWeightStrong: 600,
+        lineHeight: 1.5,
       },
       components: {
         // Institutional/terminal table feel: subtle header band, crisp
@@ -163,12 +175,15 @@ export default function App() {
                 <Route path="/force-change-password" element={<ErrorBoundary><ForceChangePassword /></ErrorBoundary>} />
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+                  <Route path="/watchlist" element={<ErrorBoundary><Watchlist /></ErrorBoundary>} />
                   <Route path="/market" element={<ErrorBoundary><Market /></ErrorBoundary>} />
+                  <Route path="/hk-market" element={<Navigate to="/market?market=hk" replace />} />
+                  <Route path="/trading-calendar" element={<ErrorBoundary><TradingCalendar /></ErrorBoundary>} />
                   <Route path="/screener" element={<ErrorBoundary><Screener /></ErrorBoundary>} />
                   <Route path="/daily-review" element={<ErrorBoundary><DailyReviewPage /></ErrorBoundary>} />
                 <Route path="/potential" element={<ErrorBoundary><PotentialPage /></ErrorBoundary>} />
                   <Route path="/feed" element={<ErrorBoundary><Feed /></ErrorBoundary>} />
-                  <Route path="/twitter" element={<ErrorBoundary><Twitter /></ErrorBoundary>} />
+                  <Route path="/twitter" element={<Navigate to="/feed?tab=twitter" replace />} />
                   <Route path="/analysis" element={<ErrorBoundary><AnalysisEntry /></ErrorBoundary>} />
                   <Route path="/investment-research" element={<Navigate to="/analysis" replace />} />
                   <Route path="/investment-research/:code" element={<ErrorBoundary><InvestmentResearch /></ErrorBoundary>} />
@@ -180,7 +195,11 @@ export default function App() {
                   <Route path="/industry-chain/:name" element={<ErrorBoundary><IndustryChain /></ErrorBoundary>} />
                   <Route path="/chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
                   <Route path="/capabilities" element={<ErrorBoundary><Capabilities /></ErrorBoundary>} />
+                  <Route path="/master-data" element={<ErrorBoundary><MasterData /></ErrorBoundary>} />
+                  <Route path="/stock-concept" element={<Navigate to="/master-data?tab=concept" replace />} />
+                  <Route path="/industry-classification" element={<Navigate to="/master-data?tab=industry" replace />} />
                   <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
+                  <Route path="/stock/:code" element={<ErrorBoundary><Stock /></ErrorBoundary>} />
                   <Route path="/analysis/:code" element={<ErrorBoundary><Analysis /></ErrorBoundary>} />
                 </Route>
                 </Route>

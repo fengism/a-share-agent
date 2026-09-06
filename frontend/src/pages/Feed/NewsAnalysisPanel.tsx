@@ -32,7 +32,7 @@ function SummaryItem({ item, index }: { item: NewsAnalysisItem; index: number })
                     padding: "1px 6px",
                     color: colors.primary,
                     borderRadius: 2,
-                    fontSize: 10,
+                    fontSize: "var(--c-font-xs)",
                     lineHeight: "16px",
                     textDecoration: "none",
                   }}

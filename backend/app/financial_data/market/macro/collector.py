@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 
-MetricFetcher = Callable[[str, Callable], Awaitable[object]]
+MetricFetcher = Callable[[str, Callable | None], Awaitable[object]]
 
 _BASIC_SOURCES = (
     ("cpi", "fetch_china_cpi"),
@@ -17,12 +17,20 @@ _FULL_SOURCES = (
     ("trade", "fetch_china_trade"),
     ("social_financing", "fetch_china_social_financing"),
     ("gdp", "fetch_china_gdp"),
+    ("industrial_production", "fetch_china_industrial_production"),
+    ("retail_sales", "fetch_china_retail_sales"),
+    ("fixed_asset_investment", "fetch_china_fixed_asset_investment"),
+    ("real_estate", "fetch_china_real_estate"),
+    ("employment", "fetch_china_employment"),
 )
 
 
 async def _collect(provider, sources: tuple[tuple[str, str], ...], fetch_metric: MetricFetcher) -> dict[str, object]:
     values = await asyncio.gather(
-        *(fetch_metric(operation, getattr(provider, method_name)) for operation, method_name in sources),
+        *(
+            fetch_metric(operation, getattr(provider, method_name, None))
+            for operation, method_name in sources
+        ),
         return_exceptions=True,
     )
     return {

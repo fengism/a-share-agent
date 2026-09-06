@@ -192,7 +192,8 @@ class EastMoneyBase:
 
     def fetch_datacenter_report(self, report_name: str, columns: str = "ALL",
                                 filter_str: str = "", page_size: int = 50,
-                                sort_columns: str = "", sort_types: str = "-1") -> list[dict]:
+                                sort_columns: str = "", sort_types: str = "-1",
+                                page_number: int = 1) -> list[dict]:
         """东财数据中心统一查询 — 龙虎榜/解禁/融资融券/大宗交易/股东户数/分红 共用。
 
         Param:
@@ -200,6 +201,7 @@ class EastMoneyBase:
             columns: 返回字段，默认 "ALL"
             filter_str: 过滤条件字符串
             page_size: 每页条数
+            page_number: 页码，从 1 开始
             sort_columns: 排序字段
             sort_types: 排序方向（-1 倒序，1 正序）
         Return:
@@ -207,7 +209,7 @@ class EastMoneyBase:
         """
         params = {
             "reportName": report_name, "columns": columns,
-            "pageNumber": "1", "pageSize": str(page_size),
+            "pageNumber": str(page_number), "pageSize": str(page_size),
             "sortColumns": sort_columns, "sortTypes": sort_types,
             "source": "WEB", "client": "WEB",
         }

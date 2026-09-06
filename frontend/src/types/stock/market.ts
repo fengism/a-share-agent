@@ -28,9 +28,34 @@ export interface HsgtFlowPoint {
 }
 
 export interface HsgtFlow {
+  date: string;
   updated_at: string;
   unit: string;
+  is_stale: boolean;
   points: HsgtFlowPoint[];
+}
+
+export interface NorthboundHistoryPoint {
+  date: string;
+  north_money: number | null;
+  sh_connect: number | null;
+  sz_connect: number | null;
+  south_money: number | null;
+  hs300_open: number | null;
+  hs300_close: number | null;
+  hs300_high: number | null;
+  hs300_low: number | null;
+  hs300_change: number | null;
+  hs300_change_pct: number | null;
+}
+
+export interface NorthboundHistory {
+  source: "乐咕乐股" | "东方财富";
+  updated_at: string;
+  unit: string;
+  index_name: string;
+  is_stale: boolean;
+  items: NorthboundHistoryPoint[];
 }
 
 export interface MarketEmotionDistribution {
@@ -250,6 +275,55 @@ export interface MarketMargin {
   items: MarketMarginItem[];
 }
 
+export type MarketPriceAnomalyExchange = "SH" | "SZ" | "BJ";
+
+export interface MarketPriceAnomalyItem {
+  code: string;
+  name: string;
+  market: MarketPriceAnomalyExchange;
+  change_pct: number | null;
+  deviation: number | null;
+  days: number | null;
+  board: number | null;
+  rule_code: number | null;
+  rule: string;
+  is_today: boolean;
+}
+
+export interface MarketPriceAnomaly {
+  source: "东方财富";
+  date: string;
+  fetched_at: string;
+  page_no: number;
+  page_size: number;
+  pages: number;
+  is_stale: boolean;
+  items: MarketPriceAnomalyItem[];
+}
+
+export interface MarketPriceAnomalyCountItem {
+  code: string;
+  name: string;
+  market: MarketPriceAnomalyExchange;
+  price: number | null;
+  change_pct: number | null;
+  times: number | null;
+  deviation: number | null;
+  days: number | null;
+  board: number | null;
+}
+
+export interface MarketPriceAnomalyCount {
+  source: "东方财富";
+  date: string;
+  fetched_at: string;
+  page_no: number;
+  page_size: number;
+  pages: number;
+  is_stale: boolean;
+  items: MarketPriceAnomalyCountItem[];
+}
+
 export interface MarketWindStock {
   code: string;
   name: string;
@@ -386,4 +460,175 @@ export interface TradingCalendar {
   previous_trading_day: string | null;
   next_trading_day: string | null;
   degraded: boolean;
+}
+
+export interface TreasuryYieldPoint {
+  date: string;
+  cn_2y: number | null;
+  cn_5y: number | null;
+  cn_10y: number | null;
+  cn_30y: number | null;
+  cn_10y_2y: number | null;
+  cn_gdp_growth?: number | null;
+  us_2y: number | null;
+  us_5y: number | null;
+  us_10y: number | null;
+  us_30y: number | null;
+  us_10y_2y: number | null;
+  us_gdp_growth?: number | null;
+  spread_10y: number | null;
+  spread_2y: number | null;
+}
+
+export interface TreasuryTermStructure {
+  tenor: string;
+  cn_yield: number | null;
+  us_yield: number | null;
+  spread: number | null;
+}
+
+export interface TreasuryYieldsResponse {
+  history: TreasuryYieldPoint[];
+  term_structure: TreasuryTermStructure[];
+  total_count: number;
+  latest: {
+    date: string;
+    china_10y_yield: number | null;
+    china_2y_yield: number | null;
+    china_5y_yield?: number | null;
+    china_30y_yield?: number | null;
+    china_10y_2y_spread?: number | null;
+    us_10y_yield: number | null;
+    us_2y_yield: number | null;
+    us_5y_yield?: number | null;
+    us_30y_yield?: number | null;
+    us_10y_2y_spread: number | null;
+    us_china_10y_spread: number | null;
+    us_china_spread_status: string;
+    us_yield_curve_status: string;
+  };
+}
+
+export interface GlobalMacroRatesData {
+  timestamp: string;
+  dollar_and_fx: {
+    dxy?: { name: string; code: string; value: number | null; change: number | null; change_pct: number | null };
+    usd_cnh?: { name: string; code: string; value: number | null; change: number | null; change_pct: number | null };
+    usd_cny?: { name: string; code: string; value: number | null; change: number | null; change_pct: number | null };
+  };
+  treasury_yields_and_spreads: {
+    date: string;
+    china_10y_yield: number | null;
+    china_2y_yield: number | null;
+    china_5y_yield?: number | null;
+    china_30y_yield?: number | null;
+    china_10y_2y_spread?: number | null;
+    us_10y_yield: number | null;
+    us_2y_yield: number | null;
+    us_5y_yield?: number | null;
+    us_30y_yield?: number | null;
+    us_china_10y_spread: number | null;
+    us_china_spread_status: string;
+    us_10y_2y_spread: number | null;
+    us_yield_curve_status: string;
+  };
+  treasury_curve?: {
+    history: TreasuryYieldPoint[];
+    term_structure: TreasuryTermStructure[];
+    total_count: number;
+  };
+  central_bank_policy_rates: {
+    china_lpr_1y: string;
+    china_lpr_5y: string;
+    us_fed_funds_rate: string;
+  };
+  market_implications: {
+    us_10y_impact: string;
+    us_china_spread_impact: string;
+    dxy_cnh_impact: string;
+  };
+}
+
+export interface CommodityItem {
+  symbol: string;
+  name: string;
+  contract: string;
+  category: string;
+  unit: string;
+  latest_price: number | null;
+  change: number | null;
+  change_pct: number | null;
+  high: number | null;
+  low: number | null;
+  open: number | null;
+  prev_settle: number | null;
+  volume: number | null;
+  open_interest: number | null;
+  date: string;
+  description: string;
+  related_chains: string[];
+}
+
+export interface CommoditiesResponse {
+  query: string;
+  total_count: number;
+  items: CommodityItem[];
+}
+
+export interface SgeGoldHistoryPoint {
+  date: string;
+  open: number;
+  close: number;
+  low: number;
+  high: number;
+  change: number | null;
+  change_pct: number | null;
+}
+
+export interface SgeGoldResponse {
+  symbol: string;
+  name: string;
+  unit: string;
+  source: string;
+  latest: SgeGoldHistoryPoint | null;
+  history: SgeGoldHistoryPoint[];
+  updated_at: string;
+  is_stale: boolean;
+}
+
+export interface CustomsMonthSummary {
+  month: string;
+  report_date: string;
+  export_val: number;
+  import_val: number;
+  trade_balance: number;
+  balance_status: string;
+  export_yoy_pct: number;
+  import_yoy_pct: number;
+  export_accumulate: number;
+  import_accumulate: number;
+  export_accumulate_yoy_pct: number;
+  import_accumulate_yoy_pct: number;
+}
+
+export interface CustomsCommodityProfile {
+  category: string;
+  commodity: string;
+  trade_type: string;
+  unit: string;
+  description: string;
+  key_target_markets: string;
+  related_a_stocks: string[];
+  industry_chains: string[];
+}
+
+export interface CustomsTradeDataResponse {
+  query: string;
+  latest_month_summary: CustomsMonthSummary;
+  recent_12m_macro_trend: CustomsMonthSummary[];
+  matched_commodity_profiles: CustomsCommodityProfile[];
+  investment_implications: {
+    export_driver: string;
+    substitute_driver: string;
+  };
 }

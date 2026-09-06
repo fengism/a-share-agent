@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import {
   ApartmentOutlined,
   CheckCircleOutlined,
@@ -6,7 +6,7 @@ import {
   SearchOutlined,
   StopOutlined,
 } from "@ant-design/icons";
-import { Button, Input, Tabs, message } from "antd";
+import { Button, Input, Tabs, Tag, message } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "../../api/queryKeys";
 import { useNavigate, useParams } from "react-router-dom";
@@ -14,6 +14,7 @@ import {
   useConfig,
   useDeleteIndustryChainArchive,
   useIndustryChainArchive,
+  useIndustryChainLatest,
   useInfiniteIndustryChainHistory,
 } from "../../api/queries";
 import AgentProcessPanel from "../../components/AgentProcessPanel";
@@ -30,6 +31,7 @@ import IndustryReport, { type IndustryPushResult } from "./IndustryReport";
 import { INDUSTRY_CHAIN_STAGES } from "./industryWorkflow";
 import { useIndustryChainWorkflowController } from "../../hooks/useIndustryChainWorkflowController";
 import IndustryResearchScopeControls from "./IndustryResearchScopeControls";
+import { useIndustryArchiveAutoLoader } from "./useIndustryArchiveAutoLoader";
 import {
   DEFAULT_INDUSTRY_SCOPE,
   industryScopeRequest,
@@ -37,6 +39,21 @@ import {
 } from "./industryScope";
 
 const { Search } = Input;
+// 图谱目录较重（卡片网格 + 管理操作）；分析期间 SSE 事件频繁更新，
+// memo + 稳定的 onAnalyze 引用可避免图谱子树随进度事件重渲染
+const MemoizedIndustryAtlas = memo(IndustryAtlas);
+
+const HOT_INDUSTRIES = [
+  { name: "人形机器人", icon: "🤖" },
+  { name: "低空经济", icon: "✈️" },
+  { name: "CPO光模块", icon: "🔌" },
+  { name: "固态电池", icon: "🔋" },
+  { name: "半导体设备", icon: "💾" },
+  { name: "算力租赁", icon: "⚡" },
+  { name: "创新药", icon: "💊" },
+  { name: "商业航天", icon: "🛰️" },
+  { name: "智能座舱", icon: "🚗" },
+];
 
 export default function IndustryChain() {
   const colors = useColors();
@@ -65,7 +82,6 @@ export default function IndustryChain() {
     refetch: refetchHistory,
   } = useInfiniteIndustryChainHistory(debouncedHistoryFilter);
   const history = historyPages?.pages.flat() ?? [];
-  const latestArchiveId = history.find((item) => item.name === activeName)?.archive_id ?? "";
   const archiveMutation = useIndustryChainArchive();
   const deleteArchiveMutation = useDeleteIndustryChainArchive();
 
@@ -84,19 +100,34 @@ export default function IndustryChain() {
     loadResult,
     clearResult,
   } = useIndustryChainWorkflowController({
-    onSuccess: () => message.success("产业链分析完成"),
-    onError: (runError) => message.error(runError.message),
-    onCancelled: (cancelResult) => message.info(
+    onSuccess: useCallback(() => message.success("产业链分析完成"), []),
+    onError: useCallback((runError: Error) => message.error(runError.message), []),
+    onCancelled: useCallback((cancelResult: "cancelled" | "detached" | "completed") => message.info(
       cancelResult === "cancelled"
         ? "已停止产业研究"
         : cancelResult === "completed"
           ? "任务已完成，正在刷新产业研究"
           : "已停止等待，后台共享任务仍在运行",
-    ),
+    ), []),
   });
+  const { data: latestArchive, isLoading: isLatestLoading } = useIndustryChainLatest(activeName);
+  const latestArchiveId = latestArchive?.archive_id ?? "";
   const displayedResult = result && runningName === activeName ? result : null;
-  const displayedArchiveId = displayedResult ? archiveId : latestArchiveId;
+  const displayedArchiveId = displayedResult ? archiveId : "";
   const isActiveRouteRun = isAnalyzing && runningName === activeName;
+
+  // URL 直达 /industry-chain/:name 时自动加载最新存档；同一存档只请求一次，
+  // 避免 mutation 状态更新触发页面重渲染后形成重复请求循环。
+  useIndustryArchiveAutoLoader({
+    activeName,
+    latestArchiveId,
+    isLatestLoading,
+    isAnalyzing,
+    hasDisplayedResult: Boolean(displayedResult),
+    hasCurrentRouteError: Boolean(error && runningName === activeName),
+    loadArchive: archiveMutation.mutateAsync,
+    loadResult,
+  });
 
   useEffect(() => {
     setInputValue(activeName);
@@ -112,11 +143,16 @@ export default function IndustryChain() {
       return;
     }
 
-    navigate(`/industry-chain/${encodeURIComponent(name)}`, { replace: true });
-    setPushResult(null);
-    runAnalysis(name, industryScopeRequest(researchScope), {
+    const started = runAnalysis(name, industryScopeRequest(researchScope), {
       force: Boolean(displayedResult && runningName === name),
     });
+    if (!started) {
+      // 已有任务在运行时 runAnalysis 会拒绝启动；此前静默返回导致用户点按钮无任何反馈
+      message.warning(`「${runningName}」的产业链分析正在进行中，请等待完成后再发起新分析`);
+      return;
+    }
+    navigate(`/industry-chain/${encodeURIComponent(name)}`, { replace: true });
+    setPushResult(null);
   }, [displayedResult, navigate, researchScope, runAnalysis, runningName]);
 
   const handleLoadArchive = useCallback(async (item: IndustryChainHistoryItem) => {
@@ -230,7 +266,7 @@ export default function IndustryChain() {
             {
               key: "atlas",
               label: "知识库图谱",
-              children: <IndustryAtlas onAnalyze={handleAnalyzeFromAtlas} />,
+              children: <MemoizedIndustryAtlas onAnalyze={handleAnalyzeFromAtlas} />,
             },
             {
               key: "analysis",
@@ -252,6 +288,29 @@ export default function IndustryChain() {
                       onSearch={handleAnalyze}
                       disabled={isActiveRouteRun}
                     />
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center", marginTop: "12px", marginBottom: "4px" }}>
+                      <span style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted, flexShrink: 0 }}>🔥 热门赛道:</span>
+                      {HOT_INDUSTRIES.map((item) => (
+                        <Tag
+                          key={item.name}
+                          style={{
+                            cursor: isActiveRouteRun ? "not-allowed" : "pointer",
+                            fontSize: "var(--c-font-xs)",
+                            marginInlineEnd: 0,
+                            padding: "2px 10px",
+                            borderRadius: "12px",
+                            transition: "all 0.2s",
+                          }}
+                          onClick={() => {
+                            if (isActiveRouteRun) return;
+                            setInputValue(item.name);
+                            handleAnalyze(item.name);
+                          }}
+                        >
+                          {item.icon} {item.name}
+                        </Tag>
+                      ))}
+                    </div>
                     <IndustryResearchScopeControls
                       value={researchScope}
                       disabled={isActiveRouteRun}
@@ -259,7 +318,7 @@ export default function IndustryChain() {
                     />
                   </div>
 
-                  {(isActiveRouteRun || (runningName === activeName && (currentStage >= 0 || error || agentProcess.plan || agentProcess.toolCalls.length > 0))) && (
+                  {(isActiveRouteRun || (runningName === activeName && (currentStage >= 0 || error || agentProcess.plan || agentProcess.toolCalls.length > 0 || agentProcess.rounds.length > 0))) && (
                     <WorkflowProgressPanel
                       current={currentStage}
                       status={error ? "error" : isActiveRouteRun ? "running" : "success"}
@@ -277,6 +336,7 @@ export default function IndustryChain() {
                         plan={agentProcess.plan}
                         status={agentProcess.status}
                         toolCalls={agentProcess.toolCalls}
+                        rounds={agentProcess.rounds}
                         isRunning={isActiveRouteRun && currentStage === 0}
                       />
                     </WorkflowProgressPanel>
@@ -293,10 +353,10 @@ export default function IndustryChain() {
                       onPush={handlePush}
                     />
                   )}
-                  {!displayedResult && !isActiveRouteRun && !error && (
+                  {!displayedResult && !isActiveRouteRun && !error && !isLatestLoading && (
                     <div style={{ ...cardStyle, padding: 60, textAlign: "center" }}>
                       <ApartmentOutlined style={{ fontSize: 48, color: colors.textMuted, marginBottom: 16 }} />
-                      <div style={{ color: colors.textMuted, fontSize: 14 }}>输入产业关键词，开始 AI 产业链分析</div>
+                      <div style={{ color: colors.textMuted, fontSize: "var(--c-font-base)" }}>输入产业关键词，开始 AI 产业链分析</div>
                     </div>
                   )}
                 </>

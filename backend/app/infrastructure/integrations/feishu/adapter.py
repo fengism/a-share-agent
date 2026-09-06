@@ -70,7 +70,7 @@ def _first_after_heading(
         if block.type == "heading":
             if in_section:
                 return ""
-            in_section = block.text == heading
+            in_section = (heading in block.text) or (block.text == heading)
             continue
         if in_section and block.type == block_type and block.text.strip():
             return block.text.strip()
@@ -129,6 +129,14 @@ def to_feishu_card(data_type: str, title: str, content: list[ContentBlock], doc_
         }
         return card
 
+    template_color = "blue"
+    if data_type == "analysis":
+        text_dump = " ".join(b.text for b in content[:6])
+        if any(w in text_dump for w in ("强烈买入", "买入", "strong_buy", "buy")):
+            template_color = "green"
+        elif any(w in text_dump for w in ("强烈减持", "减持", "谨慎", "strong_sell", "sell")):
+            template_color = "red"
+
     paragraphs = [b.text for b in content if b.type == "paragraph"]
     summary = paragraphs[0] if paragraphs else "-"
 
@@ -142,30 +150,56 @@ def to_feishu_card(data_type: str, title: str, content: list[ContentBlock], doc_
         if strategy_text:
             extra_elements.append(_markdown_element(f"**策略：** {strategy_text}"))
     elif data_type == "analysis":
-        metrics = paragraphs[1] if len(paragraphs) > 1 else ""
-        action = _first_after_heading(content, "行动与持续跟踪", "paragraph")
-        risk = _first_after_heading(content, "风险提示", "bullet")
+        # 提取核心研判指标
+        metrics = ""
+        for p in paragraphs:
+            if "【核心研判】" in p or "当前价格" in p or "目标区间" in p:
+                metrics = p
+                break
+        
+        # 提取核心投资结论
+        conclusion = _first_after_heading(content, "综合投资结论与核心投资逻辑", "paragraph") or (
+            paragraphs[1] if len(paragraphs) > 1 and paragraphs[1] != metrics else summary
+        )
+
+        # 提取行动建议
+        action = _first_after_heading(content, "投资行动建议与监控体系", "paragraph") or _first_after_heading(content, "行动与持续跟踪", "paragraph")
+
+        # 提取估值三情景速览
+        valuation = _first_after_heading(content, "估值假设与三情景推演", "paragraph") or _first_after_heading(content, "估值假设与情景", "paragraph")
+
+        # 提取首要风险
+        risk = _first_after_heading(content, "逆向推演与主要风险清单", "bullet") or _first_after_heading(content, "风险提示", "bullet")
+
         if metrics:
-            extra_elements.append(_markdown_element(f"**关键指标**\n{metrics}"))
+            extra_elements.append(_markdown_element(f"**📊 核心研判决议**\n{metrics}"))
+        if conclusion:
+            extra_elements.append(_markdown_element(f"**💡 核心投资逻辑**\n{conclusion}"))
         if action:
-            extra_elements.append(_markdown_element(f"**行动建议**\n{action}"))
+            extra_elements.append(_markdown_element(f"**🎯 投资行动与买入区间**\n{action}"))
+        if valuation:
+            extra_elements.append(_markdown_element(f"**⚖️ 估值三情景公允区间**\n{valuation}"))
         if risk:
-            extra_elements.append(_markdown_element(f"**首要风险**\n{risk}"))
+            extra_elements.append(_markdown_element(f"**🚨 首要风险预警**\n{risk}"))
     else:
         second_line = paragraphs[1] if len(paragraphs) > 1 else ""
         if second_line:
             extra_elements.append(_markdown_element(second_line))
 
+    card_elements = (
+        extra_elements if data_type == "analysis"
+        else [_markdown_element(summary), *extra_elements]
+    )
+
     card = {
         "header": {
-            "template": "blue",
+            "template": template_color,
             "title": {"tag": "plain_text", "content": f"{icon} {title}"},
         },
         "elements": [
-            _markdown_element(f"**核心结论**\n{summary}" if data_type == "analysis" else summary),
-            *extra_elements,
+            *card_elements,
             {"tag": "action", "actions": [
-                {"tag": "button", "text": {"tag": "plain_text", "content": "📄 查看完整报告"}, "url": doc_url, "type": "primary"},
+                {"tag": "button", "text": {"tag": "plain_text", "content": "📄 查看完整研报"}, "url": doc_url, "type": "primary"},
             ]},
         ],
     }

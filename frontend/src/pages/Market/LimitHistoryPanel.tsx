@@ -65,7 +65,7 @@ export default function LimitHistoryPanel() {
           <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
             <Space orientation="vertical" size={0}>
               <Text strong>{stock.name}</Text>
-              <Text type="secondary" style={{ fontSize: 12 }}>{stock.code}</Text>
+              <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>{stock.code}</Text>
             </Space>
           </StockExternalLink>
         ),

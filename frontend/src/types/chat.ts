@@ -38,6 +38,7 @@ export type AgentPlanStepStatus =
   | "cancelled";
 
 export type AgentExecutionStatus = "completed" | "partial" | "failed";
+export type AgentResearchRoundStatus = "running" | "completed" | "degraded";
 
 export interface AgentPlanStep {
   id: string;
@@ -62,11 +63,27 @@ export interface AgentPlanStepUpdate {
   attempt: number;
 }
 
+export interface AgentResearchRound {
+  round_index: number;
+  round_total: number;
+  status: AgentResearchRoundStatus;
+  objective: string;
+  evidence_gaps: string[];
+  tool_names: string[];
+  tool_selection_reason: string;
+  evidence_added: string[];
+  judgment_basis: string[];
+  conclusion: string;
+  next_step: string;
+}
+
 export interface ChatStreamDelta {
   type:
     | "status"
     | "plan"
     | "plan_step"
+    | "round_started"
+    | "round_completed"
     | "text"
     | "reasoning"
     | "tool_call"
@@ -76,6 +93,7 @@ export interface ChatStreamDelta {
   content?: string | null;
   plan?: AgentPlan | null;
   plan_step?: AgentPlanStepUpdate | null;
+  research_round?: AgentResearchRound | null;
   tool_call?: ToolCallInfo | null;
   tool_result?: ToolResultInfo | null;
   tool_result_summary?: AgentToolResultSummary | null;

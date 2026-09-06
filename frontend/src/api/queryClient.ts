@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
+import { QUERY_CACHE_POLICIES } from "./cachePolicies";
 import { ApiError, ApiTimeoutError } from "./client";
 
 export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
@@ -16,6 +17,10 @@ export function shouldRetryQuery(failureCount: number, error: unknown): boolean 
 
 export const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: shouldRetryQuery, refetchOnWindowFocus: false, staleTime: 60 * 1000 },
+    queries: {
+      retry: shouldRetryQuery,
+      refetchOnWindowFocus: false,
+      staleTime: QUERY_CACHE_POLICIES.defaultQuery.staleMs,
+    },
   },
 });

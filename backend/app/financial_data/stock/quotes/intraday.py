@@ -6,7 +6,7 @@ from typing import cast
 
 import pandas as pd
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key, series_cache
 from app.core.cache_policies import STOCK_INTRADAY
 from app.core.concurrency.rate_limiter import call_blocking, cls_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
@@ -194,10 +194,11 @@ async def get_intraday(code: str) -> IntradayData:
             timeout=_TRADE_DATE_TIMEOUT_SECONDS,
         )
     except Exception as error:
-        logger.info("最近交易日查询不可用，分时源自行确定日期: code=%s, error=%s", sym.raw, error)
+        err_detail = type(error).__name__ if not str(error) else str(error)
+        logger.debug("最近交易日探活跳过 (%s)，分时源将自行确定最新交易日: code=%s", err_detail, sym.raw)
         date = ""
     cache_key = dated_cache_key("intraday", sym.raw, date)
-    cached = cache.get(cache_key)
+    cached = series_cache.get(cache_key)
     if isinstance(cached, IntradayData):
         return cached
 
@@ -210,7 +211,7 @@ async def get_intraday(code: str) -> IntradayData:
             IntradayData 模型对象
         """
         result = await _load_intraday(sym, date)
-        cache.set(cache_key, result, ttl=STOCK_INTRADAY.ttl_seconds)
+        series_cache.set(cache_key, result, ttl=STOCK_INTRADAY.ttl_seconds)
         return result
 
     return cast(IntradayData, await _intraday_singleflight.do(cache_key, load_and_cache))

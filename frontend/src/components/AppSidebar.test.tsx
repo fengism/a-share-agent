@@ -85,7 +85,7 @@ describe("AppSidebar", () => {
     expect(preloadAppRoute).toHaveBeenCalledWith("/market");
   });
 
-  it("places chat directly below market in the common navigation", async () => {
+  it("places home, watchlist, market, and news entries in the market information group", async () => {
     render(
       <AppSidebar
         activeKey="/"
@@ -106,7 +106,60 @@ describe("AppSidebar", () => {
       .getAllByRole("button")
       .map((item) => item.textContent);
 
-    expect(menuItems.slice(0, 4)).toEqual(["首页", "市场", "对话", "资讯"]);
+    expect(menuItems.slice(0, 4)).toEqual(["首页", "自选", "市场", "资讯"]);
+    expect(menuItems).not.toContain("港股市场");
+  });
+
+  it("places the trading calendar in the lower tool navigation", () => {
+    const onNavigate = vi.fn();
+    render(
+      <AppSidebar
+        activeKey="/trading-calendar"
+        collapsed={false}
+        isMobile={false}
+        mobileNavOpen={false}
+        themeKey="stellar-blue"
+        onCollapse={vi.fn()}
+        onMobileNavClose={vi.fn()}
+        onNavigate={onNavigate}
+      />,
+    );
+
+    const navigation = within(screen.getByRole("navigation", { name: "主导航" }));
+    const menuItems = navigation.getAllByRole("button").map((item) => item.textContent);
+    expect(menuItems.slice(-4)).toEqual(["交易日历", "行业与概念", "能力", "设置"]);
+
+    const calendarItem = navigation.getByRole("button", { name: "交易日历" });
+    expect(calendarItem).toHaveAttribute("aria-current", "page");
+    fireEvent.click(calendarItem);
+    expect(onNavigate).toHaveBeenCalledWith("/trading-calendar");
+  });
+
+  it("opens and preloads the industry and concepts master data page", async () => {
+    const onNavigate = vi.fn();
+    render(
+      <AppSidebar
+        activeKey="/master-data"
+        collapsed={false}
+        isMobile={false}
+        mobileNavOpen={false}
+        themeKey="stellar-blue"
+        onCollapse={vi.fn()}
+        onMobileNavClose={vi.fn()}
+        onNavigate={onNavigate}
+      />,
+    );
+
+    const industryItem = screen.getByRole("button", { name: "行业与概念" });
+    expect(industryItem).toHaveAttribute("aria-current", "page");
+    await act(async () => {
+      fireEvent.pointerEnter(industryItem);
+      await Promise.resolve();
+    });
+    expect(preloadAppRoute).toHaveBeenCalledWith("/master-data");
+
+    fireEvent.click(industryItem);
+    expect(onNavigate).toHaveBeenCalledWith("/master-data");
   });
 
   it("marks the active route and navigates from native controls", () => {
@@ -144,11 +197,30 @@ describe("AppSidebar", () => {
       />,
     );
 
-    const stockItem = screen.getByRole("button", { name: "个股研究" });
+    const stockItem = screen.getByRole("button", { name: "个股" });
     expect(stockItem).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("button", { name: "投资研究" })).not.toBeInTheDocument();
     fireEvent.click(stockItem);
     expect(onNavigate).toHaveBeenCalledWith("/analysis");
+  });
+
+  it("keeps Twitter inside the unified information entry", () => {
+    render(
+      <AppSidebar
+        activeKey="/feed"
+        collapsed={false}
+        isMobile={false}
+        mobileNavOpen={false}
+        themeKey="stellar-blue"
+        onCollapse={vi.fn()}
+        onMobileNavClose={vi.fn()}
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    const navigation = within(screen.getByRole("navigation", { name: "主导航" }));
+    expect(navigation.getByRole("button", { name: "资讯" })).toHaveAttribute("aria-current", "page");
+    expect(navigation.queryByRole("button", { name: "Twitter/X" })).not.toBeInTheDocument();
   });
 
   it("does not expose a second investment research navigation item", () => {
@@ -167,7 +239,7 @@ describe("AppSidebar", () => {
 
     const navigation = within(screen.getByRole("navigation", { name: "主导航" }));
     const labels = navigation.getAllByRole("button").map((item) => item.textContent);
-    expect(labels).toContain("个股研究");
+    expect(labels).toContain("个股");
     expect(labels).not.toContain("投资研究");
   });
 

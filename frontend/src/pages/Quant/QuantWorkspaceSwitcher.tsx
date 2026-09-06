@@ -54,7 +54,7 @@ export default function QuantWorkspaceSwitcher({
         onChange={(key) => setWorkspaceView(key as WorkspaceView)}
         ariaLabel="量化研究工作区"
         tabBarGutter={16}
-        tabBarStyle={{ marginBottom: 20, fontWeight: 700 }}
+        tabBarStyle={{ marginBottom: 20, fontWeight: "var(--c-weight-bold)" }}
         preserveVisited
         items={[
           {

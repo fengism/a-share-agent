@@ -48,7 +48,7 @@ export default function AdminResetCard() {
       style={{ ...cardStyle, marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
     >
-      <div style={{ fontSize: 12, color: c.textMuted, marginBottom: 12 }}>
+      <div style={{ fontSize: "var(--c-font-sm)", color: c.textMuted, marginBottom: 12 }}>
         为忘记密码的用户生成一次性重置链接（不经邮件）。链接仅显示一次，请复制后线下发给该用户；用户打开后自行设置新密码，其现有会话会全部失效。
       </div>
       <Form
@@ -86,11 +86,11 @@ export default function AdminResetCard() {
             border: `1px solid ${c.border}`, borderRadius: 8,
           }}
         >
-          <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>
+          <div style={{ fontSize: "var(--c-font-sm)", color: c.textSecondary, marginBottom: 6 }}>
             已为 <Text strong>{result.username}</Text> 生成链接（{result.expires_at} 前有效），仅显示一次：
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: isNarrow ? "stretch" : "center", flexDirection: isNarrow ? "column" : "row" }}>
-            <code style={{ flex: 1, fontFamily: "monospace", fontSize: 12, color: c.textPrimary, wordBreak: "break-all" }}>
+            <code style={{ flex: 1, fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)", color: c.textPrimary, wordBreak: "break-all" }}>
               {result.url}
             </code>
             <Button size="small" icon={<CopyOutlined />} onClick={copy} style={{ alignSelf: isNarrow ? "flex-end" : undefined }}>复制</Button>

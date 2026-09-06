@@ -19,9 +19,11 @@ from app.financial_data.stock.public import (
     get_kline,
     get_valuation,
 )
+from app.financial_data.stock.quotes.chip_distribution import calculate_chip_distribution
+from app.financial_data.stock.quotes.key_levels import calculate_key_levels
 from app.modules.analysis.models import AnalysisResult
 from app.modules.analysis.persistence.repository import get_latest_analysis
-from app.modules.analysis.schemas import AnalysisPageData, AnalysisPageSection
+from app.modules.analysis.schemas import AnalysisKeyLevels, AnalysisPageData, AnalysisPageSection
 
 logger = logging.getLogger(__name__)
 
@@ -134,12 +136,29 @@ async def get_analysis_page_data(
         else:
             values[section] = result
 
+    kline: KlineData | None = values["kline"]
+    key_levels = None
+    chip_distribution = None
+    if kline is not None:
+        levels = calculate_key_levels(kline.items)
+        key_levels = AnalysisKeyLevels(
+            current_price=levels.current_price,
+            support=levels.support,
+            resistance=levels.resistance,
+        )
+        try:
+            chip_distribution = calculate_chip_distribution(kline.items, code=kline.code)
+        except (ValueError, RuntimeError) as exc:
+            logger.warning("分析聚合页筹码分布计算失败: code=%s error=%s", code, exc)
+
     return AnalysisPageData(
         stock_info=values["stock_info"],
-        kline=values["kline"],
+        kline=kline,
         intraday=values["intraday"],
         valuation=values["valuation"],
         cached_analysis=values["cached_analysis"],
+        key_levels=key_levels,
+        chip_distribution=chip_distribution,
         partial=bool(unavailable_sections),
         unavailable_sections=unavailable_sections,
     )

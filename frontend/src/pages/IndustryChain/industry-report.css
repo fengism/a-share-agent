@@ -24,9 +24,59 @@
 }
 
 .industry-report__meta {
+  min-width: 0;
   margin-top: 10px;
   color: var(--c-text-secondary);
   font-size: var(--c-font-sm);
+}
+
+.industry-report__title,
+.industry-report__aliases,
+.industry-report__scope-summary,
+.industry-wrap-tag-list {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.industry-report__title,
+.industry-report__scope-summary {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-report__title {
+  flex: 1 1 260px;
+}
+
+.industry-report__alert,
+.industry-report__alert .ant-alert-message,
+.industry-report__alert .ant-alert-description,
+.industry-report__warning {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-wrap-tag,
+.industry-report__wrap-tag,
+.industry-chain-node__tag,
+.industry-chain-table__tag,
+.atlas-wrap-tag {
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  line-height: var(--c-leading-normal);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-nowrap-tag {
+  flex: none;
+  white-space: nowrap;
 }
 
 .industry-report__chapter-nav {
@@ -123,6 +173,7 @@
 }
 
 .industry-conclusion__summary {
+  min-width: 0;
   padding: 18px 20px;
   border-block: 1px solid var(--c-border);
   background: color-mix(in srgb, var(--c-primary) 6%, var(--c-card-bg));
@@ -145,7 +196,9 @@
   font-size: var(--c-font-base);
   font-weight: var(--c-weight-medium);
   line-height: var(--c-leading-relaxed);
+  white-space: normal;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .industry-conclusion__positioning {
@@ -158,6 +211,13 @@
   color: var(--c-text-secondary);
   font-size: var(--c-font-sm);
   line-height: var(--c-leading-normal);
+}
+
+.industry-conclusion__positioning > span {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .industry-conclusion__metrics {
@@ -187,11 +247,20 @@
   font-size: var(--c-font-sm);
 }
 
+.industry-conclusion__metrics span,
+.industry-conclusion__metrics strong,
+.industry-conclusion__metrics small {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .industry-conclusion__metrics strong {
   color: var(--c-text-primary);
   font-size: var(--c-font-xl);
   line-height: var(--c-leading-tight);
-  overflow-wrap: anywhere;
 }
 
 .industry-conclusion__grid {
@@ -219,8 +288,18 @@
   font-size: var(--c-font-base);
 }
 
+.industry-conclusion__factor.is-positive {
+  color: var(--c-up);
+  background: color-mix(in srgb, var(--c-up) 4%, var(--c-card-bg));
+}
+
 .industry-conclusion__factor.is-positive h3 {
   color: var(--c-up);
+}
+
+.industry-conclusion__factor.is-negative {
+  color: var(--c-down);
+  background: color-mix(in srgb, var(--c-down) 4%, var(--c-card-bg));
 }
 
 .industry-conclusion__factor.is-negative h3 {
@@ -240,23 +319,30 @@
   min-width: 0;
 }
 
-.industry-conclusion__factor li > div {
+.industry-conclusion__item-heading {
   display: flex;
-  align-items: center;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px 8px;
 }
 
-.industry-conclusion__factor li strong {
+.industry-conclusion__item-title {
+  min-width: 0;
+  flex: 1 1 160px;
   color: var(--c-text-primary);
   font-size: var(--c-font-md);
+  white-space: normal;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-.industry-conclusion__factor li > div > span {
+.industry-conclusion__confidence {
   flex: none;
   color: var(--c-text-muted);
   font-size: var(--c-font-xs);
+  white-space: nowrap;
 }
 
 .industry-conclusion__factor li p {
@@ -266,13 +352,24 @@
   color: var(--c-text-secondary);
   font-size: var(--c-font-sm);
   line-height: var(--c-leading-normal);
+  white-space: normal;
   overflow-wrap: anywhere;
+  word-break: break-word;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .industry-conclusion__companies .ant-tag {
+  flex: none;
   margin: 0;
+}
+
+.industry-evidence-link {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .industry-report__section {
@@ -319,6 +416,8 @@
   min-width: 0;
   gap: 0;
   margin-bottom: 16px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .industry-research-block {
@@ -333,11 +432,16 @@
 }
 
 .industry-research-block__title {
+  min-width: 0;
+  max-width: 100%;
   margin: 0 0 14px;
   color: var(--c-text-primary);
   font-size: var(--c-font-base);
   font-weight: var(--c-weight-semibold);
   line-height: var(--c-leading-tight);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .industry-research-block__title::before {
@@ -353,6 +457,9 @@
 
 .industry-research-block__body {
   min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .industry-research-grid {
@@ -445,6 +552,47 @@
   border-top: 1px solid var(--c-border);
 }
 
+.industry-chain-node__heading,
+.industry-chain-node__name,
+.industry-chain-node__tag-list,
+.industry-chain-tier__heading,
+.industry-chain-tier__label,
+.industry-chain-tier__title {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.industry-chain-node__name,
+.industry-chain-tier__label,
+.industry-chain-tier__title {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-chain-tier__label {
+  flex: 1 1 auto;
+}
+
+.industry-chain-tier__count {
+  flex: none;
+  white-space: nowrap;
+}
+
+.industry-market-metrics-table,
+.industry-chain-table {
+  max-width: 100%;
+}
+
+.industry-market-metrics-table .ant-table-cell,
+.industry-chain-table .ant-table-cell,
+.industry-chain-table__text {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .industry-chain-node:first-child {
   border-top: 0;
 }
@@ -490,13 +638,23 @@
 }
 
 .industry-research-audit > summary > span {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   font-weight: var(--c-weight-medium);
 }
 
 .industry-research-audit > summary > small {
+  min-width: 0;
+  max-width: 100%;
   margin-left: auto;
   color: var(--c-text-muted);
   font-size: var(--c-font-xs);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .industry-research-audit__body {
@@ -510,6 +668,7 @@
 
 .industry-source-list__item {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
@@ -518,15 +677,46 @@
   border-bottom: 1px solid var(--c-border);
 }
 
+.industry-source-label,
+.industry-source-list__title,
+.industry-source-list__meta {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.industry-source-list__title {
+  flex: 1 1 240px;
+}
+
+.industry-source-list__meta {
+  flex: 0 1 auto;
+  text-align: right;
+}
+
 .industry-source-list__item:last-child {
   border-bottom: 0;
 }
 
 .industry-evidence-item {
+  min-width: 0;
   padding: 10px;
   border: 1px solid var(--c-border);
   border-radius: var(--c-radius-sm);
   background: var(--c-elevated-bg);
+}
+
+.industry-evidence-item__summary,
+.industry-evidence-item__tool,
+.industry-evidence-item__provider,
+.industry-evidence-item__title {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .industry-report__full-report-anchor {
@@ -656,12 +846,6 @@
     gap: 3px;
   }
 
-  .industry-chain-node .ant-tag,
-  .industry-research-list .ant-tag {
-    max-width: 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
 }
 
 .industry-markdown {
@@ -670,33 +854,41 @@
   max-width: 100%;
   overflow: hidden;
   color: var(--c-text-secondary);
-  font-size: 14px;
-  line-height: 1.8;
+  font-size: var(--c-font-base);
+  line-height: var(--c-leading-relaxed);
   overflow-wrap: anywhere;
+}
+
+.industry-markdown :where(h1, h2, h3, p, li, blockquote, a) {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .industry-markdown h1,
 .industry-markdown h2,
 .industry-markdown h3 {
   color: var(--c-text-primary);
-  line-height: 1.45;
+  line-height: var(--c-leading-normal);
 }
 
 .industry-markdown h1 {
   margin: 0 0 16px;
-  font-size: 20px;
+  font-size: var(--c-font-2xl);
 }
 
 .industry-markdown h2 {
   margin: 26px 0 12px;
   padding-bottom: 7px;
   border-bottom: 1px solid var(--c-border);
-  font-size: 17px;
+  font-size: var(--c-font-xl);
 }
 
 .industry-markdown h3 {
   margin: 20px 0 8px;
-  font-size: 15px;
+  font-size: var(--c-font-lg);
 }
 
 .industry-markdown p,
@@ -757,7 +949,7 @@
 .industry-markdown th {
   color: var(--c-text-primary);
   background: var(--c-elevated-bg);
-  font-weight: 600;
+  font-weight: var(--c-weight-semibold);
 }
 
 .industry-markdown code {
@@ -765,8 +957,8 @@
   border-radius: 4px;
   background: var(--c-elevated-bg);
   color: var(--c-text-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
+  font-family: var(--c-font-mono);
+  font-size: var(--c-font-sm);
 }
 
 .industry-markdown pre {
@@ -780,4 +972,83 @@
 .industry-markdown pre code {
   padding: 0;
   background: transparent;
+}
+
+.atlas-chain-card {
+  min-width: 0;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.atlas-chain-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--c-primary) 45%, var(--c-border)) !important;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--c-primary) 12%, transparent);
+}
+
+.atlas-company-chip {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  transition: all 0.15s ease;
+}
+
+.atlas-chain-card__heading,
+.atlas-chain-card__name,
+.atlas-chain-card__summary,
+.atlas-chain-card__stats,
+.atlas-detail__heading,
+.atlas-detail__name,
+.atlas-detail__summary,
+.atlas-driver-chip,
+.atlas-layer__heading,
+.atlas-layer__name,
+.atlas-segment,
+.atlas-segment__heading,
+.atlas-segment__name,
+.atlas-company-chip__name {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.atlas-chain-card__heading,
+.atlas-chain-card__stats {
+  flex-wrap: wrap;
+}
+
+.atlas-chain-card__name,
+.atlas-chain-card__summary,
+.atlas-detail__name,
+.atlas-detail__summary,
+.atlas-driver-chip,
+.atlas-layer__name,
+.atlas-segment__name,
+.atlas-company-chip__name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.atlas-chain-card__name,
+.atlas-detail__name,
+.atlas-layer__name,
+.atlas-segment__name,
+.atlas-company-chip__name {
+  flex: 1 1 auto;
+}
+
+.atlas-driver-chip {
+  height: auto;
+}
+
+.atlas-layer__count,
+.atlas-company-chip__code {
+  flex: none;
+  white-space: nowrap;
+}
+
+.atlas-company-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--c-primary) !important;
+  color: var(--c-primary) !important;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--c-primary) 15%, transparent);
 }

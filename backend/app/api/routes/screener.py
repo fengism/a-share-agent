@@ -43,13 +43,29 @@ async def screen_stocks(filters: ScreenerFilter):
 
 
 @router.get("/industries", response_model=list[str])
-async def get_industries():
+async def get_industries(level: int | None = None):
     """获取可用于筛选的行业名称列表。
 
+    Param:
+        level: 可选的申万级别 (1, 2, 3)，不传时返回全级别去重行业列表。
     Return:
         list[str]: 行业名称集合。
     """
-    return await get_industry_list()
+    return await get_industry_list(level=level)
+
+
+@router.get("/concepts", response_model=list[str])
+async def get_concepts():
+    """获取可用于筛选的概念名称列表。
+
+    Return:
+        list[str]: 概念名称集合。
+    """
+    from app.core.concurrency.rate_limiter import call_blocking
+    from app.modules.stock_concept.public import get_all_concepts
+
+    items = await call_blocking(get_all_concepts, limit=2000)
+    return [item["name"] for item in items]
 
 
 @router.post("/percentile", response_model=ValuationPercentileResult)

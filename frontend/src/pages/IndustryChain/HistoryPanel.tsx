@@ -101,7 +101,7 @@ export default function HistoryPanel({
                         {item.title || `${item.name} 产业链`}
                       </span>
                       {isLoadingArchive ? (
-                        <Text style={{ color: colors.primary, whiteSpace: "nowrap", fontSize: 12 }}>
+                        <Text style={{ color: colors.primary, whiteSpace: "nowrap", fontSize: "var(--c-font-sm)" }}>
                           <LoadingOutlined /> 加载中
                         </Text>
                       ) : null}

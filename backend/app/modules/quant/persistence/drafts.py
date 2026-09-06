@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import uuid4
 
+from app.core.exceptions import ResourceNotFoundError
 from app.infrastructure.persistence.connection import get_connection
 
 DraftStatus = Literal["draft", "validated", "testing", "backtested", "published"]
@@ -66,7 +67,8 @@ def _to_draft(row) -> StrategyDraftRow:
 def _require_draft(draft_id: str) -> StrategyDraftRow:
     draft = get_draft(draft_id)
     if draft is None:
-        raise KeyError(draft_id)
+        # 有意为之的 404 信号；其余 KeyError(draft_id) 是并发冲突的内部标记，勿改
+        raise ResourceNotFoundError(f"量化草稿不存在: {draft_id}")
     return draft
 
 

@@ -21,7 +21,7 @@ function KuaixunTab({ searchQuery }: { searchQuery: string }) {
     <div>
       {!isLoading && items.length > 0 && (
         <div className="feed-tab-meta" style={{ justifyContent: "flex-end" }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>共 {items.length} 条快讯</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: "var(--c-font-sm)" }}>共 {items.length} 条快讯</Text>
         </div>
       )}
       <PaginatedList
@@ -94,7 +94,7 @@ function OtherNewsTab({ searchQuery }: { searchQuery: string }) {
 }
 
 export default function FeedTabs({ searchQuery }: { searchQuery: string }) {
-  const [activeTab, setActiveTab] = useUrlSearchParam("tab", "kuaixun", { allowedValues: FEED_TABS });
+  const [activeTab, setActiveTab] = useUrlSearchParam("channel", "kuaixun", { allowedValues: FEED_TABS });
 
   return (
     <Tabs

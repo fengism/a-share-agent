@@ -83,7 +83,7 @@ export default function InviteManagerCard() {
       style={{ ...cardStyle, marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
     >
-      <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 12 }}>
+      <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginBottom: 12 }}>
         新用户注册需填写有效且未使用的邀请码；每个邀请码仅可使用一次。可为邀请码设置过期时间，未使用的邀请码可随时撤销。
       </div>
       {isNarrow && <div style={{ marginBottom: 12 }}>{inviteControls}</div>}
@@ -113,10 +113,10 @@ export default function InviteManagerCard() {
               }}
             >
               <div style={{ minWidth: 0 }}>
-                <code style={{ fontFamily: "monospace", fontSize: 13, color: colors.textPrimary, wordBreak: "break-all" }}>
+                <code style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-md)", color: colors.textPrimary, wordBreak: "break-all" }}>
                   {invite.code}
                 </code>
-                <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted, marginTop: 2 }}>
                   {invite.expires_at ? `过期时间：${invite.expires_at}` : "永不过期"}
                 </div>
               </div>

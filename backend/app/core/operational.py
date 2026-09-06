@@ -20,6 +20,10 @@ class OperationalSnapshot:
     workflow_queue: Mapping[str, Any]
     backups: Mapping[str, Mapping[str, Any]]
     global_cache: Mapping[str, int]
+    market_cache: Mapping[str, int]
+    reference_cache: Mapping[str, int]
+    analysis_cache: Mapping[str, int]
+    series_cache: Mapping[str, int]
     provider_circuits: Mapping[str, ProviderCircuitSnapshot]
 
 

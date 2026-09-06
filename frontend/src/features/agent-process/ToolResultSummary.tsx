@@ -29,7 +29,7 @@ export default function ToolResultSummary({ value }: { value?: ToolSummary }) {
         lineHeight: "var(--c-leading-relaxed)",
       }}
     >
-      <Text type="secondary" style={{ fontSize: "inherit", lineHeight: "inherit", fontWeight: 600 }}>
+      <Text type="secondary" style={{ fontSize: "inherit", lineHeight: "inherit", fontWeight: "var(--c-weight-semibold)" }}>
         结果摘要
       </Text>
       <div style={{ marginTop: "var(--c-space-1)", fontSize: "inherit", lineHeight: "inherit" }}>

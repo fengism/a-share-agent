@@ -5,6 +5,10 @@ from pydantic import BaseModel, Field
 from app.financial_data.stock.insights.sources import (
     EASTMONEY_FUND_FLOW_API,
     EASTMONEY_FUND_FLOW_SOURCE_ID,
+    SINA_BULLETIN_LIST_API,
+    SINA_BULLETIN_SOURCE_ID,
+    SINA_REPORT_LIST_API,
+    SINA_REPORT_SOURCE_ID,
 )
 
 
@@ -84,6 +88,57 @@ class RetailSentimentPost(BaseModel):
     text: str
     author: str | None = None
     publish_time: str | None = None
+
+
+class StockBulletinItem(BaseModel):
+    """单条公司公告。"""
+
+    id: str
+    title: str
+    date: str = ""
+    type: str = ""
+    type2: str = ""
+    url: str = ""
+    pdf_url: str = ""
+    origin: str = ""
+    source: str = SINA_BULLETIN_SOURCE_ID
+    source_api: str = SINA_BULLETIN_LIST_API
+
+
+class StockBulletinPage(BaseModel):
+    """个股公告分页结果。"""
+
+    code: str
+    name: str = ""
+    page: int = 1
+    page_size: int = 10
+    total_pages: int = 0
+    items: list[StockBulletinItem] = Field(default_factory=list)
+
+
+class StockReportItem(BaseModel):
+    """单条券商研报评级。"""
+
+    id: str
+    title: str
+    org: str = ""
+    author: str = ""
+    date: str = ""
+    rating: str = ""
+    goal_price: float | None = None
+    report_type: str = ""
+    url: str = ""
+    source: str = SINA_REPORT_SOURCE_ID
+    source_api: str = SINA_REPORT_LIST_API
+
+
+class StockReportPage(BaseModel):
+    """个股研报评级列表（最近 N 个月）。"""
+
+    code: str
+    months: int = 6
+    total_count: int = 0
+    items: list[StockReportItem] = Field(default_factory=list)
 
 
 class RetailSentiment(BaseModel):

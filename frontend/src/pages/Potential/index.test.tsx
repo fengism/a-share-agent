@@ -54,7 +54,7 @@ describe("PotentialPage", () => {
     expect(screen.getByText("底部放量")).toBeInTheDocument();
     expect(screen.getByText("4.0")).toBeInTheDocument();
     const link = screen.getAllByRole("link", { name: /亨通光电/ })[0];
-    expect(link).toHaveAttribute("href", "/analysis/600487");
+    expect(link).toHaveAttribute("href", "/stock/600487");
   });
 
   it("marks fresh signals with a tag", () => {

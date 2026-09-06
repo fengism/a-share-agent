@@ -2,7 +2,8 @@ import logging
 from collections.abc import Awaitable
 from datetime import date
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import market_cache as cache
 from app.core.cache_policies import MARKET_INDICES
 from app.core.concurrency.rate_limiter import akshare_semaphore, call_blocking, tencent_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight

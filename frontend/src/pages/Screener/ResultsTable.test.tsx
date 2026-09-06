@@ -61,7 +61,7 @@ describe("ResultsTable", () => {
     expect(onSelectedCodesChange).toHaveBeenCalledWith(["600519"]);
     expect(screen.getByRole("link", { name: "600519" })).toHaveAttribute(
       "href",
-      "/analysis/600519",
+      "/stock/600519",
     );
     expect(screen.getByRole("link", { name: "600519" })).not.toHaveAttribute("target");
     expect(screen.getByText("主板")).toBeInTheDocument();

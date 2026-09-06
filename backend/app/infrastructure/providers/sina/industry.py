@@ -17,9 +17,10 @@ from app.constants.market import SINA_MARKET_HQ_URL, SINA_MARKET_NODES_URL
 
 logger = logging.getLogger(__name__)
 
-_SW_NODE_PATTERN = re.compile(r"^sw([12])_(\d{6})$")
-_SW_BRANCH_LABELS = {1: "申万一级", 2: "申万二级"}
-_SW_MIN_NODE_COUNTS = {1: 30, 2: 120}
+_SW_LEVELS = (1, 2, 3)
+_SW_NODE_PATTERN = re.compile(r"^sw([123])_(\d{6})$")
+_SW_BRANCH_LABELS = {1: "申万一级", 2: "申万二级", 3: "申万三级"}
+_SW_MIN_NODE_COUNTS = {1: 30, 2: 120, 3: 300}
 _SW_MIN_MAPPING_SIZE = 4000
 _SW_MIN_CROSS_LEVEL_COVERAGE = 0.98
 _SW_PAGE_SIZE = 100
@@ -127,7 +128,7 @@ def _parse_branch_nodes(branch: list[Any], level: int) -> list[SinaSwIndustryNod
 
 
 def parse_sw_industry_nodes(payload: object) -> SwNodeMap:
-    """Extract only Shenwan level-one and level-two nodes below the A-share branch."""
+    """Extract Shenwan level-one, level-two and level-three nodes below A shares."""
     a_share_branch = _find_named_branch(payload, "A股")
     if a_share_branch is None:
         raise RuntimeError("新浪行情分类缺少 A股 节点")
@@ -290,8 +291,8 @@ def build_sw_industry_mappings(
     *,
     max_workers: int = _SW_WORKERS,
 ) -> SwMappingMap:
-    """Build deterministic stock-to-industry mappings for both Shenwan levels."""
-    ordered_nodes = [node for level in (1, 2) for node in nodes_by_level.get(level, [])]
+    """Build deterministic stock-to-industry mappings for all Shenwan levels."""
+    ordered_nodes = [node for level in _SW_LEVELS for node in nodes_by_level.get(level, [])]
     members_by_node: dict[str, list[dict[str, Any]]] = {}
     with ThreadPoolExecutor(max_workers=max(1, max_workers), thread_name_prefix="sina-sw-industry") as executor:
         futures = {node.node: executor.submit(component_loader, node.node) for node in ordered_nodes}
@@ -302,7 +303,7 @@ def build_sw_industry_mappings(
             members_by_node[node.node] = members
 
     result: SwMappingMap = {}
-    for level in (1, 2):
+    for level in _SW_LEVELS:
         mapping: dict[str, str] = {}
         industry_names: list[str] = []
         for node in nodes_by_level.get(level, []):
@@ -324,24 +325,29 @@ def validate_sw_mapping_coverage(
     *,
     minimum_coverage: float = _SW_MIN_CROSS_LEVEL_COVERAGE,
 ) -> float:
-    """Require level-one and level-two mappings to describe nearly the same stock universe."""
+    """Require adjacent Shenwan levels to describe nearly the same stock universe."""
     if not 0 <= minimum_coverage <= 1:
         raise ValueError("申万行业跨级覆盖率阈值必须在 0 到 1 之间")
-    level_one_codes = set(mappings.get(1, ({}, []))[0])
-    level_two_codes = set(mappings.get(2, ({}, []))[0])
-    if not level_one_codes or not level_two_codes:
-        raise RuntimeError("新浪申万跨级股票覆盖率无法计算：行业映射为空")
-    common_count = len(level_one_codes & level_two_codes)
-    level_one_coverage = common_count / len(level_one_codes)
-    level_two_coverage = common_count / len(level_two_codes)
-    coverage = min(level_one_coverage, level_two_coverage)
-    if coverage < minimum_coverage:
-        raise RuntimeError(
-            "新浪申万跨级股票覆盖率不足: "
-            f"coverage={coverage:.4f}, minimum={minimum_coverage:.4f}, "
-            f"level1={len(level_one_codes)}, level2={len(level_two_codes)}, common={common_count}"
-        )
-    return coverage
+    coverage_by_pair: list[float] = []
+    for lower_level, upper_level in zip(_SW_LEVELS[:-1], _SW_LEVELS[1:], strict=True):
+        lower_codes = set(mappings.get(lower_level, ({}, []))[0])
+        upper_codes = set(mappings.get(upper_level, ({}, []))[0])
+        if not lower_codes or not upper_codes:
+            raise RuntimeError(
+                "新浪申万跨级股票覆盖率无法计算："
+                f"level{lower_level}={len(lower_codes)}, level{upper_level}={len(upper_codes)}"
+            )
+        common_count = len(lower_codes & upper_codes)
+        coverage = min(common_count / len(lower_codes), common_count / len(upper_codes))
+        if coverage < minimum_coverage:
+            raise RuntimeError(
+                "新浪申万跨级股票覆盖率不足: "
+                f"coverage={coverage:.4f}, minimum={minimum_coverage:.4f}, "
+                f"level{lower_level}={len(lower_codes)}, level{upper_level}={len(upper_codes)}, "
+                f"common={common_count}"
+            )
+        coverage_by_pair.append(coverage)
+    return min(coverage_by_pair)
 
 
 def fetch_sw_industry_mappings(
@@ -349,7 +355,7 @@ def fetch_sw_industry_mappings(
     *,
     session_factory: Callable[[], requests.Session] = requests.Session,
 ) -> SwMappingMap:
-    """Fetch and validate complete Sina Shenwan level-one and level-two mappings."""
+    """Fetch and validate complete Sina Shenwan level-one through level-three mappings."""
     started_at = time.perf_counter()
     stats = _FetchStats()
     payload = _request_json_list(
@@ -377,18 +383,21 @@ def fetch_sw_industry_mappings(
     finally:
         session_pool.close()
 
-    for level in (1, 2):
+    for level in _SW_LEVELS:
         mapping, _ = mappings[level]
         if len(mapping) <= _SW_MIN_MAPPING_SIZE:
             raise RuntimeError(f"新浪申万{level}级股票映射不足: {len(mapping)} <= {_SW_MIN_MAPPING_SIZE}")
     coverage = validate_sw_mapping_coverage(mappings)
     logger.info(
-        "新浪申万行业映射获取成功: level1_nodes=%s level2_nodes=%s level1_stocks=%s "
-        "level2_stocks=%s cross_level_coverage=%.4f retries=%s elapsed_ms=%.2f",
+        "新浪申万行业映射获取成功: level1_nodes=%s level2_nodes=%s level3_nodes=%s "
+        "level1_stocks=%s level2_stocks=%s level3_stocks=%s "
+        "cross_level_coverage=%.4f retries=%s elapsed_ms=%.2f",
         len(nodes_by_level[1]),
         len(nodes_by_level[2]),
+        len(nodes_by_level[3]),
         len(mappings[1][0]),
         len(mappings[2][0]),
+        len(mappings[3][0]),
         coverage,
         stats.retries,
         (time.perf_counter() - started_at) * 1000,

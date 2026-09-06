@@ -40,6 +40,10 @@ async def health_metrics(
         status="ok",
         metrics=metrics_snapshot,
         global_cache=dict(snapshot.global_cache),
+        market_cache=dict(snapshot.market_cache),
+        reference_cache=dict(snapshot.reference_cache),
+        analysis_cache=dict(snapshot.analysis_cache),
+        series_cache=dict(snapshot.series_cache),
         provider_circuits={
             name: ProviderCircuitStateResponse.model_validate(circuit)
             for name, circuit in snapshot.provider_circuits.items()

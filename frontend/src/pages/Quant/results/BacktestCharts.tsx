@@ -27,7 +27,7 @@ export default function BacktestCharts({ equityCurve }: BacktestChartsProps) {
 
   return (
     <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-      <Col xs={24} lg={15}>
+      <Col xs={24} lg={16}>
         <Card title="策略与基准净值" size="small" style={cardStyle} className="quant-result-card quant-chart-card">
           {equityCurve.length > 0 ? (
             <ReactECharts
@@ -40,7 +40,7 @@ export default function BacktestCharts({ equityCurve }: BacktestChartsProps) {
           ) : <div className="quant-chart-empty"><Empty description="暂无净值数据" /></div>}
         </Card>
       </Col>
-      <Col xs={24} lg={9}>
+      <Col xs={24} lg={8}>
         <Card title="组合回撤" size="small" style={cardStyle} className="quant-result-card quant-chart-card">
           {equityCurve.length > 0 ? (
             <ReactECharts

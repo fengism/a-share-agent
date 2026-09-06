@@ -44,9 +44,9 @@
 }
 
 .analysis-history-item.is-active {
-  border-color: color-mix(in srgb, var(--c-accent) 65%, var(--c-border));
-  background: color-mix(in srgb, var(--c-accent) 9%, var(--c-nested-bg));
-  box-shadow: inset 3px 0 var(--c-accent), 0 0 18px color-mix(in srgb, var(--c-accent) 7%, transparent);
+  border-color: var(--c-accent);
+  background: var(--c-hover-bg);
+  box-shadow: inset 3px 0 var(--c-accent);
 }
 
 .analysis-history-item__name {
@@ -77,17 +77,17 @@
 
 .analysis-history-item__signal.is-关注 {
   color: var(--c-success);
-  background: color-mix(in srgb, var(--c-success) 12%, transparent);
+  background: var(--c-hover-bg);
 }
 
 .analysis-history-item__signal.is-谨慎 {
   color: var(--c-up);
-  background: color-mix(in srgb, var(--c-up) 12%, transparent);
+  background: var(--c-hover-bg);
 }
 
 .analysis-history-item__signal.is-观察 {
   color: var(--c-accent);
-  background: color-mix(in srgb, var(--c-accent) 12%, transparent);
+  background: var(--c-hover-bg);
 }
 
 .analysis-rail__more {

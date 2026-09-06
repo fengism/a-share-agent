@@ -11,6 +11,10 @@ from app.modules.analysis.history_service import (
 )
 from app.modules.analysis.models import AnalysisResult, FactorAnalysis
 from app.modules.analysis.page_service import get_analysis_page_data
+from app.modules.analysis.pdf_service import (
+    generate_research_report_html,
+    render_pdf_bytes_from_html,
+)
 from app.modules.analysis.pipeline import run_analysis
 from app.modules.analysis.schemas import AnalysisHistoryItem, AnalysisPageData
 from app.modules.analysis.stream import create_analysis_event_generator
@@ -23,6 +27,7 @@ __all__ = [
     "FactorAnalysis",
     "WorkflowCapacityError",
     "create_analysis_event_generator",
+    "generate_research_report_html",
     "get_analysis_page_data",
     "get_latest_analysis",
     "get_analysis_by_date",
@@ -31,5 +36,6 @@ __all__ = [
     "load_analysis_history",
     "load_latest_analysis",
     "remove_analysis_history",
+    "render_pdf_bytes_from_html",
     "run_analysis",
 ]

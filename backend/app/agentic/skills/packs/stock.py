@@ -21,6 +21,8 @@ SKILLS = (
             "get_stock_news",
             "get_stock_sentiment",
             "get_stock_risk_data",
+            "get_restricted_shares_lift",
+            "get_interactive_qa",
             "analyze_stock",
             "analyze_financials",
             "compare_stocks",
@@ -31,6 +33,11 @@ SKILLS = (
             "仅问单一维度时调用对应单项工具，不升级为全面分析。",
         ),
         exclusions=("调用组合工具后不要重复调用其组成工具", "已确认代码后不要再次搜索"),
+        examples=(
+            "查询茅台最新估值与财报 ➔ get_stock_valuation_detail('600519')",
+            "对比宁德时代与比亚迪 ➔ compare_stocks(['300750', '002594'])",
+            "分析平安银行技术指标 ➔ get_stock_technical_indicators('000001')",
+        ),
         priority=30,
     ),
     Skill(
@@ -44,6 +51,10 @@ SKILLS = (
             "条件可精确映射到固定字段时才用 screen_stocks；行业名称不确定时先用 get_industries。",
         ),
         exclusions=("不要用 iwencai_query 代替选股", "同一条件不要同时调用两种选股工具"),
+        examples=(
+            "选出市盈率小于20且ROE大于15%的白酒股 ➔ iwencai_select_stock(query='市盈率<20，ROE>15%，白酒行业')",
+            "筛选半导体板块涨幅前十 ➔ screen_stocks(industries=['半导体'], sort_by='change_pct', sort_order='desc')",
+        ),
         priority=40,
     ),
 )

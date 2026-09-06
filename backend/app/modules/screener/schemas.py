@@ -21,6 +21,7 @@ class ScreenerFilter(BaseModel):
     turnover_pct_min: float | None = None
     turnover_pct_max: float | None = None
     industries: list[str] | None = None
+    concepts: list[str] | None = None
     # 市场板块筛选：主板/科创板/创业板/北交所，None 表示全部市场
     markets: list[str] | None = Field(default=None, max_length=4)
 
@@ -63,7 +64,10 @@ class ScreenerItem(BaseModel):
     board: str | None = None
     listing_date: str | None = None
     exchange_industry: str | None = None
+    first_industry: StockConcept | None = None
     second_industry: StockConcept | None = None
+    third_industry: StockConcept | None = None
+    concepts: list[str] = Field(default_factory=list)
 
 
 class ScreenerResult(BaseModel):

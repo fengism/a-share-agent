@@ -6,6 +6,7 @@ import {
   type InfiniteData,
 } from "@tanstack/react-query";
 import { API_TIMEOUTS } from "../client";
+import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import {
   asApiModel,
   openApiDelete,
@@ -36,9 +37,11 @@ export function useActiveWorkflows() {
     select: asApiModel<WorkflowJob[]>(),
     refetchInterval: (query) => {
       const jobs = query.state.data as WorkflowJob[] | undefined;
-      return jobs?.length ? 2_000 : 10_000;
+      return jobs?.length
+        ? QUERY_CACHE_POLICIES.workflowActive.activePollMs
+        : QUERY_CACHE_POLICIES.workflowActive.idlePollMs;
     },
-    staleTime: 1_000,
+    staleTime: QUERY_CACHE_POLICIES.workflowActive.staleMs,
   });
 }
 
@@ -68,7 +71,7 @@ export function useInfiniteDailyReviewHistory(pageSize = 50) {
         ? undefined
         : pages.reduce((count, page) => count + page.length, 0)
     ),
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.workflowHistory.staleMs,
   });
 }
 
@@ -80,7 +83,7 @@ export function useDailyReview(date: string) {
     }),
     select: asApiModel<DailyReviewResult>(),
     enabled: !!date,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.workflowHistory.staleMs,
   });
 }
 
@@ -99,6 +102,14 @@ export function useDeleteDailyReview() {
       path: { date },
     }),
   });
+}
+
+export async function downloadDailyReviewPdf(date: string): Promise<void> {
+  const { apiDownload } = await import("../client");
+  await apiDownload(
+    `/daily-review/${encodeURIComponent(date)}/export-pdf`,
+    `每日复盘-${date}.pdf`,
+  );
 }
 
 export function usePush() {
@@ -133,7 +144,7 @@ export function useInfiniteAllAnalysisHistory(
         : pages.reduce((count, page) => count + page.length, 0)
     ),
     initialData: normalizedQuery ? undefined : initialData,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.workflowHistory.staleMs,
   });
 }
 
@@ -146,7 +157,7 @@ export function useAnalysisHistorySnapshot(code: string, date: string) {
     }),
     select: asApiModel<AnalysisResult>(),
     enabled: !!code && !!date,
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: QUERY_CACHE_POLICIES.workflowImmutableSnapshot.staleMs,
   });
 }
 
@@ -188,8 +199,9 @@ export function useDeleteAnalysisHistory() {
 export function useInfiniteIndustryChainHistory(name = "", pageSize = 50) {
   return useInfiniteQuery({
     queryKey: queryKeys.workflows.industryChainHistory(name, pageSize),
-    queryFn: ({ pageParam }) => openApiGet("/api/industry-chain/history", {
+    queryFn: ({ pageParam, signal }) => openApiGet("/api/industry-chain/history", {
       query: { name: name || undefined, limit: pageSize, offset: pageParam },
+      options: { signal },
     }),
     select: (data) => ({
       ...data,
@@ -201,18 +213,20 @@ export function useInfiniteIndustryChainHistory(name = "", pageSize = 50) {
         ? undefined
         : pages.reduce((count, page) => count + page.length, 0)
     ),
-    staleTime: 0,
+    // 历史存档是静态数据，无需每次挂载都重拉第一页
+    staleTime: QUERY_CACHE_POLICIES.workflowHistory.staleMs,
   });
 }
 
 export function useIndustryChainLatest(name: string) {
   return useQuery({
     queryKey: queryKeys.workflows.industryChainLatest(name),
-    queryFn: () => openApiGet("/api/industry-chain/{name}/latest", {
+    queryFn: ({ signal }) => openApiGet("/api/industry-chain/{name}/latest", {
       path: { name },
+      options: { signal },
     }),
     enabled: !!name,
-    staleTime: 0,
+    staleTime: QUERY_CACHE_POLICIES.workflowLatest.staleMs,
   });
 }
 
@@ -221,7 +235,7 @@ export function useIndustryChainAtlasCatalog() {
     queryKey: queryKeys.workflows.industryChainAtlasCatalog,
     queryFn: () => openApiGet("/api/industry-chain/atlas/chains"),
     select: asApiModel<AtlasCatalog>(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.workflowAtlas.staleMs,
   });
 }
 
@@ -233,7 +247,7 @@ export function useIndustryChainAtlasChain(slug: string) {
     }),
     select: asApiModel<AtlasChain>(),
     enabled: !!slug,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.workflowAtlas.staleMs,
   });
 }
 
@@ -285,4 +299,17 @@ export function useDeleteIndustryChainArchive() {
       { path: { name, archive_id: archiveId } },
     ),
   });
+}
+
+export async function downloadIndustryChainPdf(name: string, archiveId?: string): Promise<void> {
+  const { apiDownload } = await import("../client");
+  const fallback = `${name}_产业链深度研究报告.pdf`;
+  await apiDownload(`/industry-chain/${name}/export-pdf`, fallback, { archive_id: archiveId });
+}
+
+export async function downloadIndustryChainPdfFromData(result: IndustryChainResult): Promise<void> {
+  const { apiDownloadPost } = await import("../client");
+  const name = result.name || "产业链";
+  const fallback = `${name}_产业链深度研究报告.pdf`;
+  await apiDownloadPost("/industry-chain/export-pdf", result, fallback);
 }

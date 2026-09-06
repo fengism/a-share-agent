@@ -1,8 +1,9 @@
 """每日复盘 HTTP API。"""
 
 from typing import Annotated
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 
 from app.api.auth.dependencies import require_active_user
 from app.api.errors import BadRequestError, NotFoundError
@@ -13,9 +14,11 @@ from app.modules.daily_review.public import (
     DailyReviewRequest,
     DailyReviewResult,
     generate_daily_review,
+    generate_daily_review_pdf_html,
     get_daily_review_record,
     list_daily_review_history,
     remove_daily_review,
+    render_daily_review_pdf_bytes,
 )
 
 router = APIRouter()
@@ -42,6 +45,29 @@ async def get_daily_review_history(
         limit=limit,
         offset=offset,
         can_delete_legacy=bool(user["is_admin"]),
+    )
+
+
+@router.get("/{date}/export-pdf")
+async def export_daily_review_pdf(
+    date: str,
+    user: AuthenticatedUser = Depends(require_active_user),
+):
+    """根据日期读取复盘记录，并生成包含矢量图表的 PDF。"""
+    review = await get_daily_review_record(date, user["id"])
+    if review is None:
+        raise NotFoundError("复盘记录不存在", code="daily_review.not_found")
+
+    html_content = generate_daily_review_pdf_html(review)
+    pdf_bytes = await render_daily_review_pdf_bytes(html_content)
+    filename = f"每日复盘_{review.date}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )
 
 

@@ -136,3 +136,113 @@ export function apiPut<T>(path: string, body?: unknown, options?: ApiRequestOpti
 export function apiDelete<T>(path: string, options?: ApiRequestOptions): Promise<T> {
   return apiRequest<T>("DELETE", path, undefined, undefined, options);
 }
+
+export async function apiDownload(
+  path: string,
+  fallbackFilename: string,
+  params?: ApiQueryParams,
+  options: ApiRequestOptions = {},
+): Promise<void> {
+  const url = new URL(`${BASE_URL}${path}`, window.location.origin);
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        url.searchParams.set(key, String(value));
+      }
+    });
+  }
+  const fullUrl = `${url.pathname}${url.search}`;
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(fullUrl, {
+    method: "GET",
+    headers,
+    credentials: "include",
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) notifyUnauthorized();
+    const errorBody = await response.json().catch(() => ({}));
+    const parsedError = parseApiError(errorBody, `下载失败: ${response.status}`);
+    throw new ApiError(response.status, path, parsedError.message, parsedError);
+  }
+
+  const blob = await response.blob();
+  let filename = fallbackFilename;
+  const disposition = response.headers.get("Content-Disposition");
+  if (disposition) {
+    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match?.[1]) {
+      filename = decodeURIComponent(utf8Match[1]);
+    } else {
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      if (match?.[1]) filename = match[1];
+    }
+  }
+
+  const blobUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = blobUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  window.URL.revokeObjectURL(blobUrl);
+}
+
+export async function apiDownloadPost(
+  path: string,
+  body: unknown,
+  fallbackFilename: string,
+  options: ApiRequestOptions = {},
+): Promise<void> {
+  const url = new URL(`${BASE_URL}${path}`, window.location.origin);
+  const fullUrl = `${url.pathname}${url.search}`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const csrfToken = getCsrfToken();
+  if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+
+  const response = await fetch(fullUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    credentials: "include",
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) notifyUnauthorized();
+    const errorBody = await response.json().catch(() => ({}));
+    const parsedError = parseApiError(errorBody, `下载失败: ${response.status}`);
+    throw new ApiError(response.status, path, parsedError.message, parsedError);
+  }
+
+  const blob = await response.blob();
+  let filename = fallbackFilename;
+  const disposition = response.headers.get("Content-Disposition");
+  if (disposition) {
+    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match?.[1]) {
+      filename = decodeURIComponent(utf8Match[1]);
+    } else {
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      if (match?.[1]) filename = match[1];
+    }
+  }
+
+  const blobUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = blobUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  window.URL.revokeObjectURL(blobUrl);
+}

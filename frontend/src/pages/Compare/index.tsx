@@ -67,8 +67,8 @@ export default function ComparePage() {
         value: stock.code,
         label: (
           <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
-            <span style={{ fontWeight: 500 }}>{stock.name}</span>
-            <span style={{ color: c.textSecondary, fontSize: 12 }}>{stock.code}</span>
+            <span style={{ fontWeight: "var(--c-weight-medium)" }}>{stock.name}</span>
+            <span style={{ color: c.textSecondary, fontSize: "var(--c-font-sm)" }}>{stock.code}</span>
           </div>
         ),
       }));
@@ -90,7 +90,7 @@ export default function ComparePage() {
           return <ChangeValue value={typeof value === "number" ? value : null} fontWeight={500} />;
         }
         return value !== null && value !== undefined
-          ? <span style={{ fontWeight: 500 }}>{String(value)}</span>
+          ? <span style={{ fontWeight: "var(--c-weight-medium)" }}>{String(value)}</span>
           : <span style={{ color: c.textSecondary }}>-</span>;
       },
     })),
@@ -181,7 +181,7 @@ export default function ComparePage() {
 
           {selectedCodes.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>{selectedCodes.length}/5</Text>
+              <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>{selectedCodes.length}/5</Text>
               {selectedCodes.map((code) => {
                 const stock = validData.find((item) => item.code === code);
                 return (
@@ -190,7 +190,7 @@ export default function ComparePage() {
                     closable
                     onClose={() => removeCode(code)}
                     color="blue"
-                    style={{ fontSize: 13, padding: "2px 10px", borderRadius: 999 }}
+                    style={{ fontSize: "var(--c-font-md)", padding: "2px 10px", borderRadius: 999 }}
                   >
                     {stock?.name || code} ({code})
                   </Tag>
@@ -249,8 +249,8 @@ export default function ComparePage() {
                   }}
                   styles={{ body: { padding: "14px 16px" } }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: 15, color: c.textPrimary, marginBottom: 2 }}>{stock.name}</div>
-                  <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 10 }}>{stock.code}</div>
+                  <div style={{ fontWeight: "var(--c-weight-bold)", fontSize: "var(--c-font-lg)", color: c.textPrimary, marginBottom: 2 }}>{stock.name}</div>
+                  <div style={{ fontSize: "var(--c-font-sm)", color: c.textSecondary, marginBottom: 10 }}>{stock.code}</div>
                   {isNarrow ? (
                     <ResponsiveMetricGrid
                       items={[
@@ -272,17 +272,17 @@ export default function ComparePage() {
                       ]}
                     />
                   ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px", fontSize: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px", fontSize: "var(--c-font-sm)" }}>
                     <span style={{ color: c.textSecondary }}>最新价</span>
-                    <span style={{ fontWeight: 600, textAlign: "right", color: c.textPrimary }}>{stock.price?.toFixed(2) ?? "-"}</span>
+                    <span style={{ fontWeight: "var(--c-weight-semibold)", textAlign: "right", color: c.textPrimary }}>{stock.price?.toFixed(2) ?? "-"}</span>
                     <span style={{ color: c.textSecondary }}>涨跌幅</span>
                     <ChangeValue value={stock.change_pct} fontWeight={600} style={{ textAlign: "right" }} />
                     <span style={{ color: c.textSecondary }}>PE(TTM)</span>
-                    <span style={{ fontWeight: 600, textAlign: "right", color: c.textPrimary }}>{stock.pe_ttm?.toFixed(2) ?? "-"}</span>
+                    <span style={{ fontWeight: "var(--c-weight-semibold)", textAlign: "right", color: c.textPrimary }}>{stock.pe_ttm?.toFixed(2) ?? "-"}</span>
                     <span style={{ color: c.textSecondary }}>PB</span>
-                    <span style={{ fontWeight: 600, textAlign: "right", color: c.textPrimary }}>{stock.pb?.toFixed(2) ?? "-"}</span>
+                    <span style={{ fontWeight: "var(--c-weight-semibold)", textAlign: "right", color: c.textPrimary }}>{stock.pb?.toFixed(2) ?? "-"}</span>
                     <span style={{ color: c.textSecondary }}>总市值</span>
-                    <span style={{ fontWeight: 600, textAlign: "right", color: c.textPrimary }}>{formatMarketCap(stock.market_cap)}</span>
+                    <span style={{ fontWeight: "var(--c-weight-semibold)", textAlign: "right", color: c.textPrimary }}>{formatMarketCap(stock.market_cap)}</span>
                     <span style={{ color: c.textSecondary }}>行业</span>
                     <span style={{ textAlign: "right", color: c.textPrimary }}>{stock.industry ?? "-"}</span>
                     </div>
@@ -296,7 +296,7 @@ export default function ComparePage() {
           {!isNarrow && (
             <Card
               size="small"
-              title={<span style={{ fontWeight: 600 }}>指标对比</span>}
+              title={<span style={{ fontWeight: "var(--c-weight-semibold)" }}>指标对比</span>}
               style={cardStyle}
               styles={{ body: { padding: 0 } }}
             >

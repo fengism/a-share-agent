@@ -18,7 +18,7 @@
   color: var(--c-text-secondary, #a7b0be);
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--c-font-md);
   transition: border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 
@@ -64,8 +64,8 @@
 .theme-selector-menu__title {
   padding: 4px 8px 9px;
   color: var(--c-text-muted, #6f7a89);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
   letter-spacing: 0.04em;
 }
 
@@ -115,14 +115,14 @@
 }
 
 .theme-selector-option__text strong {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
 }
 
 .theme-selector-option__text small {
   overflow: hidden;
   color: var(--c-text-muted, #6f7a89);
-  font-size: 11px;
+  font-size: var(--c-font-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

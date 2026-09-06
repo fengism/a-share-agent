@@ -42,6 +42,24 @@ export default function BacktestMetrics({
           style={{ marginBottom: 16 }}
         />
       ) : null}
+      {/* Strategy performance diagnostic tags */}
+      <div className="quant-performance-diagnostics" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px", alignItems: "center" }}>
+        <span style={{ fontSize: "var(--c-font-xs)", fontWeight: "var(--c-weight-bold)", color: colors.textSecondary }}>策略体检:</span>
+        {metrics.total_return > (metrics.benchmark_return ?? 0) ? (
+          <Tag color="success">⭐ 跑赢基准 (Alpha {(metrics.excess_return ?? 0) > 0 ? `+${metrics.excess_return?.toFixed(1)}` : metrics.excess_return?.toFixed(1)}%)</Tag>
+        ) : null}
+        {metrics.sharpe_ratio != null && metrics.sharpe_ratio >= 1.0 ? (
+          <Tag color="blue">⚡ 风险调整收益优良 (Sharpe {metrics.sharpe_ratio.toFixed(2)})</Tag>
+        ) : null}
+        {Math.abs(metrics.max_drawdown) <= 10 ? (
+          <Tag color="cyan">🛡️ 回撤控制优良 (&lt;10%)</Tag>
+        ) : Math.abs(metrics.max_drawdown) >= 25 ? (
+          <Tag color="warning">⚠️ 历史回撤偏大 (&gt;25%)</Tag>
+        ) : null}
+        {metrics.win_rate != null && metrics.win_rate >= 55 ? (
+          <Tag color="purple">🎯 胜率显著 ({metrics.win_rate.toFixed(1)}%)</Tag>
+        ) : null}
+      </div>
       <div className="quant-metric-grid">
         {metricItems.map(([label, value, suffix]) => {
           const tone = label === "最大回撤"
@@ -56,6 +74,9 @@ export default function BacktestMetrics({
                 suffix={value == null ? undefined : suffix}
                 styles={{
                   content: {
+                    fontFamily: "var(--c-font-mono)",
+                    fontWeight: 700,
+                    letterSpacing: "-0.01em",
                     color: label === "最大回撤"
                       ? colors.down
                       : typeof value === "number" && value > 0 ? colors.up : colors.textPrimary,

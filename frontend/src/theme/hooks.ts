@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useThemeStore } from "./store";
 import { themes } from "./themes";
 import type { ThemeColors, ThemeMeta, DesignTokens } from "./themes";
+import { APP_MONO_FONT_FAMILY } from "./typography";
 
 /** Subscribe to the current theme's color palette. */
 export function useColors(): ThemeColors {
@@ -81,9 +82,8 @@ export function tokensToCssVars(meta: ThemeMeta): Record<string, string> {
     "--c-warning": meta.colors.warning,
     "--c-info": meta.colors.info,
     "--c-on-primary": meta.colors.onPrimary,
-    // serif stack (used by the Feed newspaper style)
-    "--c-font-serif":
-      'Georgia, "Times New Roman", "Noto Serif SC", "Songti SC", serif',
+    // shared monospace stack for code, identifiers, tokens, and keys
+    "--c-font-mono": APP_MONO_FONT_FAMILY,
     // double-rule borders (Feed newspaper style, width only — color stays var(--c-text-primary))
     "--c-border-double": "3px",
     "--c-border-double-wide": "4px",
@@ -101,8 +101,10 @@ export function useStyles() {
     () => ({
       pageContainerStyle: {
         maxWidth: t.container.page,
+        width: "100%",
         margin: "0 auto" as const,
-        padding: `0 ${t.space[2]} ${t.space[6]}`,
+        padding: `0 ${t.space[3]} ${t.space[6]}`,
+        boxSizing: "border-box" as const,
       },
 
       pageHeaderStyle: { marginBottom: t.space[5] },
@@ -225,7 +227,7 @@ export function semanticTagStyle(color: SemanticTagColor): React.CSSProperties {
   const v = SEMANTIC_TAG_VARS[color];
   return {
     color: v,
-    borderColor: `color-mix(in srgb, ${v} 45%, var(--c-border))`,
-    background: `color-mix(in srgb, ${v} 12%, transparent)`,
+    borderColor: `var(--c-border)`,
+    background: `var(--c-hover-bg)`,
   };
 }

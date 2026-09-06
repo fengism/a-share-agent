@@ -1,4 +1,31 @@
 export const queryKeys = {
+  industryClassification: {
+    root: ["industry-classification"] as const,
+    status: ["industry-classification", "status"] as const,
+    hierarchy: (marketGroup: string, level1: string, level2: string) =>
+      ["industry-classification", "hierarchy", marketGroup, level1, level2] as const,
+    records: (filters: object) => ["industry-classification", "records", filters] as const,
+  },
+  stockConcept: {
+    root: ["stock-concept"] as const,
+    status: ["stock-concept", "status"] as const,
+    concepts: (query?: string) => ["stock-concept", "concepts", query ?? ""] as const,
+    records: (filters: object) => ["stock-concept", "records", filters] as const,
+  },
+  stockProfile: {
+    root: ["stock-profile"] as const,
+    summary: ["stock-profile", "summary"] as const,
+    records: (filters: object) => ["stock-profile", "records", filters] as const,
+    record: (code: string) => ["stock-profile", "record", code] as const,
+  },
+  hk: {
+    indices: ["hk", "indices"] as const,
+    indexHistory: (symbol: string, period: string) => ["hk", "index-history", symbol, period] as const,
+    stocks: (query: string, page: number, pageSize: number) => ["hk", "stocks", query, page, pageSize] as const,
+    stockSearch: (query: string) => ["hk", "stock-search", query] as const,
+    stockHistory: (code: string, period: string, adjust: string) =>
+      ["hk", "stock-history", code, period, adjust] as const,
+  },
   market: {
     indices: ["marketIndices"] as const,
     emotion: ["marketEmotion"] as const,
@@ -13,7 +40,12 @@ export const queryKeys = {
       ["marketIndexKline", symbol, period, startDate] as const,
     indexIntraday: (symbol: string) => ["marketIndexIntraday", symbol] as const,
     hsgtFlow: ["hsgtFlow"] as const,
+    northboundHistory: (pageSize: number) => ["northboundHistory", pageSize] as const,
     margin: ["marketMargin"] as const,
+    priceAnomaly: (pageNo: number, pageSize: number) =>
+      ["marketPriceAnomaly", pageNo, pageSize] as const,
+    priceAnomalyCount: (pageNo: number, pageSize: number, sortKey: string, sortDir: string) =>
+      ["marketPriceAnomalyCount", pageNo, pageSize, sortKey, sortDir] as const,
     tradingCalendar: (year: string) => ["tradingCalendar", year] as const,
     thsHotRank: ["thsHotRank"] as const,
     thsHotConcept: ["thsHotConcept"] as const,
@@ -30,9 +62,17 @@ export const queryKeys = {
     newsAnalysis: ["newsAnalysis"] as const,
     macroAll: ["macroAllData"] as const,
     macroUs: ["macroUsData"] as const,
+    macroGlobalRates: ["macroGlobalRates"] as const,
+    macroTreasuryYields: (pageSize?: number) => ["macroTreasuryYields", pageSize || 300] as const,
+    macroCommodities: (symbol?: string) => ["macroCommodities", symbol || "all"] as const,
+    macroSgeGold: (symbol: string) => ["macroSgeGold", symbol] as const,
+    macroCustomsTrade: (commodity?: string) => ["macroCustomsTrade", commodity || "all"] as const,
   },
   stock: {
     search: (query: string) => ["stockSearch", query] as const,
+    info: (code: string) => ["stockInfo", code] as const,
+    businessIntro: (code: string) => ["stockBusinessIntro", code] as const,
+    chipDistribution: (code: string) => ["stockChipDistribution", code] as const,
     kline: (code: string, period: string, adjust: string, startDate: string, endDate = "") =>
       ["kline", code, period, adjust, startDate, endDate] as const,
     intraday: (code: string) => ["stockIntraday", code] as const,
@@ -41,6 +81,9 @@ export const queryKeys = {
     valuationDetail: (code: string) => ["valuationDetail", code] as const,
     indicators: (code: string) => ["indicators", code] as const,
     categorizedNews: (code: string) => ["categorizedNews", code] as const,
+    bulletins: (code: string, page: number, pageSize: number) =>
+      ["stockBulletins", code, page, pageSize] as const,
+    reports: (code: string, months: number) => ["stockReports", code, months] as const,
     sentiment: (code: string) => ["sentiment", code] as const,
     retailSentiment: (code: string) => ["retailSentiment", code] as const,
     compare: (codes: string) => ["stockCompare", codes] as const,
@@ -55,6 +98,7 @@ export const queryKeys = {
   screener: {
     screen: (filters: unknown) => ["screener", filters] as const,
     industries: ["industries"] as const,
+    concepts: ["screener-concepts"] as const,
     strategies: ["screener-strategies"] as const,
   },
   settings: {

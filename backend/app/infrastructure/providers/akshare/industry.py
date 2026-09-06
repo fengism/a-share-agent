@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 def fetch_sw_index_realtime(level: int = 2) -> pd.DataFrame:
-    if level not in (1, 2):
+    if level not in (1, 2, 3):
         raise ValueError(f"不支持的申万行业级别: {level}")
-    industry_type = "一级行业" if level == 1 else "二级行业"
+    industry_type = {1: "一级行业", 2: "二级行业", 3: "三级行业"}[level]
     try:
         return ak.index_realtime_sw(symbol=industry_type)
     except requests.RequestException as exc:

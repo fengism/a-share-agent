@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { SearchOutlined } from "@ant-design/icons";
 import { loadAppHeaderSearch } from "./appHeaderSearchLoader";
 
@@ -34,6 +34,7 @@ function SearchTrigger({
       <span className="app-header-search-trigger__label">
         {isMobile ? "代码 / 名称" : "输入代码或名称，如 600519、贵州茅台、AAPL"}
       </span>
+      {!isMobile && <kbd className="app-search-kbd">⌘K</kbd>}
       <span className="app-header-search-trigger__action" aria-hidden="true">
         <SearchOutlined />
       </span>
@@ -46,6 +47,18 @@ export default function DeferredAppHeaderSearch({ isMobile }: DeferredAppHeaderS
   const preload = () => {
     void loadAppHeaderSearch().catch(() => undefined);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        preload();
+        setActive(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   if (!active) {
     return (

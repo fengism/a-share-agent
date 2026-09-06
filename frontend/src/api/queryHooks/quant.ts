@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { API_TIMEOUTS, apiDelete, apiGet, apiPost, apiPut } from "../client";
+import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import type { components } from "../generated/schema";
 import { queryKeys } from "../queryKeys";
 
@@ -22,8 +23,8 @@ export function useQuantStrategyPresets() {
   return useQuery({
     queryKey: queryKeys.quant.presets,
     queryFn: () => apiGet<QuantStrategyPreset[]>("/quant/strategy-presets"),
-    staleTime: 60_000,
-    refetchInterval: 10 * 60_000,
+    staleTime: QUERY_CACHE_POLICIES.quantPresets.staleMs,
+    refetchInterval: QUERY_CACHE_POLICIES.quantPresets.pollMs,
     refetchIntervalInBackground: false,
   });
 }
@@ -39,7 +40,11 @@ export function useQuantStrategyDrafts() {
   return useQuery({
     queryKey: queryKeys.quant.drafts,
     queryFn: () => apiGet<QuantStrategyDraft[]>("/quant/strategy-drafts"),
-    refetchInterval: (query) => query.state.data?.some((draft) => draft.status === "testing") ? 1_000 : false,
+    refetchInterval: (query) => (
+      query.state.data?.some((draft) => draft.status === "testing")
+        ? QUERY_CACHE_POLICIES.quantDrafts.activePollMs
+        : false
+    ),
   });
 }
 
@@ -169,7 +174,7 @@ export function useQuantBacktests(pageSize = 50) {
     ),
     refetchInterval: (query) => (
       query.state.data?.pages.some((page) => page.items.some((run) => isActive(run.status)))
-        ? 2_000
+        ? QUERY_CACHE_POLICIES.quantBacktestRuns.listActivePollMs
         : false
     ),
   });
@@ -180,7 +185,11 @@ export function useQuantBacktest(runId?: string) {
     queryKey: queryKeys.quant.run(runId ?? ""),
     queryFn: () => apiGet<QuantBacktestRun>(`/quant/backtests/${runId}`),
     enabled: Boolean(runId),
-    refetchInterval: (query) => isActive(query.state.data?.status) ? 1_000 : false,
+    refetchInterval: (query) => (
+      isActive(query.state.data?.status)
+        ? QUERY_CACHE_POLICIES.quantBacktestRuns.detailActivePollMs
+        : false
+    ),
   });
 }
 

@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 import { Steps, Tag, Typography } from "antd";
 import type { AgentPlan, AgentPlanStepStatus, ToolCallDisplay } from "../types/chat";
+import type { AgentProcessRound } from "../features/agent-process/agentProcess";
 import { toolDisplayName } from "../features/agent-process/toolPresentation";
 import ToolResultSummary from "../features/agent-process/ToolResultSummary";
 import { formatToolArguments } from "../utils/toolCall";
@@ -58,15 +59,161 @@ function groupedToolStatus(tools: ToolCallDisplay[]) {
   };
 }
 
+function ToolCallGroups({ toolCalls }: { toolCalls: ToolCallDisplay[] }) {
+  const toolGroups = Array.from(
+    toolCalls.reduce((groups, tool) => {
+      const existing = groups.get(tool.name) ?? [];
+      existing.push(tool);
+      groups.set(tool.name, existing);
+      return groups;
+    }, new Map<string, ToolCallDisplay[]>()),
+  );
+
+  if (toolGroups.length === 0) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--c-space-2)", marginTop: "var(--c-space-1)" }}>
+      {toolGroups.map(([name, tools]) => {
+        const state = groupedToolStatus(tools);
+        return (
+          <details key={name} style={{ border: "1px solid var(--c-border)", borderRadius: "var(--c-radius-md)", padding: "var(--c-space-2) var(--c-space-3)" }}>
+            <summary style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)", cursor: "pointer" }}>
+              <ToolOutlined />
+              <span style={{ display: "flex", minWidth: 0, flex: 1, flexWrap: "wrap", alignItems: "center", gap: "var(--c-space-2)" }}>
+                <Text>{toolDisplayName(name)}</Text>
+                {toolDisplayName(name) !== name ? <Text code>{name}</Text> : null}
+              </span>
+              <Tag icon={state.icon} style={semanticTagStyle(state.color)}>{state.label}</Tag>
+            </summary>
+            {tools.map((tool, index) => {
+              const callState = toolStatus(tool);
+              return (
+                <div key={tool.id} style={{ marginTop: "var(--c-space-2)", paddingTop: "var(--c-space-2)", borderTop: "1px solid var(--c-border)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--c-space-2)" }}>
+                    <Text type="secondary">{tools.length > 1 ? `第 ${index + 1} 次调用` : "调用参数"}</Text>
+                    {tools.length > 1 ? <Text type="secondary">{callState.label}</Text> : null}
+                  </div>
+                  <pre style={{ maxHeight: 180, overflow: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{formatToolArguments(tool.arguments)}</pre>
+                  <ToolResultSummary value={tool.resultSummary} />
+                </div>
+              );
+            })}
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
+function RoundField({ label, children }: { label: string; children: ReactElement | string }) {
+  return (
+    <div>
+      <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>{label}</Text>
+      <div style={{ marginTop: "var(--c-space-1)", color: "var(--c-text-primary)" }}>{children}</div>
+    </div>
+  );
+}
+
+function RoundList({ values, emptyText = "暂无" }: { values: string[]; emptyText?: string }) {
+  if (values.length === 0) return <Text type="secondary">{emptyText}</Text>;
+  return (
+    <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+      {values.map((value, index) => <li key={`${value}-${index}`}>{value}</li>)}
+    </ul>
+  );
+}
+
+function roundStatus(round: AgentProcessRound) {
+  if (round.status === "running") {
+    return { color: "primary" as SemanticTagColor, label: "调研中", icon: <LoadingOutlined spin /> };
+  }
+  if (round.status === "degraded") {
+    return { color: "warning" as SemanticTagColor, label: "证据不足", icon: <WarningOutlined /> };
+  }
+  return { color: "down" as SemanticTagColor, label: "已完成", icon: <CheckCircleOutlined /> };
+}
+
+function ResearchRounds({ rounds }: { rounds: AgentProcessRound[] }) {
+  if (rounds.length === 0) return null;
+
+  return (
+    <div aria-label="调研轮次" style={{ marginTop: "var(--c-space-4)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)", marginBottom: "var(--c-space-2)" }}>
+        <BulbOutlined style={{ color: "var(--c-accent)" }} />
+        <Text strong>调研轮次</Text>
+        <Text type="secondary">结构化推理摘要</Text>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--c-space-3)" }}>
+        {rounds.map((round) => {
+          const state = roundStatus(round);
+          return (
+            <section
+              key={round.roundIndex}
+              aria-label={`第 ${round.roundIndex} 轮调研`}
+              style={{
+                padding: "var(--c-space-3)",
+                border: "1px solid var(--c-border)",
+                borderLeft: `3px solid ${round.status === "degraded" ? "var(--c-warning)" : "var(--c-primary)"}`,
+                borderRadius: "var(--c-radius-md)",
+                background: "var(--c-hover-bg)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--c-space-2)", marginBottom: "var(--c-space-3)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)" }}>
+                  <Text strong>第 {round.roundIndex} 轮</Text>
+                  <Text type="secondary">计划最多 {round.roundTotal} 轮</Text>
+                </div>
+                <Tag icon={state.icon} style={semanticTagStyle(state.color)}>{state.label}</Tag>
+              </div>
+
+              <div style={{ display: "grid", gap: "var(--c-space-3)" }}>
+                <RoundField label="研究目标">{round.objective || "待确定"}</RoundField>
+                <RoundField label="当前证据缺口">
+                  <RoundList values={round.evidenceGaps} emptyText="无" />
+                </RoundField>
+                <RoundField label="工具选择依据">{round.toolSelectionReason || "待确定"}</RoundField>
+                <RoundField label="工具名称">
+                  {round.toolNames.length > 0 ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--c-space-2)" }}>
+                      {round.toolNames.map((name) => <Text code key={name}>{name}</Text>)}
+                    </div>
+                  ) : <Text type="secondary">暂无</Text>}
+                </RoundField>
+                {round.statusText ? <RoundField label="执行进度">{round.statusText}</RoundField> : null}
+                <RoundField label="关键判断依据">
+                  <RoundList values={round.judgmentBasis} emptyText={round.status === "running" ? "调研中" : "暂无"} />
+                </RoundField>
+                <RoundField label="新增证据">
+                  <RoundList values={round.evidenceAdded} emptyText={round.status === "running" ? "调研中" : "暂无"} />
+                </RoundField>
+                <RoundField label="本轮结论">{round.conclusion || (round.status === "running" ? "调研中" : "暂无")}</RoundField>
+                <RoundField label="下一轮计划">{round.nextStep || (round.status === "running" ? "待本轮完成后生成" : "暂无")}</RoundField>
+                {round.toolCalls.length > 0 ? (
+                  <div>
+                    <Text type="secondary" style={{ fontSize: "var(--c-font-sm)" }}>工具调用</Text>
+                    <ToolCallGroups toolCalls={round.toolCalls} />
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function AgentProcessPanel({
   plan,
   status,
   toolCalls,
+  rounds = [],
   isRunning,
 }: {
   plan?: AgentPlan;
   status: string;
   toolCalls: ToolCallDisplay[];
+  rounds?: AgentProcessRound[];
   isRunning: boolean;
 }) {
   const steps = plan?.steps ?? [];
@@ -74,7 +221,8 @@ export default function AgentProcessPanel({
     || toolCalls.some((tool) => tool.isError);
   const hasCancellation = steps.some((step) => step.status === "cancelled")
     || toolCalls.some((tool) => tool.isCancelled);
-  const hasDegradation = steps.some((step) => step.status === "degraded");
+  const hasDegradation = steps.some((step) => step.status === "degraded")
+    || rounds.some((round) => round.status === "degraded");
   const hasSkippedTool = toolCalls.some((tool) => tool.isSkipped);
   const degradedSteps = steps.filter((step) => step.status === "degraded");
   const regularSteps = steps.filter((step) => step.status !== "degraded");
@@ -82,12 +230,24 @@ export default function AgentProcessPanel({
     step.status !== "pending" && step.status !== "running"
   )).length;
   const [expanded, setExpanded] = useState(isRunning);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
     setExpanded(isRunning);
   }, [isRunning]);
 
-  if (!plan && toolCalls.length === 0 && !status) return null;
+  useEffect(() => {
+    if (!isRunning) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isRunning]);
+
+  if (!plan && toolCalls.length === 0 && rounds.length === 0 && !status) return null;
 
   const badge = hasFailure
     ? { color: "up" as SemanticTagColor, label: "执行失败", icon: <CloseCircleOutlined /> }
@@ -100,16 +260,9 @@ export default function AgentProcessPanel({
           : { color: "down" as SemanticTagColor, label: "已完成", icon: <CheckCircleOutlined /> };
   const detail = [
     steps.length > 0 ? `${settledSteps}/${steps.length} 个步骤` : "",
+    rounds.length > 0 ? `${rounds.length} 轮调研` : "",
     toolCalls.length > 0 ? `${toolCalls.length} 次工具调用` : "",
   ].filter(Boolean).join(" · ");
-  const toolGroups = Array.from(
-    toolCalls.reduce((groups, tool) => {
-      const existing = groups.get(tool.name) ?? [];
-      existing.push(tool);
-      groups.set(tool.name, existing);
-      return groups;
-    }, new Map<string, ToolCallDisplay[]>()),
-  );
 
   return (
     <section style={{ marginTop: "var(--c-space-5)", paddingTop: "var(--c-space-4)", borderTop: "1px solid var(--c-border)" }}>
@@ -136,7 +289,31 @@ export default function AgentProcessPanel({
 
       {expanded ? (
         <div style={{ marginTop: "var(--c-space-3)" }}>
-          {status && <div style={{ color: "var(--c-text-secondary)", fontSize: "var(--c-font-md)", marginBottom: "var(--c-space-3)" }}>{status}</div>}
+          {status && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--c-space-2)",
+                color: isRunning ? "var(--c-primary)" : "var(--c-text-secondary)",
+                fontSize: "var(--c-font-md)",
+                marginBottom: "var(--c-space-3)",
+                padding: isRunning ? "var(--c-space-2) var(--c-space-3)" : undefined,
+                background: isRunning ? "var(--c-hover-bg)" : undefined,
+                borderLeft: isRunning ? "3px solid var(--c-primary)" : undefined,
+                borderRadius: isRunning ? "var(--c-radius-md)" : undefined,
+                fontWeight: isRunning ? "var(--c-weight-semibold)" : undefined,
+              }}
+            >
+              {isRunning ? <LoadingOutlined spin style={{ color: "var(--c-primary)" }} /> : null}
+              <span style={{ flex: 1 }}>{status}</span>
+              {isRunning && elapsedSeconds > 0 ? (
+                <span style={{ color: "var(--c-text-muted)", fontSize: "var(--c-font-sm)", fontWeight: "normal" }}>
+                  已耗时 {elapsedSeconds}s
+                </span>
+              ) : null}
+            </div>
+          )}
 
           {plan?.summary ? (
             <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--c-space-2)", marginBottom: "var(--c-space-3)", color: "var(--c-text-secondary)" }}>
@@ -162,8 +339,8 @@ export default function AgentProcessPanel({
           ) : null}
 
           {degradedSteps.length > 0 ? (
-            <div aria-label="Agent 数据缺口" style={{ marginBottom: "var(--c-space-3)", padding: "var(--c-space-3)", border: "1px solid color-mix(in srgb, var(--c-warning) 45%, var(--c-border))", borderRadius: "var(--c-radius-md)", background: "color-mix(in srgb, var(--c-warning) 8%, transparent)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)", color: "var(--c-warning)", fontWeight: 600 }}>
+            <div aria-label="Agent 数据缺口" style={{ marginBottom: "var(--c-space-3)", padding: "var(--c-space-3)", border: "1px solid var(--c-border)", borderLeft: "3px solid var(--c-warning)", borderRadius: "var(--c-radius-md)", background: "var(--c-hover-bg)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)", color: "var(--c-warning)", fontWeight: "var(--c-weight-semibold)" }}>
                 <WarningOutlined />
                 数据缺口
               </div>
@@ -176,38 +353,8 @@ export default function AgentProcessPanel({
             </div>
           ) : null}
 
-          {toolGroups.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--c-space-2)", marginTop: "var(--c-space-1)" }}>
-              {toolGroups.map(([name, tools]) => {
-                const state = groupedToolStatus(tools);
-                return (
-                  <details key={name} style={{ border: "1px solid var(--c-border)", borderRadius: "var(--c-radius-md)", padding: "var(--c-space-2) var(--c-space-3)" }}>
-                    <summary style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)", cursor: "pointer" }}>
-                      <ToolOutlined />
-                      <span style={{ display: "flex", minWidth: 0, flex: 1, flexWrap: "wrap", alignItems: "center", gap: "var(--c-space-2)" }}>
-                        <Text>{toolDisplayName(name)}</Text>
-                        {toolDisplayName(name) !== name ? <Text code>{name}</Text> : null}
-                      </span>
-                      <Tag icon={state.icon} style={semanticTagStyle(state.color)}>{state.label}</Tag>
-                    </summary>
-                    {tools.map((tool, index) => {
-                      const callState = toolStatus(tool);
-                      return (
-                        <div key={tool.id} style={{ marginTop: "var(--c-space-2)", paddingTop: "var(--c-space-2)", borderTop: "1px solid var(--c-border)" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--c-space-2)" }}>
-                            <Text type="secondary">{tools.length > 1 ? `第 ${index + 1} 次调用` : "调用参数"}</Text>
-                            {tools.length > 1 ? <Text type="secondary">{callState.label}</Text> : null}
-                          </div>
-                          <pre style={{ maxHeight: 180, overflow: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{formatToolArguments(tool.arguments)}</pre>
-                          <ToolResultSummary value={tool.resultSummary} />
-                        </div>
-                      );
-                    })}
-                  </details>
-                );
-              })}
-            </div>
-          )}
+          <ResearchRounds rounds={rounds} />
+          {rounds.length === 0 ? <ToolCallGroups toolCalls={toolCalls} /> : null}
         </div>
       ) : null}
     </section>

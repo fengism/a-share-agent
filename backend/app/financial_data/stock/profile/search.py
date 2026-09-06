@@ -4,7 +4,7 @@ import logging
 
 import pandas as pd
 
-from app.core.cache import cache
+from app.core.cache import reference_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, eastmoney_semaphore
 from app.core.market import safe_float
 from app.domain.stock import StockSearchItem

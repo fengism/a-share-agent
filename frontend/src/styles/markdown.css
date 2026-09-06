@@ -21,16 +21,16 @@
 
 .chat-markdown strong {
   color: var(--c-text-primary);
-  font-weight: 700;
+  font-weight: var(--c-weight-bold);
 }
 
 .chat-markdown code {
-  background: color-mix(in srgb, var(--c-primary) 15%, transparent);
+  background: var(--c-hover-bg);
   color: var(--c-primary);
   padding: 1px 5px;
   border-radius: 4px;
-  font-size: 13px;
-  font-family: monospace;
+  font-size: var(--c-font-md);
+  font-family: var(--c-font-mono);
 }
 
 .chat-markdown pre {
@@ -60,12 +60,12 @@
 .chat-markdown h3 {
   color: var(--c-text-primary);
   margin: 8px 0 4px;
-  font-weight: 700;
+  font-weight: var(--c-weight-bold);
 }
 
-.chat-markdown h3 { font-size: 14px; }
-.chat-markdown h2 { font-size: 15px; }
-.chat-markdown h1 { font-size: 16px; }
+.chat-markdown h3 { font-size: var(--c-font-base); }
+.chat-markdown h2 { font-size: var(--c-font-lg); }
+.chat-markdown h1 { font-size: var(--c-font-lg); }
 
 .chat-markdown hr {
   border: none;
@@ -77,7 +77,7 @@
   border-collapse: collapse;
   width: 100%;
   margin: 6px 0;
-  font-size: 13px;
+  font-size: var(--c-font-md);
 }
 
 .chat-markdown th,
@@ -90,5 +90,5 @@
 .chat-markdown th {
   background: var(--c-elevated-bg);
   color: var(--c-text-secondary);
-  font-weight: 600;
+  font-weight: var(--c-weight-semibold);
 }

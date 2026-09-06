@@ -1,7 +1,8 @@
 import logging
 from datetime import UTC, datetime
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, eastmoney_semaphore
 from app.core.exceptions import UpstreamUnavailableError
 from app.financial_data.market.quotes.schemas import MarketMarginItem, MarketMarginResponse

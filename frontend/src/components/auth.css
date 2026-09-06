@@ -98,7 +98,7 @@
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  font-size: 20px;
+  font-size: var(--c-font-2xl);
 }
 
 .auth-hero__brand > span:last-child {
@@ -109,12 +109,12 @@
 
 .auth-hero__brand strong {
   color: var(--c-text-primary, #f2f4f7);
-  font-size: 15px;
+  font-size: var(--c-font-base);
 }
 
 .auth-hero__brand small {
   color: var(--c-text-muted, #6b7280);
-  font-size: 9px;
+  font-size: var(--c-font-xs);
   letter-spacing: 0.16em;
 }
 
@@ -130,16 +130,16 @@
   border-radius: 999px;
   background: var(--c-primary-soft, rgba(111, 99, 217, 0.08));
   color: var(--c-primary, #6f63d9);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
 }
 
 .auth-hero__copy h2 {
   max-width: 500px;
   margin: 18px 0 16px;
   color: var(--c-text-primary, #f2f4f7);
-  font-size: clamp(30px, 3.2vw, 44px);
-  line-height: 1.22;
+  font-size: clamp(var(--c-font-3xl), 3.2vw, var(--c-font-display));
+  line-height: var(--c-leading-tight);
   letter-spacing: -0.035em;
 }
 
@@ -147,8 +147,8 @@
   max-width: 500px;
   margin: 0;
   color: var(--c-text-secondary, #9ca3af);
-  font-size: 15px;
-  line-height: 1.8;
+  font-size: var(--c-font-base);
+  line-height: var(--c-leading-relaxed);
 }
 
 .auth-hero__chart {
@@ -183,7 +183,7 @@
   align-items: center;
   gap: 7px;
   color: var(--c-text-muted, #6b7280);
-  font-size: 9px;
+  font-size: var(--c-font-xs);
   letter-spacing: 0.12em;
 }
 
@@ -228,7 +228,7 @@
   align-items: center;
   gap: 6px;
   color: var(--c-text-secondary, #9ca3af);
-  font-size: 12px;
+  font-size: var(--c-font-sm);
 }
 
 .auth-hero__features .anticon {
@@ -255,29 +255,29 @@
   height: 48px;
   margin-bottom: 20px;
   border-radius: 14px;
-  font-size: 23px;
+  font-size: var(--c-font-2xl);
 }
 
 .auth-header h1 {
   margin: 0;
   color: var(--c-text-primary, #f2f4f7);
-  font-size: 26px;
-  line-height: 1.3;
+  font-size: var(--c-font-3xl);
+  line-height: var(--c-leading-tight);
   letter-spacing: -0.02em;
 }
 
 .auth-header__description {
   margin-top: 7px;
   color: var(--c-text-secondary, #9ca3af);
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: var(--c-font-md);
+  line-height: var(--c-leading-relaxed);
 }
 
 .auth-form .ant-form-item-label > label,
 .auth-field-label-row label {
   color: var(--c-text-secondary, #9ca3af);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-medium);
 }
 
 .auth-form .ant-input-affix-wrapper,
@@ -301,7 +301,7 @@
 
 .auth-field-label-row a,
 .auth-footer a {
-  font-size: 13px;
+  font-size: var(--c-font-md);
 }
 
 .auth-form-item--paired {
@@ -314,18 +314,18 @@
 }
 
 .auth-form__submit .ant-btn {
-  font-weight: 600;
+  font-weight: var(--c-weight-semibold);
   box-shadow: 0 8px 22px var(--c-focus-ring, rgba(111, 99, 217, 0.34));
 }
 
 .auth-primary-action {
   min-height: 44px;
-  font-weight: 600;
+  font-weight: var(--c-weight-semibold);
 }
 
 .auth-footer {
   color: var(--c-text-secondary, #9ca3af);
-  font-size: 13px;
+  font-size: var(--c-font-md);
   text-align: center;
 }
 
@@ -337,7 +337,7 @@
   height: auto;
   padding: 0;
   color: var(--c-text-secondary, #9ca3af);
-  font-size: 13px;
+  font-size: var(--c-font-md);
 }
 
 @media (max-width: 900px) {
@@ -389,6 +389,6 @@
   }
 
   .auth-header h1 {
-    font-size: 23px;
+    font-size: var(--c-font-2xl);
   }
 }

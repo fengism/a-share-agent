@@ -548,6 +548,144 @@ MARKET_MIGRATIONS = (
     Migration(9, "finalize twitter analysis snapshots", _finalize_twitter_analysis_snapshots),
 )
 
+def _add_stock_concepts_tables(conn: sqlite3.Connection) -> None:
+    statements = (
+        """
+        CREATE TABLE IF NOT EXISTS stock_concepts (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            name                 TEXT NOT NULL UNIQUE,
+            stock_count          INTEGER NOT NULL DEFAULT 0,
+            created_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            updated_at           TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_stock_concepts_name ON stock_concepts(name)",
+        """
+        CREATE TABLE IF NOT EXISTS stock_concept_mappings (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            market_group         TEXT NOT NULL DEFAULT 'A' CHECK (market_group IN ('A', 'HK', 'OVERSEAS')),
+            exchange_suffix      TEXT NOT NULL DEFAULT 'SZ',
+            stock_code           TEXT NOT NULL,
+            stock_name           TEXT NOT NULL DEFAULT '',
+            concepts_json        TEXT NOT NULL DEFAULT '[]',
+            source               TEXT NOT NULL DEFAULT 'manual',
+            source_version       TEXT NOT NULL DEFAULT '',
+            is_manual_override   INTEGER NOT NULL DEFAULT 0 CHECK (is_manual_override IN (0, 1)),
+            created_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            updated_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            UNIQUE(stock_code)
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_concept_map_stock_code ON stock_concept_mappings(stock_code)",
+        "CREATE INDEX IF NOT EXISTS idx_concept_map_stock_name ON stock_concept_mappings(stock_name)",
+        "CREATE INDEX IF NOT EXISTS idx_concept_map_market ON stock_concept_mappings(market_group)",
+        """
+        CREATE TABLE IF NOT EXISTS stock_concept_import_batches (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            import_token         TEXT NOT NULL UNIQUE,
+            content_hash         TEXT NOT NULL,
+            filename             TEXT NOT NULL,
+            source_version       TEXT NOT NULL DEFAULT '',
+            status               TEXT NOT NULL CHECK (status IN ('previewed', 'committed', 'failed')),
+            total_rows           INTEGER NOT NULL DEFAULT 0,
+            valid_rows           INTEGER NOT NULL DEFAULT 0,
+            added_rows           INTEGER NOT NULL DEFAULT 0,
+            updated_rows         INTEGER NOT NULL DEFAULT 0,
+            unchanged_rows       INTEGER NOT NULL DEFAULT 0,
+            skipped_rows         INTEGER NOT NULL DEFAULT 0,
+            invalid_rows         INTEGER NOT NULL DEFAULT 0,
+            warnings_json        TEXT NOT NULL DEFAULT '[]',
+            created_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            committed_at         TEXT
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_concept_import_hash ON stock_concept_import_batches(content_hash)",
+        "CREATE INDEX IF NOT EXISTS idx_concept_import_created ON stock_concept_import_batches(created_at DESC)",
+    )
+    for statement in statements:
+        conn.execute(statement)
+
+
+def _add_stock_basic_profiles_tables(conn: sqlite3.Connection) -> None:
+    statements = (
+        """
+        CREATE TABLE IF NOT EXISTS stock_basic_profiles (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            market_group         TEXT NOT NULL DEFAULT 'A' CHECK (market_group IN ('A', 'HK', 'OVERSEAS')),
+            exchange             TEXT NOT NULL DEFAULT '',
+            board                TEXT NOT NULL DEFAULT '',
+            stock_code           TEXT NOT NULL UNIQUE,
+            stock_name           TEXT NOT NULL DEFAULT '',
+            listing_date         TEXT,
+            main_business        TEXT NOT NULL DEFAULT '',
+            business_scope       TEXT NOT NULL DEFAULT '',
+            products             TEXT NOT NULL DEFAULT '',
+            industry             TEXT NOT NULL DEFAULT '',
+            sw_level1_name       TEXT NOT NULL DEFAULT '',
+            sw_level2_name       TEXT NOT NULL DEFAULT '',
+            sw_level3_name       TEXT NOT NULL DEFAULT '',
+            city                 TEXT NOT NULL DEFAULT '',
+            province             TEXT NOT NULL DEFAULT '',
+            legal_repr           TEXT NOT NULL DEFAULT '',
+            registered_capital   TEXT NOT NULL DEFAULT '',
+            setup_date           TEXT,
+            website              TEXT NOT NULL DEFAULT '',
+            company_intro        TEXT NOT NULL DEFAULT '',
+            source               TEXT NOT NULL DEFAULT 'exchange',
+            source_version       TEXT NOT NULL DEFAULT '',
+            is_manual_override   INTEGER NOT NULL DEFAULT 0 CHECK (is_manual_override IN (0, 1)),
+            created_at           TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+            updated_at           TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_market ON stock_basic_profiles(market_group)",
+        "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_exchange ON stock_basic_profiles(exchange)",
+        "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_board ON stock_basic_profiles(board)",
+        "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_code ON stock_basic_profiles(stock_code)",
+        "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_name ON stock_basic_profiles(stock_name)",
+        "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_listing_date ON stock_basic_profiles(listing_date)",
+        "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_updated ON stock_basic_profiles(updated_at DESC)",
+    )
+    for statement in statements:
+        conn.execute(statement)
+
+
+def _normalize_hk_stock_codes(conn: sqlite3.Connection) -> None:
+    """把 .HK 股票代码补齐到 5 位数字，统一港股代码口径。
+
+    历史导入的港股代码存在 4 位（如 0700.HK）与 6 位（如 000700.HK）两种
+    偏差，与 financial_data.hk 模块的 5 位口径对不上；已存在同码目标行时跳过。
+    """
+    for table in ("stock_concept_mappings", "sw_industry_classifications", "stock_basic_profiles"):
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
+        ).fetchone()
+        if exists is None:
+            continue
+        rows = conn.execute(
+            f"SELECT id, stock_code FROM {table} WHERE stock_code LIKE '%.HK'"
+        ).fetchall()
+        for row_id, code in rows:
+            base = str(code)[: -len(".HK")]
+            if not base.isdigit() or len(base) >= 5:
+                continue
+            normalized = base.zfill(5) + ".HK"
+            occupied = conn.execute(
+                f"SELECT 1 FROM {table} WHERE stock_code = ? AND id <> ?",
+                (normalized, row_id),
+            ).fetchone()
+            if occupied is not None:
+                continue
+            conn.execute(f"UPDATE {table} SET stock_code = ? WHERE id = ?", (normalized, row_id))
+
+
+INDUSTRY_MIGRATIONS: tuple[Migration, ...] = (
+    Migration(1, "add stock concepts tables", _add_stock_concepts_tables),
+    Migration(2, "add stock basic profiles tables", _add_stock_basic_profiles_tables),
+    Migration(3, "normalize hk stock codes to 5 digits", _normalize_hk_stock_codes),
+)
+
+
 
 def apply_migrations(
     conn: sqlite3.Connection,

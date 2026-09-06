@@ -26,6 +26,10 @@ class HealthMetricsResponse(BaseModel):
     status: Literal["ok"]
     metrics: dict[str, Any]
     global_cache: dict[str, int]
+    market_cache: dict[str, int]
+    reference_cache: dict[str, int]
+    analysis_cache: dict[str, int]
+    series_cache: dict[str, int]
     provider_circuits: dict[str, ProviderCircuitStateResponse]
 
 

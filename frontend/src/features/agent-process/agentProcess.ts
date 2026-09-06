@@ -1,17 +1,46 @@
-import type { AgentPlan, ChatStreamDelta, ToolCallDisplay } from "../../types/chat";
+import type {
+  AgentPlan,
+  AgentResearchRound,
+  AgentResearchRoundStatus,
+  ChatStreamDelta,
+  ToolCallDisplay,
+} from "../../types/chat";
+
+export interface AgentProcessRound {
+  roundIndex: number;
+  roundTotal: number;
+  status: AgentResearchRoundStatus;
+  objective: string;
+  evidenceGaps: string[];
+  toolNames: string[];
+  toolSelectionReason: string;
+  evidenceAdded: string[];
+  judgmentBasis: string[];
+  conclusion: string;
+  nextStep: string;
+  statusText: string;
+  toolCalls: ToolCallDisplay[];
+}
 
 export interface AgentProcessState {
   plan?: AgentPlan;
   status: string;
   toolCalls: ToolCallDisplay[];
+  rounds: AgentProcessRound[];
+  activeRoundIndex?: number;
 }
 
 export function createAgentProcessState(): AgentProcessState {
-  return { status: "", toolCalls: [] };
+  return { status: "", toolCalls: [], rounds: [] };
 }
 
 export function hasAgentProcess(state: AgentProcessState): boolean {
-  return Boolean(state.plan || state.status || state.toolCalls.length > 0);
+  return Boolean(
+    state.plan
+    || state.status
+    || state.toolCalls.length > 0
+    || state.rounds.length > 0,
+  );
 }
 
 export function agentProcessFromEvents(
@@ -20,10 +49,94 @@ export function agentProcessFromEvents(
   return (events ?? []).reduce(applyAgentEvent, createAgentProcessState());
 }
 
+function toProcessRound(
+  value: AgentResearchRound,
+  previous?: AgentProcessRound,
+): AgentProcessRound {
+  return {
+    roundIndex: value.round_index,
+    roundTotal: value.round_total,
+    status: value.status,
+    objective: value.objective,
+    evidenceGaps: value.evidence_gaps,
+    toolNames: value.tool_names,
+    toolSelectionReason: value.tool_selection_reason,
+    evidenceAdded: value.evidence_added,
+    judgmentBasis: value.judgment_basis,
+    conclusion: value.conclusion,
+    nextStep: value.next_step,
+    statusText: previous?.statusText ?? "",
+    toolCalls: previous?.toolCalls ?? [],
+  };
+}
+
+function upsertRound(
+  rounds: AgentProcessRound[],
+  value: AgentResearchRound,
+): AgentProcessRound[] {
+  const previous = rounds.find((round) => round.roundIndex === value.round_index);
+  const next = toProcessRound(value, previous);
+  return [
+    ...rounds.filter((round) => round.roundIndex !== value.round_index),
+    next,
+  ].sort((left, right) => left.roundIndex - right.roundIndex);
+}
+
+function updateRound(
+  rounds: AgentProcessRound[],
+  roundIndex: number | undefined,
+  update: (round: AgentProcessRound) => AgentProcessRound,
+): AgentProcessRound[] {
+  if (roundIndex === undefined) return rounds;
+  return rounds.map((round) => (
+    round.roundIndex === roundIndex ? update(round) : round
+  ));
+}
+
+function appendToolCall(
+  tools: ToolCallDisplay[],
+  toolCall: ToolCallDisplay,
+): ToolCallDisplay[] {
+  return [
+    ...tools.filter((item) => item.id !== toolCall.id),
+    toolCall,
+  ];
+}
+
+function applyToolResult(
+  tools: ToolCallDisplay[],
+  event: ChatStreamDelta,
+): ToolCallDisplay[] {
+  if (!event.tool_result) return tools;
+  const toolResult = event.tool_result;
+  return tools.map((item) => (
+    item.id === toolResult.tool_call_id
+      ? {
+          ...item,
+          isError: toolResult.is_error && event.tool_result_summary?.status !== "skipped",
+          isSkipped: event.tool_result_summary?.status === "skipped",
+          isExecuting: false,
+          resultSummary: event.tool_result_summary || undefined,
+        }
+      : item
+  ));
+}
+
 export function applyAgentEvent(
   state: AgentProcessState,
   event: ChatStreamDelta,
 ): AgentProcessState {
+  if (
+    (event.type === "round_started" || event.type === "round_completed")
+    && event.research_round
+  ) {
+    const isStarted = event.type === "round_started";
+    return {
+      ...state,
+      rounds: upsertRound(state.rounds, event.research_round),
+      activeRoundIndex: isStarted ? event.research_round.round_index : undefined,
+    };
+  }
   if (event.type === "plan" && event.plan) {
     return { ...state, plan: event.plan };
   }
@@ -42,7 +155,15 @@ export function applyAgentEvent(
     };
   }
   if (event.type === "status") {
-    return { ...state, status: event.content || "Agent 正在执行" };
+    const status = event.content || "Agent 正在执行";
+    return {
+      ...state,
+      status,
+      rounds: updateRound(state.rounds, state.activeRoundIndex, (round) => ({
+        ...round,
+        statusText: status,
+      })),
+    };
   }
   if (event.type === "tool_call" && event.tool_call) {
     const toolCall: ToolCallDisplay = {
@@ -53,34 +174,28 @@ export function applyAgentEvent(
     };
     return {
       ...state,
-      toolCalls: [
-        ...state.toolCalls.filter((item) => item.id !== toolCall.id),
-        toolCall,
-      ],
+      toolCalls: appendToolCall(state.toolCalls, toolCall),
+      rounds: updateRound(state.rounds, state.activeRoundIndex, (round) => ({
+        ...round,
+        toolCalls: appendToolCall(round.toolCalls, toolCall),
+      })),
     };
   }
   if (event.type === "tool_result" && event.tool_result) {
-    const toolResult = event.tool_result;
     return {
       ...state,
-      toolCalls: state.toolCalls.map((item) => (
-        item.id === toolResult.tool_call_id
-          ? {
-              ...item,
-              isError: toolResult.is_error && event.tool_result_summary?.status !== "skipped",
-              isSkipped: event.tool_result_summary?.status === "skipped",
-              isExecuting: false,
-              resultSummary: event.tool_result_summary || undefined,
-            }
-          : item
-      )),
+      toolCalls: applyToolResult(state.toolCalls, event),
+      rounds: updateRound(state.rounds, state.activeRoundIndex, (round) => ({
+        ...round,
+        toolCalls: applyToolResult(round.toolCalls, event),
+      })),
     };
   }
   if (event.type === "error") {
-    return { ...state, status: event.error || "Agent 执行失败" };
+    return { ...state, status: event.error || "Agent 执行失败", activeRoundIndex: undefined };
   }
   if (event.type === "done") {
-    return { ...state, status: "Agent 调研完成" };
+    return { ...state, status: "Agent 调研完成", activeRoundIndex: undefined };
   }
   return state;
 }

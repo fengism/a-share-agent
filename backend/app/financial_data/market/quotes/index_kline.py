@@ -4,7 +4,7 @@ from collections.abc import Awaitable
 
 import pandas as pd
 
-from app.core.cache import cache, cache_date, dated_cache_key_no_day, one_year_ago_date
+from app.core.cache import cache_date, dated_cache_key_no_day, one_year_ago_date, series_cache
 from app.core.concurrency.rate_limiter import akshare_semaphore, call_blocking, eastmoney_semaphore, tdx_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
@@ -251,14 +251,14 @@ async def get_index_kline(symbol: str, period: str = "daily", start_date: str = 
     policy = await resolve_market_data_cache_policy(period, parsed_end_date)
     cache_key = dated_cache_key_no_day("market_index_kline", symbol, period, start_date, end_date)
     if policy.read_cache:
-        cached = cache.get(cache_key)
+        cached = series_cache.get(cache_key)
         if cached is not None:
             return cached
 
     async def load_and_cache() -> KlineData:
         result = await _load_index_kline(symbol, period, start_date, end_date)
         if policy.write_cache and policy.ttl_seconds is not None:
-            cache.set(cache_key, result, ttl=policy.ttl_seconds)
+            series_cache.set(cache_key, result, ttl=policy.ttl_seconds)
         return result
 
     return await _index_kline_singleflight.do(cache_key, load_and_cache)

@@ -3,12 +3,12 @@ from app.agentic.skills.contracts import Skill
 SKILLS = (
     Skill(
         name="url_content",
-        description="网页阅读与对比",
-        triggers=("消息包含 HTTP(S) 链接", "阅读、总结或对比网页内容"),
-        activation_keywords=("阅读", "总结", "网页内容", "对比网页"),
-        tool_names=("fetch_url", "fetch_urls"),
+        description="网页与 PDF 研报阅读与对比",
+        triggers=("消息包含 HTTP(S) 链接或 PDF 文档", "阅读、总结或对比网页/PDF内容"),
+        activation_keywords=("阅读", "总结", "网页内容", "对比网页", "pdf", "研报正文", "公告原文"),
+        tool_names=("fetch_url", "fetch_urls", "read_pdf"),
         rules=(
-            "单个链接用 fetch_url；多个链接一次性用 fetch_urls。",
+            "单个链接用 fetch_url；多个链接一次性用 fetch_urls；PDF 研报/公告使用 read_pdf 读取指定页码与表格。",
             "默认使用 mode=auto；明确需要 JS 渲染时用 dynamic，普通 HTTP 被反爬拦截时用 stealth。",
             "仅依据抓取正文作答；抓取失败时说明原因，不补写原文没有的信息。",
         ),
@@ -29,8 +29,8 @@ SKILLS = (
         name="information_query",
         description="公开网页、资讯检索与自然语言结构化查询",
         triggers=("搜索互联网或查找公开网页", "查找研报、公告或新闻", "无法映射为固定工具参数的数据查询"),
-        activation_keywords=("搜索", "查找", "检索", "网页", "白皮书", "公开来源", "资料来源"),
-        tool_names=("web_search", "fetch_url", "fetch_urls", "iwencai_search", "iwencai_query"),
+        activation_keywords=("搜索", "查找", "检索", "网页", "白皮书", "公开来源", "资料来源", "pdf"),
+        tool_names=("web_search", "fetch_url", "fetch_urls", "read_pdf", "iwencai_search", "iwencai_query"),
         rules=(
             "公开互联网网页和通用资料先用 web_search；搜索结果只用于发现候选页面，不视为完整正文。",
             "今日或最新资讯将 time_range 设为 day，近期动态设为 week，普通检索默认 half_year；仅历史或静态资料使用 any。",

@@ -8,7 +8,6 @@ import AIConclusion from "./AIConclusion";
 import AnalysisDecisionBoard from "./AnalysisDecisionBoard";
 import FundamentalPanel from "./FundamentalPanel";
 import {
-  loadFundFlowPanel,
   loadResearchFrameworkPanel,
   loadSentimentPanel,
   loadTechnicalPanel,
@@ -19,8 +18,7 @@ const ResearchFrameworkPanel = lazy(loadResearchFrameworkPanel);
 const TechnicalPanel = lazy(loadTechnicalPanel);
 const ValuationPanel = lazy(loadValuationPanel);
 const SentimentPanel = lazy(loadSentimentPanel);
-const FundFlowPanel = lazy(loadFundFlowPanel);
-const ANALYSIS_PANEL_KEYS = ["research", "fundamental", "technical", "valuation", "sentiment", "fundflow"] as const;
+const ANALYSIS_PANEL_KEYS = ["research", "fundamental", "technical", "valuation", "sentiment"] as const;
 
 function preload(loader: () => Promise<unknown>) {
   void loader().catch(() => undefined);
@@ -51,7 +49,7 @@ export default function AnalysisPanels({
     allowedValues: ANALYSIS_PANEL_KEYS,
   });
   const panelItems = [
-    {
+    ...(result ? [{
       key: "research",
       label: "研究结论",
       onIntent: () => preload(loadResearchFrameworkPanel),
@@ -68,7 +66,7 @@ export default function AnalysisPanels({
           </Suspense>
         </div>
       ) : null,
-    },
+    }] : []),
     {
       key: "fundamental",
       label: "基本面",
@@ -84,7 +82,6 @@ export default function AnalysisPanels({
     { key: "technical", label: "技术面", onIntent: () => preload(loadTechnicalPanel), children: code ? <Suspense fallback={<PanelFallback />}><TechnicalPanel code={code} analysis={result} /></Suspense> : null },
     { key: "valuation", label: "估值面", onIntent: () => preload(loadValuationPanel), children: code ? <Suspense fallback={<PanelFallback />}><ValuationPanel code={code} analysis={result} /></Suspense> : null },
     { key: "sentiment", label: "情绪面", onIntent: () => preload(loadSentimentPanel), children: code ? <Suspense fallback={<PanelFallback />}><SentimentPanel code={code} analysis={result} /></Suspense> : null },
-    { key: "fundflow", label: "资金流向", onIntent: () => preload(loadFundFlowPanel), children: code ? <Suspense fallback={<PanelFallback />}><FundFlowPanel code={code} isExportingPdf={isExportingPdf} /></Suspense> : null },
   ];
 
   return (
@@ -105,7 +102,7 @@ export default function AnalysisPanels({
           <div
             className="pdf-section-title"
             data-pdf-group={item.key === "fundamental" ? true : undefined}
-            style={{ fontSize: 15, fontWeight: 700, color: colors.textPrimary, marginBottom: 12 }}
+            style={{ fontSize: "var(--c-font-lg)", fontWeight: "var(--c-weight-bold)", color: colors.textPrimary, marginBottom: 12 }}
           >
             {item.label}
           </div>
@@ -118,7 +115,7 @@ export default function AnalysisPanels({
           onChange={setActivePanelKey}
           ariaLabel="个股研究维度"
           size="large"
-          tabBarStyle={{ marginBottom: 18, borderBottom: `1px solid ${colors.border}`, fontWeight: 700 }}
+          tabBarStyle={{ marginBottom: 18, borderBottom: `1px solid ${colors.border}`, fontWeight: "var(--c-weight-bold)" }}
         />
       )}
     </Card>

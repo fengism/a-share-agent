@@ -62,7 +62,7 @@ describe("AppHeaderSearch", () => {
     expect(input).toHaveFocus();
     fireEvent.keyDown(input, { key: "Enter", code: "Enter", charCode: 13 });
 
-    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/analysis/600519"));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/stock/600519"));
     expect(mocks.resolveCode).toHaveBeenCalledWith("600519");
     expect(mocks.clear).toHaveBeenCalledTimes(1);
   });

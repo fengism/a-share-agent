@@ -41,7 +41,7 @@ export default function LazyKlineChart({
   }, [renderChart]);
 
   return (
-    <div ref={containerRef} style={{ minHeight: height }}>
+    <div ref={containerRef} style={{ minHeight: height, backgroundColor: "var(--c-card-bg)" }}>
       {renderChart ? (
         <Suspense fallback={<Skeleton active paragraph={{ rows: 8 }} />}>
           <KlineChart data={data} height={height} viewKey={viewKey} tradeMarkers={tradeMarkers} chanlun={chanlun} />

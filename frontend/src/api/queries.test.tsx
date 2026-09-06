@@ -101,7 +101,7 @@ describe("query request lifecycle", () => {
       1,
       "/industry-chain/history",
       { name: "AI", limit: 2, offset: 0 },
-      undefined,
+      { signal: expect.anything() },
     );
 
     await act(async () => {
@@ -112,7 +112,7 @@ describe("query request lifecycle", () => {
       2,
       "/industry-chain/history",
       { name: "AI", limit: 2, offset: 2 },
-      undefined,
+      { signal: expect.anything() },
     );
     await waitFor(() => expect(result.current.data?.pages).toHaveLength(2));
     expect(result.current.data?.pages.flat()).toHaveLength(3);

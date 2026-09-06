@@ -6,6 +6,7 @@ import { stopChatRuntime } from "../features/chat/chatRuntime";
 import { useAnalysisStore } from "../store/analysisStore";
 import { useChatStore } from "../store/chatStore";
 import { useIndustryChainWorkflowStore } from "../store/industryChainWorkflowStore";
+import { buildStockAnalysisUrl } from "../utils/stockLinks";
 
 const { Text } = Typography;
 
@@ -16,7 +17,7 @@ function workflowLabel(job: WorkflowJob) {
 }
 
 function workflowTarget(job: WorkflowJob) {
-  if (job.kind === "analysis") return `/analysis/${encodeURIComponent(String(job.request.code || job.dedupe_key))}`;
+  if (job.kind === "analysis") return buildStockAnalysisUrl(String(job.request.code || job.dedupe_key));
   if (job.kind === "industry_chain") return `/industry-chain/${encodeURIComponent(String(job.request.name || job.dedupe_key))}`;
   return "/";
 }

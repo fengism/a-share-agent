@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
-import TradingCalendarTab from "./TradingCalendarTab";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import TradingCalendar from ".";
 
 vi.mock("../../api/queries", () => ({
   useMarketIndexKline: () => ({
@@ -36,14 +36,22 @@ vi.mock("../../api/queries", () => ({
   }),
 }));
 
-describe("TradingCalendarTab", () => {
+describe("TradingCalendar", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("renders the month grid with trading-day marks and today status", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-23T12:00:00+08:00"));
+
     render(
       <MemoryRouter>
-        <TradingCalendarTab />
+        <TradingCalendar />
       </MemoryRouter>,
     );
 
+    expect(screen.getByRole("heading", { name: "交易日历" })).toBeInTheDocument();
     expect(screen.getByText("A 股交易日历")).toBeInTheDocument();
     expect(screen.getByText(/2026 年 8 月/)).toBeInTheDocument();
     expect(screen.getByText(/2 个交易日/)).toBeInTheDocument();

@@ -10,6 +10,7 @@ from app.modules.potential.service import (
     list_potential_date_items,
     mine_potential_stocks,
     run_daily_mining,
+    run_scheduled_daily_mining,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "list_potential_date_items",
     "mine_potential_stocks",
     "run_daily_mining",
+    "run_scheduled_daily_mining",
 ]

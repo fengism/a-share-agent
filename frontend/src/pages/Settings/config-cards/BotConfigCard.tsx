@@ -190,7 +190,7 @@ export default function BotConfigCard({ form, onChange, onSave, isSaving }: Conf
             onChange={(event) => onChange({ bot_admin_users: event.target.value.split("\n") })}
             placeholder={"ou_xxxxx\nou_yyyyy"}
           />
-          <div style={{ marginTop: 4, fontSize: 12, color: colors.textMuted }}>
+          <div style={{ marginTop: 4, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
             `/batch` 等敏感命令仅允许该名单内用户执行。Worker 并发变更需重启后端生效。
           </div>
         </Col>

@@ -2,7 +2,8 @@ import logging
 from datetime import UTC, date, datetime
 from typing import cast
 
-from app.core.cache import cache, dated_cache_key_no_day
+from app.core.cache import dated_cache_key_no_day
+from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import (
     baidu_semaphore,
     call_blocking,
@@ -14,7 +15,11 @@ from app.core.concurrency.rate_limiter import (
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
 from app.core.market import safe_float
-from app.financial_data.market.trading_session import SHANGHAI_TIMEZONE, resolve_market_data_cache_policy
+from app.financial_data.market.trading_session import (
+    SHANGHAI_TIMEZONE,
+    get_market_date_on_or_before,
+    resolve_market_data_cache_policy,
+)
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
@@ -195,10 +200,11 @@ async def _load_industry_rankings(target_date: date) -> dict:
 
 async def get_industry_rankings(requested_date: date | None = None) -> dict:
     """获取指定日期的行业涨跌与资金排行。"""
-    target_date = requested_date or _shanghai_today()
-    if target_date > _shanghai_today():
+    requested_target = requested_date or _shanghai_today()
+    if requested_target > _shanghai_today():
         raise InvalidRequestError("行业排行不能查询未来日期")
 
+    target_date = await get_market_date_on_or_before(requested_target)
     policy = await resolve_market_data_cache_policy("daily", target_date)
     cache_key = dated_cache_key_no_day("industry_rankings", target_date.isoformat())
     if policy.read_cache:

@@ -66,7 +66,7 @@ describe("MarketWindBoard", () => {
     expect(screen.getByText("2 板")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /南模生物/ })).toHaveAttribute(
       "href",
-      "/analysis/688265",
+      "/stock/688265",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "选择风口 IDC电源" }));

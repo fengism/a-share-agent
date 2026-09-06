@@ -9,7 +9,8 @@ from typing import Any, TypeVar, cast
 import pandas as pd
 
 from app.configuration import get_settings
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import (
     baidu_semaphore,
     call_blocking,

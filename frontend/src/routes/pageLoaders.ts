@@ -1,9 +1,13 @@
 export const pageLoaders = {
   appLayout: () => import("../components/AppLayout"),
   dashboard: () => import("../pages/Dashboard"),
+  watchlist: () => import("../pages/Watchlist"),
   market: () => import("../pages/Market"),
+  hkMarket: () => import("../pages/HKMarket"),
+  tradingCalendar: () => import("../pages/TradingCalendar"),
   screener: () => import("../pages/Screener"),
   analysis: () => import("../pages/Analysis"),
+  stock: () => import("../pages/Stock"),
   analysisEntry: () => import("../pages/Analysis/Entry"),
   investmentResearch: () => import("../pages/InvestmentResearch"),
   dailyReview: () => import("../pages/DailyReview"),
@@ -11,13 +15,15 @@ export const pageLoaders = {
   chat: () => import("../pages/Chat"),
   settings: () => import("../pages/Settings"),
   feed: () => import("../pages/Feed"),
-  twitter: () => import("../pages/Twitter"),
   industryChain: () => import("../pages/IndustryChain"),
   compare: () => import("../pages/Compare"),
   macro: () => import("../pages/Macro"),
   portfolio: () => import("../pages/Portfolio"),
   quant: () => import("../pages/Quant"),
   capabilities: () => import("../pages/Capabilities"),
+  industryClassification: () => import("../pages/IndustryClassification"),
+  stockConcept: () => import("../pages/StockConcept"),
+  masterData: () => import("../pages/MasterData"),
   login: () => import("../pages/Login"),
   register: () => import("../pages/Register"),
   resetPassword: () => import("../pages/ResetPassword"),
@@ -28,7 +34,10 @@ type PageLoader = () => Promise<unknown>;
 
 const routeLoaders: Record<string, PageLoader> = {
   "/": pageLoaders.dashboard,
+  "/watchlist": pageLoaders.watchlist,
   "/market": pageLoaders.market,
+  "/hk-market": () => pageLoaders.hkMarket(),
+  "/trading-calendar": () => pageLoaders.tradingCalendar(),
   "/screener": pageLoaders.screener,
   "/analysis": pageLoaders.analysisEntry,
   "/investment-research": pageLoaders.analysisEntry,
@@ -36,39 +45,48 @@ const routeLoaders: Record<string, PageLoader> = {
   "/chat": pageLoaders.chat,
   "/settings": pageLoaders.settings,
   "/feed": pageLoaders.feed,
-  "/twitter": pageLoaders.twitter,
+  "/twitter": () => pageLoaders.feed(),
   "/industry-chain": pageLoaders.industryChain,
   "/compare": pageLoaders.compare,
   "/macro": pageLoaders.macro,
   "/portfolio": pageLoaders.portfolio,
   "/quant": pageLoaders.quant,
   "/capabilities": pageLoaders.capabilities,
+  "/industry-classification": () => pageLoaders.industryClassification(),
+  "/stock-concept": () => pageLoaders.stockConcept(),
+  "/master-data": () => pageLoaders.masterData(),
 };
 
 const routeIntentLoaders: Partial<Record<string, PageLoader>> = {
-  "/market": () => Promise.all([
-    pageLoaders.market(),
+  "/": () => Promise.all([
+    pageLoaders.dashboard(),
     import("../pages/Market/prefetch").then(({ prefetchMarketOverview }) => prefetchMarketOverview()),
   ]),
+  "/market": () => pageLoaders.market(),
 };
 
 const preloadCache = new Map<string, Promise<void>>();
 
-export function preloadAppRoute(pathname: string): Promise<void> | undefined {
-  const routeKey = pathname.startsWith("/analysis/")
-    ? "/analysis/:code"
-    : pathname.startsWith("/investment-research/")
-      ? "/investment-research/:code"
-      : pathname.startsWith("/industry-chain/")
-        ? "/industry-chain/:name"
-        : pathname;
-  const loader = routeKey === "/analysis/:code"
-    ? pageLoaders.analysis
-    : routeKey === "/investment-research/:code"
-      ? pageLoaders.investmentResearch
-      : routeKey === "/industry-chain/:name"
-        ? pageLoaders.industryChain
-        : routeIntentLoaders[routeKey] ?? routeLoaders[routeKey];
+export function preloadAppRoute(pathnameWithSearch: string): Promise<void> | undefined {
+  const pathname = pathnameWithSearch.split("?")[0];
+  const routeKey = pathname.startsWith("/stock/")
+    ? "/stock/:code"
+    : pathname.startsWith("/analysis/")
+      ? "/analysis/:code"
+      : pathname.startsWith("/investment-research/")
+        ? "/investment-research/:code"
+        : pathname.startsWith("/industry-chain/")
+          ? "/industry-chain/:name"
+          : pathname;
+  const loader = routeKey === "/stock/:code"
+    ? pageLoaders.stock
+    : routeKey === "/analysis/:code"
+      ? pageLoaders.analysis
+      : routeKey === "/investment-research/:code"
+        ? pageLoaders.investmentResearch
+        : routeKey === "/industry-chain/:name"
+          ? pageLoaders.industryChain
+          : routeIntentLoaders[routeKey] ?? routeLoaders[routeKey];
   if (!loader) return undefined;
   const cached = preloadCache.get(routeKey);
   if (cached) return cached;

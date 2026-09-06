@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useAuthStore } from "../../store/authStore";
 import Screener from ".";
 
 const mocks = vi.hoisted(() => ({
@@ -51,6 +52,7 @@ const strategy = {
 
 vi.mock("../../api/queries", () => ({
   useIndustries: () => ({ data: [], error: null, refetch: vi.fn() }),
+  useScreenerConcepts: () => ({ data: [], error: null, refetch: vi.fn() }),
   useScreenerStrategies: () => ({ data: [strategy], error: null, isLoading: false, refetch: vi.fn() }),
   useRunScreenerStrategy: () => mocks.useRunStrategy(),
   useScreenerScreen: () => mocks.useScreen(),
@@ -149,6 +151,10 @@ describe("Screener strategy workflow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    useAuthStore.setState({
+      user: { id: 1, username: "alice", is_admin: false, must_change_password: false },
+      bootstrapped: true,
+    });
     currentFilters = filters;
     mocks.useRunStrategy.mockReturnValue({ mutateAsync: mocks.mutateAsync, isPending: false });
     mocks.useScreen.mockReturnValue({
@@ -269,7 +275,7 @@ describe("Screener strategy workflow", () => {
     fireEvent.change(screen.getByRole("spinbutton", { name: "最大信号年龄" }), { target: { value: "30" } });
     fireEvent.click(screen.getByRole("radio", { name: "前 200 候选" }));
 
-    await waitFor(() => expect(JSON.parse(window.localStorage.getItem("screener-strategy-settings") ?? "{}")).toEqual({
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem("screener-strategy-settings:user:1") ?? "{}")).toEqual({
       strategyKey: "bull_trend",
       parameters: { fast_period: 12 },
       maxSignalAgeBars: 30,
@@ -283,6 +289,59 @@ describe("Screener strategy workflow", () => {
     expect(screen.getByRole("spinbutton", { name: "快速周期" })).toHaveValue("12");
     expect(screen.getByRole("spinbutton", { name: "最大信号年龄" })).toHaveValue("30");
     expect(screen.getByRole("radio", { name: "前 200 候选" })).toBeChecked();
+  });
+
+  it("migrates legacy strategy settings into the current user scope", async () => {
+    window.localStorage.setItem("screener-strategy-settings", JSON.stringify({
+      strategyKey: "bull_trend",
+      parameters: { fast_period: 15 },
+      maxSignalAgeBars: 40,
+      scanLimit: 200,
+    }));
+
+    render(<MemoryRouter><Screener /></MemoryRouter>);
+
+    expect(await screen.findByRole("spinbutton", { name: "快速周期" })).toHaveValue("15");
+    expect(window.localStorage.getItem("screener-strategy-settings")).toBeNull();
+    expect(JSON.parse(window.localStorage.getItem("screener-strategy-settings:user:1") ?? "{}")).toEqual({
+      strategyKey: "bull_trend",
+      parameters: { fast_period: 15 },
+      maxSignalAgeBars: 40,
+      scanLimit: 200,
+    });
+  });
+
+  it("restores settings independently after the authenticated user changes", async () => {
+    window.localStorage.setItem("screener-strategy-settings:user:1", JSON.stringify({
+      strategyKey: "bull_trend",
+      parameters: { fast_period: 12 },
+      maxSignalAgeBars: 30,
+      scanLimit: 200,
+    }));
+    window.localStorage.setItem("screener-strategy-settings:user:2", JSON.stringify({
+      strategyKey: "bull_trend",
+      parameters: { fast_period: 8 },
+      maxSignalAgeBars: 10,
+      scanLimit: 50,
+    }));
+    render(<MemoryRouter><Screener /></MemoryRouter>);
+
+    expect(await screen.findByRole("spinbutton", { name: "快速周期" })).toHaveValue("12");
+    expect(screen.getByRole("radio", { name: "前 200 候选" })).toBeChecked();
+
+    act(() => useAuthStore.setState({
+      user: { id: 2, username: "bob", is_admin: false, must_change_password: false },
+    }));
+
+    await waitFor(() => expect(screen.getByRole("spinbutton", { name: "快速周期" })).toHaveValue("8"));
+    expect(screen.getByRole("spinbutton", { name: "最大信号年龄" })).toHaveValue("10");
+    expect(screen.getByRole("radio", { name: "当前页 2" })).toBeChecked();
+    expect(JSON.parse(window.localStorage.getItem("screener-strategy-settings:user:1") ?? "{}")).toEqual({
+      strategyKey: "bull_trend",
+      parameters: { fast_period: 12 },
+      maxSignalAgeBars: 30,
+      scanLimit: 200,
+    });
   });
 
   it("shows matches from the full 200-candidate scope even when they are outside the current page", async () => {

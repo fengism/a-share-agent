@@ -1,27 +1,76 @@
-import { Row, Col } from "antd";
-import { useMacroAllData } from "../../api/queries";
+import { Row, Col, Tag, Card, Table, Space } from "antd";
+import { RocketOutlined } from "@ant-design/icons";
+import { useMacroAllData, useCustomsTradeData } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import MacroIndicatorCard from "./MacroIndicatorCard";
 import { useColors } from "../../styles/ui";
 import type { ThemeColors } from "../../theme/themes";
+import type { CustomsCommodityProfile } from "../../types/stock";
 
 const EXPORTS_IMPORTS_FIELDS = (c: ThemeColors) => [
   { key: "EXPORTS_SAME", label: "出口同比", color: c.primary, unit: "%" },
   { key: "IMPORTS_SAME", label: "进口同比", color: c.accent, unit: "%" },
-
 ];
 
 const BALANCE_FIELDS = (c: ThemeColors) => [
   { key: "BALANCE", label: "贸易差额", color: c.accent, precision: 1 },
-
 ];
 
 export default function TradeTab() {
   const c = useColors();
   const { data, isLoading, error, refetch } = useMacroAllData();
+  const { data: customsData } = useCustomsTradeData();
 
   const exportsImports = data?.trade?.exports_imports;
   const balance = data?.trade?.balance;
+
+  const exportYoY = exportsImports?.latest?.EXPORTS_SAME != null ? Number(exportsImports.latest.EXPORTS_SAME) : null;
+  const importYoY = exportsImports?.latest?.IMPORTS_SAME != null ? Number(exportsImports.latest.IMPORTS_SAME) : null;
+  const tradeBal = balance?.latest?.BALANCE != null ? Number(balance.latest.BALANCE) : null;
+
+  const profiles = customsData?.matched_commodity_profiles ?? [];
+
+  const commodityColumns = [
+    {
+      title: "出海 / 进口商品类别",
+      key: "commodity",
+      render: (_: unknown, record: CustomsCommodityProfile) => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{record.commodity}</div>
+          <div style={{ fontSize: 12, color: c.textSecondary }}>
+            <Tag color={record.trade_type === "出口" ? "blue" : "purple"}>{record.trade_type}</Tag>
+            <span>{record.category} · {record.unit}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "核心目标市场 / 来源地",
+      dataIndex: "key_target_markets",
+      key: "key_target_markets",
+      render: (m: string) => <span style={{ fontSize: 12 }}>{m}</span>,
+    },
+    {
+      title: "A 股核心受益 / 关联龙头",
+      dataIndex: "related_a_stocks",
+      key: "related_a_stocks",
+      render: (stocks: string[]) => (
+        <Space size={[0, 4]} wrap>
+          {stocks.map((stk) => (
+            <Tag key={stk} color="cyan" style={{ fontSize: 12 }}>
+              {stk}
+            </Tag>
+          ))}
+        </Space>
+      ),
+    },
+    {
+      title: "出海驱动逻辑与产业传导",
+      dataIndex: "description",
+      key: "description",
+      render: (desc: string) => <span style={{ fontSize: 12, color: c.textSecondary }}>{desc}</span>,
+    },
+  ];
 
   return (
     <SectionDataState
@@ -33,7 +82,23 @@ export default function TradeTab() {
       errorTitle="进出口数据加载失败"
       minHeight={280}
     >
-      <Row gutter={[16, 16]}>
+      {exportYoY != null ? (
+        <div className="macro-insight-banner">
+          <div className="macro-insight-banner__title">
+            <span>💡 进出口与外贸景气度监测</span>
+            <Tag color={tradeBal != null && tradeBal >= 0 ? "blue" : "purple"}>
+              {tradeBal != null && tradeBal >= 0 ? "对外贸易顺差格局" : "外贸进出口动态"}
+            </Tag>
+          </div>
+          <div className="macro-insight-banner__body">
+            出口同比 <strong>{exportYoY > 0 ? `+${exportYoY.toFixed(1)}` : exportYoY.toFixed(1)}%</strong>，进口同比 <strong>{importYoY != null ? `${importYoY > 0 ? "+" : ""}${importYoY.toFixed(1)}%` : "-"}</strong>
+            {tradeBal != null ? <>，当期贸易差额 <strong className="financial-num">{tradeBal.toFixed(1)}</strong> 亿美元</> : null}。
+            外贸作为总需求“三驾马车”的重要组成部分，直观反映外需景气与全球供应链分工地位。
+          </div>
+        </div>
+      ) : null}
+
+      <Row className="macro-card-grid" gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} md={12}>
           <MacroIndicatorCard
             title="进出口同比增速"
@@ -53,6 +118,23 @@ export default function TradeTab() {
           />
         </Col>
       </Row>
+
+      {/* 重点出海与进口商品量价及 A 股产业链映射 */}
+      {profiles.length > 0 ? (
+        <Card
+          title={<span><RocketOutlined style={{ marginRight: 6, color: c.primary }} />海关总署重点出海与进口商品及 A 股产业链映射</span>}
+          size="small"
+          bordered={false}
+        >
+          <Table
+            rowKey="commodity"
+            dataSource={profiles}
+            columns={commodityColumns}
+            pagination={false}
+            size="middle"
+          />
+        </Card>
+      ) : null}
     </SectionDataState>
   );
 }

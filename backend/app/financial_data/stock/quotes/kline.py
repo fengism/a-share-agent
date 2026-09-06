@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from app.core.cache import cache, cache_date, dated_cache_key_no_day, one_year_ago_date
+from app.core.cache import cache_date, dated_cache_key_no_day, one_year_ago_date, series_cache
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import SymbolFormats, normalize_code
 from app.domain.market import KlineData
@@ -84,7 +84,7 @@ async def get_kline(
         adjust,
     )
     if policy.read_cache:
-        cached = cache.get(cache_key)
+        cached = series_cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -98,7 +98,7 @@ async def get_kline(
         """
         result = await _load_kline(sym, period, parsed_start_date, parsed_end_date, adjust)
         if policy.write_cache and policy.ttl_seconds is not None:
-            cache.set(cache_key, result, ttl=policy.ttl_seconds)
+            series_cache.set(cache_key, result, ttl=policy.ttl_seconds)
         return result
 
     return await _kline_singleflight.do(cache_key, load_and_cache)

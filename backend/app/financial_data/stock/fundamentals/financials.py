@@ -8,7 +8,8 @@ from datetime import date
 import pandas as pd
 
 from app.constants.financial_labels import FINANCIAL_METRIC_ALIASES, FINANCIAL_METRIC_LABELS
-from app.core.cache import cache, dated_cache_key_no_day
+from app.core.cache import dated_cache_key_no_day
+from app.core.cache import reference_cache as cache
 from app.core.concurrency.rate_limiter import akshare_semaphore, sina_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError

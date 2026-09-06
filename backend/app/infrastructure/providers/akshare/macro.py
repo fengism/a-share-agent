@@ -197,10 +197,6 @@ def fetch_us_cpi() -> list[dict[str, Any]]:
     }), carry_forward=True)[:24]
 
 
-def fetch_us_core_pce() -> list[dict[str, Any]]:
-    return _us_indicator(ak.macro_usa_core_pce_price)
-
-
 def fetch_us_labor() -> list[dict[str, Any]]:
     return _combined_rows(_parallel_event_series({
         "UNEMPLOYMENT": ak.macro_usa_unemployment_rate,

@@ -1,63 +1,83 @@
 slug: semiconductor
 name: 半导体
-category: 半导体
-summary: 覆盖设备、材料、制造、封测与设计环节的集成电路产业链，国产化替代是核心主线。
-aliases: [集成电路, 芯片]
-tags: [国产替代, 集成电路, 科技]
+category: 半导体与集成电路
+summary: 覆盖集成电路核心设计工具EDA/IP、关键设备与材料、前道晶圆制造、先进封装测试(CoWoS/Chiplet)及下游模拟/数字/功率设计的自主可控全产业链。
+aliases: [集成电路, 芯片, 半导体产业链, 晶圆代工]
+tags: [国产替代, 集成电路, 科技, 半导体制造, 先进封装, 算力硬件]
 drivers:
-  - 先进制程与先进封装需求
-  - 设备材料国产化替代
-  - AI/汽车电子拉动芯片需求
+  - 先进制程突破与先进制程设备材料国产化率提升
+  - 先进封装 (CoWoS/2.5D/3D Chiplet) 突破算力互连瓶颈
+  - AI 算力芯片、汽车电子与工业控制需求共振
+  - 存储芯片周期底部反转与 HBM 国产供应链建设
 layers:
   - key: upstream
-    name: 上游 · 设备与材料
+    name: 上游 · 核心半导体设备、EDA/IP 与关键材料
     segments:
-      - name: 设备
+      - name: 半导体前道核心设备
+        description: 刻蚀、薄膜沉积 (PVD/CVD/ALD)、CMP 抛光、清洗、去胶与涂胶显影等晶圆前道核心装备
         companies:
-          - { name: 北方华创, code: "002371", note: 刻蚀/薄膜/炉管平台型 }
-          - { name: 中微公司, code: "688012", note: 刻蚀设备 }
-          - { name: 拓荆科技, code: "688072", note: 薄膜沉积设备 }
-          - { name: 华海清科, code: "688120", note: CMP 设备 }
-          - { name: 盛美上海, code: "688082", note: 清洗设备 }
-          - { name: 长川科技, code: "300604", note: 测试机与分选机 }
-      - name: 材料
+          - { name: 北方华创, code: "002371", note: 刻蚀/薄膜沉积/氧化炉平台型半导体设备龙头 }
+          - { name: 中微公司, code: "688012", note: CCP/ICP 等离子体刻蚀设备与 MOCVD 领军者 }
+          - { name: 拓荆科技, code: "688072", note: PECVD/ALD/SACVD 薄膜沉积设备领先企业 }
+          - { name: 华海清科, code: "688120", note: 晶圆化学机械抛光 (CMP) 绝对龙头 }
+          - { name: 盛美上海, code: "688082", note: 差异化单片与槽式半导体清洗设备 }
+          - { name: 芯源微, code: "688037", note: 涂胶显影 (Track) 与单片湿法设备 }
+          - { name: 长川科技, code: "300604", note: 后道集成电路测试机与分选机 }
+      - name: EDA 工具与芯片 IP
+        description: 芯片设计不可或缺的软件工具与基础单元架构 IP
         companies:
-          - { name: 沪硅产业, code: "688126", note: 大硅片 }
-          - { name: 雅克科技, code: "002409", note: 前驱体+电子特气 }
-          - { name: 南大光电, code: "300346", note: 光刻胶+特气 }
-          - { name: 安集科技, code: "688019", note: CMP 抛光液 }
-          - { name: 鼎龙股份, code: "300054", note: CMP 抛光垫 }
+          - { name: 概伦电子, code: "688206", note: 器件建模与电路仿真 EDA 龙头 }
+          - { name: 华大九天, code: "301269", note: 国内全流程 EDA 软件系统领头羊 }
+          - { name: 芯原股份, code: "688521", note: 一站式芯片定制与核心半导体 IP 授权 }
+      - name: 半导体核心材料与化学品
+        description: 大硅片、光刻胶、电子特气、靶材、湿电子化学品与抛光液
+        companies:
+          - { name: 沪硅产业, code: "688126", note: 12英寸/8英寸高品质半导体大硅片 }
+          - { name: 安集科技, code: "688019", note: 晶圆 CMP 抛光液与功能性湿电子化学品 }
+          - { name: 鼎龙股份, code: "300054", note: CMP 抛光垫打破海外垄断，半导体材料平台 }
+          - { name: 雅克科技, code: "002409", note: 半导体前驱体材料与高纯电子特气 }
+          - { name: 南大光电, code: "300346", note: ArF 光刻胶与高纯特种气体 }
+          - { name: 江丰电子, code: "300666", note: 超高纯半导体溅射靶材领跑者 }
   - key: midstream
-    name: 中游 · 制造、封测与存储
+    name: 中游 · 晶圆制造、先进封测与存储体系
     segments:
-      - name: 晶圆制造
+      - name: 晶圆代工制造
+        description: 前道芯片代工制造，涵盖成熟工艺扩产与先进制程攻坚
         companies:
-          - { name: 中芯国际, code: "688981", note: 内地代工龙头 }
-          - { name: 华虹公司, code: "688347", note: 特色工艺代工 }
-      - name: 封装测试
+          - { name: 中芯国际, code: "688981", note: 中国大陆规模最大、技术最先进的晶圆代工龙头 }
+          - { name: 华虹公司, code: "688347", note: 特色工艺晶圆代工平台 (嵌入式非易失存储/功率) }
+      - name: 封装与先进封装测试 (CoWoS/Chiplet)
+        description: 传统引线封测向高密度 Fan-out、2.5D/3D 先进封装技术演进
         companies:
-          - { name: 长电科技, code: "600584", note: 封测龙头 }
-          - { name: 通富微电, code: "002156", note: 先进封装 }
-          - { name: 华天科技, code: "002185", note: 封测 }
-      - name: 存储芯片
+          - { name: 通富微电, code: "002156", note: 先进封测领军企业，深度布局大型芯片 Chiplet }
+          - { name: 长电科技, code: "600584", note: 全球前列的封测巨头，X-DFO 晶圆级先进封装 }
+          - { name: 华天科技, code: "002185", note: 规模化芯片封测综合服务平台 }
+      - name: 存储芯片与控制模组
+        description: DRAM、NAND Flash、NOR Flash、EEPROM 及车规/企业级存储
         companies:
-          - { name: 兆易创新, code: "603986", note: NOR Flash+MCU }
-          - { name: 北京君正, code: "300223", note: 车规存储 }
-          - { name: 江波龙, code: "301308", note: 存储模组 }
+          - { name: 兆易创新, code: "603986", note: NOR Flash 全球领先，布局 DRAM 与 MCU }
+          - { name: 江波龙, code: "301308", note: 存储模组龙头，自研主控芯片与封测一体化 }
+          - { name: 北京君正, code: "300223", note: 北京矽成车载/工规 DRAM/SRAM 存储龙头 }
+          - { name: 澜起科技, code: "688008", note: DDR5 内存接口芯片与 PCIe 互联控制 }
   - key: downstream
-    name: 下游 · 芯片设计
+    name: 下游 · 芯片设计与终端应用
     segments:
-      - name: 模拟与射频
+      - name: 模拟芯片与射频前端
+        description: 信号链、电源管理芯片 (PMIC)、射频开关及滤波器
         companies:
-          - { name: 圣邦股份, code: "300661", note: 模拟芯片 }
-          - { name: 卓胜微, code: "300782", note: 射频前端 }
-          - { name: 纳芯微, code: "688052", note: 隔离与传感 }
-      - name: 数字与接口
+          - { name: 圣邦股份, code: "300661", note: 模拟芯片龙头，信号链与电源管理全布局 }
+          - { name: 卓胜微, code: "300782", note: 射频前端芯片 (L-PAMiF/开关/LNA) 龙头 }
+          - { name: 纳芯微, code: "688052", note: 汽车级高可靠隔离与磁传感芯片 }
+      - name: 数字 SoC、图像传感与端侧计算
+        description: CIS 图像传感器、手机/汽车/安防 SoC 处理器
         companies:
-          - { name: 韦尔股份, code: "603501", note: CIS 图像传感 }
-          - { name: 澜起科技, code: "688008", note: 内存接口芯片 }
-      - name: 功率半导体
+          - { name: 韦尔股份, code: "603501", note: 全球前三 CIS 图像传感器与模拟半导体 }
+          - { name: 瑞芯微, code: "603893", note: 端侧 AIoT 与车载 SoC 处理器芯片 }
+          - { name: 恒玄科技, code: "688608", note: 智能可穿戴音频与边缘 AI SoC }
+      - name: 功率半导体与碳化硅 (SiC)
+        description: MOSFET、IGBT、第三代半导体 SiC 模块，驱动新能源车与光储充
         companies:
-          - { name: 斯达半导, code: "603290", note: IGBT/SiC 模块 }
-          - { name: 时代电气, code: "688187", note: IGBT+轨交装备 }
-          - { name: 士兰微, code: "600460", note: IDM 功率 }
+          - { name: 时代电气, code: "688187", note: 高压 IGBT 龙头，轨交/电网/车规级功率器件 }
+          - { name: 斯达半导, code: "603290", note: 车规级 IGBT 与 SiC 模块国内龙头 }
+          - { name: 三安光电, code: "600703", note: 碳化硅 (SiC) 衬底/外延/器件垂直一体化 }
+          - { name: 士兰微, code: "600460", note: 国内 IDM 模拟与功率器件综合巨头 }

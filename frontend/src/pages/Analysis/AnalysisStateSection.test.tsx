@@ -21,6 +21,7 @@ describe("AnalysisStateSection", () => {
         agentProcess={{
           status: "",
           toolCalls: [],
+          rounds: [],
         }}
       />,
     );

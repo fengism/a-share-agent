@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 import threading
 from collections.abc import Callable
@@ -14,11 +15,18 @@ from app.core.metrics import metrics
 
 logger = logging.getLogger(__name__)
 
-DatabaseName = Literal["market", "user"]
+DatabaseName = Literal["market", "user", "industry"]
+ALL_DATABASES: tuple[DatabaseName, ...] = ("market", "user", "industry")
 
 _DATA_DIR = DATA_DIR
-_DB_PATH = _DATA_DIR / "market_data.db"
-_USER_DB_PATH = _DATA_DIR / "user_data.db"
+DB_DIR = _DATA_DIR / "db"
+_DATABASE_FILENAMES: dict[DatabaseName, str] = {
+    "market": "market_data.db",
+    "user": "user_data.db",
+    "industry": "industry_data.db",
+}
+_storage_migration_lock = threading.Lock()
+_storage_migration_done = False
 
 # 每线程一个 SQLite 连接：单一共享连接在多线程下并发执行多语句事务（execute
 # + commit）不安全，事务会相互交错。WAL 模式原生支持多连接并发读写，因此改为
@@ -30,13 +38,76 @@ _registry_lock = threading.Lock()
 _connection_generation = 0
 
 
+def _legacy_and_target_pairs(data_dir: Path, db_dir: Path) -> list[tuple[Path, Path]]:
+    pairs: list[tuple[Path, Path]] = []
+    for filename in _DATABASE_FILENAMES.values():
+        for suffix in ("", "-wal", "-shm"):
+            pairs.append((data_dir / f"{filename}{suffix}", db_dir / f"{filename}{suffix}"))
+    pairs.append((data_dir / "backups", db_dir / "backups"))
+    return pairs
+
+
+def migrate_legacy_database_storage(
+    *,
+    data_dir: Path = _DATA_DIR,
+    db_dir: Path = DB_DIR,
+) -> list[tuple[Path, Path]]:
+    """Move legacy SQLite files into ``data/db`` without overwriting anything."""
+    pairs = _legacy_and_target_pairs(data_dir, db_dir)
+    conflicts = [(source, target) for source, target in pairs if source.exists() and target.exists()]
+    if conflicts:
+        details = ", ".join(f"{source} -> {target}" for source, target in conflicts)
+        raise RuntimeError(f"数据库目录迁移冲突，拒绝覆盖已有文件: {details}")
+
+    pending = [(source, target) for source, target in pairs if source.exists()]
+    if not pending:
+        return []
+    db_dir.mkdir(parents=True, exist_ok=True)
+    moved: list[tuple[Path, Path]] = []
+    try:
+        for source, target in pending:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(source, target)
+            moved.append((source, target))
+            logger.info("旧数据库存储已迁移: source=%s target=%s", source, target)
+    except Exception:
+        rollback_errors: list[str] = []
+        for source, target in reversed(moved):
+            try:
+                os.replace(target, source)
+            except Exception as rollback_error:
+                rollback_errors.append(f"{target} -> {source}: {rollback_error}")
+        if rollback_errors:
+            logger.critical("数据库目录迁移回滚不完整: %s", "; ".join(rollback_errors))
+        raise
+    return moved
+
+
+def _ensure_database_storage_migrated() -> None:
+    global _storage_migration_done
+    if _storage_migration_done:
+        return
+    with _storage_migration_lock:
+        if _storage_migration_done:
+            return
+        migrate_legacy_database_storage()
+        _storage_migration_done = True
+
+
 def database_path(database: DatabaseName = "market") -> Path:
     """返回指定逻辑数据库的文件路径。"""
-    if database == "market":
-        return _DB_PATH
-    if database == "user":
-        return _USER_DB_PATH
-    raise ValueError(f"未知数据库: {database}")
+    try:
+        filename = _DATABASE_FILENAMES[database]
+    except KeyError as error:
+        raise ValueError(f"未知数据库: {database}") from error
+    _ensure_database_storage_migrated()
+    return DB_DIR / filename
+
+
+def default_backup_dir() -> Path:
+    """Return the unified default backup directory, migrating the legacy path first."""
+    _ensure_database_storage_migrated()
+    return DB_DIR / "backups"
 
 
 def get_connection(database: DatabaseName = "market") -> sqlite3.Connection:
@@ -77,7 +148,7 @@ def get_connection(database: DatabaseName = "market") -> sqlite3.Connection:
 
 def database_storage_snapshot(
     *,
-    databases: tuple[DatabaseName, ...] = ("market", "user"),
+    databases: tuple[DatabaseName, ...] = ALL_DATABASES,
     connection_provider: Callable[[DatabaseName], sqlite3.Connection] = get_connection,
     path_provider: Callable[[DatabaseName], Path] = database_path,
 ) -> dict[str, dict[str, int | float | str]]:
@@ -234,14 +305,17 @@ def close_connection():
 
 
 def reset_for_tests() -> None:
-    """测试辅助：关闭全部连接，使下次 get_connection 使用当前测试数据库路径。"""
+    """测试辅助：关闭连接并重置一次性存储迁移状态。"""
+    global _storage_migration_done
     close_connection()
+    with _storage_migration_lock:
+        _storage_migration_done = False
 
 
 def checkpoint_wal() -> dict[str, dict[str, int | bool | str]]:
     """主动触发两个数据库的 WAL checkpoint，控制 WAL 文件大小。"""
     snapshot: dict[str, dict[str, int | bool | str]] = {}
-    for database in ("market", "user"):
+    for database in ALL_DATABASES:
         started_at = perf_counter()
         try:
             row = get_connection(database).execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
@@ -281,7 +355,7 @@ def checkpoint_wal() -> dict[str, dict[str, int | bool | str]]:
 def optimize_databases() -> dict[str, dict[str, bool | int | str]]:
     """执行 SQLite 推荐的轻量统计优化，不重建数据库文件。"""
     snapshot: dict[str, dict[str, bool | int | str]] = {}
-    for database in ("market", "user"):
+    for database in ALL_DATABASES:
         started_at = perf_counter()
         try:
             rows = get_connection(database).execute("PRAGMA optimize").fetchall()

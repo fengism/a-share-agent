@@ -5,6 +5,7 @@ from app.financial_data.stock.classification.service import (
     fetch_industry_mapping_sw_first,
     fetch_industry_mapping_sw_level,
     fetch_industry_mapping_sw_second,
+    fetch_industry_mapping_sw_third,
     get_industry_list,
     get_industry_mapping,
     update_industry_mapping_sw_files,
@@ -22,12 +23,26 @@ from app.financial_data.stock.fundamentals.schemas import (
     RevenueBreakdownItem,
     StockCompareItem,
 )
+from app.financial_data.stock.insights.bulletins import get_stock_bulletins
 from app.financial_data.stock.insights.fund_flow import get_stock_fund_flow
+from app.financial_data.stock.insights.interactive_qa import get_interactive_qa
 from app.financial_data.stock.insights.news import get_stock_news, get_stock_news_categorized
+from app.financial_data.stock.insights.reports import get_stock_reports
+from app.financial_data.stock.insights.restricted import get_restricted_shares_lift
 from app.financial_data.stock.insights.retail import get_retail_sentiment, get_stock_sentiment
 from app.financial_data.stock.insights.risk import get_stock_risk_data
-from app.financial_data.stock.insights.schemas import RetailSentiment, StockFundFlowItem, StockRiskData, StockSentiment
-from app.financial_data.stock.profile.basic_info import get_basic_info
+from app.financial_data.stock.insights.schemas import (
+    RetailSentiment,
+    StockBulletinItem,
+    StockBulletinPage,
+    StockFundFlowItem,
+    StockReportItem,
+    StockReportPage,
+    StockRiskData,
+    StockSentiment,
+)
+from app.financial_data.stock.profile.basic_info import get_basic_info, get_stock_concept_map, get_stock_concepts
+from app.financial_data.stock.profile.business_intro import get_stock_business_intro
 from app.financial_data.stock.profile.exchange_master import (
     ExchangeStockMaster,
     ExchangeStockRecord,
@@ -35,8 +50,10 @@ from app.financial_data.stock.profile.exchange_master import (
     get_exchange_stock_master,
 )
 from app.financial_data.stock.profile.name_map import build_stock_name_map, get_stock_name_map
-from app.financial_data.stock.profile.schemas import StockBasicInfo
+from app.financial_data.stock.profile.schemas import StockBasicInfo, StockBusinessIntro
 from app.financial_data.stock.profile.search import search_stocks
+from app.financial_data.stock.quotes.chip_distribution import get_chip_distribution
+from app.financial_data.stock.quotes.chip_schemas import ChipDistribution
 from app.financial_data.stock.quotes.historical import (
     HistoricalBarSet,
     get_historical_bars,
@@ -58,6 +75,7 @@ __all__ = [
     "build_stock_name_map",
     "build_industry_mapping",
     "compute_percentiles",
+    "ChipDistribution",
     "FinancialMetrics",
     "FinancialStatementRow",
     "fetch_realtime_quotes",
@@ -65,11 +83,15 @@ __all__ = [
     "fetch_industry_mapping_sw_first",
     "fetch_industry_mapping_sw_level",
     "fetch_industry_mapping_sw_second",
+    "fetch_industry_mapping_sw_third",
     "ExchangeStockMaster",
     "ExchangeStockRecord",
     "build_exchange_stock_master",
     "get_exchange_stock_master",
     "get_basic_info",
+    "get_chip_distribution",
+    "get_stock_concept_map",
+    "get_stock_concepts",
     "get_financial",
     "get_financial_metrics",
     "get_historical_bars",
@@ -80,7 +102,12 @@ __all__ = [
     "get_kline",
     "get_retail_sentiment",
     "get_revenue_breakdown",
+    "get_restricted_shares_lift",
+    "get_interactive_qa",
     "get_stock_fund_flow",
+    "get_stock_bulletins",
+    "get_stock_business_intro",
+    "get_stock_reports",
     "get_stock_name_map",
     "get_stock_news",
     "get_stock_news_categorized",
@@ -97,8 +124,13 @@ __all__ = [
     "RevenueBreakdownItem",
     "search_stocks",
     "StockBasicInfo",
+    "StockBusinessIntro",
+    "StockBulletinItem",
+    "StockBulletinPage",
     "StockCompareItem",
     "StockFundFlowItem",
+    "StockReportItem",
+    "StockReportPage",
     "StockRiskData",
     "StockSentiment",
     "StockValuation",

@@ -10,6 +10,8 @@ from app.domain.stock import StockConcept, StockConceptInfo
 from app.financial_data.stock.profile.schemas import StockBasicInfo
 from app.financial_data.stock.profile.sources import (
     EASTMONEY_STOCK_PROFILE,
+    STOCK_CONCEPT_MAPPING,
+    SW_INDUSTRY_CLASSIFICATION,
     TDX_HTTP_FINANCE,
     TDX_HTTP_STOCK_QUOTE,
     TENCENT_STOCK_CONCEPTS,
@@ -32,6 +34,8 @@ class BasicInfoInputs:
     tencent_quote: dict[str, Any]
     tdx_http_quote: dict[str, Any] = field(default_factory=dict)
     tdx_http_finance: dict[str, Any] = field(default_factory=dict)
+    sw_industry_record: dict[str, Any] | None = None
+    stock_concept_record: dict[str, Any] | None = None
 
 
 def format_listing_date(value: Any) -> str | None:
@@ -201,8 +205,13 @@ def build_basic_info(symbol: SymbolFormats, inputs: BasicInfoInputs) -> StockBas
         "exchange_industry",
         (exchange.get("industry"), exchange_source),
     )
-    first_industry = inputs.stock_concepts.first_concept
-    if first_industry is not None:
+
+    sw_ind = inputs.sw_industry_record
+    if sw_ind and sw_ind.get("sw_level1_name"):
+        first_industry = StockConcept(code="", name=str(sw_ind["sw_level1_name"]))
+        field_sources["first_industry"] = SW_INDUSTRY_CLASSIFICATION.id
+    elif inputs.stock_concepts.first_concept is not None:
+        first_industry = inputs.stock_concepts.first_concept
         field_sources["first_industry"] = TENCENT_STOCK_CONCEPTS.id
     else:
         industry_name = _pick_text(
@@ -212,13 +221,36 @@ def build_basic_info(symbol: SymbolFormats, inputs: BasicInfoInputs) -> StockBas
         )
         if industry_name:
             first_industry = StockConcept(code="", name=str(industry_name))
+        else:
+            first_industry = None
 
-    second_industry = inputs.stock_concepts.second_concept
-    if second_industry is not None:
+    if sw_ind and sw_ind.get("sw_level2_name"):
+        second_industry = StockConcept(code="", name=str(sw_ind["sw_level2_name"]))
+        field_sources["second_industry"] = SW_INDUSTRY_CLASSIFICATION.id
+    elif inputs.stock_concepts.second_concept is not None:
+        second_industry = inputs.stock_concepts.second_concept
         field_sources["second_industry"] = TENCENT_STOCK_CONCEPTS.id
-    concepts = inputs.stock_concepts.concepts if inputs.concepts_available else None
-    if inputs.concepts_available:
+    else:
+        second_industry = None
+
+    if sw_ind and sw_ind.get("sw_level3_name"):
+        third_industry = StockConcept(
+            code=str(sw_ind.get("sw_industry_code") or ""),
+            name=str(sw_ind["sw_level3_name"]),
+        )
+        field_sources["third_industry"] = SW_INDUSTRY_CLASSIFICATION.id
+    else:
+        third_industry = None
+
+    cnp_rec = inputs.stock_concept_record
+    if cnp_rec and cnp_rec.get("concepts"):
+        concepts = [StockConcept(code=name, name=name) for name in cnp_rec["concepts"]]
+        field_sources["concepts"] = STOCK_CONCEPT_MAPPING.id
+    elif inputs.concepts_available:
+        concepts = inputs.stock_concepts.concepts
         field_sources["concepts"] = TENCENT_STOCK_CONCEPTS.id
+    else:
+        concepts = None
 
     return StockBasicInfo(
         code=symbol.raw,
@@ -234,6 +266,7 @@ def build_basic_info(symbol: SymbolFormats, inputs: BasicInfoInputs) -> StockBas
         exchange_industry=exchange_industry,
         first_industry=first_industry,
         second_industry=second_industry,
+        third_industry=third_industry,
         current_price=current_price,
         pe_static=pe_static,
         concepts=concepts,

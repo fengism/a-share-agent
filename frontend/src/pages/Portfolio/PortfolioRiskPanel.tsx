@@ -39,7 +39,7 @@ export default function PortfolioRiskPanel({ risk }: PortfolioRiskPanelProps) {
             precision={2}
             suffix={risk.max_single_stock_pct == null ? undefined : "%"}
           />
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>{largestPosition}</Text>
+          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>{largestPosition}</Text>
         </Col>
         <Col xs={12} md={8}>
           <Statistic
@@ -52,7 +52,7 @@ export default function PortfolioRiskPanel({ risk }: PortfolioRiskPanelProps) {
         <Col xs={12} md={8}>
           <Statistic title="已定价股票" value={risk.priced_stock_count} suffix="只" />
           {risk.unpriced_stock_count > 0 ? (
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
               另有 {risk.unpriced_stock_count} 只缺少行情
             </Text>
           ) : null}

@@ -1,16 +1,19 @@
 import asyncio
+import logging
 
 import pandas as pd
 
+from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 from app.core.market import safe_float, safe_string
 from app.domain.stock import StockConcept
 from app.financial_data.stock.public import (
     ExchangeStockMaster,
     get_exchange_stock_master,
-    get_industry_mapping,
     get_spot_snapshot,
 )
 from app.modules.screener.schemas import ScreenerFilter, ScreenerItem, ScreenerResult
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_candidate_code(value: object) -> str:
@@ -23,7 +26,8 @@ def _normalize_candidate_code(value: object) -> str:
 async def _get_exchange_master_optional() -> ExchangeStockMaster | None:
     try:
         return await asyncio.wait_for(get_exchange_stock_master(), timeout=2.0)
-    except Exception:
+    except Exception as exc:
+        logger.warning("交易所股票主档获取失败，筛选将跳过交易所元数据: %s", exc)
         return None
 
 
@@ -43,14 +47,10 @@ def _merge_exchange_master(df: pd.DataFrame, master: ExchangeStockMaster | None)
         result = result[result["代码"].isin(by_code)].copy()
     official_names = result["代码"].map({code: record.name for code, record in by_code.items()})
     result["名称"] = official_names.fillna(result["名称"])
-    result["exchange_industry"] = result["代码"].map(
-        {code: record.industry for code, record in by_code.items()}
-    )
+    result["exchange_industry"] = result["代码"].map({code: record.industry for code, record in by_code.items()})
     result["exchange"] = result["代码"].map({code: record.exchange for code, record in by_code.items()})
     result["board"] = result["代码"].map({code: record.board for code, record in by_code.items()})
-    result["listing_date"] = result["代码"].map(
-        {code: record.listing_date for code, record in by_code.items()}
-    )
+    result["listing_date"] = result["代码"].map({code: record.listing_date for code, record in by_code.items()})
     return result
 
 
@@ -68,30 +68,42 @@ def _build_industry_concept(name: str | None) -> StockConcept | None:
     return StockConcept(code="", name=text)
 
 
-async def screen_stocks(filters: ScreenerFilter) -> ScreenerResult:
-    """按筛选条件过滤股票全市场快照并返回分页结果。
+def _screen_dataframe(
+    df: pd.DataFrame,
+    second_industry_map: dict[str, str] | dict[str, dict[str, str]],
+    exchange_master: ExchangeStockMaster | None,
+    filters: ScreenerFilter,
+    concept_map: dict[str, list[str]] | None = None,
+) -> ScreenerResult:
+    """对全市场快照执行过滤、排序与分页（CPU 密集同步函数，必须经 call_blocking 调度到线程池）。
 
-    Param:
-        filters: ScreenerFilter 过滤条件对象
-    Return:
-        ScreenerResult 包含分页后的股票条目与总数
+    注意：入参 df 可能是共享缓存对象，本函数只读它，所有写入都发生在 _merge_exchange_master 的副本上。
     """
-    df, second_industry_map, exchange_master = await asyncio.gather(
-        get_spot_snapshot(),
-        get_industry_mapping(),
-        _get_exchange_master_optional(),
-    )
-    if df is None:
-        raise ValueError("无法获取市场数据")
-
     df = _merge_exchange_master(df, exchange_master)
-    df["second_industry"] = df["代码"].map(
-        lambda code: safe_string(second_industry_map.get(str(code)))
-    )
+
+    def _extract_ind(code: object, key: str) -> str | None:
+        val = second_industry_map.get(str(code))
+        if isinstance(val, dict):
+            return safe_string(val.get(key))
+        if key == "level2":
+            return safe_string(val)
+        return None
+
+    def _extract_code(code: object) -> str:
+        val = second_industry_map.get(str(code))
+        if isinstance(val, dict):
+            return safe_string(val.get("code")) or ""
+        return ""
+
+    df["first_industry"] = df["代码"].map(lambda code: _extract_ind(code, "level1"))
+    df["second_industry"] = df["代码"].map(lambda code: _extract_ind(code, "level2"))
+    df["third_industry"] = df["代码"].map(lambda code: _extract_ind(code, "level3"))
+    df["third_industry_code"] = df["代码"].map(_extract_code)
+    df["concepts"] = df["代码"].map(lambda code: (concept_map or {}).get(str(code), []))
+
     candidate_count = len(df)
-    sw_industry_coverage = (
-        float(df["second_industry"].notna().sum()) / candidate_count if candidate_count else 0.0
-    )
+    has_sw_ind = df["first_industry"].notna() | df["second_industry"].notna() | df["third_industry"].notna()
+    sw_industry_coverage = float(has_sw_ind.sum()) / candidate_count if candidate_count else 0.0
     exchange_industry_coverage = (
         float(df["exchange_industry"].notna().sum()) / candidate_count if candidate_count else 0.0
     )
@@ -139,7 +151,17 @@ async def screen_stocks(filters: ScreenerFilter) -> ScreenerResult:
     if filters.turnover_pct_max is not None:
         mask &= df["turnover_pct_num"] <= filters.turnover_pct_max
     if filters.industries:
-        mask &= df["second_industry"].isin(filters.industries)
+        target_industries = set(filters.industries)
+        industry_match = (
+            df["first_industry"].isin(target_industries)
+            | df["second_industry"].isin(target_industries)
+            | df["third_industry"].isin(target_industries)
+        )
+        mask &= industry_match
+    if filters.concepts:
+        target_concepts = set(filters.concepts)
+        concept_match = df["concepts"].map(lambda c_list: bool(target_concepts.intersection(c_list or [])))
+        mask &= concept_match
     # 市场板块筛选（board 来自交易所 master；master 缺失时不生效，避免误杀全市场）
     if filters.markets and df["board"].notna().any():
         mask &= df["board"].isin(filters.markets)
@@ -196,6 +218,13 @@ async def screen_stocks(filters: ScreenerFilter) -> ScreenerResult:
 
     items: list[ScreenerItem] = []
     for _, row in page_data.iterrows():
+        f_ind = safe_string(row.get("first_industry"))
+        s_ind = safe_string(row.get("second_industry"))
+        t_ind = safe_string(row.get("third_industry"))
+        t_code = safe_string(row.get("third_industry_code")) or ""
+        raw_concepts = row.get("concepts")
+        stock_concepts = list(raw_concepts) if isinstance(raw_concepts, list) else []
+
         items.append(
             ScreenerItem(
                 code=str(row["代码"]),
@@ -211,7 +240,10 @@ async def screen_stocks(filters: ScreenerFilter) -> ScreenerResult:
                 board=safe_string(row.get("board")),
                 listing_date=safe_string(row.get("listing_date")),
                 exchange_industry=safe_string(row.get("exchange_industry")),
-                second_industry=_build_industry_concept(row.get("second_industry")),
+                first_industry=_build_industry_concept(f_ind),
+                second_industry=_build_industry_concept(s_ind),
+                third_industry=StockConcept(code=t_code, name=t_ind) if t_ind else None,
+                concepts=stock_concepts,
             )
         )
 
@@ -226,4 +258,37 @@ async def screen_stocks(filters: ScreenerFilter) -> ScreenerResult:
         risk_excluded_st=risk_excluded_st,
         risk_excluded_new_listing=risk_excluded_new_listing,
         risk_excluded_low_liquidity=risk_excluded_low_liquidity,
+    )
+
+
+async def screen_stocks(filters: ScreenerFilter) -> ScreenerResult:
+    """按筛选条件过滤股票全市场快照并返回分页结果。
+
+    Param:
+        filters: ScreenerFilter 过滤条件对象
+    Return:
+        ScreenerResult 包含分页后的股票条目与总数
+    """
+    from app.modules.industry_classification.public import a_share_all_levels_mapping
+    from app.modules.stock_concept.public import a_share_all_concepts_mapping
+
+    df, industry_levels_map, concept_map, exchange_master = await asyncio.gather(
+        get_spot_snapshot(),
+        call_blocking(a_share_all_levels_mapping, semaphore=misc_semaphore),
+        call_blocking(a_share_all_concepts_mapping, semaphore=misc_semaphore),
+        _get_exchange_master_optional(),
+    )
+    if df is None:
+        raise ValueError("无法获取市场数据")
+
+    # 全市场 5000+ 行的 pandas 过滤/排序是 CPU 密集同步操作，
+    # 必须调度到线程池执行，避免阻塞事件循环上的其他请求。
+    return await call_blocking(
+        _screen_dataframe,
+        df,
+        industry_levels_map,
+        exchange_master,
+        filters,
+        concept_map=concept_map,
+        semaphore=misc_semaphore,
     )

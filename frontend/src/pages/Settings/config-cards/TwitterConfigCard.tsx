@@ -24,7 +24,7 @@ export default function TwitterConfigCard({ form, onChange, onSave, isSaving }: 
             onChange={(event) => onChange({ twitter_feeds: event.target.value.split("\n") })}
             placeholder={"qinbafrank\n账号2\n账号3"}
           />
-          <div style={{ marginTop: 4, fontSize: 12, color: colors.textMuted }}>
+          <div style={{ marginTop: 4, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
             用于拉取 Twitter/X 上的财经推文和文章，每行填写一个账号名（不带 @）
           </div>
         </Col>

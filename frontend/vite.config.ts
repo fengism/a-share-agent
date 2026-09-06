@@ -12,6 +12,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    resolve: {
+      alias: {
+        html2canvas: "html2canvas-pro",
+      },
+    },
     server: {
       proxy: apiProxy,
       allowedHosts: ["localhost", "127.0.0.1"],

@@ -69,6 +69,12 @@ export function parseScreenerUrlState(params: URLSearchParams): ScreenerUrlState
     .filter(Boolean);
   if (industries?.length) filters.industries = Array.from(new Set(industries));
 
+  const concepts = params.get("concepts")
+    ?.split(",")
+    .map((concept) => concept.trim())
+    .filter(Boolean);
+  if (concepts?.length) filters.concepts = Array.from(new Set(concepts));
+
   const markets = params.get("markets")
     ?.split(",")
     .map((market) => market.trim())
@@ -98,6 +104,9 @@ export function serializeScreenerUrlState(state: ScreenerUrlState): URLSearchPar
 
   if (state.filters.industries?.length) {
     params.set("industries", Array.from(new Set(state.filters.industries)).join(","));
+  }
+  if (state.filters.concepts?.length) {
+    params.set("concepts", Array.from(new Set(state.filters.concepts)).join(","));
   }
   if (state.filters.markets?.length) {
     params.set("markets", Array.from(new Set(state.filters.markets)).join(","));

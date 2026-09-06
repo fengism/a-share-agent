@@ -42,6 +42,7 @@ class ConfigResponse(BaseModel):
     eastmoney_cookie: str
     baidu_cookie: str
     ths_cookie: str
+    legulegu_token: str
     eastmoney_min_interval_seconds: float
     eastmoney_datacenter_min_interval_seconds: float
     eastmoney_datacenter_cooldown_seconds: float
@@ -105,6 +106,7 @@ class ConfigUpdateRequest(BaseModel):
     eastmoney_cookie: str | None = None
     baidu_cookie: str | None = None
     ths_cookie: str | None = None
+    legulegu_token: str | None = None
     eastmoney_min_interval_seconds: float | None = Field(default=None, ge=0, le=60)
     eastmoney_datacenter_min_interval_seconds: float | None = Field(default=None, ge=0, le=60)
     eastmoney_datacenter_cooldown_seconds: float | None = Field(default=None, ge=0, le=86400)

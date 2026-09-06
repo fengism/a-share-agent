@@ -140,7 +140,7 @@ class WorkflowJobStore:
             ).fetchone()
             if active is not None:
                 active_job = _job_from_row(active)
-                if kind in {"analysis", "daily_review"}:
+                if kind in {"analysis", "daily_review", "industry_chain"}:
                     active_request = {**active_job.request, "force": bool(active_job.request.get("force", False))}
                     if active_request != request:
                         raise WorkflowRequestMismatchError(

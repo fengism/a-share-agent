@@ -136,7 +136,7 @@ export default function CapabilityCatalog({ capabilities }: { capabilities: Chat
       render: (_, row) => (
         <div>
           <div style={{ color: colors.textSecondary }}>{row.schema.description || "-"}</div>
-          <div style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+          <div style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", marginTop: 2 }}>
             {schemaConstraints(row.schema)}
           </div>
         </div>

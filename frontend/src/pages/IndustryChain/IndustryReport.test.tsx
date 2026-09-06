@@ -18,6 +18,7 @@ vi.mock("@ant-design/icons", () => ({
   BankOutlined: () => <span />,
   CloudUploadOutlined: () => <span />,
   DatabaseOutlined: () => <span />,
+  FilePdfOutlined: () => <span />,
   FileTextOutlined: () => <span />,
   FullscreenOutlined: () => <span />,
   RiseOutlined: () => <span />,
@@ -245,6 +246,183 @@ describe("IndustryReport", () => {
     const fullReport = screen.getByText("04 · 完整研究正文").closest(".ant-collapse-item");
     expect(fullReport).not.toHaveClass("ant-collapse-item-active");
     expect(container.querySelector(".industry-conclusion")).toBeInTheDocument();
+  });
+
+  it("keeps long conclusion content inside shrinkable wrapping containers", () => {
+    const longChinese = "产业链核心驱动来自需求增长与供给改善并需要持续跟踪验证".repeat(6);
+    const longEnglish = "ContinuousUnbrokenCompanyIdentifier".repeat(8);
+    const longEvidenceTitle = "VeryLongEvidenceSourceTitleWithoutNaturalBreakpoints".repeat(6);
+    const longUrl = `https://example.com/${"long-path-segment".repeat(12)}`;
+    const wrappingResult: IndustryChainResult = {
+      ...result,
+      positioning: longChinese,
+      driver_insights: [{
+        title: "需求增长（证据 ev_long_title）",
+        detail: `${longChinese} ${longUrl}`,
+        confidence: "high",
+      }],
+      key_stocks: [{
+        name: longEnglish,
+        code: "000001",
+        description: longChinese,
+      }],
+      evidence_catalog: [{
+        evidence_id: "ev_long_title",
+        tool_name: "fetch_url",
+        arguments: JSON.stringify({ url: longUrl }),
+        title: longEvidenceTitle,
+        source_urls: [longUrl],
+        fetched_at: "2026-09-02T12:00:00Z",
+        truncated: false,
+      }],
+    };
+
+    renderReport(
+      <IndustryReport
+        result={wrappingResult}
+        activeName="AI 芯片"
+        archiveId="archive-long-content"
+        isPushing={false}
+        pushResult={null}
+        onPush={vi.fn()}
+      />,
+    );
+
+    const conclusion = screen.getByRole("region", { name: "产业链结论摘要" });
+    const evidenceLink = within(conclusion).getByRole("link", { name: longEvidenceTitle });
+    const insightHeading = evidenceLink.closest(".industry-conclusion__item-heading");
+
+    expect(evidenceLink).toHaveClass("industry-evidence-link");
+    expect(evidenceLink.closest("strong")).toHaveClass("industry-conclusion__item-title");
+    expect(insightHeading).toBeInTheDocument();
+    expect(within(insightHeading as HTMLElement).getByText("高置信度")).toHaveClass(
+      "industry-conclusion__confidence",
+    );
+    expect(within(conclusion).getByText(longEnglish)).toHaveClass(
+      "industry-conclusion__item-title",
+    );
+    expect(within(conclusion).getAllByText(longChinese).length).toBeGreaterThan(0);
+  });
+
+  it("marks long chain, stock, table, header, and evidence content as wrappable", async () => {
+    const longMetric = "营收同比增长与海外业务占比持续提升".repeat(8);
+    const longMarketShare = "全球细分市场占有率与国内市场占有率".repeat(6);
+    const longRole = "核心零部件研发制造与全球供应链协同".repeat(6);
+    const longCompany = "ContinuousUnbrokenCompanyIdentifier".repeat(7);
+    const longAlias = "VeryLongIndustryAliasWithoutNaturalBreakpoints".repeat(5);
+    const longEvidenceId = `ev_${"longidentifier".repeat(12)}`;
+    const longReportName = "VeryLongIndustryReportNameWithoutNaturalBreakpoints".repeat(5);
+    const longMetricLabel = "VeryLongMetricLabelWithoutNaturalBreakpoints".repeat(5);
+    const longMetricValue = "VeryLongMetricValueWithoutNaturalBreakpoints".repeat(5);
+    const longMetricPeriod = "VeryLongMetricPeriodWithoutNaturalBreakpoints".repeat(5);
+    const longSource = "VeryLongSourcePublisherWithoutNaturalBreakpoints".repeat(5);
+    const longSourceTitle = "VeryLongSourceTitleWithoutNaturalBreakpoints".repeat(5);
+    const longWarning = "VeryLongQualityWarningWithoutNaturalBreakpoints".repeat(5);
+    const wrappingResult: IndustryChainResult = {
+      ...result,
+      name: longReportName,
+      aliases: [longAlias],
+      warnings: [longWarning],
+      market_metrics: [{
+        label: longMetricLabel,
+        value: longMetricValue,
+        period: longMetricPeriod,
+        source: longSource,
+      }],
+      sources: [{
+        title: longSourceTitle,
+        publisher: longSource,
+        date: longMetricPeriod,
+      }],
+      research_scope: {
+        company_scope: "a_share",
+        region_scope: "中国大陆与全球供应链市场".repeat(5),
+      },
+      upstream: [{
+        name: "超长上游环节名称".repeat(8),
+        role: longRole,
+        companies: [longCompany],
+        market_share: longMarketShare,
+        metric: longMetric,
+        evidence_ids: [longEvidenceId],
+      }],
+      key_stocks: [{
+        name: "超长重点公司名称".repeat(8),
+        code: "000001",
+        role: longRole,
+        companies: [longCompany],
+        market_share: longMarketShare,
+        metric: longMetric,
+      }],
+      evidence_catalog: [{
+        evidence_id: longEvidenceId,
+        tool_name: "VeryLongToolProviderNameWithoutNaturalBreakpoints".repeat(4),
+        title: "超长证据标题".repeat(12),
+        source_urls: [],
+        fetched_at: "2026-09-02T12:00:00Z",
+        truncated: false,
+      }],
+    };
+
+    const { container } = renderReport(
+      <IndustryReport
+        result={wrappingResult}
+        activeName="AI 芯片"
+        archiveId="archive-wrapping-content"
+        isPushing={false}
+        pushResult={null}
+        onPush={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector(".industry-report__title")).toHaveTextContent(
+      `${longReportName} 产业链`,
+    );
+    expect(screen.getByText(longAlias)).toHaveClass("industry-report__wrap-tag");
+    expect(screen.getByText(/研究范围：/)).toHaveClass("industry-report__scope-summary");
+    expect(screen.getByText(longWarning)).toHaveClass("industry-report__warning");
+    expect(
+      screen.getAllByText(longMetricLabel).filter((element) =>
+        element.classList.contains("industry-conclusion__metric-label"),
+      ),
+    ).toHaveLength(1);
+    expect(
+      screen.getAllByText(longMetricValue).filter((element) =>
+        element.classList.contains("industry-conclusion__metric-value"),
+      ),
+    ).toHaveLength(1);
+    expect(screen.getByText(longSourceTitle)).toHaveClass("industry-source-list__title");
+    expect(screen.getByText(`${longSource} · ${longMetricPeriod}`)).toHaveClass(
+      "industry-source-list__meta",
+    );
+    screen.getAllByText(`来源：${longSource}`).forEach((source) => {
+      expect(source).toHaveClass("industry-source-label");
+    });
+    expect(screen.getAllByText(`${longMarketShare} · ${longMetric}`)).toHaveLength(2);
+    screen.getAllByText(`${longMarketShare} · ${longMetric}`).forEach((metric) => {
+      expect(metric).toHaveClass("industry-chain-node__metric");
+    });
+    expect(
+      screen.getAllByText(longRole).filter((role) =>
+        role.classList.contains("industry-chain-node__tag"),
+      ),
+    ).toHaveLength(2);
+    expect(screen.getAllByText(`${longCompany} ↗`).every((company) => company.classList.contains("industry-chain-node__tag"))).toBe(true);
+    expect(screen.getByText(`证据 ${longEvidenceId}`)).toHaveClass("industry-wrap-tag");
+
+    fireEvent.click(screen.getByText("📋 环节清单"));
+
+    await waitFor(() => {
+      expect(container.querySelector(".industry-chain-table")).toBeInTheDocument();
+    });
+    const chainTable = container.querySelector(".industry-chain-table") as HTMLElement;
+    expect(within(chainTable).getByText(`${longMarketShare} · ${longMetric}`)).toHaveClass(
+      "industry-chain-table__tag",
+    );
+    expect(within(chainTable).getByText(longRole)).toHaveClass("industry-chain-table__tag");
+    expect(within(chainTable).getByText(`${longCompany} ↗`)).toHaveClass(
+      "industry-chain-table__tag",
+    );
   });
 
   it("shows degraded quality and archive warnings", () => {

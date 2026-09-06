@@ -159,3 +159,16 @@ async def get_stock_risk_data(code: str) -> Any:
         包含 fund_flow、margin_trading、block_trade、holder_change 四个维度的字典
     """
     return await get_application_tool_handlers().get_stock_risk_data(code)
+
+
+async def get_restricted_shares_lift(code: str) -> Any:
+    """获取个股限售解禁日历与抛压监测数据。"""
+    from app.financial_data.stock.insights.restricted import get_restricted_shares_lift as _get_lift
+    return await _get_lift(code=code)
+
+
+async def get_interactive_qa(code: str, keyword: str = "", limit: int = 15) -> Any:
+    """获取交易所互动平台董秘官方问答。"""
+    from app.financial_data.stock.insights.interactive_qa import get_interactive_qa as _get_qa
+    return await _get_qa(code=code, keyword=keyword, limit=limit)
+

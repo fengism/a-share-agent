@@ -8,7 +8,7 @@
  */
 
 .terminal-table-row td {
-  font-size: 12px;
+  font-size: var(--c-font-sm);
   color: var(--c-text-secondary);
   padding-top: 8px !important;
   padding-bottom: 8px !important;
@@ -33,7 +33,7 @@
 
 .ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
   color: var(--c-primary);
-  font-weight: 700;
+  font-weight: var(--c-weight-bold);
 }
 
 .ant-tabs .ant-tabs-ink-bar {
@@ -78,7 +78,7 @@
   padding: 0 !important;
   background: var(--c-page-bg) !important;
   color: var(--c-text-primary) !important;
-  font-family: var(--stock-research-font-family, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif) !important;
+  font-family: var(--stock-research-font-family, var(--c-font-sans)) !important;
   font-size: var(--stock-research-body-size) !important;
   line-height: var(--stock-research-body-leading) !important;
   letter-spacing: 0 !important;
@@ -100,14 +100,14 @@
 
 .pdf-exporting .terminal-table-row td,
 .pdf-exporting .ant-table-thead > tr > th {
-  font-size: 13px !important;
-  line-height: 1.5 !important;
+  font-size: var(--c-font-md) !important;
+  line-height: var(--c-leading-normal) !important;
 }
 
 .pdf-exporting .pdf-statement-section > .ant-typography {
-  font-size: 16px !important;
+  font-size: var(--c-font-lg) !important;
   font-weight: var(--c-weight-semibold);
-  line-height: 1.5 !important;
+  line-height: var(--c-leading-normal) !important;
 }
 
 .pdf-exporting .analysis-workspace {
@@ -182,16 +182,36 @@
 }
 
 .pdf-exporting .research-evidence-ruler__grade {
-  background: var(--c-nested-bg);
+  background: var(--c-nested-bg) !important;
 }
 
 .pdf-exporting .research-reading-toolbar {
-  background: var(--c-card-bg);
-  backdrop-filter: none;
+  display: none !important;
+}
+
+.pdf-exporting .research-section {
+  box-shadow: none !important;
+}
+
+.pdf-exporting * {
+  box-shadow: none !important;
 }
 
 .pdf-exporting .markdown-body code {
   background: var(--c-nested-bg);
+}
+
+.pdf-exporting .research-section,
+.pdf-exporting .research-evidence-ruler,
+.pdf-exporting .research-decision-hero,
+.pdf-exporting .research-action-column,
+.pdf-exporting .research-decision-tracking-card,
+.pdf-exporting .research-moat-grid article,
+.pdf-exporting .research-scenario-grid article,
+.pdf-exporting .research-risk-register article,
+.pdf-exporting .research-gap-list article {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
 }
 
 .pdf-exporting .pdf-list-item {

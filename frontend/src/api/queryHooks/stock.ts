@@ -8,18 +8,59 @@ import { useAStockTradingSession } from "../../hooks/useAStockTradingSession";
 import type {
   AnalysisPageData,
   CategorizedStockNews,
+  ChipDistribution,
   FundamentalExportData,
   IntradayData,
   KlineData,
   RetailSentiment,
   RevenueBreakdown,
+  StockBasicInfo,
+  StockBulletinPage,
+  StockBusinessIntro,
   StockCompareItem,
   StockFundFlowItem,
+  StockReportPage,
   StockSearchItem,
   StockSentiment,
   StockValuationDetail,
   TechnicalIndicators,
 } from "../../types/stock";
+
+export function useStockInfo(code: string) {
+  return useQuery({
+    queryKey: queryKeys.stock.info(code),
+    queryFn: () => openApiGet("/api/stock/{code}/info", {
+      path: { code },
+    }),
+    select: asApiModel<StockBasicInfo>(),
+    enabled: !!code,
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
+  });
+}
+
+export function useStockBusinessIntro(code: string) {
+  return useQuery({
+    queryKey: queryKeys.stock.businessIntro(code),
+    queryFn: () => openApiGet("/api/stock/{code}/business-intro", {
+      path: { code },
+    }),
+    select: asApiModel<StockBusinessIntro>(),
+    enabled: !!code,
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
+  });
+}
+
+export function useStockChipDistribution(code: string) {
+  return useQuery({
+    queryKey: queryKeys.stock.chipDistribution(code),
+    queryFn: () => openApiGet("/api/stock/{code}/chip-distribution", {
+      path: { code },
+    }),
+    select: asApiModel<ChipDistribution>(),
+    enabled: !!code,
+    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
+  });
+}
 
 export function useStockSearch(query: string) {
   return useQuery({
@@ -30,7 +71,7 @@ export function useStockSearch(query: string) {
     }),
     select: asApiModel<StockSearchItem[]>(),
     enabled: query.length >= 1,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
     placeholderData: (previous) => previous,
   });
 }
@@ -53,7 +94,7 @@ export function useKlineData(
     }),
     select: asApiModel<KlineData>(),
     enabled: enabled && !!code,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
   });
 }
 
@@ -78,11 +119,11 @@ export function useFinancial(code: string, type: "balance" | "profit" | "cashflo
     queryFn: () => fetchFinancial(code, type),
     select: asApiModel<Record<string, unknown>[]>(),
     enabled: !!code,
-    staleTime: 24 * 60 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
   });
 }
 
-const REVENUE_BREAKDOWN_STALE_TIME = 24 * 60 * 60 * 1000;
+const REVENUE_BREAKDOWN_STALE_TIME = QUERY_CACHE_POLICIES.reference.staleMs;
 
 function fetchFinancial(code: string, type: "balance" | "profit" | "cashflow") {
   return openApiGet("/api/stock/{code}/financial", {
@@ -154,7 +195,7 @@ export function useValuationDetail(code: string) {
     }),
     select: asApiModel<StockValuationDetail>(),
     enabled: !!code,
-    staleTime: 24 * 60 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketDaily.staleMs,
   });
 }
 
@@ -166,7 +207,7 @@ export function useIndicators(code: string) {
     }),
     select: asApiModel<TechnicalIndicators>(),
     enabled: !!code,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
   });
 }
 
@@ -178,7 +219,36 @@ export function useCategorizedStockNews(code: string) {
     }),
     select: asApiModel<CategorizedStockNews>(),
     enabled: !!code,
-    staleTime: 10 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
+  });
+}
+
+export function useStockBulletins(code: string, page: number, pageSize = 10) {
+  return useQuery({
+    queryKey: queryKeys.stock.bulletins(code, page, pageSize),
+    queryFn: ({ signal }) => openApiGet("/api/stock/{code}/bulletins", {
+      path: { code },
+      query: { page, page_size: pageSize },
+      options: { signal },
+    }),
+    select: asApiModel<StockBulletinPage>(),
+    enabled: !!code,
+    staleTime: QUERY_CACHE_POLICIES.marketThirtyMinutes.staleMs,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useStockReports(code: string, months = 6) {
+  return useQuery({
+    queryKey: queryKeys.stock.reports(code, months),
+    queryFn: ({ signal }) => openApiGet("/api/stock/{code}/reports", {
+      path: { code },
+      query: { months },
+      options: { signal },
+    }),
+    select: asApiModel<StockReportPage>(),
+    enabled: !!code,
+    staleTime: QUERY_CACHE_POLICIES.marketThirtyMinutes.staleMs,
   });
 }
 
@@ -190,7 +260,7 @@ export function useStockSentiment(code: string) {
     }),
     select: asApiModel<StockSentiment>(),
     enabled: !!code,
-    staleTime: 10 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
   });
 }
 
@@ -202,7 +272,7 @@ export function useRetailSentiment(code: string) {
     }),
     select: asApiModel<RetailSentiment>(),
     enabled: !!code,
-    staleTime: 10 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
   });
 }
 
@@ -214,7 +284,7 @@ export function useStockCompare(codes: string) {
     }),
     select: asApiModel<StockCompareItem[]>(),
     enabled: codes.length > 0,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
   });
 }
 
@@ -226,7 +296,7 @@ export function useStockFundFlow(code: string) {
     }),
     select: asApiModel<StockFundFlowItem[]>(),
     enabled: !!code,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
   });
 }
 
@@ -238,6 +308,21 @@ export function useAnalysisPageData(code: string, options: { enabled?: boolean }
     }),
     select: asApiModel<AnalysisPageData>(),
     enabled: !!code && (options.enabled ?? true),
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
   });
+}
+
+export async function downloadAnalysisPdf(code: string, date?: string): Promise<void> {
+  const { apiDownload } = await import("../client");
+  const fallback = `${code}_深度投研报告.pdf`;
+  await apiDownload(`/analysis/${code}/export-pdf`, fallback, { date });
+}
+
+export async function downloadAnalysisPdfFromData(result: unknown): Promise<void> {
+  const { apiDownloadPost } = await import("../client");
+  const res = result as { code?: string; stock_code?: string; name?: string; stock_name?: string };
+  const code = res?.stock_code || res?.code || "stock";
+  const name = res?.stock_name || res?.name || code;
+  const fallback = `${code}_${name}_深度投研报告.pdf`;
+  await apiDownloadPost("/analysis/export-pdf", result, fallback);
 }

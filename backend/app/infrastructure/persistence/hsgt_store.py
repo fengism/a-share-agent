@@ -59,10 +59,15 @@ def query_hsgt_dates(limit: int = 30) -> list[dict]:
     conn = get_connection()
     cursor = conn.execute(
         """
-        SELECT date, MAX(total) AS total, MAX(updated_at) AS updated_at
-        FROM hsgt_flow
-        GROUP BY date
-        ORDER BY date DESC
+        SELECT latest.date, flow.total, latest.updated_at
+        FROM (
+            SELECT date, MAX(time) AS final_time, MAX(updated_at) AS updated_at
+            FROM hsgt_flow
+            GROUP BY date
+        ) AS latest
+        JOIN hsgt_flow AS flow
+          ON flow.date = latest.date AND flow.time = latest.final_time
+        ORDER BY latest.date DESC
         LIMIT ?
         """,
         (limit,),

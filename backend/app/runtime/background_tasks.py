@@ -10,16 +10,22 @@ logger = logging.getLogger(__name__)
 
 
 async def refresh_industry_mapping_file_daily() -> None:
-    from app.financial_data.stock.public import update_industry_mapping_sw_second_file
+    from app.modules.industry_classification.public import scheduled_refresh
 
     async def iteration():
-        await call_blocking(update_industry_mapping_sw_second_file)
-        logger.info("行业映射文件更新完成")
+        result = await scheduled_refresh()
+        if result is not None:
+            logger.info(
+                "申万行业数据库更新完成: added=%s updated=%s unchanged=%s",
+                result.added,
+                result.updated,
+                result.unchanged,
+            )
 
     await task_scheduler.run_periodic(
         name="industry_mapping_refresh",
         coro_factory=iteration,
-        interval_seconds=24 * 60 * 60,
+        interval_seconds=60 * 60,
         leader_election=True,
     )
 
@@ -58,6 +64,7 @@ async def periodic_wal_checkpoint() -> None:
 
 
 async def periodic_database_backup() -> None:
+    from app.infrastructure.persistence.connection import default_backup_dir
     from app.infrastructure.persistence.operations import create_online_backups
 
     async def iteration():
@@ -66,7 +73,7 @@ async def periodic_database_backup() -> None:
             return
         created = await call_blocking(
             create_online_backups,
-            settings.database_backup_dir or settings.app_data_dir / "backups",
+            settings.database_backup_dir or default_backup_dir(),
             retention_count=settings.database_backup_retention_count,
             mirror_dir=settings.database_backup_mirror_dir,
             semaphore=database_semaphore,
@@ -128,16 +135,11 @@ async def twitter_health_check() -> bool:
 
 
 async def refresh_potential_stocks_daily() -> None:
-    """每日收盘后自动挖掘潜力股（当天已有结果则跳过）。"""
-    from datetime import datetime as dt
-
-    from app.modules.potential.public import run_daily_mining
+    """仅在交易日收盘后自动挖掘潜力股。"""
+    from app.modules.potential.public import run_scheduled_daily_mining
 
     async def iteration():
-        # 收盘后窗口内执行（15:10 起到当日结束），其他时段跳过
-        if not (15 <= dt.now().hour and (dt.now().hour > 15 or dt.now().minute >= 10)):
-            return
-        await run_daily_mining(force=False)
+        await run_scheduled_daily_mining()
 
     await task_scheduler.run_periodic(
         name="potential_stock_daily",

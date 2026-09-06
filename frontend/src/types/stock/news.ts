@@ -18,6 +18,49 @@ export interface CategorizedStockNews {
   cls_news: StockNews[];
 }
 
+export interface StockBulletin {
+  id: string;
+  title: string;
+  date: string;
+  type: string;
+  type2: string;
+  url: string;
+  pdf_url: string;
+  origin: string;
+  source: string;
+  source_api: string;
+}
+
+export interface StockBulletinPage {
+  code: string;
+  name: string;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  items: StockBulletin[];
+}
+
+export interface StockResearchReport {
+  id: string;
+  title: string;
+  org: string;
+  author: string;
+  date: string;
+  rating: string;
+  goal_price: number | null;
+  report_type: string;
+  url: string;
+  source: string;
+  source_api: string;
+}
+
+export interface StockReportPage {
+  code: string;
+  months: number;
+  total_count: number;
+  items: StockResearchReport[];
+}
+
 export interface FeedNewsItem {
   title: string;
   content: string;

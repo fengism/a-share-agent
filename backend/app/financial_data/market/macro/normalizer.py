@@ -18,16 +18,56 @@ _MONEY_SUPPLY_KEYS = [
 ]
 _SOCIAL_FINANCING_KEYS = [
     "TIME",
+    "SOCIAL_FINANCING_INCREMENT",
+    "RMB_LOAN_ACCUMULATE",
     "RMB_LOAN",
     "RMB_LOAN_SAME",
-    "RMB_LOAN_ACCUMULATE",
+    "RMB_LOAN_SEQUENTIAL",
     "LOAN_ACCUMULATE_SAME",
+    "FX_LOAN",
+    "ENTRUSTED_LOAN",
+    "TRUST_LOAN",
+    "UNDISCOUNTED_BANKERS_ACCEPTANCE",
+    "CORPORATE_BOND",
+    "GOVERNMENT_BOND",
+    "EQUITY_FINANCING",
+    "ABS_BY_DEPOSITORY",
+    "LOANS_WRITTEN_OFF",
+]
+_INDUSTRIAL_PRODUCTION_KEYS = [
+    "TIME",
+    "VALUE_ADDED_YOY",
+    "VALUE_ADDED_ACCUMULATE_YOY",
+]
+_RETAIL_SALES_KEYS = [
+    "TIME",
+    "RETAIL_VALUE",
+    "RETAIL_YOY",
+    "RETAIL_ACCUMULATE",
+    "RETAIL_ACCUMULATE_YOY",
+]
+_FIXED_ASSET_INVESTMENT_KEYS = ["TIME", "INVESTMENT_ACCUMULATE_YOY"]
+_REAL_ESTATE_KEYS = [
+    "TIME",
+    "DEVELOPMENT_INVESTMENT",
+    "DEVELOPMENT_INVESTMENT_YOY",
+    "SALES_AREA",
+    "SALES_AREA_YOY",
+    "SALES_VALUE",
+    "SALES_VALUE_YOY",
+]
+_EMPLOYMENT_KEYS = [
+    "TIME",
+    "URBAN_SURVEYED_UNEMPLOYMENT",
+    "CITY31_SURVEYED_UNEMPLOYMENT",
 ]
 _SHIBOR_PERIODS = {
     "隔夜": "ON",
     "O/N": "ON",
     "1周": "WEEK1",
     "1W": "WEEK1",
+    "2周": "WEEK2",
+    "2W": "WEEK2",
     "1月": "MONTH1",
     "1M": "MONTH1",
     "3月": "MONTH3",
@@ -285,6 +325,56 @@ def normalize_full(
         growth = {"gdp": {"latest": None, "trend": []}}
         if isinstance(gdp_data, Exception):
             logger.warning("GDP 数据获取失败: %s", gdp_data)
+
+    growth.update(
+        {
+            "industrial_production": _series(
+                collected.get("industrial_production"),
+                _INDUSTRIAL_PRODUCTION_KEYS,
+                12,
+                "规模以上工业增加值",
+                logger,
+                extract_latest_func,
+                extract_recent_func,
+            ),
+            "retail_sales": _series(
+                collected.get("retail_sales"),
+                _RETAIL_SALES_KEYS,
+                12,
+                "社会消费品零售总额",
+                logger,
+                extract_latest_func,
+                extract_recent_func,
+            ),
+            "fixed_asset_investment": _series(
+                collected.get("fixed_asset_investment"),
+                _FIXED_ASSET_INVESTMENT_KEYS,
+                12,
+                "固定资产投资",
+                logger,
+                extract_latest_func,
+                extract_recent_func,
+            ),
+            "real_estate": _series(
+                collected.get("real_estate"),
+                _REAL_ESTATE_KEYS,
+                12,
+                "房地产开发与销售",
+                logger,
+                extract_latest_func,
+                extract_recent_func,
+            ),
+            "employment": _series(
+                collected.get("employment"),
+                _EMPLOYMENT_KEYS,
+                12,
+                "城镇调查失业率",
+                logger,
+                extract_latest_func,
+                extract_recent_func,
+            ),
+        }
+    )
 
     trade_data = collected.get("trade")
     if isinstance(trade_data, list) and trade_data:

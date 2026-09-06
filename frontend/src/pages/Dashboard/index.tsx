@@ -1,44 +1,83 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { AimOutlined, ReloadOutlined } from "@ant-design/icons";
-import { Button, Card, Col, Row, Tag, Typography } from "antd";
-import { useMarketIndices, useMarketMainline } from "../../api/queries";
+import { Button, Card, Table, Tag, Typography } from "antd";
+import type { ColumnsType } from "antd/es/table";
+import { useNavigate } from "react-router-dom";
+import { useMarketMainline } from "../../api/queries";
 import ChangeValue from "../../components/ChangeValue";
-import IndexIntradayCard from "../../components/IndexIntradayCard";
+import RefreshBadge from "../../components/RefreshBadge";
 import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
-import { useColors, useStyles, useTokens } from "../../styles/ui";
-import type { MarketMainlineChance, MarketMainlineStyle } from "../../types/stock";
-import { formatAmount } from "../../utils/format";
+import { useAStockTradingSession } from "../../hooks/useAStockTradingSession";
+import { useColors, useStyles, useTokens, semanticTagStyle } from "../../styles/ui";
+import type {
+  MarketMainlineChance,
+  MarketMainlineStyle,
+  MarketMainlineStyleIndex,
+} from "../../types/stock";
 import { HotRankContent as HotRankBoard } from "../../components/HotRankBoard";
+import MarketOverviewBoard from "../../components/MarketOverviewBoard";
 import MarketWindBoard from "../../components/MarketWindBoard";
 import WatchlistPanel from "./WatchlistPanel";
 
 const { Text } = Typography;
 
-const INDEX_NAMES = ["上证指数", "深证成指", "创业板指", "科创50", "沪深300", "中证500"];
-
-function formatIndexPrice(value: number | string | null | undefined) {
-  const numericValue = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(numericValue) ? numericValue.toFixed(2) : "-";
+interface MainlineFaucetRow {
+  key: string;
+  code: string;
+  name: string;
+  change_pct: number | null;
+  reason: string;
+  origin: string;
 }
 
-function formatFetchedAt(value: string | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
+interface MainlineStyleStockRow {
+  key: string;
+  code: string;
+  name: string;
+  change_30d: number | null;
+  indexName: string;
 }
 
-function SectionHeading({ icon, title }: { icon: ReactNode; title: string }) {
-  const c = useColors();
-  const t = useTokens();
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
-      <span style={{ color: c.primary, fontSize: t.font.lg, display: "inline-flex" }}>{icon}</span>
-      <Text strong style={{ fontSize: t.font.lg, color: c.textPrimary }}>{title}</Text>
-    </div>
-  );
+function collectFaucetRows(chances: MarketMainlineChance[]): MainlineFaucetRow[] {
+  const rows: MainlineFaucetRow[] = [];
+  const seen = new Set<string>();
+  for (const chance of chances) {
+    for (const plate of chance.plates) {
+      for (const faucet of plate.faucets) {
+        if (seen.has(faucet.code)) continue;
+        seen.add(faucet.code);
+        rows.push({
+          key: faucet.code,
+          code: faucet.code,
+          name: faucet.name,
+          change_pct: faucet.change_pct,
+          reason: faucet.reason,
+          origin: plate.name === chance.title ? chance.title : `${chance.title} · ${plate.name}`,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+function collectStyleStockRows(style: MarketMainlineStyle): MainlineStyleStockRow[] {
+  const rows: MainlineStyleStockRow[] = [];
+  const seen = new Set<string>();
+  for (const index of style.indexes) {
+    for (const stock of index.stocks) {
+      if (seen.has(stock.code)) continue;
+      seen.add(stock.code);
+      rows.push({
+        key: stock.code,
+        code: stock.code,
+        name: stock.name,
+        change_30d: stock.change_30d,
+        indexName: index.name || "指数",
+      });
+    }
+  }
+  return rows;
 }
 
 function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
@@ -92,21 +131,6 @@ function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
             {plate.reason ? (
               <Text type="secondary" style={{ fontSize: t.font.xs }} ellipsis>{plate.reason}</Text>
             ) : null}
-            {plate.faucets.length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: t.space[3] }}>
-                {plate.faucets.map((faucet) => (
-                  <span key={faucet.code} style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[1] }}>
-                    <StockExternalLink code={faucet.code} name={faucet.name}>
-                      {faucet.name}
-                    </StockExternalLink>
-                    <ChangeValue value={faucet.change_pct} />
-                    {faucet.reason ? (
-                      <Text type="secondary" style={{ fontSize: t.font.xs }}>{faucet.reason}</Text>
-                    ) : null}
-                  </span>
-                ))}
-              </div>
-            ) : null}
           </div>
         ))}
       </div>
@@ -114,62 +138,140 @@ function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
   );
 }
 
-function MainlineStyleCard({ style }: { style: MarketMainlineStyle }) {
+function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
   const c = useColors();
   const t = useTokens();
+
+  const columns: ColumnsType<MainlineFaucetRow> = [
+    {
+      title: "龙头股",
+      key: "stock",
+      width: 160,
+      render: (_value, row) => (
+        <span style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[2] }}>
+          <StockExternalLink code={row.code} name={row.name}><strong>{row.name}</strong></StockExternalLink>
+          <span style={{ color: c.textSecondary, fontSize: t.font.xs }}>{row.code}</span>
+        </span>
+      ),
+    },
+    { title: "所属主线", dataIndex: "origin", key: "origin", width: 150, ellipsis: true },
+    {
+      title: "涨跌幅",
+      dataIndex: "change_pct",
+      key: "change_pct",
+      width: 90,
+      align: "right",
+      render: (value: number | null) => <ChangeValue value={value} />,
+    },
+    {
+      title: "上涨逻辑",
+      dataIndex: "reason",
+      key: "reason",
+      ellipsis: true,
+      render: (value: string) => value || "-",
+    },
+  ];
+
+  return (
+    <Card
+      size="small"
+      title={`主线龙头股（${rows.length}）`}
+      style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
+    >
+      <Table<MainlineFaucetRow>
+        size="small"
+        rowKey="key"
+        columns={columns}
+        dataSource={rows}
+        pagination={{ pageSize: 10, size: "small", showSizeChanger: false, hideOnSinglePage: true }}
+      />
+    </Card>
+  );
+}
+
+function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
+  const c = useColors();
+  const t = useTokens();
+  const stockRows = useMemo(() => collectStyleStockRows(style), [style]);
+
+  const indexColumns: ColumnsType<MarketMainlineStyleIndex> = [
+    {
+      title: "指数",
+      key: "name",
+      render: (_value, index) => <strong>{index.name || "指数"}</strong>,
+    },
+    {
+      title: "近30日涨跌幅",
+      dataIndex: "change_30d",
+      key: "change_30d",
+      width: 120,
+      align: "right",
+      render: (value: number | null) => <ChangeValue value={value} />,
+    },
+  ];
+
+  const stockColumns: ColumnsType<MainlineStyleStockRow> = [
+    {
+      title: "个股",
+      key: "stock",
+      width: 160,
+      render: (_value, row) => (
+        <span style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[2] }}>
+          <StockExternalLink code={row.code} name={row.name}><strong>{row.name}</strong></StockExternalLink>
+          <span style={{ color: c.textSecondary, fontSize: t.font.xs }}>{row.code}</span>
+        </span>
+      ),
+    },
+    { title: "所属指数", dataIndex: "indexName", key: "indexName", width: 140, ellipsis: true },
+    {
+      title: "近30日涨跌幅",
+      dataIndex: "change_30d",
+      key: "change_30d",
+      width: 120,
+      align: "right",
+      render: (value: number | null) => <ChangeValue value={value} />,
+    },
+  ];
+
   return (
     <Card
       size="small"
       title="风格判断"
-      style={{
-        borderRadius: t.radius.md,
-        boxShadow: t.shadow.xs,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-      }}
-      styles={{ body: { flex: 1, minHeight: 0 } }}
+      style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
+      styles={{ body: { display: "grid", gap: t.space[3] } }}
     >
-      <div style={{ display: "grid", gap: t.space[2] }}>
+      {style.title || style.interpret ? (
         <div style={{ display: "grid", gap: 2 }}>
-          {style.title ? (
-            <Text strong style={{ fontSize: t.font.sm }}>{style.title}</Text>
-          ) : null}
+          {style.title ? <Text strong style={{ fontSize: t.font.sm }}>{style.title}</Text> : null}
           {style.interpret ? (
-            <Text type="secondary" style={{ fontSize: t.font.xs }}>{style.interpret}</Text>
+            <Text type="secondary" style={{ fontSize: t.font.sm }}>{style.interpret}</Text>
           ) : null}
         </div>
-        {style.indexes.map((index) => (
-          <div
-            key={`${index.code}-${index.name}`}
-            style={{
-              background: c.nestedBg,
-              borderRadius: t.radius.sm,
-              padding: `${t.space[2]} ${t.space[3]}`,
-              display: "grid",
-              gap: 2,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "baseline", gap: t.space[2], flexWrap: "wrap" }}>
-              <Text strong style={{ fontSize: t.font.sm }}>{index.name || "指数"}</Text>
-              <ChangeValue value={index.change_30d} />
-              <Text type="secondary" style={{ fontSize: t.font.xs }}>近30日</Text>
-            </div>
-            {index.stocks.length > 0 ? (
-              <div style={{ display: "grid", gap: 2 }}>
-                {index.stocks.slice(0, 5).map((stock) => (
-                  <span key={stock.code} style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[1] }}>
-                    <StockExternalLink code={stock.code} name={stock.name}>
-                      {stock.name}
-                    </StockExternalLink>
-                    <ChangeValue value={stock.change_30d} />
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
+      ) : null}
+      {style.indexes.length > 0 ? (
+        <div style={{ display: "grid", gap: t.space[2] }}>
+          <Text strong style={{ fontSize: t.font.sm }}>指数表现</Text>
+          <Table<MarketMainlineStyleIndex>
+            size="small"
+            rowKey="code"
+            columns={indexColumns}
+            dataSource={style.indexes}
+            pagination={false}
+          />
+        </div>
+      ) : null}
+      {stockRows.length > 0 ? (
+        <div style={{ display: "grid", gap: t.space[2] }}>
+          <Text strong style={{ fontSize: t.font.sm }}>代表个股</Text>
+          <Table<MainlineStyleStockRow>
+            size="small"
+            rowKey="key"
+            columns={stockColumns}
+            dataSource={stockRows}
+            pagination={{ pageSize: 10, size: "small", showSizeChanger: false, hideOnSinglePage: true }}
+          />
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -177,16 +279,23 @@ function MainlineStyleCard({ style }: { style: MarketMainlineStyle }) {
 function DashboardMainlineSection() {
   const t = useTokens();
   const query = useMarketMainline();
+  const isTradingSession = useAStockTradingSession();
   const chances = useMemo(() => query.data?.items ?? [], [query.data?.items]);
+  const faucetRows = useMemo(() => collectFaucetRows(chances), [chances]);
+  const style = query.data?.style ?? null;
+  const hasContent = chances.length > 0 || style != null;
 
   return (
-    <section aria-label="今日主线" style={{ marginTop: t.space[4] }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: t.space[2] }}>
-        <SectionHeading icon={<AimOutlined />} title="今日主线" />
-        <div style={{ display: "flex", alignItems: "center", gap: t.space[1] }}>
-          <Text type="secondary" style={{ fontSize: t.font.xs }}>
-            更新时间：{formatFetchedAt(query.data?.fetched_at)}
-          </Text>
+    <section aria-label="今日主线">
+      <header className="dashboard-section-heading" style={{ marginBottom: 16 }}>
+        <span className="dashboard-section-heading__icon"><AimOutlined /></span>
+        <span className="dashboard-section-heading__text">
+          <strong>今日主线</strong>
+          <small>主线题材机会与市场风格判断</small>
+        </span>
+        <span className="dashboard-section-heading__actions">
+          <Tag style={{ ...semanticTagStyle("primary"), marginInlineEnd: 0 }}>{chances.length} 条主线</Tag>
+          <RefreshBadge label={isTradingSession ? "每分钟自动更新" : "每 5 分钟更新"} />
           <Button
             type="text"
             size="small"
@@ -196,23 +305,28 @@ function DashboardMainlineSection() {
             title="刷新今日主线"
             onClick={() => void query.refetch()}
           />
-        </div>
-      </div>
+        </span>
+      </header>
       <SectionDataState
         isLoading={query.isLoading}
         error={query.error}
         onRetry={() => query.refetch()}
-        isEmpty={!query.isLoading && !query.error && chances.length === 0}
+        isEmpty={!query.isLoading && !query.error && !hasContent}
         emptyText="暂无今日主线数据"
         errorTitle="今日主线加载失败"
         skeletonRows={4}
         minHeight={160}
       >
-        <div className="dashboard-mainline-grid" style={{ marginTop: t.space[2] }}>
-          {chances.map((chance) => (
-            <MainlineChanceCard key={chance.title} chance={chance} />
-          ))}
-          {query.data?.style ? <MainlineStyleCard style={query.data.style} /> : null}
+        <div style={{ display: "grid", gap: t.space[3] }}>
+          {chances.length > 0 ? (
+            <div className="dashboard-mainline-grid">
+              {chances.map((chance) => (
+                <MainlineChanceCard key={chance.title} chance={chance} />
+              ))}
+            </div>
+          ) : null}
+          {faucetRows.length > 0 ? <MainlineFaucetTableCard rows={faucetRows} /> : null}
+          {style ? <MainlineStyleTableCard style={style} /> : null}
         </div>
       </SectionDataState>
     </section>
@@ -220,111 +334,54 @@ function DashboardMainlineSection() {
 }
 
 export default function Dashboard() {
-  const { data: marketData, isLoading, error, refetch } = useMarketIndices();
-  const c = useColors();
-  const t = useTokens();
-  const { pageContainerStyle, rowGutter } = useStyles();
-  const [activeIndexCode, setActiveIndexCode] = useState("000001");
-
-  const mainIndices = useMemo(
-    () => INDEX_NAMES.map(
-      (name) => (marketData?.indices || []).find((item) => item.name === name),
-    ).filter((item) => item != null),
-    [marketData],
-  );
-  const activeIndex = mainIndices.find((item) => item.code === activeIndexCode) ?? mainIndices[0];
-
-  useEffect(() => {
-    if (mainIndices.length > 0 && !mainIndices.some((item) => item.code === activeIndexCode)) {
-      setActiveIndexCode(mainIndices[0].code);
-    }
-  }, [activeIndexCode, mainIndices]);
+  const { pageContainerStyle } = useStyles();
+  const navigate = useNavigate();
 
   const today = new Date();
   const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
 
   return (
-    <div className="dashboard-page" style={pageContainerStyle}>
+    <div
+      className="dashboard-page"
+      style={{ ...pageContainerStyle, width: "100%", maxWidth: "none", boxSizing: "border-box" }}
+    >
       <header className="dashboard-hero">
         <div className="dashboard-hero__copy">
-          <span className="dashboard-hero__eyebrow">今日市场</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="dashboard-hero__eyebrow">今日市场</span>
+            <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>·</span>
+            <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-primary)", fontWeight: 600 }}>AI 投研智能态势中枢</span>
+          </div>
           <h1>市场总览</h1>
           <p>{dateStr}</p>
         </div>
-        <div className="dashboard-hero__meta" aria-label="市场概览元数据">
-          <span>当前查看 {activeIndex?.name || "等待行情"} · {activeIndex?.code || "-"}</span>
+        <div className="dashboard-hero__shortcuts" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <Button size="small" shape="round" onClick={() => navigate("/analysis")} style={{ fontSize: "var(--c-font-xs)" }}>
+            🤖 个股研报
+          </Button>
+          <Button size="small" shape="round" onClick={() => navigate("/screener")} style={{ fontSize: "var(--c-font-xs)" }}>
+            ⚡ 智能选股
+          </Button>
+          <Button size="small" shape="round" onClick={() => navigate("/quant")} style={{ fontSize: "var(--c-font-xs)" }}>
+            📊 量化回测
+          </Button>
+          <Button size="small" shape="round" onClick={() => navigate("/industry-chain")} style={{ fontSize: "var(--c-font-xs)" }}>
+            🕸️ 产业链图谱
+          </Button>
         </div>
       </header>
       <div className="dashboard-layout">
-        <section className="dashboard-main" aria-label="市场概览">
-          <SectionDataState
-            isLoading={isLoading}
-            error={error}
-            onRetry={() => refetch()}
-            isEmpty={mainIndices.length === 0}
-            emptyText="暂无市场指数数据"
-            errorTitle="市场指数加载失败"
-            skeletonRows={3}
-            minHeight={180}
-          >
-            <Row gutter={[rowGutter, rowGutter]}>
-              {mainIndices.map((idx) => {
-                const isUp = idx.change_pct != null && idx.change_pct > 0;
-                const isDown = idx.change_pct != null && idx.change_pct < 0;
-                const color = isUp ? c.up : isDown ? c.down : c.textSecondary;
-                return (
-                  <Col xs={24} sm={12} md={8} key={idx.code}>
-                    <button
-                      type="button"
-                      aria-label={`选择${idx.name}分时图`}
-                      aria-pressed={idx.code === activeIndex?.code}
-                      onClick={() => setActiveIndexCode(idx.code)}
-                      className={`dashboard-index-button${idx.code === activeIndex?.code ? " is-active" : ""}`}
-                    >
-                      <div className={`dashboard-index-tile${idx.code === activeIndex?.code ? " is-active" : ""}`} style={{
-                        display: "flex", flexDirection: "column", gap: t.space[1],
-                        background: idx.code === activeIndex?.code ? c.activeBg : c.hoverBg,
-                        borderStyle: "solid", borderWidth: "1px 1px 1px 3px",
-                        borderColor: `${idx.code === activeIndex?.code ? c.primary : c.border} ${idx.code === activeIndex?.code ? c.primary : c.border} ${idx.code === activeIndex?.code ? c.primary : c.border} ${color}`,
-                        borderRadius: t.radius.md, height: "100%", boxSizing: "border-box",
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: t.space[2] }}>
-                          <span className="dashboard-index-tile__identity">
-                            <Text style={{ color: c.textSecondary, fontSize: t.font.md, fontWeight: Number(t.weight.medium) }}>{idx.name}</Text>
-                            <Text type="secondary" style={{ fontSize: t.font.xs }}>{idx.code}</Text>
-                          </span>
-                          <Text style={{ color: c.textMuted, fontSize: t.font.sm }}>额 {formatAmount(idx.amount)}</Text>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: t.space[2] }}>
-                          <Text style={{ color, fontSize: t.font["2xl"], fontWeight: Number(t.weight.bold), lineHeight: t.leading.tight }}>{formatIndexPrice(idx.price)}</Text>
-                          <ChangeValue value={idx.change_pct} showIcon style={{ fontSize: t.font.base }} />
-                        </div>
-                      </div>
-                    </button>
-                  </Col>
-                );
-              })}
-            </Row>
-            {activeIndex && (
-              <div style={{ marginTop: t.space[4] }}>
-                <IndexIntradayCard
-                  symbol={activeIndex.code}
-                  name={activeIndex.name}
-                  price={activeIndex.price}
-                  changePct={activeIndex.change_pct}
-                  preClose={activeIndex.pre_close}
-                  height={300}
-                />
-              </div>
-            )}
-          </SectionDataState>
-          <DashboardMainlineSection />
-          <section aria-label="今日风口" style={{ marginTop: t.space[4] }}>
+        <section className="dashboard-main" aria-label="首页中间内容">
+          <section className="dashboard-market-board" aria-label="首页市场看板">
+            <MarketOverviewBoard showRankings={false} onNavigate={(tab) => navigate(`/market?tab=${tab}`)} />
+          </section>
+          <section aria-label="市场风向">
             <MarketWindBoard embedded />
           </section>
+          <DashboardMainlineSection />
         </section>
-        <aside className="dashboard-sidebar" aria-label="首页榜单与自选栏">
-          <HotRankBoard embedded />
+        <aside className="dashboard-sidebar" aria-label="首页热榜与自选栏">
+          <section aria-label="热榜"><HotRankBoard embedded /></section>
           <WatchlistPanel />
         </aside>
       </div>

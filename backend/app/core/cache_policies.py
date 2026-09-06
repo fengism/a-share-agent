@@ -12,6 +12,7 @@ class TtlPolicy:
 class FreshStalePolicy:
     fresh_seconds: int
     stale_seconds: int
+    maxsize: int
 
 
 @dataclass(frozen=True)
@@ -20,7 +21,11 @@ class LiveStablePolicy:
     stable_seconds: int
 
 
-REALTIME_STOCK_QUOTES = FreshStalePolicy(fresh_seconds=10, stale_seconds=300)
+REALTIME_STOCK_QUOTES = FreshStalePolicy(
+    fresh_seconds=10,
+    stale_seconds=300,
+    maxsize=10_000,
+)
 MARKET_INDICES = LiveStablePolicy(live_seconds=30, stable_seconds=24 * 60 * 60)
 INDEX_INTRADAY = TtlPolicy(ttl_seconds=30)
 STOCK_INTRADAY = TtlPolicy(ttl_seconds=30)
@@ -29,3 +34,10 @@ MARKET_LIMIT_HISTORY = TtlPolicy(ttl_seconds=24 * 60 * 60)
 MARKET_SECTOR_STOCKS_HISTORY = TtlPolicy(ttl_seconds=24 * 60 * 60)
 BASIC_INFO_FINAL = TtlPolicy(ttl_seconds=5 * 60)
 BASIC_INFO_STATIC = TtlPolicy(ttl_seconds=24 * 60 * 60)
+
+PRICE_ANOMALY = TtlPolicy(ttl_seconds=24 * 60 * 60)
+VALUATION = TtlPolicy(ttl_seconds=24 * 60 * 60)
+VALUATION_DETAIL = TtlPolicy(ttl_seconds=24 * 60 * 60)
+SINA_STOCK_NAMES = TtlPolicy(ttl_seconds=24 * 60 * 60)
+SINA_SPOT_SNAPSHOT = TtlPolicy(ttl_seconds=60)
+AGENT_WEB_FETCH = TtlPolicy(ttl_seconds=10 * 60)

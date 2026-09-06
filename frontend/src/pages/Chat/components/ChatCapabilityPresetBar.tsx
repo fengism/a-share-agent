@@ -1,3 +1,4 @@
+import { SettingOutlined, UpOutlined } from "@ant-design/icons";
 import { Button, Space, Typography } from "antd";
 import type {
   ChatCapabilitiesResponse,
@@ -20,6 +21,8 @@ interface ChatCapabilityPresetBarProps {
   agentNames: string[] | null;
   onApply: (skillNames: string[], agentNames: string[]) => void;
   disabled: boolean;
+  isCustomOpen?: boolean;
+  onToggleCustom?: () => void;
 }
 
 function sameNames(left: string[], right: string[]): boolean {
@@ -35,6 +38,8 @@ export function ChatCapabilityPresetBar({
   agentNames,
   onApply,
   disabled,
+  isCustomOpen,
+  onToggleCustom,
 }: ChatCapabilityPresetBarProps) {
   if (!capabilities) return null;
 
@@ -76,7 +81,7 @@ export function ChatCapabilityPresetBar({
 
   return (
     <div className="chat-capability-presets">
-      <Text type="secondary">本会话预设</Text>
+      <Text type="secondary">会话预设</Text>
       <Space size={[6, 6]} wrap>
         {CAPABILITY_PRESETS.map((preset) => (
           <Button
@@ -91,6 +96,17 @@ export function ChatCapabilityPresetBar({
           </Button>
         ))}
       </Space>
+      {onToggleCustom ? (
+        <Button
+          size="small"
+          type="text"
+          icon={isCustomOpen ? <UpOutlined /> : <SettingOutlined />}
+          style={{ marginLeft: "auto", color: "var(--c-text-muted)" }}
+          onClick={onToggleCustom}
+        >
+          {isCustomOpen ? "收起专家配置" : "自定义配置"}
+        </Button>
+      ) : null}
     </div>
   );
 }

@@ -12,7 +12,7 @@ export function buildIntradayVisibleRange(timestamp: number): IntradayVisibleRan
   const month = date.getUTCMonth();
   const day = date.getUTCDate();
   return {
-    from: Date.UTC(year, month, day, 9, 0) / 1000 as UTCTimestamp,
-    to: Date.UTC(year, month, day, 16, 0) / 1000 as UTCTimestamp,
+    from: Date.UTC(year, month, day, 9, 30) / 1000 as UTCTimestamp,
+    to: Date.UTC(year, month, day, 15, 0) / 1000 as UTCTimestamp,
   };
 }

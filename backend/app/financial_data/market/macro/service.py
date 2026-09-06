@@ -3,11 +3,13 @@ import logging
 import re
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any, cast
 
 from app.configuration.paths import DATA_DIR
-from app.core.cache import cache, dated_cache_key_no_day
+from app.core.cache import dated_cache_key_no_day
+from app.core.cache import reference_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.financial_data.market.macro import collector as macro_collector
@@ -17,7 +19,33 @@ from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
-_akshare_macro_semaphore = asyncio.Semaphore(8)
+_NBS_MACRO_CONCURRENCY = 8
+_AKSHARE_MACRO_CONCURRENCY = 8
+_nbs_macro_semaphore = asyncio.Semaphore(_NBS_MACRO_CONCURRENCY)
+_akshare_macro_semaphore = asyncio.Semaphore(_AKSHARE_MACRO_CONCURRENCY)
+# 宏观抓取专用线程池：akshare 部分接口会无限悬挂（请求无超时），wait_for 超时
+# 只能放弃等待、无法终止已运行的线程。悬挂调用若占用共享阻塞线程池，会拖死
+# 全应用的 call_blocking（含 SQLite 读写）；专用池的 max_workers 就是悬挂线程
+# 的硬上限，最坏情况仅宏观抓取自身降级（排队任务在 wait_for 处依次超时）。
+_MACRO_BLOCKING_EXECUTOR = ThreadPoolExecutor(
+    max_workers=_NBS_MACRO_CONCURRENCY + _AKSHARE_MACRO_CONCURRENCY,
+    thread_name_prefix="macro-blocking",
+)
+
+
+async def _run_macro_blocking(
+    func: Callable[[], Any],
+    *,
+    semaphore: asyncio.Semaphore | None = None,
+) -> Any:
+    """在宏观专用线程池中执行阻塞抓取，避免悬挂线程拖垮共享线程池。"""
+    loop = asyncio.get_running_loop()
+    if semaphore is None:
+        return await loop.run_in_executor(_MACRO_BLOCKING_EXECUTOR, func)
+    async with semaphore:
+        return await loop.run_in_executor(_MACRO_BLOCKING_EXECUTOR, func)
+
+
 _macro_singleflight: AsyncSingleFlight[dict] = AsyncSingleFlight()
 _macro_metric_singleflight: AsyncSingleFlight[object] = AsyncSingleFlight()
 _eastmoney_provider = None
@@ -31,26 +59,54 @@ _MACRO_METHODS = {
     "pmi": "fetch_china_pmi",
     "money_supply": "fetch_china_economy_currency_supply",
     "gdp": "fetch_china_gdp",
+    "industrial_production": "fetch_china_industrial_production",
+    "retail_sales": "fetch_china_retail_sales",
+    "fixed_asset_investment": "fetch_china_fixed_asset_investment",
+    "real_estate": "fetch_china_real_estate",
+    "employment": "fetch_china_employment",
     "lpr": "fetch_china_lpr",
     "shibor": "fetch_china_shibor",
     "trade": "fetch_china_trade",
     "social_financing": "fetch_china_social_financing",
     "us_gdp": "fetch_us_gdp",
     "us_cpi": "fetch_us_cpi",
-    "us_core_pce": "fetch_us_core_pce",
     "us_labor": "fetch_us_labor",
     "us_pmi": "fetch_us_pmi",
     "us_fed_rate": "fetch_us_fed_rate",
     "us_retail_sales": "fetch_us_retail_sales",
     "us_trade_balance": "fetch_us_trade_balance",
 }
-_NBS_FIRST_OPERATIONS = {"cpi", "ppi", "pmi", "gdp"}
-_AKSHARE_ONLY_OPERATIONS = {operation for operation in _MACRO_METHODS if operation.startswith("us_")}
-_AKSHARE_CHINA_OPERATIONS = {"cpi", "ppi", "pmi", "gdp", "money_supply", "lpr", "shibor", "trade", "social_financing"}
+_NBS_FIRST_OPERATIONS = {
+    "cpi",
+    "ppi",
+    "pmi",
+    "money_supply",
+    "gdp",
+    "lpr",
+    "trade",
+    "shibor",
+    "industrial_production",
+    "retail_sales",
+    "fixed_asset_investment",
+    "real_estate",
+    "employment",
+    "social_financing",
+}
+_US_OPERATIONS = {operation for operation in _MACRO_METHODS if operation.startswith("us_")}
+# 美国宏观中东财数据中心已有直连实现的指标（akshare 依赖金十页面，当前不可用），akshare 兜底；
+# 其余 us_* 指标东财侧暂无对应序列，仍走 akshare 单源
+_US_EASTMONEY_OPERATIONS = {
+    "us_gdp",
+    "us_cpi",
+    "us_labor",
+    "us_pmi",
+    "us_fed_rate",
+    "us_retail_sales",
+    "us_trade_balance",
+}
 _US_FIELDS = {
     "us_gdp": ["TIME", "VALUE"],
     "us_cpi": ["TIME", "CPI_YOY", "CPI_MOM", "CORE_CPI_MOM"],
-    "us_core_pce": ["TIME", "VALUE"],
     "us_labor": ["TIME", "UNEMPLOYMENT", "NON_FARM", "INITIAL_JOBLESS"],
     "us_pmi": ["TIME", "MANUFACTURING_PMI", "SERVICES_PMI"],
     "us_fed_rate": ["TIME", "VALUE"],
@@ -58,7 +114,13 @@ _US_FIELDS = {
     "us_trade_balance": ["TIME", "VALUE"],
 }
 _US_SNAPSHOT_PATH = DATA_DIR / "us_macro_snapshot.json"
+_US_SNAPSHOT_SCHEMA_VERSION = 3
 _US_SNAPSHOT_MAX_AGE_SECONDS = 6 * 60 * 60
+_US_METRIC_FETCH_TIMEOUT_SECONDS = 90
+# 单个数据源尝试的上限；前端宏观查询超时为 120s，需为回退链留出多次尝试空间
+_MACRO_PROVIDER_TIMEOUT_SECONDS = 25
+# NBS 房地产等指标会串行请求多个统计分组，单独放宽以覆盖慢响应。
+_NBS_PROVIDER_TIMEOUT_SECONDS = 45
 _us_macro_singleflight: AsyncSingleFlight[dict] = AsyncSingleFlight()
 _us_refresh_task: asyncio.Task | None = None
 
@@ -68,7 +130,27 @@ _PROVIDER_APIS = {
     "eastmoney": "https://datacenter-web.eastmoney.com/api/data/v1/get",
     "akshare": "https://akshare.akfamily.xyz/data/macro/macro.html",
 }
-_MONTHLY_OPERATIONS = {"cpi", "ppi", "pmi", "money_supply", "social_financing", "trade", *_AKSHARE_ONLY_OPERATIONS}
+_PROVIDER_OPERATION_APIS = {
+    ("nbs", "lpr"): "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-currency/LprChrtCSV",
+    ("nbs", "shibor"): "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-shibor/ShiborHis",
+    ("nbs", "social_financing"): (
+        "https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html"
+    ),
+}
+_MONTHLY_OPERATIONS = {
+    "cpi",
+    "ppi",
+    "pmi",
+    "money_supply",
+    "social_financing",
+    "trade",
+    "industrial_production",
+    "retail_sales",
+    "fixed_asset_investment",
+    "real_estate",
+    "employment",
+    *_US_OPERATIONS,
+}
 
 
 def _latest_period(operation: str, rows: list[dict]) -> str | None:
@@ -128,7 +210,7 @@ def _with_metric_metadata(
         {
             **row,
             "_SOURCE": provider,
-            "_SOURCE_API": _PROVIDER_APIS[provider],
+            "_SOURCE_API": _PROVIDER_OPERATION_APIS.get((provider, operation), _PROVIDER_APIS[provider]),
             "_LATEST_PERIOD": latest_period,
             "_IS_FALLBACK": is_fallback,
             "_IS_STALE": is_stale,
@@ -148,29 +230,65 @@ async def _load_macro_metric(operation: str) -> object:
     if method_name is None:
         raise ValueError(f"不支持的宏观指标: {operation}")
     provider_names: tuple[str, ...]
-    if operation in _AKSHARE_ONLY_OPERATIONS:
+    if operation in _US_EASTMONEY_OPERATIONS:
+        provider_names = ("eastmoney", "akshare")
+    elif operation in _US_OPERATIONS:
         provider_names = ("akshare",)
     elif operation in _NBS_FIRST_OPERATIONS:
-        provider_names = ("akshare", "nbs", "eastmoney")
-    elif operation == "money_supply":
-        provider_names = ("akshare", "eastmoney", "nbs")
-    elif operation in _AKSHARE_CHINA_OPERATIONS:
-        provider_names = ("akshare", "eastmoney")
+        # 国内宏观数据优先使用官方源聚合 Provider，东财和 akshare 依次兜底。
+        provider_names = ("nbs", "eastmoney", "akshare")
     else:
         provider_names = ("eastmoney",)
 
     last_error: Exception | None = None
+    supported_attempts = 0
+    providers: dict[str, object] = {}
+
+    def resolve_provider(provider_name: str) -> object:
+        if provider_name not in providers:
+            providers[provider_name] = get_provider(provider_name)
+        return providers[provider_name]
+
     for index, provider_name in enumerate(provider_names):
-        provider = get_provider(provider_name)
-        try:
-            result = await provider_gateway.call(
+        provider = resolve_provider(provider_name)
+        fetcher = getattr(provider, method_name, None)
+        if not callable(fetcher):
+            logger.debug(
+                "宏观指标数据源不支持该操作，跳过: operation=%s provider=%s method=%s",
+                operation,
                 provider_name,
-                f"macro_{operation}",
-                lambda provider=provider: call_blocking(
-                    getattr(provider, method_name),
-                    semaphore=_akshare_macro_semaphore if provider_name == "akshare" else None,
+                method_name,
+            )
+            continue
+
+        is_fallback_attempt = supported_attempts > 0
+        supported_attempts += 1
+        if provider_name == "nbs":
+            semaphore = _nbs_macro_semaphore
+        elif provider_name == "akshare":
+            semaphore = _akshare_macro_semaphore
+        else:
+            semaphore = None
+
+        try:
+            # 单个数据源尝试限时：akshare 部分接口当前会无限悬挂（请求无超时），
+            # 不限时会堵死整条回退链导致指标刷不出来。NBS 使用独立并发额度，
+            # 避免全量宏观数据并发加载时在共享信号量中排队并集体超时。
+            result = await asyncio.wait_for(
+                provider_gateway.call(
+                    provider_name,
+                    f"macro_{operation}",
+                    lambda fetcher=fetcher, semaphore=semaphore: _run_macro_blocking(
+                        fetcher,
+                        semaphore=semaphore,
+                    ),
+                    is_fallback_attempt=is_fallback_attempt,
                 ),
-                is_fallback_attempt=index > 0,
+                timeout=(
+                    _NBS_PROVIDER_TIMEOUT_SECONDS
+                    if provider_name == "nbs"
+                    else _MACRO_PROVIDER_TIMEOUT_SECONDS
+                ),
             )
             if not isinstance(result, list) or not result or not all(isinstance(row, dict) for row in result):
                 raise ValueError(f"{provider_name} 宏观指标为空或格式无效: {operation}")
@@ -178,10 +296,20 @@ async def _load_macro_metric(operation: str) -> object:
                 result,
                 operation=operation,
                 provider=provider_name,
-                is_fallback=index > 0,
+                is_fallback=is_fallback_attempt,
             )
-            if provider_name in {"nbs", "akshare"} and len(provider_names) > 1 and enriched[0]["_IS_STALE"]:
-                raise ValueError(f"{provider_name} 宏观指标已滞后: {operation} {enriched[0]['_LATEST_PERIOD']}")
+            # 有实际可用的下游数据源时，当前结果滞后则继续降级；如果后续数据源
+            # 根本没有实现该指标，则保留官方源的历史数据而不是返回空结果。
+            if provider_name in {"nbs", "akshare"} and enriched[0]["_IS_STALE"]:
+                has_supported_fallback = any(
+                    callable(getattr(resolve_provider(next_provider_name), method_name, None))
+                    for next_provider_name in provider_names[index + 1:]
+                )
+                if has_supported_fallback:
+                    raise ValueError(
+                        f"{provider_name} 宏观指标已滞后: "
+                        f"{operation} {enriched[0]['_LATEST_PERIOD']}"
+                    )
             cache.set(
                 _macro_metric_cache_key(operation),
                 enriched,
@@ -190,11 +318,13 @@ async def _load_macro_metric(operation: str) -> object:
             return enriched
         except Exception as error:
             last_error = error
+            error_detail = str(error).strip() or type(error).__name__
             logger.info(
-                "宏观指标数据源失败: operation=%s provider=%s error=%s",
+                "宏观指标数据源失败: operation=%s provider=%s error_type=%s error=%s",
                 operation,
                 provider_name,
-                error,
+                type(error).__name__,
+                error_detail,
             )
     if last_error is not None:
         raise last_error
@@ -290,21 +420,38 @@ def _load_us_macro_snapshot() -> dict | None:
     try:
         import json
         payload = json.loads(_US_SNAPSHOT_PATH.read_text(encoding="utf-8"))
-        if not isinstance(payload, dict) or not isinstance(payload.get("indicators"), dict):
+        if (
+            not isinstance(payload, dict)
+            or payload.get("_schema_version") != _US_SNAPSHOT_SCHEMA_VERSION
+            or not isinstance(payload.get("indicators"), dict)
+        ):
             return None
+        payload.pop("_schema_version")
         return payload
     except (OSError, ValueError, TypeError):
         return None
 
 
 def _save_us_macro_snapshot(payload: dict) -> None:
-    atomic_write_json(_US_SNAPSHOT_PATH, payload, indent=0)
+    atomic_write_json(
+        _US_SNAPSHOT_PATH,
+        {**payload, "_schema_version": _US_SNAPSHOT_SCHEMA_VERSION},
+        indent=0,
+    )
 
 
 async def _collect_us_macro_data() -> dict:
     operations = tuple(_US_FIELDS)
+    # 单指标独立限时：个别源（如当前挂死的 akshare）不允许阻塞整份快照的落盘，
+    # 超时/失败只记入 failed_indicators，其余指标正常返回
     values = await asyncio.gather(
-        *(_fetch_macro_metric(operation, force_refresh=True) for operation in operations),
+        *(
+            asyncio.wait_for(
+                _fetch_macro_metric(operation, force_refresh=True),
+                timeout=_US_METRIC_FETCH_TIMEOUT_SECONDS,
+            )
+            for operation in operations
+        ),
         return_exceptions=True,
     )
     failed = {

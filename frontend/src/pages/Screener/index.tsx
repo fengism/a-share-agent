@@ -2,9 +2,10 @@ import { InfoCircleOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, InputNumber, message, Modal, Progress, Radio, Space, Tag, Tooltip, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
-import { useIndustries, useRunScreenerStrategy, useScreenerScreen, useScreenerStrategies } from "../../api/queries";
+import { useIndustries, useRunScreenerStrategy, useScreenerConcepts, useScreenerScreen, useScreenerStrategies } from "../../api/queries";
 import DataRefreshIndicator from "../../components/DataRefreshIndicator";
 import SectionDataState from "../../components/SectionDataState";
+import { useAuthStore } from "../../store/authStore";
 import { useStyles } from "../../styles/ui";
 import type { ScreenerFilter, ScreenerItem, ScreenerStrategyPreset } from "../../types/stock";
 import FilterPanel from "./FilterPanel";
@@ -25,7 +26,9 @@ interface PresetStrategy {
 const PRESET_STRATEGIES: PresetStrategy[] = [
   { label: "低估值蓝筹", description: "PE<15 · PB<2 · 市值>200亿", icon: "🛡️", filters: { pe_min: 0, pe_max: 15, pb_min: 0, pb_max: 2, market_cap_min: 200, market_cap_max: null, sort_by: "market_cap", sort_order: "desc" } },
   { label: "破净股", description: "PB<1 · 市值>50亿", icon: "💎", filters: { pb_min: 0, pb_max: 1, market_cap_min: 50, market_cap_max: null, sort_by: "pb", sort_order: "asc" } },
+  { label: "大盘核心", description: "市值>500亿 · PE<25", icon: "👑", filters: { market_cap_min: 500, market_cap_max: null, pe_min: 0, pe_max: 25, sort_by: "market_cap", sort_order: "desc" } },
   { label: "高成长活跃", description: "涨跌幅>2% · 换手率>3%", icon: "🚀", filters: { change_pct_min: 2, change_pct_max: null, turnover_pct_min: 3, turnover_pct_max: null, sort_by: "change_pct", sort_order: "desc" } },
+  { label: "放量突破", description: "换手率>5% · 涨跌幅>3%", icon: "💥", filters: { turnover_pct_min: 5, turnover_pct_max: null, change_pct_min: 3, change_pct_max: null, sort_by: "turnover_pct", sort_order: "desc" } },
   { label: "低价活跃股", description: "股价<10 · 换手率>5%", icon: "⚡", filters: { price_min: 0, price_max: 10, turnover_pct_min: 5, turnover_pct_max: null, sort_by: "turnover_pct", sort_order: "desc" } },
   { label: "绩优蓝筹", description: "PE 5-30 · PB 1-8 · 市值>500亿", icon: "🏆", filters: { pe_min: 5, pe_max: 30, pb_min: 1, pb_max: 8, market_cap_min: 500, market_cap_max: null, sort_by: "market_cap", sort_order: "desc" } },
 ];
@@ -41,30 +44,52 @@ interface StoredStrategySettings {
   scanLimit: 50 | 200;
 }
 
-function loadStrategySettings(): StoredStrategySettings {
-  const defaults: StoredStrategySettings = {
+function defaultStrategySettings(): StoredStrategySettings {
+  return {
     parameters: {},
     maxSignalAgeBars: 20,
     scanLimit: 50,
   };
-  if (typeof window === "undefined") return defaults;
+}
+
+function strategySettingsStorageKey(userId?: number): string | undefined {
+  return userId == null ? undefined : `${STRATEGY_SETTINGS_STORAGE_KEY}:user:${userId}`;
+}
+
+function parseStrategySettings(raw: string | null): StoredStrategySettings {
+  const defaults = defaultStrategySettings();
+  if (raw == null) return defaults;
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object") return defaults;
+  return {
+    strategyKey: typeof parsed.strategyKey === "string" ? parsed.strategyKey : undefined,
+    parameters: parsed.parameters && typeof parsed.parameters === "object" && !Array.isArray(parsed.parameters)
+      ? parsed.parameters
+      : {},
+    maxSignalAgeBars: parsed.maxSignalAgeBars === null
+      ? null
+      : Number.isInteger(parsed.maxSignalAgeBars) && parsed.maxSignalAgeBars >= 0 && parsed.maxSignalAgeBars <= 250
+        ? parsed.maxSignalAgeBars
+        : defaults.maxSignalAgeBars,
+    scanLimit: parsed.scanLimit === 200 ? 200 : 50,
+  };
+}
+
+function loadStrategySettings(storageKey?: string): StoredStrategySettings {
+  if (typeof window === "undefined" || !storageKey) return defaultStrategySettings();
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(STRATEGY_SETTINGS_STORAGE_KEY) ?? "null");
-    if (!parsed || typeof parsed !== "object") return defaults;
-    return {
-      strategyKey: typeof parsed.strategyKey === "string" ? parsed.strategyKey : undefined,
-      parameters: parsed.parameters && typeof parsed.parameters === "object" && !Array.isArray(parsed.parameters)
-        ? parsed.parameters
-        : {},
-      maxSignalAgeBars: parsed.maxSignalAgeBars === null
-        ? null
-        : Number.isInteger(parsed.maxSignalAgeBars) && parsed.maxSignalAgeBars >= 0 && parsed.maxSignalAgeBars <= 250
-          ? parsed.maxSignalAgeBars
-          : defaults.maxSignalAgeBars,
-      scanLimit: parsed.scanLimit === 200 ? 200 : 50,
-    };
+    const scopedRaw = window.localStorage.getItem(storageKey);
+    if (scopedRaw != null) return parseStrategySettings(scopedRaw);
+
+    const legacyRaw = window.localStorage.getItem(STRATEGY_SETTINGS_STORAGE_KEY);
+    const settings = parseStrategySettings(legacyRaw);
+    if (legacyRaw != null) {
+      window.localStorage.setItem(storageKey, JSON.stringify(settings));
+      window.localStorage.removeItem(STRATEGY_SETTINGS_STORAGE_KEY);
+    }
+    return settings;
   } catch {
-    return defaults;
+    return defaultStrategySettings();
   }
 }
 
@@ -87,7 +112,8 @@ function restoreStrategyParameters(
 }
 
 export default function Screener() {
-  const [initialStrategySettings] = useState(loadStrategySettings);
+  const userId = useAuthStore((state) => state.user?.id);
+  const strategyStorageKey = strategySettingsStorageKey(userId);
   const navigate = useNavigate();
   const filters = useScreenerFilterController();
   const batch = useScreenerBatchController();
@@ -114,12 +140,14 @@ export default function Screener() {
   const [excludedDetailsOpen, setExcludedDetailsOpen] = useState(false);
   const [selectedStrategyKey, setSelectedStrategyKey] = useState<string>();
   const [strategyParameters, setStrategyParameters] = useState<Record<string, number | boolean | string>>({});
-  const [maxSignalAgeBars, setMaxSignalAgeBars] = useState<number | null>(initialStrategySettings.maxSignalAgeBars);
-  const [scanLimit, setScanLimit] = useState<50 | 200>(initialStrategySettings.scanLimit);
+  const [maxSignalAgeBars, setMaxSignalAgeBars] = useState<number | null>(20);
+  const [scanLimit, setScanLimit] = useState<50 | 200>(50);
   const [strategyProgress, setStrategyProgress] = useState<{ completed: number; total: number; matched: number; excluded: number; failed: number }>();
   const [strategySettingsRestored, setStrategySettingsRestored] = useState(false);
+  const [restoredStrategyStorageKey, setRestoredStrategyStorageKey] = useState<string>();
   const [cancelStrategy, setCancelStrategy] = useState<(() => void)>();
   const { data: industries = [], error: industriesError, refetch: refetchIndustries } = useIndustries();
+  const { data: concepts = [] } = useScreenerConcepts();
   const {
     data: screenerResult,
     isLoading: screenerLoading,
@@ -133,25 +161,57 @@ export default function Screener() {
   const previousFilterSignatureRef = useRef(appliedFilterSignature);
 
   useEffect(() => {
-    if (strategySettingsRestored || !strategies.data) return;
-    const savedStrategy = strategies.data.find((strategy) => strategy.key === initialStrategySettings.strategyKey);
-    if (savedStrategy) {
-      setSelectedStrategyKey(savedStrategy.key);
-      setStrategyParameters(restoreStrategyParameters(savedStrategy, initialStrategySettings.parameters));
-    }
-    setStrategySettingsRestored(true);
-  }, [initialStrategySettings, strategies.data, strategySettingsRestored]);
+    setStrategySettingsRestored(false);
+    setRestoredStrategyStorageKey(undefined);
+    setSelectedStrategyKey(undefined);
+    setStrategyParameters({});
+    setMaxSignalAgeBars(20);
+    setScanLimit(50);
+  }, [strategyStorageKey]);
 
   useEffect(() => {
-    if (!strategySettingsRestored || typeof window === "undefined") return;
+    if (
+      !strategyStorageKey
+      || !strategies.data
+      || restoredStrategyStorageKey === strategyStorageKey
+    ) return;
+
+    const settings = loadStrategySettings(strategyStorageKey);
+    setMaxSignalAgeBars(settings.maxSignalAgeBars);
+    setScanLimit(settings.scanLimit);
+
+    const savedStrategy = strategies.data.find((strategy) => strategy.key === settings.strategyKey);
+    if (savedStrategy) {
+      setSelectedStrategyKey(savedStrategy.key);
+      setStrategyParameters(restoreStrategyParameters(savedStrategy, settings.parameters));
+    }
+    setRestoredStrategyStorageKey(strategyStorageKey);
+    setStrategySettingsRestored(true);
+  }, [restoredStrategyStorageKey, strategies.data, strategyStorageKey]);
+
+  useEffect(() => {
+    if (
+      !strategySettingsRestored
+      || !strategyStorageKey
+      || restoredStrategyStorageKey !== strategyStorageKey
+      || typeof window === "undefined"
+    ) return;
     const settings: StoredStrategySettings = {
       strategyKey: selectedStrategyKey,
       parameters: strategyParameters,
       maxSignalAgeBars,
       scanLimit,
     };
-    window.localStorage.setItem(STRATEGY_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-  }, [maxSignalAgeBars, scanLimit, selectedStrategyKey, strategyParameters, strategySettingsRestored]);
+    window.localStorage.setItem(strategyStorageKey, JSON.stringify(settings));
+  }, [
+    maxSignalAgeBars,
+    restoredStrategyStorageKey,
+    scanLimit,
+    selectedStrategyKey,
+    strategyParameters,
+    strategySettingsRestored,
+    strategyStorageKey,
+  ]);
 
   useEffect(() => {
     if (previousFilterSignatureRef.current === appliedFilterSignature) return;
@@ -280,7 +340,7 @@ export default function Screener() {
       </div>
       <Card
         size="small"
-        title={<span style={{ fontWeight: 600 }}>筛选条件</span>}
+        title={<span style={{ fontWeight: "var(--c-weight-semibold)" }}>筛选条件</span>}
         style={{ ...cardStyle, marginBottom: 16 }}
         styles={{ body: sectionCardBodyStyle }}
       >
@@ -290,7 +350,7 @@ export default function Screener() {
               key={preset.label}
               size="small"
               shape="round"
-              style={{ fontSize: 13, fontWeight: 500 }}
+              style={{ fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-medium)" }}
               onClick={() => filters.applyPreset(preset.filters)}
               title={preset.description}
             >
@@ -299,7 +359,7 @@ export default function Screener() {
           ))}
         </div>
         <div style={{ marginBottom: 14 }}>
-          <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 600 }}>历史信号选股（应用于候选范围）</div>
+          <div style={{ marginBottom: 8, fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-semibold)" }}>历史信号选股（应用于候选范围）</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {(strategies.data ?? []).map((strategy) => (
               <Button
@@ -324,10 +384,10 @@ export default function Screener() {
             if (!selected) return null;
             return (
               <div style={{ marginTop: 12, padding: 12, border: "1px solid var(--c-border)", borderRadius: 8 }}>
-                <div style={{ marginBottom: 10, fontWeight: 600 }}>{selected.name}参数</div>
+                <div style={{ marginBottom: 10, fontWeight: "var(--c-weight-semibold)" }}>{selected.name}参数</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end" }}>
                   {selected.parameter_definitions.map((parameter) => (
-                    <label key={parameter.key} style={{ display: "grid", gap: 4, fontSize: 12 }}>
+                    <label key={parameter.key} style={{ display: "grid", gap: 4, fontSize: "var(--c-font-sm)" }}>
                       <span>{parameter.label}</span>
                       <InputNumber
                         aria-label={parameter.label}
@@ -340,7 +400,7 @@ export default function Screener() {
                       />
                     </label>
                   ))}
-                  <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: "var(--c-font-sm)" }}>
                     <span>
                       最大信号年龄（交易日K线）{" "}
                       <Tooltip title="从最近一次入场信号到最新交易日的 K 线根数；清空后不限制">
@@ -385,6 +445,7 @@ export default function Screener() {
           filters={filters.filters}
           onFiltersChange={filters.setFilters}
           industries={industries}
+          concepts={concepts}
           onSearch={filters.handleSearch}
           onReset={filters.handleReset}
           showPercentile={filters.showPercentile}
@@ -469,7 +530,7 @@ export default function Screener() {
       <Card
         size="small"
         title={(
-          <span style={{ fontWeight: 600 }}>
+          <span style={{ fontWeight: "var(--c-weight-semibold)" }}>
             {showMatchedOnly && strategyResult
               ? `策略命中 (${strategyResult.matchedItems.length} 只)`
               : `筛选结果${screenerResult ? ` (${screenerResult.total} 只)` : ""}`}

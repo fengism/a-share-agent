@@ -1,0 +1,209 @@
+/* Daily Review Markdown presentation styles */
+.daily-review-markdown {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  line-height: var(--c-leading-relaxed);
+  word-break: break-word;
+}
+
+.daily-review-markdown h1,
+.daily-review-markdown h2,
+.daily-review-markdown h3,
+.daily-review-markdown h4 {
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-tight);
+}
+
+.daily-review-markdown h1 {
+  font-size: var(--c-font-2xl);
+  margin: 24px 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.daily-review-markdown h1:first-child {
+  margin-top: 0;
+}
+
+.daily-review-markdown h2 {
+  font-size: var(--c-font-xl);
+  margin: 22px 0 12px;
+  padding-left: 10px;
+  border-left: 3px solid var(--c-primary);
+}
+
+.daily-review-markdown h2:first-child {
+  margin-top: 0;
+}
+
+.daily-review-markdown h3 {
+  font-size: var(--c-font-lg);
+  margin: 18px 0 10px;
+}
+
+.daily-review-markdown h4 {
+  font-size: var(--c-font-base);
+  margin: 14px 0 8px;
+}
+
+.daily-review-markdown p {
+  margin: 0 0 12px;
+  line-height: 1.75;
+}
+
+.daily-review-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.daily-review-markdown strong {
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-bold);
+}
+
+.daily-review-markdown ul,
+.daily-review-markdown ol {
+  margin: 8px 0 14px;
+  padding-left: 22px;
+}
+
+.daily-review-markdown li {
+  margin-bottom: 6px;
+  line-height: 1.65;
+}
+
+.daily-review-markdown li::marker {
+  color: var(--c-primary);
+}
+
+.daily-review-markdown blockquote {
+  margin: 14px 0;
+  padding: 12px 18px;
+  border-left: 4px solid var(--c-primary);
+  border-radius: 0 var(--c-radius-md) var(--c-radius-md) 0;
+  background: color-mix(in srgb, var(--c-primary) 6%, var(--c-card-bg));
+  color: var(--c-text-secondary);
+}
+
+.daily-review-markdown blockquote p {
+  margin-bottom: 0;
+}
+
+.daily-review-markdown hr {
+  border: none;
+  border-top: 1px solid var(--c-border);
+  margin: 20px 0;
+}
+
+.daily-review-markdown-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 16px 0;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+}
+
+.daily-review-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--c-font-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-review-markdown th,
+.daily-review-markdown td {
+  padding: 10px 14px;
+  border: 1px solid var(--c-border);
+  text-align: left;
+}
+
+.daily-review-markdown th {
+  background: color-mix(in srgb, var(--c-primary) 8%, var(--c-card-bg));
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-semibold);
+  white-space: nowrap;
+}
+
+.daily-review-markdown tr:hover td {
+  background: color-mix(in srgb, var(--c-primary) 4%, var(--c-card-bg));
+}
+
+.daily-review-markdown code {
+  background: color-mix(in srgb, var(--c-primary) 12%, transparent);
+  color: var(--c-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--c-font-mono);
+  font-size: 0.9em;
+}
+
+.daily-review-markdown pre {
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 14px 0;
+}
+
+.daily-review-markdown pre code {
+  background: none;
+  padding: 0;
+  color: var(--c-text-secondary);
+}
+
+/* Daily review snapshot visualizations */
+.daily-review-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.daily-review-chart-card {
+  min-width: 0;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-lg);
+  background: var(--c-card-bg);
+}
+
+.daily-review-chart-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+.daily-review-chart-card__header strong {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+}
+
+.daily-review-chart-card__header span {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs);
+}
+
+.daily-review-chart-card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 150px;
+  font-family: var(--c-font-family);
+}
+
+.daily-review-charts-empty {
+  padding: 36px 16px;
+  border: 1px dashed var(--c-border);
+  border-radius: var(--c-radius-lg);
+  color: var(--c-text-secondary);
+  text-align: center;
+  background: var(--c-nested-bg);
+}
+
+@media (max-width: 900px) {
+  .daily-review-charts-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

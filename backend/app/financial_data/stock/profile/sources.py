@@ -194,6 +194,20 @@ LEGACY_STOCK_NAMES = BasicDataSourceSpec(
     operation="stock_names",
     api="stock_names.json (upstream unavailable)",
 )
+SW_INDUSTRY_CLASSIFICATION = BasicDataSourceSpec(
+    id="sw_industry",
+    name="申万行业分类",
+    provider="industry_data.db",
+    operation="sw_industry_classification",
+    api="sw_industry_classifications",
+)
+STOCK_CONCEPT_MAPPING = BasicDataSourceSpec(
+    id="stock_concept",
+    name="个股概念库",
+    provider="industry_data.db",
+    operation="stock_concept_mapping",
+    api="stock_concept_mappings",
+)
 
 _SOURCE_CATALOG = {
     source.id: source
@@ -204,6 +218,8 @@ _SOURCE_CATALOG = {
         BSE_STOCK_LISTING,
         TENCENT_STOCK_QUOTE,
         TENCENT_STOCK_CONCEPTS,
+        SW_INDUSTRY_CLASSIFICATION,
+        STOCK_CONCEPT_MAPPING,
         SINA_SPOT_SNAPSHOT,
         SINA_CN_RANK_SPOT_SNAPSHOT,
         EASTMONEY_SPOT_SNAPSHOT,

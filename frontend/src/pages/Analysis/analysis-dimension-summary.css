@@ -4,7 +4,7 @@
 
 .analysis-dimension-summary {
   display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
+  grid-template-columns: 140px minmax(0, 1fr);
   min-width: 0;
   align-items: stretch;
 }
@@ -19,8 +19,8 @@
   align-content: center;
   justify-items: center;
   gap: var(--c-space-2);
-  min-height: 190px;
-  padding: var(--c-space-4);
+  min-height: 160px;
+  padding: var(--c-space-3);
   border-right: 1px solid var(--c-border);
   background: var(--c-hover-bg);
   text-align: center;
@@ -34,13 +34,13 @@
 
 .analysis-dimension-summary__score-empty {
   display: grid;
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   place-items: center;
   border: 2px solid var(--c-border);
   border-radius: 50%;
   color: var(--c-text-muted);
-  font-size: var(--c-font-2xl);
+  font-size: var(--c-font-xl);
   font-weight: var(--c-weight-bold);
 }
 

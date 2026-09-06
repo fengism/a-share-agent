@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Row, Col, InputNumber, Select, Button, Space, Switch, Slider, Typography } from "antd";
 import { SearchOutlined, ReloadOutlined } from "@ant-design/icons";
 import type { ScreenerFilter } from "../../types/stock";
@@ -33,6 +34,7 @@ interface Props {
   filters: ScreenerFilter;
   onFiltersChange: (filters: ScreenerFilter) => void;
   industries: string[];
+  concepts?: string[];
   onSearch: () => void;
   onReset: () => void;
   showPercentile: boolean;
@@ -44,11 +46,20 @@ interface Props {
 }
 
 export default function FilterPanel({
-  filters, onFiltersChange, industries, onSearch, onReset,
+  filters, onFiltersChange, industries, concepts = [], onSearch, onReset,
   showPercentile, onShowPercentileChange,
   pePercentileMax, pbPercentileMax, onPePercentileMaxChange, onPbPercentileMaxChange,
 }: Props) {
   const { fieldLabelStyle, mutedTextStyle } = useStyles();
+
+  const industryOptions = useMemo(
+    () => industries.map((n) => ({ label: n, value: n })),
+    [industries],
+  );
+  const conceptOptions = useMemo(
+    () => concepts.map((n) => ({ label: n, value: n })),
+    [concepts],
+  );
 
   const set = (patch: Partial<ScreenerFilter>) => {
     onFiltersChange({ ...filters, ...patch });
@@ -66,23 +77,51 @@ export default function FilterPanel({
       </Row>
 
       <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={4}>
           <div style={fieldLabelStyle}>市场板块</div>
           <Select mode="multiple" style={{ width: "100%" }} placeholder="全部市场" value={filters.markets || []} onChange={(v) => set({ markets: v.length > 0 ? v : null, page: 1 })} options={[
             { label: "主板", value: "主板" },
             { label: "创业板", value: "创业板" },
             { label: "科创板", value: "科创板" },
             { label: "北交所", value: "北交所" },
-          ]} size="small" maxTagCount={4} allowClear />
+          ]} size="small" maxTagCount={2} allowClear />
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={5}>
           <div style={fieldLabelStyle}>行业板块</div>
-          <Select mode="multiple" style={{ width: "100%" }} placeholder="选择行业（可多选）" value={filters.industries || []} onChange={(v) => set({ industries: v.length > 0 ? v : null })} options={industries.map((n) => ({ label: n, value: n }))} size="small" maxTagCount={3} allowClear />
+          <Select
+            mode="multiple"
+            style={{ width: "100%" }}
+            placeholder="选择行业（可多选）"
+            value={filters.industries || []}
+            onChange={(v) => set({ industries: v.length > 0 ? v : null, page: 1 })}
+            options={industryOptions}
+            filterOption={(input, option) => (option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+            size="small"
+            maxTagCount={2}
+            allowClear
+            showSearch
+          />
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={5}>
+          <div style={fieldLabelStyle}>概念题材</div>
+          <Select
+            mode="multiple"
+            style={{ width: "100%" }}
+            placeholder="选择概念（可多选）"
+            value={filters.concepts || []}
+            onChange={(v) => set({ concepts: v.length > 0 ? v : null, page: 1 })}
+            options={conceptOptions}
+            filterOption={(input, option) => (option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+            size="small"
+            maxTagCount={2}
+            allowClear
+            showSearch
+          />
+        </Col>
+        <Col xs={24} sm={12} md={5}>
           <div style={fieldLabelStyle}>排序</div>
           <Space>
-            <Select size="small" value={filters.sort_by} onChange={(v) => set({ sort_by: v })} style={{ width: 100 }} options={[
+            <Select size="small" value={filters.sort_by} onChange={(v) => set({ sort_by: v })} style={{ width: 95 }} options={[
               { label: "市值", value: "market_cap" }, { label: "PE", value: "pe" }, { label: "PB", value: "pb" },
               { label: "价格", value: "price" }, { label: "涨跌幅", value: "change_pct" }, { label: "换手率", value: "turnover_pct" }, { label: "成交量", value: "volume" },
             ]} />
@@ -91,7 +130,7 @@ export default function FilterPanel({
             ]} />
           </Space>
         </Col>
-        <Col xs={24} sm={12} md={6} style={{ textAlign: "right", paddingTop: 20 }}>
+        <Col xs={24} sm={12} md={5} style={{ textAlign: "right", paddingTop: 20 }}>
           <Space>
             <Button icon={<ReloadOutlined />} onClick={onReset} size="small">重置</Button>
             <Button type="primary" icon={<SearchOutlined />} onClick={onSearch} size="small">筛选</Button>
@@ -103,8 +142,8 @@ export default function FilterPanel({
         <Col span={24}>
           <Space>
             <Switch size="small" checked={showPercentile} onChange={onShowPercentileChange} />
-            <Text style={{ fontSize: 13, color: mutedTextStyle.color }}>估值百分位过滤</Text>
-            {showPercentile && <Text type="secondary" style={{ ...mutedTextStyle, fontSize: 11 }}>（按需计算，可能需要较长时间）</Text>}
+            <Text style={{ fontSize: "var(--c-font-md)", color: mutedTextStyle.color }}>估值百分位过滤</Text>
+            {showPercentile && <Text type="secondary" style={{ ...mutedTextStyle, fontSize: "var(--c-font-xs)" }}>（按需计算，可能需要较长时间）</Text>}
           </Space>
         </Col>
         {showPercentile && (

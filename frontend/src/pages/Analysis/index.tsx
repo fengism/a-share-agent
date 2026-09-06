@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, message, Skeleton } from "antd";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  downloadAnalysisPdf,
+  downloadAnalysisPdfFromData,
   ensureFundamentalData,
   useAddWatchlistItem,
   useAnalysisHistorySnapshot,
@@ -12,6 +14,7 @@ import {
   useWatchlist,
 } from "../../api/queries";
 import QueryErrorState from "../../components/QueryErrorState";
+import StockWorkspaceNav from "../../features/stock-navigation/StockWorkspaceNav";
 import { loadKlineChart } from "../../charts/klineChartLoader";
 import { usePdfExport } from "../../hooks/usePdfExport";
 import { useWorkflowPush } from "../../hooks/useWorkflowPush";
@@ -21,6 +24,7 @@ import AnalysisChartsSection from "./AnalysisChartsSection";
 import AnalysisDataStatus from "./AnalysisDataStatus";
 import AnalysisHeaderCard from "./AnalysisHeaderCard";
 import AnalysisHistoryRail from "../../features/investment-research/AnalysisHistoryRail";
+import AnalysisKeyLevels from "./AnalysisKeyLevels";
 import AnalysisPanels from "./AnalysisPanels";
 import AnalysisStateSection from "./AnalysisStateSection";
 import {
@@ -206,10 +210,25 @@ export default function Analysis() {
     },
   });
 
+  const reportDate = normalizeAnalysisDate(displayResult?.analysis_date) || historyDate;
+
   const handleExportPdf = useCallback(async () => {
     if (!code) return;
-    await exportPdf();
-  }, [code, exportPdf]);
+    const hide = messageApi.loading("正在生成纯矢量投研 PDF 研报...", 0);
+    try {
+      if (displayResult) {
+        await downloadAnalysisPdfFromData(displayResult);
+      } else {
+        await downloadAnalysisPdf(code, reportDate || undefined);
+      }
+      hide();
+      messageApi.success("PDF 研报已生成并开始下载");
+    } catch (backendError) {
+      hide();
+      console.warn("[Analysis] 后端矢量 PDF 导出受阻，切换至客户端增强模式:", backendError);
+      await exportPdf();
+    }
+  }, [code, displayResult, exportPdf, messageApi, reportDate]);
 
   if (pageLoading || (historyDate && isHistoricalLoading)) {
     return (
@@ -255,6 +274,7 @@ export default function Analysis() {
             currentDate={normalizeAnalysisDate(displayResult?.analysis_date) || historyDate || undefined}
           />
           <div className="analysis-workspace__header" data-pdf-capture data-pdf-group>
+            {code ? <StockWorkspaceNav code={code} /> : null}
             <AnalysisHeaderCard
               code={code}
               pageData={pageData}
@@ -292,6 +312,11 @@ export default function Analysis() {
               />
             )}
             <AnalysisDataStatus pageData={pageData} result={displayResult} />
+            <AnalysisKeyLevels
+              current={pageData?.key_levels?.current_price}
+              support={pageData?.key_levels?.support}
+              resistance={pageData?.key_levels?.resistance}
+            />
             <AnalysisStateSection
               isAnalyzing={isAnalyzing}
               error={analysisError}

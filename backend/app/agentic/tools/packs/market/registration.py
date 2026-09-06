@@ -249,3 +249,66 @@ def register_market_tools(target_registry=None):
         policy=_MARKET_DAILY_POLICY,
         executor=_get_sector_stocks_history,
     ))
+
+    target.register_tool(Tool(
+        name="get_commodity_spot_prices",
+        description="查询大宗商品与重要工业品现货/主力合约最新价格与产业链映射（覆盖碳酸锂、工业硅、铜、铝、锌、镍、锡、黄金、白银、螺纹钢、铁矿石、焦炭、原油、甲醇、PTA、纯碱、生猪等）。支持指定商品名称，或省略参数查看全部大宗商品概览。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "symbol": {
+                    "type": "string",
+                    "description": "大宗商品名称或关键词，例如：碳酸锂、工业硅、电解铜、螺纹钢、生猪、原油；省略则返回全市场重要大宗商品概览",
+                    "default": "",
+                },
+            },
+        },
+        policy=_MARKET_REALTIME_POLICY,
+        executor=_get_commodity_spot_prices,
+    ))
+
+    target.register_tool(Tool(
+        name="get_global_macro_rates",
+        description="获取全球宏观利率、中美10年期国债收益率、中美利差、美元指数 (DXY)、离岸人民币 (USD/CNH) 及央行政策利率。当用户问'美债收益率''中美利差''美元指数''全球流动性''汇率'时调用。",
+        parameters={"type": "object", "properties": {}},
+        policy=_MARKET_REALTIME_POLICY,
+        executor=_get_global_macro_rates,
+    ))
+
+    target.register_tool(Tool(
+        name="get_customs_trade_data",
+        description="获取海关总署月度进出口总额、贸易顺差/逆差、同比增速，以及汽车/新能源/光伏/锂电池/半导体芯片/工程机械/家电/船舶等重点出海与进口商品量价数据及 A 股产业链映射。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "commodity": {
+                    "type": "string",
+                    "description": "重点出海或进口商品名称，例如：汽车、锂电池、光伏、芯片、家电、船舶、工程机械、钢材、原油；省略则返回海关宏观进出口总况与核心出海分类概览",
+                    "default": "",
+                },
+            },
+        },
+        policy=_MARKET_DAILY_POLICY,
+        executor=_get_customs_trade_data,
+    ))
+
+
+async def _get_commodity_spot_prices(symbol: str = "") -> Any:
+    """获取大宗商品与重要工业品现货/主力合约最新价格。"""
+    from app.financial_data.market.quotes.commodity import get_commodity_spot_prices
+    return await get_commodity_spot_prices(symbol=symbol)
+
+
+async def _get_global_macro_rates() -> Any:
+    """获取全球宏观利率、国债收益率与汇率流动性看板。"""
+    from app.financial_data.market.quotes.global_macro import get_global_macro_rates
+    return await get_global_macro_rates()
+
+
+async def _get_customs_trade_data(commodity: str = "") -> Any:
+    """获取海关进出口贸易与重点出海商品数据。"""
+    from app.financial_data.market.quotes.customs import get_customs_trade_data
+    return await get_customs_trade_data(commodity=commodity)
+
+
+

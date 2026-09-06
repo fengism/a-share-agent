@@ -15,14 +15,14 @@
   color: var(--c-text-primary);
   font-size: var(--stock-research-body-size);
   font-weight: var(--c-weight-semibold);
-  line-height: 1.5;
+  line-height: var(--c-leading-normal);
 }
 
 .financial-data-section__header-note,
 .financial-data-section__metadata {
   color: var(--c-text-secondary);
   font-size: var(--stock-research-label-size);
-  line-height: 1.55;
+  line-height: var(--c-leading-normal);
 }
 
 .financial-data-section__empty {
@@ -50,19 +50,19 @@
 
 .financial-data-sections .ant-table {
   font-size: var(--stock-research-table-size);
-  line-height: 1.55;
+  line-height: var(--c-leading-normal);
 }
 
 .financial-data-sections .ant-table-thead > tr > th {
   font-size: var(--stock-research-label-size);
   font-weight: var(--c-weight-semibold);
-  line-height: 1.5;
+  line-height: var(--c-leading-normal);
 }
 
 .financial-data-sections .terminal-table-row td,
 .financial-data-sections .ant-table-tbody > tr > td {
   font-size: var(--stock-research-table-size);
-  line-height: 1.55;
+  line-height: var(--c-leading-normal);
 }
 
 .financial-statement-table__metric,
@@ -93,7 +93,7 @@
   margin-bottom: var(--c-space-2);
   font-size: var(--stock-research-body-size);
   font-weight: var(--c-weight-semibold);
-  line-height: 1.5;
+  line-height: var(--c-leading-normal);
 }
 
 .financial-revenue-card .ant-card-body {
@@ -113,7 +113,7 @@
   margin-bottom: 6px;
   font-size: var(--stock-research-support-size);
   font-weight: var(--c-weight-semibold);
-  line-height: 1.5;
+  line-height: var(--c-leading-normal);
 }
 
 .financial-data-section__footnote {
@@ -121,5 +121,5 @@
   margin-top: 10px;
   color: var(--c-text-secondary);
   font-size: var(--stock-research-label-size);
-  line-height: 1.6;
+  line-height: var(--c-leading-normal);
 }

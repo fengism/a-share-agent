@@ -47,9 +47,9 @@ test: backend-test frontend-test ## 运行前后端测试
 
 check: backend-lint backend-type backend-test frontend-api-check frontend-test frontend-lint frontend-build ## 运行完整质量检查
 
-pack: ## 打包源码（排除密钥、依赖、数据库和日志）
+pack: ## 打包源码（排除密钥、依赖、运行时数据库和日志，使用仓库种子初始化行业库）
 	tar czf stock-agent.tar.gz \
-		--exclude='stock-agent.tar.gz' \
+		--exclude='stock-agent.tar*' \
 		--exclude='.git' \
 		--exclude='.env' \
 		--exclude='.env.local' \
@@ -58,6 +58,10 @@ pack: ## 打包源码（排除密钥、依赖、数据库和日志）
 		--exclude='.agents' \
 		--exclude='.codex' \
 		--exclude='.harness_local' \
+		--exclude='.agy-staff' \
+		--exclude='output' \
+		--exclude='tmp' \
+		--exclude='session-logs' \
 		--exclude='AGENTS.local.md' \
 		--exclude='backend/.venv' \
 		--exclude='backend/data' \
@@ -95,8 +99,17 @@ backend-type: ## 检查后端静态类型
 backend-test: ## 运行后端测试
 	cd backend && uv run --frozen pytest -q
 
-backend-db-init: ## 初始化双数据库并应用结构迁移
+backend-db-init: ## 初始化双数据库并应用结构迁移（空行业库自动播种）
 	cd backend && uv run --frozen python -c 'from app.infrastructure.persistence import init_db; init_db(); print("database initialization complete")'
+
+backend-export-seeds: ## 从行业库导出种子数据（backend/seeds/*.csv.gz）
+	cd backend && uv run --frozen python -m app.scripts.export_industry_seeds
+
+backend-seeds-drift: ## 对比运行行业库与种子快照差异（只读）
+	cd backend && uv run --frozen python -m app.scripts.seeds_drift
+
+backend-seed-hot-stocks: ## 为热门股票抓取经营信息入库（make backend-seed-hot-stocks TOP=100）
+	cd backend && uv run --frozen python -m app.scripts.seed_hot_stock_business --top $${TOP:-50}
 
 backend-reset-accounts: ## 重置本地账号数据
 	cd backend && uv run --frozen python -m app.scripts.reset_accounts

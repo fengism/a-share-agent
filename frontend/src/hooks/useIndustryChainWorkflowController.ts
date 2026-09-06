@@ -22,7 +22,19 @@ export function useIndustryChainWorkflowController({
   onCancelled,
 }: IndustryChainWorkflowControllerOptions = {}) {
   const queryClient = useQueryClient();
-  const state = useIndustryChainWorkflowStore();
+  // 逐字段订阅：避免任何一次无关 patch（如 jobId 写入）触发整页重渲染；
+  // 运行期每个 SSE 事件都会更新 agentProcess，未变化的字段不应引起重渲染
+  const runId = useIndustryChainWorkflowStore((s) => s.runId);
+  const jobId = useIndustryChainWorkflowStore((s) => s.jobId);
+  const name = useIndustryChainWorkflowStore((s) => s.name);
+  const isAnalyzing = useIndustryChainWorkflowStore((s) => s.isAnalyzing);
+  const isCancelling = useIndustryChainWorkflowStore((s) => s.isCancelling);
+  const currentStage = useIndustryChainWorkflowStore((s) => s.currentStage);
+  const stageMessage = useIndustryChainWorkflowStore((s) => s.stageMessage);
+  const result = useIndustryChainWorkflowStore((s) => s.result);
+  const archiveId = useIndustryChainWorkflowStore((s) => s.archiveId);
+  const error = useIndustryChainWorkflowStore((s) => s.error);
+  const agentProcess = useIndustryChainWorkflowStore((s) => s.agentProcess);
 
   const runAnalysis = useCallback((
     name: string,
@@ -131,5 +143,21 @@ export function useIndustryChainWorkflowController({
     }
   }, [onCancelled, onError, queryClient]);
 
-  return { ...state, runAnalysis, cancelAnalysis, loadResult, clearResult };
+  return {
+    runId,
+    jobId,
+    name,
+    isAnalyzing,
+    isCancelling,
+    currentStage,
+    stageMessage,
+    result,
+    archiveId,
+    error,
+    agentProcess,
+    runAnalysis,
+    cancelAnalysis,
+    loadResult,
+    clearResult,
+  };
 }

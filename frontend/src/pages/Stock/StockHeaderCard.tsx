@@ -1,0 +1,88 @@
+import { BankOutlined, FileSearchOutlined, PlusOutlined, StarFilled } from "@ant-design/icons";
+import { Button, Card, Tag, Tooltip, Typography } from "antd";
+import { useNavigate } from "react-router-dom";
+import { useColors, useStyles } from "../../styles/ui";
+import type { StockBasicInfo } from "../../types/stock";
+import { buildStockAnalysisUrl } from "../../utils/stockLinks";
+
+const { Title, Text } = Typography;
+
+interface StockHeaderCardProps {
+  info: StockBasicInfo;
+  isWatched: boolean;
+  isWatchlistPending: boolean;
+  onToggleWatchlist: () => void;
+}
+
+export default function StockHeaderCard({
+  info,
+  isWatched,
+  isWatchlistPending,
+  onToggleWatchlist,
+}: StockHeaderCardProps) {
+  const navigate = useNavigate();
+  const colors = useColors();
+  const { cardStyle } = useStyles();
+  const industry = info.second_industry?.name || info.first_industry?.name || info.exchange_industry;
+  const fullIndustry = [info.first_industry?.name, info.second_industry?.name, info.third_industry?.name].filter(Boolean).join(" / ");
+
+  return (
+    <Card className="stock-header-card" style={cardStyle} styles={{ body: { padding: 0 } }}>
+      <span className="stock-header-card__glow" aria-hidden="true" />
+      <div className="stock-header-card__content">
+        <div className="stock-header-card__identity">
+          <div className="stock-header-card__eyebrow">
+            <span aria-hidden="true" />
+            公司概览
+          </div>
+          <div className="stock-header-card__title-row">
+            <span className="stock-header-card__icon" aria-hidden="true"><BankOutlined /></span>
+            <Title level={2}>{info.name || info.code}</Title>
+            <Text className="stock-header-card__code">{info.code}</Text>
+          </div>
+          <div className="stock-header-card__tags">
+            {industry ? (
+              <Tooltip title={fullIndustry ? `申万行业: ${fullIndustry}` : industry}>
+                <Tag>{industry}</Tag>
+              </Tooltip>
+            ) : null}
+            {(info.concepts ?? []).slice(0, 6).map((concept) => (
+              <Tag key={concept.code || concept.name}>{concept.name}</Tag>
+            ))}
+            {(info.concepts ?? []).length > 6 && (
+              <Tooltip title={(info.concepts ?? []).slice(6).map((c) => c.name).join(" · ")}>
+                <Tag style={{ cursor: "pointer" }}>+{(info.concepts ?? []).length - 6}</Tag>
+              </Tooltip>
+            )}
+          </div>
+        </div>
+        <div className="stock-header-card__quote">
+          <Text type="secondary"><span className="stock-header-card__quote-dot" />最新价</Text>
+          <strong style={{ color: colors.textPrimary }}>
+            {info.current_price == null ? "-" : `¥${info.current_price.toFixed(2)}`}
+          </strong>
+          <small>行情快照</small>
+        </div>
+        <div className="stock-header-card__actions">
+          <Button
+            icon={isWatched ? <StarFilled /> : <PlusOutlined />}
+            aria-label={isWatched ? "移出自选" : "加入自选"}
+            loading={isWatchlistPending}
+            onClick={onToggleWatchlist}
+            style={{ color: isWatched ? colors.warning : colors.primary }}
+          >
+            {isWatched ? "已自选" : "加入自选"}
+          </Button>
+          <Button
+            type="primary"
+            icon={<FileSearchOutlined />}
+            aria-label="进入 AI 分析"
+            onClick={() => navigate(buildStockAnalysisUrl(info.code))}
+          >
+            进入 AI 分析
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}

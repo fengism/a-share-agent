@@ -54,7 +54,7 @@
   border-radius: 50%;
   background: color-mix(in srgb, var(--c-primary) 13%, transparent);
   color: var(--c-primary);
-  font-size: 13px;
+  font-size: var(--c-font-md);
 }
 
 .chat-process-summary {
@@ -67,8 +67,8 @@
 .chat-process-summary strong {
   overflow: hidden;
   color: var(--c-text-primary);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -76,7 +76,7 @@
 .chat-process-summary span {
   overflow: hidden;
   color: var(--c-text-muted);
-  font-size: 11px;
+  font-size: var(--c-font-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -84,7 +84,7 @@
 .chat-process-chevron,
 .chat-tool-chevron {
   color: var(--c-text-muted);
-  font-size: 11px;
+  font-size: var(--c-font-xs);
   transition: transform 0.2s ease;
 }
 
@@ -128,7 +128,7 @@
   border-radius: 50%;
   background: var(--c-card-bg);
   color: var(--c-text-secondary);
-  font-size: 12px;
+  font-size: var(--c-font-sm);
 }
 
 .chat-process-step-icon.is-reasoning {
@@ -169,14 +169,14 @@
 .chat-process-step-title {
   min-height: 26px;
   color: var(--c-text-primary);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--c-font-md);
+  font-weight: var(--c-weight-semibold);
   line-height: 26px;
 }
 
 .chat-process-step-description {
   color: var(--c-text-muted);
-  font-size: 12px;
+  font-size: var(--c-font-sm);
 }
 
 .chat-plan-step-title {
@@ -192,8 +192,8 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--c-text-muted) 9%, transparent);
   color: var(--c-text-muted);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-medium);
   line-height: 18px;
 }
 
@@ -226,8 +226,8 @@
   border-radius: 0 8px 8px 0;
   background: color-mix(in srgb, var(--c-accent) 5%, transparent);
   color: var(--c-text-secondary);
-  font-size: 12px;
-  line-height: 1.7;
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-relaxed);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -253,8 +253,8 @@
 .chat-tool-heading code {
   overflow: hidden;
   color: var(--c-text-primary);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -264,7 +264,7 @@
   align-items: center;
   gap: 4px;
   color: var(--c-text-muted);
-  font-size: 11px;
+  font-size: var(--c-font-xs);
   white-space: nowrap;
 }
 
@@ -299,8 +299,8 @@
 .chat-tool-detail-label {
   margin: 2px 0 5px;
   color: var(--c-text-muted);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--c-font-xs);
+  font-weight: var(--c-weight-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -313,9 +313,9 @@
   border-radius: 6px;
   background: var(--c-card-bg);
   color: var(--c-text-secondary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-  line-height: 1.55;
+  font-family: var(--c-font-mono);
+  font-size: var(--c-font-xs);
+  line-height: var(--c-leading-normal);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -326,8 +326,8 @@
 
 .chat-assistant-answer {
   color: var(--c-text-primary);
-  font-size: 14px;
-  line-height: 1.75;
+  font-size: var(--c-font-base);
+  line-height: var(--c-leading-relaxed);
   overflow-wrap: anywhere;
 }
 
@@ -377,11 +377,28 @@
     opacity: 1;
   }
 }
+.chat-custom-config-pane {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  animation: chatConfigFadeIn 0.2s ease-out;
+}
+
+@keyframes chatConfigFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .chat-agent-selector,
 .chat-skill-selector {
   display: grid;
   gap: 10px;
-  margin-bottom: 12px;
   padding: 10px 12px;
   border: 1px solid var(--c-border);
   border-radius: 10px;
@@ -413,7 +430,7 @@
   flex-wrap: wrap;
   gap: 6px 12px;
   color: var(--c-text-muted);
-  font-size: 11px;
+  font-size: var(--c-font-xs);
 }
 
 .chat-agent-selector-status > span,

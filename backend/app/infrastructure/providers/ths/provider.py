@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import requests
 
+import app.infrastructure.providers.ths.business_intro as business_intro
 import app.infrastructure.providers.ths.forecast as forecast
 import app.infrastructure.providers.ths.hot_rank as hot_rank
 import app.infrastructure.providers.ths.hsgt as hsgt
@@ -47,6 +48,9 @@ class ThsDataProvider:
         plate: bool = False,
     ) -> list[dict]:
         return hot_rank.normalize_items(items, plate=plate)
+
+    def fetch_stock_business_intro(self, code: str):
+        return business_intro.fetch_stock_business_intro(self._transport, code)
 
     def fetch_stock_forecast_reports(self, code: str):
         return forecast.fetch_stock_forecast_reports(self._transport, code)

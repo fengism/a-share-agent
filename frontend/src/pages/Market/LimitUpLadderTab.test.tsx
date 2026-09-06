@@ -70,7 +70,7 @@ describe("LimitUpLadderTab", () => {
     expect(screen.getByText("百花医药")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /百花医药/ })).toHaveAttribute(
       "href",
-      "/analysis/600721",
+      "/stock/600721",
     );
     expect(screen.getByText("7连板")).toBeInTheDocument();
     expect(screen.getAllByText("大单一字").length).toBeGreaterThan(0);

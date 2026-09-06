@@ -30,7 +30,16 @@ class StockBasicInfo(BaseModel):
     exchange_industry: str | None = None
     first_industry: StockConcept | None = None
     second_industry: StockConcept | None = None
+    third_industry: StockConcept | None = None
     current_price: float | None = None
     concepts: list[StockConcept] | None = None
     data_sources: list[StockDataSource] = Field(default_factory=list)
     field_sources: dict[str, str] = Field(default_factory=dict)
+
+
+class StockBusinessIntro(BaseModel):
+    """股票主营介绍及同花顺动态字段。"""
+
+    code: str
+    source: str = "ths"
+    items: dict[str, str] = Field(default_factory=dict)

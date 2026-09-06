@@ -16,6 +16,29 @@ from app.infrastructure.llm.spec import LLMClientSpec, resolve_llm_client_spec
 _POOL_MAXSIZE = 16
 
 
+_LLM_CONNECTION_ERROR_NAMES = frozenset({
+    "APIConnectionError",
+    "APITimeoutError",
+    "APIConnectionTimeoutError",
+})
+
+
+def is_llm_connection_error(error: BaseException) -> bool:
+    """LLM 网关连不上（网络/代理故障）——可重试的上游错误，而非业务失败。
+
+    openai 与 litellm 的连接类异常类名一致（APIConnectionError/APITimeoutError），
+    按异常类名匹配以避免硬依赖具体 SDK；同时沿 __cause__ 链穿透包装层。
+    """
+    current: BaseException | None = error
+    depth = 0
+    while current is not None and depth < 8:
+        if type(current).__name__ in _LLM_CONNECTION_ERROR_NAMES:
+            return True
+        current = current.__cause__
+        depth += 1
+    return False
+
+
 @dataclass(frozen=True)
 class OpenAIChatRuntime:
     client: Any

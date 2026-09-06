@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut } from "../client";
 import { createInviteApi, listInvitesApi, revokeInviteApi } from "../auth";
+import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { queryKeys } from "../queryKeys";
 import type { InviteItem } from "../../types/auth";
 import type { BotAdminJob, BotAdminJobsResponse, ConfigData, ConfigUpdate } from "../../types/settings";
@@ -9,7 +10,7 @@ export function useConfig() {
   return useQuery({
     queryKey: queryKeys.settings.config,
     queryFn: () => apiGet<ConfigData>("/config"),
-    staleTime: 30 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.settingsConfig.staleMs,
   });
 }
 
@@ -29,7 +30,7 @@ export function useBotJobs(enabled: boolean) {
       { status: "failed", limit: 50 },
     ),
     enabled,
-    staleTime: 10 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.settingsBotJobs.staleMs,
   });
 }
 
@@ -44,7 +45,7 @@ export function useInvites(enabled: boolean) {
     queryKey: queryKeys.settings.invites,
     queryFn: () => listInvitesApi(),
     enabled,
-    staleTime: 30 * 1000,
+    staleTime: QUERY_CACHE_POLICIES.settingsInvites.staleMs,
   });
 }
 

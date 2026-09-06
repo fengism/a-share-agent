@@ -20,10 +20,10 @@ export default function IndustryResearchScopeControls({
 
   return (
     <details style={{ marginTop: 12 }}>
-      <summary style={{ color: colors.textSecondary, cursor: "pointer", fontSize: 13 }}>分析范围（可选）</summary>
+      <summary style={{ color: colors.textSecondary, cursor: "pointer", fontSize: "var(--c-font-md)" }}>分析范围（可选）</summary>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginTop: 12 }}>
         <label>
-          <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: 12 }}>区域口径</Text>
+          <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: "var(--c-font-sm)" }}>区域口径</Text>
           <Select
             value={value.region}
             disabled={disabled}
@@ -37,7 +37,7 @@ export default function IndustryResearchScopeControls({
           />
         </label>
         <label>
-          <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: 12 }}>时间范围</Text>
+          <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: "var(--c-font-sm)" }}>时间范围</Text>
           <Select
             value={value.time_range}
             disabled={disabled}
@@ -52,7 +52,7 @@ export default function IndustryResearchScopeControls({
           />
         </label>
         <label>
-          <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: 12 }}>公司范围</Text>
+          <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: "var(--c-font-sm)" }}>公司范围</Text>
           <Select
             value={value.company_scope}
             disabled={disabled}
@@ -65,7 +65,7 @@ export default function IndustryResearchScopeControls({
           />
         </label>
         <label>
-          <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: 12 }}>分析基准日</Text>
+          <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: "var(--c-font-sm)" }}>分析基准日</Text>
           <Input
             type="date"
             value={value.as_of_date || ""}
@@ -76,7 +76,7 @@ export default function IndustryResearchScopeControls({
         {value.time_range === "custom" && (
           <>
             <label>
-              <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: 12 }}>开始日期</Text>
+              <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: "var(--c-font-sm)" }}>开始日期</Text>
               <Input
                 type="date"
                 value={value.start_date || ""}
@@ -85,7 +85,7 @@ export default function IndustryResearchScopeControls({
               />
             </label>
             <label>
-              <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: 12 }}>结束日期</Text>
+              <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: "var(--c-font-sm)" }}>结束日期</Text>
               <Input
                 type="date"
                 value={value.end_date || ""}

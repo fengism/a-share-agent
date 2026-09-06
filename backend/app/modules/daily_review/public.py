@@ -1,6 +1,10 @@
 """Daily Review 模块对其他业务模块开放的稳定入口。"""
 
 from app.modules.daily_review.models import DailyReviewResult, DailyReviewSection
+from app.modules.daily_review.pdf_service import (
+    generate_daily_review_pdf_html,
+    render_daily_review_pdf_bytes,
+)
 from app.modules.daily_review.schemas import DailyReviewHistoryItem, DailyReviewRequest
 from app.modules.daily_review.service import (
     generate_daily_review,
@@ -16,8 +20,10 @@ __all__ = [
     "DailyReviewResult",
     "DailyReviewSection",
     "generate_daily_review",
+    "generate_daily_review_pdf_html",
     "get_daily_review_record",
     "list_daily_review_history",
     "load_daily_review",
     "remove_daily_review",
+    "render_daily_review_pdf_bytes",
 ]

@@ -3,7 +3,8 @@ import logging
 from dataclasses import dataclass
 from typing import Callable
 
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import market_cache as cache
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.news import dedupe_news_items, filter_recent_news_items, news_sort_key
 from app.domain.news import NewsSearchItem

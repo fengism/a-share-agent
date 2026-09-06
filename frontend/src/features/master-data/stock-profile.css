@@ -1,0 +1,72 @@
+.stock-profile-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stock-profile-stat-grid .ant-card {
+  height: 100%;
+  border-color: var(--c-border);
+}
+
+.stock-profile-stat-grid .ant-card-body {
+  padding: 14px 16px;
+}
+
+.stock-profile-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.stock-profile-filters__left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.stock-profile-filters__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stock-profile-business-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--c-text-subtle);
+}
+
+.stock-profile-drawer__section {
+  margin-bottom: 20px;
+}
+
+.stock-profile-drawer__section:last-child {
+  margin-bottom: 0;
+}
+
+.stock-profile-drawer__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text);
+  border-left: 3px solid var(--c-primary);
+  padding-left: 8px;
+}
+
+.stock-profile-detail-desc .ant-descriptions-item-label {
+  width: 90px;
+  color: var(--c-text-subtle);
+}

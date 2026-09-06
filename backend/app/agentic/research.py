@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -21,6 +22,7 @@ from app.agentic.events import (
     AgentPlan,
     AgentPlanStep,
     AgentPlanStepUpdate,
+    AgentResearchRound,
     auditable_agent_event,
 )
 from app.agentic.tools.serialization import has_meaningful_tool_content
@@ -68,6 +70,12 @@ def build_research_system_prompt(
             "- 检查结果标题、摘要和发布日期；若主要结果早于默认时间窗、偏离主题或缺少权威来源，"
             "应缩小研究维度并加入当前年份、官方、白皮书、研报、公告等来源词后重新搜索。"
         )
+    sections.append(
+        "## 数据源权威性与冲突处理\n"
+        "- 官方财报与结构化接口（如 analyze_financials, get_stock_info, get_stock_valuation_detail 等）是定量财务事实的最高准绳。\n"
+        "- 若搜索结果（web_search / iwencai_search）或网页抓取（fetch_url）中的二手财务数据与财报接口返回的财务指标（营收、归母净利、扣非净利、毛利率、资产负债率、EPS、分部数据等）存在差异或冲突，必须无条件以财报接口数据为准，严禁采用搜索引擎摘要或第三方非标网页数据覆盖财报接口数据。\n"
+        "- 网页搜索与外部资料仅用于获取行业趋势、商业护城河背景、产业链地位和舆情定性资料，不用于替代定量财务数据。"
+    )
     return "\n\n".join(sections)
 
 
@@ -117,15 +125,17 @@ def _gap_tool_names(
 
 def _build_gap_message(
     original_message: str,
-    first_result: AgentRoundResult,
+    previous_result: AgentRoundResult,
     evidence: list[AgentEvidence],
     missing: list[EvidenceRequirement],
+    round_index: int = 2,
 ) -> str:
     labels = "、".join(item.label for item in missing)
+    round_desc = f"第 {round_index} 轮" if round_index > 1 else "本轮"
     return "\n".join([
         f"原始调研任务：{original_message}",
-        f"首轮调研摘要：{first_result.summary or '暂无结论'}",
-        f"缺失证据维度：{labels}",
+        f"前序调研摘要：{previous_result.summary or '暂无结论'}",
+        f"缺失证据维度（{round_desc}）：{labels}",
         "请仅围绕缺失维度继续调用允许的工具补齐证据。必须实际调用工具，不得使用常识补写。",
         "先检查已有工具参数，不得原样重复失败或低质量的查询；应根据缺失维度缩小范围并改进检索词。",
         "已有工具证据：",
@@ -307,6 +317,123 @@ async def _collect_round_result(
         summaries.append(result.summary.strip())
 
 
+def _round_objective(
+    round_index: int,
+    requirements: list[EvidenceRequirement],
+) -> str:
+    labels = "、".join(item.label for item in requirements)
+    if round_index == 1:
+        return f"建立{labels}的完整证据基线"
+    return f"补齐{labels}的证据缺口"
+
+
+def _round_tool_selection_reason(
+    round_index: int,
+    requirements: list[EvidenceRequirement],
+) -> str:
+    labels = "、".join(item.label for item in requirements)
+    if round_index == 1:
+        return "选择覆盖全部证据维度的可用工具，先建立完整证据基线"
+    return f"仅选择可覆盖{labels}的工具，避免重复首轮已完成的检索"
+
+
+def _round_evidence_added(result: AgentRoundResult) -> list[str]:
+    counts = Counter(item.tool_name for item in result.evidence)
+    return [f"{tool_name}：{count} 条" for tool_name, count in counts.items()]
+
+
+def _round_judgment_basis(
+    result: AgentRoundResult,
+    missing_before: list[EvidenceRequirement],
+    missing_after: list[EvidenceRequirement],
+) -> list[str]:
+    missing_after_keys = {item.key for item in missing_after}
+    satisfied = [
+        item.label for item in missing_before if item.key not in missing_after_keys
+    ]
+    basis = [f"本轮新增 {len(result.evidence)} 条有效工具证据"]
+    if satisfied:
+        basis.append(f"本轮满足证据维度：{'、'.join(satisfied)}")
+    if missing_after:
+        basis.append(f"仍缺少证据维度：{'、'.join(item.label for item in missing_after)}")
+    else:
+        basis.append("全部证据维度已满足")
+    return basis
+
+
+def _round_next_step(
+    missing: list[EvidenceRequirement],
+    *,
+    can_continue: bool,
+    made_progress: bool,
+) -> str:
+    if not missing:
+        return "证据维度已满足，结束自适应调研"
+    labels = "、".join(item.label for item in missing)
+    if not made_progress and not can_continue:
+        return f"本轮未缩小证据缺口，停止空转并记录数据缺口：{labels}"
+    if can_continue:
+        return f"下一轮聚焦补齐：{labels}"
+    return f"已达到最大轮次，记录数据缺口：{labels}"
+
+
+async def _emit_round_started(
+    progress: _ResearchProgress,
+    *,
+    round_index: int,
+    round_total: int,
+    requirements: list[EvidenceRequirement],
+    tool_names: tuple[str, ...],
+) -> AgentResearchRound:
+    research_round = AgentResearchRound(
+        round_index=round_index,
+        round_total=round_total,
+        status="running",
+        objective=_round_objective(round_index, requirements),
+        evidence_gaps=[item.label for item in requirements],
+        tool_names=list(tool_names),
+        tool_selection_reason=_round_tool_selection_reason(round_index, requirements),
+    )
+    await progress.emit(AgentEvent(
+        type="round_started",
+        research_round=research_round,
+    ))
+    return research_round
+
+
+async def _emit_round_completed(
+    progress: _ResearchProgress,
+    started: AgentResearchRound,
+    result: AgentRoundResult,
+    missing_before: list[EvidenceRequirement],
+    missing_after: list[EvidenceRequirement],
+    *,
+    can_continue: bool,
+    made_progress: bool,
+) -> None:
+    await progress.emit(AgentEvent(
+        type="round_completed",
+        research_round=started.model_copy(update={
+            "status": (
+                "completed"
+                if not missing_after or (can_continue and made_progress)
+                else "degraded"
+            ),
+            "evidence_gaps": [item.label for item in missing_after],
+            "evidence_added": _round_evidence_added(result),
+            "judgment_basis": _round_judgment_basis(
+                result, missing_before, missing_after
+            ),
+            "conclusion": result.summary.strip()[:2000],
+            "next_step": _round_next_step(
+                missing_after,
+                can_continue=can_continue,
+                made_progress=made_progress,
+            ),
+        }),
+    ))
+
+
 async def run_agentic_research(
     spec: AgentResearchSpec,
     message: str,
@@ -320,29 +447,89 @@ async def run_agentic_research(
     await progress.start()
     round_callback = progress.forward_event
 
+    max_rounds = max(1, spec.max_rounds)
+    initial_requirements = list(spec.requirements)
+
     async with runtime.open_session(spec, settings=settings) as session:
-        first_result = await _run_round(
+        first_round = await _emit_round_started(
+            progress,
+            round_index=1,
+            round_total=max_rounds,
+            requirements=initial_requirements,
+            tool_names=spec.tool_names,
+        )
+        last_result = await _run_round(
             session,
             message,
             spec.tool_names,
             round_callback,
-            tool_call_reserve=_FOLLOWUP_TOOL_CALL_RESERVE,
+            tool_call_reserve=_FOLLOWUP_TOOL_CALL_RESERVE if max_rounds > 1 else 0,
         )
-        await _collect_round_result(first_result, evidence, summaries, progress)
+        await _collect_round_result(last_result, evidence, summaries, progress)
 
         missing = _missing_requirements(spec.requirements, evidence)
-        if missing:
+        await _emit_round_completed(
+            progress,
+            first_round,
+            last_result,
+            initial_requirements,
+            missing,
+            can_continue=bool(missing and max_rounds > 1),
+            made_progress=bool(last_result.evidence),
+        )
+        current_round = 2
+
+        while missing and current_round <= max_rounds:
+            missing_before = list(missing)
+            missing_count_before = len(missing_before)
             await progress.emit(AgentEvent(
                 type="status",
-                content=f"首轮证据仍缺少 {'、'.join(item.label for item in missing)}，正在补充调研…",
+                content=f"第 {current_round - 1} 轮证据仍缺少 {'、'.join(item.label for item in missing_before)}，正在进行第 {current_round} 轮自适应补充调研…",
             ))
+            allowed_tools = _gap_tool_names(spec, missing_before)
+            started_round = await _emit_round_started(
+                progress,
+                round_index=current_round,
+                round_total=max_rounds,
+                requirements=missing_before,
+                tool_names=allowed_tools,
+            )
             gap_result = await _run_round(
                 session,
-                _build_gap_message(message, first_result, evidence, missing),
-                _gap_tool_names(spec, missing),
+                _build_gap_message(
+                    message,
+                    last_result,
+                    evidence,
+                    missing_before,
+                    round_index=current_round,
+                ),
+                allowed_tools,
                 round_callback,
+                tool_call_reserve=(
+                    _FOLLOWUP_TOOL_CALL_RESERVE if current_round < max_rounds else 0
+                ),
             )
             await _collect_round_result(gap_result, evidence, summaries, progress)
+            last_result = gap_result
+            missing = _missing_requirements(spec.requirements, evidence)
+            made_progress = len(missing) < missing_count_before
+            can_continue = bool(
+                missing and made_progress and current_round < max_rounds
+            )
+            await _emit_round_completed(
+                progress,
+                started_round,
+                gap_result,
+                missing_before,
+                missing,
+                can_continue=can_continue,
+                made_progress=made_progress,
+            )
+
+            # 若本轮未获取到任何新的补充证据，说明剩余维度无法通过现有工具继续获取，适时停止避免空转
+            if not made_progress:
+                break
+            current_round += 1
 
     missing = _missing_requirements(spec.requirements, evidence)
     fatal_missing = [item for item in missing if item.fatal]

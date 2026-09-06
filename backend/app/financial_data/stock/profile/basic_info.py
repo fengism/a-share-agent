@@ -11,7 +11,8 @@ import pandas as pd
 
 from app.configuration import get_settings
 from app.configuration.paths import DATA_DIR
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import reference_cache as cache
 from app.core.cache_policies import BASIC_INFO_FINAL, BASIC_INFO_STATIC
 from app.core.concurrency.rate_limiter import (
     call_blocking,
@@ -23,7 +24,7 @@ from app.core.concurrency.rate_limiter import (
 )
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import SymbolFormats, normalize_code, safe_float, safe_string
-from app.domain.stock import StockConceptInfo
+from app.domain.stock import StockConcept, StockConceptInfo
 from app.financial_data.stock.profile.industry_normalization import normalize_exchange_industry
 from app.financial_data.stock.profile.merger import (
     BasicInfoInputs,
@@ -193,6 +194,64 @@ async def _fetch_cached_tencent_concepts(code: str) -> StockConceptInfo | None:
     normalized = result if isinstance(result, StockConceptInfo) else None
     cache.set(cache_key, _CachedConcepts(normalized), ttl=BASIC_INFO_STATIC.ttl_seconds)
     return normalized
+
+
+async def get_stock_concepts(code: str) -> list[StockConcept]:
+    """获取单只股票的概念列表，优先从本地概念库获取，未配置则回退到腾讯接口。"""
+    sym = normalize_code(code)
+    try:
+        from app.modules.stock_concept.repository import get_record as get_concept_record
+
+        # 本地库以 带后缀 形式存储（如 600519.SH），裸码查询走仓储层 LIKE 兜底
+        local_rec = await call_blocking(get_concept_record, f"{sym.raw}.{sym.exchange}")
+        if local_rec and local_rec.get("concepts"):
+            return [StockConcept(code=name, name=name) for name in local_rec["concepts"]]
+    except Exception as exc:
+        logger.debug("本地个股概念查询失败: %s", exc)
+
+    result = await _fetch_cached_tencent_concepts(sym.raw)
+    return list(result.concepts) if result is not None else []
+
+
+async def get_stock_concept_map(codes: list[str]) -> dict[str, list[StockConcept]]:
+    """批量获取股票概念，单只失败不影响其余股票。优先使用本地数据库。"""
+    normalized_codes: list[str] = []
+    seen: set[str] = set()
+    for code in codes:
+        normalized = normalize_code(code).raw
+        if normalized not in seen:
+            seen.add(normalized)
+            normalized_codes.append(normalized)
+
+    # 尝试从本地数据库批量获取；existing_by_codes 接受裸码并内部扩展
+    # .SZ/.SH/.BJ 后缀，返回结果同时带裸码与带后缀两种 key
+    concept_map: dict[str, list[StockConcept]] = {}
+    missing_codes: list[str] = []
+    try:
+        from app.modules.stock_concept.repository import existing_by_codes
+
+        local_records = await call_blocking(existing_by_codes, normalized_codes)
+        for raw_code in normalized_codes:
+            rec = local_records.get(raw_code)
+            if rec and rec.get("concepts"):
+                concept_map[raw_code] = [StockConcept(code=n, name=n) for n in rec["concepts"]]
+            else:
+                missing_codes.append(raw_code)
+    except Exception as exc:
+        logger.debug("本地个股概念批量查询失败: %s", exc)
+        missing_codes = normalized_codes
+
+    if missing_codes:
+        results = await asyncio.gather(
+            *(_fetch_cached_tencent_concepts(code) for code in missing_codes),
+            return_exceptions=True,
+        )
+        for code, result in zip(missing_codes, results, strict=True):
+            if isinstance(result, BaseException) or result is None:
+                concept_map[code] = []
+            else:
+                concept_map[code] = list(result.concepts)
+    return concept_map
 
 
 async def _fetch_cached_tdx_finance(code: str) -> dict[str, Any]:
@@ -394,6 +453,26 @@ def _find_spot_row(spot_df: pd.DataFrame | None, code: str):
     return matched.iloc[0]
 
 
+def _load_local_industry_record(code: str) -> dict[str, Any] | None:
+    try:
+        from app.modules.industry_classification.repository import get_record as get_industry_record
+
+        return get_industry_record(code)
+    except Exception as exc:
+        logger.debug("本地个股行业查询失败: code=%s, error=%s", code, exc)
+        return None
+
+
+def _load_local_concept_record(code: str) -> dict[str, Any] | None:
+    try:
+        from app.modules.stock_concept.repository import get_record as get_concept_record
+
+        return get_concept_record(code)
+    except Exception as exc:
+        logger.debug("本地个股概念查询失败: code=%s, error=%s", code, exc)
+        return None
+
+
 async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo:
     """聚合多数据源并缓存股票基本信息。
 
@@ -411,6 +490,8 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
         quote_result,
         tdx_quote_result,
         tdx_finance_result,
+        sw_ind_result,
+        stock_cnp_result,
     ) = await asyncio.gather(
         _load_basic_info_spot_df(),
         asyncio.wait_for(_fetch_exchange_basic_row(sym.raw), timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS),
@@ -442,6 +523,8 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
             _fetch_cached_tdx_finance(sym.raw),
             timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS,
         ),
+        call_blocking(_load_local_industry_record, sym.raw, semaphore=misc_semaphore),
+        call_blocking(_load_local_concept_record, sym.raw, semaphore=misc_semaphore),
         return_exceptions=True,
     )
 
@@ -458,12 +541,17 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
 
     spot_df = spot_result if isinstance(spot_result, pd.DataFrame) else None
     exchange_data = exchange_result if isinstance(exchange_result, ExchangeBasicData) else None
-    name_map_snapshot = name_map_result if isinstance(name_map_result, StockNameMapSnapshot) else StockNameMapSnapshot.empty()
+    name_map_snapshot = (
+        name_map_result if isinstance(name_map_result, StockNameMapSnapshot) else StockNameMapSnapshot.empty()
+    )
     concepts_available = isinstance(concept_result, StockConceptInfo)
     stock_concepts = concept_result if concepts_available else _EMPTY_STOCK_CONCEPT
     tencent_quote = quote_result if isinstance(quote_result, dict) else {}
     tdx_http_quote = tdx_quote_result if isinstance(tdx_quote_result, dict) else {}
     tdx_http_finance = tdx_finance_result if isinstance(tdx_finance_result, dict) else {}
+    sw_industry_record = sw_ind_result if isinstance(sw_ind_result, dict) else None
+    stock_concept_record = stock_cnp_result if isinstance(stock_cnp_result, dict) else None
+
     primary_inputs = BasicInfoInputs(
         eastmoney_profile={},
         exchange_profile=exchange_data.values if exchange_data else {},
@@ -477,6 +565,8 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
         tencent_quote=tencent_quote,
         tdx_http_quote=tdx_http_quote,
         tdx_http_finance=tdx_http_finance,
+        sw_industry_record=sw_industry_record,
+        stock_concept_record=stock_concept_record,
     )
     result = build_basic_info(sym, primary_inputs)
     missing_fields = missing_eastmoney_profile_fields(result)

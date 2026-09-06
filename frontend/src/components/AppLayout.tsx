@@ -83,19 +83,25 @@ export default function AppLayout() {
 
 function getActiveKey(pathname: string): string {
   if (pathname === "/") return "/";
-  if (pathname.startsWith("/market")) return "/market";
+  if (pathname.startsWith("/watchlist")) return "/watchlist";
+  if (pathname.startsWith("/market") || pathname.startsWith("/hk-market")) return "/market";
+  if (pathname.startsWith("/trading-calendar")) return "/trading-calendar";
   if (pathname.startsWith("/macro")) return "/macro";
   if (pathname.startsWith("/compare")) return "/compare";
   if (pathname.startsWith("/portfolio")) return "/portfolio";
   if (pathname.startsWith("/quant")) return "/quant";
   if (pathname.startsWith("/feed")) return "/feed";
-  if (pathname.startsWith("/twitter")) return "/twitter";
+  if (pathname.startsWith("/twitter")) return "/feed";
   if (pathname.startsWith("/screener")) return "/screener";
   if (pathname.startsWith("/chat")) return "/chat";
   if (pathname.startsWith("/daily-review")) return "/daily-review";
+  if (pathname.startsWith("/stock")) return "/analysis";
   if (pathname.startsWith("/investment-research")) return "/analysis";
   if (pathname.startsWith("/analysis")) return "/analysis";
   if (pathname.startsWith("/industry-chain")) return "/industry-chain";
+  if (pathname.startsWith("/master-data") || pathname.startsWith("/stock-concept") || pathname.startsWith("/industry-classification")) {
+    return "/master-data";
+  }
   if (pathname.startsWith("/capabilities")) return "/capabilities";
   if (pathname.startsWith("/settings")) return "/settings";
   return "/";

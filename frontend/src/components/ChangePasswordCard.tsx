@@ -34,7 +34,7 @@ export default function ChangePasswordCard() {
       style={{ ...cardStyle, marginBottom: 16 }}
       styles={{ body: sectionCardBodyStyle }}
     >
-      <div style={{ fontSize: 12, color: c.textMuted, marginBottom: 12 }}>
+      <div style={{ fontSize: "var(--c-font-sm)", color: c.textMuted, marginBottom: 12 }}>
         修改登录密码。修改成功后，除当前设备外的其它会话将被强制退出。
       </div>
       <Form form={form} layout="vertical" onFinish={onFinish} requiredMark={false}>

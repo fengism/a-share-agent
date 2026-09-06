@@ -26,6 +26,7 @@ def register_web_tools(
     fetch_url_executor: Callable[..., Any],
     fetch_urls_executor: Callable[..., Any],
     search_executor: Callable[..., Any],
+    read_pdf_executor: Callable[..., Any] | None = None,
     *,
     target_registry: CapabilityCatalog = registry,
     fetch_policy: ToolPolicy = WEB_FETCH_POLICY,
@@ -155,6 +156,47 @@ def register_web_tools(
             executor=fetch_urls_executor,
         )
     )
+    if read_pdf_executor is not None:
+        target_registry.register_tool(
+            Tool(
+                name="read_pdf",
+                description=(
+                    "下载并深度阅读 PDF 格式的券商研报、上市公司定期财报（年报/半年报）或官方公告。"
+                    "支持提取指定页码范围的正文段落及结构化 Markdown 表格。"
+                    "当搜索或网页链接指向 .pdf 文件，或者需要研读完整报告原文时调用。"
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "PDF 文档的在线 URL 地址（http/https 均可，如 https://.../report.pdf），或应用数据目录内的本地 .pdf 路径",
+                        },
+                        "start_page": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1,
+                            "description": "起始阅读页码（从 1 开始计数，默认第 1 页）",
+                        },
+                        "max_pages": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 50,
+                            "default": 20,
+                            "description": "本次提取的最大页数（默认 20 页）",
+                        },
+                        "extract_tables": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "是否解析并提取 PDF 中的结构化数据表格为 Markdown 表格",
+                        },
+                    },
+                    "required": ["url"],
+                },
+                policy=fetch_policy,
+                executor=read_pdf_executor,
+            )
+        )
 
 
 def register_twitter_tools(

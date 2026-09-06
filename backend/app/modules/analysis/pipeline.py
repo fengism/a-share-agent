@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
@@ -7,11 +8,12 @@ from zoneinfo import ZoneInfo
 from app.agentic.events import AgentEvent, auditable_agent_event
 from app.agentic.public import AgentEvidenceInsufficientError
 from app.configuration import get_effective_settings
-from app.core.cache import cache
+from app.core.cache import analysis_cache as cache
 from app.core.errors import log_internal_error
 from app.core.progress import ProgressCallback, ProgressEmitter, StageClock
 from app.modules.analysis import result_service, stages
 from app.modules.analysis.events import ANALYSIS_STAGE_NAMES, AnalysisProgress, AnalysisStage
+from app.modules.analysis.key_levels import apply_key_levels, resolve_key_levels
 from app.modules.analysis.models import AnalysisResult
 from app.modules.analysis.persistence import repository as analysis_storage
 
@@ -98,11 +100,14 @@ async def run_analysis(
                     agent_event=public_event,
                 ))
 
-        research = await stages.research_stock(
-            code,
-            analysis_date,
-            settings,
-            event_callback=emit_agent_event if progress_callback is not None else None,
+        research, key_levels = await asyncio.gather(
+            stages.research_stock(
+                code,
+                analysis_date,
+                settings,
+                event_callback=emit_agent_event if progress_callback is not None else None,
+            ),
+            resolve_key_levels(code),
         )
         await _emit_stage_completed(progress, 1, clock)
 
@@ -114,13 +119,39 @@ async def run_analysis(
         clock = await _emit_stage_started(
             progress,
             3,
-            detail="正在调用AI模型，可能需要10-25秒...",
+            detail="AI 正在长思维链深度推理中（8大投研章节）...",
         )
-        result = await stages.generate_analysis_result(code, prompt_context, settings)
+
+        reasoning_milestones = [
+            (0.0, "🧠 AI 开始深度推理：评估资料完备度与事实证据链…"),
+            (3.0, "🔍 AI 正在解构商业模式、经济引擎与分部盈利质量…"),
+            (6.5, "🏰 AI 正在校验护城河壁垒与潜在破坏因素…"),
+            (10.0, "👔 AI 正在审查管理层历史业绩、资本配置与股东利益一致性…"),
+            (13.5, "🌐 AI 正在审视行业格局、周期位置与产业链价值链分配…"),
+            (17.0, "🐻 AI 正在进行最强逆向推演（Inversion Bear Case）与风险矩阵评估…"),
+            (20.5, "⚖️ AI 正在构建三情景估值模型（Bull / Base / Bear）与公允价值区间…"),
+            (24.0, "🎯 AI 正在生成行动建议触发器、核心跟踪指标与数据缺口汇总…"),
+        ]
+
+        async def _stream_thinking_milestones():
+            for delay, milestone in reasoning_milestones:
+                if delay > 0:
+                    await asyncio.sleep(3.5)
+                await emit_agent_event(AgentEvent(type="status", content=milestone))
+
+        thinking_task = asyncio.create_task(_stream_thinking_milestones())
+        try:
+            result = await stages.generate_analysis_result(code, prompt_context, settings)
+        finally:
+            thinking_task.cancel()
+            await asyncio.gather(thinking_task, return_exceptions=True)
+
+        result = apply_key_levels(result, key_levels)
         result = cast(
             AnalysisResult,
             result.model_copy(update={"agent_trace": list(research.execution_trace)}),
         )
+        await emit_agent_event(AgentEvent(type="status", content="✨ 8大投研章节已全部生成完毕，正在组装研报…"))
         await _emit_stage_completed(progress, 3, clock)
 
         if before_persist is not None:

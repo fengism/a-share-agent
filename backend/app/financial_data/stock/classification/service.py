@@ -3,7 +3,8 @@ import logging
 from typing import cast
 
 from app.configuration.paths import DATA_DIR
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import reference_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking
 from app.core.concurrency.singleflight import SyncSingleFlight
 from app.financial_data.stock.classification import builder as industry_builder
@@ -13,14 +14,16 @@ from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
-_INDUSTRY_LEVEL_NAMES = {1: "一级", 2: "二级"}
+_INDUSTRY_LEVEL_NAMES = {1: "一级", 2: "二级", 3: "三级"}
 _INDUSTRY_MAPPING_FILES = {
     1: DATA_DIR / "industry_first_mapping.json",
     2: DATA_DIR / "industry_second_mapping.json",
+    3: DATA_DIR / "industry_third_mapping.json",
 }
 _INDUSTRY_FILE_CACHE_KEYS = {
     1: ("industry_first_mapping_file", "industry_first_list_file"),
     2: ("industry_second_mapping_file", "industry_second_list_file"),
+    3: ("industry_third_mapping_file", "industry_third_list_file"),
 }
 _INDUSTRY_MAPPING_FILE = _INDUSTRY_MAPPING_FILES[2]
 _INDUSTRY_MAPPING_CACHE_KEY, _INDUSTRY_LIST_CACHE_KEY = _INDUSTRY_FILE_CACHE_KEYS[2]
@@ -126,8 +129,8 @@ def _build_industry_mapping_sw_index_akshare(level: int) -> tuple[dict[str, str]
     provider = _get_akshare_provider()
     index_dataframe = provider_gateway.call_sync(
         "akshare",
-        "sw_index_realtime" if level == 2 else "sw_index_realtime_level_1",
-        lambda: provider.fetch_sw_index_realtime() if level == 2 else provider.fetch_sw_index_realtime(level=level),
+        f"sw_index_realtime_level_{level}",
+        lambda: provider.fetch_sw_index_realtime(level=level),
         max_attempts=1,
         retry_budget_seconds=8.0,
     )
@@ -228,8 +231,8 @@ def update_industry_mapping_sw_level_file(level: int) -> tuple[dict[str, str], l
 
 
 def update_industry_mapping_sw_files() -> dict[int, tuple[dict[str, str], list[str]]]:
-    """Refresh level-one and level-two snapshots independently."""
-    return {level: update_industry_mapping_sw_level_file(level) for level in (1, 2)}
+    """Refresh level-one through level-three snapshots independently."""
+    return {level: update_industry_mapping_sw_level_file(level) for level in (1, 2, 3)}
 
 
 def fetch_industry_mapping_sw_level(level: int) -> tuple[dict[str, str], list[str]]:
@@ -264,6 +267,11 @@ def fetch_industry_mapping_sw_second() -> tuple[dict[str, str], list[str]]:
     return fetch_industry_mapping_sw_level(2)
 
 
+def fetch_industry_mapping_sw_third() -> tuple[dict[str, str], list[str]]:
+    """同步获取申万三级行业映射，优先使用缓存与本地文件。"""
+    return fetch_industry_mapping_sw_level(3)
+
+
 def update_industry_mapping_sw_second_file() -> tuple[dict[str, str], list[str]]:
     """Refresh both levels while preserving the established level-two return contract."""
     return update_industry_mapping_sw_files()[2]
@@ -276,17 +284,74 @@ async def build_industry_mapping() -> tuple[dict[str, str], list[str]]:
     )
 
 
+async def _get_database_mapping(level: int) -> dict[str, str]:
+    from app.modules.industry_classification.repository import a_share_mapping
+
+    return await call_blocking(a_share_mapping, level)
+
+
+async def _database_mapping_is_fresh() -> bool:
+    """数据库映射是否来自至少一次成功的在线刷新（而非种子快照）。
+
+    种子/从未在线刷新过的库不含新上市股票；未刷新成功前请求优先走在线源，
+    避免陈旧快照被无限期当作权威数据且无任何告警。刷新开关关闭但此前
+    刷新成功过（运维有意冻结）时仍视为可信。
+    """
+    from app.modules.industry_classification.repository import get_refresh_state
+
+    state = await call_blocking(get_refresh_state)
+    last_succeeded = str(state.get("last_succeeded_at") or "").strip()
+    return bool(last_succeeded)
+
+
 async def get_industry_mapping(level: int = 2) -> dict[str, str]:
-    mapping, _ = cast(
-        tuple[dict[str, str], list[str]],
-        await call_blocking(fetch_industry_mapping_sw_level, level),
-    )
-    return mapping
+    _validate_level(level)
+    mapping = await _get_database_mapping(level)
+    if _is_valid_mapping(mapping) and await _database_mapping_is_fresh():
+        return mapping
+    try:
+        online_mapping, _ = cast(
+            tuple[dict[str, str], list[str]],
+            await call_blocking(fetch_industry_mapping_sw_level, level),
+        )
+    except Exception:
+        if _is_valid_mapping(mapping):
+            logger.warning("在线行业映射获取失败，回退数据库快照: level=%s", level)
+            return mapping
+        raise
+    if _is_valid_mapping(online_mapping):
+        return online_mapping
+    if _is_valid_mapping(mapping):
+        logger.warning("在线行业映射数据量不足，回退数据库快照: level=%s", level)
+        return mapping
+    return online_mapping
 
 
-async def get_industry_list(level: int = 2) -> list[str]:
-    _, industry_list = cast(
-        tuple[dict[str, str], list[str]],
-        await call_blocking(fetch_industry_mapping_sw_level, level),
-    )
-    return industry_list
+async def get_industry_list(level: int | None = 2) -> list[str]:
+    if level is None:
+        from app.modules.industry_classification.repository import get_all_distinct_industries
+
+        all_ind = await call_blocking(get_all_distinct_industries)
+        if all_ind:
+            return cast(list[str], all_ind)
+        level = 2
+    _validate_level(level)
+    mapping = await _get_database_mapping(level)
+    if _is_valid_mapping(mapping) and await _database_mapping_is_fresh():
+        return _build_industry_list(mapping)
+    try:
+        _, industry_list = cast(
+            tuple[dict[str, str], list[str]],
+            await call_blocking(fetch_industry_mapping_sw_level, level),
+        )
+    except Exception:
+        if _is_valid_mapping(mapping):
+            logger.warning("在线行业列表获取失败，回退数据库快照: level=%s", level)
+            return _build_industry_list(mapping)
+        raise
+    if industry_list:
+        return cast(list[str], industry_list)
+    if _is_valid_mapping(mapping):
+        logger.warning("在线行业列表数据量不足，回退数据库快照: level=%s", level)
+        return _build_industry_list(mapping)
+    return cast(list[str], industry_list)

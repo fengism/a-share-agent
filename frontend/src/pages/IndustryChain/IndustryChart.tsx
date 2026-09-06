@@ -13,6 +13,7 @@ export default function IndustryChart({ option, height }: IndustryChartProps) {
       option={option}
       style={{ height, width: "100%" }}
       notMerge
+      opts={{ renderer: "svg" }}
     />
   );
 }

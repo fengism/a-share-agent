@@ -5,7 +5,8 @@ from typing import cast
 import pandas as pd
 
 from app.constants.market import INDEX_FALLBACKS
-from app.core.cache import cache, dated_cache_key
+from app.core.cache import dated_cache_key
+from app.core.cache import market_cache as cache
 from app.core.cache_policies import INDEX_INTRADAY
 from app.core.concurrency.rate_limiter import sina_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight

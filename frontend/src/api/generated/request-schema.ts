@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/analysis/export-pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Custom Analysis Pdf
+         * @description 基于前端传入的实时分析结果对象直接生成纯矢量投研 PDF。
+         */
+        post: operations["export_custom_analysis_pdf_api_analysis_export_pdf_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/analysis/history/all": {
         parameters: {
             query?: never;
@@ -46,6 +66,26 @@ export interface paths {
          *         AnalysisResult: 完整的结构化分析结果，包含评级、信号与目标价等字段。
          */
         post: operations["trigger_analysis_api_analysis__code__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analysis/{code}/export-pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Analysis Pdf
+         * @description 根据股票代码与日期，通过无头浏览器直接生成纯矢量投研 PDF 并下载。
+         */
+        get: operations["export_analysis_pdf_api_analysis__code__export_pdf_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -584,6 +624,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/daily-review/{date}/export-pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Daily Review Pdf
+         * @description 根据日期读取复盘记录，并生成包含矢量图表的 PDF。
+         */
+        get: operations["export_daily_review_pdf_api_daily_review__date__export_pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -675,6 +735,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hk/indices/realtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Hk Index Quotes
+         * @description 获取新浪港股核心指数实时行情。
+         */
+        get: operations["get_hk_index_quotes_api_hk_indices_realtime_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hk/indices/{symbol}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Hk Index History
+         * @description 获取新浪港股指数历史行情。
+         */
+        get: operations["get_hk_index_history_api_hk_indices__symbol__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hk/stocks/realtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Hk Stock Quotes
+         * @description 获取新浪港股实时行情，并支持本地搜索和分页。
+         */
+        get: operations["get_hk_stock_quotes_api_hk_stocks_realtime_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hk/stocks/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Hk Stocks
+         * @description 从本地主数据索引快速搜索港股。
+         */
+        get: operations["search_hk_stocks_api_hk_stocks_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hk/stocks/{code}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Hk Stock History
+         * @description 获取新浪港股个股历史行情。
+         */
+        get: operations["get_hk_stock_history_api_hk_stocks__code__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/industry-chain/atlas/chains": {
         parameters: {
             query?: never;
@@ -750,9 +910,29 @@ export interface paths {
         put?: never;
         /**
          * Mine Industry Chain Atlas
-         * @description 把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目。
+         * @description 把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目（管理员）。
          */
         post: operations["mine_industry_chain_atlas_api_industry_chain_atlas_mine_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-chain/export-pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Custom Industry Chain Pdf
+         * @description 基于前端传入的实时产业链分析结果对象直接生成纯矢量投研 PDF。
+         */
+        post: operations["export_custom_industry_chain_pdf_api_industry_chain_export_pdf_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -811,6 +991,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/industry-chain/{name}/export-pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Industry Chain Pdf
+         * @description 根据产业链名称与存档 ID，直接生成纯矢量投研 PDF 并下载。
+         */
+        get: operations["export_industry_chain_pdf_api_industry_chain__name__export_pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/industry-chain/{name}/latest": {
         parameters: {
             query?: never;
@@ -861,6 +1061,194 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/industry-classification/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Industries */
+        get: operations["export_industries_api_industry_classification_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-classification/import/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Commit Excel Import */
+        post: operations["commit_excel_import_api_industry_classification_import_commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-classification/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Excel Import */
+        post: operations["preview_excel_import_api_industry_classification_import_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-classification/industries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Industries */
+        get: operations["get_industries_api_industry_classification_industries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-classification/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Record */
+        post: operations["create_record_api_industry_classification_records_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-classification/records/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Record */
+        put: operations["update_record_api_industry_classification_records__record_id__put"];
+        post?: never;
+        /** Remove Record */
+        delete: operations["remove_record_api_industry_classification_records__record_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-classification/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Industries */
+        post: operations["refresh_industries_api_industry_classification_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-classification/refresh-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Refresh Policy */
+        put: operations["update_refresh_policy_api_industry_classification_refresh_policy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-classification/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Status */
+        get: operations["get_status_api_industry_classification_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-classification/stocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Stocks */
+        get: operations["get_stocks_api_industry_classification_stocks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-classification/stocks/{stock_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Stock */
+        get: operations["get_stock_api_industry_classification_stocks__stock_code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/macro/all": {
         parameters: {
             query?: never;
@@ -873,6 +1261,106 @@ export interface paths {
          * @description 获取全量宏观经济指标数据。
          */
         get: operations["get_macro_all_api_macro_all_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/macro/commodities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Commodities
+         * @description 获取大宗商品与工业品现货基差与产业链映射。
+         */
+        get: operations["get_commodities_api_macro_commodities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/macro/customs-trade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Customs Trade
+         * @description 获取海关总署月度进出口总况与重点出海商品量价。
+         */
+        get: operations["get_customs_trade_api_macro_customs_trade_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/macro/global-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Global Rates
+         * @description 获取全球宏观利率、中美10Y国债收益率与汇率流动性看板。
+         */
+        get: operations["get_global_rates_api_macro_global_rates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/macro/sge-gold": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sge Gold
+         * @description 获取上海黄金交易所指定品种的历史行情。
+         */
+        get: operations["get_sge_gold_api_macro_sge_gold_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/macro/treasury-yields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Treasury Yields
+         * @description 获取中美国债收益率历史曲线、期限结构与中美利差数据。
+         */
+        get: operations["get_treasury_yields_api_macro_treasury_yields_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1278,6 +1766,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/northbound-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Northbound History
+         * @description 获取北向资金与沪深300历史对照数据。
+         */
+        get: operations["get_northbound_history_api_market_northbound_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/other-news": {
         parameters: {
             query?: never;
@@ -1290,6 +1798,46 @@ export interface paths {
          * @description 获取非快讯类新闻。
          */
         get: operations["get_market_other_news_api_market_other_news_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/price-anomaly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Price Anomaly
+         * @description 获取交易所异动明细。
+         */
+        get: operations["get_market_price_anomaly_api_market_price_anomaly_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/price-anomaly/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Price Anomaly Count
+         * @description 获取按标的聚合的交易所异动统计。
+         */
+        get: operations["get_market_price_anomaly_count_api_market_price_anomaly_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1890,6 +2438,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/screener/concepts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concepts
+         * @description 获取可用于筛选的概念名称列表。
+         *
+         *     Return:
+         *         list[str]: 概念名称集合。
+         */
+        get: operations["get_concepts_api_screener_concepts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/screener/industries": {
         parameters: {
             query?: never;
@@ -1901,6 +2472,8 @@ export interface paths {
          * Get Industries
          * @description 获取可用于筛选的行业名称列表。
          *
+         *     Param:
+         *         level: 可选的申万级别 (1, 2, 3)，不传时返回全级别去重行业列表。
          *     Return:
          *         list[str]: 行业名称集合。
          */
@@ -1997,6 +2570,328 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stock-concept/concepts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Concepts */
+        get: operations["get_concepts_api_stock_concept_concepts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-concept/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Concepts */
+        get: operations["export_concepts_api_stock_concept_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-concept/import/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Commit Import File */
+        post: operations["commit_import_file_api_stock_concept_import_commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-concept/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Import File */
+        post: operations["preview_import_file_api_stock_concept_import_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-concept/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Record */
+        post: operations["create_record_api_stock_concept_records_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-concept/records/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Record */
+        put: operations["update_record_api_stock_concept_records__record_id__put"];
+        post?: never;
+        /** Remove Record */
+        delete: operations["remove_record_api_stock_concept_records__record_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-concept/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Status */
+        get: operations["get_status_api_stock_concept_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-concept/stocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Stocks */
+        get: operations["get_stocks_api_stock_concept_stocks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-concept/stocks/{stock_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Stock */
+        get: operations["get_stock_api_stock_concept_stocks__stock_code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-profile/enrich/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrich Record
+         * @description 补充个股资料：库中已有主营信息时直接返回，缺失才从同花顺/东方财富抓取并持久化（force=true 强制刷新）。
+         */
+        post: operations["enrich_record_api_stock_profile_enrich__code__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-profile/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Records
+         * @description 分页筛选个股基础资料列表。
+         */
+        get: operations["get_records_api_stock_profile_records_get"];
+        put?: never;
+        /**
+         * Create Or Update Record
+         * @description 手动创建或更新个股基础资料。
+         */
+        post: operations["create_or_update_record_api_stock_profile_records_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-profile/records/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Records
+         * @description 按筛选条件导出全部个股基础资料为 CSV（带 BOM，Excel 可直接打开）。
+         */
+        get: operations["export_records_api_stock_profile_records_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-profile/records/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Records
+         * @description 批量导入个股基础资料（Base64 编码的 Excel/CSV），内容无变化的行自动跳过。
+         */
+        post: operations["import_records_api_stock_profile_records_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-profile/records/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Record By Code
+         * @description 按股票代码获取个股基础资料（支持 600519 或 600519.SH）。
+         */
+        get: operations["get_record_by_code_api_stock_profile_records__code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-profile/records/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Record By Id
+         * @description 按记录 ID 手工保存个股基础资料（股票代码不可变更）。
+         */
+        put: operations["update_record_by_id_api_stock_profile_records__record_id__put"];
+        post?: never;
+        /**
+         * Delete Record By Id
+         * @description 删除指定的个股基础资料记录。
+         */
+        delete: operations["delete_record_by_id_api_stock_profile_records__record_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-profile/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Summary
+         * @description 获取个股基础资料库统计概览（股票总数、主营覆盖率、板块分布等）。
+         */
+        get: operations["get_summary_api_stock_profile_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-profile/sync-master": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Master
+         * @description 从官方交易所名录与申万行业数据全量同步/更新个股基础资料库。
+         */
+        post: operations["sync_master_api_stock_profile_sync_master_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stock/analysis-page/{code}": {
         parameters: {
             query?: never;
@@ -2057,6 +2952,66 @@ export interface paths {
          * @description 按名称或代码模糊搜索股票。
          */
         get: operations["search_stocks_api_stock_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock/{code}/bulletins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Bulletins
+         * @description 获取个股公司公告分页列表（新浪财经）。
+         */
+        get: operations["get_bulletins_api_stock__code__bulletins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock/{code}/business-intro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stock Business Intro
+         * @description 获取个股主营介绍；首次抓取后从本地持久化文件读取。
+         */
+        get: operations["get_stock_business_intro_api_stock__code__business_intro_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock/{code}/chip-distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chip Distribution
+         * @description 基于前复权日 K 与换手率在本地计算个股筹码分布。
+         */
+        get: operations["get_chip_distribution_api_stock__code__chip_distribution_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2257,6 +3212,26 @@ export interface paths {
          * @description 获取按类别分组的个股新闻流。
          */
         get: operations["get_news_categorized_api_stock__code__news_categorized_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock/{code}/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Reports
+         * @description 获取个股券商研报评级列表（新浪财经，最近 N 个月）。
+         */
+        get: operations["get_reports_api_stock__code__reports_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2578,6 +3553,7 @@ export interface components {
             plan_step?: components["schemas"]["AgentPlanStepUpdate"] | null;
             /** Reasoning Content */
             reasoning_content?: string | null;
+            research_round?: components["schemas"]["AgentResearchRound"] | null;
             /** Status */
             status?: ("completed" | "partial" | "failed") | null;
             tool_call?: components["schemas"]["ToolCallInfo"] | null;
@@ -2587,7 +3563,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "status" | "plan" | "plan_step" | "text" | "reasoning" | "tool_call" | "tool_result" | "error" | "done";
+            type: "status" | "plan" | "round_started" | "round_completed" | "plan_step" | "text" | "reasoning" | "tool_call" | "tool_result" | "error" | "done";
             /** Warnings */
             warnings?: string[];
         };
@@ -2659,6 +3635,43 @@ export interface components {
             /** Step Id */
             step_id: string;
         };
+        /** AgentResearchRound */
+        AgentResearchRound: {
+            /**
+             * Conclusion
+             * @default
+             */
+            conclusion?: string;
+            /** Evidence Added */
+            evidence_added?: string[];
+            /** Evidence Gaps */
+            evidence_gaps?: string[];
+            /** Judgment Basis */
+            judgment_basis?: string[];
+            /**
+             * Next Step
+             * @default
+             */
+            next_step?: string;
+            /** Objective */
+            objective: string;
+            /** Round Index */
+            round_index: number;
+            /** Round Total */
+            round_total: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "completed" | "degraded";
+            /** Tool Names */
+            tool_names?: string[];
+            /**
+             * Tool Selection Reason
+             * @default
+             */
+            tool_selection_reason?: string;
+        };
         /** AgentToolResultSummary */
         AgentToolResultSummary: {
             /** Metadata */
@@ -2714,12 +3727,26 @@ export interface components {
             stock_name: string;
         };
         /**
+         * AnalysisKeyLevels
+         * @description 根据日 K 行情计算出的确定性关键点位。
+         */
+        AnalysisKeyLevels: {
+            /** Current Price */
+            current_price?: number | null;
+            /** Resistance */
+            resistance?: number | null;
+            /** Support */
+            support?: number | null;
+        };
+        /**
          * AnalysisPageData
          * @description 分析页聚合响应；单个分区失败时保留其余可用数据。
          */
         AnalysisPageData: {
             cached_analysis?: components["schemas"]["AnalysisResult"] | null;
+            chip_distribution?: components["schemas"]["ChipDistribution"] | null;
             intraday?: components["schemas"]["IntradayData"] | null;
+            key_levels?: components["schemas"]["AnalysisKeyLevels"] | null;
             kline?: components["schemas"]["KlineData"] | null;
             /**
              * Partial
@@ -2989,6 +4016,15 @@ export interface components {
             /** Eastmoney News */
             eastmoney_news?: components["schemas"]["NewsSearchItem"][];
         };
+        /** CentralBankPolicyRates */
+        CentralBankPolicyRates: {
+            /** China Lpr 1Y */
+            china_lpr_1y: string;
+            /** China Lpr 5Y */
+            china_lpr_5y: string;
+            /** Us Fed Funds Rate */
+            us_fed_funds_rate: string;
+        };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** New Password */
@@ -3184,6 +4220,213 @@ export interface components {
             timeout_seconds?: number | null;
         };
         /**
+         * ChipCostRange
+         * @description 指定比例筹码覆盖的成本区间。
+         */
+        ChipCostRange: {
+            /** High */
+            high: number;
+            /** Low */
+            low: number;
+        };
+        /**
+         * ChipDistribution
+         * @description 基于历史日 K 与换手率在本地估算的筹码分布。
+         */
+        ChipDistribution: {
+            /** As Of Date */
+            as_of_date: string;
+            /** Avg Cost */
+            avg_cost: number;
+            /** Code */
+            code: string;
+            /** Concentration 70 */
+            concentration_70?: number | null;
+            /** Concentration 90 */
+            concentration_90?: number | null;
+            cost_70: components["schemas"]["ChipCostRange"];
+            cost_90: components["schemas"]["ChipCostRange"];
+            /** Histogram */
+            histogram?: components["schemas"]["ChipHistogramItem"][];
+            /** Peak Price */
+            peak_price: number;
+            /** Price */
+            price: number;
+            /** Profit Ratio */
+            profit_ratio: number;
+            /**
+             * Source
+             * @default local
+             */
+            source?: string;
+        };
+        /**
+         * ChipHistogramItem
+         * @description 单个价格网格上的筹码占比。
+         */
+        ChipHistogramItem: {
+            /** Price */
+            price: number;
+            /** Ratio */
+            ratio: number;
+        };
+        /** CommoditiesResponse */
+        CommoditiesResponse: {
+            /** Items */
+            items?: components["schemas"]["CommodityItem"][];
+            /** Query */
+            query: string;
+            /** Total Count */
+            total_count: number;
+        };
+        /** CommodityItem */
+        CommodityItem: {
+            /** Category */
+            category: string;
+            /** Change */
+            change?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Contract */
+            contract: string;
+            /** Date */
+            date?: string | null;
+            /** Description */
+            description: string;
+            /** High */
+            high?: number | null;
+            /** Latest Price */
+            latest_price?: number | null;
+            /** Low */
+            low?: number | null;
+            /** Name */
+            name: string;
+            /** Open */
+            open?: number | null;
+            /** Open Interest */
+            open_interest?: number | null;
+            /** Prev Settle */
+            prev_settle?: number | null;
+            /** Related Chains */
+            related_chains?: string[];
+            /** Symbol */
+            symbol: string;
+            /** Unit */
+            unit: string;
+            /** Volume */
+            volume?: number | null;
+        };
+        /** ConceptImportCommitRequest */
+        ConceptImportCommitRequest: {
+            /** Content Base64 */
+            content_base64: string;
+            /** Filename */
+            filename: string;
+            /**
+             * Force Override
+             * @default false
+             */
+            force_override?: boolean;
+            /** Import Token */
+            import_token: string;
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+        };
+        /** ConceptImportCommitResponse */
+        ConceptImportCommitResponse: {
+            /** Added */
+            added: number;
+            /** Skipped */
+            skipped: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Updated */
+            updated: number;
+        };
+        /** ConceptImportFileRequest */
+        ConceptImportFileRequest: {
+            /** Content Base64 */
+            content_base64: string;
+            /** Filename */
+            filename: string;
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+        };
+        /** ConceptImportPreviewResponse */
+        ConceptImportPreviewResponse: {
+            /** Added Rows */
+            added_rows: number;
+            /** Content Hash */
+            content_hash: string;
+            /** Import Token */
+            import_token: string;
+            /** Invalid Rows */
+            invalid_rows: number;
+            /** Sample */
+            sample: {
+                [key: string]: unknown;
+            }[];
+            /** Skipped Rows */
+            skipped_rows: number;
+            /** Total Rows */
+            total_rows: number;
+            /** Unchanged Rows */
+            unchanged_rows: number;
+            /** Updated Rows */
+            updated_rows: number;
+            /** Valid Rows */
+            valid_rows: number;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** ConceptItem */
+        ConceptItem: {
+            /** Name */
+            name: string;
+            /** Stock Count */
+            stock_count: number;
+        };
+        /** ConceptListResponse */
+        ConceptListResponse: {
+            /** Items */
+            items: components["schemas"]["ConceptItem"][];
+            /** Total */
+            total: number;
+        };
+        /** ConceptMutationResponse */
+        ConceptMutationResponse: {
+            /** Id */
+            id?: number | null;
+            /**
+             * Success
+             * @default true
+             */
+            success?: boolean;
+        };
+        /** ConceptStats */
+        ConceptStats: {
+            /** Latest Updated At */
+            latest_updated_at?: string | null;
+            /** Market Counts */
+            market_counts: {
+                [key: string]: number;
+            };
+            /** Total Concepts */
+            total_concepts: number;
+            /** Total Stocks */
+            total_stocks: number;
+        };
+        /** ConceptStatusResponse */
+        ConceptStatusResponse: {
+            stats: components["schemas"]["ConceptStats"];
+        };
+        /**
          * ConfigResponse
          * @description Current effective configuration with secrets masked.
          */
@@ -3278,6 +4521,8 @@ export interface components {
             iwencai_base_url: string;
             /** Iwencai Enabled */
             iwencai_enabled: boolean;
+            /** Legulegu Token */
+            legulegu_token: string;
             /** Llm Api Key */
             llm_api_key: string;
             /**
@@ -3405,6 +4650,8 @@ export interface components {
             iwencai_base_url?: string | null;
             /** Iwencai Enabled */
             iwencai_enabled?: boolean | null;
+            /** Legulegu Token */
+            legulegu_token?: string | null;
             /** Llm Api Key */
             llm_api_key?: string | null;
             /** Llm Api Mode */
@@ -3436,6 +4683,118 @@ export interface components {
         CreateInviteRequest: {
             /** Expires In Days */
             expires_in_days?: number | null;
+        };
+        /** CustomsCommodityProfile */
+        CustomsCommodityProfile: {
+            /** Category */
+            category: string;
+            /** Commodity */
+            commodity: string;
+            /** Description */
+            description: string;
+            /** Industry Chains */
+            industry_chains?: string[];
+            /** Key Target Markets */
+            key_target_markets: string;
+            /** Related A Stocks */
+            related_a_stocks?: string[];
+            /** Trade Type */
+            trade_type: string;
+            /** Unit */
+            unit: string;
+        };
+        /** CustomsInvestmentImplications */
+        CustomsInvestmentImplications: {
+            /** Export Driver */
+            export_driver: string;
+            /** Substitute Driver */
+            substitute_driver: string;
+        };
+        /**
+         * CustomsMonthSummary
+         * @description 海关进出口月度总况（金额单位：亿美元）。
+         */
+        CustomsMonthSummary: {
+            /**
+             * Balance Status
+             * @default
+             */
+            balance_status?: string;
+            /**
+             * Export Accumulate
+             * @description 累计出口金额（亿美元）
+             * @default 0
+             */
+            export_accumulate?: number;
+            /**
+             * Export Accumulate Yoy Pct
+             * @description 累计出口同比（%）
+             * @default 0
+             */
+            export_accumulate_yoy_pct?: number;
+            /**
+             * Export Val
+             * @description 当月出口金额（亿美元）
+             * @default 0
+             */
+            export_val?: number;
+            /**
+             * Export Yoy Pct
+             * @description 当月出口同比（%）
+             * @default 0
+             */
+            export_yoy_pct?: number;
+            /**
+             * Import Accumulate
+             * @description 累计进口金额（亿美元）
+             * @default 0
+             */
+            import_accumulate?: number;
+            /**
+             * Import Accumulate Yoy Pct
+             * @description 累计进口同比（%）
+             * @default 0
+             */
+            import_accumulate_yoy_pct?: number;
+            /**
+             * Import Val
+             * @description 当月进口金额（亿美元）
+             * @default 0
+             */
+            import_val?: number;
+            /**
+             * Import Yoy Pct
+             * @description 当月进口同比（%）
+             * @default 0
+             */
+            import_yoy_pct?: number;
+            /**
+             * Month
+             * @default
+             */
+            month?: string;
+            /**
+             * Report Date
+             * @default
+             */
+            report_date?: string;
+            /**
+             * Trade Balance
+             * @description 当月贸易差额（亿美元，出口-进口）
+             * @default 0
+             */
+            trade_balance?: number;
+        };
+        /** CustomsTradeDataResponse */
+        CustomsTradeDataResponse: {
+            investment_implications: components["schemas"]["CustomsInvestmentImplications"];
+            latest_month_summary?: components["schemas"]["CustomsMonthSummary"];
+            /** Matched Commodity Profiles */
+            matched_commodity_profiles?: components["schemas"]["CustomsCommodityProfile"][];
+            /** Query */
+            query: string;
+            /** Recent 12M Macro Trend */
+            recent_12m_macro_trend?: components["schemas"]["CustomsMonthSummary"][];
         };
         /**
          * DCFScenario
@@ -3752,6 +5111,12 @@ export interface components {
              */
             deleted?: boolean;
         };
+        /** DollarAndFx */
+        DollarAndFx: {
+            dxy?: components["schemas"]["FxQuote"] | null;
+            usd_cnh?: components["schemas"]["FxQuote"] | null;
+            usd_cny?: components["schemas"]["FxQuote"] | null;
+        };
         /** DragonTigerDetail */
         DragonTigerDetail: {
             /** Buy Amount */
@@ -3980,10 +5345,108 @@ export interface components {
         FinancialStatementRow: {
             [key: string]: unknown;
         };
+        /** FxQuote */
+        FxQuote: {
+            /** Change */
+            change?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Value */
+            value?: number | null;
+        };
+        /** GlobalMacroRatesResponse */
+        GlobalMacroRatesResponse: {
+            central_bank_policy_rates: components["schemas"]["CentralBankPolicyRates"];
+            dollar_and_fx?: components["schemas"]["DollarAndFx"];
+            market_implications: components["schemas"]["MarketImplications"];
+            /** Timestamp */
+            timestamp: string;
+            treasury_curve?: components["schemas"]["TreasuryCurve"];
+            treasury_yields_and_spreads?: components["schemas"]["TreasuryLatest"];
+        };
+        /** HKStockQuote */
+        HKStockQuote: {
+            /** Amount */
+            amount?: number | null;
+            /** Ask */
+            ask?: number | null;
+            /** Bid */
+            bid?: number | null;
+            /** Change */
+            change?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** English Name */
+            english_name?: string | null;
+            /** High */
+            high?: number | null;
+            /** Low */
+            low?: number | null;
+            /** Name */
+            name: string;
+            /** Open */
+            open?: number | null;
+            /** Pre Close */
+            pre_close?: number | null;
+            /** Price */
+            price?: number | null;
+            /** Trade Type */
+            trade_type?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Volume */
+            volume?: number | null;
+        };
+        /** HKStockQuotePage */
+        HKStockQuotePage: {
+            /** Items */
+            items: components["schemas"]["HKStockQuote"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /**
+             * Source
+             * @default sina
+             */
+            source?: string;
+            /** Total */
+            total: number;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** HKStockSearchItem */
+        HKStockSearchItem: {
+            /** Code */
+            code: string;
+            /** English Name */
+            english_name?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** HKStockSearchResult */
+        HKStockSearchResult: {
+            /** Items */
+            items: components["schemas"]["HKStockSearchItem"][];
+        };
         /** HealthMetricsResponse */
         HealthMetricsResponse: {
+            /** Analysis Cache */
+            analysis_cache: {
+                [key: string]: number;
+            };
             /** Global Cache */
             global_cache: {
+                [key: string]: number;
+            };
+            /** Market Cache */
+            market_cache: {
                 [key: string]: number;
             };
             /** Metrics */
@@ -3993,6 +5456,14 @@ export interface components {
             /** Provider Circuits */
             provider_circuits: {
                 [key: string]: components["schemas"]["ProviderCircuitStateResponse"];
+            };
+            /** Reference Cache */
+            reference_cache: {
+                [key: string]: number;
+            };
+            /** Series Cache */
+            series_cache: {
+                [key: string]: number;
             };
             /**
              * Status
@@ -4046,6 +5517,16 @@ export interface components {
         };
         /** HsgtFlowResponse */
         HsgtFlowResponse: {
+            /**
+             * Date
+             * @default
+             */
+            date?: string;
+            /**
+             * Is Stale
+             * @default false
+             */
+            is_stale?: boolean;
             /** Points */
             points?: components["schemas"]["HsgtFlowPoint"][];
             /**
@@ -4058,6 +5539,81 @@ export interface components {
              * @default
              */
             updated_at?: string;
+        };
+        /** ImportCommitRequest */
+        ImportCommitRequest: {
+            /** Content Base64 */
+            content_base64: string;
+            /** Effective Date */
+            effective_date?: string | null;
+            /** Filename */
+            filename: string;
+            /**
+             * Force Override
+             * @default false
+             */
+            force_override?: boolean;
+            /** Import Token */
+            import_token: string;
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+        };
+        /** ImportCommitResponse */
+        ImportCommitResponse: {
+            /** Added */
+            added: number;
+            /** Skipped */
+            skipped: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Updated */
+            updated: number;
+        };
+        /** ImportFileRequest */
+        ImportFileRequest: {
+            /** Content Base64 */
+            content_base64: string;
+            /** Effective Date */
+            effective_date?: string | null;
+            /** Filename */
+            filename: string;
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+        };
+        /** ImportPreviewResponse */
+        ImportPreviewResponse: {
+            /** Added Rows */
+            added_rows: number;
+            /** Conflict Rows */
+            conflict_rows: number;
+            /** Content Hash */
+            content_hash: string;
+            /** Import Token */
+            import_token: string;
+            /** Invalid Rows */
+            invalid_rows: number;
+            /** Sample */
+            sample: {
+                [key: string]: unknown;
+            }[];
+            /** Skipped Rows */
+            skipped_rows: number;
+            /** Total Rows */
+            total_rows: number;
+            /** Unchanged Rows */
+            unchanged_rows: number;
+            /** Updated Rows */
+            updated_rows: number;
+            /** Valid Rows */
+            valid_rows: number;
+            /** Warnings */
+            warnings: string[];
         };
         /**
          * IndexIntradayData
@@ -4684,6 +6240,26 @@ export interface components {
              */
             url?: string;
         };
+        /** IndustryHierarchyResponse */
+        IndustryHierarchyResponse: {
+            /** Level1 */
+            level1: string[];
+            /** Level2 */
+            level2: string[];
+            /** Level3 */
+            level3: string[];
+        };
+        /** IndustryListResponse */
+        IndustryListResponse: {
+            /** Items */
+            items: components["schemas"]["IndustryRecord"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
         /** IndustryPosition */
         IndustryPosition: {
             /**
@@ -4786,6 +6362,126 @@ export interface components {
              * @default 0
              */
             total?: number;
+        };
+        /** IndustryRecord */
+        IndustryRecord: {
+            /** Created At */
+            created_at: string;
+            /** Effective Date */
+            effective_date?: string | null;
+            /** Exchange Suffix */
+            exchange_suffix: string;
+            /** Id */
+            id: number;
+            /** Is Manual Override */
+            is_manual_override: boolean;
+            /**
+             * Market Group
+             * @enum {string}
+             */
+            market_group: "A" | "HK" | "OVERSEAS";
+            /** Source */
+            source: string;
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+            /** Stock Code */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @default
+             */
+            stock_name?: string;
+            /**
+             * Sw Industry Code
+             * @default
+             */
+            sw_industry_code?: string;
+            /**
+             * Sw Level1 Name
+             * @default
+             */
+            sw_level1_name?: string;
+            /**
+             * Sw Level2 Name
+             * @default
+             */
+            sw_level2_name?: string;
+            /**
+             * Sw Level3 Name
+             * @default
+             */
+            sw_level3_name?: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** IndustryRecordInput */
+        IndustryRecordInput: {
+            /** Effective Date */
+            effective_date?: string | null;
+            /** Exchange Suffix */
+            exchange_suffix: string;
+            /**
+             * Market Group
+             * @enum {string}
+             */
+            market_group: "A" | "HK" | "OVERSEAS";
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+            /** Stock Code */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @default
+             */
+            stock_name?: string;
+            /**
+             * Sw Industry Code
+             * @default
+             */
+            sw_industry_code?: string;
+            /**
+             * Sw Level1 Name
+             * @default
+             */
+            sw_level1_name?: string;
+            /**
+             * Sw Level2 Name
+             * @default
+             */
+            sw_level2_name?: string;
+            /**
+             * Sw Level3 Name
+             * @default
+             */
+            sw_level3_name?: string;
+        };
+        /** IndustryStats */
+        IndustryStats: {
+            /** Latest Updated At */
+            latest_updated_at?: string | null;
+            /** Level1 Count */
+            level1_count: number;
+            /** Level2 Count */
+            level2_count: number;
+            /** Level3 Count */
+            level3_count: number;
+            /** Market Counts */
+            market_counts: {
+                [key: string]: number;
+            };
+            /** Total */
+            total: number;
+        };
+        /** IndustryStatusResponse */
+        IndustryStatusResponse: {
+            refresh: components["schemas"]["RefreshState"];
+            stats: components["schemas"]["IndustryStats"];
         };
         /** InformationQuality */
         InformationQuality: {
@@ -5310,6 +7006,15 @@ export interface components {
              */
             up_num?: number;
         };
+        /** MarketImplications */
+        MarketImplications: {
+            /** Dxy Cnh Impact */
+            dxy_cnh_impact: string;
+            /** Us 10Y Impact */
+            us_10y_impact: string;
+            /** Us China Spread Impact */
+            us_china_spread_impact: string;
+        };
         /**
          * MarketIndices
          * @description 市场概览数据。
@@ -5696,6 +7401,117 @@ export interface components {
             /** Url */
             url?: string;
         };
+        /** MarketPriceAnomalyCountItem */
+        MarketPriceAnomalyCountItem: {
+            /** Board */
+            board?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Days */
+            days?: number | null;
+            /** Deviation */
+            deviation?: number | null;
+            /**
+             * Market
+             * @enum {string}
+             */
+            market: "SH" | "SZ" | "BJ";
+            /** Name */
+            name: string;
+            /** Price */
+            price?: number | null;
+            /** Times */
+            times?: number | null;
+        };
+        /** MarketPriceAnomalyCountResponse */
+        MarketPriceAnomalyCountResponse: {
+            /** Date */
+            date: string;
+            /** Fetched At */
+            fetched_at: string;
+            /**
+             * Is Stale
+             * @default false
+             */
+            is_stale?: boolean;
+            /** Items */
+            items?: components["schemas"]["MarketPriceAnomalyCountItem"][];
+            /** Page No */
+            page_no: number;
+            /** Page Size */
+            page_size: number;
+            /**
+             * Pages
+             * @default 0
+             */
+            pages?: number;
+            /**
+             * Source
+             * @default 东方财富
+             * @constant
+             */
+            source?: "东方财富";
+        };
+        /** MarketPriceAnomalyItem */
+        MarketPriceAnomalyItem: {
+            /** Board */
+            board?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Days */
+            days?: number | null;
+            /** Deviation */
+            deviation?: number | null;
+            /**
+             * Is Today
+             * @default false
+             */
+            is_today?: boolean;
+            /**
+             * Market
+             * @enum {string}
+             */
+            market: "SH" | "SZ" | "BJ";
+            /** Name */
+            name: string;
+            /** Rule */
+            rule: string;
+            /** Rule Code */
+            rule_code?: number | null;
+        };
+        /** MarketPriceAnomalyResponse */
+        MarketPriceAnomalyResponse: {
+            /** Date */
+            date: string;
+            /** Fetched At */
+            fetched_at: string;
+            /**
+             * Is Stale
+             * @default false
+             */
+            is_stale?: boolean;
+            /** Items */
+            items?: components["schemas"]["MarketPriceAnomalyItem"][];
+            /** Page No */
+            page_no: number;
+            /** Page Size */
+            page_size: number;
+            /**
+             * Pages
+             * @default 0
+             */
+            pages?: number;
+            /**
+             * Source
+             * @default 东方财富
+             * @constant
+             */
+            source?: "东方财富";
+        };
         /** MarketSectorStocksHistoryItem */
         MarketSectorStocksHistoryItem: {
             /**
@@ -5937,6 +7753,16 @@ export interface components {
             /** Threats */
             threats?: string[];
         };
+        /** MutationResponse */
+        MutationResponse: {
+            /** Id */
+            id?: number | null;
+            /**
+             * Success
+             * @default true
+             */
+            success?: boolean;
+        };
         /** NeedsSetupResponse */
         NeedsSetupResponse: {
             /** Needs Setup */
@@ -6022,6 +7848,59 @@ export interface components {
             title: string;
             /** Url */
             url: string;
+        };
+        /** NorthboundHistoryPoint */
+        NorthboundHistoryPoint: {
+            /** Date */
+            date: string;
+            /** Hs300 Change */
+            hs300_change?: number | null;
+            /** Hs300 Change Pct */
+            hs300_change_pct?: number | null;
+            /** Hs300 Close */
+            hs300_close?: number | null;
+            /** Hs300 High */
+            hs300_high?: number | null;
+            /** Hs300 Low */
+            hs300_low?: number | null;
+            /** Hs300 Open */
+            hs300_open?: number | null;
+            /** North Money */
+            north_money?: number | null;
+            /** Sh Connect */
+            sh_connect?: number | null;
+            /** South Money */
+            south_money?: number | null;
+            /** Sz Connect */
+            sz_connect?: number | null;
+        };
+        /** NorthboundHistoryResponse */
+        NorthboundHistoryResponse: {
+            /**
+             * Index Name
+             * @default 沪深300
+             */
+            index_name?: string;
+            /**
+             * Is Stale
+             * @default false
+             */
+            is_stale?: boolean;
+            /** Items */
+            items?: components["schemas"]["NorthboundHistoryPoint"][];
+            /**
+             * Source
+             * @default 乐咕乐股
+             * @enum {string}
+             */
+            source?: "乐咕乐股" | "东方财富";
+            /**
+             * Unit
+             * @default 亿元
+             */
+            unit?: string;
+            /** Updated At */
+            updated_at: string;
         };
         /** OkResponse */
         OkResponse: {
@@ -7066,6 +8945,49 @@ export interface components {
              */
             status: "ok" | "error";
         };
+        /** RefreshPolicyRequest */
+        RefreshPolicyRequest: {
+            /** Enabled */
+            enabled: boolean;
+            /** Interval Seconds */
+            interval_seconds: number;
+        };
+        /** RefreshResponse */
+        RefreshResponse: {
+            /** Added */
+            added: number;
+            /** Provider */
+            provider: string;
+            /** Unchanged */
+            unchanged: number;
+            /** Updated */
+            updated: number;
+        };
+        /** RefreshState */
+        RefreshState: {
+            /** Enabled */
+            enabled: boolean;
+            /** Interval Seconds */
+            interval_seconds: number;
+            /** Last Added */
+            last_added: number;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Failed At */
+            last_failed_at?: string | null;
+            /** Last Started At */
+            last_started_at?: string | null;
+            /** Last Succeeded At */
+            last_succeeded_at?: string | null;
+            /** Last Unchanged */
+            last_unchanged: number;
+            /** Last Updated */
+            last_updated: number;
+            /** Provider */
+            provider: string;
+            /** Updated At */
+            updated_at: string;
+        };
         /** RegisterRequest */
         RegisterRequest: {
             /** Invite Code */
@@ -7269,6 +9191,8 @@ export interface components {
             change_pct_max?: number | null;
             /** Change Pct Min */
             change_pct_min?: number | null;
+            /** Concepts */
+            concepts?: string[] | null;
             /**
              * Exclude St
              * @default false
@@ -7334,10 +9258,13 @@ export interface components {
             change_pct?: number | null;
             /** Code */
             code: string;
+            /** Concepts */
+            concepts?: string[];
             /** Exchange */
             exchange?: string | null;
             /** Exchange Industry */
             exchange_industry?: string | null;
+            first_industry?: components["schemas"]["StockConcept"] | null;
             /** Listing Date */
             listing_date?: string | null;
             /** Market Cap */
@@ -7351,6 +9278,7 @@ export interface components {
             /** Price */
             price?: number | null;
             second_industry?: components["schemas"]["StockConcept"] | null;
+            third_industry?: components["schemas"]["StockConcept"] | null;
             /** Turnover Pct */
             turnover_pct?: number | null;
             /** Volume */
@@ -7577,6 +9505,44 @@ export interface components {
             /** Segment */
             segment: string;
         };
+        /** SgeGoldHistoryPoint */
+        SgeGoldHistoryPoint: {
+            /** Change */
+            change?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Close */
+            close: number;
+            /** Date */
+            date: string;
+            /** High */
+            high: number;
+            /** Low */
+            low: number;
+            /** Open */
+            open: number;
+        };
+        /** SgeGoldResponse */
+        SgeGoldResponse: {
+            /** History */
+            history?: components["schemas"]["SgeGoldHistoryPoint"][];
+            /**
+             * Is Stale
+             * @default false
+             */
+            is_stale?: boolean;
+            latest?: components["schemas"]["SgeGoldHistoryPoint"] | null;
+            /** Name */
+            name: string;
+            /** Source */
+            source: string;
+            /** Symbol */
+            symbol: string;
+            /** Unit */
+            unit: string;
+            /** Updated At */
+            updated_at: string;
+        };
         /**
          * StockBasicInfo
          * @description 股票基础信息、行业分类与当前估值概览。
@@ -7614,10 +9580,348 @@ export interface components {
             /** Pe Ttm */
             pe_ttm?: number | null;
             second_industry?: components["schemas"]["StockConcept"] | null;
+            third_industry?: components["schemas"]["StockConcept"] | null;
             /** Total Shares */
             total_shares?: number | null;
             /** Turnover Pct */
             turnover_pct?: number | null;
+        };
+        /** StockBasicProfileInput */
+        StockBasicProfileInput: {
+            /**
+             * Board
+             * @default
+             */
+            board?: string;
+            /**
+             * Business Scope
+             * @default
+             */
+            business_scope?: string;
+            /**
+             * City
+             * @default
+             */
+            city?: string;
+            /**
+             * Company Intro
+             * @default
+             */
+            company_intro?: string;
+            /**
+             * Exchange
+             * @default
+             */
+            exchange?: string;
+            /**
+             * Industry
+             * @default
+             */
+            industry?: string;
+            /**
+             * Legal Repr
+             * @default
+             */
+            legal_repr?: string;
+            /** Listing Date */
+            listing_date?: string | null;
+            /**
+             * Main Business
+             * @default
+             */
+            main_business?: string;
+            /**
+             * Market Group
+             * @default A
+             * @enum {string}
+             */
+            market_group?: "A" | "HK" | "OVERSEAS";
+            /**
+             * Products
+             * @default
+             */
+            products?: string;
+            /**
+             * Province
+             * @default
+             */
+            province?: string;
+            /**
+             * Registered Capital
+             * @default
+             */
+            registered_capital?: string;
+            /** Setup Date */
+            setup_date?: string | null;
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+            /** Stock Code */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @default
+             */
+            stock_name?: string;
+            /**
+             * Sw Level1 Name
+             * @default
+             */
+            sw_level1_name?: string;
+            /**
+             * Sw Level2 Name
+             * @default
+             */
+            sw_level2_name?: string;
+            /**
+             * Sw Level3 Name
+             * @default
+             */
+            sw_level3_name?: string;
+            /**
+             * Website
+             * @default
+             */
+            website?: string;
+        };
+        /** StockBasicProfileListResponse */
+        StockBasicProfileListResponse: {
+            /** Items */
+            items: components["schemas"]["StockBasicProfileRecord"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** StockBasicProfileRecord */
+        StockBasicProfileRecord: {
+            /**
+             * Board
+             * @default
+             */
+            board?: string;
+            /**
+             * Business Scope
+             * @default
+             */
+            business_scope?: string;
+            /**
+             * City
+             * @default
+             */
+            city?: string;
+            /**
+             * Company Intro
+             * @default
+             */
+            company_intro?: string;
+            /** Created At */
+            created_at: string;
+            /**
+             * Exchange
+             * @default
+             */
+            exchange?: string;
+            /** Id */
+            id: number;
+            /**
+             * Industry
+             * @default
+             */
+            industry?: string;
+            /** Is Manual Override */
+            is_manual_override: boolean;
+            /**
+             * Legal Repr
+             * @default
+             */
+            legal_repr?: string;
+            /** Listing Date */
+            listing_date?: string | null;
+            /**
+             * Main Business
+             * @default
+             */
+            main_business?: string;
+            /**
+             * Market Group
+             * @default A
+             * @enum {string}
+             */
+            market_group?: "A" | "HK" | "OVERSEAS";
+            /**
+             * Products
+             * @default
+             */
+            products?: string;
+            /**
+             * Province
+             * @default
+             */
+            province?: string;
+            /**
+             * Registered Capital
+             * @default
+             */
+            registered_capital?: string;
+            /** Setup Date */
+            setup_date?: string | null;
+            /** Source */
+            source: string;
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+            /** Stock Code */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @default
+             */
+            stock_name?: string;
+            /**
+             * Sw Level1 Name
+             * @default
+             */
+            sw_level1_name?: string;
+            /**
+             * Sw Level2 Name
+             * @default
+             */
+            sw_level2_name?: string;
+            /**
+             * Sw Level3 Name
+             * @default
+             */
+            sw_level3_name?: string;
+            /** Updated At */
+            updated_at: string;
+            /**
+             * Website
+             * @default
+             */
+            website?: string;
+        };
+        /** StockBasicProfileSummary */
+        StockBasicProfileSummary: {
+            /** Board Counts */
+            board_counts: {
+                [key: string]: number;
+            };
+            /** Has Business Count */
+            has_business_count: number;
+            /** Has Listing Date Count */
+            has_listing_date_count: number;
+            /** Last Updated At */
+            last_updated_at: string | null;
+            /** Market Group Counts */
+            market_group_counts: {
+                [key: string]: number;
+            };
+            /** Total */
+            total: number;
+        };
+        /**
+         * StockBulletinItem
+         * @description 单条公司公告。
+         */
+        StockBulletinItem: {
+            /**
+             * Date
+             * @default
+             */
+            date?: string;
+            /** Id */
+            id: string;
+            /**
+             * Origin
+             * @default
+             */
+            origin?: string;
+            /**
+             * Pdf Url
+             * @default
+             */
+            pdf_url?: string;
+            /**
+             * Source
+             * @default sina_stock_bulletins
+             */
+            source?: string;
+            /**
+             * Source Api
+             * @default CB_AllService.getBulletinList
+             */
+            source_api?: string;
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @default
+             */
+            type?: string;
+            /**
+             * Type2
+             * @default
+             */
+            type2?: string;
+            /**
+             * Url
+             * @default
+             */
+            url?: string;
+        };
+        /**
+         * StockBulletinPage
+         * @description 个股公告分页结果。
+         */
+        StockBulletinPage: {
+            /** Code */
+            code: string;
+            /** Items */
+            items?: components["schemas"]["StockBulletinItem"][];
+            /**
+             * Name
+             * @default
+             */
+            name?: string;
+            /**
+             * Page
+             * @default 1
+             */
+            page?: number;
+            /**
+             * Page Size
+             * @default 10
+             */
+            page_size?: number;
+            /**
+             * Total Pages
+             * @default 0
+             */
+            total_pages?: number;
+        };
+        /**
+         * StockBusinessIntro
+         * @description 股票主营介绍及同花顺动态字段。
+         */
+        StockBusinessIntro: {
+            /** Code */
+            code: string;
+            /** Items */
+            items?: {
+                [key: string]: string;
+            };
+            /**
+             * Source
+             * @default ths
+             */
+            source?: string;
         };
         /** StockCompareItem */
         StockCompareItem: {
@@ -7662,6 +9966,83 @@ export interface components {
             code: string;
             /** Name */
             name: string;
+        };
+        /** StockConceptListResponse */
+        StockConceptListResponse: {
+            /** Items */
+            items: components["schemas"]["StockConceptRecord"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** StockConceptRecord */
+        StockConceptRecord: {
+            /** Concepts */
+            concepts?: string[];
+            /** Created At */
+            created_at: string;
+            /**
+             * Exchange Suffix
+             * @default SZ
+             */
+            exchange_suffix?: string;
+            /** Id */
+            id: number;
+            /** Is Manual Override */
+            is_manual_override: boolean;
+            /**
+             * Market Group
+             * @default A
+             * @enum {string}
+             */
+            market_group?: "A" | "HK" | "OVERSEAS";
+            /** Source */
+            source: string;
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+            /** Stock Code */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @default
+             */
+            stock_name?: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** StockConceptRecordInput */
+        StockConceptRecordInput: {
+            /** Concepts */
+            concepts?: string[];
+            /**
+             * Exchange Suffix
+             * @default SZ
+             */
+            exchange_suffix?: string;
+            /**
+             * Market Group
+             * @default A
+             * @enum {string}
+             */
+            market_group?: "A" | "HK" | "OVERSEAS";
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+            /** Stock Code */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @default
+             */
+            stock_name?: string;
         };
         /**
          * StockDataSource
@@ -7711,6 +10092,130 @@ export interface components {
             source_api?: string;
             /** Super Net */
             super_net?: number | null;
+        };
+        /** StockProfileEnrichResponse */
+        StockProfileEnrichResponse: {
+            /**
+             * Message
+             * @default
+             */
+            message?: string;
+            /** Stock Code */
+            stock_code: string;
+            /** Stock Name */
+            stock_name: string;
+            /** Success */
+            success: boolean;
+            /** Updated Fields */
+            updated_fields: string[];
+        };
+        /**
+         * StockProfileImportFileRequest
+         * @description 批量导入请求：Base64 编码的 Excel/CSV 文件。
+         */
+        StockProfileImportFileRequest: {
+            /** Content Base64 */
+            content_base64: string;
+            /**
+             * Filename
+             * @default profiles.xlsx
+             */
+            filename?: string;
+            /**
+             * Update Manual
+             * @description 是否覆盖手动维护(is_manual_override)的存量记录
+             * @default false
+             */
+            update_manual?: boolean;
+        };
+        /** StockProfileImportResponse */
+        StockProfileImportResponse: {
+            /** Added */
+            added: number;
+            /** Invalid Rows */
+            invalid_rows: number;
+            /** Skipped */
+            skipped: number;
+            /** Total Rows */
+            total_rows: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Updated */
+            updated: number;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /**
+         * StockReportItem
+         * @description 单条券商研报评级。
+         */
+        StockReportItem: {
+            /**
+             * Author
+             * @default
+             */
+            author?: string;
+            /**
+             * Date
+             * @default
+             */
+            date?: string;
+            /** Goal Price */
+            goal_price?: number | null;
+            /** Id */
+            id: string;
+            /**
+             * Org
+             * @default
+             */
+            org?: string;
+            /**
+             * Rating
+             * @default
+             */
+            rating?: string;
+            /**
+             * Report Type
+             * @default
+             */
+            report_type?: string;
+            /**
+             * Source
+             * @default sina_stock_reports
+             */
+            source?: string;
+            /**
+             * Source Api
+             * @default ReportService.getList
+             */
+            source_api?: string;
+            /** Title */
+            title: string;
+            /**
+             * Url
+             * @default
+             */
+            url?: string;
+        };
+        /**
+         * StockReportPage
+         * @description 个股研报评级列表（最近 N 个月）。
+         */
+        StockReportPage: {
+            /** Code */
+            code: string;
+            /** Items */
+            items?: components["schemas"]["StockReportItem"][];
+            /**
+             * Months
+             * @default 6
+             */
+            months?: number;
+            /**
+             * Total Count
+             * @default 0
+             */
+            total_count?: number;
         };
         /**
          * StockSearchItem
@@ -8210,6 +10715,118 @@ export interface components {
             /** Trade Dates */
             trade_dates?: string[];
         };
+        /** TreasuryCurve */
+        TreasuryCurve: {
+            /** History */
+            history?: components["schemas"]["TreasuryYieldPoint"][];
+            /** Term Structure */
+            term_structure?: components["schemas"]["TreasuryTermStructure"][];
+            /**
+             * Total Count
+             * @default 0
+             */
+            total_count?: number;
+        };
+        /** TreasuryLatest */
+        TreasuryLatest: {
+            /** China 10Y 2Y Spread */
+            china_10y_2y_spread?: number | null;
+            /** China 10Y Yield */
+            china_10y_yield?: number | null;
+            /** China 2Y Yield */
+            china_2y_yield?: number | null;
+            /** China 30Y Yield */
+            china_30y_yield?: number | null;
+            /** China 5Y Yield */
+            china_5y_yield?: number | null;
+            /**
+             * Date
+             * @default
+             */
+            date?: string;
+            /** Us 10Y 2Y Spread */
+            us_10y_2y_spread?: number | null;
+            /** Us 10Y Yield */
+            us_10y_yield?: number | null;
+            /** Us 2Y Yield */
+            us_2y_yield?: number | null;
+            /** Us 30Y Yield */
+            us_30y_yield?: number | null;
+            /** Us 5Y Yield */
+            us_5y_yield?: number | null;
+            /** Us China 10Y Spread */
+            us_china_10y_spread?: number | null;
+            /**
+             * Us China Spread Status
+             * @default
+             */
+            us_china_spread_status?: string;
+            /**
+             * Us Yield Curve Status
+             * @default
+             */
+            us_yield_curve_status?: string;
+        };
+        /** TreasuryTermStructure */
+        TreasuryTermStructure: {
+            /** Cn Yield */
+            cn_yield?: number | null;
+            /** Spread */
+            spread?: number | null;
+            /** Tenor */
+            tenor: string;
+            /** Us Yield */
+            us_yield?: number | null;
+        };
+        /** TreasuryYieldPoint */
+        TreasuryYieldPoint: {
+            /** Cn 10Y */
+            cn_10y?: number | null;
+            /** Cn 10Y 2Y */
+            cn_10y_2y?: number | null;
+            /** Cn 2Y */
+            cn_2y?: number | null;
+            /** Cn 30Y */
+            cn_30y?: number | null;
+            /** Cn 5Y */
+            cn_5y?: number | null;
+            /** Cn Gdp Growth */
+            cn_gdp_growth?: number | null;
+            /**
+             * Date
+             * @default
+             */
+            date?: string;
+            /** Spread 10Y */
+            spread_10y?: number | null;
+            /** Spread 2Y */
+            spread_2y?: number | null;
+            /** Us 10Y */
+            us_10y?: number | null;
+            /** Us 10Y 2Y */
+            us_10y_2y?: number | null;
+            /** Us 2Y */
+            us_2y?: number | null;
+            /** Us 30Y */
+            us_30y?: number | null;
+            /** Us 5Y */
+            us_5y?: number | null;
+            /** Us Gdp Growth */
+            us_gdp_growth?: number | null;
+        };
+        /** TreasuryYieldsResponse */
+        TreasuryYieldsResponse: {
+            /** History */
+            history?: components["schemas"]["TreasuryYieldPoint"][];
+            latest?: components["schemas"]["TreasuryLatest"];
+            /** Term Structure */
+            term_structure?: components["schemas"]["TreasuryTermStructure"][];
+            /**
+             * Total Count
+             * @default 0
+             */
+            total_count?: number;
+        };
         /**
          * TwitterAnalysisReference
          * @description 支撑 Twitter 观点的原始内容引用。
@@ -8670,6 +11287,12 @@ export interface components {
             enabled: boolean;
             /** Id */
             id: number;
+            /**
+             * Market
+             * @default cn
+             * @enum {string}
+             */
+            market?: "cn" | "hk";
             /** Stock Code */
             stock_code: string;
             /** Threshold */
@@ -8687,6 +11310,12 @@ export interface components {
              * @enum {string}
              */
             condition: "price_above" | "price_below" | "change_pct_above" | "change_pct_below";
+            /**
+             * Market
+             * @default cn
+             * @enum {string}
+             */
+            market?: "cn" | "hk";
             /** Threshold */
             threshold: number;
         };
@@ -8694,16 +11323,38 @@ export interface components {
         WatchlistItem: {
             /** Alerts */
             alerts?: components["schemas"]["WatchlistAlert"][];
+            /** Amount */
+            amount?: number | null;
             /** Change Pct */
             change_pct?: number | null;
+            /** Concepts */
+            concepts?: components["schemas"]["StockConcept"][];
             /** Created At */
             created_at: string;
             /** Current Price */
             current_price?: number | null;
+            /** High Price */
+            high_price?: number | null;
             /** Id */
             id: number;
+            /** Low Price */
+            low_price?: number | null;
+            /**
+             * Market
+             * @default cn
+             * @enum {string}
+             */
+            market?: "cn" | "hk";
+            /** Market Cap */
+            market_cap?: number | null;
             /** Note */
             note: string;
+            /** Open Price */
+            open_price?: number | null;
+            /** Pe Ttm */
+            pe_ttm?: number | null;
+            /** Previous Close */
+            previous_close?: number | null;
             /**
              * Quote Source
              * @default
@@ -8713,9 +11364,19 @@ export interface components {
             stock_code: string;
             /** Stock Name */
             stock_name: string;
+            /** Turnover Pct */
+            turnover_pct?: number | null;
+            /** Volume */
+            volume?: number | null;
         };
         /** WatchlistItemCreate */
         WatchlistItemCreate: {
+            /**
+             * Market
+             * @default cn
+             * @enum {string}
+             */
+            market?: "cn" | "hk";
             /**
              * Note
              * @default
@@ -8784,6 +11445,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    export_custom_analysis_pdf_api_analysis_export_pdf_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalysisResult"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_all_analysis_history_api_analysis_history_all_get: {
         parameters: {
             query?: {
@@ -8835,6 +11529,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalysisResult"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_analysis_pdf_api_analysis__code__export_pdf_get: {
+        parameters: {
+            query?: {
+                date?: string | null;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description 统一错误响应 */
@@ -9791,6 +12518,37 @@ export interface operations {
             };
         };
     };
+    export_daily_review_pdf_api_daily_review__date__export_pdf_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     health_api_health_get: {
         parameters: {
             query?: never;
@@ -9887,6 +12645,182 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    get_hk_index_quotes_api_hk_indices_realtime_get: {
+        parameters: {
+            query?: {
+                /** @description 逗号分隔的指数代码：HSI,HSCEI,HSTECH */
+                symbols?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketIndices"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_hk_index_history_api_hk_indices__symbol__history_get: {
+        parameters: {
+            query?: {
+                period?: string;
+                /** @description 起始日期 YYYYMMDD 或 YYYY-MM-DD */
+                start_date?: string;
+                /** @description 结束日期 YYYYMMDD 或 YYYY-MM-DD */
+                end_date?: string;
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KlineData"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_hk_stock_quotes_api_hk_stocks_realtime_get: {
+        parameters: {
+            query?: {
+                /** @description 逗号分隔的港股代码，例如 00700,09988 */
+                codes?: string;
+                /** @description 按代码、中文名或英文名搜索 */
+                query?: string;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HKStockQuotePage"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    search_hk_stocks_api_hk_stocks_search_get: {
+        parameters: {
+            query?: {
+                /** @description 港股代码、中文名或英文名 */
+                q?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HKStockSearchResult"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_hk_stock_history_api_hk_stocks__code__history_get: {
+        parameters: {
+            query?: {
+                period?: string;
+                adjust?: string;
+                /** @description 起始日期 YYYYMMDD 或 YYYY-MM-DD */
+                start_date?: string;
+                /** @description 结束日期 YYYYMMDD 或 YYYY-MM-DD */
+                end_date?: string;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KlineData"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -10048,6 +12982,39 @@ export interface operations {
             };
         };
     };
+    export_custom_industry_chain_pdf_api_industry_chain_export_pdf_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IndustryChainResult"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_industry_chain_history_api_industry_chain_history_get: {
         parameters: {
             query?: {
@@ -10145,6 +13112,39 @@ export interface operations {
             };
         };
     };
+    export_industry_chain_pdf_api_industry_chain__name__export_pdf_get: {
+        parameters: {
+            query?: {
+                archive_id?: string | null;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_industry_chain_latest_api_industry_chain__name__latest_get: {
         parameters: {
             query?: never;
@@ -10207,6 +13207,398 @@ export interface operations {
             };
         };
     };
+    export_industries_api_industry_classification_export_get: {
+        parameters: {
+            query?: {
+                query?: string;
+                market_group?: string;
+                level1?: string;
+                level2?: string;
+                level3?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    commit_excel_import_api_industry_classification_import_commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportCommitResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_excel_import_api_industry_classification_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportFileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreviewResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_industries_api_industry_classification_industries_get: {
+        parameters: {
+            query?: {
+                market_group?: string;
+                level1?: string;
+                level2?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryHierarchyResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_record_api_industry_classification_records_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IndustryRecordInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_record_api_industry_classification_records__record_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IndustryRecordInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    remove_record_api_industry_classification_records__record_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refresh_industries_api_industry_classification_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefreshResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_refresh_policy_api_industry_classification_refresh_policy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryStatusResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_status_api_industry_classification_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryStatusResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_stocks_api_industry_classification_stocks_get: {
+        parameters: {
+            query?: {
+                query?: string;
+                market_group?: string;
+                level1?: string;
+                level2?: string;
+                level3?: string;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryListResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_stock_api_industry_classification_stocks__stock_code__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryRecord"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_macro_all_api_macro_all_get: {
         parameters: {
             query?: {
@@ -10226,6 +13618,163 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MacroAllDataResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_commodities_api_macro_commodities_get: {
+        parameters: {
+            query?: {
+                /** @description 大宗商品名称，省略返回全量概览 */
+                symbol?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommoditiesResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_customs_trade_api_macro_customs_trade_get: {
+        parameters: {
+            query?: {
+                /** @description 重点进出口商品名称，省略返回全量概览 */
+                commodity?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomsTradeDataResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_global_rates_api_macro_global_rates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlobalMacroRatesResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_sge_gold_api_macro_sge_gold_get: {
+        parameters: {
+            query?: {
+                /** @description 上海黄金交易所品种代码 */
+                symbol?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SgeGoldResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_treasury_yields_api_macro_treasury_yields_get: {
+        parameters: {
+            query?: {
+                /** @description 历史曲线记录条数 */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TreasuryYieldsResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -10852,6 +14401,38 @@ export interface operations {
             };
         };
     };
+    get_northbound_history_api_market_northbound_history_get: {
+        parameters: {
+            query?: {
+                /** @description 返回最近交易日数量 */
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NorthboundHistoryResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_market_other_news_api_market_other_news_get: {
         parameters: {
             query?: never;
@@ -10868,6 +14449,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NewsSearchItem"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_market_price_anomaly_api_market_price_anomaly_get: {
+        parameters: {
+            query?: {
+                /** @description 每页条数 */
+                page_size?: number;
+                /** @description 页码 */
+                page_no?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketPriceAnomalyResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_market_price_anomaly_count_api_market_price_anomaly_count_get: {
+        parameters: {
+            query?: {
+                /** @description 每页条数 */
+                page_size?: number;
+                /** @description 页码 */
+                page_no?: number;
+                /** @description 排序字段 */
+                sort_key?: string;
+                /** @description 排序方向 */
+                sort_dir?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketPriceAnomalyCountResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -12123,9 +15776,40 @@ export interface operations {
             };
         };
     };
-    get_industries_api_screener_industries_get: {
+    get_concepts_api_screener_concepts_get: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_industries_api_screener_industries_get: {
+        parameters: {
+            query?: {
+                level?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -12280,6 +15964,682 @@ export interface operations {
             };
         };
     };
+    get_concepts_api_stock_concept_concepts_get: {
+        parameters: {
+            query?: {
+                query?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptListResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_concepts_api_stock_concept_export_get: {
+        parameters: {
+            query?: {
+                query?: string;
+                market_group?: string;
+                concept?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    commit_import_file_api_stock_concept_import_commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptImportCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptImportCommitResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_import_file_api_stock_concept_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptImportFileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptImportPreviewResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_record_api_stock_concept_records_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockConceptRecordInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptMutationResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_record_api_stock_concept_records__record_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockConceptRecordInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptMutationResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    remove_record_api_stock_concept_records__record_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptMutationResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_status_api_stock_concept_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptStatusResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_stocks_api_stock_concept_stocks_get: {
+        parameters: {
+            query?: {
+                query?: string;
+                market_group?: string;
+                concept?: string;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockConceptListResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_stock_api_stock_concept_stocks__stock_code__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockConceptRecord"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    enrich_record_api_stock_profile_enrich__code__post: {
+        parameters: {
+            query?: {
+                /** @description 是否强制刷新 */
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProfileEnrichResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_records_api_stock_profile_records_get: {
+        parameters: {
+            query?: {
+                /** @description 股票代码或名称模糊搜索 */
+                q?: string;
+                /** @description 市场组别 */
+                market_group?: string;
+                /** @description 交易所(SH/SZ/BJ/HK) */
+                exchange?: string;
+                /** @description 上市板块(主板/科创板/创业板/北交所/港股主板) */
+                board?: string;
+                /** @description 是否已录入主营业务 */
+                has_business?: boolean | null;
+                /** @description 是否有上市时间 */
+                has_listing_date?: boolean | null;
+                /** @description 页码 */
+                page?: number;
+                /** @description 每页条数 */
+                page_size?: number;
+                /** @description 排序字段 */
+                sort_by?: string;
+                /** @description 排序方向 */
+                sort_order?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBasicProfileListResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_or_update_record_api_stock_profile_records_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockBasicProfileInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBasicProfileRecord"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_records_api_stock_profile_records_export_get: {
+        parameters: {
+            query?: {
+                /** @description 股票代码或名称模糊搜索 */
+                q?: string;
+                /** @description 市场组别 */
+                market_group?: string;
+                /** @description 交易所(SH/SZ/BJ/HK) */
+                exchange?: string;
+                /** @description 上市板块 */
+                board?: string;
+                /** @description 是否已录入主营业务 */
+                has_business?: boolean | null;
+                /** @description 是否有上市时间 */
+                has_listing_date?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    import_records_api_stock_profile_records_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockProfileImportFileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockProfileImportResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_record_by_code_api_stock_profile_records__code__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBasicProfileRecord"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_record_by_id_api_stock_profile_records__record_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockBasicProfileInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBasicProfileRecord"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_record_by_id_api_stock_profile_records__record_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_summary_api_stock_profile_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBasicProfileSummary"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    sync_master_api_stock_profile_sync_master_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_analysis_page_api_stock_analysis_page__code__get: {
         parameters: {
             query?: never;
@@ -12362,6 +16722,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockSearchItem"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_bulletins_api_stock__code__bulletins_get: {
+        parameters: {
+            query?: {
+                /** @description 页码，从 1 开始 */
+                page?: number;
+                /** @description 每页条数 */
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBulletinPage"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_stock_business_intro_api_stock__code__business_intro_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBusinessIntro"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_chip_distribution_api_stock__code__chip_distribution_get: {
+        parameters: {
+            query?: {
+                grid_size?: number;
+                decay?: number;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChipDistribution"];
                 };
             };
             /** @description 统一错误响应 */
@@ -12695,6 +17156,40 @@ export interface operations {
             };
         };
     };
+    get_reports_api_stock__code__reports_get: {
+        parameters: {
+            query?: {
+                /** @description 回溯月数，默认最近 6 个月 */
+                months?: number;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockReportPage"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_retail_sentiment_api_stock__code__retail_sentiment_get: {
         parameters: {
             query?: never;
@@ -12945,7 +17440,9 @@ export interface operations {
     };
     delete_watchlist_item_api_watchlist__stock_code__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                market?: "cn" | "hk";
+            };
             header?: never;
             path: {
                 stock_code: string;

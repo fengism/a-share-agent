@@ -8,7 +8,7 @@ import {
 describe("shared screener URL state", () => {
   it("round-trips applied filters and percentile settings", () => {
     const state = parseScreenerUrlState(new URLSearchParams(
-      "pe_max=15&market_cap_min=200&industries=银行,保险&sort=pe&order=asc&page=2&size=20&percentile=1&pe_pct=30",
+      "pe_max=15&market_cap_min=200&industries=银行,保险&concepts=高股息精选,跨境支付&sort=pe&order=asc&page=2&size=20&percentile=1&pe_pct=30",
     ));
 
     expect(state).toMatchObject({
@@ -16,6 +16,7 @@ describe("shared screener URL state", () => {
         pe_max: 15,
         market_cap_min: 200,
         industries: ["银行", "保险"],
+        concepts: ["高股息精选", "跨境支付"],
         sort_by: "pe",
         sort_order: "asc",
         page: 2,

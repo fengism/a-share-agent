@@ -19,7 +19,16 @@ vi.mock("../../charts/LazyKlineChart", () => ({
   ),
 }));
 vi.mock("../../charts/IntradayChart", () => ({ default: () => null }));
-vi.mock("../../charts/IndicatorSubCharts", () => ({ default: () => null }));
+vi.mock("../../charts/IndicatorSubCharts", () => ({
+  default: ({ types }: { types?: string[] }) => (
+    <div data-testid="analysis-indicators">{types?.join(",") ?? "all"}</div>
+  ),
+}));
+vi.mock("./ChipDistributionPanel", () => ({
+  default: ({ data }: { data: { peak_price: number } }) => (
+    <div data-testid="chip-distribution-panel">{data.peak_price}</div>
+  ),
+}));
 vi.mock("../../theme/hooks", () => ({
   useColors: () => ({
     primary: "#1677ff",
@@ -79,6 +88,34 @@ describe("AnalysisChartsSection", () => {
 
     expect(mocks.useKlineData).toHaveBeenLastCalledWith("600519", "weekly", "qfq", true);
     expect(screen.getByTestId("kline-chart")).toHaveTextContent("20");
+  });
+
+
+  it("leaves MACD on the stock profile while retaining RSI and KDJ", () => {
+    render(
+      <AnalysisChartsSection
+        code="600519"
+        pageData={{ kline: defaultKline } as AnalysisPageData}
+      />,
+    );
+
+    expect(screen.getByTestId("analysis-indicators")).toHaveTextContent("rsi,kdj");
+    expect(screen.getByTestId("analysis-indicators")).not.toHaveTextContent("macd");
+  });
+
+  it("leaves chip distribution to the stock profile page", () => {
+    render(
+      <AnalysisChartsSection
+        code="600519"
+        pageData={{
+          kline: defaultKline,
+          chip_distribution: { peak_price: 98.8 },
+        } as unknown as AnalysisPageData}
+      />,
+    );
+
+    expect(screen.queryByText("筹码分布")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("chip-distribution-panel")).not.toBeInTheDocument();
   });
 
   it("shows a local retry action when the selected K-line request fails", () => {

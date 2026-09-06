@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import cast
 
-from app.core.cache import cache, dated_cache_key, dated_cache_key_no_day
+from app.core.cache import dated_cache_key, dated_cache_key_no_day
+from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import baidu_semaphore, eastmoney_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError

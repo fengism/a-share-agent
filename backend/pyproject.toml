@@ -33,7 +33,10 @@ dependencies = [
     "cryptography>=44.0.0",
     "pyyaml>=6.0",
     "scrapling[fetchers]>=0.4",
+    "curl-cffi>=0.13.0",
     "httpx>=0.28.0",
+    "pypdf>=6.16.2",
+    "pdfplumber>=0.11.10",
 ]
 
 [dependency-groups]
@@ -48,6 +51,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
+pythonpath = ["."]
 asyncio_mode = "auto"
 addopts = "-ra"
 
