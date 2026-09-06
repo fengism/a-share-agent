@@ -7,6 +7,7 @@ import ChatSessionSyncBridge from "./ChatSessionSyncBridge";
 import WorkflowRuntimeBridge from "./WorkflowRuntimeBridge";
 import AppSidebar from "./AppSidebar";
 import RouteLoadingFallback from "./RouteLoadingFallback";
+import UpdateBanner from "./UpdateBanner";
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -55,6 +56,7 @@ export default function AppLayout() {
           marginLeft: isMobile ? 0 : collapsed ? 68 : 184,
           transition: "margin-left 0.2s",
         }}>
+          <UpdateBanner />
           <AppHeader
             isMobile={isMobile}
             themeKey={themeKey}

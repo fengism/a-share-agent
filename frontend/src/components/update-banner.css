@@ -1,0 +1,9 @@
+.update-banner .ant-alert-banner {
+  border-inline-end: 0;
+  border-inline-start: 0;
+}
+
+.update-banner-current {
+  color: var(--c-text-muted, rgba(0, 0, 0, 0.45));
+  font-size: 12px;
+}

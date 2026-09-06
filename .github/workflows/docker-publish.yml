@@ -46,6 +46,7 @@ jobs:
           build-args: |
             APP_UID=1000
             APP_GID=1000
+            APP_VERSION=${{ github.sha }}
 
   frontend:
     runs-on: ubuntu-latest

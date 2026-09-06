@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from app.api import errors, system
+from app.api import errors, system, version
 from app.api.router import create_api_router
 
 
@@ -29,4 +29,8 @@ def register_api(
         health_handler=health_handler,
         metrics_access_dependency=metrics_access_dependency,
         operational_snapshot_provider=operational_snapshot_provider,
+    )
+    version.register_version_endpoints(
+        application,
+        active_user_dependencies=active_user_dependencies,
     )

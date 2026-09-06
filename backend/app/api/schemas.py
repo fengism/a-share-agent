@@ -9,6 +9,12 @@ class LivenessResponse(BaseModel):
     status: Literal["ok"]
 
 
+class VersionCheckResponse(BaseModel):
+    current_version: str
+    latest_version: str | None = None
+    update_available: bool = False
+
+
 class ReadinessResponse(BaseModel):
     status: Literal["ok", "error"]
     database: Literal["connected", "error"]

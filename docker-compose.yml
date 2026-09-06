@@ -33,6 +33,8 @@ services:
 
   backend:
     image: ${BACKEND_IMAGE:-fengliu1989/a-share-backend:main}
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     build:
       context: ./backend
       args:
@@ -82,6 +84,8 @@ services:
 
   frontend:
     image: ${FRONTEND_IMAGE:-fengliu1989/a-share-frontend:main}
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     build: ./frontend
     restart: unless-stopped
     stop_grace_period: 10s
@@ -113,3 +117,26 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+  updater:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    # 在线更新执行器：仅响应后端管理员触发的手动更新，不自动轮询。
+    # 挂载 docker.sock 等价于宿主机 root 权限，故只在内网、不暴露端口。
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_HTTP_API_TOKEN: "${UPDATER_HTTP_TOKEN:-}"
+      WATCHTOWER_HTTP_API_PERIODIC_POLL: "false"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      TZ: "${TZ:-Asia/Shanghai}"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

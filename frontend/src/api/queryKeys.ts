@@ -101,6 +101,9 @@ export const queryKeys = {
     concepts: ["screener-concepts"] as const,
     strategies: ["screener-strategies"] as const,
   },
+  system: {
+    version: ["system", "version"] as const,
+  },
   settings: {
     config: ["config"] as const,
     failedBotJobs: ["bot-jobs", "failed"] as const,
