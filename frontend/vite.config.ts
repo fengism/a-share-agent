@@ -29,15 +29,11 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id) {
             if (!id.includes("node_modules")) return;
-            // ECharts depends one-way on zrender; separating them keeps both
-            // route-only chunks below the warning threshold without cycles.
-            if (id.includes("/zrender/")) return "vendor-zrender";
-            if (
-              id.includes("/echarts/lib/chart/tree/")
-              || id.endsWith("/echarts/lib/data/Tree.js")
-            )
-              return "vendor-echarts-tree";
-            if (id.includes("/echarts/")) return "vendor-echarts";
+            // ECharts 与 zrender 保持单向依赖；树图模块不能单独拆分，
+            // 否则与 vendor-echarts 形成循环 chunk，运行时报
+            // "Class extends value undefined"（评估顺序错乱）。
+            if (id.includes("/zrender/") || id.includes("/echarts/"))
+              return "vendor-echarts";
             if (id.includes("lightweight-charts")) return "vendor-charts";
             if (
               id.includes("/react-router") ||
