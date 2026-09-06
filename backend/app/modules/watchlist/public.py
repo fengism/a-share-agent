@@ -7,6 +7,7 @@ from app.modules.watchlist.schemas import (
 )
 from app.modules.watchlist.service import (
     UnknownWatchlistStockError,
+    WatchlistAlertLimitError,
     WatchlistItemNotFoundError,
     add_watchlist_alert,
     add_watchlist_item,
@@ -19,6 +20,7 @@ __all__ = [
     "UnknownWatchlistStockError",
     "WatchlistAlert",
     "WatchlistAlertCreate",
+    "WatchlistAlertLimitError",
     "WatchlistItem",
     "WatchlistItemCreate",
     "WatchlistItemNotFoundError",
