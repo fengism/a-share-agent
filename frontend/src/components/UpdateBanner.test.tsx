@@ -28,7 +28,11 @@ function mockVersion(data: {
   latest_version: string | null;
   update_available: boolean;
 }) {
-  asMock(useVersionCheck).mockReturnValue({ data, refetch: vi.fn() });
+  asMock(useVersionCheck).mockReturnValue({
+    data,
+    refetch: vi.fn().mockResolvedValue({}),
+    isFetching: false,
+  });
 }
 
 describe("UpdateBanner", () => {
@@ -37,17 +41,19 @@ describe("UpdateBanner", () => {
     mockState.user = { id: 1, username: "admin", is_admin: true };
   });
 
-  it("renders nothing when no update is available", () => {
+  it("shows the idle manual-check bar when no update is available", () => {
     mockVersion({
       current_version: "abc1234",
       latest_version: "abc1234",
       update_available: false,
     });
-    const { container } = render(<UpdateBanner />);
-    expect(container).toBeEmptyDOMElement();
+    render(<UpdateBanner />);
+    expect(screen.getByText(/当前版本 abc1234/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /检查更新/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /立即更新/ })).not.toBeInTheDocument();
   });
 
-  it("shows versions and update button for admin", () => {
+  it("shows versions and update button for admin when update is available", () => {
     mockVersion({
       current_version: "abc1234",
       latest_version: "def5678",
@@ -67,7 +73,23 @@ describe("UpdateBanner", () => {
     });
     render(<UpdateBanner />);
     expect(screen.getByText(/请联系管理员更新/)).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /立即更新/ })).not.toBeInTheDocument();
+  });
+
+  it("calls manual refetch when the check button is clicked", async () => {
+    const refetch = vi.fn().mockResolvedValue({});
+    asMock(useVersionCheck).mockReturnValue({
+      data: {
+        current_version: "abc1234",
+        latest_version: "def5678",
+        update_available: false,
+      },
+      refetch,
+      isFetching: false,
+    });
+    render(<UpdateBanner />);
+    fireEvent.click(screen.getByRole("button", { name: /检查更新/ }));
+    await waitFor(() => expect(refetch).toHaveBeenCalled());
   });
 
   it("triggers the update mutation on click", async () => {

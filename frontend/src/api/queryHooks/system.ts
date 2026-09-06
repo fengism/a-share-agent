@@ -8,13 +8,16 @@ export interface VersionCheckData {
   update_available: boolean;
 }
 
-export function useVersionCheck(options?: { pollMs?: number }) {
+export function useVersionCheck(options?: { pollMs?: number | false }) {
   return useQuery({
     queryKey: queryKeys.system.version,
     queryFn: ({ signal }) =>
       apiGet<VersionCheckData>("/system/version", undefined, { signal }),
     staleTime: 5 * 60_000,
-    refetchInterval: options?.pollMs ?? 10 * 60_000,
+    // 默认不自动轮询，仅由用户手动"检查更新"触发；
+    // 触发更新后的完成检测例外（pollMs），用于轮询新容器版本就绪。
+    refetchInterval: options?.pollMs ?? false,
+    refetchOnWindowFocus: false,
     retry: false,
   });
 }
