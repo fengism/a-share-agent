@@ -1,6 +1,6 @@
 services:
   tdx-api:
-    image: "${TDX_IMAGE:-fengliu1989/tdx:sha-e814a9cb6c2480903186d28a219de5d175499fce@sha256:dc4a9573c01e26f9f904c8f2ec2cbf524618c407d0a137e3490179b1328ce421}"
+    image: "${TDX_IMAGE:-fengliu1989/tdx:sha-0c2f854fc78696eefd8891e55dd3b37323cf309d@sha256:6c6cf5d652d9c706b598dc47143a96d188e01ac9d3ecfa0d9d03785ee7f1c7ae}"
     restart: unless-stopped
     stop_grace_period: 15s
     security_opt:
