@@ -3340,6 +3340,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * System Update
+         * @description Atomically enqueue an update request for the updater container.
+         */
+        post: operations["system_update_api_system_update_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/update/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * System Update Status
+         * @description Return the latest updater state from the shared data directory.
+         */
+        get: operations["system_update_status_api_system_update_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** System Version */
+        get: operations["system_version_api_system_version_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -10961,6 +11018,18 @@ export interface components {
              */
             status: "ok" | "skipped";
         };
+        /** UpdateStatusResponse */
+        UpdateStatusResponse: {
+            /** Message */
+            message?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "idle" | "pending" | "running" | "succeeded" | "failed" | "failed_rolled_back" | "failed_rollback_failed";
+            /** Updated At */
+            updated_at?: string | null;
+        };
         /** UserOut */
         UserOut: {
             /** Id */
@@ -11271,6 +11340,18 @@ export interface components {
             base: components["schemas"]["ValuationScenario"];
             bear: components["schemas"]["ValuationScenario"];
             bull: components["schemas"]["ValuationScenario"];
+        };
+        /** VersionCheckResponse */
+        VersionCheckResponse: {
+            /** Current Version */
+            current_version: string;
+            /** Latest Version */
+            latest_version?: string | null;
+            /**
+             * Update Available
+             * @default false
+             */
+            update_available: boolean;
         };
         /** WatchlistAlert */
         WatchlistAlert: {
@@ -17341,6 +17422,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    system_update_api_system_update_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateStatusResponse"];
+                };
+            };
+        };
+    };
+    system_update_status_api_system_update_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateStatusResponse"];
+                };
+            };
+        };
+    };
+    system_version_api_system_version_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionCheckResponse"];
                 };
             };
         };

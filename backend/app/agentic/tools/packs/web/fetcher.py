@@ -9,7 +9,7 @@ import requests
 
 from app.agentic.tools.packs.web.content import extract_text, smart_truncate
 from app.agentic.tools.packs.web.pdf import detect_content_type, handle_pdf_response
-from app.agentic.tools.packs.web.scrapling import BrowserMode, needs_fallback, scrapling_fetch
+from app.agentic.tools.packs.web.scrapling import BrowserMode, is_challenge_page, needs_fallback, scrapling_fetch
 from app.agentic.tools.packs.web.transport import request_pinned
 from app.agentic.tools.packs.web.twitter import fetch_tweet
 from app.agentic.tools.packs.web.url_security import (
@@ -136,15 +136,23 @@ async def scrapling_fallback(
     url: str,
     *,
     fetch_func: BrowserFetch = scrapling_fetch,
+    browser_modes: tuple[BrowserMode, ...] = ("dynamic", "stealth"),
 ) -> dict[str, Any]:
-    """Try the guarded in-process browser modes in increasing cost order."""
+    """Try browser modes in order, rejecting challenge pages as failed attempts."""
     errors: list[str] = []
-    for browser_mode in ("stealth", "dynamic"):
+    for browser_mode in browser_modes:
         metrics.record_agentic_event(f"browser_fallback_{browser_mode}")
         result = await fetch_func(url, browser_mode)
-        if not result.get("error") and result.get("content"):
+        challenge = is_challenge_page(
+            title=str(result.get("title") or ""),
+            content=str(result.get("content") or ""),
+        )
+        if not result.get("error") and result.get("content") and not challenge:
             return result
-        errors.append(str(result.get("error") or f"{browser_mode} 未返回正文"))
+        error = result.get("error") or (
+            f"{browser_mode} 返回了访问验证页" if challenge else f"{browser_mode} 未返回正文"
+        )
+        errors.append(str(error))
     return {
         "url": url,
         "title": "",
@@ -233,14 +241,20 @@ async def fetch_url(
             return {"url": target_url, "title": "", "content": "", "error": str(error)}
         return None
 
-    async def run_browser_fallback(target_url: str) -> dict[str, Any]:
+    async def run_browser_fallback(
+        target_url: str,
+        *,
+        browser_modes: tuple[BrowserMode, ...] = ("dynamic", "stealth"),
+    ) -> dict[str, Any]:
         unsafe_response = await reject_unsafe_browser_target(target_url)
         if unsafe_response is not None:
             return unsafe_response
         try:
             if fallback_func is not None:
                 return await within_browser_budget(fallback_func(target_url))
-            return await within_browser_budget(scrapling_fallback(target_url, fetch_func=execute_browser))
+            return await within_browser_budget(
+                scrapling_fallback(target_url, fetch_func=execute_browser, browser_modes=browser_modes)
+            )
         except TimeoutError as error:
             return {"url": target_url, "title": "", "content": "", "error": str(error)}
 
@@ -302,14 +316,37 @@ async def fetch_url(
         }
 
     fallback_note = ""
-    if mode == "auto" and needs_fallback(content):
-        fallback_url = _fallback_target_url(url, response)
-        logger.info("安全 HTTP 正文较短 (%d 字)，尝试浏览器模式: %s", len(content), fallback_url)
-        fallback_result = await run_browser_fallback(fallback_url)
+    challenge_page = is_challenge_page(html=response.text, title=title, content=content)
+    if challenge_page and mode == "http":
+        return {
+            "url": resolved_url,
+            "title": title,
+            "content": "",
+            "error": "HTTP 抓取返回了访问验证页",
+            "content_type": content_type,
+            "fetch_mode": "http",
+        }
+    if mode == "auto" and (challenge_page or needs_fallback(content)):
+        # When HTTP lands on an interstitial, restart browser navigation from the
+        # caller's URL instead of opening the temporary verification endpoint.
+        fallback_url = url if challenge_page else _fallback_target_url(url, response)
+        explicit_waf = "cf_app_waf" in f"{response.text[:8192]}\n{content[:4096]}".lower()
+        browser_modes: tuple[BrowserMode, ...] = ("stealth", "dynamic") if explicit_waf else ("dynamic", "stealth")
+        logger.info("安全 HTTP 正文不可用 (%d 字)，尝试浏览器模式: %s", len(content), fallback_url)
+        fallback_result = await run_browser_fallback(fallback_url, browser_modes=browser_modes)
         if not fallback_result.get("error"):
             cache.set(cache_key, fallback_result, FETCH_CACHE_TTL)
             return fallback_result
         fallback_note = str(fallback_result.get("error") or "浏览器降级不可用")
+        if challenge_page:
+            return {
+                "url": resolved_url,
+                "title": title,
+                "content": "",
+                "error": "访问验证页，浏览器抓取未能获取正文",
+                "note": fallback_note,
+                "content_type": content_type,
+            }
 
     truncated_content, was_truncated = truncate_func(content)
     final_result: dict[str, Any] = {

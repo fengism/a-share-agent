@@ -157,7 +157,12 @@ async def get_chip_distribution(
     decay: float = 1.0,
 ) -> ChipDistribution:
     """加载前复权日 K 后在本地计算个股筹码分布。"""
-    kline = await get_kline(code, period="daily", adjust="qfq")
+    kline = await get_kline(
+        code,
+        period="daily",
+        adjust="qfq",
+        require_turnover=True,
+    )
     return calculate_chip_distribution(
         kline.items,
         code=kline.code,

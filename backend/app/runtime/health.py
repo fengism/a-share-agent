@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
 from app.core.operational import OperationalSnapshot
-from app.runtime.task_health import critical_background_tasks as get_critical_background_tasks
+from app.runtime.task_health import readiness_background_tasks as get_readiness_background_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,8 @@ async def readiness_response(
     database_check: Callable[[], bool] = check_database,
     encryption_check: Callable[[], str] = check_config_encryption,
     background_snapshot: Callable[[], dict[str, dict]],
+    readiness_background_tasks: Collection[str] | None = None,
+    # 兼容旧调用方；新代码应使用 readiness_background_tasks。
     critical_background_tasks: Collection[str] | None = None,
     max_consecutive_failures: int = 3,
     blocking_runner=call_blocking,
@@ -116,17 +118,19 @@ async def readiness_response(
     if database_ok:
         encryption_status = await blocking_runner(encryption_check, semaphore=database_semaphore)
     background_tasks = background_snapshot()
-    critical_tasks = (
-        get_critical_background_tasks()
-        if critical_background_tasks is None
-        else critical_background_tasks
-    )
+    if readiness_background_tasks is not None and critical_background_tasks is not None:
+        raise ValueError("readiness 与旧 critical 任务参数不能同时提供")
+    required_tasks = readiness_background_tasks
+    if required_tasks is None:
+        required_tasks = critical_background_tasks
+    if required_tasks is None:
+        required_tasks = get_readiness_background_tasks()
     background_ok = all(
         _critical_task_is_healthy(
             background_tasks.get(name, {}),
             max_consecutive_failures=max_consecutive_failures,
         )
-        for name in critical_tasks
+        for name in required_tasks
     )
     ready = database_ok and encryption_status != "error" and background_ok
     return JSONResponse(

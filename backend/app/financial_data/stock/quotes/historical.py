@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
@@ -163,9 +164,10 @@ async def _load_historical_source(
     start_date: str,
     end_date: str,
     fetcher: Callable[..., pd.DataFrame],
-    *fetch_args: str,
+    *fetch_args: object,
     semaphore: asyncio.Semaphore,
     aggregate_period: str | None = None,
+    require_turnover: bool = False,
 ) -> tuple[str, list[KlineItem]]:
     frame = await call_blocking(fetcher, *fetch_args, semaphore=semaphore)
     if aggregate_period is not None:
@@ -180,6 +182,22 @@ async def _load_historical_source(
     items = _normalize_frame(symbol, frame)
     if not items:
         raise ValueError(f"{source} 未返回有效历史行情")
+    if require_turnover:
+        valid_turnover = [
+            item.turnover_pct is not None
+            and math.isfinite(item.turnover_pct)
+            and item.turnover_pct >= 0
+            for item in items
+        ]
+        valid_count = sum(valid_turnover)
+        if valid_count == 0:
+            raise ValueError(f"{source} 未返回有效换手率")
+        coverage = valid_count / len(items)
+        if coverage < 0.95:
+            raise ValueError(f"{source} 换手率覆盖率不足: {coverage:.1%}")
+        first_valid_index = valid_turnover.index(True)
+        if not all(valid_turnover[first_valid_index:]):
+            raise ValueError(f"{source} 换手率存在缺口")
     return source, items
 
 
@@ -189,6 +207,7 @@ def _historical_source_attempts(
     start_date: str,
     end_date: str,
     adjust: str,
+    require_turnover: bool = False,
 ) -> list[ProviderAttempt[tuple[str, list[KlineItem]]]]:
     attempts: list[ProviderAttempt[tuple[str, list[KlineItem]]]] = []
     if period == "daily":
@@ -207,7 +226,9 @@ def _historical_source_attempts(
                         start_date,
                         end_date,
                         adjust,
+                        require_turnover,
                         semaphore=tdx_semaphore,
+                        require_turnover=require_turnover,
                     ),
                     on_error=f"TDX HTTP 复权K线不可用: code={symbol}",
                     max_attempts=1,
@@ -228,6 +249,7 @@ def _historical_source_attempts(
                     end_date,
                     adjust,
                     semaphore=tencent_semaphore,
+                    require_turnover=require_turnover,
                 ),
                 on_error=f"腾讯财经复权K线不可用: code={symbol}",
                 max_attempts=1,
@@ -248,6 +270,7 @@ def _historical_source_attempts(
                     end_date,
                     adjust,
                     semaphore=akshare_semaphore,
+                    require_turnover=require_turnover,
                 ),
                 on_error=f"新浪复权K线不可用: code={symbol}",
                 max_attempts=1,
@@ -270,8 +293,10 @@ def _historical_source_attempts(
                         start_date,
                         end_date,
                         adjust,
+                        require_turnover,
                         semaphore=tdx_semaphore,
                         aggregate_period=period,
+                        require_turnover=require_turnover,
                     ),
                     on_error=f"TDX HTTP 日线聚合复权{period_label}K线不可用: code={symbol}",
                     max_attempts=1,
@@ -293,6 +318,7 @@ def _historical_source_attempts(
                     adjust,
                     semaphore=tencent_semaphore,
                     aggregate_period=period,
+                    require_turnover=require_turnover,
                 ),
                 on_error=f"腾讯财经日线聚合复权{period_label}K线不可用: code={symbol}",
                 max_attempts=1,
@@ -312,6 +338,7 @@ def _historical_source_attempts(
                     adjust,
                     semaphore=akshare_semaphore,
                     aggregate_period=period,
+                    require_turnover=require_turnover,
                 ),
                 on_error=f"新浪日线聚合复权{period_label}K线不可用: code={symbol}",
                 max_attempts=1,
@@ -334,6 +361,7 @@ def _historical_source_attempts(
                     end_date,
                     adjust,
                     semaphore=cls_semaphore,
+                    require_turnover=require_turnover,
                 ),
                 on_error=f"财联社不复权K线不可用: code={symbol}",
                 max_attempts=1,
@@ -355,6 +383,7 @@ def _historical_source_attempts(
                 end_date,
                 adjust,
                 semaphore=eastmoney_semaphore,
+                require_turnover=require_turnover,
             ),
             on_error=f"东方财富直连复权K线 fallback 不可用: code={symbol}",
             max_attempts=1,
@@ -374,6 +403,7 @@ def _historical_source_attempts(
                 end_date,
                 adjust,
                 semaphore=akshare_semaphore,
+                require_turnover=require_turnover,
             ),
             on_error=f"AkShare 东方财富复权K线最终 fallback 不可用: code={symbol}",
             max_attempts=1,
@@ -389,6 +419,7 @@ async def get_historical_bars(
     *,
     period: str = "daily",
     adjust: str = "qfq",
+    require_turnover: bool = False,
 ) -> HistoricalBarSet:
     """通过支持显式复权的 Provider Chain 加载历史行情。"""
     symbol = normalize_code(code).raw
@@ -402,6 +433,7 @@ async def get_historical_bars(
         start_date.strftime("%Y%m%d"),
         end_date.strftime("%Y%m%d"),
         adjust,
+        require_turnover,
     )
     try:
         source, items = await BaseProviderChain(

@@ -103,6 +103,7 @@ export const queryKeys = {
   },
   system: {
     version: ["system", "version"] as const,
+    updateStatus: ["system", "update-status"] as const,
   },
   settings: {
     config: ["config"] as const,

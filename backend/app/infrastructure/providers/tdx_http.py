@@ -1,16 +1,30 @@
 """通过独立 TDX HTTP 服务访问通达信数据。"""
 
+import math
+from bisect import bisect_right
 from collections.abc import Callable
+from datetime import date
 from typing import Any
 
 import pandas as pd
 import requests
 
 from app.configuration import get_settings
-from app.core.market import normalize_code, safe_float, safe_string
+from app.core.market import normalize_code, safe_float, safe_int, safe_string
 from app.infrastructure.http.client import get_provider_session as get_session
 
-_KLINE_COLUMNS = ["date", "open", "close", "high", "low", "volume", "amount", "pre_close"]
+_KLINE_COLUMNS = [
+    "date",
+    "open",
+    "close",
+    "high",
+    "low",
+    "volume",
+    "amount",
+    "pre_close",
+    "turnover_pct",
+]
+_EQUITY_CHANGE_CATEGORIES = frozenset({2, 3, 5, 7, 8, 9, 10})
 
 
 class TdxHttpAPIError(RuntimeError):
@@ -22,14 +36,41 @@ class TdxHttpUnavailableError(TdxHttpAPIError, ConnectionError):
 
 
 def _tdx_price(value: Any) -> float | None:
-    return safe_float(value, scale=1000)
+    parsed = safe_float(value, scale=1000)
+    return float(parsed) if parsed is not None else None
 
 
 def _date_number(value: Any) -> str | None:
     number = safe_float(value)
-    if number is None or number <= 0:
+    if number is None or not math.isfinite(number) or number <= 0:
         return None
     return f"{int(number):08d}"
+
+
+def _parse_equity_history(payload: Any) -> tuple[list[date], list[float]]:
+    """Parse TDX GBBQ records into effective dates and float shares."""
+    if not isinstance(payload, dict) or not isinstance(payload.get("List"), list):
+        raise TdxHttpAPIError("TDX HTTP 股本变更响应结构无效")
+
+    events: list[tuple[date, float]] = []
+    for item in payload["List"]:
+        if not isinstance(item, dict):
+            continue
+        category = safe_int(item.get("Category"))
+        float_shares = safe_float(item.get("C3"))
+        parsed_time = pd.to_datetime(item.get("Time"), errors="coerce")
+        if (
+            category not in _EQUITY_CHANGE_CATEGORIES
+            or float_shares is None
+            or not math.isfinite(float_shares)
+            or float_shares <= 0
+            or pd.isna(parsed_time)
+        ):
+            continue
+        events.append((parsed_time.date(), float_shares))
+
+    events.sort(key=lambda event: event[0])
+    return [event[0] for event in events], [event[1] for event in events]
 
 
 class TdxHttpDataProvider:
@@ -100,8 +141,9 @@ class TdxHttpDataProvider:
         start_date: str = "",
         end_date: str = "",
         adjust: str = "qfq",
+        include_turnover: bool = False,
     ) -> pd.DataFrame:
-        """获取日 K 线，支持前复权、后复权和不复权。"""
+        """获取日 K 线，并按需使用历史流通股本计算换手率。"""
         symbol = normalize_code(code)
         normalized_start = start_date.strip().replace("-", "")
         normalized_end = end_date.strip().replace("-", "")
@@ -117,14 +159,19 @@ class TdxHttpDataProvider:
 
         end_boundary = pd.to_datetime(normalized_end, format="%Y%m%d", errors="coerce") if normalized_end else None
         rows: list[dict[str, Any]] = []
+        trading_dates: list[date] = []
         for item in payload["List"]:
             if not isinstance(item, dict):
                 continue
             parsed_date = pd.to_datetime(item.get("Time"), errors="coerce")
             if pd.isna(parsed_date):
                 continue
-            if end_boundary is not None and parsed_date.date() > end_boundary.date():
+            trading_date = parsed_date.date()
+            if end_boundary is not None and trading_date > end_boundary.date():
                 continue
+            volume = safe_float(item.get("Volume"))
+            if volume is not None and (not math.isfinite(volume) or volume < 0):
+                volume = None
             rows.append(
                 {
                     "date": parsed_date.strftime("%Y-%m-%d"),
@@ -132,13 +179,30 @@ class TdxHttpDataProvider:
                     "close": safe_float(item.get("Close"), scale=1000),
                     "high": safe_float(item.get("High"), scale=1000),
                     "low": safe_float(item.get("Low"), scale=1000),
-                    "volume": safe_float(item.get("Volume")),
+                    "volume": volume,
                     "amount": safe_float(item.get("Amount"), scale=1000),
                     "pre_close": safe_float(item.get("Last"), scale=1000),
+                    "turnover_pct": None,
                 }
             )
+            trading_dates.append(trading_date)
         if not rows:
             return pd.DataFrame(columns=_KLINE_COLUMNS)
+
+        if include_turnover:
+            equity_payload = self._request("/gbbq", params={"code": symbol.prefixed_lower})
+            equity_dates, float_shares = _parse_equity_history(equity_payload)
+            for row, trading_date in zip(rows, trading_dates, strict=True):
+                volume = row["volume"]
+                if volume is None:
+                    continue
+                equity_index = bisect_right(equity_dates, trading_date) - 1
+                if equity_index < 0:
+                    continue
+                # TDX K 线成交量单位为手，GBBQ C3 的流通股本单位为股。
+                turnover_pct = volume * 10_000 / float_shares[equity_index]
+                if math.isfinite(turnover_pct) and turnover_pct >= 0:
+                    row["turnover_pct"] = turnover_pct
         return pd.DataFrame(rows, columns=_KLINE_COLUMNS).sort_values("date").reset_index(drop=True)
 
     def fetch_stock_quotes(self, codes: list[str]) -> dict[str, dict[str, Any]]:

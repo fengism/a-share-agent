@@ -15,6 +15,20 @@ class VersionCheckResponse(BaseModel):
     update_available: bool = False
 
 
+class UpdateStatusResponse(BaseModel):
+    status: Literal[
+        "idle",
+        "pending",
+        "running",
+        "succeeded",
+        "failed",
+        "failed_rolled_back",
+        "failed_rollback_failed",
+    ]
+    message: str | None = None
+    updated_at: str | None = None
+
+
 class ReadinessResponse(BaseModel):
     status: Literal["ok", "error"]
     database: Literal["connected", "error"]

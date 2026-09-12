@@ -147,7 +147,7 @@ export default function HKMarketTab({
       const match = stocksQuery.data?.items.find((item) => item.code === defaultStockCode);
       setActiveStock(match ?? { code: defaultStockCode, name: defaultStockCode });
     }
-  }, [defaultStockCode, stocksQuery.data?.items]);
+  }, [activeStock?.code, defaultStockCode, stocksQuery.data?.items]);
 
   useEffect(() => {
     if (activeStock && activeStock.name === activeStock.code && stocksQuery.data?.items) {
@@ -198,9 +198,8 @@ export default function HKMarketTab({
   const isSearchPending = !isSelectedSearch && Boolean(normalizedSearch)
     && (normalizedSearch !== debouncedSearch || stockSearchQuery.isFetching);
 
-  const rawStocks = stocksQuery.data?.items ?? [];
   const displayStocks = useMemo(() => {
-    const list = [...rawStocks];
+    const list = [...(stocksQuery.data?.items ?? [])];
     if (sortOption === "gainers") {
       return list.sort((a, b) => (b.change_pct ?? -Infinity) - (a.change_pct ?? -Infinity));
     }
@@ -211,7 +210,7 @@ export default function HKMarketTab({
       return list.sort((a, b) => (b.amount ?? -Infinity) - (a.amount ?? -Infinity));
     }
     return list;
-  }, [rawStocks, sortOption]);
+  }, [sortOption, stocksQuery.data?.items]);
 
   const columns: TableProps<HKStockQuote>["columns"] = [
     {

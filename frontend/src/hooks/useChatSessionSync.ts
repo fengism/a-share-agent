@@ -36,7 +36,6 @@ export function useChatSessionSync(): ChatSyncStatus {
     const persistSnapshot = (snapshot: ReturnType<typeof toServerChatState>) => {
       const serializedSnapshot = JSON.stringify(snapshot);
       if (serializedSnapshot === lastPersistedSnapshot) {
-        if (!disposed) updateStatus("synced");
         return Promise.resolve();
       }
       const operation = saveQueue

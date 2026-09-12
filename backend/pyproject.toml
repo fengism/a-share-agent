@@ -35,6 +35,8 @@ dependencies = [
     "scrapling[fetchers]>=0.4",
     "curl-cffi>=0.13.0",
     "httpx>=0.28.0",
+    "packaging>=24.0",
+    "playwright>=1.55.0",
     "pypdf>=6.16.2",
     "pdfplumber>=0.11.10",
 ]

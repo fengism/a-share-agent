@@ -20,58 +20,90 @@ if TYPE_CHECKING:
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ROOT_DIR = BACKEND_DIR.parent
 
-PRIVATE_USER_KEYS = frozenset({
-    "llm_provider", "llm_api_mode", "llm_api_version", "llm_api_key", "llm_base_url",
-    "llm_model", "llm_temperature",
-    "notion_enabled", "notion_api_token", "notion_parent_page_id", "notion_database_id",
-    "feishu_enabled", "feishu_app_id", "feishu_app_secret", "feishu_folder_token",
-    "feishu_wiki_space_id", "feishu_wiki_daily_review_parent", "feishu_wiki_analysis_parent",
-    "feishu_daily_review_folder", "feishu_analysis_folder", "feishu_default_receiver",
-    "iwencai_enabled", "iwencai_base_url", "iwencai_api_key",
-    "disabled_chat_skills", "disabled_chat_agents",
-})
+PRIVATE_USER_KEYS = frozenset(
+    {
+        "llm_provider",
+        "llm_api_mode",
+        "llm_api_version",
+        "llm_api_key",
+        "llm_base_url",
+        "llm_model",
+        "llm_temperature",
+        "notion_enabled",
+        "notion_api_token",
+        "notion_parent_page_id",
+        "notion_database_id",
+        "feishu_enabled",
+        "feishu_app_id",
+        "feishu_app_secret",
+        "feishu_folder_token",
+        "feishu_wiki_space_id",
+        "feishu_wiki_daily_review_parent",
+        "feishu_wiki_analysis_parent",
+        "feishu_daily_review_folder",
+        "feishu_analysis_folder",
+        "feishu_default_receiver",
+        "iwencai_enabled",
+        "iwencai_base_url",
+        "iwencai_api_key",
+        "disabled_chat_skills",
+        "disabled_chat_agents",
+    }
+)
 
-PERSISTED_GLOBAL_KEYS = frozenset({
-    "http_trust_env",
-    "twitter_feeds",
-    "eastmoney_cookie",
-    "baidu_cookie",
-    "ths_cookie",
-    "legulegu_token",
-    "eastmoney_min_interval_seconds",
-    "eastmoney_datacenter_min_interval_seconds",
-    "eastmoney_datacenter_cooldown_seconds",
-    "eastmoney_jitter_min_seconds",
-    "eastmoney_jitter_max_seconds",
-    "eastmoney_cooldown_seconds",
-    "eastmoney_transient_failure_threshold",
-    "bot_enabled",
-    "bot_command_prefix",
-    "bot_service_user_id",
-    "bot_rate_limit_requests",
-    "bot_rate_limit_window",
-    "bot_webhook_max_skew_seconds",
-    "bot_event_dedup_ttl_seconds",
-    "bot_job_poll_seconds",
-    "bot_job_lease_seconds",
-    "bot_job_max_attempts",
-    "bot_job_retry_base_seconds",
-    "bot_job_worker_concurrency",
-    "bot_batch_concurrency",
-    "bot_batch_max_stocks",
-    "bot_admin_users",
-    "bot_feishu_app_id",
-    "bot_feishu_app_secret",
-    "feishu_verification_token",
-    "feishu_encrypt_key",
-})
+PERSISTED_GLOBAL_KEYS = frozenset(
+    {
+        "http_trust_env",
+        "twitter_feeds",
+        "eastmoney_cookie",
+        "baidu_cookie",
+        "ths_cookie",
+        "legulegu_token",
+        "eastmoney_min_interval_seconds",
+        "eastmoney_datacenter_min_interval_seconds",
+        "eastmoney_datacenter_cooldown_seconds",
+        "eastmoney_jitter_min_seconds",
+        "eastmoney_jitter_max_seconds",
+        "eastmoney_cooldown_seconds",
+        "eastmoney_transient_failure_threshold",
+        "bot_enabled",
+        "bot_command_prefix",
+        "bot_service_user_id",
+        "bot_rate_limit_requests",
+        "bot_rate_limit_window",
+        "bot_webhook_max_skew_seconds",
+        "bot_event_dedup_ttl_seconds",
+        "bot_job_poll_seconds",
+        "bot_job_lease_seconds",
+        "bot_job_max_attempts",
+        "bot_job_retry_base_seconds",
+        "bot_job_worker_concurrency",
+        "bot_batch_concurrency",
+        "bot_batch_max_stocks",
+        "bot_admin_users",
+        "bot_feishu_app_id",
+        "bot_feishu_app_secret",
+        "feishu_verification_token",
+        "feishu_encrypt_key",
+    }
+)
 
-SECRET_KEYS = frozenset({
-    "llm_api_key", "feishu_app_secret", "feishu_verification_token", "feishu_encrypt_key",
-    "bot_feishu_app_secret",
-    "iwencai_api_key", "notion_api_token", "eastmoney_cookie", "baidu_cookie",
-    "baidu_acs_token", "ths_cookie", "legulegu_token",
-})
+SECRET_KEYS = frozenset(
+    {
+        "llm_api_key",
+        "feishu_app_secret",
+        "feishu_verification_token",
+        "feishu_encrypt_key",
+        "bot_feishu_app_secret",
+        "iwencai_api_key",
+        "notion_api_token",
+        "eastmoney_cookie",
+        "baidu_cookie",
+        "baidu_acs_token",
+        "ths_cookie",
+        "legulegu_token",
+    }
+)
 
 
 class Settings(BaseSettings):
@@ -206,8 +238,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     web_fetch_max_response_bytes: int = Field(default=20 * 1024 * 1024, ge=64 * 1024, le=100 * 1024 * 1024)
     web_fetch_browser_enabled: bool = True
-    web_fetch_browser_timeout_seconds: float = Field(default=60.0, ge=5.0, le=120.0)
-    web_fetch_browser_settle_seconds: float = Field(default=5.0, ge=0.0, le=15.0)
+    web_fetch_browser_timeout_seconds: float = Field(default=20.0, ge=5.0, le=120.0)
+    web_fetch_browser_settle_seconds: float = Field(default=10.0, ge=0.0, le=15.0)
     web_fetch_browser_max_concurrency: int = Field(default=2, ge=1, le=8)
 
     eastmoney_cookie: str = ""

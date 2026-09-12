@@ -275,8 +275,8 @@ export function useAnalysisWorkflowController({
     isAnalyzing: ownsCurrentRun && isAnalyzing,
     isCancelling: ownsCurrentRun && isCancelling,
     analysisError: ownsCurrentContext ? analysisError : null,
-    stages: ownsCurrentRun ? stages : [],
-    currentStageIndex: ownsCurrentRun ? currentStageIndex : 0,
+    stages: ownsCurrentContext ? stages : [],
+    currentStageIndex: ownsCurrentContext ? currentStageIndex : 0,
     agentProcess: ownsCurrentContext || displayResult
       ? displayAgentProcess
       : createAgentProcessState(),

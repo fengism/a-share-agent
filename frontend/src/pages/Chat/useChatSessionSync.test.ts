@@ -80,6 +80,27 @@ describe("useChatSessionSync", () => {
     }
   });
 
+  it("does not reschedule persistence for sync-status-only updates", async () => {
+    const { result, unmount } = renderHook(() => useChatSessionSync());
+    await waitFor(() => expect(result.current).toBe("synced"));
+    mocks.saveChatState.mockClear();
+    const setSyncStatus = vi.spyOn(useChatStore.getState(), "setSyncStatus");
+    vi.useFakeTimers();
+    try {
+      act(() => useChatStore.getState().setStreaming(true));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+
+      expect(mocks.saveChatState).not.toHaveBeenCalled();
+      expect(setSyncStatus).not.toHaveBeenCalled();
+      unmount();
+    } finally {
+      setSyncStatus.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it("reloads the newer server snapshot after a revision conflict", async () => {
     const newerState = {
       ...remoteState,

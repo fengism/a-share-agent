@@ -103,6 +103,20 @@ describe("analysisStore ownership", () => {
     }));
   });
 
+  it("releases run ownership after a normal completion", () => {
+    useAnalysisStore.getState().beginRun(identity);
+    useAnalysisStore.getState().finishRun(identity);
+
+    let state = useAnalysisStore.getState();
+    expect(state.activeRun).toBeNull();
+    expect(state.activeStream).toBeNull();
+    expect(state.isAnalyzing).toBe(false);
+
+    useAnalysisStore.getState().claimContext("000001", "analysis");
+    state = useAnalysisStore.getState();
+    expect(state.currentCode).toBe("000001");
+  });
+
   it("ignores stale mutations from a previous owner", () => {
     const replacement = { ownerId: "owner-2", runId: "run-2", code: "000001" };
     useAnalysisStore.getState().beginRun(identity);

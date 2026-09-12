@@ -62,6 +62,7 @@ async def _load_pdf_visual_data(
                 start_date=start_date.isoformat(),
                 end_date=end_date.isoformat(),
                 adjust="qfq",
+                require_turnover=True,
             ),
             timeout=15,
         )

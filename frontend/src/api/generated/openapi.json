@@ -19194,6 +19194,50 @@
         "title": "TwitterFeedRefreshResponse",
         "type": "object"
       },
+      "UpdateStatusResponse": {
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "status": {
+            "enum": [
+              "idle",
+              "pending",
+              "running",
+              "succeeded",
+              "failed",
+              "failed_rolled_back",
+              "failed_rollback_failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "UpdateStatusResponse",
+        "type": "object"
+      },
       "UserOut": {
         "properties": {
           "id": {
@@ -20135,6 +20179,35 @@
           "bear"
         ],
         "title": "ValuationScenarios",
+        "type": "object"
+      },
+      "VersionCheckResponse": {
+        "properties": {
+          "current_version": {
+            "title": "Current Version",
+            "type": "string"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "update_available": {
+            "default": false,
+            "title": "Update Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "current_version"
+        ],
+        "title": "VersionCheckResponse",
         "type": "object"
       },
       "WatchlistAlert": {
@@ -30207,6 +30280,77 @@
         "tags": [
           "stock"
         ]
+      }
+    },
+    "/api/system/update": {
+      "post": {
+        "description": "Atomically enqueue an update request for the updater container.",
+        "operationId": "system_update_api_system_update_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "System Update"
+      }
+    },
+    "/api/system/update/status": {
+      "get": {
+        "description": "Return the latest updater state from the shared data directory.",
+        "operationId": "system_update_status_api_system_update_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "System Update Status"
+      }
+    },
+    "/api/system/version": {
+      "get": {
+        "operationId": "system_version_api_system_version_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionCheckResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "System Version"
       }
     },
     "/api/watchlist": {

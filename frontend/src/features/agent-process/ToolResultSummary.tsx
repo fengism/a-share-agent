@@ -14,6 +14,15 @@ const METADATA_LABELS: Record<string, string> = {
   source: "数据源",
 };
 
+function safeExternalUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function ToolResultSummary({ value }: { value?: ToolSummary }) {
   if (!value) return null;
   const metadata = Object.entries(value.metadata ?? {});
@@ -44,17 +53,25 @@ export default function ToolResultSummary({ value }: { value?: ToolSummary }) {
       ) : null}
       {sources.length > 0 ? (
         <div style={{ display: "grid", gap: "var(--c-space-1)", marginTop: "var(--c-space-2)" }}>
-          {sources.map((source) => (
-            <a
-              key={source.url}
-              href={source.url}
-              target="_blank"
-              rel="noreferrer"
-              style={{ overflowWrap: "anywhere", fontSize: "inherit", lineHeight: "inherit" }}
-            >
-              <LinkOutlined /> {source.title || source.domain || source.url}
-            </a>
-          ))}
+          {sources.map((source) => {
+            const label = source.title || source.domain || source.url;
+            const href = safeExternalUrl(source.url);
+            return href ? (
+              <a
+                key={source.url}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ overflowWrap: "anywhere", fontSize: "inherit", lineHeight: "inherit" }}
+              >
+                <LinkOutlined /> {label}
+              </a>
+            ) : (
+              <span key={source.url} style={{ overflowWrap: "anywhere" }}>
+                {label}
+              </span>
+            );
+          })}
         </div>
       ) : null}
     </div>

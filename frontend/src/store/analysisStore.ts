@@ -152,7 +152,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
   },
   finishRun: (identity) => set((state) => (
     ownsRun(state.activeRun, identity)
-      ? { isAnalyzing: false, isCancelling: false, activeStream: null }
+      ? { isAnalyzing: false, isCancelling: false, activeStream: null, activeRun: null }
       : state
   )),
   resetAnalysis: () => {

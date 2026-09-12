@@ -194,7 +194,9 @@ export function createChatMessageSlice(
 
     setStreaming: (isStreaming) => set({ isStreaming }),
     setActiveRun: (activeRunSessionId, activeRunLabel) => set({ activeRunSessionId, activeRunLabel }),
-    setSyncStatus: (syncStatus) => set({ syncStatus }),
+    setSyncStatus: (syncStatus) => set((state) => (
+      state.syncStatus === syncStatus ? state : { syncStatus }
+    )),
     setAbortController: (abortController) => set({ abortController }),
 
     clearChat: () => {

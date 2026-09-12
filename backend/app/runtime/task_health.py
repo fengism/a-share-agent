@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 background_task_health: dict[str, dict] = {}
 _critical_background_tasks: set[str] = set()
+_readiness_background_tasks: set[str] = set()
 
 
 def get_task_health(name: str) -> dict:
@@ -30,13 +31,22 @@ def new_task_health() -> dict:
     }
 
 
-def register_background_task(name: str, *, critical: bool = False) -> dict:
+def register_background_task(
+    name: str,
+    *,
+    critical: bool = False,
+    readiness_required: bool = False,
+) -> dict:
     entry = background_task_health.setdefault(name, new_task_health())
     entry["unexpected_exit"] = False
     if critical:
         _critical_background_tasks.add(name)
     else:
         _critical_background_tasks.discard(name)
+    if readiness_required:
+        _readiness_background_tasks.add(name)
+    else:
+        _readiness_background_tasks.discard(name)
     return entry
 
 
@@ -44,13 +54,27 @@ def critical_background_tasks() -> frozenset[str]:
     return frozenset(_critical_background_tasks)
 
 
+def readiness_background_tasks() -> frozenset[str]:
+    return frozenset(_readiness_background_tasks)
+
+
 def clear_critical_background_tasks() -> None:
     _critical_background_tasks.clear()
+    _readiness_background_tasks.clear()
 
 
-def monitor_long_running_task(task: asyncio.Task[None], *, critical: bool = False) -> None:
+def monitor_long_running_task(
+    task: asyncio.Task[None],
+    *,
+    critical: bool = False,
+    readiness_required: bool = False,
+) -> None:
     name = task.get_name()
-    entry = register_background_task(name, critical=critical)
+    entry = register_background_task(
+        name,
+        critical=critical,
+        readiness_required=readiness_required,
+    )
 
     def on_done(completed: asyncio.Task[None]) -> None:
         if completed.cancelled():

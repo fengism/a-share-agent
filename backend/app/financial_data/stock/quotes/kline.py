@@ -19,6 +19,7 @@ async def _load_kline(
     start_date: date,
     end_date: date,
     adjust: str,
+    require_turnover: bool,
 ) -> KlineData:
     """通过严格历史行情链加载 K 线并保留数据来源信息。
 
@@ -37,6 +38,7 @@ async def _load_kline(
         end_date,
         period=period,
         adjust=adjust,
+        require_turnover=require_turnover,
     )
     return KlineData(
         code=bars.code,
@@ -49,7 +51,13 @@ async def _load_kline(
 
 
 async def get_kline(
-    code: str, period: str = "daily", start_date: str = "", end_date: str = "", adjust: str = "qfq"
+    code: str,
+    period: str = "daily",
+    start_date: str = "",
+    end_date: str = "",
+    adjust: str = "qfq",
+    *,
+    require_turnover: bool = False,
 ) -> KlineData:
     """获取股票 K 线数据，带 single-flight 与交易时段感知缓存。
 
@@ -59,6 +67,7 @@ async def get_kline(
         start_date: 起始日期，留空默认一年前
         end_date: 结束日期，留空默认当天
         adjust: 复权类型，默认 qfq
+        require_turnover: 是否要求返回至少一条有效换手率；用于筹码分布等依赖换手率的计算
     Return:
         KlineData 模型对象
     """
@@ -82,6 +91,7 @@ async def get_kline(
         parsed_start_date.isoformat(),
         parsed_end_date.isoformat(),
         adjust,
+        "turnover-required" if require_turnover else "turnover-optional",
     )
     if policy.read_cache:
         cached = series_cache.get(cache_key)
@@ -96,7 +106,14 @@ async def get_kline(
         Return:
             KlineData 模型对象
         """
-        result = await _load_kline(sym, period, parsed_start_date, parsed_end_date, adjust)
+        result = await _load_kline(
+            sym,
+            period,
+            parsed_start_date,
+            parsed_end_date,
+            adjust,
+            require_turnover,
+        )
         if policy.write_cache and policy.ttl_seconds is not None:
             series_cache.set(cache_key, result, ttl=policy.ttl_seconds)
         return result

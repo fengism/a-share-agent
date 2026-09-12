@@ -23,6 +23,7 @@ class BackgroundTaskSpec:
     factory: AsyncTaskFactory
     long_running: bool = False
     critical: bool = False
+    readiness_required: bool = False
     start_message: str | None = None
     restart_on_exit: bool = False
     restart_base_seconds: float = 1.0
@@ -34,6 +35,8 @@ class BackgroundTaskSpec:
             raise ValueError("后台任务名称不能为空")
         if self.critical and not self.long_running:
             raise ValueError("关键后台任务必须是长驻任务")
+        if self.readiness_required and not self.long_running:
+            raise ValueError("readiness 依赖的后台任务必须是长驻任务")
         if self.restart_on_exit and not self.long_running:
             raise ValueError("只有长驻任务可以配置自动重启")
         if self.restart_base_seconds <= 0:
@@ -55,7 +58,11 @@ class BackgroundTaskSupervisor:
         return tuple(self._tasks)
 
     async def _run_spec(self, spec: BackgroundTaskSpec) -> None:
-        entry = register_background_task(spec.name, critical=spec.critical)
+        entry = register_background_task(
+            spec.name,
+            critical=spec.critical,
+            readiness_required=spec.readiness_required,
+        )
         consecutive_restarts = 0
         while True:
             started_at = time.monotonic()
@@ -114,7 +121,11 @@ class BackgroundTaskSupervisor:
             task = asyncio.create_task(self._run_spec(spec), name=spec.name)
             self._tasks[spec.name] = task
             if spec.long_running:
-                monitor_long_running_task(task, critical=spec.critical)
+                monitor_long_running_task(
+                    task,
+                    critical=spec.critical,
+                    readiness_required=spec.readiness_required,
+                )
             if spec.start_message:
                 logger.info(spec.start_message)
 

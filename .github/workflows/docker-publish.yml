@@ -7,17 +7,91 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "docker-compose.yml"
       - ".github/workflows/docker-publish.yml"
   workflow_dispatch:
 
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  # 串行推进发布标记，避免旧任务在别名更新到一半时被新任务取消。
+  cancel-in-progress: false
+
 env:
   DOCKERHUB_NAMESPACE: fengliu1989
+  BACKEND_IMAGE: fengliu1989/a-share-backend
+  FRONTEND_IMAGE: fengliu1989/a-share-frontend
 
 jobs:
-  backend:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.9.1"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Lint backend
+        working-directory: backend
+        run: |
+          uv run --frozen ruff check app tests
+          uv run --frozen mypy
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+
+      - name: Test and build frontend
+        working-directory: frontend
+        run: |
+          npm test
+          npm run lint
+          npm run build
+          npm run api:check
+
+  backend:
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      version: ${{ steps.app-version.outputs.version }}
+      release-marker: ${{ steps.app-version.outputs.release-marker }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: app-version
+        name: Resolve application version
+        working-directory: backend
+        shell: bash
+        run: |
+          project_version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          version="v${project_version#v}"
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "$version" ]]; then
+            echo "Git tag $GITHUB_REF_NAME does not match backend version $version" >&2
+            exit 1
+          fi
+          if [[ ! "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Backend version $version is not a supported semantic version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release-marker=release-$version-sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -26,30 +100,24 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKERHUB_NAMESPACE }}/a-share-backend
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=sha,format=short
-
-      - uses: docker/build-push-action@v6
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.BACKEND_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             APP_UID=1000
             APP_GID=1000
-            APP_VERSION=${{ github.sha }}
+            APP_VERSION=${{ steps.app-version.outputs.version }}
+            APP_REVISION=${{ github.sha }}
 
   frontend:
+    needs: verify
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,20 +128,83 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - id: meta
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          outputs: type=image,name=${{ env.FRONTEND_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish:
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: frontend-meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKERHUB_NAMESPACE }}/a-share-frontend
+          images: ${{ env.FRONTEND_IMAGE }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
-            type=sha,format=short
 
-      - uses: docker/build-push-action@v6
+      - id: backend-meta
+        uses: docker/metadata-action@v5
         with:
-          context: ./frontend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          images: ${{ env.BACKEND_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      # release marker 必须最后发布；它出现时代表同一 revision 的前后端镜像都已可用。
+      - name: Promote frontend image
+        shell: bash
+        env:
+          DIGEST: ${{ needs.frontend.outputs.digest }}
+          METADATA_JSON: ${{ steps.frontend-meta.outputs.json }}
+        run: |
+          tags=(--tag "$FRONTEND_IMAGE:sha-${GITHUB_SHA::7}")
+          while IFS= read -r tag; do
+            [[ -n "$tag" ]] && tags+=(--tag "$tag")
+          done < <(jq -r '.tags[]' <<< "$METADATA_JSON")
+          docker buildx imagetools create "${tags[@]}" "$FRONTEND_IMAGE@$DIGEST"
+
+      - name: Promote backend public aliases
+        shell: bash
+        env:
+          DIGEST: ${{ needs.backend.outputs.digest }}
+          METADATA_JSON: ${{ steps.backend-meta.outputs.json }}
+        run: |
+          tags=()
+          while IFS= read -r tag; do
+            [[ -n "$tag" ]] && tags+=(--tag "$tag")
+          done < <(jq -r '.tags[]' <<< "$METADATA_JSON")
+          if (( ${#tags[@]} > 0 )); then
+            docker buildx imagetools create "${tags[@]}" "$BACKEND_IMAGE@$DIGEST"
+          fi
+
+      - name: Publish backend immutable image
+        shell: bash
+        env:
+          DIGEST: ${{ needs.backend.outputs.digest }}
+        run: |
+          docker buildx imagetools create \
+            --tag "$BACKEND_IMAGE:sha-${GITHUB_SHA::7}" \
+            "$BACKEND_IMAGE@$DIGEST"
+
+      - name: Publish complete release marker
+        shell: bash
+        env:
+          DIGEST: ${{ needs.backend.outputs.digest }}
+          RELEASE_MARKER: ${{ needs.backend.outputs.release-marker }}
+        run: |
+          docker buildx imagetools create \
+            --tag "$BACKEND_IMAGE:$RELEASE_MARKER" \
+            "$BACKEND_IMAGE@$DIGEST"

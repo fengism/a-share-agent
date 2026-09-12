@@ -1442,7 +1442,7 @@ def generate_research_report_html(
                     {_render_pill(f'持仓管理: {holder_act}', '#f0fdf4', '#15803d', '#86efac')}
                 </div>
                 <div style="font-size:12px; font-weight:700; color:#1e40af;">
-                    建议买入/加仓区间: {buy_range_str}
+                    建议买入/加仓区间: {_esc(buy_range_str)}
                 </div>
             </div>
             <div style="font-size:11px; color:#334155; line-height:1.5;">
