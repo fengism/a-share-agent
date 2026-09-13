@@ -45,6 +45,30 @@ from app.modules.chat.routing import (
 
 logger = logging.getLogger(__name__)
 
+_FAILURE_REASON_ID_SEPARATOR = "（错误编号："
+
+
+def _summarize_failure_reasons(results: dict[str, AgentExecutionResult]) -> str:
+    """全部 Agent 失败时，透出可操作的失败原因而非泛化提示。
+
+    各 Agent 对同一根因（如 LLM 余额不足）的失败文案仅错误编号不同，
+    按剥离编号后的文本去重；单一原因时保留编号便于日志关联，多个原因
+    时拼接去编号后的要点。
+    """
+    ordered: list[str] = []
+    for result in results.values():
+        reason = next((error for error in reversed(result.errors) if error), None)
+        if not reason:
+            continue
+        base = reason.split(_FAILURE_REASON_ID_SEPARATOR)[0]
+        if not any(base == existing.split(_FAILURE_REASON_ID_SEPARATOR)[0] for existing in ordered):
+            ordered.append(reason)
+    if not ordered:
+        return "当前分析未生成有效结果，请稍后重试"
+    if len(ordered) == 1:
+        return ordered[0]
+    return "；".join(reason.split(_FAILURE_REASON_ID_SEPARATOR)[0] for reason in ordered)
+
 
 class Orchestrator:
     def __init__(
@@ -174,7 +198,7 @@ class Orchestrator:
             if result.status != "failed" and result.analysis.strip()
         }
         if not usable_results:
-            yield AgentEvent(type="error", error="当前分析未生成有效结果，请稍后重试")
+            yield AgentEvent(type="error", error=_summarize_failure_reasons(results))
             yield AgentEvent(type="done", status="failed")
             return
 
