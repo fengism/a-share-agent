@@ -38,7 +38,10 @@ RUN groupadd --gid "${APP_GID}" app \
 
 COPY --chown=app:app --from=build /app/.venv /app/.venv
 
+# chromium 需同时保留完整版与 headless shell 两个变体：playwright(dynamic 渲染/PDF)
+# 默认用 headless shell，scrapling 的 StealthyFetcher(patchright) 亦然，均不可省略。
 RUN /app/.venv/bin/patchright install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
     && chown -R app:app /ms-playwright
 
 COPY --chown=app:app app/ app/
