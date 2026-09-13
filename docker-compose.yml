@@ -22,6 +22,8 @@ services:
     environment:
       # backend 只在 Compose 内网暴露，并固定经 frontend Nginx 反代。
       TRUST_PROXY_HEADERS: "true"
+      # HOME 指向 data 卷：tdxhub 等库的 ~/.tdxhub 缓存随卷持久化（容器重启不丢）
+      HOME: /app/data/home
     volumes:
       # tdxhub 客户端缓存（镜像内 ~/.tdxhub 软链至此）随 data 卷持久化
       - ./data:/app/data
@@ -115,7 +117,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - updater-control
-    read_only: true
+    # 注意：此镜像 entrypoint 启动时要写 /usr/local/etc/haproxy/haproxy.cfg，
+    # 因此不能对根文件系统设 read_only（生产环境验证过的行为）。
     tmpfs:
       - /run:size=8m,mode=0755
       - /tmp:size=8m,mode=1777
