@@ -12,8 +12,8 @@ from app.financial_data.stock.profile.sources import (
     EASTMONEY_STOCK_PROFILE,
     STOCK_CONCEPT_MAPPING,
     SW_INDUSTRY_CLASSIFICATION,
-    TDX_HTTP_FINANCE,
-    TDX_HTTP_STOCK_QUOTE,
+    TDXHUB_FINANCE,
+    TDXHUB_STOCK_QUOTE,
     TENCENT_STOCK_CONCEPTS,
     TENCENT_STOCK_QUOTE,
     source_contracts,
@@ -32,8 +32,8 @@ class BasicInfoInputs:
     stock_concepts: StockConceptInfo
     concepts_available: bool
     tencent_quote: dict[str, Any]
-    tdx_http_quote: dict[str, Any] = field(default_factory=dict)
-    tdx_http_finance: dict[str, Any] = field(default_factory=dict)
+    tdx_quote: dict[str, Any] = field(default_factory=dict)
+    tdx_finance: dict[str, Any] = field(default_factory=dict)
     sw_industry_record: dict[str, Any] | None = None
     stock_concept_record: dict[str, Any] | None = None
 
@@ -87,7 +87,6 @@ def _estimate_shares_from_spot(spot_row: pd.Series | None, market_cap_field: str
     return market_cap / price
 
 
-
 _EASTMONEY_PROFILE_FILLABLE_FIELDS = (
     "name",
     "listing_date",
@@ -102,11 +101,8 @@ _EASTMONEY_PROFILE_FILLABLE_FIELDS = (
 
 def missing_eastmoney_profile_fields(result: StockBasicInfo) -> list[str]:
     """Return fields that EastMoney profile can still fill after preferred sources merge."""
-    return [
-        field_name
-        for field_name in _EASTMONEY_PROFILE_FILLABLE_FIELDS
-        if field_name not in result.field_sources
-    ]
+    return [field_name for field_name in _EASTMONEY_PROFILE_FILLABLE_FIELDS if field_name not in result.field_sources]
+
 
 def build_basic_info(symbol: SymbolFormats, inputs: BasicInfoInputs) -> StockBasicInfo:
     """按显式优先级合并基础资料，并记录每个字段的实际来源。"""
@@ -114,8 +110,8 @@ def build_basic_info(symbol: SymbolFormats, inputs: BasicInfoInputs) -> StockBas
     profile = inputs.eastmoney_profile
     exchange = inputs.exchange_profile
     quote = inputs.tencent_quote
-    tdx_quote = inputs.tdx_http_quote
-    tdx_finance = inputs.tdx_http_finance
+    tdx_quote = inputs.tdx_quote
+    tdx_finance = inputs.tdx_finance
     spot = inputs.spot_row
     spot_source = inputs.spot_source_id
     exchange_source = inputs.exchange_source_id
@@ -125,7 +121,7 @@ def build_basic_info(symbol: SymbolFormats, inputs: BasicInfoInputs) -> StockBas
         "name",
         (exchange.get("name"), exchange_source),
         (quote.get("name"), TENCENT_STOCK_QUOTE.id),
-        (tdx_quote.get("name"), TDX_HTTP_STOCK_QUOTE.id),
+        (tdx_quote.get("name"), TDXHUB_STOCK_QUOTE.id),
         (profile.get("name"), EASTMONEY_STOCK_PROFILE.id),
         (spot.get("名称") if spot is not None else None, spot_source),
         (inputs.name_map.get(symbol.raw), inputs.name_map_source_id),
@@ -134,13 +130,13 @@ def build_basic_info(symbol: SymbolFormats, inputs: BasicInfoInputs) -> StockBas
         field_sources,
         "listing_date",
         (exchange.get("listing_date"), exchange_source),
-        (format_listing_date(tdx_finance.get("list_date")), TDX_HTTP_FINANCE.id),
+        (format_listing_date(tdx_finance.get("list_date")), TDXHUB_FINANCE.id),
         (format_listing_date(profile.get("list_date")), EASTMONEY_STOCK_PROFILE.id),
     )
     total_shares = _pick_number(
         field_sources,
         "total_shares",
-        (tdx_finance.get("total_shares"), TDX_HTTP_FINANCE.id),
+        (tdx_finance.get("total_shares"), TDXHUB_FINANCE.id),
         (exchange.get("total_shares"), exchange_source),
         (profile.get("total_shares"), EASTMONEY_STOCK_PROFILE.id),
         (_estimate_shares_from_spot(spot, "总市值"), spot_source),
@@ -148,7 +144,7 @@ def build_basic_info(symbol: SymbolFormats, inputs: BasicInfoInputs) -> StockBas
     circulating_shares = _pick_number(
         field_sources,
         "circulating_shares",
-        (tdx_finance.get("float_shares"), TDX_HTTP_FINANCE.id),
+        (tdx_finance.get("float_shares"), TDXHUB_FINANCE.id),
         (exchange.get("circulating_shares"), exchange_source),
         (profile.get("float_shares"), EASTMONEY_STOCK_PROFILE.id),
         (_estimate_shares_from_spot(spot, "流通市值"), spot_source),
@@ -190,7 +186,7 @@ def build_basic_info(symbol: SymbolFormats, inputs: BasicInfoInputs) -> StockBas
         field_sources,
         "current_price",
         (quote.get("price"), TENCENT_STOCK_QUOTE.id),
-        (tdx_quote.get("price"), TDX_HTTP_STOCK_QUOTE.id),
+        (tdx_quote.get("price"), TDXHUB_STOCK_QUOTE.id),
         (profile.get("price"), EASTMONEY_STOCK_PROFILE.id),
         (spot.get("最新价") if spot is not None else None, spot_source),
     )

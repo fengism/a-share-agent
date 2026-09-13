@@ -1,18 +1,16 @@
 import logging
-import threading
 from datetime import datetime
 
 import pandas as pd
-from mootdx.consts import MARKET_SH, MARKET_SZ
-from mootdx.quotes import Quotes
 
 from app.core.market import normalize_code, normalize_index_code, normalize_index_symbol
+from app.infrastructure.providers.tdxhub import shared_tdxhub_quotes
 
 logger = logging.getLogger(__name__)
 
 
 class TdxDataProvider:
-    """Purpose: 基于 mootdx 客户端封装通达信本地行情接口，提供股票与指数 K 线、F10 信息。"""
+    """Purpose: 基于 tdxhub 客户端封装通达信本地行情接口，提供股票与指数 K 线、F10 信息。"""
 
     DAILY_FREQUENCY = 9
     name = "tdx"
@@ -20,29 +18,24 @@ class TdxDataProvider:
     KLINE_COLUMNS = ["date", "open", "close", "high", "low", "volume", "amount", "pre_close", "change_pct"]
     NUMERIC_COLUMNS = ["open", "close", "high", "low", "volume", "amount"]
     F10_CATEGORIES = (
-        "最新提示", "公司概况", "财务分析",
-        "股东研究", "股本结构", "资本运作",
-        "业内点评", "行业分析", "公司大事",
+        "最新提示",
+        "公司概况",
+        "财务分析",
+        "股东研究",
+        "股本结构",
+        "资本运作",
+        "业内点评",
+        "行业分析",
+        "公司大事",
     )
 
     def __init__(self):
-        """初始化 TdxDataProvider，延迟创建多线程 mootdx 客户端。"""
-        self._client = None
-        self._client_lock = threading.Lock()
-
-    @property
-    def client(self):
-        """按需创建 mootdx 客户端，避免模块导入阶段产生网络连接。"""
-        if self._client is None:
-            with self._client_lock:
-                if self._client is None:
-                    self._client = Quotes.factory(market="std", multithread=True, heartbeat=True)
-        return self._client
+        """初始化 TdxDataProvider，通过共享 tdxhub 客户端访问行情。"""
+        self._quotes = shared_tdxhub_quotes
 
     def reset_client(self) -> None:
-        """清空已创建的 mootdx 客户端，便于异常恢复或测试隔离。"""
-        with self._client_lock:
-            self._client = None
+        """清空共享 tdxhub 客户端，便于异常恢复或测试隔离。"""
+        self._quotes.reset()
 
     def fetch_basic_info(self, code: str) -> dict[str, str]:
         """通过通达信 F10 接口获取个股各类基本信息。
@@ -55,7 +48,11 @@ class TdxDataProvider:
         sym = normalize_code(code)
         result: dict[str, str] = {}
         for category in self.F10_CATEGORIES:
-            result[category] = self.client.F10(symbol=sym.raw, name=category) or ""
+            frame = self._quotes.call("F10", symbol=sym.raw, name=category)
+            content = ""
+            if isinstance(frame, pd.DataFrame) and not frame.empty:
+                content = str(frame.iloc[0].get("content") or "")
+            result[category] = content
         return result
 
     def fetch_stock_kline(self, code: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:
@@ -70,7 +67,13 @@ class TdxDataProvider:
         """
         sym = normalize_code(code)
         offset = self._calculate_offset(start_date, end_date)
-        raw_df = self.client.bars(symbol=sym.raw, frequency=self.DAILY_FREQUENCY, offset=offset)
+        raw_df = self._quotes.call(
+            "bars",
+            symbol=sym.raw,
+            frequency=self.DAILY_FREQUENCY,
+            start=0,
+            offset=offset,
+        )
         return self._format_kline_df(raw_df, start_date=start_date, end_date=end_date)
 
     def fetch_index_kline(self, symbol: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:
@@ -83,11 +86,11 @@ class TdxDataProvider:
         Return:
             包含 date、OHLCV、amount、pre_close、change_pct 的 DataFrame
         """
-        raw_symbol, market = self._normalize_index_request(symbol)
+        raw_symbol = self._normalize_index_request(symbol)
         offset = self._calculate_offset(start_date, end_date)
-        raw_df = self.client.index(
+        raw_df = self._quotes.call(
+            "index",
             symbol=raw_symbol,
-            market=market,
             frequency=self.DAILY_FREQUENCY,
             start=0,
             offset=offset,
@@ -113,14 +116,13 @@ class TdxDataProvider:
         return datetime.strptime(normalized, "%Y%m%d")
 
     @staticmethod
-    def _normalize_index_request(symbol: str) -> tuple[str, int]:
-        """归一化 TDX 指数代码，并解析 mootdx 所需的沪深市场编号。"""
+    def _normalize_index_request(symbol: str) -> str:
+        """归一化 TDX 指数代码；市场由 tdxhub 按代码段自动推断。"""
         normalized_symbol = normalize_index_symbol(symbol.strip().lower())
         raw_symbol = normalize_index_code(normalized_symbol)
         if not raw_symbol.isdigit() or len(raw_symbol) != 6:
             raise ValueError(f"无效指数代码: {symbol}，需要6位数字")
-        market = MARKET_SH if normalized_symbol.startswith("sh") else MARKET_SZ
-        return raw_symbol, market
+        return raw_symbol
 
     def _format_kline_df(
         self,
@@ -130,8 +132,8 @@ class TdxDataProvider:
         end_date: str = "",
         volume_multiplier: int | float = 1,
     ) -> pd.DataFrame:
-        """将 mootdx 原始 K 线 DataFrame 统一整理为 provider 标准列。"""
-        if raw_df is None or raw_df.empty:
+        """将 tdxhub 原始 K 线 DataFrame 统一整理为 provider 标准列。"""
+        if raw_df is None or not isinstance(raw_df, pd.DataFrame) or raw_df.empty:
             return pd.DataFrame(columns=self.KLINE_COLUMNS)
 
         df = self._ensure_datetime_column(raw_df)
@@ -160,7 +162,7 @@ class TdxDataProvider:
 
     @staticmethod
     def _ensure_datetime_column(raw_df: pd.DataFrame) -> pd.DataFrame:
-        """兼容 mootdx 将 datetime 放在列或索引上的两种返回形态。"""
+        """兼容 tdxhub 将 datetime 放在列或索引上的两种返回形态。"""
         df = raw_df.copy()
         if "datetime" in df.columns:
             return df.reset_index(drop=True)

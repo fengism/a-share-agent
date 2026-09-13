@@ -43,9 +43,7 @@ class ProviderSettingsView:
     retry_base_seconds: float
     retry_budget_seconds: float
     retry_jitter_seconds: float
-    tdx_http_enabled: bool
-    tdx_http_base_url: str
-    tdx_http_timeout_seconds: float
+    tdxhub_timeout_seconds: float
     eastmoney_min_interval_seconds: float
     eastmoney_datacenter_min_interval_seconds: float
 
@@ -58,9 +56,7 @@ class ProviderSettingsView:
             retry_base_seconds=settings.provider_retry_base_seconds,
             retry_budget_seconds=settings.provider_retry_budget_seconds,
             retry_jitter_seconds=settings.provider_retry_jitter_seconds,
-            tdx_http_enabled=settings.tdx_http_enabled,
-            tdx_http_base_url=settings.tdx_http_base_url,
-            tdx_http_timeout_seconds=settings.tdx_http_timeout_seconds,
+            tdxhub_timeout_seconds=settings.tdxhub_timeout_seconds,
             eastmoney_min_interval_seconds=settings.eastmoney_min_interval_seconds,
             eastmoney_datacenter_min_interval_seconds=(
                 settings.eastmoney_datacenter_min_interval_seconds

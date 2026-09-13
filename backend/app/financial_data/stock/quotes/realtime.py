@@ -5,6 +5,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
+from typing import cast
 
 from app.configuration import get_settings
 from app.core.cache_policies import REALTIME_STOCK_QUOTES
@@ -69,11 +70,10 @@ def _summarize_sources(codes: list[str], quote_sources: dict[str, str]) -> str:
 
 
 async def _fetch_realtime_quote_set_uncached(codes: list[str]) -> RealtimeQuoteSet:
-    """优先使用腾讯行情，并通过 TDX HTTP 补齐缺失代码。"""
+    """优先使用腾讯行情，并通过 TDX 补齐缺失代码。"""
     if not codes:
         return RealtimeQuoteSet(source="tencent", quotes={}, quote_sources={})
     normalized_codes = list(dict.fromkeys(normalize_code(code).raw for code in codes))
-    tdx_http_enabled = get_settings().tdx_http_enabled
     attempts: list[ProviderAttempt[RealtimeQuoteSet]] = [
         ProviderAttempt(
             label="tencent",
@@ -84,43 +84,43 @@ async def _fetch_realtime_quote_set_uncached(codes: list[str]) -> RealtimeQuoteS
                 semaphore=tencent_semaphore,
             ),
             on_error="腾讯实时行情不可用",
-        )
+        ),
+        ProviderAttempt(
+            label="tdxhub",
+            loader=lambda: _load_quote_source(
+                "tdxhub",
+                get_provider("tdxhub").fetch_stock_quotes,
+                normalized_codes,
+                semaphore=tdx_semaphore,
+            ),
+            on_error="TDX 实时行情不可用",
+        ),
     ]
-    if tdx_http_enabled:
-        attempts.append(
-            ProviderAttempt(
-                label="tdx_http",
-                loader=lambda: _load_quote_source(
-                    "tdx_http",
-                    get_provider("tdx_http").fetch_stock_quotes,
-                    normalized_codes,
-                    semaphore=tdx_semaphore,
-                ),
-                on_error="TDX HTTP 实时行情不可用",
-            )
-        )
     try:
-        primary = await BaseProviderChain(attempts, operation="stock_quotes").run()
+        primary = cast(
+            RealtimeQuoteSet,
+            await BaseProviderChain(attempts, operation="stock_quotes").run(),
+        )
     except Exception as error:
         raise UpstreamUnavailableError("个股实时行情上游暂时不可用") from error
     missing_codes = [code for code in normalized_codes if code not in primary.quotes]
-    if primary.source != "tencent" or not tdx_http_enabled or not missing_codes:
+    if primary.source != "tencent" or not missing_codes:
         return primary
 
     try:
         fallback = await provider_gateway.call(
-            "tdx_http",
+            "tdxhub",
             "stock_quotes",
             lambda: _load_quote_source(
-                "tdx_http",
-                get_provider("tdx_http").fetch_stock_quotes,
+                "tdxhub",
+                get_provider("tdxhub").fetch_stock_quotes,
                 missing_codes,
                 semaphore=tdx_semaphore,
             ),
             is_fallback_attempt=True,
         )
     except Exception as exc:
-        logger.info("TDX HTTP 未能补齐部分实时行情: codes=%s, error=%s", missing_codes, exc)
+        logger.info("TDX 未能补齐部分实时行情: codes=%s, error=%s", missing_codes, exc)
         return primary
 
     merged_quotes = {**primary.quotes, **fallback.quotes}

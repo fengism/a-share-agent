@@ -15,7 +15,7 @@ _PROVIDER_EXPORTS = {
     "sina": ("app.infrastructure.providers.sina.provider", "sina_provider"),
     "sina_hk": ("app.infrastructure.providers.sina.hk", "sina_hk_provider"),
     "tdx": ("app.infrastructure.providers.tdx", "tdx_provider"),
-    "tdx_http": ("app.infrastructure.providers.tdx_http", "tdx_http_provider"),
+    "tdxhub": ("app.infrastructure.providers.tdxhub", "tdxhub_provider"),
     "tencent": ("app.infrastructure.providers.tencent", "tencent_provider"),
     "ths": ("app.infrastructure.providers.ths.provider", "ths_provider"),
     "twitter": ("app.infrastructure.providers.twitter", "twitter_provider"),

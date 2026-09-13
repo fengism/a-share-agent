@@ -3,7 +3,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from app.configuration import get_settings
 from app.constants.market import (
     BAIDU_STOCK_NAMES_URL,
     EASTMONEY_CLIST_URL,
@@ -21,7 +20,7 @@ from app.financial_data.stock.profile.name_sources import (
     SINA_STOCK_NAMES_SOURCE_ID,
     SSE_STOCK_NAMES_SOURCE_ID,
     SZSE_STOCK_NAMES_SOURCE_ID,
-    TDX_HTTP_STOCK_NAMES_SOURCE_ID,
+    TDXHUB_STOCK_NAMES_SOURCE_ID,
 )
 from app.financial_data.stock.profile.schemas import StockDataSource
 from app.financial_data.stock.quotes.sources import (
@@ -161,31 +160,26 @@ SINA_STOCK_NAMES = BasicDataSourceSpec(
     operation="stock_names",
     api=SINA_MARKET_HQ_URL,
 )
-TDX_HTTP_STOCK_NAMES = BasicDataSourceSpec(
-    id=TDX_HTTP_STOCK_NAMES_SOURCE_ID,
-    name="TDX HTTP 股票名称列表",
-    provider="tdx_http",
+TDXHUB_STOCK_NAMES = BasicDataSourceSpec(
+    id=TDXHUB_STOCK_NAMES_SOURCE_ID,
+    name="TDX 股票名称列表",
+    provider="tdxhub",
     operation="stock_names",
-    api=lambda: (
-        f"{get_settings().tdx_http_base_url.rstrip('/')}/code/stocks | "
-        f"{get_settings().tdx_http_base_url.rstrip('/')}/code/all?exchange={{exchange}}"
-    ),
+    api="tdxhub.Quotes.stock_all(security_type='a_stock')",
 )
-TDX_HTTP_STOCK_QUOTE = BasicDataSourceSpec(
-    id="tdx_http.stock_quote",
-    name="TDX HTTP 实时行情",
-    provider="tdx_http",
+TDXHUB_STOCK_QUOTE = BasicDataSourceSpec(
+    id="tdxhub.stock_quote",
+    name="TDX 实时行情",
+    provider="tdxhub",
     operation="stock_quote",
-    api=lambda: f"{get_settings().tdx_http_base_url.rstrip('/')}/quote?codes={{symbols}}",
+    api="tdxhub.Quotes.quotes(codes)",
 )
-TDX_HTTP_FINANCE = BasicDataSourceSpec(
-    id="tdx_http.finance",
-    name="TDX HTTP 财务基础信息",
-    provider="tdx_http",
+TDXHUB_FINANCE = BasicDataSourceSpec(
+    id="tdxhub.finance",
+    name="TDX 财务基础信息",
+    provider="tdxhub",
     operation="finance",
-    api=lambda: (
-        f"{get_settings().tdx_http_base_url.rstrip('/')}/finance?exchange={{exchange}}&code={{code}}"
-    ),
+    api="tdxhub.Quotes.finance(code)",
 )
 LEGACY_STOCK_NAMES = BasicDataSourceSpec(
     id=LEGACY_STOCK_NAMES_SOURCE_ID,
@@ -228,9 +222,9 @@ _SOURCE_CATALOG = {
         BAIDU_STOCK_NAMES,
         EASTMONEY_STOCK_NAMES,
         SINA_STOCK_NAMES,
-        TDX_HTTP_STOCK_NAMES,
-        TDX_HTTP_STOCK_QUOTE,
-        TDX_HTTP_FINANCE,
+        TDXHUB_STOCK_NAMES,
+        TDXHUB_STOCK_QUOTE,
+        TDXHUB_FINANCE,
         LEGACY_STOCK_NAMES,
     )
 }

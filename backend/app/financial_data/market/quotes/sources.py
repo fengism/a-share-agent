@@ -44,7 +44,7 @@ MARKET_STATISTICS_SOURCE_APIS = {
 
 INDEX_KLINE_SOURCE_APIS = {
     "东方财富指数K线直连": "https://push2his.eastmoney.com/api/qt/stock/kline/get",
-    "TDX 指数K线": "mootdx://index",
+    "TDX 指数K线": "tdxhub://index",
     "Akshare 腾讯指数K线": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
     "Akshare 东方财富指数K线": "https://push2his.eastmoney.com/api/qt/stock/kline/get",
     "Akshare 新浪指数K线": "https://finance.sina.com.cn/realstock/company/{symbol}/hisdata/klc_kl.js",

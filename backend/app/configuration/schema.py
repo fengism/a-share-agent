@@ -163,9 +163,7 @@ class Settings(BaseSettings):
     provider_retry_budget_seconds: float = 5.0
     provider_retry_jitter_seconds: float = 0.1
 
-    tdx_http_enabled: bool = False
-    tdx_http_base_url: str = "http://127.0.0.1:18080"
-    tdx_http_timeout_seconds: float = Field(default=10.0, gt=0)
+    tdxhub_timeout_seconds: float = Field(default=10.0, gt=0)
 
     eastmoney_min_interval_seconds: float = 1.0
     eastmoney_datacenter_min_interval_seconds: float = 1.0

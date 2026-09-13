@@ -42,7 +42,11 @@ COPY --chown=app:app app/ app/
 # 空库首次初始化时自动播种概念/个股基础数据，SEEDS_DIR 解析为 /app/seeds
 COPY --chown=app:app seeds/ seeds/
 
-RUN mkdir -p data logs && chown -R app:app data logs
+# tdxhub 客户端在 ~/.tdxhub 下写 bestip 与证券目录缓存；
+# 经软链落到 data 卷持久化，容器重启不丢缓存、也无需额外的宿主机目录授权。
+RUN mkdir -p data logs data/tdxhub \
+    && ln -s /app/data/tdxhub /home/app/.tdxhub \
+    && chown -R app:app data logs
 
 USER app
 

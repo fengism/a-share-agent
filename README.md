@@ -93,7 +93,7 @@ docker compose down
 
 Docker Compose 只会从 `.env` 读取 `CONFIG_ENCRYPTION_KEY`，不会在首次启动或容器重建时自动生成。将密钥生成命令的输出填入 `.env` 的 `CONFIG_ENCRYPTION_KEY`，并妥善备份该值；后续容器重建、迁移或数据恢复时必须继续使用同一个密钥，否则已加密的用户私密配置无法解密。未配置密钥时，空数据库仍可启动，但无法保存 API Key、Token 等敏感配置；如果数据库中已经存在敏感配置，后端就绪检查将失败。
 
-启动后访问 `http://localhost:8080`。默认拓扑只有一个 `backend` 容器：同一 Uvicorn 进程运行 HTTP 服务、周期维护以及 Bot、Quant 和 Analysis/Industry Chain 持久化任务 Worker；此外还有一个 `frontend` 容器和一个 `tdx-api` sidecar，不会额外启动 `backend-worker`。如端口冲突，可在 `.env` 中设置 `DOCKER_FRONTEND_PORT=8081`，再访问对应端口。`tdx-api` 默认仅绑定宿主机 `127.0.0.1:18080`。
+启动后访问 `http://localhost:8080`。默认拓扑只有 `backend` 与 `frontend` 两个容器：同一 Uvicorn 进程运行 HTTP 服务、周期维护以及 Bot、Quant 和 Analysis/Industry Chain 持久化任务 Worker，不会额外启动 `backend-worker`；通达信数据由后端内置的 tdxhub-sdk 直连获取，无独立 sidecar。如端口冲突，可在 `.env` 中设置 `DOCKER_FRONTEND_PORT=8081`，再访问对应端口。
 
 #### Docker Hub 自动发布
 

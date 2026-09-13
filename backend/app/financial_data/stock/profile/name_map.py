@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from time import time
 from typing import cast
 
-from app.configuration import get_settings
 from app.configuration.paths import DATA_DIR
 from app.core.concurrency.rate_limiter import (
     baidu_semaphore,
@@ -30,7 +29,7 @@ from app.financial_data.stock.profile.sources import (
     CNINFO_STOCK_NAMES,
     EASTMONEY_STOCK_NAMES,
     SINA_STOCK_NAMES,
-    TDX_HTTP_STOCK_NAMES,
+    TDXHUB_STOCK_NAMES,
     BasicDataSourceSpec,
 )
 from app.financial_data.stock.quotes.sources import KNOWN_SPOT_SOURCE_IDS, get_spot_source
@@ -156,9 +155,9 @@ def _get_sina_provider():
     return get_provider("sina")
 
 
-def _get_tdx_http_provider():
-    """Lazily resolve the TDX HTTP provider singleton."""
-    return get_provider("tdx_http")
+def _get_tdxhub_provider():
+    """Lazily resolve the TDX provider singleton."""
+    return get_provider("tdxhub")
 
 
 def _load_stock_name_file() -> StockNameMapSnapshot | None:
@@ -315,16 +314,14 @@ async def _fetch_stock_name_map_remote() -> StockNameMapSnapshot | None:
     except Exception as error:
         logger.info("交易所统一股票主表不可用，回退聚合名称来源: %s", error)
 
-    attempts = []
-    if get_settings().tdx_http_enabled:
-        attempts.append(
-            StockNameSourceAttempt(
-                source=TDX_HTTP_STOCK_NAMES,
-                display_name="TDX HTTP",
-                fetcher_factory=lambda: _get_tdx_http_provider().fetch_stock_names,
-                semaphore=tdx_semaphore,
-            )
+    attempts = [
+        StockNameSourceAttempt(
+            source=TDXHUB_STOCK_NAMES,
+            display_name="TDX",
+            fetcher_factory=lambda: _get_tdxhub_provider().fetch_stock_names,
+            semaphore=tdx_semaphore,
         )
+    ]
     attempts.extend(
         [
             StockNameSourceAttempt(

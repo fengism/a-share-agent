@@ -10,7 +10,6 @@ from datetime import date
 
 import pandas as pd
 
-from app.configuration import get_settings
 from app.core.concurrency.rate_limiter import (
     akshare_semaphore,
     call_blocking,
@@ -211,29 +210,28 @@ def _historical_source_attempts(
 ) -> list[ProviderAttempt[tuple[str, list[KlineItem]]]]:
     attempts: list[ProviderAttempt[tuple[str, list[KlineItem]]]] = []
     if period == "daily":
-        if get_settings().tdx_http_enabled:
-            attempts.append(
-                ProviderAttempt(
-                    label="TDX HTTP 复权K线",
-                    loader=lambda: _load_historical_source(
-                        "tdx_http",
-                        symbol,
-                        period,
-                        start_date,
-                        end_date,
-                        get_provider("tdx_http").fetch_stock_kline,
-                        symbol,
-                        start_date,
-                        end_date,
-                        adjust,
-                        require_turnover,
-                        semaphore=tdx_semaphore,
-                        require_turnover=require_turnover,
-                    ),
-                    on_error=f"TDX HTTP 复权K线不可用: code={symbol}",
-                    max_attempts=1,
-                )
+        attempts.append(
+            ProviderAttempt(
+                label="TDX 复权K线",
+                loader=lambda: _load_historical_source(
+                    "tdxhub",
+                    symbol,
+                    period,
+                    start_date,
+                    end_date,
+                    get_provider("tdxhub").fetch_stock_kline,
+                    symbol,
+                    start_date,
+                    end_date,
+                    adjust,
+                    require_turnover,
+                    semaphore=tdx_semaphore,
+                    require_turnover=require_turnover,
+                ),
+                on_error=f"TDX 复权K线不可用: code={symbol}",
+                max_attempts=1,
             )
+        )
         attempts.append(
             ProviderAttempt(
                 label="腾讯财经复权K线",
@@ -278,30 +276,29 @@ def _historical_source_attempts(
         )
     else:
         period_label = "周" if period == "weekly" else "月"
-        if get_settings().tdx_http_enabled:
-            attempts.append(
-                ProviderAttempt(
-                    label=f"TDX HTTP 日线聚合复权{period_label}K线",
-                    loader=lambda: _load_historical_source(
-                        "tdx-http-daily-aggregate",
-                        symbol,
-                        period,
-                        start_date,
-                        end_date,
-                        get_provider("tdx_http").fetch_stock_kline,
-                        symbol,
-                        start_date,
-                        end_date,
-                        adjust,
-                        require_turnover,
-                        semaphore=tdx_semaphore,
-                        aggregate_period=period,
-                        require_turnover=require_turnover,
-                    ),
-                    on_error=f"TDX HTTP 日线聚合复权{period_label}K线不可用: code={symbol}",
-                    max_attempts=1,
-                )
+        attempts.append(
+            ProviderAttempt(
+                label=f"TDX 日线聚合复权{period_label}K线",
+                loader=lambda: _load_historical_source(
+                    "tdxhub-daily-aggregate",
+                    symbol,
+                    period,
+                    start_date,
+                    end_date,
+                    get_provider("tdxhub").fetch_stock_kline,
+                    symbol,
+                    start_date,
+                    end_date,
+                    adjust,
+                    require_turnover,
+                    semaphore=tdx_semaphore,
+                    aggregate_period=period,
+                    require_turnover=require_turnover,
+                ),
+                on_error=f"TDX 日线聚合复权{period_label}K线不可用: code={symbol}",
+                max_attempts=1,
             )
+        )
         attempts.extend([
             ProviderAttempt(
                 label=f"腾讯财经日线聚合复权{period_label}K线",

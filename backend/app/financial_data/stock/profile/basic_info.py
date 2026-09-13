@@ -9,7 +9,6 @@ from typing import Any, cast
 
 import pandas as pd
 
-from app.configuration import get_settings
 from app.configuration.paths import DATA_DIR
 from app.core.cache import dated_cache_key
 from app.core.cache import reference_cache as cache
@@ -36,8 +35,8 @@ from app.financial_data.stock.profile.name_map import StockNameMapSnapshot, get_
 from app.financial_data.stock.profile.schemas import StockBasicInfo
 from app.financial_data.stock.profile.sources import (
     EASTMONEY_STOCK_PROFILE,
-    TDX_HTTP_FINANCE,
-    TDX_HTTP_STOCK_QUOTE,
+    TDXHUB_FINANCE,
+    TDXHUB_STOCK_QUOTE,
     TENCENT_STOCK_CONCEPTS,
     TENCENT_STOCK_QUOTE,
     BasicDataSourceSpec,
@@ -154,19 +153,17 @@ def _get_tencent_provider():
     return get_provider("tencent")
 
 
-def _get_tdx_http_provider():
-    """Lazily resolve the TDX HTTP provider singleton."""
-    return get_provider("tdx_http")
+def _get_tdxhub_provider():
+    """Lazily resolve the TDX provider singleton."""
+    return get_provider("tdxhub")
 
 
-async def _fetch_optional_tdx_http(
+async def _fetch_optional_tdxhub(
     source: BasicDataSourceSpec,
     method_name: str,
     code: str,
 ) -> dict[str, Any]:
-    if not get_settings().tdx_http_enabled:
-        return {}
-    fetcher = getattr(_get_tdx_http_provider(), method_name)
+    fetcher = getattr(_get_tdxhub_provider(), method_name)
     return cast(
         dict[str, Any],
         await _fetch_provider_blocking(
@@ -255,14 +252,12 @@ async def get_stock_concept_map(codes: list[str]) -> dict[str, list[StockConcept
 
 
 async def _fetch_cached_tdx_finance(code: str) -> dict[str, Any]:
-    if not get_settings().tdx_http_enabled:
-        return {}
-    cache_key = dated_cache_key("tdx_http_finance", code)
+    cache_key = dated_cache_key("tdxhub_finance", code)
     cached = cache.get(cache_key)
     if isinstance(cached, dict):
         return cast(dict[str, Any], cached)
-    result = await _fetch_optional_tdx_http(
-        TDX_HTTP_FINANCE,
+    result = await _fetch_optional_tdxhub(
+        TDXHUB_FINANCE,
         "fetch_finance_info",
         code,
     )
@@ -512,8 +507,8 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
             timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS,
         ),
         asyncio.wait_for(
-            _fetch_optional_tdx_http(
-                TDX_HTTP_STOCK_QUOTE,
+            _fetch_optional_tdxhub(
+                TDXHUB_STOCK_QUOTE,
                 "fetch_stock_quote",
                 sym.raw,
             ),
@@ -535,9 +530,9 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
     if isinstance(quote_result, Exception):
         logger.info("腾讯实时行情不可用: code=%s, error=%s", sym.raw, quote_result)
     if isinstance(tdx_quote_result, Exception):
-        logger.info("TDX HTTP 实时行情不可用: code=%s, error=%s", sym.raw, tdx_quote_result)
+        logger.info("TDX 实时行情不可用: code=%s, error=%s", sym.raw, tdx_quote_result)
     if isinstance(tdx_finance_result, Exception):
-        logger.info("TDX HTTP 财务信息不可用: code=%s, error=%s", sym.raw, tdx_finance_result)
+        logger.info("TDX 财务信息不可用: code=%s, error=%s", sym.raw, tdx_finance_result)
 
     spot_df = spot_result if isinstance(spot_result, pd.DataFrame) else None
     exchange_data = exchange_result if isinstance(exchange_result, ExchangeBasicData) else None
@@ -547,8 +542,8 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
     concepts_available = isinstance(concept_result, StockConceptInfo)
     stock_concepts = concept_result if concepts_available else _EMPTY_STOCK_CONCEPT
     tencent_quote = quote_result if isinstance(quote_result, dict) else {}
-    tdx_http_quote = tdx_quote_result if isinstance(tdx_quote_result, dict) else {}
-    tdx_http_finance = tdx_finance_result if isinstance(tdx_finance_result, dict) else {}
+    tdx_quote = tdx_quote_result if isinstance(tdx_quote_result, dict) else {}
+    tdx_finance = tdx_finance_result if isinstance(tdx_finance_result, dict) else {}
     sw_industry_record = sw_ind_result if isinstance(sw_ind_result, dict) else None
     stock_concept_record = stock_cnp_result if isinstance(stock_cnp_result, dict) else None
 
@@ -563,8 +558,8 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
         stock_concepts=stock_concepts,
         concepts_available=concepts_available,
         tencent_quote=tencent_quote,
-        tdx_http_quote=tdx_http_quote,
-        tdx_http_finance=tdx_http_finance,
+        tdx_quote=tdx_quote,
+        tdx_finance=tdx_finance,
         sw_industry_record=sw_industry_record,
         stock_concept_record=stock_concept_record,
     )
