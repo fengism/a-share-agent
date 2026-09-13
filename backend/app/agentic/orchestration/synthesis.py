@@ -13,6 +13,7 @@ from app.agentic.runtime.llm import stream_chat_completion
 from app.core.errors import build_internal_error, log_internal_error
 from app.core.metrics import metrics
 from app.infrastructure.llm.adapters import LLMRetryableError
+from app.infrastructure.llm.runtime import describe_llm_account_error
 
 logger = logging.getLogger(__name__)
 _PARTIAL_SOURCE_WARNING = "部分专业分析未完整完成，综合结论可能受限"
@@ -149,12 +150,17 @@ async def stream_synthesis(
                     type(exc).__name__,
                 )
             else:
-                _, detail = log_internal_error(
+                error_id, detail = log_internal_error(
                     logger,
                     "Agentic synthesis",
                     exc,
                     "综合分析生成失败",
                 )
+                # 账号/配置类错误（Key 无效、余额不足等）透出真实原因，
+                # 完整异常仍保留在日志供错误编号关联。
+                user_reason = describe_llm_account_error(exc)
+                if user_reason is not None:
+                    detail = f"{user_reason}（错误编号：{error_id}）"
             metrics.record_agentic_event("synthesis_fallback")
             warnings.append(_SYNTHESIS_FALLBACK_WARNING)
             yield AgentEvent(type="text", content=f"\n{detail}\n")

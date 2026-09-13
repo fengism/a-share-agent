@@ -43,7 +43,7 @@ from app.core.errors import build_internal_error, log_internal_error
 from app.core.exceptions import UpstreamUnavailableError
 from app.core.metrics import metrics
 from app.infrastructure.llm.adapters import LLMRetryableError
-from app.infrastructure.llm.runtime import is_llm_connection_error
+from app.infrastructure.llm.runtime import describe_llm_account_error, is_llm_connection_error
 
 logger = logging.getLogger(__name__)
 _OUTPUT_TRUNCATED_WARNING = "模型输出达到长度上限，回答可能不完整"
@@ -63,6 +63,11 @@ def _log_agent_llm_error(operation: str, exc: Exception, public_message: str) ->
         )
         return error_id, detail
     error_id, detail = log_internal_error(logger, operation, exc, public_message)
+    # 账号/配置类错误（Key 无效、余额不足等）由用户自行配置的模型账号引起，
+    # 可自行解决，透出真实原因而非脱敏提示；完整异常仍保留在日志供关联。
+    user_reason = describe_llm_account_error(exc)
+    if user_reason is not None:
+        return error_id, f"{user_reason}（错误编号：{error_id}）"
     return str(error_id), str(detail)
 
 

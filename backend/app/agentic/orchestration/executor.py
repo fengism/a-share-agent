@@ -16,6 +16,7 @@ from app.agentic.protocol import AgentMessage
 from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.tools.cache import SharedToolCache
 from app.core.errors import log_internal_error
+from app.core.exceptions import UpstreamUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,22 @@ async def stream_execution_plan(
             )
         except asyncio.CancelledError:
             raise
+        except UpstreamUnavailableError as exc:
+            # Agent 层抛出的上游不可用已记完整日志并携带面向用户的文案
+            # （如 LLM 连接失败），直接透传，避免二次脱敏掩盖真实原因。
+            logger.warning(
+                "Agentic task %s 上游不可用: %s",
+                task.agent_name,
+                exc,
+            )
+            detail = str(exc)
+            result = AgentExecutionResult(
+                agent_name=task.agent_name,
+                display_name=task.display_name,
+                analysis=detail,
+                status="failed",
+                errors=[detail],
+            )
         except Exception as exc:
             _, detail = log_internal_error(
                 logger,
