@@ -577,6 +577,7 @@ class AgentExecutor:
             if event_queue is not None:
                 await event_queue.put(delta)
 
+        forced_tool_round = False
         for round_num in range(profile.max_rounds):
             metrics.record_agentic_event("agent_round")
             tool_definitions = state.tool_definitions
@@ -589,7 +590,8 @@ class AgentExecutor:
                     state.warnings.append(_TOOL_BUDGET_WARNING)
             tool_choice = (
                 "required"
-                if round_num == 0 and tool_definitions and require_tool_first_round
+                if tool_definitions
+                and (forced_tool_round or (round_num == 0 and require_tool_first_round))
                 else "auto"
                 if tool_definitions
                 else "none"
@@ -636,6 +638,16 @@ class AgentExecutor:
                     allowed_names=state.effective_tool_names,
                 )
             if not tool_calls:
+                if (
+                    tool_definitions
+                    and require_tool_evidence
+                    and not any(result.has_evidence for result in state.tool_results)
+                    and not forced_tool_round
+                ):
+                    # 部分模型在 auto 模式下只叙述"正在调用工具"而不真正发起
+                    # tool_calls；补一轮强制要求调用工具，仍失败才按无证据处理。
+                    forced_tool_round = True
+                    continue
                 if require_tool_evidence and not any(
                     result.has_evidence for result in state.tool_results
                 ):
