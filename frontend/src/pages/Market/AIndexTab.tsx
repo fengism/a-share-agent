@@ -130,12 +130,13 @@ export default function AIndexTab() {
                             color: getChangeColor(idx.change_pct, c),
                             fontSize: t.font["3xl"],
                             fontWeight: Number(t.weight.bold),
+                            fontFamily: "var(--c-font-mono)",
                           },
                         }}
                       />
                       <div style={{ marginTop: t.space[2], display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <ChangeValue value={idx.change_pct} showIcon />
-                        <Text type="secondary" style={{ fontSize: t.font.sm, fontFamily: "monospace" }}>{idx.code}</Text>
+                        <Text type="secondary" style={{ fontSize: t.font.sm, fontFamily: "var(--c-font-mono)" }}>{idx.code}</Text>
                       </div>
                       <div style={{ marginTop: t.space[2], display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <Text type="secondary" style={{ fontSize: t.font.sm }}>成交额 {formatAmount(idx.amount)}</Text>

@@ -4,8 +4,6 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator, Collection
 
-from openai import AsyncOpenAI
-
 from app.agentic.agents.catalog import select_agent_profiles
 from app.agentic.agents.contracts import AgentExecutionResult
 from app.agentic.bootstrap import register_all_capabilities
@@ -29,6 +27,7 @@ from app.agentic.tools.packs.stock.context import resolve_stock_context
 from app.configuration import get_effective_settings
 from app.core.metrics import metrics
 from app.infrastructure.llm.runtime import borrow_async_openai_chat_runtime
+from app.infrastructure.llm.tool_calling import AsyncLLMClient
 from app.modules.chat.general_agent import stream_general_agent
 from app.modules.chat.prompts import (
     DECISION_SYNTHESIS_PROMPT,
@@ -128,7 +127,7 @@ class Orchestrator:
         self,
         message: str,
         decision: RoutingDecision,
-        llm_client: AsyncOpenAI,
+        llm_client: AsyncLLMClient,
         model: str,
     ) -> RoutingDecision:
         if not decision.needs_llm_classification:
@@ -150,7 +149,7 @@ class Orchestrator:
         message: str,
         history: list[AgentMessage] | None,
         decision: RoutingDecision,
-        llm_client: AsyncOpenAI,
+        llm_client: AsyncLLMClient,
         model: str,
         temperature: float,
         stock_context: str = "",
@@ -283,13 +282,13 @@ class Orchestrator:
     def _keyword_classify(self, message: str) -> RoutingDecision:
         return classify_message(message, self.sub_agents)
 
-    async def _llm_classify(self, message: str, llm_client: AsyncOpenAI, model: str) -> RoutingDecision:
+    async def _llm_classify(self, message: str, llm_client: AsyncLLMClient, model: str) -> RoutingDecision:
         return await classify_with_llm(message, llm_client, model, self.sub_agents)
 
     async def _run_sub_agents_streaming(
         self, plan: ExecutionPlan, message: str,
         history: list[AgentMessage] | None,
-        llm_client: AsyncOpenAI, model: str,
+        llm_client: AsyncLLMClient, model: str,
         results: dict[str, AgentExecutionResult],
         temperature: float = 0.1,
         *,
@@ -312,7 +311,7 @@ class Orchestrator:
     async def _run_plan_with_review(
         self, plan: ExecutionPlan, message: str,
         history: list[AgentMessage] | None,
-        llm_client: AsyncOpenAI, model: str,
+        llm_client: AsyncLLMClient, model: str,
         results: dict[str, AgentExecutionResult],
         temperature: float = 0.1,
     ) -> AsyncGenerator[AgentEvent, None]:
@@ -378,7 +377,7 @@ class Orchestrator:
                     )
 
     async def _synthesize(self, message: str, results: dict[str, AgentExecutionResult],
-                          llm_client: AsyncOpenAI, model: str,
+                          llm_client: AsyncLLMClient, model: str,
                           temperature: float = 0.1) -> AsyncGenerator[AgentEvent, None]:
         async for event in stream_synthesis(
             message,

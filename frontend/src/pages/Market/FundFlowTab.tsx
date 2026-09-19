@@ -53,7 +53,7 @@ export default function FundFlowTab() {
                 <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${p.color};"></span>
                 <span>${p.seriesName}</span>
               </span>
-              <span style="font-weight: 600; font-family: monospace; color: ${valColor};">${val}</span>
+              <span style="font-weight: 600; font-family: var(--c-font-mono); color: ${valColor};">${val}</span>
             </div>`;
           });
           return header + rows.join("");

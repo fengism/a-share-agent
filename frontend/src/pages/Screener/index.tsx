@@ -568,7 +568,6 @@ export default function Screener() {
             isAnalyzing={batch.isBatchAnalyzing}
             analysisProgress={batch.analysisProgress}
             onAddWatchlist={() => void batch.handleAddSelectedToWatchlist()}
-            onCompare={() => navigate(`/compare?codes=${encodeURIComponent(batch.selectedCodes.join(","))}`)}
             onAnalyze={() => void batch.handleBatchAnalyze()}
             onBacktest={() => navigate(`/quant?codes=${encodeURIComponent(batch.selectedCodes.join(","))}`)}
             onClear={batch.clearSelection}

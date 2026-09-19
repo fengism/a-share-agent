@@ -5,6 +5,7 @@ import { useAuthStore } from "../store/authStore";
 import { useColors, useTokens } from "../styles/ui";
 import { themes } from "../theme/themes";
 import DeferredAppHeaderSearch from "./DeferredAppHeaderSearch";
+import HeaderMarketTicker from "./HeaderMarketTicker";
 import ThemeSelector from "./ThemeSelector";
 import AppUserMenu from "./AppUserMenu";
 import GlobalTaskIndicator from "./GlobalTaskIndicator";
@@ -49,6 +50,7 @@ export default function AppHeader({ isMobile, themeKey, onMobileNavOpen }: AppHe
           <MenuOutlined style={{ fontSize: 18 }} />
         </button>
       )}
+      {!isMobile && <HeaderMarketTicker />}
       <div className="app-command-header__search">
         <DeferredAppHeaderSearch isMobile={isMobile} />
       </div>

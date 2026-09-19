@@ -1,3 +1,5 @@
+import asyncio
+
 import app.modules.portfolio.accounting as portfolio_accounting
 import app.modules.portfolio.builder as portfolio_builder
 from app.core.concurrency.rate_limiter import (
@@ -6,13 +8,15 @@ from app.core.concurrency.rate_limiter import (
 )
 from app.financial_data.stock.public import get_stock_name_map
 from app.infrastructure.persistence import portfolio as portfolio_store
+from app.modules.industry_classification.public import get_records_by_stock_codes
 from app.modules.portfolio.accounting import (
     InsufficientSharesError,
     LedgerReplay,
     replay_transactions,
 )
-from app.modules.portfolio.quotes import fetch_quotes
+from app.modules.portfolio.quotes import fetch_quote_batch, fetch_quotes
 from app.modules.portfolio.schemas import (
+    PortfolioResponse,
     PortfolioTransaction,
     PortfolioTransactionCreate,
     PortfolioTransactionPreview,
@@ -25,6 +29,35 @@ class PortfolioTransactionNotFoundError(LookupError):
 
 class UnknownPortfolioStockError(ValueError):
     pass
+
+
+async def _build_projected_portfolio(
+    rows: list[dict],
+    candidate: dict,
+) -> tuple[PortfolioResponse, str | None]:
+    projected_replay = replay_transactions([*rows, candidate])
+    quote_stock_codes = list(dict.fromkeys(lot.stock_code for lot in projected_replay.open_lots))
+    industry_stock_codes = list(quote_stock_codes)
+    target_stock_code = str(candidate["stock_code"])
+    if target_stock_code not in industry_stock_codes:
+        industry_stock_codes.append(target_stock_code)
+    quote_batch, settings, industries = await asyncio.gather(
+        fetch_quote_batch(quote_stock_codes),
+        call_blocking(portfolio_store.get_account_settings, int(candidate["user_id"]), semaphore=database_semaphore),
+        call_blocking(get_records_by_stock_codes, industry_stock_codes, semaphore=database_semaphore),
+    )
+    target_industry = industries.get(target_stock_code) or industries.get(target_stock_code.split(".", 1)[0]) or {}
+    target_sector_name = str(target_industry.get("sw_level1_name") or "").strip() or None
+    portfolio = portfolio_builder.build_portfolio(
+        projected_replay,
+        quote_batch.quotes,
+        quoted_at=quote_batch.quoted_at,
+        quote_source=quote_batch.source,
+        quote_stale=quote_batch.stale,
+        settings=settings,
+        industries=industries,
+    )
+    return portfolio, target_sector_name
 
 
 async def _resolve_stock(request: PortfolioTransactionCreate, user_id: int) -> tuple[str, dict] | None:
@@ -117,28 +150,31 @@ async def preview_transaction(
     rows = await call_blocking(
         portfolio_store.list_transactions,
         user_id,
-        stock_code=request.stock_code,
         semaphore=database_semaphore,
     )
     candidate_id = max((int(row["id"]) for row in rows), default=0) + 1
     trade_time = request.trade_time.isoformat(timespec="seconds")
-    preview = portfolio_accounting.preview_transaction(
-        rows,
-        {
-            "id": candidate_id,
-            "user_id": user_id,
-            "stock_code": request.stock_code,
-            "stock_name": stock_name,
-            "side": request.side,
-            "trade_price": request.trade_price,
-            "trade_time": trade_time,
-            "shares": request.shares,
-            "fee": request.fee,
-            "note": request.note,
-            "created_at": trade_time,
-        },
+    candidate = {
+        "id": candidate_id,
+        "user_id": user_id,
+        "stock_code": request.stock_code,
+        "stock_name": stock_name,
+        "side": request.side,
+        "trade_price": request.trade_price,
+        "trade_time": trade_time,
+        "shares": request.shares,
+        "fee": request.fee,
+        "note": request.note,
+        "created_at": trade_time,
+    }
+    preview = portfolio_accounting.preview_transaction(rows, candidate)
+    projected, target_sector_name = await _build_projected_portfolio(rows, candidate)
+    return portfolio_builder.preview_from_replay(
+        request,
+        preview,
+        projected,
+        target_sector_name=target_sector_name,
     )
-    return portfolio_builder.preview_from_replay(request, preview)
 
 
 async def preview_transaction_update(
@@ -159,40 +195,34 @@ async def preview_transaction_update(
         raise UnknownPortfolioStockError(request.stock_code)
     stock_name, _ = resolved
 
-    previous_stock_code = str(existing["stock_code"])
-    if previous_stock_code != request.stock_code:
-        previous_rows = await call_blocking(
-            portfolio_store.list_transactions,
-            user_id,
-            stock_code=previous_stock_code,
-            semaphore=database_semaphore,
-        )
-        replay_transactions([row for row in previous_rows if int(row["id"]) != transaction_id])
-
     rows = await call_blocking(
         portfolio_store.list_transactions,
         user_id,
-        stock_code=request.stock_code,
         semaphore=database_semaphore,
     )
+    rows_without_existing = [row for row in rows if int(row["id"]) != transaction_id]
     trade_time = request.trade_time.isoformat(timespec="seconds")
-    preview = portfolio_accounting.preview_transaction(
-        [row for row in rows if int(row["id"]) != transaction_id],
-        {
-            "id": transaction_id,
-            "user_id": user_id,
-            "stock_code": request.stock_code,
-            "stock_name": stock_name,
-            "side": request.side,
-            "trade_price": request.trade_price,
-            "trade_time": trade_time,
-            "shares": request.shares,
-            "fee": request.fee,
-            "note": request.note,
-            "created_at": str(existing.get("created_at") or trade_time),
-        },
+    candidate = {
+        "id": transaction_id,
+        "user_id": user_id,
+        "stock_code": request.stock_code,
+        "stock_name": stock_name,
+        "side": request.side,
+        "trade_price": request.trade_price,
+        "trade_time": trade_time,
+        "shares": request.shares,
+        "fee": request.fee,
+        "note": request.note,
+        "created_at": str(existing.get("created_at") or trade_time),
+    }
+    preview = portfolio_accounting.preview_transaction(rows_without_existing, candidate)
+    projected, target_sector_name = await _build_projected_portfolio(rows_without_existing, candidate)
+    return portfolio_builder.preview_from_replay(
+        request,
+        preview,
+        projected,
+        target_sector_name=target_sector_name,
     )
-    return portfolio_builder.preview_from_replay(request, preview)
 
 
 def _persist_transaction_update(

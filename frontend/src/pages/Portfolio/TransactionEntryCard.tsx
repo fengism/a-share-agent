@@ -129,7 +129,7 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
       return;
     }
     const transaction = buildTransaction(values);
-    if (!transaction || transaction.side !== "sell") return;
+    if (!transaction) return;
     previewMutation.reset();
     try {
       await previewMutation.mutateAsync(transaction);
@@ -290,24 +290,22 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
           <Col xs={24} sm={8} md={5}>
             <Form.Item label={isMobile ? undefined : " "}>
               <Space.Compact block>
-                {side === "sell" ? (
-                  <Button
-                    icon={<EyeOutlined />}
-                    loading={previewMutation.isPending}
-                    disabled={!stocks.length}
-                    onClick={handlePreview}
-                    style={{ width: "50%" }}
-                  >
-                    预演卖出
-                  </Button>
-                ) : null}
+                <Button
+                  icon={<EyeOutlined />}
+                  loading={previewMutation.isPending}
+                  disabled={side === "sell" && !stocks.length}
+                  onClick={handlePreview}
+                  style={{ width: "50%" }}
+                >
+                  预演{side === "buy" ? "买入" : "卖出"}
+                </Button>
                 <Button
                   type="primary"
                   htmlType="submit"
                   icon={<SwapOutlined />}
                   loading={createMutation.isPending}
                   disabled={side === "sell" && !stocks.length}
-                  style={{ width: side === "sell" ? "50%" : "100%" }}
+                  style={{ width: "50%" }}
                 >
                   记录{side === "buy" ? "买入" : "卖出"}
                 </Button>
@@ -315,9 +313,12 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
             </Form.Item>
           </Col>
         </Row>
-        {side === "sell" && previewMutation.data ? (
+        {previewMutation.data ? (
           <div style={{ marginBottom: 16 }}>
-            <TransactionPreviewAlert preview={previewMutation.data} title="卖出预演结果" />
+            <TransactionPreviewAlert
+              preview={previewMutation.data}
+              title={`${previewMutation.data.side === "buy" ? "买入" : "卖出"}预演结果`}
+            />
           </div>
         ) : null}
       </Form>

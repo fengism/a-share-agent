@@ -1,8 +1,10 @@
 import { Alert, Card, Col, Row, Statistic, Typography } from "antd";
 import {
+  BankOutlined,
   CheckCircleOutlined,
   FundOutlined,
   LineChartOutlined,
+  PieChartOutlined,
   RiseOutlined,
   StockOutlined,
   WalletOutlined,
@@ -24,12 +26,24 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
 
   return (
     <>
+      {!summary.cash_configured ? (
+        <Alert
+          type="info"
+          showIcon
+          title="尚未配置初始资金"
+          description="配置后可计算现金余额、总资产和真实仓位；当前仍按证券持仓内部市值展示集中度。"
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
+
       {summary.unpriced_count > 0 ? (
         <Alert
           type="warning"
           showIcon
           title={`${summary.unpriced_count} 只股票暂未获取到行情`}
-          description="最新市值和浮动盈亏仅汇总已成功定价的持仓。"
+          description={summary.cash_configured
+            ? "最新市值和浮动盈亏仅汇总已定价持仓；总资产与仓位已按未定价持仓的剩余成本估算。"
+            : "最新市值和浮动盈亏仅汇总已成功定价的持仓。"}
           style={{ marginBottom: 16 }}
         />
       ) : null}
@@ -42,12 +56,87 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
               ...cardStyle,
               position: "relative",
               overflow: "hidden",
+              borderLeft: "3px solid var(--c-primary)",
+            }}
+            className="u-card-interactive"
+          >
+            <Statistic
+              title={<span><BankOutlined style={{ marginRight: 6 }} />总资产</span>}
+              value={summary.total_asset_value ?? "-"}
+              precision={2}
+              prefix={summary.total_asset_value == null ? undefined : "¥"}
+              styles={{ content: { fontFamily: "var(--c-font-mono)", fontWeight: 700 } }}
+            />
+            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+              证券估值 {formatMoney(summary.estimated_securities_value)}
+            </Text>
+          </Card>
+        </Col>
+        <Col xs={12} lg={8} xl={4}>
+          <Card
+            size="small"
+            style={{
+              ...cardStyle,
+              position: "relative",
+              overflow: "hidden",
+              borderLeft: `3px solid ${changeColor(summary.cash_balance, colors)}`,
+            }}
+            className="u-card-interactive"
+          >
+            <Statistic
+              title={<span><WalletOutlined style={{ marginRight: 6 }} />现金余额</span>}
+              value={summary.cash_balance ?? "-"}
+              precision={2}
+              prefix={summary.cash_balance == null ? undefined : "¥"}
+              styles={{
+                content: {
+                  fontFamily: "var(--c-font-mono)",
+                  fontWeight: 700,
+                  color: changeColor(summary.cash_balance, colors),
+                },
+              }}
+            />
+            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+              初始资金 {formatMoney(summary.initial_cash)}
+            </Text>
+          </Card>
+        </Col>
+        <Col xs={12} lg={8} xl={4}>
+          <Card
+            size="small"
+            style={{
+              ...cardStyle,
+              position: "relative",
+              overflow: "hidden",
+              borderLeft: "3px solid #722ed1",
+            }}
+            className="u-card-interactive"
+          >
+            <Statistic
+              title={<span><PieChartOutlined style={{ marginRight: 6 }} />总仓位</span>}
+              value={summary.total_position_pct ?? "-"}
+              precision={2}
+              suffix={summary.total_position_pct == null ? undefined : "%"}
+              styles={{ content: { fontFamily: "var(--c-font-mono)", fontWeight: 700 } }}
+            />
+            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+              按总资产口径计算
+            </Text>
+          </Card>
+        </Col>
+        <Col xs={12} lg={8} xl={4}>
+          <Card
+            size="small"
+            style={{
+              ...cardStyle,
+              position: "relative",
+              overflow: "hidden",
               borderLeft: `3px solid var(--c-primary)`,
             }}
             className="u-card-interactive"
           >
             <Statistic
-              title={<span><WalletOutlined style={{ marginRight: 6 }} />最新市值</span>}
+              title={<span><StockOutlined style={{ marginRight: 6 }} />最新市值</span>}
               value={summary.total_market_value}
               precision={2}
               prefix="¥"

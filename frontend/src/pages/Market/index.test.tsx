@@ -59,6 +59,7 @@ describe("Market", () => {
     expect(navigation).toHaveTextContent("涨停板");
     expect(navigation).toHaveTextContent("北向资金");
     expect(navigation).toHaveTextContent("融资融券");
+    expect(navigation).toHaveTextContent("市场宽度");
     expect(navigation).toHaveTextContent("板块涨跌幅");
     expect(navigation).not.toHaveTextContent("交易日历");
     expect(navigation).toHaveTextContent("龙虎榜");
@@ -93,6 +94,7 @@ describe("Market", () => {
     expect(navigation).toHaveTextContent("A股大盘");
     expect(navigation).toHaveTextContent("市场情绪");
     expect(navigation).toHaveTextContent("融资融券");
+    expect(navigation).toHaveTextContent("市场宽度");
     expect(navigation).not.toHaveTextContent("交易日历");
   });
 
@@ -121,6 +123,7 @@ describe("Market", () => {
     expect(navigation).toHaveTextContent("涨停板");
     expect(navigation).toHaveTextContent("北向资金");
     expect(navigation).toHaveTextContent("板块涨跌幅");
+    expect(navigation).toHaveTextContent("市场宽度");
     expect(navigation).toHaveTextContent("龙虎榜");
     expect(navigation).toHaveTextContent("交易所异动");
   });

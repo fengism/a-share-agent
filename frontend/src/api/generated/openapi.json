@@ -2745,6 +2745,10 @@
             "title": "Feishu Wiki Space Id",
             "type": "string"
           },
+          "fred_api_key": {
+            "title": "Fred Api Key",
+            "type": "string"
+          },
           "http_trust_env": {
             "title": "Http Trust Env",
             "type": "boolean"
@@ -2866,6 +2870,7 @@
           "provider_defaults",
           "twitter_feeds",
           "eastmoney_cookie",
+          "fred_api_key",
           "baidu_cookie",
           "ths_cookie",
           "legulegu_token",
@@ -3391,6 +3396,17 @@
             ],
             "title": "Feishu Wiki Space Id"
           },
+          "fred_api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fred Api Key"
+          },
           "http_trust_env": {
             "anyOf": [
               {
@@ -3618,6 +3634,156 @@
           }
         },
         "title": "CreateInviteRequest",
+        "type": "object"
+      },
+      "CrudeOilData": {
+        "properties": {
+          "brent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CrudeOilQuote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/CrudeOilHistoryPoint"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "sc0": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CrudeOilQuote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "wti": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CrudeOilQuote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "CrudeOilData",
+        "type": "object"
+      },
+      "CrudeOilHistoryPoint": {
+        "properties": {
+          "brent_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brent Close"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "sc_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sc Close"
+          },
+          "wti_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wti Close"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "title": "CrudeOilHistoryPoint",
+        "type": "object"
+      },
+      "CrudeOilQuote": {
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "date": {
+            "default": "",
+            "title": "Date",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "unit": {
+            "default": "",
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "name"
+        ],
+        "title": "CrudeOilQuote",
         "type": "object"
       },
       "CustomsCommodityProfile": {
@@ -5368,6 +5534,16 @@
           "central_bank_policy_rates": {
             "$ref": "#/components/schemas/CentralBankPolicyRates"
           },
+          "crude_oil": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CrudeOilData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "dollar_and_fx": {
             "$ref": "#/components/schemas/DollarAndFx"
           },
@@ -6418,6 +6594,160 @@
         "title": "IndexSnapshotItem",
         "type": "object"
       },
+      "IndustryChainAnalysisMetadata": {
+        "properties": {
+          "agent_evidence_count": {
+            "default": 0,
+            "title": "Agent Evidence Count",
+            "type": "integer"
+          },
+          "archive_duration_ms": {
+            "default": 0,
+            "title": "Archive Duration Ms",
+            "type": "integer"
+          },
+          "cache_hits": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cache Hits",
+            "type": "array"
+          },
+          "cache_misses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cache Misses",
+            "type": "array"
+          },
+          "failed_dimensions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed Dimensions",
+            "type": "array"
+          },
+          "public_item_count": {
+            "default": 0,
+            "title": "Public Item Count",
+            "type": "integer"
+          },
+          "research_duration_ms": {
+            "default": 0,
+            "title": "Research Duration Ms",
+            "type": "integer"
+          },
+          "successful_dimensions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Successful Dimensions",
+            "type": "array"
+          },
+          "synthesis_duration_ms": {
+            "default": 0,
+            "title": "Synthesis Duration Ms",
+            "type": "integer"
+          },
+          "total_duration_ms": {
+            "default": 0,
+            "title": "Total Duration Ms",
+            "type": "integer"
+          }
+        },
+        "title": "IndustryChainAnalysisMetadata",
+        "type": "object"
+      },
+      "IndustryChainChangeItem": {
+        "properties": {
+          "after": {
+            "default": "",
+            "title": "After",
+            "type": "string"
+          },
+          "before": {
+            "default": "",
+            "title": "Before",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "chain",
+              "company",
+              "market",
+              "event",
+              "driver",
+              "risk",
+              "summary"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "change_type": {
+            "enum": [
+              "added",
+              "removed",
+              "updated"
+            ],
+            "title": "Change Type",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "change_type",
+          "title"
+        ],
+        "title": "IndustryChainChangeItem",
+        "type": "object"
+      },
+      "IndustryChainChangeSet": {
+        "properties": {
+          "added_count": {
+            "default": 0,
+            "title": "Added Count",
+            "type": "integer"
+          },
+          "has_changes": {
+            "default": false,
+            "title": "Has Changes",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainChangeItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "previous_archive_id": {
+            "default": "",
+            "title": "Previous Archive Id",
+            "type": "string"
+          },
+          "removed_count": {
+            "default": 0,
+            "title": "Removed Count",
+            "type": "integer"
+          },
+          "updated_count": {
+            "default": 0,
+            "title": "Updated Count",
+            "type": "integer"
+          }
+        },
+        "title": "IndustryChainChangeSet",
+        "type": "object"
+      },
       "IndustryChainChart": {
         "properties": {
           "description": {
@@ -7023,6 +7353,76 @@
         "title": "IndustryChainNode",
         "type": "object"
       },
+      "IndustryChainOpportunity": {
+        "properties": {
+          "catalyst_score": {
+            "default": 0,
+            "title": "Catalyst Score",
+            "type": "integer"
+          },
+          "code": {
+            "default": "",
+            "title": "Code",
+            "type": "string"
+          },
+          "earnings_score": {
+            "default": 0,
+            "title": "Earnings Score",
+            "type": "integer"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "evidence_score": {
+            "default": 0,
+            "title": "Evidence Score",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prosperity_score": {
+            "default": 0,
+            "title": "Prosperity Score",
+            "type": "integer"
+          },
+          "rationale": {
+            "default": "",
+            "title": "Rationale",
+            "type": "string"
+          },
+          "risk_score": {
+            "default": 0,
+            "title": "Risk Score",
+            "type": "integer"
+          },
+          "role": {
+            "default": "",
+            "title": "Role",
+            "type": "string"
+          },
+          "total_score": {
+            "default": 0,
+            "title": "Total Score",
+            "type": "integer"
+          },
+          "valuation_score": {
+            "default": 0,
+            "title": "Valuation Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "IndustryChainOpportunity",
+        "type": "object"
+      },
       "IndustryChainResearchScope": {
         "properties": {
           "as_of_date": {
@@ -7111,6 +7511,9 @@
             "title": "Aliases",
             "type": "array"
           },
+          "analysis_metadata": {
+            "$ref": "#/components/schemas/IndustryChainAnalysisMetadata"
+          },
           "archive_id": {
             "default": "",
             "title": "Archive Id",
@@ -7132,6 +7535,9 @@
             },
             "title": "Capital Moves",
             "type": "array"
+          },
+          "changes": {
+            "$ref": "#/components/schemas/IndustryChainChangeSet"
           },
           "charts": {
             "items": {
@@ -7233,6 +7639,13 @@
             "title": "Name",
             "type": "string"
           },
+          "opportunities": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainOpportunity"
+            },
+            "title": "Opportunities",
+            "type": "array"
+          },
           "positioning": {
             "default": "",
             "title": "Positioning",
@@ -7316,6 +7729,9 @@
             "title": "Technology Routes",
             "type": "array"
           },
+          "topic_resolution": {
+            "$ref": "#/components/schemas/IndustryChainTopicResolution"
+          },
           "trends": {
             "items": {
               "$ref": "#/components/schemas/IndustryChainInsight"
@@ -7374,6 +7790,48 @@
           "title"
         ],
         "title": "IndustryChainSource",
+        "type": "object"
+      },
+      "IndustryChainTopicResolution": {
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "boundary_note": {
+            "default": "",
+            "title": "Boundary Note",
+            "type": "string"
+          },
+          "matched_sectors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Matched Sectors",
+            "type": "array"
+          },
+          "normalized_name": {
+            "default": "",
+            "title": "Normalized Name",
+            "type": "string"
+          },
+          "possible_topics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Possible Topics",
+            "type": "array"
+          },
+          "requested_name": {
+            "default": "",
+            "title": "Requested Name",
+            "type": "string"
+          }
+        },
+        "title": "IndustryChainTopicResolution",
         "type": "object"
       },
       "IndustryHierarchyResponse": {
@@ -8793,6 +9251,111 @@
         "title": "ManagementAssessment",
         "type": "object"
       },
+      "MarketBreadthDailySummary": {
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "strong_industry_count": {
+            "default": 0,
+            "title": "Strong Industry Count",
+            "type": "integer"
+          },
+          "strong_ratio": {
+            "default": 0.0,
+            "title": "Strong Ratio",
+            "type": "number"
+          },
+          "total_industry_count": {
+            "default": 0,
+            "title": "Total Industry Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "title": "MarketBreadthDailySummary",
+        "type": "object"
+      },
+      "MarketBreadthResponse": {
+        "properties": {
+          "completed_market_date": {
+            "default": "",
+            "title": "Completed Market Date",
+            "type": "string"
+          },
+          "dates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dates",
+            "type": "array"
+          },
+          "fetched_at": {
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "industries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Industries",
+            "type": "array"
+          },
+          "source": {
+            "const": "本地计算",
+            "default": "本地计算",
+            "title": "Source",
+            "type": "string"
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "successful_stocks": {
+            "default": 0,
+            "title": "Successful Stocks",
+            "type": "integer"
+          },
+          "summaries": {
+            "items": {
+              "$ref": "#/components/schemas/MarketBreadthDailySummary"
+            },
+            "title": "Summaries",
+            "type": "array"
+          },
+          "total_stocks": {
+            "default": 0,
+            "title": "Total Stocks",
+            "type": "integer"
+          },
+          "values": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fetched_at"
+        ],
+        "title": "MarketBreadthResponse",
+        "type": "object"
+      },
       "MarketBreadthSnapshot": {
         "properties": {
           "date": {
@@ -10163,9 +10726,15 @@
       "MarketSectorStocksHistoryItem": {
         "properties": {
           "amount": {
-            "default": 0,
-            "title": "Amount",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
           },
           "buy_ratio": {
             "anyOf": [
@@ -10227,14 +10796,26 @@
             "type": "string"
           },
           "float_amount": {
-            "default": 0,
-            "title": "Float Amount",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Float Amount"
           },
           "limit_count": {
-            "default": 0,
-            "title": "Limit Count",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Count"
           },
           "limit_tag": {
             "default": "",
@@ -10242,19 +10823,37 @@
             "type": "string"
           },
           "main_buy": {
-            "default": 0,
-            "title": "Main Buy",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Buy"
           },
           "main_net": {
-            "default": 0,
-            "title": "Main Net",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Net"
           },
           "main_sell": {
-            "default": 0,
-            "title": "Main Sell",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Sell"
           },
           "name": {
             "title": "Name",
@@ -10281,6 +10880,28 @@
               }
             ],
             "title": "Price"
+          },
+          "quote_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Source"
+          },
+          "quoted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quoted At"
           },
           "rank_tag": {
             "default": "",
@@ -10335,6 +10956,10 @@
       },
       "MarketSectorStocksHistoryResponse": {
         "properties": {
+          "constituent_date": {
+            "title": "Constituent Date",
+            "type": "string"
+          },
           "date": {
             "title": "Date",
             "type": "string"
@@ -10342,6 +10967,16 @@
           "fetched_at": {
             "title": "Fetched At",
             "type": "string"
+          },
+          "history_details_available": {
+            "default": true,
+            "title": "History Details Available",
+            "type": "boolean"
+          },
+          "is_realtime": {
+            "default": false,
+            "title": "Is Realtime",
+            "type": "boolean"
           },
           "items": {
             "items": {
@@ -10353,6 +10988,33 @@
           "plate_id": {
             "title": "Plate Id",
             "type": "string"
+          },
+          "quote_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Source"
+          },
+          "quoted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quoted At"
+          },
+          "realtime_partial": {
+            "default": false,
+            "title": "Realtime Partial",
+            "type": "boolean"
           },
           "source": {
             "const": "开盘红",
@@ -10368,6 +11030,7 @@
         },
         "required": [
           "date",
+          "constituent_date",
           "plate_id",
           "fetched_at"
         ],
@@ -10744,6 +11407,624 @@
         "title": "MutationResponse",
         "type": "object"
       },
+      "NationalTeamEtfPoint": {
+        "properties": {
+          "close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "estimated_net_flow_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Net Flow 100M"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "shares_100m": {
+            "title": "Shares 100M",
+            "type": "number"
+          },
+          "shares_change_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Change 100M"
+          },
+          "shares_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Change Pct"
+          },
+          "source": {
+            "default": "unknown",
+            "title": "Source",
+            "type": "string"
+          },
+          "verification_status": {
+            "default": "unknown",
+            "title": "Verification Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "shares_100m"
+        ],
+        "title": "NationalTeamEtfPoint",
+        "type": "object"
+      },
+      "NationalTeamEtfSeries": {
+        "properties": {
+          "change_20d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change 20D 100M"
+          },
+          "change_5d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change 5D 100M"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "exchange": {
+            "enum": [
+              "SH",
+              "SZ"
+            ],
+            "title": "Exchange",
+            "type": "string"
+          },
+          "fund_manager": {
+            "title": "Fund Manager",
+            "type": "string"
+          },
+          "index_key": {
+            "title": "Index Key",
+            "type": "string"
+          },
+          "index_name": {
+            "title": "Index Name",
+            "type": "string"
+          },
+          "latest_change_1d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Change 1D 100M"
+          },
+          "latest_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Date"
+          },
+          "latest_shares_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Shares 100M"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamEtfPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "fund_manager",
+          "exchange",
+          "index_key",
+          "index_name"
+        ],
+        "title": "NationalTeamEtfSeries",
+        "type": "object"
+      },
+      "NationalTeamIndexPoint": {
+        "properties": {
+          "cumulative_change_100m": {
+            "default": 0,
+            "title": "Cumulative Change 100M",
+            "type": "number"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "estimated_net_flow_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Net Flow 100M"
+          },
+          "index_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Close"
+          },
+          "shares_change_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Change 100M"
+          },
+          "total_shares_100m": {
+            "title": "Total Shares 100M",
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "total_shares_100m"
+        ],
+        "title": "NationalTeamIndexPoint",
+        "type": "object"
+      },
+      "NationalTeamIndexSeries": {
+        "properties": {
+          "change_20d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change 20D 100M"
+          },
+          "change_5d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change 5D 100M"
+          },
+          "covered_etf_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Covered Etf Codes",
+            "type": "array"
+          },
+          "estimated_net_flow_1d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Net Flow 1D 100M"
+          },
+          "etf_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Etf Codes",
+            "type": "array"
+          },
+          "index_code": {
+            "title": "Index Code",
+            "type": "string"
+          },
+          "index_key": {
+            "title": "Index Key",
+            "type": "string"
+          },
+          "index_name": {
+            "title": "Index Name",
+            "type": "string"
+          },
+          "latest_change_1d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Change 1D 100M"
+          },
+          "latest_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Date"
+          },
+          "latest_total_shares_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Total Shares 100M"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamIndexPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          }
+        },
+        "required": [
+          "index_key",
+          "index_name",
+          "index_code"
+        ],
+        "title": "NationalTeamIndexSeries",
+        "type": "object"
+      },
+      "NationalTeamResponse": {
+        "properties": {
+          "as_of_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of Date"
+          },
+          "calendar_degraded": {
+            "default": false,
+            "title": "Calendar Degraded",
+            "type": "boolean"
+          },
+          "covered_etf_count": {
+            "default": 0,
+            "title": "Covered Etf Count",
+            "type": "integer"
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "etfs": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamEtfSeries"
+            },
+            "title": "Etfs",
+            "type": "array"
+          },
+          "expected_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Date"
+          },
+          "fetched_at": {
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "indices": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamIndexSeries"
+            },
+            "title": "Indices",
+            "type": "array"
+          },
+          "methodology": {
+            "title": "Methodology",
+            "type": "string"
+          },
+          "missing_etfs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Etfs",
+            "type": "array"
+          },
+          "missing_indices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Indices",
+            "type": "array"
+          },
+          "missing_price_etfs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Price Etfs",
+            "type": "array"
+          },
+          "missing_share_etfs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Share Etfs",
+            "type": "array"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/NationalTeamShareObservation"
+            },
+            "title": "Observations",
+            "type": "array"
+          },
+          "partial": {
+            "default": false,
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "refreshing": {
+            "default": false,
+            "title": "Refreshing",
+            "type": "boolean"
+          },
+          "requested_days": {
+            "title": "Requested Days",
+            "type": "integer"
+          },
+          "source": {
+            "default": "上交所/深交所/东方财富",
+            "title": "Source",
+            "type": "string"
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/NationalTeamSummary"
+          },
+          "total_etf_count": {
+            "default": 12,
+            "title": "Total Etf Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fetched_at",
+          "requested_days",
+          "methodology",
+          "disclaimer"
+        ],
+        "title": "NationalTeamResponse",
+        "type": "object"
+      },
+      "NationalTeamShareObservation": {
+        "properties": {
+          "business_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Date"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "fetched_at": {
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "shares_100m": {
+            "title": "Shares 100M",
+            "type": "number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "verification_status": {
+            "const": "provisional",
+            "default": "provisional",
+            "title": "Verification Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "source",
+          "shares_100m",
+          "fetched_at"
+        ],
+        "title": "NationalTeamShareObservation",
+        "type": "object"
+      },
+      "NationalTeamSummary": {
+        "properties": {
+          "change_1d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change 1D 100M"
+          },
+          "change_20d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change 20D 100M"
+          },
+          "change_5d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change 5D 100M"
+          },
+          "estimated_net_flow_1d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Net Flow 1D 100M"
+          },
+          "estimated_net_flow_20d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Net Flow 20D 100M"
+          },
+          "estimated_net_flow_5d_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Net Flow 5D 100M"
+          },
+          "total_shares_100m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Shares 100M"
+          }
+        },
+        "title": "NationalTeamSummary",
+        "type": "object"
+      },
       "NeedsSetupResponse": {
         "properties": {
           "needs_setup": {
@@ -11107,6 +12388,97 @@
         "title": "PeerMetricStats",
         "type": "object"
       },
+      "PortfolioAccountSettings": {
+        "properties": {
+          "initial_cash": {
+            "anyOf": [
+              {
+                "maximum": 1000000000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Cash"
+          },
+          "max_sector_pct": {
+            "default": 40,
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Max Sector Pct",
+            "type": "number"
+          },
+          "max_single_stock_pct": {
+            "default": 30,
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Max Single Stock Pct",
+            "type": "number"
+          },
+          "max_total_position_pct": {
+            "default": 80,
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Max Total Position Pct",
+            "type": "number"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "title": "PortfolioAccountSettings",
+        "type": "object"
+      },
+      "PortfolioAccountSettingsUpdate": {
+        "properties": {
+          "initial_cash": {
+            "anyOf": [
+              {
+                "maximum": 1000000000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Cash"
+          },
+          "max_sector_pct": {
+            "default": 40,
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Max Sector Pct",
+            "type": "number"
+          },
+          "max_single_stock_pct": {
+            "default": 30,
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Max Single Stock Pct",
+            "type": "number"
+          },
+          "max_total_position_pct": {
+            "default": 80,
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Max Total Position Pct",
+            "type": "number"
+          }
+        },
+        "title": "PortfolioAccountSettingsUpdate",
+        "type": "object"
+      },
       "PortfolioClosedPosition": {
         "properties": {
           "buy_count": {
@@ -11383,6 +12755,9 @@
           "risk": {
             "$ref": "#/components/schemas/PortfolioRiskSummary"
           },
+          "settings": {
+            "$ref": "#/components/schemas/PortfolioAccountSettings"
+          },
           "stocks": {
             "items": {
               "$ref": "#/components/schemas/PortfolioStockSummary"
@@ -11408,6 +12783,7 @@
           "closed_positions",
           "summary",
           "risk",
+          "settings",
           "quoted_at"
         ],
         "title": "PortfolioResponse",
@@ -11447,6 +12823,36 @@
             ],
             "title": "Largest Position Stock Name"
           },
+          "largest_sector_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largest Sector Name"
+          },
+          "largest_sector_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largest Sector Pct"
+          },
+          "max_sector_limit_pct": {
+            "title": "Max Sector Limit Pct",
+            "type": "number"
+          },
+          "max_single_stock_limit_pct": {
+            "title": "Max Single Stock Limit Pct",
+            "type": "number"
+          },
           "max_single_stock_pct": {
             "anyOf": [
               {
@@ -11458,9 +12864,20 @@
             ],
             "title": "Max Single Stock Pct"
           },
+          "max_total_position_limit_pct": {
+            "title": "Max Total Position Limit Pct",
+            "type": "number"
+          },
           "priced_stock_count": {
             "title": "Priced Stock Count",
             "type": "integer"
+          },
+          "sector_allocations": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioSectorAllocation"
+            },
+            "title": "Sector Allocations",
+            "type": "array"
           },
           "top3_concentration_pct": {
             "anyOf": [
@@ -11488,9 +12905,48 @@
         "required": [
           "concentration_level",
           "priced_stock_count",
-          "unpriced_stock_count"
+          "unpriced_stock_count",
+          "max_total_position_limit_pct",
+          "max_single_stock_limit_pct",
+          "max_sector_limit_pct"
         ],
         "title": "PortfolioRiskSummary",
+        "type": "object"
+      },
+      "PortfolioSectorAllocation": {
+        "properties": {
+          "allocation_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocation Pct"
+          },
+          "market_value": {
+            "title": "Market Value",
+            "type": "number"
+          },
+          "sector_name": {
+            "title": "Sector Name",
+            "type": "string"
+          },
+          "stock_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stock Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sector_name",
+          "market_value"
+        ],
+        "title": "PortfolioSectorAllocation",
         "type": "object"
       },
       "PortfolioStockSummary": {
@@ -11588,6 +13044,28 @@
             "title": "Realized Profit Amount",
             "type": "number"
           },
+          "sector_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector Name"
+          },
+          "securities_allocation_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Securities Allocation Pct"
+          },
           "stock_code": {
             "title": "Stock Code",
             "type": "string"
@@ -11626,9 +13104,39 @@
       },
       "PortfolioSummary": {
         "properties": {
+          "cash_balance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Balance"
+          },
+          "cash_configured": {
+            "title": "Cash Configured",
+            "type": "boolean"
+          },
           "combined_profit_amount": {
             "title": "Combined Profit Amount",
             "type": "number"
+          },
+          "estimated_securities_value": {
+            "title": "Estimated Securities Value",
+            "type": "number"
+          },
+          "initial_cash": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Cash"
           },
           "losing_count": {
             "title": "Losing Count",
@@ -11654,6 +13162,17 @@
             "title": "Stock Count",
             "type": "integer"
           },
+          "total_asset_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Asset Value"
+          },
           "total_cost": {
             "title": "Total Cost",
             "type": "number"
@@ -11661,6 +13180,17 @@
           "total_market_value": {
             "title": "Total Market Value",
             "type": "number"
+          },
+          "total_position_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Position Pct"
           },
           "total_profit_amount": {
             "title": "Total Profit Amount",
@@ -11703,7 +13233,9 @@
           "combined_profit_amount",
           "profitable_count",
           "losing_count",
-          "unpriced_count"
+          "unpriced_count",
+          "cash_configured",
+          "estimated_securities_value"
         ],
         "title": "PortfolioSummary",
         "type": "object"
@@ -11860,9 +13392,35 @@
             "title": "Available Shares",
             "type": "integer"
           },
+          "cash_balance_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Balance After"
+          },
           "current_shares_after": {
             "title": "Current Shares After",
             "type": "integer"
+          },
+          "estimated_total_assets_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Total Assets After"
+          },
+          "fee": {
+            "title": "Fee",
+            "type": "number"
           },
           "matched_cost": {
             "anyOf": [
@@ -11893,6 +13451,28 @@
             ],
             "title": "Realized Profit Amount"
           },
+          "sector_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector Name"
+          },
+          "sector_position_pct_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector Position Pct After"
+          },
           "shares_after_trade": {
             "title": "Shares After Trade",
             "type": "integer"
@@ -11909,9 +13489,42 @@
             "title": "Stock Code",
             "type": "string"
           },
+          "stock_position_pct_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Position Pct After"
+          },
+          "total_position_pct_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Position Pct After"
+          },
+          "trade_amount": {
+            "title": "Trade Amount",
+            "type": "number"
+          },
           "trade_time": {
             "title": "Trade Time",
             "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [
@@ -11920,7 +13533,9 @@
           "trade_time",
           "available_shares",
           "shares_after_trade",
-          "current_shares_after"
+          "current_shares_after",
+          "trade_amount",
+          "fee"
         ],
         "title": "PortfolioTransactionPreview",
         "type": "object"
@@ -12374,6 +13989,13 @@
           "metrics": {
             "$ref": "#/components/schemas/QuantMetrics"
           },
+          "model_assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Model Assumptions",
+            "type": "array"
+          },
           "monthly_returns": {
             "items": {
               "$ref": "#/components/schemas/QuantMonthlyReturn"
@@ -12474,6 +14096,16 @@
             "title": "Status",
             "type": "string"
           },
+          "summary_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuantMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "updated_at": {
             "title": "Updated At",
             "type": "number"
@@ -12526,12 +14158,28 @@
       },
       "QuantExecutionConfig": {
         "properties": {
+          "cash_reserve_ratio": {
+            "default": 0,
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "Cash Reserve Ratio",
+            "type": "number"
+          },
           "commission_rate": {
             "default": 0.0003,
             "maximum": 0.01,
             "minimum": 0.0,
             "title": "Commission Rate",
             "type": "number"
+          },
+          "fee_schedule": {
+            "default": "custom",
+            "enum": [
+              "custom",
+              "a_share_historical"
+            ],
+            "title": "Fee Schedule",
+            "type": "string"
           },
           "initial_cash": {
             "default": 1000000,
@@ -12546,6 +14194,40 @@
             "minimum": 1.0,
             "title": "Lot Size",
             "type": "integer"
+          },
+          "max_daily_participation_rate": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 0.1,
+            "title": "Max Daily Participation Rate"
+          },
+          "max_portfolio_drawdown": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1.0,
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Portfolio Drawdown"
+          },
+          "max_position_weight": {
+            "default": 1,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Max Position Weight",
+            "type": "number"
           },
           "minimum_commission": {
             "default": 5,
@@ -12581,6 +14263,45 @@
             "minimum": 0.0,
             "title": "Stamp Duty Rate",
             "type": "number"
+          },
+          "stop_loss_pct": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1.0,
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Loss Pct"
+          },
+          "target_annual_volatility": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 2.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Annual Volatility"
+          },
+          "trailing_stop_pct": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1.0,
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trailing Stop Pct"
           },
           "transfer_fee_rate": {
             "default": 1e-05,
@@ -12696,6 +14417,18 @@
             ],
             "title": "Calmar Ratio"
           },
+          "closed_trade_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed Trade Count"
+          },
           "downside_volatility": {
             "anyOf": [
               {
@@ -12732,6 +14465,18 @@
           "max_drawdown": {
             "title": "Max Drawdown",
             "type": "number"
+          },
+          "observation_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation Count"
           },
           "profit_loss_ratio": {
             "anyOf": [
@@ -13150,7 +14895,7 @@
             "$ref": "#/components/schemas/QuantExecutionConfig"
           },
           "maximum_drawdown_pct": {
-            "default": 80,
+            "default": 30,
             "exclusiveMinimum": 0.0,
             "maximum": 80.0,
             "title": "Maximum Drawdown Pct",
@@ -13167,7 +14912,29 @@
                 "type": "null"
               }
             ],
+            "default": 20,
             "title": "Maximum Holdout Drawdown Pct"
+          },
+          "minimum_closed_trade_count": {
+            "default": 5,
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Minimum Closed Trade Count",
+            "type": "integer"
+          },
+          "minimum_holdout_closed_trade_count": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 2,
+            "title": "Minimum Holdout Closed Trade Count"
           },
           "minimum_holdout_sharpe_ratio": {
             "anyOf": [
@@ -13194,6 +14961,13 @@
               }
             ],
             "title": "Minimum Holdout Trade Count"
+          },
+          "minimum_observation_count": {
+            "default": 120,
+            "maximum": 1500.0,
+            "minimum": 0.0,
+            "title": "Minimum Observation Count",
+            "type": "integer"
           },
           "minimum_sharpe_ratio": {
             "anyOf": [
@@ -13276,6 +15050,17 @@
       },
       "QuantStrategyDraftQualityGate": {
         "properties": {
+          "closed_trade_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed Trade Count"
+          },
           "definition_hash": {
             "title": "Definition Hash",
             "type": "string"
@@ -13286,6 +15071,17 @@
             },
             "title": "Errors",
             "type": "array"
+          },
+          "holdout_closed_trade_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdout Closed Trade Count"
           },
           "holdout_max_drawdown": {
             "anyOf": [
@@ -13351,6 +15147,26 @@
             ],
             "title": "Maximum Holdout Drawdown Pct"
           },
+          "minimum_closed_trade_count": {
+            "default": 0,
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Minimum Closed Trade Count",
+            "type": "integer"
+          },
+          "minimum_holdout_closed_trade_count": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Holdout Closed Trade Count"
+          },
           "minimum_holdout_sharpe_ratio": {
             "anyOf": [
               {
@@ -13377,6 +15193,13 @@
             ],
             "title": "Minimum Holdout Trade Count"
           },
+          "minimum_observation_count": {
+            "default": 0,
+            "maximum": 1500.0,
+            "minimum": 0.0,
+            "title": "Minimum Observation Count",
+            "type": "integer"
+          },
           "minimum_sharpe_ratio": {
             "anyOf": [
               {
@@ -13394,6 +15217,17 @@
             "default": 1,
             "title": "Minimum Trade Count",
             "type": "integer"
+          },
+          "observation_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation Count"
           },
           "passed": {
             "anyOf": [
@@ -18625,6 +20459,11 @@
             ],
             "title": "China 5Y Yield"
           },
+          "china_date": {
+            "default": "",
+            "title": "China Date",
+            "type": "string"
+          },
           "date": {
             "default": "",
             "title": "Date",
@@ -18699,6 +20538,11 @@
           "us_china_spread_status": {
             "default": "",
             "title": "Us China Spread Status",
+            "type": "string"
+          },
+          "us_date": {
+            "default": "",
+            "title": "Us Date",
             "type": "string"
           },
           "us_yield_curve_status": {
@@ -24468,6 +26312,59 @@
         ]
       }
     },
+    "/api/market/breadth": {
+      "get": {
+        "description": "获取申万2级行业市场宽度热力图（收盘价站上 MA20 股票占比）。",
+        "operationId": "get_market_breadth_api_market_breadth_get",
+        "parameters": [
+          {
+            "description": "返回的交易日数量，10-120",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "description": "返回的交易日数量，10-120",
+              "maximum": 120,
+              "minimum": 10,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketBreadthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Market Breadth",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/api/market/dragon-tiger": {
       "get": {
         "description": "获取龙虎榜列表。",
@@ -25339,6 +27236,59 @@
         ]
       }
     },
+    "/api/market/national-team-etf-holdings": {
+      "get": {
+        "description": "获取核心宽基 ETF 份额变化与国家队持仓代理监测。",
+        "operationId": "get_national_team_etf_holdings_api_market_national_team_etf_holdings_get",
+        "parameters": [
+          {
+            "description": "返回最近自然日数量，30-365",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 120,
+              "description": "返回最近自然日数量，30-365",
+              "maximum": 365,
+              "minimum": 30,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NationalTeamResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get National Team Etf Holdings",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/api/market/news-analysis": {
       "get": {
         "description": "获取由 LLM 生成的市场资讯综合分析。",
@@ -25630,16 +27580,16 @@
     },
     "/api/market/sector-stocks-history": {
       "get": {
-        "description": "获取开盘红板块在指定历史日期的成分股列表。",
+        "description": "获取开盘红板块成分股；当天补充股票实时行情。",
         "operationId": "get_sector_stocks_history_api_market_sector_stocks_history_get",
         "parameters": [
           {
-            "description": "历史日期 YYYY-MM-DD，必须早于今天",
+            "description": "查询日期 YYYY-MM-DD，支持当天和历史日期",
             "in": "query",
             "name": "date",
             "required": true,
             "schema": {
-              "description": "历史日期 YYYY-MM-DD，必须早于今天",
+              "description": "查询日期 YYYY-MM-DD，支持当天和历史日期",
               "format": "date",
               "title": "Date",
               "type": "string"
@@ -26127,6 +28077,52 @@
           }
         ],
         "summary": "Add Position",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/api/portfolio/settings": {
+      "put": {
+        "operationId": "update_account_settings_api_portfolio_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioAccountSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioAccountSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Account Settings",
         "tags": [
           "portfolio"
         ]

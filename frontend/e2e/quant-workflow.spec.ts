@@ -75,11 +75,14 @@ const run = {
     benchmark: "000300",
   },
   result: {
+    model_assumptions: ["信号按 T 日收盘计算，T+1 开盘尝试成交。", "采用前复权行情，不含完整分红送转资金账本。", "停牌、跌停和流动性不足可能延迟退出。"],
     engine_version: "v1",
     data_hash: "hash",
     data_sources: ["tencent"],
     codes: ["600519"],
     metrics: {
+      observation_count: 120,
+      closed_trade_count: 4,
       total_return: 12.34,
       annualized_return: 11.2,
       annualized_volatility: 10,
@@ -236,3 +239,78 @@ test("shows full-sample and holdout gates in the strategy authoring workspace", 
   await expect(page.getByRole("spinbutton", { name: "后段最低夏普比率（可选）" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
+
+for (const { width, theme } of [
+  { width: 1440, theme: "stellar-blue" },
+  { width: 1440, theme: "light" },
+  { width: 1024, theme: "light" },
+  { width: 390, theme: "stellar-blue" },
+  { width: 360, theme: "light" },
+]) {
+  test(`keeps quant settings and metrics readable at ${width}px in ${theme}`, async ({ page }, testInfo) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.setViewportSize({ width, height: 960 });
+    await page.addInitScript((themeKey) => {
+      localStorage.setItem("a-share-agent-theme", JSON.stringify({ state: { themeKey }, version: 0 }));
+    }, theme);
+    await mockQuantApi(page);
+    await page.goto("/quant");
+    await expect(page.getByLabel("回测类型")).toContainText("日线回测");
+    await page.getByRole("button", { name: /高级执行参数/ }).click();
+    for (const name of ["交易成本", "仓位管理", "退出保护"]) {
+      await expect(page.getByRole("region", { name, exact: true })).toBeVisible();
+    }
+    const execution = page.getByRole("region", { name: /3\. 执行设置/ });
+    const strategyBox = await page.locator(".quant-strategy-stage").boundingBox();
+    const universeBox = await page.locator(".quant-form-layout__universe").boundingBox();
+    const executionBox = await execution.boundingBox();
+    expect(executionBox!.y).toBeGreaterThanOrEqual(strategyBox!.y + strategyBox!.height);
+    expect(executionBox!.y).toBeGreaterThanOrEqual(universeBox!.y + universeBox!.height);
+    if (width >= 1200) {
+      expect(executionBox!.width).toBeGreaterThan(strategyBox!.width);
+    }
+    await expect(page.getByLabel("印花税（BP）", { exact: true })).toBeEnabled();
+    const feeMode = page.getByRole("combobox", { name: /^税费模式/ });
+    await feeMode.click();
+    await page.getByText("A 股历史税率", { exact: true }).click();
+    await expect(page.getByLabel("印花税（BP）", { exact: true })).toBeDisabled();
+    await expect(page.getByLabel("过户费（BP）", { exact: true })).toBeDisabled();
+    await expect(page.getByLabel("佣金（BP）", { exact: true })).toBeEnabled();
+    await feeMode.click();
+    await page.getByText("自定义固定税率", { exact: true }).click();
+    await expect(page.getByLabel("印花税（BP）", { exact: true })).toBeEnabled();
+
+    const stopLoss = page.getByRole("spinbutton", { name: /^持仓止损/ });
+    await stopLoss.fill("8");
+    await page.getByRole("button", { name: /高级执行参数/ }).click();
+    await expect(page.getByRole("region", { name: "退出保护", exact: true })).toBeHidden();
+    await page.getByRole("button", { name: /高级执行参数/ }).click();
+    await expect(stopLoss).toHaveValue("8");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    expect(await execution.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    if (process.env.QUANT_UI_SCREENSHOTS) {
+      await execution.screenshot({ path: testInfo.outputPath("execution.png") });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: testInfo.outputPath("setup.png"), fullPage: true });
+    }
+
+    await page.goto("/quant?panel=result&run=run-one");
+    const core = page.getByRole("group", { name: "核心回测指标" });
+    await expect(core).toBeVisible();
+    await expect(core.locator(".quant-metric-card")).toHaveCount(4);
+    await expect(core.getByText("交易日样本数")).toBeVisible();
+    await expect(core).toContainText("120");
+    await expect(page.getByRole("group", { name: "补充回测指标" }).locator(".quant-metric-card")).toHaveCount(5);
+    const assumptions = page.getByRole("complementary", { name: "回测模型与适用边界" });
+    await expect(assumptions).toContainText("历史表现不代表未来收益");
+    await expect(assumptions.locator("ul")).toBeHidden();
+    await assumptions.locator("summary").click();
+    await expect(assumptions.locator("ul")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    if (process.env.QUANT_UI_SCREENSHOTS) {
+      await page.screenshot({ path: testInfo.outputPath("result.png"), fullPage: true });
+    }
+    expect(errors).toEqual([]);
+  });
+}

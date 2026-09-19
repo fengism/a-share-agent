@@ -5,7 +5,7 @@ import { ConfigProvider, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { useThemeStore, tokensToCssVars } from "./styles/ui";
 import { themes } from "./theme/themes";
-import { APP_FONT_FAMILY } from "./theme/typography";
+import { APP_FONT_FAMILY, APP_MONO_FONT_FAMILY } from "./theme/typography";
 import "./styles/base.css";
 import "./styles/markdown.css";
 import "./styles/analysis-export.css";
@@ -22,6 +22,7 @@ const AppLayout = lazy(pageLoaders.appLayout);
 const Dashboard = lazy(pageLoaders.dashboard);
 const Watchlist = lazy(pageLoaders.watchlist);
 const Market = lazy(pageLoaders.market);
+const NationalTeam = lazy(pageLoaders.nationalTeam);
 const TradingCalendar = lazy(pageLoaders.tradingCalendar);
 const Screener = lazy(pageLoaders.screener);
 const Analysis = lazy(pageLoaders.analysis);
@@ -34,7 +35,6 @@ const Chat = lazy(pageLoaders.chat);
 const Settings = lazy(pageLoaders.settings);
 const Feed = lazy(pageLoaders.feed);
 const IndustryChain = lazy(pageLoaders.industryChain);
-const Compare = lazy(pageLoaders.compare);
 const Macro = lazy(pageLoaders.macro);
 const Portfolio = lazy(pageLoaders.portfolio);
 const Quant = lazy(pageLoaders.quant);
@@ -57,8 +57,14 @@ function AntProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement;
     root.setAttribute("data-theme", themeKey);
     root.style.colorScheme = meta.isLight ? "light" : "dark";
+    root.style.background = meta.colors.pageBg;
+    if (document.body) {
+      document.body.style.background = meta.colors.pageBg;
+    }
     const cc = meta.colors;
     const vars: Record<string, string> = {
+      "--boot-bg": cc.pageBg,
+      "--boot-fg": cc.textPrimary,
       "--c-page-bg": cc.pageBg,
       "--c-card-bg": cc.cardBg,
       "--c-elevated-bg": cc.elevatedBg,
@@ -73,6 +79,8 @@ function AntProvider({ children }: { children: React.ReactNode }) {
       "--c-text-primary": cc.textPrimary,
       "--c-text-secondary": cc.textSecondary,
       "--c-text-muted": cc.textMuted,
+      "--c-text-subtle": cc.textMuted,
+      "--c-text": cc.textPrimary,
       "--c-border": cc.border,
       "--c-focus-ring": cc.focusRing,
       "--c-surface-overlay": cc.surfaceOverlay,
@@ -86,6 +94,9 @@ function AntProvider({ children }: { children: React.ReactNode }) {
       "--c-primary-3": `${cc.primary}4d`,
       "--c-muted-soft": `${cc.textMuted}14`,
       "--c-font-sans": APP_FONT_FAMILY,
+      "--c-font-mono": APP_MONO_FONT_FAMILY,
+      "--c-sider-bg": meta.siderBg,
+      "--c-header-bg": meta.headerBg,
       ...tokensToCssVars(meta),
     };
     for (const k in vars) root.style.setProperty(k, vars[k]);
@@ -177,6 +188,7 @@ export default function App() {
                   <Route path="/" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
                   <Route path="/watchlist" element={<ErrorBoundary><Watchlist /></ErrorBoundary>} />
                   <Route path="/market" element={<ErrorBoundary><Market /></ErrorBoundary>} />
+                  <Route path="/national-team" element={<ErrorBoundary><NationalTeam /></ErrorBoundary>} />
                   <Route path="/hk-market" element={<Navigate to="/market?market=hk" replace />} />
                   <Route path="/trading-calendar" element={<ErrorBoundary><TradingCalendar /></ErrorBoundary>} />
                   <Route path="/screener" element={<ErrorBoundary><Screener /></ErrorBoundary>} />
@@ -188,7 +200,7 @@ export default function App() {
                   <Route path="/investment-research" element={<Navigate to="/analysis" replace />} />
                   <Route path="/investment-research/:code" element={<ErrorBoundary><InvestmentResearch /></ErrorBoundary>} />
                   <Route path="/macro" element={<ErrorBoundary><Macro /></ErrorBoundary>} />
-                  <Route path="/compare" element={<ErrorBoundary><Compare /></ErrorBoundary>} />
+                  <Route path="/compare" element={<Navigate to="/screener" replace />} />
                   <Route path="/portfolio" element={<ErrorBoundary><Portfolio /></ErrorBoundary>} />
                   <Route path="/quant" element={<ErrorBoundary><Quant /></ErrorBoundary>} />
                   <Route path="/industry-chain" element={<ErrorBoundary><IndustryChain /></ErrorBoundary>} />

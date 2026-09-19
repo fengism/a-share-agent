@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 
 from playwright.async_api import async_playwright
 
+from app.infrastructure.browser_runtime import launch_full_chromium
 from app.modules.industry_chain.models import (
     IndustryChainInsight,
     IndustryChainNode,
@@ -681,7 +682,10 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
 async def render_industry_chain_pdf_bytes(html_content: str) -> bytes:
     """使用 Playwright 启动无头 Chromium 并将产业链 HTML 渲染为纯矢量 PDF 二进制。"""
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
+        browser = await launch_full_chromium(
+            p.chromium,
+            args=["--no-sandbox", "--disable-setuid-sandbox"],
+        )
         try:
             page = await browser.new_page()
             await page.set_content(html_content, wait_until="networkidle")

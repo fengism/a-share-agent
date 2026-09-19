@@ -1,5 +1,6 @@
 const TOOL_LABELS: Record<string, string> = {
   analyze_financials: "财务分析",
+  financial_calculator: "财务固定公式",
   fetch_url: "网页正文",
   fetch_urls: "批量网页正文",
   get_commodity_spot_prices: "大宗商品现货价",
@@ -18,7 +19,7 @@ const TOOL_LABELS: Record<string, string> = {
   iwencai_query: "问财结构化查询",
   iwencai_search: "问财搜索",
   public_industry_data: "产业公共数据",
-  python_interpreter: "Python 计算沙盒",
+  python_interpreter: "隔离 Python 计算",
   read_pdf: "阅读 PDF 研报/公告",
   web_search: "网页搜索",
 };

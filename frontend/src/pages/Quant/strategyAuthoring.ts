@@ -6,6 +6,9 @@ export interface DraftBacktestValues {
   dateRange: [Dayjs, Dayjs];
   benchmark: string;
   minimumTradeCount: number;
+  minimumClosedTradeCount: number;
+  minimumObservationCount: number;
+  minimumHoldoutClosedTradeCount?: number | null;
   maximumDrawdownPct: number;
   minimumSharpeRatio?: number;
   minimumHoldoutTradeCount?: number;

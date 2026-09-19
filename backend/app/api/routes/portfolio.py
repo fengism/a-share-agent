@@ -8,6 +8,8 @@ from app.api.schemas import DeleteResponse
 from app.domain.identity import AuthenticatedUser
 from app.modules.portfolio.public import (
     InsufficientSharesError,
+    PortfolioAccountSettings,
+    PortfolioAccountSettingsUpdate,
     PortfolioPosition,
     PortfolioPositionCreate,
     PortfolioResponse,
@@ -24,6 +26,7 @@ from app.modules.portfolio.public import delete_transaction as delete_transactio
 from app.modules.portfolio.public import get_portfolio as get_portfolio_service
 from app.modules.portfolio.public import preview_transaction as preview_transaction_service
 from app.modules.portfolio.public import preview_transaction_update as preview_transaction_update_service
+from app.modules.portfolio.public import update_account_settings as update_account_settings_service
 from app.modules.portfolio.public import update_transaction as update_transaction_service
 
 router = APIRouter()
@@ -32,6 +35,14 @@ router = APIRouter()
 @router.get("", response_model=PortfolioResponse)
 async def get_portfolio(user: AuthenticatedUser = Depends(require_active_user)):
     return await get_portfolio_service(user["id"])
+
+
+@router.put("/settings", response_model=PortfolioAccountSettings)
+async def update_account_settings(
+    request: PortfolioAccountSettingsUpdate,
+    user: AuthenticatedUser = Depends(require_active_user),
+):
+    return await update_account_settings_service(request, user["id"])
 
 
 @router.post("", response_model=PortfolioPosition)

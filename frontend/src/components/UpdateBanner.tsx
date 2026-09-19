@@ -19,7 +19,11 @@ function formatVersion(version: string): string {
   return /^[0-9a-f]{8,}$/i.test(version) ? version.slice(0, 7) : version;
 }
 
-export default function UpdateBanner() {
+interface UpdateBannerProps {
+  showIdle?: boolean;
+}
+
+export default function UpdateBanner({ showIdle = true }: UpdateBannerProps = {}) {
   const user = useAuthStore((s) => s.user);
   const isAdmin = Boolean(user?.is_admin);
   const [phase, setPhase] = useState<UpdatePhase>("idle");
@@ -129,6 +133,10 @@ export default function UpdateBanner() {
         />
       </div>
     );
+  }
+
+  if (!showIdle) {
+    return null;
   }
 
   // 闲置态：纤细的检查更新入口，不自动请求版本接口。

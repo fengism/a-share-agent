@@ -119,6 +119,61 @@ class IndustryChainChart(BaseModel):
     option: dict[str, Any] = Field(default_factory=dict)
 
 
+class IndustryChainChangeItem(BaseModel):
+    category: Literal["chain", "company", "market", "event", "driver", "risk", "summary"]
+    change_type: Literal["added", "removed", "updated"]
+    title: str
+    detail: str = ""
+    before: str = ""
+    after: str = ""
+
+
+class IndustryChainChangeSet(BaseModel):
+    previous_archive_id: str = ""
+    has_changes: bool = False
+    added_count: int = 0
+    removed_count: int = 0
+    updated_count: int = 0
+    items: list[IndustryChainChangeItem] = Field(default_factory=list)
+
+
+class IndustryChainOpportunity(BaseModel):
+    name: str
+    code: str = ""
+    role: str = ""
+    prosperity_score: int = 0
+    earnings_score: int = 0
+    valuation_score: int = 0
+    catalyst_score: int = 0
+    evidence_score: int = 0
+    risk_score: int = 0
+    total_score: int = 0
+    rationale: str = ""
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class IndustryChainTopicResolution(BaseModel):
+    requested_name: str = ""
+    normalized_name: str = ""
+    aliases: list[str] = Field(default_factory=list)
+    matched_sectors: list[str] = Field(default_factory=list)
+    possible_topics: list[str] = Field(default_factory=list)
+    boundary_note: str = ""
+
+
+class IndustryChainAnalysisMetadata(BaseModel):
+    total_duration_ms: int = 0
+    research_duration_ms: int = 0
+    synthesis_duration_ms: int = 0
+    archive_duration_ms: int = 0
+    cache_hits: list[str] = Field(default_factory=list)
+    cache_misses: list[str] = Field(default_factory=list)
+    failed_dimensions: list[str] = Field(default_factory=list)
+    successful_dimensions: list[str] = Field(default_factory=list)
+    agent_evidence_count: int = 0
+    public_item_count: int = 0
+
+
 class IndustryChainResult(BaseModel):
     model_config = ConfigDict(validate_assignment=True)
 
@@ -158,3 +213,9 @@ class IndustryChainResult(BaseModel):
     missing_evidence: list[str] = Field(default_factory=list)
     conflicts: list[IndustryChainConflict] = Field(default_factory=list)
     agent_trace: list[AgentEvent] = Field(default_factory=list)
+    changes: IndustryChainChangeSet = Field(default_factory=IndustryChainChangeSet)
+    opportunities: list[IndustryChainOpportunity] = Field(default_factory=list)
+    topic_resolution: IndustryChainTopicResolution = Field(default_factory=IndustryChainTopicResolution)
+    analysis_metadata: IndustryChainAnalysisMetadata = Field(
+        default_factory=IndustryChainAnalysisMetadata
+    )

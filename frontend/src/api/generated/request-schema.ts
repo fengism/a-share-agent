@@ -1386,6 +1386,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/breadth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Breadth
+         * @description 获取申万2级行业市场宽度热力图（收盘价站上 MA20 股票占比）。
+         */
+        get: operations["get_market_breadth_api_market_breadth_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/dragon-tiger": {
         parameters: {
             query?: never;
@@ -1746,6 +1766,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/national-team-etf-holdings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get National Team Etf Holdings
+         * @description 获取核心宽基 ETF 份额变化与国家队持仓代理监测。
+         */
+        get: operations["get_national_team_etf_holdings_api_market_national_team_etf_holdings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/news-analysis": {
         parameters: {
             query?: never;
@@ -1855,7 +1895,7 @@ export interface paths {
         };
         /**
          * Get Sector Stocks History
-         * @description 获取开盘红板块在指定历史日期的成分股列表。
+         * @description 获取开盘红板块成分股；当天补充股票实时行情。
          */
         get: operations["get_sector_stocks_history_api_market_sector_stocks_history_get"];
         put?: never;
@@ -2018,6 +2058,23 @@ export interface paths {
         put?: never;
         /** Add Position */
         post: operations["add_position_api_portfolio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Account Settings */
+        put: operations["update_account_settings_api_portfolio_settings_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4568,6 +4625,8 @@ export interface components {
             feishu_wiki_daily_review_parent: string;
             /** Feishu Wiki Space Id */
             feishu_wiki_space_id: string;
+            /** Fred Api Key */
+            fred_api_key: string;
             /** Http Trust Env */
             http_trust_env: boolean;
             /** Is Admin */
@@ -4699,6 +4758,8 @@ export interface components {
             feishu_wiki_daily_review_parent?: string | null;
             /** Feishu Wiki Space Id */
             feishu_wiki_space_id?: string | null;
+            /** Fred Api Key */
+            fred_api_key?: string | null;
             /** Http Trust Env */
             http_trust_env?: boolean | null;
             /** Iwencai Api Key */
@@ -4740,6 +4801,48 @@ export interface components {
         CreateInviteRequest: {
             /** Expires In Days */
             expires_in_days?: number | null;
+        };
+        /** CrudeOilData */
+        CrudeOilData: {
+            brent?: components["schemas"]["CrudeOilQuote"] | null;
+            /** History */
+            history?: components["schemas"]["CrudeOilHistoryPoint"][];
+            sc0?: components["schemas"]["CrudeOilQuote"] | null;
+            wti?: components["schemas"]["CrudeOilQuote"] | null;
+        };
+        /** CrudeOilHistoryPoint */
+        CrudeOilHistoryPoint: {
+            /** Brent Close */
+            brent_close?: number | null;
+            /** Date */
+            date: string;
+            /** Sc Close */
+            sc_close?: number | null;
+            /** Wti Close */
+            wti_close?: number | null;
+        };
+        /** CrudeOilQuote */
+        CrudeOilQuote: {
+            /** Change */
+            change?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /**
+             * Date
+             * @default
+             */
+            date?: string;
+            /** Name */
+            name: string;
+            /** Price */
+            price?: number | null;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Unit
+             * @default
+             */
+            unit?: string;
         };
         /** CustomsCommodityProfile */
         CustomsCommodityProfile: {
@@ -5418,6 +5521,7 @@ export interface components {
         /** GlobalMacroRatesResponse */
         GlobalMacroRatesResponse: {
             central_bank_policy_rates: components["schemas"]["CentralBankPolicyRates"];
+            crude_oil?: components["schemas"]["CrudeOilData"] | null;
             dollar_and_fx?: components["schemas"]["DollarAndFx"];
             market_implications: components["schemas"]["MarketImplications"];
             /** Timestamp */
@@ -5759,6 +5863,107 @@ export interface components {
             price?: number | null;
             /** Volume */
             volume?: number | null;
+        };
+        /** IndustryChainAnalysisMetadata */
+        IndustryChainAnalysisMetadata: {
+            /**
+             * Agent Evidence Count
+             * @default 0
+             */
+            agent_evidence_count?: number;
+            /**
+             * Archive Duration Ms
+             * @default 0
+             */
+            archive_duration_ms?: number;
+            /** Cache Hits */
+            cache_hits?: string[];
+            /** Cache Misses */
+            cache_misses?: string[];
+            /** Failed Dimensions */
+            failed_dimensions?: string[];
+            /**
+             * Public Item Count
+             * @default 0
+             */
+            public_item_count?: number;
+            /**
+             * Research Duration Ms
+             * @default 0
+             */
+            research_duration_ms?: number;
+            /** Successful Dimensions */
+            successful_dimensions?: string[];
+            /**
+             * Synthesis Duration Ms
+             * @default 0
+             */
+            synthesis_duration_ms?: number;
+            /**
+             * Total Duration Ms
+             * @default 0
+             */
+            total_duration_ms?: number;
+        };
+        /** IndustryChainChangeItem */
+        IndustryChainChangeItem: {
+            /**
+             * After
+             * @default
+             */
+            after?: string;
+            /**
+             * Before
+             * @default
+             */
+            before?: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "chain" | "company" | "market" | "event" | "driver" | "risk" | "summary";
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "added" | "removed" | "updated";
+            /**
+             * Detail
+             * @default
+             */
+            detail?: string;
+            /** Title */
+            title: string;
+        };
+        /** IndustryChainChangeSet */
+        IndustryChainChangeSet: {
+            /**
+             * Added Count
+             * @default 0
+             */
+            added_count?: number;
+            /**
+             * Has Changes
+             * @default false
+             */
+            has_changes?: boolean;
+            /** Items */
+            items?: components["schemas"]["IndustryChainChangeItem"][];
+            /**
+             * Previous Archive Id
+             * @default
+             */
+            previous_archive_id?: string;
+            /**
+             * Removed Count
+             * @default 0
+             */
+            removed_count?: number;
+            /**
+             * Updated Count
+             * @default 0
+             */
+            updated_count?: number;
         };
         /** IndustryChainChart */
         IndustryChainChart: {
@@ -6148,6 +6353,63 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** IndustryChainOpportunity */
+        IndustryChainOpportunity: {
+            /**
+             * Catalyst Score
+             * @default 0
+             */
+            catalyst_score?: number;
+            /**
+             * Code
+             * @default
+             */
+            code?: string;
+            /**
+             * Earnings Score
+             * @default 0
+             */
+            earnings_score?: number;
+            /** Evidence Ids */
+            evidence_ids?: string[];
+            /**
+             * Evidence Score
+             * @default 0
+             */
+            evidence_score?: number;
+            /** Name */
+            name: string;
+            /**
+             * Prosperity Score
+             * @default 0
+             */
+            prosperity_score?: number;
+            /**
+             * Rationale
+             * @default
+             */
+            rationale?: string;
+            /**
+             * Risk Score
+             * @default 0
+             */
+            risk_score?: number;
+            /**
+             * Role
+             * @default
+             */
+            role?: string;
+            /**
+             * Total Score
+             * @default 0
+             */
+            total_score?: number;
+            /**
+             * Valuation Score
+             * @default 0
+             */
+            valuation_score?: number;
+        };
         /** IndustryChainResearchScope */
         IndustryChainResearchScope: {
             /** As Of Date */
@@ -6181,6 +6443,7 @@ export interface components {
             agent_trace?: components["schemas"]["AgentEvent"][];
             /** Aliases */
             aliases?: string[];
+            analysis_metadata?: components["schemas"]["IndustryChainAnalysisMetadata"];
             /**
              * Archive Id
              * @default
@@ -6194,6 +6457,7 @@ export interface components {
             archive_status?: "none" | "saved" | "failed";
             /** Capital Moves */
             capital_moves?: components["schemas"]["IndustryChainInsight"][];
+            changes?: components["schemas"]["IndustryChainChangeSet"];
             /** Charts */
             charts?: components["schemas"]["IndustryChainChart"][];
             /** Competition */
@@ -6230,6 +6494,8 @@ export interface components {
              * @default
              */
             name?: string;
+            /** Opportunities */
+            opportunities?: components["schemas"]["IndustryChainOpportunity"][];
             /**
              * Positioning
              * @default
@@ -6268,6 +6534,7 @@ export interface components {
             summary_evidence_ids?: string[];
             /** Technology Routes */
             technology_routes?: components["schemas"]["IndustryChainInsight"][];
+            topic_resolution?: components["schemas"]["IndustryChainTopicResolution"];
             /** Trends */
             trends?: components["schemas"]["IndustryChainInsight"][];
             /** Upstream */
@@ -6296,6 +6563,30 @@ export interface components {
              * @default
              */
             url?: string;
+        };
+        /** IndustryChainTopicResolution */
+        IndustryChainTopicResolution: {
+            /** Aliases */
+            aliases?: string[];
+            /**
+             * Boundary Note
+             * @default
+             */
+            boundary_note?: string;
+            /** Matched Sectors */
+            matched_sectors?: string[];
+            /**
+             * Normalized Name
+             * @default
+             */
+            normalized_name?: string;
+            /** Possible Topics */
+            possible_topics?: string[];
+            /**
+             * Requested Name
+             * @default
+             */
+            requested_name?: string;
         };
         /** IndustryHierarchyResponse */
         IndustryHierarchyResponse: {
@@ -6871,6 +7162,65 @@ export interface components {
              * @default
              */
             track_record?: string;
+        };
+        /** MarketBreadthDailySummary */
+        MarketBreadthDailySummary: {
+            /** Date */
+            date: string;
+            /**
+             * Strong Industry Count
+             * @default 0
+             */
+            strong_industry_count?: number;
+            /**
+             * Strong Ratio
+             * @default 0
+             */
+            strong_ratio?: number;
+            /**
+             * Total Industry Count
+             * @default 0
+             */
+            total_industry_count?: number;
+        };
+        /** MarketBreadthResponse */
+        MarketBreadthResponse: {
+            /**
+             * Completed Market Date
+             * @default
+             */
+            completed_market_date?: string;
+            /** Dates */
+            dates?: string[];
+            /** Fetched At */
+            fetched_at: string;
+            /** Industries */
+            industries?: string[];
+            /**
+             * Source
+             * @default 本地计算
+             * @constant
+             */
+            source?: "本地计算";
+            /**
+             * Stale
+             * @default false
+             */
+            stale?: boolean;
+            /**
+             * Successful Stocks
+             * @default 0
+             */
+            successful_stocks?: number;
+            /** Summaries */
+            summaries?: components["schemas"]["MarketBreadthDailySummary"][];
+            /**
+             * Total Stocks
+             * @default 0
+             */
+            total_stocks?: number;
+            /** Values */
+            values?: (number | null)[][];
         };
         /** MarketBreadthSnapshot */
         MarketBreadthSnapshot: {
@@ -7571,11 +7921,8 @@ export interface components {
         };
         /** MarketSectorStocksHistoryItem */
         MarketSectorStocksHistoryItem: {
-            /**
-             * Amount
-             * @default 0
-             */
-            amount?: number;
+            /** Amount */
+            amount?: number | null;
             /** Buy Ratio */
             buy_ratio?: number | null;
             /** Change Pct */
@@ -7588,42 +7935,31 @@ export interface components {
             chg_5d?: number | null;
             /** Code */
             code: string;
-            /**
-             * Float Amount
-             * @default 0
-             */
-            float_amount?: number;
-            /**
-             * Limit Count
-             * @default 0
-             */
-            limit_count?: number;
+            /** Float Amount */
+            float_amount?: number | null;
+            /** Limit Count */
+            limit_count?: number | null;
             /**
              * Limit Tag
              * @default
              */
             limit_tag?: string;
-            /**
-             * Main Buy
-             * @default 0
-             */
-            main_buy?: number;
-            /**
-             * Main Net
-             * @default 0
-             */
-            main_net?: number;
-            /**
-             * Main Sell
-             * @default 0
-             */
-            main_sell?: number;
+            /** Main Buy */
+            main_buy?: number | null;
+            /** Main Net */
+            main_net?: number | null;
+            /** Main Sell */
+            main_sell?: number | null;
             /** Name */
             name: string;
             /** Net Ratio */
             net_ratio?: number | null;
             /** Price */
             price?: number | null;
+            /** Quote Source */
+            quote_source?: string | null;
+            /** Quoted At */
+            quoted_at?: string | null;
             /**
              * Rank Tag
              * @default
@@ -7643,14 +7979,35 @@ export interface components {
         };
         /** MarketSectorStocksHistoryResponse */
         MarketSectorStocksHistoryResponse: {
+            /** Constituent Date */
+            constituent_date: string;
             /** Date */
             date: string;
             /** Fetched At */
             fetched_at: string;
+            /**
+             * History Details Available
+             * @default true
+             */
+            history_details_available?: boolean;
+            /**
+             * Is Realtime
+             * @default false
+             */
+            is_realtime?: boolean;
             /** Items */
             items?: components["schemas"]["MarketSectorStocksHistoryItem"][];
             /** Plate Id */
             plate_id: string;
+            /** Quote Source */
+            quote_source?: string | null;
+            /** Quoted At */
+            quoted_at?: string | null;
+            /**
+             * Realtime Partial
+             * @default false
+             */
+            realtime_partial?: boolean;
             /**
              * Source
              * @default 开盘红
@@ -7820,6 +8177,209 @@ export interface components {
              */
             success?: boolean;
         };
+        /** NationalTeamEtfPoint */
+        NationalTeamEtfPoint: {
+            /** Close */
+            close?: number | null;
+            /** Date */
+            date: string;
+            /** Estimated Net Flow 100M */
+            estimated_net_flow_100m?: number | null;
+            /** Fetched At */
+            fetched_at?: string | null;
+            /** Shares 100M */
+            shares_100m: number;
+            /** Shares Change 100M */
+            shares_change_100m?: number | null;
+            /** Shares Change Pct */
+            shares_change_pct?: number | null;
+            /**
+             * Source
+             * @default unknown
+             */
+            source?: string;
+            /**
+             * Verification Status
+             * @default unknown
+             */
+            verification_status?: string;
+        };
+        /** NationalTeamEtfSeries */
+        NationalTeamEtfSeries: {
+            /** Change 20D 100M */
+            change_20d_100m?: number | null;
+            /** Change 5D 100M */
+            change_5d_100m?: number | null;
+            /** Code */
+            code: string;
+            /**
+             * Exchange
+             * @enum {string}
+             */
+            exchange: "SH" | "SZ";
+            /** Fund Manager */
+            fund_manager: string;
+            /** Index Key */
+            index_key: string;
+            /** Index Name */
+            index_name: string;
+            /** Latest Change 1D 100M */
+            latest_change_1d_100m?: number | null;
+            /** Latest Date */
+            latest_date?: string | null;
+            /** Latest Shares 100M */
+            latest_shares_100m?: number | null;
+            /** Name */
+            name: string;
+            /** Points */
+            points?: components["schemas"]["NationalTeamEtfPoint"][];
+        };
+        /** NationalTeamIndexPoint */
+        NationalTeamIndexPoint: {
+            /**
+             * Cumulative Change 100M
+             * @default 0
+             */
+            cumulative_change_100m?: number;
+            /** Date */
+            date: string;
+            /** Estimated Net Flow 100M */
+            estimated_net_flow_100m?: number | null;
+            /** Index Close */
+            index_close?: number | null;
+            /** Shares Change 100M */
+            shares_change_100m?: number | null;
+            /** Total Shares 100M */
+            total_shares_100m: number;
+        };
+        /** NationalTeamIndexSeries */
+        NationalTeamIndexSeries: {
+            /** Change 20D 100M */
+            change_20d_100m?: number | null;
+            /** Change 5D 100M */
+            change_5d_100m?: number | null;
+            /** Covered Etf Codes */
+            covered_etf_codes?: string[];
+            /** Estimated Net Flow 1D 100M */
+            estimated_net_flow_1d_100m?: number | null;
+            /** Etf Codes */
+            etf_codes?: string[];
+            /** Index Code */
+            index_code: string;
+            /** Index Key */
+            index_key: string;
+            /** Index Name */
+            index_name: string;
+            /** Latest Change 1D 100M */
+            latest_change_1d_100m?: number | null;
+            /** Latest Date */
+            latest_date?: string | null;
+            /** Latest Total Shares 100M */
+            latest_total_shares_100m?: number | null;
+            /** Points */
+            points?: components["schemas"]["NationalTeamIndexPoint"][];
+        };
+        /** NationalTeamResponse */
+        NationalTeamResponse: {
+            /** As Of Date */
+            as_of_date?: string | null;
+            /**
+             * Calendar Degraded
+             * @default false
+             */
+            calendar_degraded?: boolean;
+            /**
+             * Covered Etf Count
+             * @default 0
+             */
+            covered_etf_count?: number;
+            /** Disclaimer */
+            disclaimer: string;
+            /** Etfs */
+            etfs?: components["schemas"]["NationalTeamEtfSeries"][];
+            /** Expected Date */
+            expected_date?: string | null;
+            /** Fetched At */
+            fetched_at: string;
+            /** Indices */
+            indices?: components["schemas"]["NationalTeamIndexSeries"][];
+            /** Methodology */
+            methodology: string;
+            /** Missing Etfs */
+            missing_etfs?: string[];
+            /** Missing Indices */
+            missing_indices?: string[];
+            /** Missing Price Etfs */
+            missing_price_etfs?: string[];
+            /** Missing Share Etfs */
+            missing_share_etfs?: string[];
+            /** Observations */
+            observations?: components["schemas"]["NationalTeamShareObservation"][];
+            /**
+             * Partial
+             * @default false
+             */
+            partial?: boolean;
+            /**
+             * Refreshing
+             * @default false
+             */
+            refreshing?: boolean;
+            /** Requested Days */
+            requested_days: number;
+            /**
+             * Source
+             * @default 上交所/深交所/东方财富
+             */
+            source?: string;
+            /**
+             * Stale
+             * @default false
+             */
+            stale?: boolean;
+            summary?: components["schemas"]["NationalTeamSummary"];
+            /**
+             * Total Etf Count
+             * @default 12
+             */
+            total_etf_count?: number;
+        };
+        /** NationalTeamShareObservation */
+        NationalTeamShareObservation: {
+            /** Business Date */
+            business_date?: string | null;
+            /** Code */
+            code: string;
+            /** Fetched At */
+            fetched_at: string;
+            /** Shares 100M */
+            shares_100m: number;
+            /** Source */
+            source: string;
+            /**
+             * Verification Status
+             * @default provisional
+             * @constant
+             */
+            verification_status?: "provisional";
+        };
+        /** NationalTeamSummary */
+        NationalTeamSummary: {
+            /** Change 1D 100M */
+            change_1d_100m?: number | null;
+            /** Change 20D 100M */
+            change_20d_100m?: number | null;
+            /** Change 5D 100M */
+            change_5d_100m?: number | null;
+            /** Estimated Net Flow 1D 100M */
+            estimated_net_flow_1d_100m?: number | null;
+            /** Estimated Net Flow 20D 100M */
+            estimated_net_flow_20d_100m?: number | null;
+            /** Estimated Net Flow 5D 100M */
+            estimated_net_flow_5d_100m?: number | null;
+            /** Total Shares 100M */
+            total_shares_100m?: number | null;
+        };
         /** NeedsSetupResponse */
         NeedsSetupResponse: {
             /** Needs Setup */
@@ -7988,6 +8548,48 @@ export interface components {
              */
             sample_size?: number;
         };
+        /** PortfolioAccountSettings */
+        PortfolioAccountSettings: {
+            /** Initial Cash */
+            initial_cash?: number | null;
+            /**
+             * Max Sector Pct
+             * @default 40
+             */
+            max_sector_pct?: number;
+            /**
+             * Max Single Stock Pct
+             * @default 30
+             */
+            max_single_stock_pct?: number;
+            /**
+             * Max Total Position Pct
+             * @default 80
+             */
+            max_total_position_pct?: number;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** PortfolioAccountSettingsUpdate */
+        PortfolioAccountSettingsUpdate: {
+            /** Initial Cash */
+            initial_cash?: number | null;
+            /**
+             * Max Sector Pct
+             * @default 40
+             */
+            max_sector_pct?: number;
+            /**
+             * Max Single Stock Pct
+             * @default 30
+             */
+            max_single_stock_pct?: number;
+            /**
+             * Max Total Position Pct
+             * @default 80
+             */
+            max_total_position_pct?: number;
+        };
         /** PortfolioClosedPosition */
         PortfolioClosedPosition: {
             /** Buy Count */
@@ -8090,6 +8692,7 @@ export interface components {
             /** Quoted At */
             quoted_at: string;
             risk: components["schemas"]["PortfolioRiskSummary"];
+            settings: components["schemas"]["PortfolioAccountSettings"];
             /** Stocks */
             stocks: components["schemas"]["PortfolioStockSummary"][];
             summary: components["schemas"]["PortfolioSummary"];
@@ -8107,16 +8710,39 @@ export interface components {
             largest_position_stock_code?: string | null;
             /** Largest Position Stock Name */
             largest_position_stock_name?: string | null;
+            /** Largest Sector Name */
+            largest_sector_name?: string | null;
+            /** Largest Sector Pct */
+            largest_sector_pct?: number | null;
+            /** Max Sector Limit Pct */
+            max_sector_limit_pct: number;
+            /** Max Single Stock Limit Pct */
+            max_single_stock_limit_pct: number;
             /** Max Single Stock Pct */
             max_single_stock_pct?: number | null;
+            /** Max Total Position Limit Pct */
+            max_total_position_limit_pct: number;
             /** Priced Stock Count */
             priced_stock_count: number;
+            /** Sector Allocations */
+            sector_allocations?: components["schemas"]["PortfolioSectorAllocation"][];
             /** Top3 Concentration Pct */
             top3_concentration_pct?: number | null;
             /** Unpriced Stock Count */
             unpriced_stock_count: number;
             /** Warnings */
             warnings?: string[];
+        };
+        /** PortfolioSectorAllocation */
+        PortfolioSectorAllocation: {
+            /** Allocation Pct */
+            allocation_pct?: number | null;
+            /** Market Value */
+            market_value: number;
+            /** Sector Name */
+            sector_name: string;
+            /** Stock Codes */
+            stock_codes?: string[];
         };
         /** PortfolioStockSummary */
         PortfolioStockSummary: {
@@ -8142,6 +8768,10 @@ export interface components {
             profit_pct?: number | null;
             /** Realized Profit Amount */
             realized_profit_amount: number;
+            /** Sector Name */
+            sector_name?: string | null;
+            /** Securities Allocation Pct */
+            securities_allocation_pct?: number | null;
             /** Stock Code */
             stock_code: string;
             /** Stock Name */
@@ -8153,8 +8783,16 @@ export interface components {
         };
         /** PortfolioSummary */
         PortfolioSummary: {
+            /** Cash Balance */
+            cash_balance?: number | null;
+            /** Cash Configured */
+            cash_configured: boolean;
             /** Combined Profit Amount */
             combined_profit_amount: number;
+            /** Estimated Securities Value */
+            estimated_securities_value: number;
+            /** Initial Cash */
+            initial_cash?: number | null;
             /** Losing Count */
             losing_count: number;
             /** Position Count */
@@ -8167,10 +8805,14 @@ export interface components {
             realized_profit_amount: number;
             /** Stock Count */
             stock_count: number;
+            /** Total Asset Value */
+            total_asset_value?: number | null;
             /** Total Cost */
             total_cost: number;
             /** Total Market Value */
             total_market_value: number;
+            /** Total Position Pct */
+            total_position_pct?: number | null;
             /** Total Profit Amount */
             total_profit_amount: number;
             /** Total Profit Pct */
@@ -8247,14 +8889,24 @@ export interface components {
         PortfolioTransactionPreview: {
             /** Available Shares */
             available_shares: number;
+            /** Cash Balance After */
+            cash_balance_after?: number | null;
             /** Current Shares After */
             current_shares_after: number;
+            /** Estimated Total Assets After */
+            estimated_total_assets_after?: number | null;
+            /** Fee */
+            fee: number;
             /** Matched Cost */
             matched_cost?: number | null;
             /** Matches */
             matches?: components["schemas"]["PortfolioLotMatch"][];
             /** Realized Profit Amount */
             realized_profit_amount?: number | null;
+            /** Sector Name */
+            sector_name?: string | null;
+            /** Sector Position Pct After */
+            sector_position_pct_after?: number | null;
             /** Shares After Trade */
             shares_after_trade: number;
             /**
@@ -8264,8 +8916,16 @@ export interface components {
             side: "buy" | "sell";
             /** Stock Code */
             stock_code: string;
+            /** Stock Position Pct After */
+            stock_position_pct_after?: number | null;
+            /** Total Position Pct After */
+            total_position_pct_after?: number | null;
+            /** Trade Amount */
+            trade_amount: number;
             /** Trade Time */
             trade_time: string;
+            /** Warnings */
+            warnings?: string[];
         };
         /**
          * PotentialDailyResult
@@ -8496,6 +9156,8 @@ export interface components {
             /** Market Snapshots */
             market_snapshots?: components["schemas"]["QuantMarketSnapshot"][];
             metrics: components["schemas"]["QuantMetrics"];
+            /** Model Assumptions */
+            model_assumptions?: string[];
             /** Monthly Returns */
             monthly_returns: components["schemas"]["QuantMonthlyReturn"][];
             /** Open Positions */
@@ -8527,6 +9189,7 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
+            summary_metrics?: components["schemas"]["QuantMetrics"] | null;
             /** Updated At */
             updated_at: number;
         };
@@ -8544,10 +9207,21 @@ export interface components {
         /** QuantExecutionConfig */
         QuantExecutionConfig: {
             /**
+             * Cash Reserve Ratio
+             * @default 0
+             */
+            cash_reserve_ratio?: number;
+            /**
              * Commission Rate
              * @default 0.0003
              */
             commission_rate?: number;
+            /**
+             * Fee Schedule
+             * @default custom
+             * @enum {string}
+             */
+            fee_schedule?: "custom" | "a_share_historical";
             /**
              * Initial Cash
              * @default 1000000
@@ -8558,6 +9232,18 @@ export interface components {
              * @default 100
              */
             lot_size?: number;
+            /**
+             * Max Daily Participation Rate
+             * @default 0.1
+             */
+            max_daily_participation_rate?: number | null;
+            /** Max Portfolio Drawdown */
+            max_portfolio_drawdown?: number | null;
+            /**
+             * Max Position Weight
+             * @default 1
+             */
+            max_position_weight?: number;
             /**
              * Minimum Commission
              * @default 5
@@ -8583,6 +9269,12 @@ export interface components {
              * @default 0.0005
              */
             stamp_duty_rate?: number;
+            /** Stop Loss Pct */
+            stop_loss_pct?: number | null;
+            /** Target Annual Volatility */
+            target_annual_volatility?: number | null;
+            /** Trailing Stop Pct */
+            trailing_stop_pct?: number | null;
             /**
              * Transfer Fee Rate
              * @default 0.00001
@@ -8631,6 +9323,8 @@ export interface components {
             benchmark_return?: number | null;
             /** Calmar Ratio */
             calmar_ratio?: number | null;
+            /** Closed Trade Count */
+            closed_trade_count?: number | null;
             /** Downside Volatility */
             downside_volatility?: number | null;
             /** Excess Return */
@@ -8639,6 +9333,8 @@ export interface components {
             information_ratio?: number | null;
             /** Max Drawdown */
             max_drawdown: number;
+            /** Observation Count */
+            observation_count?: number | null;
             /** Profit Loss Ratio */
             profit_loss_ratio?: number | null;
             /** Sharpe Ratio */
@@ -8769,15 +9465,33 @@ export interface components {
             execution?: components["schemas"]["QuantExecutionConfig"];
             /**
              * Maximum Drawdown Pct
-             * @default 80
+             * @default 30
              */
             maximum_drawdown_pct?: number;
-            /** Maximum Holdout Drawdown Pct */
+            /**
+             * Maximum Holdout Drawdown Pct
+             * @default 20
+             */
             maximum_holdout_drawdown_pct?: number | null;
+            /**
+             * Minimum Closed Trade Count
+             * @default 5
+             */
+            minimum_closed_trade_count?: number;
+            /**
+             * Minimum Holdout Closed Trade Count
+             * @default 2
+             */
+            minimum_holdout_closed_trade_count?: number | null;
             /** Minimum Holdout Sharpe Ratio */
             minimum_holdout_sharpe_ratio?: number | null;
             /** Minimum Holdout Trade Count */
             minimum_holdout_trade_count?: number | null;
+            /**
+             * Minimum Observation Count
+             * @default 120
+             */
+            minimum_observation_count?: number;
             /** Minimum Sharpe Ratio */
             minimum_sharpe_ratio?: number | null;
             /**
@@ -8806,10 +9520,14 @@ export interface components {
         };
         /** QuantStrategyDraftQualityGate */
         QuantStrategyDraftQualityGate: {
+            /** Closed Trade Count */
+            closed_trade_count?: number | null;
             /** Definition Hash */
             definition_hash: string;
             /** Errors */
             errors?: string[];
+            /** Holdout Closed Trade Count */
+            holdout_closed_trade_count?: number | null;
             /** Holdout Max Drawdown */
             holdout_max_drawdown?: number | null;
             /** Holdout Sharpe Ratio */
@@ -8825,10 +9543,22 @@ export interface components {
             maximum_drawdown_pct?: number;
             /** Maximum Holdout Drawdown Pct */
             maximum_holdout_drawdown_pct?: number | null;
+            /**
+             * Minimum Closed Trade Count
+             * @default 0
+             */
+            minimum_closed_trade_count?: number;
+            /** Minimum Holdout Closed Trade Count */
+            minimum_holdout_closed_trade_count?: number | null;
             /** Minimum Holdout Sharpe Ratio */
             minimum_holdout_sharpe_ratio?: number | null;
             /** Minimum Holdout Trade Count */
             minimum_holdout_trade_count?: number | null;
+            /**
+             * Minimum Observation Count
+             * @default 0
+             */
+            minimum_observation_count?: number;
             /** Minimum Sharpe Ratio */
             minimum_sharpe_ratio?: number | null;
             /**
@@ -8836,6 +9566,8 @@ export interface components {
              * @default 1
              */
             minimum_trade_count?: number;
+            /** Observation Count */
+            observation_count?: number | null;
             /** Passed */
             passed?: boolean | null;
             /**
@@ -10797,6 +11529,11 @@ export interface components {
             /** China 5Y Yield */
             china_5y_yield?: number | null;
             /**
+             * China Date
+             * @default
+             */
+            china_date?: string;
+            /**
              * Date
              * @default
              */
@@ -10818,6 +11555,11 @@ export interface components {
              * @default
              */
             us_china_spread_status?: string;
+            /**
+             * Us Date
+             * @default
+             */
+            us_date?: string;
             /**
              * Us Yield Curve Status
              * @default
@@ -13901,6 +14643,38 @@ export interface operations {
             };
         };
     };
+    get_market_breadth_api_market_breadth_get: {
+        parameters: {
+            query?: {
+                /** @description 返回的交易日数量，10-120 */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketBreadthResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_dragon_tiger_list_api_market_dragon_tiger_get: {
         parameters: {
             query?: {
@@ -14453,6 +15227,38 @@ export interface operations {
             };
         };
     };
+    get_national_team_etf_holdings_api_market_national_team_etf_holdings_get: {
+        parameters: {
+            query?: {
+                /** @description 返回最近自然日数量，30-365 */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NationalTeamResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_news_analysis_api_market_news_analysis_get: {
         parameters: {
             query?: never;
@@ -14618,7 +15424,7 @@ export interface operations {
     get_sector_stocks_history_api_market_sector_stocks_history_get: {
         parameters: {
             query: {
-                /** @description 历史日期 YYYY-MM-DD，必须早于今天 */
+                /** @description 查询日期 YYYY-MM-DD，支持当天和历史日期 */
                 date: string;
                 /** @description 开盘红板块 ID，例如 881169 */
                 plate_id: string;
@@ -14916,6 +15722,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioPosition"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_account_settings_api_portfolio_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioAccountSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioAccountSettings"];
                 };
             };
             /** @description 统一错误响应 */

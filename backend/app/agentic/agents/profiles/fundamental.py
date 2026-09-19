@@ -7,6 +7,7 @@ PROFILE = AgentProfile(
     description="分析财务质量、成长性和估值水平",
     system_prompt=FUNDAMENTAL_AGENT_PROMPT,
     tool_names=(
+        "financial_calculator",
         "get_stock_valuation_detail",
         "analyze_financials",
         "iwencai_select_stock",

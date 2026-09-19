@@ -1,6 +1,7 @@
 """量化回测应用服务。"""
 
 import asyncio
+import threading
 from dataclasses import replace
 from datetime import date, timedelta
 from typing import Any
@@ -227,13 +228,15 @@ def _to_api(
     row: run_store.QuantRunRow,
     *,
     include_market_snapshots: bool = False,
+    summary_only: bool = False,
 ) -> QuantBacktestRun:
     return QuantBacktestRun(
         id=row.id,
         name=row.name,
         status=row.status,
-        request=QuantBacktestCreate.model_validate(row.request),
-        result=_result_with_market_snapshots(row) if include_market_snapshots else row.result,
+        request=QuantBacktestPayload.model_validate({**row.request, "strategy_snapshot": None}),
+        result=None if summary_only else (_result_with_market_snapshots(row) if include_market_snapshots else row.result),
+        summary_metrics=row.result if summary_only else None,
         error=row.last_error,
         attempts=row.attempts,
         created_at=row.created_at,
@@ -316,13 +319,15 @@ async def list_backtests(user_id: int, *, limit: int = 50, offset: int = 0) -> Q
         offset=offset,
         semaphore=database_semaphore,
     )
-    return QuantBacktestList(items=[_to_api(row) for row in rows])
+    return QuantBacktestList(items=[_to_api(row, summary_only=True) for row in rows])
 
 
 async def execute_backtest(request: QuantBacktestCreate | QuantBacktestPayload) -> tuple[dict[str, Any], dict[str, Any]]:
     payload = _as_backtest_payload(request)
     strategy_snapshot = payload.strategy_snapshot or _resolve_strategy(payload.strategy)
     warmup_bars = strategy_warmup_bars(strategy_snapshot)
+    if payload.execution.target_annual_volatility is not None:
+        warmup_bars = max(warmup_bars, 21)
     required_prestart_bars = warmup_bars + 1
     stock_history_start = payload.start_date - timedelta(
         days=required_prestart_bars * 2 + 14,
@@ -343,28 +348,34 @@ async def execute_backtest(request: QuantBacktestCreate | QuantBacktestPayload) 
         get_index_kline(
             payload.benchmark,
             period="daily",
-            start_date=payload.start_date.isoformat(),
+            start_date=(payload.start_date - timedelta(days=14)).isoformat(),
             end_date=payload.end_date.isoformat(),
         )
     )
     bar_sets, benchmark = await asyncio.gather(stock_history_task, benchmark_task)
     bar_sets = _normalize_bar_sets(bar_sets, payload.start_date.isoformat(), warmup_bars)
     benchmark_hash = historical_bar_hash(payload.benchmark, "daily", "", benchmark.items)
-    result = await call_blocking(
-        run_backtest,
-        {bar_set.code: bar_set.items for bar_set in bar_sets},
-        benchmark.items,
-        strategy_snapshot,
-        payload.execution,
-        data_hashes=[*(bar_set.data_hash for bar_set in bar_sets), benchmark_hash],
-        data_sources=[
-            *(bar_set.source for bar_set in bar_sets),
-            benchmark.source or "benchmark-provider-chain",
-        ],
-        evaluation_start_date=payload.start_date.isoformat(),
-        evaluation_end_date=payload.end_date.isoformat(),
-        semaphore=misc_semaphore,
-    )
+    cancel_event = threading.Event()
+    try:
+        result = await call_blocking(
+            run_backtest,
+            {bar_set.code: bar_set.items for bar_set in bar_sets},
+            benchmark.items,
+            strategy_snapshot,
+            payload.execution,
+            data_hashes=[*(bar_set.data_hash for bar_set in bar_sets), benchmark_hash],
+            data_sources=[
+                *(bar_set.source for bar_set in bar_sets),
+                benchmark.source or "benchmark-provider-chain",
+            ],
+            evaluation_start_date=payload.start_date.isoformat(),
+            evaluation_end_date=payload.end_date.isoformat(),
+            cancel_event=cancel_event,
+            semaphore=misc_semaphore,
+        )
+    finally:
+        # asyncio 取消不会终止工作线程；显式通知纯计算循环尽快退出。
+        cancel_event.set()
     input_snapshot = {
         "stocks": {
             bar_set.code: [item.model_dump(mode="json") for item in bar_set.items]
@@ -372,7 +383,10 @@ async def execute_backtest(request: QuantBacktestCreate | QuantBacktestPayload) 
         },
         "benchmark": [item.model_dump(mode="json") for item in benchmark.items],
         "stock_metadata": {
-            bar_set.code: {"source": bar_set.source, "data_hash": bar_set.data_hash}
+            bar_set.code: {
+                "source": bar_set.source, "data_hash": bar_set.data_hash,
+                "adjust": bar_set.adjust, "adjustment_verified": bar_set.adjustment_verified,
+            }
             for bar_set in bar_sets
         },
         "strategy": strategy_snapshot.model_dump(mode="json"),

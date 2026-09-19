@@ -10,6 +10,7 @@ from typing import Any, Iterable
 
 from playwright.async_api import async_playwright
 
+from app.infrastructure.browser_runtime import launch_full_chromium
 from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection
 
 logger = logging.getLogger(__name__)
@@ -359,8 +360,8 @@ def generate_daily_review_pdf_html(result: DailyReviewResult) -> str:
 async def render_daily_review_pdf_bytes(html_content: str) -> bytes:
     """使用 Chromium 将完整 HTML 渲染为带页眉页脚的 A4 PDF。"""
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(
-            headless=True,
+        browser = await launch_full_chromium(
+            playwright.chromium,
             args=["--no-sandbox", "--disable-setuid-sandbox"],
         )
         try:

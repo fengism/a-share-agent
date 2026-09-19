@@ -4,20 +4,53 @@
 }
 
 .market-page-header {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  position: relative;
 }
 
 .market-top-tabs > .ant-tabs-nav {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(32, 198, 229, 0.16);
+}
+
+[data-theme="light"] .market-top-tabs > .ant-tabs-nav {
+  border-bottom: 1px solid var(--c-border);
 }
 
 .market-top-tabs > .ant-tabs-nav .ant-tabs-tab {
-  padding: 8px 18px;
+  padding: 8px 24px;
   font-size: 15px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  letter-spacing: 0.02em;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--c-radius-md) var(--c-radius-md) 0 0;
+}
+
+.market-top-tabs > .ant-tabs-nav .ant-tabs-tab:hover {
+  color: var(--c-accent, #20c6e5);
+}
+
+[data-theme="light"] .market-top-tabs > .ant-tabs-nav .ant-tabs-tab:hover {
+  color: var(--c-primary);
 }
 
 .market-top-tabs > .ant-tabs-nav .ant-tabs-tab-active {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--c-accent, #20c6e5) !important;
+}
+
+[data-theme="light"] .market-top-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+  color: var(--c-primary) !important;
+}
+
+.market-top-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
+  background: linear-gradient(90deg, #087f98, #20c6e5, #3ec98f) !important;
+  box-shadow: 0 0 10px rgba(32, 198, 229, 0.6) !important;
+  height: 3px !important;
+  border-radius: 2px !important;
+}
+
+[data-theme="light"] .market-top-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
+  background: var(--c-primary) !important;
+  box-shadow: none !important;
 }

@@ -1,12 +1,14 @@
 """产业链免配置公共数据兜底采集。"""
 
 import asyncio
+import json
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
 from app.agentic.public import execute_web_search
+from app.core.cache import reference_cache
 from app.core.news import parse_news_time
 from app.domain.industry_chain import (
     IndustryChainResearchScope,
@@ -196,22 +198,59 @@ def _scope_search_options(scope: IndustryChainResearchScope) -> tuple[str, str, 
     return region, date_range, time_range, language
 
 
+PUBLIC_DIMENSIONS = frozenset({
+    "stocks",
+    "market",
+    "competition",
+    "technology",
+    "chain",
+    "drivers_risks",
+    "reports",
+    "events",
+})
+_DIMENSION_TTL_SECONDS = {
+    "stocks": 6 * 60 * 60,
+    "market": 15 * 60,
+    "competition": 6 * 60 * 60,
+    "technology": 24 * 60 * 60,
+    "chain": 24 * 60 * 60,
+    "drivers_risks": 6 * 60 * 60,
+    "reports": 24 * 60 * 60,
+    "events": 30 * 60,
+}
+
+
+def _dimension_cache_key(
+    name: str,
+    dimension: str,
+    scope: IndustryChainResearchScope,
+) -> str:
+    scope_json = json.dumps(
+        scope.model_dump(mode="json", exclude_none=True),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return f"industry-chain:public:v2:{_normalize_topic(name)}:{dimension}:{scope_json}"
+
+
 async def collect_public_industry_data(
     name: str,
     scope: IndustryChainResearchScope | None = None,
+    dimensions: set[str] | None = None,
 ) -> dict:
-    """使用免配置行情与资讯源补充产业链研究材料。"""
+    """按维度采集并缓存免配置行情与资讯，只刷新缺失或已过期的部分。"""
     resolved_scope = resolve_industry_chain_scope(scope)
+    requested = set(dimensions) if dimensions is not None else set(PUBLIC_DIMENSIONS)
+    unknown = requested - PUBLIC_DIMENSIONS
+    if unknown:
+        raise ValueError(f"未知产业链公共数据维度: {', '.join(sorted(unknown))}")
+
     region, date_range, time_range, language = _scope_search_options(resolved_scope)
     company_terms = (
         "A股 上市公司"
         if resolved_scope.company_scope == "a_share"
         else "全球主要公司 上市公司 非上市公司"
-    )
-    stock_search = (
-        public_data.stock_search(f"{name}产业链 A股 上中下游")
-        if resolved_scope.company_scope == "a_share"
-        else asyncio.sleep(0, result=[])
     )
 
     def web_search(topic: str, *, search_time_range: str | None = None):
@@ -223,95 +262,191 @@ async def collect_public_industry_data(
             language=language,
         )
 
-    results = await asyncio.gather(
-        stock_search,
-        _industry_call("industry_rankings", 100),
-        _industry_call("concept_rankings", 100),
-        _industry_call("industry_fund_flow"),
-        _industry_call("concept_fund_flow"),
-        public_data.market_news(),
-        web_search("市场规模 复合增长率 CAGR 渗透率", search_time_range="any"),
-        web_search(f"竞争格局 市场份额 CR3 CR5 {company_terms}"),
-        web_search("核心技术路线 工艺壁垒 成本下降曲线 商业化成熟度"),
-        web_search("上游核心零部件 原材料 关键设备 国产替代率 供应商", search_time_range="any"),
-        web_search("中游生产制造 系统集成 总装 分部毛利率 附加值", search_time_range="any"),
-        web_search("下游应用场景 终端客户需求 增速 商业化落地", search_time_range="any"),
-        web_search("核心增长驱动力 政策催化 供应瓶颈 关键风险"),
-        web_search("行业深度研报 白皮书 pdf 证券公司", search_time_range="any"),
-        web_search("重大行业政策 头部企业扩产 订单 并购 最新事件"),
-        return_exceptions=True,
-    )
-    (
-        stock_search, industry_rankings, concept_rankings, industry_flow, concept_flow,
-        news, market_web, competition_web, technology_web, upstream_web, midstream_web,
-        downstream_web, driver_risk_web, reports_web, events_web,
-    ) = results
-    sector_rows = [
-        *_ranking_rows(industry_rankings, "industry"),
-        *_ranking_rows(concept_rankings, "concept"),
-    ]
-    matched_sectors = _select_relevant_rows(name, sector_rows)
-    component_sectors = [sector for sector in matched_sectors if sector.get("code")][:3]
-    component_results = await asyncio.gather(
-        *(_industry_call("industry_components", sector["code"]) for sector in component_sectors),
-        return_exceptions=True,
-    )
+    async def collect_market() -> dict:
+        industry_rankings, concept_rankings, industry_flow, concept_flow, market_web = await asyncio.gather(
+            _industry_call("industry_rankings", 100),
+            _industry_call("concept_rankings", 100),
+            _industry_call("industry_fund_flow"),
+            _industry_call("concept_fund_flow"),
+            web_search("市场规模 复合增长率 CAGR 渗透率", search_time_range="any"),
+            return_exceptions=True,
+        )
+        sector_rows = [
+            *_ranking_rows(industry_rankings, "industry"),
+            *_ranking_rows(concept_rankings, "concept"),
+        ]
+        matched_sectors = _select_relevant_rows(name, sector_rows)
+        return {
+            "market_data": {
+                "matched_sectors": matched_sectors,
+                "fund_flow": _select_relevant_flows(
+                    name,
+                    matched_sectors,
+                    [industry_flow, concept_flow],
+                ),
+                "web_results": _web_results(market_web),
+            },
+            "rankings": matched_sectors,
+        }
 
-    stocks = []
-    seen_stocks = set()
-    for item in _as_records(stock_search):
-        record = _stock_record(item)
-        if record and (record["code"] or record["name"]) not in seen_stocks:
-            seen_stocks.add(record["code"] or record["name"])
-            stocks.append(record)
-
-    competition_data = []
-    for sector, components in zip(component_sectors, component_results):
-        sector_stocks = []
-        for item in _as_records(components):
-            record = _stock_record(item, str(sector.get("name") or ""))
+    async def collect_stocks() -> dict:
+        if resolved_scope.company_scope != "a_share":
+            return {"stocks": []}
+        value = await public_data.stock_search(f"{name}产业链 A股 上中下游")
+        stocks = []
+        seen = set()
+        for item in _as_records(value):
+            record = _stock_record(item)
             if record is None:
                 continue
-            sector_stocks.append(record)
             key = record["code"] or record["name"]
-            if key not in seen_stocks:
-                seen_stocks.add(key)
-                stocks.append(record)
-        if sector_stocks:
-            competition_data.append(
-                {
+            if key in seen:
+                continue
+            seen.add(key)
+            stocks.append(record)
+        return {"stocks": stocks}
+
+    async def collect_competition(matched_sectors: list[dict]) -> dict:
+        competition_web = web_search(f"竞争格局 市场份额 CR3 CR5 {company_terms}")
+        component_sectors = [sector for sector in matched_sectors if sector.get("code")][:3]
+        component_results = await asyncio.gather(
+            *(_industry_call("industry_components", sector["code"]) for sector in component_sectors),
+            return_exceptions=True,
+        )
+        competition_search = await competition_web
+        competition_data = []
+        component_stocks = []
+        for sector, components in zip(component_sectors, component_results):
+            sector_stocks = []
+            for item in _as_records(components):
+                record = _stock_record(item, str(sector.get("name") or ""))
+                if record is not None:
+                    sector_stocks.append(record)
+                    component_stocks.append(record)
+            if sector_stocks:
+                competition_data.append({
                     "market": sector.get("name", ""),
                     "summary": "东方财富板块成分股",
                     "companies": sector_stocks,
-                }
-            )
+                })
+        return {
+            "competition_data": [*competition_data, *_web_results(competition_search)],
+            "_component_stocks": component_stocks,
+        }
 
-    relevant_flows = _select_relevant_flows(name, matched_sectors, [industry_flow, concept_flow])
-    relevant_news = _filter_news_by_scope(
-        _select_relevant_news(name, matched_sectors, news),
-        resolved_scope,
-    )
-    public_events = _dedupe_records([*relevant_news, *_web_results(events_web)])
-    return {
-        "research_scope": resolved_scope.model_dump(mode="json", exclude_none=True),
-        "stocks": stocks,
-        "market_data": {
-            "matched_sectors": matched_sectors,
-            "fund_flow": relevant_flows,
-            "web_results": _web_results(market_web),
-        },
-        "competition_data": [*competition_data, *_web_results(competition_web)],
-        "technology_data": _web_results(technology_web),
-        "chain_data": {
-            "upstream": _web_results(upstream_web),
-            "midstream": _web_results(midstream_web),
-            "downstream": _web_results(downstream_web),
-        },
-        "driver_risk_data": _web_results(driver_risk_web),
-        "reports": _web_results(reports_web),
-        "events": public_events,
-        "rankings": matched_sectors,
+    async def collect_technology() -> dict:
+        value = await web_search("核心技术路线 工艺壁垒 成本下降曲线 商业化成熟度")
+        return {"technology_data": _web_results(value)}
+
+    async def collect_chain() -> dict:
+        upstream, midstream, downstream = await asyncio.gather(
+            web_search("上游核心零部件 原材料 关键设备 国产替代率 供应商", search_time_range="any"),
+            web_search("中游生产制造 系统集成 总装 分部毛利率 附加值", search_time_range="any"),
+            web_search("下游应用场景 终端客户需求 增速 商业化落地", search_time_range="any"),
+            return_exceptions=True,
+        )
+        return {"chain_data": {
+            "upstream": _web_results(upstream),
+            "midstream": _web_results(midstream),
+            "downstream": _web_results(downstream),
+        }}
+
+    async def collect_drivers_risks() -> dict:
+        value = await web_search("核心增长驱动力 政策催化 供应瓶颈 关键风险")
+        return {"driver_risk_data": _web_results(value)}
+
+    async def collect_reports() -> dict:
+        value = await web_search("行业深度研报 白皮书 pdf 证券公司", search_time_range="any")
+        return {"reports": _web_results(value)}
+
+    async def collect_events(matched_sectors: list[dict]) -> dict:
+        news, events_web = await asyncio.gather(
+            public_data.market_news(),
+            web_search("重大行业政策 头部企业扩产 订单 并购 最新事件"),
+            return_exceptions=True,
+        )
+        relevant_news = _filter_news_by_scope(
+            _select_relevant_news(name, matched_sectors, news),
+            resolved_scope,
+        )
+        return {"events": _dedupe_records([*relevant_news, *_web_results(events_web)])}
+
+    cache_hits: list[str] = []
+    cache_misses: list[str] = []
+    failed_dimensions: list[str] = []
+    dimension_payloads: dict[str, dict] = {}
+
+    async def load_dimension(dimension: str, collector: Callable[[], Awaitable[dict]]) -> dict:
+        key = _dimension_cache_key(name, dimension, resolved_scope)
+        found, cached = reference_cache.get_with_status(key)
+        if found and isinstance(cached, dict):
+            cache_hits.append(dimension)
+            return cached
+        cache_misses.append(dimension)
+        payload = await collector()
+        reference_cache.set(key, payload, ttl=_DIMENSION_TTL_SECONDS[dimension])
+        return payload
+
+    needs_market_context = bool(requested & {"market", "competition", "events"})
+    market_payload: dict = {}
+    if needs_market_context:
+        try:
+            market_payload = await load_dimension("market", collect_market)
+        except Exception:
+            failed_dimensions.append("market")
+        else:
+            if "market" in requested:
+                dimension_payloads["market"] = market_payload
+    matched_sectors = list((market_payload.get("market_data") or {}).get("matched_sectors") or [])
+
+    collectors: dict[str, Callable[[], Awaitable[dict]]] = {
+        "stocks": collect_stocks,
+        "competition": lambda: collect_competition(matched_sectors),
+        "technology": collect_technology,
+        "chain": collect_chain,
+        "drivers_risks": collect_drivers_risks,
+        "reports": collect_reports,
+        "events": lambda: collect_events(matched_sectors),
     }
+    selected = [dimension for dimension in sorted(requested) if dimension != "market"]
+    outcomes = await asyncio.gather(
+        *(load_dimension(dimension, collectors[dimension]) for dimension in selected),
+        return_exceptions=True,
+    )
+    for dimension, outcome in zip(selected, outcomes):
+        if isinstance(outcome, Exception):
+            failed_dimensions.append(dimension)
+            continue
+        dimension_payloads[dimension] = outcome
+
+    combined: dict[str, Any] = {
+        "research_scope": resolved_scope.model_dump(mode="json", exclude_none=True),
+    }
+    component_stocks: list[dict] = []
+    for payload in dimension_payloads.values():
+        component_stocks.extend(payload.get("_component_stocks") or [])
+        combined.update({key: value for key, value in payload.items() if not key.startswith("_")})
+
+    stocks = [*(combined.get("stocks") or []), *component_stocks]
+    if stocks:
+        deduped_stocks = []
+        seen_stocks = set()
+        for stock in stocks:
+            key = stock.get("code") or stock.get("name")
+            if not key or key in seen_stocks:
+                continue
+            seen_stocks.add(key)
+            deduped_stocks.append(stock)
+        combined["stocks"] = deduped_stocks
+
+    combined["_collection_metadata"] = {
+        "requested_dimensions": sorted(requested),
+        "cache_hits": sorted(cache_hits),
+        "cache_misses": sorted(cache_misses),
+        "failed_dimensions": sorted(failed_dimensions),
+        "successful_dimensions": sorted(set(dimension_payloads) - set(failed_dimensions)),
+    }
+    return combined
 
 
-__all__ = ["collect_public_industry_data"]
+__all__ = ["PUBLIC_DIMENSIONS", "collect_public_industry_data"]

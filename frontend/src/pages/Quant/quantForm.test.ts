@@ -13,6 +13,25 @@ import {
 } from "./quantForm";
 
 describe("quant form helpers", () => {
+  it("converts risk percentages and preserves explicit disabled limits", () => {
+    const execution = buildBacktestRequest({
+      ...INITIAL_VALUES, feeSchedule: "a_share_historical", participationPercent: 5,
+      maxPositionPercent: 20, cashReservePercent: 15, stopLossPercent: 8,
+      trailingStopPercent: 10, maxDrawdownPercent: 25, targetVolatilityPercent: 12,
+    }).execution;
+    expect(execution).toEqual(expect.objectContaining({
+      fee_schedule: "a_share_historical", max_daily_participation_rate: 0.05,
+      max_position_weight: 0.2, cash_reserve_ratio: 0.15, stop_loss_pct: 0.08,
+      trailing_stop_pct: 0.1, max_portfolio_drawdown: 0.25, target_annual_volatility: 0.12,
+    }));
+    expect(buildBacktestRequest({ ...INITIAL_VALUES, participationPercent: null }).execution)
+      .toEqual(expect.objectContaining({
+        max_daily_participation_rate: null, stop_loss_pct: null, trailing_stop_pct: null,
+        max_portfolio_drawdown: null, target_annual_volatility: null,
+      }));
+    expect(buildBacktestRequest(INITIAL_VALUES).execution?.max_daily_participation_rate).toBe(0.1);
+  });
+
   it("normalizes and deduplicates custom stock codes", () => {
     expect(parseStockCodes("600519， 000001 600519")).toEqual(["600519", "000001"]);
     expect(buildBacktestRequest({ ...INITIAL_VALUES, codes: "600519, 600519" }).universe.codes).toEqual(["600519"]);

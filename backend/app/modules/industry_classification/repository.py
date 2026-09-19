@@ -112,6 +112,36 @@ def get_record(stock_code: str) -> dict[str, Any] | None:
     return _record(row) if row else None
 
 
+def get_records_by_stock_codes(stock_codes: Iterable[str]) -> dict[str, dict[str, Any]]:
+    """批量读取股票行业，避免组合风险计算逐只查询数据库。"""
+    normalized = {str(code).strip().upper() for code in stock_codes if str(code).strip()}
+    if not normalized:
+        return {}
+    aliases = normalized | {code.split(".", 1)[0] for code in normalized}
+    placeholders = ",".join("?" for _ in aliases)
+    rows = _connection().execute(
+        f"""
+        SELECT * FROM sw_industry_classifications
+        WHERE stock_code IN ({placeholders})
+           OR CASE WHEN instr(stock_code, '.') > 0
+                   THEN substr(stock_code, 1, instr(stock_code, '.') - 1)
+                   ELSE stock_code END IN ({placeholders})
+        """,
+        (*aliases, *aliases),
+    ).fetchall()
+    result: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        record = _record(row)
+        raw_code = str(record["stock_code"]).strip().upper()
+        result[raw_code] = record
+        result.setdefault(raw_code.split(".", 1)[0], record)
+    return {
+        code: result.get(code) or result.get(code.split(".", 1)[0])
+        for code in normalized
+        if result.get(code) or result.get(code.split(".", 1)[0])
+    }
+
+
 def get_record_by_id(record_id: int) -> dict[str, Any] | None:
     row = _connection().execute(
         "SELECT * FROM sw_industry_classifications WHERE id = ?", (record_id,)
@@ -618,4 +648,3 @@ def get_all_distinct_industries(level: int | None = None) -> list[str]:
         "SELECT DISTINCT sw_level3_name FROM sw_industry_classifications WHERE market_group='A' AND sw_level3_name<>''"
     ).fetchall()
     return sorted([str(r[0]) for r in rows if r[0]])
-

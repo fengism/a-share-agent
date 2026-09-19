@@ -20,6 +20,12 @@ describe("PortfolioSummaryCards", () => {
         profitable_count: 1,
         losing_count: 0,
         unpriced_count: 0,
+        cash_configured: true,
+        initial_cash: 100000,
+        cash_balance: 99394,
+        estimated_securities_value: 660,
+        total_asset_value: 100054,
+        total_position_pct: 0.66,
       }} />,
     );
 
@@ -28,5 +34,35 @@ describe("PortfolioSummaryCards", () => {
     expect(screen.getByText("综合盈亏")).toBeInTheDocument();
     expect(screen.getByText("按 FIFO 成本核算卖出")).toBeInTheDocument();
     expect(screen.getByText("共 2 笔交易流水")).toBeInTheDocument();
+    expect(screen.getByText("总资产").closest(".ant-statistic")).toHaveTextContent("100,054.00");
+    expect(screen.getByText("现金余额").closest(".ant-statistic")).toHaveTextContent("99,394.00");
+    expect(screen.getByText("总仓位").closest(".ant-statistic")).toHaveTextContent("0.66%");
+  });
+
+  it("prompts for initial cash when account accounting is not configured", () => {
+    render(<PortfolioSummaryCards summary={{
+      stock_count: 0,
+      position_count: 0,
+      transaction_count: 0,
+      total_cost: 0,
+      priced_cost: 0,
+      total_market_value: 0,
+      total_profit_amount: 0,
+      total_profit_pct: null,
+      unrealized_profit_amount: 0,
+      realized_profit_amount: 0,
+      combined_profit_amount: 0,
+      profitable_count: 0,
+      losing_count: 0,
+      unpriced_count: 0,
+      cash_configured: false,
+      initial_cash: null,
+      cash_balance: null,
+      estimated_securities_value: 0,
+      total_asset_value: null,
+      total_position_pct: null,
+    }} />);
+
+    expect(screen.getByText("尚未配置初始资金")).toBeInTheDocument();
   });
 });

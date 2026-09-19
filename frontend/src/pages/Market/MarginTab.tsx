@@ -51,7 +51,7 @@ export default function MarginTab() {
             const prefix = isNet && item.value > 0 ? "+" : "";
             content += `<div style="display: flex; justify-content: space-between; gap: 16px; margin: 3px 0;">
               <span>${item.marker} ${item.seriesName}</span>
-              <strong style="font-family: monospace;">${prefix}${val} 亿元</strong>
+              <strong style="font-family: var(--c-font-mono);">${prefix}${val} 亿元</strong>
             </div>`;
           });
           return content;

@@ -230,6 +230,7 @@ _US_ECON_INDICATOR_IDS = {
     "CPI_YOY": "EMG00000733",  # 美国:CPI:非季调:当月同比
     "CPI_MOM": "EMG00000770",  # 美国:CPI:季调:环比
     "CORE_CPI_MOM": "EMG00000771",  # 美国:核心CPI:季调:环比
+    "PPI_MOM": "EMG00177897",  # 美国:PPI:季调:环比
     "UNEMPLOYMENT": "EMG00001039",  # 美国:失业率:季调
     "NON_FARM": "EMG00152118",  # 美国:新增非农就业人数:当月值:季调
 }
@@ -305,6 +306,13 @@ class UsEconMixin:
         rows = [{"TIME": period, "VALUE": value} for period, value in sorted(series.items(), reverse=True)]
         return rows[:_US_ECON_ROW_LIMIT]
 
+    def fetch_us_ppi(self) -> list[dict]:
+        """美国 PPI 环比（东财数据中心只有环比，同比/核心字段依赖 FRED 主源）。"""
+        series = {
+            "PPI_MOM": self._fetch_us_econ_series(_US_ECON_INDICATOR_IDS["PPI_MOM"]),
+        }
+        return self._combine_us_series(series)
+
     def fetch_us_cpi(self) -> list[dict]:
         """美国 CPI 同比/环比/核心环比。"""
         series = {
@@ -326,11 +334,37 @@ class UsEconMixin:
         return self._combine_us_series(series)
 
     def fetch_us_pmi(self) -> list[dict]:
-        """美国 ISM 制造业/服务业 PMI。"""
-        series = {
-            field: self._fetch_us_econ_series(indicator_id)
+        """美国 ISM 制造业/服务业 PMI。
+
+        两条 PMI 序列使用同一个数据中心请求获取，避免串行请求在上游响应较慢时
+        超过宏观指标的单 Provider 超时。
+        """
+        indicator_fields = {
+            indicator_id: field
             for field, indicator_id in _US_PMI_INDICATOR_IDS.items()
         }
+        indicator_filter = ",".join(f'"{indicator_id}"' for indicator_id in indicator_fields)
+        rows = self.fetch_datacenter_report(
+            "RPT_ECONOMICVALUE_USANEW",
+            filter_str=f"(INDICATOR_ID in ({indicator_filter}))",
+            columns="ALL",
+            page_size=_US_ECON_PAGE_SIZE,
+            sort_columns="REPORT_DATE",
+            sort_types="-1",
+        )
+        series: dict[str, dict[str, float]] = {
+            field: {} for field in _US_PMI_INDICATOR_IDS
+        }
+        for row in rows:
+            field = indicator_fields.get(str(row.get("INDICATOR_ID") or ""))
+            value = row.get("VALUE")
+            report_date = str(row.get("REPORT_DATE") or "")[:10]
+            if field is None or value is None or len(report_date) != 10:
+                continue
+            try:
+                series[field][report_date] = float(value)
+            except (TypeError, ValueError):
+                continue
         return self._combine_us_series(series)
 
     def fetch_us_fed_rate(self) -> list[dict]:

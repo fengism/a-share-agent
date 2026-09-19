@@ -1,12 +1,13 @@
 import { Col, Row } from "antd";
 import AdminResetCard from "../../components/AdminResetCard";
-import { BotConfigCard, DataSourceCookiesCard, TwitterConfigCard } from "./ConfigCards";
+import { BotConfigCard, DataSourceCookiesCard, FredConfigCard, TwitterConfigCard } from "./ConfigCards";
 import BotJobManagerCard from "./BotJobManagerCard";
 import InviteManagerCard from "./InviteManagerCard";
 import type { ConfigSectionProps } from "./sectionTypes";
 
 interface DataSourcesSettingsSectionProps extends ConfigSectionProps {
   onSaveTwitter: () => void;
+  onSaveFred: () => void;
   onSaveDataSourceCookies: () => void;
 }
 
@@ -16,6 +17,7 @@ export function DataSourcesSettingsSection({
   isSaving,
   sectionTitleStyle,
   onSaveTwitter,
+  onSaveFred,
   onSaveDataSourceCookies,
 }: DataSourcesSettingsSectionProps) {
   const cardProps = { form, onChange, isSaving };
@@ -25,6 +27,9 @@ export function DataSourcesSettingsSection({
       <Row gutter={[16, 0]}>
         <Col xs={24} lg={12}>
           <TwitterConfigCard {...cardProps} onSave={onSaveTwitter} />
+        </Col>
+        <Col xs={24} lg={12}>
+          <FredConfigCard {...cardProps} onSave={onSaveFred} />
         </Col>
         <Col xs={24} lg={12}>
           <DataSourceCookiesCard {...cardProps} onSave={onSaveDataSourceCookies} />

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import type { QuantBacktestResult } from "../../api/queries";
@@ -65,6 +65,44 @@ function makeResult(overrides: Partial<QuantBacktestResult> = {}): QuantBacktest
 }
 
 describe("BacktestResult", () => {
+  it("discloses model assumptions and complete trade samples", () => {
+    const result = makeResult({ model_assumptions: ["前复权行情不含分红送转资金账本"] });
+    result.metrics.closed_trade_count = 3;
+    result.metrics.observation_count = 120;
+    render(<BacktestResult result={result} />);
+    expect(screen.getByText("日线近似模拟，历史表现不代表未来收益。")).toBeVisible();
+    expect(screen.getByText("前复权行情不含分红送转资金账本")).not.toBeVisible();
+    fireEvent.click(screen.getByText("回测模型与适用边界"));
+    expect(screen.getByText("前复权行情不含分红送转资金账本")).toBeVisible();
+    const core = screen.getByRole("group", { name: "核心回测指标" });
+    expect(within(core).getByText("交易日样本数").closest(".ant-statistic")).toHaveTextContent("120天");
+    expect(within(core).queryByText("年化收益")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "补充回测指标" })).getByText("年化收益")).toBeInTheDocument();
+    expect(screen.getByText("完整平仓次数")).toBeInTheDocument();
+    expect(screen.getByText("交易日样本数")).toBeInTheDocument();
+  });
+
+  it.each([undefined, 0])("distinguishes missing and zero observation counts (%s)", (count) => {
+    const result = makeResult();
+    result.metrics.observation_count = count;
+    render(<BacktestResult result={result} />);
+    expect(screen.getByText("交易日样本数").closest(".ant-statistic"))
+      .toHaveTextContent(count === undefined ? "未记录" : "0天");
+  });
+
+  it("uses signed metric tones without rating a strategy as safe", () => {
+    const result = makeResult();
+    result.metrics.total_return = -4;
+    result.metrics.annualized_return = 0;
+    result.metrics.max_drawdown = -26;
+    render(<BacktestResult result={result} />);
+    expect(screen.getByText("总收益").closest(".quant-metric-card")).toHaveClass("quant-metric-card--negative");
+    expect(screen.getByText("年化收益").closest(".quant-metric-card")).toHaveClass("quant-metric-card--neutral");
+    expect(screen.getByText("夏普比率").closest(".quant-metric-card")).toHaveClass("quant-metric-card--neutral");
+    expect(screen.getByText("历史回撤 ≥ 25%")).toBeVisible();
+    expect(screen.getByText("仅描述该回测区间，不代表未来表现")).toBeVisible();
+  });
+
   it("renders metrics, compact charts and result tables", () => {
     render(<BacktestResult result={makeResult()} />);
 
@@ -110,6 +148,7 @@ describe("BacktestResult", () => {
     render(<BacktestResult result={result} />);
 
     expect(screen.getByText("该回测没有可用的基准收益")).toBeInTheDocument();
+    expect(screen.queryByText(/跑赢基准/)).not.toBeInTheDocument();
     expect(screen.getByText(/建议重新创建回测/)).toBeInTheDocument();
   });
 

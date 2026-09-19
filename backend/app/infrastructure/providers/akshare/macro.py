@@ -189,6 +189,13 @@ def fetch_us_gdp() -> list[dict[str, Any]]:
     return _us_indicator(ak.macro_usa_gdp_monthly)
 
 
+def fetch_us_ppi() -> list[dict[str, Any]]:
+    return _combined_rows(_parallel_event_series({
+        "PPI_MOM": ak.macro_usa_ppi,
+        "CORE_PPI_MOM": ak.macro_usa_core_ppi,
+    }), carry_forward=True)[:24]
+
+
 def fetch_us_cpi() -> list[dict[str, Any]]:
     return _combined_rows(_parallel_event_series({
         "CPI_YOY": ak.macro_usa_cpi_yoy,

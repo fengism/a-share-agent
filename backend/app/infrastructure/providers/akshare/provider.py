@@ -49,6 +49,7 @@ class AkshareDataProvider:
 
     fetch_us_gdp = staticmethod(macro.fetch_us_gdp)
     fetch_us_cpi = staticmethod(macro.fetch_us_cpi)
+    fetch_us_ppi = staticmethod(macro.fetch_us_ppi)
     fetch_us_labor = staticmethod(macro.fetch_us_labor)
     fetch_us_pmi = staticmethod(macro.fetch_us_pmi)
     fetch_us_fed_rate = staticmethod(macro.fetch_us_fed_rate)

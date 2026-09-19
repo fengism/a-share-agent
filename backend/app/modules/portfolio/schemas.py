@@ -40,6 +40,17 @@ class PortfolioTransactionCreate(BaseModel):
         return value.strip()
 
 
+class PortfolioAccountSettingsUpdate(BaseModel):
+    initial_cash: float | None = Field(default=None, ge=0, le=1_000_000_000_000)
+    max_total_position_pct: float = Field(default=80, gt=0, le=100)
+    max_single_stock_pct: float = Field(default=30, gt=0, le=100)
+    max_sector_pct: float = Field(default=40, gt=0, le=100)
+
+
+class PortfolioAccountSettings(PortfolioAccountSettingsUpdate):
+    updated_at: str | None = None
+
+
 class PortfolioLotMatch(BaseModel):
     buy_transaction_id: int
     buy_time: str
@@ -75,6 +86,15 @@ class PortfolioTransactionPreview(BaseModel):
     matched_cost: float | None = None
     realized_profit_amount: float | None = None
     matches: list[PortfolioLotMatch] = Field(default_factory=list)
+    trade_amount: float
+    fee: float
+    cash_balance_after: float | None = None
+    estimated_total_assets_after: float | None = None
+    total_position_pct_after: float | None = None
+    stock_position_pct_after: float | None = None
+    sector_name: str | None = None
+    sector_position_pct_after: float | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class PortfolioPosition(BaseModel):
@@ -107,6 +127,8 @@ class PortfolioStockSummary(BaseModel):
     realized_profit_amount: float
     total_profit_amount: float | None = None
     allocation_pct: float | None = None
+    securities_allocation_pct: float | None = None
+    sector_name: str | None = None
     profit_contribution_pct: float | None = None
 
 
@@ -125,6 +147,12 @@ class PortfolioSummary(BaseModel):
     profitable_count: int
     losing_count: int
     unpriced_count: int
+    cash_configured: bool
+    initial_cash: float | None = None
+    cash_balance: float | None = None
+    estimated_securities_value: float
+    total_asset_value: float | None = None
+    total_position_pct: float | None = None
 
 
 class PortfolioClosedPosition(BaseModel):
@@ -150,7 +178,20 @@ class PortfolioRiskSummary(BaseModel):
     concentration_level: Literal["low", "medium", "high", "unknown"]
     priced_stock_count: int
     unpriced_stock_count: int
+    max_total_position_limit_pct: float
+    max_single_stock_limit_pct: float
+    max_sector_limit_pct: float
+    largest_sector_name: str | None = None
+    largest_sector_pct: float | None = None
+    sector_allocations: list["PortfolioSectorAllocation"] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class PortfolioSectorAllocation(BaseModel):
+    sector_name: str
+    market_value: float
+    allocation_pct: float | None = None
+    stock_codes: list[str] = Field(default_factory=list)
 
 
 class PortfolioResponse(BaseModel):
@@ -160,6 +201,7 @@ class PortfolioResponse(BaseModel):
     closed_positions: list[PortfolioClosedPosition]
     summary: PortfolioSummary
     risk: PortfolioRiskSummary
+    settings: PortfolioAccountSettings
     quoted_at: str
     quote_source: str = "tencent"
     quote_stale: bool = False

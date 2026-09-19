@@ -7,6 +7,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
+from typing import Protocol
 
 import pandas as pd
 
@@ -24,6 +25,14 @@ from app.domain.market import KlineItem
 from app.financial_data.kline_quality import validate_kline_frame
 from app.infrastructure.providers.provider_chain import BaseProviderChain, ProviderAttempt
 from app.infrastructure.providers.registry import get_provider
+
+
+class HistoricalRequestLimiter(Protocol):
+    """市场级批量任务可注入的历史行情请求节流器。"""
+
+    async def wait(self, source: str) -> None: ...
+
+    async def observe_error(self, source: str, error: Exception) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -167,8 +176,16 @@ async def _load_historical_source(
     semaphore: asyncio.Semaphore,
     aggregate_period: str | None = None,
     require_turnover: bool = False,
+    request_limiter: HistoricalRequestLimiter | None = None,
 ) -> tuple[str, list[KlineItem]]:
-    frame = await call_blocking(fetcher, *fetch_args, semaphore=semaphore)
+    if request_limiter is not None:
+        await request_limiter.wait(source)
+    try:
+        frame = await call_blocking(fetcher, *fetch_args, semaphore=semaphore)
+    except Exception as error:
+        if request_limiter is not None:
+            await request_limiter.observe_error(source, error)
+        raise
     if aggregate_period is not None:
         frame = _resample_adjusted_daily_frame(frame, aggregate_period)
     frame = validate_kline_frame(
@@ -207,6 +224,8 @@ def _historical_source_attempts(
     end_date: str,
     adjust: str,
     require_turnover: bool = False,
+    *,
+    request_limiter: HistoricalRequestLimiter | None = None,
 ) -> list[ProviderAttempt[tuple[str, list[KlineItem]]]]:
     attempts: list[ProviderAttempt[tuple[str, list[KlineItem]]]] = []
     if period == "daily":
@@ -227,6 +246,7 @@ def _historical_source_attempts(
                     require_turnover,
                     semaphore=tdx_semaphore,
                     require_turnover=require_turnover,
+                    request_limiter=request_limiter,
                 ),
                 on_error=f"TDX 复权K线不可用: code={symbol}",
                 max_attempts=1,
@@ -248,6 +268,7 @@ def _historical_source_attempts(
                     adjust,
                     semaphore=tencent_semaphore,
                     require_turnover=require_turnover,
+                    request_limiter=request_limiter,
                 ),
                 on_error=f"腾讯财经复权K线不可用: code={symbol}",
                 max_attempts=1,
@@ -269,6 +290,7 @@ def _historical_source_attempts(
                     adjust,
                     semaphore=akshare_semaphore,
                     require_turnover=require_turnover,
+                    request_limiter=request_limiter,
                 ),
                 on_error=f"新浪复权K线不可用: code={symbol}",
                 max_attempts=1,
@@ -294,6 +316,7 @@ def _historical_source_attempts(
                     semaphore=tdx_semaphore,
                     aggregate_period=period,
                     require_turnover=require_turnover,
+                    request_limiter=request_limiter,
                 ),
                 on_error=f"TDX 日线聚合复权{period_label}K线不可用: code={symbol}",
                 max_attempts=1,
@@ -316,6 +339,7 @@ def _historical_source_attempts(
                     semaphore=tencent_semaphore,
                     aggregate_period=period,
                     require_turnover=require_turnover,
+                    request_limiter=request_limiter,
                 ),
                 on_error=f"腾讯财经日线聚合复权{period_label}K线不可用: code={symbol}",
                 max_attempts=1,
@@ -336,6 +360,7 @@ def _historical_source_attempts(
                     semaphore=akshare_semaphore,
                     aggregate_period=period,
                     require_turnover=require_turnover,
+                    request_limiter=request_limiter,
                 ),
                 on_error=f"新浪日线聚合复权{period_label}K线不可用: code={symbol}",
                 max_attempts=1,
@@ -359,6 +384,7 @@ def _historical_source_attempts(
                     adjust,
                     semaphore=cls_semaphore,
                     require_turnover=require_turnover,
+                    request_limiter=request_limiter,
                 ),
                 on_error=f"财联社不复权K线不可用: code={symbol}",
                 max_attempts=1,
@@ -381,6 +407,7 @@ def _historical_source_attempts(
                 adjust,
                 semaphore=eastmoney_semaphore,
                 require_turnover=require_turnover,
+                request_limiter=request_limiter,
             ),
             on_error=f"东方财富直连复权K线 fallback 不可用: code={symbol}",
             max_attempts=1,
@@ -401,6 +428,7 @@ def _historical_source_attempts(
                 adjust,
                 semaphore=akshare_semaphore,
                 require_turnover=require_turnover,
+                request_limiter=request_limiter,
             ),
             on_error=f"AkShare 东方财富复权K线最终 fallback 不可用: code={symbol}",
             max_attempts=1,
@@ -417,6 +445,8 @@ async def get_historical_bars(
     period: str = "daily",
     adjust: str = "qfq",
     require_turnover: bool = False,
+    max_provider_sources: int | None = None,
+    request_limiter: HistoricalRequestLimiter | None = None,
 ) -> HistoricalBarSet:
     """通过支持显式复权的 Provider Chain 加载历史行情。"""
     symbol = normalize_code(code).raw
@@ -424,7 +454,7 @@ async def get_historical_bars(
         raise ValueError("不支持的 K 线周期")
     if adjust not in {"qfq", "hfq", ""}:
         raise ValueError("不支持的复权方式")
-    attempts = _historical_source_attempts(
+    attempt_args = (
         symbol,
         period,
         start_date.strftime("%Y%m%d"),
@@ -432,6 +462,17 @@ async def get_historical_bars(
         adjust,
         require_turnover,
     )
+    if request_limiter is None:
+        attempts = _historical_source_attempts(*attempt_args)
+    else:
+        attempts = _historical_source_attempts(
+            *attempt_args,
+            request_limiter=request_limiter,
+        )
+    if max_provider_sources is not None:
+        if max_provider_sources < 1:
+            raise ValueError("max_provider_sources 必须大于 0")
+        attempts = attempts[:max_provider_sources]
     try:
         source, items = await BaseProviderChain(
             attempts,

@@ -17,13 +17,13 @@ class SymbolFormats:
 
 
 def classify_exchange(code: str) -> str:
-    """Classify the exchange of a six-digit stock code."""
+    """Classify the exchange of a six-digit mainland-listed security code."""
     code = code.strip()
     if not code.isdigit() or len(code) != 6:
         raise ValueError(f"无效股票代码: {code}，需要6位数字")
-    if code.startswith("6") or code.startswith("900"):
+    if code.startswith(("5", "6", "900")):
         return "SH"
-    if code.startswith(("0", "2", "3")):
+    if code.startswith(("0", "1", "2", "3")):
         return "SZ"
     if code.startswith(("4", "8", "920")):
         return "BJ"

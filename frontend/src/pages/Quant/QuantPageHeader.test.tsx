@@ -7,6 +7,8 @@ describe("QuantPageHeader", () => {
     render(<QuantPageHeader />);
 
     expect(screen.getByRole("heading", { name: "量化研究" })).toBeInTheDocument();
+    expect(screen.queryByText("READY")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("回测类型")).toHaveTextContent("日线回测");
     expect(screen.getByText("策略实验室")).toBeInTheDocument();
     expect(screen.getByText(/配置策略、跟踪任务/)).toBeInTheDocument();
     expect(screen.queryByLabelText("回测能力")).not.toBeInTheDocument();

@@ -4,7 +4,10 @@ import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import type { components } from "../generated/schema";
 import { queryKeys } from "../queryKeys";
 import { useAStockTradingSession } from "../../hooks/useAStockTradingSession";
+import { usePageVisibility } from "../../hooks/usePageVisibility";
 import type {
+  PortfolioAccountSettings,
+  PortfolioAccountSettingsUpdate,
   PortfolioResponse,
   PortfolioTransaction,
   PortfolioTransactionCreate,
@@ -15,11 +18,12 @@ type DeleteResponse = components["schemas"]["DeleteResponse"];
 
 export function usePortfolio() {
   const isTradingSession = useAStockTradingSession();
+  const isVisible = usePageVisibility();
   return useQuery({
     queryKey: queryKeys.portfolio,
     queryFn: () => apiGet<PortfolioResponse>("/portfolio"),
     staleTime: QUERY_CACHE_POLICIES.portfolioRealtime.staleMs,
-    refetchInterval: isTradingSession ? QUERY_CACHE_POLICIES.portfolioRealtime.pollMs : false,
+    refetchInterval: isTradingSession && isVisible ? QUERY_CACHE_POLICIES.portfolioRealtime.pollMs : false,
   });
 }
 
@@ -28,6 +32,15 @@ export function useCreatePortfolioTransaction() {
   return useMutation({
     mutationFn: (transaction: PortfolioTransactionCreate) =>
       apiPost<PortfolioTransaction>("/portfolio/transactions", transaction),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
+  });
+}
+
+export function useUpdatePortfolioSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: PortfolioAccountSettingsUpdate) =>
+      apiPut<PortfolioAccountSettings>("/portfolio/settings", settings),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
   });
 }

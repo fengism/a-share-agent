@@ -2,6 +2,9 @@
 
 from app.financial_data.market.macro.schemas import (
     CommoditiesResponse,
+    CrudeOilData,
+    CrudeOilHistoryPoint,
+    CrudeOilQuote,
     CustomsTradeDataResponse,
     GlobalMacroRatesResponse,
     MacroAllDataResponse,
@@ -14,6 +17,7 @@ from app.financial_data.market.macro.service import (
     get_macro_all_data,
     get_macro_data,
     get_us_macro_data,
+    invalidate_us_macro_snapshot,
     prewarm_us_macro_data,
 )
 from app.financial_data.market.news import (
@@ -22,6 +26,7 @@ from app.financial_data.market.news import (
     get_market_news,
     get_market_other_news,
 )
+from app.financial_data.market.quotes.breadth import get_market_breadth
 from app.financial_data.market.quotes.commodity import get_commodity_spot_prices
 from app.financial_data.market.quotes.customs import get_customs_trade_data
 from app.financial_data.market.quotes.dragon_tiger import get_dragon_tiger_detail, get_dragon_tiger_list
@@ -36,6 +41,7 @@ from app.financial_data.market.quotes.limit_history import get_limit_history
 from app.financial_data.market.quotes.limit_up_ladder import get_limit_up_ladder
 from app.financial_data.market.quotes.mainline import get_market_mainline
 from app.financial_data.market.quotes.margin import get_market_margin
+from app.financial_data.market.quotes.national_team import get_national_team_etf_holdings
 from app.financial_data.market.quotes.northbound_history import get_northbound_history
 from app.financial_data.market.quotes.price_anomaly import (
     get_market_price_anomaly,
@@ -49,6 +55,8 @@ from app.financial_data.market.quotes.schemas import (
     IndexIntradayData,
     IndexIntradayItem,
     IndustryRankings,
+    MarketBreadthDailySummary,
+    MarketBreadthResponse,
     MarketEmotion,
     MarketEmotionDistribution,
     MarketLimitHistoryCategory,
@@ -80,6 +88,12 @@ from app.financial_data.market.quotes.schemas import (
     MarketWindResponse,
     MarketWindStock,
     MarketWindStocksResponse,
+    NationalTeamEtfPoint,
+    NationalTeamEtfSeries,
+    NationalTeamIndexPoint,
+    NationalTeamIndexSeries,
+    NationalTeamResponse,
+    NationalTeamSummary,
     NorthboundHistoryPoint,
     NorthboundHistoryResponse,
     ThsHotPlate,
@@ -123,6 +137,7 @@ __all__ = [
     "get_macro_all_data",
     "get_macro_data",
     "get_us_macro_data",
+    "invalidate_us_macro_snapshot",
     "prewarm_us_macro_data",
     "get_market_feed",
     "get_market_date_on_or_before",
@@ -130,6 +145,7 @@ __all__ = [
     "get_market_kuaixun",
     "get_market_mainline",
     "get_market_margin",
+    "get_national_team_etf_holdings",
     "get_market_other_news",
     "get_northbound_history",
     "get_commodity_spot_prices",
@@ -138,6 +154,7 @@ __all__ = [
     "get_treasury_yield_curve",
     "get_market_price_anomaly",
     "get_market_price_anomaly_count",
+    "get_market_breadth",
     "get_limit_up_ladder",
     "get_limit_history",
     "get_market_news",
@@ -163,6 +180,9 @@ __all__ = [
     "SgeGoldHistoryPoint",
     "SgeGoldResponse",
     "CommoditiesResponse",
+    "CrudeOilData",
+    "CrudeOilHistoryPoint",
+    "CrudeOilQuote",
     "CustomsTradeDataResponse",
     "GlobalMacroRatesResponse",
     "TreasuryYieldsResponse",
@@ -183,6 +203,14 @@ __all__ = [
     "MarketMainlineChance",
     "MarketMarginItem",
     "MarketMarginResponse",
+    "NationalTeamEtfPoint",
+    "NationalTeamEtfSeries",
+    "NationalTeamIndexPoint",
+    "NationalTeamIndexSeries",
+    "NationalTeamResponse",
+    "NationalTeamSummary",
+    "MarketBreadthDailySummary",
+    "MarketBreadthResponse",
     "NorthboundHistoryPoint",
     "NorthboundHistoryResponse",
     "MarketPriceAnomalyCountItem",

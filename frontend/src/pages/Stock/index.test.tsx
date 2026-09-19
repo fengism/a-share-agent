@@ -67,7 +67,11 @@ vi.mock("../../api/queries", () => ({
 
 vi.mock("../../charts/LazyKlineChart", () => ({ default: () => <div>K 线图</div> }));
 vi.mock("../../charts/IntradayChart", () => ({ default: () => <div>分时图</div> }));
-vi.mock("../../charts/IndicatorSubCharts", () => ({ default: () => <div>MACD 指标图</div> }));
+vi.mock("../../charts/IndicatorSubCharts", () => ({
+  default: ({ activeType }: { activeType?: string }) => (
+    <div>{activeType ? activeType.toUpperCase() : "MACD"} 指标图</div>
+  ),
+}));
 vi.mock("../../features/stock-insights/AnnouncementsPanel", () => ({
   default: () => {
     mocks.informationTabs();
@@ -78,6 +82,9 @@ vi.mock("../../features/stock-insights/ResearchReportsPanel", () => ({ default: 
 vi.mock("../../features/stock-insights/FundFlowPanel", () => ({ default: () => <div>资金面板</div> }));
 vi.mock("../../features/stock-insights/ChipDistributionPanel", () => ({
   default: () => <div>筹码分布内容</div>,
+}));
+vi.mock("./HKStockPageContent", () => ({
+  default: ({ code }: { code: string }) => <div data-testid="hk-stock-page">港股资料页: {code}</div>,
 }));
 vi.mock("../../features/investment-research/KeyFinancialMetricsSection", () => ({
   default: () => {
@@ -136,7 +143,7 @@ describe("StockPage", () => {
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/analysis/600519"));
   });
 
-  it("shows MACD and chip distribution with the market charts", () => {
+  it("shows MACD and chip distribution with the market charts", async () => {
     render(
       <MemoryRouter initialEntries={["/stock/600519"]}>
         <Routes><Route path="/stock/:code" element={<StockPage />} /></Routes>
@@ -146,8 +153,14 @@ describe("StockPage", () => {
     fireEvent.click(screen.getByText("MACD"));
     expect(screen.getByText("MACD 指标图")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByText("RSI"));
+    expect(screen.getByText("RSI 指标图")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("KDJ"));
+    expect(screen.getByText("KDJ 指标图")).toBeInTheDocument();
+
     fireEvent.click(screen.getByText("筹码分布"));
-    expect(screen.getByText("筹码分布内容")).toBeInTheDocument();
+    expect(await screen.findByText("筹码分布内容")).toBeInTheDocument();
   });
 
   it("adds the stock to the watchlist", async () => {
@@ -182,6 +195,28 @@ describe("StockPage", () => {
 
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/stock/600519"));
     expect(mocks.stockInfo).toHaveBeenCalledWith("600519");
+  });
+
+  it("renders HK stock content when given an HK stock code", () => {
+    render(
+      <MemoryRouter initialEntries={["/stock/00700"]}>
+        <Routes><Route path="/stock/:code" element={<StockPage />} /></Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("hk-stock-page")).toHaveTextContent("港股资料页: 00700");
+    expect(mocks.stockInfo).not.toHaveBeenCalled();
+  });
+
+  it("redirects short HK stock code to canonical 5-digit profile URL", async () => {
+    render(
+      <MemoryRouter initialEntries={["/stock/700"]}>
+        <Routes><Route path="/stock/:code" element={<StockPage />} /></Routes>
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/stock/00700"));
   });
 
   it("defers financial and information requests until their sections approach the viewport", async () => {

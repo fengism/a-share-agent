@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Button, Card, Tag, Typography } from "antd";
 import { CalendarOutlined, LeftOutlined, RightOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { useMarketIndexKline, useTradingCalendar } from "../../api/queries";
+import { useMarketIndexKline, useMarketIndices, useTradingCalendar } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { hexToRgba } from "../../charts/utils";
 import { useColors, useStyles, useTokens } from "../../styles/ui";
@@ -196,13 +196,14 @@ export default function TradingCalendar() {
   const [cursor, setCursor] = useState(() => ({ year: initial.year(), month: initial.month() }));
   const query = useTradingCalendar(cursor.year);
   const klineQuery = useMarketIndexKline(BENCHMARK_SYMBOL, "daily");
+  const indicesQuery = useMarketIndices();
 
   const tradeDateSet = useMemo(
     () => new Set(query.data?.trade_dates ?? []),
     [query.data?.trade_dates],
   );
 
-  // 上证指数日涨跌幅：以前收盘为基准计算
+  // 上证指数日涨跌幅：以前收盘为基准计算历史热力，并融合今日实时指数快照
   const heatMap = useMemo(() => {
     const map = new Map<string, DayHeat>();
     const items = klineQuery.data?.items ?? [];
@@ -212,8 +213,30 @@ export default function TradingCalendar() {
       if (!prev.close || !current.close) continue;
       map.set(current.date, { changePct: (current.close / prev.close - 1) * 100 });
     }
+
+    // 当今天为交易日且历史日K尚未归档今日数据时，使用大盘实时行情补充当日涨跌幅
+    const today = query.data?.today ?? dayjs().format("YYYY-MM-DD");
+    const isTodayTrading = query.data?.today_is_trading_day || tradeDateSet.has(today);
+    if (today && isTodayTrading && !map.has(today)) {
+      const shIndex = indicesQuery.data?.indices?.find(
+        (idx) =>
+          idx.code === BENCHMARK_SYMBOL ||
+          idx.code.includes(BENCHMARK_SYMBOL) ||
+          idx.name.includes("上证"),
+      );
+      if (shIndex?.change_pct != null) {
+        map.set(today, { changePct: shIndex.change_pct });
+      }
+    }
+
     return map;
-  }, [klineQuery.data?.items]);
+  }, [
+    klineQuery.data?.items,
+    query.data?.today,
+    query.data?.today_is_trading_day,
+    tradeDateSet,
+    indicesQuery.data?.indices,
+  ]);
 
   const moveMonth = (delta: number) => {
     setCursor((current) => {

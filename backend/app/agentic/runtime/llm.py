@@ -16,6 +16,7 @@ from app.infrastructure.llm.adapters import (
     extract_usage,
     normalize_retryable_llm_error,
     prepare_completion_kwargs,
+    validate_chat_completion_response,
 )
 
 
@@ -66,6 +67,7 @@ async def create_chat_completion(
         queue_wait_ms = (time.perf_counter() - started_at) * 1000
         try:
             response = await client.chat.completions.create(**request_kwargs)
+            validate_chat_completion_response(response)
         except asyncio.CancelledError:
             duration_ms = (time.perf_counter() - started_at) * 1000
             metrics.record_llm_prompt(

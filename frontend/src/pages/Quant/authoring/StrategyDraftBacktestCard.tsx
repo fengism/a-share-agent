@@ -31,7 +31,11 @@ export default function StrategyDraftBacktestCard({
           dateRange: [dayjs().subtract(1, "year"), dayjs()],
           benchmark: "000300",
           minimumTradeCount: 1,
-          maximumDrawdownPct: 80,
+          maximumDrawdownPct: 30,
+          minimumClosedTradeCount: 5,
+          minimumObservationCount: 120,
+          minimumHoldoutClosedTradeCount: 2,
+          maximumHoldoutDrawdownPct: 20,
         }}
         onFinish={(values) => void onBacktest(values)}
       >
@@ -59,6 +63,12 @@ export default function StrategyDraftBacktestCard({
           <Form.Item name="minimumTradeCount" label="最低交易次数">
             <InputNumber min={1} max={10_000} precision={0} style={{ width: "100%" }} />
           </Form.Item>
+          <Form.Item name="minimumClosedTradeCount" label="最低完整平仓次数" rules={[{ required: true }]}>
+            <InputNumber min={0} max={10_000} precision={0} style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="minimumObservationCount" label="最低交易日样本数" rules={[{ required: true }]}>
+            <InputNumber min={0} max={1500} precision={0} style={{ width: "100%" }} />
+          </Form.Item>
           <Form.Item name="maximumDrawdownPct" label="最大允许回撤（%）">
             <InputNumber min={0.01} max={80} step={1} style={{ width: "100%" }} />
           </Form.Item>
@@ -68,6 +78,9 @@ export default function StrategyDraftBacktestCard({
           <Typography.Text strong className="quant-authoring-gate-heading">
             后段样本门禁
           </Typography.Text>
+          <Form.Item name="minimumHoldoutClosedTradeCount" label="后段最低完整平仓次数（可选）">
+            <InputNumber min={0} max={10_000} precision={0} placeholder="不限制" style={{ width: "100%" }} />
+          </Form.Item>
           <Form.Item name="minimumHoldoutTradeCount" label="后段最低交易次数（可选）">
             <InputNumber min={0} max={10_000} precision={0} placeholder="不限制" style={{ width: "100%" }} />
           </Form.Item>
@@ -90,6 +103,9 @@ export default function StrategyDraftBacktestCard({
             </Button>
           </Form.Item>
         </div>
+        <Typography.Paragraph type="secondary">
+          成交笔数不等于完整交易样本，分批成交仅在全部平仓后计为一次。后段使用固定参数重新试跑，门禁通过不代表统计显著或未来盈利。
+        </Typography.Paragraph>
       </Form>
     </Card>
   );

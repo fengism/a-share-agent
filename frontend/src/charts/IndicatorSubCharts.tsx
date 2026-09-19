@@ -10,7 +10,13 @@ import { shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
 
 export type IndicatorType = "macd" | "rsi" | "kdj";
-type Props = { code: string; types?: readonly IndicatorType[]; height?: number };
+type Props = {
+  code: string;
+  types?: readonly IndicatorType[];
+  height?: number;
+  activeType?: IndicatorType;
+  onTypeChange?: (type: IndicatorType) => void;
+};
 const DEFAULT_INDICATOR_TYPES: readonly IndicatorType[] = ["macd", "rsi", "kdj"];
 type IndicatorSeries = ISeriesApi<"Line"> | ISeriesApi<"Histogram">;
 
@@ -76,16 +82,23 @@ function rsiChart(
   rsiLine.setData(data);
 
   const ref70 = chart.addSeries(LineSeries, {
-    color: hexToRgba(c.up, 0.3), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+    color: hexToRgba(c.up, 0.35), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+  });
+  const ref50 = chart.addSeries(LineSeries, {
+    color: hexToRgba(c.textMuted, 0.2), lineWidth: 1, lineStyle: 3, priceLineVisible: false, lastValueVisible: false,
   });
   const ref30 = chart.addSeries(LineSeries, {
-    color: hexToRgba(c.down, 0.3), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+    color: hexToRgba(c.down, 0.35), lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
   });
 
   if (data.length >= 2) {
     ref70.setData([
       { time: data[0].time, value: 70 },
       { time: data[data.length - 1].time, value: 70 },
+    ]);
+    ref50.setData([
+      { time: data[0].time, value: 50 },
+      { time: data[data.length - 1].time, value: 50 },
     ]);
     ref30.setData([
       { time: data[0].time, value: 30 },
@@ -96,7 +109,7 @@ function rsiChart(
   chart.priceScale("right").applyOptions({
     scaleMargins: { top: 0.12, bottom: 0.12 },
   });
-  return [rsiLine, ref70, ref30];
+  return [rsiLine, ref70, ref50, ref30];
 }
 
 function kdjChart(
@@ -106,15 +119,15 @@ function kdjChart(
   c: ThemeColors,
 ): IndicatorSeries[] {
   const kLine = chart.addSeries(LineSeries, {
-    color: c.primary, lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
+    color: c.primary, lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.01, formatter: (v: number) => v.toFixed(2) },
   });
   const dLine = chart.addSeries(LineSeries, {
-    color: c.accent, lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
+    color: c.accent, lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.01, formatter: (v: number) => v.toFixed(2) },
   });
   const jLine = chart.addSeries(LineSeries, {
-    color: c.textSecondary, lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
+    color: c.warning, lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: "custom", minMove: 0.01, formatter: (v: number) => v.toFixed(2) },
   });
 
@@ -141,13 +154,23 @@ function kdjChart(
   return [kLine, dLine, jLine];
 }
 
-export default function IndicatorSubCharts({ code, types = DEFAULT_INDICATOR_TYPES, height = 180 }: Props) {
+export default function IndicatorSubCharts({
+  code,
+  types = DEFAULT_INDICATOR_TYPES,
+  height = 180,
+  activeType: controlledActiveType,
+  onTypeChange,
+}: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
   colorsRef.current = c;
-  const [indicatorType, setIndicatorType] = useState<IndicatorType>(types[0] ?? "macd");
+  const [internalIndicatorType, setInternalIndicatorType] = useState<IndicatorType>(
+    controlledActiveType ?? types[0] ?? "macd",
+  );
   const availableTypes = types.length > 0 ? types : DEFAULT_INDICATOR_TYPES;
-  const activeIndicatorType = availableTypes.includes(indicatorType) ? indicatorType : availableTypes[0];
+  const activeIndicatorType = controlledActiveType ?? (
+    availableTypes.includes(internalIndicatorType) ? internalIndicatorType : availableTypes[0]
+  );
   const { data: indicators, isLoading } = useIndicators(code);
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<IChartApi | null>(null);
@@ -240,13 +263,18 @@ export default function IndicatorSubCharts({ code, types = DEFAULT_INDICATOR_TYP
     });
   }, [c.border, c.cardBg, c.textMuted, c.textSecondary]);
 
+  const handleIndicatorChange = (val: IndicatorType) => {
+    setInternalIndicatorType(val);
+    onTypeChange?.(val);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
         {availableTypes.length > 1 ? (
           <Segmented
             value={activeIndicatorType}
-            onChange={(val) => setIndicatorType(val as IndicatorType)}
+            onChange={(val) => handleIndicatorChange(val as IndicatorType)}
             options={[
               { label: "MACD(12,26,9)", value: "macd" as const },
               { label: "RSI(14)", value: "rsi" as const },
@@ -294,8 +322,8 @@ export default function IndicatorSubCharts({ code, types = DEFAULT_INDICATOR_TYP
               <span style={{ color: c.accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} /> D
               </span>
-              <span style={{ color: c.textSecondary, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.textSecondary, display: "inline-block" }} /> J
+              <span style={{ color: c.warning, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 2, background: c.warning, display: "inline-block" }} /> J
               </span>
             </>
           )}

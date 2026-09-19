@@ -91,7 +91,6 @@ export default function KeyFinancialMetricsSection({
           size="small"
           scroll={isExportingPdf ? undefined : { x: 220 + group.periods.length * 150 }}
           pagination={false}
-          bordered={false}
           rowClassName={() => "terminal-table-row"}
         />
       </div>

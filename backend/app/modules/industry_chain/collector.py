@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
+from app.domain.industry_chain import IndustryChainResearchScope
 from app.financial_data.industry.public import (
     query_industry_data,
     search_industry_content,
@@ -61,8 +62,11 @@ def _has_content(value: Any) -> bool:
     return bool(value)
 
 
-async def collect_industry_chain_data(name: str) -> dict:
-    """按研究主题并行采集产业链材料。"""
+async def collect_industry_chain_data(
+    name: str,
+    scope: IndustryChainResearchScope | None = None,
+) -> dict:
+    """按研究主题并行采集产业链材料，仅对缺失维度调用公共数据兜底。"""
     results = await asyncio.gather(
         research_data.select_stock(f"{name}产业链 上中下游", limit=20),
         research_data.query(f"{name}行业 市场规模 增长率 近三年", limit=15),
@@ -81,9 +85,27 @@ async def collect_industry_chain_data(name: str) -> dict:
         "events": _resolved(results[5]),
         "rankings": [],
     }
-    if not all(_has_content(collected[key]) for key in _DATA_KEYS[:-1]):
+    key_dimensions = {
+        "stocks": "stocks",
+        "market_data": "market",
+        "competition_data": "competition",
+        "technology_data": "technology",
+        "reports": "reports",
+        "events": "events",
+        "rankings": "market",
+    }
+    missing_dimensions = {
+        dimension
+        for key, dimension in key_dimensions.items()
+        if not _has_content(collected.get(key))
+    }
+    if missing_dimensions:
         try:
-            fallback = await collect_public_industry_data(name)
+            fallback = await collect_public_industry_data(
+                name,
+                scope,
+                dimensions=missing_dimensions,
+            )
         except Exception as error:
             logger.warning("产业链公共数据兜底失败: name=%s, error=%s", name, error)
             fallback = {}

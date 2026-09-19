@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from app.configuration.llm_routing import resolve_llm_routing
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
 from app.configuration.schema import Settings
 from app.domain.llm import LLMConfigurationError
@@ -30,22 +31,19 @@ class LLMClientSpec:
 
 def resolve_llm_client_spec(settings: Settings) -> LLMClientSpec:
     """Resolve provider defaults and explicit settings into a pool key."""
-    provider = str(getattr(settings, "llm_provider", "openai") or "openai").lower()
+    routing = resolve_llm_routing(settings)
+    provider = routing.provider
     defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["openai"])
-    configured_mode = str(getattr(settings, "llm_api_mode", "auto") or "auto").lower()
-    api_mode = (
-        str(defaults.get("api_mode", "openai"))
-        if configured_mode == "auto"
-        else configured_mode
-    )
+    api_mode = routing.api_mode
     if api_mode not in {"openai", "litellm"}:
         raise ValueError(f"Unsupported LLM API mode: {api_mode}")
 
-    api_key = str(getattr(settings, "llm_api_key", "") or "")
+    api_key = str(getattr(settings, "llm_api_key", "") or "").strip()
     if not api_key and defaults.get("api_key_required", True):
         label = str(defaults.get("label") or provider)
         raise LLMConfigurationError(
-            f"{label} 缺少 API Key，请在设置页填写 API Key 或配置 LLM_API_KEY"
+            f"{label} 缺少 API Key，请在设置页填写个人 API Key。"
+            "自定义调用目标不能复用全局 Key；管理员可通过 LLM_API_KEY 配置全局 Key"
         )
     if not api_key and not defaults.get("api_key_required", True):
         api_key = "local"
@@ -53,10 +51,8 @@ def resolve_llm_client_spec(settings: Settings) -> LLMClientSpec:
         provider=provider,
         api_mode=api_mode,
         api_key=api_key,
-        base_url=str(getattr(settings, "llm_base_url", "") or defaults["base_url"]),
-        model=str(getattr(settings, "llm_model", "") or defaults["model"]),
-        api_version=str(
-            getattr(settings, "llm_api_version", "") or defaults.get("api_version", "")
-        ),
+        base_url=routing.base_url,
+        model=routing.model,
+        api_version=routing.api_version,
         timeout=float(getattr(settings, "llm_timeout_seconds", 120.0)),
     )

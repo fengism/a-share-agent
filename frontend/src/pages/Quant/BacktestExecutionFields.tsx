@@ -1,72 +1,12 @@
 import { InfoCircleOutlined, PlayCircleOutlined } from "@ant-design/icons";
 import { Button, Col, Collapse, DatePicker, Form, Input, InputNumber, Row, Typography } from "antd";
 import dayjs from "dayjs";
+import BacktestAdvancedFields from "./BacktestAdvancedFields";
 import { FormSectionHeader } from "./BacktestFormSections";
 import { dateRangeValidationError, type QuantFormValues } from "./quantForm";
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
-
-function AdvancedExecutionFields() {
-  return (
-    <Row gutter={[14, 0]} align="bottom" className="quant-advanced-execution-fields">
-      <Col xs={12} sm={8} md={4}>
-        <Form.Item
-          name="commissionBps"
-          label="佣金（BP）"
-          rules={[{ required: true, type: "number", min: 0, max: 100, message: "佣金需在 0-100 BP" }]}
-        >
-          <InputNumber min={0} max={100} step={0.1} style={{ width: "100%" }} />
-        </Form.Item>
-      </Col>
-      <Col xs={12} sm={8} md={4}>
-        <Form.Item
-          name="minimumCommission"
-          label="最低佣金（元）"
-          rules={[{ required: true, type: "number", min: 0, max: 1000, message: "最低佣金需在 0-1000 元" }]}
-        >
-          <InputNumber min={0} max={1000} step={1} style={{ width: "100%" }} />
-        </Form.Item>
-      </Col>
-      <Col xs={12} sm={8} md={4}>
-        <Form.Item
-          name="stampDutyBps"
-          label="印花税（BP）"
-          rules={[{ required: true, type: "number", min: 0, max: 100, message: "印花税需在 0-100 BP" }]}
-        >
-          <InputNumber min={0} max={100} step={0.1} style={{ width: "100%" }} />
-        </Form.Item>
-      </Col>
-      <Col xs={12} sm={8} md={4}>
-        <Form.Item
-          name="transferFeeBps"
-          label="过户费（BP）"
-          rules={[{ required: true, type: "number", min: 0, max: 100, message: "过户费需在 0-100 BP" }]}
-        >
-          <InputNumber min={0} max={100} step={0.01} style={{ width: "100%" }} />
-        </Form.Item>
-      </Col>
-      <Col xs={12} sm={8} md={4}>
-        <Form.Item
-          name="lotSize"
-          label="交易单位（股）"
-          rules={[{ required: true, type: "number", min: 1, max: 10_000, message: "交易单位需在 1-10000 股" }]}
-        >
-          <InputNumber min={1} max={10_000} step={100} precision={0} style={{ width: "100%" }} />
-        </Form.Item>
-      </Col>
-      <Col xs={12} sm={8} md={4}>
-        <Form.Item
-          name="riskFreeRatePercent"
-          label="无风险利率（%）"
-          rules={[{ required: true, type: "number", min: -10, max: 50, message: "无风险利率需在 -10%-50%" }]}
-        >
-          <InputNumber min={-10} max={50} step={0.1} style={{ width: "100%" }} />
-        </Form.Item>
-      </Col>
-    </Row>
-  );
-}
 
 export default function BacktestExecutionFields({ isSubmitting }: { isSubmitting: boolean }) {
   return (
@@ -74,7 +14,7 @@ export default function BacktestExecutionFields({ isSubmitting }: { isSubmitting
       <div id="quant-execution-title">
         <FormSectionHeader title="3. 执行设置" description="确定回测区间、比较基准和资金假设" />
       </div>
-      <Row gutter={[14, 0]} align="bottom">
+      <Row gutter={[14, 0]} align="bottom" className="quant-basic-execution-fields">
         <Col xs={24} md={8}>
           <Form.Item
             name="dateRange"
@@ -119,8 +59,8 @@ export default function BacktestExecutionFields({ isSubmitting }: { isSubmitting
         className="quant-advanced-execution"
         items={[{
           key: "advanced",
-          label: "高级执行参数",
-          children: <AdvancedExecutionFields />,
+          label: <span className="quant-advanced-label">高级执行参数<small>交易成本 / 仓位管理 / 退出保护</small></span>,
+          children: <BacktestAdvancedFields />,
         }]}
       />
       <div className="quant-submit-bar">

@@ -379,6 +379,21 @@
   font-size: var(--c-font-base);
 }
 
+.macro-page__snapshot-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--c-space-3);
+  min-height: 32px;
+}
+
+@media (max-width: 575px) {
+  .macro-page__snapshot-status {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 1199px) {
   .macro-page .responsive-section-nav--rail {
     grid-template-columns: 172px minmax(0, 1fr);

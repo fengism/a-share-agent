@@ -122,9 +122,14 @@ def get_run(user_id: int, run_id: str) -> QuantRunRow | None:
 def list_runs(user_id: int, *, limit: int = 50, offset: int = 0) -> list[QuantRunRow]:
     rows = get_connection("user").execute(
         """
-        SELECT * FROM quant_backtest_runs
+        SELECT id, user_id, name, status, attempts, max_attempts, last_error,
+               created_at, updated_at, completed_at, lease_owner,
+               json_remove(request_json, '$.strategy_snapshot') AS request_json,
+               json_extract(result_json, '$.metrics') AS result_json,
+               NULL AS input_snapshot_json
+        FROM quant_backtest_runs
         WHERE user_id = ?
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT ? OFFSET ?
         """,
         (user_id, limit, offset),

@@ -64,16 +64,17 @@ async def _load_pdf_visual_data(
                 adjust="qfq",
                 require_turnover=True,
             ),
-            timeout=15,
+            timeout=25,
         )
     except Exception as exc:
-        logger.warning("PDF 行情图数据加载失败 code=%s: %s", code, exc)
+        err_msg = "请求超时(TimeoutError >25s)" if isinstance(exc, (TimeoutError, asyncio.TimeoutError)) else (str(exc).strip() or repr(exc))
+        logger.warning("PDF 行情图数据加载失败 code=%s: %s", code, err_msg)
         return None, None
 
     try:
         chip_distribution = calculate_chip_distribution(kline_data.items, code=kline_data.code)
     except Exception as exc:
-        logger.warning("PDF 筹码图数据计算失败 code=%s: %s", code, exc)
+        logger.warning("PDF 筹码图数据计算失败 code=%s: %s", code, str(exc).strip() or repr(exc))
         chip_distribution = None
     return kline_data, chip_distribution
 

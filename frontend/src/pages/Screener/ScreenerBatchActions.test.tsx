@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import ScreenerBatchActions from "./ScreenerBatchActions";
 
 describe("ScreenerBatchActions", () => {
-  it("enforces comparison and analysis selection limits", () => {
+  it("removes stock comparison while preserving analysis and backtest actions", () => {
     const backtest = vi.fn();
     render(
       <ScreenerBatchActions
@@ -12,14 +12,13 @@ describe("ScreenerBatchActions", () => {
         isAnalyzing={false}
         analysisProgress=""
         onAddWatchlist={vi.fn()}
-        onCompare={vi.fn()}
         onAnalyze={vi.fn()}
         onBacktest={backtest}
         onClear={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("button", { name: /批量对比/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /批量对比/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /批量分析/ })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: /批量回测/ }));
     expect(backtest).toHaveBeenCalledOnce();

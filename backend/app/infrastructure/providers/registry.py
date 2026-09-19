@@ -7,6 +7,7 @@ _PROVIDER_EXPORTS = {
     "cninfo": ("app.infrastructure.providers.cninfo", "cninfo_provider"),
     "eastmoney": ("app.infrastructure.providers.eastmoney", "eastmoney_provider"),
     "exchange": ("app.infrastructure.providers.exchange", "exchange_provider"),
+    "fred": ("app.infrastructure.providers.fred", "fred_provider"),
     "iwencai": ("app.infrastructure.providers.iwencai", "iwencai_provider"),
     "kaipanhong": ("app.infrastructure.providers.kaipanhong", "kaipanhong_provider"),
     "legulegu": ("app.infrastructure.providers.legulegu.provider", "legulegu_provider"),

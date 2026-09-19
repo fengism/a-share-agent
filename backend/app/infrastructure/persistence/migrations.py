@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from app.infrastructure.persistence.connection import unit_of_work
 from app.infrastructure.persistence.ddl import (
+    PORTFOLIO_ACCOUNT_SETTINGS_STATEMENTS,
     PORTFOLIO_TRANSACTION_STATEMENTS,
     QUANT_ACTIVE_USER_INDEX,
     QUANT_STRATEGY_DRAFT_STATEMENTS,
@@ -337,6 +338,11 @@ def _add_portfolio_transactions(conn: sqlite3.Connection) -> None:
     )
 
 
+def _add_portfolio_account_settings(conn: sqlite3.Connection) -> None:
+    for statement in PORTFOLIO_ACCOUNT_SETTINGS_STATEMENTS:
+        conn.execute(statement)
+
+
 def _remove_legacy_portfolio_positions(conn: sqlite3.Connection) -> None:
     legacy_table = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'portfolio_positions'"
@@ -536,7 +542,92 @@ USER_MIGRATIONS = (
     Migration(17, "add quant strategy drafts", _add_quant_strategy_drafts),
     Migration(18, "add screener strategy workflow kind", _add_screener_strategy_workflow_kind),
     Migration(19, "add daily review workflow kind", _add_daily_review_workflow_kind),
+    Migration(20, "add portfolio account settings", _add_portfolio_account_settings),
 )
+
+def _add_national_team_etf_tables(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS national_team_etf_shares (
+            code       TEXT    NOT NULL,
+            date       TEXT    NOT NULL,
+            shares     REAL    NOT NULL,
+            updated_at REAL    NOT NULL,
+            PRIMARY KEY (code, date)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_national_team_etf_shares_code_date "
+        "ON national_team_etf_shares(code, date DESC)"
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS national_team_etf_backfill_state (
+            scope      TEXT    NOT NULL,
+            date       TEXT    NOT NULL,
+            updated_at REAL    NOT NULL,
+            PRIMARY KEY (scope, date)
+        )
+        """
+    )
+
+
+def _add_sector_constituent_tables(conn: sqlite3.Connection) -> None:
+    statements = (
+        """
+        CREATE TABLE IF NOT EXISTS sector_constituent_snapshots (
+            source           TEXT NOT NULL,
+            plate_id         TEXT NOT NULL,
+            constituent_date TEXT NOT NULL,
+            fetched_at       TEXT NOT NULL,
+            stock_count      INTEGER NOT NULL,
+            PRIMARY KEY (source, plate_id, constituent_date)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS sector_constituents (
+            source           TEXT NOT NULL,
+            plate_id         TEXT NOT NULL,
+            constituent_date TEXT NOT NULL,
+            stock_code       TEXT NOT NULL,
+            stock_name       TEXT NOT NULL DEFAULT '',
+            tags             TEXT NOT NULL DEFAULT '',
+            position         INTEGER NOT NULL,
+            history_json     TEXT NOT NULL,
+            PRIMARY KEY (source, plate_id, constituent_date, stock_code),
+            FOREIGN KEY (source, plate_id, constituent_date)
+                REFERENCES sector_constituent_snapshots(source, plate_id, constituent_date)
+                ON DELETE CASCADE
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_sector_constituent_snapshot_lookup
+        ON sector_constituent_snapshots(source, plate_id, constituent_date DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_sector_constituent_stock_lookup
+        ON sector_constituents(stock_code, constituent_date DESC)
+        """,
+    )
+    for statement in statements:
+        conn.execute(statement)
+
+
+def _add_national_team_provenance(conn: sqlite3.Connection) -> None:
+    from app.infrastructure.persistence.ddl import (
+        NATIONAL_TEAM_ETF_IMPORTS_TABLE,
+        NATIONAL_TEAM_ETF_OBSERVATIONS_TABLE,
+    )
+
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(national_team_etf_shares)")}
+    if "source" not in columns:
+        conn.execute("ALTER TABLE national_team_etf_shares ADD COLUMN source TEXT NOT NULL DEFAULT 'unknown'")
+    if "verification_status" not in columns:
+        conn.execute("ALTER TABLE national_team_etf_shares ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'unknown'")
+    conn.execute(NATIONAL_TEAM_ETF_OBSERVATIONS_TABLE)
+    conn.execute(NATIONAL_TEAM_ETF_IMPORTS_TABLE)
+
 
 MARKET_MIGRATIONS = (
     Migration(3, "add background task leases", _add_background_task_leases),
@@ -546,6 +637,9 @@ MARKET_MIGRATIONS = (
     Migration(7, "add twitter analysis cache", _add_twitter_analysis_cache),
     Migration(8, "add twitter analysis snapshots", _add_twitter_analysis_snapshots),
     Migration(9, "finalize twitter analysis snapshots", _finalize_twitter_analysis_snapshots),
+    Migration(10, "add national team etf tables", _add_national_team_etf_tables),
+    Migration(11, "add sector constituent tables", _add_sector_constituent_tables),
+    Migration(12, "add national team provenance", _add_national_team_provenance),
 )
 
 def _add_stock_concepts_tables(conn: sqlite3.Connection) -> None:

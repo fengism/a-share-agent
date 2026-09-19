@@ -73,7 +73,7 @@ function LimitUpLadderContent() {
         <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
           <Space orientation="vertical" size={0}>
             <Text strong style={{ fontSize: t.font.md }}>{stock.name}</Text>
-            <Text type="secondary" style={{ fontSize: t.font.xs, fontFamily: "monospace" }}>{stock.code}</Text>
+            <Text type="secondary" style={{ fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{stock.code}</Text>
           </Space>
         </StockExternalLink>
       ),
@@ -96,7 +96,7 @@ function LimitUpLadderContent() {
       dataIndex: "limit_up_time",
       width: 100,
       align: "center",
-      render: (value: string) => <span style={{ fontFamily: "monospace" }}>{value || "-"}</span>,
+      render: (value: string) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{value || "-"}</span>,
     },
     {
       title: "所属板块",
@@ -132,7 +132,7 @@ function LimitUpLadderContent() {
       width: 110,
       align: "right",
       render: (value: number) => (
-        <span style={{ fontFamily: "monospace", fontWeight: Number(t.weight.medium) }}>
+        <span style={{ fontFamily: "var(--c-font-mono)", fontWeight: Number(t.weight.medium) }}>
           {formatAmount(value)}
         </span>
       ),

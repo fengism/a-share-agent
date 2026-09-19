@@ -37,7 +37,7 @@ export default function AppLayout() {
       <ChatSessionSyncBridge />
       <WorkflowRuntimeBridge />
       <a className="app-skip-link" href="#main-content">跳到主要内容</a>
-      <div style={{ minHeight: "100vh", background: colors.pageBg }}>
+      <div className="app-shell-root" style={{ minHeight: "100vh", backgroundColor: colors.pageBg }}>
         <AppSidebar
           activeKey={getActiveKey(location.pathname)}
           collapsed={collapsed}
@@ -53,10 +53,10 @@ export default function AppLayout() {
           minWidth: 0,
           minHeight: "100vh",
           flexDirection: "column",
-          marginLeft: isMobile ? 0 : collapsed ? 68 : 184,
+          marginLeft: isMobile ? 0 : collapsed ? 68 : 210,
           transition: "margin-left 0.2s",
         }}>
-          <UpdateBanner />
+          <UpdateBanner showIdle={false} />
           <AppHeader
             isMobile={isMobile}
             themeKey={themeKey}
@@ -86,10 +86,10 @@ export default function AppLayout() {
 function getActiveKey(pathname: string): string {
   if (pathname === "/") return "/";
   if (pathname.startsWith("/watchlist")) return "/watchlist";
+  if (pathname.startsWith("/national-team")) return "/national-team";
   if (pathname.startsWith("/market") || pathname.startsWith("/hk-market")) return "/market";
   if (pathname.startsWith("/trading-calendar")) return "/trading-calendar";
   if (pathname.startsWith("/macro")) return "/macro";
-  if (pathname.startsWith("/compare")) return "/compare";
   if (pathname.startsWith("/portfolio")) return "/portfolio";
   if (pathname.startsWith("/quant")) return "/quant";
   if (pathname.startsWith("/feed")) return "/feed";

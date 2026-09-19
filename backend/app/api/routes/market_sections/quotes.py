@@ -11,6 +11,7 @@ from app.financial_data.market.public import (
     HsgtFlowResponse,
     IndexIntradayData,
     IndustryRankings,
+    MarketBreadthResponse,
     MarketEmotion,
     MarketLimitHistoryCategory,
     MarketLimitHistoryResponse,
@@ -23,6 +24,7 @@ from app.financial_data.market.public import (
     MarketVolumeResponse,
     MarketWindResponse,
     MarketWindStocksResponse,
+    NationalTeamResponse,
     NorthboundHistoryResponse,
     ThsHotPlate,
     ThsHotStock,
@@ -38,6 +40,7 @@ from app.financial_data.market.public import get_indices as get_indices_service
 from app.financial_data.market.public import get_industry_rankings as get_industry_rankings_service
 from app.financial_data.market.public import get_limit_history as get_limit_history_service
 from app.financial_data.market.public import get_limit_up_ladder as get_limit_up_ladder_service
+from app.financial_data.market.public import get_market_breadth as get_market_breadth_service
 from app.financial_data.market.public import get_market_emotion as get_market_emotion_service
 from app.financial_data.market.public import get_market_mainline as get_market_mainline_service
 from app.financial_data.market.public import get_market_margin as get_market_margin_service
@@ -50,6 +53,9 @@ from app.financial_data.market.public import (
 from app.financial_data.market.public import get_market_volume as get_market_volume_service
 from app.financial_data.market.public import get_market_wind as get_market_wind_service
 from app.financial_data.market.public import get_market_wind_stocks as get_market_wind_stocks_service
+from app.financial_data.market.public import (
+    get_national_team_etf_holdings as get_national_team_etf_holdings_service,
+)
 from app.financial_data.market.public import get_northbound_history as get_northbound_history_service
 from app.financial_data.market.public import get_sector_stocks_history as get_sector_stocks_history_service
 from app.financial_data.market.public import get_ths_hot_concept as get_ths_hot_concept_service
@@ -93,10 +99,10 @@ async def get_limit_history(
 
 @router.get("/sector-stocks-history", response_model=MarketSectorStocksHistoryResponse)
 async def get_sector_stocks_history(
-    date: Date = Query(..., description="历史日期 YYYY-MM-DD，必须早于今天"),
+    date: Date = Query(..., description="查询日期 YYYY-MM-DD，支持当天和历史日期"),
     plate_id: str = Query(..., min_length=1, description="开盘红板块 ID，例如 881169"),
 ):
-    """获取开盘红板块在指定历史日期的成分股列表。"""
+    """获取开盘红板块成分股；当天补充股票实时行情。"""
     return await get_sector_stocks_history_service(date, plate_id)
 
 
@@ -115,6 +121,25 @@ async def get_market_margin(
 ):
     """获取沪深两市融资融券历史合计（日级，单位亿元）。"""
     return await get_market_margin_service(days)
+
+
+@router.get("/breadth", response_model=MarketBreadthResponse)
+async def get_market_breadth(
+    days: int = Query(60, ge=10, le=120, description="返回的交易日数量，10-120"),
+):
+    """获取申万2级行业市场宽度热力图（收盘价站上 MA20 股票占比）。"""
+    return await get_market_breadth_service(days)
+
+
+@router.get(
+    "/national-team-etf-holdings",
+    response_model=NationalTeamResponse,
+)
+async def get_national_team_etf_holdings(
+    days: int = Query(120, ge=30, le=365, description="返回最近自然日数量，30-365"),
+):
+    """获取核心宽基 ETF 份额变化与国家队持仓代理监测。"""
+    return await get_national_team_etf_holdings_service(days)
 
 
 @router.get("/price-anomaly", response_model=MarketPriceAnomalyResponse)

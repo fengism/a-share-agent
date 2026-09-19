@@ -7,8 +7,6 @@ from collections.abc import AsyncGenerator, Awaitable, Callable, Collection
 from dataclasses import dataclass, field
 from typing import Literal
 
-from openai import AsyncOpenAI
-
 from app.agentic.agents.contracts import (
     AgentExecutionResult,
     AgentProfile,
@@ -20,7 +18,6 @@ from app.agentic.messages import build_messages
 from app.agentic.orchestration.opinions import parse_opinion_block
 from app.agentic.protocol import (
     AgentMessage,
-    ToolCallFunction,
     ToolCallInfo,
     ToolResultInfo,
 )
@@ -30,7 +27,6 @@ from app.agentic.tools.cache import SharedToolCache
 from app.agentic.tools.calls import (
     build_assistant_tool_message,
     extract_pseudo_tool_calls,
-    tool_call_infos_from_stream,
 )
 from app.agentic.tools.serialization import (
     has_meaningful_tool_content,
@@ -42,8 +38,17 @@ from app.configuration import get_settings
 from app.core.errors import build_internal_error, log_internal_error
 from app.core.exceptions import UpstreamUnavailableError
 from app.core.metrics import metrics
-from app.infrastructure.llm.adapters import LLMRetryableError
+from app.infrastructure.llm.adapters import LLMInvalidResponseError, LLMRetryableError
 from app.infrastructure.llm.runtime import describe_llm_account_error, is_llm_connection_error
+from app.infrastructure.llm.tool_calling import (
+    AsyncLLMClient,
+    ChatCompletionStreamNormalizer,
+    LLMCapabilities,
+    LLMTurn,
+    capabilities_from_client,
+    normalize_chat_completion,
+    resolve_tool_request,
+)
 
 logger = logging.getLogger(__name__)
 _OUTPUT_TRUNCATED_WARNING = "模型输出达到长度上限，回答可能不完整"
@@ -53,6 +58,17 @@ _TOOL_BUDGET_WARNING = "工具调用额度已用尽，已基于现有结果继�
 
 
 def _log_agent_llm_error(operation: str, exc: Exception, public_message: str) -> tuple[str, str]:
+    if isinstance(exc, LLMInvalidResponseError):
+        error_id, detail = build_internal_error(
+            "模型服务返回格式异常，请检查接口地址、API 模式与 OpenAI 兼容性"
+        )
+        logger.warning(
+            "%s响应格式异常 error_id=%s error_type=%s",
+            operation,
+            error_id,
+            type(exc).__name__,
+        )
+        return error_id, detail
     if isinstance(exc, LLMRetryableError):
         error_id, detail = build_internal_error("模型服务暂时不可用，请稍后重试")
         logger.warning(
@@ -69,14 +85,6 @@ def _log_agent_llm_error(operation: str, exc: Exception, public_message: str) ->
     if user_reason is not None:
         return error_id, f"{user_reason}（错误编号：{error_id}）"
     return str(error_id), str(detail)
-
-
-@dataclass(frozen=True, slots=True)
-class _AgentTurn:
-    content: str
-    reasoning_content: str
-    tool_calls: tuple[ToolCallInfo, ...]
-    finish_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +179,8 @@ class AgentExecutor:
         analysis: str,
         status: Literal["completed", "partial", "failed"],
         reasoning_content: str = "",
+        *,
+        retryable: bool = True,
     ) -> AgentExecutionResult:
         cleaned_analysis, opinion = parse_opinion_block(
             profile.name,
@@ -189,10 +199,11 @@ class AgentExecutor:
             warnings=state.warnings,
             duration_ms=int((time.monotonic() - state.started_at) * 1000),
             reasoning_content=reasoning_content,
+            retryable=retryable,
         )
 
     @staticmethod
-    def _record_turn_completion(state: _ExecutionState, turn: _AgentTurn) -> None:
+    def _record_turn_completion(state: _ExecutionState, turn: LLMTurn) -> None:
         if (
             turn.finish_reason == "length"
             and _OUTPUT_TRUNCATED_WARNING not in state.warnings
@@ -215,6 +226,7 @@ class AgentExecutor:
         emit: Callable[[AgentEvent], Awaitable[None]],
         execution_context: AgentExecutionContext | None,
         tool_call_reserve: int,
+        capabilities: LLMCapabilities,
     ) -> None:
         state.messages.append(build_assistant_tool_message(tool_calls, assistant_content))
         for tool_call in tool_calls:
@@ -228,16 +240,27 @@ class AgentExecutor:
             tool_call_reserve=tool_call_reserve,
         )
 
-        accepted_results = await asyncio.gather(
-            *(
-                state.tool_cache.execute(
-                    tool_call,
-                    allowed_names=state.effective_tool_names,
-                    execution_context=execution_context,
+        if capabilities.parallel_tool_calls:
+            accepted_results = await asyncio.gather(
+                *(
+                    state.tool_cache.execute(
+                        tool_call,
+                        allowed_names=state.effective_tool_names,
+                        execution_context=execution_context,
+                    )
+                    for _, tool_call in accepted_calls
                 )
-                for _, tool_call in accepted_calls
             )
-        )
+        else:
+            accepted_results = []
+            for _, tool_call in accepted_calls:
+                accepted_results.append(
+                    await state.tool_cache.execute(
+                        tool_call,
+                        allowed_names=state.effective_tool_names,
+                        execution_context=execution_context,
+                    )
+                )
         for (index, tool_call), result in zip(accepted_calls, accepted_results):
             tool_results[index] = result
             if result.is_error:
@@ -303,7 +326,7 @@ class AgentExecutor:
         self,
         profile: AgentProfile,
         state: _ExecutionState,
-        llm_client: AsyncOpenAI,
+        llm_client: AsyncLLMClient,
         model: str,
         temperature: float,
         stream_response: bool,
@@ -311,6 +334,7 @@ class AgentExecutor:
         execution_context: AgentExecutionContext,
     ) -> AgentExecutionResult:
         generation_failed = False
+        retryable = True
         reasoning_content = ""
         try:
             turn = await self._complete_turn(
@@ -331,6 +355,7 @@ class AgentExecutor:
             self._record_turn_completion(state, turn)
         except Exception as exc:
             generation_failed = True
+            retryable = not isinstance(exc, LLMInvalidResponseError)
             _, analysis = _log_agent_llm_error(
                 f"Agent {profile.name} 最终分析",
                 exc,
@@ -358,11 +383,12 @@ class AgentExecutor:
             analysis,
             status,
             reasoning_content,
+            retryable=retryable,
         )
 
     async def _complete_turn(
         self,
-        llm_client: AsyncOpenAI,
+        llm_client: AsyncLLMClient,
         *,
         model: str,
         messages: list[dict],
@@ -372,47 +398,35 @@ class AgentExecutor:
         stream_response: bool,
         emit: Callable[[AgentEvent], Awaitable[None]],
         max_completion_tokens: int | None = None,
-    ) -> _AgentTurn:
+    ) -> LLMTurn:
+        capabilities = capabilities_from_client(llm_client)
+        tool_request = resolve_tool_request(
+            tool_definitions,
+            tool_choice,
+            stream=stream_response,
+            capabilities=capabilities,
+        )
         kwargs = {
             "model": model,
             "messages": messages,
             "temperature": temperature,
-            "stream": stream_response,
+            "stream": tool_request.stream,
         }
-        if tool_definitions:
-            kwargs["tools"] = tool_definitions
-            kwargs["tool_choice"] = tool_choice
+        if tool_request.tools:
+            kwargs["tools"] = list(tool_request.tools)
+        if tool_request.tool_choice is not None:
+            kwargs["tool_choice"] = tool_request.tool_choice
 
-        if not stream_response:
+        if not tool_request.stream:
             response = await create_chat_completion(
                 llm_client,
                 metric_stage=("agent.final@v1" if tool_choice == "none" else "agent.round@v1"),
                 max_completion_tokens=max_completion_tokens,
                 **kwargs,
             )
-            message = response.choices[0].message
-            tool_calls = tuple(
-                ToolCallInfo(
-                    id=tool_call.id or f"call_{index}",
-                    type="function",
-                    function=ToolCallFunction(
-                        name=tool_call.function.name,
-                        arguments=tool_call.function.arguments,
-                    ),
-                )
-                for index, tool_call in enumerate(message.tool_calls or [])
-            )
-            return _AgentTurn(
-                content=message.content or "",
-                reasoning_content=getattr(message, "reasoning_content", "") or "",
-                tool_calls=tool_calls,
-                finish_reason=getattr(response.choices[0], "finish_reason", None),
-            )
+            return normalize_chat_completion(response)
 
-        content = ""
-        reasoning_content = ""
-        finish_reason: str | None = None
-        tool_calls_accumulator: dict[int, dict[str, str]] = {}
+        normalizer = ChatCompletionStreamNormalizer()
         stream_text_immediately = tool_choice == "none"
         stream = stream_chat_completion(
             llm_client,
@@ -422,44 +436,26 @@ class AgentExecutor:
         )
         try:
             async for chunk in stream:
-                if not chunk.choices:
-                    continue
-                choice = chunk.choices[0]
-                chunk_finish_reason = getattr(choice, "finish_reason", None)
-                if chunk_finish_reason is not None:
-                    finish_reason = chunk_finish_reason
-                delta = choice.delta
+                delta = normalizer.add(chunk)
                 if delta.content:
-                    content += delta.content
                     if stream_text_immediately:
                         await emit(AgentEvent(type="text", content=delta.content))
-                delta_reasoning = getattr(delta, "reasoning_content", "") or ""
-                if delta_reasoning:
-                    reasoning_content += delta_reasoning
-                    await emit(AgentEvent(type="reasoning", content=delta_reasoning))
-                for tool_call_delta in delta.tool_calls or []:
-                    accumulator = tool_calls_accumulator.setdefault(
-                        tool_call_delta.index,
-                        {"id": "", "name": "", "arguments": ""},
+                if delta.reasoning_content:
+                    await emit(
+                        AgentEvent(type="reasoning", content=delta.reasoning_content)
                     )
-                    if tool_call_delta.id:
-                        accumulator["id"] = tool_call_delta.id
-                    if tool_call_delta.function:
-                        if tool_call_delta.function.name:
-                            accumulator["name"] = tool_call_delta.function.name
-                        if tool_call_delta.function.arguments:
-                            accumulator["arguments"] += tool_call_delta.function.arguments
         except LLMRetryableError:
-            if not content.strip():
+            turn = normalizer.finish()
+            if not turn.content.strip():
                 raise
-            finish_reason = "stream_error"
+            return LLMTurn(
+                content=turn.content,
+                reasoning_content=turn.reasoning_content,
+                tool_calls=turn.tool_calls,
+                finish_reason="stream_error",
+            )
 
-        return _AgentTurn(
-            content=content,
-            reasoning_content=reasoning_content,
-            tool_calls=tuple(tool_call_infos_from_stream(tool_calls_accumulator)),
-            finish_reason=finish_reason,
-        )
+        return normalizer.finish()
 
     async def _classify_tool_calls(
         self,
@@ -530,7 +526,7 @@ class AgentExecutor:
         profile: AgentProfile,
         message: str,
         history: list[AgentMessage] | None,
-        llm_client: AsyncOpenAI,
+        llm_client: AsyncLLMClient,
         model: str,
         event_queue: asyncio.Queue | None = None,
         tool_cache: "SharedToolCache | None" = None,
@@ -550,7 +546,7 @@ class AgentExecutor:
         Param:
             message: 用户消息
             history: 历史消息列表，可选
-            llm_client: 异步 OpenAI 客户端
+            llm_client: Provider 无关的异步 Chat Completions 客户端
             model: 模型名称
             event_queue: 可选事件队列，用于实时推送工具调用/结果增量
             tool_cache: 可选的跨 Agent 共享工具缓存，未提供时本 Agent 内部新建（仅本 Agent 内去重）
@@ -560,6 +556,7 @@ class AgentExecutor:
         execution_context = execution_context or AgentExecutionContext.from_current(
             get_settings()
         )
+        capabilities = capabilities_from_client(llm_client)
         state = self._build_execution_state(
             profile,
             message,
@@ -623,6 +620,16 @@ class AgentExecutor:
                         "LLM 服务连接失败，请检查网络或代理配置后重试"
                     ) from exc
                 state.errors.append(detail)
+                if isinstance(exc, LLMInvalidResponseError):
+                    if stream_response:
+                        await emit(AgentEvent(type="error", error=detail))
+                    return self._build_result(
+                        profile,
+                        state,
+                        detail,
+                        "failed",
+                        retryable=False,
+                    )
                 if stream_response:
                     await emit(AgentEvent(type="error", error=detail))
                     return self._build_result(profile, state, "", "failed")
@@ -685,6 +692,7 @@ class AgentExecutor:
                 emit,
                 execution_context,
                 tool_call_reserve,
+                capabilities,
             )
 
         if require_tool_evidence and not any(
@@ -712,7 +720,7 @@ class AgentExecutor:
         profile: AgentProfile,
         message: str,
         history: list[AgentMessage] | None,
-        llm_client: AsyncOpenAI,
+        llm_client: AsyncLLMClient,
         model: str,
         *,
         allowed_tool_names: Collection[str] | None = None,

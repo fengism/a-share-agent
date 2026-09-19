@@ -205,7 +205,7 @@ def register_market_tools(target_registry=None):
 
     target.register_tool(Tool(
         name="get_industry_rankings",
-        description="获取行业板块涨跌与资金排行，包括排名、板块代码、涨跌幅、成交额和主力净流入。当用户问'哪些板块领涨''板块资金''行业排行'时调用；板块代码可作为 get_sector_stocks_history 的 plate_id 查询历史成分股。",
+        description="获取行业板块涨跌与资金排行，包括排名、板块代码、涨跌幅、成交额和主力净流入。当用户问'哪些板块领涨''板块资金''行业排行'时调用；板块代码可作为 get_sector_stocks_history 的 plate_id 查询成分股。",
         parameters={
             "type": "object",
             "properties": {
@@ -230,14 +230,14 @@ def register_market_tools(target_registry=None):
 
     target.register_tool(Tool(
         name="get_sector_stocks_history",
-        description="获取开盘红板块在指定历史日期的成分股明细，包括每只股票的涨跌幅、成交额、主力净额、连板标签和龙虎榜标签。仅支持今天之前的日期；先用 get_industry_rankings 获取板块代码（code 字段）作为 plate_id。",
+        description="获取开盘红板块在指定日期的成分股明细。历史日期返回开盘红历史详情；当天使用最近历史交易日的开盘红成分名单，并补充最新价格、涨跌幅、成交额、换手率和流通市值。先用 get_industry_rankings 获取板块代码（code 字段）作为 plate_id。",
         parameters={
             "type": "object",
             "properties": {
                 "date": {
                     "type": "string",
                     "format": "date",
-                    "description": "历史日期，格式 YYYY-MM-DD，必须早于今天",
+                    "description": "查询日期，格式 YYYY-MM-DD，支持当天和历史日期",
                 },
                 "plate_id": {
                     "type": "string",

@@ -1,275 +1,114 @@
-"""Python 计算沙盒执行服务。
-
-隔离策略（纵深防御）：
-1. AST 白名单：仅允许导入科学计算白名单模块，禁止一切 dunder 访问与
-   eval/exec/getattr 等逃生舱调用——正则黑名单可被 importlib.import_module
-   等手法绕过，AST 检查从语法层封死。
-2. 子进程最小环境：不继承父进程环境变量（防止 LLM API key 泄露），
-   工作目录为一次性临时目录，stdin 关闭，解释器隔离模式（-I）运行。
-3. 资源限制：RLIMIT_AS/RLIMIT_CPU/RLIMIT_FSIZE 限制内存、CPU 与文件写入。
-4. 输出上限：stdout/stderr 超 1 MB 即终止进程，防止撑爆父进程内存。
-
-已知残余风险：pandas/numpy 本身具备文件读取能力（如 pd.read_csv），无法在
-AST 层区分合法计算与恶意读取；配合工具层的仅管理员门控与最小环境兜底。
-"""
+"""Remote-only Python execution. No local subprocess or AST-based security boundary."""
 
 from __future__ import annotations
 
-import ast
 import asyncio
-import os
-import re
-import shutil
-import sys
-import tempfile
-from typing import Any
-
-_TIMEOUT_SECONDS = 5.0
-_MAX_OUTPUT_BYTES = 1_000_000
-
-# 允许导入的模块白名单（与预注入的科学计算环境保持一致）
-_ALLOWED_IMPORT_MODULES = frozenset({
-    "collections",
-    "datetime",
-    "decimal",
-    "fractions",
-    "functools",
-    "itertools",
-    "json",
-    "math",
-    "numpy",
-    "pandas",
-    "random",
-    "re",
-    "statistics",
-    "time",
-})
-
-# 禁止直接调用的内建逃生舱（getattr 可读取 __globals__ 等内部状态）
-_BANNED_BUILTIN_CALLS = frozenset({
-    "__import__",
-    "breakpoint",
-    "compile",
-    "delattr",
-    "dir",
-    "eval",
-    "exec",
-    "getattr",
-    "globals",
-    "input",
-    "locals",
-    "open",
-    "setattr",
-    "vars",
-})
-
-# 第一道粗筛：既有高危指令黑名单，命中即拒
-_DANGEROUS_PATTERNS = (
-    r"\bimport\s+os\b",
-    r"\bfrom\s+os\b",
-    r"\bimport\s+subprocess\b",
-    r"\bfrom\s+subprocess\b",
-    r"\bimport\s+sys\b",
-    r"\bfrom\s+sys\b",
-    r"\bimport\s+shutil\b",
-    r"\bfrom\s+shutil\b",
-    r"\bimport\s+socket\b",
-    r"\bfrom\s+socket\b",
-    r"\bimport\s+urllib\b",
-    r"\bfrom\s+urllib\b",
-    r"\bimport\s+requests\b",
-    r"\bfrom\s+requests\b",
-    r"\bimport\s+httpx\b",
-    r"\bfrom\s+httpx\b",
-    r"\bimport\s+aiohttp\b",
-    r"\bfrom\s+aiohttp\b",
-    r"\bopen\s*\(",
-    r"\beval\s*\(",
-    r"\bexec\s*\(",
-    r"\b__import__\s*\(",
-    r"\bglobals\s*\(",
-    r"\blocals\s*\(",
-    r"\bos\.",
-    r"\bsys\.",
-    r"\bsubprocess\.",
-)
-
-_PRE_INJECTED_ENV = """
-import math
-import datetime
 import json
-import re
-from decimal import Decimal
+import logging
+import math
+import uuid
+from typing import Any
+from urllib.parse import urlsplit
 
-try:
-    import numpy as np
-except ImportError:
-    pass
+import httpx
 
-try:
-    import pandas as pd
-    pd.set_option('display.max_columns', 20)
-    pd.set_option('display.width', 1000)
-except ImportError:
-    pass
-"""
+from app.configuration import get_settings
 
-
-class _OutputLimitExceeded(Exception):
-    pass
+logger = logging.getLogger(__name__)
+_TIMEOUT_SECONDS = 20.0
+_MAX_CODE_BYTES = 32_768
+_MAX_RESPONSE_BYTES = 1_048_576
 
 
-def _check_code_safety(code: str) -> str | None:
-    """静态安全检查：黑名单粗筛 + AST 白名单，返回拦截原因或 None。"""
-    for pattern in _DANGEROUS_PATTERNS:
-        if re.search(pattern, code, re.IGNORECASE):
-            return f"安全拦截: 禁止在计算沙盒中使用潜在高危指令（匹配规则: {pattern}）"
-    return _check_code_ast(code)
+def _unavailable() -> dict[str, Any]:
+    return {
+        "ok": False,
+        "output": "",
+        "error_code": "sandbox_unavailable",
+        "error": "隔离 Python 服务未配置、不可用或响应无效；未在后端本机执行。常用计算请使用 financial_calculator。",
+    }
 
 
-def _check_code_ast(code: str) -> str | None:
+async def _cancel_job(client: httpx.AsyncClient, path: str) -> None:
     try:
-        tree = ast.parse(code)
-    except SyntaxError as exc:
-        return f"代码语法错误: {exc}"
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                root = alias.name.split(".")[0]
-                if root not in _ALLOWED_IMPORT_MODULES:
-                    return (
-                        "安全拦截: 不允许导入模块 "
-                        f"{alias.name!r}（仅允许: {sorted(_ALLOWED_IMPORT_MODULES)}）"
-                    )
-        elif isinstance(node, ast.ImportFrom):
-            root = (node.module or "").split(".")[0]
-            if root not in _ALLOWED_IMPORT_MODULES:
-                return f"安全拦截: 不允许从模块 {node.module!r} 导入"
-        elif isinstance(node, ast.Attribute):
-            if node.attr.startswith("__") and node.attr.endswith("__"):
-                return f"安全拦截: 禁止访问 dunder 属性 {node.attr!r}"
-        elif isinstance(node, ast.Name):
-            if node.id.startswith("__") and node.id.endswith("__"):
-                return f"安全拦截: 禁止引用 dunder 名称 {node.id!r}"
-        elif isinstance(node, ast.Call):
-            func = node.func
-            if isinstance(func, ast.Name) and func.id in _BANNED_BUILTIN_CALLS:
-                return f"安全拦截: 禁止调用 {func.id}()"
-    return None
-
-
-def _child_env() -> dict[str, str]:
-    """最小子进程环境：不继承父进程变量，防止 API key 等机密泄露。"""
-    allowed_keys = ("PATH", "LANG", "LC_ALL", "TMPDIR", "PYTHONIOENCODING", "PYTHONUTF8")
-    return {key: os.environ[key] for key in allowed_keys if key in os.environ}
-
-
-def _apply_child_resource_limits() -> None:  # pragma: no cover - 在子进程中执行
-    import resource
-
-    limits = (
-        (resource.RLIMIT_AS, 512 * 1024 * 1024),
-        (resource.RLIMIT_CPU, (4, 4)),
-        (resource.RLIMIT_FSIZE, (1, 1)),  # 禁止写文件
-        (resource.RLIMIT_NPROC, (64, 64)),
-    )
-    for limit, value in limits:
-        try:
-            resource.setrlimit(limit, value if isinstance(value, tuple) else (value, value))
-        except (ValueError, OSError):
-            pass
-
-
-async def _read_limited(stream: asyncio.StreamReader | None, limit: int) -> bytes:
-    if stream is None:
-        return b""
-    chunks: list[bytes] = []
-    total = 0
-    while True:
-        chunk = await stream.read(65536)
-        if not chunk:
-            break
-        total += len(chunk)
-        if total > limit:
-            raise _OutputLimitExceeded()
-        chunks.append(chunk)
-    return b"".join(chunks)
+        async with asyncio.timeout(3):
+            response = await client.delete(path, timeout=3)
+            response.raise_for_status()
+    except (httpx.HTTPError, TimeoutError, ValueError):
+        # Runner also enforces an independent wall deadline and reaps expired containers.
+        logger.warning("Python 沙盒取消请求失败，等待执行服务的独立超时清理")
 
 
 async def execute_python_code(code: str, timeout: float = _TIMEOUT_SECONDS) -> dict[str, Any]:
-    """在隔离子进程沙盒中执行 Python 代码并捕获输出。"""
-    security_error = _check_code_safety(code)
-    if security_error:
-        return {
-            "ok": False,
-            "error": security_error,
-            "output": "",
-        }
-
-    full_script = f"{_PRE_INJECTED_ENV}\n{code}\n"
-    workdir = tempfile.mkdtemp(prefix="py-sandbox-")
     try:
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable,
-            "-I",
-            "-c",
-            full_script,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            stdin=asyncio.subprocess.DEVNULL,
-            cwd=workdir,
-            env=_child_env(),
-            preexec_fn=_apply_child_resource_limits,
+        valid_code = (
+            isinstance(code, str)
+            and bool(code.strip())
+            and "\x00" not in code
+            and len(code.encode("utf-8")) <= _MAX_CODE_BYTES
         )
-        try:
-            read_task = asyncio.gather(
-                _read_limited(proc.stdout, _MAX_OUTPUT_BYTES),
-                _read_limited(proc.stderr, _MAX_OUTPUT_BYTES),
-            )
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(read_task, timeout=timeout)
-        except TimeoutError:
-            try:
-                proc.kill()
-            except ProcessLookupError:
-                pass
-            await proc.wait()
-            return {
-                "ok": False,
-                "error": f"代码执行超时（超过 {timeout} 秒安全上限，已终止进程）",
-                "output": "",
-            }
-        except _OutputLimitExceeded:
-            try:
-                proc.kill()
-            except ProcessLookupError:
-                pass
-            await proc.wait()
-            return {
-                "ok": False,
-                "error": f"输出超过 {_MAX_OUTPUT_BYTES} 字节上限，已终止进程",
-                "output": "",
-            }
-
-        stdout_text = stdout_bytes.decode("utf-8", errors="replace").strip()
-        stderr_text = stderr_bytes.decode("utf-8", errors="replace").strip()
-
-        if proc.returncode != 0:
-            return {
-                "ok": False,
-                "error": stderr_text or f"进程异常退出 (退出码 {proc.returncode})",
-                "output": stdout_text,
-            }
-
-        return {
-            "ok": True,
-            "output": stdout_text if stdout_text else "（代码执行成功，无标准输出。提示：请使用 print(...) 打印需要查看的计算结果）",
-        }
-    except Exception as exc:
+    except UnicodeEncodeError:
+        valid_code = False
+    if not valid_code:
         return {
             "ok": False,
-            "error": f"沙盒执行异常: {exc}",
             "output": "",
+            "error_code": "invalid_arguments",
+            "error": "代码必须为有效 UTF-8、非空、不含空字节且不超过 32768 字节",
         }
-    finally:
-        shutil.rmtree(workdir, ignore_errors=True)
+    if not math.isfinite(timeout) or timeout <= 0:
+        return _unavailable()
+    settings = get_settings()  # Global deployment configuration, never user-overridable settings.
+    url, token = settings.python_sandbox_url.rstrip("/"), settings.python_sandbox_token
+    try:
+        parsed = urlsplit(url)
+        _ = parsed.port  # Reject malformed ports before creating an HTTP client.
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+            or len(token) < 32
+            or not token.isascii()
+            or not token.isprintable()
+        ):
+            return _unavailable()
+    except ValueError:
+        return _unavailable()
+    path = f"/jobs/{uuid.uuid4().hex}"
+    async with httpx.AsyncClient(
+        base_url=url,
+        headers={"Authorization": f"Bearer {token}"},
+        trust_env=False,
+        follow_redirects=False,
+        timeout=min(timeout, _TIMEOUT_SECONDS),
+    ) as client:
+        try:
+            async with asyncio.timeout(min(timeout, _TIMEOUT_SECONDS)):
+                async with client.stream("POST", path, json={"code": code}) as response:
+                    if response.status_code != 200:
+                        raise ValueError("runner unavailable")
+                    payload = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        if len(payload) + len(chunk) > _MAX_RESPONSE_BYTES:
+                            raise ValueError("oversized response")
+                        payload.extend(chunk)
+                result = json.loads(payload)
+                if (
+                    not isinstance(result, dict)
+                    or type(result.get("ok")) is not bool
+                    or not isinstance(result.get("output"), str)
+                    or not isinstance(result.get("error"), str)
+                ):
+                    raise ValueError("invalid response")
+                return {key: result[key] for key in ("ok", "output", "error")}
+        except asyncio.CancelledError:
+            cleanup = asyncio.create_task(_cancel_job(client, path))
+            await asyncio.shield(cleanup)
+            raise
+        except (httpx.HTTPError, TimeoutError, ValueError):
+            await _cancel_job(client, path)
+            return _unavailable()

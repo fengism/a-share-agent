@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import IndustryRankTab from "./IndustryRankTab";
@@ -74,12 +74,19 @@ vi.mock("../../api/queries", () => ({
   },
   useMarketSectorStocksHistory: (date: string, plateId: string) => {
     mocks.stocksQuery(date, plateId);
+    const isToday = date === new Date().toLocaleDateString("sv-SE");
     return {
       data: {
         source: "开盘红",
-        date: "2026-08-20",
+        date,
+        constituent_date: isToday ? "2026-09-18" : date,
         plate_id: "881169",
         fetched_at: "2026-08-21T08:00:00+00:00",
+        quoted_at: isToday ? "2026-09-19T10:15:00" : null,
+        quote_source: isToday ? "tencent" : null,
+        is_realtime: isToday,
+        realtime_partial: false,
+        history_details_available: !isToday,
         total: 1,
         items: [
           {
@@ -89,21 +96,23 @@ vi.mock("../../api/queries", () => ({
             price: 12.35,
             change_pct: 10.02,
             amount: 1_234_567_890,
-            turnover_rate: 8.66,
-            float_amount: 22_000_000_000,
-            main_buy: 320_000_000,
-            main_sell: 210_000_000,
-            main_net: 110_000_000,
-            buy_ratio: 45.2,
-            sell_ratio: 29.7,
-            net_ratio: 15.5,
-            limit_tag: "首板",
-            rank_tag: "龙一",
-            recent_chg: 25.3,
-            limit_count: 2,
-            chg_1d: 10.02,
-            chg_5d: 18.4,
-            chg_20d: 32.1,
+            turnover_rate: isToday ? null : 8.66,
+            float_amount: isToday ? null : 22_000_000_000,
+            main_buy: isToday ? null : 320_000_000,
+            main_sell: isToday ? null : 210_000_000,
+            main_net: isToday ? null : 110_000_000,
+            buy_ratio: isToday ? null : 45.2,
+            sell_ratio: isToday ? null : 29.7,
+            net_ratio: isToday ? null : 15.5,
+            limit_tag: isToday ? "" : "首板",
+            rank_tag: isToday ? "" : "龙一",
+            recent_chg: isToday ? null : 25.3,
+            limit_count: isToday ? null : 2,
+            chg_1d: isToday ? null : 10.02,
+            chg_5d: isToday ? null : 18.4,
+            chg_20d: isToday ? null : 32.1,
+            quote_source: isToday ? "tencent" : null,
+            quoted_at: isToday ? "2026-09-19T10:15:00" : null,
           },
         ],
       },
@@ -178,7 +187,7 @@ describe("IndustryRankTab", () => {
     expect(mocks.stocksQuery).toHaveBeenCalledWith("2026-08-21", "881169");
   });
 
-  it("disables the drill-down action when the selected date is today", () => {
+  it("opens the latest sector stocks with historical constituent context for today", async () => {
     const today = new Date().toLocaleDateString("sv-SE");
     mocks.rankingData = {
       ...baselineRankingData,
@@ -186,11 +195,24 @@ describe("IndustryRankTab", () => {
     };
     renderTab(`/market?tab=industry-rank&industryDate=${today}`);
 
-    const actions = screen.getAllByRole("button", { name: "成分股" });
-    for (const action of actions) {
-      expect(action).toBeDisabled();
-    }
-    expect(mocks.stocksQuery).not.toHaveBeenCalledWith(today, "881169");
+    const action = screen.getAllByRole("button", { name: "成分股" })[0];
+    expect(action).toBeEnabled();
+    fireEvent.click(action);
+
+    await screen.findByText(new RegExp(`贵金属 成分股 · ${today}`));
+    expect(mocks.stocksQuery).toHaveBeenCalledWith(today, "881169");
+    expect(screen.getByText("成分口径：开盘红 2026-09-18")).toBeInTheDocument();
+    expect(screen.getByText("行情时间：2026-09-19T10:15:00")).toBeInTheDocument();
+    const drawer = within(screen.getByRole("dialog"));
+    expect(drawer.getAllByText("现价").length).toBeGreaterThan(0);
+    expect(drawer.getAllByText("成交额").length).toBeGreaterThan(0);
+    expect(drawer.getByText("12.35")).toBeInTheDocument();
+    expect(drawer.getByText("12.3亿")).toBeInTheDocument();
+    expect(drawer.queryByText("主力净额")).not.toBeInTheDocument();
+    expect(drawer.queryByText("换手率")).not.toBeInTheDocument();
+    expect(drawer.queryByText("流通市值")).not.toBeInTheDocument();
+    expect(drawer.queryByText("连板标签")).not.toBeInTheDocument();
+    expect(drawer.queryByText("龙虎榜")).not.toBeInTheDocument();
   });
 
   it("disables the drill-down action when rankings come from a fallback source", () => {

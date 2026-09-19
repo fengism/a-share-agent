@@ -17,7 +17,9 @@ export default function BacktestRunSummary({ run }: { run: QuantBacktestRun }) {
   const status = QUANT_RUN_STATUS_META[run.status];
   const strategy = run.request.strategy ?? { type: "ma_cross" };
   const execution = run.request.execution;
-  const costSummary = execution
+  const costSummary = execution?.fee_schedule === "a_share_historical"
+    ? `A 股历史税率（按成交日期） · 佣金 ${compactNumber(execution.commission_rate * 10_000)} BP · 最低 ${compactNumber(execution.minimum_commission)} 元 · 滑点 ${compactNumber(execution.slippage_bps)} BP`
+    : execution
     ? `佣金 ${compactNumber(execution.commission_rate * 10_000)} BP · 最低 ${compactNumber(execution.minimum_commission)} 元 · 印花税 ${compactNumber(execution.stamp_duty_rate * 10_000)} BP · 过户费 ${compactNumber(execution.transfer_fee_rate * 10_000)} BP · 滑点 ${compactNumber(execution.slippage_bps)} BP`
     : "默认执行参数";
 
@@ -53,6 +55,13 @@ export default function BacktestRunSummary({ run }: { run: QuantBacktestRun }) {
               children: execution ? `${currencyFormatter.format(execution.initial_cash)} 元` : "默认执行参数",
             },
             { key: "costs", label: "交易成本", children: costSummary },
+            { key: "participation", label: "日成交额参与率", children: execution?.max_daily_participation_rate == null ? "不限制 / 旧版未记录" : `${compactNumber(execution.max_daily_participation_rate * 100)}%` },
+            { key: "position", label: "单股仓位上限", children: `${compactNumber((execution?.max_position_weight ?? 1) * 100)}%` },
+            { key: "reserve", label: "现金保留比例", children: `${compactNumber((execution?.cash_reserve_ratio ?? 0) * 100)}%` },
+            ...([
+              ["stop_loss_pct", "持仓止损"], ["trailing_stop_pct", "移动止损"],
+              ["max_portfolio_drawdown", "回撤熔断"], ["target_annual_volatility", "目标年化波动率"],
+            ] as const).map(([key, label]) => ({ key, label, children: execution?.[key] == null ? "关闭" : `${compactNumber(execution[key] * 100)}%` })),
             { key: "lot-size", label: "交易单位", children: execution ? `${execution.lot_size} 股` : "默认执行参数" },
             {
               key: "risk-free",

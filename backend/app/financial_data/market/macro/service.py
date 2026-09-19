@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any, cast
 
+from app.configuration import get_settings
 from app.configuration.paths import DATA_DIR
 from app.core.cache import dated_cache_key_no_day
 from app.core.cache import reference_cache as cache
@@ -14,7 +15,7 @@ from app.core.concurrency.rate_limiter import call_blocking
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.financial_data.market.macro import collector as macro_collector
 from app.financial_data.market.macro import normalizer as macro_normalizer
-from app.infrastructure.persistence.json_storage import atomic_write_json
+from app.infrastructure.persistence.json_storage import atomic_write_json, durable_unlink
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
@@ -75,6 +76,11 @@ _MACRO_METHODS = {
     "us_fed_rate": "fetch_us_fed_rate",
     "us_retail_sales": "fetch_us_retail_sales",
     "us_trade_balance": "fetch_us_trade_balance",
+    "us_pce": "fetch_us_pce",
+    "us_ppi": "fetch_us_ppi",
+    "us_employment_details": "fetch_us_employment_details",
+    "us_consumer_confidence": "fetch_us_consumer_confidence",
+    "us_credit_spread": "fetch_us_credit_spread",
 }
 _NBS_FIRST_OPERATIONS = {
     "cpi",
@@ -93,6 +99,7 @@ _NBS_FIRST_OPERATIONS = {
     "social_financing",
 }
 _US_OPERATIONS = {operation for operation in _MACRO_METHODS if operation.startswith("us_")}
+_FRED_ONLY_OPERATIONS = {"us_pce", "us_employment_details", "us_consumer_confidence", "us_credit_spread"}
 # 美国宏观中东财数据中心已有直连实现的指标（akshare 依赖金十页面，当前不可用），akshare 兜底；
 # 其余 us_* 指标东财侧暂无对应序列，仍走 akshare 单源
 _US_EASTMONEY_OPERATIONS = {
@@ -103,18 +110,24 @@ _US_EASTMONEY_OPERATIONS = {
     "us_fed_rate",
     "us_retail_sales",
     "us_trade_balance",
+    "us_ppi",
 }
 _US_FIELDS = {
     "us_gdp": ["TIME", "VALUE"],
-    "us_cpi": ["TIME", "CPI_YOY", "CPI_MOM", "CORE_CPI_MOM"],
+    "us_cpi": ["TIME", "CPI_YOY", "CPI_MOM", "CORE_CPI_YOY", "CORE_CPI_MOM"],
     "us_labor": ["TIME", "UNEMPLOYMENT", "NON_FARM", "INITIAL_JOBLESS"],
     "us_pmi": ["TIME", "MANUFACTURING_PMI", "SERVICES_PMI"],
     "us_fed_rate": ["TIME", "VALUE"],
     "us_retail_sales": ["TIME", "VALUE"],
     "us_trade_balance": ["TIME", "VALUE"],
+    "us_pce": ["TIME", "PCE_YOY", "PCE_MOM", "CORE_PCE_YOY", "CORE_PCE_MOM"],
+    "us_ppi": ["TIME", "PPI_YOY", "PPI_MOM", "CORE_PPI_YOY", "CORE_PPI_MOM"],
+    "us_employment_details": ["TIME", "CIVILIAN_LABOR_PARTICIPATION", "AVG_HOURLY_EARNINGS_MOM"],
+    "us_consumer_confidence": ["TIME", "VALUE"],
+    "us_credit_spread": ["TIME", "VALUE"],
 }
 _US_SNAPSHOT_PATH = DATA_DIR / "us_macro_snapshot.json"
-_US_SNAPSHOT_SCHEMA_VERSION = 3
+_US_SNAPSHOT_SCHEMA_VERSION = 7
 _US_SNAPSHOT_MAX_AGE_SECONDS = 6 * 60 * 60
 _US_METRIC_FETCH_TIMEOUT_SECONDS = 90
 # 单个数据源尝试的上限；前端宏观查询超时为 120s，需为回退链留出多次尝试空间
@@ -127,6 +140,7 @@ _us_refresh_task: asyncio.Task | None = None
 
 _PROVIDER_APIS = {
     "nbs": "https://data.stats.gov.cn/dg/website/publicrelease/web/external/stream/esData",
+    "fred": "https://api.stlouisfed.org/fred/series/observations",
     "eastmoney": "https://datacenter-web.eastmoney.com/api/data/v1/get",
     "akshare": "https://akshare.akfamily.xyz/data/macro/macro.html",
 }
@@ -149,7 +163,7 @@ _MONTHLY_OPERATIONS = {
     "fixed_asset_investment",
     "real_estate",
     "employment",
-    *_US_OPERATIONS,
+    *(_US_OPERATIONS - {"us_gdp"}),
 }
 
 
@@ -174,7 +188,7 @@ def _is_stale_metric(operation: str, latest_period: str | None) -> bool:
             return True
         year, month = int(match.group(1)), int(match.group(2))
         return (now.year * 12 + now.month) - (year * 12 + month) > 2
-    if operation == "gdp":
+    if operation in {"gdp", "us_gdp"}:
         match = re.search(r"(\d{4})Q([1-4])", latest_period)
         if match is None:
             return True
@@ -222,7 +236,13 @@ def _with_metric_metadata(
 
 
 def _macro_metric_cache_key(operation: str) -> str:
-    return cast(str, dated_cache_key_no_day("macro_metric", _MACRO_CACHE_VERSION, operation))
+    source_variant = (
+        "fred" if operation in _US_OPERATIONS and get_settings().fred_api_key.strip() else "default"
+    )
+    return cast(
+        str,
+        dated_cache_key_no_day("macro_metric", _MACRO_CACHE_VERSION, operation, source_variant),
+    )
 
 
 async def _load_macro_metric(operation: str) -> object:
@@ -230,7 +250,12 @@ async def _load_macro_metric(operation: str) -> object:
     if method_name is None:
         raise ValueError(f"不支持的宏观指标: {operation}")
     provider_names: tuple[str, ...]
-    if operation in _US_EASTMONEY_OPERATIONS:
+    fred_configured = bool(get_settings().fred_api_key.strip())
+    if operation in _FRED_ONLY_OPERATIONS:
+        if not fred_configured:
+            return []
+        provider_names = ("fred",)
+    elif operation in _US_EASTMONEY_OPERATIONS:
         provider_names = ("eastmoney", "akshare")
     elif operation in _US_OPERATIONS:
         provider_names = ("akshare",)
@@ -239,6 +264,12 @@ async def _load_macro_metric(operation: str) -> object:
         provider_names = ("nbs", "eastmoney", "akshare")
     else:
         provider_names = ("eastmoney",)
+    if (
+        operation in _US_OPERATIONS
+        and operation not in _FRED_ONLY_OPERATIONS
+        and fred_configured
+    ):
+        provider_names = ("fred", *provider_names)
 
     last_error: Exception | None = None
     supported_attempts = 0
@@ -326,6 +357,8 @@ async def _load_macro_metric(operation: str) -> object:
                 type(error).__name__,
                 error_detail,
             )
+    if operation in _FRED_ONLY_OPERATIONS:
+        return []
     if last_error is not None:
         raise last_error
     raise RuntimeError(f"宏观指标数据源为空: {operation}")
@@ -438,6 +471,18 @@ def _save_us_macro_snapshot(payload: dict) -> None:
         {**payload, "_schema_version": _US_SNAPSHOT_SCHEMA_VERSION},
         indent=0,
     )
+
+
+def invalidate_us_macro_snapshot() -> bool:
+    """使持久化的美国宏观快照失效，让下一次读取使用最新数据源配置刷新。"""
+    try:
+        removed = durable_unlink(_US_SNAPSHOT_PATH)
+    except OSError:
+        logger.warning("美国宏观快照失效失败: path=%s", _US_SNAPSHOT_PATH, exc_info=True)
+        return False
+    if removed:
+        logger.info("美国宏观快照已失效: path=%s", _US_SNAPSHOT_PATH)
+    return removed
 
 
 async def _collect_us_macro_data() -> dict:

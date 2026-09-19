@@ -14,6 +14,9 @@ export default function IwencaiConfigCard({ form, onChange, onSave, isSaving }: 
       onSave={onSave}
       isSaving={isSaving}
     >
+      <p style={{ color: "var(--c-text-muted)", marginTop: 0 }}>
+        自定义问财地址需要填写个人 API Key，不会继承全局 Key；保留掩码不会设置新 Key。
+      </p>
       <Row gutter={[24, 16]}>
         <Col span={24}>
           <div style={fieldLabelStyle}>启用问财数据源</div>

@@ -7,8 +7,10 @@ import { apiGet, apiPost, API_TIMEOUTS } from "../client";
 import { queryKeys } from "../queryKeys";
 import {
   useForceRefreshMacroAllData,
+  useForceRefreshUsMacroData,
   useIndustryRankings,
   useMarketIndices,
+  useNationalTeamHoldings,
   useMarketIndexIntraday,
   useMarketEmotion,
   useMarketLimitHistory,
@@ -23,7 +25,7 @@ import {
   useMarketTwitterAnalysisRefresh,
   useMarketTwitterFeedRefresh,
 } from "./market";
-import type { MacroAllData } from "../../types/stock";
+import type { MacroAllData, MacroUsData } from "../../types/stock";
 
 const mocks = vi.hoisted(() => ({
   isTradingSession: true,
@@ -361,8 +363,14 @@ describe("market emotion query", () => {
     vi.mocked(apiGet).mockResolvedValue({
       source: "开盘红",
       date: "2026-08-20",
+      constituent_date: "2026-08-20",
       plate_id: "881169",
       fetched_at: "2026-08-21T08:00:00+00:00",
+      quoted_at: null,
+      quote_source: null,
+      is_realtime: false,
+      realtime_partial: false,
+      history_details_available: true,
       total: 0,
       items: [],
     });
@@ -385,8 +393,43 @@ describe("market emotion query", () => {
     const options = queryClient.getQueryCache().find({
       queryKey: queryKeys.market.sectorStocksHistory("2026-08-20", "881169"),
     })?.options as { refetchInterval?: unknown; staleTime?: unknown } | undefined;
-    expect(options?.refetchInterval).toBeUndefined();
+    expect(options?.refetchInterval).toBe(false);
     expect(options?.staleTime).toBe(86_400_000);
+    queryClient.clear();
+  });
+
+  it("refreshes today's sector stock quotes during trading", async () => {
+    const today = dayjs().format("YYYY-MM-DD");
+    vi.mocked(apiGet).mockResolvedValue({
+      source: "开盘红",
+      date: today,
+      constituent_date: dayjs().subtract(1, "day").format("YYYY-MM-DD"),
+      plate_id: "881169",
+      fetched_at: "2026-09-19T02:15:00+00:00",
+      quoted_at: "2026-09-19T10:15:00",
+      quote_source: "tencent",
+      is_realtime: true,
+      realtime_partial: false,
+      history_details_available: false,
+      total: 0,
+      items: [],
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(
+      () => useMarketSectorStocksHistory(today, "881169"),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const options = queryClient.getQueryCache().find({
+      queryKey: queryKeys.market.sectorStocksHistory(today, "881169"),
+    })?.options as { refetchInterval?: unknown; staleTime?: unknown } | undefined;
+    expect(options?.refetchInterval).toBe(60_000);
+    expect(options?.staleTime).toBe(60_000);
     queryClient.clear();
   });
 
@@ -449,6 +492,33 @@ describe("macro data queries", () => {
     expect(queryClient.getQueryData(["macroAllData"])).toEqual(freshData);
     queryClient.clear();
   });
+
+  it("forces a US macro refresh and replaces the shared query cache", async () => {
+    const freshData: MacroUsData = {
+      indicators: {},
+      updated_at: "2026-09-14T10:00:00+00:00",
+      refreshing: false,
+      failed_indicators: {},
+    };
+    vi.mocked(apiGet).mockResolvedValue(freshData);
+    const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useForceRefreshUsMacroData(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    expect(apiGet).toHaveBeenCalledWith(
+      "/macro/us",
+      { force_refresh: true },
+      { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    );
+    expect(queryClient.getQueryData(queryKeys.market.macroUs)).toEqual(freshData);
+    queryClient.clear();
+  });
 });
 
 describe("twitter data queries", () => {
@@ -497,5 +567,31 @@ describe("twitter data queries", () => {
     );
     expect(queryClient.getQueryData(queryKeys.market.twitterAnalysis("market-author"))).toEqual(regenerated);
     queryClient.clear();
+  });
+});
+
+
+describe("useNationalTeamHoldings refresh policy", () => {
+  it.each([
+    { partial: true, refreshing: false, interval: 60_000, staleTime: 60_000 },
+    { partial: false, refreshing: true, interval: 60_000, staleTime: 60_000 },
+    { partial: false, refreshing: false, interval: false, staleTime: 600_000 },
+  ])("uses $interval polling for partial=$partial refreshing=$refreshing", async ({ partial, refreshing, interval, staleTime }) => {
+    vi.mocked(apiGet).mockResolvedValue({ partial, refreshing });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result, unmount } = renderHook(() => useNationalTeamHoldings(120), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const query = client.getQueryCache().find({ queryKey: queryKeys.market.nationalTeam(120) });
+    const options = query?.options as {
+      refetchInterval: (value: unknown) => number | false;
+      staleTime: (value: unknown) => number;
+      refetchIntervalInBackground: boolean;
+    };
+    expect(options.refetchInterval(query)).toBe(interval);
+    expect(options.staleTime(query)).toBe(staleTime);
+    expect(options.refetchIntervalInBackground).toBe(false);
+    unmount();
+    client.clear();
   });
 });

@@ -15,6 +15,7 @@ from app.core.concurrency.rate_limiter import (
     misc_semaphore,
     shutdown_blocking_executor,
 )
+from app.infrastructure.javascript_runtime import initialize_javascript_runtime
 from app.runtime.task_supervisor import BackgroundTaskSpec, BackgroundTaskSupervisor
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,7 @@ def _supervised_task_factory(
 
 def build_background_task_specs(
     *,
+    settings_provider: Callable[[], Settings],
     supervised_once: SupervisedRunner,
     industry_mapping_prewarm: AsyncTaskFactory,
     stock_name_map_prewarm: AsyncTaskFactory,
@@ -135,6 +137,7 @@ def build_background_task_specs(
             critical=True,
             restart_on_exit=True,
             start_message="SQLite 在线备份任务已启动",
+            enabled=lambda: settings_provider().database_backup_enabled,
         ),
         BackgroundTaskSpec(
             name="twitter_feed",
@@ -143,6 +146,7 @@ def build_background_task_specs(
             critical=True,
             restart_on_exit=True,
             start_message="Twitter 资讯定时拉取任务已启动",
+            enabled=lambda: bool(settings_provider().twitter_feeds),
         ),
         BackgroundTaskSpec(
             name="potential_stock_daily",
@@ -159,6 +163,7 @@ def build_background_task_specs(
             critical=True,
             restart_on_exit=True,
             start_message="Bot 持久化任务 Worker 已启动",
+            enabled=lambda: settings_provider().bot_enabled,
         ),
         BackgroundTaskSpec(
             name="quant_strategy_reload",
@@ -203,16 +208,22 @@ async def application_lifespan(
     quant_job_worker: AsyncTaskFactory,
     workflow_job_worker: AsyncTaskFactory,
     settings_effects_shutdown: AsyncTaskFactory,
+    javascript_runtime_initializer: Callable[[], None] = initialize_javascript_runtime,
     history_index_initializer: Callable[[], None] = ensure_history_indexes,
     global_settings_initializer: Callable[[], None] = load_persisted_global_settings,
     database_integrity_checker: Callable[[], None] = verify_database_integrity,
     blocking_runner=call_blocking,
 ) -> AsyncIterator[None]:
+    javascript_runtime_initializer()
+    logger.info("JavaScript 运行时初始化完成")
+
     from app.financial_data.hk.search_index import prewarm_hk_stock_search_index
     from app.financial_data.market.public import prewarm_us_macro_data
+    from app.financial_data.market.quotes.national_team import initialize_national_team_refresh
     from app.financial_data.stock.public import build_industry_mapping, build_stock_name_map
     from app.infrastructure.persistence import init_db
 
+    initialize_national_team_refresh()
     configure_blocking_executor(settings_provider().blocking_thread_pool_workers)
 
     await blocking_runner(init_db, semaphore=database_semaphore)
@@ -272,6 +283,7 @@ async def application_lifespan(
     logger.info("量化策略定义加载完成")
 
     task_specs = build_background_task_specs(
+        settings_provider=settings_provider,
         supervised_once=supervised_once,
         industry_mapping_prewarm=build_industry_mapping,
         stock_name_map_prewarm=build_stock_name_map,
@@ -295,6 +307,10 @@ async def application_lifespan(
         await task_supervisor.stop()
 
         await settings_effects_shutdown()
+
+        from app.financial_data.market.quotes.national_team import shutdown_national_team_refresh
+
+        await shutdown_national_team_refresh()
 
         from app.infrastructure.http.client import close_session
         from app.infrastructure.llm.runtime import close_async_runtime_pool

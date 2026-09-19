@@ -10,6 +10,7 @@ import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
 import { useColors, useStyles, semanticTagStyle } from "../../styles/ui";
 import type { ConfigUpdate, ProviderDefault } from "../../types/settings";
+import SystemUpdateCard from "./SystemUpdateCard";
 import { useConfigSectionSave } from "./useConfigSectionSave";
 
 const AiSettingsSection = lazy(() => import("./PersonalSettingsSections").then((module) => ({
@@ -71,6 +72,7 @@ export default function SettingsPage() {
       iwencai_api_key: config.iwencai_api_key,
       twitter_feeds: config.twitter_feeds,
       eastmoney_cookie: config.eastmoney_cookie,
+      fred_api_key: config.fred_api_key,
       baidu_cookie: config.baidu_cookie,
       bot_enabled: config.bot_enabled,
       bot_command_prefix: config.bot_command_prefix,
@@ -192,6 +194,15 @@ export default function SettingsPage() {
     );
   }, [form.twitter_feeds, queryClient, saveConfig]);
 
+  const handleSaveFred = useCallback(() => {
+    const value = (form.fred_api_key ?? "").trim();
+    if (value.includes("***") || value === (config?.fred_api_key ?? "")) {
+      message.info("没有需要保存的变更");
+      return;
+    }
+    saveConfig({ fred_api_key: value }, "FRED API Key 已保存");
+  }, [config?.fred_api_key, form.fred_api_key, saveConfig]);
+
   const handleSaveDataSourceCookies = useCallback(() => {
     const patch: ConfigUpdate = {};
     if (form.eastmoney_cookie && !form.eastmoney_cookie.endsWith("***")) {
@@ -293,6 +304,7 @@ export default function SettingsPage() {
               <section aria-labelledby="account-settings-title">
                 <h3 id="account-settings-title" style={sectionTitleStyle}>账号与安全</h3>
                 <ChangePasswordCard />
+                <SystemUpdateCard />
               </section>
             ),
           },
@@ -345,6 +357,7 @@ export default function SettingsPage() {
                     isSaving={isSaving}
                     sectionTitleStyle={sectionTitleStyle}
                     onSaveTwitter={handleSaveTwitter}
+                    onSaveFred={handleSaveFred}
                     onSaveDataSourceCookies={handleSaveDataSourceCookies}
                   />
                 </Suspense>

@@ -1,5 +1,4 @@
 import {
-  BarChartOutlined,
   ExperimentOutlined,
   EyeOutlined,
   RobotOutlined,
@@ -15,7 +14,6 @@ interface ScreenerBatchActionsProps {
   isAnalyzing: boolean;
   analysisProgress: string;
   onAddWatchlist: () => void;
-  onCompare: () => void;
   onAnalyze: () => void;
   onBacktest: () => void;
   onClear: () => void;
@@ -27,7 +25,6 @@ export default function ScreenerBatchActions({
   isAnalyzing,
   analysisProgress,
   onAddWatchlist,
-  onCompare,
   onAnalyze,
   onBacktest,
   onClear,
@@ -45,15 +42,6 @@ export default function ScreenerBatchActions({
         onClick={onAddWatchlist}
       >
         加入自选
-      </Button>
-      <Button
-        size="small"
-        icon={<BarChartOutlined />}
-        disabled={count < 2 || count > 5}
-        title={count > 5 ? "个股对比最多支持 5 只" : undefined}
-        onClick={onCompare}
-      >
-        批量对比
       </Button>
       <Button
         size="small"

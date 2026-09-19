@@ -7,6 +7,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "sandbox/**"
       - "docker-compose.yml"
       - ".github/workflows/docker-publish.yml"
   workflow_dispatch:
@@ -20,6 +21,8 @@ env:
   DOCKERHUB_NAMESPACE: fengliu1989
   BACKEND_IMAGE: fengliu1989/a-share-backend
   FRONTEND_IMAGE: fengliu1989/a-share-frontend
+  PYTHON_RUNNER_IMAGE: fengliu1989/a-share-python-runner
+  PYTHON_SANDBOX_IMAGE: fengliu1989/a-share-python-sandbox
 
 jobs:
   verify:
@@ -41,11 +44,12 @@ jobs:
         working-directory: backend
         run: uv sync --frozen
 
-      - name: Lint backend
+      - name: Lint backend and sandbox
         working-directory: backend
         run: |
-          uv run --frozen ruff check app
+          uv run --frozen ruff check app ../sandbox
           uv run --frozen mypy
+          uv run --frozen mypy ../sandbox
 
       - uses: actions/setup-node@v4
         with:
@@ -136,8 +140,56 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  python-runner:
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./sandbox
+          target: runner
+          outputs: type=image,name=${{ env.PYTHON_RUNNER_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=python-runner
+          cache-to: type=gha,mode=max,scope=python-runner
+
+  python-sandbox:
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./sandbox
+          target: worker
+          outputs: type=image,name=${{ env.PYTHON_SANDBOX_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=python-sandbox
+          cache-to: type=gha,mode=max,scope=python-sandbox
+
   publish:
-    needs: [backend, frontend]
+    needs: [backend, frontend, python-runner, python-sandbox]
     runs-on: ubuntu-latest
     steps:
       - uses: docker/setup-buildx-action@v3
@@ -163,7 +215,22 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
 
-      # release marker 必须最后发布；它出现时代表同一 revision 的前后端镜像都已可用。
+      - id: python-runner-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.PYTHON_RUNNER_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      - id: python-sandbox-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.PYTHON_SANDBOX_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
       - name: Promote frontend image
         shell: bash
         env:
@@ -175,6 +242,30 @@ jobs:
             [[ -n "$tag" ]] && tags+=(--tag "$tag")
           done < <(jq -r '.tags[]' <<< "$METADATA_JSON")
           docker buildx imagetools create "${tags[@]}" "$FRONTEND_IMAGE@$DIGEST"
+
+      - name: Promote python-runner image
+        shell: bash
+        env:
+          DIGEST: ${{ needs.python-runner.outputs.digest }}
+          METADATA_JSON: ${{ steps.python-runner-meta.outputs.json }}
+        run: |
+          tags=(--tag "$PYTHON_RUNNER_IMAGE:sha-${GITHUB_SHA::7}")
+          while IFS= read -r tag; do
+            [[ -n "$tag" ]] && tags+=(--tag "$tag")
+          done < <(jq -r '.tags[]' <<< "$METADATA_JSON")
+          docker buildx imagetools create "${tags[@]}" "$PYTHON_RUNNER_IMAGE@$DIGEST"
+
+      - name: Promote python-sandbox image
+        shell: bash
+        env:
+          DIGEST: ${{ needs.python-sandbox.outputs.digest }}
+          METADATA_JSON: ${{ steps.python-sandbox-meta.outputs.json }}
+        run: |
+          tags=(--tag "$PYTHON_SANDBOX_IMAGE:sha-${GITHUB_SHA::7}")
+          while IFS= read -r tag; do
+            [[ -n "$tag" ]] && tags+=(--tag "$tag")
+          done < <(jq -r '.tags[]' <<< "$METADATA_JSON")
+          docker buildx imagetools create "${tags[@]}" "$PYTHON_SANDBOX_IMAGE@$DIGEST"
 
       - name: Promote backend public aliases
         shell: bash
@@ -199,6 +290,7 @@ jobs:
             --tag "$BACKEND_IMAGE:sha-${GITHUB_SHA::7}" \
             "$BACKEND_IMAGE@$DIGEST"
 
+      # release marker 必须最后发布；它出现时代表同一 revision 的前后端及沙箱镜像都已可用。
       - name: Publish complete release marker
         shell: bash
         env:

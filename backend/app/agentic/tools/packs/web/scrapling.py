@@ -21,6 +21,7 @@ from app.agentic.tools.packs.web.browser_proxy import (
 from app.agentic.tools.packs.web.content import extract_text
 from app.agentic.tools.packs.web.url_security import UnsafeUrlError, validate_url_syntax
 from app.core.metrics import metrics
+from app.infrastructure.browser_runtime import launch_full_chromium
 
 logger = logging.getLogger(__name__)
 
@@ -398,8 +399,8 @@ async def fetch_dynamic_document(
         browser = None
         context = None
         async with manager as playwright:
-            browser = await playwright.chromium.launch(
-                headless=True,
+            browser = await launch_full_chromium(
+                playwright.chromium,
                 args=[*_BROWSER_FLAGS, "--proxy-bypass-list=<-loopback>"],
                 proxy={"server": proxy.url, "bypass": ""},
             )

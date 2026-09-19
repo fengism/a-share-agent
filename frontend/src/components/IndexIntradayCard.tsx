@@ -43,19 +43,21 @@ export default function IndexIntradayCard({
       size="small"
       className="index-intraday-card"
       title={
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontWeight: Number(t.weight.semibold) }}>{name || symbol} 分时</span>
-          {displayPrice != null && (
-            <span style={{
-              fontFamily: "var(--c-font-mono)",
-              fontSize: t.font.sm,
-              fontWeight: Number(t.weight.bold),
-              color: changePct == null || changePct === 0 ? c.textPrimary : changePct > 0 ? c.up : c.down,
-            }}>
-              {displayPrice.toFixed(2)}
-            </span>
-          )}
-          <ChangeValue value={changePct ?? null} showIcon />
+        <div className="index-intraday-card__header">
+          <span className="index-intraday-card__title" style={{ fontWeight: Number(t.weight.semibold) }}>{name || symbol} 分时</span>
+          <span className="index-intraday-card__pill">
+            {displayPrice != null && (
+              <span style={{
+                fontFamily: "var(--c-font-mono)",
+                fontSize: t.font.sm,
+                fontWeight: Number(t.weight.bold),
+                color: changePct == null || changePct === 0 ? c.textPrimary : changePct > 0 ? c.up : c.down,
+              }}>
+                {displayPrice.toFixed(2)}
+              </span>
+            )}
+            <ChangeValue value={changePct ?? null} showIcon />
+          </span>
         </div>
       }
       extra={

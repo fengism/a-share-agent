@@ -136,6 +136,7 @@ export default function BacktestHistory({
         <ul className="quant-history-list">
           {filteredRuns.map((run) => {
             const status = QUANT_RUN_STATUS_META[run.status];
+            const metrics = run.summary_metrics ?? run.result?.metrics;
             const isSelected = selectedRunId === run.id;
             const codes = quantUniverseLabel(run);
             const strategy = quantStrategyLabel(run.request.strategy ?? { type: "ma_cross" });
@@ -155,20 +156,20 @@ export default function BacktestHistory({
                   <Text type="secondary" className="quant-history-meta">
                     {strategy} · {codes} · {run.request.start_date} 至 {run.request.end_date} · {dayjs.unix(run.created_at).format("MM-DD HH:mm")}
                   </Text>
-                  {run.result?.metrics ? (
-                    <div className="quant-history-metrics-summary" style={{ display: "flex", gap: "10px", marginTop: "4px", fontSize: "var(--c-font-xs)", alignItems: "center" }}>
-                      <span style={{ color: run.result.metrics.total_return >= 0 ? colors.up : colors.down, fontWeight: 700, fontFamily: "var(--c-font-mono)" }}>
-                        收益: {run.result.metrics.total_return > 0 ? `+${run.result.metrics.total_return.toFixed(1)}` : run.result.metrics.total_return.toFixed(1)}%
+                  {metrics ? (
+                    <span className="quant-history-metrics-summary">
+                      <span style={{ color: metrics.total_return >= 0 ? colors.up : colors.down, fontWeight: 700, fontFamily: "var(--c-font-mono)" }}>
+                        收益: {metrics.total_return > 0 ? `+${metrics.total_return.toFixed(1)}` : metrics.total_return.toFixed(1)}%
                       </span>
                       <span style={{ color: colors.down, fontFamily: "var(--c-font-mono)", fontWeight: 600 }}>
-                        回撤: {run.result.metrics.max_drawdown.toFixed(1)}%
+                        回撤: {metrics.max_drawdown.toFixed(1)}%
                       </span>
-                      {run.result.metrics.sharpe_ratio != null ? (
+                      {metrics.sharpe_ratio != null ? (
                         <span style={{ color: colors.textSecondary, fontFamily: "var(--c-font-mono)" }}>
-                          夏普: {run.result.metrics.sharpe_ratio.toFixed(2)}
+                          夏普: {metrics.sharpe_ratio.toFixed(2)}
                         </span>
                       ) : null}
-                    </div>
+                    </span>
                   ) : null}
                 </button>
                 <div className="quant-history-actions">

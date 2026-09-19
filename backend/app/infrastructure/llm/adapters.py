@@ -19,6 +19,10 @@ class LLMUpstreamResponseError(LLMRetryableError):
     """The provider returned an empty or non-JSON HTTP response."""
 
 
+class LLMInvalidResponseError(RuntimeError):
+    """The provider returned a non-retryable, incompatible completion response."""
+
+
 class LLMEmptyResponseError(LLMRetryableError):
     """The provider returned a syntactically valid completion with no text."""
 
@@ -82,6 +86,29 @@ def extract_usage(response: Any) -> LLMUsage | None:
         prompt_tokens=_usage_value(usage, "prompt_tokens", "input_tokens"),
         completion_tokens=_usage_value(usage, "completion_tokens", "output_tokens"),
     )
+
+
+def validate_chat_completion_response(response: Any) -> Any:
+    """Validate the minimum SDK response shape used by Chat Completions callers.
+
+    Do not include the raw response in errors: compatible gateways may return an
+    authentication page or other sensitive body while still using HTTP 200.
+    """
+    if isinstance(response, (str, bytes, bytearray, dict)) or response is None:
+        raise LLMInvalidResponseError("LLM 上游响应对象类型异常")
+
+    choices = getattr(response, "choices", None)
+    if choices is None:
+        raise LLMInvalidResponseError("LLM 上游响应 choices 为空")
+    try:
+        first_choice = choices[0]
+    except IndexError:
+        raise LLMInvalidResponseError("LLM 上游响应 choices 为空") from None
+    except (KeyError, TypeError):
+        raise LLMInvalidResponseError("LLM 上游响应 choices 格式异常") from None
+    if getattr(first_choice, "message", None) is None:
+        raise LLMInvalidResponseError("LLM 上游响应缺少 message")
+    return response
 
 
 def is_reasoning_model(model: str) -> bool:

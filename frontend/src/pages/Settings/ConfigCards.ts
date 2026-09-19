@@ -1,6 +1,7 @@
 export { default as BotConfigCard } from "./config-cards/BotConfigCard";
 export { default as DataSourceCookiesCard } from "./config-cards/DataSourceCookiesCard";
 export { default as FeishuConfigCard } from "./config-cards/FeishuConfigCard";
+export { default as FredConfigCard } from "./config-cards/FredConfigCard";
 export { default as IwencaiConfigCard } from "./config-cards/IwencaiConfigCard";
 export { default as LlmConfigCard } from "./config-cards/LlmConfigCard";
 export { default as NotionConfigCard } from "./config-cards/NotionConfigCard";

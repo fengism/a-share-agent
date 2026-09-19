@@ -4,11 +4,11 @@ import re
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
-from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 from app.agentic.runtime.llm import create_chat_completion
 from app.infrastructure.llm.prompting.parsing import extract_json_object
+from app.infrastructure.llm.tool_calling import AsyncLLMClient
 from app.modules.chat.prompts import (
     ORCHESTRATOR_CLASSIFY_PROMPT,
     ORCHESTRATOR_CLASSIFY_PROMPT_REF,
@@ -145,7 +145,7 @@ def classify_message(
 
 async def classify_with_llm(
     message: str,
-    llm_client: AsyncOpenAI,
+    llm_client: AsyncLLMClient,
     model: str,
     available_agents: Collection[str] = DEFAULT_AGENT_NAMES,
 ) -> RoutingDecision:

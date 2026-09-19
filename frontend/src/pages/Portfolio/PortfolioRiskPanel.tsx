@@ -2,6 +2,7 @@ import { Alert, Card, Col, Row, Space, Statistic, Tag, Typography } from "antd";
 import type { PortfolioRiskSummary } from "../../types/portfolio";
 import { useColors, useStyles, semanticTagStyle } from "../../styles/ui";
 import type { SemanticTagColor } from "../../theme/hooks";
+import { formatMoney } from "./portfolioFormatters";
 
 const { Text } = Typography;
 
@@ -23,41 +24,84 @@ export default function PortfolioRiskPanel({ risk }: PortfolioRiskPanelProps) {
   const largestPosition = risk.largest_position_stock_name && risk.largest_position_stock_code
     ? `${risk.largest_position_stock_name} · ${risk.largest_position_stock_code}`
     : "暂无可评估持仓";
+  const largestSector = risk.largest_sector_name ?? "暂无行业归属";
 
   return (
     <Card
       size="small"
-      title="持仓集中度"
+      title="仓位风险"
       extra={<Tag style={semanticTagStyle(level.color)}>{level.label}</Tag>}
       style={{ ...cardStyle, marginBottom: 16 }}
     >
       <Row gutter={[16, 12]}>
-        <Col xs={24} md={8}>
+        <Col xs={12} md={6}>
+          <Statistic
+            title="总仓位上限"
+            value={risk.max_total_position_limit_pct}
+            precision={2}
+            suffix="%"
+          />
+          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            买入预演超过上限时提示
+          </Text>
+        </Col>
+        <Col xs={12} md={6}>
           <Statistic
             title="最大单股权重"
             value={risk.max_single_stock_pct ?? "-"}
             precision={2}
             suffix={risk.max_single_stock_pct == null ? undefined : "%"}
           />
-          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>{largestPosition}</Text>
+          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", display: "block" }}>
+            {largestPosition}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            上限 {risk.max_single_stock_limit_pct.toFixed(2)}%
+          </Text>
         </Col>
-        <Col xs={12} md={8}>
+        <Col xs={12} md={6}>
+          <Statistic
+            title="最大行业仓位"
+            value={risk.largest_sector_pct ?? "-"}
+            precision={2}
+            suffix={risk.largest_sector_pct == null ? undefined : "%"}
+          />
+          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", display: "block" }}>
+            {largestSector}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            上限 {risk.max_sector_limit_pct.toFixed(2)}%
+          </Text>
+        </Col>
+        <Col xs={12} md={6}>
           <Statistic
             title="前三大持仓占比"
             value={risk.top3_concentration_pct ?? "-"}
             precision={2}
             suffix={risk.top3_concentration_pct == null ? undefined : "%"}
           />
-        </Col>
-        <Col xs={12} md={8}>
-          <Statistic title="已定价股票" value={risk.priced_stock_count} suffix="只" />
-          {risk.unpriced_stock_count > 0 ? (
-            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
-              另有 {risk.unpriced_stock_count} 只缺少行情
-            </Text>
-          ) : null}
+          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            已定价 {risk.priced_stock_count} 只
+            {risk.unpriced_stock_count > 0 ? ` · 未定价 ${risk.unpriced_stock_count} 只` : ""}
+          </Text>
         </Col>
       </Row>
+
+      {risk.sector_allocations?.length ? (
+        <div style={{ marginTop: 16 }}>
+          <Text strong style={{ display: "block", marginBottom: 8 }}>行业仓位</Text>
+          <Space wrap size={[8, 8]}>
+            {risk.sector_allocations.map((sector) => (
+              <Tag key={sector.sector_name}>
+                {sector.sector_name} {sector.allocation_pct == null ? "-" : `${sector.allocation_pct.toFixed(2)}%`}
+                <Text style={{ color: colors.textMuted, marginLeft: 6 }}>
+                  {formatMoney(sector.market_value)} · {sector.stock_codes?.length ?? 0} 只
+                </Text>
+              </Tag>
+            ))}
+          </Space>
+        </div>
+      ) : null}
 
       {risk.warnings?.length ? (
         <Alert

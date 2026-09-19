@@ -37,7 +37,7 @@ src/
   api/         # 后端请求封装、TanStack Query hooks、SSE 流
   charts/      # ECharts 按需注册、K 线/分时/指标图
   components/  # 布局(AppLayout)、错误边界、通用组件
-  pages/       # 各功能页:Dashboard/Market/Macro/Compare/Feed/
+  pages/       # 各功能页:Dashboard/Market/Macro/Feed/
                #   Screener/Chat/DailyReview/Analysis/IndustryChain/Settings
   store/       # Zustand store(分析、对话)
   theme/       # 主题定义与 hooks(4 套主题,支持切换,持久化)

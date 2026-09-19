@@ -121,6 +121,61 @@ export interface IndustryChainConflict {
   evidence_ids?: string[];
 }
 
+export interface IndustryChainChangeItem {
+  category: "chain" | "company" | "market" | "event" | "driver" | "risk" | "summary";
+  change_type: "added" | "removed" | "updated";
+  title: string;
+  detail?: string;
+  before?: string;
+  after?: string;
+}
+
+export interface IndustryChainChangeSet {
+  previous_archive_id: string;
+  has_changes: boolean;
+  added_count: number;
+  removed_count: number;
+  updated_count: number;
+  items: IndustryChainChangeItem[];
+}
+
+export interface IndustryChainOpportunity {
+  name: string;
+  code?: string;
+  role?: string;
+  prosperity_score: number;
+  earnings_score: number;
+  valuation_score: number;
+  catalyst_score: number;
+  evidence_score: number;
+  risk_score: number;
+  total_score: number;
+  rationale?: string;
+  evidence_ids?: string[];
+}
+
+export interface IndustryChainTopicResolution {
+  requested_name?: string;
+  normalized_name?: string;
+  aliases?: string[];
+  matched_sectors?: string[];
+  possible_topics?: string[];
+  boundary_note?: string;
+}
+
+export interface IndustryChainAnalysisMetadata {
+  total_duration_ms?: number;
+  research_duration_ms?: number;
+  synthesis_duration_ms?: number;
+  archive_duration_ms?: number;
+  cache_hits?: string[];
+  cache_misses?: string[];
+  failed_dimensions?: string[];
+  successful_dimensions?: string[];
+  agent_evidence_count?: number;
+  public_item_count?: number;
+}
+
 export interface IndustryChainResult {
   schema_version?: number;
   name: string;
@@ -157,6 +212,10 @@ export interface IndustryChainResult {
   missing_evidence?: string[];
   conflicts?: IndustryChainConflict[];
   agent_trace?: ChatStreamDelta[];
+  changes?: IndustryChainChangeSet;
+  opportunities?: IndustryChainOpportunity[];
+  topic_resolution?: IndustryChainTopicResolution;
+  analysis_metadata?: IndustryChainAnalysisMetadata;
 }
 
 export interface IndustryChainHistoryItem {

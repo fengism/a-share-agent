@@ -18,6 +18,7 @@ vi.mock("./DeferredAppHeaderSearch", () => ({ default: () => <div>全局股票�
 vi.mock("./ThemeSelector", () => ({ default: () => <button>主题</button> }));
 vi.mock("./AppUserMenu", () => ({ default: () => null }));
 vi.mock("./GlobalTaskIndicator", () => ({ default: () => null }));
+vi.mock("./HeaderMarketTicker", () => ({ default: () => null }));
 
 describe("AppHeader command bar", () => {
   it("keeps search and theme controls without duplicating sidebar navigation", () => {

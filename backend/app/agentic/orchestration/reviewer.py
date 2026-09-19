@@ -28,7 +28,16 @@ def review_execution_plan(
             add_retry(task.task_id, "任务没有返回结果")
             continue
         if result.status == "failed":
-            add_retry(task.task_id, "任务执行失败")
+            if result.retryable:
+                add_retry(task.task_id, "任务执行失败")
+            else:
+                issues.append(
+                    PlanIssue(
+                        task_id=task.task_id,
+                        reason="任务执行失败，当前错误不可通过重试恢复",
+                        retryable=False,
+                    )
+                )
             continue
         if not result.analysis.strip():
             add_retry(task.task_id, "任务没有生成有效分析")

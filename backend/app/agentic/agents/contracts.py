@@ -53,3 +53,4 @@ class AgentExecutionResult:
     duration_ms: int = 0
     reasoning_content: str = ""
     opinion: "AgentOpinion | None" = None
+    retryable: bool = True

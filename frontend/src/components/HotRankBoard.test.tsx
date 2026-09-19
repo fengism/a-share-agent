@@ -4,8 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HotRankContent } from "./HotRankBoard";
 
+let isNarrowMock = false;
 vi.mock("../hooks/useMediaQuery", () => ({
-  useMediaQuery: () => false,
+  useMediaQuery: () => isNarrowMock,
 }));
 
 function queryResult<T>(data: T) {
@@ -56,6 +57,7 @@ vi.mock("../api/queries", () => ({
 
 describe("HotRankContent", () => {
   it("keeps complete columns and supports two-axis scrolling in the dashboard rail", () => {
+    isNarrowMock = false;
     const { container } = render(
       <MemoryRouter>
         <HotRankContent embedded />
@@ -66,13 +68,23 @@ describe("HotRankContent", () => {
     expect(screen.getByRole("columnheader", { name: "代码" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "名称" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "关联概念" })).toBeInTheDocument();
-    expect(screen.getByText("贵州茅台")).toBeInTheDocument();
+
+    const codeLink = screen.getByRole("link", { name: "600519" });
+    expect(codeLink).toBeInTheDocument();
+    expect(codeLink).toHaveAttribute("href", "/stock/600519");
+    expect(codeLink).toHaveAttribute("title", "查看贵州茅台（600519）个股详情");
+
+    const nameLink = screen.getByRole("link", { name: "贵州茅台" });
+    expect(nameLink).toBeInTheDocument();
+    expect(nameLink).toHaveAttribute("href", "/stock/600519");
+    expect(nameLink).toHaveAttribute("title", "查看贵州茅台（600519）个股详情");
+
     const stockHorizontalScroller = screen.getByRole("region", { name: "热股榜左右滑动区域" });
     expect(stockHorizontalScroller).toHaveClass("hot-rank-horizontal-scroll");
     expect(stockHorizontalScroller.firstElementChild).toHaveStyle({ minWidth: "635px" });
 
     Object.defineProperty(stockHorizontalScroller, "scrollLeft", { value: 0, writable: true });
-    const fireMousePointer = (type: string, clientX: number) => {
+    const fireMousePointer = (target: Element, type: string, clientX: number) => {
       const event = new Event(type, { bubbles: true, cancelable: true });
       Object.defineProperties(event, {
         pointerId: { value: 1 },
@@ -80,12 +92,20 @@ describe("HotRankContent", () => {
         button: { value: 0 },
         clientX: { value: clientX },
       });
-      fireEvent(stockHorizontalScroller, event);
+      fireEvent(target, event);
     };
-    fireMousePointer("pointerdown", 240);
-    fireMousePointer("pointermove", 120);
+
+    // Pointer down on link does NOT initiate drag
+    fireMousePointer(codeLink, "pointerdown", 240);
+    fireMousePointer(stockHorizontalScroller, "pointermove", 120);
+    expect(stockHorizontalScroller.scrollLeft).toBe(0);
+    fireMousePointer(stockHorizontalScroller, "pointerup", 120);
+
+    // Pointer down on scroll container / table initiates drag
+    fireMousePointer(stockHorizontalScroller, "pointerdown", 240);
+    fireMousePointer(stockHorizontalScroller, "pointermove", 120);
     expect(stockHorizontalScroller.scrollLeft).toBe(120);
-    fireMousePointer("pointerup", 120);
+    fireMousePointer(stockHorizontalScroller, "pointerup", 120);
 
     expect(container.querySelector(".ant-table")).toHaveClass("ant-table-scroll-horizontal");
     expect(container.querySelector(".ant-table-tbody-virtual-holder")).toHaveStyle({
@@ -106,4 +126,19 @@ describe("HotRankContent", () => {
     });
     expect(conceptTable).toHaveStyle({ width: "655px" });
   });
+
+  it("renders clickable stock links in narrow mobile mode", () => {
+    isNarrowMock = true;
+    render(
+      <MemoryRouter>
+        <HotRankContent embedded />
+      </MemoryRouter>,
+    );
+
+    const stockLink = screen.getByRole("link", { name: /贵州茅台.*600519/ });
+    expect(stockLink).toBeInTheDocument();
+    expect(stockLink).toHaveAttribute("href", "/stock/600519");
+    expect(stockLink).toHaveAttribute("title", "查看贵州茅台（600519）个股详情");
+  });
 });
+

@@ -7,6 +7,7 @@ PROFILE = AgentProfile(
     description="识别主要风险、回撤因素和风险控制位置",
     system_prompt=RISK_AGENT_PROMPT,
     tool_names=(
+        "financial_calculator",
         "get_stock_risk_data",
         "get_stock_technical_indicators",
         "get_stock_valuation_detail",

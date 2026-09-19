@@ -50,6 +50,10 @@ export default function LlmConfigCard({
       onSave={onSave}
       isSaving={isSaving}
     >
+      <p style={{ color: "var(--c-text-muted)", marginTop: 0 }}>
+        全局 Key 仅可用于全局调用目标。自定义 Provider、Base URL、API 模式 / 版本或 LiteLLM 模型时，
+        请使用个人 API Key；免 Key 的本地服务可留空。掩码不是新 Key。
+      </p>
       <Row gutter={[24, 16]}>
         <Col span={24} sm={12}>
           <div style={fieldLabelStyle}>Provider</div>

@@ -3,6 +3,20 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TradingCalendar from ".";
 
+const mocks = vi.hoisted(() => ({
+  calendarData: {
+    start_date: "2026-01-01",
+    end_date: "2026-12-31",
+    trade_dates: ["2026-08-21", "2026-08-24"],
+    count: 242,
+    today: "2026-08-23",
+    today_is_trading_day: false,
+    previous_trading_day: "2026-08-21",
+    next_trading_day: "2026-08-24",
+    degraded: false,
+  },
+}));
+
 vi.mock("../../api/queries", () => ({
   useMarketIndexKline: () => ({
     data: {
@@ -19,16 +33,16 @@ vi.mock("../../api/queries", () => ({
     refetch: vi.fn(),
   }),
   useTradingCalendar: () => ({
+    data: mocks.calendarData,
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useMarketIndices: () => ({
     data: {
-      start_date: "2026-01-01",
-      end_date: "2026-12-31",
-      trade_dates: ["2026-08-21", "2026-08-24"],
-      count: 242,
-      today: "2026-08-23",
-      today_is_trading_day: false,
-      previous_trading_day: "2026-08-21",
-      next_trading_day: "2026-08-24",
-      degraded: false,
+      indices: [
+        { code: "000001", name: "上证指数", price: 3250.5, change_pct: 1.25, volume: 1000, amount: 2000 },
+      ],
     },
     isLoading: false,
     error: null,
@@ -62,4 +76,45 @@ describe("TradingCalendar", () => {
     expect(screen.getAllByLabelText("上一月").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("下一月").length).toBeGreaterThan(0);
   });
+
+  it("renders today real-time benchmark index change percentage on a trading day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-24T10:30:00+08:00"));
+
+    render(
+      <MemoryRouter>
+        <TradingCalendar />
+      </MemoryRouter>,
+    );
+
+    // In mock, 2026-08-24 is a trading day and has +1.57% from K-line (3230/3180 - 1 = +1.57%)
+    expect(screen.getByText("+1.57%")).toBeInTheDocument();
+  });
+
+  it("falls back to real-time index change percentage when K-line has not settled today", () => {
+    mocks.calendarData = {
+      start_date: "2026-01-01",
+      end_date: "2026-12-31",
+      trade_dates: ["2026-08-21", "2026-08-24", "2026-08-25"],
+      count: 242,
+      today: "2026-08-25",
+      today_is_trading_day: true,
+      previous_trading_day: "2026-08-24",
+      next_trading_day: "2026-08-26",
+      degraded: false,
+    };
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-25T10:30:00+08:00"));
+
+    render(
+      <MemoryRouter>
+        <TradingCalendar />
+      </MemoryRouter>,
+    );
+
+    // In mock, 2026-08-25 is not in K-line, so it gets +1.25% from useMarketIndices
+    expect(screen.getByText("+1.25%")).toBeInTheDocument();
+    expect(screen.getByText("今天交易日")).toBeInTheDocument();
+  });
 });
+

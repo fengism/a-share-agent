@@ -1,3 +1,4 @@
+import { InfoCircleOutlined } from "@ant-design/icons";
 import type { QuantBacktestResult, QuantStrategyConfig } from "../../api/queries";
 import BacktestCharts from "./results/BacktestCharts";
 import BacktestMetrics from "./results/BacktestMetrics";
@@ -20,6 +21,15 @@ export default function BacktestResult({ result, strategy }: { result: QuantBack
           <strong>{quantStrategyIdentity(strategy)}</strong>
           <span>{quantStrategyParameterSummary(strategy)}</span>
         </div>
+      ) : null}
+      {result.model_assumptions?.length ? (
+        <aside className="quant-model-assumptions" aria-label="回测模型与适用边界">
+          <div><InfoCircleOutlined aria-hidden="true" /><strong>日线近似模拟，历史表现不代表未来收益。</strong></div>
+          <details>
+            <summary>回测模型与适用边界</summary>
+            <ul>{result.model_assumptions.map((item) => <li key={item}>{item}</li>)}</ul>
+          </details>
+        </aside>
       ) : null}
       <div id="quant-result-metrics" className="quant-result-anchor">
         <BacktestMetrics

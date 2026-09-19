@@ -68,6 +68,9 @@ def evaluate_quality_gate(
     expected_definition_hash: str,
     minimum_trade_count: int,
     maximum_drawdown_pct: float,
+    minimum_closed_trade_count: int = 0,
+    minimum_observation_count: int = 0,
+    minimum_holdout_closed_trade_count: int | None = None,
     minimum_sharpe_ratio: float | None = None,
     minimum_holdout_trade_count: int | None = None,
     maximum_holdout_drawdown_pct: float | None = None,
@@ -127,10 +130,25 @@ def evaluate_quality_gate(
             if valid_sharpe
             else "夏普比率指标无效"
         )
+    sample_counts = {}
+    for field, source, key, threshold, label in (
+        ("closed_trade_count", metrics, "closed_trade_count", minimum_closed_trade_count, "完整平仓次数"),
+        ("observation_count", metrics, "observation_count", minimum_observation_count, "交易日样本数"),
+        ("holdout_closed_trade_count", holdout_metrics, "closed_trade_count",
+         minimum_holdout_closed_trade_count, "后段样本完整平仓次数"),
+    ):
+        value = source.get(key) if isinstance(source, dict) else None
+        valid = type(value) is int and value >= 0
+        sample_counts[field] = value if valid else None
+        if run.status == "succeeded" and threshold is not None and threshold > 0 and (
+            not valid or value < threshold
+        ):
+            errors.append(f"{label} {value if valid else '缺失'} 少于最低要求 {threshold}")
     holdout_required = any(
         value is not None
         for value in (
             minimum_holdout_trade_count,
+            minimum_holdout_closed_trade_count,
             maximum_holdout_drawdown_pct,
             minimum_holdout_sharpe_ratio,
         )
@@ -195,6 +213,10 @@ def evaluate_quality_gate(
         run_status=run.status,
         definition_hash=expected_definition_hash,
         minimum_trade_count=minimum_trade_count,
+        minimum_closed_trade_count=minimum_closed_trade_count,
+        minimum_observation_count=minimum_observation_count,
+        minimum_holdout_closed_trade_count=minimum_holdout_closed_trade_count,
+        **sample_counts,
         maximum_drawdown_pct=maximum_drawdown_pct,
         minimum_sharpe_ratio=minimum_sharpe_ratio,
         minimum_holdout_trade_count=minimum_holdout_trade_count,
@@ -261,6 +283,9 @@ async def _sync_draft(row: draft_store.StrategyDraftRow) -> draft_store.Strategy
         run,
         expected_definition_hash=row.definition_hash,
         minimum_trade_count=minimum_trade_count,
+        minimum_closed_trade_count=row.quality_gate.get("minimum_closed_trade_count", 0),
+        minimum_observation_count=row.quality_gate.get("minimum_observation_count", 0),
+        minimum_holdout_closed_trade_count=row.quality_gate.get("minimum_holdout_closed_trade_count"),
         maximum_drawdown_pct=maximum_drawdown_pct,
         minimum_sharpe_ratio=minimum_sharpe_ratio,
         minimum_holdout_trade_count=minimum_holdout_trade_count,
@@ -407,6 +432,9 @@ async def backtest_strategy_draft(
         run_status="pending",
         definition_hash=row.definition_hash,
         minimum_trade_count=request.minimum_trade_count,
+        minimum_closed_trade_count=request.minimum_closed_trade_count,
+        minimum_observation_count=request.minimum_observation_count,
+        minimum_holdout_closed_trade_count=request.minimum_holdout_closed_trade_count,
         maximum_drawdown_pct=request.maximum_drawdown_pct,
         minimum_sharpe_ratio=request.minimum_sharpe_ratio,
         minimum_holdout_trade_count=request.minimum_holdout_trade_count,

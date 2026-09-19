@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useThemeStore } from "./store";
 import { themes } from "./themes";
 import type { ThemeColors, ThemeMeta, DesignTokens } from "./themes";
-import { APP_MONO_FONT_FAMILY } from "./typography";
+import { APP_FONT_FAMILY, APP_MONO_FONT_FAMILY } from "./typography";
 
 /** Subscribe to the current theme's color palette. */
 export function useColors(): ThemeColors {
@@ -80,9 +80,11 @@ export function tokensToCssVars(meta: ThemeMeta): Record<string, string> {
     // semantic colors (also surfaced as CSS vars for CSS-only consumers)
     "--c-success": meta.colors.success,
     "--c-warning": meta.colors.warning,
+    "--c-error": meta.antToken.colorError,
     "--c-info": meta.colors.info,
     "--c-on-primary": meta.colors.onPrimary,
-    // shared monospace stack for code, identifiers, tokens, and keys
+    // shared font stacks
+    "--c-font-sans": APP_FONT_FAMILY,
     "--c-font-mono": APP_MONO_FONT_FAMILY,
     // double-rule borders (Feed newspaper style, width only — color stays var(--c-text-primary))
     "--c-border-double": "3px",

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BacktestForm from "./BacktestForm";
 
@@ -33,6 +33,36 @@ function selectStrategy(name: RegExp) {
 }
 
 describe("BacktestForm", () => {
+  it("groups advanced settings and preserves risk inputs when collapsed", async () => {
+    render(<BacktestForm onCreated={vi.fn()} />);
+    fireEvent.click(screen.getByText("高级执行参数"));
+    const costs = await screen.findByRole("region", { name: "交易成本" });
+    const positions = screen.getByRole("region", { name: "仓位管理" });
+    const exits = screen.getByRole("region", { name: "退出保护" });
+    expect(Number((within(costs).getByLabelText("佣金（BP）") as HTMLInputElement).value)).toBe(3);
+    expect(within(positions).getByLabelText(/单股仓位上限/)).toHaveValue("100");
+    fireEvent.change(within(exits).getByLabelText(/持仓止损/), { target: { value: "8" } });
+    fireEvent.click(screen.getByText("高级执行参数"));
+    fireEvent.click(screen.getByRole("button", { name: "开始回测" }));
+    await waitFor(() => expect(mocks.createRun).toHaveBeenCalledWith(expect.objectContaining({
+      execution: expect.objectContaining({ stop_loss_pct: 0.08 }),
+    })));
+  });
+
+  it("marks fixed tax rates inactive in historical fee mode without losing their values", async () => {
+    render(<BacktestForm onCreated={vi.fn()} />);
+    fireEvent.click(screen.getByText("高级执行参数"));
+    fireEvent.mouseDown(await screen.findByRole("combobox", { name: /^税费模式/ }));
+    fireEvent.click(await screen.findByText("A 股历史税率"));
+    await waitFor(() => expect(screen.getByLabelText("印花税（BP）")).toBeDisabled());
+    expect(screen.getByLabelText("过户费（BP）")).toBeDisabled();
+    expect(screen.getByLabelText("佣金（BP）")).not.toBeDisabled();
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: /^税费模式/ }));
+    fireEvent.click(await screen.findByText("自定义固定税率"));
+    await waitFor(() => expect(screen.getByLabelText("印花税（BP）")).toBeEnabled());
+    expect(Number((screen.getByLabelText("印花税（BP）") as HTMLInputElement).value)).toBe(5);
+  });
+
   beforeEach(() => {
     mocks.createRun.mockReset().mockResolvedValue({ id: "new-run" });
     mocks.saveStrategy.mockReset();
@@ -199,8 +229,8 @@ describe("BacktestForm", () => {
     expect(screen.getByLabelText("过户费（BP）")).toHaveDisplayValue("0.10");
     expect(screen.getByLabelText("交易单位（股）")).toHaveValue("100");
     expect(screen.getByLabelText("无风险利率（%）")).toHaveDisplayValue("1.5");
-    expect(screen.getByLabelText("佣金（BP）").closest(".quant-advanced-execution-fields"))
-      .toHaveClass("ant-row-bottom");
+    expect(screen.getByRole("region", { name: "交易成本" }))
+      .toContainElement(screen.getByLabelText("佣金（BP）"));
   });
 
   it("confirms before deleting a saved strategy", async () => {

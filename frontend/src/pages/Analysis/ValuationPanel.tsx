@@ -554,7 +554,6 @@ export default function ValuationPanel({ code, analysis }: Props) {
                 columnWidth: 38,
               } : undefined}
               scroll={isNarrow ? undefined : { x: "max-content" }}
-              bordered={false}
               rowClassName={() => "terminal-table-row"}
             />
           </Card>
@@ -590,7 +589,6 @@ export default function ValuationPanel({ code, analysis }: Props) {
             columnWidth: 38,
           } : undefined}
           scroll={isNarrow ? undefined : { x: "max-content" }}
-          bordered={false}
           rowClassName={() => "terminal-table-row"}
         />
       </Card>

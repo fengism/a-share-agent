@@ -12,6 +12,7 @@ interface StockHeaderCardProps {
   isWatched: boolean;
   isWatchlistPending: boolean;
   onToggleWatchlist: () => void;
+  changePct?: number | null;
 }
 
 export default function StockHeaderCard({
@@ -19,12 +20,14 @@ export default function StockHeaderCard({
   isWatched,
   isWatchlistPending,
   onToggleWatchlist,
+  changePct,
 }: StockHeaderCardProps) {
   const navigate = useNavigate();
   const colors = useColors();
   const { cardStyle } = useStyles();
   const industry = info.second_industry?.name || info.first_industry?.name || info.exchange_industry;
   const fullIndustry = [info.first_industry?.name, info.second_industry?.name, info.third_industry?.name].filter(Boolean).join(" / ");
+  const dotStateClass = changePct == null ? "" : changePct > 0 ? "is-up" : changePct < 0 ? "is-down" : "is-flat";
 
   return (
     <Card className="stock-header-card" style={cardStyle} styles={{ body: { padding: 0 } }}>
@@ -57,8 +60,17 @@ export default function StockHeaderCard({
           </div>
         </div>
         <div className="stock-header-card__quote">
-          <Text type="secondary"><span className="stock-header-card__quote-dot" />最新价</Text>
-          <strong style={{ color: colors.textPrimary }}>
+          <Text type="secondary"><span className={`stock-header-card__quote-dot ${dotStateClass}`.trim()} />最新价</Text>
+          <strong
+            className={changePct == null || changePct === 0 ? "" : changePct > 0 ? "is-up" : "is-down"}
+            style={{
+              color: changePct == null || changePct === 0
+                ? colors.textPrimary
+                : changePct > 0
+                ? colors.up
+                : colors.down,
+            }}
+          >
             {info.current_price == null ? "-" : `¥${info.current_price.toFixed(2)}`}
           </strong>
           <small>行情快照</small>

@@ -10,4 +10,7 @@ export type PortfolioLotMatch = components["schemas"]["PortfolioLotMatch"];
 export type PortfolioTransactionCreate = components["schemas"]["PortfolioTransactionCreate"];
 export type PortfolioTransaction = components["schemas"]["PortfolioTransaction"];
 export type PortfolioTransactionPreview = components["schemas"]["PortfolioTransactionPreview"];
+export type PortfolioAccountSettings = components["schemas"]["PortfolioAccountSettings"];
+export type PortfolioAccountSettingsUpdate = components["schemas"]["PortfolioAccountSettingsUpdate"];
+export type PortfolioSectorAllocation = components["schemas"]["PortfolioSectorAllocation"];
 export type PortfolioResponse = components["schemas"]["PortfolioResponse"];

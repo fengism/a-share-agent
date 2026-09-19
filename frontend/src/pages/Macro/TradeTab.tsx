@@ -124,7 +124,7 @@ export default function TradeTab() {
         <Card
           title={<span><RocketOutlined style={{ marginRight: 6, color: c.primary }} />海关总署重点出海与进口商品及 A 股产业链映射</span>}
           size="small"
-          bordered={false}
+          variant="borderless"
         >
           <Table
             rowKey="commodity"

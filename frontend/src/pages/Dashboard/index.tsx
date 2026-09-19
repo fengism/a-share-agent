@@ -1,5 +1,12 @@
 import { useMemo } from "react";
-import { AimOutlined, ReloadOutlined } from "@ant-design/icons";
+import {
+  AimOutlined,
+  ApartmentOutlined,
+  LineChartOutlined,
+  ReloadOutlined,
+  RobotOutlined,
+  ThunderboltOutlined,
+} from "@ant-design/icons";
 import { Button, Card, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useNavigate } from "react-router-dom";
@@ -81,10 +88,10 @@ function collectStyleStockRows(style: MarketMainlineStyle): MainlineStyleStockRo
 }
 
 function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
-  const c = useColors();
   const t = useTokens();
   return (
     <Card
+      className="dashboard-mainline-card"
       size="small"
       title={chance.title}
       extra={
@@ -113,13 +120,7 @@ function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
         {chance.plates.map((plate) => (
           <div
             key={`${plate.code}-${plate.name}`}
-            style={{
-              background: c.nestedBg,
-              borderRadius: t.radius.sm,
-              padding: `${t.space[2]} ${t.space[3]}`,
-              display: "grid",
-              gap: t.space[1],
-            }}
+            className="dashboard-mainline-plate"
           >
             <div style={{ display: "flex", alignItems: "baseline", gap: t.space[2], flexWrap: "wrap" }}>
               <Text strong>{plate.name}</Text>
@@ -174,6 +175,7 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
 
   return (
     <Card
+      className="dashboard-mainline-card"
       size="small"
       title={`主线龙头股（${rows.length}）`}
       style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
@@ -235,6 +237,7 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
 
   return (
     <Card
+      className="dashboard-mainline-card"
       size="small"
       title="风格判断"
       style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
@@ -347,26 +350,54 @@ export default function Dashboard() {
     >
       <header className="dashboard-hero">
         <div className="dashboard-hero__copy">
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span className="dashboard-hero__eyebrow">今日市场</span>
             <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>·</span>
-            <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-primary)", fontWeight: 600 }}>AI 投研智能态势中枢</span>
+            <span className="dashboard-hero__terminal-badge">
+              <span className="dashboard-hero__pulse-dot" />
+              AI 投研智能态势中枢
+            </span>
+            <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>·</span>
+            <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-secondary)", fontFamily: "var(--c-font-mono)" }}>{dateStr}</span>
           </div>
           <h1>市场总览</h1>
-          <p>{dateStr}</p>
         </div>
         <div className="dashboard-hero__shortcuts" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <Button size="small" shape="round" onClick={() => navigate("/analysis")} style={{ fontSize: "var(--c-font-xs)" }}>
-            🤖 个股研报
+          <Button
+            size="small"
+            shape="round"
+            className="dashboard-hero__shortcut-btn"
+            icon={<RobotOutlined style={{ color: "var(--c-primary)" }} />}
+            onClick={() => navigate("/analysis")}
+          >
+            个股研报
           </Button>
-          <Button size="small" shape="round" onClick={() => navigate("/screener")} style={{ fontSize: "var(--c-font-xs)" }}>
-            ⚡ 智能选股
+          <Button
+            size="small"
+            shape="round"
+            className="dashboard-hero__shortcut-btn"
+            icon={<ThunderboltOutlined style={{ color: "var(--c-warning, #faad14)" }} />}
+            onClick={() => navigate("/screener")}
+          >
+            智能选股
           </Button>
-          <Button size="small" shape="round" onClick={() => navigate("/quant")} style={{ fontSize: "var(--c-font-xs)" }}>
-            📊 量化回测
+          <Button
+            size="small"
+            shape="round"
+            className="dashboard-hero__shortcut-btn"
+            icon={<LineChartOutlined style={{ color: "var(--c-accent, #13c2c2)" }} />}
+            onClick={() => navigate("/quant")}
+          >
+            量化回测
           </Button>
-          <Button size="small" shape="round" onClick={() => navigate("/industry-chain")} style={{ fontSize: "var(--c-font-xs)" }}>
-            🕸️ 产业链图谱
+          <Button
+            size="small"
+            shape="round"
+            className="dashboard-hero__shortcut-btn"
+            icon={<ApartmentOutlined style={{ color: "var(--c-info, #1677ff)" }} />}
+            onClick={() => navigate("/industry-chain")}
+          >
+            产业链图谱
           </Button>
         </div>
       </header>

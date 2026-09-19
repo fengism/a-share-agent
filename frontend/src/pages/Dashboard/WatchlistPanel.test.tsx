@@ -101,7 +101,7 @@ describe("WatchlistPanel", () => {
     expect(mocks.remove).toHaveBeenCalledWith("601991");
   });
 
-  it("keeps Hong Kong stocks on the Hong Kong market page", () => {
+  it("links Hong Kong stocks to dedicated stock profile page", () => {
     mocks.items.splice(0, mocks.items.length, {
       ...defaultItem,
       stock_code: "00700",
@@ -111,6 +111,6 @@ describe("WatchlistPanel", () => {
 
     renderPanel();
 
-    expect(screen.getByRole("link", { name: /腾讯控股/ })).toHaveAttribute("href", "/market?market=hk&code=00700");
+    expect(screen.getByRole("link", { name: /腾讯控股/ })).toHaveAttribute("href", "/stock/00700");
   });
 });

@@ -320,6 +320,25 @@ PORTFOLIO_TRANSACTION_STATEMENTS = (
 
 USER_TABLES.extend(PORTFOLIO_TRANSACTION_STATEMENTS)
 
+PORTFOLIO_ACCOUNT_SETTINGS_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS portfolio_account_settings (
+        user_id                  INTEGER PRIMARY KEY,
+        initial_cash             REAL CHECK (initial_cash IS NULL OR initial_cash >= 0),
+        max_total_position_pct   REAL NOT NULL DEFAULT 80
+                                 CHECK (max_total_position_pct > 0 AND max_total_position_pct <= 100),
+        max_single_stock_pct     REAL NOT NULL DEFAULT 30
+                                 CHECK (max_single_stock_pct > 0 AND max_single_stock_pct <= 100),
+        max_sector_pct           REAL NOT NULL DEFAULT 40
+                                 CHECK (max_sector_pct > 0 AND max_sector_pct <= 100),
+        updated_at               TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    """,
+)
+
+USER_TABLES.extend(PORTFOLIO_ACCOUNT_SETTINGS_STATEMENTS)
+
 WATCHLIST_STATEMENTS = (
     """
     CREATE TABLE IF NOT EXISTS watchlist_items (
@@ -725,3 +744,97 @@ INDUSTRY_TABLES = [
     "CREATE INDEX IF NOT EXISTS idx_stock_basic_profiles_updated ON stock_basic_profiles(updated_at DESC)",
 ]
 
+
+# ── 国家队 ETF 份额（market_data.db） ──
+NATIONAL_TEAM_ETF_SHARES_TABLE = """
+CREATE TABLE IF NOT EXISTS national_team_etf_shares (
+    code       TEXT    NOT NULL,
+    date       TEXT    NOT NULL,
+    shares     REAL    NOT NULL,
+    updated_at REAL    NOT NULL,
+    source TEXT NOT NULL DEFAULT 'unknown',
+    verification_status TEXT NOT NULL DEFAULT 'unknown',
+    PRIMARY KEY (code, date)
+)
+"""
+NATIONAL_TEAM_ETF_SHARES_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_national_team_etf_shares_code_date
+ON national_team_etf_shares(code, date DESC)
+"""
+NATIONAL_TEAM_ETF_BACKFILL_TABLE = """
+CREATE TABLE IF NOT EXISTS national_team_etf_backfill_state (
+    scope      TEXT    NOT NULL,
+    date       TEXT    NOT NULL,
+    updated_at REAL    NOT NULL,
+    PRIMARY KEY (scope, date)
+)
+"""
+
+NATIONAL_TEAM_ETF_OBSERVATIONS_TABLE = """
+CREATE TABLE IF NOT EXISTS national_team_etf_observations (
+    code TEXT NOT NULL,
+    source TEXT NOT NULL,
+    shares REAL NOT NULL,
+    business_date TEXT,
+    fetched_at REAL NOT NULL,
+    verification_status TEXT NOT NULL DEFAULT 'provisional',
+    PRIMARY KEY (code, source)
+)
+"""
+NATIONAL_TEAM_ETF_IMPORTS_TABLE = """
+CREATE TABLE IF NOT EXISTS national_team_etf_imports (
+    path TEXT PRIMARY KEY,
+    imported_at REAL NOT NULL
+)
+"""
+
+MARKET_TABLES.extend(
+    [
+        NATIONAL_TEAM_ETF_SHARES_TABLE,
+        NATIONAL_TEAM_ETF_SHARES_INDEX,
+        NATIONAL_TEAM_ETF_BACKFILL_TABLE,
+        NATIONAL_TEAM_ETF_OBSERVATIONS_TABLE,
+        NATIONAL_TEAM_ETF_IMPORTS_TABLE,
+    ]
+)
+
+
+# ── 板块成分股历史快照（market_data.db） ──
+MARKET_TABLES.extend(
+    [
+        """
+        CREATE TABLE IF NOT EXISTS sector_constituent_snapshots (
+            source           TEXT NOT NULL,
+            plate_id         TEXT NOT NULL,
+            constituent_date TEXT NOT NULL,
+            fetched_at       TEXT NOT NULL,
+            stock_count      INTEGER NOT NULL,
+            PRIMARY KEY (source, plate_id, constituent_date)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS sector_constituents (
+            source           TEXT NOT NULL,
+            plate_id         TEXT NOT NULL,
+            constituent_date TEXT NOT NULL,
+            stock_code       TEXT NOT NULL,
+            stock_name       TEXT NOT NULL DEFAULT '',
+            tags             TEXT NOT NULL DEFAULT '',
+            position         INTEGER NOT NULL,
+            history_json     TEXT NOT NULL,
+            PRIMARY KEY (source, plate_id, constituent_date, stock_code),
+            FOREIGN KEY (source, plate_id, constituent_date)
+                REFERENCES sector_constituent_snapshots(source, plate_id, constituent_date)
+                ON DELETE CASCADE
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_sector_constituent_snapshot_lookup
+        ON sector_constituent_snapshots(source, plate_id, constituent_date DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_sector_constituent_stock_lookup
+        ON sector_constituents(stock_code, constituent_date DESC)
+        """,
+    ]
+)

@@ -22,6 +22,20 @@ vi.mock("./ConfigCards", () => ({
   ),
   DataSourceCookiesCard: () => null,
   FeishuConfigCard: () => null,
+  FredConfigCard: ({ form, onChange, onSave }: {
+    form: ConfigUpdate;
+    onChange: (patch: ConfigUpdate) => void;
+    onSave: () => void;
+  }) => (
+    <div>
+      <input
+        aria-label="FRED API Key"
+        value={form.fred_api_key || ""}
+        onChange={(event) => onChange({ fred_api_key: event.target.value })}
+      />
+      <button type="button" onClick={onSave}>保存 FRED 配置</button>
+    </div>
+  ),
   IwencaiConfigCard: () => null,
   LlmConfigCard: () => null,
   NotionConfigCard: () => null,
@@ -31,6 +45,7 @@ vi.mock("./ConfigCards", () => ({
 
 vi.mock("./BotJobManagerCard", () => ({ default: () => null }));
 vi.mock("./InviteManagerCard", () => ({ default: () => null }));
+vi.mock("./SystemUpdateCard", () => ({ default: () => null }));
 vi.mock("../../components/AdminResetCard", () => ({ default: () => null }));
 vi.mock("../../components/ChangePasswordCard", () => ({ default: () => null }));
 
@@ -64,6 +79,7 @@ const config: ConfigData = {
   provider_defaults: {},
   twitter_feeds: [],
   eastmoney_cookie: "",
+  fred_api_key: "fred-***-key",
   baidu_cookie: "",
   ths_cookie: "",
   http_trust_env: false,
@@ -146,6 +162,52 @@ describe("SettingsPage Bot config", () => {
     expect(patch).not.toHaveProperty("bot_feishu_app_secret");
     expect(patch).not.toHaveProperty("feishu_verification_token");
     expect(patch).not.toHaveProperty("feishu_encrypt_key");
+    queryClient.clear();
+  });
+
+  it("does not write the masked FRED API Key back", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "数据源管理" }));
+    const saveButton = await screen.findByRole("button", { name: "保存 FRED 配置" });
+    await waitFor(() => expect(screen.getByLabelText("FRED API Key")).toHaveValue("fred-***-key"));
+    fireEvent.click(saveButton);
+
+    expect(mocks.mutateConfig).not.toHaveBeenCalled();
+    queryClient.clear();
+  });
+
+  it("submits a new plaintext FRED API Key", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "数据源管理" }));
+    const input = await screen.findByLabelText("FRED API Key");
+    fireEvent.change(input, { target: { value: "new-fred-key" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存 FRED 配置" }));
+
+    expect(mocks.mutateConfig).toHaveBeenCalledWith({ fred_api_key: "new-fred-key" }, expect.anything());
     queryClient.clear();
   });
 });

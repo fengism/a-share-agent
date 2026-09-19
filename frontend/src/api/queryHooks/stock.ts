@@ -17,7 +17,6 @@ import type {
   StockBasicInfo,
   StockBulletinPage,
   StockBusinessIntro,
-  StockCompareItem,
   StockFundFlowItem,
   StockReportPage,
   StockSearchItem,
@@ -273,18 +272,6 @@ export function useRetailSentiment(code: string) {
     select: asApiModel<RetailSentiment>(),
     enabled: !!code,
     staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
-  });
-}
-
-export function useStockCompare(codes: string) {
-  return useQuery({
-    queryKey: queryKeys.stock.compare(codes),
-    queryFn: () => openApiGet("/api/stock/compare", {
-      query: { codes },
-    }),
-    select: asApiModel<StockCompareItem[]>(),
-    enabled: codes.length > 0,
-    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
   });
 }
 

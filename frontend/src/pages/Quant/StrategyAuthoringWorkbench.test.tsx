@@ -148,6 +148,24 @@ describe("StrategyAuthoringWorkbench", () => {
     expect(screen.getByText(/后段样本：交易 2 次/)).toHaveTextContent("最大回撤 -8%");
   });
 
+  it("sends explicit null when optional holdout gates are cleared", async () => {
+    render(<StrategyAuthoringWorkbench onBacktestCreated={vi.fn()} />);
+    fireEvent.change(screen.getByRole("spinbutton", { name: "后段最低完整平仓次数（可选）" }), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "后段最大允许回撤（可选，%）" }), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /使用当前快照试跑/ }));
+    await waitFor(() => expect(mocks.backtest).toHaveBeenCalledWith({
+      draftId: draft.id,
+      request: expect.objectContaining({
+        minimum_holdout_closed_trade_count: null,
+        maximum_holdout_drawdown_pct: null,
+      }),
+    }));
+  });
+
   it("sends optional full-sample and holdout gates to the backtest request", async () => {
     const onBacktestCreated = vi.fn();
     render(<StrategyAuthoringWorkbench onBacktestCreated={onBacktestCreated} />);
@@ -169,6 +187,10 @@ describe("StrategyAuthoringWorkbench", () => {
     await waitFor(() => expect(mocks.backtest).toHaveBeenCalledWith({
       draftId: draft.id,
       request: expect.objectContaining({
+        minimum_closed_trade_count: 5,
+        minimum_observation_count: 120,
+        minimum_holdout_closed_trade_count: 2,
+        maximum_drawdown_pct: 30,
         minimum_sharpe_ratio: 0.6,
         minimum_holdout_trade_count: 3,
         maximum_holdout_drawdown_pct: 15,

@@ -3,6 +3,7 @@ import { apiDelete, apiGet, apiPost } from "../client";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { queryKeys } from "../queryKeys";
 import { useAStockTradingSession } from "../../hooks/useAStockTradingSession";
+import { usePageVisibility } from "../../hooks/usePageVisibility";
 import type {
   WatchlistAlert,
   WatchlistAlertCreate,
@@ -14,11 +15,12 @@ import type {
 
 export function useWatchlist() {
   const isTradingSession = useAStockTradingSession();
+  const isVisible = usePageVisibility();
   return useQuery({
     queryKey: queryKeys.watchlist,
     queryFn: () => apiGet<WatchlistResponse>("/watchlist"),
     staleTime: QUERY_CACHE_POLICIES.watchlistRealtime.staleMs,
-    refetchInterval: isTradingSession ? QUERY_CACHE_POLICIES.watchlistRealtime.pollMs : false,
+    refetchInterval: isTradingSession && isVisible ? QUERY_CACHE_POLICIES.watchlistRealtime.pollMs : false,
   });
 }
 

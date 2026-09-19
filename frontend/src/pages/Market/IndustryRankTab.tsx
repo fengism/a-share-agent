@@ -42,6 +42,7 @@ function SectorStocksDrawer({
   const items = useMemo(() => query.data?.items ?? [], [query.data?.items]);
   const hasData = items.length > 0;
 
+  const historyDetailsAvailable = query.data?.history_details_available ?? true;
   const columns: ColumnsType<MarketSectorStocksHistoryItem> = useMemo(() => {
     const stockColumn = {
       title: "股票",
@@ -52,10 +53,17 @@ function SectorStocksDrawer({
         <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
           <Space orientation="vertical" size={0}>
             <span style={{ fontWeight: Number(t.weight.medium) }}>{stock.name}</span>
-            <span style={{ color: c.textSecondary, fontSize: t.font.xs, fontFamily: "monospace" }}>{stock.code}</span>
+            <span style={{ color: c.textSecondary, fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{stock.code}</span>
           </Space>
         </StockExternalLink>
       ),
+    };
+    const priceColumn = {
+      title: "现价",
+      dataIndex: "price",
+      width: 80,
+      align: "right" as const,
+      render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{value === null ? "-" : value.toFixed(2)}</span>,
     };
     const changeColumn = {
       title: "涨跌幅",
@@ -68,32 +76,34 @@ function SectorStocksDrawer({
       defaultSortOrder: "descend" as const,
       render: (value: number | null) => <ChangeValue value={value} />,
     };
+    const amountColumn = {
+      title: "成交额",
+      dataIndex: "amount",
+      width: 110,
+      align: "right" as const,
+      render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatAmount(value)}</span>,
+    };
     const netColumn = {
       title: "主力净额",
       dataIndex: "main_net",
       width: 110,
       align: "right" as const,
       sorter: (left: MarketSectorStocksHistoryItem, right: MarketSectorStocksHistoryItem) => (
-        left.main_net - right.main_net
+        (left.main_net ?? 0) - (right.main_net ?? 0)
       ),
-      render: (value: number) => (
-        <span style={{ color: value > 0 ? c.up : value < 0 ? c.down : undefined, fontFamily: "monospace" }}>
+      render: (value: number | null) => (
+        <span style={{ color: value != null && value > 0 ? c.up : value != null && value < 0 ? c.down : undefined, fontFamily: "var(--c-font-mono)" }}>
           {formatAmount(value)}
         </span>
       ),
     };
 
+    if (!historyDetailsAvailable) return [stockColumn, priceColumn, changeColumn, amountColumn];
     if (isNarrow) return [stockColumn, changeColumn, netColumn];
 
     return [
       stockColumn,
-      {
-        title: "现价",
-        dataIndex: "price",
-        width: 80,
-        align: "right" as const,
-        render: (value: number | null) => <span style={{ fontFamily: "monospace" }}>{value === null ? "-" : value.toFixed(2)}</span>,
-      },
+      priceColumn,
       changeColumn,
       {
         title: "连板标签",
@@ -101,7 +111,7 @@ function SectorStocksDrawer({
         width: 100,
         align: "center" as const,
         render: (value: string, stock: MarketSectorStocksHistoryItem) => value ? (
-          <Tag style={{ color: c.up }}>{value}{stock.limit_count > 0 ? ` · ${stock.limit_count}板` : ""}</Tag>
+          <Tag style={{ color: c.up }}>{value}{(stock.limit_count ?? 0) > 0 ? ` · ${stock.limit_count}板` : ""}</Tag>
         ) : "-",
       },
       {
@@ -111,20 +121,14 @@ function SectorStocksDrawer({
         align: "center" as const,
         render: (value: string) => value || "-",
       },
-      {
-        title: "成交额",
-        dataIndex: "amount",
-        width: 110,
-        align: "right" as const,
-        render: (value: number) => <span style={{ fontFamily: "monospace" }}>{formatAmount(value)}</span>,
-      },
+      amountColumn,
       netColumn,
       {
         title: "换手率",
         dataIndex: "turnover_rate",
         width: 90,
         align: "right" as const,
-        render: (value: number | null) => <span style={{ fontFamily: "monospace" }}>{formatRate(value)}</span>,
+        render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatRate(value)}</span>,
       },
       {
         title: "近期涨幅",
@@ -138,10 +142,10 @@ function SectorStocksDrawer({
         dataIndex: "float_amount",
         width: 120,
         align: "right" as const,
-        render: (value: number) => <span style={{ fontFamily: "monospace" }}>{formatMarketCap(value)}</span>,
+        render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatMarketCap(value)}</span>,
       },
     ];
-  }, [c, isNarrow, t]);
+  }, [c, historyDetailsAvailable, isNarrow, t]);
 
   const renderExpandedRow = useCallback((record: MarketSectorStocksHistoryItem) => (
     <ResponsiveMetricGrid
@@ -168,6 +172,24 @@ function SectorStocksDrawer({
       title={`${sector?.name ?? ""} 成分股 · ${dateText}`}
       destroyOnHidden
     >
+      {query.data ? (
+        <Space wrap style={{ marginBottom: t.space[3], color: c.textSecondary }}>
+          <span>
+            {query.data.date === query.data.constituent_date ? "成分日期" : "成分口径"}：
+            {query.data.date === query.data.constituent_date ? "" : "开盘红 "}
+            {query.data.constituent_date}
+          </span>
+          {query.data.quoted_at ? <span>行情时间：{query.data.quoted_at}</span> : null}
+          {query.data.realtime_partial ? (
+            <Tag color="warning">
+              {query.data.is_realtime ? "部分成分股暂无当天行情" : "当天行情暂不可用，未回退历史交易数据"}
+            </Tag>
+          ) : null}
+          {query.data.history_details_available && query.data.date !== query.data.constituent_date ? (
+            <Tag>非交易日，展示最近交易日数据</Tag>
+          ) : null}
+        </Space>
+      ) : null}
       <SectionDataState
         isLoading={query.isLoading && !hasData}
         error={hasData ? undefined : query.error}
@@ -183,11 +205,11 @@ function SectorStocksDrawer({
           columns={columns}
           dataSource={items}
           pagination={{ pageSize: 20, showSizeChanger: false }}
-          expandable={isNarrow ? {
+          expandable={isNarrow && historyDetailsAvailable ? {
             expandedRowRender: renderExpandedRow,
             columnWidth: 36,
           } : undefined}
-          scroll={{ x: 800 }}
+          scroll={{ x: historyDetailsAvailable ? 800 : 500 }}
           size="small"
         />
       </SectionDataState>
@@ -216,12 +238,9 @@ export default function IndustryRankTab() {
   const source = data?.source || "未知";
   const actualDate = data?.date || dateText;
   const dateWasResolved = hasData && actualDate !== dateText;
-  const isToday = actualDate === today;
   const isKaipanhongSource = source === "开盘红" && (data?.fund_data_available ?? false);
-  const drillDownDisabled = isToday || !isKaipanhongSource;
-  const drillDownTooltip = isToday
-    ? "历史成分股仅支持查询今天之前的日期"
-    : "当前数据来自降级数据源，仅开盘红数据支持查看成分股";
+  const drillDownDisabled = !isKaipanhongSource;
+  const drillDownTooltip = "当前数据来自降级数据源，仅开盘红数据支持查看成分股";
   const [drawerSector, setDrawerSector] = useState<DrawerSector | null>(null);
 
   const columns: ColumnsType<IndustryRankItem> = useMemo(() => {
@@ -288,7 +307,7 @@ export default function IndustryRankTab() {
         (left.net_inflow ?? 0) - (right.net_inflow ?? 0)
       ),
       render: (value: number | null) => (
-        <span style={{ color: value == null ? c.textSecondary : value >= 0 ? c.up : c.down, fontFamily: "monospace" }}>
+        <span style={{ color: value == null ? c.textSecondary : value >= 0 ? c.up : c.down, fontFamily: "var(--c-font-mono)" }}>
           {formatAmount(value)}
         </span>
       ),
@@ -313,24 +332,24 @@ export default function IndustryRankTab() {
         align: "right",
         render: (value: number | null) => <ChangeValue value={value} />,
       },
-      { title: "成交额", dataIndex: "amount", width: 110, align: "right", render: (val) => <span style={{ fontFamily: "monospace" }}>{formatAmount(val)}</span> },
+      { title: "成交额", dataIndex: "amount", width: 110, align: "right", render: (val) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatAmount(val)}</span> },
       netColumn,
       {
         title: "主买",
         dataIndex: "buy_amount",
         width: 110,
         align: "right",
-        render: (value: number | null) => <span style={{ color: c.up, fontFamily: "monospace" }}>{formatAmount(value)}</span>,
+        render: (value: number | null) => <span style={{ color: c.up, fontFamily: "var(--c-font-mono)" }}>{formatAmount(value)}</span>,
       },
       {
         title: "主卖",
         dataIndex: "sell_amount",
         width: 110,
         align: "right",
-        render: (value: number | null) => <span style={{ color: c.down, fontFamily: "monospace" }}>{formatAmount(value)}</span>,
+        render: (value: number | null) => <span style={{ color: c.down, fontFamily: "var(--c-font-mono)" }}>{formatAmount(value)}</span>,
       },
-      { title: "换手率", dataIndex: "turnover_rate", width: 90, align: "right", render: (val) => <span style={{ fontFamily: "monospace" }}>{formatRate(val)}</span> },
-      { title: "行业市值", dataIndex: "market_cap", width: 120, align: "right", render: (val) => <span style={{ fontFamily: "monospace" }}>{formatMarketCap(val)}</span> },
+      { title: "换手率", dataIndex: "turnover_rate", width: 90, align: "right", render: (val) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatRate(val)}</span> },
+      { title: "行业市值", dataIndex: "market_cap", width: 120, align: "right", render: (val) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatMarketCap(val)}</span> },
       stocksActionColumn,
     ];
   }, [c, isNarrow, drillDownDisabled, drillDownTooltip, t]);

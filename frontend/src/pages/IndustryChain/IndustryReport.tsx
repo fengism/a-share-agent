@@ -16,6 +16,8 @@ import { downloadIndustryChainPdfFromData, useMineIndustryChainAtlas } from "../
 import { useColors, useStyles } from "../../styles/ui";
 import type { IndustryChainChart, IndustryChainResult } from "../../types/stock";
 import IndustryConclusion from "./IndustryConclusion";
+import IndustryReportChanges from "./IndustryReportChanges";
+import IndustryOpportunityMap from "./IndustryOpportunityMap";
 import IndustryResearchSections, { IndustryResearchAudit } from "./IndustryResearchSections";
 import MarkdownReport from "./MarkdownReport";
 import LazyIndustryChart from "./LazyIndustryChart";
@@ -100,6 +102,9 @@ export default function IndustryReport({
     }
   };
   const scope = result.research_scope;
+  const topicResolution = result.topic_resolution;
+  const reportName = topicResolution?.normalized_name || result.name || activeName;
+  const possibleTopics = topicResolution?.possible_topics ?? [];
   const scopeSummary = scope && Object.keys(scope).length > 0
     ? [
       { china: "中国", global: "全球", china_and_global: "中国与全球" }[scope.region] || scope.region,
@@ -145,7 +150,7 @@ export default function IndustryReport({
         <div className="industry-report__title-row">
           <Text className="industry-report__title" strong style={{ color: colors.textPrimary, fontSize: "var(--c-font-lg)" }}>
             <ApartmentOutlined style={{ marginRight: 6 }} />
-            {result.name || activeName} 产业链
+            {reportName} 产业链
           </Text>
           <div className="industry-report__actions">
             <Popover
@@ -241,6 +246,26 @@ export default function IndustryReport({
         </div>
       </div>
 
+      {(topicResolution?.boundary_note || possibleTopics.length > 1) && (
+        <Alert
+          type={possibleTopics.length > 1 ? "warning" : "info"}
+          showIcon
+          className="industry-report__topic-resolution"
+          title={possibleTopics.length > 1 ? "研究主题存在多种口径" : "本次研究口径"}
+          description={(
+            <div>
+              {topicResolution?.boundary_note && <p>{topicResolution.boundary_note}</p>}
+              {possibleTopics.length > 1 && (
+                <div className="industry-report__topic-options">
+                  <span>候选主题：</span>
+                  {possibleTopics.map((topic) => <Tag key={topic}>{topic}</Tag>)}
+                </div>
+              )}
+            </div>
+          )}
+        />
+      )}
+
       {(result.quality_status === "degraded" || result.archive_status === "failed" || Boolean(result.warnings?.length)) && (
         <Alert
           className="industry-report__alert"
@@ -274,6 +299,10 @@ export default function IndustryReport({
       </nav>
 
       <IndustryConclusion result={result} />
+
+      <IndustryReportChanges changes={result.changes} />
+
+      <IndustryOpportunityMap opportunities={result.opportunities} />
 
       <section id="industry-detail" className="industry-report__section" aria-labelledby="industry-detail-heading">
         <header className="industry-report__section-heading">

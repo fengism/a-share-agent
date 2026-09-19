@@ -21,15 +21,16 @@ export default function BacktestMetrics({
   const colors = useColors();
   const { cardStyle } = useStyles();
   const metricItems = [
-    ["总收益", metrics.total_return, "%"],
-    ["年化收益", metrics.annualized_return, "%"],
-    ["超额收益", metrics.excess_return, "%"],
-    ["最大回撤", metrics.max_drawdown, "%"],
-    ["夏普比率", metrics.sharpe_ratio, ""],
-    ["索提诺比率", metrics.sortino_ratio, ""],
-    ["卡玛比率", metrics.calmar_ratio, ""],
-    ["信息比率", metrics.information_ratio, ""],
-  ] as const;
+    { label: "总收益", value: metrics.total_return, suffix: "%", primary: true, hint: "回测区间累计收益", signed: true },
+    { label: "最大回撤", value: metrics.max_drawdown, suffix: "%", primary: true, hint: "净值从峰值到谷值的跌幅", signed: true },
+    { label: "夏普比率", value: metrics.sharpe_ratio, suffix: "", primary: true, hint: "单位总风险的超额回报", signed: false },
+    { label: "交易日样本数", value: metrics.observation_count, suffix: "天", primary: true, hint: "结合样本量评估结果可靠性", signed: false },
+    { label: "年化收益", value: metrics.annualized_return, suffix: "%", primary: false, signed: true },
+    { label: "超额收益", value: metrics.excess_return, suffix: "%", primary: false, signed: true },
+    { label: "索提诺比率", value: metrics.sortino_ratio, suffix: "", primary: false, signed: false },
+    { label: "卡玛比率", value: metrics.calmar_ratio, suffix: "", primary: false, signed: false },
+    { label: "信息比率", value: metrics.information_ratio, suffix: "", primary: false, signed: false },
+  ];
 
   return (
     <>
@@ -42,50 +43,39 @@ export default function BacktestMetrics({
           style={{ marginBottom: 16 }}
         />
       ) : null}
-      {/* Strategy performance diagnostic tags */}
-      <div className="quant-performance-diagnostics" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px", alignItems: "center" }}>
-        <span style={{ fontSize: "var(--c-font-xs)", fontWeight: "var(--c-weight-bold)", color: colors.textSecondary }}>策略体检:</span>
-        {metrics.total_return > (metrics.benchmark_return ?? 0) ? (
-          <Tag color="success">⭐ 跑赢基准 (Alpha {(metrics.excess_return ?? 0) > 0 ? `+${metrics.excess_return?.toFixed(1)}` : metrics.excess_return?.toFixed(1)}%)</Tag>
-        ) : null}
-        {metrics.sharpe_ratio != null && metrics.sharpe_ratio >= 1.0 ? (
-          <Tag color="blue">⚡ 风险调整收益优良 (Sharpe {metrics.sharpe_ratio.toFixed(2)})</Tag>
-        ) : null}
-        {Math.abs(metrics.max_drawdown) <= 10 ? (
-          <Tag color="cyan">🛡️ 回撤控制优良 (&lt;10%)</Tag>
-        ) : Math.abs(metrics.max_drawdown) >= 25 ? (
-          <Tag color="warning">⚠️ 历史回撤偏大 (&gt;25%)</Tag>
-        ) : null}
-        {metrics.win_rate != null && metrics.win_rate >= 55 ? (
-          <Tag color="purple">🎯 胜率显著 ({metrics.win_rate.toFixed(1)}%)</Tag>
-        ) : null}
-      </div>
-      <div className="quant-metric-grid">
-        {metricItems.map(([label, value, suffix]) => {
-          const tone = label === "最大回撤"
-            ? "risk"
-            : typeof value === "number" && value > 0 ? "positive" : "neutral";
-          return (
-            <Card size="small" style={cardStyle} className={`quant-metric-card quant-metric-card--${tone}`} key={label}>
-              <Statistic
-                title={label}
-                value={value ?? "-"}
-                precision={value == null ? undefined : 2}
-                suffix={value == null ? undefined : suffix}
-                styles={{
-                  content: {
+      {[true, false].map((primary) => (
+        <div className={primary ? "quant-metric-grid" : "quant-metric-grid quant-metric-grid--secondary"} role="group" aria-label={primary ? "核心回测指标" : "补充回测指标"} key={String(primary)}>
+          {metricItems.filter((item) => item.primary === primary).map(({ label, value, suffix, hint, signed }) => {
+            const tone = signed && value != null && value !== 0
+              ? label === "最大回撤" || value < 0 ? "negative" : "positive"
+              : "neutral";
+            return (
+              <Card size="small" style={cardStyle} className={`quant-metric-card quant-metric-card--${tone}`} key={label}>
+                <Statistic
+                  title={label}
+                  value={value ?? (label === "交易日样本数" ? "未记录" : "—")}
+                  precision={value == null ? undefined : label === "交易日样本数" ? 0 : 2}
+                  suffix={value == null ? undefined : suffix}
+                  styles={{ content: {
                     fontFamily: "var(--c-font-mono)",
                     fontWeight: 700,
-                    letterSpacing: "-0.01em",
-                    color: label === "最大回撤"
-                      ? colors.down
-                      : typeof value === "number" && value > 0 ? colors.up : colors.textPrimary,
-                  },
-                }}
-              />
-            </Card>
-          );
-        })}
+                    color: tone === "positive" ? colors.up : tone === "negative" ? colors.down : colors.textPrimary,
+                  } }}
+                />
+                {hint ? <div className="quant-metric-hint">{hint}</div> : null}
+              </Card>
+            );
+          })}
+        </div>
+      ))}
+      <div className="quant-performance-diagnostics">
+        <span>本次历史表现</span>
+        {metrics.benchmark_return != null && metrics.excess_return != null && metrics.excess_return > 0 ? (
+          <Tag color="blue">跑赢基准 +{metrics.excess_return.toFixed(1)}%</Tag>
+        ) : null}
+        {Math.abs(metrics.max_drawdown) >= 25 ? <Tag color="warning">历史回撤 ≥ 25%</Tag> : null}
+        {metrics.win_rate != null ? <Tag>历史胜率 {metrics.win_rate.toFixed(1)}%</Tag> : null}
+        <small>仅描述该回测区间，不代表未来表现</small>
       </div>
 
       <Card title="回测概览" size="small" style={cardStyle} className="quant-result-card quant-result-overview">
@@ -94,6 +84,7 @@ export default function BacktestMetrics({
           bordered
           column={{ xs: 1, sm: 2, lg: 4 }}
           items={[
+            { key: "closed", label: "完整平仓次数", children: metrics.closed_trade_count ?? "旧版未记录" },
             { key: "benchmark", label: "基准收益", children: formatPercent(metrics.benchmark_return) },
             { key: "volatility", label: "年化波动", children: formatPercent(metrics.annualized_volatility) },
             { key: "downside-volatility", label: "下行波动", children: formatPercent(metrics.downside_volatility) },

@@ -25,6 +25,14 @@ export interface QuantFormValues {
   transferFeeBps: number;
   lotSize: number;
   riskFreeRatePercent: number;
+  feeSchedule?: "custom" | "a_share_historical";
+  participationPercent?: number | null;
+  maxPositionPercent?: number;
+  cashReservePercent?: number;
+  stopLossPercent?: number | null;
+  trailingStopPercent?: number | null;
+  maxDrawdownPercent?: number | null;
+  targetVolatilityPercent?: number | null;
 }
 
 export interface StrategyOption {
@@ -134,6 +142,10 @@ export const INITIAL_VALUES: QuantFormValues = {
   transferFeeBps: 0.1,
   lotSize: 100,
   riskFreeRatePercent: 1.5,
+  feeSchedule: "custom",
+  participationPercent: 10,
+  maxPositionPercent: 100,
+  cashReservePercent: 0,
 };
 
 function strategyParameterSummary(preset: QuantStrategyPreset): string {
@@ -271,6 +283,14 @@ export function buildBacktestRequest(values: QuantFormValues): QuantBacktestCrea
       lot_size: values.lotSize,
       risk_free_rate: values.riskFreeRatePercent / 100,
       rebalance_window_days: 3,
+      fee_schedule: values.feeSchedule ?? "custom",
+      max_daily_participation_rate: values.participationPercent === null ? null : (values.participationPercent ?? 10) / 100,
+      max_position_weight: (values.maxPositionPercent ?? 100) / 100,
+      cash_reserve_ratio: (values.cashReservePercent ?? 0) / 100,
+      stop_loss_pct: values.stopLossPercent == null ? null : values.stopLossPercent / 100,
+      trailing_stop_pct: values.trailingStopPercent == null ? null : values.trailingStopPercent / 100,
+      max_portfolio_drawdown: values.maxDrawdownPercent == null ? null : values.maxDrawdownPercent / 100,
+      target_annual_volatility: values.targetVolatilityPercent == null ? null : values.targetVolatilityPercent / 100,
     },
     start_date: values.dateRange[0].format("YYYY-MM-DD"),
     end_date: values.dateRange[1].format("YYYY-MM-DD"),

@@ -21,10 +21,10 @@ export default function QuantPageHeader() {
       <Paragraph className="quant-page-header__description" style={{ ...pageDescriptionStyle, marginBottom: 0 }}>
         配置策略、跟踪任务，再单独查看收益与风险分析。
       </Paragraph>
-      <div className="quant-page-header__status" aria-label="量化服务状态">
-        <span className="quant-page-header__status-dot" />
-        <span>研究环境</span>
-        <strong>READY</strong>
+      <div className="quant-page-header__status" aria-label="回测类型">
+        <ExperimentOutlined aria-hidden="true" />
+        <span>研究模式</span>
+        <strong>日线回测</strong>
       </div>
     </header>
   );

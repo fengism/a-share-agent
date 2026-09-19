@@ -1,0 +1,798 @@
+/* ==========================================================================
+   National Team (国家队 ETF 代理监测) Page Styles
+   - Cyber Quant Terminal aesthetic
+   - Compact, high-density, low-noise financial dashboard layout
+   ========================================================================== */
+
+.national-team-page {
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── 1. Hero / Header Command Bar ────────────────────────────────────────── */
+.national-team-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+  background:
+    radial-gradient(ellipse 60% 120% at 95% 50%, rgba(32, 198, 229, 0.08), transparent 70%),
+    radial-gradient(ellipse 40% 100% at 5% 50%, rgba(22, 119, 255, 0.06), transparent 60%),
+    var(--c-card-bg);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), var(--shadow-xs, 0 1px 3px rgba(0, 0, 0, 0.05));
+  backdrop-filter: blur(8px);
+}
+
+.national-team-hero__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.national-team-hero__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 9px;
+  border: 1px solid rgba(32, 198, 229, 0.3);
+  color: var(--c-accent, #20c6e5);
+  background: linear-gradient(135deg, rgba(32, 198, 229, 0.16), rgba(8, 127, 152, 0.06));
+  font-size: 17px;
+  box-shadow: 0 0 12px rgba(32, 198, 229, 0.15);
+}
+
+.national-team-hero__title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.national-team-hero__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.national-team-hero__title.ant-typography {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.national-team-hero__tag {
+  margin: 0;
+  font-weight: 600;
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 0 6px;
+  line-height: 18px;
+  border: 1px solid rgba(32, 198, 229, 0.3);
+  color: var(--c-accent, #20c6e5);
+  background: rgba(32, 198, 229, 0.1);
+}
+
+.national-team-hero__as-of {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.06));
+}
+
+.national-team-hero__as-of strong {
+  font-family: var(--c-font-mono);
+  color: var(--c-text-primary);
+  margin-left: 3px;
+}
+
+.national-team-hero__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--c-text-muted);
+  font-size: 12px;
+}
+
+.national-team-hero__meta-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.national-team-hero__meta-dot {
+  opacity: 0.4;
+}
+
+.national-team-hero__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.national-team-segmented.ant-segmented {
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.08));
+  border: 1px solid var(--c-border);
+  padding: 2px;
+}
+
+.national-team-refresh-btn {
+  font-size: 12px;
+  height: 30px;
+}
+
+/* ── 2. Alerts (Info / Warning) ─────────────────────────────────────────── */
+.national-team-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.national-team-disclaimer.ant-alert,
+.national-team-partial-alert.ant-alert {
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  backdrop-filter: blur(6px);
+}
+
+.national-team-disclaimer.ant-alert {
+  border-color: rgba(32, 198, 229, 0.25);
+  background: rgba(32, 198, 229, 0.03);
+}
+
+.national-team-disclaimer .ant-alert-message {
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.national-team-disclaimer .ant-alert-description {
+  font-size: 12px;
+  display: inline;
+  color: var(--c-text-secondary);
+}
+
+.national-team-partial-alert.ant-alert {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+/* ── 3. KPI Summary Console ─────────────────────────────────────────────── */
+.national-team-summary-section {
+  width: 100%;
+}
+
+.national-team-summary {
+  margin: 0 !important;
+}
+
+.national-team-summary__card {
+  height: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--c-border);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--c-card-bg);
+}
+
+.national-team-summary__card .ant-card-body {
+  padding: 10px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.national-team-summary__card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  border-color: rgba(32, 198, 229, 0.35);
+}
+
+.national-team-summary__card--total {
+  background:
+    linear-gradient(135deg, rgba(32, 198, 229, 0.1) 0%, rgba(8, 127, 152, 0.03) 100%),
+    var(--c-card-bg);
+  border-color: rgba(32, 198, 229, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.national-team-summary__card--total::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #087f98, #20c6e5, #3ec98f);
+}
+
+.national-team-summary .ant-statistic-title {
+  color: var(--c-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 3px;
+  letter-spacing: 0.01em;
+}
+
+.national-team-summary .ant-statistic-content {
+  font-family: var(--c-font-mono);
+  font-size: clamp(15px, 1.15vw, 19px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.national-team-summary .ant-statistic-content-prefix {
+  margin-right: 4px;
+  font-size: 13px;
+}
+
+.national-team-summary__hint {
+  margin-top: 4px;
+  color: var(--c-text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+/* ── 4. Structure Rotation (结构轮动) ────────────────────────────────────── */
+.national-team-rotation {
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), var(--shadow-xs, 0 1px 3px rgba(0, 0, 0, 0.04));
+  overflow: hidden;
+}
+
+.national-team-rotation .ant-card-head {
+  min-height: 40px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.national-team-rotation__header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.national-team-rotation__title-text {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.national-team-rotation__subtitle {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--c-text-muted);
+}
+
+.national-team-rotation .ant-card-body {
+  padding: 10px 16px 8px;
+}
+
+.national-team-rotation__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 20px;
+}
+
+.national-team-rotation__item {
+  display: grid;
+  grid-template-columns: 20px 100px minmax(60px, 1fr) 95px;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.national-team-rotation__item:hover {
+  background: var(--c-hover-bg, rgba(128, 128, 128, 0.06));
+}
+
+.national-team-rotation__rank {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--c-text-muted);
+  background: var(--c-bg-subtle, rgba(140, 140, 140, 0.1));
+  font-family: var(--c-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.national-team-rotation__rank--1 {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+}
+
+.national-team-rotation__rank--2 {
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(100, 116, 139, 0.25);
+}
+
+.national-team-rotation__rank--3 {
+  background: linear-gradient(135deg, #d97706, #92400e);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+}
+
+.national-team-rotation__info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.national-team-rotation__name {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.national-team-rotation__code {
+  font-size: 10px;
+  font-family: var(--c-font-mono);
+  color: var(--c-text-muted);
+}
+
+.national-team-rotation__bar {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--c-muted-soft, rgba(128, 128, 128, 0.1));
+}
+
+.national-team-rotation__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.national-team-rotation__val.ant-typography {
+  font-family: var(--c-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.national-team-rotation__footer {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--c-border);
+}
+
+.national-team-rotation__note {
+  font-size: 11px;
+}
+
+/* ── 5. Section Headings ─────────────────────────────────────────────────── */
+.national-team-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.national-team-section-heading__left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.national-team-section-heading__title.ant-typography {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.national-team-section-heading__desc.ant-typography {
+  font-size: 12px;
+  color: var(--c-text-muted);
+}
+
+.national-team-section-heading__tag {
+  margin: 0;
+  font-size: 11px;
+  border-radius: 4px;
+}
+
+/* ── 6. Chart Grid & Index Dual Axis Card ────────────────────────────────── */
+.national-team-chart-grid {
+  display: grid;
+  /* 宽屏 3 列，中屏 2 列，小屏 1 列，大幅压缩垂直滚动距离 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1399px) {
+  .national-team-chart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .national-team-chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.national-team-index-card {
+  min-width: 0;
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), var(--shadow-xs, 0 1px 3px rgba(0, 0, 0, 0.04));
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--c-card-bg);
+}
+
+.national-team-index-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-color: rgba(32, 198, 229, 0.35);
+}
+
+.national-team-index-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.national-team-index-card__title-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.national-team-index-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.national-team-index-card__title.ant-typography {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.national-team-index-card__tag {
+  margin: 0;
+  font-family: var(--c-font-mono);
+  font-size: 10px;
+  padding: 0 4px;
+  line-height: 16px;
+  border-radius: 3px;
+}
+
+/* 内联微型图例：居左排布在标题下方，极具紧凑感与指引性 */
+.national-team-index-card__legend {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 20px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+  font-size: 11px;
+  width: fit-content;
+}
+
+.national-team-index-card__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.national-team-index-card__legend-sub.ant-typography {
+  font-size: 10px;
+  color: var(--c-text-muted);
+}
+
+.national-team-index-card__legend-line {
+  display: inline-block;
+  width: 12px;
+  height: 0;
+  border-top: 2px solid currentColor;
+}
+
+.national-team-index-card__legend-line--dashed {
+  border-top-style: dashed;
+}
+
+/* 右侧最新统计与增量指标 */
+.national-team-index-card__stat-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.national-team-index-card__shares-box {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.national-team-index-card__shares-label {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
+.national-team-index-card__shares-val {
+  font-family: var(--c-font-mono);
+  color: var(--c-text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.national-team-index-card__delta-wrap {
+  justify-content: flex-end;
+}
+
+.national-team-index-card__change-tag {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--c-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* 成分 ETF 条：弱化细条，不夺目但随时可知 */
+.national-team-index-card__etfs-bar {
+  margin-bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.03));
+  border: 1px dashed var(--c-border);
+}
+
+.national-team-index-card__etf-list.ant-typography {
+  font-size: 11px;
+  color: var(--c-text-muted);
+  display: block;
+}
+
+.national-team-index-card__history-note {
+  display: block;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* ── 7. ETF Table Section ────────────────────────────────────────────────── */
+.national-team-table-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.national-team-section-heading--table {
+  align-items: center;
+}
+
+.national-team-table-filters {
+  display: flex;
+  align-items: center;
+}
+
+.national-team-table-card {
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), var(--shadow-xs, 0 1px 3px rgba(0, 0, 0, 0.04));
+}
+
+.national-team-table .ant-table-thead > tr > th {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.04));
+  border-bottom: 1px solid var(--c-border);
+}
+
+.national-team-table .ant-table-tbody > tr > td {
+  font-size: 12.5px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.national-team-index-tag {
+  margin: 0;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 11px;
+  padding: 0 6px;
+  line-height: 18px;
+}
+
+.national-team-etf-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.national-team-etf-code-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.national-team-code {
+  font-family: var(--c-font-mono);
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.national-team-code-link {
+  color: var(--c-accent, #20c6e5);
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.national-team-code-link:hover {
+  text-decoration: underline;
+  color: var(--c-primary, #1677ff);
+  text-shadow: 0 0 8px rgba(32, 198, 229, 0.3);
+}
+
+.national-team-exchange-tag {
+  margin: 0;
+  font-size: 9px;
+  padding: 0 3px;
+  line-height: 14px;
+  border-radius: 2px;
+  color: var(--c-text-muted);
+  border: 1px solid var(--c-border);
+}
+
+.national-team-etf-fullname.ant-typography {
+  font-size: 11px;
+  color: var(--c-text-secondary);
+  line-height: 1.2;
+}
+
+.national-team-subtle-text.ant-typography {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-date {
+  font-family: var(--c-font-mono);
+  font-size: 12px;
+  color: var(--c-text-secondary);
+}
+
+.national-team-shares-val {
+  font-family: var(--c-font-mono);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.national-team-delta-pill {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--c-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+/* ── 8. Methodology Note (底部方法论) ─────────────────────────────────────── */
+.national-team-methodology {
+  border-radius: 10px;
+  border: 1px solid var(--c-border);
+  background: var(--c-bg-subtle, rgba(128, 128, 128, 0.03));
+}
+
+.national-team-methodology__icon {
+  font-size: 15px;
+  margin-top: 2px;
+}
+
+.national-team-methodology__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.national-team-methodology__header {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.national-team-methodology__footer {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* ── 9. Responsive Breakpoints ───────────────────────────────────────────── */
+@media (max-width: 991px) {
+  .national-team-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .national-team-hero__controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .national-team-rotation__list {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 575px) {
+  .national-team-hero {
+    padding: 10px 12px;
+  }
+
+  .national-team-hero__title-row {
+    gap: 6px;
+  }
+
+  .national-team-hero__title.ant-typography {
+    font-size: 17px;
+  }
+
+  .national-team-hero__meta {
+    flex-wrap: wrap;
+    font-size: 11px;
+  }
+
+  .national-team-hero__controls {
+    flex-wrap: wrap;
+  }
+
+  .national-team-segmented.ant-segmented {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .national-team-rotation__item {
+    grid-template-columns: 20px 85px minmax(40px, 1fr) 80px;
+    gap: 6px;
+  }
+}

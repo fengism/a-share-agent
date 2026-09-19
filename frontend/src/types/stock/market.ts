@@ -1,3 +1,4 @@
+import type { components } from "../../api/generated/schema";
 import type { IntradayItem } from "./quotes";
 
 export interface MarketIndices {
@@ -169,29 +170,37 @@ export interface MarketSectorStocksHistoryItem {
   tags: string;
   price: number | null;
   change_pct: number | null;
-  amount: number;
+  amount: number | null;
   turnover_rate: number | null;
-  float_amount: number;
-  main_buy: number;
-  main_sell: number;
-  main_net: number;
+  float_amount: number | null;
+  main_buy: number | null;
+  main_sell: number | null;
+  main_net: number | null;
   buy_ratio: number | null;
   sell_ratio: number | null;
   net_ratio: number | null;
   limit_tag: string;
   rank_tag: string;
   recent_chg: number | null;
-  limit_count: number;
+  limit_count: number | null;
   chg_1d: number | null;
   chg_5d: number | null;
   chg_20d: number | null;
+  quote_source: string | null;
+  quoted_at: string | null;
 }
 
 export interface MarketSectorStocksHistory {
   source: "开盘红";
   date: string;
+  constituent_date: string;
   plate_id: string;
   fetched_at: string;
+  quoted_at: string | null;
+  quote_source: string | null;
+  is_realtime: boolean;
+  realtime_partial: boolean;
+  history_details_available: boolean;
   total: number;
   items: MarketSectorStocksHistoryItem[];
 }
@@ -273,6 +282,21 @@ export interface MarketMargin {
   source: "东方财富";
   fetched_at: string;
   items: MarketMarginItem[];
+}
+export interface MarketBreadthDailySummary {
+  date: string;
+  strong_industry_count: number;
+  total_industry_count: number;
+  strong_ratio: number;
+}
+
+export interface MarketBreadth {
+  source: "本地计算";
+  fetched_at: string;
+  industries: string[];
+  dates: string[];
+  values: (number | null)[][];
+  summaries: MarketBreadthDailySummary[];
 }
 
 export type MarketPriceAnomalyExchange = "SH" | "SZ" | "BJ";
@@ -493,6 +517,8 @@ export interface TreasuryYieldsResponse {
   total_count: number;
   latest: {
     date: string;
+    china_date?: string;
+    us_date?: string;
     china_10y_yield: number | null;
     china_2y_yield: number | null;
     china_5y_yield?: number | null;
@@ -518,6 +544,8 @@ export interface GlobalMacroRatesData {
   };
   treasury_yields_and_spreads: {
     date: string;
+    china_date?: string;
+    us_date?: string;
     china_10y_yield: number | null;
     china_2y_yield: number | null;
     china_5y_yield?: number | null;
@@ -547,6 +575,31 @@ export interface GlobalMacroRatesData {
     us_china_spread_impact: string;
     dxy_cnh_impact: string;
   };
+  crude_oil?: CrudeOilData | null;
+}
+
+export interface CrudeOilQuote {
+  symbol: string;
+  name: string;
+  price: number | null;
+  change: number | null;
+  change_pct: number | null;
+  unit: string;
+  date: string;
+}
+
+export interface CrudeOilHistoryPoint {
+  date: string;
+  sc_close: number | null;
+  wti_close: number | null;
+  brent_close: number | null;
+}
+
+export interface CrudeOilData {
+  sc0?: CrudeOilQuote | null;
+  wti?: CrudeOilQuote | null;
+  brent?: CrudeOilQuote | null;
+  history: CrudeOilHistoryPoint[];
 }
 
 export interface CommodityItem {
@@ -632,3 +685,11 @@ export interface CustomsTradeDataResponse {
     substitute_driver: string;
   };
 }
+
+
+export type NationalTeamEtfPoint = components["schemas"]["NationalTeamEtfPoint"];
+export type NationalTeamEtfSeries = components["schemas"]["NationalTeamEtfSeries"];
+export type NationalTeamIndexPoint = components["schemas"]["NationalTeamIndexPoint"];
+export type NationalTeamIndexSeries = components["schemas"]["NationalTeamIndexSeries"];
+export type NationalTeamSummary = components["schemas"]["NationalTeamSummary"];
+export type NationalTeamResponse = components["schemas"]["NationalTeamResponse"];

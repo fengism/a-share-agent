@@ -40,6 +40,7 @@ export interface ConfigData {
   provider_defaults: Record<string, ProviderDefault>;
   twitter_feeds: string[];
   eastmoney_cookie: string;
+  fred_api_key: string;
   baidu_cookie: string;
   ths_cookie: string;
   http_trust_env: boolean;

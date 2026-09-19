@@ -29,6 +29,8 @@ export default function PotentialPage() {
 
   const items = useMemo(() => resultQuery.data?.items ?? [], [resultQuery.data?.items]);
 
+  const isLatestDate = selectedDate == null || selectedDate === dates[0]?.date;
+
   const columns: ColumnsType<PotentialStockItem> = useMemo(() => [
     {
       title: "#",
@@ -76,14 +78,14 @@ export default function PotentialPage() {
       ),
     },
     {
-      title: "最新价",
+      title: isLatestDate ? "收盘价" : "选出收盘价",
       dataIndex: "price",
-      width: 90,
+      width: 100,
       align: "right",
       render: (value: number | null) => formatValue(value),
     },
     {
-      title: "涨跌幅",
+      title: isLatestDate ? "涨跌幅" : "当日涨跌",
       dataIndex: "change_pct",
       width: 90,
       align: "right",
@@ -95,9 +97,21 @@ export default function PotentialPage() {
       width: 100,
       align: "right",
       sorter: (a: PotentialStockItem, b: PotentialStockItem) => a.score - b.score,
-      render: (value: number) => (
-        <span style={{ fontWeight: Number(t.weight.bold), color: c.primary }}>{value.toFixed(1)}</span>
-      ),
+      render: (value: number) => {
+        const isHigh = value >= 4.5;
+        return (
+          <span
+            className={isHigh ? "potential-score-badge--high" : "potential-score-badge"}
+            style={{
+              fontWeight: Number(t.weight.bold),
+              color: isHigh ? c.accent : c.primary,
+              fontFamily: "var(--c-font-mono)",
+            }}
+          >
+            {value.toFixed(1)}
+          </span>
+        );
+      },
     },
     {
       title: "命中策略",
@@ -115,10 +129,20 @@ export default function PotentialPage() {
       dataIndex: "signal_date",
       width: 110,
       render: (value: string, record: PotentialStockItem) => (
-        <span>
+        <span style={{ fontFamily: "var(--c-font-mono)" }}>
           {value || "-"}
           {record.signal_age_days != null && record.signal_age_days <= 3 ? (
-            <Tag style={{ ...semanticTagStyle("up"), fontSize: t.font.xs, marginInlineStart: t.space[1] }}>新</Tag>
+            <Tag
+              className="potential-signal-new-tag"
+              style={{
+                ...semanticTagStyle("up"),
+                fontSize: t.font.xs,
+                marginInlineStart: t.space[1],
+                fontWeight: Number(t.weight.semibold),
+              }}
+            >
+              新
+            </Tag>
           ) : null}
         </span>
       ),
@@ -130,7 +154,7 @@ export default function PotentialPage() {
       align: "right",
       render: (value: number | null) => formatValue(value),
     },
-  ], [c, t]);
+  ], [c, t, isLatestDate]);
 
   return (
     <div aria-label="潜力股挖掘页">
@@ -139,6 +163,18 @@ export default function PotentialPage() {
           <span style={{ display: "inline-flex", alignItems: "center", gap: t.space[2] }}>
             <RadarChartOutlined style={{ color: c.primary }} />
             <span>每日潜力股</span>
+            <Tag
+              style={{
+                fontFamily: "var(--c-font-mono)",
+                fontSize: t.font.xs,
+                color: c.primary,
+                borderColor: "color-mix(in srgb, var(--c-primary) 35%, transparent)",
+                background: "color-mix(in srgb, var(--c-primary) 10%, transparent)",
+                letterSpacing: "0.06em",
+              }}
+            >
+              QUANT RADAR
+            </Tag>
           </span>
         )}
         extra={(

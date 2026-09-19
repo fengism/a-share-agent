@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { FundProjectionScreenOutlined } from "@ant-design/icons";
-import { Card, Segmented } from "antd";
+import { Card, Segmented, Skeleton } from "antd";
 import { useKlineData, useStockChipDistribution, useStockIntraday } from "../../api/queries";
 import IndicatorSubCharts from "../../charts/IndicatorSubCharts";
 import IntradayChart from "../../charts/IntradayChart";
 import LazyKlineChart from "../../charts/LazyKlineChart";
 import SectionDataState from "../../components/SectionDataState";
-import ChipDistributionPanel from "../../features/stock-insights/ChipDistributionPanel";
 import { useStyles } from "../../styles/ui";
 import StockSectionTitle from "./StockSectionTitle";
+
+const ChipDistributionPanel = lazy(() => import("../../features/stock-insights/ChipDistributionPanel"));
 
 function KlinePanel({ code }: { code: string }) {
   const [period, setPeriod] = useState("daily");
@@ -80,13 +81,19 @@ function ChipDistributionView({ code }: { code: string }) {
       errorTitle="筹码分布加载失败"
       minHeight={380}
     >
-      {query.data ? <ChipDistributionPanel data={query.data} embedded /> : null}
+      {query.data ? (
+        <Suspense fallback={<Skeleton active paragraph={{ rows: 8 }} />}>
+          <ChipDistributionPanel data={query.data} embedded />
+        </Suspense>
+      ) : null}
     </SectionDataState>
   );
 }
 
+type ChartView = "kline" | "intraday" | "macd" | "rsi" | "kdj" | "chips";
+
 export default function StockCharts({ code }: { code: string }) {
-  const [activeView, setActiveView] = useState<"kline" | "intraday" | "macd" | "chips">("kline");
+  const [activeView, setActiveView] = useState<ChartView>("kline");
   const { cardStyle } = useStyles();
 
   return (
@@ -99,10 +106,12 @@ export default function StockCharts({ code }: { code: string }) {
             { label: "K 线", value: "kline" },
             { label: "分时", value: "intraday" },
             { label: "MACD", value: "macd" },
+            { label: "RSI", value: "rsi" },
+            { label: "KDJ", value: "kdj" },
             { label: "筹码分布", value: "chips" },
           ]}
           value={activeView}
-          onChange={(value) => setActiveView(value as "kline" | "intraday" | "macd" | "chips")}
+          onChange={(value) => setActiveView(value as ChartView)}
           size="small"
         />
       )}
@@ -112,9 +121,15 @@ export default function StockCharts({ code }: { code: string }) {
         <KlinePanel code={code} />
       ) : activeView === "intraday" ? (
         <IntradayPanel code={code} />
-      ) : activeView === "macd" ? (
+      ) : activeView === "macd" || activeView === "rsi" || activeView === "kdj" ? (
         <div className="stock-macd-panel">
-          <IndicatorSubCharts code={code} types={["macd"]} height={240} />
+          <IndicatorSubCharts
+            code={code}
+            types={["macd", "rsi", "kdj"]}
+            activeType={activeView}
+            onTypeChange={(type) => setActiveView(type)}
+            height={260}
+          />
         </div>
       ) : (
         <ChipDistributionView code={code} />

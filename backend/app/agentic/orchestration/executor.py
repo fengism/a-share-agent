@@ -5,8 +5,6 @@ import logging
 from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass
 
-from openai import AsyncOpenAI
-
 from app.agentic.agents.contracts import AgentExecutionResult, AgentProfile
 from app.agentic.agents.executor import agent_executor
 from app.agentic.events import AgentEvent
@@ -17,6 +15,7 @@ from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.tools.cache import SharedToolCache
 from app.core.errors import log_internal_error
 from app.core.exceptions import UpstreamUnavailableError
+from app.infrastructure.llm.tool_calling import AsyncLLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ async def stream_execution_plan(
     plan: ExecutionPlan,
     message: str,
     history: list[AgentMessage] | None,
-    llm_client: AsyncOpenAI,
+    llm_client: AsyncLLMClient,
     model: str,
     results: dict[str, AgentExecutionResult],
     temperature: float = 0.1,

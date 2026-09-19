@@ -15,6 +15,18 @@ const SESSION_BOUNDARIES = [
   SESSION_RANGES[1].end + 1,
 ] as const;
 
+const HK_SESSION_RANGES = [
+  { start: 9 * 60 + 25, end: 12 * 60 + 5 },
+  { start: 13 * 60, end: 16 * 60 + 10 },
+] as const;
+
+const HK_SESSION_BOUNDARIES = [
+  HK_SESSION_RANGES[0].start,
+  HK_SESSION_RANGES[0].end + 1,
+  HK_SESSION_RANGES[1].start,
+  HK_SESSION_RANGES[1].end + 1,
+] as const;
+
 const shanghaiClockFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: SHANGHAI_TIMEZONE,
   year: "numeric",
@@ -74,6 +86,33 @@ export function millisecondsUntilNextAStockSessionBoundary(now = new Date()) {
     if (weekday === 0 || weekday === 6) continue;
 
     for (const boundaryMinutes of SESSION_BOUNDARIES) {
+      const boundaryEpoch = candidateDate.getTime()
+        + (boundaryMinutes - SHANGHAI_UTC_OFFSET_MINUTES) * MINUTE_MS;
+      if (boundaryEpoch > currentEpoch) return boundaryEpoch - currentEpoch;
+    }
+  }
+
+  return DAY_MS;
+}
+
+export function isHKStockAutoRefreshTime(now = new Date()) {
+  const clock = getShanghaiClock(now);
+  return isWeekday(clock.weekday) && HK_SESSION_RANGES.some(
+    ({ start, end }) => clock.minutes >= start && clock.minutes <= end,
+  );
+}
+
+export function millisecondsUntilNextHKStockSessionBoundary(now = new Date()) {
+  const clock = getShanghaiClock(now);
+  const currentDateEpoch = Date.UTC(clock.year, clock.month - 1, clock.day);
+  const currentEpoch = now.getTime();
+
+  for (let dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
+    const candidateDate = new Date(currentDateEpoch + dayOffset * DAY_MS);
+    const weekday = candidateDate.getUTCDay();
+    if (weekday === 0 || weekday === 6) continue;
+
+    for (const boundaryMinutes of HK_SESSION_BOUNDARIES) {
       const boundaryEpoch = candidateDate.getTime()
         + (boundaryMinutes - SHANGHAI_UTC_OFFSET_MINUTES) * MINUTE_MS;
       if (boundaryEpoch > currentEpoch) return boundaryEpoch - currentEpoch;

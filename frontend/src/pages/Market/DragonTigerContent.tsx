@@ -47,7 +47,7 @@ function DetailModal({
       width: 110,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ color: c.up, fontWeight: Number(t.weight.semibold), fontFamily: "monospace" }}>
+        <span style={{ color: c.up, fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)" }}>
           {formatNumber(value)}
         </span>
       ),
@@ -58,7 +58,7 @@ function DetailModal({
       width: 90,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ fontFamily: "monospace" }}>{formatRatioPercent(value, 2)}</span>
+        <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatRatioPercent(value, 2)}</span>
       ),
     },
   ], [c.up, t.weight.semibold]);
@@ -71,7 +71,7 @@ function DetailModal({
       width: 110,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ color: c.down, fontWeight: Number(t.weight.semibold), fontFamily: "monospace" }}>
+        <span style={{ color: c.down, fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)" }}>
           {formatNumber(value)}
         </span>
       ),
@@ -82,7 +82,7 @@ function DetailModal({
       width: 90,
       align: "right",
       render: (value: number | null) => (
-        <span style={{ fontFamily: "monospace" }}>{formatRatioPercent(value, 2)}</span>
+        <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatRatioPercent(value, 2)}</span>
       ),
     },
   ], [c.down, t.weight.semibold]);
@@ -199,7 +199,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
           render: (_: unknown, record: DragonTigerItem) => (
             <StockExternalLink code={record.code} name={record.name} style={{ display: "block", color: c.primary }}>
               <span style={{ display: "block", color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
-              <span style={{ display: "block", color: c.textMuted, fontSize: t.font.xs, fontFamily: "monospace" }}>{record.code}</span>
+              <span style={{ display: "block", color: c.textMuted, fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{record.code}</span>
             </StockExternalLink>
           ),
         },
@@ -216,7 +216,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
           width: 88,
           align: "right",
           render: (value: number | null) => value == null ? "-" : (
-            <span style={{ color: changeColor(value, c), fontWeight: Number(t.weight.semibold), fontFamily: "monospace" }}>
+            <span style={{ color: changeColor(value, c), fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)" }}>
               {value > 0 ? "+" : ""}{value.toFixed(0)}
             </span>
           ),
@@ -230,7 +230,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
         dataIndex: "code",
         width: 90,
         render: (code: string) => (
-          <StockExternalLink code={code} style={{ color: c.primary, fontWeight: Number(t.weight.medium), fontFamily: "monospace" }}>
+          <StockExternalLink code={code} style={{ color: c.primary, fontWeight: Number(t.weight.medium), fontFamily: "var(--c-font-mono)" }}>
             {code}
           </StockExternalLink>
         ),
@@ -251,7 +251,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
         dataIndex: "close",
         width: 85,
         align: "right",
-        render: (value: number | null) => <span style={{ fontFamily: "monospace" }}>{formatNumber(value)}</span>,
+        render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatNumber(value)}</span>,
       },
       {
         title: "涨跌幅",
@@ -275,7 +275,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
         align: "right",
         sorter: (a, b) => (a.buy_amount ?? 0) - (b.buy_amount ?? 0),
         render: (value: number | null) => (
-          <span style={{ color: c.up, fontFamily: "monospace" }}>{value?.toFixed(0) ?? "-"}</span>
+          <span style={{ color: c.up, fontFamily: "var(--c-font-mono)" }}>{value?.toFixed(0) ?? "-"}</span>
         ),
       },
       {
@@ -285,7 +285,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
         align: "right",
         sorter: (a, b) => (a.sell_amount ?? 0) - (b.sell_amount ?? 0),
         render: (value: number | null) => (
-          <span style={{ color: c.down, fontFamily: "monospace" }}>{value?.toFixed(0) ?? "-"}</span>
+          <span style={{ color: c.down, fontFamily: "var(--c-font-mono)" }}>{value?.toFixed(0) ?? "-"}</span>
         ),
       },
       {
@@ -299,7 +299,7 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
           value == null ? (
             "-"
           ) : (
-            <span style={{ color: changeColor(value, c), fontWeight: Number(t.weight.semibold), fontFamily: "monospace" }}>
+            <span style={{ color: changeColor(value, c), fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)" }}>
               {value > 0 ? "+" : ""}{value.toFixed(0)}
             </span>
           ),
@@ -309,21 +309,21 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
         dataIndex: "deal_amount",
         width: 100,
         align: "right",
-        render: (value: number | null) => <span style={{ fontFamily: "monospace" }}>{formatWanAmount(value)}</span>,
+        render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatWanAmount(value)}</span>,
       },
       {
         title: "占成交比",
         dataIndex: "deal_amount_rate",
         width: 85,
         align: "right",
-        render: (value: number | null) => <span style={{ fontFamily: "monospace" }}>{formatRatioPercent(value)}</span>,
+        render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatRatioPercent(value)}</span>,
       },
       {
         title: "换手率",
         dataIndex: "turnover_pct",
         width: 80,
         align: "right",
-        render: (value: number | null) => <span style={{ fontFamily: "monospace" }}>{formatSignedPercent(value).replace("+", "")}</span>,
+        render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatSignedPercent(value).replace("+", "")}</span>,
       },
       {
         title: "次日后",

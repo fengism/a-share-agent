@@ -1,54 +1,77 @@
-import { lazy, Suspense } from "react";
-import { Button, Typography, message } from "antd";
+import { lazy, Suspense, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Button, Skeleton, Typography, message } from "antd";
 import {
   AppstoreOutlined,
   DollarOutlined,
   LineChartOutlined,
   BankOutlined,
-  FundOutlined,
   GoldOutlined,
   BarChartOutlined,
   GlobalOutlined,
   ReloadOutlined,
   FireOutlined,
   CompassOutlined,
+  ExportOutlined,
 } from "@ant-design/icons";
 import { useForceRefreshMacroAllData } from "../../api/queries";
 import ResponsiveSectionNav from "../../components/ResponsiveSectionNav";
-import DomesticMacroOverview from "./DomesticMacroOverview";
-import PriceTab from "./PriceTab";
-import PmiTab from "./PmiTab";
-import FinanceTab from "./FinanceTab";
-import RatesTab from "./RatesTab";
-import GrowthTab from "./GrowthTab";
-import TradeTab from "./TradeTab";
-import GlobalRatesTab from "./GlobalRatesTab";
-import CommoditiesTab from "./CommoditiesTab";
-import SgeGoldTab from "./SgeGoldTab";
 import { useStyles } from "../../styles/ui";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import "./macro-page.css";
 
-const { Title, Paragraph } = Typography;
+const DomesticMacroOverview = lazy(() => import("./DomesticMacroOverview"));
+const PriceTab = lazy(() => import("./PriceTab"));
+const PmiTab = lazy(() => import("./PmiTab"));
+const FinanceTab = lazy(() => import("./FinanceTab"));
+const GrowthTab = lazy(() => import("./GrowthTab"));
+const TradeTab = lazy(() => import("./TradeTab"));
+const GlobalRatesTab = lazy(() => import("./GlobalRatesTab"));
+const CommoditiesTab = lazy(() => import("./CommoditiesTab"));
+const SgeGoldTab = lazy(() => import("./SgeGoldTab"));
 const UsMacroTab = lazy(() => import("./UsMacroTab"));
+
+function TabFallback() {
+  return (
+    <div aria-label="宏观模块加载中" style={{ minHeight: 420, padding: 20 }}>
+      <Skeleton active paragraph={{ rows: 8 }} />
+    </div>
+  );
+}
+const { Title, Paragraph } = Typography;
+
 const MACRO_TABS = [
   "overview",
   "growth",
-  "prices",
   "pmi",
-  "monetary",
-  "rates",
+  "prices",
   "trade",
+  "monetary",
+  "global_rates",
   "commodities",
   "sge_gold",
-  "global_rates",
   "us",
 ] as const;
 
 export default function Macro() {
   const { pageContainerStyle } = useStyles();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useUrlSearchParam("tab", "overview", { allowedValues: MACRO_TABS });
   const refreshMacroData = useForceRefreshMacroAllData();
+
+  // 兼容旧版 ?tab=rates 链接：资金利率已全面整合进金融流动性，平滑重定向至 monetary
+  useEffect(() => {
+    if (searchParams.get("tab") === "rates") {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.set("tab", "monetary");
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleForceRefresh = () => {
     refreshMacroData.mutate(undefined, {
@@ -89,83 +112,77 @@ export default function Macro() {
         ariaLabel="宏观经济指标分类"
         desktopMode="rail"
         collapseQuery="(max-width: 959px)"
+        preserveVisited
         items={[
           {
             key: "overview",
             label: <span><AppstoreOutlined /> 宏观总览</span>,
             mobileLabel: "宏观总览",
-            group: "国内宏观",
-            children: <DomesticMacroOverview />,
+            group: "综合看板",
+            children: <Suspense fallback={<TabFallback />}><DomesticMacroOverview /></Suspense>,
           },
           {
             key: "growth",
             label: <span><BarChartOutlined /> 经济增长</span>,
             mobileLabel: "经济增长",
-            group: "国内宏观",
-            children: <GrowthTab />,
-          },
-          {
-            key: "prices",
-            label: <span><DollarOutlined /> 物价通胀</span>,
-            mobileLabel: "物价通胀",
-            group: "国内宏观",
-            children: <PriceTab />,
+            group: "实体与景气",
+            children: <Suspense fallback={<TabFallback />}><GrowthTab /></Suspense>,
           },
           {
             key: "pmi",
             label: <span><LineChartOutlined /> 景气监测</span>,
             mobileLabel: "景气监测",
-            group: "国内宏观",
-            children: <PmiTab />,
+            group: "实体与景气",
+            children: <Suspense fallback={<TabFallback />}><PmiTab /></Suspense>,
+          },
+          {
+            key: "prices",
+            label: <span><DollarOutlined /> 物价通胀</span>,
+            mobileLabel: "物价通胀",
+            group: "实体与景气",
+            children: <Suspense fallback={<TabFallback />}><PriceTab /></Suspense>,
+          },
+          {
+            key: "trade",
+            label: <span><ExportOutlined /> 海关与出海</span>,
+            mobileLabel: "海关与出海",
+            group: "实体与景气",
+            children: <Suspense fallback={<TabFallback />}><TradeTab /></Suspense>,
           },
           {
             key: "monetary",
             label: <span><BankOutlined /> 金融流动性</span>,
             mobileLabel: "金融流动性",
-            group: "国内宏观",
-            children: <FinanceTab />,
+            group: "流动性与利率",
+            children: <Suspense fallback={<TabFallback />}><FinanceTab /></Suspense>,
           },
           {
-            key: "trade",
-            label: <span><GlobalOutlined /> 海关与出海</span>,
-            mobileLabel: "海关与出海",
-            group: "国内宏观",
-            children: <TradeTab />,
-          },
-          {
-            key: "rates",
-            label: <span><FundOutlined /> 资金利率</span>,
-            mobileLabel: "资金利率",
-            group: "国内宏观",
-            children: <RatesTab />,
+            key: "global_rates",
+            label: <span><CompassOutlined /> 全球利率与外汇</span>,
+            mobileLabel: "全球利率与外汇",
+            group: "流动性与利率",
+            children: <Suspense fallback={<TabFallback />}><GlobalRatesTab /></Suspense>,
           },
           {
             key: "commodities",
             label: <span><FireOutlined /> 大宗商品现货</span>,
             mobileLabel: "大宗商品现货",
-            group: "工业品大宗",
-            children: <CommoditiesTab />,
+            group: "大宗与海外",
+            children: <Suspense fallback={<TabFallback />}><CommoditiesTab /></Suspense>,
           },
           {
             key: "sge_gold",
             label: <span><GoldOutlined /> 上金所黄金走势</span>,
             mobileLabel: "黄金走势",
-            group: "工业品大宗",
-            children: <SgeGoldTab />,
-          },
-          {
-            key: "global_rates",
-            label: <span><CompassOutlined /> 全球利率与汇率</span>,
-            mobileLabel: "全球利率与汇率",
-            group: "全球市场",
-            children: <GlobalRatesTab />,
+            group: "大宗与海外",
+            children: <Suspense fallback={<TabFallback />}><SgeGoldTab /></Suspense>,
           },
           {
             key: "us",
             label: <span><GlobalOutlined /> 美国宏观</span>,
             mobileLabel: "美国宏观",
-            group: "全球市场",
-            children: <Suspense fallback={<div className="macro-page__loading">正在加载美国宏观数据…</div>}><UsMacroTab /></Suspense>,
+            group: "大宗与海外",
+            children: <Suspense fallback={<TabFallback />}><UsMacroTab /></Suspense>,
           },
         ]}
       />

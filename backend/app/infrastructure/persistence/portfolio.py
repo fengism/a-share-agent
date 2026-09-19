@@ -201,3 +201,73 @@ def delete_transaction(
         )
         validator(_list_transactions(work.connection, user_id, str(transaction["stock_code"])))
     return True
+
+_DEFAULT_SETTINGS: dict[str, float | None] = {
+    "initial_cash": None,
+    "max_total_position_pct": 80.0,
+    "max_single_stock_pct": 30.0,
+    "max_sector_pct": 40.0,
+}
+
+
+def get_account_settings(user_id: int, *, connection=None) -> dict[str, Any]:
+    row = (
+        (connection or get_connection())
+        .execute(
+            """
+            SELECT user_id, initial_cash, max_total_position_pct,
+                   max_single_stock_pct, max_sector_pct, updated_at
+            FROM portfolio_account_settings
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        )
+        .fetchone()
+    )
+    if row is None:
+        return {"user_id": user_id, **_DEFAULT_SETTINGS, "updated_at": None}
+    return dict(row)
+
+
+def upsert_account_settings(
+    user_id: int,
+    *,
+    initial_cash: float | None,
+    max_total_position_pct: float,
+    max_single_stock_pct: float,
+    max_sector_pct: float,
+    connection=None,
+) -> dict[str, Any]:
+    target = connection or get_connection()
+    with unit_of_work(connection=target, immediate=True) as work:
+        work.connection.execute(
+            """
+            INSERT INTO portfolio_account_settings(
+                user_id, initial_cash, max_total_position_pct,
+                max_single_stock_pct, max_sector_pct, updated_at
+            ) VALUES (?, ?, ?, ?, ?, datetime('now','localtime'))
+            ON CONFLICT(user_id) DO UPDATE SET
+                initial_cash = excluded.initial_cash,
+                max_total_position_pct = excluded.max_total_position_pct,
+                max_single_stock_pct = excluded.max_single_stock_pct,
+                max_sector_pct = excluded.max_sector_pct,
+                updated_at = datetime('now','localtime')
+            """,
+            (
+                user_id,
+                initial_cash,
+                max_total_position_pct,
+                max_single_stock_pct,
+                max_sector_pct,
+            ),
+        )
+        row = work.connection.execute(
+            """
+            SELECT user_id, initial_cash, max_total_position_pct,
+                   max_single_stock_pct, max_sector_pct, updated_at
+            FROM portfolio_account_settings
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+    return dict(row)

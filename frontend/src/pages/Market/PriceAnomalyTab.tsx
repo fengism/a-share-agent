@@ -50,7 +50,7 @@ function ChangeValue({ value }: { value: number | null | undefined }) {
   const c = useColors();
   if (value == null) return <>-</>;
   return (
-    <span style={{ color: value > 0 ? c.up : value < 0 ? c.down : c.textSecondary, fontFamily: "monospace" }}>
+    <span style={{ color: value > 0 ? c.up : value < 0 ? c.down : c.textSecondary, fontFamily: "var(--c-font-mono)" }}>
       {value > 0 ? "+" : ""}{value.toFixed(2)}%
     </span>
   );
@@ -62,7 +62,7 @@ function StockCell({ code, name }: { code: string; name: string }) {
   return (
     <StockExternalLink code={code} name={name} className="market-price-anomaly__stock">
       <span style={{ color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{name || "-"}</span>
-      <span style={{ color: c.textMuted, fontFamily: "monospace" }}>{code}</span>
+      <span style={{ color: c.textMuted, fontFamily: "var(--c-font-mono)" }}>{code}</span>
     </StockExternalLink>
   );
 }
@@ -155,7 +155,7 @@ export default function PriceAnomalyTab() {
       dataIndex: "price",
       width: 90,
       align: "right",
-      render: (value: number | null) => <span style={{ fontFamily: "monospace" }}>{formatNumber(value)}</span>,
+      render: (value: number | null) => <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatNumber(value)}</span>,
     },
     {
       title: "涨跌幅",
@@ -169,7 +169,7 @@ export default function PriceAnomalyTab() {
       dataIndex: "times",
       width: 92,
       align: "right",
-      render: (value: number | null) => value == null ? "-" : <span style={{ fontFamily: "monospace" }}>{value}次</span>,
+      render: (value: number | null) => value == null ? "-" : <span style={{ fontFamily: "var(--c-font-mono)" }}>{value}次</span>,
     },
     {
       title: "累计偏离值",
@@ -225,7 +225,7 @@ export default function PriceAnomalyTab() {
       <Row gutter={[12, 12]} className="market-price-anomaly__metrics">
         <Col xs={12} md={8}>
           <Card size="small" style={{ borderRadius: t.radius?.md || 8, boxShadow: t.shadow?.xs }}>
-            <Statistic title={isDetail ? "本页异动记录" : "本页异动股票"} value={items.length} styles={{ content: { fontFamily: "monospace" } }} />
+            <Statistic title={isDetail ? "本页异动记录" : "本页异动股票"} value={items.length} styles={{ content: { fontFamily: "var(--c-font-mono)" } }} />
           </Card>
         </Col>
         <Col xs={12} md={8}>
@@ -233,7 +233,7 @@ export default function PriceAnomalyTab() {
             <Statistic
               title={isDetail ? (isCurrentDataDate ? "今日触发" : "数据日触发") : "本页异动次数"}
               value={isDetail ? todayCount : anomalyTimes}
-              styles={{ content: { color: c.warning, fontFamily: "monospace", fontWeight: 600 } }}
+              styles={{ content: { color: c.warning, fontFamily: "var(--c-font-mono)", fontWeight: 600 } }}
             />
           </Card>
         </Col>

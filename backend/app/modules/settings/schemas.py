@@ -40,6 +40,7 @@ class ConfigResponse(BaseModel):
     provider_defaults: dict
     twitter_feeds: list[str]
     eastmoney_cookie: str
+    fred_api_key: str
     baidu_cookie: str
     ths_cookie: str
     legulegu_token: str
@@ -104,6 +105,7 @@ class ConfigUpdateRequest(BaseModel):
     http_trust_env: bool | None = None
     twitter_feeds: list[str] | None = None
     eastmoney_cookie: str | None = None
+    fred_api_key: str | None = None
     baidu_cookie: str | None = None
     ths_cookie: str | None = None
     legulegu_token: str | None = None

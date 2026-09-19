@@ -148,7 +148,7 @@ export default function CommoditiesTab() {
         </div>
       </div>
 
-      <Card size="small" bordered={false} style={{ marginBottom: 16 }}>
+      <Card size="small" variant="borderless" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
           <Radio.Group
             value={selectedCategory}

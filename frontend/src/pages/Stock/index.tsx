@@ -4,13 +4,15 @@ import {
   useAddWatchlistItem,
   useDeleteWatchlistItem,
   useStockInfo,
+  useStockIntraday,
   useWatchlist,
 } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import StockWorkspaceNav from "../../features/stock-navigation/StockWorkspaceNav";
 import { useStyles } from "../../styles/ui";
-import { buildStockProfileUrl, normalizeAshareStockCode } from "../../utils/stockLinks";
+import { buildStockProfileUrl, parseStockCode } from "../../utils/stockLinks";
 import DeferredStockSection from "./DeferredStockSection";
+import HKStockPageContent from "./HKStockPageContent";
 import StockBusinessIntro from "./StockBusinessIntro";
 import StockCharts from "./StockCharts";
 import StockHeaderCard from "./StockHeaderCard";
@@ -22,34 +24,39 @@ import "./stock-page.css";
 export default function StockPage() {
   const { code = "" } = useParams<{ code: string }>();
   const routeCode = code.trim();
-  const normalizedCode = normalizeAshareStockCode(routeCode);
+  const parsed = parseStockCode(routeCode);
   const navigate = useNavigate();
   const { pageContainerStyle } = useStyles();
 
-  if (!normalizedCode) {
+  if (!parsed) {
     return (
       <main className="stock-page" style={pageContainerStyle}>
         <Result
           status="warning"
           title="股票代码无效"
-          subTitle="请输入 6 位 A 股代码，例如 600519、SH600519 或 600519.SH。"
+          subTitle="请输入 6 位 A 股代码（如 600519、SH600519）或 5 位港股代码（如 00700、HK00700）。"
           extra={<Button type="primary" onClick={() => navigate("/")}>返回首页</Button>}
         />
       </main>
     );
   }
 
-  if (routeCode !== normalizedCode) {
-    return <Navigate replace to={buildStockProfileUrl(normalizedCode)} />;
+  if (routeCode !== parsed.code) {
+    return <Navigate to={buildStockProfileUrl(parsed.code)} replace />;
   }
 
-  return <StockProfileContent code={normalizedCode} />;
+  if (parsed.market === "hk") {
+    return <HKStockPageContent code={parsed.code} />;
+  }
+
+  return <StockPageContent code={parsed.code} />;
 }
 
-function StockProfileContent({ code }: { code: string }) {
+function StockPageContent({ code }: { code: string }) {
   const { pageContainerStyle } = useStyles();
   const [messageApi, contextHolder] = message.useMessage();
   const infoQuery = useStockInfo(code);
+  const intradayQuery = useStockIntraday(code);
   const watchlistQuery = useWatchlist();
   const addWatchlistItem = useAddWatchlistItem();
   const deleteWatchlistItem = useDeleteWatchlistItem();
@@ -57,6 +64,15 @@ function StockProfileContent({ code }: { code: string }) {
     (item) => item.stock_code === code && item.market !== "hk",
   ));
   const isWatchlistPending = addWatchlistItem.isPending || deleteWatchlistItem.isPending;
+
+  const intradayItems = intradayQuery.data?.items;
+  const prevClose = intradayQuery.data?.prev_close;
+  const latestPrice = (intradayItems && intradayItems.length > 0)
+    ? intradayItems[intradayItems.length - 1]?.price
+    : infoQuery.data?.current_price;
+  const changePct = (prevClose != null && prevClose > 0 && latestPrice != null)
+    ? ((latestPrice - prevClose) / prevClose) * 100
+    : null;
 
   const handleToggleWatchlist = async () => {
     if (isWatchlistPending) return;
@@ -93,6 +109,7 @@ function StockProfileContent({ code }: { code: string }) {
             isWatched={isWatched}
             isWatchlistPending={isWatchlistPending}
             onToggleWatchlist={() => { void handleToggleWatchlist(); }}
+            changePct={changePct}
           />
         ) : null}
       </SectionDataState>

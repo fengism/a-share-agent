@@ -21,8 +21,10 @@ vi.mock("@ant-design/icons", () => ({
   FilePdfOutlined: () => <span />,
   FileTextOutlined: () => <span />,
   FullscreenOutlined: () => <span />,
+  HistoryOutlined: () => <span />,
   RiseOutlined: () => <span />,
   SendOutlined: () => <span />,
+  TrophyOutlined: () => <span />,
   WarningOutlined: () => <span />,
 }));
 
@@ -423,6 +425,90 @@ describe("IndustryReport", () => {
     expect(within(chainTable).getByText(`${longCompany} ↗`)).toHaveClass(
       "industry-chain-table__tag",
     );
+  });
+
+  it("renders topic resolution, report changes, opportunity map, and runtime metadata", async () => {
+    const enhancedResult: IndustryChainResult = {
+      ...result,
+      topic_resolution: {
+        requested_name: "AI 芯片",
+        normalized_name: "智能算力芯片",
+        possible_topics: ["人工智能", "半导体"],
+        boundary_note: "当前主题可能对应多个板块口径，请确认研究边界。",
+      },
+      changes: {
+        previous_archive_id: "archive-previous",
+        has_changes: true,
+        added_count: 1,
+        removed_count: 0,
+        updated_count: 0,
+        items: [{
+          category: "company",
+          change_type: "added",
+          title: "新增公司",
+          after: "产业链新增标的",
+        }],
+      },
+      opportunities: [{
+        name: "示例公司",
+        code: "000001",
+        role: "核心供应商",
+        prosperity_score: 18,
+        earnings_score: 17,
+        valuation_score: 12,
+        catalyst_score: 14,
+        evidence_score: 15,
+        risk_score: 6,
+        total_score: 73,
+        rationale: "需求增长与份额提升。",
+      }],
+      analysis_metadata: {
+        total_duration_ms: 12_500,
+        research_duration_ms: 8_000,
+        synthesis_duration_ms: 3_500,
+        archive_duration_ms: 1_000,
+        cache_hits: ["technology"],
+        cache_misses: ["market", "events"],
+        failed_dimensions: ["events"],
+        successful_dimensions: ["market", "technology"],
+        agent_evidence_count: 7,
+        public_item_count: 11,
+      },
+    };
+
+    renderReport(
+      <IndustryReport
+        result={enhancedResult}
+        activeName="AI 芯片"
+        archiveId="archive-current"
+        isPushing={false}
+        pushResult={null}
+        onPush={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("智能算力芯片 产业链")).toBeInTheDocument();
+    expect(screen.getByText("研究主题存在多种口径")).toBeInTheDocument();
+    expect(screen.getByText("当前主题可能对应多个板块口径，请确认研究边界。")).toBeInTheDocument();
+    expect(screen.getByText("人工智能")).toBeInTheDocument();
+    expect(screen.getByText("半导体")).toBeInTheDocument();
+
+    expect(screen.getByRole("region", { name: "较上一版变化" })).toHaveTextContent(
+      "新增 1 · 更新 0 · 移除 0",
+    );
+    fireEvent.click(screen.getByText("查看 1 项变化"));
+    expect(await screen.findByText("新增公司")).toBeInTheDocument();
+
+    expect(screen.getByRole("region", { name: "投资研究地图" })).toBeInTheDocument();
+    expect(screen.getByText("研究优先级，不构成买卖建议")).toBeInTheDocument();
+    expect(screen.getByText("示例公司")).toBeInTheDocument();
+    expect(screen.getByText("73 分")).toBeInTheDocument();
+
+    expect(screen.getByRole("heading", { name: "运行信息" })).toBeInTheDocument();
+    expect(screen.getByText("12.5 s")).toBeInTheDocument();
+    expect(screen.getByText("缓存命中：技术路线")).toBeInTheDocument();
+    expect(screen.getByText("本次刷新：市场、事件")).toBeInTheDocument();
+    expect(screen.getByText("失败维度：事件")).toBeInTheDocument();
   });
 
   it("shows degraded quality and archive warnings", () => {

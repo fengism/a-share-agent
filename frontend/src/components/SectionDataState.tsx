@@ -42,7 +42,20 @@ export default function SectionDataState({
   }
 
   if (isEmpty) {
-    return <Empty description={emptyText} style={{ minHeight, padding: "32px 0" }} />;
+    return (
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description={emptyText}
+        style={{
+          minHeight,
+          padding: "24px 0",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      />
+    );
   }
 
   return <>{children}</>;

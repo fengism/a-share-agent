@@ -32,6 +32,9 @@ services:
     tmpfs:
       - /tmp:size=512m,mode=1777
       - /home/app/.cache:size=128m,uid=${APP_UID:-1000},gid=${APP_GID:-1000},mode=0700
+    networks:
+      - default
+      - python-control
     expose:
       - "8000"
     deploy:
@@ -85,6 +88,63 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+  # Optional Python control plane. Build both targets before enabling the profile.
+  # This service is trusted infrastructure with Docker control privileges; never expose its port.
+  # Submitted code runs in separate, networkless containers with NO socket/volume mounts.
+  python-runner:
+    profiles: ["python-sandbox"]
+    image: ${PYTHON_RUNNER_IMAGE:-fengliu1989/a-share-python-runner:main}
+    build:
+      context: ./sandbox
+      target: runner
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    environment:
+      PYTHON_SANDBOX_TOKEN: ${PYTHON_SANDBOX_TOKEN:-}
+      PYTHON_SANDBOX_IMAGE: ${PYTHON_SANDBOX_IMAGE:-fengliu1989/a-share-python-sandbox:main}
+    volumes:
+      - ${PYTHON_SANDBOX_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro
+    networks:
+      - python-control
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          pids: 64
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Build-only target. Jobs are created by python-runner, never as a shared Compose worker.
+  python-sandbox-image:
+    profiles: ["python-sandbox-build"]
+    image: ${PYTHON_SANDBOX_IMAGE:-fengliu1989/a-share-python-sandbox:main}
+    build:
+      context: ./sandbox
+      target: worker
+    network_mode: none
+    read_only: true
+    entrypoint: ["/usr/local/bin/python", "-c", "pass"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:0.1.2
@@ -184,5 +244,7 @@ services:
         max-file: "2"
 
 networks:
+  python-control:
+    internal: true
   updater-control:
     internal: true

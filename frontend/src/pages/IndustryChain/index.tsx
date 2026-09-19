@@ -1,12 +1,11 @@
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ApartmentOutlined,
   CheckCircleOutlined,
   LoadingOutlined,
-  SearchOutlined,
   StopOutlined,
 } from "@ant-design/icons";
-import { Button, Input, Tabs, Tag, message } from "antd";
+import { Button, Tabs, message } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "../../api/queryKeys";
 import { useNavigate, useParams } from "react-router-dom";
@@ -15,6 +14,7 @@ import {
   useDeleteIndustryChainArchive,
   useIndustryChainArchive,
   useIndustryChainLatest,
+  useIndustryChainAtlasCatalog,
   useInfiniteIndustryChainHistory,
 } from "../../api/queries";
 import AgentProcessPanel from "../../components/AgentProcessPanel";
@@ -30,7 +30,7 @@ import IndustryAtlas from "./IndustryAtlas";
 import IndustryReport, { type IndustryPushResult } from "./IndustryReport";
 import { INDUSTRY_CHAIN_STAGES } from "./industryWorkflow";
 import { useIndustryChainWorkflowController } from "../../hooks/useIndustryChainWorkflowController";
-import IndustryResearchScopeControls from "./IndustryResearchScopeControls";
+import IndustrySearchPanel from "./IndustrySearchPanel";
 import { useIndustryArchiveAutoLoader } from "./useIndustryArchiveAutoLoader";
 import {
   DEFAULT_INDUSTRY_SCOPE,
@@ -38,12 +38,11 @@ import {
   validateIndustryScope,
 } from "./industryScope";
 
-const { Search } = Input;
 // 图谱目录较重（卡片网格 + 管理操作）；分析期间 SSE 事件频繁更新，
 // memo + 稳定的 onAnalyze 引用可避免图谱子树随进度事件重渲染
 const MemoizedIndustryAtlas = memo(IndustryAtlas);
 
-const HOT_INDUSTRIES = [
+const FALLBACK_HOT_INDUSTRIES = [
   { name: "人形机器人", icon: "🤖" },
   { name: "低空经济", icon: "✈️" },
   { name: "CPO光模块", icon: "🔌" },
@@ -82,6 +81,20 @@ export default function IndustryChain() {
     refetch: refetchHistory,
   } = useInfiniteIndustryChainHistory(debouncedHistoryFilter);
   const history = historyPages?.pages.flat() ?? [];
+  const { data: atlasCatalog } = useIndustryChainAtlasCatalog();
+  const hotIndustries = useMemo(() => {
+    const iconByName = new Map(FALLBACK_HOT_INDUSTRIES.map((item) => [item.name, item.icon]));
+    const names = [
+      ...history.map((item) => item.name),
+      ...(atlasCatalog?.chains ?? []).map((item) => item.name),
+      ...FALLBACK_HOT_INDUSTRIES.map((item) => item.name),
+    ];
+    const uniqueNames = [...new Set(names.map((name) => name.trim()).filter(Boolean))];
+    return uniqueNames.slice(0, 9).map((name) => ({
+      name,
+      icon: iconByName.get(name) ?? "◈",
+    }));
+  }, [atlasCatalog?.chains, history]);
   const archiveMutation = useIndustryChainArchive();
   const deleteArchiveMutation = useDeleteIndustryChainArchive();
 
@@ -274,47 +287,17 @@ export default function IndustryChain() {
               children: (
                 <>
                   <div style={{ ...cardStyle, padding: "16px 20px", marginBottom: 20 }}>
-                    <Search
-                      placeholder="输入产业链名称，如：锂电池、AI芯片、光伏..."
-                      enterButton={(
-                        <span>
-                          <SearchOutlined /> {displayedResult && inputValue.trim() === activeName ? "重新分析" : "开始分析"}
-                        </span>
-                      )}
-                      size="large"
-                      loading={isActiveRouteRun}
+                    <IndustrySearchPanel
                       value={inputValue}
-                      onChange={(event) => setInputValue(event.target.value)}
+                      activeName={activeName}
+                      hasDisplayedResult={Boolean(displayedResult)}
+                      disabled={isActiveRouteRun}
+                      loading={isActiveRouteRun}
+                      hotIndustries={hotIndustries}
+                      scope={researchScope}
+                      onValueChange={setInputValue}
                       onSearch={handleAnalyze}
-                      disabled={isActiveRouteRun}
-                    />
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center", marginTop: "12px", marginBottom: "4px" }}>
-                      <span style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted, flexShrink: 0 }}>🔥 热门赛道:</span>
-                      {HOT_INDUSTRIES.map((item) => (
-                        <Tag
-                          key={item.name}
-                          style={{
-                            cursor: isActiveRouteRun ? "not-allowed" : "pointer",
-                            fontSize: "var(--c-font-xs)",
-                            marginInlineEnd: 0,
-                            padding: "2px 10px",
-                            borderRadius: "12px",
-                            transition: "all 0.2s",
-                          }}
-                          onClick={() => {
-                            if (isActiveRouteRun) return;
-                            setInputValue(item.name);
-                            handleAnalyze(item.name);
-                          }}
-                        >
-                          {item.icon} {item.name}
-                        </Tag>
-                      ))}
-                    </div>
-                    <IndustryResearchScopeControls
-                      value={researchScope}
-                      disabled={isActiveRouteRun}
-                      onChange={setResearchScope}
+                      onScopeChange={setResearchScope}
                     />
                   </div>
 

@@ -21,6 +21,17 @@ import { buildStockAnalysisUrl, buildStockProfileUrl } from "../../utils/stockLi
 
 const { Paragraph, Text } = Typography;
 
+const DIMENSION_LABELS: Record<string, string> = {
+  stocks: "公司",
+  market: "市场",
+  competition: "竞争格局",
+  technology: "技术路线",
+  chain: "产业链",
+  drivers_risks: "驱动与风险",
+  reports: "研报",
+  events: "事件",
+};
+
 function ResearchBlock({
   title,
   extra,
@@ -94,6 +105,51 @@ function EvidenceTags({ ids }: { ids?: string[] }) {
     <div className="industry-wrap-tag-list" style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
       {ids.map((id) => <Tag key={id} className="industry-wrap-tag" style={{ margin: 0, fontSize: "var(--c-font-xs)" }}>证据 {id}</Tag>)}
     </div>
+  );
+}
+
+function formatDuration(durationMs?: number): string {
+  const value = Math.max(0, durationMs || 0);
+  if (value < 1000) return `${value} ms`;
+  return `${(value / 1000).toFixed(value >= 10_000 ? 1 : 2)} s`;
+}
+
+function formatDimensions(dimensions?: string[]): string {
+  if (!dimensions?.length) return "无";
+  return dimensions.map((dimension) => DIMENSION_LABELS[dimension] || dimension).join("、");
+}
+
+function AnalysisRuntimePanel({ result }: { result: IndustryChainResult }) {
+  const metadata = result.analysis_metadata;
+  if (!metadata) return null;
+
+  const metrics = [
+    ["总耗时", formatDuration(metadata.total_duration_ms)],
+    ["调研", formatDuration(metadata.research_duration_ms)],
+    ["合成", formatDuration(metadata.synthesis_duration_ms)],
+    ["存档", formatDuration(metadata.archive_duration_ms)],
+    ["Agent 证据", `${metadata.agent_evidence_count || 0} 条`],
+    ["公共数据", `${metadata.public_item_count || 0} 项`],
+  ];
+
+  return (
+    <ResearchBlock title="运行信息">
+      <div className="industry-analysis-runtime__metrics">
+        {metrics.map(([label, value]) => (
+          <div key={label}>
+            <Text type="secondary">{label}</Text>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="industry-analysis-runtime__dimensions">
+        <Text type="secondary">缓存命中：{formatDimensions(metadata.cache_hits)}</Text>
+        <Text type="secondary">本次刷新：{formatDimensions(metadata.cache_misses)}</Text>
+        <Text type={metadata.failed_dimensions?.length ? "danger" : "secondary"}>
+          失败维度：{formatDimensions(metadata.failed_dimensions)}
+        </Text>
+      </div>
+    </ResearchBlock>
   );
 }
 
@@ -670,6 +726,7 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
 export function IndustryResearchAudit({ result }: { result: IndustryChainResult }) {
   return (
     <div className="industry-report__section-content">
+      <AnalysisRuntimePanel result={result} />
       <ResearchQualityPanel
         coverage={result.coverage}
         missingEvidence={result.missing_evidence || []}

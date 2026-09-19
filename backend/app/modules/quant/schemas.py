@@ -60,13 +60,23 @@ class QuantUniverse(BaseModel):
 
 
 class QuantExecutionConfig(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
     initial_cash: float = Field(default=1_000_000, gt=0, le=1_000_000_000)
     commission_rate: float = Field(default=0.0003, ge=0, le=0.01)
     minimum_commission: float = Field(default=5, ge=0, le=1000)
     stamp_duty_rate: float = Field(default=0.0005, ge=0, le=0.01)
     transfer_fee_rate: float = Field(default=0.00001, ge=0, le=0.01)
+    fee_schedule: Literal["custom", "a_share_historical"] = "custom"
+    max_daily_participation_rate: float | None = Field(default=0.1, gt=0, le=1)
     slippage_bps: float = Field(default=5, ge=0, le=500)
     lot_size: int = Field(default=100, ge=1, le=10_000)
+    max_position_weight: float = Field(default=1, gt=0, le=1)
+    cash_reserve_ratio: float = Field(default=0, ge=0, lt=1)
+    stop_loss_pct: float | None = Field(default=None, gt=0, lt=1)
+    trailing_stop_pct: float | None = Field(default=None, gt=0, lt=1)
+    max_portfolio_drawdown: float | None = Field(default=None, gt=0, lt=1)
+    target_annual_volatility: float | None = Field(default=None, gt=0, le=2)
     risk_free_rate: float = Field(default=0.015, ge=-0.1, le=0.5)
     # 信号变化/无法成交后的重平衡重试窗口（交易日）
     rebalance_window_days: int = Field(default=3, ge=1, le=10)
@@ -94,6 +104,16 @@ class QuantBacktestCreate(BaseModel):
 
 class QuantBacktestPayload(QuantBacktestCreate):
     strategy_snapshot: StrategySnapshot | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def preserve_stored_execution_defaults(cls, value):
+        # 持久化旧任务未记录参与率时沿用不限额；新建请求会显式序列化新版默认值。
+        if isinstance(value, dict):
+            execution = value.get("execution", {})
+            if isinstance(execution, dict) and "max_daily_participation_rate" not in execution:
+                return {**value, "execution": {**execution, "max_daily_participation_rate": None}}
+        return value
 
 
 class QuantEquityPoint(BaseModel):
@@ -153,6 +173,8 @@ class QuantMetrics(BaseModel):
     profit_loss_ratio: float | None = None
     turnover_rate: float
     trade_count: int
+    closed_trade_count: int | None = Field(default=None, ge=0)
+    observation_count: int | None = Field(default=None, ge=0)
 
 
 class QuantHoldoutValidation(BaseModel):
@@ -176,6 +198,7 @@ class QuantBacktestResult(BaseModel):
     open_positions: list[QuantOpenPosition] = Field(default_factory=list)
     market_snapshots: list[QuantMarketSnapshot] = Field(default_factory=list)
     holdout_validation: QuantHoldoutValidation | None = None
+    model_assumptions: list[str] = Field(default_factory=list)
 
 
 class QuantBacktestRun(BaseModel):
@@ -184,6 +207,7 @@ class QuantBacktestRun(BaseModel):
     status: QuantRunStatus
     request: QuantBacktestCreate
     result: QuantBacktestResult | None = None
+    summary_metrics: QuantMetrics | None = None
     error: str | None = None
     attempts: int = 0
     created_at: float
@@ -253,6 +277,12 @@ class QuantStrategyDraftQualityGate(BaseModel):
     passed: bool | None = None
     run_status: str = "pending"
     definition_hash: str
+    minimum_closed_trade_count: int = Field(default=0, ge=0, le=10_000)
+    minimum_observation_count: int = Field(default=0, ge=0, le=1500)
+    minimum_holdout_closed_trade_count: int | None = Field(default=None, ge=0, le=10_000)
+    closed_trade_count: int | None = None
+    observation_count: int | None = None
+    holdout_closed_trade_count: int | None = None
     minimum_trade_count: int = 1
     maximum_drawdown_pct: float = Field(default=80, gt=0, le=80)
     minimum_sharpe_ratio: float | None = Field(default=None, ge=-20, le=20)
@@ -301,11 +331,14 @@ class QuantStrategyDraftBacktestRequest(BaseModel):
     start_date: date
     end_date: date
     benchmark: str = Field(default="000300", min_length=6, max_length=8)
+    minimum_closed_trade_count: int = Field(default=5, ge=0, le=10_000)
+    minimum_observation_count: int = Field(default=120, ge=0, le=1500)
+    minimum_holdout_closed_trade_count: int | None = Field(default=2, ge=0, le=10_000)
     minimum_trade_count: int = Field(default=1, ge=1, le=10_000)
-    maximum_drawdown_pct: float = Field(default=80, gt=0, le=80)
+    maximum_drawdown_pct: float = Field(default=30, gt=0, le=80)
     minimum_sharpe_ratio: float | None = Field(default=None, ge=-20, le=20)
     minimum_holdout_trade_count: int | None = Field(default=None, ge=0, le=10_000)
-    maximum_holdout_drawdown_pct: float | None = Field(default=None, gt=0, le=80)
+    maximum_holdout_drawdown_pct: float | None = Field(default=20, gt=0, le=80)
     minimum_holdout_sharpe_ratio: float | None = Field(default=None, ge=-20, le=20)
 
     @model_validator(mode="after")

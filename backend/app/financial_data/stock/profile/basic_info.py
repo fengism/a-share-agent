@@ -58,7 +58,18 @@ _EXCHANGE_LISTING_TIMEOUT_SECONDS = 3.0
 _EXCHANGE_LISTING_SNAPSHOT_MAX_STALE_SECONDS = 7 * 24 * 60 * 60
 _EXCHANGE_LISTING_SNAPSHOT_PATH = DATA_DIR / "exchange_stock_listing_sz.json"
 _PRIMARY_SOURCE_TIMEOUT_SECONDS = 2.5
+_TDX_SOURCE_TIMEOUT_SECONDS = 5.0
 _PROFILE_FALLBACK_TIMEOUT_SECONDS = 1.5
+
+
+def _describe_error(exc: BaseException | None) -> str:
+    if exc is None:
+        return ""
+    if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+        return "请求超时(TimeoutError)"
+    msg = str(exc).strip()
+    return f"{type(exc).__name__}: {msg}" if msg else type(exc).__name__
+
 
 _EMPTY_STOCK_CONCEPT = StockConceptInfo(
     concepts=[],
@@ -512,11 +523,11 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
                 "fetch_stock_quote",
                 sym.raw,
             ),
-            timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS,
+            timeout=_TDX_SOURCE_TIMEOUT_SECONDS,
         ),
         asyncio.wait_for(
             _fetch_cached_tdx_finance(sym.raw),
-            timeout=_PRIMARY_SOURCE_TIMEOUT_SECONDS,
+            timeout=_TDX_SOURCE_TIMEOUT_SECONDS,
         ),
         call_blocking(_load_local_industry_record, sym.raw, semaphore=misc_semaphore),
         call_blocking(_load_local_concept_record, sym.raw, semaphore=misc_semaphore),
@@ -524,15 +535,15 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
     )
 
     if isinstance(exchange_result, Exception):
-        logger.info("交易所基础信息不可用: code=%s, error=%s", sym.raw, exchange_result)
+        logger.info("交易所基础信息不可用: code=%s, error=%s", sym.raw, _describe_error(exchange_result))
     if isinstance(concept_result, Exception):
-        logger.info("腾讯行业概念不可用: code=%s, error=%s", sym.raw, concept_result)
+        logger.info("腾讯行业概念不可用: code=%s, error=%s", sym.raw, _describe_error(concept_result))
     if isinstance(quote_result, Exception):
-        logger.info("腾讯实时行情不可用: code=%s, error=%s", sym.raw, quote_result)
+        logger.info("腾讯实时行情不可用: code=%s, error=%s", sym.raw, _describe_error(quote_result))
     if isinstance(tdx_quote_result, Exception):
-        logger.info("TDX 实时行情不可用: code=%s, error=%s", sym.raw, tdx_quote_result)
+        logger.info("TDX 实时行情不可用: code=%s, error=%s", sym.raw, _describe_error(tdx_quote_result))
     if isinstance(tdx_finance_result, Exception):
-        logger.info("TDX 财务信息不可用: code=%s, error=%s", sym.raw, tdx_finance_result)
+        logger.info("TDX 财务信息不可用: code=%s, error=%s", sym.raw, _describe_error(tdx_finance_result))
 
     spot_df = spot_result if isinstance(spot_result, pd.DataFrame) else None
     exchange_data = exchange_result if isinstance(exchange_result, ExchangeBasicData) else None

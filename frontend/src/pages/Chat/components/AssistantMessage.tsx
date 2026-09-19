@@ -65,13 +65,9 @@ export const AssistantMessage = React.memo(function AssistantMessage({
 
       {hasContent && (
         <div className="chat-assistant-answer">
-          {isStreaming ? (
-            <div style={{ whiteSpace: "pre-wrap" }}>{normalizedContent}</div>
-          ) : (
-            <div className="chat-markdown">
-              <ReactMarkdown remarkPlugins={markdownPlugins}>{normalizedContent}</ReactMarkdown>
-            </div>
-          )}
+          <div className="chat-markdown">
+            <ReactMarkdown remarkPlugins={markdownPlugins}>{normalizedContent}</ReactMarkdown>
+          </div>
           {isStreaming && <BlinkingCursor />}
         </div>
       )}

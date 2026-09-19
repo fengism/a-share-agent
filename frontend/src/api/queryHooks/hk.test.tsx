@@ -5,7 +5,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { openApiGet } from "../openapiClient";
 import { queryKeys } from "../queryKeys";
-import { useHKStockSearch } from "./hk";
+import { useHKIndices, useHKStockSearch } from "./hk";
+
+const mocks = vi.hoisted(() => ({
+  isHKTradingSession: true,
+}));
+
+vi.mock("../../hooks/useHKStockTradingSession", () => ({
+  useHKStockTradingSession: () => mocks.isHKTradingSession,
+}));
 
 vi.mock("../openapiClient", async () => {
   const actual = await vi.importActual<typeof import("../openapiClient")>("../openapiClient");
@@ -70,6 +78,34 @@ describe("Hong Kong stock search query", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(firstSignal?.aborted).toBe(true);
+    queryClient.clear();
+  });
+});
+
+describe("Hong Kong indices query polling", () => {
+  it("polls every 30 seconds in session and disables it off session", async () => {
+    mocks.isHKTradingSession = true;
+    vi.mocked(openApiGet).mockResolvedValue([]);
+    const queryClient = createQueryClient();
+    const { result, rerender, unmount } = renderHook(() => useHKIndices(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const getInterval = () => {
+      const options = queryClient.getQueryCache().find({
+        queryKey: queryKeys.hk.indices,
+      })?.options as { refetchInterval?: unknown } | undefined;
+      return options?.refetchInterval;
+    };
+
+    expect(getInterval()).toBe(30_000);
+
+    mocks.isHKTradingSession = false;
+    rerender();
+    expect(getInterval()).toBe(false);
+
+    unmount();
     queryClient.clear();
   });
 });

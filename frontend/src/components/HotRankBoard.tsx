@@ -42,15 +42,21 @@ function HorizontalScrollArea({ children, contentWidth, label }: HorizontalScrol
     startX: 0,
     startScrollLeft: 0,
     moved: false,
+    isDragging: false,
   });
 
   const stopDragging = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (dragState.current.pointerId !== event.pointerId) return;
     event.currentTarget.classList.remove("is-dragging");
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    try {
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // Ignore capture release errors
     }
     dragState.current.pointerId = -1;
+    dragState.current.isDragging = false;
   };
 
   return (
@@ -61,21 +67,36 @@ function HorizontalScrollArea({ children, contentWidth, label }: HorizontalScrol
       tabIndex={0}
       onPointerDown={(event) => {
         if (event.pointerType !== "mouse" || event.button !== 0) return;
+        const target = event.target as HTMLElement | null;
+        if (target?.closest("a, button, input, textarea, select, [role='button'], .ant-table-row-expand-icon")) {
+          return;
+        }
         dragState.current = {
           pointerId: event.pointerId,
           startX: event.clientX,
           startScrollLeft: event.currentTarget.scrollLeft,
           moved: false,
+          isDragging: false,
         };
-        event.currentTarget.setPointerCapture?.(event.pointerId);
-        event.currentTarget.classList.add("is-dragging");
       }}
       onPointerMove={(event) => {
         const drag = dragState.current;
         if (drag.pointerId !== event.pointerId) return;
         const distance = event.clientX - drag.startX;
-        if (Math.abs(distance) > 3) drag.moved = true;
-        if (!drag.moved) return;
+        if (!drag.isDragging) {
+          if (Math.abs(distance) > 4) {
+            drag.moved = true;
+            drag.isDragging = true;
+            try {
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+            } catch {
+              // Ignore pointer capture errors
+            }
+            event.currentTarget.classList.add("is-dragging");
+          } else {
+            return;
+          }
+        }
         event.currentTarget.scrollLeft = drag.startScrollLeft - distance;
         event.preventDefault();
       }}
@@ -115,9 +136,14 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
           render: (_: unknown, record: ThsHotStock) => (
             <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
               {rankBadge(record.rank, c, t)}
-              <StockExternalLink code={record.code} name={record.name} style={{ minWidth: 0, color: c.primary }}>
+              <StockExternalLink
+                code={record.code}
+                name={record.name}
+                className="hot-rank-stock-link"
+                style={{ minWidth: 0, color: c.primary }}
+              >
                 <span style={{ display: "block", color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
-                <span style={{ display: "block", color: c.textMuted, fontSize: t.font.xs }}>{record.code}</span>
+                <span style={{ display: "block", color: c.textMuted, fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{record.code}</span>
               </StockExternalLink>
             </div>
           ),
@@ -145,13 +171,33 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
       title: "代码",
       dataIndex: "code",
       width: 90,
-      render: (code: string) => (
-        <StockExternalLink code={code} style={{ color: c.primary, fontWeight: Number(t.weight.medium) }}>
+      render: (code: string, record: ThsHotStock) => (
+        <StockExternalLink
+          code={code}
+          name={record.name}
+          className="hot-rank-stock-link hot-rank-stock-code"
+          style={{ color: c.primary, fontWeight: Number(t.weight.medium), fontFamily: "var(--c-font-mono)" }}
+        >
           {code}
         </StockExternalLink>
       ),
     },
-    { title: "名称", dataIndex: "name", width: 100, ellipsis: true },
+    {
+      title: "名称",
+      dataIndex: "name",
+      width: 100,
+      ellipsis: true,
+      render: (name: string, record: ThsHotStock) => (
+        <StockExternalLink
+          code={record.code}
+          name={name}
+          className="hot-rank-stock-link hot-rank-stock-name"
+          style={{ color: c.textPrimary, fontWeight: Number(t.weight.medium) }}
+        >
+          {name}
+        </StockExternalLink>
+      ),
+    },
     {
       title: "涨跌幅",
       dataIndex: "change_pct",

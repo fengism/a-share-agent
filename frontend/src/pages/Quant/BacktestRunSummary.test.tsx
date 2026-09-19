@@ -24,6 +24,10 @@ const run: QuantBacktestRun = {
     benchmark: "000300",
     execution: {
       initial_cash: 1_000_000,
+      cash_reserve_ratio: 0,
+      max_position_weight: 1,
+      max_daily_participation_rate: 0.1,
+      fee_schedule: "custom",
       commission_rate: 0.0003,
       minimum_commission: 5,
       stamp_duty_rate: 0.0005,
@@ -37,6 +41,19 @@ const run: QuantBacktestRun = {
 };
 
 describe("BacktestRunSummary", () => {
+  it("shows historical fees and explicit risk limits", () => {
+    const configured = structuredClone(run);
+    Object.assign(configured.request.execution!, {
+      fee_schedule: "a_share_historical", max_daily_participation_rate: null,
+      max_position_weight: 0.2, stop_loss_pct: 0.08,
+    });
+    render(<BacktestRunSummary run={configured} />);
+    expect(screen.getByText(/A 股历史税率（按成交日期）/)).toBeInTheDocument();
+    expect(screen.getByText("不限制 / 旧版未记录")).toBeInTheDocument();
+    expect(screen.getByText("20%")).toBeInTheDocument();
+    expect(screen.getByText("8%")).toBeInTheDocument();
+  });
+
   it("identifies the selected run and its request context", () => {
     render(<BacktestRunSummary run={run} />);
 

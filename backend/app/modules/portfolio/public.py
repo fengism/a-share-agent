@@ -2,6 +2,8 @@
 
 from app.modules.portfolio.positions import add_position, delete_position, list_held_stock_codes
 from app.modules.portfolio.schemas import (
+    PortfolioAccountSettings,
+    PortfolioAccountSettingsUpdate,
     PortfolioPosition,
     PortfolioPositionCreate,
     PortfolioResponse,
@@ -9,7 +11,7 @@ from app.modules.portfolio.schemas import (
     PortfolioTransactionCreate,
     PortfolioTransactionPreview,
 )
-from app.modules.portfolio.service import get_portfolio
+from app.modules.portfolio.service import get_portfolio, update_account_settings
 from app.modules.portfolio.transactions import (
     InsufficientSharesError,
     PortfolioTransactionNotFoundError,
@@ -23,6 +25,8 @@ from app.modules.portfolio.transactions import (
 
 __all__ = [
     "InsufficientSharesError",
+    "PortfolioAccountSettings",
+    "PortfolioAccountSettingsUpdate",
     "PortfolioTransactionNotFoundError",
     "UnknownPortfolioStockError",
     "PortfolioPosition",
@@ -40,4 +44,5 @@ __all__ = [
     "preview_transaction",
     "preview_transaction_update",
     "update_transaction",
+    "update_account_settings",
 ]

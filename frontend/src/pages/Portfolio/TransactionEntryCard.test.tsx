@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createTransaction: vi.fn(),
   previewTransaction: vi.fn(),
   resetPreview: vi.fn(),
+  resolveCode: vi.fn(),
 }));
 
 vi.mock("../../api/queries", () => ({
@@ -33,7 +34,7 @@ vi.mock("../../hooks/useStockSearchController", () => ({
     retry: vi.fn(),
     setInputValue: vi.fn(),
     clear: vi.fn(),
-    resolveCode: vi.fn(),
+    resolveCode: mocks.resolveCode,
   }),
 }));
 
@@ -42,6 +43,7 @@ describe("TransactionEntryCard", () => {
     mocks.createTransaction.mockReset().mockResolvedValue({ id: 9 });
     mocks.previewTransaction.mockReset();
     mocks.resetPreview.mockReset();
+    mocks.resolveCode.mockReset();
   });
 
   it("limits sell entry to held stocks and submits the selected holding", async () => {
@@ -122,6 +124,46 @@ describe("TransactionEntryCard", () => {
       trade_price: 12,
       shares: 40,
       fee: 0,
+      note: "",
+    }));
+  });
+
+  it("previews a buy with the same transaction payload", async () => {
+    mocks.resolveCode.mockReturnValue("600519");
+    mocks.previewTransaction.mockResolvedValue({
+      stock_code: "600519",
+      side: "buy",
+      trade_time: "2026-09-19T10:00:00",
+      available_shares: 0,
+      shares_after_trade: 100,
+      current_shares_after: 100,
+      matched_cost: null,
+      realized_profit_amount: null,
+      matches: [],
+      trade_amount: 1000,
+      fee: 5,
+      cash_balance_after: 98995,
+      estimated_total_assets_after: 100000,
+      total_position_pct_after: 1,
+      stock_position_pct_after: 1,
+      sector_name: "食品饮料",
+      sector_position_pct_after: 1,
+      warnings: [],
+    });
+    render(<TransactionEntryCard stocks={[]} />);
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "买入价" }), { target: { value: "10" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "股数" }), { target: { value: "100" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "手续费（可选）" }), { target: { value: "5" } });
+    fireEvent.click(screen.getByRole("button", { name: /预演买入/ }));
+
+    await waitFor(() => expect(mocks.previewTransaction).toHaveBeenCalledTimes(1));
+    expect(mocks.previewTransaction).toHaveBeenCalledWith(expect.objectContaining({
+      stock_code: "600519",
+      side: "buy",
+      trade_price: 10,
+      shares: 100,
+      fee: 5,
       note: "",
     }));
   });

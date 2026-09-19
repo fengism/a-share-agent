@@ -106,8 +106,34 @@ describe("AppSidebar", () => {
       .getAllByRole("button")
       .map((item) => item.textContent);
 
-    expect(menuItems.slice(0, 4)).toEqual(["首页", "自选", "市场", "资讯"]);
+    expect(menuItems.slice(0, 5)).toEqual(["首页", "自选", "市场", "国家队", "资讯"]);
     expect(menuItems).not.toContain("港股市场");
+  });
+
+  it("opens and preloads the national team holdings page", async () => {
+    const onNavigate = vi.fn();
+    render(
+      <AppSidebar
+        activeKey="/national-team"
+        collapsed={false}
+        isMobile={false}
+        mobileNavOpen={false}
+        themeKey="stellar-blue"
+        onCollapse={vi.fn()}
+        onMobileNavClose={vi.fn()}
+        onNavigate={onNavigate}
+      />,
+    );
+
+    const item = screen.getByRole("button", { name: "国家队" });
+    expect(item).toHaveAttribute("aria-current", "page");
+    await act(async () => {
+      fireEvent.pointerEnter(item);
+      await Promise.resolve();
+    });
+    expect(preloadAppRoute).toHaveBeenCalledWith("/national-team");
+    fireEvent.click(item);
+    expect(onNavigate).toHaveBeenCalledWith("/national-team");
   });
 
   it("places the trading calendar in the lower tool navigation", () => {
@@ -127,7 +153,7 @@ describe("AppSidebar", () => {
 
     const navigation = within(screen.getByRole("navigation", { name: "主导航" }));
     const menuItems = navigation.getAllByRole("button").map((item) => item.textContent);
-    expect(menuItems.slice(-4)).toEqual(["交易日历", "行业与概念", "能力", "设置"]);
+    expect(menuItems.slice(-4)).toEqual(["交易日历", "主数据管理", "能力", "设置"]);
 
     const calendarItem = navigation.getByRole("button", { name: "交易日历" });
     expect(calendarItem).toHaveAttribute("aria-current", "page");
@@ -135,7 +161,7 @@ describe("AppSidebar", () => {
     expect(onNavigate).toHaveBeenCalledWith("/trading-calendar");
   });
 
-  it("opens and preloads the industry and concepts master data page", async () => {
+  it("opens and preloads the master data management page", async () => {
     const onNavigate = vi.fn();
     render(
       <AppSidebar
@@ -150,7 +176,7 @@ describe("AppSidebar", () => {
       />,
     );
 
-    const industryItem = screen.getByRole("button", { name: "行业与概念" });
+    const industryItem = screen.getByRole("button", { name: "主数据管理" });
     expect(industryItem).toHaveAttribute("aria-current", "page");
     await act(async () => {
       fireEvent.pointerEnter(industryItem);
@@ -241,6 +267,7 @@ describe("AppSidebar", () => {
     const labels = navigation.getAllByRole("button").map((item) => item.textContent);
     expect(labels).toContain("个股");
     expect(labels).not.toContain("投资研究");
+    expect(labels).not.toContain("对比");
   });
 
   it("keeps collapsed routes accessible without visible labels", () => {
@@ -278,5 +305,23 @@ describe("AppSidebar", () => {
 
     expect(await screen.findByTestId("mobile-sidebar-drawer")).toBeInTheDocument();
     expect(loadMobileSidebarDrawer).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies light theme background when themeKey is light", () => {
+    render(
+      <AppSidebar
+        activeKey="/"
+        collapsed={false}
+        isMobile={false}
+        mobileNavOpen={false}
+        themeKey="light"
+        onCollapse={vi.fn()}
+        onMobileNavClose={vi.fn()}
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    const aside = screen.getByRole("complementary", { name: "应用侧栏" });
+    expect(aside).toHaveStyle({ background: "#ffffff" });
   });
 });

@@ -20,6 +20,8 @@ import type {
   MarketLimitUpLadder,
   MarketMainline,
   MarketMargin,
+  NationalTeamResponse,
+  MarketBreadth,
   NorthboundHistory,
   MarketPriceAnomaly,
   MarketPriceAnomalyCount,
@@ -102,6 +104,8 @@ export function useMarketLimitHistory(date: string, category: MarketLimitHistory
 }
 
 export function useMarketSectorStocksHistory(date: string, plateId: string) {
+  const isTradingSession = useAStockTradingSession();
+  const isToday = date === dayjs().format("YYYY-MM-DD");
   return useQuery({
     queryKey: queryKeys.market.sectorStocksHistory(date, plateId),
     queryFn: () => openApiGet("/api/market/sector-stocks-history", {
@@ -110,7 +114,12 @@ export function useMarketSectorStocksHistory(date: string, plateId: string) {
     }),
     select: asApiModel<MarketSectorStocksHistory>(),
     enabled: Boolean(date && plateId),
-    staleTime: QUERY_CACHE_POLICIES.marketSectorStocksHistory.staleMs,
+    staleTime: isToday
+      ? QUERY_CACHE_POLICIES.marketRealtime.staleMs
+      : QUERY_CACHE_POLICIES.marketSectorStocksHistory.staleMs,
+    refetchInterval: isToday && isTradingSession
+      ? QUERY_CACHE_POLICIES.marketRealtime.pollMs
+      : false,
   });
 }
 
@@ -216,6 +225,21 @@ export function useNorthboundHistory(pageSize = 500) {
   });
 }
 
+export function useNationalTeamHoldings(days = 120) {
+  return useQuery({
+    queryKey: queryKeys.market.nationalTeam(days),
+    queryFn: () => openApiGet("/api/market/national-team-etf-holdings", {
+      query: { days },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<NationalTeamResponse>(),
+    staleTime: (query) => query.state.data?.partial || query.state.data?.refreshing
+      ? 60_000 : QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
+    refetchInterval: (query) => query.state.data?.partial || query.state.data?.refreshing ? 60_000 : false,
+    refetchIntervalInBackground: false,
+  });
+}
+
 export function useMarketMargin(enabled = true) {
   return useQuery({
     queryKey: queryKeys.market.margin,
@@ -224,6 +248,19 @@ export function useMarketMargin(enabled = true) {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<MarketMargin>(),
+    enabled,
+    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
+  });
+}
+
+export function useMarketBreadth(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.market.breadth,
+    queryFn: () => openApiGet("/api/market/breadth", {
+      query: { days: 60 },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<MarketBreadth>(),
     enabled,
     staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
   });
@@ -507,6 +544,19 @@ export function useUsMacroData() {
     }),
     select: asApiModel<MacroUsData>(),
     staleTime: QUERY_CACHE_POLICIES.macro.staleMs,
+  });
+}
+
+export function useForceRefreshUsMacroData() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => openApiGet("/api/macro/us", {
+      query: { force_refresh: true },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }).then(asApiModel<MacroUsData>()),
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.market.macroUs, data);
+    },
   });
 }
 

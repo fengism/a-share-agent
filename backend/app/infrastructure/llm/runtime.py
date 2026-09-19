@@ -12,6 +12,7 @@ from app.configuration.schema import Settings
 from app.infrastructure.llm.adapters import prepare_completion_kwargs
 from app.infrastructure.llm.pool import AsyncResourcePool
 from app.infrastructure.llm.spec import LLMClientSpec, resolve_llm_client_spec
+from app.infrastructure.llm.tool_calling import LLMCapabilities, resolve_llm_capabilities
 
 _POOL_MAXSIZE = 16
 
@@ -91,6 +92,7 @@ class OpenAIChatRuntime:
 class AsyncOpenAIChatRuntime:
     client: Any
     model: str
+    capabilities: LLMCapabilities = LLMCapabilities()
 
 
 class LiteLLMAsyncCompletions:
@@ -124,7 +126,9 @@ class LiteLLMAsyncClient:
         base_url: str,
         api_version: str = "",
         timeout: float,
+        capabilities: LLMCapabilities = LLMCapabilities(),
     ) -> None:
+        self.capabilities = capabilities
         self.chat = SimpleNamespace(
             completions=LiteLLMAsyncCompletions(
                 api_key=api_key,
@@ -147,8 +151,14 @@ class OpenAIAsyncCompletions:
 
 
 class OpenAIAsyncClient:
-    def __init__(self, client: AsyncOpenAI) -> None:
+    def __init__(
+        self,
+        client: AsyncOpenAI,
+        *,
+        capabilities: LLMCapabilities = LLMCapabilities(),
+    ) -> None:
         self._client = client
+        self.capabilities = capabilities
         self.chat = SimpleNamespace(
             completions=OpenAIAsyncCompletions(client.chat.completions)
         )
@@ -180,6 +190,11 @@ def _create_async_openai_chat_runtime(
     litellm_client_type: type = LiteLLMAsyncClient,
     openai_client_type: type = OpenAIAsyncClient,
 ) -> AsyncOpenAIChatRuntime:
+    capabilities = resolve_llm_capabilities(
+        provider=spec.provider,
+        api_mode=spec.api_mode,
+        model=spec.model,
+    )
     if spec.api_mode == "litellm":
         return AsyncOpenAIChatRuntime(
             client=litellm_client_type(
@@ -187,8 +202,10 @@ def _create_async_openai_chat_runtime(
                 base_url=spec.base_url,
                 api_version=spec.api_version,
                 timeout=spec.timeout,
+                capabilities=capabilities,
             ),
             model=spec.model,
+            capabilities=capabilities,
         )
     raw_client = async_openai_factory(
         api_key=spec.api_key,
@@ -197,8 +214,9 @@ def _create_async_openai_chat_runtime(
         http_client=http_client_factory(trust_env=False),
     )
     return AsyncOpenAIChatRuntime(
-        client=openai_client_type(raw_client),
+        client=openai_client_type(raw_client, capabilities=capabilities),
         model=spec.model,
+        capabilities=capabilities,
     )
 
 

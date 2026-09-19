@@ -3,6 +3,7 @@ import {
   ApartmentOutlined,
   ApiOutlined,
   AuditOutlined,
+  BankOutlined,
   BulbOutlined,
   CalendarOutlined,
   ClockCircleOutlined,
@@ -42,30 +43,37 @@ const NAV_GROUPS = [
       { key: "/", icon: <HomeOutlined />, label: "首页" },
       { key: "/watchlist", icon: <StarOutlined />, label: "自选" },
       { key: "/market", icon: <FundOutlined />, label: "市场" },
+      { key: "/national-team", icon: <BankOutlined />, label: "国家队" },
       { key: "/feed", icon: <ClockCircleOutlined />, label: "资讯" },
     ],
   },
   {
+    key: "macro_industry",
+    label: "宏观产业",
+    icon: <GlobalOutlined />,
+    items: [
+      { key: "/macro", icon: <GlobalOutlined />, label: "宏观" },
+      { key: "/industry-chain", icon: <ApartmentOutlined />, label: "产业链" },
+    ],
+  },
+  {
     key: "research",
-    label: "智能投研",
+    label: "个股投研",
     icon: <BulbOutlined />,
     items: [
       { key: "/chat", icon: <MessageOutlined />, label: "对话" },
       { key: "/analysis", icon: <FileSearchOutlined />, label: "个股" },
       { key: "/screener", icon: <FilterOutlined />, label: "选股" },
       { key: "/potential", icon: <RadarChartOutlined />, label: "潜力股" },
-      { key: "/industry-chain", icon: <ApartmentOutlined />, label: "产业链" },
-      { key: "/macro", icon: <GlobalOutlined />, label: "宏观" },
-      { key: "/compare", icon: <LineChartOutlined />, label: "对比" },
-      { key: "/quant", icon: <ExperimentOutlined />, label: "量化" },
     ],
   },
   {
     key: "trading",
-    label: "交易复盘",
+    label: "交易策略",
     icon: <AuditOutlined />,
     items: [
       { key: "/portfolio", icon: <PieChartOutlined />, label: "仓位" },
+      { key: "/quant", icon: <ExperimentOutlined />, label: "量化" },
       { key: "/daily-review", icon: <FileTextOutlined />, label: "复盘" },
       { key: "/trading-calendar", icon: <CalendarOutlined />, label: "交易日历" },
     ],
@@ -75,12 +83,12 @@ const NAV_GROUPS = [
     label: "基础数据",
     icon: <DatabaseOutlined />,
     items: [
-      { key: "/master-data", icon: <DatabaseOutlined />, label: "行业与概念" },
+      { key: "/master-data", icon: <DatabaseOutlined />, label: "主数据管理" },
     ],
   },
   {
     key: "system",
-    label: "系统设置",
+    label: "系统管理",
     icon: <ControlOutlined />,
     items: [
       { key: "/capabilities", icon: <ApiOutlined />, label: "能力" },
@@ -160,9 +168,12 @@ export default function AppSidebar({
                 >
                   <LineChartOutlined style={{ color: colors.onPrimary, fontSize: 16 }} />
                 </span>
-                <span className="app-sidebar-brand__title" style={{ color: colors.textPrimary, fontSize: t.font.lg }}>
-                  A股智能分析
-                </span>
+                <div className="app-sidebar-brand__text">
+                  <span className="app-sidebar-brand__title" style={{ color: colors.textPrimary, fontSize: t.font.lg }}>
+                    A股智能分析
+                  </span>
+                  <span className="app-sidebar-brand__tag">QUANT TERMINAL</span>
+                </div>
               </button>
               {!isMobile && (
                 <button
@@ -191,6 +202,18 @@ export default function AppSidebar({
                 </div>
               ))}
         </nav>
+
+        <div className={`app-sidebar-footer${isCollapsed ? " app-sidebar-footer--collapsed" : ""}`}>
+          <div className="app-sidebar-footer__status" title="QUANT RADAR: 在线">
+            <span className="app-sidebar-footer__pulse" />
+            {!isCollapsed && (
+              <>
+                <span className="app-sidebar-footer__label">QUANT RADAR</span>
+                <span className="app-sidebar-footer__badge">ONLINE</span>
+              </>
+            )}
+          </div>
+        </div>
       </>
     );
   };
@@ -212,10 +235,11 @@ export default function AppSidebar({
   return (
     <aside
       aria-label="应用侧栏"
+      className="app-sidebar-aside"
       style={{
-        width: collapsed ? 68 : 184,
-        minWidth: collapsed ? 68 : 184,
-        maxWidth: collapsed ? 68 : 184,
+        width: collapsed ? 68 : 210,
+        minWidth: collapsed ? 68 : 210,
+        maxWidth: collapsed ? 68 : 210,
         background: themes[themeKey].siderBg,
         borderRight: `1px solid ${colors.border}`,
         position: "fixed",

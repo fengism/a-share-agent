@@ -33,7 +33,8 @@ export default function StrategyDraftOverviewCard({
   const status = selectedDraft ? STRATEGY_DRAFT_STATUS_META[selectedDraft.status] : null;
   const qualityGate = selectedDraft?.quality_gate;
   const hasHoldoutMetrics = qualityGate && (
-    qualityGate.holdout_trade_count != null
+    qualityGate.holdout_closed_trade_count != null
+    || qualityGate.holdout_trade_count != null
     || qualityGate.holdout_max_drawdown != null
     || qualityGate.holdout_sharpe_ratio != null
   );
@@ -97,9 +98,14 @@ export default function StrategyDraftOverviewCard({
                 最大回撤 {qualityGate.max_drawdown ?? "-"}% ·
                 夏普 {qualityGate.sharpe_ratio ?? "-"}
               </span>
+              <span>
+                交易日样本 {qualityGate.observation_count ?? "-"} / 最低 {qualityGate.minimum_observation_count} ·
+                完整平仓 {qualityGate.closed_trade_count ?? "-"} / 最低 {qualityGate.minimum_closed_trade_count}
+              </span>
               {hasHoldoutMetrics ? (
                 <span>
                   后段样本：交易 {qualityGate.holdout_trade_count ?? "-"} 次 ·
+                  完整平仓 {qualityGate.holdout_closed_trade_count ?? "-"} / 最低 {qualityGate.minimum_holdout_closed_trade_count ?? "不限制"} ·
                   最大回撤 {qualityGate.holdout_max_drawdown ?? "-"}% ·
                   夏普 {qualityGate.holdout_sharpe_ratio ?? "-"}
                 </span>

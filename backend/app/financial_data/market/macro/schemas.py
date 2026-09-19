@@ -60,6 +60,8 @@ class TreasuryTermStructure(BaseModel):
 
 class TreasuryLatest(BaseModel):
     date: str = ""
+    china_date: str = ""
+    us_date: str = ""
     china_10y_yield: float | None = None
     china_2y_yield: float | None = None
     china_5y_yield: float | None = None
@@ -111,6 +113,30 @@ class MarketImplications(BaseModel):
     dxy_cnh_impact: str
 
 
+class CrudeOilQuote(BaseModel):
+    symbol: str
+    name: str
+    price: float | None = None
+    change: float | None = None
+    change_pct: float | None = None
+    unit: str = ""
+    date: str = ""
+
+
+class CrudeOilHistoryPoint(BaseModel):
+    date: str
+    sc_close: float | None = None
+    wti_close: float | None = None
+    brent_close: float | None = None
+
+
+class CrudeOilData(BaseModel):
+    sc0: CrudeOilQuote | None = None
+    wti: CrudeOilQuote | None = None
+    brent: CrudeOilQuote | None = None
+    history: list[CrudeOilHistoryPoint] = Field(default_factory=list)
+
+
 class GlobalMacroRatesResponse(BaseModel):
     timestamp: str
     dollar_and_fx: DollarAndFx = Field(default_factory=DollarAndFx)
@@ -118,6 +144,7 @@ class GlobalMacroRatesResponse(BaseModel):
     treasury_curve: TreasuryCurve = Field(default_factory=TreasuryCurve)
     central_bank_policy_rates: CentralBankPolicyRates
     market_implications: MarketImplications
+    crude_oil: CrudeOilData | None = None
 
 
 class CommodityItem(BaseModel):

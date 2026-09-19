@@ -3,6 +3,8 @@ import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { API_TIMEOUTS } from "../client";
 import { openApiGet, type OpenApiResponse } from "../openapiClient";
 import { queryKeys } from "../queryKeys";
+import { useHKStockTradingSession } from "../../hooks/useHKStockTradingSession";
+import { usePageVisibility } from "../../hooks/usePageVisibility";
 
 export type HKStockQuotePage = OpenApiResponse<"/api/hk/stocks/realtime", "get">;
 export type HKStockQuote = HKStockQuotePage["items"][number];
@@ -12,13 +14,15 @@ export type HKIndices = OpenApiResponse<"/api/hk/indices/realtime", "get">;
 export type HKKlineData = OpenApiResponse<"/api/hk/indices/{symbol}/history", "get">;
 
 export function useHKIndices() {
+  const isTradingSession = useHKStockTradingSession();
+  const isVisible = usePageVisibility();
   return useQuery({
     queryKey: queryKeys.hk.indices,
     queryFn: () => openApiGet("/api/hk/indices/realtime", {
       query: {},
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
-    refetchInterval: 30_000,
+    refetchInterval: isTradingSession && isVisible ? 30_000 : false,
   });
 }
 
@@ -35,6 +39,8 @@ export function useHKIndexHistory(symbol: string, period: string) {
 }
 
 export function useHKStocks(query: string, page: number, pageSize: number) {
+  const isTradingSession = useHKStockTradingSession();
+  const isVisible = usePageVisibility();
   return useQuery({
     queryKey: queryKeys.hk.stocks(query, page, pageSize),
     queryFn: () => openApiGet("/api/hk/stocks/realtime", {
@@ -42,7 +48,7 @@ export function useHKStocks(query: string, page: number, pageSize: number) {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     placeholderData: keepPreviousData,
-    refetchInterval: 30_000,
+    refetchInterval: isTradingSession && isVisible ? 30_000 : false,
   });
 }
 
@@ -68,5 +74,22 @@ export function useHKStockHistory(code: string, period: string, adjust: string) 
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     enabled: Boolean(code),
+  });
+}
+
+export function useHKStockQuote(code: string) {
+  const isTradingSession = useHKStockTradingSession();
+  const isVisible = usePageVisibility();
+  return useQuery({
+    queryKey: queryKeys.hk.stockQuote(code),
+    queryFn: async () => {
+      const page = await openApiGet("/api/hk/stocks/realtime", {
+        query: { codes: code, query: "", page: 1, page_size: 1 },
+        options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+      });
+      return page.items[0] ?? null;
+    },
+    enabled: Boolean(code),
+    refetchInterval: isTradingSession && isVisible ? 30_000 : false,
   });
 }

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import secrets
 from collections.abc import Callable
 from typing import Any, Literal
@@ -53,36 +52,6 @@ class IwencaiDataProvider:
         self._settings_provider = settings_provider
         self._session_provider = session_provider
 
-    @property
-    def _base_url(self) -> str:
-        """问财 API 的 base_url，优先从配置读取，回退到环境变量与默认值。
-
-        Return:
-            问财 OpenAPI 的 base URL
-        """
-        try:
-            settings = self._settings_provider()
-            return settings.iwencai_base_url
-        except Exception as e:
-            logger.debug("问财 base_url 读取配置失败，使用环境变量回退: %s", e)
-            return os.environ.get("IWENCAI_BASE_URL", "https://openapi.iwencai.com")
-
-    @property
-    def _api_key(self) -> str:
-        """问财 API 的鉴权 Key，优先从配置读取，回退到环境变量。
-
-        Return:
-            问财 API Key 字符串
-        """
-        try:
-            settings = self._settings_provider()
-            key = settings.iwencai_api_key
-            if key:
-                return key
-        except Exception as e:
-            logger.debug("问财 API Key 读取配置失败，使用环境变量回退: %s", e)
-        return os.environ.get("IWENCAI_API_KEY", "")
-
     def _claw_headers(self, skill_id: str, call_type: str = "normal") -> dict:
         """构造问财 Claw 协议所需的自定义头（包含 trace_id）。
 
@@ -104,7 +73,7 @@ class IwencaiDataProvider:
             "X-Claw-Trace-Id": secrets.token_hex(32),
         }
 
-    def _request_headers(self, skill_id: str) -> dict:
+    def _request_headers(self, skill_id: str, *, settings: Settings) -> dict:
         """构造问财请求头（合并鉴权、Claw 头与 skill_id）。
 
         Param:
@@ -112,9 +81,9 @@ class IwencaiDataProvider:
         Return:
             完整的请求头字典
         """
-        api_key = self._api_key.strip()
+        api_key = settings.iwencai_api_key.strip()
         if not api_key:
-            raise IwencaiConfigurationError("问财 API Key 未配置，请在设置中填写后重试")
+            raise IwencaiConfigurationError("问财 API Key 未配置，请在设置中填写；自定义地址不能复用全局 Key")
         return {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -157,10 +126,13 @@ class IwencaiDataProvider:
         Return:
             问财接口返回的 data 字段
         """
+        # Read URL and key from one snapshot; never restore an isolated key from env.
+        settings = self._settings_provider()
+        headers = self._request_headers(skill_id, settings=settings)
         response = self._session_provider().post(
-            f"{self._base_url}{path}",
+            f"{settings.iwencai_base_url}{path}",
             json=payload,
-            headers=self._request_headers(skill_id),
+            headers=headers,
             timeout=30,
         )
         if response.status_code in {401, 403}:

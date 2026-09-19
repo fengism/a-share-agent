@@ -4,6 +4,7 @@ import {
   AlertOutlined,
   AppstoreOutlined,
   DashboardOutlined,
+  HeatMapOutlined,
   FireOutlined,
   FundOutlined,
   LineChartOutlined,
@@ -22,6 +23,7 @@ import {
   loadIndustryRankTab,
   loadLimitUpLadderTab,
   loadMarginTab,
+  loadMarketBreadthTab,
   loadMarketEmotionTab,
   loadPriceAnomalyTab,
 } from "./marketTabLoaders";
@@ -30,6 +32,7 @@ import "./market-page.css";
 const HKMarketTab = lazy(() => import("../../features/hk-market/HKMarketTab"));
 const FundFlowTab = lazy(loadFundFlowTab);
 const MarginTab = lazy(loadMarginTab);
+const MarketBreadthTab = lazy(loadMarketBreadthTab);
 const MarketEmotionTab = lazy(loadMarketEmotionTab);
 const LimitUpLadderTab = lazy(loadLimitUpLadderTab);
 const IndustryRankTab = lazy(loadIndustryRankTab);
@@ -47,6 +50,7 @@ const MARKET_TABS = [
   "limit-up",
   "fund-flow",
   "margin",
+  "breadth",
   "industry-rank",
   "dragon-tiger",
   "price-anomaly",
@@ -81,6 +85,7 @@ export default function Market() {
     { key: "limit-up", label: <span><FireOutlined /> 涨停板</span>, mobileLabel: "涨停板", onIntent: () => preload(loadLimitUpLadderTab), children: <Suspense fallback={<TabFallback />}><LimitUpLadderTab /></Suspense> },
     { key: "fund-flow", label: <span><LineChartOutlined /> 北向资金</span>, mobileLabel: "北向资金", onIntent: () => preload(loadFundFlowTab), children: <Suspense fallback={<TabFallback />}><FundFlowTab /></Suspense> },
     { key: "margin", label: <span><PayCircleOutlined /> 融资融券</span>, mobileLabel: "融资融券", onIntent: () => preload(loadMarginTab), children: <Suspense fallback={<TabFallback />}><MarginTab /></Suspense> },
+    { key: "breadth", label: <span><HeatMapOutlined /> 市场宽度</span>, mobileLabel: "市场宽度", onIntent: () => preload(loadMarketBreadthTab), children: <Suspense fallback={<TabFallback />}><MarketBreadthTab /></Suspense> },
     { key: "industry-rank", label: <span><AppstoreOutlined /> 板块涨跌幅</span>, mobileLabel: "板块涨跌幅", onIntent: () => preload(loadIndustryRankTab), children: <Suspense fallback={<TabFallback />}><IndustryRankTab /></Suspense> },
     { key: "dragon-tiger", label: <span><SwapRightOutlined style={{ transform: "rotate(90deg)" }} /> 龙虎榜</span>, mobileLabel: "龙虎榜", onIntent: () => preload(loadDragonTigerTab), children: <Suspense fallback={<TabFallback />}><DragonTigerTab /></Suspense> },
     { key: "price-anomaly", label: <span><AlertOutlined /> 交易所异动</span>, mobileLabel: "交易所异动", onIntent: () => preload(loadPriceAnomalyTab), children: <Suspense fallback={<TabFallback />}><PriceAnomalyTab /></Suspense> },
@@ -101,6 +106,7 @@ export default function Market() {
           size="middle"
           tabBarGutter={12}
           collapseQuery="(max-width: 1024px)"
+          preserveVisited
           items={aShareItems}
         />
       ),

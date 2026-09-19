@@ -1,6 +1,6 @@
 [project]
 name = "stock-agent-backend"
-version = "0.1.0"
+version = "0.2.0"
 description = "A 股智能分析系统后端，支持分时、K 线、财报、估值与 AI 分析"
 readme = "../README.md"
 requires-python = ">=3.11"
@@ -157,6 +157,7 @@ files = [
     "app/api/auth/dependencies.py",
     "app/api/auth/http.py",
     "app/domain/identity.py",
+    "app/infrastructure/browser_runtime.py",
     "app/infrastructure/persistence/chat_state.py",
     "app/infrastructure/http/client.py",
     "app/infrastructure/providers/cls.py",

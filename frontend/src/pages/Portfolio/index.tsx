@@ -7,8 +7,10 @@ import QueryErrorState from "../../components/QueryErrorState";
 import { useStyles } from "../../styles/ui";
 import PortfolioSummaryCards from "./PortfolioSummaryCards";
 import PortfolioTables from "./PortfolioTables";
+import PortfolioTradeKline from "./PortfolioTradeKline";
 import PortfolioQuoteStatus from "./PortfolioQuoteStatus";
 import PortfolioRiskPanel from "./PortfolioRiskPanel";
+import PortfolioSettingsCard from "./PortfolioSettingsCard";
 import TransactionEntryCard, { type TransactionEntryCardHandle } from "./TransactionEntryCard";
 import type { PortfolioStockSummary } from "../../types/portfolio";
 import { errorMessage, formatTime } from "./portfolioFormatters";
@@ -94,9 +96,11 @@ export default function PortfolioPage() {
         </Card>
       ) : data ? (
         <>
+          <PortfolioSettingsCard settings={data.settings} />
           <PortfolioSummaryCards summary={data.summary} />
           <PortfolioRiskPanel risk={data.risk} />
           <TransactionEntryCard ref={transactionEntryRef} stocks={data.stocks} />
+          <PortfolioTradeKline stocks={data.stocks} transactions={data.transactions} />
           <PortfolioTables
             positions={data.positions}
             stocks={data.stocks}

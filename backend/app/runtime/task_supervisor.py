@@ -15,6 +15,7 @@ from app.runtime.task_health import monitor_long_running_task, register_backgrou
 logger = logging.getLogger(__name__)
 
 AsyncTaskFactory = Callable[[], Coroutine[Any, Any, None]]
+TaskEnabledPredicate = Callable[[], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +30,7 @@ class BackgroundTaskSpec:
     restart_base_seconds: float = 1.0
     restart_max_seconds: float = 60.0
     restart_reset_seconds: float = 60.0
+    enabled: TaskEnabledPredicate | None = None
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -50,8 +52,15 @@ class BackgroundTaskSpec:
 class BackgroundTaskSupervisor:
     """Own all application background tasks and stop them as one unit."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, condition_poll_seconds: float = 5.0) -> None:
+        if condition_poll_seconds <= 0:
+            raise ValueError("条件任务检查间隔必须大于 0")
+        self._condition_poll_seconds = condition_poll_seconds
+        self._specs: dict[str, BackgroundTaskSpec] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._condition_task: asyncio.Task[None] | None = None
+        self._reconcile_lock = asyncio.Lock()
+        self._started = False
 
     @property
     def task_names(self) -> tuple[str, ...]:
@@ -109,36 +118,107 @@ class BackgroundTaskSupervisor:
             entry["status"] = "starting"
             entry["next_run"] = None
 
+    def _start_spec(self, spec: BackgroundTaskSpec) -> None:
+        task = asyncio.create_task(self._run_spec(spec), name=spec.name)
+        self._tasks[spec.name] = task
+        if spec.long_running:
+            monitor_long_running_task(
+                task,
+                critical=spec.critical,
+                readiness_required=spec.readiness_required,
+            )
+        if spec.start_message:
+            logger.info(spec.start_message)
+
+    @staticmethod
+    def _is_enabled(spec: BackgroundTaskSpec) -> bool:
+        return spec.enabled is None or spec.enabled()
+
+    async def reconcile(self) -> None:
+        """Apply current enable predicates without restarting unaffected tasks."""
+        async with self._reconcile_lock:
+            if not self._started:
+                return
+            for spec in self._specs.values():
+                if spec.enabled is None:
+                    continue
+                try:
+                    enabled = self._is_enabled(spec)
+                except Exception:
+                    logger.exception("后台任务启用条件检查失败，保留当前状态: task=%s", spec.name)
+                    continue
+
+                task = self._tasks.get(spec.name)
+                if enabled and task is None:
+                    self._start_spec(spec)
+                    continue
+                if enabled or task is None:
+                    continue
+
+                task.cancel()
+                result = await asyncio.gather(task, return_exceptions=True)
+                if self._tasks.get(spec.name) is task:
+                    self._tasks.pop(spec.name, None)
+                error = result[0]
+                if isinstance(error, BaseException) and not isinstance(error, asyncio.CancelledError):
+                    logger.error(
+                        "条件后台任务停止异常 task=%s error_type=%s",
+                        spec.name,
+                        type(error).__name__,
+                    )
+                logger.info("后台任务已按配置停止: task=%s", spec.name)
+
+    async def _run_condition_reconciler(self) -> None:
+        while True:
+            await asyncio.sleep(self._condition_poll_seconds)
+            await self.reconcile()
+
     def start(self, specs: Iterable[BackgroundTaskSpec]) -> None:
-        if self._tasks:
+        if self._started:
             raise RuntimeError("后台任务监督器已启动")
         task_specs = tuple(specs)
         names = [spec.name for spec in task_specs]
         if len(names) != len(set(names)):
             raise ValueError("后台任务名称重复")
 
+        self._specs = {spec.name: spec for spec in task_specs}
+        self._started = True
         for spec in task_specs:
-            task = asyncio.create_task(self._run_spec(spec), name=spec.name)
-            self._tasks[spec.name] = task
-            if spec.long_running:
-                monitor_long_running_task(
-                    task,
-                    critical=spec.critical,
-                    readiness_required=spec.readiness_required,
-                )
-            if spec.start_message:
-                logger.info(spec.start_message)
+            try:
+                enabled = self._is_enabled(spec)
+            except Exception:
+                logger.exception("后台任务启用条件初始检查失败，暂不启动: task=%s", spec.name)
+                continue
+            if enabled:
+                self._start_spec(spec)
+            else:
+                logger.info("后台任务已按配置禁用: task=%s", spec.name)
+
+        if any(spec.enabled is not None for spec in task_specs):
+            self._condition_task = asyncio.create_task(
+                self._run_condition_reconciler(),
+                name="background_task_condition_reconciler",
+            )
 
     async def stop(self) -> None:
-        tasks = list(self._tasks.values())
-        self._tasks.clear()
-        for task in tasks:
-            task.cancel()
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for task, result in zip(tasks, results):
-            if isinstance(result, BaseException) and not isinstance(result, asyncio.CancelledError):
-                logger.error(
-                    "后台任务关闭异常 task=%s error_type=%s",
-                    task.get_name(),
-                    type(result).__name__,
-                )
+        self._started = False
+        condition_task = self._condition_task
+        self._condition_task = None
+        if condition_task is not None:
+            condition_task.cancel()
+            await asyncio.gather(condition_task, return_exceptions=True)
+
+        async with self._reconcile_lock:
+            tasks = list(self._tasks.values())
+            self._tasks.clear()
+            self._specs.clear()
+            for task in tasks:
+                task.cancel()
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for task, result in zip(tasks, results):
+                if isinstance(result, BaseException) and not isinstance(result, asyncio.CancelledError):
+                    logger.error(
+                        "后台任务关闭异常 task=%s error_type=%s",
+                        task.get_name(),
+                        type(result).__name__,
+                    )

@@ -1,7 +1,8 @@
 /** Responsive adjustments shared by the Quant page modules. */
 @media (max-width: 1100px) {
   .quant-form-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "saved" "universe" "strategy" "execution";
   }
 
   .quant-form-layout__saved,
@@ -12,6 +13,14 @@
     grid-row: auto;
   }
 
+
+  .quant-advanced-execution-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quant-basic-execution-fields.ant-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
   .quant-task-columns {
     grid-template-columns: 1fr;
@@ -188,6 +197,17 @@
 
   .quant-saved-actions .ant-btn {
     width: 100%;
+  }
+
+  .quant-basic-execution-fields.ant-row,
+  .quant-execution-group__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quant-advanced-label {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .quant-form-section {

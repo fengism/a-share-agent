@@ -4,8 +4,6 @@ import logging
 from collections.abc import AsyncGenerator, Mapping
 from typing import Literal
 
-from openai import AsyncOpenAI
-
 from app.agentic.agents.contracts import AgentExecutionResult
 from app.agentic.events import AgentEvent
 from app.agentic.orchestration.opinions import build_synthesis_guidance
@@ -14,6 +12,7 @@ from app.core.errors import build_internal_error, log_internal_error
 from app.core.metrics import metrics
 from app.infrastructure.llm.adapters import LLMRetryableError
 from app.infrastructure.llm.runtime import describe_llm_account_error
+from app.infrastructure.llm.tool_calling import AsyncLLMClient
 
 logger = logging.getLogger(__name__)
 _PARTIAL_SOURCE_WARNING = "部分专业分析未完整完成，综合结论可能受限"
@@ -67,7 +66,7 @@ def build_synthesis_input(
 async def stream_synthesis(
     message: str,
     results: Mapping[str, AgentExecutionResult],
-    llm_client: AsyncOpenAI,
+    llm_client: AsyncLLMClient,
     model: str,
     *,
     system_prompt: str,

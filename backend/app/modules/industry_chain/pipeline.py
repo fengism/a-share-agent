@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any, Literal, cast
 
@@ -25,8 +26,13 @@ from app.domain.industry_chain import (
 )
 from app.infrastructure.llm.prompting import PromptExecutionError, run_structured_prompt
 from app.modules.industry_chain import research as industry_research
+from app.modules.industry_chain.archive_service import (
+    get_latest_industry_chain_archive,
+    load_industry_chain_archive,
+)
 from app.modules.industry_chain.atlas.loader import get_atlas_chain, list_atlas_chains
 from app.modules.industry_chain.atlas.miner import auto_mine_from_result, mining_slug
+from app.modules.industry_chain.diff import compute_industry_chain_changes
 from app.modules.industry_chain.events import IndustryChainProgress
 from app.modules.industry_chain.evidence import (
     build_evidence_catalog,
@@ -35,7 +41,12 @@ from app.modules.industry_chain.evidence import (
     validate_result_evidence_ids,
     validate_result_source_urls,
 )
-from app.modules.industry_chain.models import IndustryChainEvidenceStats, IndustryChainResult
+from app.modules.industry_chain.insights import build_opportunities, build_topic_resolution
+from app.modules.industry_chain.models import (
+    IndustryChainAnalysisMetadata,
+    IndustryChainEvidenceStats,
+    IndustryChainResult,
+)
 from app.modules.industry_chain.normalizer import (
     result_from_payload,
 )
@@ -301,6 +312,7 @@ async def run_industry_chain_analysis(
     force: bool = False,
 ) -> IndustryChainResult:
     """执行产业链数据采集、结构化生成和结果存档。"""
+    total_started_at = time.perf_counter()
     progress = ProgressEmitter(progress_callback)
     resolved_scope = resolve_industry_chain_scope(scope)
     # 未显式指定日期时，start/end/as_of 随"今天"重算；从缓存键剔除日期字段，
@@ -346,6 +358,7 @@ async def run_industry_chain_analysis(
                 agent_event=public_event,
             ))
 
+        research_started_at = time.perf_counter()
         outcomes = await asyncio.gather(
             _research_industry_chain(
                 name,
@@ -361,11 +374,18 @@ async def run_industry_chain_analysis(
 
         warnings: list[str] = []
         public_data: dict[str, Any] = {}
+        collection_metadata: dict[str, Any] = {}
         if isinstance(public_outcome, Exception):
             logger.warning("产业链公共数据采集失败: name=%s, error=%s", name, public_outcome)
             _add_warning(warnings, "公共结构化数据采集失败，本次报告仅使用 Agent 工具证据")
-        elif isinstance(public_outcome, dict) and _has_public_data(public_outcome):
-            public_data = public_outcome
+        elif isinstance(public_outcome, dict):
+            raw_collection_metadata = public_outcome.get("_collection_metadata")
+            if isinstance(raw_collection_metadata, dict):
+                collection_metadata = raw_collection_metadata
+            if _has_public_data(public_outcome):
+                public_data = public_outcome
+            else:
+                _add_warning(warnings, "公共结构化数据未返回有效内容，本次报告仅使用 Agent 工具证据")
         else:
             _add_warning(warnings, "公共结构化数据未返回有效内容，本次报告仅使用 Agent 工具证据")
 
@@ -397,6 +417,7 @@ async def run_industry_chain_analysis(
             stage=_RESEARCH_STAGE,
             message="数据采集、Agent 调研与证据校验完成",
         ))
+        research_duration_ms = round((time.perf_counter() - research_started_at) * 1000)
 
         compacted_public_data = compact_public_industry_data(public_data) if public_data else {}
         public_serialized = (
@@ -451,6 +472,7 @@ async def run_industry_chain_analysis(
                 agent_evidence_count=evidence_stats.selected_count - (1 if public_data else 0),
             ),
         }
+        synthesis_started_at = time.perf_counter()
         await progress.emit(_event(
             event_type="stage_started",
             stage=_SYNTHESIS_STAGE,
@@ -506,6 +528,8 @@ async def run_industry_chain_analysis(
         except Exception as enrich_exc:
             logger.debug("股票代码自动富化跳过: %s", enrich_exc)
 
+        result.topic_resolution = build_topic_resolution(name, result, public_data)
+        result.opportunities = build_opportunities(result)
         _apply_quality_gate(result, resolved_scope)
         if structured_prompt_succeeded:
             result.llm_review = render_industry_markdown(result)
@@ -514,6 +538,49 @@ async def run_industry_chain_analysis(
             stage=_SYNTHESIS_STAGE,
             message="结构化产业链报告生成完成",
         ))
+        synthesis_duration_ms = round((time.perf_counter() - synthesis_started_at) * 1000)
+
+        def metadata_dimensions(key: str) -> list[str]:
+            value = collection_metadata.get(key)
+            if not isinstance(value, list):
+                return []
+            return sorted({str(item) for item in value if str(item).strip()})
+
+        public_item_count = sum(
+            _collection_item_count(public_data.get(key)) for key in _PUBLIC_DATA_KEYS
+        )
+        result.analysis_metadata = IndustryChainAnalysisMetadata(
+            research_duration_ms=research_duration_ms,
+            synthesis_duration_ms=synthesis_duration_ms,
+            cache_hits=metadata_dimensions("cache_hits"),
+            cache_misses=metadata_dimensions("cache_misses"),
+            failed_dimensions=metadata_dimensions("failed_dimensions"),
+            successful_dimensions=metadata_dimensions("successful_dimensions"),
+            agent_evidence_count=len(research_evidence),
+            public_item_count=public_item_count,
+        )
+
+        archive_started_at = time.perf_counter()
+        try:
+            previous_archive = await get_latest_industry_chain_archive(
+                name,
+                user_id,
+                can_delete_legacy=False,
+            )
+            previous_result = None
+            if previous_archive.archive_id:
+                previous_result = await load_industry_chain_archive(
+                    name,
+                    previous_archive.archive_id,
+                    user_id,
+                )
+            result.changes = compute_industry_chain_changes(
+                previous_result,
+                result,
+                previous_archive_id=previous_archive.archive_id,
+            )
+        except Exception as diff_exc:
+            logger.warning("产业链版本差异计算失败: name=%s, error=%s", name, diff_exc)
 
         try:
             archive_id = await call_blocking(
@@ -530,6 +597,13 @@ async def run_industry_chain_analysis(
             result.archive_status = "failed"
             _add_warning(result.warnings, "报告已生成，但保存失败；当前结果无法推送，请重新分析")
             logger.warning("产业链存档失败: name=%s, error=%s", name, save_exc)
+
+        result.analysis_metadata.archive_duration_ms = round(
+            (time.perf_counter() - archive_started_at) * 1000
+        )
+        result.analysis_metadata.total_duration_ms = round(
+            (time.perf_counter() - total_started_at) * 1000
+        )
 
         if result.archive_status == "saved" and result.quality_status == "complete":
             # 降级报告结构不完整、代码未过全量校验，不写入共享知识库

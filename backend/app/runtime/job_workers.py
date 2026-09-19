@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from dataclasses import dataclass
 
 from app.configuration import get_settings
 from app.modules.bot.public import process_next_bot_job
@@ -19,6 +20,26 @@ QUANT_JOB_HEALTH_NAME = "quant_job_worker"
 WORKFLOW_JOB_OWNER_ID = f"{BACKGROUND_TASK_OWNER_ID}:workflow"
 WORKFLOW_JOB_HEALTH_NAME = "workflow_job_worker"
 _BOT_RECONCILE_INTERVAL_SECONDS = 1.0
+_QUANT_JOB_POLL_SECONDS = 0.5
+_IDLE_POLL_MAX_SECONDS = 5.0
+
+
+@dataclass(slots=True)
+class IdlePollBackoff:
+    """Bound idle polling while restoring low latency immediately after work."""
+
+    max_seconds: float = _IDLE_POLL_MAX_SECONDS
+    _last_delay: float = 0.0
+
+    def next_delay(self, base_seconds: float) -> float:
+        base = max(0.1, base_seconds)
+        cap = max(base, self.max_seconds)
+        delay = base if self._last_delay <= 0 else min(cap, max(base, self._last_delay * 2))
+        self._last_delay = delay
+        return delay
+
+    def reset(self) -> None:
+        self._last_delay = 0.0
 
 
 async def _run_bot_job_worker_slot(owner_id: str) -> None:
@@ -115,6 +136,7 @@ async def run_bot_job_worker() -> None:
 async def run_quant_job_worker() -> None:
     health = background_task_health.setdefault(QUANT_JOB_HEALTH_NAME, new_task_health())
     health["status"] = "running"
+    idle_backoff = IdlePollBackoff()
     try:
         while True:
             try:
@@ -127,8 +149,10 @@ async def run_quant_job_worker() -> None:
                 continue
             health["status"] = "running"
             health["last_error"] = None
-            if not processed:
-                await asyncio.sleep(0.5)
+            if processed:
+                idle_backoff.reset()
+            else:
+                await asyncio.sleep(idle_backoff.next_delay(_QUANT_JOB_POLL_SECONDS))
     except asyncio.CancelledError:
         health["status"] = "stopped"
         raise
@@ -139,6 +163,7 @@ async def run_quant_job_worker() -> None:
 
 
 async def _run_workflow_job_worker_slot(owner_id: str, shutdown_event: asyncio.Event) -> None:
+    idle_backoff = IdlePollBackoff()
     while True:
         try:
             processed = await process_next_workflow_job(
@@ -151,8 +176,10 @@ async def _run_workflow_job_worker_slot(owner_id: str, shutdown_event: asyncio.E
             logger.exception("Workflow Worker 槽位轮询失败: owner=%s", owner_id)
             await asyncio.sleep(1)
             continue
-        if not processed:
-            await asyncio.sleep(get_settings().workflow_job_poll_seconds)
+        if processed:
+            idle_backoff.reset()
+        else:
+            await asyncio.sleep(idle_backoff.next_delay(get_settings().workflow_job_poll_seconds))
 
 
 async def run_workflow_job_worker() -> None:

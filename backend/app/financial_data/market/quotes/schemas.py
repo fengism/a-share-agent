@@ -419,29 +419,37 @@ class MarketSectorStocksHistoryItem(BaseModel):
     tags: str = ""
     price: float | None = None
     change_pct: float | None = None
-    amount: int = 0
+    amount: int | None = None
     turnover_rate: float | None = None
-    float_amount: int = 0
-    main_buy: int = 0
-    main_sell: int = 0
-    main_net: int = 0
+    float_amount: int | None = None
+    main_buy: int | None = None
+    main_sell: int | None = None
+    main_net: int | None = None
     buy_ratio: float | None = None
     sell_ratio: float | None = None
     net_ratio: float | None = None
     limit_tag: str = ""
     rank_tag: str = ""
     recent_chg: float | None = None
-    limit_count: int = 0
+    limit_count: int | None = None
     chg_1d: float | None = None
     chg_5d: float | None = None
     chg_20d: float | None = None
+    quote_source: str | None = None
+    quoted_at: str | None = None
 
 
 class MarketSectorStocksHistoryResponse(BaseModel):
     source: Literal["开盘红"] = "开盘红"
     date: str
+    constituent_date: str
     plate_id: str
     fetched_at: str
+    quoted_at: str | None = None
+    quote_source: str | None = None
+    is_realtime: bool = False
+    realtime_partial: bool = False
+    history_details_available: bool = True
     total: int = 0
     items: list[MarketSectorStocksHistoryItem] = Field(default_factory=list)
 
@@ -493,3 +501,117 @@ class IndexIntradayData(BaseModel):
     source: str = ""
     prev_close: float | None = None
     items: list[IndexIntradayItem] = Field(default_factory=list)
+
+
+class MarketBreadthDailySummary(BaseModel):
+    date: str
+    strong_industry_count: int = 0
+    total_industry_count: int = 0
+    strong_ratio: float = 0.0
+
+
+class MarketBreadthResponse(BaseModel):
+    source: Literal["本地计算"] = "本地计算"
+    fetched_at: str
+    completed_market_date: str = ""
+    stale: bool = False
+    successful_stocks: int = 0
+    total_stocks: int = 0
+    industries: list[str] = Field(default_factory=list)
+    dates: list[str] = Field(default_factory=list)
+    values: list[list[float | None]] = Field(default_factory=list)
+    summaries: list[MarketBreadthDailySummary] = Field(default_factory=list)
+
+
+class NationalTeamEtfPoint(BaseModel):
+    date: str
+    source: str = "unknown"
+    fetched_at: str | None = None
+    verification_status: str = "unknown"
+    shares_100m: float
+    shares_change_100m: float | None = None
+    shares_change_pct: float | None = None
+    close: float | None = None
+    estimated_net_flow_100m: float | None = None
+
+
+class NationalTeamEtfSeries(BaseModel):
+    code: str
+    name: str
+    fund_manager: str
+    exchange: Literal["SH", "SZ"]
+    index_key: str
+    index_name: str
+    latest_date: str | None = None
+    latest_shares_100m: float | None = None
+    latest_change_1d_100m: float | None = None
+    change_5d_100m: float | None = None
+    change_20d_100m: float | None = None
+    points: list[NationalTeamEtfPoint] = Field(default_factory=list)
+
+
+class NationalTeamIndexPoint(BaseModel):
+    date: str
+    total_shares_100m: float
+    shares_change_100m: float | None = None
+    cumulative_change_100m: float = 0
+    index_close: float | None = None
+    estimated_net_flow_100m: float | None = None
+
+
+class NationalTeamIndexSeries(BaseModel):
+    index_key: str
+    index_name: str
+    index_code: str
+    etf_codes: list[str] = Field(default_factory=list)
+    covered_etf_codes: list[str] = Field(default_factory=list)
+    latest_date: str | None = None
+    latest_total_shares_100m: float | None = None
+    latest_change_1d_100m: float | None = None
+    change_5d_100m: float | None = None
+    change_20d_100m: float | None = None
+    estimated_net_flow_1d_100m: float | None = None
+    points: list[NationalTeamIndexPoint] = Field(default_factory=list)
+
+
+class NationalTeamSummary(BaseModel):
+    total_shares_100m: float | None = None
+    change_1d_100m: float | None = None
+    change_5d_100m: float | None = None
+    change_20d_100m: float | None = None
+    estimated_net_flow_1d_100m: float | None = None
+    estimated_net_flow_5d_100m: float | None = None
+    estimated_net_flow_20d_100m: float | None = None
+
+
+class NationalTeamShareObservation(BaseModel):
+    code: str
+    source: str
+    shares_100m: float
+    business_date: str | None = None
+    fetched_at: str
+    verification_status: Literal["provisional"] = "provisional"
+
+
+class NationalTeamResponse(BaseModel):
+    source: str = "上交所/深交所/东方财富"
+    fetched_at: str
+    as_of_date: str | None = None
+    requested_days: int
+    partial: bool = False
+    missing_etfs: list[str] = Field(default_factory=list)
+    expected_date: str | None = None
+    stale: bool = False
+    calendar_degraded: bool = False
+    refreshing: bool = False
+    observations: list[NationalTeamShareObservation] = Field(default_factory=list)
+    missing_share_etfs: list[str] = Field(default_factory=list)
+    missing_price_etfs: list[str] = Field(default_factory=list)
+    missing_indices: list[str] = Field(default_factory=list)
+    covered_etf_count: int = 0
+    total_etf_count: int = 12
+    methodology: str
+    disclaimer: str
+    summary: NationalTeamSummary = Field(default_factory=NationalTeamSummary)
+    indices: list[NationalTeamIndexSeries] = Field(default_factory=list)
+    etfs: list[NationalTeamEtfSeries] = Field(default_factory=list)

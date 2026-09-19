@@ -41,6 +41,17 @@ const baseProps = {
 };
 
 describe("BacktestHistory", () => {
+  it("renders metrics from lightweight summaries without loading full results", () => {
+    render(<BacktestHistory {...baseProps} runs={[makeRun({
+      result: null,
+      summary_metrics: {
+        total_return: 12.34, annualized_return: 15, annualized_volatility: 10,
+        max_drawdown: -5, trade_count: 8, turnover_rate: 100,
+      },
+    })]} />);
+    expect(screen.getByText("收益: +12.3%")).toBeInTheDocument();
+  });
+
   it("renders reusable loading, error and empty states", () => {
     const { rerender } = render(<BacktestHistory {...baseProps} runs={[]} isLoading />);
     expect(screen.getByLabelText("数据加载中")).toBeInTheDocument();

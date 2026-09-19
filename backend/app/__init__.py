@@ -1,27 +1,11 @@
-# Patch py_mini_racer MiniRacer.__del__ to avoid AttributeError on process exit.
-# py_mini_racer 0.6.0 (pulled in by akshare) does not guard self.ext becoming
-# None during interpreter shutdown, causing noisy "ignored exception" traces.
-# We use atexit to apply the patch only after py_mini_racer has been loaded by
-# a downstream dependency, avoiding eager import that would trigger the very
-# module loading this patch is designed to suppress noise from.
+"""A-share agent backend package."""
+
 import atexit as _atexit
 
+from app.infrastructure.javascript_runtime import (
+    install_legacy_mini_racer_shutdown_guard as _install_legacy_mini_racer_shutdown_guard,
+)
 
-def _patch_mini_racer_del():
-    try:
-        from py_mini_racer.py_mini_racer import MiniRacer as _MiniRacer
-
-        _original_del = _MiniRacer.__del__
-
-        def _safe_del(self):
-            try:
-                _original_del(self)
-            except (AttributeError, TypeError):
-                pass
-
-        _MiniRacer.__del__ = _safe_del
-    except ImportError:
-        pass
-
-
-_atexit.register(_patch_mini_racer_del)
+# Lifespan startup installs this guard before normal AkShare usage. Keep an
+# atexit fallback for scripts that import app modules without running FastAPI.
+_atexit.register(_install_legacy_mini_racer_shutdown_guard)

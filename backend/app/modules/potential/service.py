@@ -28,10 +28,11 @@ from app.modules.screener.strategy_screening import SCREENER_STRATEGY_KEYS
 
 logger = logging.getLogger(__name__)
 
-# 候选池：剔除风控隐患后按成交额取头部
+# 候选池：兼顾高流动性龙头与中盘活跃成长股
 _MAX_CANDIDATES = 300
-_MIN_AMOUNT_YI = 2.0
+_MIN_AMOUNT_YI = 0.8
 _MIN_LISTING_DAYS = 365
+_MAX_SIGNAL_AGE_DAYS = 5
 _MAX_OUTPUT = 50
 _MAX_CONCURRENCY = 6
 _HISTORY_DAYS = 420
@@ -63,7 +64,7 @@ def _select_candidates(
     df: pd.DataFrame | None,
     master_records: list,
 ) -> list[dict]:
-    """从全市场快照筛出风控合格的候选池（按成交额降序取头部）。"""
+    """从全市场快照筛出风控合格的候选池（分层覆盖核心高成交龙头与中盘活跃成长股）。"""
     if df is None or df.empty:
         return []
     frame = df.copy()
@@ -74,6 +75,7 @@ def _select_candidates(
     frame["board"] = frame["代码"].map({code: record.board for code, record in by_code.items()})
     frame["listing_date"] = frame["代码"].map({code: record.listing_date for code, record in by_code.items()})
     frame["amount_yi"] = pd.to_numeric(frame.get("成交额"), errors="coerce") / 1e8
+    frame["turnover_pct"] = pd.to_numeric(frame.get("换手率"), errors="coerce")
 
     name_text = frame["名称"].astype(str)
     mask = ~(name_text.str.upper().str.contains("ST", na=False) | name_text.str.contains("退", na=False))
@@ -82,7 +84,19 @@ def _select_candidates(
     mask &= listing_days.isna() | (listing_days >= _MIN_LISTING_DAYS)
     frame = frame[mask]
 
-    frame = frame.sort_values(by="amount_yi", ascending=False).head(_MAX_CANDIDATES)
+    # 分层挑选候选池：
+    # 1. 头部高流动性龙头（成交额前 150 名）
+    # 2. 中盘活跃成长股票（成交额 0.8~15 亿且换手率 2%~18% 之间前 150 名）
+    head_candidates = frame.sort_values(by="amount_yi", ascending=False).head(150)
+    mid_pool = frame[
+        (frame["amount_yi"] <= 15.0)
+        & (frame["turnover_pct"] >= 2.0)
+        & (frame["turnover_pct"] <= 18.0)
+    ]
+    mid_candidates = mid_pool.sort_values(by="turnover_pct", ascending=False).head(150)
+    merged_frame = pd.concat([head_candidates, mid_candidates]).drop_duplicates(subset=["代码"], keep="first")
+    selected = merged_frame.head(_MAX_CANDIDATES)
+
     return [
         {
             "code": str(row["代码"]),
@@ -93,7 +107,7 @@ def _select_candidates(
             "turnover_pct": pd.to_numeric(row.get("换手率"), errors="coerce"),
             "amount": row["amount_yi"],
         }
-        for _, row in frame.iterrows()
+        for _, row in selected.iterrows()
     ]
 
 
@@ -129,13 +143,18 @@ def _evaluate_strategies(
         if not positions or positions[-1] != 1:
             continue
         entry_index = _latest_entry_index(positions)
-        age = len(positions) - 1 - entry_index if entry_index is not None else None
+        if entry_index is None:
+            continue
+        age = len(positions) - 1 - entry_index
+        # 信号时效性风控：只保留最近 _MAX_SIGNAL_AGE_DAYS (5个交易日) 内触发 entry 的新鲜信号
+        if age > _MAX_SIGNAL_AGE_DAYS:
+            continue
         weight = _STRATEGY_WEIGHTS.get(key, 1.0)
-        if age is not None and age <= _FRESH_SIGNAL_DAYS:
+        if age <= _FRESH_SIGNAL_DAYS:
             weight *= 1.5
         score += weight
         hits.append(snapshot.definition.name)
-        if entry_index is not None and (signal_age is None or age < signal_age):
+        if signal_age is None or age < signal_age:
             signal_age = age
             latest_signal_date = bars_items[entry_index].date
     return hits, latest_signal_date, signal_age, score
@@ -223,6 +242,22 @@ async def mine_potential_stocks(market_date: date) -> PotentialDailyResult:
                 failed += 1
                 return
 
+        final_bar = bars.items[-1]
+        prev_bar = bars.items[-2] if len(bars.items) >= 2 else None
+
+        prev_close = prev_bar.close if prev_bar else final_bar.close
+        calc_change_pct = (
+            round((final_bar.close - prev_close) / prev_close * 100, 2)
+            if prev_close and prev_close > 0
+            else _float_or_none(candidate.get("change_pct"))
+        )
+
+        # 当日跌幅与形态风控：排除当日收盘跌幅超 3% 或大阴线杀跌股票（实体跌幅超 3.5%）
+        if calc_change_pct is not None and calc_change_pct < -3.0:
+            return
+        if final_bar.open > 0 and (final_bar.close - final_bar.open) / final_bar.open < -0.035:
+            return
+
         hits, latest_signal_date, signal_age, score = await call_blocking(
             _evaluate_strategies,
             bars.items,
@@ -231,12 +266,16 @@ async def mine_potential_stocks(market_date: date) -> PotentialDailyResult:
         )
         if not hits:
             return
+
+        # 以交易日官方日K线收盘价格与精确涨跌幅为准，确保与行情详情及K线完全对齐
+        exact_price = round(final_bar.close, 2) if final_bar.close else _float_or_none(candidate.get("price"))
+
         items.append(
             PotentialStockItem(
                 code=code,
                 name=candidate["name"],
-                price=_float_or_none(candidate.get("price")),
-                change_pct=_float_or_none(candidate.get("change_pct")),
+                price=exact_price,
+                change_pct=calc_change_pct,
                 market_cap=_float_or_none(candidate.get("market_cap")),
                 turnover_pct=_float_or_none(candidate.get("turnover_pct")),
                 amount=_float_or_none(candidate.get("amount")),

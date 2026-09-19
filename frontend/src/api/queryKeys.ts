@@ -25,6 +25,7 @@ export const queryKeys = {
     stockSearch: (query: string) => ["hk", "stock-search", query] as const,
     stockHistory: (code: string, period: string, adjust: string) =>
       ["hk", "stock-history", code, period, adjust] as const,
+    stockQuote: (code: string) => ["hk", "stock-quote", code] as const,
   },
   market: {
     indices: ["marketIndices"] as const,
@@ -42,6 +43,8 @@ export const queryKeys = {
     hsgtFlow: ["hsgtFlow"] as const,
     northboundHistory: (pageSize: number) => ["northboundHistory", pageSize] as const,
     margin: ["marketMargin"] as const,
+    nationalTeam: (days: number) => ["nationalTeam", days] as const,
+    breadth: ["marketBreadth"] as const,
     priceAnomaly: (pageNo: number, pageSize: number) =>
       ["marketPriceAnomaly", pageNo, pageSize] as const,
     priceAnomalyCount: (pageNo: number, pageSize: number, sortKey: string, sortDir: string) =>
@@ -86,7 +89,6 @@ export const queryKeys = {
     reports: (code: string, months: number) => ["stockReports", code, months] as const,
     sentiment: (code: string) => ["sentiment", code] as const,
     retailSentiment: (code: string) => ["retailSentiment", code] as const,
-    compare: (codes: string) => ["stockCompare", codes] as const,
     fundFlow: (code: string) => ["stockFundFlow", code] as const,
     analysisPage: (code: string) => ["analysisPage", code] as const,
   },

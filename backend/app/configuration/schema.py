@@ -56,6 +56,7 @@ PERSISTED_GLOBAL_KEYS = frozenset(
         "http_trust_env",
         "twitter_feeds",
         "eastmoney_cookie",
+        "fred_api_key",
         "baidu_cookie",
         "ths_cookie",
         "legulegu_token",
@@ -90,6 +91,7 @@ PERSISTED_GLOBAL_KEYS = frozenset(
 
 SECRET_KEYS = frozenset(
     {
+        "python_sandbox_token",
         "llm_api_key",
         "feishu_app_secret",
         "feishu_verification_token",
@@ -98,6 +100,7 @@ SECRET_KEYS = frozenset(
         "iwencai_api_key",
         "notion_api_token",
         "eastmoney_cookie",
+        "fred_api_key",
         "baidu_cookie",
         "baidu_acs_token",
         "ths_cookie",
@@ -124,6 +127,10 @@ class Settings(BaseSettings):
     llm_model: str = "deepseek-v4-flash"
     llm_temperature: float = 0.1
     llm_timeout_seconds: int = 180
+
+    # Deployment-only; deliberately absent from private/persisted editable keys.
+    python_sandbox_url: str = ""
+    python_sandbox_token: str = Field(default="", repr=False)
 
     # 缓存 TTL 必须为正整数：TTLCache.set 对 ttl<=0 直接抛 ValueError，
     # 零值配置若在启动时不拦截，会在运行时把对应接口全部打挂
@@ -241,6 +248,7 @@ class Settings(BaseSettings):
     web_fetch_browser_max_concurrency: int = Field(default=2, ge=1, le=8)
 
     eastmoney_cookie: str = ""
+    fred_api_key: str = ""
     baidu_cookie: str = ""
     baidu_acs_token: str = ""
     ths_cookie: str = ""

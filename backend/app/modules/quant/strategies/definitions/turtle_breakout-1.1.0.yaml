@@ -1,0 +1,39 @@
+api_version: quant.strategy/v1
+key: turtle_breakout
+version: 1.1.0
+enabled: true
+name: 海龟唐安奇突破
+description: 收盘价突破前一交易日为止的周期最高价时入场，跌破同期最低价时退出。
+scenario: 牛市启动与趋势突破
+risk_level: high
+presentation:
+  icon: rocket
+parameters:
+  lookback_period:
+    type: integer
+    label: 通道周期
+    default: 20
+    minimum: 2
+    maximum: 250
+indicators:
+  upper:
+    operator: rolling_max
+    input: high
+    period: $lookback_period
+    offset: 1
+  lower:
+    operator: rolling_min
+    input: low
+    period: $lookback_period
+    offset: 1
+signals:
+  entry:
+    operator: greater_or_equal
+    left: close
+    right: upper
+  exit:
+    operator: less_or_equal
+    left: close
+    right: lower
+position:
+  mode: binary

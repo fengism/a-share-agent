@@ -4,7 +4,11 @@ import asyncio
 import logging
 
 from app.configuration.schema import Settings
-from app.financial_data.market.public import refresh_twitter_feeds, refresh_twitter_feeds_sync
+from app.financial_data.market.public import (
+    invalidate_us_macro_snapshot,
+    refresh_twitter_feeds,
+    refresh_twitter_feeds_sync,
+)
 from app.infrastructure.http.client import reset_session
 from app.infrastructure.integrations.feishu.auth import clear_token_cache
 
@@ -83,6 +87,9 @@ def apply_update_side_effects(updated: Settings, patch: dict) -> None:
 
     if "http_trust_env" in patch:
         reset_session()
+
+    if "fred_api_key" in patch:
+        invalidate_us_macro_snapshot()
 
     if "twitter_feeds" not in patch:
         return
