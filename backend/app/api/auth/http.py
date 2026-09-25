@@ -16,7 +16,9 @@ def user_out(user: AuthenticatedUser) -> UserOut:
         id=user["id"],
         username=user["username"],
         is_admin=bool(user["is_admin"]),
+        is_active=bool(user.get("is_active", 1)),
         must_change_password=bool(user.get("must_change_password", 0)),
+        created_at=str(user["created_at"]) if user.get("created_at") else None,
     )
 
 
@@ -92,6 +94,18 @@ def auth_error_to_http(error: AuthServiceError) -> ApiError:
                 {"Retry-After": str(retry_after)},
             )
         return response(401, "用户名或密码错误")
+    if code == AuthErrorCode.ACCOUNT_DISABLED:
+        return response(403, "账号已被禁用")
+    if code == AuthErrorCode.CANNOT_DISABLE_SELF:
+        return response(400, "不能禁用当前登录账号")
+    if code == AuthErrorCode.CANNOT_DELETE_SELF:
+        return response(400, "不能删除当前登录账号")
+    if code == AuthErrorCode.CANNOT_DEMOTE_SELF:
+        return response(400, "不能取消当前登录账号的管理员权限")
+    if code == AuthErrorCode.LAST_ADMIN_PROTECTED:
+        return response(400, "不能停用或降级系统中唯一的有效管理员")
+    if code == AuthErrorCode.USER_NOT_FOUND:
+        return response(404, "用户不存在")
     if code == AuthErrorCode.INCORRECT_PASSWORD:
         return response(400, "原密码错误")
     if code == AuthErrorCode.UNCHANGED_PASSWORD:

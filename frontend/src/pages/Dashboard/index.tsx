@@ -355,7 +355,7 @@ export default function Dashboard() {
             <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>·</span>
             <span className="dashboard-hero__terminal-badge">
               <span className="dashboard-hero__pulse-dot" />
-              AI 投研智能态势中枢
+              A股实时态势
             </span>
             <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>·</span>
             <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-secondary)", fontFamily: "var(--c-font-mono)" }}>{dateStr}</span>
@@ -385,7 +385,7 @@ export default function Dashboard() {
             size="small"
             shape="round"
             className="dashboard-hero__shortcut-btn"
-            icon={<LineChartOutlined style={{ color: "var(--c-accent, #13c2c2)" }} />}
+            icon={<LineChartOutlined style={{ color: "var(--c-primary)" }} />}
             onClick={() => navigate("/quant")}
           >
             量化回测
@@ -394,7 +394,7 @@ export default function Dashboard() {
             size="small"
             shape="round"
             className="dashboard-hero__shortcut-btn"
-            icon={<ApartmentOutlined style={{ color: "var(--c-info, #1677ff)" }} />}
+            icon={<ApartmentOutlined style={{ color: "var(--c-primary)" }} />}
             onClick={() => navigate("/industry-chain")}
           >
             产业链图谱

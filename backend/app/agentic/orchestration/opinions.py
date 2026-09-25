@@ -4,7 +4,7 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 from app.agentic.agents.contracts import AgentExecutionResult
 
@@ -23,10 +23,9 @@ AGENT_WEIGHTS: dict[str, float] = {
     "risk": 0.15,
 }
 
-_OPINION_BLOCK_PATTERN = re.compile(
-    r"```agent-opinion\s*\n(.*?)\n```",
-    re.DOTALL,
-)
+# 单独匹配代码围栏，绝不跨块搜索 signal；裸 JSON 交给解码器处理嵌套结构。
+_FENCED_BLOCK_PATTERN = re.compile(r"```([^\n`{]*)\n?(.*?)(```|\Z)", re.DOTALL)
+_JSON_START_PATTERN = re.compile(r"[\[{]")
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,27 +52,66 @@ def parse_opinion_block(
     display_name: str,
     analysis: str,
 ) -> tuple[str, AgentOpinion | None]:
-    """从 Agent 输出中解析末尾的 ```agent-opinion``` 结构化块。
+    """从 Agent 输出中解析末尾的结构化结论块，支持标准块与容错后备提取。
 
     Return:
         (剔除结构化块后的正文, 解析出的意见；无有效块时为 None)
     """
-    match = _OPINION_BLOCK_PATTERN.search(analysis)
-    if match is None:
-        return analysis, None
-    cleaned = analysis[: match.start()].rstrip() + analysis[match.end():]
-    try:
-        payload = json.loads(match.group(1))
-    except (json.JSONDecodeError, ValueError):
-        return cleaned, None
+    candidates: list[tuple[int, int, object]] = []
+    blocks = list(_FENCED_BLOCK_PATTERN.finditer(analysis))
+    for block in blocks:
+        if block.group(3) != "```":
+            continue  # 未闭合的围栏保留正文，也不允许裸 JSON 后备解析进入其中。
+        language = block.group(1).strip().lower()
+        if language not in {"agent-opinion", "json", ""}:
+            continue
+        # 无显式标记的 JSON 只接受末尾独立结论，避免把普通数据当作意见。
+        if language != "agent-opinion" and analysis[block.end():].strip():
+            continue
+        try:
+            payload = json.loads(block.group(2))
+        except (json.JSONDecodeError, ValueError):
+            continue
+        candidates.append((block.start(), block.end(), payload))
+
+    decoder = json.JSONDecoder()
+    consumed = 0
+    for match in _JSON_START_PATTERN.finditer(analysis):
+        start = match.start()
+        if start < consumed or any(block.start() <= start < block.end() for block in blocks):
+            continue
+        try:
+            payload, end = decoder.raw_decode(analysis, start)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        consumed = end  # 跳过完整对象/数组，不能把其中的嵌套对象误当成结论。
+        line_start = analysis.rfind("\n", 0, start) + 1
+        if analysis[line_start:start].strip() or analysis[end:].strip():
+            continue
+        candidates.append((start, end, payload))
+
+    for start, end, payload in sorted(candidates, key=lambda item: item[0], reverse=True):
+        opinion = _parse_opinion_payload(agent_name, display_name, payload)
+        if opinion is not None:
+            # 校验成功后才移除这一块，其他正文和无效结构化块原样保留。
+            cleaned = (analysis[:start] + analysis[end:]).strip()
+            return cleaned, opinion
+    return analysis, None
+
+
+def _parse_opinion_payload(
+    agent_name: str,
+    display_name: str,
+    payload: object,
+) -> AgentOpinion | None:
     if not isinstance(payload, dict):
-        return cleaned, None
+        return None
 
     signal = str(payload.get("signal", "")).strip().lower()
     if signal not in VALID_SIGNALS:
-        return cleaned, None
+        return None
     risk_text = str(payload.get("risk_level", "none")).strip().lower()
-    risk_level: RiskLevel = risk_text if risk_text in VALID_RISK_LEVELS else "none"
+    risk_level: RiskLevel = cast(RiskLevel, risk_text) if risk_text in VALID_RISK_LEVELS else "none"
     opinion = AgentOpinion(
         agent_name=agent_name,
         display_name=display_name,
@@ -81,7 +119,7 @@ def parse_opinion_block(
         confidence=_clamp01(payload.get("confidence", 0.5)),
         risk_level=risk_level,
     )
-    return cleaned, opinion
+    return opinion
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,8 +190,9 @@ def build_synthesis_guidance(results: Mapping[str, AgentExecutionResult]) -> str
         "- 信号权重参考: 技术 40% / 基本面 25% / 情报 20% / 风险 15%（缺失维度按剩余归一化）",
     ]
     if summary.risk_veto:
-        lines.append(
-            "- 硬性风控约束: 风险维度判定为高风险，最终结论不得给出买入或加仓建议，"
-            "最高只能给观望（hold），并必须显著列出风险因素"
+        # 风控否决放在最前，预算截断不得优先丢弃这条硬约束。
+        lines.insert(0,
+            "- 硬性风控约束: 风险维度高风险看空，最终结论不得买入或加仓，"
+            "最高观望（hold），必须列出风险因素"
         )
     return "\n".join(lines)

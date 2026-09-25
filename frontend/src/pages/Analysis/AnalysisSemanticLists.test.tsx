@@ -1,49 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { AnalysisResult } from "../../types/stock";
 import AIConclusion from "./AIConclusion";
-import SentimentPanel from "./SentimentPanel";
-
-vi.mock("../../api/queries", () => ({
-  useCategorizedStockNews: () => ({
-    data: {
-      cls_news: [{ title: "财联社快讯", publish_time: "10:30" }],
-      eastmoney_news: [{ title: "东方财富报道", source: "东方财富", publish_time: "09:45" }],
-    },
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
-  useStockSentiment: () => ({
-    data: { heat_score: 72, hot_rank: 15 },
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
-  useRetailSentiment: () => ({
-    data: {
-      score: 65,
-      guba_post_count: 1,
-      post_count: 1,
-      bullish_ratio: 0.6,
-      summary: "讨论情绪偏积极",
-      sample_posts: [{ text: "看好后续表现", author: "投资者", publish_time: "10:00" }],
-    },
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
-}));
 
 describe("analysis semantic lists", () => {
-  it("renders sentiment samples and news as semantic lists", () => {
-    render(<SentimentPanel code="600519" />);
-
-    expect(screen.getAllByRole("list")).toHaveLength(3);
-    expect(screen.getByText("看好后续表现")).toBeInTheDocument();
-    expect(screen.getByText("财联社快讯")).toBeInTheDocument();
-  });
-
   it("renders key factors and risks as semantic lists", () => {
     const result = {
       fundamental: { score: 8, summary: "基本面稳健" },
@@ -94,7 +54,10 @@ describe("analysis semantic lists", () => {
     expect(screen.getByText("12个月估值区间")).toBeInTheDocument();
     expect(screen.getByText("当前价与预期空间")).toBeInTheDocument();
     expect(screen.getByText("决策因子")).toBeInTheDocument();
-    expect(screen.getAllByRole("progressbar")).toHaveLength(4);
+    expect(screen.queryByText("技术面")).not.toBeInTheDocument();
+    expect(screen.queryByText("趋势向上")).not.toBeInTheDocument();
+    expect(screen.queryByText("情绪面")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("progressbar")).toHaveLength(2);
   });
 
 });

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../api/queries", () => ({
+  useAnalysisSnapshot: () => ({ data: { cached_analysis: null }, isLoading: false, error: null, refetch: vi.fn() }),
   useStockInfo: (code: string) => {
     mocks.stockInfo(code);
     return ({
@@ -93,8 +94,13 @@ vi.mock("../../features/investment-research/KeyFinancialMetricsSection", () => (
   },
 }));
 
+vi.mock("../../features/investment-research/RevenueBreakdownSection", () => ({
+  default: () => <div>营收与毛利构成</div>,
+}));
+
 function LocationProbe() {
-  return <span data-testid="location">{useLocation().pathname}</span>;
+  const location = useLocation();
+  return <span data-testid="location">{location.pathname}{location.search}{location.hash}</span>;
 }
 
 describe("StockPage", () => {
@@ -136,7 +142,12 @@ describe("StockPage", () => {
     expect(screen.getByRole("heading", { name: "行情、技术与筹码" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "财务指标" })).toBeInTheDocument();
     expect(screen.getByText("最近四个报告期财务指标")).toBeInTheDocument();
+    expect(screen.getByText("营收与毛利构成")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "财务" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("heading", { name: "资讯与研究" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "资讯" }));
     expect(screen.getByRole("heading", { name: "资讯与研究" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "散户评论" })).toBeInTheDocument();
 
     expect(screen.getByRole("link", { name: "个股资料" })).toHaveAttribute("aria-current", "page");
     fireEvent.click(screen.getByRole("button", { name: "进入 AI 分析" }));
@@ -197,6 +208,23 @@ describe("StockPage", () => {
     expect(mocks.stockInfo).toHaveBeenCalledWith("600519");
   });
 
+  it("keeps profile tab and anchor when normalizing a stock code", async () => {
+    const scroll = vi.fn();
+    const originalScroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scroll;
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/stock/SH600519?tab=information#stock-details"]}>
+        <Routes><Route path="/stock/:code" element={<StockPage />} /></Routes>
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/stock/600519?tab=information#stock-details"));
+    expect(screen.getByRole("tab", { name: "资讯" })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: "start" }));
+    unmount();
+    HTMLElement.prototype.scrollIntoView = originalScroll;
+  });
+
   it("renders HK stock content when given an HK stock code", () => {
     render(
       <MemoryRouter initialEntries={["/stock/00700"]}>
@@ -242,8 +270,7 @@ describe("StockPage", () => {
 
     expect(mocks.financialSection).not.toHaveBeenCalled();
     expect(mocks.informationTabs).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("财务指标即将加载")).toBeInTheDocument();
-    expect(screen.getByLabelText("资讯与研究即将加载")).toBeInTheDocument();
+    expect(screen.getByLabelText("财务、估值、资金与资讯即将加载")).toBeInTheDocument();
 
     await act(async () => {
       observers.forEach((notify) => {
@@ -253,6 +280,8 @@ describe("StockPage", () => {
     });
 
     expect(mocks.financialSection).toHaveBeenCalledTimes(1);
+    expect(mocks.informationTabs).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("tab", { name: "资讯" }));
     expect(mocks.informationTabs).toHaveBeenCalledTimes(1);
   });
 });

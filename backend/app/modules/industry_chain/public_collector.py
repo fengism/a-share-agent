@@ -17,6 +17,7 @@ from app.domain.industry_chain import (
 from app.financial_data.industry.public import call_industry_data
 from app.financial_data.market.public import get_market_news
 from app.financial_data.stock.public import search_stocks
+from app.modules.industry_chain.query_plan import source_packages
 
 
 @dataclass
@@ -226,12 +227,12 @@ def _dimension_cache_key(
     scope: IndustryChainResearchScope,
 ) -> str:
     scope_json = json.dumps(
-        scope.model_dump(mode="json", exclude_none=True),
+        scope.model_dump(mode="json", exclude_none=True, exclude={"refresh_dimensions"}),
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
     )
-    return f"industry-chain:public:v2:{_normalize_topic(name)}:{dimension}:{scope_json}"
+    return f"industry-chain:public:v4:{_normalize_topic(name)}:{dimension}:{scope_json}"
 
 
 async def collect_public_industry_data(
@@ -246,21 +247,23 @@ async def collect_public_industry_data(
     if unknown:
         raise ValueError(f"未知产业链公共数据维度: {', '.join(sorted(unknown))}")
 
-    region, date_range, time_range, language = _scope_search_options(resolved_scope)
-    company_terms = (
-        "A股 上市公司"
-        if resolved_scope.company_scope == "a_share"
-        else "全球主要公司 上市公司 非上市公司"
-    )
+    _, _, time_range, language = _scope_search_options(resolved_scope)
+    packages = {package.key: package for package in source_packages(name, resolved_scope)}
+    # One request-local task per document family; no per-metric fan-out and no cross-user cache.
+    searches: dict[str, asyncio.Task] = {}
 
-    def web_search(topic: str, *, search_time_range: str | None = None):
-        return public_data.web_search(
-            f"{name}产业链 {topic} {region} {date_range}",
-            engine="bing_cn",
-            max_results=8,
-            time_range=search_time_range or time_range,
-            language=language,
-        )
+    async def source_search(family: str):
+        if family not in searches:
+            query = (f"{name} 政策公告 {resolved_scope.end_date.year}" if family == "events" else packages[family].query)
+            searches[family] = asyncio.create_task(public_data.web_search(
+                query, engine="bing_cn", max_results=8,
+                time_range=time_range if family == "events" else "any", language=language,
+            ))
+        return await searches[family]
+
+    def candidates(value, family):
+        return [{**row, "discovery_group": family, "content_status": "not_fetched"}
+                for row in _web_results(value)]
 
     async def collect_market() -> dict:
         industry_rankings, concept_rankings, industry_flow, concept_flow, market_web = await asyncio.gather(
@@ -268,7 +271,7 @@ async def collect_public_industry_data(
             _industry_call("concept_rankings", 100),
             _industry_call("industry_fund_flow"),
             _industry_call("concept_fund_flow"),
-            web_search("市场规模 复合增长率 CAGR 渗透率", search_time_range="any"),
+            source_search("landscape"),
             return_exceptions=True,
         )
         sector_rows = [
@@ -284,7 +287,7 @@ async def collect_public_industry_data(
                     matched_sectors,
                     [industry_flow, concept_flow],
                 ),
-                "web_results": _web_results(market_web),
+                "web_results": candidates(market_web, "landscape"),
             },
             "rankings": matched_sectors,
         }
@@ -307,7 +310,7 @@ async def collect_public_industry_data(
         return {"stocks": stocks}
 
     async def collect_competition(matched_sectors: list[dict]) -> dict:
-        competition_web = web_search(f"竞争格局 市场份额 CR3 CR5 {company_terms}")
+        competition_web = source_search("landscape")
         component_sectors = [sector for sector in matched_sectors if sector.get("code")][:3]
         component_results = await asyncio.gather(
             *(_industry_call("industry_components", sector["code"]) for sector in component_sectors),
@@ -330,46 +333,37 @@ async def collect_public_industry_data(
                     "companies": sector_stocks,
                 })
         return {
-            "competition_data": [*competition_data, *_web_results(competition_search)],
+            "competition_data": [*competition_data, *candidates(competition_search, "landscape")],
             "_component_stocks": component_stocks,
         }
 
     async def collect_technology() -> dict:
-        value = await web_search("核心技术路线 工艺壁垒 成本下降曲线 商业化成熟度")
-        return {"technology_data": _web_results(value)}
+        return {"technology_data": candidates(await source_search("landscape"), "landscape")}
 
     async def collect_chain() -> dict:
-        upstream, midstream, downstream = await asyncio.gather(
-            web_search("上游核心零部件 原材料 关键设备 国产替代率 供应商", search_time_range="any"),
-            web_search("中游生产制造 系统集成 总装 分部毛利率 附加值", search_time_range="any"),
-            web_search("下游应用场景 终端客户需求 增速 商业化落地", search_time_range="any"),
-            return_exceptions=True,
-        )
+        # Broad document discovery cannot establish tier-specific facts or companies.
         return {"chain_data": {
-            "upstream": _web_results(upstream),
-            "midstream": _web_results(midstream),
-            "downstream": _web_results(downstream),
+            "upstream": [], "midstream": [], "downstream": [],
+            "source_candidates": candidates(await source_search("landscape"), "landscape"),
         }}
 
     async def collect_drivers_risks() -> dict:
-        value = await web_search("核心增长驱动力 政策催化 供应瓶颈 关键风险")
-        return {"driver_risk_data": _web_results(value)}
+        return {"driver_risk_data": candidates(await source_search("demand"), "demand")}
 
     async def collect_reports() -> dict:
-        value = await web_search("行业深度研报 白皮书 pdf 证券公司", search_time_range="any")
-        return {"reports": _web_results(value)}
+        return {"reports": candidates(await source_search("landscape"), "landscape")}
 
     async def collect_events(matched_sectors: list[dict]) -> dict:
         news, events_web = await asyncio.gather(
             public_data.market_news(),
-            web_search("重大行业政策 头部企业扩产 订单 并购 最新事件"),
+            source_search("events"),
             return_exceptions=True,
         )
         relevant_news = _filter_news_by_scope(
             _select_relevant_news(name, matched_sectors, news),
             resolved_scope,
         )
-        return {"events": _dedupe_records([*relevant_news, *_web_results(events_web)])}
+        return {"events": _dedupe_records([*relevant_news, *candidates(events_web, "events")])}
 
     cache_hits: list[str] = []
     cache_misses: list[str] = []
@@ -379,12 +373,22 @@ async def collect_public_industry_data(
     async def load_dimension(dimension: str, collector: Callable[[], Awaitable[dict]]) -> dict:
         key = _dimension_cache_key(name, dimension, resolved_scope)
         found, cached = reference_cache.get_with_status(key)
-        if found and isinstance(cached, dict):
+        if found and isinstance(cached, dict) and dimension not in resolved_scope.refresh_dimensions:
             cache_hits.append(dimension)
             return cached
         cache_misses.append(dimension)
         payload = await collector()
-        reference_cache.set(key, payload, ttl=_DIMENSION_TTL_SECONDS[dimension])
+        # Empty/error-only payloads must not poison a dimension cache.
+        def has_content(value):
+            if isinstance(value, dict):
+                return not value.get("error") and any(has_content(v) for k, v in value.items() if not k.startswith("_"))
+            if isinstance(value, list):
+                return any(has_content(v) for v in value)
+            return bool(value)
+        if has_content(payload):
+            reference_cache.set(key, payload, ttl=_DIMENSION_TTL_SECONDS[dimension])
+        else:
+            failed_dimensions.append(dimension)
         return payload
 
     needs_market_context = bool(requested & {"market", "competition", "events"})
@@ -420,7 +424,7 @@ async def collect_public_industry_data(
         dimension_payloads[dimension] = outcome
 
     combined: dict[str, Any] = {
-        "research_scope": resolved_scope.model_dump(mode="json", exclude_none=True),
+        "research_scope": resolved_scope.model_dump(mode="json", exclude_none=True, exclude={"refresh_dimensions"}),
     }
     component_stocks: list[dict] = []
     for payload in dimension_payloads.values():
@@ -441,6 +445,7 @@ async def collect_public_industry_data(
 
     combined["_collection_metadata"] = {
         "requested_dimensions": sorted(requested),
+        "refresh_dimensions": sorted(set(resolved_scope.refresh_dimensions)),
         "cache_hits": sorted(cache_hits),
         "cache_misses": sorted(cache_misses),
         "failed_dimensions": sorted(failed_dimensions),

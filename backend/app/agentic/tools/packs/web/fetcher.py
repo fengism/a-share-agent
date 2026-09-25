@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import random
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ import requests
 
 from app.agentic.tools.packs.web.content import extract_text, smart_truncate
 from app.agentic.tools.packs.web.pdf import detect_content_type, handle_pdf_response
+from app.agentic.tools.packs.web.quality import body_quality_reason, checked_body, decode_html_response
 from app.agentic.tools.packs.web.scrapling import BrowserMode, is_challenge_page, needs_fallback, scrapling_fetch
 from app.agentic.tools.packs.web.transport import request_pinned
 from app.agentic.tools.packs.web.twitter import fetch_tweet
@@ -132,6 +134,12 @@ FetchMode = Literal["auto", "http", "stealth", "dynamic"]
 BrowserFetch = Callable[[str, BrowserMode], Awaitable[dict[str, Any]]]
 
 
+def _checked_browser_result(result: dict[str, Any]) -> dict[str, Any]:
+    if not result.get("error") and is_challenge_page(title=str(result.get("title") or ""), content=str(result.get("content") or "")):
+        return {"url": result.get("url", ""), "content": "", "error": "浏览器返回访问验证页，未取得正文", "error_reason": "web_challenge"}
+    return checked_body(result)
+
+
 async def scrapling_fallback(
     url: str,
     *,
@@ -140,9 +148,10 @@ async def scrapling_fallback(
 ) -> dict[str, Any]:
     """Try browser modes in order, rejecting challenge pages as failed attempts."""
     errors: list[str] = []
+    last_reason = "web_browser_failed"
     for browser_mode in browser_modes:
         metrics.record_agentic_event(f"browser_fallback_{browser_mode}")
-        result = await fetch_func(url, browser_mode)
+        result = _checked_browser_result(await fetch_func(url, browser_mode))
         challenge = is_challenge_page(
             title=str(result.get("title") or ""),
             content=str(result.get("content") or ""),
@@ -153,15 +162,17 @@ async def scrapling_fallback(
             f"{browser_mode} 返回了访问验证页" if challenge else f"{browser_mode} 未返回正文"
         )
         errors.append(str(error))
+        last_reason = result.get("error_reason") or "web_browser_failed"
     return {
         "url": url,
         "title": "",
         "content": "",
         "error": "; ".join(errors) or "浏览器抓取失败",
+        "error_reason": last_reason,
     }
 
 
-async def fetch_url(
+async def web_fetch(
     url: str,
     mode: FetchMode = "auto",
     *,
@@ -180,7 +191,7 @@ async def fetch_url(
     """Fetch one URL using explicit HTTP/browser mode or guarded automatic fallback."""
     if mode not in {"auto", "http", "stealth", "dynamic"}:
         return {"url": url, "title": "", "content": "", "error": f"不支持抓取模式: {mode}"}
-    cache_key = f"fetch:{mode}:{url}"
+    cache_key = f"fetch:v2:{mode}:{url}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cast(dict[str, Any], cached)
@@ -246,24 +257,51 @@ async def fetch_url(
         *,
         browser_modes: tuple[BrowserMode, ...] = ("dynamic", "stealth"),
     ) -> dict[str, Any]:
-        unsafe_response = await reject_unsafe_browser_target(target_url)
-        if unsafe_response is not None:
-            return unsafe_response
+        started = loop.time()
+        result: dict[str, Any] | None = None
+        outcome = "exception"
         try:
-            if fallback_func is not None:
-                return await within_browser_budget(fallback_func(target_url))
-            return await within_browser_budget(
-                scrapling_fallback(target_url, fetch_func=execute_browser, browser_modes=browser_modes)
+            unsafe_response = await reject_unsafe_browser_target(target_url)
+            if unsafe_response is not None:
+                result = unsafe_response
+                outcome = "unsafe_url"
+                return result
+            try:
+                if fallback_func is not None:
+                    result = _checked_browser_result(await within_browser_budget(fallback_func(target_url)))
+                else:
+                    result = await within_browser_budget(
+                        scrapling_fallback(target_url, fetch_func=execute_browser, browser_modes=browser_modes)
+                    )
+            except TimeoutError:
+                result = {"url": target_url, "title": "", "content": "", "error": "浏览器抓取总超时", "error_reason": "web_browser_timeout"}
+            reason = str(result.get("error_reason") or "")
+            outcome = (reason if reason in {
+                "web_browser_timeout", "web_empty_body", "web_insufficient_body",
+                "web_unreadable_body", "web_script_shell", "web_challenge",
+            } else "failed") if result.get("error") else "usable"
+            return result
+        except asyncio.CancelledError:
+            outcome = "cancelled"
+            raise
+        finally:
+            # Only an opaque URL hash and host: no query tokens, page body or upstream errors.
+            selected_mode = (result or {}).get("fetch_mode", "")
+            logger.info(
+                "浏览器回退结束: host=%s url_id=%s modes=%s selected_mode=%s outcome=%s characters=%d elapsed_ms=%d",
+                urlparse(target_url).hostname or "unknown",
+                hashlib.sha256(target_url.encode()).hexdigest()[:12],
+                ",".join(browser_modes), selected_mode if selected_mode in {"dynamic", "stealth"} else "unknown",
+                outcome, len(str((result or {}).get("content") or "")),
+                round((loop.time() - started) * 1000),
             )
-        except TimeoutError as error:
-            return {"url": target_url, "title": "", "content": "", "error": str(error)}
 
     if mode in {"stealth", "dynamic"}:
         unsafe_response = await reject_unsafe_browser_target(url)
         if unsafe_response is not None:
             return unsafe_response
         try:
-            browser_result = await within_browser_budget(execute_browser(url, cast(BrowserMode, mode)))
+            browser_result = _checked_browser_result(await within_browser_budget(execute_browser(url, cast(BrowserMode, mode))))
         except TimeoutError as error:
             return {"url": url, "title": "", "content": "", "error": str(error)}
         if not browser_result.get("error"):
@@ -280,13 +318,14 @@ async def fetch_url(
         response = await http_request
         resolved_url = str(getattr(response, "url", "") or url)
         content_type = content_type_detector(response.headers.get("content-type"))
-        response.encoding = response.apparent_encoding or "utf-8"
         if content_type == "pdf":
             # PDF 解析是 CPU 密集的同步调用，放线程池避免阻塞事件循环
             pdf_result = await asyncio.to_thread(pdf_handler, response, resolved_url)
-            cache.set(cache_key, pdf_result, FETCH_CACHE_TTL)
+            if not pdf_result.get("error"):
+                cache.set(cache_key, pdf_result, FETCH_CACHE_TTL)
             return pdf_result
-        meta, (title, content) = text_extractor(response.text)
+        html = decode_html_response(response)
+        meta, (title, content) = text_extractor(html)
     except UnsafeUrlError as error:
         logger.warning("拒绝抓取不安全 URL %s: %s", url, error)
         return {"url": url, "title": "", "content": "", "error": str(error)}
@@ -302,7 +341,8 @@ async def fetch_url(
                 "error": str(error) or f"HTTP {status_code}",
                 "status_code": status_code,
             }
-        logger.info("安全 HTTP 抓取失败 (%s)，尝试浏览器模式: %s", url, error)
+        logger.info("安全 HTTP 抓取失败，尝试浏览器模式: host=%s url_id=%s error_type=%s",
+                    urlparse(url).hostname, hashlib.sha256(url.encode()).hexdigest()[:12], type(error).__name__)
         fallback_result = await run_browser_fallback(url)
         if not fallback_result.get("error"):
             cache.set(cache_key, fallback_result, FETCH_CACHE_TTL)
@@ -316,7 +356,7 @@ async def fetch_url(
         }
 
     fallback_note = ""
-    challenge_page = is_challenge_page(html=response.text, title=title, content=content)
+    challenge_page = is_challenge_page(html=html, title=title, content=content)
     if challenge_page and mode == "http":
         return {
             "url": resolved_url,
@@ -326,13 +366,15 @@ async def fetch_url(
             "content_type": content_type,
             "fetch_mode": "http",
         }
-    if mode == "auto" and (challenge_page or needs_fallback(content)):
+    quality_reason = body_quality_reason(content)
+    if mode == "auto" and (challenge_page or quality_reason or needs_fallback(content)):
         # When HTTP lands on an interstitial, restart browser navigation from the
         # caller's URL instead of opening the temporary verification endpoint.
         fallback_url = url if challenge_page else _fallback_target_url(url, response)
-        explicit_waf = "cf_app_waf" in f"{response.text[:8192]}\n{content[:4096]}".lower()
+        explicit_waf = "cf_app_waf" in f"{html[:8192]}\n{content[:4096]}".lower()
         browser_modes: tuple[BrowserMode, ...] = ("stealth", "dynamic") if explicit_waf else ("dynamic", "stealth")
-        logger.info("安全 HTTP 正文不可用 (%d 字)，尝试浏览器模式: %s", len(content), fallback_url)
+        logger.info("安全 HTTP 正文不可用 (%d 字)，尝试浏览器模式: host=%s url_id=%s",
+                    len(content), urlparse(fallback_url).hostname, hashlib.sha256(fallback_url.encode()).hexdigest()[:12])
         fallback_result = await run_browser_fallback(fallback_url, browser_modes=browser_modes)
         if not fallback_result.get("error"):
             cache.set(cache_key, fallback_result, FETCH_CACHE_TTL)
@@ -348,6 +390,9 @@ async def fetch_url(
                 "content_type": content_type,
             }
 
+    if quality_reason:
+        return checked_body({"url": resolved_url, "title": title, "content": content, "content_type": content_type, "fetch_mode": "http"})
+
     truncated_content, was_truncated = truncate_func(content)
     final_result: dict[str, Any] = {
         "url": resolved_url,
@@ -357,6 +402,7 @@ async def fetch_url(
         "content_length": len(content),
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "fetch_mode": "http",
+        "body_quality": "usable",
     }
     if meta:
         final_result["meta"] = meta
@@ -375,7 +421,7 @@ async def fetch_urls(
     urls: list[str],
     mode: FetchMode = "auto",
     *,
-    fetch_one: Callable[..., Awaitable[dict[str, Any]]] = fetch_url,
+    fetch_one: Callable[..., Awaitable[dict[str, Any]]] = web_fetch,
 ) -> list[dict[str, Any]]:
     """Fetch up to ten URLs with bounded per-batch concurrency and stable ordering."""
     if not urls:

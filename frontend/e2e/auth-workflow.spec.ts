@@ -56,7 +56,10 @@ test("reconnects a durable workflow and cancels it remotely", async ({ page }) =
   await page.route("**/api/auth/me", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(user) });
   });
-  await page.route("**/api/stock/analysis-page/600519", async (route) => {
+  await page.route("**/api/stock/600519/info", (route) => route.fulfill({
+    json: { code: "600519", name: "贵州茅台" },
+  }));
+  await page.route("**/api/stock/analysis-page/600519?include_market_data=false", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -129,7 +132,8 @@ test("reconnects a durable workflow and cancels it remotely", async ({ page }) =
   expect(cursors[0]).toBeUndefined();
   expect(cursors[1]).toBe("1:2");
   await expect(page.getByText("Agent 思考与执行")).toBeVisible();
-  await page.getByRole("button", { name: /Agent 思考与执行/ }).click();
+  const processToggle = page.getByRole("button", { name: /Agent 思考与执行/ });
+  if (await processToggle.getAttribute("aria-expanded") === "false") await processToggle.click();
   await expect(page.getByText("先核验财务与估值，再检查风险")).toBeVisible();
 
   await page.getByRole("button", { name: "停止研究" }).click();

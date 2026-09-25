@@ -10,9 +10,9 @@ from openai import AsyncOpenAI, OpenAI
 from app.configuration.runtime import get_effective_settings
 from app.configuration.schema import Settings
 from app.infrastructure.llm.adapters import prepare_completion_kwargs
+from app.infrastructure.llm.capabilities import LLMCapabilities
 from app.infrastructure.llm.pool import AsyncResourcePool
 from app.infrastructure.llm.spec import LLMClientSpec, resolve_llm_client_spec
-from app.infrastructure.llm.tool_calling import LLMCapabilities, resolve_llm_capabilities
 
 _POOL_MAXSIZE = 16
 
@@ -96,21 +96,31 @@ class AsyncOpenAIChatRuntime:
 
 
 class LiteLLMAsyncCompletions:
-    def __init__(self, *, api_key: str, base_url: str, api_version: str, timeout: float) -> None:
+    def __init__(
+        self, *, api_key: str, base_url: str, api_version: str, timeout: float,
+        max_retries: int | None = 0,
+        capabilities: LLMCapabilities | None = None,
+        model: str | None = None,
+    ) -> None:
+        self._model = model
+        self.capabilities = capabilities
         self._api_key = api_key
         self._base_url = base_url
         self._api_version = api_version
         self._timeout = timeout
+        self._max_retries = max_retries
 
     async def create(self, **kwargs):
         from litellm import acompletion
 
-        kwargs = prepare_completion_kwargs(kwargs)
+        kwargs = prepare_completion_kwargs(kwargs, self.capabilities, expected_model=self._model)
         kwargs.update(
             api_key=self._api_key,
             timeout=self._timeout,
             drop_params=True,
         )
+        if self._max_retries is not None:
+            kwargs["num_retries"] = self._max_retries
         if self._base_url:
             kwargs["api_base"] = self._base_url
         if self._api_version:
@@ -126,7 +136,9 @@ class LiteLLMAsyncClient:
         base_url: str,
         api_version: str = "",
         timeout: float,
-        capabilities: LLMCapabilities = LLMCapabilities(),
+        capabilities: LLMCapabilities | None = None,
+        model: str | None = None,
+        max_retries: int | None = 0,
     ) -> None:
         self.capabilities = capabilities
         self.chat = SimpleNamespace(
@@ -135,6 +147,9 @@ class LiteLLMAsyncClient:
                 base_url=base_url,
                 api_version=api_version,
                 timeout=timeout,
+                max_retries=max_retries,
+                capabilities=capabilities,
+                model=model,
             )
         )
 
@@ -143,11 +158,13 @@ class LiteLLMAsyncClient:
 
 
 class OpenAIAsyncCompletions:
-    def __init__(self, completions: Any) -> None:
+    def __init__(self, completions: Any, capabilities: LLMCapabilities | None = None, model: str | None = None) -> None:
+        self._model = model
         self._completions = completions
+        self.capabilities = capabilities
 
     async def create(self, **kwargs):
-        return await self._completions.create(**prepare_completion_kwargs(kwargs))
+        return await self._completions.create(**prepare_completion_kwargs(kwargs, self.capabilities, expected_model=self._model))
 
 
 class OpenAIAsyncClient:
@@ -155,16 +172,31 @@ class OpenAIAsyncClient:
         self,
         client: AsyncOpenAI,
         *,
-        capabilities: LLMCapabilities = LLMCapabilities(),
+        capabilities: LLMCapabilities | None = None,
+        model: str | None = None,
     ) -> None:
         self._client = client
         self.capabilities = capabilities
         self.chat = SimpleNamespace(
-            completions=OpenAIAsyncCompletions(client.chat.completions)
+            completions=OpenAIAsyncCompletions(client.chat.completions, capabilities, model)
         )
 
     async def close(self) -> None:
         await self._client.close()
+
+
+class OpenAISyncClient:
+    def __init__(self, client: Any, capabilities: LLMCapabilities, model: str) -> None:
+        self._model = model
+        self._client = client
+        self.capabilities = capabilities
+        self.chat = SimpleNamespace(completions=self)
+
+    def create(self, **kwargs):
+        return self._client.chat.completions.create(**prepare_completion_kwargs(kwargs, self.capabilities, expected_model=self._model))
+
+    def close(self) -> None:
+        self._client.close()
 
 
 def _create_openai_chat_runtime(
@@ -177,9 +209,12 @@ def _create_openai_chat_runtime(
         api_key=spec.api_key,
         base_url=spec.base_url,
         timeout=spec.timeout,
+        max_retries=0,
         http_client=http_client_factory(trust_env=False),
     )
-    return OpenAIChatRuntime(client=client, model=spec.model)
+    return OpenAIChatRuntime(
+        client=OpenAISyncClient(client, spec.effective_capabilities, spec.model), model=spec.model,
+    )
 
 
 def _create_async_openai_chat_runtime(
@@ -189,12 +224,9 @@ def _create_async_openai_chat_runtime(
     http_client_factory: Callable[..., Any] = httpx.AsyncClient,
     litellm_client_type: type = LiteLLMAsyncClient,
     openai_client_type: type = OpenAIAsyncClient,
+    max_retries: int | None = 0,
 ) -> AsyncOpenAIChatRuntime:
-    capabilities = resolve_llm_capabilities(
-        provider=spec.provider,
-        api_mode=spec.api_mode,
-        model=spec.model,
-    )
+    capabilities = spec.effective_capabilities
     if spec.api_mode == "litellm":
         return AsyncOpenAIChatRuntime(
             client=litellm_client_type(
@@ -203,6 +235,8 @@ def _create_async_openai_chat_runtime(
                 api_version=spec.api_version,
                 timeout=spec.timeout,
                 capabilities=capabilities,
+                model=spec.model,
+                **({"max_retries": max_retries} if max_retries is not None else {}),
             ),
             model=spec.model,
             capabilities=capabilities,
@@ -211,10 +245,11 @@ def _create_async_openai_chat_runtime(
         api_key=spec.api_key,
         base_url=spec.base_url,
         timeout=spec.timeout,
+        max_retries=0 if max_retries is None else max_retries,
         http_client=http_client_factory(trust_env=False),
     )
     return AsyncOpenAIChatRuntime(
-        client=openai_client_type(raw_client, capabilities=capabilities),
+        client=openai_client_type(raw_client, capabilities=capabilities, model=spec.model),
         model=spec.model,
         capabilities=capabilities,
     )
@@ -229,7 +264,9 @@ def create_openai_chat_runtime(settings: Settings | None = None) -> OpenAIChatRu
     )
 
 
-def create_async_openai_chat_runtime(settings: Settings | None = None) -> AsyncOpenAIChatRuntime:
+def create_async_openai_chat_runtime(
+    settings: Settings | None = None, *, max_retries: int | None = 0,
+) -> AsyncOpenAIChatRuntime:
     settings = settings or get_effective_settings()
     return _create_async_openai_chat_runtime(
         resolve_llm_client_spec(settings),
@@ -237,6 +274,7 @@ def create_async_openai_chat_runtime(settings: Settings | None = None) -> AsyncO
         http_client_factory=httpx.AsyncClient,
         litellm_client_type=LiteLLMAsyncClient,
         openai_client_type=OpenAIAsyncClient,
+        max_retries=max_retries,
     )
 
 

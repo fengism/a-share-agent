@@ -18,11 +18,14 @@ from app.financial_data.stock.insights.sources import (
     BAIDU_FUND_FLOW_SOURCE_ID,
     EASTMONEY_FUND_FLOW_API,
     EASTMONEY_FUND_FLOW_SOURCE_ID,
+    TDXHUB_FUND_FLOW_API,
+    TDXHUB_FUND_FLOW_SOURCE_ID,
 )
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
+_tdxhub_fund_flow_semaphore = asyncio.Semaphore(1)
 _fund_flow_singleflight: AsyncSingleFlight[list[StockFundFlowItem]] = AsyncSingleFlight()
 _FUND_FLOW_FAILURE_TTL_SECONDS = 30
 _FUND_FLOW_LAST_GOOD_TTL_SECONDS = 24 * 60 * 60
@@ -38,6 +41,7 @@ class _FundFlowAttempt:
     source_id: str
     source_api: str
     semaphore: asyncio.Semaphore
+    max_attempts: int | None = None
 
 
 _FUND_FLOW_ATTEMPTS = (
@@ -56,6 +60,15 @@ _FUND_FLOW_ATTEMPTS = (
         source_id=EASTMONEY_FUND_FLOW_SOURCE_ID,
         source_api=EASTMONEY_FUND_FLOW_API,
         semaphore=eastmoney_semaphore,
+    ),
+    _FundFlowAttempt(
+        provider="tdxhub",
+        operation="stock_fund_flow_history",
+        method="fetch_stock_fund_flow_history",
+        source_id=TDXHUB_FUND_FLOW_SOURCE_ID,
+        source_api=TDXHUB_FUND_FLOW_API,
+        semaphore=_tdxhub_fund_flow_semaphore,
+        max_attempts=1,
     ),
 )
 
@@ -102,8 +115,8 @@ def _normalize_fund_flow(items: object) -> list[StockFundFlowItem]:
 async def _fetch_remote_stock_fund_flow(code: str) -> list[StockFundFlowItem]:
     last_error: Exception | None = None
     for index, attempt in enumerate(_FUND_FLOW_ATTEMPTS):
-        provider = get_provider(attempt.provider)
         try:
+            provider = get_provider(attempt.provider)
             rows = await provider_gateway.call_blocking(
                 attempt.provider,
                 attempt.operation,
@@ -111,6 +124,7 @@ async def _fetch_remote_stock_fund_flow(code: str) -> list[StockFundFlowItem]:
                 code,
                 semaphore=attempt.semaphore,
                 is_fallback_attempt=index > 0,
+                max_attempts=attempt.max_attempts,
             )
             result = [
                 StockFundFlowItem.model_validate(row).model_copy(

@@ -1,14 +1,16 @@
-"""大宗商品与重要工业品现货/期货行情服务。"""
+"""大宗商品期货连续/主力合约行情服务（旧接口名兼容）。"""
 
 from __future__ import annotations
 
 import logging
+import math
+import re
 from dataclasses import dataclass
-from typing import Any
-
-import httpx
+from typing import Any, cast
 
 from app.core.cache import market_cache as cache
+from app.infrastructure.providers.provider_gateway import provider_gateway
+from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -256,6 +258,11 @@ def _match_commodity_specs(query: str) -> list[CommodityItemSpec]:
     if not clean_query or clean_query in ("all", "overview", "全部", "大宗商品", "大盘", "概览"):
         return list(COMMODITY_SPECS)
 
+    exact = [spec for spec in COMMODITY_SPECS if clean_query in {
+        spec.symbol.lower(), spec.name.lower(), spec.sina_code.lower(), spec.sina_code.lower().removeprefix("nf_"), *spec.keywords,
+    }]
+    if exact:
+        return exact
     matched = []
     for spec in COMMODITY_SPECS:
         if (
@@ -263,79 +270,29 @@ def _match_commodity_specs(query: str) -> list[CommodityItemSpec]:
             or spec.symbol.lower() in clean_query
             or clean_query in spec.name.lower()
             or clean_query in spec.category.lower()
-            or any(clean_query in kw or kw in clean_query for kw in spec.keywords)
+            or any(clean_query == kw or (not kw.isascii() and (clean_query in kw or kw in clean_query)) or (kw.isascii() and re.search(rf"(?<![a-z]){re.escape(kw)}(?![a-z])", clean_query)) for kw in spec.keywords)
             or any(clean_query in chain for chain in spec.related_chains)
         ):
             matched.append(spec)
-    return matched or list(COMMODITY_SPECS)
+    return matched
 
 
-def _parse_sina_futures_line(line: str) -> tuple[str, dict[str, Any]] | None:
-    """解析单条新浪 nf_ 合约行情行，返回 (sina_code, quote)。
-
-    上游字段布局经 akshare futures_zh_spot 列映射与 2026-09 实测双重核对：
-    2 开盘 / 3 最高 / 4 最低 / 5 昨收 / 6 买价 / 8 最新价 / 10 昨结算 /
-    13 持仓量 / 14 成交量 / 17 行情日期。
-    """
-    if "=" not in line or '"' not in line:
-        return None
-    code_part = line.split("=")[0].split("_")[-1]
-    fields = line.split('"')[1].split(",")
-    if len(fields) < 18:
-        return None
-    try:
-        open_price = float(fields[2])
-        high_price = float(fields[3])
-        low_price = float(fields[4])
-        # 涨跌幅官方口径基于昨结算价，优先取 fields[10]；昨收(fields[5])仅兜底
-        prev_settle = float(fields[10]) if float(fields[10]) > 0 else float(fields[5])
-        current_price = float(fields[8]) if float(fields[8]) > 0 else float(fields[6])
-        if current_price > 0 and prev_settle > 0:
-            change = current_price - prev_settle
-            change_pct = change / prev_settle * 100
-        else:
-            # 非交易时段最新价与买价可能均为 0，输出 None 而不是 0/-100%
-            change = None
-            change_pct = None
-        open_interest = float(fields[13])
-        volume = float(fields[14])
-        quote_date = fields[17]
-    except (ValueError, IndexError):
-        return None
-    return f"nf_{code_part}", {
-        "price": round(current_price, 2) if current_price > 0 else None,
-        "prev_settle": round(prev_settle, 2) if prev_settle > 0 else None,
-        "change": round(change, 2) if change is not None else None,
-        "change_pct": round(change_pct, 2) if change_pct is not None else None,
-        "open": round(open_price, 2),
-        "high": round(high_price, 2),
-        "low": round(low_price, 2),
-        "volume": int(volume),
-        "open_interest": int(open_interest),
-        "date": quote_date,
-    }
+def _has_price(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0
 
 
 async def fetch_commodity_quotes(specs: list[CommodityItemSpec]) -> list[dict[str, Any]]:
-    """批量从新浪行情通道获取大宗商品/工业品现货主力实时价格。"""
+    """批量从新浪行情通道获取期货连续/主力合约最新行情，不是现货价格。"""
     if not specs:
         return []
 
-    symbols_param = ",".join(spec.sina_code for spec in specs)
-    url = f"https://hq.sinajs.cn/list={symbols_param}"
-    headers = {
-        "Referer": "https://finance.sina.com.cn",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-    }
-
     quote_map: dict[str, dict[str, Any]] = {}
     try:
-        async with httpx.AsyncClient(timeout=6.0) as client:
-            resp = await client.get(url, headers=headers)
-            for line in resp.text.strip().split("\n"):
-                parsed = _parse_sina_futures_line(line)
-                if parsed is not None:
-                    quote_map[parsed[0]] = parsed[1]
+        quote_map = await provider_gateway.call(
+            "sina",
+            "fetch_futures_quotes",
+            lambda: get_provider("sina").fetch_futures_quotes([spec.sina_code for spec in specs]),
+        )
     except Exception as exc:
         logger.warning("大宗商品行情获取失败: %s", exc)
 
@@ -343,12 +300,16 @@ async def fetch_commodity_quotes(specs: list[CommodityItemSpec]) -> list[dict[st
     for spec in specs:
         quote = quote_map.get(spec.sina_code, {})
         results.append({
+            "quote_kind": "futures",
+            "source": "sina_futures",
+            "source_url": f"https://hq.sinajs.cn/list={spec.sina_code}",
+            "status": "available" if _has_price(quote.get("price")) else "unavailable",
             "symbol": spec.symbol,
             "name": spec.name,
             "contract": spec.sina_code.replace("nf_", ""),
             "category": spec.category,
             "unit": spec.unit,
-            "latest_price": quote.get("price"),
+            "latest_price": quote.get("price") if _has_price(quote.get("price")) else None,
             "change": quote.get("change"),
             "change_pct": quote.get("change_pct"),
             "high": quote.get("high"),
@@ -365,19 +326,28 @@ async def fetch_commodity_quotes(specs: list[CommodityItemSpec]) -> list[dict[st
 
 
 async def get_commodity_spot_prices(symbol: str = "") -> dict[str, Any]:
-    """查询大宗商品与重要工业品现货/主力合约最新价格与产业链映射。"""
-    cache_key = f"commodity_spot_{symbol.strip().lower()}"
+    """兼容旧名称：仅查询期货行情及静态产业映射，不提供现货/基差。"""
+    cache_key = f"commodity_futures_v2_{symbol.strip().lower()}"
     cached = cache.get(cache_key)
     if cached is not None:
-        return cached
+        return cast(dict[str, Any], cached)
 
     matched_specs = _match_commodity_specs(symbol)
     items = await fetch_commodity_quotes(matched_specs)
 
+    available_count = sum(item["status"] == "available" for item in items)
     response = {
+        "quote_kind": "futures",
+        "source": "sina_futures",
+        "status": "not_found" if not matched_specs else "available" if available_count == len(items) else "partial" if available_count else "unavailable",
+        "available_count": available_count,
+        "spot_available": False,
+        "basis_available": False,
+        "caveats": ["仅为期货连续/主力合约最近报价，不是现货采购价；不提供现货基差。", "报价时间以每条 date 为准；产业映射为静态研究线索，不证明成本或收益传导。"],
         "query": symbol.strip() or "全部重要大宗商品",
         "total_count": len(items),
         "items": items,
     }
-    cache.set(cache_key, response, ttl=_CACHE_TTL_SECONDS)
+    if items and available_count == len(items):
+        cache.set(cache_key, response, ttl=_CACHE_TTL_SECONDS)
     return response

@@ -30,9 +30,9 @@ def _get_eastmoney_provider():
     return get_provider("eastmoney")
 
 
-def _get_tdx_provider():
-    """Lazily resolve the TDX provider singleton."""
-    return get_provider("tdx")
+def _get_tdxhub_provider():
+    """Lazily resolve the TDXHub provider singleton."""
+    return get_provider("tdxhub")
 
 
 _index_kline_singleflight = AsyncSingleFlight[KlineData]()
@@ -93,7 +93,7 @@ def _build_index_kline_source_attempts(
             loader=lambda: _require_index_kline_frame(
                 "TDX 指数K线",
                 call_blocking(
-                    _get_tdx_provider().fetch_index_kline,
+                    _get_tdxhub_provider().fetch_index_kline,
                     symbol=symbol,
                     start_date=start_date,
                     end_date=end_date,

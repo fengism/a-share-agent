@@ -11,7 +11,7 @@ import { useAnalysisStore, type AnalysisRunIdentity } from "../../store/analysis
 import { useIndustryChainWorkflowStore } from "../../store/industryChainWorkflowStore";
 import type { AnalysisResult, IndustryChainResult } from "../../types/stock";
 import { normalizeAnalysisDate } from "../investment-research/analysisHistoryUrl";
-import { agentProcessFromEvents, applyAgentEvent } from "../agent-process/agentProcess";
+import { agentProcessFromEvents, applyAgentEvent, stopAgentProcess } from "../agent-process/agentProcess";
 import { INDUSTRY_CHAIN_STAGES, industryStageIndex } from "../../pages/IndustryChain/industryWorkflow";
 import type { WorkflowJob } from "../../api/queries";
 
@@ -39,7 +39,10 @@ function applyAnalysisProgress(identity: AnalysisRunIdentity, progress: Analysis
   if ((progress.type === "complete" || progress.type === "cached") && progress.result) {
     state.setRunResult(identity, progress.result);
   }
-  if (progress.type === "error") state.setRunError(identity, progress.error || "研究失败");
+  if (progress.type === "error") {
+    if (progress.cancelled) state.stopRun(identity, "cancelled");
+    else state.setRunError(identity, progress.error || "研究失败");
+  }
 }
 
 export function resumeAnalysisWorkflow(job: WorkflowJob) {
@@ -50,6 +53,7 @@ export function resumeAnalysisWorkflow(job: WorkflowJob) {
   current.beginRun(identity);
   const stream = resumeAnalysis(job.id, (progress) => applyAnalysisProgress(identity, progress));
   current.setRunStream(identity, stream);
+  current.setRunJobId(identity, job.id);
   void stream.promise.then((result: AnalysisResult) => {
     const state = useAnalysisStore.getState();
     if (state.activeRun?.runId !== identity.runId) return;
@@ -66,14 +70,24 @@ export function resumeAnalysisWorkflow(job: WorkflowJob) {
     const state = useAnalysisStore.getState();
     if (state.activeRun?.runId !== identity.runId) return;
     const message = error instanceof Error ? error.message : "研究失败";
-    if (message !== "已停止等待" && message !== "已取消") state.setRunError(identity, message);
-  }).finally(() => useAnalysisStore.getState().finishRun(identity));
+    if (message === "已停止等待" || message === "已取消") {
+      state.stopRun(identity, message === "已取消" ? "cancelled" : "detached");
+    } else {
+      state.setRunError(identity, message);
+    }
+  }).finally(() => {
+    useAnalysisStore.getState().finishRun(identity);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
+  });
 }
 
 function applyIndustryProgress(runId: number, progress: IndustryChainProgress) {
   const state = useIndustryChainWorkflowStore.getState();
-  if (state.runId !== runId) return;
-  if (progress.type === "stage_started" && progress.stage) {
+  if (state.runId !== runId || !state.isAnalyzing) return;
+  if (progress.type === "error" && progress.cancelled) {
+    state.stopRun(runId, "cancelled");
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
+  } else if (progress.type === "stage_started" && progress.stage) {
     const index = industryStageIndex(progress.stage);
     state.patch(runId, {
       currentStage: index >= 0 ? index : state.currentStage,
@@ -97,15 +111,18 @@ export function resumeIndustryChainWorkflow(job: WorkflowJob) {
     (progress) => applyIndustryProgress(runId, progress),
   );
   current.setStream(runId, stream);
+  current.patch(runId, { jobId: job.id });
   void stream.promise.then((result) => {
     const state = useIndustryChainWorkflowStore.getState();
-    if (state.runId !== runId) return;
+    if (state.runId !== runId || !state.isAnalyzing) return;
     state.patch(runId, {
       result,
       archiveId: result.archive_id || "",
       currentStage: INDUSTRY_CHAIN_STAGES.length,
       stageMessage: result.archive_status === "failed" ? "分析完成，但存档失败" : "分析完成",
       isAnalyzing: false,
+      isCancelling: false,
+      status: "success",
       agentProcess: state.agentProcess.plan || state.agentProcess.toolCalls.length > 0
         ? state.agentProcess
         : agentProcessFromEvents(result.agent_trace),
@@ -118,10 +135,16 @@ export function resumeIndustryChainWorkflow(job: WorkflowJob) {
     ]);
   }).catch((error: unknown) => {
     const state = useIndustryChainWorkflowStore.getState();
-    if (state.runId !== runId) return;
+    if (state.runId !== runId || !state.isAnalyzing) return;
     const message = error instanceof Error ? error.message : "产业链分析失败";
-    if (message !== "已停止等待" && message !== "已取消") {
-      state.patch(runId, { error: message, isAnalyzing: false, stream: null });
+    if (message === "已停止等待" || message === "已取消") {
+      state.stopRun(runId, message === "已取消" ? "cancelled" : "detached");
+    } else {
+      state.patch(runId, {
+        error: message, status: "error", isAnalyzing: false, isCancelling: false, stream: null,
+        agentProcess: stopAgentProcess(state.agentProcess, "failed", message),
+      });
     }
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
   });
 }

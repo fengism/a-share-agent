@@ -1,67 +1,38 @@
 import { Progress, Tag, Typography } from "antd";
-import { TrophyOutlined } from "@ant-design/icons";
+import { FileSearchOutlined } from "@ant-design/icons";
 import type { IndustryChainOpportunity } from "../../types/stock";
 
 const { Text } = Typography;
+const bounded = (value?: number) => typeof value === "number" && Number.isFinite(value)
+  ? Math.max(0, Math.min(100, value)) : 0;
 
-const SCORE_ITEMS: Array<{ key: keyof IndustryChainOpportunity; label: string }> = [
-  { key: "prosperity_score", label: "景气" },
-  { key: "earnings_score", label: "盈利" },
-  { key: "valuation_score", label: "估值" },
-  { key: "catalyst_score", label: "催化" },
-  { key: "evidence_score", label: "证据" },
-  { key: "risk_score", label: "风险" },
-];
-
-function scoreValue(opportunity: IndustryChainOpportunity, key: keyof IndustryChainOpportunity) {
-  const value = opportunity[key];
-  return typeof value === "number" ? Math.max(0, Math.min(100, value)) : 0;
-}
-
-export default function IndustryOpportunityMap({
-  opportunities,
-}: {
-  opportunities?: IndustryChainOpportunity[];
-}) {
+export default function IndustryOpportunityMap({ opportunities }: { opportunities?: IndustryChainOpportunity[] }) {
   if (!opportunities?.length) return null;
-
   return (
     <section className="industry-opportunity-map" aria-labelledby="industry-opportunity-map-heading">
       <header>
-        <div>
-          <TrophyOutlined />
-          <strong id="industry-opportunity-map-heading">投资研究地图</strong>
-        </div>
-        <Text type="secondary">研究优先级，不构成买卖建议</Text>
+        <div><FileSearchOutlined /><strong id="industry-opportunity-map-heading">公司研究资料</strong></div>
+        <Text type="secondary">按资料完整度排列，不代表投资价值或收益预期</Text>
       </header>
       <ol>
-        {opportunities.map((opportunity, index) => (
-          <li key={`${opportunity.code || opportunity.name}-${index}`}>
-            <div className="industry-opportunity-map__rank">{index + 1}</div>
-            <div className="industry-opportunity-map__content">
-              <div className="industry-opportunity-map__title">
-                <strong>{opportunity.name}</strong>
-                {opportunity.code && <Tag>{opportunity.code}</Tag>}
-                {opportunity.role && <Text type="secondary">{opportunity.role}</Text>}
-                <span>{opportunity.total_score} 分</span>
+        {opportunities.map((item, index) => {
+          const current = item.scoring_version === 2 && item.score_kind === "research_completeness";
+          return (
+            <li key={`${item.code || item.name}-${index}`}>
+              <div className="industry-opportunity-map__content">
+                <div className="industry-opportunity-map__title">
+                  <strong className="industry-opportunity-map__name">{item.name}</strong>{item.code && <Tag>{item.code}</Tag>}
+                  {item.role && <Text className="industry-opportunity-map__role" type="secondary">{item.role}</Text>}
+                  <span className="industry-opportunity-map__completeness">{current ? `资料完整度 ${bounded(item.completeness_score)}%` : "旧版评分已停用"}</span>
+                </div>
+                {current && <Progress percent={bounded(item.completeness_score)} showInfo={false} size="small" />}
+                <Text type="secondary">盈利、估值、景气：未评估</Text>
+                {current && <p>角色、描述、指标、有效证据各占 25%；完整度不等于事实准确性。</p>}
+                {item.rationale && <p>{item.rationale}</p>}
               </div>
-              <Progress
-                percent={scoreValue(opportunity, "total_score")}
-                showInfo={false}
-                size="small"
-                strokeColor="var(--c-primary)"
-              />
-              <div className="industry-opportunity-map__scores">
-                {SCORE_ITEMS.map(({ key, label }) => (
-                  <span key={key}>{label} {scoreValue(opportunity, key)}</span>
-                ))}
-              </div>
-              {opportunity.rationale && (
-                <p>{opportunity.rationale}</p>
-              )}
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ol>
     </section>
   );

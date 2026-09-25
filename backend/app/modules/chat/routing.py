@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 
 from app.agentic.runtime.llm import create_chat_completion
+from app.financial_data.stock.profile.name_map import contains_known_stock_name
 from app.infrastructure.llm.prompting.parsing import extract_json_object
 from app.infrastructure.llm.tool_calling import AsyncLLMClient
 from app.modules.chat.prompts import (
@@ -19,17 +20,26 @@ DEFAULT_AGENT_NAMES = ("technical", "fundamental", "news", "risk", "macro")
 _KEYWORD_MAP: dict[str, tuple[str, ...]] = {
     "technical": (
         "K线", "K 线", "MACD", "RSI", "KDJ", "布林", "技术面", "均线", "趋势",
-        "支撑", "压力", "量价", "金叉", "死叉", "k线",
+        "支撑", "压力", "量价", "金叉", "死叉", "k线", "超买", "超卖", "背离",
+        "放量", "缩量", "突破", "破位",
     ),
     "fundamental": (
-        "PE", "PB", "估值", "财报", "财务", "ROE", "营收", "基本面",
+        "PE", "PB", "PS", "PEG", "估值", "财报", "财务", "ROE", "营收", "基本面",
         "市盈率", "市净率", "净利润", "分红", "选股", "筛选", "小于", "大于",
+        "毛利率", "扣非", "资产负债", "现金流", "高股息",
     ),
-    "news": ("新闻", "研报", "公告", "舆情", "热度", "情绪", "利好", "利空", "消息"),
-    "risk": ("风险", "止损", "仓位", "波动", "回撤", "预警", "风险评估"),
+    "news": (
+        "新闻", "研报", "公告", "舆情", "热度", "情绪", "利好", "利空", "消息",
+        "互动易", "e互动", "董秘", "催化剂", "传闻", "辟谣",
+    ),
+    "risk": (
+        "风险", "止损", "仓位", "波动", "回撤", "预警", "风险评估",
+        "解禁", "限售", "减持", "质押", "抛压", "排雷",
+    ),
     "macro": (
         "CPI", "PPI", "PMI", "M0", "M1", "M2", "GDP", "宏观", "通胀",
         "通缩", "货币供应", "降准", "降息", "利率", "货币政策", "经济数据",
+        "美债", "中美利差", "美元指数", "汇率", "大宗商品", "现货", "海关", "进出口",
     ),
 }
 
@@ -121,8 +131,10 @@ def classify_message(
     matched_agents = [agent_name for agent_name in matched_domains if agent_name in available]
     agent_names = [name for name in DEFAULT_AGENT_NAMES if name in available]
     has_stock_code = bool(extract_stock_codes(message))
+    has_stock_name = contains_known_stock_name(message)
+    is_stock_target = has_stock_code or has_stock_name
 
-    if not matched_domains and not has_stock_code:
+    if not matched_domains and not is_stock_target:
         if any(keyword in message for keyword in _FULL_ANALYSIS_KEYWORDS):
             return RoutingDecision(
                 agents=agent_names,
@@ -136,10 +148,13 @@ def classify_message(
             reasoning="根据领域关键词选择 Agent",
         )
 
+    # 纯股票标的查询（识别到股票代码或已知股票名称）：
+    # 默认个股核心四维度（技术、基本面、舆情、风控），避免无差别调用宏观全国指标
+    target_agents: list[str] = [name for name in ("technical", "fundamental", "news", "risk") if name in available]
     return RoutingDecision(
-        agents=agent_names,
+        agents=target_agents or agent_names,
         needs_llm_classification=True,
-        reasoning="仅识别到股票代码，需要模型判断分析维度",
+        reasoning="识别到股票标的，需要模型判断分析维度",
     )
 
 

@@ -1,4 +1,3 @@
-import random
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -7,7 +6,8 @@ import httpx
 from app.agentic.tools.application import get_application_tool_handlers
 from app.agentic.tools.packs.web.content import smart_truncate
 from app.agentic.tools.packs.web.url_security import parse_tweet_url
-from app.constants.http import USER_AGENTS
+from app.infrastructure.providers.provider_gateway import provider_gateway
+from app.infrastructure.providers.registry import get_provider
 
 
 async def fetch_tweet(
@@ -18,12 +18,12 @@ async def fetch_tweet(
     """Fetch a public X/Twitter post through FxTwitter."""
     username, tweet_id = parse_tweet_url(url)
     result: dict[str, Any] = {"url": url, "author": username, "tweet_id": tweet_id}
-    api_url = f"https://api.fxtwitter.com/{username}/status/{tweet_id}"
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.get(api_url, headers={"User-Agent": random.choice(USER_AGENTS)})
-            response.raise_for_status()
-            data = response.json()
+        data = await provider_gateway.call(
+            "twitter",
+            "fetch_tweet",
+            lambda: get_provider("twitter").fetch_tweet(username, tweet_id),
+        )
 
         if data.get("code") != 200:
             result["error"] = (

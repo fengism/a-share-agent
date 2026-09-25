@@ -13,10 +13,12 @@ describe("AppUserMenu", () => {
   it("shows identity and routes menu actions through existing callbacks", async () => {
     const onLogout = vi.fn().mockResolvedValue(undefined);
     const onSettings = vi.fn();
+    const onCapabilities = vi.fn();
     render(
       <AppUserMenu
         user={user}
         isMobile={false}
+        onCapabilities={onCapabilities}
         onSettings={onSettings}
         onLogout={onLogout}
       />,
@@ -27,8 +29,13 @@ describe("AppUserMenu", () => {
     fireEvent.click(trigger);
     expect(screen.getByText("管理员")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("menuitem", { name: "设置" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "系统设置" }));
     expect(onSettings).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: "系统能力" }));
+    expect(onCapabilities).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
     fireEvent.click(trigger);

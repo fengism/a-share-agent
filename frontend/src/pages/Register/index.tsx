@@ -106,7 +106,8 @@ export default function RegisterPage() {
           label="用户名"
           rules={[
             { required: true, message: "请输入用户名" },
-            { min: 3, max: 32, message: "用户名长度 3–32" },
+            { min: 3, max: 32, message: "用户名长度 3–32 位" },
+            { pattern: /^[a-zA-Z0-9_.-]+$/, message: "用户名仅支持字母、数字、点(.)、下划线(_)和中划线(-)" },
           ]}
         >
           <Input prefix={<UserOutlined />} placeholder="用户名" autoComplete="username" />
@@ -116,7 +117,8 @@ export default function RegisterPage() {
           label="密码"
           rules={[
             { required: true, message: "请输入密码" },
-            { min: 6, max: 128, message: "密码长度 6–128" },
+            { min: 8, max: 128, message: "密码长度至少 8 位" },
+            { pattern: /^(?=.*[A-Za-z])(?=.*\d)/, message: "密码必须同时包含字母和数字" },
           ]}
         >
           <Input.Password prefix={<LockOutlined />} placeholder="密码" autoComplete="new-password" />

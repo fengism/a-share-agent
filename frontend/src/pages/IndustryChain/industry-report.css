@@ -1160,6 +1160,8 @@
 
 .industry-opportunity-map > header {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -1169,6 +1171,7 @@
 
 .industry-opportunity-map > header > div {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 8px;
   color: var(--c-text-primary);
@@ -1182,27 +1185,17 @@
   list-style: none;
 }
 
-.industry-opportunity-map li {
+.industry-opportunity-map > ol > li {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 12px;
+  /* No rank cell: the sole content child must occupy the full row. */
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   padding: 16px;
   border-bottom: 1px solid var(--c-border);
 }
 
 .industry-opportunity-map li:last-child {
   border-bottom: 0;
-}
-
-.industry-opportunity-map__rank {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--c-primary) 12%, transparent);
-  color: var(--c-primary);
-  font-weight: var(--c-weight-semibold);
 }
 
 .industry-opportunity-map__content {
@@ -1217,19 +1210,40 @@
   gap: 6px;
 }
 
-.industry-opportunity-map__title > span:last-child {
+.industry-opportunity-map__title > * {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.industry-opportunity-map__name {
+  color: var(--c-text-primary);
+}
+
+.industry-opportunity-map__completeness {
   margin-left: auto;
   color: var(--c-primary);
   font-weight: var(--c-weight-semibold);
 }
 
-.industry-opportunity-map__scores {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin-top: 5px;
-  color: var(--c-text-secondary);
-  font-size: var(--c-font-xs);
+.industry-opportunity-map > header > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 575px) {
+  .industry-opportunity-map > header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .industry-opportunity-map__completeness {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
 }
 
 .industry-opportunity-map p {
@@ -1289,3 +1303,13 @@
   gap: 6px;
   margin-top: 12px;
 }
+
+.industry-decision-research {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+}
+.industry-decision-research > ul { padding-left: 20px; }
+.industry-decision-research > ul > li { margin-bottom: 16px; }
+.industry-decision-research p { line-height: 1.6; overflow-wrap: anywhere; }

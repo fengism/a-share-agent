@@ -113,6 +113,8 @@ class UserContextMiddleware:
 
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_QUIET_POLL_PATHS = frozenset({"/api/workflows/active"})
+_SLOW_POLL_MS = 1000
 
 
 class RequestObservabilityMiddleware:
@@ -129,6 +131,7 @@ class RequestObservabilityMiddleware:
         request_id_reset = set_current_request_id(request_id)
         started_at = time.perf_counter()
         status = 500
+        failed = False
 
         async def send_with_request_id(message):
             nonlocal status
@@ -141,6 +144,10 @@ class RequestObservabilityMiddleware:
 
         try:
             await self.app(scope, receive, send_with_request_id)
+        except BaseException:
+            # A stream may fail after sending 200; never demote that failure.
+            failed = True
+            raise
         finally:
             duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
             route = scope.get("route")
@@ -149,18 +156,30 @@ class RequestObservabilityMiddleware:
             metric_path = route_path or "<unmatched>"
             method = scope.get("method", "")
             user_id = scope.get("state", {}).get("user_id")
-            metrics.record_request(method, metric_path, status, duration_ms)
-            logger.info(
-                "request completed request_id=%s method=%s path=%s route=%s status=%s duration_ms=%.2f user_id=%s",
-                request_id,
-                method,
-                request_path,
-                metric_path,
-                status,
-                duration_ms,
-                user_id,
-            )
-            reset_current_request_id(request_id_reset)
+            level = logging.INFO
+            if failed or status >= 500:
+                level = logging.ERROR
+            elif status >= 400:
+                level = logging.WARNING
+            elif method == "GET" and request_path in _QUIET_POLL_PATHS and 200 <= status < 300:
+                # Only short polling requests are quiet; long-lived SSE is not a slow poll.
+                level = logging.WARNING if duration_ms >= _SLOW_POLL_MS else logging.DEBUG
+            try:
+                metrics.record_request(method, metric_path, status, duration_ms)
+                logger.log(
+                    level,
+                    "request %s request_id=%s method=%s path=%s route=%s status=%s duration_ms=%.2f user_id=%s",
+                    "failed" if failed else "completed",
+                    request_id,
+                    method,
+                    request_path,
+                    metric_path,
+                    status,
+                    duration_ms,
+                    user_id,
+                )
+            finally:
+                reset_current_request_id(request_id_reset)
 
 
 def _extract_auth_context(

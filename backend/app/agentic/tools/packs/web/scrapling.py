@@ -40,6 +40,7 @@ _CHALLENGE_TITLES = frozenset(
 _CHALLENGE_TITLE_SUFFIXES = ("安全验证", "访问验证", "人机验证")
 _CHALLENGE_MARKERS = (
     "attention required",
+    "acw_sc__v2",
     "cf-chl-",
     "cf_app_waf",
     "checking your browser",

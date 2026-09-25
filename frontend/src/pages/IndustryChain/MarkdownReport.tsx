@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { readableReferences } from "./reportPresentation";
 import { tryExtractFromJson } from "./reportHelpers";
 import "./industry-report.css";
 
@@ -14,6 +15,8 @@ export default function MarkdownReport({ content }: { content: string }) {
 
   const codeBlockMatch = text.match(/^```(?:markdown|md)?\s*([\s\S]*?)```$/);
   if (codeBlockMatch) text = codeBlockMatch[1].trim();
+
+  text = readableReferences(text);
 
   return (
     <div className="industry-markdown">

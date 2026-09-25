@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator, AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
+from contextlib import aclosing
 from dataclasses import dataclass
 
 from app.agentic.events import AgentEvent
@@ -22,7 +23,7 @@ from app.modules.chat.schemas import ChatRequest
 logger = logging.getLogger(__name__)
 
 _GLOBAL_LIMIT_KEY = 0
-ChatAgentRunner = Callable[..., AsyncIterator[AgentEvent]]
+ChatAgentRunner = Callable[..., AsyncGenerator[AgentEvent, None]]
 
 
 class ChatConcurrencyLimitError(RuntimeError):
@@ -125,13 +126,14 @@ class ChatStreamService:
             try:
                 timeout_seconds = max(1, int(settings.chat_total_timeout_seconds))
                 async with asyncio.timeout(timeout_seconds):
-                    async for event in self._agent_runner(
+                    async with aclosing(self._agent_runner(
                         request.message,
                         request.history,
                         request.agent_names,
                         request.skill_names,
-                    ):
-                        await queue.put(event)
+                    )) as stream:
+                        async for event in stream:
+                            await queue.put(event)
             except TimeoutError:
                 await queue.put(AgentEvent(type="error", error="对话处理超时，请缩小问题范围后重试"))
             except asyncio.CancelledError:

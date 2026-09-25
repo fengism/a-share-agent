@@ -1,3 +1,4 @@
+import { appendProcessUpdate, finalizeChatProcess } from "../features/chat/chatProcess";
 import type { ToolCallDisplay } from "../types/chat";
 import {
   nextChatMessageId,
@@ -25,6 +26,8 @@ type ChatMessageSlice = Pick<
   | "setReasoningContent"
   | "appendToReasoning"
   | "setAssistantStatus"
+  | "addAssistantProcessUpdate"
+  | "setAssistantProcessOutcome"
   | "setStreaming"
   | "setActiveRun"
   | "setSyncStatus"
@@ -169,16 +172,48 @@ export function createChatMessageSlice(
         messages: updateMessageById(state.messages, messageId, (message) => ({
           ...message,
           reasoningContent,
+          reasoningBlocks: undefined,
         })),
       }));
     },
 
-    appendToReasoning: (messageId, text) => {
+    appendToReasoning: (messageId, text, source) => {
       if (!text) return;
+      set((state) => ({
+        messages: updateMessageById(state.messages, messageId, (message) => {
+          const start = message.reasoningContent?.length ?? 0;
+          const blocks = [...(message.reasoningBlocks ?? [])];
+          const last = blocks[blocks.length - 1];
+          if (source) {
+            if (last?.block_id === source.block_id && last.end === start) {
+              blocks[blocks.length - 1] = { ...last, end: start + text.length };
+            } else {
+              blocks.push({ ...source, start, end: start + text.length });
+            }
+          }
+          return {
+            ...message,
+            reasoningContent: (message.reasoningContent || "") + text,
+            reasoningBlocks: blocks.length ? blocks : undefined,
+          };
+        }),
+      }));
+    },
+
+    addAssistantProcessUpdate: (messageId, update) => {
       set((state) => ({
         messages: updateMessageById(state.messages, messageId, (message) => ({
           ...message,
-          reasoningContent: (message.reasoningContent || "") + text,
+          processUpdates: appendProcessUpdate(message.processUpdates, update),
+        })),
+      }));
+    },
+
+    setAssistantProcessOutcome: (messageId, outcome) => {
+      set((state) => ({
+        messages: updateMessageById(state.messages, messageId, (message) => ({
+          ...message,
+          processOutcome: outcome,
         })),
       }));
     },
@@ -188,6 +223,7 @@ export function createChatMessageSlice(
         messages: updateMessageById(state.messages, messageId, (message) => ({
           ...message,
           status: status || undefined,
+          processUpdates: appendProcessUpdate(message.processUpdates, { type: "status", content: status }),
         })),
       }));
     },
@@ -222,7 +258,7 @@ export function createChatMessageSlice(
       return { message: prepared.message, history: prepared.history };
     },
 
-    finalizeMessage: (messageId) => {
+    finalizeMessage: (messageId, outcome) => {
       set((state) => {
         const target = state.messages.find((message) => message.id === messageId);
         if (!target || target.isStreaming === false) return state;
@@ -231,26 +267,9 @@ export function createChatMessageSlice(
           : state.history;
         return {
           history,
-          messages: updateMessageById(state.messages, messageId, (message) => ({
-            ...message,
-            isStreaming: false,
-            status: undefined,
-            plan: message.plan
-              ? {
-                  ...message.plan,
-                  steps: message.plan.steps.map((step) => (
-                    step.status === "pending" || step.status === "running"
-                      ? { ...step, status: "cancelled", detail: "执行已停止" }
-                      : step
-                  )),
-                }
-              : undefined,
-            toolCalls: message.toolCalls?.map((toolCall) => (
-              toolCall.isExecuting
-                ? { ...toolCall, isExecuting: false, isCancelled: true }
-                : toolCall
-            )),
-          })),
+          messages: updateMessageById(state.messages, messageId, (message) => (
+            finalizeChatProcess(message, outcome)
+          )),
         };
       });
       persist();

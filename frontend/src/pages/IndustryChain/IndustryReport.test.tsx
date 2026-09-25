@@ -13,6 +13,7 @@ import type { IndustryChainResult } from "../../types/stock";
 import IndustryReport from "./IndustryReport";
 
 vi.mock("@ant-design/icons", () => ({
+  FileSearchOutlined: () => <span />,
   AimOutlined: () => <span />,
   ApartmentOutlined: () => <span />,
   BankOutlined: () => <span />,
@@ -105,7 +106,7 @@ describe("IndustryReport", () => {
       sources: [{ title: "服务器市场报告", publisher: "IDC", date: "2025" }],
       evidence_catalog: [{
         evidence_id: "ev_report",
-        tool_name: "fetch_url",
+        tool_name: "web_fetch",
         arguments: '{"url":"https://example.com/report"}',
         title: "服务器产业白皮书",
         source_urls: ["https://example.com/report"],
@@ -155,7 +156,7 @@ describe("IndustryReport", () => {
     expect(screen.getByText("关键趋势与催化剂")).toBeInTheDocument();
     expect(screen.getByText("算电协同")).toBeInTheDocument();
     expect(screen.getByText("运营商集采")).toBeInTheDocument();
-    expect(screen.getByText("英维克")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "关系传导与公司验证" })).getByText("英维克")).toBeInTheDocument();
     expect(screen.getByText("数据来源与口径")).toBeInTheDocument();
     expect(screen.getByText(/研究范围：全球 · 2026-02-16 至 2026-08-18 · 全部公开公司/)).toBeInTheDocument();
     expect(screen.getByText("重点公司")).toBeInTheDocument();
@@ -166,7 +167,8 @@ describe("IndustryReport", () => {
     expect(screen.getByRole("link", { name: "来源：公司公告" })).toHaveAttribute("href", "https://example.com/chip");
     expect(screen.getByText("工具证据目录")).toBeInTheDocument();
     expect(screen.getByText("服务器产业白皮书")).toBeInTheDocument();
-    expect(screen.getByText("ev_report")).toBeInTheDocument();
+    expect(screen.queryByText(/ev_report/)).not.toBeInTheDocument();
+    expect(screen.getByText("资料 1")).toBeInTheDocument();
     expect(screen.getByText(/共 8 次调用 · 去重后 6 条 · 合成使用 4 条/)).toBeInTheDocument();
 
     const detailedResearch = screen.getByRole("region", { name: "详细分析" });
@@ -270,7 +272,7 @@ describe("IndustryReport", () => {
       }],
       evidence_catalog: [{
         evidence_id: "ev_long_title",
-        tool_name: "fetch_url",
+        tool_name: "web_fetch",
         arguments: JSON.stringify({ url: longUrl }),
         title: longEvidenceTitle,
         source_urls: [longUrl],
@@ -410,7 +412,8 @@ describe("IndustryReport", () => {
       ),
     ).toHaveLength(2);
     expect(screen.getAllByText(`${longCompany} ↗`).every((company) => company.classList.contains("industry-chain-node__tag"))).toBe(true);
-    expect(screen.getByText(`证据 ${longEvidenceId}`)).toHaveClass("industry-wrap-tag");
+    expect(screen.queryByText(new RegExp(longEvidenceId))).not.toBeInTheDocument();
+    expect(screen.getByText("关联 1 项资料")).toHaveClass("industry-wrap-tag");
 
     fireEvent.click(screen.getByText("📋 环节清单"));
 
@@ -499,10 +502,11 @@ describe("IndustryReport", () => {
     fireEvent.click(screen.getByText("查看 1 项变化"));
     expect(await screen.findByText("新增公司")).toBeInTheDocument();
 
-    expect(screen.getByRole("region", { name: "投资研究地图" })).toBeInTheDocument();
-    expect(screen.getByText("研究优先级，不构成买卖建议")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "公司研究资料" })).toBeInTheDocument();
+    expect(screen.getByText("按资料完整度排列，不代表投资价值或收益预期")).toBeInTheDocument();
     expect(screen.getByText("示例公司")).toBeInTheDocument();
-    expect(screen.getByText("73 分")).toBeInTheDocument();
+    expect(screen.getByText("旧版评分已停用")).toBeInTheDocument();
+    expect(screen.queryByText("73 分")).not.toBeInTheDocument();
 
     expect(screen.getByRole("heading", { name: "运行信息" })).toBeInTheDocument();
     expect(screen.getByText("12.5 s")).toBeInTheDocument();

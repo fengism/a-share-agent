@@ -11,11 +11,15 @@ router = APIRouter()
 
 
 @router.get("/analysis-page/{code}", response_model=AnalysisPageData)
-async def get_analysis_page(code: str, user: AuthenticatedUser = Depends(require_active_user)):
+async def get_analysis_page(
+    code: str,
+    include_market_data: bool = True,
+    user: AuthenticatedUser = Depends(require_active_user),
+):
     """聚合分析页面所需的所有数据，并发加载。
 
     将 stock/info、stock/kline、stock/intraday、stock/valuation、analysis/result
-    合并为一个响应，减少前端页面加载时的 HTTP 往返次数。
+    合并为一个响应；include_market_data=false 时只加载历史分析，行情由个股查询缓存复用。
 
     Param:
         code: 6 位股票代码
@@ -27,5 +31,6 @@ async def get_analysis_page(code: str, user: AuthenticatedUser = Depends(require
         code,
         user_id=user["id"],
         cache_ttl=settings.cache_ttl_analysis,
+        include_market_data=include_market_data,
         section_timeout_seconds=settings.analysis_page_section_timeout_seconds,
     )

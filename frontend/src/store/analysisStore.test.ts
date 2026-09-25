@@ -124,10 +124,25 @@ describe("analysisStore ownership", () => {
 
     useAnalysisStore.getState().setRunError(identity, "stale");
     useAnalysisStore.getState().finishRun(identity);
+    useAnalysisStore.getState().stopRun(identity, "cancelled");
 
     const state = useAnalysisStore.getState();
     expect(state.activeRun).toEqual(replacement);
     expect(state.analysisError).toBeNull();
     expect(state.isAnalyzing).toBe(true);
   });
+  it("starts a fresh run without retaining the cancelled job identity or process", () => {
+    const store = useAnalysisStore.getState();
+    store.beginRun(identity);
+    store.setRunJobId(identity, "old-job");
+    store.stopRun(identity, "cancelled");
+    expect(useAnalysisStore.getState().agentProcess.termination).toBe("cancelled");
+    store.beginRun({ ...identity, runId: "new-run" });
+    expect(useAnalysisStore.getState()).toMatchObject({
+      jobId: "", isAnalyzing: true, isCancelling: false, analysisError: null,
+      analysisResult: null, analysisStages: [], agentProcess: { status: "", toolCalls: [], rounds: [] },
+    });
+    expect(useAnalysisStore.getState().agentProcess.termination).toBeUndefined();
+  });
+
 });

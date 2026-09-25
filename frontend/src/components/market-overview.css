@@ -61,15 +61,15 @@
 }
 
 [data-theme="stellar-blue"] .market-board__indices {
-  border: 1px solid rgba(32, 198, 229, 0.24);
-  background: linear-gradient(180deg, rgba(16, 24, 38, 0.96) 0%, rgba(11, 17, 28, 0.98) 100%);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 8px 26px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="light"] .market-board__indices {
   border: 1px solid var(--c-border);
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.04);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(44, 34, 20, 0.04);
 }
 
 .market-board-index {
@@ -87,8 +87,8 @@
 }
 
 [data-theme="stellar-blue"] .market-board-index {
-  border-right: 1px solid rgba(32, 198, 229, 0.12);
-  border-bottom: 1px solid rgba(32, 198, 229, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="light"] .market-board-index {
@@ -100,8 +100,8 @@
 .market-board-index:nth-last-child(-n + 3) { border-bottom: 0; }
 
 [data-theme="stellar-blue"] .market-board-index:hover {
-  background: rgba(32, 198, 229, 0.06);
-  box-shadow: inset 0 0 20px rgba(32, 198, 229, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: none;
 }
 
 [data-theme="light"] .market-board-index:hover {
@@ -174,8 +174,8 @@
 
 [data-theme="light"] .market-board-index__identity small {
   color: var(--c-text-secondary);
-  background: #eef2f6;
-  border: 1px solid #e2e8f0;
+  background: var(--c-nested-bg);
+  border: 1px solid var(--c-border);
 }
 
 .market-board-index__amount {
@@ -222,15 +222,15 @@
 }
 
 [data-theme="stellar-blue"] .market-board__metrics {
-  border: 1px solid rgba(32, 198, 229, 0.24);
-  background: linear-gradient(180deg, rgba(16, 24, 38, 0.96) 0%, rgba(11, 17, 28, 0.98) 100%);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 8px 26px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="light"] .market-board__metrics {
   border: 1px solid var(--c-border);
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.04);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(44, 34, 20, 0.04);
 }
 
 .market-board-metric {
@@ -243,11 +243,11 @@
 }
 
 [data-theme="stellar-blue"] .market-board-metric {
-  border-right: 1px solid rgba(32, 198, 229, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="stellar-blue"] .market-board-metric:hover {
-  background: rgba(32, 198, 229, 0.06);
+  background: rgba(255, 255, 255, 0.035);
 }
 
 [data-theme="light"] .market-board-metric {
@@ -317,25 +317,25 @@
 }
 
 [data-theme="stellar-blue"] .market-board-panel {
-  border: 1px solid rgba(32, 198, 229, 0.22);
-  background: linear-gradient(180deg, rgba(16, 24, 38, 0.96) 0%, rgba(11, 17, 28, 0.98) 100%);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="stellar-blue"] .market-board-panel:hover {
-  border-color: rgba(32, 198, 229, 0.4);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 12px 30px rgba(0, 0, 0, 0.38), 0 0 14px rgba(32, 198, 229, 0.14);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 [data-theme="light"] .market-board-panel {
   border: 1px solid var(--c-border);
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.04);
+  background: var(--c-card-bg);
+  box-shadow: 0 1px 3px rgba(44, 34, 20, 0.04);
 }
 
 [data-theme="light"] .market-board-panel:hover {
-  border-color: rgba(8, 127, 152, 0.35);
-  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
+  border-color: var(--c-focus-ring);
+  box-shadow: 0 4px 12px rgba(44, 34, 20, 0.06);
 }
 
 .market-board-panel--emotion,
@@ -349,12 +349,12 @@
 }
 
 [data-theme="stellar-blue"] .market-board-panel__header {
-  background: rgba(10, 16, 26, 0.65);
-  border-bottom: 1px solid rgba(32, 198, 229, 0.14);
+  background: var(--c-nested-bg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="light"] .market-board-panel__header {
-  background: #f8fafc;
+  background: var(--c-nested-bg);
   border-bottom: 1px solid var(--c-border);
 }
 
@@ -362,8 +362,8 @@
 .market-board-panel__title strong { font-size: var(--c-font-md); font-weight: var(--c-weight-semibold); white-space: nowrap; }
 .market-board-panel__title > span:last-child:not(.market-board-panel__icon) { overflow: hidden; color: var(--c-text-muted); font-size: var(--c-font-xs); text-overflow: ellipsis; white-space: nowrap; }
 .market-board-panel__icon {
-  color: var(--c-accent);
-  filter: drop-shadow(0 0 6px rgba(32, 198, 229, 0.6));
+  color: var(--c-primary);
+  filter: none;
 }
 
 [data-theme="light"] .market-board-panel__icon {
@@ -389,7 +389,7 @@
 }
 
 [data-theme="stellar-blue"] .market-board-emotion__score {
-  border-right: 1px solid rgba(32, 198, 229, 0.14);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="light"] .market-board-emotion__score {
@@ -404,8 +404,8 @@
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  color: var(--c-accent);
-  text-shadow: 0 0 14px rgba(32, 198, 229, 0.5);
+  color: var(--c-primary);
+  text-shadow: none;
 }
 
 [data-theme="light"] .market-board-emotion__score > strong {
@@ -415,7 +415,7 @@
 
 .market-board-emotion__score > small {
   margin-top: 4px;
-  color: var(--c-accent);
+  color: var(--c-primary);
   font-size: var(--c-font-sm);
   font-weight: var(--c-weight-semibold);
 }
@@ -443,7 +443,7 @@
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--c-down), var(--c-warning), var(--c-up));
-  box-shadow: 0 0 10px rgba(32, 198, 229, 0.4);
+  box-shadow: none;
 }
 
 [data-theme="light"] .market-board-emotion__meter > span {

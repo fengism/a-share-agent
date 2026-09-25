@@ -1,4 +1,4 @@
-import { useQuery, type QueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, type QueryClient } from "@tanstack/react-query";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { API_TIMEOUTS } from "../client";
 import { asApiModel, openApiGet } from "../openapiClient";
@@ -18,6 +18,7 @@ import type {
   StockBulletinPage,
   StockBusinessIntro,
   StockFundFlowItem,
+  StockFundFlowPage,
   StockReportPage,
   StockSearchItem,
   StockSentiment,
@@ -25,14 +26,14 @@ import type {
   TechnicalIndicators,
 } from "../../types/stock";
 
-export function useStockInfo(code: string) {
+export function useStockInfo(code: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.stock.info(code),
     queryFn: () => openApiGet("/api/stock/{code}/info", {
       path: { code },
     }),
     select: asApiModel<StockBasicInfo>(),
-    enabled: !!code,
+    enabled: !!code && (options.enabled ?? true),
     staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
   });
 }
@@ -97,7 +98,7 @@ export function useKlineData(
   });
 }
 
-export function useStockIntraday(code: string, initialData?: IntradayData | null) {
+export function useStockIntraday(code: string, initialData?: IntradayData | null, options: { enabled?: boolean } = {}) {
   const isTradingSession = useAStockTradingSession();
   return useQuery({
     queryKey: queryKeys.stock.intraday(code),
@@ -105,7 +106,7 @@ export function useStockIntraday(code: string, initialData?: IntradayData | null
       path: { code },
     }),
     select: asApiModel<IntradayData>(),
-    enabled: Boolean(code),
+    enabled: Boolean(code) && (options.enabled ?? true),
     initialData: initialData ?? undefined,
     staleTime: QUERY_CACHE_POLICIES.stockIntraday.staleMs,
     refetchInterval: isTradingSession ? QUERY_CACHE_POLICIES.stockIntraday.pollMs : false,
@@ -280,6 +281,7 @@ export function useStockFundFlow(code: string) {
     queryKey: queryKeys.stock.fundFlow(code),
     queryFn: () => openApiGet("/api/stock/{code}/fund-flow", {
       path: { code },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<StockFundFlowItem[]>(),
     enabled: !!code,
@@ -287,16 +289,71 @@ export function useStockFundFlow(code: string) {
   });
 }
 
-export function useAnalysisPageData(code: string, options: { enabled?: boolean } = {}) {
+export function useStockFundFlowPages(code: string) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.stock.fundFlowPages(code),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => openApiGet("/api/stock/{code}/fund-flow-pages", {
+      path: { code }, query: pageParam ? { cursor: pageParam } : undefined,
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }).then(asApiModel<StockFundFlowPage>()),
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
+    enabled: !!code,
+    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
+    retry: false,
+  });
+}
+
+export function useAnalysisSnapshot(code: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.stock.analysisPage(code),
     queryFn: () => openApiGet("/api/stock/analysis-page/{code}", {
       path: { code },
+      query: { include_market_data: false },
     }),
     select: asApiModel<AnalysisPageData>(),
     enabled: !!code && (options.enabled ?? true),
     staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
   });
+}
+
+export function useAnalysisPageData(code: string, options: { enabled?: boolean } = {}) {
+  // Share identity, live price and headline valuation with the stock profile.
+  // The analysis endpoint only loads the user's cached research result.
+  const info = useStockInfo(code, options);
+  const intraday = useStockIntraday(code, undefined, options);
+  const snapshot = useAnalysisSnapshot(code, options);
+  const unavailable = new Set<NonNullable<AnalysisPageData["unavailable_sections"]>[number]>(
+    (snapshot.data?.unavailable_sections ?? []).filter((section) => section === "cached_analysis"),
+  );
+  if (snapshot.isError) unavailable.add("cached_analysis");
+  if (info.isError) unavailable.add("stock_info");
+  if (intraday.isError) unavailable.add("intraday");
+  const data: AnalysisPageData | undefined = snapshot.data || info.data ? {
+    stock_info: info.data ?? null,
+    intraday: intraday.data ?? null,
+    valuation: info.data ? {
+      code,
+      pe_ttm: info.data.pe_ttm,
+      pb: info.data.pb,
+      ps_ttm: null,
+      peers: [],
+    } : null,
+    cached_analysis: snapshot.data?.cached_analysis ?? null,
+    kline: null,
+    key_levels: null,
+    chip_distribution: null,
+    partial: unavailable.size > 0,
+    unavailable_sections: [...unavailable],
+  } : undefined;
+  return {
+    ...snapshot,
+    data,
+    isLoading: snapshot.isLoading || info.isLoading,
+    isError: snapshot.isError || info.isError,
+    error: snapshot.error ?? info.error,
+    refetch: () => Promise.all([snapshot.refetch(), info.refetch(), intraday.refetch()]),
+  };
 }
 
 export async function downloadAnalysisPdf(code: string, date?: string): Promise<void> {

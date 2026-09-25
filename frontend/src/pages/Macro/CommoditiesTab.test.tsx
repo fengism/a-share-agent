@@ -57,6 +57,8 @@ vi.mock("../../api/queries", () => ({
 describe("CommoditiesTab", () => {
   it("renders commodity items and categories", () => {
     render(<CommoditiesTab />);
+    expect(screen.getByText("大宗商品期货连续 / 主力合约行情")).toBeInTheDocument();
+    expect(screen.getByText(/不是现货采购价/)).toBeInTheDocument();
     expect(screen.getByText("碳酸锂连续")).toBeInTheDocument();
     expect(screen.getByText("电解铜连续")).toBeInTheDocument();
     expect(screen.getAllByText("新能源金属").length).toBeGreaterThanOrEqual(1);

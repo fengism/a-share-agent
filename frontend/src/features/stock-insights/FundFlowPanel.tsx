@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from "react";
-import { Alert, Card, Col, Row, Table, Typography, Tag } from "antd";
+import { Alert, Button, Card, Col, Row, Table, Typography, Tag } from "antd";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
-import { useStockFundFlow } from "../../api/queries";
+import { useStockFundFlowPages } from "../../api/queries";
 import ResponsiveMetricGrid from "../../components/ResponsiveMetricGrid";
 import SectionDataState from "../../components/SectionDataState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
@@ -44,7 +44,10 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
   const c = useColors();
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const { cardStyle } = useStyles();
-  const { data, isLoading, error, refetch } = useStockFundFlow(code);
+  const query = useStockFundFlowPages(code);
+  const { isLoading, error, refetch } = query;
+  const data = useMemo(() => query.data?.pages.flatMap((page) => page.items), [query.data]);
+  const total = query.data?.pages[0]?.total ?? 0;
   const net = useMemo<NetColors>(
     () => ({ up: c.up, down: c.down, muted: c.textMuted }),
     [c.down, c.textMuted, c.up],
@@ -166,7 +169,7 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
   return (
     <SectionDataState
       isLoading={isLoading}
-      error={error}
+      error={data?.length ? null : error}
       onRetry={() => refetch()}
       isEmpty={!data || data.length === 0}
       emptyText="暂无资金流向数据"
@@ -180,6 +183,31 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
           type="warning"
           showIcon
           title="资金流上游暂不可用，当前展示最近一次成功缓存"
+        />
+      ) : null}
+      {recentData.some((item) => item.source === "tdxhub_stock_fund_flow_estimate") ? (
+        <Alert
+          type="info"
+          showIcon
+          title="备选数据源：TDXHub 分笔估算"
+          description="按分笔成交金额分档计算，非交易所官方资金流，与百度、东方财富口径可能不同；主力、大单等仅为金额分档，不代表交易者身份。"
+        />
+      ) : null}
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <Text type="secondary">已加载 {recentData.length} / {total} 个交易日 · 每批最多 20 日</Text>
+        {query.hasNextPage && !isExportingPdf ? (
+          <Button aria-label={query.isFetchNextPageError ? "重试加载更多" : "加载更多"} loading={query.isFetchingNextPage} onClick={() => { void query.fetchNextPage(); }}>
+            {query.isFetchNextPageError ? "重试加载更多" : "加载更多"}
+          </Button>
+        ) : null}
+      </div>
+      {error && data?.length ? (
+        <Alert
+          type="warning"
+          showIcon
+          title="后续批次加载失败，已加载数据仍可查看"
+          description={error instanceof Error ? error.message : "请稍后重试"}
+          action={<Button onClick={() => { void refetch(); }}>重新加载</Button>}
         />
       ) : null}
       {/* Summary cards for latest day */}
@@ -202,7 +230,7 @@ export default function FundFlowPanel({ code, isExportingPdf = false }: { code: 
       {/* Bar chart */}
       {chartOption && (
         <Card size="small" style={cardStyle} styles={{ body: { padding: 8 } }}>
-          <Text style={{ fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-semibold)", color: c.textPrimary, marginBottom: 4, display: "block", paddingLeft: 4 }}>主力净流入走势（近60日）</Text>
+          <Text style={{ fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-semibold)", color: c.textPrimary, marginBottom: 4, display: "block", paddingLeft: 4 }}>主力净流入走势（已加载 {recentData.length} 日）</Text>
           <ReactEChartsCore echarts={echarts} option={chartOption} style={{ height: 220 }} notMerge />
         </Card>
       )}

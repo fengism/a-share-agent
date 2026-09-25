@@ -15,6 +15,7 @@ import pandas as pd
 import urllib3
 
 from app.infrastructure.http.client import provider_get, provider_post
+from app.infrastructure.providers import exchange_etf
 
 SSE_STOCK_LIST_URL = "https://query.sse.com.cn/sseQuery/commonQuery.do"
 SZSE_STOCK_LIST_URL = "https://www.szse.cn/api/report/ShowReport/data"
@@ -352,6 +353,10 @@ class OfficialExchangeProvider:
     """Load listed-stock metadata directly from the three official exchanges."""
 
     name = "exchange"
+
+    fetch_sse_etf_shares = staticmethod(exchange_etf.fetch_sse_etf_shares)
+    fetch_szse_etf_share_history = staticmethod(exchange_etf.fetch_szse_etf_share_history)
+    fetch_szse_etf_current_shares = staticmethod(exchange_etf.fetch_szse_etf_current_shares)
 
     def fetch_stock_names_sh(self, code: str | None = None) -> pd.DataFrame:
         records: list[dict[str, Any]] = []

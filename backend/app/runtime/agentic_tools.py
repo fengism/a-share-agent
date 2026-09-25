@@ -39,6 +39,12 @@ async def _search_stocks(query: str) -> Any:
     return [item.model_dump() for item in result]
 
 
+async def _get_stock_documents(**kwargs: Any) -> Any:
+    from app.financial_data.stock import public as stock_data
+
+    return await stock_data.get_stock_documents(**kwargs)
+
+
 async def _get_stock_info(code: str) -> Any:
     from app.financial_data.stock import public as stock_data
 
@@ -333,6 +339,7 @@ def configure_application_tools() -> None:
             get_stock_financial=_get_stock_financial,
             get_stock_financial_metrics=_get_stock_financial_metrics,
             get_stock_revenue_breakdown=_get_stock_revenue_breakdown,
+            get_stock_documents=_get_stock_documents,
             get_stock_info=_get_stock_info,
             get_stock_kline=_get_stock_kline,
             get_stock_news=_get_stock_news,

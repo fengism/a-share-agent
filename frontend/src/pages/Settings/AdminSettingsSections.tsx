@@ -3,6 +3,8 @@ import AdminResetCard from "../../components/AdminResetCard";
 import { BotConfigCard, DataSourceCookiesCard, FredConfigCard, TwitterConfigCard } from "./ConfigCards";
 import BotJobManagerCard from "./BotJobManagerCard";
 import InviteManagerCard from "./InviteManagerCard";
+import SecurityAuditCard from "./SecurityAuditCard";
+import UserManagerCard from "./UserManagerCard";
 import type { ConfigSectionProps } from "./sectionTypes";
 
 interface DataSourcesSettingsSectionProps extends ConfigSectionProps {
@@ -53,10 +55,12 @@ export function AdminSettingsSection({
   return (
     <section aria-labelledby="admin-settings-title">
       <h3 id="admin-settings-title" style={sectionTitleStyle}>管理员工具</h3>
+      <UserManagerCard />
+      <InviteManagerCard />
+      <SecurityAuditCard />
+      <AdminResetCard />
       <BotConfigCard form={form} onChange={onChange} isSaving={isSaving} onSave={onSaveBot} />
       <BotJobManagerCard />
-      <InviteManagerCard />
-      <AdminResetCard />
     </section>
   );
 }

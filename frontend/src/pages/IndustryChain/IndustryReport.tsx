@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   ApartmentOutlined,
   CloudUploadOutlined,
@@ -15,9 +15,13 @@ import { queryKeys } from "../../api/queryKeys";
 import { downloadIndustryChainPdfFromData, useMineIndustryChainAtlas } from "../../api/queryHooks/workflows";
 import { useColors, useStyles } from "../../styles/ui";
 import type { IndustryChainChart, IndustryChainResult } from "../../types/stock";
+import { reportPresentation } from "./reportPresentation";
 import IndustryConclusion from "./IndustryConclusion";
 import IndustryReportChanges from "./IndustryReportChanges";
 import IndustryOpportunityMap from "./IndustryOpportunityMap";
+import IndustryEvidenceChecks from "./IndustryEvidenceChecks";
+import IndustryResearchTheses from "./IndustryResearchTheses";
+import IndustryDecisionResearch from "./IndustryDecisionResearch";
 import IndustryResearchSections, { IndustryResearchAudit } from "./IndustryResearchSections";
 import MarkdownReport from "./MarkdownReport";
 import LazyIndustryChart from "./LazyIndustryChart";
@@ -73,7 +77,7 @@ function MineToAtlasButton({ name, archiveId }: { name: string; archiveId: strin
 }
 
 export default function IndustryReport({
-  result,
+  result: rawResult,
   activeName,
   archiveId,
   defaultReceiver,
@@ -81,6 +85,7 @@ export default function IndustryReport({
   pushResult,
   onPush,
 }: IndustryReportProps) {
+  const result = useMemo(() => reportPresentation(rawResult), [rawResult]);
   const colors = useColors();
   const { cardStyle } = useStyles();
   const isNarrow = useMediaQuery("(max-width: 768px)");
@@ -92,7 +97,7 @@ export default function IndustryReport({
     try {
       setIsExportingPdf(true);
       message.loading({ content: "正在生成产业链 PDF 研报...", key: "export-industry-pdf" });
-      await downloadIndustryChainPdfFromData(result);
+      await downloadIndustryChainPdfFromData(rawResult);
       message.success({ content: "产业链 PDF 研报导出成功", key: "export-industry-pdf" });
     } catch (err: unknown) {
       const detail = err instanceof Error ? `: ${err.message}` : "";
@@ -300,6 +305,8 @@ export default function IndustryReport({
 
       <IndustryConclusion result={result} />
 
+      <IndustryResearchTheses result={result} />
+
       <IndustryReportChanges changes={result.changes} />
 
       <IndustryOpportunityMap opportunities={result.opportunities} />
@@ -311,6 +318,7 @@ export default function IndustryReport({
           <small>{detailModuleCount} 个模块</small>
         </header>
 
+        <IndustryDecisionResearch key={result.archive_id || result.name} result={result} />
         <IndustryResearchSections result={result} />
 
         {result.charts.length > 0 && (
@@ -371,6 +379,7 @@ export default function IndustryReport({
           <h2 id="industry-audit-heading">研究依据</h2>
           <small>{auditItemCount} 项依据</small>
         </header>
+        <IndustryEvidenceChecks result={result} />
         <IndustryResearchAudit result={result} />
       </section>
 

@@ -89,11 +89,11 @@ export default function Macro() {
             <Title level={3} className="macro-page__title">宏观经济</Title>
           </div>
           <Paragraph className="macro-page__description">
-            聚合国内产出增长、物价通胀、景气周期、海关出海量价、大宗工业品现货基差、中美利差与全球流动性利率，一站式洞察宏观大周期。
+            聚合国内产出增长、物价通胀、景气周期、全国进出口总量、大宗商品期货行情、中美利差与全球流动性利率，一站式洞察宏观大周期。
           </Paragraph>
           <div className="macro-page__scope" aria-label="数据覆盖范围">
             <span>10 大主题</span>
-            <span>大宗现货 & 海关出海</span>
+            <span>商品期货 & 全国进出口</span>
             <span>全球利差 & 美债折现率</span>
           </div>
         </div>
@@ -165,8 +165,8 @@ export default function Macro() {
           },
           {
             key: "commodities",
-            label: <span><FireOutlined /> 大宗商品现货</span>,
-            mobileLabel: "大宗商品现货",
+            label: <span><FireOutlined /> 大宗商品期货</span>,
+            mobileLabel: "大宗商品期货",
             group: "大宗与海外",
             children: <Suspense fallback={<TabFallback />}><CommoditiesTab /></Suspense>,
           },

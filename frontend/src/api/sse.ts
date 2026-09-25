@@ -26,6 +26,7 @@ export interface AnalysisProgress {
   agent_event?: ChatStreamDelta | null;
   result?: AnalysisResult | null;
   error?: string | null;
+  cancelled?: boolean;
 }
 
 export type ProgressHandler = (event: AnalysisProgress) => void;
@@ -406,6 +407,7 @@ export function resumeAnalysis(jobId: string, onProgress: ProgressHandler): Work
 // ── 产业链分析 SSE ──
 
 export interface IndustryChainProgress {
+  cancelled?: boolean;
   type: "stage_started" | "stage_completed" | "agent_event" | "complete" | "error";
   stage?: string;
   message?: string;

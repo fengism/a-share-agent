@@ -226,7 +226,7 @@ export default function GlobalRatesTab() {
       tooltip: {
         trigger: "axis",
         backgroundColor: "rgba(255, 255, 255, 0.96)",
-        borderColor: "#e2e8f0",
+        borderColor: c.border,
         textStyle: { color: "#1e293b", fontSize: 12 },
         extraCssText: "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); border-radius: 6px;",
         valueFormatter: (val: unknown) => (val != null && typeof val === "number" ? `${val.toFixed(3)}%` : "-"),
@@ -303,7 +303,7 @@ export default function GlobalRatesTab() {
         tooltip: {
           trigger: "axis",
           backgroundColor: "rgba(255, 255, 255, 0.96)",
-          borderColor: "#e2e8f0",
+          borderColor: c.border,
           textStyle: { color: "#1e293b", fontSize: 12 },
           extraCssText: "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); border-radius: 6px;",
         },
@@ -453,7 +453,7 @@ export default function GlobalRatesTab() {
       tooltip: {
         trigger: "axis",
         backgroundColor: "rgba(255, 255, 255, 0.96)",
-        borderColor: "#e2e8f0",
+        borderColor: c.border,
         textStyle: { color: "#1e293b", fontSize: 12 },
         extraCssText: "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); border-radius: 6px;",
       },

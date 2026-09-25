@@ -8,6 +8,15 @@ from typing import Any, Literal, Protocol
 
 from app.agentic.protocol import ToolCallFunction, ToolCallInfo
 from app.infrastructure.llm.adapters import extract_message_text
+from app.infrastructure.llm.capabilities import (
+    DEFAULT_LLM_CAPABILITIES as DEFAULT_LLM_CAPABILITIES,
+)
+from app.infrastructure.llm.capabilities import (
+    LLMCapabilities as LLMCapabilities,
+)
+from app.infrastructure.llm.capabilities import (
+    resolve_llm_capabilities as resolve_llm_capabilities,
+)
 
 ToolChoice = Literal["auto", "required", "none"]
 
@@ -24,21 +33,6 @@ class AsyncLLMClient(Protocol):
     """Small structural interface required by the agent runtime."""
 
     chat: AsyncChatAPI
-
-
-@dataclass(frozen=True, slots=True)
-class LLMCapabilities:
-    """Tool-calling features supported by one provider/model endpoint."""
-
-    native_tool_calling: bool = True
-    streaming_tool_calls: bool = True
-    parallel_tool_calls: bool = True
-    supports_tool_choice_none: bool = True
-    supports_tool_choice_required: bool = True
-    supports_strict_json_schema: bool = False
-
-
-DEFAULT_LLM_CAPABILITIES = LLMCapabilities()
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,54 +55,6 @@ class ToolRequest:
     tools: tuple[dict[str, Any], ...]
     tool_choice: ToolChoice | None
     stream: bool
-
-
-_FULL_TOOL_PROVIDERS = frozenset(
-    {
-        "openai",
-        "azure",
-        "claude",
-        "gemini",
-        "deepseek",
-        "qwen",
-        "zhipu",
-        "moonshot",
-    }
-)
-_CONSERVATIVE_TOOL_PROVIDERS = frozenset(
-    {
-        "custom",
-        "ollama",
-        "openrouter",
-        "siliconflow",
-    }
-)
-
-
-def resolve_llm_capabilities(
-    *,
-    provider: str,
-    api_mode: str,
-    model: str,
-) -> LLMCapabilities:
-    """Return conservative defaults without claiming support for every hosted model."""
-    del api_mode, model  # Reserved for model-level overrides and capability probing.
-    normalized_provider = provider.strip().lower()
-    if normalized_provider in _FULL_TOOL_PROVIDERS:
-        return DEFAULT_LLM_CAPABILITIES
-    if normalized_provider in _CONSERVATIVE_TOOL_PROVIDERS:
-        return LLMCapabilities(
-            streaming_tool_calls=False,
-            parallel_tool_calls=False,
-            supports_tool_choice_none=False,
-            supports_tool_choice_required=False,
-        )
-    return LLMCapabilities(
-        streaming_tool_calls=False,
-        parallel_tool_calls=False,
-        supports_tool_choice_none=False,
-        supports_tool_choice_required=False,
-    )
 
 
 def capabilities_from_client(client: AsyncLLMClient) -> LLMCapabilities:

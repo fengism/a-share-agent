@@ -9,11 +9,13 @@ PROFILE = AgentProfile(
     tool_names=(
         "get_stock_news",
         "get_stock_sentiment",
+        "get_interactive_qa",
         "iwencai_search",
         "web_search",
-        "fetch_url",
+        "web_fetch",
         "fetch_urls",
+        "read_pdf",
     ),
-    skill_names=("stock_analysis",),
+    skill_names=("stock_analysis", "information_query", "url_content"),
     max_rounds=3,
 )

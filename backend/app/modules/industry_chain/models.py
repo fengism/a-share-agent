@@ -6,7 +6,21 @@ from app.agentic.events import AgentEvent
 from app.domain.prompting import PromptTrace
 
 
-class IndustryChainNode(BaseModel):
+class IndustryChainCitation(BaseModel):
+    evidence_id: str
+    quote: str = Field(default="", max_length=1500)
+    source_url: str = Field(default="", description="服务端匹配原文所属 URL，不接受模型自报链接")
+    location: str = Field(default="", max_length=200, description="原文页码/表格/章节；未核实则留空")
+
+
+class IndustryChainClaim(BaseModel):
+    citations: list[IndustryChainCitation] = Field(default_factory=list)
+    verification_status: Literal["unverified", "quote_matched"] = "unverified"
+    verification_notes: list[str] = Field(default_factory=list)
+    evidence_basis: Literal["disclosed", "forecast", "inference", "opinion"] = "disclosed"
+
+
+class IndustryChainNode(IndustryChainClaim):
     model_config = ConfigDict(extra="allow")
 
     name: str | None = None
@@ -15,6 +29,13 @@ class IndustryChainNode(BaseModel):
     role: str = ""
     description: str = ""
     companies: list[str] = Field(default_factory=list)
+    business_relevance: Literal["unverified", "concept", "business", "earnings"] = "unverified"
+    revenue_share: str = ""
+    revenue_period: str = ""
+    benefit_path: str = ""
+    realization_conditions: list[str] = Field(default_factory=list)
+    invalidation_conditions: list[str] = Field(default_factory=list)
+    tracking_metrics: list[str] = Field(default_factory=list)
     market_share: str = ""
     metric: str = ""
     source: str = ""
@@ -24,11 +45,16 @@ class IndustryChainNode(BaseModel):
     confidence: Literal["high", "medium", "low"] = "medium"
 
 
-class IndustryChainMetric(BaseModel):
+class IndustryChainMetric(IndustryChainClaim):
     label: str
     value: str
     period: str = ""
     growth: str = ""
+    metric_id: str = ""
+    numeric_value: str = ""
+    unit: str = ""
+    region: str = ""
+    statistical_scope: str = ""
     source: str = ""
     source_url: str = ""
     evidence_ids: list[str] = Field(default_factory=list)
@@ -36,7 +62,7 @@ class IndustryChainMetric(BaseModel):
     confidence: Literal["high", "medium", "low"] = "medium"
 
 
-class IndustryChainInsight(BaseModel):
+class IndustryChainInsight(IndustryChainClaim):
     title: str
     detail: str = ""
     evidence: str = ""
@@ -47,13 +73,44 @@ class IndustryChainInsight(BaseModel):
     confidence: Literal["high", "medium", "low"] = "medium"
 
 
+class IndustryChainThesis(IndustryChainInsight):
+    chain_path: list[str] = Field(default_factory=list, max_length=6)
+    mechanism: str = ""
+    conditions: list[str] = Field(default_factory=list)
+    counter_evidence: str = ""
+    invalidation: str = ""
+    tracking_metrics: list[str] = Field(default_factory=list)
+    beneficiaries: list[str] = Field(default_factory=list)
+
+
+class IndustryChainVerificationRepair(BaseModel):
+    status: Literal["not_needed", "completed", "no_new_evidence", "failed"] = "not_needed"
+    attempted_rounds: int = 0
+    added_evidence_count: int = 0
+    targets: list[str] = Field(default_factory=list)
+    note: str = ""
+
+
+class IndustryChainRelationship(IndustryChainInsight):
+    driver: str = ""
+    target_metric: str = ""
+    time_lag: str = ""
+    tracking_metrics: list[str] = Field(default_factory=list)
+    source_node: str
+    target_node: str
+    relation_type: Literal["supply", "purchase", "substitute", "compete", "transmission"]
+    impact_direction: Literal["positive", "negative", "mixed", "unknown"] = "unknown"
+    conditions: list[str] = Field(default_factory=list)
+    invalidation: str = ""
+
+
 class IndustryChainCompetitionGroup(BaseModel):
     market: str
     summary: str = ""
     companies: list[IndustryChainNode] = Field(default_factory=list)
 
 
-class IndustryChainEvent(BaseModel):
+class IndustryChainEvent(IndustryChainClaim):
     date: str = ""
     title: str
     impact: str = ""
@@ -85,6 +142,7 @@ class IndustryChainEvidence(BaseModel):
     content_preview: str = ""
     status: Literal["success", "error"] = "success"
     error_message: str = ""
+    material_type: Literal["discovery", "body", "structured", "unknown"] = "unknown"
 
 
 class IndustryChainEvidenceStats(BaseModel):
@@ -126,10 +184,15 @@ class IndustryChainChangeItem(BaseModel):
     detail: str = ""
     before: str = ""
     after: str = ""
+    change_basis: Literal["fact", "observation", "evidence", "text"] = "text"
+    numeric_delta: str = ""
+    percentage_delta: str = ""
 
 
 class IndustryChainChangeSet(BaseModel):
     previous_archive_id: str = ""
+    comparable: bool = True
+    comparison_note: str = ""
     has_changes: bool = False
     added_count: int = 0
     removed_count: int = 0
@@ -148,6 +211,10 @@ class IndustryChainOpportunity(BaseModel):
     evidence_score: int = 0
     risk_score: int = 0
     total_score: int = 0
+    scoring_version: int = 1
+    score_kind: Literal["research_completeness"] = "research_completeness"
+    completeness_score: int = 0
+    fundamental_status: Literal["not_evaluated"] = "not_evaluated"
     rationale: str = ""
     evidence_ids: list[str] = Field(default_factory=list)
 
@@ -182,6 +249,8 @@ class IndustryChainResult(BaseModel):
     aliases: list[str] = Field(default_factory=list)
     summary: str = ""
     positioning: str = ""
+    research_theses: list[IndustryChainThesis] = Field(default_factory=list)
+    verification_repair: IndustryChainVerificationRepair = Field(default_factory=IndustryChainVerificationRepair)
     summary_evidence_ids: list[str] = Field(default_factory=list)
     positioning_evidence_ids: list[str] = Field(default_factory=list)
     market_metrics: list[IndustryChainMetric] = Field(default_factory=list)
@@ -215,6 +284,7 @@ class IndustryChainResult(BaseModel):
     agent_trace: list[AgentEvent] = Field(default_factory=list)
     changes: IndustryChainChangeSet = Field(default_factory=IndustryChainChangeSet)
     opportunities: list[IndustryChainOpportunity] = Field(default_factory=list)
+    relationships: list[IndustryChainRelationship] = Field(default_factory=list)
     topic_resolution: IndustryChainTopicResolution = Field(default_factory=IndustryChainTopicResolution)
     analysis_metadata: IndustryChainAnalysisMetadata = Field(
         default_factory=IndustryChainAnalysisMetadata

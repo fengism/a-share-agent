@@ -98,6 +98,7 @@ async def chat(request: ChatRequest, user: AuthenticatedUser = Depends(require_a
                 public_event = auditable_agent_event(
                     update.agent_event,
                     include_text=True,
+                    include_reasoning=True,
                     strip_tool_content=False,
                 )
                 if public_event is None:

@@ -571,10 +571,11 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
   }, [c.cardBg, c.border, c.down, c.textMuted, c.textSecondary, c.up, height]);
 
   return (
-    <div ref={wrapperRef} style={{ position: "relative", width: "100%", height, display: "flex", flexDirection: "column", backgroundColor: c.cardBg }}>
-      {/* Real-time Interactive Candle HUD status bar */}
-      <div style={{
-        minHeight: 28,
+    <div ref={wrapperRef} className="kline-chart" style={{ position: "relative", width: "100%", minHeight: height, display: "flex", flexDirection: "column", backgroundColor: c.cardBg }}>
+      {/* Allow wrapped quotes to grow without overlapping the toolbar or plot. */}
+      <div className="kline-chart__hud" style={{
+        minHeight: 32,
+        flexShrink: 0,
         padding: "4px 8px",
         display: "flex",
         alignItems: "center",
@@ -654,7 +655,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
         </div>
       </div>
 
-      <div style={{ position: "relative", flex: 1, width: "100%", minHeight: height - 32, backgroundColor: c.cardBg }}>
+      <div className="kline-chart__plot" style={{ position: "relative", flex: "0 0 auto", width: "100%", height: height - 32, backgroundColor: c.cardBg }}>
         <div ref={chartElRef} style={{ width: "100%", height: "100%", backgroundColor: c.cardBg }} />
         <div ref={brushRef} style={{
           position: "absolute", top: 0, bottom: 0, display: "none", pointerEvents: "none",

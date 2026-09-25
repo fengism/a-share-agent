@@ -1,7 +1,8 @@
+import { buildStockValuationUrl } from "./analysisHistoryUrl";
 import { ArrowRightOutlined, AuditOutlined, WarningOutlined } from "@ant-design/icons";
 import { Alert, Button, Empty, Progress, Segmented, Tag, Typography } from "antd";
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type {
   AnalysisResult,
   AssessmentDirection,
@@ -225,7 +226,8 @@ export default function ResearchFrameworkPanel({
   onOpenValuation,
   forceFullReport = false,
 }: ResearchFrameworkPanelProps) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [compactPreference, setCompactPreference] = useState(true);
   const compact = forceFullReport ? false : compactPreference;
   const research = analysis?.research_framework;
@@ -256,9 +258,7 @@ export default function ResearchFrameworkPanel({
 
   const { information_quality: quality } = research;
   const openValuation = onOpenValuation ?? (() => {
-    const next = new URLSearchParams(searchParams);
-    next.set("panel", "valuation");
-    setSearchParams(next);
+    navigate(buildStockValuationUrl(analysis.stock_code, searchParams.get("date")));
   });
 
   return (

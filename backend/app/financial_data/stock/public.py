@@ -24,7 +24,9 @@ from app.financial_data.stock.fundamentals.schemas import (
     StockCompareItem,
 )
 from app.financial_data.stock.insights.bulletins import get_stock_bulletins
+from app.financial_data.stock.insights.documents import get_stock_documents
 from app.financial_data.stock.insights.fund_flow import get_stock_fund_flow
+from app.financial_data.stock.insights.fund_flow_pages import get_stock_fund_flow_page
 from app.financial_data.stock.insights.interactive_qa import get_interactive_qa
 from app.financial_data.stock.insights.news import get_stock_news, get_stock_news_categorized
 from app.financial_data.stock.insights.reports import get_stock_reports
@@ -36,6 +38,7 @@ from app.financial_data.stock.insights.schemas import (
     StockBulletinItem,
     StockBulletinPage,
     StockFundFlowItem,
+    StockFundFlowPage,
     StockReportItem,
     StockReportPage,
     StockRiskData,
@@ -105,7 +108,9 @@ __all__ = [
     "get_restricted_shares_lift",
     "get_interactive_qa",
     "get_stock_fund_flow",
+    "get_stock_fund_flow_page",
     "get_stock_bulletins",
+    "get_stock_documents",
     "get_stock_business_intro",
     "get_stock_reports",
     "get_stock_name_map",
@@ -129,6 +134,7 @@ __all__ = [
     "StockBulletinPage",
     "StockCompareItem",
     "StockFundFlowItem",
+    "StockFundFlowPage",
     "StockReportItem",
     "StockReportPage",
     "StockRiskData",

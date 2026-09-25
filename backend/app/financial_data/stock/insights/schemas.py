@@ -26,6 +26,16 @@ class StockFundFlowItem(BaseModel):
     is_stale: bool = False
 
 
+class StockFundFlowPage(BaseModel):
+    """固定来源与日期的资金流批次，total 为最多 60 个交易日的可查询天数。"""
+
+    items: list[StockFundFlowItem]
+    total: int
+    next_cursor: str | None = None
+    source: str
+    source_api: str
+
+
 class MarginTradingItem(BaseModel):
     date: str
     rzye: float | None = None

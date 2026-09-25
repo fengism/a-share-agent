@@ -8,12 +8,14 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
-from app.configuration import Settings
+from app.configuration import Settings, get_effective_settings
 from app.core.metrics import metrics
 from app.domain.prompting import PromptTrace
 from app.infrastructure.llm.adapters import LLMClient
+from app.infrastructure.llm.policy import generation_scope
 from app.infrastructure.llm.prompting.spec import PromptContext, PromptSpec
-from app.infrastructure.llm.sync_client import create_llm_client, llm_chat_result
+from app.infrastructure.llm.streaming import StreamingLLMClient, streaming_llm_client
+from app.infrastructure.llm.sync_client import llm_chat_result
 
 logger = logging.getLogger(__name__)
 OutputT = TypeVar("OutputT", bound=BaseModel)
@@ -37,11 +39,13 @@ def _input_digest(messages: list[dict[str, str]]) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-def _trace(spec: PromptSpec, messages: list[dict[str, str]], client: LLMClient, temperature: float) -> PromptTrace:
+def _trace(
+    spec: PromptSpec, messages: list[dict[str, str]], model: str, temperature: float,
+) -> PromptTrace:
     return PromptTrace(
         prompt_id=spec.id,
         prompt_version=spec.version,
-        model=str(getattr(client, "model", "")),
+        model=model,
         temperature=temperature,
         input_digest=_input_digest(messages),
         generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
@@ -49,19 +53,44 @@ def _trace(spec: PromptSpec, messages: list[dict[str, str]], client: LLMClient, 
 
 
 async def run_structured_prompt(
+    spec: PromptSpec[OutputT], context: PromptContext, *, settings: Settings | None = None,
+    client: LLMClient | None = None, temperature: float | None = None,
+    async_client: StreamingLLMClient | None = None,
+    timeout_seconds: float | None = None, max_tokens: int | None = None,
+) -> PromptRun[OutputT]:
+    if client is not None and async_client is not None:
+        raise ValueError("Specify only one LLM client")
+    settings = settings or get_effective_settings()
+    timeout = settings.llm_generation_timeout_seconds if timeout_seconds is None else timeout_seconds
+    async with generation_scope(settings, timeout_seconds=timeout):
+        if client is not None or async_client is not None:
+            return await _run_structured_prompt(
+                spec, context, settings=settings, client=client,
+                temperature=temperature, async_client=async_client,
+            )
+        async with streaming_llm_client(
+            settings, max_tokens=max_tokens if max_tokens is not None else settings.llm_generation_max_completion_tokens,
+        ) as managed_client:
+            return await _run_structured_prompt(
+                spec, context, settings=settings, async_client=managed_client, temperature=temperature,
+            )
+
+
+async def _run_structured_prompt(
     spec: PromptSpec[OutputT],
     context: PromptContext,
     *,
     settings: Settings | None = None,
     client: LLMClient | None = None,
     temperature: float | None = None,
+    async_client: StreamingLLMClient | None = None,
 ) -> PromptRun[OutputT]:
     """渲染、执行并校验一个结构化 Prompt，失败时按规格执行修复重试。"""
-    if client is None:
-        client = create_llm_client(settings)
+    if client is not None and async_client is not None:
+        raise ValueError("Specify only one LLM client")
     effective_temperature = spec.temperature if temperature is None else temperature
     messages = spec.render(context)
-    trace = _trace(spec, messages, client, effective_temperature)
+    trace = _trace(spec, messages, str(getattr(async_client or client, "model", "")), effective_temperature)
     raw_response = ""
     parse_error: Exception | None = None
     prompt_tokens = 0
@@ -84,13 +113,18 @@ async def run_structured_prompt(
             ]
         started_at = time.perf_counter()
         try:
-            completion = await llm_chat_result(
-                request_messages,
-                temperature=request_temperature,
-                json_format=True,
-                settings=settings,
-                client=client,
-            )
+            if async_client is not None:
+                completion = await async_client.chat_result(
+                    request_messages, temperature=request_temperature, json_format=True,
+                )
+            else:
+                completion = await llm_chat_result(
+                    request_messages,
+                    temperature=request_temperature,
+                    json_format=True,
+                    settings=settings,
+                    client=client,
+                )
             raw_response = completion.text
         except Exception as error:
             metrics.record_llm_prompt(

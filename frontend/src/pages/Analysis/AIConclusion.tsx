@@ -19,8 +19,6 @@ export default function AIConclusion({ result, embedded = false }: Props) {
   const { cardStyle } = useStyles();
   const {
     fundamental,
-    technical,
-    sentiment,
     valuation_view,
     fair_value_range,
     overall_rating,
@@ -62,8 +60,6 @@ export default function AIConclusion({ result, embedded = false }: Props) {
   const scoreColor = (score: number) => score >= 8 ? c.up : score >= 6 ? c.primary : score >= 4 ? c.warning : c.down;
   const dimensionScores = [
     { label: "基本面", score: fundamental.score, summary: fundamental.summary },
-    { label: "技术面", score: technical.score, summary: technical.summary },
-    { label: "情绪面", score: sentiment.score, summary: sentiment.summary },
   ];
   const valuationText = valuation_view || "暂无明确结论";
   const valuationRange = fair_value_range?.[0] != null && fair_value_range[0] > 0

@@ -1,9 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut } from "../client";
-import { createInviteApi, listInvitesApi, revokeInviteApi } from "../auth";
+import {
+  cleanupExpiredInvitesApi,
+  createInviteApi,
+  deleteUserApi,
+  fetchLoginAuditLogsApi,
+  listInvitesApi,
+  listUsersApi,
+  revokeInviteApi,
+  revokeUserSessionsApi,
+  updateUserMustChangePasswordApi,
+  updateUserRoleApi,
+  updateUserStatusApi,
+} from "../auth";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { queryKeys } from "../queryKeys";
-import type { InviteItem } from "../../types/auth";
+import type { AdminUserItem, InviteItem, LoginAuditLogsResponse } from "../../types/auth";
 import type { BotAdminJob, BotAdminJobsResponse, ConfigData, ConfigUpdate } from "../../types/settings";
 
 export function useConfig() {
@@ -55,4 +67,64 @@ export function useCreateInvite() {
 
 export function useRevokeInvite() {
   return useMutation({ mutationFn: (code: string) => revokeInviteApi(code) });
+}
+
+export function useAdminUsers(enabled: boolean) {
+  return useQuery<AdminUserItem[]>({
+    queryKey: queryKeys.settings.users,
+    queryFn: () => listUsersApi(),
+    enabled,
+    staleTime: QUERY_CACHE_POLICIES.settingsUsers.staleMs,
+  });
+}
+
+export function useUpdateUserStatus() {
+  return useMutation({
+    mutationFn: ({ userId, isActive }: { userId: number; isActive: boolean }) =>
+      updateUserStatusApi(userId, isActive),
+  });
+}
+
+export function useUpdateUserRole() {
+  return useMutation({
+    mutationFn: ({ userId, isAdmin }: { userId: number; isAdmin: boolean }) =>
+      updateUserRoleApi(userId, isAdmin),
+  });
+}
+
+export function useDeleteUser() {
+  return useMutation({
+    mutationFn: (userId: number) => deleteUserApi(userId),
+  });
+}
+
+export function useRevokeUserSessions() {
+  return useMutation({
+    mutationFn: (userId: number) => revokeUserSessionsApi(userId),
+  });
+}
+
+export function useUpdateUserMustChangePassword() {
+  return useMutation({
+    mutationFn: ({ userId, mustChangePassword }: { userId: number; mustChangePassword: boolean }) =>
+      updateUserMustChangePasswordApi(userId, mustChangePassword),
+  });
+}
+
+export function useCleanupExpiredInvites() {
+  return useMutation({
+    mutationFn: () => cleanupExpiredInvitesApi(),
+  });
+}
+
+export function useLoginAuditLogs(
+  params?: { limit?: number; offset?: number; status?: string; username?: string },
+  enabled = true,
+) {
+  return useQuery<LoginAuditLogsResponse>({
+    queryKey: queryKeys.settings.auditLogs(params),
+    queryFn: ({ signal }) => fetchLoginAuditLogsApi(params, signal),
+    enabled,
+    staleTime: QUERY_CACHE_POLICIES.settingsAuditLogs.staleMs,
+  });
 }

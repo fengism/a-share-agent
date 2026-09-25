@@ -17,10 +17,11 @@ from typing import Protocol
 import pandas as pd
 
 from app.configuration.paths import DATA_DIR
-from app.core.concurrency.rate_limiter import call_blocking, sina_semaphore
+from app.core.concurrency.rate_limiter import sina_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
 from app.infrastructure.persistence.json_storage import atomic_write_json
+from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
@@ -240,7 +241,9 @@ class HKStockSearchIndex:
 
     async def _fetch_and_persist(self) -> _SearchIndexState:
         try:
-            frame = await call_blocking(
+            frame = await provider_gateway.call_blocking(
+                "sina_hk",
+                "fetch_hk_stocks_spot",
                 self.provider.fetch_hk_stocks_spot,
                 semaphore=sina_semaphore,
             )

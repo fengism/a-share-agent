@@ -1,4 +1,4 @@
-from typing import TypeAlias
+from typing import Literal, TypeAlias
 
 from pydantic import BaseModel, Field
 
@@ -148,6 +148,10 @@ class GlobalMacroRatesResponse(BaseModel):
 
 
 class CommodityItem(BaseModel):
+    quote_kind: Literal["futures"] = "futures"
+    source: str = "sina_futures"
+    source_url: str = ""
+    status: Literal["available", "unavailable"] = "unavailable"
     symbol: str
     name: str
     contract: str
@@ -168,6 +172,13 @@ class CommodityItem(BaseModel):
 
 
 class CommoditiesResponse(BaseModel):
+    quote_kind: Literal["futures"] = "futures"
+    source: str = "sina_futures"
+    status: Literal["available", "partial", "unavailable", "not_found"] = "unavailable"
+    available_count: int = 0
+    spot_available: bool = False
+    basis_available: bool = False
+    caveats: list[str] = Field(default_factory=list)
     query: str
     total_count: int
     items: list[CommodityItem] = Field(default_factory=list)
@@ -178,19 +189,21 @@ class CustomsMonthSummary(BaseModel):
 
     month: str = ""
     report_date: str = ""
-    export_val: float = Field(default=0, description="当月出口金额（亿美元）")
-    import_val: float = Field(default=0, description="当月进口金额（亿美元）")
-    trade_balance: float = Field(default=0, description="当月贸易差额（亿美元，出口-进口）")
+    export_val: float | None = Field(default=None, description="当月出口金额（亿美元）")
+    import_val: float | None = Field(default=None, description="当月进口金额（亿美元）")
+    trade_balance: float | None = Field(default=None, description="当月贸易差额（亿美元，出口-进口）")
     balance_status: str = ""
-    export_yoy_pct: float = Field(default=0, description="当月出口同比（%）")
-    import_yoy_pct: float = Field(default=0, description="当月进口同比（%）")
-    export_accumulate: float = Field(default=0, description="累计出口金额（亿美元）")
-    import_accumulate: float = Field(default=0, description="累计进口金额（亿美元）")
-    export_accumulate_yoy_pct: float = Field(default=0, description="累计出口同比（%）")
-    import_accumulate_yoy_pct: float = Field(default=0, description="累计进口同比（%）")
+    export_yoy_pct: float | None = Field(default=None, description="当月出口同比（%）")
+    import_yoy_pct: float | None = Field(default=None, description="当月进口同比（%）")
+    export_accumulate: float | None = Field(default=None, description="累计出口金额（亿美元）")
+    import_accumulate: float | None = Field(default=None, description="累计进口金额（亿美元）")
+    export_accumulate_yoy_pct: float | None = Field(default=None, description="累计出口同比（%）")
+    import_accumulate_yoy_pct: float | None = Field(default=None, description="累计进口同比（%）")
 
 
 class CustomsCommodityProfile(BaseModel):
+    data_kind: Literal["static_reference"] = "static_reference"
+    source: str = "builtin_reference"
     category: str
     commodity: str
     trade_type: str
@@ -207,8 +220,15 @@ class CustomsInvestmentImplications(BaseModel):
 
 
 class CustomsTradeDataResponse(BaseModel):
+    data_scope: Literal["national_macro"] = "national_macro"
+    source: str = "eastmoney_china_trade"
+    amount_unit: str = "USD_100_million"
+    macro_status: Literal["available", "partial", "unavailable"] = "unavailable"
+    profile_match_status: Literal["matched", "not_found"] = "not_found"
+    commodity_series_available: bool = False
+    caveats: list[str] = Field(default_factory=list)
     query: str
-    latest_month_summary: CustomsMonthSummary = Field(default_factory=CustomsMonthSummary)
+    latest_month_summary: CustomsMonthSummary | None = None
     recent_12m_macro_trend: list[CustomsMonthSummary] = Field(default_factory=list)
     matched_commodity_profiles: list[CustomsCommodityProfile] = Field(default_factory=list)
     investment_implications: CustomsInvestmentImplications

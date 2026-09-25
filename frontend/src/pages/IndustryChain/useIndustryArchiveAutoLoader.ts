@@ -14,6 +14,7 @@ interface IndustryArchiveAutoLoaderOptions {
   isAnalyzing: boolean;
   hasDisplayedResult: boolean;
   hasCurrentRouteError: boolean;
+  hasCurrentRouteStopped?: boolean;
   loadArchive: (request: IndustryArchiveRequest) => Promise<IndustryChainResult>;
   loadResult: (name: string, result: IndustryChainResult, archiveId: string) => void;
 }
@@ -25,6 +26,7 @@ export function useIndustryArchiveAutoLoader({
   isAnalyzing,
   hasDisplayedResult,
   hasCurrentRouteError,
+  hasCurrentRouteStopped = false,
   loadArchive,
   loadResult,
 }: IndustryArchiveAutoLoaderOptions): void {
@@ -43,7 +45,8 @@ export function useIndustryArchiveAutoLoader({
     && !isLatestLoading
     && !isAnalyzing
     && !hasDisplayedResult
-    && !hasCurrentRouteError,
+    && !hasCurrentRouteError
+    && !hasCurrentRouteStopped,
   );
   const requestKey = shouldLoad
     ? JSON.stringify([activeName, latestArchiveId])

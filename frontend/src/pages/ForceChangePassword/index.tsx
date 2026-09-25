@@ -63,7 +63,8 @@ export default function ForceChangePasswordPage() {
           label="新密码"
           rules={[
             { required: true, message: "请输入新密码" },
-            { min: 6, max: 128, message: "密码长度 6–128" },
+            { min: 8, max: 128, message: "密码长度至少 8 位" },
+            { pattern: /^(?=.*[A-Za-z])(?=.*\d)/, message: "密码必须同时包含字母和数字" },
           ]}
         >
           <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />

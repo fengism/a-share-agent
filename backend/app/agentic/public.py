@@ -31,6 +31,7 @@ async def run_agentic_research(
     settings: Any = None,
     runtime: AgentResearchRuntime | None = None,
     event_callback: Callable[[AgentEvent], Awaitable[None]] | None = None,
+    evidence_callback: Callable[[AgentEvidence], None] | None = None,
 ) -> AgenticResearchResult:
     return cast(AgenticResearchResult, await _run_agentic_research(
         spec,
@@ -38,6 +39,7 @@ async def run_agentic_research(
         runtime=runtime or _DEFAULT_RUNTIME,
         settings=settings,
         event_callback=event_callback,
+        evidence_callback=evidence_callback,
     ))
 
 

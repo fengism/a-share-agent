@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.configuration.llm_compatibility import LLMCompatibilityOverride
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
 
 if TYPE_CHECKING:
@@ -116,6 +117,7 @@ class Settings(BaseSettings):
         env_file=[ROOT_DIR / ".env", BACKEND_DIR / ".env"],
         env_file_encoding="utf-8",
         case_sensitive=False,
+        hide_input_in_errors=True,
         extra="ignore",
     )
 
@@ -126,7 +128,22 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-v4-flash"
     llm_temperature: float = 0.1
-    llm_timeout_seconds: int = 180
+    llm_timeout_seconds: int = Field(default=300, gt=0)
+    # Deployment policy; current provider/model is never changed by these limits.
+    llm_generation_timeout_seconds: float = Field(default=1200.0, gt=0)
+    llm_generation_max_completion_tokens: int = Field(default=8192, ge=1)
+    llm_max_attempts: int = Field(default=2, ge=1, le=3)
+    llm_model_max_completion_tokens: int | None = Field(default=None, ge=1)
+    llm_stream_include_usage: bool = True
+    llm_json_mode_enabled: bool = True
+    llm_compatibility_overrides: list[LLMCompatibilityOverride] = Field(default_factory=list, repr=False)
+    agent_research_timeout_seconds: float = Field(default=1200.0, gt=0)
+    # Deployment-only research budgets, independent from interactive chat.
+    industry_chain_tool_calls_total: int = Field(default=72, ge=8, le=128)
+    industry_chain_repair_tool_calls_total: int = Field(default=24, ge=4, le=48)
+    # Long report generation: one deadline shared by streaming and schema repair.
+    analysis_llm_timeout_seconds: float = Field(default=1200.0, gt=0)
+    analysis_llm_max_completion_tokens: int = Field(default=32768, ge=1)
 
     # Deployment-only; deliberately absent from private/persisted editable keys.
     python_sandbox_url: str = ""
@@ -171,6 +188,8 @@ class Settings(BaseSettings):
     provider_retry_jitter_seconds: float = 0.1
 
     tdxhub_timeout_seconds: float = Field(default=10.0, gt=0)
+    # 单次历史资金流备选查询的总 I/O 预算（包含连接、分页和逐日聚合）。
+    tdxhub_fund_flow_timeout_seconds: float = Field(default=60.0, gt=0, le=90)
 
     eastmoney_min_interval_seconds: float = 1.0
     eastmoney_datacenter_min_interval_seconds: float = 1.0
@@ -269,6 +288,7 @@ class Settings(BaseSettings):
     trust_proxy_headers: bool = False
     auth_cookie_secure: bool = False
     default_admin_username: str = "admin"
+    default_admin_password: str = ""
 
     @property
     def llm(self) -> LLMSettingsView:

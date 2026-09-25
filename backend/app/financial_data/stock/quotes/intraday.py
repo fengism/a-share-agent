@@ -8,13 +8,12 @@ import pandas as pd
 
 from app.core.cache import dated_cache_key, series_cache
 from app.core.cache_policies import STOCK_INTRADAY
-from app.core.concurrency.rate_limiter import call_blocking, cls_semaphore
+from app.core.concurrency.rate_limiter import call_blocking, cls_semaphore, sina_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import normalize_code, safe_float
 from app.financial_data.stock.quotes.schemas import IntradayData, IntradayItem
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
-from app.infrastructure.providers.sina.quotes import get_last_trade_date
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +189,14 @@ async def get_intraday(code: str) -> IntradayData:
     sym = normalize_code(code)
     try:
         date = await asyncio.wait_for(
-            asyncio.to_thread(get_last_trade_date, code),
+            provider_gateway.call_blocking(
+                "sina",
+                "fetch_last_trade_date",
+                get_provider("sina").fetch_last_trade_date,
+                code,
+                semaphore=sina_semaphore,
+                max_attempts=1,
+            ),
             timeout=_TRADE_DATE_TIMEOUT_SECONDS,
         )
     except Exception as error:

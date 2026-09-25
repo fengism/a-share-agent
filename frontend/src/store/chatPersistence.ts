@@ -152,6 +152,9 @@ function compactActiveSession(data: SessionData, textLimit: number): SessionData
     messages: data.messages.slice(-2).map((message) => ({
       ...message,
       content: truncateText(message.content, textLimit),
+      // Under storage pressure, discard verbose process metadata before the answer.
+      processUpdates: undefined,
+      reasoningBlocks: undefined,
       reasoningContent: message.reasoningContent
         ? truncateText(message.reasoningContent, textLimit)
         : message.reasoningContent,
@@ -210,6 +213,24 @@ export function compactChatSessionData(
   }
 
   const oldestFirst = [...sessions].sort((left, right) => left.updatedAt - right.updatedAt);
+  // Process text is expendable; do not drop old answers just to keep reasoning.
+  for (const session of oldestFirst) {
+    const entry = nextData[session.id];
+    if (!entry) continue;
+    nextData[session.id] = {
+      ...entry,
+      messages: entry.messages.map((message) => ({
+        ...message, reasoningContent: undefined, reasoningBlocks: undefined, processUpdates: undefined,
+      })),
+      history: entry.history.map((message) => ({ ...message, reasoning_content: undefined })),
+    };
+    compacted = true;
+    serialized = serializeSessionData(nextData);
+    if (serialized.length <= maxSize) {
+      return { sessionData: nextData, serialized, compacted, fits: true };
+    }
+  }
+
   for (const session of oldestFirst) {
     if (session.id === activeSessionId) continue;
     const entry = nextData[session.id];

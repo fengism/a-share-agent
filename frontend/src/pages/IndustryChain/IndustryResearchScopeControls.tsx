@@ -64,6 +64,18 @@ export default function IndustryResearchScopeControls({
             ]}
           />
         </label>
+        <label style={{ gridColumn: "1 / -1" }}>
+          <Text type="secondary" style={{ display: "block", marginBottom: 4 }}>强制刷新公共数据维度（其他维度复用有效缓存）</Text>
+          <Select mode="multiple" aria-label="刷新公共数据维度" value={value.refresh_dimensions || []}
+            disabled={disabled} onChange={(refresh_dimensions) => update({ refresh_dimensions })} style={{ width: "100%" }}
+            options={[
+              { value: "market", label: "市场与价格" }, { value: "stocks", label: "公司" },
+              { value: "competition", label: "竞争" }, { value: "technology", label: "技术" },
+              { value: "chain", label: "产业结构" }, { value: "drivers_risks", label: "驱动与风险" },
+              { value: "reports", label: "研报" }, { value: "events", label: "事件" },
+            ]} />
+          <Text type="secondary">刷新后仍会执行 Agent 调研与报告合成，不承诺只消耗所选维度的模型调用。</Text>
+        </label>
         <label>
           <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: "var(--c-font-sm)" }}>分析基准日</Text>
           <Input

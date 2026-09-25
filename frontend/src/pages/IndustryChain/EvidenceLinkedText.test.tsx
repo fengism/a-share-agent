@@ -6,7 +6,7 @@ import EvidenceLinkedText from "./EvidenceLinkedText";
 const catalog: IndustryChainEvidence[] = [
   {
     evidence_id: "ev_report",
-    tool_name: "fetch_url",
+    tool_name: "web_fetch",
     title: "人形机器人产业发展报告",
     source_urls: ["https://example.com/reports/humanoid"],
   },
@@ -17,7 +17,7 @@ const catalog: IndustryChainEvidence[] = [
   },
   {
     evidence_id: "ev_no_url",
-    tool_name: "fetch_url",
+    tool_name: "web_fetch",
     title: "无链接报告",
     source_urls: [],
   },
@@ -64,7 +64,7 @@ describe("EvidenceLinkedText", () => {
         text="证据 ev_unsafe"
         evidenceCatalog={[{
           evidence_id: "ev_unsafe",
-          tool_name: "fetch_url",
+          tool_name: "web_fetch",
           title: "不安全来源",
           source_urls: ["javascript:alert(1)"],
         }]}
@@ -75,4 +75,10 @@ describe("EvidenceLinkedText", () => {
     expect(container.querySelector("a")).toBeNull();
     expect(container.textContent).not.toContain("ev_unsafe");
   });
+});
+
+it("does not pretend the first URL in a batch is the supporting article", () => {
+  const { container } = render(<EvidenceLinkedText text="证据 ev_batch" evidenceCatalog={[{evidence_id:"ev_batch",tool_name:"fetch_urls",source_urls:["https://example.com/a","https://example.com/b"]}]} />);
+  expect(container.textContent).not.toContain("ev_batch");
+  expect(container.querySelector("a")).toBeNull();
 });

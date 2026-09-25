@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from contextlib import aclosing
 
 from app.agentic.agents.catalog import list_agent_profiles
 from app.agentic.bootstrap import register_all_capabilities
@@ -70,16 +71,18 @@ async def run_chat_agent(
             needs_llm_classification=plan.needs_llm_classification,
             reasoning=plan.reasoning,
         )
-        async for delta in orchestrator.run(message, history, initial_decision=decision):
-            yield delta
+        async with aclosing(orchestrator.run(message, history, initial_decision=decision)) as stream:
+            async for delta in stream:
+                yield delta
         return
 
-    async for delta in stream_general_agent(
+    async with aclosing(stream_general_agent(
         message,
         history,
         tool_names=plan.tool_names,
         skill_names=plan.active_skill_names,
         require_tool_evidence=plan.requires_tool_evidence,
         execution_context=execution_context,
-    ):
-        yield delta
+    )) as stream:
+        async for delta in stream:
+            yield delta

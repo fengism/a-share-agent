@@ -37,7 +37,8 @@ class AgentProfile:
 class ToolExecutionSummary:
     name: str
     is_error: bool
-    has_evidence: bool = False
+    has_evidence: bool = False  # Raw acquisition succeeded with meaningful data.
+    context_has_evidence: bool = False  # Evidence actually included in model context.
 
 
 @dataclass(slots=True)
@@ -54,3 +55,4 @@ class AgentExecutionResult:
     reasoning_content: str = ""
     opinion: "AgentOpinion | None" = None
     retryable: bool = True
+    termination_reason: str = ""  # Sanitized code, never a provider error body.

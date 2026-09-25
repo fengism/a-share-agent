@@ -229,3 +229,7 @@ def fetch_us_retail_sales() -> list[dict[str, Any]]:
 
 def fetch_us_trade_balance() -> list[dict[str, Any]]:
     return _us_indicator(ak.macro_usa_trade_balance)
+
+
+def fetch_bond_yields():
+    return ak.bond_zh_us_rate()

@@ -40,7 +40,7 @@ usage() {
 
 可选环境变量:
   BACKEND_HOST      后端监听地址，默认 127.0.0.1
-  BACKEND_PORT      后端端口，默认 8000
+  BACKEND_PORT      后端端口，默认 18001
   FRONTEND_HOST     前端监听地址，默认 127.0.0.1
   FRONTEND_PORT     前端端口，默认 5173
   STARTUP_TIMEOUT   服务启动超时秒数，默认 90

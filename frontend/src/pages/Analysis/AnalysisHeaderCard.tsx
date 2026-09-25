@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import {
   DownloadOutlined,
+  DownOutlined,
   FileSearchOutlined,
   HistoryOutlined,
   PlusOutlined,
@@ -91,7 +92,7 @@ export default function AnalysisHeaderCard({
   const latestIntraday = activeIntradayItems.length > 0
     ? activeIntradayItems[activeIntradayItems.length - 1]
     : null;
-  const latestPrice = latestIntraday?.price ?? latestKline?.close ?? null;
+  const latestPrice = latestIntraday?.price ?? info?.current_price ?? latestKline?.close ?? null;
   const latestChangePct = latestIntraday?.change_pct
     ?? (
       latestIntraday?.price != null && activeIntraday?.prev_close
@@ -150,6 +151,18 @@ export default function AnalysisHeaderCard({
             >
               研究历史
             </Button>
+            {result ? (
+              <Button
+                type="link"
+                size="small"
+                icon={<DownOutlined />}
+                className="pdf-hide"
+                href="#analysis-result"
+                aria-label="查看结论"
+              >
+                查看结论
+              </Button>
+            ) : null}
             {result ? (
               <Button
                 type="link"

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/client";
 import { useAuthStore } from "../../store/authStore";
 import { useChatStore } from "../../store/chatStore";
+import { readPendingChat } from "../../store/chatSyncRecovery";
 import { useChatSessionSync } from "./useChatSessionSync";
 
 const mocks = vi.hoisted(() => ({
@@ -101,7 +102,7 @@ describe("useChatSessionSync", () => {
     }
   });
 
-  it("reloads the newer server snapshot after a revision conflict", async () => {
+  it("preserves local edits instead of hydrating the newer snapshot after a revision conflict", async () => {
     const newerState = {
       ...remoteState,
       revision: 3,
@@ -121,11 +122,11 @@ describe("useChatSessionSync", () => {
 
     act(() => useChatStore.getState().renameSession("remote-session", "本地更新"));
 
-    await waitFor(() => expect(mocks.getChatState).toHaveBeenCalledTimes(2), { timeout: 2_000 });
-    await waitFor(() => {
-      expect(useChatStore.getState().sessions[0]?.title).toBe("其他页面更新的会话");
-      expect(result.current).toBe("synced");
-    });
+    await waitFor(() => expect(result.current).toBe("error"), { timeout: 2_000 });
+    expect(mocks.getChatState).toHaveBeenCalledTimes(1);
+    expect(mocks.saveChatState).toHaveBeenCalledOnce();
+    expect(useChatStore.getState().sessions[0]?.title).toBe("本地更新");
+    expect(readPendingChat(window.localStorage, 7)).toEqual({ revision: 2 });
     unmount();
   });
 });

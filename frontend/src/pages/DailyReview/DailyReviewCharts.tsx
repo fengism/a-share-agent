@@ -13,10 +13,10 @@ interface NamedValue {
 const UP_COLOR = "#ef4444";
 const DOWN_COLOR = "#16a34a";
 const NEUTRAL_COLOR = "#94a3b8";
-const PRIMARY_COLOR = "#2563eb";
-const GRID_COLOR = "var(--c-border, #e2e8f0)";
-const TEXT_COLOR = "var(--c-text-secondary, #475569)";
-const PRIMARY_TEXT_COLOR = "var(--c-text-primary, #0f172a)";
+const PRIMARY_COLOR = "#d97706";
+const GRID_COLOR = "var(--c-border, #e7e2d7)";
+const TEXT_COLOR = "var(--c-text-secondary, #57534e)";
+const PRIMARY_TEXT_COLOR = "var(--c-text-primary, #1c1917)";
 
 function finiteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -82,7 +82,7 @@ function BreadthChart({ snapshot }: DailyReviewChartsProps) {
           return (
             <g key={item.name}>
               <text x="0" y={y + 14} fill={TEXT_COLOR} fontSize="13">{item.name}</text>
-              <rect x="58" y={y} width="350" height="20" rx="5" fill="var(--c-nested-bg, #f1f5f9)" />
+              <rect x="58" y={y} width="350" height="20" rx="5" fill="var(--c-nested-bg, #f4f0e8)" />
               <rect x="58" y={y} width={width} height="20" rx="5" fill={item.color} opacity="0.9" />
               <text x="422" y={y + 14} fill={PRIMARY_TEXT_COLOR} fontSize="13" fontWeight="700">{item.value.toLocaleString("zh-CN")} 家</text>
             </g>

@@ -7,6 +7,37 @@ logger = logging.getLogger(__name__)
 class MacroMixin:
     """东方财富 macro 数据接口。"""
 
+    def fetch_fx_quotes(self, *, delayed: bool = False):
+        host = "push2delay" if delayed else "push2"
+        response = self.em_get_response(
+            f"https://{host}.eastmoney.com/api/qt/ulist.np/get",
+            params={"fltt": "2", "invt": "2", "fields": "f12,f14,f2,f3,f4", "secids": "100.UDI,133.USDCNH,120.USDCNYC"},
+            timeout=5,
+        )
+        response.raise_for_status()
+        return (response.json().get("data") or {}).get("diff", [])
+
+    def fetch_treasury_yield_history(self, page_size: int = 300, page_number: int = 1):
+        response = self.em_get_response(
+            self.DATACENTER_URL,
+            params={
+                "reportName": "RPTA_WEB_TREASURYYIELD",
+                "columns": "ALL",
+                "sortColumns": "SOLAR_DATE",
+                "sortTypes": "-1",
+                "token": "894050c76af8597a853f5b408b759f5d",
+                "pageNumber": str(page_number),
+                "pageSize": str(page_size),
+            },
+            timeout=8,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        result = payload.get("result")
+        if not isinstance(result, dict) or not isinstance(result.get("data"), list):
+            raise ValueError("东方财富国债收益率返回格式无效")
+        return result
+
     def fetch_china_cpi(self):
         """
         中国CPI数据。

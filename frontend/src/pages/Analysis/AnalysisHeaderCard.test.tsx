@@ -39,6 +39,7 @@ describe("AnalysisHeaderCard", () => {
 
     expect(onShowHistory).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "开始研究" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "查看结论" })).not.toBeInTheDocument();
   });
 
   it("prefers the latest intraday quote over the completed daily K-line", () => {
@@ -151,6 +152,7 @@ describe("AnalysisHeaderCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "打开报告模式" }));
 
     expect(onOpenResearchReport).toHaveBeenCalledOnce();
+    expect(screen.getByRole("link", { name: "查看结论" })).toHaveAttribute("href", "#analysis-result");
     expect(screen.getByRole("button", { name: "更新研究" })).toBeInTheDocument();
   });
 });

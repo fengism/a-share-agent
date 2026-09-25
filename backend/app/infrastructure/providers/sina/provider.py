@@ -25,15 +25,22 @@ from app.core.dataframes import coerce_numeric_columns, normalize_intraday_df, r
 from app.core.market import normalize_code, normalize_index_symbol, normalize_stock_name, safe_float
 from app.infrastructure.providers.sina import bulletins as sina_bulletins
 from app.infrastructure.providers.sina import financials as sina_financials
+from app.infrastructure.providers.sina import futures as sina_futures
 from app.infrastructure.providers.sina import industry as sina_industry
 from app.infrastructure.providers.sina import reports as sina_reports
 from app.infrastructure.providers.sina.parsing import parse_jsonp
+from app.infrastructure.providers.sina.quotes import get_last_trade_date
 
 logger = logging.getLogger(__name__)
 
 
 class SinaDataProvider:
     """Purpose: 直接对接新浪财经接口的 K线、指数、快照、分时等数据提供器（备用源）。"""
+
+    fetch_crude_oil_quotes = staticmethod(sina_futures.fetch_crude_oil_quotes)
+    fetch_futures_quotes = staticmethod(sina_futures.fetch_futures_quotes)
+    fetch_futures_history = staticmethod(sina_futures.fetch_futures_history)
+    fetch_last_trade_date = staticmethod(get_last_trade_date)
 
     HQ_PAGE_SIZE = 80
     HQ_MAX_PAGES = 80

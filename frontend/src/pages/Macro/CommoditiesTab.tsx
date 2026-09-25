@@ -78,6 +78,13 @@ export default function CommoditiesTab() {
       ),
     },
     {
+      title: "报价日期 / 状态",
+      key: "quote_date",
+      render: (_: unknown, record: CommodityItem) => (
+        <span>{record.date || "日期缺失"}{record.latest_price == null ? " · 暂无报价" : " · 最近报价"}</span>
+      ),
+    },
+    {
       title: "涨跌幅",
       dataIndex: "change_pct",
       key: "change_pct",
@@ -134,17 +141,17 @@ export default function CommoditiesTab() {
       error={data ? undefined : error}
       onRetry={() => refetch()}
       isEmpty={!data || items.length === 0}
-      emptyText="暂无大宗商品现货行情数据"
+      emptyText="暂无大宗商品期货行情数据"
       errorTitle="大宗商品数据加载失败"
       minHeight={320}
     >
       <div className="macro-insight-banner">
         <div className="macro-insight-banner__title">
-          <span><FireOutlined /> 核心大宗商品与工业原材料现货基差看板</span>
+          <span><FireOutlined /> 大宗商品期货连续 / 主力合约行情</span>
           <Tag color="geekblue">覆盖 {items.length} 大工业与民生基准品种</Tag>
         </div>
         <div className="macro-insight-banner__body">
-          实时跟踪碳酸锂、工业硅、电解铜、铝、原油、生猪等大宗商品主力合约价格。上游原材料价格波动直接影响中下游制造产业链（电池电芯、光伏组件、电网特缆、养殖屠宰）的毛利率与盈利弹性。
+          跟踪新浪期货连续 / 主力合约最近报价，不是现货采购价，也不提供现货基差。不能直接用于估算企业采购成本或毛利；静态产业映射仅供研究参考。报价时间以各行日期为准。
         </div>
       </div>
 

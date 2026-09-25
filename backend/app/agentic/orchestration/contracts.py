@@ -44,6 +44,8 @@ class AgentTask:
 class ExecutionPlan:
     tasks: tuple[AgentTask, ...]
     reasoning: str = ""
+    # 重试仍携带完整 DAG；仅这些未受影响的任务可复用上一轮结果。
+    reuse_task_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         task_ids = [task.task_id for task in self.tasks]
@@ -55,6 +57,12 @@ class ExecutionPlan:
             raise ValueError("执行计划暂不支持重复调用同一 Agent")
 
         known_ids = set(task_ids)
+        reuse_ids = set(self.reuse_task_ids)
+        if len(reuse_ids) != len(self.reuse_task_ids) or not reuse_ids <= known_ids:
+            raise ValueError("执行计划包含重复或不存在的复用任务")
+        for task in self.tasks:
+            if task.task_id in reuse_ids and not set(task.dependencies) <= reuse_ids:
+                raise ValueError("复用任务不能依赖本轮重新执行的任务")
         for task in self.tasks:
             missing = sorted(set(task.dependencies) - known_ids)
             if missing:

@@ -94,6 +94,16 @@ def build_chat_capability_plan(
         if agent_name in profiles_by_name
         and set(profiles_by_name[agent_name].skill_names).intersection(active_skill_set)
     )
+    if candidate_agents:
+        candidate_skills = {
+            skill_name
+            for agent_name in candidate_agents
+            for skill_name in profiles_by_name[agent_name].skill_names
+            if skill_name in enabled_skills
+        }
+        active_skills = tuple(dict.fromkeys((*active_skills, *candidate_skills)))
+        tool_names = tuple(registry.get_tool_names_for_skills(active_skills))
+
     requires_evidence = bool(active_skills and tool_names)
     reasoning = decision.reasoning if candidate_agents else (
         "根据消息意图激活数据 Skill" if active_skills else "未命中数据能力，使用通用对话"

@@ -1,0 +1,99 @@
+.valuation-panel {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.valuation-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--c-space-3);
+}
+
+.valuation-snapshot-grid > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.valuation-method-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: var(--c-space-4);
+}
+
+.valuation-method-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--c-space-3);
+  padding: var(--c-space-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-lg);
+  background: var(--c-hover-bg);
+  color: var(--c-text-secondary);
+  text-align: center;
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.valuation-method-card__title {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  font-weight: var(--c-weight-semibold);
+  line-height: var(--c-leading-normal);
+}
+
+.valuation-method-card__value {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-2xl);
+  font-weight: var(--c-weight-bold);
+  line-height: var(--c-leading-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.valuation-method-card__tags {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--c-space-1);
+}
+
+.valuation-method-card__tags .ant-tag {
+  margin: 0;
+  min-width: 0;
+  padding-inline: var(--c-space-1);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.valuation-method-card p {
+  margin: 0;
+}
+
+.valuation-method-card__details {
+  display: grid;
+  align-content: end;
+  flex: 1;
+  gap: var(--c-space-2);
+}
+
+@container (max-width: 900px) {
+  .valuation-snapshot-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .valuation-method-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 560px) {
+  .valuation-snapshot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .valuation-method-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

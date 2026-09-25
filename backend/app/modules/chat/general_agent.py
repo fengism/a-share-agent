@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Collection
+from contextlib import aclosing
 
 from app.agentic.agents.contracts import AgentProfile
 from app.agentic.agents.service import stream_agent
@@ -36,7 +37,7 @@ async def stream_general_agent(
         tool_names=effective_tool_names,
         max_rounds=_MAX_ROUNDS,
     )
-    async for event in stream_agent(
+    async with aclosing(stream_agent(
         profile,
         message,
         history,
@@ -46,5 +47,6 @@ async def stream_general_agent(
         require_tool_first_round=require_tool_evidence,
         require_tool_evidence=require_tool_evidence,
         execution_context=execution_context,
-    ):
-        yield event
+    )) as stream:
+        async for event in stream:
+            yield event

@@ -19,7 +19,7 @@ export default function AnalysisEntry() {
     <div style={pageContainerStyle}>
       <WorkflowPageHeader
         title="个股"
-        description="从投资研究结论出发，深入查看基本面、估值、技术面、情绪与资金流向"
+        description="查看投资研究结论与行动建议，行情、财务、估值和资讯统一在个股资料页浏览"
         icon={<FileSearchOutlined />}
       />
       <WorkflowWorkspace

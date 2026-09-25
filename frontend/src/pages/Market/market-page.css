@@ -10,7 +10,7 @@
 
 .market-top-tabs > .ant-tabs-nav {
   margin-bottom: 20px;
-  border-bottom: 1px solid rgba(32, 198, 229, 0.16);
+  border-bottom: 1px solid var(--c-border);
 }
 
 [data-theme="light"] .market-top-tabs > .ant-tabs-nav {
@@ -27,7 +27,7 @@
 }
 
 .market-top-tabs > .ant-tabs-nav .ant-tabs-tab:hover {
-  color: var(--c-accent, #20c6e5);
+  color: var(--c-primary);
 }
 
 [data-theme="light"] .market-top-tabs > .ant-tabs-nav .ant-tabs-tab:hover {
@@ -35,8 +35,8 @@
 }
 
 .market-top-tabs > .ant-tabs-nav .ant-tabs-tab-active {
-  font-weight: 700;
-  color: var(--c-accent, #20c6e5) !important;
+  font-weight: 600;
+  color: var(--c-primary) !important;
 }
 
 [data-theme="light"] .market-top-tabs > .ant-tabs-nav .ant-tabs-tab-active {
@@ -44,9 +44,9 @@
 }
 
 .market-top-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
-  background: linear-gradient(90deg, #087f98, #20c6e5, #3ec98f) !important;
-  box-shadow: 0 0 10px rgba(32, 198, 229, 0.6) !important;
-  height: 3px !important;
+  background: var(--c-primary) !important;
+  box-shadow: none !important;
+  height: 2px !important;
   border-radius: 2px !important;
 }
 

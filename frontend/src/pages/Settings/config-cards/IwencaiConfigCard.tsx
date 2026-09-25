@@ -3,7 +3,7 @@ import { Col, Input, Row, Switch } from "antd";
 import { useStyles } from "../../../styles/ui";
 import { SettingsCard, type ConfigCardProps } from "../SettingsCard";
 
-export default function IwencaiConfigCard({ form, onChange, onSave, isSaving }: ConfigCardProps) {
+export default function IwencaiConfigCard({ form, onChange, onSave, isSaving, stretch }: ConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
 
   return (
@@ -13,6 +13,7 @@ export default function IwencaiConfigCard({ form, onChange, onSave, isSaving }: 
       saveLabel="保存问财配置"
       onSave={onSave}
       isSaving={isSaving}
+      stretch={stretch}
     >
       <p style={{ color: "var(--c-text-muted)", marginTop: 0 }}>
         自定义问财地址需要填写个人 API Key，不会继承全局 Key；保留掩码不会设置新 Key。

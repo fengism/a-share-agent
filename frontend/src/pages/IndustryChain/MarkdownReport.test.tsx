@@ -52,3 +52,10 @@ ${longEnglish}
     expect(container.querySelector(".industry-markdown pre")).not.toBeInTheDocument();
   });
 });
+
+it("hides stored evidence IDs without losing real source links", () => {
+  const { container } = render(<MarkdownReport content={"## 旧报告\n结论（证据 `ev_abc123`）\n\n[公司公告](https://example.com/report)"} />);
+  expect(container.textContent).not.toMatch(/ev_/i);
+  expect(screen.getByText(/相关资料/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "公司公告" })).toHaveAttribute("href", "https://example.com/report");
+});

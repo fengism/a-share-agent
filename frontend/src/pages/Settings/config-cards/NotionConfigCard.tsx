@@ -3,7 +3,7 @@ import { Col, Input, Row, Switch } from "antd";
 import { useStyles } from "../../../styles/ui";
 import { SettingsCard, type ConfigCardProps } from "../SettingsCard";
 
-export default function NotionConfigCard({ form, onChange, onSave, isSaving }: ConfigCardProps) {
+export default function NotionConfigCard({ form, onChange, onSave, isSaving, stretch }: ConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
 
   return (
@@ -13,6 +13,7 @@ export default function NotionConfigCard({ form, onChange, onSave, isSaving }: C
       saveLabel="保存 Notion 配置"
       onSave={onSave}
       isSaving={isSaving}
+      stretch={stretch}
     >
       <Row gutter={[24, 16]}>
         <Col span={24}>

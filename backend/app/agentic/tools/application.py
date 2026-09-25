@@ -27,6 +27,7 @@ class ApplicationToolHandlers:
     get_stock_financial: AsyncHandler
     get_stock_financial_metrics: AsyncHandler
     get_stock_revenue_breakdown: AsyncHandler
+    get_stock_documents: AsyncHandler
     get_stock_info: AsyncHandler
     get_stock_kline: AsyncHandler
     get_stock_news: AsyncHandler

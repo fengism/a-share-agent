@@ -38,7 +38,7 @@ class IntradayMixin:
         }
 
         big_df = pd.DataFrame()
-        for event in event_stream(url, params):
+        for event in event_stream(url, params, session=self.em_session):
             event_json = json.loads(event.replace("data: ", ""))
             details = event_json.get("data", {}).get("details") or []
             if not details:
@@ -85,7 +85,7 @@ class IntradayMixin:
         }
 
         big_df = pd.DataFrame()
-        for event in event_stream(url, params):
+        for event in event_stream(url, params, session=self.em_session):
             event_json = json.loads(event.replace("data: ", ""))
             temp_df = pd.DataFrame([item.split(",") for item in event_json["data"]["trends"]])
             big_df = pd.concat(objs=[big_df, temp_df], ignore_index=True)

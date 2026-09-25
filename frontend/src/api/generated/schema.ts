@@ -194,6 +194,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/admin/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Login Audit Logs
+         * @description Admin: list login audit log records with filtering and pagination.
+         */
+        get: operations["get_login_audit_logs_api_auth_admin_audit_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/admin/reset-link": {
         parameters: {
             query?: never;
@@ -211,6 +231,126 @@ export interface paths {
          *     hash is stored. No email infrastructure is involved.
          */
         post: operations["admin_reset_link_api_auth_admin_reset_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Users
+         * @description Admin: list all registered accounts.
+         */
+        get: operations["list_users_api_auth_admin_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/admin/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete User
+         * @description Admin: delete a user account and purge all their sessions/configs.
+         */
+        delete: operations["delete_user_api_auth_admin_users__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/admin/users/{user_id}/must-change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update User Must Change Password
+         * @description Admin: toggle whether a user must change their password on next login.
+         */
+        post: operations["update_user_must_change_password_api_auth_admin_users__user_id__must_change_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/admin/users/{user_id}/revoke-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke User Sessions
+         * @description Admin: force revoke all active sessions for a user.
+         */
+        post: operations["revoke_user_sessions_api_auth_admin_users__user_id__revoke_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/admin/users/{user_id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update User Role
+         * @description Admin: promote or demote a user's admin role.
+         */
+        put: operations["update_user_role_api_auth_admin_users__user_id__role_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/admin/users/{user_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update User Status
+         * @description Admin: enable or disable a user account.
+         */
+        put: operations["update_user_status_api_auth_admin_users__user_id__status_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -286,6 +426,26 @@ export interface paths {
         get: operations["list_invites_api_auth_invites_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/invites/cleanup-expired": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cleanup Expired Invites
+         * @description Admin: purge expired and unused invites.
+         */
+        post: operations["cleanup_expired_invites_api_auth_invites_cleanup_expired_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1278,7 +1438,7 @@ export interface paths {
         };
         /**
          * Get Commodities
-         * @description 获取大宗商品与工业品现货基差与产业链映射。
+         * @description 获取大宗商品期货最近报价与静态产业映射，不含现货/基差。
          */
         get: operations["get_commodities_api_macro_commodities_get"];
         put?: never;
@@ -1298,7 +1458,7 @@ export interface paths {
         };
         /**
          * Get Customs Trade
-         * @description 获取海关总署月度进出口总况与重点出海商品量价。
+         * @description 获取全国月度进出口总况及静态商品介绍，不含细分商品量价。
          */
         get: operations["get_customs_trade_api_macro_customs_trade_get"];
         put?: never;
@@ -2961,7 +3121,7 @@ export interface paths {
          * @description 聚合分析页面所需的所有数据，并发加载。
          *
          *     将 stock/info、stock/kline、stock/intraday、stock/valuation、analysis/result
-         *     合并为一个响应，减少前端页面加载时的 HTTP 往返次数。
+         *     合并为一个响应；include_market_data=false 时只加载历史分析，行情由个股查询缓存复用。
          *
          *     Param:
          *         code: 6 位股票代码
@@ -3149,6 +3309,26 @@ export interface paths {
          * @description 获取个股资金流向日级数据。
          */
         get: operations["get_fund_flow_api_stock__code__fund_flow_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock/{code}/fund-flow-pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fund Flow Page
+         * @description 每批最多 20 日，后续批次固定首批来源和日期。
+         */
+        get: operations["get_fund_flow_page_api_stock__code__fund_flow_pages_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3667,6 +3847,7 @@ export interface components {
             plan_step?: components["schemas"]["AgentPlanStepUpdate"] | null;
             /** Reasoning Content */
             reasoning_content?: string | null;
+            reasoning_source?: components["schemas"]["AgentReasoningSource"] | null;
             research_round?: components["schemas"]["AgentResearchRound"] | null;
             /** Status */
             status?: ("completed" | "partial" | "failed") | null;
@@ -3748,6 +3929,34 @@ export interface components {
             status: "pending" | "running" | "completed" | "degraded" | "failed" | "cancelled";
             /** Step Id */
             step_id: string;
+        };
+        /** AgentReasoningSource */
+        AgentReasoningSource: {
+            /**
+             * Attempt
+             * @default 1
+             */
+            attempt: number;
+            /** Block Id */
+            block_id: string;
+            /**
+             * Source
+             * @default 模型
+             */
+            source: string;
+            /**
+             * Stage
+             * @default agent
+             * @enum {string}
+             */
+            stage: "agent" | "synthesis";
+            /** Task Id */
+            task_id?: string | null;
+            /**
+             * Turn
+             * @default 1
+             */
+            turn: number;
         };
         /** AgentResearchRound */
         AgentResearchRound: {
@@ -4384,12 +4593,56 @@ export interface components {
             /** Ratio */
             ratio: number;
         };
+        /** CleanupInvitesResponse */
+        CleanupInvitesResponse: {
+            /** Cleaned Count */
+            cleaned_count: number;
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+        };
         /** CommoditiesResponse */
         CommoditiesResponse: {
+            /**
+             * Available Count
+             * @default 0
+             */
+            available_count: number;
+            /**
+             * Basis Available
+             * @default false
+             */
+            basis_available: boolean;
+            /** Caveats */
+            caveats?: string[];
             /** Items */
             items?: components["schemas"]["CommodityItem"][];
             /** Query */
             query: string;
+            /**
+             * Quote Kind
+             * @default futures
+             * @constant
+             */
+            quote_kind: "futures";
+            /**
+             * Source
+             * @default sina_futures
+             */
+            source: string;
+            /**
+             * Spot Available
+             * @default false
+             */
+            spot_available: boolean;
+            /**
+             * Status
+             * @default unavailable
+             * @enum {string}
+             */
+            status: "available" | "partial" | "unavailable" | "not_found";
             /** Total Count */
             total_count: number;
         };
@@ -4421,8 +4674,30 @@ export interface components {
             open_interest?: number | null;
             /** Prev Settle */
             prev_settle?: number | null;
+            /**
+             * Quote Kind
+             * @default futures
+             * @constant
+             */
+            quote_kind: "futures";
             /** Related Chains */
             related_chains?: string[];
+            /**
+             * Source
+             * @default sina_futures
+             */
+            source: string;
+            /**
+             * Source Url
+             * @default
+             */
+            source_url: string;
+            /**
+             * Status
+             * @default unavailable
+             * @enum {string}
+             */
+            status: "available" | "unavailable";
             /** Symbol */
             symbol: string;
             /** Unit */
@@ -4850,6 +5125,12 @@ export interface components {
             category: string;
             /** Commodity */
             commodity: string;
+            /**
+             * Data Kind
+             * @default static_reference
+             * @constant
+             */
+            data_kind: "static_reference";
             /** Description */
             description: string;
             /** Industry Chains */
@@ -4858,6 +5139,11 @@ export interface components {
             key_target_markets: string;
             /** Related A Stocks */
             related_a_stocks?: string[];
+            /**
+             * Source
+             * @default builtin_reference
+             */
+            source: string;
             /** Trade Type */
             trade_type: string;
             /** Unit */
@@ -4883,51 +5169,43 @@ export interface components {
             /**
              * Export Accumulate
              * @description 累计出口金额（亿美元）
-             * @default 0
              */
-            export_accumulate: number;
+            export_accumulate?: number | null;
             /**
              * Export Accumulate Yoy Pct
              * @description 累计出口同比（%）
-             * @default 0
              */
-            export_accumulate_yoy_pct: number;
+            export_accumulate_yoy_pct?: number | null;
             /**
              * Export Val
              * @description 当月出口金额（亿美元）
-             * @default 0
              */
-            export_val: number;
+            export_val?: number | null;
             /**
              * Export Yoy Pct
              * @description 当月出口同比（%）
-             * @default 0
              */
-            export_yoy_pct: number;
+            export_yoy_pct?: number | null;
             /**
              * Import Accumulate
              * @description 累计进口金额（亿美元）
-             * @default 0
              */
-            import_accumulate: number;
+            import_accumulate?: number | null;
             /**
              * Import Accumulate Yoy Pct
              * @description 累计进口同比（%）
-             * @default 0
              */
-            import_accumulate_yoy_pct: number;
+            import_accumulate_yoy_pct?: number | null;
             /**
              * Import Val
              * @description 当月进口金额（亿美元）
-             * @default 0
              */
-            import_val: number;
+            import_val?: number | null;
             /**
              * Import Yoy Pct
              * @description 当月进口同比（%）
-             * @default 0
              */
-            import_yoy_pct: number;
+            import_yoy_pct?: number | null;
             /**
              * Month
              * @default
@@ -4941,20 +5219,54 @@ export interface components {
             /**
              * Trade Balance
              * @description 当月贸易差额（亿美元，出口-进口）
-             * @default 0
              */
-            trade_balance: number;
+            trade_balance?: number | null;
         };
         /** CustomsTradeDataResponse */
         CustomsTradeDataResponse: {
+            /**
+             * Amount Unit
+             * @default USD_100_million
+             */
+            amount_unit: string;
+            /** Caveats */
+            caveats?: string[];
+            /**
+             * Commodity Series Available
+             * @default false
+             */
+            commodity_series_available: boolean;
+            /**
+             * Data Scope
+             * @default national_macro
+             * @constant
+             */
+            data_scope: "national_macro";
             investment_implications: components["schemas"]["CustomsInvestmentImplications"];
-            latest_month_summary?: components["schemas"]["CustomsMonthSummary"];
+            latest_month_summary?: components["schemas"]["CustomsMonthSummary"] | null;
+            /**
+             * Macro Status
+             * @default unavailable
+             * @enum {string}
+             */
+            macro_status: "available" | "partial" | "unavailable";
             /** Matched Commodity Profiles */
             matched_commodity_profiles?: components["schemas"]["CustomsCommodityProfile"][];
+            /**
+             * Profile Match Status
+             * @default not_found
+             * @enum {string}
+             */
+            profile_match_status: "matched" | "not_found";
             /** Query */
             query: string;
             /** Recent 12M Macro Trend */
             recent_12m_macro_trend?: components["schemas"]["CustomsMonthSummary"][];
+            /**
+             * Source
+             * @default eastmoney_china_trade
+             */
+            source: string;
         };
         /**
          * DCFScenario
@@ -5923,6 +6235,12 @@ export interface components {
              */
             category: "chain" | "company" | "market" | "event" | "driver" | "risk" | "summary";
             /**
+             * Change Basis
+             * @default text
+             * @enum {string}
+             */
+            change_basis: "fact" | "observation" | "evidence" | "text";
+            /**
              * Change Type
              * @enum {string}
              */
@@ -5932,6 +6250,16 @@ export interface components {
              * @default
              */
             detail: string;
+            /**
+             * Numeric Delta
+             * @default
+             */
+            numeric_delta: string;
+            /**
+             * Percentage Delta
+             * @default
+             */
+            percentage_delta: string;
             /** Title */
             title: string;
         };
@@ -5942,6 +6270,16 @@ export interface components {
              * @default 0
              */
             added_count: number;
+            /**
+             * Comparable
+             * @default true
+             */
+            comparable: boolean;
+            /**
+             * Comparison Note
+             * @default
+             */
+            comparison_note: string;
             /**
              * Has Changes
              * @default false
@@ -5986,6 +6324,28 @@ export interface components {
              * @default
              */
             type: string;
+        };
+        /** IndustryChainCitation */
+        IndustryChainCitation: {
+            /** Evidence Id */
+            evidence_id: string;
+            /**
+             * Location
+             * @description 原文页码/表格/章节；未核实则留空
+             * @default
+             */
+            location: string;
+            /**
+             * Quote
+             * @default
+             */
+            quote: string;
+            /**
+             * Source Url
+             * @description 服务端匹配原文所属 URL，不接受模型自报链接
+             * @default
+             */
+            source_url: string;
         };
         /** IndustryChainCompetitionGroup */
         IndustryChainCompetitionGroup: {
@@ -6054,6 +6414,8 @@ export interface components {
         };
         /** IndustryChainEvent */
         IndustryChainEvent: {
+            /** Citations */
+            citations?: components["schemas"]["IndustryChainCitation"][];
             /**
              * Claim Type
              * @default fact
@@ -6071,6 +6433,12 @@ export interface components {
              * @default
              */
             date: string;
+            /**
+             * Evidence Basis
+             * @default disclosed
+             * @enum {string}
+             */
+            evidence_basis: "disclosed" | "forecast" | "inference" | "opinion";
             /** Evidence Ids */
             evidence_ids?: string[];
             /**
@@ -6090,6 +6458,14 @@ export interface components {
             source_url: string;
             /** Title */
             title: string;
+            /** Verification Notes */
+            verification_notes?: string[];
+            /**
+             * Verification Status
+             * @default unverified
+             * @enum {string}
+             */
+            verification_status: "unverified" | "quote_matched";
         };
         /** IndustryChainEvidence */
         IndustryChainEvidence: {
@@ -6115,6 +6491,12 @@ export interface components {
              * @default
              */
             fetched_at: string;
+            /**
+             * Material Type
+             * @default unknown
+             * @enum {string}
+             */
+            material_type: "discovery" | "body" | "structured" | "unknown";
             /**
              * Provider
              * @default
@@ -6208,6 +6590,8 @@ export interface components {
         };
         /** IndustryChainInsight */
         IndustryChainInsight: {
+            /** Citations */
+            citations?: components["schemas"]["IndustryChainCitation"][];
             /**
              * Claim Type
              * @default inference
@@ -6230,6 +6614,12 @@ export interface components {
              * @default
              */
             evidence: string;
+            /**
+             * Evidence Basis
+             * @default disclosed
+             * @enum {string}
+             */
+            evidence_basis: "disclosed" | "forecast" | "inference" | "opinion";
             /** Evidence Ids */
             evidence_ids?: string[];
             /**
@@ -6244,6 +6634,14 @@ export interface components {
             source_url: string;
             /** Title */
             title: string;
+            /** Verification Notes */
+            verification_notes?: string[];
+            /**
+             * Verification Status
+             * @default unverified
+             * @enum {string}
+             */
+            verification_status: "unverified" | "quote_matched";
         };
         /** IndustryChainLatestResponse */
         IndustryChainLatestResponse: {
@@ -6257,6 +6655,8 @@ export interface components {
         };
         /** IndustryChainMetric */
         IndustryChainMetric: {
+            /** Citations */
+            citations?: components["schemas"]["IndustryChainCitation"][];
             /**
              * Claim Type
              * @default fact
@@ -6269,6 +6669,12 @@ export interface components {
              * @enum {string}
              */
             confidence: "high" | "medium" | "low";
+            /**
+             * Evidence Basis
+             * @default disclosed
+             * @enum {string}
+             */
+            evidence_basis: "disclosed" | "forecast" | "inference" | "opinion";
             /** Evidence Ids */
             evidence_ids?: string[];
             /**
@@ -6279,10 +6685,25 @@ export interface components {
             /** Label */
             label: string;
             /**
+             * Metric Id
+             * @default
+             */
+            metric_id: string;
+            /**
+             * Numeric Value
+             * @default
+             */
+            numeric_value: string;
+            /**
              * Period
              * @default
              */
             period: string;
+            /**
+             * Region
+             * @default
+             */
+            region: string;
             /**
              * Source
              * @default
@@ -6293,11 +6714,42 @@ export interface components {
              * @default
              */
             source_url: string;
+            /**
+             * Statistical Scope
+             * @default
+             */
+            statistical_scope: string;
+            /**
+             * Unit
+             * @default
+             */
+            unit: string;
             /** Value */
             value: string;
+            /** Verification Notes */
+            verification_notes?: string[];
+            /**
+             * Verification Status
+             * @default unverified
+             * @enum {string}
+             */
+            verification_status: "unverified" | "quote_matched";
         };
         /** IndustryChainNode */
         IndustryChainNode: {
+            /**
+             * Benefit Path
+             * @default
+             */
+            benefit_path: string;
+            /**
+             * Business Relevance
+             * @default unverified
+             * @enum {string}
+             */
+            business_relevance: "unverified" | "concept" | "business" | "earnings";
+            /** Citations */
+            citations?: components["schemas"]["IndustryChainCitation"][];
             /**
              * Claim Type
              * @default fact
@@ -6321,8 +6773,16 @@ export interface components {
              * @default
              */
             description: string;
+            /**
+             * Evidence Basis
+             * @default disclosed
+             * @enum {string}
+             */
+            evidence_basis: "disclosed" | "forecast" | "inference" | "opinion";
             /** Evidence Ids */
             evidence_ids?: string[];
+            /** Invalidation Conditions */
+            invalidation_conditions?: string[];
             /**
              * Market Share
              * @default
@@ -6335,6 +6795,18 @@ export interface components {
             metric: string;
             /** Name */
             name?: string | null;
+            /** Realization Conditions */
+            realization_conditions?: string[];
+            /**
+             * Revenue Period
+             * @default
+             */
+            revenue_period: string;
+            /**
+             * Revenue Share
+             * @default
+             */
+            revenue_share: string;
             /**
              * Role
              * @default
@@ -6350,6 +6822,16 @@ export interface components {
              * @default
              */
             source_url: string;
+            /** Tracking Metrics */
+            tracking_metrics?: string[];
+            /** Verification Notes */
+            verification_notes?: string[];
+            /**
+             * Verification Status
+             * @default unverified
+             * @enum {string}
+             */
+            verification_status: "unverified" | "quote_matched";
         } & {
             [key: string]: unknown;
         };
@@ -6366,6 +6848,11 @@ export interface components {
              */
             code: string;
             /**
+             * Completeness Score
+             * @default 0
+             */
+            completeness_score: number;
+            /**
              * Earnings Score
              * @default 0
              */
@@ -6377,6 +6864,12 @@ export interface components {
              * @default 0
              */
             evidence_score: number;
+            /**
+             * Fundamental Status
+             * @default not_evaluated
+             * @constant
+             */
+            fundamental_status: "not_evaluated";
             /** Name */
             name: string;
             /**
@@ -6400,6 +6893,17 @@ export interface components {
              */
             role: string;
             /**
+             * Score Kind
+             * @default research_completeness
+             * @constant
+             */
+            score_kind: "research_completeness";
+            /**
+             * Scoring Version
+             * @default 1
+             */
+            scoring_version: number;
+            /**
              * Total Score
              * @default 0
              */
@@ -6409,6 +6913,100 @@ export interface components {
              * @default 0
              */
             valuation_score: number;
+        };
+        /** IndustryChainRelationship */
+        IndustryChainRelationship: {
+            /** Citations */
+            citations?: components["schemas"]["IndustryChainCitation"][];
+            /**
+             * Claim Type
+             * @default inference
+             * @enum {string}
+             */
+            claim_type: "fact" | "inference" | "opinion";
+            /** Conditions */
+            conditions?: string[];
+            /**
+             * Confidence
+             * @default medium
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /**
+             * Driver
+             * @default
+             */
+            driver: string;
+            /**
+             * Evidence
+             * @default
+             */
+            evidence: string;
+            /**
+             * Evidence Basis
+             * @default disclosed
+             * @enum {string}
+             */
+            evidence_basis: "disclosed" | "forecast" | "inference" | "opinion";
+            /** Evidence Ids */
+            evidence_ids?: string[];
+            /**
+             * Impact Direction
+             * @default unknown
+             * @enum {string}
+             */
+            impact_direction: "positive" | "negative" | "mixed" | "unknown";
+            /**
+             * Invalidation
+             * @default
+             */
+            invalidation: string;
+            /**
+             * Relation Type
+             * @enum {string}
+             */
+            relation_type: "supply" | "purchase" | "substitute" | "compete" | "transmission";
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /** Source Node */
+            source_node: string;
+            /**
+             * Source Url
+             * @default
+             */
+            source_url: string;
+            /**
+             * Target Metric
+             * @default
+             */
+            target_metric: string;
+            /** Target Node */
+            target_node: string;
+            /**
+             * Time Lag
+             * @default
+             */
+            time_lag: string;
+            /** Title */
+            title: string;
+            /** Tracking Metrics */
+            tracking_metrics?: string[];
+            /** Verification Notes */
+            verification_notes?: string[];
+            /**
+             * Verification Status
+             * @default unverified
+             * @enum {string}
+             */
+            verification_status: "unverified" | "quote_matched";
         };
         /** IndustryChainResearchScope */
         IndustryChainResearchScope: {
@@ -6422,6 +7020,8 @@ export interface components {
             company_scope: "a_share" | "all_public";
             /** End Date */
             end_date?: string | null;
+            /** Refresh Dimensions */
+            refresh_dimensions?: ("market" | "stocks" | "competition" | "technology" | "chain" | "drivers_risks" | "reports" | "events")[];
             /**
              * Region
              * @default china_and_global
@@ -6510,10 +7110,14 @@ export interface components {
              * @enum {string}
              */
             quality_status: "complete" | "degraded";
+            /** Relationships */
+            relationships?: components["schemas"]["IndustryChainRelationship"][];
             /** Research Scope */
             research_scope?: {
                 [key: string]: string;
             };
+            /** Research Theses */
+            research_theses?: components["schemas"]["IndustryChainThesis"][];
             /** Risk Insights */
             risk_insights?: components["schemas"]["IndustryChainInsight"][];
             /** Risks */
@@ -6539,6 +7143,7 @@ export interface components {
             trends?: components["schemas"]["IndustryChainInsight"][];
             /** Upstream */
             upstream?: components["schemas"]["IndustryChainNode"][];
+            verification_repair?: components["schemas"]["IndustryChainVerificationRepair"];
             /** Warnings */
             warnings?: string[];
         };
@@ -6564,6 +7169,84 @@ export interface components {
              */
             url: string;
         };
+        /** IndustryChainThesis */
+        IndustryChainThesis: {
+            /** Beneficiaries */
+            beneficiaries?: string[];
+            /** Chain Path */
+            chain_path?: string[];
+            /** Citations */
+            citations?: components["schemas"]["IndustryChainCitation"][];
+            /**
+             * Claim Type
+             * @default inference
+             * @enum {string}
+             */
+            claim_type: "fact" | "inference" | "opinion";
+            /** Conditions */
+            conditions?: string[];
+            /**
+             * Confidence
+             * @default medium
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
+             * Counter Evidence
+             * @default
+             */
+            counter_evidence: string;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /**
+             * Evidence
+             * @default
+             */
+            evidence: string;
+            /**
+             * Evidence Basis
+             * @default disclosed
+             * @enum {string}
+             */
+            evidence_basis: "disclosed" | "forecast" | "inference" | "opinion";
+            /** Evidence Ids */
+            evidence_ids?: string[];
+            /**
+             * Invalidation
+             * @default
+             */
+            invalidation: string;
+            /**
+             * Mechanism
+             * @default
+             */
+            mechanism: string;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /**
+             * Source Url
+             * @default
+             */
+            source_url: string;
+            /** Title */
+            title: string;
+            /** Tracking Metrics */
+            tracking_metrics?: string[];
+            /** Verification Notes */
+            verification_notes?: string[];
+            /**
+             * Verification Status
+             * @default unverified
+             * @enum {string}
+             */
+            verification_status: "unverified" | "quote_matched";
+        };
         /** IndustryChainTopicResolution */
         IndustryChainTopicResolution: {
             /** Aliases */
@@ -6587,6 +7270,32 @@ export interface components {
              * @default
              */
             requested_name: string;
+        };
+        /** IndustryChainVerificationRepair */
+        IndustryChainVerificationRepair: {
+            /**
+             * Added Evidence Count
+             * @default 0
+             */
+            added_evidence_count: number;
+            /**
+             * Attempted Rounds
+             * @default 0
+             */
+            attempted_rounds: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /**
+             * Status
+             * @default not_needed
+             * @enum {string}
+             */
+            status: "not_needed" | "completed" | "no_new_evidence" | "failed";
+            /** Targets */
+            targets?: string[];
         };
         /** IndustryHierarchyResponse */
         IndustryHierarchyResponse: {
@@ -7048,6 +7757,36 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /** LoginAuditLogItem */
+        LoginAuditLogItem: {
+            /** Created At */
+            created_at: string;
+            /** Details */
+            details: string;
+            /** Id */
+            id: number;
+            /** Ip Address */
+            ip_address: string;
+            /** Status */
+            status: string;
+            /** User Agent */
+            user_agent: string;
+            /** User Id */
+            user_id?: number | null;
+            /** Username */
+            username: string;
+        };
+        /** LoginAuditLogsResponse */
+        LoginAuditLogsResponse: {
+            /** Items */
+            items: components["schemas"]["LoginAuditLogItem"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -9934,6 +10673,16 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** RevokeSessionsResponse */
+        RevokeSessionsResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Revoked Sessions */
+            revoked_sessions: number;
+        };
         /** RiskCase */
         RiskCase: {
             /**
@@ -10882,6 +11631,22 @@ export interface components {
             /** Super Net */
             super_net?: number | null;
         };
+        /**
+         * StockFundFlowPage
+         * @description 固定来源与日期的资金流批次，total 为最多 60 个交易日的可查询天数。
+         */
+        StockFundFlowPage: {
+            /** Items */
+            items: components["schemas"]["StockFundFlowItem"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Source */
+            source: string;
+            /** Source Api */
+            source_api: string;
+            /** Total */
+            total: number;
+        };
         /** StockProfileEnrichResponse */
         StockProfileEnrichResponse: {
             /**
@@ -11760,6 +12525,11 @@ export interface components {
              */
             status: "ok" | "skipped";
         };
+        /** UpdateMustChangePasswordRequest */
+        UpdateMustChangePasswordRequest: {
+            /** Must Change Password */
+            must_change_password: boolean;
+        };
         /** UpdateStatusResponse */
         UpdateStatusResponse: {
             /** Message */
@@ -11772,10 +12542,27 @@ export interface components {
             /** Updated At */
             updated_at?: string | null;
         };
+        /** UpdateUserRoleRequest */
+        UpdateUserRoleRequest: {
+            /** Is Admin */
+            is_admin: boolean;
+        };
+        /** UpdateUserStatusRequest */
+        UpdateUserStatusRequest: {
+            /** Is Active */
+            is_active: boolean;
+        };
         /** UserOut */
         UserOut: {
+            /** Created At */
+            created_at?: string | null;
             /** Id */
             id: number;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
             /** Is Admin */
             is_admin: boolean;
             /**
@@ -12558,6 +13345,40 @@ export interface operations {
             };
         };
     };
+    get_login_audit_logs_api_auth_admin_audit_logs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                status?: string | null;
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginAuditLogsResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     admin_reset_link_api_auth_admin_reset_link_post: {
         parameters: {
             query?: never;
@@ -12578,6 +13399,202 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResetLinkOut"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_users_api_auth_admin_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_user_api_auth_admin_users__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_user_must_change_password_api_auth_admin_users__user_id__must_change_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMustChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    revoke_user_sessions_api_auth_admin_users__user_id__revoke_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokeSessionsResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_user_role_api_auth_admin_users__user_id__role_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_user_status_api_auth_admin_users__user_id__status_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
                 };
             };
             /** @description 统一错误响应 */
@@ -12704,6 +13721,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InviteOut"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cleanup_expired_invites_api_auth_invites_cleanup_expired_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CleanupInvitesResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -17562,7 +18608,9 @@ export interface operations {
     };
     get_analysis_page_api_stock_analysis_page__code__get: {
         parameters: {
-            query?: never;
+            query?: {
+                include_market_data?: boolean;
+            };
             header?: never;
             path: {
                 code: string;
@@ -17872,6 +18920,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockFundFlowItem"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_fund_flow_page_api_stock__code__fund_flow_pages_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockFundFlowPage"];
                 };
             };
             /** @description 统一错误响应 */

@@ -130,3 +130,11 @@ def fetch_stock_names_bj() -> pd.DataFrame:
 
 def fetch_stock_spot_snapshot() -> pd.DataFrame:
     return ak.stock_zh_a_spot_em()
+
+
+def fetch_restricted_shares(code: str) -> pd.DataFrame:
+    return ak.stock_restricted_release_queue_em(symbol=code)
+
+
+def fetch_interactive_qa(code: str) -> pd.DataFrame:
+    return ak.stock_irm_cninfo(symbol=code)

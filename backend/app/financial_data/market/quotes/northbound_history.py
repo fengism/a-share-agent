@@ -18,6 +18,7 @@ from app.core.exceptions import UpstreamUnavailableError
 from app.financial_data.market.quotes.schemas import NorthboundHistoryPoint, NorthboundHistoryResponse
 from app.infrastructure.persistence.file_lock import exclusive_file_lock
 from app.infrastructure.persistence.json_storage import atomic_write_json
+from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
@@ -291,14 +292,19 @@ class NorthboundHistoryService:
         north_rows: list[Mapping[str, Any]] = []
         page_number = 1
         while True:
-            page_rows = self._fallback_provider.fetch_datacenter_report(
-                report_name="RPT_MUTUAL_DEAL_HISTORY",
-                columns="MUTUAL_TYPE,TRADE_DATE,DEAL_AMT",
-                filter_str='(MUTUAL_TYPE="005")',
-                page_size=_EASTMONEY_PAGE_SIZE,
-                page_number=page_number,
-                sort_columns="TRADE_DATE",
-                sort_types="-1",
+            page_rows = provider_gateway.call_sync(
+                "eastmoney",
+                "fetch_northbound_history",
+                lambda: self._fallback_provider.fetch_datacenter_report(
+                    report_name="RPT_MUTUAL_DEAL_HISTORY",
+                    columns="MUTUAL_TYPE,TRADE_DATE,DEAL_AMT",
+                    filter_str='(MUTUAL_TYPE="005")',
+                    page_size=_EASTMONEY_PAGE_SIZE,
+                    page_number=page_number,
+                    sort_columns="TRADE_DATE",
+                    sort_types="-1",
+                ),
+                is_fallback_attempt=True,
             )
             north_rows.extend(_records(page_rows))
             if len(page_rows) < _EASTMONEY_PAGE_SIZE or page_number >= _EASTMONEY_MAX_PAGES:
@@ -310,11 +316,16 @@ class NorthboundHistoryService:
         end_date = self._now_shanghai().date().strftime("%Y%m%d")
         index_rows: list[Mapping[str, Any]] = []
         try:
-            index_frame = self._fallback_provider.fetch_index_kline(
-                symbol="000300",
-                period="daily",
-                start_date=start_date,
-                end_date=end_date,
+            index_frame = provider_gateway.call_sync(
+                "eastmoney",
+                "fetch_index_kline",
+                lambda: self._fallback_provider.fetch_index_kline(
+                    symbol="000300",
+                    period="daily",
+                    start_date=start_date,
+                    end_date=end_date,
+                ),
+                is_fallback_attempt=True,
             )
             index_rows = _records(index_frame)
         except Exception as error:
@@ -329,7 +340,13 @@ class NorthboundHistoryService:
             if snapshot is not None and self._is_fresh(snapshot[1]):
                 return self._to_response(*snapshot, page_size, is_stale=False)
             try:
-                raw_items = _parse_items(self._provider.fetch_northbound_history())
+                raw_items = _parse_items(
+                    provider_gateway.call_sync(
+                        "legulegu",
+                        "fetch_northbound_history",
+                        self._provider.fetch_northbound_history,
+                    )
+                )
                 items = [NorthboundHistoryPoint.model_validate(item) for item in raw_items]
                 source = _LEGULEGU_SOURCE
             except Exception as primary_error:

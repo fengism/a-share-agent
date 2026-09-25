@@ -522,6 +522,35 @@ def _add_daily_review_workflow_kind(conn: sqlite3.Connection) -> None:
     _add_workflow_retention_index(conn)
 
 
+def _add_users_is_active(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if columns and "is_active" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
+
+
+def _add_login_audit_logs(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS login_audit_logs (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            username   TEXT    NOT NULL,
+            user_id    INTEGER,
+            ip_address TEXT    NOT NULL DEFAULT '',
+            user_agent TEXT    NOT NULL DEFAULT '',
+            status     TEXT    NOT NULL,
+            details    TEXT    NOT NULL DEFAULT '',
+            created_at TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_login_audit_created ON login_audit_logs(created_at DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_login_audit_username ON login_audit_logs(username, created_at DESC)"
+    )
+
+
 USER_MIGRATIONS = (
     Migration(1, "add users.must_change_password", _add_must_change_password),
     Migration(2, "add authentication lookup indexes", _add_auth_indexes),
@@ -543,7 +572,10 @@ USER_MIGRATIONS = (
     Migration(18, "add screener strategy workflow kind", _add_screener_strategy_workflow_kind),
     Migration(19, "add daily review workflow kind", _add_daily_review_workflow_kind),
     Migration(20, "add portfolio account settings", _add_portfolio_account_settings),
+    Migration(21, "add users is_active", _add_users_is_active),
+    Migration(22, "add login audit logs", _add_login_audit_logs),
 )
+
 
 def _add_national_team_etf_tables(conn: sqlite3.Connection) -> None:
     conn.execute(

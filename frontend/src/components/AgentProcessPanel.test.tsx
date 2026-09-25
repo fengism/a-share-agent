@@ -59,7 +59,7 @@ describe("AgentProcessPanel", () => {
         status=""
         toolCalls={[{
           id: "call-2",
-          name: "fetch_url",
+          name: "web_fetch",
           arguments: "{}",
           isExecuting: false,
           isCancelled: true,
@@ -187,9 +187,9 @@ describe("AgentProcessPanel research rounds", () => {
             status: "completed",
             objective: "补齐竞争格局的证据缺口",
             evidenceGaps: [],
-            toolNames: ["fetch_url"],
+            toolNames: ["web_fetch"],
             toolSelectionReason: "定向读取权威来源正文",
-            evidenceAdded: ["fetch_url：1 条"],
+            evidenceAdded: ["web_fetch：1 条"],
             judgmentBasis: ["全部证据维度已满足"],
             conclusion: "已确认竞争格局",
             nextStep: "证据维度已满足，结束自适应调研",

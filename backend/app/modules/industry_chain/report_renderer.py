@@ -10,6 +10,7 @@ from app.modules.industry_chain.models import (
     IndustryChainNode,
     IndustryChainResult,
 )
+from app.modules.industry_chain.presentation import presentation_payload
 
 
 def _escape_table(value: object) -> str:
@@ -25,7 +26,7 @@ def _safe_url(value: str) -> str:
 
 
 def _evidence(ids: list[str]) -> str:
-    return "、".join(f"证据 `{item}`" for item in ids) if ids else ""
+    return "、".join(dict.fromkeys(ids)) if ids else ""
 
 
 def _source(source: str, url: str) -> str:
@@ -36,7 +37,7 @@ def _source(source: str, url: str) -> str:
 
 
 def _claim_label(item: IndustryChainInsight) -> str:
-    claim = {"fact": "事实", "inference": "推断", "opinion": "观点"}[item.claim_type]
+    claim = "机构预测" if item.evidence_basis == "forecast" else {"fact": "事实陈述", "inference": "推断", "opinion": "观点"}[item.claim_type]
     confidence = {"high": "高", "medium": "中", "low": "低"}[item.confidence]
     return f"{claim}｜置信度：{confidence}"
 
@@ -75,7 +76,7 @@ def _chain_table(result: IndustryChainResult) -> list[str]:
     if not rows:
         return [*lines, "暂无可靠结构化证据。", ""]
     lines.extend([
-        "| 环节 | 节点 | 角色/说明 | 相关公司 | 来源 | 工具证据 |",
+        "| 环节 | 节点 | 角色/说明 | 相关公司 | 来源 | 资料索引 |",
         "| --- | --- | --- | --- | --- | --- |",
     ])
     lines.extend("| " + " | ".join(_escape_table(value) for value in row) + " |" for row in rows)
@@ -88,13 +89,14 @@ def _market_table(result: IndustryChainResult) -> list[str]:
     if not result.market_metrics:
         return [*lines, "暂无可靠结构化证据。", ""]
     lines.extend([
-        "| 指标 | 数据 | 期间 | 增长 | 来源 | 工具证据 |",
+        "| 指标 | 数据 | 期间 | 增长 | 来源 | 资料索引 |",
         "| --- | --- | --- | --- | --- | --- |",
     ])
     for item in result.market_metrics:
         row = [
             item.label,
-            item.value,
+            item.value + ("（机构预测）" if item.evidence_basis == "forecast" else "")
+            + ("（待验证）" if item.verification_status != "quote_matched" else "（原文匹配，非事实核实）"),
             item.period,
             item.growth,
             _source(item.source, item.source_url),
@@ -160,6 +162,7 @@ def _conflicts(conflicts: list[IndustryChainConflict]) -> list[str]:
 
 
 def render_industry_markdown(result: IndustryChainResult) -> str:
+    result = IndustryChainResult.model_validate(presentation_payload(result))
     lines = [f"# {result.name or '产业'}产业链分析", ""]
     scope = result.research_scope
     if scope:
@@ -170,7 +173,25 @@ def render_industry_markdown(result: IndustryChainResult) -> str:
         ]
         lines.extend([f"> 研究范围：{' · '.join(value for value in scope_values if value)}", ""])
 
+    lines.extend(["> 资料完整度不代表投资价值；原文匹配不等于事实核实，待验证内容不得作为确定性结论。", ""])
     lines.extend(["## 1. 行业定位与核心结论", result.summary or "暂无可靠核心结论。"])
+    if result.research_theses:
+        lines.append("### 核心研究判断（推断不等于已发生事实）")
+        for thesis in result.research_theses:
+            lines.extend([
+                f"#### {thesis.title}", thesis.detail,
+                f"证据状态：{'原文前提片段已匹配，推导仍需复核' if thesis.verification_status == 'quote_matched' else '缺少匹配前提，待验证'}",
+                f"上下游路径：{' → '.join(thesis.chain_path) or '尚未建立有向跨环节路径'}",
+                f"传导机制：{thesis.mechanism}",
+                f"成立条件：{'；'.join(thesis.conditions) or '待补充'}",
+                f"反向证据：{thesis.counter_evidence or '本次未取得反向证据'}",
+                f"失效条件：{thesis.invalidation or '待补充'}",
+                f"跟踪指标：{'；'.join(thesis.tracking_metrics) or '待补充'}",
+            ])
+            lines.extend(f"> {citation.quote} {_source('原文', citation.source_url)}" for citation in thesis.citations)
+    if result.verification_repair.attempted_rounds:
+        lines.append(f"补证说明：{result.verification_repair.note}")
+
     if result.summary_evidence_ids:
         lines.append(_evidence(result.summary_evidence_ids))
     if result.positioning:
@@ -182,6 +203,24 @@ def render_industry_markdown(result: IndustryChainResult) -> str:
     lines.extend(_competition(result))
     lines.extend(_insights("## 4. 技术路线、商业模式与壁垒", result.technology_routes))
     lines.extend(_chain_table(result))
+    if result.relationships:
+        lines.append("### 上下游经营传导（条件推断，非已核实因果）")
+        for edge in result.relationships:
+            if edge.relation_type != "transmission":
+                continue
+            lines.extend([
+                f"#### {edge.source_node} → {edge.target_node}",
+                f"冲击/变化：{edge.driver or '待补证'}",
+                f"目标经营指标：{edge.target_metric or '待补证'}",
+                f"机制：{edge.detail}",
+                f"成立条件：{'；'.join(edge.conditions) or '待补证'}",
+                f"传导时滞：{edge.time_lag or '未知，不假设即时兑现'}",
+                f"失效条件：{edge.invalidation or '待补证'}",
+                f"跟踪指标：{'；'.join(edge.tracking_metrics) or '待补证'}",
+                f"证据状态：{'前提片段已匹配，推导仍待复核' if edge.verification_status == 'quote_matched' else '前提待验证'}",
+            ])
+            lines.extend(f"> {citation.quote} {_source('原文', citation.source_url)}" for citation in edge.citations)
+
     lines.extend(_insights("## 6. 关键趋势与催化剂", [*result.driver_insights, *result.trends]))
     lines.extend(_events(result))
     lines.extend(_companies(result))
@@ -210,5 +249,36 @@ def render_industry_markdown(result: IndustryChainResult) -> str:
             suffix = "；".join(value for value in (metadata, evidence) if value)
             lines.append(f"- {label}{f'；{suffix}' if suffix else ''}")
     else:
-        lines.append("暂无独立来源目录，请参考各结构化结论的工具证据 ID。")
+        lines.append("暂无独立来源目录，请结合各项结论的来源与核验状态阅读。")
+    if result.evidence_catalog:
+        lines.extend(["", "### 资料索引（引用线索不代表事实核实）"])
+        for entry in result.evidence_catalog:
+            links = "、".join(_source(f"原文 {index + 1}", url) for index, url in enumerate(entry.source_urls) if _safe_url(url))
+            lines.append(f"- {entry.evidence_id}：{entry.title or '研究资料'}；{links or '原文链接未提供'}")
+    if result.relationships:
+        lines.extend(["", "## 关系与定性传导"])
+        for edge in result.relationships:
+            lines.extend([
+                f"- **{edge.source_node} → {edge.target_node}**：{edge.detail or edge.title}",
+                f"  - 成立条件：{'；'.join(edge.conditions) or '待补充'}；失效条件：{edge.invalidation or '待补充'}",
+                f"  - {_evidence(edge.evidence_ids)}；传导为条件假设，不作定量收益预测。",
+            ])
+    if result.key_stocks:
+        lines.extend(["", "## 公司业务相关度与验证"])
+        relevance = {"unverified": "待验证", "concept": "概念布局", "business": "业务相关（待复核）", "earnings": "收入相关（待复核）"}
+        for node in result.key_stocks:
+            lines.extend([
+                f"- **{_node_name(node)}**：{relevance[node.business_relevance]}",
+                f"  - 相关收入占比：{node.revenue_share or '未验证'}；统计期：{node.revenue_period or '待补充'}",
+                f"  - 受益路径：{node.benefit_path or '待补充'}",
+                f"  - 兑现条件：{'；'.join(node.realization_conditions) or '待补充'}",
+                f"  - 失效条件：{'；'.join(node.invalidation_conditions) or '待补充'}",
+                f"  - 跟踪指标：{'；'.join(node.tracking_metrics) or '待补充'}",
+            ])
+    lines.extend(["", "## 关键指标原文核验"])
+    for metric in result.market_metrics:
+        status = "原文片段已匹配（仍需复核）" if metric.verification_status == "quote_matched" else "待验证"
+        lines.append(f"- {metric.label}：{status}；统计期 {metric.period or '缺失'}；单位 {metric.unit or '缺失'}；地域 {metric.region or '缺失'}；口径 {metric.statistical_scope or '缺失'}")
+        for citation in metric.citations:
+            lines.append(f"  - 原文：{citation.quote}；{_source('匹配原文', citation.source_url) if citation.source_url else _evidence([citation.evidence_id])}")
     return "\n".join(lines).strip() + "\n"

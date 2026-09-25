@@ -30,27 +30,41 @@ def invite_is_valid(code: str) -> bool:
     return True
 
 
-def list_invites(created_by: int) -> list[dict]:
-    cursor = _connection().execute(
-        "SELECT * FROM invites WHERE created_by = ? ORDER BY created_at DESC",
-        (created_by,),
-    )
+def list_invites(created_by: int | None = None) -> list[dict]:
+    if created_by is None:
+        cursor = _connection().execute("SELECT * FROM invites ORDER BY created_at DESC")
+    else:
+        cursor = _connection().execute(
+            "SELECT * FROM invites WHERE created_by = ? ORDER BY created_at DESC",
+            (created_by,),
+        )
     return [dict(row) for row in cursor.fetchall()]
 
 
-def revoke_invite(code: str, created_by: int) -> str:
+def revoke_invite(code: str, created_by: int | None = None) -> str:
     invite = get_invite(code)
-    if not invite or invite["created_by"] != created_by:
+    if not invite:
         return "not_found"
     if invite["used_by"] is not None:
         return "used"
     connection = _connection()
     cursor = connection.execute(
-        "DELETE FROM invites WHERE code = ? AND created_by = ? AND used_by IS NULL",
-        (code, created_by),
+        "DELETE FROM invites WHERE code = ? AND used_by IS NULL",
+        (code,),
     )
     connection.commit()
     return "revoked" if cursor.rowcount == 1 else "used"
+
+
+def cleanup_expired_invites() -> int:
+    connection = _connection()
+    current_time = now_ts()
+    cursor = connection.execute(
+        "DELETE FROM invites WHERE used_by IS NULL AND expires_at IS NOT NULL AND expires_at < ?",
+        (current_time,),
+    )
+    connection.commit()
+    return cursor.rowcount
 
 
 def create_password_reset(user_id: int, created_by: int, token: str, expires_at: str) -> None:

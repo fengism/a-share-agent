@@ -57,23 +57,30 @@ def build_research_system_prompt(
     ]
     if "web_search" in spec.tool_names:
         recency_start = resolved_date - timedelta(days=_DEFAULT_RECENCY_DAYS)
-        sections.append(
-            "## 网页检索式规则\n"
-            f"- 默认最近半年指 {recency_start.isoformat()} 至 {resolved_date.isoformat()}；"
-            "用户未指定时间时使用 time_range=half_year、language=zh。\n"
-            "- 每个 query 只解决一个研究问题，使用‘核心实体 + 单一维度 + 地域/市场 + 资料类型 + 当前年份或最新’的简洁关键词组合。\n"
-            "- 不要直接复制完整问题，不要把市场、技术、竞争、政策等多个维度塞进同一个 query，"
-            "不要使用‘发展前景分析’这类宽泛词替代具体指标。\n"
-            f"- 时效性 query 优先使用 {resolved_date.year}、‘最新’或当前季度；"
-            "除非用户要求历史研究，不得主动加入更早年份。\n"
-            "- 多次搜索必须覆盖不同维度、地域或来源类型，不得仅改写同义词重复搜索。\n"
-            "- 检查结果标题、摘要和发布日期；若主要结果早于默认时间窗、偏离主题或缺少权威来源，"
-            "应缩小研究维度并加入当前年份、官方、白皮书、研报、公告等来源词后重新搜索。"
-        )
+        if spec.document_search_guidance:
+            sections.append(
+                f"默认最近半年为{recency_start.isoformat()}至{resolved_date.isoformat()}；"
+                "用户范围优先，未指定时web_search使用time_range=half_year、language=zh。\n"
+                + spec.document_search_guidance
+            )
+        else:
+            sections.append(
+                "## 网页检索式规则\n"
+                f"- 默认最近半年指 {recency_start.isoformat()} 至 {resolved_date.isoformat()}；"
+                "用户未指定时间时使用 time_range=half_year、language=zh。\n"
+                "- 每个 query 只解决一个研究问题，使用‘核心实体 + 单一维度 + 地域/市场 + 资料类型 + 当前年份或最新’的简洁关键词组合。\n"
+                "- 不要直接复制完整问题，不要把市场、技术、竞争、政策等多个维度塞进同一个 query，"
+                "不要使用‘发展前景分析’这类宽泛词替代具体指标。\n"
+                f"- 时效性 query 优先使用 {resolved_date.year}、‘最新’或当前季度；"
+                "除非用户要求历史研究，不得主动加入更早年份。\n"
+                "- 多次搜索必须覆盖不同维度、地域或来源类型，不得仅改写同义词重复搜索。\n"
+                "- 检查结果标题、摘要和发布日期；若主要结果早于默认时间窗、偏离主题或缺少权威来源，"
+                "应缩小研究维度并加入当前年份、官方、白皮书、研报、公告等来源词后重新搜索。"
+            )
     sections.append(
         "## 数据源权威性与冲突处理\n"
         "- 官方财报与结构化接口（如 analyze_financials, get_stock_info, get_stock_valuation_detail 等）是定量财务事实的最高准绳。\n"
-        "- 若搜索结果（web_search / iwencai_search）或网页抓取（fetch_url）中的二手财务数据与财报接口返回的财务指标（营收、归母净利、扣非净利、毛利率、资产负债率、EPS、分部数据等）存在差异或冲突，必须无条件以财报接口数据为准，严禁采用搜索引擎摘要或第三方非标网页数据覆盖财报接口数据。\n"
+        "- 若搜索结果（web_search / iwencai_search）或网页抓取（web_fetch）中的二手财务数据与财报接口返回的财务指标（营收、归母净利、扣非净利、毛利率、资产负债率、EPS、分部数据等）存在差异或冲突，必须无条件以财报接口数据为准，严禁采用搜索引擎摘要或第三方非标网页数据覆盖财报接口数据。\n"
         "- 网页搜索与外部资料仅用于获取行业趋势、商业护城河背景、产业链地位和舆情定性资料，不用于替代定量财务数据。"
     )
     return "\n\n".join(sections)
@@ -118,7 +125,7 @@ def _gap_tool_names(
         for tool_name in requirement.tool_names
     }
     discovery_tools = {"web_search", "iwencai_search"}
-    if required_tools.intersection({"fetch_url", "fetch_urls"}):
+    if required_tools.intersection({"web_fetch", "fetch_urls"}):
         required_tools.update(discovery_tools.intersection(spec.tool_names))
     return tuple(tool_name for tool_name in spec.tool_names if tool_name in required_tools)
 
@@ -129,6 +136,7 @@ def _build_gap_message(
     evidence: list[AgentEvidence],
     missing: list[EvidenceRequirement],
     round_index: int = 2,
+    document_search_guidance: str = "",
 ) -> str:
     labels = "、".join(item.label for item in missing)
     round_desc = f"第 {round_index} 轮" if round_index > 1 else "本轮"
@@ -137,6 +145,9 @@ def _build_gap_message(
         f"前序调研摘要：{previous_result.summary or '暂无结论'}",
         f"缺失证据维度（{round_desc}）：{labels}",
         "请仅围绕缺失维度继续调用允许的工具补齐证据。必须实际调用工具，不得使用常识补写。",
+        ("缺口是待阅读/核对清单，不是一项一个query。先复用已取得的文献与目录，按同一文献/公司合并检查；"
+         "仅在阅读后仍缺核心前提时增加窄查询，说明已有材料为何不足。\n" + document_search_guidance)
+        if document_search_guidance else
         "先检查已有工具参数，不得原样重复失败或低质量的查询；应根据缺失维度缩小范围并改进检索词。",
         "已有工具证据：",
         render_agent_evidence(evidence),
@@ -174,6 +185,7 @@ async def _run_round(
 class _ResearchProgress:
     spec: AgentResearchSpec
     callback: AgentEventCallback | None
+    evidence_callback: Callable[[AgentEvidence], None] | None = None
     step_status: dict[str, str] = field(init=False)
     requirements_by_tool: dict[str, tuple[EvidenceRequirement, ...]] = field(init=False)
     tool_arguments: dict[str, str] = field(init=False)
@@ -238,6 +250,15 @@ class _ResearchProgress:
                             detail=f"正在调用 {tool_name}",
                         ),
                     ))
+        # Private evidence sink before redaction; the public event callback stays metadata-only.
+        if self.evidence_callback is not None and event.type == "tool_result" and event.tool_result is not None:
+            tool_result = event.tool_result
+            if tool_result.is_error or has_meaningful_tool_content(tool_result.content):
+                self.evidence_callback(AgentEvidence(
+                    tool_call_id=tool_result.tool_call_id, tool_name=tool_result.name,
+                    arguments=self.tool_arguments.get(tool_result.tool_call_id, "{}"),
+                    content=tool_result.content, is_error=tool_result.is_error,
+                ))
         await self.emit(event)
         if (
             event.type == "tool_result"
@@ -411,21 +432,23 @@ async def _emit_round_completed(
     can_continue: bool,
     made_progress: bool,
 ) -> None:
+    exhausted = result.tool_calls_remaining == 0 and bool(missing_after)
+    budget_note = "本阶段工具额度已耗尽，保留证据与缺口并结束；不再启动无工具额度的调研轮次。" if exhausted else ""
     await progress.emit(AgentEvent(
         type="round_completed",
         research_round=started.model_copy(update={
             "status": (
                 "completed"
-                if not missing_after or (can_continue and made_progress)
+                if not result.stop_reason and not exhausted and (not missing_after or (can_continue and made_progress))
                 else "degraded"
             ),
-            "evidence_gaps": [item.label for item in missing_after],
+            "evidence_gaps": [item.label for item in missing_after] + ([result.stop_reason] if result.stop_reason else []),
             "evidence_added": _round_evidence_added(result),
-            "judgment_basis": _round_judgment_basis(
+            "judgment_basis": [result.stop_reason] if result.stop_reason else _round_judgment_basis(
                 result, missing_before, missing_after
             ),
-            "conclusion": result.summary.strip()[:2000],
-            "next_step": _round_next_step(
+            "conclusion": (result.stop_reason or result.summary.strip())[:2000],
+            "next_step": result.stop_reason or budget_note or _round_next_step(
                 missing_after,
                 can_continue=can_continue,
                 made_progress=made_progress,
@@ -440,10 +463,11 @@ async def run_agentic_research(
     runtime: AgentResearchRuntime,
     settings: Any = None,
     event_callback: AgentEventCallback | None = None,
+    evidence_callback: Callable[[AgentEvidence], None] | None = None,
 ) -> AgenticResearchResult:
     evidence: list[AgentEvidence] = []
     summaries: list[str] = []
-    progress = _ResearchProgress(spec, event_callback)
+    progress = _ResearchProgress(spec, event_callback, evidence_callback)
     await progress.start()
     round_callback = progress.forward_event
 
@@ -467,6 +491,7 @@ async def run_agentic_research(
         )
         await _collect_round_result(last_result, evidence, summaries, progress)
 
+        stop_reason = last_result.stop_reason
         missing = _missing_requirements(spec.requirements, evidence)
         await _emit_round_completed(
             progress,
@@ -474,12 +499,12 @@ async def run_agentic_research(
             last_result,
             initial_requirements,
             missing,
-            can_continue=bool(missing and max_rounds > 1),
+            can_continue=bool(missing and max_rounds > 1 and not stop_reason and last_result.tool_calls_remaining != 0),
             made_progress=bool(last_result.evidence),
         )
         current_round = 2
 
-        while missing and current_round <= max_rounds:
+        while missing and current_round <= max_rounds and not stop_reason and last_result.tool_calls_remaining != 0:
             missing_before = list(missing)
             missing_count_before = len(missing_before)
             await progress.emit(AgentEvent(
@@ -502,19 +527,21 @@ async def run_agentic_research(
                     evidence,
                     missing_before,
                     round_index=current_round,
+                    document_search_guidance=spec.document_search_guidance,
                 ),
                 allowed_tools,
                 round_callback,
-                tool_call_reserve=(
-                    _FOLLOWUP_TOOL_CALL_RESERVE if current_round < max_rounds else 0
-                ),
+                # The reserve belongs to follow-up research. Release it now,
+                # rather than locking the same last eight slots in every round.
+                tool_call_reserve=0,
             )
             await _collect_round_result(gap_result, evidence, summaries, progress)
             last_result = gap_result
+            stop_reason = gap_result.stop_reason
             missing = _missing_requirements(spec.requirements, evidence)
             made_progress = len(missing) < missing_count_before
             can_continue = bool(
-                missing and made_progress and current_round < max_rounds
+                missing and made_progress and current_round < max_rounds and not stop_reason and gap_result.tool_calls_remaining != 0
             )
             await _emit_round_completed(
                 progress,
@@ -531,6 +558,8 @@ async def run_agentic_research(
                 break
             current_round += 1
 
+    if last_result.tool_calls_remaining == 0 and _missing_requirements(spec.requirements, evidence):
+        await progress.emit(AgentEvent(type="status", content="本阶段工具总额度已耗尽，结束调研并记录未解决缺口；未再发起空轮次。"))
     missing = _missing_requirements(spec.requirements, evidence)
     fatal_missing = [item for item in missing if item.fatal]
     degraded_missing = [item for item in missing if not item.fatal]
@@ -538,7 +567,7 @@ async def run_agentic_research(
         await progress.mark_failed(fatal_missing)
     if degraded_missing:
         await progress.mark_degraded(degraded_missing)
-    if fatal_missing:
+    if fatal_missing and not stop_reason:
         labels = "、".join(item.label for item in fatal_missing)
         raise AgentEvidenceInsufficientError(f"Agent 调研证据不足：{labels}")
     if missing:
@@ -555,6 +584,7 @@ async def run_agentic_research(
     return AgenticResearchResult(
         summary="\n\n".join(summaries)[:MAX_AGENT_SUMMARY_LENGTH],
         evidence=tuple(evidence),
-        evidence_gaps=tuple(item.label for item in missing),
+        evidence_gaps=tuple(item.label for item in missing) + ((stop_reason,) if stop_reason else ()),
         execution_trace=tuple(progress.audit_events),
+        stopped_early=bool(stop_reason),
     )

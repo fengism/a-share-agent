@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-import akshare as ak
-
 from app.core.cache import market_cache as cache
+from app.core.concurrency.rate_limiter import akshare_semaphore
 from app.core.market import normalize_code
+from app.infrastructure.providers.provider_gateway import provider_gateway
+from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,13 @@ async def get_restricted_shares_lift(code: str) -> dict[str, Any]:
     past_lifts: list[dict[str, Any]] = []
 
     try:
-        df = await asyncio.to_thread(ak.stock_restricted_release_queue_em, symbol=normalized_code)
+        df = await provider_gateway.call_blocking(
+            "akshare",
+            "fetch_restricted_shares",
+            get_provider("akshare").fetch_restricted_shares,
+            normalized_code,
+            semaphore=akshare_semaphore,
+        )
         if df is not None and not df.empty:
             for _, row in df.iterrows():
                 lift_date = str(row.get("解禁时间", "")).strip()[:10]

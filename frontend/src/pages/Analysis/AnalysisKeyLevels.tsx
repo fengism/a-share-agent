@@ -14,8 +14,10 @@ export default function AnalysisKeyLevels({
   current,
   support,
   resistance,
+  currentLabel = "当前价",
 }: {
   current: number | null | undefined;
+  currentLabel?: string;
   support: number | null | undefined;
   resistance: number | null | undefined;
 }) {
@@ -38,7 +40,7 @@ export default function AnalysisKeyLevels({
           <small>距支撑 {formatDistance(insight.supportDistancePercent)}</small>
         </div>
         <div className="analysis-levels__item is-current">
-          <span>当前价</span>
+          <span>{currentLabel}</span>
           <strong>{formatPrice(current)}</strong>
           <small>区间定位基准</small>
         </div>

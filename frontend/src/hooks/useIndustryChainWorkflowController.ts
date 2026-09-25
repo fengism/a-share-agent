@@ -7,6 +7,7 @@ import type { IndustryChainResearchScope } from "../types/stock";
 import {
   agentProcessFromEvents,
   applyAgentEvent,
+  stopAgentProcess,
 } from "../features/agent-process/agentProcess";
 import { INDUSTRY_CHAIN_STAGES, industryStageIndex } from "../pages/IndustryChain/industryWorkflow";
 
@@ -27,6 +28,7 @@ export function useIndustryChainWorkflowController({
   const runId = useIndustryChainWorkflowStore((s) => s.runId);
   const jobId = useIndustryChainWorkflowStore((s) => s.jobId);
   const name = useIndustryChainWorkflowStore((s) => s.name);
+  const status = useIndustryChainWorkflowStore((s) => s.status);
   const isAnalyzing = useIndustryChainWorkflowStore((s) => s.isAnalyzing);
   const isCancelling = useIndustryChainWorkflowStore((s) => s.isCancelling);
   const currentStage = useIndustryChainWorkflowStore((s) => s.currentStage);
@@ -47,8 +49,11 @@ export function useIndustryChainWorkflowController({
     const runId = store.begin(normalizedName, scope);
     const stream = streamIndustryChain(normalizedName, (event: IndustryChainProgress) => {
       const current = useIndustryChainWorkflowStore.getState();
-      if (current.runId !== runId) return;
-      if (event.type === "stage_started" && event.stage) {
+      if (current.runId !== runId || !current.isAnalyzing) return;
+      if (event.type === "error" && event.cancelled) {
+        current.stopRun(runId, "cancelled");
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
+      } else if (event.type === "stage_started" && event.stage) {
         const nextStage = industryStageIndex(event.stage);
         current.patch(runId, {
           currentStage: nextStage >= 0 ? nextStage : current.currentStage,
@@ -70,13 +75,15 @@ export function useIndustryChainWorkflowController({
 
     void stream.promise.then((result) => {
       const current = useIndustryChainWorkflowStore.getState();
-      if (current.runId !== runId) return;
+      if (current.runId !== runId || !current.isAnalyzing) return;
       current.patch(runId, {
         result,
         archiveId: result.archive_id || "",
         currentStage: INDUSTRY_CHAIN_STAGES.length,
         stageMessage: result.archive_status === "failed" ? "分析完成，但存档失败" : "分析完成",
         isAnalyzing: false,
+        isCancelling: false,
+        status: "success",
         agentProcess: current.agentProcess.plan || current.agentProcess.toolCalls.length > 0
           ? current.agentProcess
           : agentProcessFromEvents(result.agent_trace),
@@ -90,11 +97,18 @@ export function useIndustryChainWorkflowController({
       onSuccess?.();
     }).catch((unknownError) => {
       const current = useIndustryChainWorkflowStore.getState();
-      if (current.runId !== runId) return;
+      if (current.runId !== runId || !current.isAnalyzing) return;
       const error = unknownError instanceof Error ? unknownError : new Error("产业链分析失败");
-      if (error.message === "已取消" || error.message === "已停止等待") return;
-      current.patch(runId, { error: error.message, isAnalyzing: false, isCancelling: false, stream: null });
-      onError?.(error);
+      if (error.message === "已取消" || error.message === "已停止等待") {
+        current.stopRun(runId, error.message === "已取消" ? "cancelled" : "detached");
+      } else {
+        current.patch(runId, {
+          error: error.message, status: "error", isAnalyzing: false, isCancelling: false, stream: null,
+          agentProcess: stopAgentProcess(current.agentProcess, "failed", error.message),
+        });
+        onError?.(error);
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
     });
     return true;
   }, [onError, onSuccess, queryClient]);
@@ -107,6 +121,7 @@ export function useIndustryChainWorkflowController({
       ...store,
       runId,
       name,
+      status: "success",
       isAnalyzing: false,
       isCancelling: false,
       currentStage: -1,
@@ -134,7 +149,10 @@ export function useIndustryChainWorkflowController({
           queryClient.invalidateQueries({ queryKey: queryKeys.workflows.industryChainLatest(activeName) }),
         ]);
       }
-      if (result) onCancelled?.(result);
+      if (result) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
+        onCancelled?.(result);
+      }
       return result;
     } catch (unknownError) {
       const error = unknownError instanceof Error ? unknownError : new Error("停止产业研究失败");
@@ -147,6 +165,7 @@ export function useIndustryChainWorkflowController({
     runId,
     jobId,
     name,
+    status,
     isAnalyzing,
     isCancelling,
     currentStage,

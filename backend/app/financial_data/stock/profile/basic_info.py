@@ -535,15 +535,15 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
     )
 
     if isinstance(exchange_result, Exception):
-        logger.info("交易所基础信息不可用: code=%s, error=%s", sym.raw, _describe_error(exchange_result))
+        logger.debug("交易所基础信息不可用: code=%s, error=%s", sym.raw, _describe_error(exchange_result))
     if isinstance(concept_result, Exception):
-        logger.info("腾讯行业概念不可用: code=%s, error=%s", sym.raw, _describe_error(concept_result))
+        logger.debug("腾讯行业概念不可用: code=%s, error=%s", sym.raw, _describe_error(concept_result))
     if isinstance(quote_result, Exception):
-        logger.info("腾讯实时行情不可用: code=%s, error=%s", sym.raw, _describe_error(quote_result))
+        logger.debug("腾讯实时行情不可用: code=%s, error=%s", sym.raw, _describe_error(quote_result))
     if isinstance(tdx_quote_result, Exception):
-        logger.info("TDX 实时行情不可用: code=%s, error=%s", sym.raw, _describe_error(tdx_quote_result))
+        logger.debug("TDX 实时行情不可用: code=%s, error=%s", sym.raw, _describe_error(tdx_quote_result))
     if isinstance(tdx_finance_result, Exception):
-        logger.info("TDX 财务信息不可用: code=%s, error=%s", sym.raw, _describe_error(tdx_finance_result))
+        logger.debug("TDX 财务信息不可用: code=%s, error=%s", sym.raw, _describe_error(tdx_finance_result))
 
     spot_df = spot_result if isinstance(spot_result, pd.DataFrame) else None
     exchange_data = exchange_result if isinstance(exchange_result, ExchangeBasicData) else None
@@ -583,7 +583,7 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
                 timeout=_PROFILE_FALLBACK_TIMEOUT_SECONDS,
             )
         except Exception as error:
-            logger.info(
+            logger.debug(
                 "东方财富个股资料备用源不可用: code=%s, missing=%s, error=%s",
                 sym.raw,
                 ",".join(missing_fields),

@@ -7,11 +7,9 @@ import logging
 import urllib.parse
 from typing import Any
 
-import requests
-
 from app.configuration.paths import DATA_DIR
-from app.infrastructure.providers.ths.business_intro import fetch_stock_business_intro
-from app.infrastructure.providers.ths.transport import ThsTransport
+from app.infrastructure.providers.provider_gateway import provider_gateway
+from app.infrastructure.providers.registry import get_provider
 from app.modules.stock_profile import importer
 from app.modules.stock_profile.models import (
     StockBasicProfileInput,
@@ -36,10 +34,6 @@ logger = logging.getLogger(__name__)
 
 _EXCHANGE_MASTER_FILE = DATA_DIR / "official_exchange_stock_master.json"
 _BUSINESS_INTRO_DIR = DATA_DIR / "stock_business_intro"
-_HTTP_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-    "Referer": "https://emweb.securities.eastmoney.com/",
-}
 
 
 def list_profiles(
@@ -109,9 +103,12 @@ def get_profile_summary() -> StockBasicProfileSummary:
 def fetch_ths_business_intro(code: str) -> dict[str, str]:
     """Fetch business intro from THS."""
     raw_code = code.split(".")[0]
-    transport = ThsTransport()
     try:
-        df = fetch_stock_business_intro(transport, raw_code)
+        df = provider_gateway.call_sync(
+            "ths",
+            "fetch_stock_business_intro",
+            lambda: get_provider("ths").fetch_stock_business_intro(raw_code),
+        )
         if df is not None and not df.empty:
             return {k: str(v) for k, v in df.iloc[0].to_dict().items() if v}
     except Exception as e:
@@ -121,20 +118,15 @@ def fetch_ths_business_intro(code: str) -> dict[str, str]:
 
 def fetch_eastmoney_company_survey(stock_code: str, exchange: str) -> dict[str, Any]:
     """Fetch company survey from Eastmoney CompanySurveyAjax."""
-    raw_code = stock_code.split(".")[0]
-    ex = exchange.upper() if exchange else ("SH" if raw_code.startswith("6") else "SZ")
-    sec_code = f"{ex}{raw_code}"
-    url = f"https://emweb.securities.eastmoney.com/PC_HSF10/CompanySurvey/CompanySurveyAjax?code={sec_code}"
-
     try:
-        resp = requests.get(url, headers=_HTTP_HEADERS, timeout=8)
-        if resp.status_code == 200:
-            payload = resp.json()
-            if isinstance(payload, dict):
-                return payload
-    except Exception as e:
-        logger.warning("Eastmoney survey fetch error code=%s: %s", sec_code, e)
-    return {}
+        return provider_gateway.call_sync(
+            "eastmoney",
+            "fetch_company_survey",
+            lambda: get_provider("eastmoney").fetch_company_survey(stock_code, exchange),
+        )
+    except Exception as error:
+        logger.warning("Eastmoney survey fetch error code=%s: %s", stock_code, error)
+        return {}
 
 
 def enrich_stock_profile(stock_code: str, *, force: bool = False) -> StockProfileEnrichResponse:

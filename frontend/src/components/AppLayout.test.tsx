@@ -10,8 +10,21 @@ vi.mock("../styles/ui", () => ({
 }));
 vi.mock("./AppHeader", () => ({ default: () => <header>顶部栏</header> }));
 vi.mock("./AppSidebar", () => ({
-  default: ({ activeKey }: { activeKey: string }) => (
-    <aside data-active-key={activeKey}>侧边栏</aside>
+  default: ({
+    activeKey,
+    collapsed,
+    onCollapse,
+  }: {
+    activeKey: string;
+    collapsed?: boolean;
+    onCollapse?: (collapsed: boolean) => void;
+  }) => (
+    <aside data-active-key={activeKey} data-collapsed={collapsed ? "true" : "false"}>
+      侧边栏
+      <button data-testid="sidebar-toggle-btn" onClick={() => onCollapse?.(!collapsed)}>
+        切换折叠
+      </button>
+    </aside>
   ),
 }));
 vi.mock("./ChatSessionSyncBridge", () => ({ default: () => null }));
@@ -21,6 +34,7 @@ vi.mock("./UpdateBanner", () => ({ default: () => null }));
 describe("AppLayout", () => {
   beforeEach(() => {
     vi.stubGlobal("scrollTo", vi.fn());
+    localStorage.clear();
   });
 
   it("keeps global navigation and moves focus to content after route changes", async () => {
@@ -85,5 +99,69 @@ describe("AppLayout", () => {
     );
 
     expect(screen.getByText("侧边栏")).toHaveAttribute("data-active-key", "/market");
+  });
+
+  it("persists collapsed state to localStorage when toggled", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<div>首页内容</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const sidebar = screen.getByText("侧边栏");
+    expect(sidebar).toHaveAttribute("data-collapsed", "false");
+
+    fireEvent.click(screen.getByTestId("sidebar-toggle-btn"));
+    expect(sidebar).toHaveAttribute("data-collapsed", "true");
+    expect(localStorage.getItem("trade_agent_sidebar_collapsed")).toBe("true");
+
+    fireEvent.click(screen.getByTestId("sidebar-toggle-btn"));
+    expect(sidebar).toHaveAttribute("data-collapsed", "false");
+    expect(localStorage.getItem("trade_agent_sidebar_collapsed")).toBe("false");
+  });
+
+  it("initializes collapsed state from localStorage", () => {
+    localStorage.setItem("trade_agent_sidebar_collapsed", "true");
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<div>首页内容</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("侧边栏")).toHaveAttribute("data-collapsed", "true");
+  });
+
+  it("toggles collapsed state using keyboard shortcut Cmd+B / Ctrl+B", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<div>首页内容</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const sidebar = screen.getByText("侧边栏");
+    expect(sidebar).toHaveAttribute("data-collapsed", "false");
+
+    // Press Cmd+B
+    fireEvent.keyDown(window, { key: "b", metaKey: true });
+    expect(sidebar).toHaveAttribute("data-collapsed", "true");
+    expect(localStorage.getItem("trade_agent_sidebar_collapsed")).toBe("true");
+
+    // Press Ctrl+B
+    fireEvent.keyDown(window, { key: "B", ctrlKey: true });
+    expect(sidebar).toHaveAttribute("data-collapsed", "false");
+    expect(localStorage.getItem("trade_agent_sidebar_collapsed")).toBe("false");
   });
 });

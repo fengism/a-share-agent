@@ -652,16 +652,16 @@ export interface SgeGoldResponse {
 export interface CustomsMonthSummary {
   month: string;
   report_date: string;
-  export_val: number;
-  import_val: number;
-  trade_balance: number;
+  export_val: number | null;
+  import_val: number | null;
+  trade_balance: number | null;
   balance_status: string;
-  export_yoy_pct: number;
-  import_yoy_pct: number;
-  export_accumulate: number;
-  import_accumulate: number;
-  export_accumulate_yoy_pct: number;
-  import_accumulate_yoy_pct: number;
+  export_yoy_pct: number | null;
+  import_yoy_pct: number | null;
+  export_accumulate: number | null;
+  import_accumulate: number | null;
+  export_accumulate_yoy_pct: number | null;
+  import_accumulate_yoy_pct: number | null;
 }
 
 export interface CustomsCommodityProfile {
@@ -677,7 +677,7 @@ export interface CustomsCommodityProfile {
 
 export interface CustomsTradeDataResponse {
   query: string;
-  latest_month_summary: CustomsMonthSummary;
+  latest_month_summary: CustomsMonthSummary | null;
   recent_12m_macro_trend: CustomsMonthSummary[];
   matched_commodity_profiles: CustomsCommodityProfile[];
   investment_implications: {

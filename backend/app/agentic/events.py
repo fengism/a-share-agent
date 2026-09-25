@@ -68,6 +68,15 @@ class AgentResearchRound(BaseModel):
     next_step: str = ""
 
 
+class AgentReasoningSource(BaseModel):
+    block_id: str
+    source: str = "模型"
+    stage: Literal["agent", "synthesis"] = "agent"
+    turn: int = Field(default=1, ge=1)
+    task_id: str | None = None
+    attempt: int = Field(default=1, ge=1)
+
+
 class AgentEvent(BaseModel):
     type: Literal[
         "status",
@@ -91,6 +100,7 @@ class AgentEvent(BaseModel):
     tool_result_summary: AgentToolResultSummary | None = None
     error: str | None = None
     reasoning_content: str | None = None
+    reasoning_source: AgentReasoningSource | None = None
     status: AgentExecutionStatus | None = None
     warnings: list[str] = Field(default_factory=list, max_length=16)
 
@@ -139,7 +149,7 @@ def _tool_result_summary(result: ToolResultInfo) -> AgentToolResultSummary:
         error_code = str(payload["error"].get("code") or "")[:80]
     if error_code == "tool_budget_exceeded":
         return AgentToolResultSummary(
-            summary="工具调用额度已用尽，已基于现有结果继续分析",
+            summary="本次工具请求受预算限制，未实际执行（可能是单批上限、总额、搜索节奏或正文预留）",
             status="skipped",
         )
     if error_code == "duplicate_tool_call":
@@ -153,6 +163,29 @@ def _tool_result_summary(result: ToolResultInfo) -> AgentToolResultSummary:
             "tool_unavailable": "工具暂时不可用",
             "execution_failed": "工具执行失败",
         }.get(error_code, "工具调用失败")
+        # Only publish allowlisted PDF diagnostics, never arbitrary provider error text.
+        if result.name == "read_pdf" and isinstance(payload, dict):
+            data = payload.get("data") if payload.get("ok") is False else payload
+            reason = data.get("error_reason") if isinstance(data, dict) else None
+            summary = {
+                "pdf_browser_disabled": "网站要求访问验证，但浏览器抓取未启用",
+                "pdf_browser_timeout": "网站访问验证或 PDF 下载超时",
+                "pdf_browser_failed": "网站要求访问验证，浏览器重试未能下载 PDF",
+                "pdf_not_pdf": "链接未返回 PDF 文件，请检查链接是否有效",
+                "pdf_no_text": "指定页或续读位置未取得可读正文，请检查页码",
+                "pdf_invalid_range": "PDF页码或续读参数无效",
+                "pdf_window_changed": "PDF内容已变化，请重新读取该页窗口",
+            }.get(str(reason), summary)
+        if result.name == "web_fetch" and isinstance(payload, dict):
+            data = payload.get("data") if payload.get("ok") is False else payload
+            reason = data.get("error_reason") if isinstance(data, dict) else None
+            summary = {
+                "web_empty_body": "网页未返回正文",
+                "web_insufficient_body": "网页正文过短，不能作为研究证据",
+                "web_unreadable_body": "网页正文不可读，请更换原文来源",
+                "web_script_shell": "网页仅返回脚本占位，需要浏览器读取",
+                "web_challenge": "网页返回访问验证，未取得正文",
+            }.get(str(reason), summary)
         return AgentToolResultSummary(summary=summary, status="error")
 
     data = payload
@@ -175,7 +208,18 @@ def _tool_result_summary(result: ToolResultInfo) -> AgentToolResultSummary:
             value = data.get(key)
             if isinstance(value, (str, int, float)) and str(value).strip():
                 metadata[key] = str(value)[:160]
-    if count is not None:
+    if result.name == "web_fetch" and isinstance(data, dict):
+        mode = data.get("fetch_mode")
+        quality = data.get("body_quality")
+        if mode in {"http", "dynamic", "stealth"}:
+            metadata["fetch_mode"] = mode
+        if quality in {"usable", "unusable"}:
+            metadata["body_quality"] = quality
+        if isinstance(data.get("content"), str):
+            metadata["content_characters"] = str(len(data["content"]))
+    if result.name == "web_fetch" and metadata.get("body_quality") == "usable":
+        summary = f"取得可读正文 {metadata.get('content_characters', '0')} 字（不等于事实核实）"
+    elif count is not None:
         summary = f"返回 {count} 条记录"
     elif sources:
         summary = f"获取 {len(sources)} 个来源"
@@ -188,16 +232,23 @@ def auditable_agent_event(
     event: AgentEvent,
     *,
     include_text: bool = False,
+    include_reasoning: bool = False,
     strip_tool_content: bool = True,
 ) -> AgentEvent | None:
-    """Return the execution metadata safe to expose outside the Agent runtime."""
-    if event.type == "reasoning" or (event.type == "text" and not include_text):
+    """Filter runtime events; chat may opt in to provider-returned reasoning.
+
+    Research/report consumers keep the metadata-only default.
+    """
+    if (event.type == "reasoning" and not include_reasoning) or (event.type == "text" and not include_text):
         return None
     update: dict[str, Any] = {}
-    if event.reasoning_content is not None:
+    if event.reasoning_content is not None and not include_reasoning:
         update["reasoning_content"] = None
     if event.type == "tool_result" and event.tool_result is not None:
-        update["tool_result_summary"] = _tool_result_summary(event.tool_result)
+        # Research -> pipeline -> workflow may apply redaction more than once.
+        # Do not overwrite a computed summary by re-parsing the already emptied body.
+        if event.tool_result.content or event.tool_result_summary is None:
+            update["tool_result_summary"] = _tool_result_summary(event.tool_result)
         if strip_tool_content:
             update["tool_result"] = event.tool_result.model_copy(update={"content": ""})
     return cast(AgentEvent, event.model_copy(update=update)) if update else event

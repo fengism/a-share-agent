@@ -11,8 +11,6 @@ from pathlib import Path
 from typing import Any, Protocol
 from zoneinfo import ZoneInfo
 
-from curl_cffi import requests as curl_requests
-
 from app.configuration.paths import DATA_DIR
 from app.core.concurrency.rate_limiter import call_blocking, exchange_semaphore, misc_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
@@ -20,13 +18,14 @@ from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
 from app.financial_data.market.macro.schemas import SgeGoldHistoryPoint, SgeGoldResponse
 from app.infrastructure.persistence.file_lock import exclusive_file_lock
 from app.infrastructure.persistence.json_storage import atomic_write_json
+from app.infrastructure.providers.provider_gateway import provider_gateway
+from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
 _SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 _SNAPSHOT_VERSION = 1
 _SOURCE = "上海黄金交易所"
-_SGE_URL = "https://www.sge.com.cn/graph/Dailyhq"
 
 # slug 同时用于快照文件名，显式映射可避免括号、加号等字符进入路径。
 _SGE_SYMBOLS: dict[str, tuple[str, str, str]] = {
@@ -52,35 +51,6 @@ _SGE_SYMBOLS: dict[str, tuple[str, str, str]] = {
 
 class SgeGoldProvider(Protocol):
     def fetch(self, symbol: str) -> Mapping[str, Any]: ...
-
-
-class SgeHttpProvider:
-    """访问上金所公开历史行情接口。"""
-
-    def fetch(self, symbol: str) -> Mapping[str, Any]:
-        headers = {
-            "Accept": "text/html, */*; q=0.01",
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "Origin": "https://www.sge.com.cn",
-            "Referer": "https://www.sge.com.cn/sjzx/mrhq",
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36"
-            ),
-            "X-Requested-With": "XMLHttpRequest",
-        }
-        response = curl_requests.post(
-            _SGE_URL,
-            data={"instid": symbol},
-            headers=headers,
-            timeout=15,
-            impersonate="chrome",
-        )
-        response.raise_for_status()
-        payload = response.json()
-        if not isinstance(payload, Mapping):
-            raise ValueError("上金所返回格式无效")
-        return payload
 
 
 def _number(value: Any) -> float | None:
@@ -137,7 +107,7 @@ class SgeGoldService:
         data_dir: Path = DATA_DIR,
         now: Callable[[], datetime] | None = None,
     ) -> None:
-        self._provider = provider or SgeHttpProvider()
+        self._provider = provider if provider is not None else get_provider("sge")
         self._snapshot_dir = data_dir / "sge_gold"
         self._now = now or (lambda: datetime.now(_SHANGHAI_TZ))
         self._singleflight: AsyncSingleFlight[SgeGoldResponse] = AsyncSingleFlight()
@@ -252,7 +222,14 @@ class SgeGoldService:
             if snapshot is not None and self._is_fresh(snapshot[0]):
                 return self._to_response(symbol, *snapshot, is_stale=False)
             try:
-                history = _parse_history(self._provider.fetch(symbol))
+                history = _parse_history(
+                    provider_gateway.call_sync(
+                        "sge",
+                        "fetch_gold_history",
+                        lambda: self._provider.fetch(symbol),
+                        max_attempts=1,
+                    )
+                )
             except Exception as error:
                 if snapshot is not None:
                     logger.warning(

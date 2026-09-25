@@ -98,3 +98,11 @@ export interface StockFundFlowItem {
   source_api: string;
   is_stale?: boolean;
 }
+
+export interface StockFundFlowPage {
+  items: StockFundFlowItem[];
+  total: number;
+  next_cursor: string | null;
+  source: string;
+  source_api: string;
+}

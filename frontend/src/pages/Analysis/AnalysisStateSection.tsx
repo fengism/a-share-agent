@@ -25,17 +25,19 @@ export default memo(function AnalysisStateSection({
 
   return (
     <>
-      {(isAnalyzing || error) && stages.length > 0 && (
+      {(isAnalyzing || error || agentProcess.termination) && stages.length > 0 && (
         <AnalysisProgressSteps
           stages={stages}
           currentStageIndex={currentStageIndex}
-          status={error ? "error" : "running"}
+          status={error || agentProcess.termination === "failed" ? "error" : agentProcess.termination ?? "running"}
         />
       )}
       <AgentProcessPanel
         plan={agentProcess.plan}
         status={agentProcess.status}
         toolCalls={agentProcess.toolCalls}
+        rounds={agentProcess.rounds}
+        termination={agentProcess.termination}
         isRunning={isAnalyzing}
       />
       {error && !isAnalyzing && (

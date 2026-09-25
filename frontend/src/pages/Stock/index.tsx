@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { Button, message, Result } from "antd";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   useAddWatchlistItem,
   useDeleteWatchlistItem,
@@ -16,8 +17,7 @@ import HKStockPageContent from "./HKStockPageContent";
 import StockBusinessIntro from "./StockBusinessIntro";
 import StockCharts from "./StockCharts";
 import StockHeaderCard from "./StockHeaderCard";
-import StockFinancialMetrics from "./StockFinancialMetrics";
-import StockInformationTabs from "./StockInformationTabs";
+import StockDetailTabs from "./StockDetailTabs";
 import StockMetrics from "./StockMetrics";
 import "./stock-page.css";
 
@@ -26,6 +26,7 @@ export default function StockPage() {
   const routeCode = code.trim();
   const parsed = parseStockCode(routeCode);
   const navigate = useNavigate();
+  const { search, hash } = useLocation();
   const { pageContainerStyle } = useStyles();
 
   if (!parsed) {
@@ -42,7 +43,7 @@ export default function StockPage() {
   }
 
   if (routeCode !== parsed.code) {
-    return <Navigate to={buildStockProfileUrl(parsed.code)} replace />;
+    return <Navigate to={`${buildStockProfileUrl(parsed.code)}${search}${hash}`} replace />;
   }
 
   if (parsed.market === "hk") {
@@ -56,6 +57,16 @@ function StockPageContent({ code }: { code: string }) {
   const { pageContainerStyle } = useStyles();
   const [messageApi, contextHolder] = message.useMessage();
   const infoQuery = useStockInfo(code);
+  const { hash } = useLocation();
+  useEffect(() => {
+    const targetId = hash === "#stock-details" ? "stock-details" : hash === "#stock-charts" ? "stock-charts" : null;
+    if (!targetId) return;
+    // Run after the layout resets route scrolling and re-align after info loads.
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [code, hash, infoQuery.isLoading]);
   const intradayQuery = useStockIntraday(code);
   const watchlistQuery = useWatchlist();
   const addWatchlistItem = useAddWatchlistItem();
@@ -118,12 +129,11 @@ function StockPageContent({ code }: { code: string }) {
         <StockBusinessIntro code={code} />
       </section>
       <StockCharts code={code} />
-      <DeferredStockSection label="财务指标" minHeight={360}>
-        <StockFinancialMetrics code={code} />
-      </DeferredStockSection>
-      <DeferredStockSection label="资讯与研究" minHeight={420}>
-        <StockInformationTabs code={code} />
-      </DeferredStockSection>
+      <section id="stock-details" style={{ minWidth: 0, scrollMarginTop: 80 }}>
+        <DeferredStockSection label="财务、估值、资金与资讯" minHeight={420}>
+          <StockDetailTabs key={code} code={code} />
+        </DeferredStockSection>
+      </section>
     </main>
   );
 }

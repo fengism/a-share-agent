@@ -1,101 +1,19 @@
 import { lazy, Suspense } from "react";
 import {
-  ApartmentOutlined,
-  ApiOutlined,
-  AuditOutlined,
-  BankOutlined,
-  BulbOutlined,
-  CalendarOutlined,
-  ClockCircleOutlined,
-  ControlOutlined,
-  DashboardOutlined,
-  DatabaseOutlined,
-  FileSearchOutlined,
-  FileTextOutlined,
-  RadarChartOutlined,
-  FilterOutlined,
-  FundOutlined,
-  GlobalOutlined,
-  HomeOutlined,
   LineChartOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  MessageOutlined,
-  PieChartOutlined,
-  ExperimentOutlined,
-  SettingOutlined,
-  StarOutlined,
 } from "@ant-design/icons";
+import { Tooltip } from "antd";
 import { useColors, useTokens } from "../styles/ui";
 import { themes } from "../theme/themes";
 import type { ThemeKey } from "../styles/ui";
 import { useRoutePreload } from "../routes/RoutePreloadContext";
 import { loadMobileSidebarDrawer } from "./mobileSidebarDrawerLoader";
+import { NAV_GROUPS } from "./navConfig";
+import type { NavItemConfig } from "./navConfig";
 
 const MobileSidebarDrawer = lazy(loadMobileSidebarDrawer);
-
-const NAV_GROUPS = [
-  {
-    key: "market",
-    label: "行情资讯",
-    icon: <DashboardOutlined />,
-    items: [
-      { key: "/", icon: <HomeOutlined />, label: "首页" },
-      { key: "/watchlist", icon: <StarOutlined />, label: "自选" },
-      { key: "/market", icon: <FundOutlined />, label: "市场" },
-      { key: "/national-team", icon: <BankOutlined />, label: "国家队" },
-      { key: "/feed", icon: <ClockCircleOutlined />, label: "资讯" },
-    ],
-  },
-  {
-    key: "macro_industry",
-    label: "宏观产业",
-    icon: <GlobalOutlined />,
-    items: [
-      { key: "/macro", icon: <GlobalOutlined />, label: "宏观" },
-      { key: "/industry-chain", icon: <ApartmentOutlined />, label: "产业链" },
-    ],
-  },
-  {
-    key: "research",
-    label: "个股投研",
-    icon: <BulbOutlined />,
-    items: [
-      { key: "/chat", icon: <MessageOutlined />, label: "对话" },
-      { key: "/analysis", icon: <FileSearchOutlined />, label: "个股" },
-      { key: "/screener", icon: <FilterOutlined />, label: "选股" },
-      { key: "/potential", icon: <RadarChartOutlined />, label: "潜力股" },
-    ],
-  },
-  {
-    key: "trading",
-    label: "交易策略",
-    icon: <AuditOutlined />,
-    items: [
-      { key: "/portfolio", icon: <PieChartOutlined />, label: "仓位" },
-      { key: "/quant", icon: <ExperimentOutlined />, label: "量化" },
-      { key: "/daily-review", icon: <FileTextOutlined />, label: "复盘" },
-      { key: "/trading-calendar", icon: <CalendarOutlined />, label: "交易日历" },
-    ],
-  },
-  {
-    key: "master_data",
-    label: "基础数据",
-    icon: <DatabaseOutlined />,
-    items: [
-      { key: "/master-data", icon: <DatabaseOutlined />, label: "主数据管理" },
-    ],
-  },
-  {
-    key: "system",
-    label: "系统管理",
-    icon: <ControlOutlined />,
-    items: [
-      { key: "/capabilities", icon: <ApiOutlined />, label: "能力" },
-      { key: "/settings", icon: <SettingOutlined />, label: "设置" },
-    ],
-  },
-];
 
 interface AppSidebarProps {
   activeKey: string;
@@ -123,35 +41,55 @@ export default function AppSidebar({
   const t = useTokens();
 
   const renderContent = (isCollapsed: boolean) => {
-    const renderRoute = (item: (typeof NAV_GROUPS)[number]["items"][number]) => (
-      <button
-        key={item.key}
-        type="button"
-        className="app-sidebar-nav__item"
-        aria-current={activeKey === item.key ? "page" : undefined}
-        aria-label={isCollapsed ? item.label : undefined}
-        title={isCollapsed ? item.label : undefined}
-        onPointerEnter={() => void preloadAppRoute(item.key)}
-        onFocus={() => void preloadAppRoute(item.key)}
-        onClick={() => onNavigate(item.key)}
-      >
-        <span className="app-sidebar-nav__icon" aria-hidden="true">{item.icon}</span>
-        {!isCollapsed && <span className="app-sidebar-nav__label">{item.label}</span>}
-      </button>
-    );
+    const renderRoute = (item: NavItemConfig) => {
+      const button = (
+        <button
+          key={item.key}
+          type="button"
+          className="app-sidebar-nav__item"
+          aria-current={activeKey === item.key ? "page" : undefined}
+          aria-label={isCollapsed ? item.label : undefined}
+          title={isCollapsed ? item.label : undefined}
+          onPointerEnter={() => void preloadAppRoute(item.key)}
+          onFocus={() => void preloadAppRoute(item.key)}
+          onClick={() => onNavigate(item.key)}
+        >
+          <span className="app-sidebar-nav__icon" aria-hidden="true">{item.icon}</span>
+          {!isCollapsed && <span className="app-sidebar-nav__label">{item.label}</span>}
+        </button>
+      );
+
+      if (isCollapsed) {
+        return (
+          <Tooltip
+            key={item.key}
+            placement="right"
+            title={item.label}
+            mouseEnterDelay={0.12}
+            destroyOnHidden
+          >
+            {button}
+          </Tooltip>
+        );
+      }
+
+      return button;
+    };
 
     return (
       <>
         <div className="app-sidebar-brand" style={{ borderBottomColor: colors.border }}>
           {isCollapsed ? (
-            <button
-              type="button"
-              aria-label="展开侧边栏"
-              className="al-collapse-btn app-sidebar-brand__expand"
-              onClick={() => onCollapse(false)}
-            >
-              <MenuUnfoldOutlined />
-            </button>
+            <Tooltip placement="right" title="展开侧边栏 (⌘B / Ctrl+B)" mouseEnterDelay={0.3}>
+              <button
+                type="button"
+                aria-label="展开侧边栏"
+                className="al-collapse-btn app-sidebar-brand__expand"
+                onClick={() => onCollapse(false)}
+              >
+                <MenuUnfoldOutlined />
+              </button>
+            </Tooltip>
           ) : (
             <>
               <button
@@ -170,20 +108,22 @@ export default function AppSidebar({
                 </span>
                 <div className="app-sidebar-brand__text">
                   <span className="app-sidebar-brand__title" style={{ color: colors.textPrimary, fontSize: t.font.lg }}>
-                    A股智能分析
+                    智能投研平台
                   </span>
                   <span className="app-sidebar-brand__tag">QUANT TERMINAL</span>
                 </div>
               </button>
               {!isMobile && (
-                <button
-                  type="button"
-                  aria-label="收起侧边栏"
-                  className="al-collapse-btn app-sidebar-brand__collapse"
-                  onClick={() => onCollapse(true)}
-                >
-                  <MenuFoldOutlined />
-                </button>
+                <Tooltip placement="bottom" title="收起侧边栏 (⌘B / Ctrl+B)" mouseEnterDelay={0.3}>
+                  <button
+                    type="button"
+                    aria-label="收起侧边栏"
+                    className="al-collapse-btn app-sidebar-brand__collapse"
+                    onClick={() => onCollapse(true)}
+                  >
+                    <MenuFoldOutlined />
+                  </button>
+                </Tooltip>
               )}
             </>
           )}
@@ -191,7 +131,12 @@ export default function AppSidebar({
 
         <nav className={`app-sidebar-nav${isCollapsed ? " app-sidebar-nav--collapsed" : ""}`} aria-label="主导航">
           {isCollapsed
-            ? NAV_GROUPS.flatMap((group) => group.items).map(renderRoute)
+            ? NAV_GROUPS.map((group, groupIdx) => (
+                <div key={group.key} className="app-sidebar-nav__collapsed-group">
+                  {groupIdx > 0 && <div className="app-sidebar-nav__divider" aria-hidden="true" />}
+                  {group.items.map(renderRoute)}
+                </div>
+              ))
             : NAV_GROUPS.map((group) => (
                 <div className="app-sidebar-nav__group" key={group.key}>
                   <div className="app-sidebar-nav__group-title">
@@ -204,15 +149,21 @@ export default function AppSidebar({
         </nav>
 
         <div className={`app-sidebar-footer${isCollapsed ? " app-sidebar-footer--collapsed" : ""}`}>
-          <div className="app-sidebar-footer__status" title="QUANT RADAR: 在线">
-            <span className="app-sidebar-footer__pulse" />
-            {!isCollapsed && (
-              <>
-                <span className="app-sidebar-footer__label">QUANT RADAR</span>
-                <span className="app-sidebar-footer__badge">ONLINE</span>
-              </>
-            )}
-          </div>
+          <Tooltip
+            placement="right"
+            title={isCollapsed ? "量化雷达: 在线 (⌘B / Ctrl+B 展开)" : "量化雷达: 核心行情服务在线"}
+            mouseEnterDelay={0.3}
+          >
+            <div className="app-sidebar-footer__status" title="QUANT RADAR: 在线">
+              <span className="app-sidebar-footer__pulse" />
+              {!isCollapsed && (
+                <>
+                  <span className="app-sidebar-footer__label">QUANT RADAR</span>
+                  <span className="app-sidebar-footer__badge">ONLINE</span>
+                </>
+              )}
+            </div>
+          </Tooltip>
         </div>
       </>
     );

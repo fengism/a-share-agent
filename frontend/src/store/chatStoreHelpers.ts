@@ -1,4 +1,5 @@
 import type { ChatDisplayMessage, ChatMessage } from "../types/chat";
+import { restoreChatProcess } from "../features/chat/chatProcess";
 import { loadPersistedChat } from "./chatPersistence";
 import type { PersistedChatState } from "./chatPersistence";
 
@@ -28,7 +29,9 @@ export function nextChatMessageId() {
 
 export function normalizePersistedChatState(persisted: PersistedChatState): UserChatState {
   const sessions = [...persisted.sessions];
-  const sessionData = { ...persisted.sessionData };
+  const sessionData = Object.fromEntries(Object.entries(persisted.sessionData).map(([id, data]) => [
+    id, { ...data, messages: data.messages.map(restoreChatProcess) },
+  ]));
   let activeSessionId = persisted.activeSessionId;
 
   if (sessions.length === 0) {

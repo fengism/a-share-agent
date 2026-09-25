@@ -12,6 +12,7 @@ from app.agentic.tools.packs.quant.finance import FINANCIAL_PARAMETERS, calculat
 _QUANT_MUTATION_POLICY = ToolPolicy(
     cost="high",
     cache_ttl_seconds=0,
+    deduplicate_in_batch=False,
     freshness="realtime",
     scope="user",
     timeout_seconds=180,
@@ -234,7 +235,7 @@ def register_quant_tools(target_registry: CapabilityCatalog = registry) -> None:
                 },
                 "required": ["code"],
             },
-            policy=ToolPolicy(cost="low", cache_ttl_seconds=0, scope="user", timeout_seconds=25, max_parallel_calls=2),
+            policy=ToolPolicy(cost="low", cache_ttl_seconds=0, deduplicate_in_batch=False, scope="user", timeout_seconds=25, max_parallel_calls=2),
             executor=_execute_python_code,
         )
     )

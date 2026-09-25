@@ -9,7 +9,7 @@ import requests
 
 from app.configuration import get_settings
 from app.constants.http import EASTMONEY_HEADERS
-from app.constants.market import EASTMONEY_CLIST_URL
+from app.constants.market import EASTMONEY_CLIST_URL, EASTMONEY_PUSH2_NODES
 from app.core.exceptions import UpstreamUnavailableError
 from app.core.market import safe_float
 
@@ -41,7 +41,9 @@ class EastMoneyBase:
         self._em_transient_failures_by_host: dict[str, int] = {}
         self._em_lock = threading.Lock()
         self.em_session = requests.Session()
-        self.em_session.trust_env = get_settings().http_trust_env
+        # 东方财富反爬策略严禁代理访问，强制关闭环境变量代理并清空代理配置
+        self.em_session.trust_env = False
+        self.em_session.proxies = {"http": None, "https": None}
         self.em_session.headers.update({
             "User-Agent": self.UA,
             "Accept": "application/json, text/plain, */*",
@@ -59,8 +61,18 @@ class EastMoneyBase:
             headers["cookie"] = custom_cookie
         return headers
 
+    @staticmethod
+    def _is_push2_host(hostname: str) -> bool:
+        """判断是否属于东财 push2 实时行情节点（包含主节点及数字镜像节点）。"""
+        if hostname == "push2.eastmoney.com":
+            return True
+        if hostname.endswith(".push2.eastmoney.com"):
+            prefix = hostname[:-len(".push2.eastmoney.com")]
+            return prefix.isdigit()
+        return False
+
     def em_get_response(self, url, params=None, headers=None, timeout=15, **kwargs):
-        """东财统一请求入口：全局串行节流、风控冷却与会话复用。
+        """东财统一请求入口：全局串行节流、风控冷却、push2 节点池轮询容灾与会话复用。
 
         Param:
             url: 请求地址
@@ -72,66 +84,123 @@ class EastMoneyBase:
         """
         settings = get_settings()
         with self._em_lock:
-            now = time.monotonic()
-            hostname = self._request_hostname(url)
-            cooldown_until = self._em_cooldown_until_by_host.get(hostname, 0.0)
-            if now < cooldown_until:
-                raise EastMoneyCooldownError(cooldown_until - now)
+            # 严格确保东财接口不使用代理
+            self.em_session.trust_env = False
+            self.em_session.proxies = {"http": None, "https": None}
 
-            min_interval = self._min_interval_seconds(hostname, settings)
-            jitter_min = max(0.0, settings.eastmoney_jitter_min_seconds)
-            jitter_max = max(jitter_min, settings.eastmoney_jitter_max_seconds)
-            last_call = self._em_last_call_by_host.get(hostname, 0.0)
-            wait = min_interval - (now - last_call)
-            if wait > 0:
-                time.sleep(wait + random.uniform(jitter_min, jitter_max))
-
-            self.em_session.trust_env = settings.http_trust_env
-            try:
-                response = self.em_session.get(
-                    url,
-                    params=params,
-                    headers=headers,
-                    timeout=timeout,
-                    **kwargs,
-                )
-            except (requests.ConnectionError, requests.Timeout):
-                failures = self._em_transient_failures_by_host.get(hostname, 0) + 1
-                self._em_transient_failures_by_host[hostname] = failures
-                threshold = max(1, settings.eastmoney_transient_failure_threshold)
-                if failures >= threshold:
-                    self._activate_em_cooldown(
-                        hostname,
-                        self._cooldown_seconds(hostname, settings),
-                        "连续连接失败",
-                    )
-                raise
-            finally:
-                self._em_last_call_by_host[hostname] = time.monotonic()
-
-            status_code = int(getattr(response, "status_code", 0) or 0)
-            if status_code in {403, 429}:
-                retry_after = self._retry_after_seconds(response)
-                cooldown = max(self._cooldown_seconds(hostname, settings), retry_after)
-                self._activate_em_cooldown(hostname, cooldown, f"HTTP {status_code}")
-                response.raise_for_status()
-                raise requests.HTTPError(f"东方财富风控响应: HTTP {status_code}", response=response)
-            if status_code >= 500:
-                failures = self._em_transient_failures_by_host.get(hostname, 0) + 1
-                self._em_transient_failures_by_host[hostname] = failures
-                threshold = max(1, settings.eastmoney_transient_failure_threshold)
-                if failures >= threshold:
-                    self._activate_em_cooldown(
-                        hostname,
-                        self._cooldown_seconds(hostname, settings),
-                        f"HTTP {status_code}",
-                    )
-                response.raise_for_status()
-            elif status_code >= 400:
-                response.raise_for_status()
+            orig_hostname = self._request_hostname(url)
+            is_push2 = self._is_push2_host(orig_hostname)
+            if is_push2:
+                candidate_hosts = list(EASTMONEY_PUSH2_NODES)
+                random.shuffle(candidate_hosts)
+                now = time.monotonic()
+                # 优先选择未处于冷却期的节点
+                available = [h for h in candidate_hosts if self._em_cooldown_until_by_host.get(h, 0.0) <= now]
+                if available:
+                    candidate_hosts = available
+                else:
+                    min_cooldown = min(self._em_cooldown_until_by_host.get(h, 0.0) for h in candidate_hosts)
+                    raise EastMoneyCooldownError(max(0.0, min_cooldown - now))
             else:
-                self._em_transient_failures_by_host[hostname] = 0
-            return response
+                candidate_hosts = [orig_hostname]
+                now = time.monotonic()
+                cooldown_until = self._em_cooldown_until_by_host.get(orig_hostname, 0.0)
+                if now < cooldown_until:
+                    raise EastMoneyCooldownError(cooldown_until - now)
+
+            last_exc = None
+            for attempt_idx, hostname in enumerate(candidate_hosts):
+                if is_push2 and hostname != orig_hostname:
+                    target_url = urlsplit(url)._replace(netloc=hostname).geturl()
+                else:
+                    target_url = url
+
+                now = time.monotonic()
+                cooldown_until = self._em_cooldown_until_by_host.get(hostname, 0.0)
+                if now < cooldown_until:
+                    continue
+
+                min_interval = self._min_interval_seconds(hostname, settings)
+                jitter_min = max(0.0, settings.eastmoney_jitter_min_seconds)
+                jitter_max = max(jitter_min, settings.eastmoney_jitter_max_seconds)
+                last_call = self._em_last_call_by_host.get(hostname, 0.0)
+                wait = min_interval - (now - last_call)
+                if wait > 0:
+                    time.sleep(wait + random.uniform(jitter_min, jitter_max))
+
+                has_fallback = is_push2 and (attempt_idx < len(candidate_hosts) - 1)
+                try:
+                    response = self.em_session.get(
+                        target_url,
+                        params=params,
+                        headers=headers,
+                        timeout=timeout,
+                        **kwargs,
+                    )
+                except (requests.ConnectionError, requests.Timeout) as exc:
+                    failures = self._em_transient_failures_by_host.get(hostname, 0) + 1
+                    self._em_transient_failures_by_host[hostname] = failures
+                    threshold = max(1, settings.eastmoney_transient_failure_threshold)
+                    if failures >= threshold:
+                        self._activate_em_cooldown(
+                            hostname,
+                            self._cooldown_seconds(hostname, settings),
+                            "连续连接失败",
+                        )
+                    self._em_last_call_by_host[hostname] = time.monotonic()
+                    last_exc = exc
+                    if has_fallback:
+                        logger.warning("东财 push2 节点 %s 临时不可用 (%s)，切换备用节点重试...", hostname, exc)
+                        continue
+                    raise
+                finally:
+                    self._em_last_call_by_host[hostname] = time.monotonic()
+
+                status_code = int(getattr(response, "status_code", 0) or 0)
+                if status_code in {403, 429}:
+                    retry_after = self._retry_after_seconds(response)
+                    cooldown = max(self._cooldown_seconds(hostname, settings), retry_after)
+                    self._activate_em_cooldown(hostname, cooldown, f"HTTP {status_code}")
+                    if has_fallback:
+                        logger.warning("东财 push2 节点 %s 触发风控 HTTP %s，切换备用节点重试...", hostname, status_code)
+                        continue
+                    response.raise_for_status()
+                    raise requests.HTTPError(f"东方财富风控响应: HTTP {status_code}", response=response)
+
+                if status_code in {502, 503, 504}:
+                    failures = self._em_transient_failures_by_host.get(hostname, 0) + 1
+                    self._em_transient_failures_by_host[hostname] = failures
+                    threshold = max(1, settings.eastmoney_transient_failure_threshold)
+                    if failures >= threshold:
+                        self._activate_em_cooldown(
+                            hostname,
+                            self._cooldown_seconds(hostname, settings),
+                            f"HTTP {status_code}",
+                        )
+                    if has_fallback:
+                        logger.warning("东财 push2 节点 %s 返回 HTTP %s，切换备用节点重试...", hostname, status_code)
+                        continue
+                    response.raise_for_status()
+
+                if status_code >= 500:
+                    failures = self._em_transient_failures_by_host.get(hostname, 0) + 1
+                    self._em_transient_failures_by_host[hostname] = failures
+                    threshold = max(1, settings.eastmoney_transient_failure_threshold)
+                    if failures >= threshold:
+                        self._activate_em_cooldown(
+                            hostname,
+                            self._cooldown_seconds(hostname, settings),
+                            f"HTTP {status_code}",
+                        )
+                    response.raise_for_status()
+                elif status_code >= 400:
+                    response.raise_for_status()
+                else:
+                    self._em_transient_failures_by_host[hostname] = 0
+                return response
+
+            if last_exc:
+                raise last_exc
 
     @staticmethod
     def _request_hostname(url: str) -> str:
@@ -224,7 +293,7 @@ class EastMoneyBase:
             return d["result"]["data"]
         return []
 
-    def _fetch_clist_diff(self, params: dict[str, str], headers: dict = None, page_size: int = 100, url: str = EASTMONEY_CLIST_URL) -> list[dict]:
+    def _fetch_clist_diff(self, params: dict[str, str], headers: dict | None = None, page_size: int = 100, url: str = EASTMONEY_CLIST_URL) -> list[dict]:
         """分页获取东方财富 clist 接口的全部 diff 数据。
 
         自动处理分页，直到数据取完或达到上限。

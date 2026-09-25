@@ -122,4 +122,39 @@ describe("chat persistence", () => {
     expect(storage.getItem("chat-sessions:user:9-data")).toContain("hello");
     expect(storage.getItem("chat-sessions:user:8")).toBeNull();
   });
+  it("drops bulky process records before losing the final answer under storage pressure", () => {
+    const sessionData = { active: data("最终结论") };
+    sessionData.active.messages[0].processUpdates = Array.from({ length: 60 }, (_, i) => ({ type: "status", content: `${i}: ${"过程".repeat(900)}` }));
+    const compacted = compactChatSessionData([session("active", 1)], sessionData, "active", 600);
+    expect(compacted.fits).toBe(true);
+    expect(compacted.sessionData.active.messages[0].content).toBe("最终结论");
+    expect(compacted.sessionData.active.messages[0].processUpdates).toBeUndefined();
+    expect(sessionData.active.messages[0].processUpdates).toHaveLength(60);
+  });
+
+  it("restores provider reasoning for display without adding it to model history", () => {
+    const storage = createMemoryStorage();
+    const sessionData = { active: data("最终答案") };
+    sessionData.active.messages[0].reasoningContent = "先核验公告，再比较财务指标";
+    const snapshot = { sessions: [session("active", 1)], sessionData, activeSessionId: "active" };
+    expect(persistChatSnapshot(storage, 9, snapshot)).toBe(true);
+    const restored = loadPersistedChat(storage, 9);
+    expect(restored.sessionData.active.messages[0].reasoningContent).toBe("先核验公告，再比较财务指标");
+    expect(restored.sessionData.active.history).toEqual([{ role: "assistant", content: "最终答案" }]);
+  });
+
+});
+
+it("round-trips reasoning boundaries, filters corrupt offsets and drops metadata when compacting", () => {
+  const storage = createMemoryStorage();
+  const sessionData = { active: data("答案") };
+  sessionData.active.messages[0].reasoningContent = "推理".repeat(1000);
+  const block = { block_id: "a", source: "分析", stage: "agent" as const, turn: 1, attempt: 2, start: 0, end: 2000 };
+  sessionData.active.messages[0].reasoningBlocks = [block, { ...block, end: 9999 }];
+  expect(persistChatSnapshot(storage, 1, { sessions: [session("active", 1)], sessionData, activeSessionId: "active" })).toBe(true);
+  expect(loadPersistedChat(storage, 1).sessionData.active.messages[0].reasoningBlocks).toEqual([block]);
+  const compacted = compactChatSessionData([session("active", 1)], sessionData, "active", 600);
+  expect(compacted.sessionData.active.messages[0].reasoningContent).toBeUndefined();
+  expect(compacted.sessionData.active.messages[0].reasoningBlocks).toBeUndefined();
+  expect(compacted.sessionData.active.messages[0].content).toBe("答案");
 });

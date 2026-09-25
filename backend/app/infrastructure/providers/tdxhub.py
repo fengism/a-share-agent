@@ -5,25 +5,38 @@
 """
 
 import logging
+import math
 import threading
+import time
 from collections.abc import Callable
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timedelta
+from typing import Any, TypedDict
+from zoneinfo import ZoneInfo
 
 import pandas as pd
-from tdxhub.consts import MARKET_BJ
-from tdxhub.exceptions import TdxhubConnectionError
+from tdxhub.exceptions import TdxhubConnectionError, TdxhubIncompleteDataError
 from tdxhub.quotes import Quotes
-from tdxpy.parser.std.get_security_quotes import GetSecurityQuotesCmd
+from tdxhub.tdx.deadline import remaining, request_budget
 
 from app.configuration import get_settings
-from app.core.market import normalize_code, safe_float, safe_string
+from app.core.cache import TTLCache
+from app.core.market import (
+    normalize_code,
+    normalize_index_code,
+    normalize_index_symbol,
+    safe_float,
+    safe_string,
+)
 
 logger = logging.getLogger(__name__)
 
 _DAILY_FREQUENCY = 9
 # TDX 协议单次行情快照的代码数量上限
 _QUOTES_BATCH_SIZE = 80
+_FUND_FLOW_DAYS = 60
+# Store only fully validated historical daily aggregates, not the connection.
+# Versioned keys keep these values separate from all other provider/SDK caches.
+_fund_flow_day_cache = TTLCache(maxsize=6000, name="tdxhub_fund_flow_days")
 _KLINE_COLUMNS = [
     "date",
     "open",
@@ -37,6 +50,11 @@ _KLINE_COLUMNS = [
 ]
 
 
+class _FundFlowBatch(TypedDict):
+    dates: list[str]
+    items: list[dict[str, Any]]
+
+
 class TdxhubError(RuntimeError):
     pass
 
@@ -48,7 +66,7 @@ class TdxhubUnavailableError(TdxhubError, ConnectionError):
 class SharedTdxhubQuotes:
     """进程内共享的 tdxhub 行情客户端。
 
-    tdxpy 底层 TCP 客户端非线程安全，所有调用经统一锁串行化（上游
+    TDX 底层 TCP 客户端非线程安全，所有调用经统一锁串行化（上游
     tdx_semaphore 已将并发限制为 2，串行化与原 tdx-api 池大小 1 相当）；
     连接类异常时重建客户端并重试一次。
     """
@@ -65,30 +83,6 @@ class SharedTdxhubQuotes:
     def call(self, method: str, *args: Any, **kwargs: Any) -> Any:
         def invoke(client):
             return getattr(client, method)(*args, **kwargs)
-
-        return self._invoke_with_retry(invoke)
-
-    def security_quotes_raw(self, market_code_pairs: list[tuple[int, str]]) -> Any:
-        """直接走 GetSecurityQuotesCmd 协议命令获取行情快照。
-
-        tdxpy 的 get_security_quotes 在客户端硬编码拒绝北交所(market=2)，
-        但协议本身支持（与原 tdx-api 行为一致），此处绕过该守卫。
-        """
-
-        def invoke(client):
-            api = client.client
-            # tdxpy 的证券类型表不识别 market=2，会记一条 ERROR 后按默认
-            # 价格系数 0.01 兜底（对北交所正确）。调用窗口内静音该噪音日志；
-            # 所有调用均在共享锁内串行，临时调整日志级别无并发问题。
-            tdxpy_logger = logging.getLogger("tdxpy")
-            original_level = tdxpy_logger.level
-            tdxpy_logger.setLevel(logging.CRITICAL)
-            try:
-                cmd = GetSecurityQuotesCmd(api.client, lock=api.lock)
-                cmd.setParams(market_code_pairs)
-                return cmd.call_api()
-            finally:
-                tdxpy_logger.setLevel(original_level)
 
         return self._invoke_with_retry(invoke)
 
@@ -120,12 +114,42 @@ shared_tdxhub_quotes = SharedTdxhubQuotes()
 
 
 class TdxhubDataProvider:
-    """通达信数据适配器：股票名称、K线、实时行情与财务基础信息。"""
+    """通达信数据适配器：股票名称、K线、指数K线、实时行情、F10与财务基础信息。"""
 
     name = "tdxhub"
+    DAILY_FREQUENCY = _DAILY_FREQUENCY
+    DEFAULT_OFFSET = 10
+    INDEX_KLINE_COLUMNS = [
+        "date",
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "amount",
+        "pre_close",
+        "change_pct",
+    ]
+    KLINE_COLUMNS = INDEX_KLINE_COLUMNS
+    NUMERIC_COLUMNS = ["open", "close", "high", "low", "volume", "amount"]
+    F10_CATEGORIES = (
+        "最新提示",
+        "公司概况",
+        "财务分析",
+        "股东研究",
+        "股本结构",
+        "资本运作",
+        "业内点评",
+        "行业分析",
+        "公司大事",
+    )
 
     def __init__(self, quotes: SharedTdxhubQuotes | None = None):
         self._quotes = quotes or shared_tdxhub_quotes
+
+    def reset_client(self) -> None:
+        """清空共享 tdxhub 客户端，便于异常恢复或测试隔离。"""
+        self._quotes.reset()
 
     def _call(self, method: str, *args: Any, **kwargs: Any) -> Any:
         return self._quotes.call(method, *args, **kwargs)
@@ -133,6 +157,82 @@ class TdxhubDataProvider:
     @staticmethod
     def _directory_frame(frame: Any) -> pd.DataFrame | None:
         return frame if isinstance(frame, pd.DataFrame) and not frame.empty else None
+
+    def fetch_stock_fund_flow_history(
+        self, code: str, *, dates: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """兼容完整查询，或只查询调用方已固定的交易日期（用于后续批次）。"""
+        return self._fetch_stock_fund_flow(code, dates=dates)["items"]
+
+    def fetch_stock_fund_flow_page(self, code: str) -> _FundFlowBatch:
+        """固定最近 60 日日期清单，但首次只聚合最新 20 日分笔。"""
+        return self._fetch_stock_fund_flow(code, limit=20)
+
+    def _fetch_stock_fund_flow(
+        self, code: str, *, dates: list[str] | None = None, limit: int = 60,
+    ) -> _FundFlowBatch:
+        symbol = normalize_code(code).prefixed_lower
+        settings = get_settings()
+        budget = settings.tdxhub_fund_flow_timeout_seconds
+        started_at = time.monotonic()
+        today = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
+        if dates is not None:
+            # Never let a cursor supply unvalidated, duplicate or future dates.
+            if not dates or len(dates) > _FUND_FLOW_DAYS:
+                raise ValueError("tdxhub 资金流批次日期数量无效")
+            dates = _fund_flow_dates(pd.DataFrame({"date": dates}), today)
+        stage = "connect"
+        current_date = "-"
+        result: list[dict[str, Any]] = []
+        cached_days = 0
+        try:
+            # Propagate the wall-clock budget through the SDK to each TCP read;
+            # timing out asyncio.to_thread alone does not stop a worker thread.
+            with request_budget(budget):
+                with Quotes.factory(
+                    market="std", timeout=settings.tdxhub_timeout_seconds, raise_exception=True,
+                ) as client:
+                    if dates is None:
+                        stage = "daily_bars"
+                        bars = client.bars(symbol, frequency=9, start=0, offset=_FUND_FLOW_DAYS)
+                        dates = _fund_flow_dates(bars, today)
+                    for current_date in dates[:limit]:
+                        remaining()
+                        cache_key = f"v1:{symbol}:{current_date}"
+                        cached = _fund_flow_day_cache.get(cache_key) if current_date < today else None
+                        if cached is not None:
+                            result.append(dict(cached))
+                            cached_days += 1
+                            continue
+                        stage = "historical_ticks"
+                        flow = client.capital_flow(symbol, date=current_date.replace("-", ""))
+                        remaining()
+                        row = _parse_daily_fund_flow(current_date, flow)
+                        result.append(row)
+                        if current_date < today:
+                            _fund_flow_day_cache.set(cache_key, dict(row), ttl=24 * 60 * 60)
+            logger.info(
+                "tdxhub 资金流查询完成: code=%s days=%s cached_days=%s elapsed=%.2fs",
+                symbol, len(result), cached_days, time.monotonic() - started_at,
+            )
+            return {"dates": dates, "items": result}
+        except Exception as error:
+            elapsed = time.monotonic() - started_at
+            logger.warning(
+                "tdxhub 资金流查询失败: code=%s stage=%s date=%s completed_days=%s "
+                "cached_days=%s elapsed=%.2fs budget=%ss error_type=%s",
+                symbol, stage, current_date, len(result), cached_days, elapsed, budget, type(error).__name__,
+            )
+            context = f"阶段 {stage}，日期 {current_date}，已完成 {len(result)} 日"
+            # Old SDK defaults turn exhausted request deadlines into None and
+            # then a generic paging connection error. Preserve the true category.
+            if elapsed >= budget:
+                raise TimeoutError(f"tdxhub 资金流总查询时限 {budget:g} 秒已耗尽（{context}）") from error
+            if isinstance(error, TimeoutError):
+                raise TimeoutError(f"tdxhub 资金流请求超时（{context}）") from error
+            if isinstance(error, TdxhubIncompleteDataError):
+                raise
+            raise TdxhubConnectionError(f"tdxhub 资金流查询失败（{context}）") from error
 
     def fetch_stock_names(self) -> list[dict[str, str]]:
         """获取沪深京 A 股代码与名称。"""
@@ -215,32 +315,22 @@ class TdxhubDataProvider:
     def fetch_stock_quotes(self, codes: list[str]) -> dict[str, dict[str, Any]]:
         """批量获取标准化实时行情（沪深京）。
 
-        沪深走 tdxhub 的 quotes()；北交所(market=2)被 tdxpy 客户端守卫
-        拒绝，直接走协议命令。两者均按协议上限 80 条分块请求。
+        统一走 SDK 0.3.0 的 quotes()，由 SDK 负责去重、80 条分块及
+        北交所原生协议路由，避免某批失败后返回看似完整的部分快照。
         """
         symbols = [normalize_code(code) for code in dict.fromkeys(codes)]
         if not symbols:
             return {}
         requested_codes = {symbol.raw for symbol in symbols}
+        frame = self._call("quotes", [symbol.prefixed_lower for symbol in symbols], batch_size=_QUOTES_BATCH_SIZE)
+        if not isinstance(frame, pd.DataFrame) or frame.empty:
+            return {}
         quotes: dict[str, dict[str, Any]] = {}
         quoted_at = datetime.now().isoformat(timespec="seconds")
-
-        def collect(rows: Any) -> None:
-            for row in rows or []:
-                quote = _parse_quote_row(row, requested_codes, quoted_at)
-                if quote is not None:
-                    quotes.setdefault(quote["code"], quote)
-
-        standard = [symbol for symbol in symbols if symbol.exchange.lower() != "bj"]
-        beijing = [symbol for symbol in symbols if symbol.exchange.lower() == "bj"]
-        for start in range(0, len(standard), _QUOTES_BATCH_SIZE):
-            batch = standard[start : start + _QUOTES_BATCH_SIZE]
-            frame = self._call("quotes", [symbol.prefixed_lower for symbol in batch])
-            if isinstance(frame, pd.DataFrame) and not frame.empty:
-                collect(frame.to_dict("records"))
-        for start in range(0, len(beijing), _QUOTES_BATCH_SIZE):
-            batch = beijing[start : start + _QUOTES_BATCH_SIZE]
-            collect(self._quotes.security_quotes_raw([(MARKET_BJ, symbol.raw) for symbol in batch]))
+        for row in frame.to_dict("records"):
+            quote = _parse_quote_row(row, requested_codes, quoted_at)
+            if quote is not None:
+                quotes.setdefault(quote["code"], quote)
         return quotes
 
     def fetch_stock_quote(self, code: str) -> dict[str, Any]:
@@ -261,6 +351,227 @@ class TdxhubDataProvider:
             "total_shares": safe_float(row.get("zongguben")),
             "float_shares": safe_float(row.get("liutongguben")),
         }
+
+    def fetch_basic_info(self, code: str) -> dict[str, str]:
+        """通过通达信 F10 接口获取个股各类基本信息。
+
+        Param:
+            code: 6 位股票代码
+        Return:
+            dict[str, str]: F10 分类名称到文本内容的映射
+        """
+        sym = normalize_code(code)
+        result: dict[str, str] = {}
+        for category in self.F10_CATEGORIES:
+            frame = self._quotes.call("F10", symbol=sym.raw, name=category)
+            content = ""
+            if isinstance(frame, pd.DataFrame) and not frame.empty:
+                content = str(frame.iloc[0].get("content") or "")
+            result[category] = content
+        return result
+
+    def fetch_index_kline(self, symbol: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """通过通达信本地接口获取指数 K 线并衍生昨收与涨跌幅。
+
+        Param:
+            symbol: 指数代码，支持 000001、sh000001 等格式
+            start_date: 起始日期，格式 YYYYMMDD 或 YYYY-MM-DD
+            end_date: 结束日期，格式 YYYYMMDD 或 YYYY-MM-DD
+        Return:
+            包含 date、OHLCV、amount、pre_close、change_pct 的 DataFrame
+        """
+        raw_symbol = self._normalize_index_request(symbol)
+        offset = self._calculate_offset(start_date, end_date)
+        raw_df = self._quotes.call(
+            "index",
+            symbol=raw_symbol,
+            frequency=self.DAILY_FREQUENCY,
+            start=0,
+            offset=offset,
+        )
+        return self._format_index_kline_df(raw_df, start_date=start_date, end_date=end_date, volume_multiplier=100)
+
+    def fetch_stock_bars(self, code: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """通过通达信底层原始 bars 接口获取个股 K 线（轻量直接查询）。
+
+        Param:
+            code: 6 位股票代码
+            start_date: 起始日期，格式 YYYYMMDD 或 YYYY-MM-DD
+            end_date: 结束日期，格式 YYYYMMDD 或 YYYY-MM-DD
+        Return:
+            包含 date、OHLCV、amount、pre_close、change_pct 的 DataFrame
+        """
+        sym = normalize_code(code)
+        offset = self._calculate_offset(start_date, end_date)
+        raw_df = self._quotes.call(
+            "bars",
+            symbol=sym.raw,
+            frequency=self.DAILY_FREQUENCY,
+            start=0,
+            offset=offset,
+        )
+        return self._format_index_kline_df(raw_df, start_date=start_date, end_date=end_date)
+
+    def _calculate_offset(self, start_date: str = "", end_date: str = "") -> int:
+        """根据日期范围计算 TDX 请求条数，默认返回最近 DEFAULT_OFFSET 条。"""
+        start_dt = self._parse_date(start_date)
+        end_dt = self._parse_date(end_date)
+        if not start_dt or not end_dt:
+            return self.DEFAULT_OFFSET
+        if end_dt < start_dt:
+            raise ValueError(f"结束日期早于起始日期: start_date={start_date}, end_date={end_date}")
+        return max((end_dt - start_dt).days + 1, 1)
+
+    @staticmethod
+    def _parse_date(value: str | None) -> datetime | None:
+        """解析 YYYYMMDD 或 YYYY-MM-DD 日期；空值返回 None。"""
+        if not value:
+            return None
+        normalized = str(value).strip().replace("-", "")
+        return datetime.strptime(normalized, "%Y%m%d")
+
+    @staticmethod
+    def _normalize_index_request(symbol: str) -> str:
+        """归一化 TDX 指数代码；市场由 tdxhub 按代码段自动推断。"""
+        normalized_symbol = normalize_index_symbol(symbol.strip().lower())
+        raw_symbol = str(normalize_index_code(normalized_symbol))
+        if not raw_symbol.isdigit() or len(raw_symbol) != 6:
+            raise ValueError(f"无效指数代码: {symbol}，需要6位数字")
+        return raw_symbol
+
+    def _format_index_kline_df(
+        self,
+        raw_df: pd.DataFrame | None,
+        *,
+        start_date: str = "",
+        end_date: str = "",
+        volume_multiplier: int | float = 1,
+    ) -> pd.DataFrame:
+        """将 tdxhub 原始 K 线 DataFrame 统一整理为标准列。"""
+        if raw_df is None or not isinstance(raw_df, pd.DataFrame) or raw_df.empty:
+            return pd.DataFrame(columns=self.INDEX_KLINE_COLUMNS)
+
+        df = self._ensure_datetime_column(raw_df)
+        required_columns = ["datetime", *self.NUMERIC_COLUMNS]
+        missing = [column for column in required_columns if column not in df.columns]
+        if missing:
+            logger.warning("TDX K线字段缺失: missing=%s", missing)
+            return pd.DataFrame(columns=self.INDEX_KLINE_COLUMNS)
+
+        result = df[required_columns].copy()
+        result["date"] = pd.to_datetime(result["datetime"], errors="coerce")
+        for column in self.NUMERIC_COLUMNS:
+            result[column] = pd.to_numeric(result[column], errors="coerce")
+
+        result = result.dropna(subset=["date"]).sort_values("date")
+        result = result.drop_duplicates(subset=["date"], keep="last")
+        if volume_multiplier != 1:
+            result["volume"] = result["volume"] * volume_multiplier
+
+        result["pre_close"] = result["close"].shift(1)
+        result["change_pct"] = (result["close"] - result["pre_close"]) / result["pre_close"] * 100
+
+        result = self._filter_by_date_range(result, start_date=start_date, end_date=end_date)
+        result["date"] = result["date"].dt.strftime("%Y-%m-%d")
+        return result[self.INDEX_KLINE_COLUMNS].reset_index(drop=True)
+
+    @staticmethod
+    def _ensure_datetime_column(raw_df: pd.DataFrame) -> pd.DataFrame:
+        """兼容 tdxhub 将 datetime 放在列或索引上的两种返回形态。"""
+        df = raw_df.copy()
+        if "datetime" in df.columns:
+            return df.reset_index(drop=True)
+
+        index_name = df.index.name or "datetime"
+        df = df.reset_index()
+        if "datetime" not in df.columns and index_name in df.columns:
+            df = df.rename(columns={index_name: "datetime"})
+        return df
+
+    def _filter_by_date_range(self, df: pd.DataFrame, *, start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """按日期范围过滤 K 线，保留过滤前算出的 pre_close。"""
+        start_dt = self._parse_date(start_date)
+        end_dt = self._parse_date(end_date)
+        if start_dt is not None:
+            df = df[df["date"] >= start_dt]
+        if end_dt is not None:
+            # 日 K 线可能带 15:00 时间，结束日期应包含当天完整交易数据。
+            df = df[df["date"] < end_dt + timedelta(days=1)]
+        return df.copy()
+
+
+def _fund_flow_dates(bars: Any, today: str) -> list[str]:
+    if not isinstance(bars, pd.DataFrame) or bars.empty:
+        raise TdxhubIncompleteDataError("tdxhub 资金流缺少有效日 K")
+    if "datetime" in bars.columns:
+        dates = pd.to_datetime(bars["datetime"], errors="coerce")
+    elif "date" in bars.columns:
+        dates = pd.to_datetime(bars["date"], errors="coerce")
+    elif isinstance(bars.index, pd.DatetimeIndex):
+        dates = pd.Series(bars.index)
+    else:
+        raise TdxhubIncompleteDataError("tdxhub 资金流日 K 缺少日期")
+    if dates.isna().any():
+        raise TdxhubIncompleteDataError("tdxhub 资金流日 K 日期无效")
+    day_keys = dates.dt.strftime("%Y-%m-%d").tolist()
+    if len(day_keys) != len(set(day_keys)) or any(day > today for day in day_keys):
+        raise TdxhubIncompleteDataError("tdxhub 资金流日 K 日期重复或晚于当前交易日")
+    return sorted(day_keys, reverse=True)[:_FUND_FLOW_DAYS]
+
+
+def _parse_daily_fund_flow(day: str, flow: Any) -> dict[str, Any]:
+    tiers = {"super_net": "超大单", "large_net": "大单", "medium_net": "中单", "small_net": "小单"}
+    if not isinstance(flow, pd.DataFrame) or flow.empty or "net_amount" not in flow.columns:
+        raise TdxhubIncompleteDataError(f"tdxhub {day} 缺少完整分笔资金流")
+    count = safe_float(flow.attrs.get("trade_count"))
+    if count is None or not math.isfinite(count) or count <= 0 or not flow.index.is_unique:
+        raise TdxhubIncompleteDataError(f"tdxhub {day} 无有效成交分笔")
+    if not set(tiers.values()).issubset(flow.index):
+        raise TdxhubIncompleteDataError(f"tdxhub {day} 缺少资金分档")
+    row = {"date": day, "main_net": flow.attrs.get("main_net")}
+    row.update({key: flow.loc[tier, "net_amount"] for key, tier in tiers.items()})
+    try:
+        return _parse_fund_flow_history(pd.DataFrame([row]))[0]
+    except ValueError as error:
+        raise TdxhubIncompleteDataError(f"tdxhub {day} 资金流数值无效") from error
+
+
+def _parse_fund_flow_history(frame: Any) -> list[dict[str, Any]]:
+    """TDX 金额已为元；只重命名中单字段，不缩放、不补零、不交付残缺记录。"""
+    fields = {
+        "main_net": "main_net",
+        "super_net": "super_net",
+        "large_net": "large_net",
+        "mid_net": "medium_net",
+        "small_net": "small_net",
+    }
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        raise ValueError("tdxhub 个股历史资金流为空")
+    if not {"date", *fields.values()}.issubset(frame.columns):
+        raise ValueError("tdxhub 个股历史资金流缺少必要字段")
+    result: list[dict[str, Any]] = []
+    dates: set[str] = set()
+    for record in frame.to_dict("records"):
+        raw_date = safe_string(record["date"])
+        if raw_date is None:
+            raise ValueError("tdxhub 个股历史资金流日期缺失")
+        try:
+            date_key = datetime.strptime(raw_date, "%Y-%m-%d").date().isoformat()
+        except ValueError as error:
+            raise ValueError("tdxhub 个股历史资金流日期无效") from error
+        if date_key in dates:
+            raise ValueError("tdxhub 个股历史资金流日期重复")
+        dates.add(date_key)
+        item: dict[str, Any] = {"date": date_key}
+        for target, source in fields.items():
+            raw = record[source]
+            value = safe_float(raw)
+            if isinstance(raw, bool) or value is None or not math.isfinite(value):
+                raise ValueError(f"tdxhub 个股历史资金流数值无效: field={source}")
+            item[target] = value
+        result.append(item)
+    result.sort(key=lambda item: item["date"], reverse=True)
+    return result[:60]
 
 
 def _parse_quote_row(

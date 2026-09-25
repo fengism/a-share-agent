@@ -15,6 +15,7 @@ from app.modules.industry_chain.models import (
     IndustryChainNode,
     IndustryChainResult,
 )
+from app.modules.industry_chain.presentation import presentation_payload
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def _render_evidence_tags(evidence_ids: list[str]) -> str:
     if not evidence_ids:
         return ""
     tags = "".join(
-        f'<span style="display:inline-block; font-size:9px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; padding:1px 4px; border-radius:3px; margin-right:3px; margin-top:2px;">证据 {it}</span>'
+        f'<span style="display:inline-block; font-size:9px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; padding:1px 4px; border-radius:3px; margin-right:3px; margin-top:2px;">{_esc(it)}</span>'
         for it in evidence_ids
     )
     return tags
@@ -183,6 +184,7 @@ def _render_panorama_graph(result: IndustryChainResult) -> str:
 
 def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
     """生成完整展开产业链上下游、市场规模、竞争格局与标的映射的机构级 A4 研报 HTML。"""
+    result = IndustryChainResult.model_validate(presentation_payload(result))
     name = result.name or "核心产业链"
     aliases_str = " / ".join(result.aliases) if result.aliases else ""
     summary = result.summary or "暂无产业链概述数据"

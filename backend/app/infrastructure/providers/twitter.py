@@ -1,9 +1,12 @@
 import logging
+import random
+import re
 
+import httpx
 import requests
 
 from app.configuration import get_settings
-from app.constants.http import BROWSER_USER_AGENT
+from app.constants.http import BROWSER_USER_AGENT, USER_AGENTS
 from app.core.news import parse_timestamp
 from app.domain.news import NewsSearchItem
 
@@ -15,6 +18,20 @@ class TwitterDataProvider:
     DEFAULT_BASE_URL = "https://api.fxtwitter.com/2"
     DEFAULT_TIMEOUT = 10
     name = "twitter"
+
+    async def fetch_tweet(self, username: str, tweet_id: str) -> dict:
+        if not re.fullmatch(r"[A-Za-z0-9_]{1,15}", username) or not re.fullmatch(r"[0-9]+", tweet_id):
+            raise ValueError("invalid tweet identity")
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(
+                f"https://api.fxtwitter.com/{username}/status/{tweet_id}",
+                headers={"User-Agent": random.choice(USER_AGENTS)},
+            )
+            response.raise_for_status()
+            payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("FxTwitter returned invalid payload")
+        return payload
 
     def __init__(self):
         """初始化 TwitterDataProvider 请求头与会话。"""
@@ -32,7 +49,7 @@ class TwitterDataProvider:
         Return:
             从运行时配置中读取的 Twitter 账号列表
         """
-        return get_settings().twitter_feeds
+        return list(get_settings().twitter_feeds)
 
     def _get_session(self) -> requests.Session:
         """获取当前 Session，并在运行时配置变更后同步 trust_env。"""
@@ -69,7 +86,8 @@ class TwitterDataProvider:
     ) -> dict:
         """发起请求并解析 JSON；失败时返回空字典。"""
         try:
-            return self._request(path, params=params, timeout=timeout).json()
+            payload = self._request(path, params=params, timeout=timeout).json()
+            return payload if isinstance(payload, dict) else {}
         except Exception as exc:
             logger.info("Twitter数据获取失败: %s", exc)
             return {}

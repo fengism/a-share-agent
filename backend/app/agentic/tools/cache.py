@@ -28,6 +28,41 @@ class SharedToolCache:
     def __init__(self) -> None:
         self._cache: dict[str, _SharedToolCacheEntry] = {}
 
+    def _get_entry(self, call: ToolCallInfo) -> _SharedToolCacheEntry | None:
+        policy = registry.get_tool_policy(call.function.name) or ToolPolicy()
+        if policy.cache_ttl_seconds == 0:
+            return None
+        key = tool_call_cache_key(call)
+        entry = self._cache.get(key)
+        if entry is not None and (
+            entry.future.cancelled()
+            or (entry.expires_at is not None and entry.expires_at <= time.monotonic())
+        ):
+            self._cache.pop(key, None)
+            metrics.record_agentic_event("tool_cache_expired")
+            return None
+        return entry
+
+    def get_cached_result(
+        self,
+        call: ToolCallInfo,
+        allowed_names: Collection[str] | None = None,
+    ) -> ToolResultInfo | None:
+        """Return a completed, unexpired success without consuming execution budget."""
+        if allowed_names is not None and call.function.name not in allowed_names:
+            return None
+        entry = self._get_entry(call)
+        if entry is None or not entry.future.done():
+            return None
+        result = entry.future.result()
+        if result.is_error:
+            return None
+        metrics.record_agentic_event("tool_cache_hit")
+        return ToolResultInfo(
+            tool_call_id=call.id, name=result.name,
+            content=result.content, is_error=result.is_error,
+        )
+
     async def execute(
         self,
         call: ToolCallInfo,
@@ -50,19 +85,16 @@ class SharedToolCache:
             )
 
         key = tool_call_cache_key(call)
-        existing = self._cache.get(key)
+        existing = self._get_entry(call)
         if existing is not None:
-            if existing.expires_at is None or existing.expires_at > time.monotonic():
-                metrics.record_agentic_event("tool_cache_hit")
-                cached = await asyncio.shield(existing.future)
-                return ToolResultInfo(
-                    tool_call_id=call.id,
-                    name=cached.name,
-                    content=cached.content,
-                    is_error=cached.is_error,
-                )
-            self._cache.pop(key, None)
-            metrics.record_agentic_event("tool_cache_expired")
+            metrics.record_agentic_event("tool_cache_hit")
+            cached = await asyncio.shield(existing.future)
+            return ToolResultInfo(
+                tool_call_id=call.id,
+                name=cached.name,
+                content=cached.content,
+                is_error=cached.is_error,
+            )
 
         metrics.record_agentic_event("tool_cache_miss")
         future: asyncio.Future[ToolResultInfo] = asyncio.get_running_loop().create_future()

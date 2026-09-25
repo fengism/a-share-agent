@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import { buildStockProfileUrl } from "../../utils/stockLinks";
 
 export type AnalysisDateState =
   | { kind: "missing"; date: "" }
@@ -35,4 +36,11 @@ export function formatAnalysisDate(date: string): string {
   const normalizedDate = normalizeAnalysisDate(date);
   if (!normalizedDate) return date;
   return `${normalizedDate.slice(0, 4)}-${normalizedDate.slice(4, 6)}-${normalizedDate.slice(6, 8)}`;
+}
+
+export function buildStockValuationUrl(code: string, date?: string | null): string {
+  const params = new URLSearchParams({ tab: "valuation" });
+  const normalizedDate = normalizeAnalysisDate(date);
+  if (normalizedDate) params.set("date", normalizedDate);
+  return `${buildStockProfileUrl(code)}?${params.toString()}#stock-details`;
 }

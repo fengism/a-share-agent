@@ -41,7 +41,7 @@ describe("DailyReviewCharts", () => {
     expect(screen.getByTestId("daily-review-index-chart")).toBeInTheDocument();
     expect(screen.getByTestId("daily-review-sector-chart")).toBeInTheDocument();
     expect(screen.getByTestId("daily-review-volume-chart")).toBeInTheDocument();
-    expect(screen.getByText("3,210 家")).toHaveAttribute("fill", "var(--c-text-primary, #0f172a)");
+    expect(screen.getByText("3,210 家")).toHaveAttribute("fill", expect.stringContaining("var(--c-text-primary"));
     expect(screen.getByText("上证指数")).toBeInTheDocument();
     expect(screen.getByText("机器人")).toBeInTheDocument();
     expect(screen.getByText("煤炭")).toBeInTheDocument();

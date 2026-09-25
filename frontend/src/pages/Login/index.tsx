@@ -33,7 +33,7 @@ export default function LoginPage() {
 
   return (
     <AuthShell>
-      <AuthHeader title="欢迎回来" description="登录 A 股智能分析系统，继续你的市场研判" />
+      <AuthHeader title="欢迎回来" description="登录智能投研平台，继续你的市场研判" />
 
       {error && (
         <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />

@@ -193,11 +193,7 @@ async function mockResearchApi(page: Page, cachedAnalysis: unknown = analysisRes
       body: JSON.stringify([{ code: "600519", name: "贵州茅台", price: 1520 }]),
     });
   });
-  await page.route("**/api/stock/analysis-page/600519", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
+  const pageData = {
         stock_info: { code: "600519", name: "贵州茅台", concepts: [] },
         kline: {
           code: "600519",
@@ -217,8 +213,15 @@ async function mockResearchApi(page: Page, cachedAnalysis: unknown = analysisRes
         cached_analysis: cachedAnalysis,
         partial: false,
         unavailable_sections: [],
-      }),
-    });
+      };
+  await page.route("**/api/stock/600519/info", async (route) => {
+    await route.fulfill({ json: pageData.stock_info });
+  });
+  await page.route("**/api/stock/600519/intraday", async (route) => {
+    await route.fulfill({ json: pageData.intraday });
+  });
+  await page.route("**/api/stock/analysis-page/600519?include_market_data=false", async (route) => {
+    await route.fulfill({ json: { cached_analysis: pageData.cached_analysis, partial: false, unavailable_sections: [] } });
   });
   await page.route("**/api/analysis/history/all?**", async (route) => {
     await route.fulfill({
@@ -309,18 +312,15 @@ test("uses one stock research entry and renders investment research as its defau
     summarySize: "18px",
     metricSize: "20px",
   });
-  const researchTop = await page.locator(".analysis-panels-card").evaluate((element) => (
-    element.getBoundingClientRect().top
-  ));
-  const chartsTop = await page.locator(".analysis-charts-section").evaluate((element) => (
-    element.getBoundingClientRect().top
-  ));
-  expect(researchTop).toBeLessThan(chartsTop);
+  await expect(page.locator(".analysis-panels-card, .analysis-charts-section")).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "技术面", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "打开报告模式" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "最近分析记录" })).toBeVisible();
   await expect(page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).resolves.toBe(true);
 
-  await page.getByRole("tab", { name: "基本面" }).click();
+  await page.getByRole("link", { name: "个股资料", exact: true }).click();
+  await page.locator(".stock-deferred-section").scrollIntoViewIfNeeded();
+  await expect(page.getByRole("tab", { name: "财务", exact: true })).toHaveAttribute("aria-selected", "true");
   const financialTypography = await page.locator(".financial-data-sections").evaluate((section) => {
     const heading = section.querySelector<HTMLElement>(".financial-data-section__header-title");
     const tableHeading = section.querySelector<HTMLElement>(".ant-table-thead th");
@@ -340,9 +340,10 @@ test("uses one stock research entry and renders investment research as its defau
     tableCellLineHeight: "20.15px",
   });
 
+  await page.getByRole("link", { name: "AI 分析", exact: true }).click();
   await page.getByRole("tab", { name: "研究结论" }).click();
   await page.getByRole("button", { name: /查看估值明细/ }).click();
-  await expect(page).toHaveURL(/\/analysis\/600519\?panel=valuation$/);
+  await expect(page).toHaveURL(/\/stock\/600519\?tab=valuation#stock-details$/);
 });
 
 test("keeps the stock research summary readable on mobile", async ({ page }) => {
@@ -573,3 +574,27 @@ test("redirects the legacy workbench root and keeps report deep links read only"
   await page.getByRole("button", { name: /返回个股研究/ }).click();
   await expect(page).toHaveURL(/\/analysis\/600519\?panel=research$/);
 });
+
+for (const width of [1920, 1180, 390]) {
+  test(`returns from bottom result to visible valuation details at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockResearchApi(page);
+    await page.route("**/api/analysis/600519/history/20260820", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ...analysisResult, analysis_date: "2026-08-20" }),
+    }));
+    await page.goto("/analysis/600519?date=20260820&panel=technical");
+    const result = page.getByRole("region", { name: "个股分析结果", exact: true });
+    await page.getByRole("link", { name: "查看结论", exact: true }).click();
+    await expect(result.getByRole("tab", { name: "研究结论" })).toBeInViewport();
+    // Carry the selected historical date into the profile valuation tab.
+    await result.getByText("完整报告", { exact: true }).click();
+    await result.getByRole("button", { name: "查看估值明细" }).click();
+    await expect(page).toHaveURL(/\/stock\/600519\?tab=valuation&date=20260820#stock-details$/);
+    await expect(page.getByRole("region", { name: "当前估值快照" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "估值", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("heading", { name: "估值分析" })).toBeInViewport();
+    await expect(page.getByText(/来自 2026-08-20 的历史报告/)).toBeVisible();
+  });
+}

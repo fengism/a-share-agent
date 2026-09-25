@@ -43,10 +43,22 @@ def resolve_authenticated_user(
             code="auth.session_expired",
             message="登录已过期，请重新登录",
         )
+    if not user.get("is_active", 1):
+        raise ApiError(
+            status_code=403,
+            code="auth.account_disabled",
+            message="账号已被禁用",
+        )
     return user
 
 
 def ensure_active_user(user: UserRecord) -> UserRecord:
+    if not user.get("is_active", 1):
+        raise ApiError(
+            status_code=403,
+            code="auth.account_disabled",
+            message="账号已被禁用",
+        )
     if user.get("must_change_password"):
         raise ApiError(
             status_code=403,

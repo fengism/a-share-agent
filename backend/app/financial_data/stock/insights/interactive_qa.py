@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
-import akshare as ak
-
 from app.core.cache import market_cache as cache
+from app.core.concurrency.rate_limiter import akshare_semaphore
 from app.core.market import normalize_code
+from app.infrastructure.providers.provider_gateway import provider_gateway
+from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,13 @@ async def get_interactive_qa(code: str, keyword: str = "", limit: int = 15) -> d
     company_name = ""
 
     try:
-        df = await asyncio.to_thread(ak.stock_irm_cninfo, symbol=normalized_code)
+        df = await provider_gateway.call_blocking(
+            "akshare",
+            "fetch_interactive_qa",
+            get_provider("akshare").fetch_interactive_qa,
+            normalized_code,
+            semaphore=akshare_semaphore,
+        )
         if df is not None and not df.empty:
             if "公司简称" in df.columns and len(df) > 0:
                 company_name = str(df.iloc[0].get("公司简称", ""))

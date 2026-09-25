@@ -77,6 +77,16 @@
             ],
             "title": "Reasoning Content"
           },
+          "reasoning_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentReasoningSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "research_round": {
             "anyOf": [
               {
@@ -388,6 +398,56 @@
           "status"
         ],
         "title": "AgentPlanStepUpdate",
+        "type": "object"
+      },
+      "AgentReasoningSource": {
+        "properties": {
+          "attempt": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "block_id": {
+            "title": "Block Id",
+            "type": "string"
+          },
+          "source": {
+            "default": "模型",
+            "title": "Source",
+            "type": "string"
+          },
+          "stage": {
+            "default": "agent",
+            "enum": [
+              "agent",
+              "synthesis"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "turn": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Turn",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "block_id"
+        ],
+        "title": "AgentReasoningSource",
         "type": "object"
       },
       "AgentResearchRound": {
@@ -1440,7 +1500,7 @@
         "properties": {
           "new_password": {
             "maxLength": 128,
-            "minLength": 6,
+            "minLength": 8,
             "title": "New Password",
             "type": "string"
           },
@@ -2119,8 +2179,43 @@
         "title": "ChipHistogramItem",
         "type": "object"
       },
+      "CleanupInvitesResponse": {
+        "properties": {
+          "cleaned_count": {
+            "title": "Cleaned Count",
+            "type": "integer"
+          },
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cleaned_count"
+        ],
+        "title": "CleanupInvitesResponse",
+        "type": "object"
+      },
       "CommoditiesResponse": {
         "properties": {
+          "available_count": {
+            "default": 0,
+            "title": "Available Count",
+            "type": "integer"
+          },
+          "basis_available": {
+            "default": false,
+            "title": "Basis Available",
+            "type": "boolean"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Caveats",
+            "type": "array"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/CommodityItem"
@@ -2130,6 +2225,33 @@
           },
           "query": {
             "title": "Query",
+            "type": "string"
+          },
+          "quote_kind": {
+            "const": "futures",
+            "default": "futures",
+            "title": "Quote Kind",
+            "type": "string"
+          },
+          "source": {
+            "default": "sina_futures",
+            "title": "Source",
+            "type": "string"
+          },
+          "spot_available": {
+            "default": false,
+            "title": "Spot Available",
+            "type": "boolean"
+          },
+          "status": {
+            "default": "unavailable",
+            "enum": [
+              "available",
+              "partial",
+              "unavailable",
+              "not_found"
+            ],
+            "title": "Status",
             "type": "string"
           },
           "total_count": {
@@ -2261,12 +2383,37 @@
             ],
             "title": "Prev Settle"
           },
+          "quote_kind": {
+            "const": "futures",
+            "default": "futures",
+            "title": "Quote Kind",
+            "type": "string"
+          },
           "related_chains": {
             "items": {
               "type": "string"
             },
             "title": "Related Chains",
             "type": "array"
+          },
+          "source": {
+            "default": "sina_futures",
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "default": "",
+            "title": "Source Url",
+            "type": "string"
+          },
+          "status": {
+            "default": "unavailable",
+            "enum": [
+              "available",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
           },
           "symbol": {
             "title": "Symbol",
@@ -3796,6 +3943,12 @@
             "title": "Commodity",
             "type": "string"
           },
+          "data_kind": {
+            "const": "static_reference",
+            "default": "static_reference",
+            "title": "Data Kind",
+            "type": "string"
+          },
           "description": {
             "title": "Description",
             "type": "string"
@@ -3817,6 +3970,11 @@
             },
             "title": "Related A Stocks",
             "type": "array"
+          },
+          "source": {
+            "default": "builtin_reference",
+            "title": "Source",
+            "type": "string"
           },
           "trade_type": {
             "title": "Trade Type",
@@ -3865,52 +4023,100 @@
             "type": "string"
           },
           "export_accumulate": {
-            "default": 0,
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "累计出口金额（亿美元）",
-            "title": "Export Accumulate",
-            "type": "number"
+            "title": "Export Accumulate"
           },
           "export_accumulate_yoy_pct": {
-            "default": 0,
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "累计出口同比（%）",
-            "title": "Export Accumulate Yoy Pct",
-            "type": "number"
+            "title": "Export Accumulate Yoy Pct"
           },
           "export_val": {
-            "default": 0,
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "当月出口金额（亿美元）",
-            "title": "Export Val",
-            "type": "number"
+            "title": "Export Val"
           },
           "export_yoy_pct": {
-            "default": 0,
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "当月出口同比（%）",
-            "title": "Export Yoy Pct",
-            "type": "number"
+            "title": "Export Yoy Pct"
           },
           "import_accumulate": {
-            "default": 0,
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "累计进口金额（亿美元）",
-            "title": "Import Accumulate",
-            "type": "number"
+            "title": "Import Accumulate"
           },
           "import_accumulate_yoy_pct": {
-            "default": 0,
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "累计进口同比（%）",
-            "title": "Import Accumulate Yoy Pct",
-            "type": "number"
+            "title": "Import Accumulate Yoy Pct"
           },
           "import_val": {
-            "default": 0,
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "当月进口金额（亿美元）",
-            "title": "Import Val",
-            "type": "number"
+            "title": "Import Val"
           },
           "import_yoy_pct": {
-            "default": 0,
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "当月进口同比（%）",
-            "title": "Import Yoy Pct",
-            "type": "number"
+            "title": "Import Yoy Pct"
           },
           "month": {
             "default": "",
@@ -3923,10 +4129,16 @@
             "type": "string"
           },
           "trade_balance": {
-            "default": 0,
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "当月贸易差额（亿美元，出口-进口）",
-            "title": "Trade Balance",
-            "type": "number"
+            "title": "Trade Balance"
           }
         },
         "title": "CustomsMonthSummary",
@@ -3934,11 +4146,51 @@
       },
       "CustomsTradeDataResponse": {
         "properties": {
+          "amount_unit": {
+            "default": "USD_100_million",
+            "title": "Amount Unit",
+            "type": "string"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Caveats",
+            "type": "array"
+          },
+          "commodity_series_available": {
+            "default": false,
+            "title": "Commodity Series Available",
+            "type": "boolean"
+          },
+          "data_scope": {
+            "const": "national_macro",
+            "default": "national_macro",
+            "title": "Data Scope",
+            "type": "string"
+          },
           "investment_implications": {
             "$ref": "#/components/schemas/CustomsInvestmentImplications"
           },
           "latest_month_summary": {
-            "$ref": "#/components/schemas/CustomsMonthSummary"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CustomsMonthSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "macro_status": {
+            "default": "unavailable",
+            "enum": [
+              "available",
+              "partial",
+              "unavailable"
+            ],
+            "title": "Macro Status",
+            "type": "string"
           },
           "matched_commodity_profiles": {
             "items": {
@@ -3946,6 +4198,15 @@
             },
             "title": "Matched Commodity Profiles",
             "type": "array"
+          },
+          "profile_match_status": {
+            "default": "not_found",
+            "enum": [
+              "matched",
+              "not_found"
+            ],
+            "title": "Profile Match Status",
+            "type": "string"
           },
           "query": {
             "title": "Query",
@@ -3957,6 +4218,11 @@
             },
             "title": "Recent 12M Macro Trend",
             "type": "array"
+          },
+          "source": {
+            "default": "eastmoney_china_trade",
+            "title": "Source",
+            "type": "string"
           }
         },
         "required": [
@@ -6683,6 +6949,17 @@
             "title": "Category",
             "type": "string"
           },
+          "change_basis": {
+            "default": "text",
+            "enum": [
+              "fact",
+              "observation",
+              "evidence",
+              "text"
+            ],
+            "title": "Change Basis",
+            "type": "string"
+          },
           "change_type": {
             "enum": [
               "added",
@@ -6695,6 +6972,16 @@
           "detail": {
             "default": "",
             "title": "Detail",
+            "type": "string"
+          },
+          "numeric_delta": {
+            "default": "",
+            "title": "Numeric Delta",
+            "type": "string"
+          },
+          "percentage_delta": {
+            "default": "",
+            "title": "Percentage Delta",
             "type": "string"
           },
           "title": {
@@ -6716,6 +7003,16 @@
             "default": 0,
             "title": "Added Count",
             "type": "integer"
+          },
+          "comparable": {
+            "default": true,
+            "title": "Comparable",
+            "type": "boolean"
+          },
+          "comparison_note": {
+            "default": "",
+            "title": "Comparison Note",
+            "type": "string"
           },
           "has_changes": {
             "default": false,
@@ -6772,6 +7069,38 @@
           }
         },
         "title": "IndustryChainChart",
+        "type": "object"
+      },
+      "IndustryChainCitation": {
+        "properties": {
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "location": {
+            "default": "",
+            "description": "原文页码/表格/章节；未核实则留空",
+            "maxLength": 200,
+            "title": "Location",
+            "type": "string"
+          },
+          "quote": {
+            "default": "",
+            "maxLength": 1500,
+            "title": "Quote",
+            "type": "string"
+          },
+          "source_url": {
+            "default": "",
+            "description": "服务端匹配原文所属 URL，不接受模型自报链接",
+            "title": "Source Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_id"
+        ],
+        "title": "IndustryChainCitation",
         "type": "object"
       },
       "IndustryChainCompetitionGroup": {
@@ -6899,6 +7228,13 @@
       },
       "IndustryChainEvent": {
         "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
           "claim_type": {
             "default": "fact",
             "enum": [
@@ -6922,6 +7258,17 @@
           "date": {
             "default": "",
             "title": "Date",
+            "type": "string"
+          },
+          "evidence_basis": {
+            "default": "disclosed",
+            "enum": [
+              "disclosed",
+              "forecast",
+              "inference",
+              "opinion"
+            ],
+            "title": "Evidence Basis",
             "type": "string"
           },
           "evidence_ids": {
@@ -6948,6 +7295,22 @@
           },
           "title": {
             "title": "Title",
+            "type": "string"
+          },
+          "verification_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Verification Notes",
+            "type": "array"
+          },
+          "verification_status": {
+            "default": "unverified",
+            "enum": [
+              "unverified",
+              "quote_matched"
+            ],
+            "title": "Verification Status",
             "type": "string"
           }
         },
@@ -6981,6 +7344,17 @@
           "fetched_at": {
             "default": "",
             "title": "Fetched At",
+            "type": "string"
+          },
+          "material_type": {
+            "default": "unknown",
+            "enum": [
+              "discovery",
+              "body",
+              "structured",
+              "unknown"
+            ],
+            "title": "Material Type",
             "type": "string"
           },
           "provider": {
@@ -7108,6 +7482,13 @@
       },
       "IndustryChainInsight": {
         "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
           "claim_type": {
             "default": "inference",
             "enum": [
@@ -7138,6 +7519,17 @@
             "title": "Evidence",
             "type": "string"
           },
+          "evidence_basis": {
+            "default": "disclosed",
+            "enum": [
+              "disclosed",
+              "forecast",
+              "inference",
+              "opinion"
+            ],
+            "title": "Evidence Basis",
+            "type": "string"
+          },
           "evidence_ids": {
             "items": {
               "type": "string"
@@ -7157,6 +7549,22 @@
           },
           "title": {
             "title": "Title",
+            "type": "string"
+          },
+          "verification_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Verification Notes",
+            "type": "array"
+          },
+          "verification_status": {
+            "default": "unverified",
+            "enum": [
+              "unverified",
+              "quote_matched"
+            ],
+            "title": "Verification Status",
             "type": "string"
           }
         },
@@ -7186,6 +7594,13 @@
       },
       "IndustryChainMetric": {
         "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
           "claim_type": {
             "default": "fact",
             "enum": [
@@ -7206,6 +7621,17 @@
             "title": "Confidence",
             "type": "string"
           },
+          "evidence_basis": {
+            "default": "disclosed",
+            "enum": [
+              "disclosed",
+              "forecast",
+              "inference",
+              "opinion"
+            ],
+            "title": "Evidence Basis",
+            "type": "string"
+          },
           "evidence_ids": {
             "items": {
               "type": "string"
@@ -7222,9 +7648,24 @@
             "title": "Label",
             "type": "string"
           },
+          "metric_id": {
+            "default": "",
+            "title": "Metric Id",
+            "type": "string"
+          },
+          "numeric_value": {
+            "default": "",
+            "title": "Numeric Value",
+            "type": "string"
+          },
           "period": {
             "default": "",
             "title": "Period",
+            "type": "string"
+          },
+          "region": {
+            "default": "",
+            "title": "Region",
             "type": "string"
           },
           "source": {
@@ -7237,8 +7678,34 @@
             "title": "Source Url",
             "type": "string"
           },
+          "statistical_scope": {
+            "default": "",
+            "title": "Statistical Scope",
+            "type": "string"
+          },
+          "unit": {
+            "default": "",
+            "title": "Unit",
+            "type": "string"
+          },
           "value": {
             "title": "Value",
+            "type": "string"
+          },
+          "verification_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Verification Notes",
+            "type": "array"
+          },
+          "verification_status": {
+            "default": "unverified",
+            "enum": [
+              "unverified",
+              "quote_matched"
+            ],
+            "title": "Verification Status",
             "type": "string"
           }
         },
@@ -7252,6 +7719,29 @@
       "IndustryChainNode": {
         "additionalProperties": true,
         "properties": {
+          "benefit_path": {
+            "default": "",
+            "title": "Benefit Path",
+            "type": "string"
+          },
+          "business_relevance": {
+            "default": "unverified",
+            "enum": [
+              "unverified",
+              "concept",
+              "business",
+              "earnings"
+            ],
+            "title": "Business Relevance",
+            "type": "string"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
           "claim_type": {
             "default": "fact",
             "enum": [
@@ -7306,11 +7796,29 @@
             "title": "Description",
             "type": "string"
           },
+          "evidence_basis": {
+            "default": "disclosed",
+            "enum": [
+              "disclosed",
+              "forecast",
+              "inference",
+              "opinion"
+            ],
+            "title": "Evidence Basis",
+            "type": "string"
+          },
           "evidence_ids": {
             "items": {
               "type": "string"
             },
             "title": "Evidence Ids",
+            "type": "array"
+          },
+          "invalidation_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Invalidation Conditions",
             "type": "array"
           },
           "market_share": {
@@ -7334,6 +7842,23 @@
             ],
             "title": "Name"
           },
+          "realization_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Realization Conditions",
+            "type": "array"
+          },
+          "revenue_period": {
+            "default": "",
+            "title": "Revenue Period",
+            "type": "string"
+          },
+          "revenue_share": {
+            "default": "",
+            "title": "Revenue Share",
+            "type": "string"
+          },
           "role": {
             "default": "",
             "title": "Role",
@@ -7347,6 +7872,29 @@
           "source_url": {
             "default": "",
             "title": "Source Url",
+            "type": "string"
+          },
+          "tracking_metrics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tracking Metrics",
+            "type": "array"
+          },
+          "verification_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Verification Notes",
+            "type": "array"
+          },
+          "verification_status": {
+            "default": "unverified",
+            "enum": [
+              "unverified",
+              "quote_matched"
+            ],
+            "title": "Verification Status",
             "type": "string"
           }
         },
@@ -7365,6 +7913,11 @@
             "title": "Code",
             "type": "string"
           },
+          "completeness_score": {
+            "default": 0,
+            "title": "Completeness Score",
+            "type": "integer"
+          },
           "earnings_score": {
             "default": 0,
             "title": "Earnings Score",
@@ -7381,6 +7934,12 @@
             "default": 0,
             "title": "Evidence Score",
             "type": "integer"
+          },
+          "fundamental_status": {
+            "const": "not_evaluated",
+            "default": "not_evaluated",
+            "title": "Fundamental Status",
+            "type": "string"
           },
           "name": {
             "title": "Name",
@@ -7406,6 +7965,17 @@
             "title": "Role",
             "type": "string"
           },
+          "score_kind": {
+            "const": "research_completeness",
+            "default": "research_completeness",
+            "title": "Score Kind",
+            "type": "string"
+          },
+          "scoring_version": {
+            "default": 1,
+            "title": "Scoring Version",
+            "type": "integer"
+          },
           "total_score": {
             "default": 0,
             "title": "Total Score",
@@ -7421,6 +7991,167 @@
           "name"
         ],
         "title": "IndustryChainOpportunity",
+        "type": "object"
+      },
+      "IndustryChainRelationship": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "claim_type": {
+            "default": "inference",
+            "enum": [
+              "fact",
+              "inference",
+              "opinion"
+            ],
+            "title": "Claim Type",
+            "type": "string"
+          },
+          "conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conditions",
+            "type": "array"
+          },
+          "confidence": {
+            "default": "medium",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "driver": {
+            "default": "",
+            "title": "Driver",
+            "type": "string"
+          },
+          "evidence": {
+            "default": "",
+            "title": "Evidence",
+            "type": "string"
+          },
+          "evidence_basis": {
+            "default": "disclosed",
+            "enum": [
+              "disclosed",
+              "forecast",
+              "inference",
+              "opinion"
+            ],
+            "title": "Evidence Basis",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "impact_direction": {
+            "default": "unknown",
+            "enum": [
+              "positive",
+              "negative",
+              "mixed",
+              "unknown"
+            ],
+            "title": "Impact Direction",
+            "type": "string"
+          },
+          "invalidation": {
+            "default": "",
+            "title": "Invalidation",
+            "type": "string"
+          },
+          "relation_type": {
+            "enum": [
+              "supply",
+              "purchase",
+              "substitute",
+              "compete",
+              "transmission"
+            ],
+            "title": "Relation Type",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "source_node": {
+            "title": "Source Node",
+            "type": "string"
+          },
+          "source_url": {
+            "default": "",
+            "title": "Source Url",
+            "type": "string"
+          },
+          "target_metric": {
+            "default": "",
+            "title": "Target Metric",
+            "type": "string"
+          },
+          "target_node": {
+            "title": "Target Node",
+            "type": "string"
+          },
+          "time_lag": {
+            "default": "",
+            "title": "Time Lag",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tracking_metrics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tracking Metrics",
+            "type": "array"
+          },
+          "verification_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Verification Notes",
+            "type": "array"
+          },
+          "verification_status": {
+            "default": "unverified",
+            "enum": [
+              "unverified",
+              "quote_matched"
+            ],
+            "title": "Verification Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "source_node",
+          "target_node",
+          "relation_type"
+        ],
+        "title": "IndustryChainRelationship",
         "type": "object"
       },
       "IndustryChainResearchScope": {
@@ -7457,6 +8188,24 @@
               }
             ],
             "title": "End Date"
+          },
+          "refresh_dimensions": {
+            "items": {
+              "enum": [
+                "market",
+                "stocks",
+                "competition",
+                "technology",
+                "chain",
+                "drivers_risks",
+                "reports",
+                "events"
+              ],
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Refresh Dimensions",
+            "type": "array"
           },
           "region": {
             "default": "china_and_global",
@@ -7677,12 +8426,26 @@
             "title": "Quality Status",
             "type": "string"
           },
+          "relationships": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainRelationship"
+            },
+            "title": "Relationships",
+            "type": "array"
+          },
           "research_scope": {
             "additionalProperties": {
               "type": "string"
             },
             "title": "Research Scope",
             "type": "object"
+          },
+          "research_theses": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainThesis"
+            },
+            "title": "Research Theses",
+            "type": "array"
           },
           "risk_insights": {
             "items": {
@@ -7746,6 +8509,9 @@
             "title": "Upstream",
             "type": "array"
           },
+          "verification_repair": {
+            "$ref": "#/components/schemas/IndustryChainVerificationRepair"
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -7792,6 +8558,144 @@
         "title": "IndustryChainSource",
         "type": "object"
       },
+      "IndustryChainThesis": {
+        "properties": {
+          "beneficiaries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Beneficiaries",
+            "type": "array"
+          },
+          "chain_path": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 6,
+            "title": "Chain Path",
+            "type": "array"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "claim_type": {
+            "default": "inference",
+            "enum": [
+              "fact",
+              "inference",
+              "opinion"
+            ],
+            "title": "Claim Type",
+            "type": "string"
+          },
+          "conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conditions",
+            "type": "array"
+          },
+          "confidence": {
+            "default": "medium",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "type": "string"
+          },
+          "counter_evidence": {
+            "default": "",
+            "title": "Counter Evidence",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "evidence": {
+            "default": "",
+            "title": "Evidence",
+            "type": "string"
+          },
+          "evidence_basis": {
+            "default": "disclosed",
+            "enum": [
+              "disclosed",
+              "forecast",
+              "inference",
+              "opinion"
+            ],
+            "title": "Evidence Basis",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "invalidation": {
+            "default": "",
+            "title": "Invalidation",
+            "type": "string"
+          },
+          "mechanism": {
+            "default": "",
+            "title": "Mechanism",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "default": "",
+            "title": "Source Url",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tracking_metrics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tracking Metrics",
+            "type": "array"
+          },
+          "verification_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Verification Notes",
+            "type": "array"
+          },
+          "verification_status": {
+            "default": "unverified",
+            "enum": [
+              "unverified",
+              "quote_matched"
+            ],
+            "title": "Verification Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "IndustryChainThesis",
+        "type": "object"
+      },
       "IndustryChainTopicResolution": {
         "properties": {
           "aliases": {
@@ -7832,6 +8736,45 @@
           }
         },
         "title": "IndustryChainTopicResolution",
+        "type": "object"
+      },
+      "IndustryChainVerificationRepair": {
+        "properties": {
+          "added_evidence_count": {
+            "default": 0,
+            "title": "Added Evidence Count",
+            "type": "integer"
+          },
+          "attempted_rounds": {
+            "default": 0,
+            "title": "Attempted Rounds",
+            "type": "integer"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "status": {
+            "default": "not_needed",
+            "enum": [
+              "not_needed",
+              "completed",
+              "no_new_evidence",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "title": "IndustryChainVerificationRepair",
         "type": "object"
       },
       "IndustryHierarchyResponse": {
@@ -8979,6 +9922,91 @@
           "status"
         ],
         "title": "LivenessResponse",
+        "type": "object"
+      },
+      "LoginAuditLogItem": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "details": {
+            "title": "Details",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ip_address": {
+            "title": "Ip Address",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "user_agent": {
+            "title": "User Agent",
+            "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "ip_address",
+          "user_agent",
+          "status",
+          "details",
+          "created_at"
+        ],
+        "title": "LoginAuditLogItem",
+        "type": "object"
+      },
+      "LoginAuditLogsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LoginAuditLogItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "LoginAuditLogsResponse",
         "type": "object"
       },
       "LoginRequest": {
@@ -15880,13 +16908,14 @@
           },
           "password": {
             "maxLength": 128,
-            "minLength": 6,
+            "minLength": 8,
             "title": "Password",
             "type": "string"
           },
           "username": {
             "maxLength": 32,
             "minLength": 3,
+            "pattern": "^[a-zA-Z0-9_.-]+$",
             "title": "Username",
             "type": "string"
           }
@@ -15925,7 +16954,7 @@
         "properties": {
           "new_password": {
             "maxLength": 128,
-            "minLength": 6,
+            "minLength": 8,
             "title": "New Password",
             "type": "string"
           },
@@ -16269,6 +17298,24 @@
           }
         },
         "title": "ReverseDCFResult",
+        "type": "object"
+      },
+      "RevokeSessionsResponse": {
+        "properties": {
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revoked_sessions": {
+            "title": "Revoked Sessions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revoked_sessions"
+        ],
+        "title": "RevokeSessionsResponse",
         "type": "object"
       },
       "RiskCase": {
@@ -18595,6 +19642,49 @@
           "date"
         ],
         "title": "StockFundFlowItem",
+        "type": "object"
+      },
+      "StockFundFlowPage": {
+        "description": "固定来源与日期的资金流批次，total 为最多 60 个交易日的可查询天数。",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StockFundFlowItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_api": {
+            "title": "Source Api",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "source",
+          "source_api"
+        ],
+        "title": "StockFundFlowPage",
         "type": "object"
       },
       "StockProfileEnrichResponse": {
@@ -21038,6 +22128,19 @@
         "title": "TwitterFeedRefreshResponse",
         "type": "object"
       },
+      "UpdateMustChangePasswordRequest": {
+        "properties": {
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "must_change_password"
+        ],
+        "title": "UpdateMustChangePasswordRequest",
+        "type": "object"
+      },
       "UpdateStatusResponse": {
         "properties": {
           "message": {
@@ -21082,11 +22185,53 @@
         "title": "UpdateStatusResponse",
         "type": "object"
       },
+      "UpdateUserRoleRequest": {
+        "properties": {
+          "is_admin": {
+            "title": "Is Admin",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_admin"
+        ],
+        "title": "UpdateUserRoleRequest",
+        "type": "object"
+      },
+      "UpdateUserStatusRequest": {
+        "properties": {
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_active"
+        ],
+        "title": "UpdateUserStatusRequest",
+        "type": "object"
+      },
       "UserOut": {
         "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
           },
           "is_admin": {
             "title": "Is Admin",
@@ -23036,6 +24181,97 @@
         ]
       }
     },
+    "/api/auth/admin/audit-logs": {
+      "get": {
+        "description": "Admin: list login audit log records with filtering and pagination.",
+        "operationId": "get_login_audit_logs_api_auth_admin_audit_logs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "username",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginAuditLogsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Login Audit Logs",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/admin/reset-link": {
       "post": {
         "description": "Admin issues a one-time, expiring password-reset token for a user.\n\nThe token is shown to the admin once (to hand over out-of-band); only its\nhash is stored. No email infrastructure is involved.",
@@ -23078,6 +24314,317 @@
           }
         ],
         "summary": "Admin Reset Link",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/admin/users": {
+      "get": {
+        "description": "Admin: list all registered accounts.",
+        "operationId": "list_users_api_auth_admin_users_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserOut"
+                  },
+                  "title": "Response List Users Api Auth Admin Users Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Users",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}": {
+      "delete": {
+        "description": "Admin: delete a user account and purge all their sessions/configs.",
+        "operationId": "delete_user_api_auth_admin_users__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete User",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/must-change-password": {
+      "post": {
+        "description": "Admin: toggle whether a user must change their password on next login.",
+        "operationId": "update_user_must_change_password_api_auth_admin_users__user_id__must_change_password_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMustChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update User Must Change Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/revoke-sessions": {
+      "post": {
+        "description": "Admin: force revoke all active sessions for a user.",
+        "operationId": "revoke_user_sessions_api_auth_admin_users__user_id__revoke_sessions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke User Sessions",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/role": {
+      "put": {
+        "description": "Admin: promote or demote a user's admin role.",
+        "operationId": "update_user_role_api_auth_admin_users__user_id__role_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update User Role",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/status": {
+      "put": {
+        "description": "Admin: enable or disable a user account.",
+        "operationId": "update_user_status_api_auth_admin_users__user_id__status_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update User Status",
         "tags": [
           "auth"
         ]
@@ -23266,6 +24813,43 @@
           }
         ],
         "summary": "List Invites",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/invites/cleanup-expired": {
+      "post": {
+        "description": "Admin: purge expired and unused invites.",
+        "operationId": "cleanup_expired_invites_api_auth_invites_cleanup_expired_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupInvitesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cleanup Expired Invites",
         "tags": [
           "auth"
         ]
@@ -26021,7 +27605,7 @@
     },
     "/api/macro/commodities": {
       "get": {
-        "description": "获取大宗商品与工业品现货基差与产业链映射。",
+        "description": "获取大宗商品期货最近报价与静态产业映射，不含现货/基差。",
         "operationId": "get_commodities_api_macro_commodities_get",
         "parameters": [
           {
@@ -26072,7 +27656,7 @@
     },
     "/api/macro/customs-trade": {
       "get": {
-        "description": "获取海关总署月度进出口总况与重点出海商品量价。",
+        "description": "获取全国月度进出口总况及静态商品介绍，不含细分商品量价。",
         "operationId": "get_customs_trade_api_macro_customs_trade_get",
         "parameters": [
           {
@@ -31066,7 +32650,7 @@
     },
     "/api/stock/analysis-page/{code}": {
       "get": {
-        "description": "聚合分析页面所需的所有数据，并发加载。\n\n将 stock/info、stock/kline、stock/intraday、stock/valuation、analysis/result\n合并为一个响应，减少前端页面加载时的 HTTP 往返次数。\n\nParam:\n    code: 6 位股票代码\nReturn:\n    AnalysisPageData: 分析页面所需的全部数据",
+        "description": "聚合分析页面所需的所有数据，并发加载。\n\n将 stock/info、stock/kline、stock/intraday、stock/valuation、analysis/result\n合并为一个响应；include_market_data=false 时只加载历史分析，行情由个股查询缓存复用。\n\nParam:\n    code: 6 位股票代码\nReturn:\n    AnalysisPageData: 分析页面所需的全部数据",
         "operationId": "get_analysis_page_api_stock_analysis_page__code__get",
         "parameters": [
           {
@@ -31076,6 +32660,16 @@
             "schema": {
               "title": "Code",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_market_data",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Market Data",
+              "type": "boolean"
             }
           }
         ],
@@ -31637,6 +33231,71 @@
           }
         ],
         "summary": "Get Fund Flow",
+        "tags": [
+          "stock"
+        ]
+      }
+    },
+    "/api/stock/{code}/fund-flow-pages": {
+      "get": {
+        "description": "每批最多 20 日，后续批次固定首批来源和日期。",
+        "operationId": "get_fund_flow_page_api_stock__code__fund_flow_pages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockFundFlowPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Fund Flow Page",
         "tags": [
           "stock"
         ]

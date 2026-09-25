@@ -8,17 +8,62 @@ import WorkflowRuntimeBridge from "./WorkflowRuntimeBridge";
 import AppSidebar from "./AppSidebar";
 import RouteLoadingFallback from "./RouteLoadingFallback";
 import UpdateBanner from "./UpdateBanner";
+import { getActiveNavKey } from "./navConfig";
+
+const SIDEBAR_COLLAPSED_KEY = "trade_agent_sidebar_collapsed";
 
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const colors = useColors();
   const themeKey = useThemeStore((state) => state.themeKey);
   const isMobile = useMediaQuery("(max-width: 767px)");
   const contentRef = useRef<HTMLElement>(null);
   const previousPath = useRef(location.pathname);
+
+  const handleCollapse = useCallback((nextCollapsed: boolean) => {
+    setCollapsed(nextCollapsed);
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(nextCollapsed));
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        const activeEl = document.activeElement;
+        const isInput =
+          activeEl instanceof HTMLInputElement ||
+          activeEl instanceof HTMLTextAreaElement ||
+          (activeEl as HTMLElement)?.isContentEditable;
+        if (!isInput && !isMobile) {
+          e.preventDefault();
+          setCollapsed((prev) => {
+            const next = !prev;
+            try {
+              localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+            } catch {
+              // Ignore storage errors
+            }
+            return next;
+          });
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMobile]);
 
   useEffect(() => {
     if (previousPath.current === location.pathname) return;
@@ -39,12 +84,12 @@ export default function AppLayout() {
       <a className="app-skip-link" href="#main-content">跳到主要内容</a>
       <div className="app-shell-root" style={{ minHeight: "100vh", backgroundColor: colors.pageBg }}>
         <AppSidebar
-          activeKey={getActiveKey(location.pathname)}
+          activeKey={getActiveNavKey(location.pathname)}
           collapsed={collapsed}
           isMobile={isMobile}
           mobileNavOpen={mobileNavOpen}
           themeKey={themeKey}
-          onCollapse={setCollapsed}
+          onCollapse={handleCollapse}
           onMobileNavClose={() => setMobileNavOpen(false)}
           onNavigate={handleNavigate}
         />
@@ -81,30 +126,4 @@ export default function AppLayout() {
       </div>
     </>
   );
-}
-
-function getActiveKey(pathname: string): string {
-  if (pathname === "/") return "/";
-  if (pathname.startsWith("/watchlist")) return "/watchlist";
-  if (pathname.startsWith("/national-team")) return "/national-team";
-  if (pathname.startsWith("/market") || pathname.startsWith("/hk-market")) return "/market";
-  if (pathname.startsWith("/trading-calendar")) return "/trading-calendar";
-  if (pathname.startsWith("/macro")) return "/macro";
-  if (pathname.startsWith("/portfolio")) return "/portfolio";
-  if (pathname.startsWith("/quant")) return "/quant";
-  if (pathname.startsWith("/feed")) return "/feed";
-  if (pathname.startsWith("/twitter")) return "/feed";
-  if (pathname.startsWith("/screener")) return "/screener";
-  if (pathname.startsWith("/chat")) return "/chat";
-  if (pathname.startsWith("/daily-review")) return "/daily-review";
-  if (pathname.startsWith("/stock")) return "/analysis";
-  if (pathname.startsWith("/investment-research")) return "/analysis";
-  if (pathname.startsWith("/analysis")) return "/analysis";
-  if (pathname.startsWith("/industry-chain")) return "/industry-chain";
-  if (pathname.startsWith("/master-data") || pathname.startsWith("/stock-concept") || pathname.startsWith("/industry-classification")) {
-    return "/master-data";
-  }
-  if (pathname.startsWith("/capabilities")) return "/capabilities";
-  if (pathname.startsWith("/settings")) return "/settings";
-  return "/";
 }

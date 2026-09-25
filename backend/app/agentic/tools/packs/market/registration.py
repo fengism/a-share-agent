@@ -252,7 +252,7 @@ def register_market_tools(target_registry=None):
 
     target.register_tool(Tool(
         name="get_commodity_spot_prices",
-        description="查询大宗商品与重要工业品现货/主力合约最新价格与产业链映射（覆盖碳酸锂、工业硅、铜、铝、锌、镍、锡、黄金、白银、螺纹钢、铁矿石、焦炭、原油、甲醇、PTA、纯碱、生猪等）。支持指定商品名称，或省略参数查看全部大宗商品概览。",
+        description="查询大宗商品期货连续/主力合约最近报价与静态产业映射；旧工具名兼容，不提供现货、基差或企业采购成本（覆盖碳酸锂、工业硅、铜、铝、锌、镍、锡、黄金、白银、螺纹钢、铁矿石、焦炭、原油、甲醇、PTA、纯碱、生猪等）。支持指定商品名称，或省略参数查看全部大宗商品概览。",
         parameters={
             "type": "object",
             "properties": {
@@ -263,7 +263,7 @@ def register_market_tools(target_registry=None):
                 },
             },
         },
-        policy=_MARKET_REALTIME_POLICY,
+        policy=ToolPolicy(cache_ttl_seconds=0, freshness="realtime"),
         executor=_get_commodity_spot_prices,
     ))
 
@@ -277,7 +277,7 @@ def register_market_tools(target_registry=None):
 
     target.register_tool(Tool(
         name="get_customs_trade_data",
-        description="获取海关总署月度进出口总额、贸易顺差/逆差、同比增速，以及汽车/新能源/光伏/锂电池/半导体芯片/工程机械/家电/船舶等重点出海与进口商品量价数据及 A 股产业链映射。",
+        description="获取全国近12个月进出口总额、差额、同比。commodity仅筛选静态商品介绍与公司映射，不返回该商品的出口量、金额、均价、目的地或HS编码序列。静态映射不能证明订单或受益。",
         parameters={
             "type": "object",
             "properties": {
@@ -288,13 +288,13 @@ def register_market_tools(target_registry=None):
                 },
             },
         },
-        policy=_MARKET_DAILY_POLICY,
+        policy=ToolPolicy(cache_ttl_seconds=0, freshness="daily"),
         executor=_get_customs_trade_data,
     ))
 
 
 async def _get_commodity_spot_prices(symbol: str = "") -> Any:
-    """获取大宗商品与重要工业品现货/主力合约最新价格。"""
+    """获取大宗商品期货最近报价，不含现货或基差。"""
     from app.financial_data.market.quotes.commodity import get_commodity_spot_prices
     return await get_commodity_spot_prices(symbol=symbol)
 

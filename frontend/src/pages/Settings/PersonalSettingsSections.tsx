@@ -61,11 +61,11 @@ export function IntegrationsSettingsSection({
       <h3 id="integration-settings-title" style={sectionTitleStyle}>内容集成</h3>
       <FeishuConfigCard {...cardProps} onSave={onSaveFeishu} />
       <Row gutter={[16, 0]}>
-        <Col xs={24} lg={12}>
-          <NotionConfigCard {...cardProps} onSave={onSaveNotion} />
+        <Col xs={24} lg={12} style={{ display: "flex" }}>
+          <NotionConfigCard stretch {...cardProps} onSave={onSaveNotion} />
         </Col>
-        <Col xs={24} lg={12}>
-          <IwencaiConfigCard {...cardProps} onSave={onSaveIwencai} />
+        <Col xs={24} lg={12} style={{ display: "flex" }}>
+          <IwencaiConfigCard stretch {...cardProps} onSave={onSaveIwencai} />
         </Col>
       </Row>
     </section>

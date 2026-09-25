@@ -1,6 +1,8 @@
 from enum import StrEnum
 
+import httpx
 import requests
+from curl_cffi.requests import exceptions as curl_errors
 
 from app.core.exceptions import UpstreamUnavailableError
 
@@ -20,14 +22,21 @@ class ProviderCircuitOpenError(UpstreamUnavailableError):
 def classify_provider_error(exc: Exception) -> ProviderErrorCategory:
     if isinstance(exc, ProviderCircuitOpenError):
         return ProviderErrorCategory.CIRCUIT_OPEN
-    if isinstance(exc, (requests.Timeout, TimeoutError)):
+    if isinstance(exc, (requests.Timeout, httpx.TimeoutException, curl_errors.Timeout, TimeoutError)):
         return ProviderErrorCategory.TIMEOUT
-    if isinstance(exc, requests.HTTPError):
+    if isinstance(exc, (requests.HTTPError, httpx.HTTPStatusError, curl_errors.HTTPError)):
         status = exc.response.status_code if exc.response is not None else None
         if status == 429:
             return ProviderErrorCategory.RATE_LIMIT
         if status is not None and status >= 500:
             return ProviderErrorCategory.TRANSIENT
+        return ProviderErrorCategory.PERMANENT
+    if isinstance(exc, (httpx.UnsupportedProtocol, httpx.LocalProtocolError, curl_errors.CertificateVerifyError)):
+        return ProviderErrorCategory.PERMANENT
+    if isinstance(exc, (httpx.TransportError, curl_errors.ConnectionError, curl_errors.ProxyError)):
+        return ProviderErrorCategory.TRANSIENT
+    # curl_cffi 的所有请求异常都继承 OSError，配置/URL/证书错误不能被兜底误判为瞬时故障。
+    if isinstance(exc, curl_errors.RequestException):
         return ProviderErrorCategory.PERMANENT
     if isinstance(exc, (requests.ConnectionError, ConnectionError, OSError)):
         return ProviderErrorCategory.TRANSIENT

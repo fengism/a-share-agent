@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisResult } from "../../types/stock";
 import InvestmentResearch from ".";
+import { stopAgentProcess, type AgentProcessState } from "../../features/agent-process/agentProcess";
 
 const {
   useAnalysisPageData,
@@ -79,13 +80,14 @@ const analysis = {
 
 function LocationProbe() {
   const location = useLocation();
-  return <span data-testid="location">{location.pathname}{location.search}</span>;
+  return <span data-testid="location">{location.pathname}{location.search}{location.hash}</span>;
 }
 
 function renderPage(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
+        <Route path="/stock/:code" element={<LocationProbe />} />
         <Route path="/investment-research/:code" element={<><InvestmentResearch /><LocationProbe /></>} />
         <Route path="/analysis/:code" element={<LocationProbe />} />
       </Routes>
@@ -148,7 +150,7 @@ describe("InvestmentResearch", () => {
     expect(screen.getByText("历史快照 · 2026-08-26")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "查看估值明细" }));
     expect(screen.getByTestId("location")).toHaveTextContent(
-      "/analysis/600519?date=20260826&panel=valuation",
+      "/stock/600519?tab=valuation&date=20260826#stock-details",
     );
   });
 
@@ -240,4 +242,31 @@ describe("InvestmentResearch", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("/analysis/600519?panel=research");
     expect(runAnalysis).not.toHaveBeenCalled();
   });
+  it.each(["cancelled", "detached"] as const)("preserves stopped research UI in the report view: %s", (termination) => {
+    const process: AgentProcessState = {
+      status: "采集证据中", toolCalls: [], activeRoundIndex: 1,
+      rounds: [{
+        roundIndex: 1, roundTotal: 3, status: "running", objective: "证据核验", evidenceGaps: [],
+        toolNames: ["web_fetch"], toolSelectionReason: "获取正文", evidenceAdded: [], judgmentBasis: [],
+        conclusion: "", nextStep: "", statusText: "执行中",
+        toolCalls: [{ id: "fetch", name: "web_fetch", arguments: "{}", isExecuting: true }],
+      }],
+    };
+    useAnalysisWorkflowController.mockReturnValue({
+      displayResult: null, isAnalyzing: false, isCancelling: false, analysisError: null,
+      stages: [{ stage: 1, name: "数据采集与证据校验", status: "started" }, null, null],
+      currentStageIndex: 0, agentProcess: stopAgentProcess(process, termination, "研究已停止"),
+    });
+    const { container } = renderPage("/investment-research/600519");
+    const toggle = screen.getByRole("button", { name: /Agent 思考与执行/ });
+    expect(within(toggle).getByText(termination === "cancelled" ? "已停止" : "已停止等待")).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.getByText("数据采集与证据校验")).toBeInTheDocument();
+    expect(screen.getByLabelText("第 1 轮调研")).toBeInTheDocument();
+    expect(screen.queryByText("已完成")).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-label="loading"]')).toBeNull();
+    expect(container.querySelector(".ant-spin-spinning")).toBeNull();
+    expect(container.querySelector(".ant-steps-item-process")).toBeNull();
+  });
+
 });

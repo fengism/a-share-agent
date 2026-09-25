@@ -1,9 +1,12 @@
+import type { ReasoningSource } from "../types/chat";
 import type {
   AgentToolResultSummary,
   AgentPlan,
   AgentPlanStepUpdate,
   ChatDisplayMessage,
   ChatMessage,
+  ChatProcessUpdate,
+  ChatProcessOutcome,
   ToolCallInfo,
 } from "../types/chat";
 import type { SessionData, SessionMeta } from "./chatPersistence";
@@ -47,13 +50,15 @@ export interface ChatState {
   setAssistantPlan: (messageId: string, plan: AgentPlan) => void;
   updateAssistantPlanStep: (messageId: string, update: AgentPlanStepUpdate) => void;
   setReasoningContent: (messageId: string, reasoningContent: string) => void;
-  appendToReasoning: (messageId: string, text: string) => void;
+  appendToReasoning: (messageId: string, text: string, source?: ReasoningSource) => void;
+  addAssistantProcessUpdate: (messageId: string, update: ChatProcessUpdate) => void;
+  setAssistantProcessOutcome: (messageId: string, outcome: ChatProcessOutcome) => void;
   setAssistantStatus: (messageId: string, status: string) => void;
   setStreaming: (streaming: boolean) => void;
   setActiveRun: (sessionId: string | null, label: string | null) => void;
   setSyncStatus: (status: ChatSyncStatus) => void;
   setAbortController: (controller: AbortController | null) => void;
   clearChat: () => void;
-  finalizeMessage: (messageId: string) => void;
+  finalizeMessage: (messageId: string, outcome?: ChatProcessOutcome) => void;
   regenerateLastAssistant: () => ChatRegenerationRequest | null;
 }

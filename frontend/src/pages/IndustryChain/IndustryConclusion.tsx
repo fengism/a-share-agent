@@ -1,3 +1,4 @@
+import IndustryClaimStatus from "./IndustryClaimStatus";
 import {
   AimOutlined,
   BankOutlined,
@@ -126,6 +127,7 @@ export default function IndustryConclusion({ result }: { result: IndustryChainRe
             <div key={`${metric.label}-${metric.period || "latest"}`}>
               <span className="industry-conclusion__metric-label">{metric.label}</span>
               <strong className="industry-conclusion__metric-value">{metric.value}</strong>
+              <IndustryClaimStatus claim={metric} />
               <small className="industry-conclusion__metric-meta">{[metric.period, metric.growth].filter(Boolean).join(" · ")}</small>
             </div>
           ))}

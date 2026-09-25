@@ -91,4 +91,9 @@ def generate_invite_code() -> str:
 
 def generate_temp_password() -> str:
     """Generate a random, typeable temporary password (for the seeded admin)."""
-    return secrets.token_urlsafe(12)
+    part = secrets.token_urlsafe(12)
+    if not any(c.isdigit() for c in part):
+        part = f"{part[:10]}9{part[11:]}" if len(part) > 11 else f"{part}9"
+    if not any(c.isalpha() for c in part):
+        part = f"{part[:10]}a{part[11:]}" if len(part) > 11 else f"{part}a"
+    return part

@@ -29,6 +29,8 @@ export const QUERY_CACHE_POLICIES = {
   settingsConfig: { staleMs: 30_000 },
   settingsBotJobs: { staleMs: 10_000 },
   settingsInvites: { staleMs: 30_000 },
+  settingsUsers: { staleMs: 30_000 },
+  settingsAuditLogs: { staleMs: 15_000 },
   workflowActive: { staleMs: 1_000, activePollMs: 2_000, idlePollMs: 10_000 },
   workflowHistory: { staleMs: 5 * 60_000 },
   workflowImmutableSnapshot: { staleMs: Number.POSITIVE_INFINITY },

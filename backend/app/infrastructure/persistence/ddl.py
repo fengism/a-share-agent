@@ -154,9 +154,10 @@ USER_TABLES.append(
     """
     CREATE TABLE IF NOT EXISTS users (
         id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-        username             TEXT    NOT NULL UNIQUE,
+        username             TEXT    NOT NULL UNIQUE COLLATE NOCASE,
         password_hash        TEXT    NOT NULL,
         is_admin             INTEGER NOT NULL DEFAULT 0,
+        is_active            INTEGER NOT NULL DEFAULT 1,
         must_change_password INTEGER NOT NULL DEFAULT 0,
         created_at           TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
     )
@@ -284,6 +285,28 @@ USER_TABLES.extend(
         ON password_resets(expires_at, used_at)
         """,
         "CREATE INDEX IF NOT EXISTS idx_user_config_key ON user_config(key)",
+    ]
+)
+
+USER_TABLES.append(
+    """
+    CREATE TABLE IF NOT EXISTS login_audit_logs (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        username   TEXT    NOT NULL,
+        user_id    INTEGER,
+        ip_address TEXT    NOT NULL DEFAULT '',
+        user_agent TEXT    NOT NULL DEFAULT '',
+        status     TEXT    NOT NULL,
+        details    TEXT    NOT NULL DEFAULT '',
+        created_at TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+    )
+    """
+)
+
+USER_TABLES.extend(
+    [
+        "CREATE INDEX IF NOT EXISTS idx_login_audit_created ON login_audit_logs(created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_login_audit_username ON login_audit_logs(username, created_at DESC)",
     ]
 )
 

@@ -1,23 +1,32 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.configuration.llm_routing import resolve_llm_routing
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
 from app.configuration.schema import Settings
 from app.domain.llm import LLMConfigurationError
+from app.infrastructure.llm.capabilities import LLMCapabilities, capabilities_for_settings, resolve_llm_capabilities
 
 
 @dataclass(frozen=True)
 class LLMClientSpec:
     provider: str
     api_mode: str
-    api_key: str
-    base_url: str
+    api_key: str = field(repr=False)
+    base_url: str = field(repr=False)
     model: str
     api_version: str
     timeout: float
+    capabilities: LLMCapabilities | None = None
 
     @property
-    def key(self) -> tuple[str, str, str, str, str, str, float]:
+    def effective_capabilities(self) -> LLMCapabilities:
+        return self.capabilities or resolve_llm_capabilities(
+            provider=self.provider, api_mode=self.api_mode, model=self.model,
+            base_url=self.base_url, api_version=self.api_version,
+        )
+
+    @property
+    def key(self) -> tuple[str, str, str, str, str, str, float, LLMCapabilities]:
         return (
             self.provider,
             self.api_mode,
@@ -26,6 +35,7 @@ class LLMClientSpec:
             self.model,
             self.api_version,
             self.timeout,
+            self.effective_capabilities,
         )
 
 
@@ -55,4 +65,5 @@ def resolve_llm_client_spec(settings: Settings) -> LLMClientSpec:
         model=routing.model,
         api_version=routing.api_version,
         timeout=float(getattr(settings, "llm_timeout_seconds", 120.0)),
+        capabilities=capabilities_for_settings(settings),
     )

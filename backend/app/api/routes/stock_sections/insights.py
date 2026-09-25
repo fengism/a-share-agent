@@ -9,12 +9,14 @@ from app.financial_data.stock.public import (
     RetailSentiment,
     StockBulletinPage,
     StockFundFlowItem,
+    StockFundFlowPage,
     StockReportPage,
     StockSentiment,
 )
 from app.financial_data.stock.public import get_retail_sentiment as get_retail_sentiment_service
 from app.financial_data.stock.public import get_stock_bulletins as get_stock_bulletins_service
 from app.financial_data.stock.public import get_stock_fund_flow as get_stock_fund_flow_service
+from app.financial_data.stock.public import get_stock_fund_flow_page as get_stock_fund_flow_page_service
 from app.financial_data.stock.public import get_stock_news as get_stock_news_service
 from app.financial_data.stock.public import get_stock_news_categorized as get_stock_news_categorized_service
 from app.financial_data.stock.public import get_stock_reports as get_stock_reports_service
@@ -64,6 +66,12 @@ async def get_retail_sentiment(code: str):
 async def get_fund_flow(code: str):
     """获取个股资金流向日级数据。"""
     return await get_stock_fund_flow_service(code)
+
+
+@router.get("/{code}/fund-flow-pages", response_model=StockFundFlowPage)
+async def get_fund_flow_page(code: str, cursor: str | None = Query(None, max_length=80)):
+    """每批最多 20 日，后续批次固定首批来源和日期。"""
+    return await get_stock_fund_flow_page_service(code, cursor)
 
 
 @router.get("/{code}/news-categorized", response_model=CategorizedStockNews)

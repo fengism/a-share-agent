@@ -9,11 +9,11 @@ interface Props {
 
 export default function AnalysisProgressSteps({ stages, currentStageIndex, status }: Props) {
   const items = stages.map((stage, index) => {
-    const status =
+    const stepStatus =
       !stage
         ? ("wait" as const)
         : stage.status === "started"
-        ? ("process" as const)
+        ? (status === "running" ? "process" as const : status === "error" ? "error" as const : "wait" as const)
         : stage.status === "completed"
           ? ("finish" as const)
           : stage.status === "failed"
@@ -28,7 +28,7 @@ export default function AnalysisProgressSteps({ stages, currentStageIndex, statu
 
     return {
       title: stage?.name || `阶段 ${index + 1}`,
-      status,
+      status: stepStatus,
       description,
     };
   });

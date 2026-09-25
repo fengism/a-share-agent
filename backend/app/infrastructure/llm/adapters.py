@@ -1,12 +1,21 @@
 import json
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
-from openai import OpenAI
+from openai import APIConnectionError, APITimeoutError, OpenAI
+
+from app.domain.llm import LLMConfigurationError
+from app.infrastructure.llm.capabilities import (
+    LLMCapabilities,
+    model_parameter_defaults,
+)
+from app.infrastructure.llm.capabilities import (
+    is_reasoning_model as is_reasoning_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +47,12 @@ _TRANSIENT_LLM_ERROR_MARKERS = (
 
 def normalize_retryable_llm_error(error: Exception) -> Exception:
     """Normalize transport-compatible failures that may arrive inside a HTTP 200 stream."""
+    if isinstance(error, (TimeoutError, APITimeoutError, httpx.TimeoutException, LLMInvalidResponseError)):
+        return error  # A slow/already-started request must not be automatically replayed.
     if isinstance(error, LLMRetryableError):
         return error
+    if isinstance(error, (APIConnectionError, httpx.TransportError)):
+        return LLMUpstreamResponseError("LLM 上游连接失败")
     status_code = getattr(error, "status_code", None)
     if status_code is None:
         response = getattr(error, "response", None)
@@ -47,6 +60,8 @@ def normalize_retryable_llm_error(error: Exception) -> Exception:
     message = str(error).strip().lower()
     if status_code in {408, 409, 429} or (isinstance(status_code, int) and status_code >= 500):
         return LLMUpstreamResponseError("LLM 上游暂时不可用")
+    if isinstance(status_code, int):
+        return error  # Never classify a 400/401/403 by matching its response body.
     if any(marker in message for marker in _TRANSIENT_LLM_ERROR_MARKERS):
         return LLMUpstreamResponseError("LLM 上游暂时不可用")
     return error
@@ -111,18 +126,78 @@ def validate_chat_completion_response(response: Any) -> Any:
     return response
 
 
-def is_reasoning_model(model: str) -> bool:
-    model_name = model.rsplit("/", 1)[-1].lower()
-    return model_name.startswith(("o1", "o3", "o4", "gpt-5"))
+# SDK extra_body is merged after normal parameters. Never let it rewrite fields
+# already governed here; vendor-only extensions remain available unchanged.
+_GOVERNED_BODY_FIELDS = frozenset({
+    "model", "messages", "stream", "max_tokens", "max_completion_tokens",
+    "temperature", "response_format", "stream_options", "tools", "tool_choice",
+    "parallel_tool_calls",
+})
 
 
-def prepare_completion_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Adjust Chat Completions arguments for reasoning model constraints."""
+def _validate_extra_body(value: Any) -> None:
+    if value is None:
+        return
+    if not isinstance(value, Mapping):
+        raise LLMConfigurationError("extra_body 必须是 JSON 对象")
+    if any(key in value for key in _GOVERNED_BODY_FIELDS):
+        # Do not include values: extensions may contain secrets or prompt data.
+        raise LLMConfigurationError("extra_body 不能覆盖受治理的模型、消息、预算或协议参数，请使用顶层参数")
+
+
+def _validate_token_limit(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise LLMConfigurationError("输出 token 预算必须是正整数")
+    return value
+
+
+def prepare_completion_kwargs(
+    kwargs: dict[str, Any], capabilities: LLMCapabilities | None = None,
+    *, expected_model: str | None = None,
+) -> dict[str, Any]:
+    """Idempotent request shaping shared by all SDK adapters and transports.
+
+    A resolved route policy always wins over alias hints. Do not infer provider
+    capabilities again after an explicit model/gateway override was selected.
+    """
     prepared = dict(kwargs)
-    if is_reasoning_model(str(prepared.get("model", ""))):
+    _validate_extra_body(prepared.get("extra_body"))
+    if expected_model is not None and prepared.get("model") != expected_model:
+        raise LLMConfigurationError("请求模型与客户端兼容策略不一致，请为目标模型重新创建客户端")
+    policy = capabilities or model_parameter_defaults(str(prepared.get("model", "")))
+    if not policy.supports_temperature:
         prepared.pop("temperature", None)
-        if "max_tokens" in prepared and "max_completion_tokens" not in prepared:
-            prepared["max_completion_tokens"] = prepared.pop("max_tokens")
+    token_limits = [prepared.pop(key) for key in ("max_tokens", "max_completion_tokens") if prepared.get(key) is not None]
+    prepared.pop("max_tokens", None)
+    prepared.pop("max_completion_tokens", None)
+    if policy.max_completion_tokens is not None:
+        token_limits.append(policy.max_completion_tokens)
+    if token_limits:
+        prepared[policy.token_parameter] = min(_validate_token_limit(value) for value in token_limits)
+    response_format = prepared.get("response_format")
+    if isinstance(response_format, dict):
+        if response_format.get("type") == "json_object" and not policy.json_mode:
+            prepared.pop("response_format")  # Prompt/parser validation still applies.
+        elif response_format.get("type") == "json_schema" and not policy.supports_strict_json_schema:
+            raise LLMConfigurationError("当前模型网关未启用严格 JSON Schema，请配置兼容能力或使用 JSON 对象模式")
+    if not prepared.get("stream") or not policy.stream_include_usage:
+        prepared.pop("stream_options", None)
+    if prepared.get("tool_choice") == "none" and not policy.supports_tool_choice_none:
+        prepared.pop("tools", None)
+    if prepared.get("tools"):
+        if not policy.native_tool_calling:
+            raise LLMConfigurationError("当前模型网关未启用工具调用能力")
+        if prepared.get("stream") and not policy.streaming_tool_calls:
+            raise LLMConfigurationError("当前模型网关未启用流式工具调用，请使用非流式工具轮次")
+        if isinstance(prepared.get("tool_choice"), dict) and not policy.supports_named_tool_choice:
+            raise LLMConfigurationError("当前模型网关未启用强制指定工具能力，请改用 auto 或配置兼容能力")
+        if not policy.parallel_tool_calls:
+            prepared.pop("parallel_tool_calls", None)
+        if prepared.get("tool_choice") == "required" and not policy.supports_tool_choice_required:
+            prepared["tool_choice"] = "auto"
+    else:
+        prepared.pop("tool_choice", None)
+        prepared.pop("parallel_tool_calls", None)
     return prepared
 
 
@@ -181,15 +256,18 @@ class OpenAICompatibleClient(LLMClient):
         *,
         openai_factory: Callable[..., Any] = OpenAI,
         http_client_factory: Callable[..., Any] = httpx.Client,
+        capabilities: LLMCapabilities | None = None,
     ):
         self._http_client = http_client_factory(trust_env=False)
         self.client = openai_factory(
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,
+            max_retries=0,
             http_client=self._http_client,
         )
         self.model = model
+        self.capabilities = capabilities
         logger.info("初始化OpenAI兼容客户端: model=%s, base_url=%s", model, base_url)
 
     def close(self) -> None:
@@ -219,7 +297,7 @@ class OpenAICompatibleClient(LLMClient):
             if json_format:
                 kwargs["response_format"] = {"type": "json_object"}
             response = self.client.chat.completions.create(
-                **prepare_completion_kwargs(kwargs)
+                **prepare_completion_kwargs(kwargs, self.capabilities)
             )
             content = extract_message_text(response.choices[0].message.content)
             if not content.strip():
@@ -264,9 +342,11 @@ class LiteLLMClient(LLMClient):
         base_url: str | None = None,
         timeout: float = 120.0,
         api_version: str = "",
+        capabilities: LLMCapabilities | None = None,
     ):
         self.api_key = api_key
         self.model = model
+        self.capabilities = capabilities
         self.base_url = base_url
         self.timeout = timeout
         self.api_version = api_version
@@ -281,7 +361,7 @@ class LiteLLMClient(LLMClient):
         from litellm import completion
 
         logger.info("LiteLLM请求: model=%s, messages数=%s", self.model, len(messages))
-        kwargs: dict = prepare_completion_kwargs(
+        kwargs: dict = dict(
             {
                 "model": self.model,
                 "messages": messages,
@@ -289,6 +369,7 @@ class LiteLLMClient(LLMClient):
                 "temperature": temperature,
                 "timeout": self.timeout,
                 "drop_params": True,
+                "num_retries": 0,
             }
         )
         if json_format:
@@ -299,7 +380,7 @@ class LiteLLMClient(LLMClient):
             kwargs["api_version"] = self.api_version
 
         try:
-            response = completion(**kwargs)
+            response = completion(**prepare_completion_kwargs(kwargs, self.capabilities))
             content = extract_message_text(response.choices[0].message.content)
             if not content.strip():
                 raise LLMEmptyResponseError("LiteLLM 上游返回空内容")

@@ -7,6 +7,8 @@ export interface IndustryChainChart {
   option: Record<string, unknown>;
 }
 
+export type IndustryRefreshDimension = "market" | "stocks" | "competition" | "technology" | "chain" | "drivers_risks" | "reports" | "events";
+
 export interface IndustryChainResearchScope {
   region: "china" | "global" | "china_and_global";
   time_range: "half_year" | "one_year" | "three_years" | "custom";
@@ -14,15 +16,31 @@ export interface IndustryChainResearchScope {
   end_date?: string;
   as_of_date?: string;
   company_scope: "a_share" | "all_public";
+  refresh_dimensions?: IndustryRefreshDimension[];
 }
 
-export interface IndustryChainNode {
+export interface IndustryChainClaim {
+  evidence_basis?: "disclosed" | "forecast" | "inference" | "opinion";
+  claim_type?: "fact" | "inference" | "opinion";
+  citations?: Array<{ evidence_id: string; quote: string; source_url?: string; location?: string }>;
+  verification_status?: "unverified" | "quote_matched";
+  verification_notes?: string[];
+}
+
+export interface IndustryChainNode extends IndustryChainClaim {
   name?: string | null;
   company?: string | null;
   code?: string | null;
   role?: string;
   description?: string;
   companies?: string[];
+  business_relevance?: "unverified" | "concept" | "business" | "earnings";
+  revenue_share?: string;
+  revenue_period?: string;
+  benefit_path?: string;
+  realization_conditions?: string[];
+  invalidation_conditions?: string[];
+  tracking_metrics?: string[];
   market_share?: string;
   metric?: string;
   source?: string;
@@ -33,11 +51,16 @@ export interface IndustryChainNode {
   [key: string]: unknown;
 }
 
-export interface IndustryChainMetric {
+export interface IndustryChainMetric extends IndustryChainClaim {
   label: string;
   value: string;
   period?: string;
   growth?: string;
+  metric_id?: string;
+  numeric_value?: string;
+  unit?: string;
+  region?: string;
+  statistical_scope?: string;
   source?: string;
   source_url?: string;
   evidence_ids?: string[];
@@ -45,7 +68,7 @@ export interface IndustryChainMetric {
   confidence?: "high" | "medium" | "low";
 }
 
-export interface IndustryChainInsight {
+export interface IndustryChainInsight extends IndustryChainClaim {
   title: string;
   detail?: string;
   evidence?: string;
@@ -56,13 +79,36 @@ export interface IndustryChainInsight {
   confidence?: "high" | "medium" | "low";
 }
 
+export interface IndustryChainThesis extends IndustryChainInsight {
+  chain_path?: string[];
+  mechanism?: string;
+  conditions?: string[];
+  counter_evidence?: string;
+  invalidation?: string;
+  tracking_metrics?: string[];
+  beneficiaries?: string[];
+}
+
+export interface IndustryChainRelationship extends IndustryChainInsight {
+  driver?: string;
+  target_metric?: string;
+  time_lag?: string;
+  tracking_metrics?: string[];
+  source_node: string;
+  target_node: string;
+  relation_type: "supply" | "purchase" | "substitute" | "compete" | "transmission";
+  impact_direction?: "positive" | "negative" | "mixed" | "unknown";
+  conditions?: string[];
+  invalidation?: string;
+}
+
 export interface IndustryChainCompetitionGroup {
   market: string;
   summary?: string;
   companies: IndustryChainNode[];
 }
 
-export interface IndustryChainEvent {
+export interface IndustryChainEvent extends IndustryChainClaim {
   date?: string;
   title: string;
   impact?: string;
@@ -94,6 +140,7 @@ export interface IndustryChainEvidence {
   content_preview?: string;
   status?: "success" | "error";
   error_message?: string;
+  material_type?: "discovery" | "body" | "structured" | "unknown";
 }
 
 export interface IndustryChainEvidenceStats {
@@ -128,10 +175,15 @@ export interface IndustryChainChangeItem {
   detail?: string;
   before?: string;
   after?: string;
+  change_basis?: "fact" | "observation" | "evidence" | "text";
+  numeric_delta?: string;
+  percentage_delta?: string;
 }
 
 export interface IndustryChainChangeSet {
   previous_archive_id: string;
+  comparable?: boolean;
+  comparison_note?: string;
   has_changes: boolean;
   added_count: number;
   removed_count: number;
@@ -150,6 +202,10 @@ export interface IndustryChainOpportunity {
   evidence_score: number;
   risk_score: number;
   total_score: number;
+  scoring_version?: number;
+  score_kind?: "research_completeness";
+  completeness_score?: number;
+  fundamental_status?: "not_evaluated";
   rationale?: string;
   evidence_ids?: string[];
 }
@@ -177,6 +233,14 @@ export interface IndustryChainAnalysisMetadata {
 }
 
 export interface IndustryChainResult {
+  research_theses?: IndustryChainThesis[];
+  verification_repair?: {
+    status?: "not_needed" | "completed" | "no_new_evidence" | "failed";
+    attempted_rounds?: number;
+    added_evidence_count?: number;
+    targets?: string[];
+    note?: string;
+  };
   schema_version?: number;
   name: string;
   aliases?: string[];
@@ -214,6 +278,7 @@ export interface IndustryChainResult {
   agent_trace?: ChatStreamDelta[];
   changes?: IndustryChainChangeSet;
   opportunities?: IndustryChainOpportunity[];
+  relationships?: IndustryChainRelationship[];
   topic_resolution?: IndustryChainTopicResolution;
   analysis_metadata?: IndustryChainAnalysisMetadata;
 }

@@ -17,8 +17,8 @@ export default function AuthShell({ children }: { children: ReactNode }) {
               <LineChartOutlined />
             </span>
             <span>
-              <strong>A 股智能分析系统</strong>
-              <small>A-SHARE INTELLIGENCE</small>
+              <strong>智能投研平台</strong>
+              <small>INTELLIGENT INVESTMENT PLATFORM</small>
             </span>
           </div>
 

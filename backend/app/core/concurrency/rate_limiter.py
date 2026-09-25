@@ -25,6 +25,7 @@ baidu_semaphore = asyncio.Semaphore(2)
 cls_semaphore = asyncio.Semaphore(2)
 kaipanhong_semaphore = asyncio.Semaphore(1)
 tdx_semaphore = asyncio.Semaphore(2)
+tdxhub_semaphore = tdx_semaphore
 misc_semaphore = asyncio.Semaphore(4)
 database_semaphore = asyncio.Semaphore(8)
 

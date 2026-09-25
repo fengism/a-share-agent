@@ -45,6 +45,8 @@ vi.mock("./ConfigCards", () => ({
 
 vi.mock("./BotJobManagerCard", () => ({ default: () => null }));
 vi.mock("./InviteManagerCard", () => ({ default: () => null }));
+vi.mock("./SecurityAuditCard", () => ({ default: () => null }));
+vi.mock("./UserManagerCard", () => ({ default: () => null }));
 vi.mock("./SystemUpdateCard", () => ({ default: () => null }));
 vi.mock("../../components/AdminResetCard", () => ({ default: () => null }));
 vi.mock("../../components/ChangePasswordCard", () => ({ default: () => null }));

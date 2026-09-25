@@ -77,6 +77,21 @@ export interface AgentResearchRound {
   next_step: string;
 }
 
+export interface ReasoningSource {
+  block_id: string;
+  source: string;
+  stage: "agent" | "synthesis";
+  turn: number;
+  task_id?: string | null;
+  attempt: number;
+}
+
+// Offsets into reasoningContent avoid storing the same large text twice.
+export interface ReasoningBlock extends ReasoningSource {
+  start: number;
+  end: number;
+}
+
 export interface ChatStreamDelta {
   type:
     | "status"
@@ -99,6 +114,7 @@ export interface ChatStreamDelta {
   tool_result_summary?: AgentToolResultSummary | null;
   error?: string | null;
   reasoning_content?: string | null;
+  reasoning_source?: ReasoningSource | null;
   status?: AgentExecutionStatus | null;
   warnings?: string[];
 }
@@ -124,6 +140,18 @@ export interface ToolCallDisplay {
   isCancelled?: boolean;
 }
 
+// Local terminal states are persisted with the public research metadata, not
+// added to the upstream research event contract.
+export type ChatResearchRound = Omit<AgentResearchRound, "status"> & {
+  status: AgentResearchRoundStatus | "cancelled" | "failed";
+};
+
+export type ChatProcessUpdate =
+  | { type: "status"; content: string }
+  | { type: "round"; round: ChatResearchRound };
+
+export type ChatProcessOutcome = AgentExecutionStatus | "cancelled";
+
 export interface ChatDisplayMessage {
   id: string;
   role: "user" | "assistant";
@@ -131,6 +159,9 @@ export interface ChatDisplayMessage {
   toolCalls?: ToolCallDisplay[];
   plan?: AgentPlan;
   reasoningContent?: string;
+  reasoningBlocks?: ReasoningBlock[];
+  processUpdates?: ChatProcessUpdate[];
+  processOutcome?: ChatProcessOutcome;
   status?: string;
   isStreaming?: boolean;
 }

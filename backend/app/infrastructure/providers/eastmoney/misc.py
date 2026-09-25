@@ -1,4 +1,5 @@
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -6,6 +7,38 @@ logger = logging.getLogger(__name__)
 
 class MiscMixin:
     """东方财富 misc 数据接口。"""
+
+    def fetch_etf_current_shares(self, codes: set[str]) -> dict[str, float]:
+        if not codes:
+            return {}
+        response = self.em_get_response(
+            "https://push2.eastmoney.com/api/qt/ulist.np/get",
+            params={"secids": ",".join(f"0.{code}" for code in sorted(codes)), "fields": "f12,f38"},
+            timeout=2,
+        )
+        response.raise_for_status()
+        rows = (response.json().get("data") or {}).get("diff", [])
+        result = {}
+        for row in rows:
+            code, value = str(row.get("f12", "")).strip(), row.get("f38")
+            if code in codes and isinstance(value, (int, float)) and math.isfinite(value) and value > 0:
+                result[code] = float(value)
+        return result
+
+    def fetch_company_survey(self, stock_code: str, exchange: str = ""):
+        raw_code = stock_code.split(".")[0]
+        ex = exchange.upper() if exchange else ("SH" if raw_code.startswith("6") else "SZ")
+        response = self.em_get_response(
+            "https://emweb.securities.eastmoney.com/PC_HSF10/CompanySurvey/CompanySurveyAjax",
+            params={"code": f"{ex}{raw_code}"},
+            headers={"Referer": "https://emweb.securities.eastmoney.com/"},
+            timeout=8,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("东方财富公司概况返回格式无效")
+        return payload
 
     def fetch_market_margin_summary(self, page_size: int = 240) -> list[dict]:
         """

@@ -4,6 +4,10 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   useAnalysisPageData,
+  useAnalysisSnapshot,
+  useStockInfo,
+  useStockFundFlow,
+  useStockFundFlowPages,
   useDeleteAnalysisHistory,
   useDeleteDailyReview,
   useDeleteIndustryChainArchive,
@@ -47,13 +51,150 @@ describe("query request lifecycle", () => {
       </StrictMode>
     );
 
-    const { result } = renderHook(() => useAnalysisPageData("600519"), { wrapper });
+    const { result } = renderHook(() => useStockInfo("600519"), { wrapper });
 
     await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(1));
 
     await act(async () => resolveRequest?.({ code: "600519" }));
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    client.clear();
+  });
+
+  it("allows the slower fund-flow fallback to finish without the default 15s cutoff", async () => {
+    vi.mocked(apiGet).mockResolvedValue([]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result, unmount } = renderHook(() => useStockFundFlow("600519"), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(apiGet).toHaveBeenCalledWith("/stock/600519/fund-flow", undefined, { timeoutMs: 120000 });
+    unmount();
+    client.clear();
+  });
+
+  it("fetches funding batches on demand and retries a failed cursor without losing loaded pages", async () => {
+    const first = { items: [{ date: "2026-09-24" }], total: 60, next_cursor: "session:20", source: "tdxhub", source_api: "tdxhub.capital_flow" };
+    const second = { ...first, items: [{ date: "2026-08-24" }], next_cursor: "session:40" };
+    vi.mocked(apiGet).mockResolvedValueOnce(first).mockRejectedValueOnce(new Error("batch failed")).mockResolvedValueOnce(second);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result, rerender, unmount } = renderHook(({ code }) => useStockFundFlowPages(code), { wrapper, initialProps: { code: "600519" } });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(apiGet).toHaveBeenCalledTimes(1);
+    expect(result.current.data?.pages).toEqual([first]);
+    expect(result.current.hasNextPage).toBe(true);
+    await act(async () => { await result.current.fetchNextPage(); });
+    await waitFor(() => expect(result.current.isFetchNextPageError).toBe(true));
+    expect(result.current.data?.pages).toEqual([first]);
+    await act(async () => { await result.current.fetchNextPage(); });
+    await waitFor(() => expect(result.current.isFetchNextPageError).toBe(false));
+    expect(result.current.data?.pages).toEqual([first, second]);
+    expect(apiGet).toHaveBeenNthCalledWith(2, "/stock/600519/fund-flow-pages", { cursor: "session:20" }, { timeoutMs: 120000 });
+    expect(apiGet).toHaveBeenNthCalledWith(3, "/stock/600519/fund-flow-pages", { cursor: "session:20" }, { timeoutMs: 120000 });
+    vi.mocked(apiGet).mockResolvedValueOnce({ ...first, items: [], total: 0, next_cursor: null });
+    rerender({ code: "000001" });
+    expect(result.current.data).toBeUndefined();
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.hasNextPage).toBe(false);
+    unmount();
+    client.clear();
+  });
+
+  it("loads only the cached research snapshot for profile fundamentals", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.mocked(apiGet).mockResolvedValue({ cached_analysis: { fundamental: { summary: "盈利稳健" } } });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result, unmount } = renderHook(() => useAnalysisSnapshot("600519"), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.cached_analysis?.fundamental.summary).toBe("盈利稳健");
+    expect(apiGet).toHaveBeenCalledTimes(1);
+    expect(apiGet).toHaveBeenCalledWith("/stock/analysis-page/600519", { include_market_data: false }, undefined);
+    unmount();
+    client.clear();
+  });
+
+  it("reuses stock profile caches and only fetches the research snapshot", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const stockInfo = { code: "600519", name: "贵州茅台", current_price: 1520, pe_ttm: 23.1, pb: 7.8 };
+    const intraday = { code: "600519", prev_close: 1500, items: [{ price: 1535 }] };
+    client.setQueryData(queryKeys.stock.info("600519"), stockInfo);
+    client.setQueryData(queryKeys.stock.intraday("600519"), intraday);
+    vi.mocked(apiGet).mockResolvedValue({ cached_analysis: null });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <StrictMode><QueryClientProvider client={client}>{children}</QueryClientProvider></StrictMode>
+    );
+    const { result, unmount } = renderHook(() => useAnalysisPageData("600519"), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(apiGet).toHaveBeenCalledTimes(1);
+    expect(apiGet).toHaveBeenCalledWith("/stock/analysis-page/600519", { include_market_data: false }, undefined);
+    expect(result.current.data?.stock_info).toBe(stockInfo);
+    expect(result.current.data?.intraday).toBe(intraday);
+    expect(result.current.data?.valuation).toMatchObject({ pe_ttm: 23.1, pb: 7.8 });
+    expect(result.current.data?.kline).toBeNull();
+    await act(async () => {
+      client.setQueryData(queryKeys.stock.analysisPage("600519"), { cached_analysis: { overall_rating: 8 } });
+    });
+    await waitFor(() => expect(result.current.data?.cached_analysis?.overall_rating).toBe(8));
+    unmount();
+    client.clear();
+  });
+
+  it("loads shared resources once on direct analysis navigation and isolates stock codes", async () => {
+    vi.mocked(apiGet).mockImplementation(async (path) => {
+      if (path.includes("analysis-page")) return { cached_analysis: null };
+      if (path.endsWith("/intraday")) return { items: [], prev_close: 10 };
+      return { code: path.split("/")[2], current_price: 10 };
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <StrictMode><QueryClientProvider client={client}>{children}</QueryClientProvider></StrictMode>
+    );
+    const { result, rerender, unmount } = renderHook(
+      ({ code }) => useAnalysisPageData(code), { initialProps: { code: "600519" }, wrapper },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(apiGet).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(apiGet).mock.calls.map(([path]) => path).sort()).toEqual([
+      "/stock/600519/info", "/stock/600519/intraday", "/stock/analysis-page/600519",
+    ]);
+    rerender({ code: "000001" });
+    await waitFor(() => expect(result.current.data?.stock_info?.code).toBe("000001"));
+    expect(apiGet).toHaveBeenCalledTimes(6);
+    unmount();
+    client.clear();
+  });
+
+  it.each([{ code: "600519", enabled: false }, { code: "", enabled: true }])(
+    "does not fetch disabled analysis resources: %s", ({ code, enabled }) => {
+      const client = new QueryClient();
+      const wrapper = ({ children }: PropsWithChildren) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      );
+      const { unmount } = renderHook(() => useAnalysisPageData(code, { enabled }), { wrapper });
+      expect(apiGet).not.toHaveBeenCalled();
+      unmount();
+      client.clear();
+    },
+  );
+
+  it("keeps the research result available when shared market data fails", async () => {
+    vi.mocked(apiGet).mockImplementation(async (path) => {
+      if (path.includes("analysis-page")) return { cached_analysis: { overall_rating: 7.5 } };
+      throw new Error("market unavailable");
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result, unmount } = renderHook(() => useAnalysisPageData("600519"), { wrapper });
+    await waitFor(() => expect(result.current.data?.unavailable_sections).toEqual(["stock_info", "intraday"]));
+    expect(result.current.data?.cached_analysis?.overall_rating).toBe(7.5);
+    expect(result.current.data?.partial).toBe(true);
+    unmount();
     client.clear();
   });
 

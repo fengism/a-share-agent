@@ -108,6 +108,8 @@ services:
       - ${PYTHON_SANDBOX_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro
     networks:
       - python-control
+    expose:
+      - "8080"
     read_only: true
     security_opt:
       - no-new-privileges:true
@@ -147,7 +149,7 @@ services:
       - ALL
 
   docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.1.2
+    image: ${DOCKER_SOCKET_PROXY_IMAGE:-tecnativa/docker-socket-proxy:0.1.2}
     restart: unless-stopped
     environment:
       CONTAINERS: "1"
@@ -174,9 +176,11 @@ services:
       SYSTEM: "0"
       TASKS: "0"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro
     networks:
       - updater-control
+    expose:
+      - "2375"
     # 注意：此镜像 entrypoint 启动时要写 /usr/local/etc/haproxy/haproxy.cfg，
     # 因此不能对根文件系统设 read_only（生产环境验证过的行为）。
     tmpfs:
@@ -203,7 +207,7 @@ services:
     # 项目目录只读挂载，仅 data 目录可写（写更新事务状态）。
     # 默认使用执行 docker compose 时的宿主机 PWD；若从其他目录通过 -f 启动，
     # 需将 HOST_PROJECT_DIR 显式设为本 compose 文件所在目录的绝对路径。
-    image: docker:27.5.1-cli
+    image: ${DOCKER_CLI_IMAGE:-docker:27.5.1-cli}
     restart: unless-stopped
     environment:
       DOCKER_HOST: tcp://docker-socket-proxy:2375

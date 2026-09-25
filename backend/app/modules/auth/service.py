@@ -32,6 +32,12 @@ class AuthErrorCode(StrEnum):
     RESET_USER_NOT_FOUND = "reset_user_not_found"
     RESET_THROTTLED = "reset_throttled"
     RESET_TOKEN_INVALID = "reset_token_invalid"
+    ACCOUNT_DISABLED = "account_disabled"
+    CANNOT_DISABLE_SELF = "cannot_disable_self"
+    CANNOT_DELETE_SELF = "cannot_delete_self"
+    CANNOT_DEMOTE_SELF = "cannot_demote_self"
+    LAST_ADMIN_PROTECTED = "last_admin_protected"
+    USER_NOT_FOUND = "user_not_found"
 
 
 class AuthServiceError(Exception):
@@ -60,6 +66,7 @@ def register_account(
     invite_code: str | None,
     client_ip: str,
 ) -> AuthSession:
+    normalized_username = username.strip().lower()
     ip_key = f"register-ip:{client_ip}"
     is_first = account_store.count_users() == 0
     if not is_first:
@@ -67,7 +74,7 @@ def register_account(
         if locked > 0:
             raise AuthServiceError(AuthErrorCode.REGISTER_THROTTLED, retry_after=locked)
 
-    if account_store.get_user_by_username(username):
+    if account_store.get_user_by_username(normalized_username):
         raise AuthServiceError(AuthErrorCode.USERNAME_EXISTS)
 
     normalized_invite: str | None = None
@@ -78,7 +85,7 @@ def register_account(
             raise AuthServiceError(AuthErrorCode.INVITE_REQUIRED, retry_after=retry_after)
 
     status, user = account_store.create_account(
-        username,
+        normalized_username,
         password,
         is_admin=is_first,
         invite_code=normalized_invite,
@@ -94,24 +101,61 @@ def register_account(
     if not user.get("is_admin"):
         login_throttle.reset(ip_key)
     token = session_store.create_session(user["id"])
-    logger.info("新用户注册: %s (admin=%s)", username, bool(user.get("is_admin")))
+    logger.info("新用户注册: %s (admin=%s)", normalized_username, bool(user.get("is_admin")))
     return AuthSession(token=token, user=user)
 
 
-def login(username: str, password: str, client_ip: str) -> AuthSession:
-    throttle_keys = [f"user:{username}", f"ip:{client_ip}"]
+def login(username: str, password: str, client_ip: str, user_agent: str = "") -> AuthSession:
+    normalized_username = username.strip().lower()
+    throttle_keys = [f"combo:{client_ip}:{normalized_username}", f"ip:{client_ip}"]
     locked = max((login_throttle.retry_after(key) for key in throttle_keys), default=0)
     if locked > 0:
+        account_store.record_login_audit(
+            normalized_username,
+            None,
+            client_ip,
+            user_agent,
+            "failed_rate_limited",
+            f"locked for {locked}s",
+        )
         raise AuthServiceError(AuthErrorCode.LOGIN_THROTTLED, retry_after=locked)
 
-    user = account_store.verify_credentials(username, password)
+    user = account_store.verify_credentials(normalized_username, password)
     if not user:
         retry_after = max(login_throttle.record_failure(key) for key in throttle_keys)
+        account_store.record_login_audit(
+            normalized_username,
+            None,
+            client_ip,
+            user_agent,
+            "failed_credentials",
+            "invalid username or password",
+        )
         raise AuthServiceError(AuthErrorCode.INVALID_CREDENTIALS, retry_after=retry_after)
+
+    if not user.get("is_active", 1):
+        account_store.record_login_audit(
+            normalized_username,
+            user.get("id"),
+            client_ip,
+            user_agent,
+            "failed_disabled",
+            "account disabled",
+        )
+        raise AuthServiceError(AuthErrorCode.ACCOUNT_DISABLED)
 
     for key in throttle_keys:
         login_throttle.reset(key)
-    return AuthSession(token=session_store.create_session(user["id"]), user=user)
+    token = session_store.create_session(user["id"])
+    account_store.record_login_audit(
+        normalized_username,
+        user.get("id"),
+        client_ip,
+        user_agent,
+        "success",
+        "",
+    )
+    return AuthSession(token=token, user=user)
 
 
 def get_user_by_token(token: str) -> UserRecord | None:
@@ -157,16 +201,22 @@ def create_invite(admin_id: int, expires_in_days: int | None) -> dict:
     )
 
 
-def list_invites(admin_id: int) -> list[dict]:
-    return invite_store.list_invites(admin_id)
+def list_invites(admin_id: int | None = None) -> list[dict]:
+    return invite_store.list_invites()
 
 
-def revoke_invite(code: str, admin_id: int) -> None:
-    status = invite_store.revoke_invite(code, admin_id)
+def revoke_invite(code: str, admin_id: int | None = None) -> None:
+    status = invite_store.revoke_invite(code)
     if status == "not_found":
         raise AuthServiceError(AuthErrorCode.INVITE_NOT_FOUND)
     if status == "used":
         raise AuthServiceError(AuthErrorCode.INVITE_USED)
+
+
+def cleanup_expired_invites() -> int:
+    deleted = invite_store.cleanup_expired_invites()
+    logger.info("清理过期未使用的邀请码: %s 个", deleted)
+    return deleted
 
 
 def create_password_reset_link(
@@ -202,3 +252,95 @@ def reset_password(token: str, new_password: str, client_ip: str) -> None:
 
     login_throttle.reset(ip_key)
     logger.info("密码经重置链接更新: user=%s", user_id)
+
+
+def list_users() -> list[UserRecord]:
+    return account_store.list_users()
+
+
+def update_user_status(current_admin_id: int, target_user_id: int, is_active: bool) -> UserRecord:
+    target = account_store.get_user_by_id(target_user_id)
+    if not target:
+        raise AuthServiceError(AuthErrorCode.USER_NOT_FOUND)
+    if current_admin_id == target_user_id and not is_active:
+        raise AuthServiceError(AuthErrorCode.CANNOT_DISABLE_SELF)
+    if not is_active and target.get("is_admin") and account_store.count_active_admins() <= 1:
+        raise AuthServiceError(AuthErrorCode.LAST_ADMIN_PROTECTED)
+
+    account_store.set_user_active(target_user_id, is_active)
+    updated = account_store.get_user_by_id(target_user_id)
+    assert updated is not None
+    logger.info("管理员(id=%s) 修改用户(id=%s, username=%s) 状态为 is_active=%s", current_admin_id, target_user_id, target.get("username"), is_active)
+    return updated
+
+
+def update_user_role(current_admin_id: int, target_user_id: int, is_admin: bool) -> UserRecord:
+    target = account_store.get_user_by_id(target_user_id)
+    if not target:
+        raise AuthServiceError(AuthErrorCode.USER_NOT_FOUND)
+    if current_admin_id == target_user_id and not is_admin:
+        raise AuthServiceError(AuthErrorCode.CANNOT_DEMOTE_SELF)
+    if not is_admin and target.get("is_admin") and account_store.count_active_admins() <= 1:
+        raise AuthServiceError(AuthErrorCode.LAST_ADMIN_PROTECTED)
+
+    account_store.set_user_role(target_user_id, is_admin)
+    updated = account_store.get_user_by_id(target_user_id)
+    assert updated is not None
+    logger.info("管理员(id=%s) 修改用户(id=%s, username=%s) 角色为 is_admin=%s", current_admin_id, target_user_id, target.get("username"), is_admin)
+    return updated
+
+
+def delete_user(current_admin_id: int, target_user_id: int) -> None:
+    target = account_store.get_user_by_id(target_user_id)
+    if not target:
+        raise AuthServiceError(AuthErrorCode.USER_NOT_FOUND)
+    if current_admin_id == target_user_id:
+        raise AuthServiceError(AuthErrorCode.CANNOT_DELETE_SELF)
+    if target.get("is_admin") and account_store.count_active_admins() <= 1:
+        raise AuthServiceError(AuthErrorCode.LAST_ADMIN_PROTECTED)
+
+    account_store.delete_user(target_user_id)
+    logger.warning("管理员(id=%s) 删除了用户(id=%s, username=%s)", current_admin_id, target_user_id, target.get("username"))
+
+
+def revoke_user_sessions(target_user_id: int) -> int:
+    target = account_store.get_user_by_id(target_user_id)
+    if not target:
+        raise AuthServiceError(AuthErrorCode.USER_NOT_FOUND)
+    revoked = account_store.revoke_user_sessions(target_user_id)
+    logger.info("强制踢出用户(id=%s, username=%s) 所有会话, 撤销数=%s", target_user_id, target.get("username"), revoked)
+    return revoked
+
+
+def update_user_must_change_password(
+    current_admin_id: int, target_user_id: int, must_change: bool
+) -> UserRecord:
+    target = account_store.get_user_by_id(target_user_id)
+    if not target:
+        raise AuthServiceError(AuthErrorCode.USER_NOT_FOUND)
+
+    account_store.set_user_must_change_password(target_user_id, must_change)
+    updated = account_store.get_user_by_id(target_user_id)
+    assert updated is not None
+    logger.info(
+        "管理员(id=%s) 修改用户(id=%s, username=%s) 强制改密标记: must_change_password=%s",
+        current_admin_id,
+        target_user_id,
+        target.get("username"),
+        must_change,
+    )
+    return updated
+
+
+def get_login_audit_logs(
+    limit: int = 50,
+    offset: int = 0,
+    status: str | None = None,
+    username: str | None = None,
+) -> tuple[list[dict], int]:
+    return account_store.list_login_audit_logs(
+        limit=limit,
+        offset=offset,
+        status=status,
+        username=username,
+    )

@@ -2,6 +2,7 @@ import json
 from typing import Any
 
 from app.agentic.protocol import ToolCallInfo
+from app.agentic.tools.document_output import bounded_document
 
 MAX_RESULT_LEN = 12000
 
@@ -97,12 +98,32 @@ def serialize_context_result(content: str, max_result_len: int) -> str:
         return content
     if limit < 2:
         return ""
+    try:
+        envelope = json.loads(content)
+    except (ValueError, TypeError):
+        envelope = None
+    if isinstance(envelope, dict) and envelope.get("ok") is True:
+        document = bounded_document(envelope.get("data"), limit, envelope.get("meta") or {})
+        if document is not None:
+            return document
     preview = serialize_truncated_preview(
         content,
         "Agent 工具上下文预算不足，结果已截断",
         limit,
     )
     return preview if len(preview) <= limit else "{}"
+
+
+def serialize_context_results(contents: list[str], max_result_len: int) -> list[str]:
+    """Share a batch budget fairly; small results retain their full payload first."""
+    remaining = max(0, int(max_result_len))
+    bounded = [""] * len(contents)
+    ordered = sorted(range(len(contents)), key=lambda index: len(contents[index]))
+    for offset, index in enumerate(ordered):
+        allowance = remaining // (len(ordered) - offset)
+        bounded[index] = serialize_context_result(contents[index], allowance)
+        remaining -= len(bounded[index])
+    return bounded
 
 
 def _mapping_error_message(result: Any) -> str | None:
@@ -151,6 +172,10 @@ def serialize_result(result: Any, max_result_len: int = MAX_RESULT_LEN) -> str:
     content = json.dumps(payload, ensure_ascii=False, default=str)
     if len(content) <= max_result_len:
         return content
+
+    document = bounded_document(result, max_result_len)
+    if document is not None:
+        return document
 
     if isinstance(result, list) and result:
         total = len(result)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Collection
+from contextlib import aclosing
 from typing import Any
 
 from app.agentic.agents.contracts import AgentProfile
@@ -28,7 +29,7 @@ async def stream_agent(
     effective_settings = settings or get_effective_settings()
     effective_context = execution_context or AgentExecutionContext.from_current(effective_settings)
     async with borrow_async_openai_chat_runtime(effective_settings) as runtime:
-        async for event in agent_executor.stream(
+        async with aclosing(agent_executor.stream(
             profile,
             message,
             history,
@@ -41,5 +42,6 @@ async def stream_agent(
             require_tool_first_round=require_tool_first_round,
             require_tool_evidence=require_tool_evidence,
             execution_context=effective_context,
-        ):
-            yield event
+        )) as stream:
+            async for event in stream:
+                yield event

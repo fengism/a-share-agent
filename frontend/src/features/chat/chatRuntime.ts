@@ -1,7 +1,7 @@
 import { streamChat } from "../../api/chat";
 import { useChatStore } from "../../store/chatStore";
 import { registerUserScopeHandler } from "../../store/userScope";
-import type { ChatMessage, ChatStreamDelta } from "../../types/chat";
+import type { ChatMessage, ChatProcessOutcome, ChatStreamDelta } from "../../types/chat";
 import { formatChatCompletionNotice } from "../../pages/Chat/chatCompletion";
 import { createStreamDeltaBatcher } from "../../pages/Chat/streamDeltaBatcher";
 
@@ -26,10 +26,10 @@ function ownsRun(run: ActiveChatRun) {
   return activeRun?.id === run.id;
 }
 
-function finishRun(run: ActiveChatRun) {
+function finishRun(run: ActiveChatRun, outcome: ChatProcessOutcome = "completed") {
   if (!ownsRun(run)) return;
   run.batcher.flush();
-  useChatStore.getState().finalizeMessage(run.assistantId);
+  useChatStore.getState().finalizeMessage(run.assistantId, outcome);
   activeRun = null;
   useChatStore.getState().setAbortController(null);
   useChatStore.getState().setActiveRun(null, null);
@@ -43,10 +43,10 @@ export function startChatRuntime({ input, history }: StartChatOptions) {
   if (!sessionId) return false;
   nextRunId += 1;
   const assistantId = `msg-${Date.now()}-${nextRunId}`;
-  const batcher = createStreamDeltaBatcher(({ text, reasoning }) => {
+  const batcher = createStreamDeltaBatcher(({ text, reasoning, reasoningSource }) => {
     if (!activeRun || activeRun.assistantId !== assistantId) return;
     const currentStore = useChatStore.getState();
-    if (reasoning) currentStore.appendToReasoning(assistantId, reasoning);
+    if (reasoning) currentStore.appendToReasoning(assistantId, reasoning, reasoningSource);
     if (text) currentStore.appendToAssistant(assistantId, text);
   });
   store.addAssistantMessage(assistantId);
@@ -54,7 +54,7 @@ export function startChatRuntime({ input, history }: StartChatOptions) {
   const controller = streamChat(input, history, {
     onDelta: (delta: ChatStreamDelta) => {
       const run = activeRun;
-      if (!run || run.assistantId !== assistantId) return;
+      if (!run || run.assistantId !== assistantId || run.stopRequested) return;
       const currentStore = useChatStore.getState();
       switch (delta.type) {
         case "status":
@@ -69,8 +69,15 @@ export function startChatRuntime({ input, history }: StartChatOptions) {
           batcher.flush();
           if (delta.plan_step) currentStore.updateAssistantPlanStep(assistantId, delta.plan_step);
           break;
+        case "round_started":
+        case "round_completed":
+          batcher.flush();
+          if (delta.research_round) currentStore.addAssistantProcessUpdate(assistantId, {
+            type: "round", round: delta.research_round,
+          });
+          break;
         case "reasoning":
-          batcher.enqueueReasoning(delta.content || "");
+          batcher.enqueueReasoning(delta.content || "", delta.reasoning_source);
           break;
         case "text":
           batcher.enqueueText(delta.content || "");
@@ -92,13 +99,24 @@ export function startChatRuntime({ input, history }: StartChatOptions) {
           }
           break;
         case "error":
+          // Stream errors terminate the whole chat; recoverable task failures
+          // arrive as plan_step events and must not stop other agents.
           batcher.flush();
+          currentStore.setAssistantProcessOutcome(assistantId, "failed");
           currentStore.appendToAssistant(assistantId, `\n\n[错误] ${delta.error}`);
+          finishRun(run, "failed");
           break;
         case "done":
           batcher.flush();
-          if (delta.reasoning_content) currentStore.setReasoningContent(assistantId, delta.reasoning_content);
+          if (delta.status) currentStore.setAssistantProcessOutcome(assistantId, delta.status);
+          // done may contain only the last turn, not the accumulated multi-turn trace.
+          // Use it solely as a fallback for providers that return no reasoning deltas.
+          if (delta.reasoning_content && !useChatStore.getState().messages
+            .find((message) => message.id === assistantId)?.reasoningContent?.trim()) {
+            currentStore.setReasoningContent(assistantId, delta.reasoning_content);
+          }
           currentStore.appendToAssistant(assistantId, formatChatCompletionNotice(delta));
+          finishRun(run);
           break;
       }
     },
@@ -106,12 +124,13 @@ export function startChatRuntime({ input, history }: StartChatOptions) {
       const run = activeRun;
       if (!run || run.assistantId !== assistantId || run.stopRequested) return;
       batcher.flush();
+      useChatStore.getState().setAssistantProcessOutcome(assistantId, "failed");
       useChatStore.getState().appendToAssistant(assistantId, `\n\n[连接错误] ${error.message}`);
-      finishRun(run);
+      finishRun(run, "failed");
     },
     onDone: () => {
       const run = activeRun;
-      if (!run || run.assistantId !== assistantId) return;
+      if (!run || run.assistantId !== assistantId || run.stopRequested) return;
       batcher.flush();
       finishRun(run);
     },
@@ -137,9 +156,10 @@ export function stopChatRuntime() {
   const run = activeRun;
   if (!run || run.stopRequested) return false;
   run.stopRequested = true;
-  run.batcher.flush();
+  // Release ownership before abort: transport cleanup may synchronously fire
+  // callbacks, and none of them may turn this cancellation into completion.
+  finishRun(run, "cancelled");
   run.controller.abort();
-  finishRun(run);
   return true;
 }
 

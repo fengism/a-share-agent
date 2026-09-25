@@ -67,7 +67,7 @@ async def get_treasury_yields(
 async def get_commodities(
     symbol: str = Query("", description="大宗商品名称，省略返回全量概览"),
 ):
-    """获取大宗商品与工业品现货基差与产业链映射。"""
+    """获取大宗商品期货最近报价与静态产业映射，不含现货/基差。"""
     return await get_commodity_spot_prices_service(symbol=symbol)
 
 
@@ -75,7 +75,7 @@ async def get_commodities(
 async def get_customs_trade(
     commodity: str = Query("", description="重点进出口商品名称，省略返回全量概览"),
 ):
-    """获取海关总署月度进出口总况与重点出海商品量价。"""
+    """获取全国月度进出口总况及静态商品介绍，不含细分商品量价。"""
     return await get_customs_trade_data_service(commodity=commodity)
 
 

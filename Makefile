@@ -10,9 +10,9 @@ STARTUP_TIMEOUT ?= 90
 RUN_ENV = BACKEND_HOST="$(BACKEND_HOST)" BACKEND_PORT="$(BACKEND_PORT)" FRONTEND_HOST="$(FRONTEND_HOST)" FRONTEND_PORT="$(FRONTEND_PORT)" STARTUP_TIMEOUT="$(STARTUP_TIMEOUT)"
 
 .PHONY: help setup start stop restart status logs dev prod pack check test \
-	backend-sync backend-browser-install backend-dev backend-lint backend-type backend-test backend-db-init backend-reset-accounts \
+	backend-sync backend-browser-install backend-dev backend-lint backend-type backend-test backend-db-init backend-reset-admin backend-reset-accounts \
 	frontend-install frontend-dev frontend-api-check frontend-test frontend-e2e frontend-build frontend-lint \
-	export-industry-mapping docker-up docker-down docker-restart docker-build docker-logs docker-status
+	export-industry-mapping docker-up docker-sandbox-up docker-down docker-restart docker-build docker-logs docker-status
 
 help: ## 显示可用命令
 	@awk 'BEGIN {FS = ":.*## "; printf "用法: make <target>\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-24s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -111,7 +111,10 @@ backend-seeds-drift: ## 对比运行行业库与种子快照差异（只读）
 backend-seed-hot-stocks: ## 为热门股票抓取经营信息入库（make backend-seed-hot-stocks TOP=100）
 	cd backend && uv run --frozen python -m app.scripts.seed_hot_stock_business --top $${TOP:-50}
 
-backend-reset-accounts: ## 重置本地账号数据
+backend-reset-admin: ## 重置管理员密码 (用法: make backend-reset-admin [ADMIN=xxx] [PASS=xxx])
+	cd backend && uv run python scripts/reset_admin_password.py $(ADMIN) $(if $(PASS),--password $(PASS),)
+
+backend-reset-accounts: ## 重置本地全部账号数据
 	cd backend && uv run --frozen python -m app.scripts.reset_accounts
 
 frontend-install: ## 按 lockfile 安装前端依赖
@@ -139,7 +142,12 @@ export-industry-mapping: ## 更新行业映射文件
 	cd backend && uv run --frozen python -c 'from app.financial_data.stock.public import update_industry_mapping_sw_files; update_industry_mapping_sw_files()'
 
 docker-up: ## 启动 Docker 服务
+	mkdir -p data logs
 	docker compose up -d
+
+docker-sandbox-up: ## 启动包含 Python 沙箱的 Docker 服务
+	mkdir -p data logs
+	docker compose --profile python-sandbox up -d
 
 docker-down: ## 停止 Docker 服务
 	docker compose down

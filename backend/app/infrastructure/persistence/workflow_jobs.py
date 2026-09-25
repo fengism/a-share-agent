@@ -508,6 +508,7 @@ class WorkflowJobStore:
         error: str,
         *,
         retry_delay_seconds: float,
+        allow_retry: bool = True,
         terminal_event: tuple[str, dict[str, Any]] | None = None,
         now: float | None = None,
     ) -> str | None:
@@ -523,7 +524,7 @@ class WorkflowJobStore:
             ).fetchone()
             if row is None:
                 return None
-            retrying = int(row["attempts"]) < int(row["max_attempts"])
+            retrying = allow_retry and int(row["attempts"]) < int(row["max_attempts"])
             status = "pending" if retrying else "failed"
             if not retrying and terminal_event is not None:
                 event_type, payload = terminal_event

@@ -180,13 +180,15 @@ export function useAnalysisWorkflowController({
         if (progress.result) state.setRunResult(identity, progress.result);
         break;
       case "error":
-        state.setRunError(identity, progress.error || "研究失败");
+        if (progress.cancelled) state.stopRun(identity, "cancelled");
+        else state.setRunError(identity, progress.error || "研究失败");
         break;
     }
   }, [ownsIdentity]);
 
   const runAnalysis = useCallback(async ({ force = false }: RunRequest = {}) => {
-    if (!code || streamRef.current || useAnalysisStore.getState().isCancelling) return null;
+    const current = useAnalysisStore.getState();
+    if (!code || (current.isAnalyzing && current.activeRun?.code === code) || current.isCancelling) return null;
     const identity = nextRunIdentity(ownerIdRef.current, code);
     identityRef.current = identity;
     const state = useAnalysisStore.getState();
@@ -215,17 +217,21 @@ export function useAnalysisWorkflowController({
     } catch (unknownError) {
       if (!ownsIdentity(identity)) return null;
       const error = unknownError instanceof Error ? unknownError : new Error("未知错误");
-      if (error.message === "已取消" || error.message === "已停止等待") return null;
-      useAnalysisStore.getState().setRunError(identity, error.message);
-      callbacksRef.current.onError?.(error);
+      if (error.message === "已取消" || error.message === "已停止等待") {
+        useAnalysisStore.getState().stopRun(identity, error.message === "已取消" ? "cancelled" : "detached");
+      } else {
+        useAnalysisStore.getState().setRunError(identity, error.message);
+        callbacksRef.current.onError?.(error);
+      }
       void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
       return null;
     } finally {
-      if (ownsIdentity(identity)) {
+      if (streamRef.current === stream) {
         streamRef.current = null;
         identityRef.current = null;
-        useAnalysisStore.getState().finishRun(identity);
       }
+      useAnalysisStore.getState().finishRun(identity);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
     }
   }, [code, handleProgress, ownsIdentity, queryClient, synchronizeResult]);
 
@@ -250,9 +256,12 @@ export function useAnalysisWorkflowController({
 
   const displayResult = useMemo(() => {
     if (historyDate) return historicalResult ?? null;
-    if (currentCode === code && analysisResult) return analysisResult;
+    if (currentCode === code) {
+      if (analysisResult) return analysisResult;
+      if (agentProcess.termination === "cancelled" || agentProcess.termination === "detached") return null;
+    }
     return cachedResult ?? null;
-  }, [analysisResult, cachedResult, code, currentCode, historicalResult, historyDate]);
+  }, [agentProcess.termination, analysisResult, cachedResult, code, currentCode, historicalResult, historyDate]);
 
   const ownsCurrentContext = currentCode === code;
   const ownsCurrentRun = activeRun?.code === code;

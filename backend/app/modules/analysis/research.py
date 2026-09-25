@@ -88,7 +88,7 @@ def _research_evidence_contains(evidence, keywords: tuple[str, ...]) -> bool:
 
 
 def _has_industry_research_evidence(evidence) -> bool:
-    if evidence.tool_name in {"fetch_url", "fetch_urls"} and not _has_web_body(evidence):
+    if evidence.tool_name in {"web_fetch", "fetch_urls"} and not _has_web_body(evidence):
         return False
     if evidence.tool_name == "iwencai_query" and not _has_structured_research_evidence(evidence):
         return False
@@ -96,7 +96,7 @@ def _has_industry_research_evidence(evidence) -> bool:
 
 
 def _has_management_research_evidence(evidence) -> bool:
-    if evidence.tool_name in {"fetch_url", "fetch_urls"} and not _has_web_body(evidence):
+    if evidence.tool_name in {"web_fetch", "fetch_urls"} and not _has_web_body(evidence):
         return False
     if evidence.tool_name == "iwencai_query" and not _has_structured_research_evidence(evidence):
         return False
@@ -104,7 +104,7 @@ def _has_management_research_evidence(evidence) -> bool:
 
 
 def _has_moat_research_evidence(evidence) -> bool:
-    if evidence.tool_name in {"fetch_url", "fetch_urls"} and not _has_web_body(evidence):
+    if evidence.tool_name in {"web_fetch", "fetch_urls"} and not _has_web_body(evidence):
         return False
     if evidence.tool_name == "iwencai_query" and not _has_structured_research_evidence(evidence):
         return False
@@ -120,11 +120,11 @@ ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
     system_prompt="""你是严谨的 A 股研究 Agent。你的任务是围绕指定股票和分析日期自主规划调研，并通过工具获取可验证证据。
 
 要求：
-- 财务数据权威性：官方财务与结构化接口（analyze_financials, get_stock_info, get_stock_valuation_detail 等）返回的数据具有最高事实优先级。如果搜索（web_search）或抓取（fetch_url）中的二手财务数据与财报接口返回的数据存在差异或冲突，必须无条件以财报接口数据为准，严禁采用 search 摘要覆盖财报接口。
+- 财务数据权威性：官方财务与结构化接口（analyze_financials, get_stock_info, get_stock_valuation_detail 等）返回的数据具有最高事实优先级。如果搜索（web_search）或抓取（web_fetch）中的二手财务数据与财报接口返回的数据存在差异或冲突，必须无条件以财报接口数据为准，严禁采用 search 摘要覆盖财报接口。
 - 自主决定工具调用顺序，可多轮调用并根据结果补充调查。
 - 覆盖基础资料、估值、财务、长期公开研究、技术择时、新闻情绪、风险和市场环境。
 - 长期研究需调查盈利引擎与分部质量、护城河及反证、管理层与资本配置、行业与价值链、失败路径和估值假设。
-- 使用搜索工具发现公告、公司披露、交易所资料和权威行业材料后，优先调用 fetch_url 或 fetch_urls 阅读正文；若链接或资料为 PDF 研报/公告，调用 read_pdf 提取结构化文本与数据表格；搜索摘要不能替代正文证据。
+- 使用搜索工具发现公告、公司披露、交易所资料和权威行业材料后，优先调用 web_fetch 或 fetch_urls 阅读正文；若链接或资料为 PDF 研报/公告，调用 read_pdf 提取结构化文本与数据表格；搜索摘要不能替代正文证据。
 - 保留来源、发布日期、报告期和统计口径；财务与技术判断必须基于工具返回的具体数据。
 - 分析营收与毛利构成时关注产品、业务和地区集中度；上游未提供报告期时不得推断日期，各维度不可直接相加。
 - 技术面和情绪面仅作为短期择时信息，不用于替代长期商业质量和投资确定性判断。
@@ -143,7 +143,7 @@ ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
         "iwencai_query",
         "iwencai_search",
         "web_search",
-        "fetch_url",
+        "web_fetch",
         "fetch_urls",
         "read_pdf",
     ),
@@ -163,21 +163,21 @@ ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
         EvidenceRequirement(
             "industry_research",
             "行业与价值链公开资料",
-            ("iwencai_query", "fetch_url", "fetch_urls", "read_pdf"),
+            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf"),
             validator=_has_industry_research_evidence,
             fatal=False,
         ),
         EvidenceRequirement(
             "moat_research",
             "护城河与反证公开资料",
-            ("iwencai_query", "fetch_url", "fetch_urls", "read_pdf"),
+            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf"),
             validator=_has_moat_research_evidence,
             fatal=False,
         ),
         EvidenceRequirement(
             "management_research",
             "管理层与资本配置公开资料",
-            ("iwencai_query", "fetch_url", "fetch_urls", "read_pdf"),
+            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf"),
             validator=_has_management_research_evidence,
             fatal=False,
         ),

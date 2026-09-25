@@ -4,6 +4,7 @@ import type { AnalysisStage, WorkflowStream } from "../api/sse";
 import {
   applyAgentEvent,
   createAgentProcessState,
+  stopAgentProcess,
   type AgentProcessState,
 } from "../features/agent-process/agentProcess";
 import type { ChatStreamDelta } from "../types/chat";
@@ -44,6 +45,7 @@ interface AnalysisState {
   setRunResult: (identity: AnalysisRunIdentity, result: AnalysisResult) => void;
   setRunError: (identity: AnalysisRunIdentity, error: string | null) => void;
   setRunCancelling: (identity: AnalysisRunIdentity, cancelling: boolean) => void;
+  stopRun: (identity: AnalysisRunIdentity, outcome: "cancelled" | "detached") => void;
   cancelActiveRun: () => Promise<"cancelled" | "detached" | "completed" | null>;
   finishRun: (identity: AnalysisRunIdentity) => void;
   resetAnalysis: () => void;
@@ -87,6 +89,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
   }),
   beginRun: (identity) => set({
     currentCode: identity.code,
+    jobId: "",
     activeRun: identity,
     analysisResult: null,
     isAnalyzing: true,
@@ -131,6 +134,19 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
   setRunCancelling: (identity, cancelling) => set((state) => (
     ownsRun(state.activeRun, identity) ? { isCancelling: cancelling } : state
   )),
+  stopRun: (identity, outcome) => set((state) => {
+    if (!ownsRun(state.activeRun, identity)) return state;
+    const message = outcome === "cancelled" ? "个股研究已取消" : "已停止等待，后台共享任务仍在运行";
+    return {
+      isAnalyzing: false,
+      isCancelling: false,
+      activeStream: null,
+      activeRun: null,
+      analysisResult: null,
+      analysisError: null,
+      agentProcess: stopAgentProcess(state.agentProcess, outcome, message),
+    };
+  }),
   cancelActiveRun: async () => {
     const state = get();
     if (!state.activeRun || !state.activeStream || state.isCancelling) return null;
@@ -138,21 +154,24 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
     set({ isCancelling: true, analysisError: null });
     try {
       const result = await state.activeStream.cancel();
-      set((latest) => ownsRun(latest.activeRun, identity)
-        ? { isAnalyzing: false, isCancelling: false, activeStream: null, activeRun: null }
-        : latest);
+      // A completed DELETE can arrive before the final SSE result. Keep listening.
+      if (result !== "completed") get().stopRun(identity, result);
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "取消失败";
       set((latest) => ownsRun(latest.activeRun, identity)
-        ? { isCancelling: false, analysisError: message }
+        ? { isCancelling: false }
         : latest);
       throw error;
     }
   },
   finishRun: (identity) => set((state) => (
     ownsRun(state.activeRun, identity)
-      ? { isAnalyzing: false, isCancelling: false, activeStream: null, activeRun: null }
+      ? {
+        isAnalyzing: false, isCancelling: false, activeStream: null, activeRun: null,
+        agentProcess: state.analysisError
+          ? stopAgentProcess(state.agentProcess, "failed", state.analysisError)
+          : state.agentProcess,
+      }
       : state
   )),
   resetAnalysis: () => {

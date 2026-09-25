@@ -20,6 +20,25 @@ EASTMONEY_STOCK_KLINE_URL = "http://push2his.eastmoney.com/api/qt/stock/kline/ge
 EASTMONEY_CLIST_URL = "http://push2.eastmoney.com/api/qt/clist/get"
 EASTMONEY_STOCK_PROFILE_URL = "https://push2.eastmoney.com/api/qt/stock/get"
 
+# 东方财富 push2 节点池（包含原始主节点及常见镜像节点）
+EASTMONEY_PUSH2_NODES = [
+    "push2.eastmoney.com",
+    "17.push2.eastmoney.com",
+    "45.push2.eastmoney.com",
+    "79.push2.eastmoney.com",
+    "82.push2.eastmoney.com",
+    "98.push2.eastmoney.com",
+    "100.push2.eastmoney.com",
+]
+
+
+def get_random_push2_host() -> str:
+    """从东财 push2 节点池（包含原始主节点与 6 个镜像节点）中随机选取一个节点。"""
+    import random
+
+    return random.choice(EASTMONEY_PUSH2_NODES)
+
+
 TENCENT_STOCK_CONCEPT_URL = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/stockinfo/plateNew"
 TENCENT_STOCK_QUOTE_URL = "https://qt.gtimg.cn/q="
 BAIDU_STOCK_NAMES_URL = "https://finance.pae.baidu.com/selfselect/getmarketrank"

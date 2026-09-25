@@ -1,6 +1,9 @@
+import type { ReasoningSource } from "../../types/chat";
+
 export interface StreamDeltaBatch {
   text: string;
   reasoning: string;
+  reasoningSource?: ReasoningSource;
 }
 
 type ScheduleFlush = (callback: () => void) => number;
@@ -8,7 +11,7 @@ type CancelFlush = (handle: number) => void;
 
 export interface StreamDeltaBatcher {
   enqueueText: (text: string) => void;
-  enqueueReasoning: (text: string) => void;
+  enqueueReasoning: (text: string, source?: ReasoningSource | null) => void;
   flush: () => void;
   clear: () => void;
 }
@@ -20,13 +23,15 @@ export function createStreamDeltaBatcher(
 ): StreamDeltaBatcher {
   let pendingText = "";
   let pendingReasoning = "";
+  let pendingSource: ReasoningSource | undefined;
   let scheduledHandle: number | null = null;
 
   const emit = () => {
     if (!pendingText && !pendingReasoning) return;
-    const batch = { text: pendingText, reasoning: pendingReasoning };
+    const batch = { text: pendingText, reasoning: pendingReasoning, ...(pendingSource ? { reasoningSource: pendingSource } : {}) };
     pendingText = "";
     pendingReasoning = "";
+    pendingSource = undefined;
     onFlush(batch);
   };
 
@@ -52,8 +57,10 @@ export function createStreamDeltaBatcher(
       pendingText += text;
       schedule();
     },
-    enqueueReasoning: (text) => {
+    enqueueReasoning: (text, source) => {
       if (!text) return;
+      if (pendingReasoning && pendingSource?.block_id !== source?.block_id) flush();
+      pendingSource = source ?? undefined;
       pendingReasoning += text;
       schedule();
     },
@@ -63,6 +70,7 @@ export function createStreamDeltaBatcher(
       scheduledHandle = null;
       pendingText = "";
       pendingReasoning = "";
+      pendingSource = undefined;
     },
   };
 }

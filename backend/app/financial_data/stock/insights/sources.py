@@ -4,6 +4,10 @@ BAIDU_FUND_FLOW_API = "https://finance.pae.baidu.com/vapi/v1/fundsortlist"
 EASTMONEY_FUND_FLOW_SOURCE_ID = "eastmoney_stock_fund_flow"
 EASTMONEY_FUND_FLOW_API = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
 
+# 分笔成交金额分档估算，与百度/东方财富口径不等价。
+TDXHUB_FUND_FLOW_SOURCE_ID = "tdxhub_stock_fund_flow_estimate"
+TDXHUB_FUND_FLOW_API = "tdxhub.capital_flow"
+
 EASTMONEY_MARGIN_TRADING_SOURCE_ID = "eastmoney_margin_trading"
 EASTMONEY_BLOCK_TRADE_SOURCE_ID = "eastmoney_block_trade"
 EASTMONEY_HOLDER_CHANGE_SOURCE_ID = "eastmoney_holder_num_change"

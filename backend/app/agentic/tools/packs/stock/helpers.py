@@ -172,3 +172,7 @@ async def get_interactive_qa(code: str, keyword: str = "", limit: int = 15) -> A
     from app.financial_data.stock.insights.interactive_qa import get_interactive_qa as _get_qa
     return await _get_qa(code=code, keyword=keyword, limit=limit)
 
+
+
+async def get_stock_documents(**kwargs: Any) -> Any:
+    return await get_application_tool_handlers().get_stock_documents(**kwargs)

@@ -8,13 +8,17 @@ PROFILE = AgentProfile(
     system_prompt=FUNDAMENTAL_AGENT_PROMPT,
     tool_names=(
         "financial_calculator",
+        "get_stock_info",
         "get_stock_valuation_detail",
         "analyze_financials",
+        "get_stock_financial",
+        "get_interactive_qa",
+        "compare_stocks",
         "iwencai_select_stock",
         "screen_stocks",
         "get_industries",
         "iwencai_query",
     ),
-    skill_names=("stock_analysis", "stock_screening"),
+    skill_names=("stock_analysis", "stock_screening", "financial_calculations"),
     max_rounds=3,
 )

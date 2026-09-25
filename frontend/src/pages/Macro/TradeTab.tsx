@@ -45,13 +45,13 @@ export default function TradeTab() {
       ),
     },
     {
-      title: "核心目标市场 / 来源地",
+      title: "参考市场 / 来源地（静态）",
       dataIndex: "key_target_markets",
       key: "key_target_markets",
       render: (m: string) => <span style={{ fontSize: 12 }}>{m}</span>,
     },
     {
-      title: "A 股核心受益 / 关联龙头",
+      title: "关联公司（静态，非受益判断）",
       dataIndex: "related_a_stocks",
       key: "related_a_stocks",
       render: (stocks: string[]) => (
@@ -65,7 +65,7 @@ export default function TradeTab() {
       ),
     },
     {
-      title: "出海驱动逻辑与产业传导",
+      title: "商品说明（静态）",
       dataIndex: "description",
       key: "description",
       render: (desc: string) => <span style={{ fontSize: 12, color: c.textSecondary }}>{desc}</span>,
@@ -119,10 +119,13 @@ export default function TradeTab() {
         </Col>
       </Row>
 
-      {/* 重点出海与进口商品量价及 A 股产业链映射 */}
+      <p style={{ color: c.textSecondary }}>
+        海关数值仅为全国进出口总量；下方商品介绍、参考市场和公司映射不是当期海关统计，不含细分商品数量、金额、价格或目的地序列。
+      </p>
+      {/* 静态研究线索，不是细分商品量价 */}
       {profiles.length > 0 ? (
         <Card
-          title={<span><RocketOutlined style={{ marginRight: 6, color: c.primary }} />海关总署重点出海与进口商品及 A 股产业链映射</span>}
+          title={<span><RocketOutlined style={{ marginRight: 6, color: c.primary }} />重点商品与关联公司参考（静态资料）</span>}
           size="small"
           variant="borderless"
         >

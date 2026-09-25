@@ -296,3 +296,30 @@ def build_industry_charts(result: IndustryChainResult) -> list[IndustryChainChar
         type="graph",
         option=option,
     )]
+
+
+def build_relationship_chart(result: IndustryChainResult) -> IndustryChainChart | None:
+    if not result.relationships:
+        return None
+    names = sorted({name for edge in result.relationships for name in (edge.source_node, edge.target_node)})
+    labels = {"supply": "供货", "purchase": "采购", "substitute": "替代", "compete": "竞争", "transmission": "定性传导"}
+    return IndustryChainChart(
+        title="关系与定性传导",
+        description="箭头由起点指向目标；传导为条件假设，不代表确定收益。具体依据和失效条件见关系卡片。",
+        type="graph",
+        option={
+            "tooltip": {"trigger": "item", "confine": True},
+            "series": [{
+                "type": "graph", "layout": "circular", "roam": True,
+                "label": {"show": True}, "edgeSymbol": ["none", "arrow"],
+                "data": [{"id": name, "name": name, "symbolSize": 45,
+                          "tooltip": {"formatter": escape(name)}} for name in names],
+                "links": [{
+                    "source": edge.source_node, "target": edge.target_node,
+                    "label": {"show": True, "formatter": labels[edge.relation_type]},
+                    "lineStyle": {"type": "dashed" if edge.claim_type != "fact" else "solid", "curveness": 0.15},
+                    "tooltip": {"formatter": escape(edge.detail or edge.title)},
+                } for edge in result.relationships],
+            }],
+        },
+    )

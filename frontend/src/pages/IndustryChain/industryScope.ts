@@ -22,6 +22,7 @@ export function industryScopeRequest(scope: IndustryChainResearchScope): Industr
     region: scope.region,
     time_range: scope.time_range,
     company_scope: scope.company_scope,
+    ...(scope.refresh_dimensions?.length ? { refresh_dimensions: scope.refresh_dimensions } : {}),
     ...(scope.start_date ? { start_date: scope.start_date } : {}),
     ...(scope.end_date ? { end_date: scope.end_date } : {}),
     ...(scope.as_of_date ? { as_of_date: scope.as_of_date } : {}),

@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from app.agentic.events import AgentEvent
-from app.agentic.tools.serialization import has_meaningful_tool_content
+from app.agentic.tools.serialization import has_meaningful_tool_content, serialize_context_result
 
 MAX_AGENT_SUMMARY_LENGTH = 12_000
 MAX_EVIDENCE_ARGUMENT_LENGTH = 4_000
@@ -42,17 +42,38 @@ class AgentResearchSpec:
     tool_names: tuple[str, ...]
     requirements: tuple[EvidenceRequirement, ...]
     max_rounds: int = 4
+    # Outer evidence-gap rounds and inner LLM/tool turns are different budgets.
+    # None preserves existing callers' turn limit.
+    max_tool_turns: int | None = None
+    allow_incomplete_summary: bool = False
+    reserved_tool_names: tuple[str, ...] = ()
+    reserved_tool_calls: int = 0
+    search_tool_names: tuple[str, ...] = ()
+    search_total_limit: int = 0
+    search_burst_limit: int = 0
+    document_search_guidance: str = ""
 
     def __post_init__(self) -> None:
         if not self.name.strip() or not self.display_name.strip() or not self.system_prompt.strip():
             raise ValueError("Research Agent 缺少名称、展示名或 system prompt")
         if self.max_rounds < 1:
             raise ValueError("Research Agent max_rounds 必须大于 0")
+        if self.max_tool_turns is not None and self.max_tool_turns < 1:
+            raise ValueError("Research Agent max_tool_turns 必须大于 0")
         if len(self.tool_names) != len(set(self.tool_names)):
             raise ValueError("Research Agent 包含重复工具")
         requirement_keys = [requirement.key for requirement in self.requirements]
         if len(requirement_keys) != len(set(requirement_keys)):
             raise ValueError("Research Agent 包含重复证据要求")
+        if self.reserved_tool_calls < 0 or not set(self.reserved_tool_names) <= set(self.tool_names):
+            raise ValueError("Research Agent 正文预留额度或工具无效")
+        if self.search_tool_names and (
+            not set(self.search_tool_names) <= set(self.tool_names)
+            or not 1 <= self.search_burst_limit <= self.search_total_limit
+            or not self.reserved_tool_names
+            or set(self.search_tool_names) & set(self.reserved_tool_names)
+        ):
+            raise ValueError("Research Agent 搜索/正文节奏配置无效")
         unknown_tools = {
             tool_name
             for requirement in self.requirements
@@ -76,6 +97,8 @@ class AgentEvidence:
 class AgentRoundResult:
     summary: str
     evidence: tuple[AgentEvidence, ...] = ()
+    stop_reason: str = ""  # Incomplete summary: retain tools, do not run more research rounds.
+    tool_calls_remaining: int | None = None
 
 
 @dataclass(frozen=True)
@@ -84,6 +107,7 @@ class AgenticResearchResult:
     evidence: tuple[AgentEvidence, ...]
     evidence_gaps: tuple[str, ...] = ()
     execution_trace: tuple[AgentEvent, ...] = ()
+    stopped_early: bool = False
 
     def render_prompt_context(self) -> dict[str, Any]:
         return {
@@ -138,7 +162,7 @@ def render_agent_evidence(
                 "evidence_id": evidence_id,
                 "tool_name": item.tool_name,
                 "arguments": item.arguments[:MAX_EVIDENCE_ARGUMENT_LENGTH],
-                "content": item.content[:max_item_length],
+                "content": serialize_context_result(item.content, max_item_length),
             },
             ensure_ascii=False,
         )

@@ -9,8 +9,9 @@ from typing import cast
 from zoneinfo import ZoneInfo
 
 from app.core.cache import TTLCache
-from app.core.concurrency.rate_limiter import akshare_semaphore, call_blocking
+from app.core.concurrency.rate_limiter import akshare_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
+from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,9 @@ def build_market_data_cache_policy(
 
 async def _load_trading_calendar() -> _TradingCalendarSnapshot:
     try:
-        values = await call_blocking(
+        values = await provider_gateway.call_blocking(
+            "akshare",
+            "fetch_trade_dates",
             _get_akshare_provider().fetch_trade_dates,
             semaphore=akshare_semaphore,
         )

@@ -3,30 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from datetime import UTC, datetime
 from typing import Any
 
-import akshare as ak
 import httpx
 
 from app.core.cache import market_cache as cache
+from app.core.concurrency.rate_limiter import akshare_semaphore, eastmoney_semaphore
+from app.infrastructure.providers.provider_gateway import provider_gateway
+from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 300
 
-# push2 主域名有 IP 级风控（异常断连），回退到延时行情域名；
-# 汇率场景缓存 300s，延时数据无感知差异。
-_FX_HOSTS = (
-    "https://push2.eastmoney.com",
-    "https://push2delay.eastmoney.com",
-)
-
-# 上游 f12 返回代码 -> (result key, 展示名, 标准代码)。
-# secid 经实测核对：离岸为 133.USDCNH，在岸为 120.USDCNYC（中间价口径，
-# 返回代码 USDCNYC）；119 市场下不存在 USDCNH/USDCNY，请求会被静默忽略。
 _FX_ROW_KEYS = {
     "UDI": ("dxy", "美元指数 (DXY)", "UDI"),
     "USDCNH": ("usd_cnh", "美元兑离岸人民币 (USD/CNH)", "USDCNH"),
@@ -70,22 +61,20 @@ def _apply_fx_rows(result: dict[str, Any], diff: list[dict[str, Any]]) -> None:
 
 async def fetch_fx_and_dollar_index() -> dict[str, Any]:
     """获取美元指数 (DXY)、离岸人民币 (USD/CNH) 和在岸人民币 (USD/CNY) 实时行情。"""
-    params = {
-        "fltt": "2",
-        "invt": "2",
-        "fields": "f12,f14,f2,f3,f4",
-        "secids": "100.UDI,133.USDCNH,120.USDCNYC",
-    }
-    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
-
     result = _default_fx_result()
-    for host in _FX_HOSTS:
+    for delayed in (False, True):
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get(f"{host}/api/qt/ulist.np/get", params=params, headers=headers)
-            _apply_fx_rows(result, resp.json().get("data", {}).get("diff", []))
+            rows = await provider_gateway.call_blocking(
+                "eastmoney",
+                "fetch_fx_quotes_delayed" if delayed else "fetch_fx_quotes",
+                get_provider("eastmoney").fetch_fx_quotes,
+                delayed=delayed,
+                semaphore=eastmoney_semaphore,
+                is_fallback_attempt=delayed,
+            )
+            _apply_fx_rows(result, rows)
         except Exception as exc:
-            logger.warning("美元指数与外汇行情获取失败: host=%s, error=%s", host, exc)
+            logger.warning("美元指数与外汇行情获取失败: delayed=%s, error=%s", delayed, exc)
             continue
         if result["usd_cny"]["value"] is not None:
             break
@@ -95,50 +84,44 @@ async def fetch_fx_and_dollar_index() -> dict[str, Any]:
 
 async def fetch_us_cn_treasury_yield_history(page_size: int = 300, page_number: int = 1) -> dict[str, Any]:
     """从东方财富数据中心获取中美国债收益率历史曲线、利差与期限结构。
-    
+
     接口参考: https://data.eastmoney.com/cjsj/zmgzsyl.html
     数据源: RPTA_WEB_TREASURYYIELD
     """
-    url = "https://datacenter-web.eastmoney.com/api/data/v1/get"
-    params = {
-        "reportName": "RPTA_WEB_TREASURYYIELD",
-        "columns": "ALL",
-        "sortColumns": "SOLAR_DATE",
-        "sortTypes": "-1",
-        "token": "894050c76af8597a853f5b408b759f5d",
-        "pageNumber": str(page_number),
-        "pageSize": str(page_size),
-    }
-    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
-
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.get(url, params=params, headers=headers)
-            json_data = resp.json()
-            raw_data = json_data.get("result", {}).get("data", [])
-            total_count = json_data.get("result", {}).get("count", 0)
+        result = await provider_gateway.call_blocking(
+            "eastmoney",
+            "fetch_treasury_yield_history",
+            get_provider("eastmoney").fetch_treasury_yield_history,
+            page_size,
+            page_number,
+            semaphore=eastmoney_semaphore,
+        )
+        raw_data = result.get("data", [])
+        total_count = result.get("count", 0)
 
-            history: list[dict[str, Any]] = []
-            for row in raw_data:
-                date_str = str(row.get("SOLAR_DATE", ""))[:10]
-                cn_2y = _safe_float(row.get("EMM00588704"))
-                cn_5y = _safe_float(row.get("EMM00166462"))
-                cn_10y = _safe_float(row.get("EMM00166466"))
-                cn_30y = _safe_float(row.get("EMM00166469"))
-                cn_10y_2y = _safe_float(row.get("EMM01276014"))
-                cn_gdp_growth = _safe_float(row.get("EMM00000024"))
+        history: list[dict[str, Any]] = []
+        for row in raw_data:
+            date_str = str(row.get("SOLAR_DATE", ""))[:10]
+            cn_2y = _safe_float(row.get("EMM00588704"))
+            cn_5y = _safe_float(row.get("EMM00166462"))
+            cn_10y = _safe_float(row.get("EMM00166466"))
+            cn_30y = _safe_float(row.get("EMM00166469"))
+            cn_10y_2y = _safe_float(row.get("EMM01276014"))
+            cn_gdp_growth = _safe_float(row.get("EMM00000024"))
 
-                us_2y = _safe_float(row.get("EMG00001306"))
-                us_5y = _safe_float(row.get("EMG00001308"))
-                us_10y = _safe_float(row.get("EMG00001310"))
-                us_30y = _safe_float(row.get("EMG00001312"))
-                us_10y_2y = _safe_float(row.get("EMG01339436"))
-                us_gdp_growth = _safe_float(row.get("EMG00159635"))
+            us_2y = _safe_float(row.get("EMG00001306"))
+            us_5y = _safe_float(row.get("EMG00001308"))
+            us_10y = _safe_float(row.get("EMG00001310"))
+            us_30y = _safe_float(row.get("EMG00001312"))
+            us_10y_2y = _safe_float(row.get("EMG01339436"))
+            us_gdp_growth = _safe_float(row.get("EMG00159635"))
 
-                spread_10y = round(cn_10y - us_10y, 4) if (cn_10y is not None and us_10y is not None) else None
-                spread_2y = round(cn_2y - us_2y, 4) if (cn_2y is not None and us_2y is not None) else None
+            spread_10y = round(cn_10y - us_10y, 4) if (cn_10y is not None and us_10y is not None) else None
+            spread_2y = round(cn_2y - us_2y, 4) if (cn_2y is not None and us_2y is not None) else None
 
-                history.append({
+            history.append(
+                {
                     "date": date_str,
                     "cn_2y": cn_2y,
                     "cn_5y": cn_5y,
@@ -154,125 +137,132 @@ async def fetch_us_cn_treasury_yield_history(page_size: int = 300, page_number: 
                     "us_gdp_growth": us_gdp_growth,
                     "spread_10y": spread_10y,
                     "spread_2y": spread_2y,
-                })
-
-            # 记录原始最新记录（用于追溯实际发布日期）
-            latest_us_row = next((r for r in history if r.get("us_10y") is not None), {})
-            latest_cn_row = next((r for r in history if r.get("cn_10y") is not None), {})
-
-            # 沿时间正向（从旧到新，即列表逆向）进行前值填充 (LOCF)
-            # 解决中美时区差（日间A股已收盘但美债未闭市）及各自法定节假日导致的缺值
-            for i in range(len(history) - 2, -1, -1):
-                curr = history[i]
-                prev = history[i + 1]
-                if curr.get("us_10y") is None and prev.get("us_10y") is not None:
-                    curr["us_10y"] = prev["us_10y"]
-                if curr.get("us_2y") is None and prev.get("us_2y") is not None:
-                    curr["us_2y"] = prev["us_2y"]
-                if curr.get("us_5y") is None and prev.get("us_5y") is not None:
-                    curr["us_5y"] = prev["us_5y"]
-                if curr.get("us_30y") is None and prev.get("us_30y") is not None:
-                    curr["us_30y"] = prev["us_30y"]
-                if curr.get("us_10y_2y") is None and prev.get("us_10y_2y") is not None:
-                    curr["us_10y_2y"] = prev["us_10y_2y"]
-
-                if curr.get("cn_10y") is None and prev.get("cn_10y") is not None:
-                    curr["cn_10y"] = prev["cn_10y"]
-                if curr.get("cn_2y") is None and prev.get("cn_2y") is not None:
-                    curr["cn_2y"] = prev["cn_2y"]
-                if curr.get("cn_5y") is None and prev.get("cn_5y") is not None:
-                    curr["cn_5y"] = prev["cn_5y"]
-                if curr.get("cn_30y") is None and prev.get("cn_30y") is not None:
-                    curr["cn_30y"] = prev["cn_30y"]
-                if curr.get("cn_10y_2y") is None and prev.get("cn_10y_2y") is not None:
-                    curr["cn_10y_2y"] = prev["cn_10y_2y"]
-
-                if curr.get("spread_10y") is None and curr.get("cn_10y") is not None and curr.get("us_10y") is not None:
-                    curr["spread_10y"] = round(curr["cn_10y"] - curr["us_10y"], 4)
-                if curr.get("spread_2y") is None and curr.get("cn_2y") is not None and curr.get("us_2y") is not None:
-                    curr["spread_2y"] = round(curr["cn_2y"] - curr["us_2y"], 4)
-
-            latest = history[0] if history else {}
-            cn_10y_val = latest.get("cn_10y") if latest.get("cn_10y") is not None else latest_cn_row.get("cn_10y")
-            us_10y_val = latest.get("us_10y") if latest.get("us_10y") is not None else latest_us_row.get("us_10y")
-            spread_10y_val = (
-                latest.get("spread_10y")
-                if latest.get("spread_10y") is not None
-                else (round(cn_10y_val - us_10y_val, 4) if (cn_10y_val is not None and us_10y_val is not None) else None)
-            )
-            us_10y_2y_val = latest.get("us_10y_2y") if latest.get("us_10y_2y") is not None else latest_us_row.get("us_10y_2y")
-
-            spread_status = (
-                f"正常正利差（中债高出 {spread_10y_val:.2f}%）"
-                if (spread_10y_val is not None and spread_10y_val >= 0)
-                else f"中美利差倒挂（美债高出 {abs(spread_10y_val):.2f}%）"
-                if spread_10y_val is not None
-                else "中美利差倒挂（美债收益率高于中债）"
-            )
-            us_curve_status = (
-                "收益率曲线平坦/倒挂"
-                if (us_10y_2y_val is not None and us_10y_2y_val <= 0)
-                else "收益率曲线正常陡峭"
+                }
             )
 
-            cn_2y_val = latest.get("cn_2y") if latest.get("cn_2y") is not None else latest_cn_row.get("cn_2y")
-            us_2y_val = latest.get("us_2y") if latest.get("us_2y") is not None else latest_us_row.get("us_2y")
-            cn_5y_val = latest.get("cn_5y") if latest.get("cn_5y") is not None else latest_cn_row.get("cn_5y")
-            us_5y_val = latest.get("us_5y") if latest.get("us_5y") is not None else latest_us_row.get("us_5y")
-            cn_30y_val = latest.get("cn_30y") if latest.get("cn_30y") is not None else latest_cn_row.get("cn_30y")
-            us_30y_val = latest.get("us_30y") if latest.get("us_30y") is not None else latest_us_row.get("us_30y")
+        # 记录原始最新记录（用于追溯实际发布日期）
+        latest_us_row = next((r for r in history if r.get("us_10y") is not None), {})
+        latest_cn_row = next((r for r in history if r.get("cn_10y") is not None), {})
 
-            # 期限结构对比 (Term Structure)
-            term_structure = [
-                {
-                    "tenor": "2Y",
-                    "cn_yield": cn_2y_val,
-                    "us_yield": us_2y_val,
-                    "spread": round(cn_2y_val - us_2y_val, 4) if (cn_2y_val is not None and us_2y_val is not None) else None,
-                },
-                {
-                    "tenor": "5Y",
-                    "cn_yield": cn_5y_val,
-                    "us_yield": us_5y_val,
-                    "spread": round(cn_5y_val - us_5y_val, 4) if (cn_5y_val is not None and us_5y_val is not None) else None,
-                },
-                {
-                    "tenor": "10Y",
-                    "cn_yield": cn_10y_val,
-                    "us_yield": us_10y_val,
-                    "spread": spread_10y_val,
-                },
-                {
-                    "tenor": "30Y",
-                    "cn_yield": cn_30y_val,
-                    "us_yield": us_30y_val,
-                    "spread": round(cn_30y_val - us_30y_val, 4) if (cn_30y_val is not None and us_30y_val is not None) else None,
-                },
-            ]
+        # 沿时间正向（从旧到新，即列表逆向）进行前值填充 (LOCF)
+        # 解决中美时区差（日间A股已收盘但美债未闭市）及各自法定节假日导致的缺值
+        for i in range(len(history) - 2, -1, -1):
+            curr = history[i]
+            prev = history[i + 1]
+            if curr.get("us_10y") is None and prev.get("us_10y") is not None:
+                curr["us_10y"] = prev["us_10y"]
+            if curr.get("us_2y") is None and prev.get("us_2y") is not None:
+                curr["us_2y"] = prev["us_2y"]
+            if curr.get("us_5y") is None and prev.get("us_5y") is not None:
+                curr["us_5y"] = prev["us_5y"]
+            if curr.get("us_30y") is None and prev.get("us_30y") is not None:
+                curr["us_30y"] = prev["us_30y"]
+            if curr.get("us_10y_2y") is None and prev.get("us_10y_2y") is not None:
+                curr["us_10y_2y"] = prev["us_10y_2y"]
 
-            return {
-                "history": history,
-                "term_structure": term_structure,
-                "total_count": total_count,
-                "latest": {
-                    "date": latest.get("date", ""),
-                    "china_date": latest_cn_row.get("date", latest.get("date", "")),
-                    "us_date": latest_us_row.get("date", latest.get("date", "")),
-                    "china_10y_yield": cn_10y_val,
-                    "china_2y_yield": cn_2y_val,
-                    "china_5y_yield": cn_5y_val,
-                    "china_30y_yield": cn_30y_val,
-                    "china_10y_2y_spread": latest.get("cn_10y_2y"),
-                    "us_10y_yield": us_10y_val,
-                    "us_2y_yield": us_2y_val,
-                    "us_5y_yield": us_5y_val,
-                    "us_30y_yield": us_30y_val,
-                    "us_10y_2y_spread": us_10y_2y_val,
-                    "us_china_10y_spread": spread_10y_val,
-                    "us_china_spread_status": spread_status,
-                    "us_yield_curve_status": us_curve_status,
-                },
-            }
+            if curr.get("cn_10y") is None and prev.get("cn_10y") is not None:
+                curr["cn_10y"] = prev["cn_10y"]
+            if curr.get("cn_2y") is None and prev.get("cn_2y") is not None:
+                curr["cn_2y"] = prev["cn_2y"]
+            if curr.get("cn_5y") is None and prev.get("cn_5y") is not None:
+                curr["cn_5y"] = prev["cn_5y"]
+            if curr.get("cn_30y") is None and prev.get("cn_30y") is not None:
+                curr["cn_30y"] = prev["cn_30y"]
+            if curr.get("cn_10y_2y") is None and prev.get("cn_10y_2y") is not None:
+                curr["cn_10y_2y"] = prev["cn_10y_2y"]
+
+            if curr.get("spread_10y") is None and curr.get("cn_10y") is not None and curr.get("us_10y") is not None:
+                curr["spread_10y"] = round(curr["cn_10y"] - curr["us_10y"], 4)
+            if curr.get("spread_2y") is None and curr.get("cn_2y") is not None and curr.get("us_2y") is not None:
+                curr["spread_2y"] = round(curr["cn_2y"] - curr["us_2y"], 4)
+
+        latest = history[0] if history else {}
+        cn_10y_val = latest.get("cn_10y") if latest.get("cn_10y") is not None else latest_cn_row.get("cn_10y")
+        us_10y_val = latest.get("us_10y") if latest.get("us_10y") is not None else latest_us_row.get("us_10y")
+        spread_10y_val = (
+            latest.get("spread_10y")
+            if latest.get("spread_10y") is not None
+            else (round(cn_10y_val - us_10y_val, 4) if (cn_10y_val is not None and us_10y_val is not None) else None)
+        )
+        us_10y_2y_val = (
+            latest.get("us_10y_2y") if latest.get("us_10y_2y") is not None else latest_us_row.get("us_10y_2y")
+        )
+
+        spread_status = (
+            f"正常正利差（中债高出 {spread_10y_val:.2f}%）"
+            if (spread_10y_val is not None and spread_10y_val >= 0)
+            else f"中美利差倒挂（美债高出 {abs(spread_10y_val):.2f}%）"
+            if spread_10y_val is not None
+            else "中美利差倒挂（美债收益率高于中债）"
+        )
+        us_curve_status = (
+            "收益率曲线平坦/倒挂" if (us_10y_2y_val is not None and us_10y_2y_val <= 0) else "收益率曲线正常陡峭"
+        )
+
+        cn_2y_val = latest.get("cn_2y") if latest.get("cn_2y") is not None else latest_cn_row.get("cn_2y")
+        us_2y_val = latest.get("us_2y") if latest.get("us_2y") is not None else latest_us_row.get("us_2y")
+        cn_5y_val = latest.get("cn_5y") if latest.get("cn_5y") is not None else latest_cn_row.get("cn_5y")
+        us_5y_val = latest.get("us_5y") if latest.get("us_5y") is not None else latest_us_row.get("us_5y")
+        cn_30y_val = latest.get("cn_30y") if latest.get("cn_30y") is not None else latest_cn_row.get("cn_30y")
+        us_30y_val = latest.get("us_30y") if latest.get("us_30y") is not None else latest_us_row.get("us_30y")
+
+        # 期限结构对比 (Term Structure)
+        term_structure = [
+            {
+                "tenor": "2Y",
+                "cn_yield": cn_2y_val,
+                "us_yield": us_2y_val,
+                "spread": round(cn_2y_val - us_2y_val, 4)
+                if (cn_2y_val is not None and us_2y_val is not None)
+                else None,
+            },
+            {
+                "tenor": "5Y",
+                "cn_yield": cn_5y_val,
+                "us_yield": us_5y_val,
+                "spread": round(cn_5y_val - us_5y_val, 4)
+                if (cn_5y_val is not None and us_5y_val is not None)
+                else None,
+            },
+            {
+                "tenor": "10Y",
+                "cn_yield": cn_10y_val,
+                "us_yield": us_10y_val,
+                "spread": spread_10y_val,
+            },
+            {
+                "tenor": "30Y",
+                "cn_yield": cn_30y_val,
+                "us_yield": us_30y_val,
+                "spread": round(cn_30y_val - us_30y_val, 4)
+                if (cn_30y_val is not None and us_30y_val is not None)
+                else None,
+            },
+        ]
+
+        return {
+            "history": history,
+            "term_structure": term_structure,
+            "total_count": total_count,
+            "latest": {
+                "date": latest.get("date", ""),
+                "china_date": latest_cn_row.get("date", latest.get("date", "")),
+                "us_date": latest_us_row.get("date", latest.get("date", "")),
+                "china_10y_yield": cn_10y_val,
+                "china_2y_yield": cn_2y_val,
+                "china_5y_yield": cn_5y_val,
+                "china_30y_yield": cn_30y_val,
+                "china_10y_2y_spread": latest.get("cn_10y_2y"),
+                "us_10y_yield": us_10y_val,
+                "us_2y_yield": us_2y_val,
+                "us_5y_yield": us_5y_val,
+                "us_30y_yield": us_30y_val,
+                "us_10y_2y_spread": us_10y_2y_val,
+                "us_china_10y_spread": spread_10y_val,
+                "us_china_spread_status": spread_status,
+                "us_yield_curve_status": us_curve_status,
+            },
+        }
     except Exception as exc:
         logger.warning("东方财富中美国债数据获取失败: %s", exc)
         # Fallback to akshare if direct eastmoney call fails
@@ -282,7 +272,13 @@ async def fetch_us_cn_treasury_yield_history(page_size: int = 300, page_number: 
 async def _fallback_fetch_bond_yields() -> dict[str, Any]:
     """兜底从 akshare 获取中美国债数据。"""
     try:
-        df = await asyncio.to_thread(ak.bond_zh_us_rate)
+        df = await provider_gateway.call_blocking(
+            "akshare",
+            "fetch_bond_yields",
+            get_provider("akshare").fetch_bond_yields,
+            semaphore=akshare_semaphore,
+            is_fallback_attempt=True,
+        )
         if df is not None and not df.empty:
             history = []
             for _, row in df.tail(100).iterrows():
@@ -388,18 +384,6 @@ async def get_treasury_yield_curve(page_size: int = 300) -> dict[str, Any]:
     return data
 
 
-def _parse_sina_jsonp(text: str) -> list[dict[str, Any]]:
-    """解析新浪行情接口返回的 JSONP 数组内容。"""
-    start = text.find("[")
-    end = text.rfind("]")
-    if start != -1 and end != -1:
-        try:
-            return json.loads(text[start : end + 1])
-        except Exception:
-            return []
-    return []
-
-
 async def fetch_crude_oil_data(client: httpx.AsyncClient | None = None) -> dict[str, Any]:
     """获取原油主连实时快照与历史趋势数据。
 
@@ -408,102 +392,45 @@ async def fetch_crude_oil_data(client: httpx.AsyncClient | None = None) -> dict[
     - 国际：NYMEX 纽约原油 (CL/WTI，单位：美元/桶)
     - 国际：ICE 布伦特原油 (OIL/Brent，单位：美元/桶)
     """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-        "Referer": "https://finance.sina.com.cn",
-    }
-    close_client = False
-    if client is None:
-        client = httpx.AsyncClient(timeout=8.0, headers=headers)
-        close_client = True
-
+    provider = get_provider("sina")
     try:
-        quote_url = "https://hq.sinajs.cn/list=nf_SC0,hf_CL,hf_OIL"
-        sc_url = "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_SC0=/InnerFuturesNewService.getDailyKLine?symbol=SC0"
-        cl_url = "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_CL=/GlobalFuturesService.getGlobalFuturesDailyKLine?symbol=CL"
-        oil_url = "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_OIL=/GlobalFuturesService.getGlobalFuturesDailyKLine?symbol=OIL"
-
-        quote_resp, sc_resp, cl_resp, oil_resp = await asyncio.gather(
-            client.get(quote_url),
-            client.get(sc_url),
-            client.get(cl_url),
-            client.get(oil_url),
+        quote_map, sc_raw, cl_raw, oil_raw = await asyncio.gather(
+            provider_gateway.call(
+                "sina", "fetch_crude_oil_quotes", lambda: provider.fetch_crude_oil_quotes(client=client)
+            ),
+            provider_gateway.call(
+                "sina", "fetch_futures_history_SC0", lambda: provider.fetch_futures_history("SC0", client=client)
+            ),
+            provider_gateway.call(
+                "sina", "fetch_futures_history_CL", lambda: provider.fetch_futures_history("CL", client=client)
+            ),
+            provider_gateway.call(
+                "sina", "fetch_futures_history_OIL", lambda: provider.fetch_futures_history("OIL", client=client)
+            ),
             return_exceptions=True,
         )
-
-        quotes: dict[str, Any] = {"sc0": None, "wti": None, "brent": None}
-
-        # 1. 解析实时快照
-        if not isinstance(quote_resp, Exception) and quote_resp.status_code == 200:
-            q_text = quote_resp.content.decode("gbk", errors="ignore")
-            for line in q_text.strip().split("\n"):
-                if not line.strip() or "=" not in line:
-                    continue
-                k, raw_val = line.split("=", 1)
-                fields = raw_val.strip('"; \r\n').split(",")
-                if "nf_SC0" in k and len(fields) >= 18:
-                    price = _safe_float(fields[8])
-                    prev_settle = _safe_float(fields[10])
-                    change = round(price - prev_settle, 3) if (price is not None and prev_settle is not None) else None
-                    change_pct = (
-                        round((change / prev_settle) * 100, 2)
-                        if (change is not None and prev_settle)
-                        else None
-                    )
-                    quotes["sc0"] = {
-                        "symbol": "SC0",
-                        "name": "上海原油连续",
-                        "price": price,
-                        "change": change,
-                        "change_pct": change_pct,
-                        "unit": "元/桶",
-                        "date": fields[17] if len(fields) > 17 else "",
-                    }
-                elif "hf_CL" in k and len(fields) >= 14:
-                    price = _safe_float(fields[0])
-                    prev_settle = _safe_float(fields[7])
-                    change = _safe_float(fields[1])
-                    if change is None and price is not None and prev_settle is not None:
-                        change = round(price - prev_settle, 3)
-                    change_pct = (
-                        round((change / prev_settle) * 100, 2)
-                        if (change is not None and prev_settle)
-                        else None
-                    )
-                    quotes["wti"] = {
-                        "symbol": "CL",
-                        "name": "WTI纽约原油",
-                        "price": price,
-                        "change": change,
-                        "change_pct": change_pct,
-                        "unit": "美元/桶",
-                        "date": fields[12] if len(fields) > 12 else "",
-                    }
-                elif "hf_OIL" in k and len(fields) >= 14:
-                    price = _safe_float(fields[0])
-                    prev_settle = _safe_float(fields[7])
-                    change = _safe_float(fields[1])
-                    if change is None and price is not None and prev_settle is not None:
-                        change = round(price - prev_settle, 3)
-                    change_pct = (
-                        round((change / prev_settle) * 100, 2)
-                        if (change is not None and prev_settle)
-                        else None
-                    )
-                    quotes["brent"] = {
-                        "symbol": "OIL",
-                        "name": "布伦特原油",
-                        "price": price,
-                        "change": change,
-                        "change_pct": change_pct,
-                        "unit": "美元/桶",
-                        "date": fields[12] if len(fields) > 12 else "",
-                    }
-
-        # 2. 解析历史日 K 线
-        sc_raw = _parse_sina_jsonp(sc_resp.text) if (not isinstance(sc_resp, Exception) and sc_resp.status_code == 200) else []
-        cl_raw = _parse_sina_jsonp(cl_resp.text) if (not isinstance(cl_resp, Exception) and cl_resp.status_code == 200) else []
-        oil_raw = _parse_sina_jsonp(oil_resp.text) if (not isinstance(oil_resp, Exception) and oil_resp.status_code == 200) else []
+        if isinstance(quote_map, Exception):
+            quote_map = {}
+        sc_raw = [] if isinstance(sc_raw, Exception) else sc_raw
+        cl_raw = [] if isinstance(cl_raw, Exception) else cl_raw
+        oil_raw = [] if isinstance(oil_raw, Exception) else oil_raw
+        quotes = {}
+        for key, code, symbol, name, unit in (
+            ("sc0", "nf_SC0", "SC0", "上海原油连续", "元/桶"),
+            ("wti", "hf_CL", "CL", "WTI纽约原油", "美元/桶"),
+            ("brent", "hf_OIL", "OIL", "布伦特原油", "美元/桶"),
+        ):
+            quote = quote_map.get(code)
+            quotes[key] = (
+                None
+                if quote is None
+                else {
+                    "symbol": symbol,
+                    "name": name,
+                    "unit": unit,
+                    **{field: quote.get(field) for field in ("price", "change", "change_pct", "date")},
+                }
+            )
 
         sc_map = {item["d"]: _safe_float(item.get("c")) for item in sc_raw if "d" in item}
         cl_map = {item["date"]: _safe_float(item.get("close")) for item in cl_raw if "date" in item}
@@ -561,9 +488,6 @@ async def fetch_crude_oil_data(client: httpx.AsyncClient | None = None) -> dict[
             "brent": None,
             "history": [],
         }
-    finally:
-        if close_client:
-            await client.aclose()
 
 
 async def get_crude_oil_data() -> dict[str, Any]:

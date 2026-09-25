@@ -62,6 +62,7 @@ export default function AppHeader({ isMobile, themeKey, onMobileNavOpen }: AppHe
         <AppUserMenu
           user={user}
           isMobile={isMobile}
+          onCapabilities={() => navigate("/capabilities")}
           onSettings={() => navigate("/settings")}
           onLogout={handleLogout}
         />

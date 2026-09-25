@@ -46,6 +46,7 @@ RUN /app/.venv/bin/patchright install --with-deps --no-shell chromium \
 COPY --chown=app:app app/ app/
 # 空库首次初始化时自动播种概念/个股基础数据，SEEDS_DIR 解析为 /app/seeds
 COPY --chown=app:app seeds/ seeds/
+COPY --chown=app:app scripts/ scripts/
 
 RUN mkdir -p data logs && chown -R app:app data logs
 

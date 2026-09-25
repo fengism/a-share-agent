@@ -18,6 +18,7 @@ SKILLS = (
             "get_stock_technical_indicators",
             "get_stock_kline",
             "get_stock_financial",
+            "get_stock_documents",
             "get_stock_news",
             "get_stock_sentiment",
             "get_stock_risk_data",

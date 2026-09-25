@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import logging
 import random
@@ -79,7 +80,9 @@ def _extract_pdf_pages_plumber(
         if total_pages == 0:
             return "", "", 0, 0
 
-        actual_start = max(1, min(start_page, total_pages))
+        if start_page > total_pages:
+            return "", "", total_pages, total_pages
+        actual_start = max(1, start_page)
         actual_end = min(total_pages, actual_start + max_pages - 1)
 
         extracted_parts: list[str] = []
@@ -142,7 +145,9 @@ def _extract_pdf_pages_pypdf(
     if total_pages == 0:
         return "", "", 0, 0
 
-    actual_start = max(1, min(start_page, total_pages))
+    if start_page > total_pages:
+        return "", "", total_pages, total_pages
+    actual_start = max(1, start_page)
     actual_end = min(total_pages, actual_start + max_pages - 1)
 
     extracted_parts: list[str] = []
@@ -189,24 +194,19 @@ def extract_pdf_content(
 
 
 def handle_pdf_response(response: Any, url: str) -> dict[str, Any]:
-    """兼容 fetch_url：从 response.content 中提取前 5 页。"""
+    """供 web_fetch 使用：从 response.content 中提取前 5 页。"""
     pdf_bytes = response.content
     title, text, total_pages, end_page = extract_pdf_content(pdf_bytes, start_page=1, max_pages=5)
     if text:
-        return {
+        return _page_result({
             "url": url,
             "title": title or f"PDF 文档 ({total_pages} 页)",
             "total_pages": total_pages,
             "extracted_pages": f"1 - {end_page}",
             "content": text,
             "content_type": "pdf",
-        }
-    return {
-        "url": url,
-        "title": "",
-        "content": f"[PDF 文档，共 {len(pdf_bytes)} 字节。未能在前 5 页中提取到文本，可使用 read_pdf 工具指定页码阅读]",
-        "content_type": "pdf",
-    }
+        }, 1, 5, True, 0)
+    return {"url": url, "title": "", "content": "", "error": "PDF指定页未提取到文本，请更换页码或使用可选文本PDF", "error_reason": "pdf_no_text", "content_type": "pdf"}
 
 
 def _resolve_local_pdf_path(url: str) -> str | None:
@@ -258,11 +258,15 @@ async def _read_pdf_from_local(
             "title": title or local_path.split("/")[-1],
             "total_pages": total_pages,
             "extracted_pages": f"{start_page} - {end_page}",
-            "content": content or "[PDF 文档无可选文本内容]",
+            "content": content,
             "content_type": "pdf",
         }
     except Exception as err:
         return {"url": url, "title": "", "content": "", "error": f"读取本地 PDF 失败: {err}"}
+
+
+def _pdf_http_error(url: str, reason: str, message: str) -> dict[str, Any]:
+    return {"url": url, "title": "", "content": "", "error": message, "error_reason": reason}
 
 
 async def _read_pdf_from_http(
@@ -273,6 +277,8 @@ async def _read_pdf_from_http(
     http_get_func: Any,
 ) -> dict[str, Any]:
     from app.agentic.tools.packs.web.fetcher import http_get_with_retry
+    from app.agentic.tools.packs.web.scrapling import is_challenge_page
+
     fetch_func = http_get_func or http_get_with_retry
     headers = {
         "User-Agent": random.choice(USER_AGENTS),
@@ -283,9 +289,27 @@ async def _read_pdf_from_http(
         if resp.status_code >= 400:
             return {"url": url, "title": "", "content": "", "error": f"下载 PDF 失败，HTTP 状态码 {resp.status_code}"}
         pdf_bytes = resp.content
+        if b"%PDF" not in pdf_bytes[:1024] and is_challenge_page(html=pdf_bytes[:8192].decode("utf-8", "ignore")):
+            from app.agentic.tools.packs.web.pdf_browser import fetch_pdf_in_browser
+            from app.configuration import get_settings
+
+            if not get_settings().web_fetch_browser_enabled:
+                return _pdf_http_error(
+                    url, "pdf_browser_disabled", "目标网站返回访问验证页，浏览器抓取未启用，无法下载 PDF",
+                )
+            try:
+                pdf_bytes = await fetch_pdf_in_browser(url)
+            except TimeoutError:
+                return _pdf_http_error(url, "pdf_browser_timeout", "目标网站访问验证或 PDF 浏览器下载超时")
+            except Exception as exc:
+                # Keep provider/browser internals out of user-facing audit summaries.
+                logger.info("PDF 浏览器下载失败: url=%s, error=%s", url, exc)
+                return _pdf_http_error(
+                    url, "pdf_browser_failed", "目标网站返回访问验证页，浏览器重试未能下载 PDF；请稍后重试或更换官方 PDF 链接",
+                )
         if b"%PDF" not in pdf_bytes[:1024]:
             hint = "（返回内容为 HTML 网页）" if b"<html" in pdf_bytes[:1024].lower() else ""
-            return {"url": url, "title": "", "content": "", "error": f"目标 URL 未返回标准 PDF 流{hint}"}
+            return _pdf_http_error(url, "pdf_not_pdf", f"目标 URL 未返回标准 PDF 流{hint}")
         title, content, total_pages, end_page = await asyncio.to_thread(
             extract_pdf_content,
             pdf_bytes,
@@ -298,7 +322,9 @@ async def _read_pdf_from_http(
                 "url": url,
                 "title": title or f"PDF 研报/公告 (共 {total_pages} 页)",
                 "total_pages": total_pages,
-                "content": f"[PDF 文档共 {total_pages} 页，在第 {start_page} 页至 {start_page + max_pages - 1} 页未提取到可读文本]",
+                "content": "",
+                "error": "PDF指定页未提取到可读文本",
+                "error_reason": "pdf_no_text",
                 "content_type": "pdf",
             }
         return {
@@ -321,9 +347,34 @@ async def execute_read_pdf(
     extract_tables: bool = True,
     *,
     http_get_func: Any = None,
+    content_offset: int = 0,
+    window_hash: str = "",
 ) -> dict[str, Any]:
     """下载并深度阅读 PDF 研报、财报或上市公司公告正文。"""
     # http/https 在线文档（大小写、前导空白均容忍）一律走远程下载；file:// 与本地 .pdf 路径直接读盘。
+    if start_page < 1 or not 1 <= max_pages <= 50 or content_offset < 0:
+        return _pdf_http_error(url, "pdf_invalid_range", "start_page需>=1，max_pages需为1-50，content_offset需>=0")
     if url.strip().lower().startswith(("http://", "https://")):
-        return await _read_pdf_from_http(url, start_page, max_pages, extract_tables, http_get_func)
-    return await _read_pdf_from_local(url, start_page, max_pages, extract_tables)
+        result = await _read_pdf_from_http(url, start_page, max_pages, extract_tables, http_get_func)
+    else:
+        result = await _read_pdf_from_local(url, start_page, max_pages, extract_tables)
+    return _page_result(result, start_page, max_pages, extract_tables, content_offset, window_hash)
+
+
+def _page_result(result: dict[str, Any], start: int, count: int, tables: bool, offset: int, expected_hash: str = "") -> dict[str, Any]:
+    if result.get("error"):
+        return result
+    text = str(result.get("content") or "")
+    if not text.strip() or offset >= len(text):
+        return {**result, "content": "", "error": "PDF页窗口无可读正文或续读偏移已失效", "error_reason": "pdf_no_text"}
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    if expected_hash and expected_hash != digest:
+        return {**result, "content": "", "error": "PDF页窗口内容已变化，请从该窗口起点重新读取", "error_reason": "pdf_window_changed"}
+    total = int(result.get("total_pages") or 0)
+    end = min(total, start + count - 1)
+    return {
+        **result, "content": text[offset:], "start_page": start, "max_pages": count, "window_hash": digest,
+        "extract_tables": tables, "content_offset": offset,
+        "next_read": {"start_page": end + 1, "max_pages": count, "extract_tables": tables, "content_offset": 0} if end < total else None,
+        "page_scope_note": "extracted_pages为提取窗口；若发生输出截断，按next_read续读；不代表阅读全文",
+    }

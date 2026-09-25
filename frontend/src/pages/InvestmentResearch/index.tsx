@@ -24,6 +24,7 @@ import AnalysisHistoryRail from "../../features/investment-research/AnalysisHist
 import ResearchFrameworkPanel from "../../features/investment-research/ResearchFrameworkPanel";
 import {
   buildAnalysisHistoryUrl,
+  buildStockValuationUrl,
   formatAnalysisDate,
   normalizeAnalysisDate,
   parseAnalysisDate,
@@ -108,11 +109,7 @@ export default function InvestmentResearch() {
   }, [code, historyDate, navigate]);
 
   const openValuation = useCallback(() => {
-    if (!code) return;
-    const params = new URLSearchParams();
-    if (historyDate) params.set("date", historyDate);
-    params.set("panel", "valuation");
-    navigate(`${buildStockAnalysisUrl(code)}?${params.toString()}`);
+    if (code) navigate(buildStockValuationUrl(code, historyDate));
   }, [code, historyDate, navigate]);
 
   const reportDate = normalizeAnalysisDate(displayResult?.analysis_date) || historyDate;
@@ -224,17 +221,19 @@ export default function InvestmentResearch() {
         >
           {code ? (
             <div className="investment-research-content">
-              {isAnalyzing && stages.length > 0 ? (
+              {(isAnalyzing || analysisError || agentProcess.termination) && stages.length > 0 ? (
                 <AnalysisProgressSteps
                   stages={stages}
                   currentStageIndex={currentStageIndex}
-                  status="running"
+                  status={analysisError || agentProcess.termination === "failed" ? "error" : agentProcess.termination ?? "running"}
                 />
               ) : null}
               <AgentProcessPanel
                 plan={agentProcess.plan}
                 status={agentProcess.status}
                 toolCalls={agentProcess.toolCalls}
+                rounds={agentProcess.rounds}
+                termination={agentProcess.termination}
                 isRunning={isAnalyzing}
               />
               {analysisError && !isAnalyzing ? (

@@ -6,7 +6,7 @@ import ResearchFrameworkPanel from "./ResearchFrameworkPanel";
 
 function LocationProbe() {
   const location = useLocation();
-  return <span data-testid="location">{location.search}</span>;
+  return <span data-testid="location">{location.pathname}{location.search}{location.hash}</span>;
 }
 
 const researchFramework: InvestmentResearchFramework = {
@@ -111,7 +111,7 @@ const researchFramework: InvestmentResearchFramework = {
 };
 
 function analysisWithFramework(): AnalysisResult {
-  return { research_framework: researchFramework } as AnalysisResult;
+  return { stock_code: "600519", research_framework: researchFramework } as AnalysisResult;
 }
 
 describe("ResearchFrameworkPanel", () => {
@@ -145,7 +145,7 @@ describe("ResearchFrameworkPanel", () => {
     expect(within(scenarios as HTMLElement).getByText("证据不足，未给出区间")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /查看估值明细/ }));
-    expect(screen.getByTestId("location")).toHaveTextContent("panel=valuation");
+    expect(screen.getByTestId("location")).toHaveTextContent("/stock/600519?tab=valuation#stock-details");
   });
 
   it("uses an injected valuation action in a standalone workbench", () => {
@@ -160,7 +160,7 @@ describe("ResearchFrameworkPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /查看估值明细/ }));
     expect(onOpenValuation).toHaveBeenCalledOnce();
     expect(screen.getByTestId("location")).toHaveTextContent("date=20260807");
-    expect(screen.getByTestId("location")).not.toHaveTextContent("panel=valuation");
+    expect(screen.getByTestId("location")).not.toHaveTextContent("/stock/600519?tab=valuation#stock-details");
   });
 
   it("uses compact reading by default and allows switching to the complete report", () => {

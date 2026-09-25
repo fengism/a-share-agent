@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setActiveUserScope } from "./userScope";
 import { useChatStore } from "./chatStore";
+import { fromServerChatState, toServerChatState } from "./chatServerSync";
 
 function createMemoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -179,4 +180,74 @@ describe("chatStore user scope", () => {
     expect(useChatStore.getState().agentNames).toEqual([]);
     expect(useChatStore.getState().skillNames).toEqual([]);
   });
+  it("persists public process records and terminal status independently of answer history", () => {
+    setActiveUserScope(1);
+    const store = useChatStore.getState();
+    store.addAssistantMessage("process-history");
+    store.setAssistantStatus("process-history", "核对一手资料");
+    store.appendToAssistant("process-history", "最终结论");
+    store.finalizeMessage("process-history", "partial");
+    setActiveUserScope(2);
+    setActiveUserScope(1);
+    expect(useChatStore.getState().messages[useChatStore.getState().messages.length - 1]).toMatchObject({
+      content: "最终结论", processOutcome: "partial", isStreaming: false,
+      processUpdates: [{ type: "status", content: "核对一手资料" }],
+    });
+    expect(useChatStore.getState().history[useChatStore.getState().history.length - 1]).not.toHaveProperty("processUpdates");
+  });
+
+  it.each(["local", "server"])("settles interrupted %s snapshots for active and inactive sessions", (source) => {
+    setActiveUserScope(1);
+    const store = useChatStore.getState();
+    const firstSession = store.activeSessionId!;
+    store.addAssistantMessage("unfinished");
+    store.addToolCall("unfinished", { id: "tool", type: "function", function: { name: "web_fetch", arguments: "{}" } });
+    store.addAssistantProcessUpdate("unfinished", { type: "round", round: {
+      round_index: 1, round_total: 1, status: "running", objective: "核验", evidence_gaps: [], tool_names: [],
+      tool_selection_reason: "", evidence_added: ["已有证据"], judgment_basis: [], conclusion: "", next_step: "",
+    } });
+    // Simulate a snapshot made before the old browser process was interrupted.
+    const secondSession = store.createSession();
+    store.addAssistantMessage("another-unfinished");
+    store.appendToAssistant("another-unfinished", "未完成的回答");
+    store.renameSession(secondSession, "保存中的对话");
+    if (source === "local") {
+      setActiveUserScope(2);
+      setActiveUserScope(1);
+    } else {
+      const snapshot = toServerChatState(useChatStore.getState());
+      store.hydrateSessions(fromServerChatState({ ...snapshot, revision: 1 }));
+    }
+    expect(useChatStore.getState().activeSessionId).toBe(secondSession);
+    expect(useChatStore.getState()).toMatchObject({ isStreaming: false, activeRunSessionId: null, abortController: null });
+    expect(useChatStore.getState().messages[0]).toMatchObject({ content: "未完成的回答", isStreaming: false, processOutcome: "cancelled" });
+    store.setActiveSession(firstSession);
+    expect(useChatStore.getState().messages[0]).toMatchObject({
+      isStreaming: false, processOutcome: "cancelled",
+      toolCalls: [{ isExecuting: false, isCancelled: true }],
+      processUpdates: [{ round: { status: "cancelled", evidence_added: ["已有证据"] } }],
+    });
+  });
+
+  it("persists cancelled round/tool states and cannot finalize the same message as completed later", () => {
+    setActiveUserScope(1);
+    const store = useChatStore.getState();
+    store.addAssistantMessage("cancelled");
+    store.addToolCall("cancelled", { id: "tool", type: "function", function: { name: "web_fetch", arguments: "{}" } });
+    store.addAssistantProcessUpdate("cancelled", { type: "round", round: {
+      round_index: 1, round_total: 1, status: "running", objective: "核验", evidence_gaps: [], tool_names: [],
+      tool_selection_reason: "", evidence_added: ["已有证据"], judgment_basis: [], conclusion: "", next_step: "",
+    } });
+    store.finalizeMessage("cancelled", "cancelled");
+    const settled = useChatStore.getState().messages[0];
+    store.finalizeMessage("cancelled", "completed");
+    expect(useChatStore.getState().messages[0]).toBe(settled);
+    const serverSnapshot = toServerChatState(useChatStore.getState());
+    setActiveUserScope(2);
+    setActiveUserScope(1);
+    expect(useChatStore.getState().messages[0]).toEqual(settled);
+    store.hydrateSessions(fromServerChatState({ ...serverSnapshot, revision: 1 }));
+    expect(useChatStore.getState().messages[0]).toEqual(settled);
+  });
+
 });

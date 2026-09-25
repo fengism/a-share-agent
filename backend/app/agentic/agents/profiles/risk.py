@@ -9,9 +9,10 @@ PROFILE = AgentProfile(
     tool_names=(
         "financial_calculator",
         "get_stock_risk_data",
+        "get_restricted_shares_lift",
         "get_stock_technical_indicators",
         "get_stock_valuation_detail",
     ),
-    skill_names=("stock_analysis",),
+    skill_names=("stock_analysis", "financial_calculations"),
     max_rounds=3,
 )

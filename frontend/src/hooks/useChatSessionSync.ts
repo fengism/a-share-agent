@@ -4,102 +4,138 @@ import { ApiError } from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { fromServerChatState, toServerChatState } from "../store/chatServerSync";
 import { useChatStore } from "../store/chatStore";
+import { createChatPersistSnapshot, flushChatPersist, scheduleChatPersist } from "../store/chatPersistence";
+import { clearPendingChat, markPendingChat, readPendingChat } from "../store/chatSyncRecovery";
 
 export type ChatSyncStatus = "loading" | "synced" | "error";
 
 export function useChatSessionSync(): ChatSyncStatus {
   const userId = useAuthStore((state) => state.user?.id);
   const [status, setStatus] = useState<ChatSyncStatus>("loading");
-  const updateStatus = (next: ChatSyncStatus) => {
-    setStatus(next);
-    useChatStore.getState().setSyncStatus(next);
-  };
 
   useEffect(() => {
     if (userId == null) return;
     const controller = new AbortController();
     let disposed = false;
+    let hydrating = false;
+    let ready = false;
+    let starting = false;
+    let conflicted = false;
     let saveTimer: number | undefined;
-    let unsubscribe: (() => void) | undefined;
     let saveQueue: Promise<void> = Promise.resolve();
     let lastPersistedSnapshot: string | undefined;
-    let currentRevision = 0;
-
-    const hydrateRemoteState = (response: Awaited<ReturnType<typeof getChatState>>) => {
-      if (!response.state) return false;
-      currentRevision = response.state.revision;
-      useChatStore.getState().hydrateSessions(fromServerChatState(response.state));
-      lastPersistedSnapshot = JSON.stringify(toServerChatState(useChatStore.getState()));
-      return true;
+    let currentRevision: number | null = null;
+    let changedDuringLoad = false;
+    const ownsStore = () => useAuthStore.getState().user?.id === userId;
+    const updateStatus = (next: ChatSyncStatus) => {
+      if (disposed || !ownsStore()) return;
+      setStatus(next);
+      useChatStore.getState().setSyncStatus(next);
     };
-
-    const persistSnapshot = (snapshot: ReturnType<typeof toServerChatState>) => {
-      const serializedSnapshot = JSON.stringify(snapshot);
-      if (serializedSnapshot === lastPersistedSnapshot) {
-        return Promise.resolve();
-      }
-      const operation = saveQueue
-        .catch(() => undefined)
-        .then(async () => {
-          if (serializedSnapshot === lastPersistedSnapshot) return;
-          try {
-            const response = await saveChatState(snapshot, currentRevision);
-            if (response.state) currentRevision = response.state.revision;
-          } catch (error) {
-            if (!(error instanceof ApiError) || error.code !== "chat.state_conflict") throw error;
-            const response = await getChatState(controller.signal);
-            if (!disposed) hydrateRemoteState(response);
-            return;
+    const rememberLocal = () => {
+      const state = useChatStore.getState();
+      markPendingChat(window.localStorage, userId, currentRevision);
+      scheduleChatPersist(window.localStorage, userId, createChatPersistSnapshot(
+        state.sessions, state.sessionData, state.activeSessionId, state.messages,
+        state.history, state.agentNames, state.skillNames,
+      ));
+    };
+    const persistCurrentState = () => {
+      saveQueue = saveQueue.catch(() => undefined).then(async () => {
+        if (disposed || !ownsStore() || !ready || conflicted) return;
+        try {
+          const snapshot = toServerChatState(useChatStore.getState());
+          const serialized = JSON.stringify(snapshot);
+          if (serialized !== lastPersistedSnapshot) {
+            const response = await saveChatState(snapshot, currentRevision ?? 0);
+            if (disposed || !ownsStore()) return;
+            currentRevision = response.state?.revision ?? currentRevision;
+            lastPersistedSnapshot = serialized;
           }
-          lastPersistedSnapshot = serializedSnapshot;
-        });
-      saveQueue = operation;
-      return operation.then(() => {
-        if (!disposed) updateStatus("synced");
-      }).catch((error: unknown) => {
-        if (!disposed) updateStatus("error");
-        throw error;
+          // Never acknowledge a newer local edit with an older in-flight save.
+          if (serialized === JSON.stringify(toServerChatState(useChatStore.getState()))) {
+            clearPendingChat(window.localStorage, userId);
+            updateStatus("synced");
+          } else {
+            rememberLocal();
+          }
+        } catch (error) {
+          if (disposed || !ownsStore()) return;
+          if (error instanceof ApiError && error.code === "chat.state_conflict") {
+            // Keep BOTH versions: no remote hydration and no blind revision retry.
+            conflicted = true;
+          }
+          updateStatus("error");
+        }
       });
+      return saveQueue;
     };
-
-    const persistCurrentState = () => persistSnapshot(toServerChatState(useChatStore.getState()));
-
+    const unsubscribe = useChatStore.subscribe((state, previous) => {
+      if (hydrating || disposed || !ownsStore()) return;
+      if (state.sessions === previous.sessions && state.sessionData === previous.sessionData
+        && state.activeSessionId === previous.activeSessionId && state.messages === previous.messages
+        && state.history === previous.history && state.agentNames === previous.agentNames
+        && state.skillNames === previous.skillNames) return;
+      changedDuringLoad = true;
+      try { rememberLocal(); } catch { updateStatus("error"); }
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => {
+        saveTimer = undefined;
+        if (ready) void persistCurrentState();
+        else void start();
+      }, 1_000);
+    });
     const start = async () => {
+      if (starting || disposed || !ownsStore() || ready) return;
+      starting = true;
       updateStatus("loading");
       try {
+        const pending = readPendingChat(window.localStorage, userId);
+        currentRevision = pending?.revision ?? null;
         const response = await getChatState(controller.signal);
-        if (disposed) return;
-        if (useChatStore.getState().isStreaming) {
-          currentRevision = response.state?.revision ?? 0;
-          lastPersistedSnapshot = undefined;
-          await persistCurrentState();
-        } else if (!hydrateRemoteState(response)) {
-          await persistCurrentState();
+        if (disposed || !ownsStore()) return;
+        const remoteRevision = response.state?.revision ?? 0;
+        const hasLocalEdits = pending !== null || changedDuringLoad || useChatStore.getState().isStreaming;
+        if (hasLocalEdits && response.state && currentRevision !== remoteRevision) {
+          conflicted = true;
+          ready = true;
+          updateStatus("error");
+          return;
         }
-        if (disposed) return;
-        updateStatus("synced");
-        unsubscribe = useChatStore.subscribe(() => {
-          window.clearTimeout(saveTimer);
-          saveTimer = window.setTimeout(() => {
-            saveTimer = undefined;
-            void persistCurrentState().catch(() => undefined);
-          }, 1_000);
-        });
+        currentRevision = remoteRevision;
+        if (!hasLocalEdits && response.state) {
+          hydrating = true;
+          try { useChatStore.getState().hydrateSessions(fromServerChatState(response.state)); }
+          finally { hydrating = false; }
+          lastPersistedSnapshot = JSON.stringify(toServerChatState(useChatStore.getState()));
+        } else {
+          rememberLocal();
+        }
+        ready = true;
+        await persistCurrentState();
       } catch {
-        if (!disposed) updateStatus("error");
+        updateStatus("error");
+      } finally {
+        starting = false;
       }
     };
-
+    const flushLocal = () => {
+      if (!ownsStore()) return;
+      try { flushChatPersist(); } catch { updateStatus("error"); }
+    };
+    window.addEventListener("beforeunload", flushLocal);
+    // An initial GET failure must not permanently disable synchronization.
+    const retryOnline = () => { if (!ready) void start(); else void persistCurrentState(); };
+    window.addEventListener("online", retryOnline);
     void start();
     return () => {
+      flushLocal();
       disposed = true;
       controller.abort();
-      unsubscribe?.();
-      const hasPendingSave = saveTimer !== undefined;
+      unsubscribe();
       window.clearTimeout(saveTimer);
-      if (hasPendingSave && useAuthStore.getState().user?.id === userId) {
-        void persistCurrentState().catch(() => undefined);
-      }
+      window.removeEventListener("beforeunload", flushLocal);
+      window.removeEventListener("online", retryOnline);
     };
   }, [userId]);
 

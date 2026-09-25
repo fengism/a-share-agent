@@ -63,7 +63,10 @@ class BaiduTransport:
             timeout=timeout or DEFAULT_TIMEOUT,
         )
         response.raise_for_status()
-        return response.json()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("百度返回格式非 JSON 对象")
+        return payload
 
 
 def check_result_code(data: dict) -> None:

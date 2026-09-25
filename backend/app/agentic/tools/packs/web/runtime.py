@@ -25,8 +25,8 @@ async def _fetch_tweet(url: str):
     return await twitter.fetch_tweet(url, truncate_func=_smart_truncate)
 
 
-async def _fetch_url(url: str, mode: fetcher.FetchMode = "auto"):
-    return await fetcher.fetch_url(
+async def _web_fetch(url: str, mode: fetcher.FetchMode = "auto"):
+    return await fetcher.web_fetch(
         url,
         mode=mode,
         cache=_fetch_cache,
@@ -41,7 +41,7 @@ async def _fetch_url(url: str, mode: fetcher.FetchMode = "auto"):
 
 
 async def _fetch_urls(urls: list[str], mode: fetcher.FetchMode = "auto"):
-    return await fetcher.fetch_urls(urls, mode=mode, fetch_one=_fetch_url)
+    return await fetcher.fetch_urls(urls, mode=mode, fetch_one=_web_fetch)
 
 
 async def _read_pdf(
@@ -49,6 +49,8 @@ async def _read_pdf(
     start_page: int = 1,
     max_pages: int = 20,
     extract_tables: bool = True,
+    content_offset: int = 0,
+    window_hash: str = "",
 ):
     return await pdf.execute_read_pdf(
         url,
@@ -56,6 +58,8 @@ async def _read_pdf(
         max_pages=max_pages,
         extract_tables=extract_tables,
         http_get_func=_http_get_with_retry,
+        content_offset=content_offset,
+        window_hash=window_hash,
     )
 
 
@@ -83,7 +87,7 @@ async def _execute_twitter_analyze(username: str) -> str:
 
 def register_web_tools() -> None:
     registration.register_web_tools(
-        _fetch_url,
+        _web_fetch,
         _fetch_urls,
         _execute_web_search,
         read_pdf_executor=_read_pdf,

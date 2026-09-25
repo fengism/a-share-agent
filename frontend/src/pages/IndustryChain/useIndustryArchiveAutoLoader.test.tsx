@@ -111,4 +111,24 @@ describe("useIndustryArchiveAutoLoader", () => {
     rerender({ archiveId: "archive-2" });
     await waitFor(() => expect(requestArchive).toHaveBeenCalledTimes(2));
   });
+  it("does not overwrite a stopped run with an old archive, including an in-flight load", async () => {
+    const pending = deferred<IndustryChainResult>();
+    const loadArchive = vi.fn(() => pending.promise);
+    const loadResult = vi.fn();
+    const { rerender } = renderHook(({ stopped, analyzing }) => useIndustryArchiveAutoLoader({
+      activeName: "机器人", latestArchiveId: "old-archive", isLatestLoading: false,
+      isAnalyzing: analyzing, hasDisplayedResult: false, hasCurrentRouteError: false,
+      hasCurrentRouteStopped: stopped, loadArchive, loadResult,
+    }), { initialProps: { stopped: false, analyzing: false } });
+    expect(loadArchive).toHaveBeenCalledOnce();
+    rerender({ stopped: false, analyzing: true });
+    rerender({ stopped: true, analyzing: false });
+    await act(async () => { pending.resolve(archiveResult); await pending.promise; });
+    expect(loadArchive).toHaveBeenCalledOnce();
+    expect(loadResult).not.toHaveBeenCalled();
+    // A normal route/explicit reset can still load archives afterwards.
+    rerender({ stopped: false, analyzing: false });
+    await waitFor(() => expect(loadResult).toHaveBeenCalledOnce());
+  });
+
 });

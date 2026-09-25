@@ -91,9 +91,21 @@ async def get_analysis_page_data(
     section_timeout_seconds: float,
     loaders: AnalysisPageLoaders | None = None,
     date_range: tuple[str, str] | None = None,
+    include_market_data: bool = True,
 ) -> AnalysisPageData:
     """并发聚合分析页面数据，并显式标记不可用分区。"""
     active_loaders = loaders or DEFAULT_ANALYSIS_PAGE_LOADERS
+    if not include_market_data:
+        # The research UI reuses the stock page's query cache for market data.
+        try:
+            cached = await asyncio.wait_for(
+                active_loaders.cached_analysis(code, user_id, cache_ttl),
+                timeout=min(section_timeout_seconds, _SECTION_TIMEOUT_CAPS["cached_analysis"]),
+            )
+            return AnalysisPageData(cached_analysis=cached)
+        except Exception as exc:
+            logger.warning("分析页历史分析加载失败: %s", exc)
+            return AnalysisPageData(partial=True, unavailable_sections=["cached_analysis"])
     start_date, end_date = date_range or _default_kline_date_range()
     requests: list[tuple[AnalysisPageSection, Awaitable[Any]]] = [
         ("stock_info", active_loaders.stock_info(code)),

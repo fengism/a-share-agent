@@ -16,6 +16,13 @@ describe("AnalysisKeyLevels", () => {
     expect(screen.getByText("区间运行")).toBeInTheDocument();
   });
 
+  it("labels snapshot prices separately from live quotes", () => {
+    render(<AnalysisKeyLevels current={1520} support={1450} resistance={1650} currentLabel="分析时价格" />);
+
+    expect(screen.getByText("分析时价格")).toBeInTheDocument();
+    expect(screen.queryByText("当前价")).not.toBeInTheDocument();
+  });
+
   it("keeps the section visible while market data is unavailable", () => {
     render(<AnalysisKeyLevels current={null} support={null} resistance={null} />);
 

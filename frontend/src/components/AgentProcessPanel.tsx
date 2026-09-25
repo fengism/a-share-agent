@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 import { Steps, Tag, Typography } from "antd";
 import type { AgentPlan, AgentPlanStepStatus, ToolCallDisplay } from "../types/chat";
-import type { AgentProcessRound } from "../features/agent-process/agentProcess";
+import type { AgentProcessRound, AgentProcessTermination } from "../features/agent-process/agentProcess";
 import { toolDisplayName } from "../features/agent-process/toolPresentation";
 import ToolResultSummary from "../features/agent-process/ToolResultSummary";
 import { formatToolArguments } from "../utils/toolCall";
@@ -49,8 +49,13 @@ function groupedToolStatus(tools: ToolCallDisplay[]) {
       icon: <WarningOutlined />,
     };
   }
-  if (tools.every((tool) => tool.isCancelled)) {
-    return { color: "warning" as SemanticTagColor, label: "已停止", icon: <StopOutlined /> };
+  const cancelled = tools.filter((tool) => tool.isCancelled).length;
+  if (cancelled > 0) {
+    return {
+      color: "warning" as SemanticTagColor,
+      label: tools.length > 1 ? `${cancelled}/${tools.length} 已停止` : "已停止",
+      icon: <StopOutlined />,
+    };
   }
   return {
     color: "down" as SemanticTagColor,
@@ -124,6 +129,12 @@ function RoundList({ values, emptyText = "暂无" }: { values: string[]; emptyTe
 }
 
 function roundStatus(round: AgentProcessRound) {
+  if (round.status === "cancelled" || round.status === "detached") {
+    return { color: "warning" as SemanticTagColor, label: round.status === "detached" ? "已停止等待" : "已停止", icon: <StopOutlined /> };
+  }
+  if (round.status === "failed") {
+    return { color: "up" as SemanticTagColor, label: "失败", icon: <CloseCircleOutlined /> };
+  }
   if (round.status === "running") {
     return { color: "primary" as SemanticTagColor, label: "调研中", icon: <LoadingOutlined spin /> };
   }
@@ -209,17 +220,22 @@ export default function AgentProcessPanel({
   toolCalls,
   rounds = [],
   isRunning,
+  termination,
 }: {
   plan?: AgentPlan;
   status: string;
   toolCalls: ToolCallDisplay[];
   rounds?: AgentProcessRound[];
   isRunning: boolean;
+  termination?: AgentProcessTermination;
 }) {
   const steps = plan?.steps ?? [];
-  const hasFailure = steps.some((step) => step.status === "failed")
+  const hasFailure = termination === "failed"
+    || rounds.some((round) => round.status === "failed")
+    || steps.some((step) => step.status === "failed")
     || toolCalls.some((tool) => tool.isError);
-  const hasCancellation = steps.some((step) => step.status === "cancelled")
+  const hasCancellation = rounds.some((round) => round.status === "cancelled" || round.status === "detached")
+    || steps.some((step) => step.status === "cancelled")
     || toolCalls.some((tool) => tool.isCancelled);
   const hasDegradation = steps.some((step) => step.status === "degraded")
     || rounds.some((round) => round.status === "degraded");
@@ -249,15 +265,17 @@ export default function AgentProcessPanel({
 
   if (!plan && toolCalls.length === 0 && rounds.length === 0 && !status) return null;
 
-  const badge = hasFailure
-    ? { color: "up" as SemanticTagColor, label: "执行失败", icon: <CloseCircleOutlined /> }
-    : isRunning
-      ? { color: "primary" as SemanticTagColor, label: "执行中", icon: <LoadingOutlined spin /> }
-      : hasCancellation
-        ? { color: "warning" as SemanticTagColor, label: "已停止", icon: <StopOutlined /> }
-        : hasDegradation || hasSkippedTool
-          ? { color: "warning" as SemanticTagColor, label: "数据缺口", icon: <WarningOutlined /> }
-          : { color: "down" as SemanticTagColor, label: "已完成", icon: <CheckCircleOutlined /> };
+  const badge = termination === "cancelled" || termination === "detached"
+    ? { color: "warning" as SemanticTagColor, label: termination === "detached" ? "已停止等待" : "已停止", icon: <StopOutlined /> }
+    : hasFailure
+      ? { color: "up" as SemanticTagColor, label: "执行失败", icon: <CloseCircleOutlined /> }
+      : isRunning
+        ? { color: "primary" as SemanticTagColor, label: "执行中", icon: <LoadingOutlined spin /> }
+        : hasCancellation
+          ? { color: "warning" as SemanticTagColor, label: "已停止", icon: <StopOutlined /> }
+          : hasDegradation || hasSkippedTool
+            ? { color: "warning" as SemanticTagColor, label: "数据缺口", icon: <WarningOutlined /> }
+            : { color: "down" as SemanticTagColor, label: "已完成", icon: <CheckCircleOutlined /> };
   const detail = [
     steps.length > 0 ? `${settledSteps}/${steps.length} 个步骤` : "",
     rounds.length > 0 ? `${rounds.length} 轮调研` : "",

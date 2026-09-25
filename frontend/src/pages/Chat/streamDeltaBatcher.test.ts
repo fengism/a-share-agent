@@ -46,3 +46,16 @@ describe("createStreamDeltaBatcher", () => {
     expect(onFlush).not.toHaveBeenCalled();
   });
 });
+
+it("separates reasoning blocks even within the same animation frame", () => {
+  const onFlush = vi.fn();
+  const batcher = createStreamDeltaBatcher(onFlush, () => 1, vi.fn());
+  const source = { block_id: "a", source: "财务分析", stage: "agent" as const, turn: 1, attempt: 1 };
+  batcher.enqueueReasoning("先", source);
+  batcher.enqueueReasoning("分析", source);
+  batcher.enqueueReasoning("再分析", { ...source, block_id: "b", turn: 2 });
+  batcher.flush();
+  expect(onFlush.mock.calls.map(([batch]) => [batch.reasoning, batch.reasoningSource.block_id])).toEqual([
+    ["先分析", "a"], ["再分析", "b"],
+  ]);
+});

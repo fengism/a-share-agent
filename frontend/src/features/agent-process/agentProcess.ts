@@ -6,10 +6,12 @@ import type {
   ToolCallDisplay,
 } from "../../types/chat";
 
+export type AgentProcessTermination = "cancelled" | "detached" | "failed";
+
 export interface AgentProcessRound {
   roundIndex: number;
   roundTotal: number;
-  status: AgentResearchRoundStatus;
+  status: AgentResearchRoundStatus | AgentProcessTermination;
   objective: string;
   evidenceGaps: string[];
   toolNames: string[];
@@ -28,6 +30,7 @@ export interface AgentProcessState {
   toolCalls: ToolCallDisplay[];
   rounds: AgentProcessRound[];
   activeRoundIndex?: number;
+  termination?: AgentProcessTermination;
 }
 
 export function createAgentProcessState(): AgentProcessState {
@@ -198,4 +201,38 @@ export function applyAgentEvent(
     return { ...state, status: "Agent 调研完成", activeRoundIndex: undefined };
   }
   return state;
+}
+
+/** Stop local progress without turning unfinished work into successful evidence. */
+export function stopAgentProcess(
+  state: AgentProcessState,
+  termination: AgentProcessTermination,
+  message: string,
+): AgentProcessState {
+  const stopTools = (tools: ToolCallDisplay[]) => tools.map((tool) => tool.isExecuting ? {
+    ...tool,
+    isExecuting: false,
+    isCancelled: termination !== "failed",
+    isError: termination === "failed",
+  } : tool);
+  return {
+    ...state,
+    termination,
+    status: message,
+    activeRoundIndex: undefined,
+    plan: state.plan ? {
+      ...state.plan,
+      steps: state.plan.steps.map((step) => step.status === "running" || step.status === "pending" ? {
+        ...step,
+        status: termination === "failed" ? "failed" : "cancelled",
+        detail: message,
+      } : step),
+    } : undefined,
+    toolCalls: stopTools(state.toolCalls),
+    rounds: state.rounds.map((round) => ({
+      ...round,
+      ...(round.status === "running" ? { status: termination, statusText: message } : {}),
+      toolCalls: stopTools(round.toolCalls),
+    })),
+  };
 }

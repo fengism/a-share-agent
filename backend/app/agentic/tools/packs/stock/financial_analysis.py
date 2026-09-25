@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from typing import Any, cast
 
 from app.agentic.tools.packs.stock import helpers
@@ -32,7 +33,9 @@ _CASHFLOW_RAW_FIELDS = (
 def _safe(value, default=None):
     if isinstance(value, Exception):
         return default
-    if value is None or (isinstance(value, str) and value in ("N/A", "")):
+    if value is None or isinstance(value, bool) or (isinstance(value, str) and value in ("N/A", "")):
+        return default
+    if isinstance(value, (int, float)) and not math.isfinite(value):
         return default
     return value
 
@@ -47,6 +50,36 @@ def _format_percent(value):
     if value is None:
         return None
     return round(value, 2)
+
+
+def _ratio(numerator, denominator, *, percent: bool = True):
+    numerator, denominator = _safe(numerator), _safe(denominator)
+    if numerator is None or denominator is None or denominator <= 0:
+        return None
+    return round(numerator / denominator * (100 if percent else 1), 2)
+
+
+def _gross_margin(row: dict) -> float | None:
+    # Total operating cost includes period expenses and is NOT cost of revenue.
+    revenue, cost = _safe(row.get("OPERATE_INCOME")), _safe(row.get("OPERATE_COST"))
+    if revenue is None or cost is None or revenue <= 0:
+        return None
+    return float(round((revenue - cost) / revenue * 100, 2))
+
+
+def _report_metadata(rows: list[dict]) -> dict[str, str | None]:
+    row = _latest_row(rows)
+    return {
+        "report_date": str(row.get("REPORT_DATE") or row.get("REPORT_DATE_NAME") or "") or None,
+        "report_label": str(row.get("REPORT_DATE_NAME") or "") or None,
+        "currency": str(row.get("CURRENCY") or "").strip() or None,
+    }
+
+
+def _compatible_reports(left: list[dict], right: list[dict]) -> bool:
+    a, b = _report_metadata(left), _report_metadata(right)
+    return bool(a["report_date"] and a["report_date"] == b["report_date"]
+                and a["currency"] and a["currency"] == b["currency"])
 
 
 def _latest_row(data):
@@ -79,7 +112,6 @@ def _build_income_sections(profit: list[dict[str, Any]]) -> dict[str, Any]:
         return {}
     latest = _latest_row(profit)
     revenue = _safe(latest.get("OPERATE_INCOME"))
-    cost = _safe(latest.get("OPERATE_COST"))
     net_profit = _safe(latest.get("PARENT_NETPROFIT"))
     operate_profit = _safe(latest.get("OPERATE_PROFIT"))
     eps = _safe(latest.get("BASIC_EPS"))
@@ -105,12 +137,8 @@ def _build_income_sections(profit: list[dict[str, Any]]) -> dict[str, Any]:
             "operating_profit_billion": _format_amount(operate_profit),
             "net_profit_billion": _format_amount(net_profit),
             "net_profit_yoy": _format_percent(_safe(latest.get("PARENT_NETPROFIT_YOY"))),
-            "gross_margin": _format_percent(
-                round((1 - cost / revenue) * 100, 2) if revenue and cost else None
-            ),
-            "net_margin": _format_percent(
-                round(net_profit / revenue * 100, 2) if net_profit and revenue else None
-            ),
+            "gross_margin": _gross_margin(latest),
+            "net_margin": _ratio(net_profit, revenue),
             "eps": eps,
         },
         "income_raw": _pick_raw(latest, _INCOME_RAW_FIELDS),
@@ -137,14 +165,8 @@ def _build_balance_sections(balance: list[dict[str, Any]]) -> dict[str, Any]:
             "total_equity_billion": _format_amount(total_equity),
             "cash_billion": _format_amount(cash),
             "inventory_billion": _format_amount(inventory),
-            "debt_to_asset_ratio": _format_percent(
-                round(total_liabilities / total_assets * 100, 2)
-                if total_assets and total_liabilities else None
-            ),
-            "current_ratio": _format_percent(
-                round(current_assets / current_liabilities, 2)
-                if current_assets and current_liabilities else None
-            ),
+            "debt_to_asset_ratio": _ratio(total_liabilities, total_assets),
+            "current_ratio": _ratio(current_assets, current_liabilities, percent=False),
         },
         "balance_raw": _pick_raw(latest, _BALANCE_RAW_FIELDS),
     }
@@ -169,10 +191,7 @@ def _build_cashflow_sections(cashflow: list[dict[str, Any]]) -> dict[str, Any]:
                 if operate_cashflow is not None and invest_cashflow is not None else None
             ),
             "sales_cash_billion": _format_amount(sales_cash),
-            "cash_quality": _format_percent(
-                round(operate_cashflow / sales_cash * 100, 2)
-                if operate_cashflow and sales_cash and sales_cash > 0 else None
-            ),
+            "cash_quality": _ratio(operate_cashflow, sales_cash),
         },
         "cashflow_raw": _pick_raw(latest, _CASHFLOW_RAW_FIELDS),
     }
@@ -183,36 +202,16 @@ def _build_key_indicators(
     profit: list[dict[str, Any]],
     metrics: dict[str, Any],
 ) -> dict[str, Any]:
-    if not metrics:
-        return {}
-    metric_values = _as_mapping(metrics.get("metrics"))
     profit_row = _latest_row(profit)
     balance_row = _latest_row(balance)
-    net_profit = _safe(profit_row.get("PARENT_NETPROFIT"))
-    revenue = _safe(profit_row.get("OPERATE_INCOME"))
-    cost = _safe(profit_row.get("TOTAL_OPERATE_COST"))
-    total_assets = _safe(balance_row.get("TOTAL_ASSETS"))
-    parent_equity = _safe(balance_row.get("TOTAL_PARENT_EQUITY"))
-    debt_to_asset = metric_values.get("资产负债率")
+    aligned = _compatible_reports(balance, profit)
     return {
         "key_indicators": {
-            "roe": _format_percent(
-                round(net_profit / parent_equity * 100, 2)
-                if net_profit and parent_equity else None
-            ),
-            "roa": _format_percent(
-                round(net_profit / total_assets * 100, 2)
-                if net_profit and total_assets else None
-            ),
-            "gross_margin": _format_percent(
-                round((1 - cost / revenue) * 100, 2) if revenue and cost else None
-            ),
-            "net_margin": _format_percent(
-                round(net_profit / revenue * 100, 2) if net_profit and revenue else None
-            ),
-            "debt_to_asset": _format_percent(
-                round(debt_to_asset * 100, 2) if debt_to_asset else None
-            ),
+            "roe": _ratio(profit_row.get("PARENT_NETPROFIT"), balance_row.get("TOTAL_PARENT_EQUITY")) if aligned else None,
+            "roa": _ratio(profit_row.get("PARENT_NETPROFIT"), balance_row.get("TOTAL_ASSETS")) if aligned else None,
+            "gross_margin": _gross_margin(profit_row),
+            "net_margin": _ratio(profit_row.get("PARENT_NETPROFIT"), profit_row.get("OPERATE_INCOME")),
+            "debt_to_asset": _ratio(balance_row.get("TOTAL_LIABILITIES"), balance_row.get("TOTAL_ASSETS")),
         }
     }
 
@@ -277,11 +276,17 @@ async def analyze_financials(code: str) -> Any:
     metrics = _as_mapping(metrics_value)
     result: dict[str, Any] = {"code": code}
 
-    if balance:
-        result["report_date"] = str(_safe(balance[0].get("REPORT_DATE_NAME"), ""))
-    elif metrics:
-        result["report_date"] = metrics.get("latest_report_date", "")
-
+    report_metadata = {key: _report_metadata(rows) for key, rows in (
+        ("income", profit), ("balance", balance), ("cashflow", cashflow),
+    )}
+    result["report_date"] = report_metadata["income"]["report_label"] or report_metadata["income"]["report_date"]
+    result["report_metadata"] = report_metadata
+    result["amount_units"] = {
+        "legacy_billion_fields_divisor": 100_000_000,
+        "legacy_billion_fields_unit": "亿（各报表原币种），不是十亿",
+        "currency_by_section": {key: meta["currency"] for key, meta in report_metadata.items()},
+        "currency_missing_policy": "币种缺失时不推断为人民币，不进行跨表金额比率计算",
+    }
     result.update(_build_income_sections(profit))
     result.update(_build_balance_sections(balance))
     result.update(_build_cashflow_sections(cashflow))
@@ -296,7 +301,7 @@ async def analyze_financials(code: str) -> Any:
             ("metrics", metrics_value),
             ("revenue_breakdown", breakdown_value),
         )
-        if isinstance(value, Exception)
+        if isinstance(value, Exception) or not value
     ]
     result["partial"] = bool(unavailable_sections)
     result["unavailable_sections"] = unavailable_sections
@@ -306,16 +311,20 @@ async def analyze_financials(code: str) -> Any:
         "cashflow": bool(cashflow),
         "metrics": bool(metrics),
     }
+    dates = [meta["report_date"] for meta in report_metadata.values()]
+    common_date = dates[0] if all(dates) and len(set(dates)) == 1 else None
+    warnings = ["营收与毛利构成上游未提供报告期"] if result["revenue_breakdown"]["status"] == "available" else []
+    if common_date is None:
+        warnings.append("三张报表报告期不齐或不同；各节保留自身口径，不宣称统一报告期")
+    if not _compatible_reports(balance, profit):
+        warnings.append("利润表与资产负债表日期/币种不齐或不一致，ROE/ROA未计算")
+    warnings.append("ROE/ROA为同期间利润除以期末权益/资产，未年化且未使用期初期末平均值")
     result["data_quality"] = {
         "core_sections": core_sections,
-        "common_report_date": metrics.get("latest_report_date") if metrics else None,
+        "common_report_date": common_date,
         "revenue_breakdown_status": result["revenue_breakdown"]["status"],
         "partial": bool(unavailable_sections),
         "unavailable_sections": unavailable_sections,
-        "warnings": (
-            ["营收与毛利构成上游未提供报告期"]
-            if result["revenue_breakdown"]["status"] == "available"
-            else []
-        ),
+        "warnings": warnings,
     }
     return result

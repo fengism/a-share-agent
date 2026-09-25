@@ -4,8 +4,10 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection
+from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Literal
+from uuid import uuid4
 
 from app.agentic.agents.contracts import (
     AgentExecutionResult,
@@ -13,7 +15,7 @@ from app.agentic.agents.contracts import (
     ToolExecutionSummary,
 )
 from app.agentic.catalog import registry
-from app.agentic.events import AgentEvent
+from app.agentic.events import AgentEvent, AgentReasoningSource
 from app.agentic.messages import build_messages
 from app.agentic.orchestration.opinions import parse_opinion_block
 from app.agentic.protocol import (
@@ -21,6 +23,7 @@ from app.agentic.protocol import (
     ToolCallInfo,
     ToolResultInfo,
 )
+from app.agentic.runtime.completion import completion_warning
 from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.runtime.llm import create_chat_completion, stream_chat_completion
 from app.agentic.tools.cache import SharedToolCache
@@ -30,7 +33,7 @@ from app.agentic.tools.calls import (
 )
 from app.agentic.tools.serialization import (
     has_meaningful_tool_content,
-    serialize_context_result,
+    serialize_context_results,
     serialize_error,
     tool_call_cache_key,
 )
@@ -39,22 +42,32 @@ from app.core.errors import build_internal_error, log_internal_error
 from app.core.exceptions import UpstreamUnavailableError
 from app.core.metrics import metrics
 from app.infrastructure.llm.adapters import LLMInvalidResponseError, LLMRetryableError
+from app.infrastructure.llm.policy import LLMGenerationTimeoutError
 from app.infrastructure.llm.runtime import describe_llm_account_error, is_llm_connection_error
 from app.infrastructure.llm.tool_calling import (
     AsyncLLMClient,
     ChatCompletionStreamNormalizer,
     LLMCapabilities,
     LLMTurn,
+    ToolChoice,
     capabilities_from_client,
     normalize_chat_completion,
     resolve_tool_request,
 )
 
 logger = logging.getLogger(__name__)
-_OUTPUT_TRUNCATED_WARNING = "模型输出达到长度上限，回答可能不完整"
 _EMPTY_OUTPUT_ERROR = "模型未生成有效回答，请稍后重试"
-_STREAM_INTERRUPTED_WARNING = "模型流式响应中断，已保留已生成内容"
-_TOOL_BUDGET_WARNING = "工具调用额度已用尽，已基于现有结果继续分析"
+_TOOL_CONTEXT_WARNING = "工具上下文预算不足，部分证据已截断或未提供给模型，结论可能受限"
+_TOOL_BUDGET_WARNING = "部分工具请求受单批/总额度、搜索节奏或正文预留限制，已拒绝超额请求；请以剩余额度为准"
+
+
+def _termination_error_reason(exc: Exception) -> str:
+    if isinstance(exc, LLMInvalidResponseError):
+        return "invalid_response"
+    code = getattr(exc, "status_code", None)
+    if isinstance(code, int):
+        return {400: "bad_request", 401: "authentication_error", 403: "permission_error", 429: "rate_limited"}.get(code, "generation_error")
+    return "generation_error"
 
 
 def _log_agent_llm_error(operation: str, exc: Exception, public_message: str) -> tuple[str, str]:
@@ -97,18 +110,6 @@ class _ExecutionFailed:
     exception: BaseException
 
 
-@dataclass
-class ToolCallDedupe:
-    """跨轮次共享的工具调用去重登记（由调研 session 持有）。
-
-    同一次自适应多轮调研中，后续轮次重发的相同"工具+参数"调用会重放
-    先前成功结果，而不是重新打上游。
-    """
-
-    seen_keys: set[str] = field(default_factory=set)
-    succeeded: dict[str, ToolResultInfo] = field(default_factory=dict)
-
-
 @dataclass(slots=True)
 class _ExecutionState:
     started_at: float
@@ -118,12 +119,11 @@ class _ExecutionState:
     tool_cache: SharedToolCache
     max_tool_context_characters: int
     tool_context_characters: int = 0
-    seen_tool_call_keys: set[str] = field(default_factory=set)
-    succeeded_tool_results: dict[str, ToolResultInfo] = field(default_factory=dict)
     tools_called: list[str] = field(default_factory=list)
     tool_results: list[ToolExecutionSummary] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    termination_reason: str = ""
 
 
 class AgentExecutor:
@@ -137,7 +137,6 @@ class AgentExecutor:
         execution_context: AgentExecutionContext | None,
         max_history_messages: int,
         tool_selection_prompt: str,
-        tool_dedupe: ToolCallDedupe | None = None,
     ) -> _ExecutionState:
         effective_tool_names = list(
             profile.tool_names if allowed_tool_names is None else allowed_tool_names
@@ -158,12 +157,6 @@ class AgentExecutor:
             tool_definitions=registry.get_tool_definitions_for(effective_tool_names),
             tool_cache=tool_cache or (
                 execution_context.tool_cache if execution_context is not None else SharedToolCache()
-            ),
-            seen_tool_call_keys=(
-                tool_dedupe.seen_keys if tool_dedupe is not None else set()
-            ),
-            succeeded_tool_results=(
-                tool_dedupe.succeeded if tool_dedupe is not None else {}
             ),
             max_tool_context_characters=(
                 execution_context.settings.chat_max_tool_context_characters
@@ -200,22 +193,25 @@ class AgentExecutor:
             duration_ms=int((time.monotonic() - state.started_at) * 1000),
             reasoning_content=reasoning_content,
             retryable=retryable,
+            termination_reason=state.termination_reason,
         )
 
     @staticmethod
-    def _record_turn_completion(state: _ExecutionState, turn: LLMTurn) -> None:
-        if (
-            turn.finish_reason == "length"
-            and _OUTPUT_TRUNCATED_WARNING not in state.warnings
-        ):
-            metrics.record_agentic_event("llm_output_truncated")
-            state.warnings.append(_OUTPUT_TRUNCATED_WARNING)
-        if (
-            turn.finish_reason == "stream_error"
-            and _STREAM_INTERRUPTED_WARNING not in state.warnings
-        ):
-            metrics.record_agentic_event("llm_stream_interrupted")
-            state.warnings.append(_STREAM_INTERRUPTED_WARNING)
+    def _record_turn_completion(
+        state: _ExecutionState, turn: LLMTurn, *, allow_tool_calls: bool = True,
+    ) -> None:
+        state.termination_reason = turn.finish_reason if turn.finish_reason in {
+            "stop", "tool_calls", "length", "content_filter", "stream_error",
+        } else "stop" if turn.finish_reason is None else "unexpected_finish"
+        warning = completion_warning(
+            turn.finish_reason, has_tool_calls=allow_tool_calls and bool(turn.tool_calls),
+        )
+        if warning and warning not in state.warnings:
+            if turn.finish_reason == "length":
+                metrics.record_agentic_event("llm_output_truncated")
+            elif turn.finish_reason == "stream_error":
+                metrics.record_agentic_event("llm_stream_interrupted")
+            state.warnings.append(warning)
 
     async def _execute_tool_calls(
         self,
@@ -227,8 +223,14 @@ class AgentExecutor:
         execution_context: AgentExecutionContext | None,
         tool_call_reserve: int,
         capabilities: LLMCapabilities,
+        reasoning_content: str = "",
     ) -> None:
-        state.messages.append(build_assistant_tool_message(tool_calls, assistant_content))
+        assistant_message = build_assistant_tool_message(tool_calls, assistant_content)
+        if capabilities.replay_tool_reasoning:
+            # Some thinking gateways require the original reasoning on tool turns.
+            # This stays in the invocation context; do not log/persist it here.
+            assistant_message["reasoning_content"] = reasoning_content
+        state.messages.append(assistant_message)
         for tool_call in tool_calls:
             state.tools_called.append(tool_call.function.name)
             await emit(AgentEvent(type="tool_call", tool_call=tool_call))
@@ -263,11 +265,14 @@ class AgentExecutor:
                 )
         for (index, tool_call), result in zip(accepted_calls, accepted_results):
             tool_results[index] = result
-            if result.is_error:
-                # 失败调用解除去重标记：上游瞬时可导致失败，相同参数应允许重试
-                state.seen_tool_call_keys.discard(tool_call_cache_key(tool_call))
-            else:
-                state.succeeded_tool_results[tool_call_cache_key(tool_call)] = result
+        if execution_context is not None and execution_context.search_policy is not None:
+            policy = execution_context.search_policy
+            # Process discovery completions first, then reads in this batch; no reset on reservations.
+            completed = list(zip(accepted_calls, accepted_results))
+            completed.sort(key=lambda pair: pair[0][1].function.name not in policy.tool_names)
+            for (_, call), result in completed:
+                policy.observe(call.function.name, call.function.arguments, result.content, is_error=result.is_error)
+            policy.finish_batch()
         for index, tool_call in rejected_calls:
             metrics.record_agentic_event("tool_budget_rejected")
             if _TOOL_BUDGET_WARNING not in state.warnings:
@@ -277,14 +282,33 @@ class AgentExecutor:
                 name=tool_call.function.name,
                 content=serialize_error(
                     "tool_budget_exceeded",
-                    "本轮或本次请求的工具调用预算已用尽，请基于已有结果完成回答",
+                    "本批次或总额度不足，或触及搜索节奏/正文预留限制；请优先读取已发现的网页/PDF正文，不要原样重复被拒调用",
                 ),
                 is_error=False,
             )
+        # 同轮重复调用共享首次调用的真实结果（包括失败和预算拒绝），但保留各自 ID。
+        first_indices: dict[str, int] = {}
+        for index, tool_call in enumerate(tool_calls):
+            key = tool_call_cache_key(tool_call)
+            first_index = first_indices.setdefault(key, index)
+            if tool_results[index] is None and first_index != index:
+                original = tool_results[first_index]
+                if original is None:
+                    raise RuntimeError("重复工具调用缺少原始结果")
+                tool_results[index] = ToolResultInfo(
+                    tool_call_id=tool_call.id,
+                    name=tool_call.function.name,
+                    content=original.content,
+                    is_error=original.is_error,
+                )
         resolved_results = [result for result in tool_results if result is not None]
         if len(resolved_results) != len(tool_calls):
             raise RuntimeError("工具调用结果数量与请求不一致")
-        for tool_call, result in zip(tool_calls, resolved_results):
+        context_contents = serialize_context_results(
+            [result.content for result in resolved_results],
+            state.max_tool_context_characters - state.tool_context_characters,
+        )
+        for tool_call, result, context_content in zip(tool_calls, resolved_results, context_contents):
             await emit(AgentEvent(type="tool_result", tool_result=result))
             has_evidence = (
                 not result.is_error
@@ -295,18 +319,15 @@ class AgentExecutor:
                     name=tool_call.function.name,
                     is_error=result.is_error,
                     has_evidence=has_evidence,
+                    context_has_evidence=(
+                        has_evidence and has_meaningful_tool_content(context_content)
+                    ),
                 )
-            )
-            remaining_context = max(
-                0,
-                state.max_tool_context_characters - state.tool_context_characters,
-            )
-            context_content = serialize_context_result(
-                result.content,
-                remaining_context,
             )
             if context_content != result.content:
                 metrics.record_agentic_event("tool_context_truncated")
+                if _TOOL_CONTEXT_WARNING not in state.warnings:
+                    state.warnings.append(_TOOL_CONTEXT_WARNING)
             state.tool_context_characters += len(context_content)
             state.messages.append({
                 "role": "tool",
@@ -352,10 +373,14 @@ class AgentExecutor:
             )
             analysis = turn.content
             reasoning_content = turn.reasoning_content
-            self._record_turn_completion(state, turn)
+            self._record_turn_completion(state, turn, allow_tool_calls=False)
+            retryable = bool(analysis.strip()) and turn.finish_reason in {None, "stop"}
         except Exception as exc:
+            if isinstance(exc, LLMGenerationTimeoutError):
+                raise
+            state.termination_reason = _termination_error_reason(exc)
             generation_failed = True
-            retryable = not isinstance(exc, LLMInvalidResponseError)
+            retryable = False  # Transport owns model retries; Reviewer must not replay them.
             _, analysis = _log_agent_llm_error(
                 f"Agent {profile.name} 最终分析",
                 exc,
@@ -366,6 +391,8 @@ class AgentExecutor:
                 await emit(AgentEvent(type="error", error=analysis))
 
         if not generation_failed and not analysis.strip():
+            if state.termination_reason == "stop":
+                state.termination_reason = "empty_response"
             state.errors.append(_EMPTY_OUTPUT_ERROR)
             if stream_response:
                 await emit(AgentEvent(type="error", error=_EMPTY_OUTPUT_ERROR))
@@ -393,12 +420,13 @@ class AgentExecutor:
         model: str,
         messages: list[dict],
         tool_definitions: list[dict],
-        tool_choice: str,
+        tool_choice: ToolChoice,
         temperature: float,
         stream_response: bool,
         emit: Callable[[AgentEvent], Awaitable[None]],
         max_completion_tokens: int | None = None,
     ) -> LLMTurn:
+        reasoning_source = AgentReasoningSource(block_id=uuid4().hex)
         capabilities = capabilities_from_client(llm_client)
         tool_request = resolve_tool_request(
             tool_definitions,
@@ -424,7 +452,10 @@ class AgentExecutor:
                 max_completion_tokens=max_completion_tokens,
                 **kwargs,
             )
-            return normalize_chat_completion(response)
+            turn = normalize_chat_completion(response)
+            if turn.reasoning_content:
+                await emit(AgentEvent(type="reasoning", content=turn.reasoning_content, reasoning_source=reasoning_source))
+            return turn
 
         normalizer = ChatCompletionStreamNormalizer()
         stream_text_immediately = tool_choice == "none"
@@ -435,15 +466,16 @@ class AgentExecutor:
             **kwargs,
         )
         try:
-            async for chunk in stream:
-                delta = normalizer.add(chunk)
-                if delta.content:
-                    if stream_text_immediately:
-                        await emit(AgentEvent(type="text", content=delta.content))
-                if delta.reasoning_content:
-                    await emit(
-                        AgentEvent(type="reasoning", content=delta.reasoning_content)
-                    )
+            async with aclosing(stream):
+                async for chunk in stream:
+                    delta = normalizer.add(chunk)
+                    if delta.content:
+                        if stream_text_immediately:
+                            await emit(AgentEvent(type="text", content=delta.content))
+                    if delta.reasoning_content:
+                        await emit(
+                            AgentEvent(type="reasoning", content=delta.reasoning_content, reasoning_source=reasoning_source)
+                        )
         except LLMRetryableError:
             turn = normalizer.finish()
             if not turn.content.strip():
@@ -451,11 +483,16 @@ class AgentExecutor:
             return LLMTurn(
                 content=turn.content,
                 reasoning_content=turn.reasoning_content,
-                tool_calls=turn.tool_calls,
+                tool_calls=(),
                 finish_reason="stream_error",
             )
 
-        return normalizer.finish()
+        turn = normalizer.finish()
+        if turn.finish_reason is None:
+            # Clean transport EOF is not a model completion. Never execute tool
+            # arguments from a stream whose terminal frame was not received.
+            return LLMTurn(turn.content, turn.reasoning_content, (), finish_reason="stream_error")
+        return turn
 
     async def _classify_tool_calls(
         self,
@@ -465,7 +502,7 @@ class AgentExecutor:
         execution_context: AgentExecutionContext | None,
         tool_call_reserve: int,
     ) -> tuple[list[ToolResultInfo | None], list[tuple[int, ToolCallInfo]], list[tuple[int, ToolCallInfo]]]:
-        """去重分类：成功结果重放 / 同轮重复占位 / 待执行；预算拒绝不计入已见。"""
+        """按策略分类：有效缓存重放 / 同批合并 / 按预算执行。"""
         settings = (
             execution_context.settings
             if execution_context is not None
@@ -473,52 +510,35 @@ class AgentExecutor:
         )
         tool_results: list[ToolResultInfo | None] = [None] * len(tool_calls)
         unique_calls: list[tuple[int, ToolCallInfo]] = []
+        batch_keys: set[str] = set()
         for index, tool_call in enumerate(tool_calls):
             cache_key = tool_call_cache_key(tool_call)
-            previous = state.succeeded_tool_results.get(cache_key)
+            policy = registry.get_tool_policy(tool_call.function.name)
+            deduplicate = policy is None or policy.deduplicate_in_batch
+            if deduplicate and cache_key in batch_keys:
+                metrics.record_agentic_event("duplicate_tool_call")
+                continue  # 执行结束后回填本轮首次调用结果，不额外消耗预算。
+            batch_keys.add(cache_key)
+            previous = state.tool_cache.get_cached_result(
+                tool_call, allowed_names=state.effective_tool_names,
+            )
             if previous is not None:
-                # 相同工具+参数的成功结果直接重放：模型无需再调，上游零开销
-                metrics.record_agentic_event("duplicate_tool_call")
-                tool_results[index] = ToolResultInfo(
-                    tool_call_id=tool_call.id,
-                    name=tool_call.function.name,
-                    content=(
-                        "[重复调用已拦截] 本会话已用相同参数调用过该工具，以下为先前结果：\n"
-                        + previous.content
-                    ),
-                    is_error=False,
-                )
+                tool_results[index] = previous
                 continue
-            if cache_key in state.seen_tool_call_keys:
-                # 同轮并发重复：暂以错误占位
-                metrics.record_agentic_event("duplicate_tool_call")
-                tool_results[index] = ToolResultInfo(
-                    tool_call_id=tool_call.id,
-                    name=tool_call.function.name,
-                    content=serialize_error(
-                        "duplicate_tool_call",
-                        "本 Agent 已调用过相同工具和参数，请基于已有结果继续分析",
-                    ),
-                    is_error=True,
-                )
-                continue
-            state.seen_tool_call_keys.add(cache_key)
             unique_calls.append((index, tool_call))
 
-        accepted_count = min(
-            len(unique_calls),
-            settings.chat_max_tool_calls_per_round,
-        )
-        if execution_context is not None:
-            accepted_count = await execution_context.reserve_tool_calls(
-                accepted_count,
-                preserve=tool_call_reserve,
-            )
-        accepted_calls = unique_calls[:accepted_count]
-        rejected_calls = unique_calls[accepted_count:]
-        for _index, tool_call in rejected_calls:
-            # 预算拒绝不算"已调用"：后续轮次允许再次发起
-            state.seen_tool_call_keys.discard(tool_call_cache_key(tool_call))
+        accepted_calls: list[tuple[int, ToolCallInfo]] = []
+        rejected_calls: list[tuple[int, ToolCallInfo]] = []
+        # Prefer body reads within a model batch, but preserve result order by original index.
+        if execution_context is not None and execution_context.reserved_tool_names:
+            unique_calls.sort(key=lambda pair: pair[1].function.name not in execution_context.reserved_tool_names)
+        for index, tool_call in unique_calls:
+            allowed = len(accepted_calls) < settings.chat_max_tool_calls_per_round
+            if allowed and execution_context is not None:
+                allowed = bool(await execution_context.reserve_tool_calls(
+                    1, preserve=tool_call_reserve, tool_name=tool_call.function.name,
+                ))
+            (accepted_calls if allowed else rejected_calls).append((index, tool_call))
         return tool_results, accepted_calls, rejected_calls
 
     async def run(
@@ -539,7 +559,8 @@ class AgentExecutor:
         require_tool_evidence: bool = False,
         stream_response: bool = False,
         tool_call_reserve: int = 0,
-        tool_dedupe: ToolCallDedupe | None = None,
+        task_id: str | None = None,
+        attempt: int = 1,
     ) -> AgentExecutionResult:
         """使用统一执行引擎运行一个 AgentProfile。
 
@@ -566,18 +587,39 @@ class AgentExecutor:
             execution_context,
             max_history_messages,
             tool_selection_prompt,
-            tool_dedupe=tool_dedupe,
         )
 
+        turn_number = 1
+
         async def emit(delta: AgentEvent) -> None:
-            """向事件队列推送一条增量（队列为空时静默忽略）。"""
             if event_queue is not None:
+                if delta.type == "reasoning" and delta.reasoning_source is not None:
+                    delta = delta.model_copy(update={
+                        "reasoning_source": delta.reasoning_source.model_copy(update={
+                            "source": profile.display_name, "turn": turn_number,
+                            "task_id": task_id, "attempt": attempt,
+                        }),
+                    })
                 await event_queue.put(delta)
 
         forced_tool_round = False
+        search_guidance_message = None
         for round_num in range(profile.max_rounds):
+            turn_number = round_num + 1
             metrics.record_agentic_event("agent_round")
             tool_definitions = state.tool_definitions
+            if execution_context.search_policy is not None:
+                guidance = execution_context.search_policy.instruction()
+                # One replaceable message per inner run, not an ever-growing instruction history.
+                if search_guidance_message is None:
+                    search_guidance_message = {"role": "user", "content": guidance}
+                    state.messages.append(search_guidance_message)
+                else:
+                    search_guidance_message["content"] = guidance
+            if execution_context.reserved_tool_names:
+                tool_definitions = [definition for definition in tool_definitions if execution_context.tool_calls_available(
+                    preserve=tool_call_reserve, tool_name=definition["function"]["name"],
+                ) > 0]
             if (
                 tool_definitions
                 and execution_context.tool_calls_available(preserve=tool_call_reserve) <= 0
@@ -585,7 +627,7 @@ class AgentExecutor:
                 tool_definitions = []
                 if _TOOL_BUDGET_WARNING not in state.warnings:
                     state.warnings.append(_TOOL_BUDGET_WARNING)
-            tool_choice = (
+            tool_choice: ToolChoice = (
                 "required"
                 if tool_definitions
                 and (forced_tool_round or (round_num == 0 and require_tool_first_round))
@@ -608,11 +650,14 @@ class AgentExecutor:
                     ),
                 )
             except Exception as exc:
+                state.termination_reason = _termination_error_reason(exc)
                 _, detail = _log_agent_llm_error(
                     f"Agent {profile.name} 模型调用",
                     exc,
                     "模型调用失败",
                 )
+                if isinstance(exc, LLMGenerationTimeoutError):
+                    raise
                 if is_llm_connection_error(exc):
                     # LLM 网关不可达是可重试的上游故障：快速失败并保留真实原因，
                     # 继续空转只会把根因伪装成"调研证据不足"误导排查与监控。
@@ -632,10 +677,20 @@ class AgentExecutor:
                     )
                 if stream_response:
                     await emit(AgentEvent(type="error", error=detail))
-                    return self._build_result(profile, state, "", "failed")
-                break
+                    return self._build_result(profile, state, "", "failed", retryable=False)
+                return self._build_result(profile, state, detail, "failed", retryable=False)
 
             self._record_turn_completion(state, turn)
+
+            if turn.finish_reason == "stream_error":
+                if stream_response and turn.content and tool_choice != "none":
+                    await emit(AgentEvent(type="text", content=turn.content))
+                return self._build_result(
+                    profile, state, turn.content,
+                    "partial" if turn.content.strip() else "failed",
+                    turn.reasoning_content,
+                    retryable=False,
+                )
 
             tool_calls = list(turn.tool_calls)
             if not tool_calls and tool_definitions:
@@ -648,7 +703,7 @@ class AgentExecutor:
                 if (
                     tool_definitions
                     and require_tool_evidence
-                    and not any(result.has_evidence for result in state.tool_results)
+                    and not any(result.context_has_evidence for result in state.tool_results)
                     and not forced_tool_round
                 ):
                     # 部分模型在 auto 模式下只叙述"正在调用工具"而不真正发起
@@ -656,7 +711,7 @@ class AgentExecutor:
                     forced_tool_round = True
                     continue
                 if require_tool_evidence and not any(
-                    result.has_evidence for result in state.tool_results
+                    result.context_has_evidence for result in state.tool_results
                 ):
                     detail = "未获取有效工具证据，无法生成可靠结论"
                     state.errors.append(detail)
@@ -664,6 +719,8 @@ class AgentExecutor:
                         await emit(AgentEvent(type="error", error=detail))
                     return self._build_result(profile, state, "", "failed", turn.reasoning_content)
                 if not turn.content.strip():
+                    if state.termination_reason == "stop":
+                        state.termination_reason = "empty_response"
                     state.errors.append(_EMPTY_OUTPUT_ERROR)
                     if stream_response:
                         await emit(AgentEvent(type="error", error=_EMPTY_OUTPUT_ERROR))
@@ -673,6 +730,7 @@ class AgentExecutor:
                         "",
                         "failed",
                         turn.reasoning_content,
+                        retryable=False,
                     )
                 if stream_response and turn.content and tool_choice != "none":
                     await emit(AgentEvent(type="text", content=turn.content))
@@ -682,6 +740,7 @@ class AgentExecutor:
                     turn.content,
                     "partial" if state.errors or state.warnings else "completed",
                     turn.reasoning_content,
+                    retryable=turn.finish_reason in {None, "stop"},
                 )
 
             await self._execute_tool_calls(
@@ -693,10 +752,11 @@ class AgentExecutor:
                 execution_context,
                 tool_call_reserve,
                 capabilities,
+                turn.reasoning_content,
             )
 
         if require_tool_evidence and not any(
-            result.has_evidence for result in state.tool_results
+            result.context_has_evidence for result in state.tool_results
         ):
             detail = "未获取有效工具证据，无法生成可靠结论"
             state.errors.append(detail)
@@ -704,6 +764,7 @@ class AgentExecutor:
                 await emit(AgentEvent(type="error", error=detail))
             return self._build_result(profile, state, "", "failed")
 
+        turn_number += 1
         return await self._complete_final_result(
             profile,
             state,

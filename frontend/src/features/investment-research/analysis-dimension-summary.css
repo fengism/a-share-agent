@@ -93,13 +93,13 @@
   gap: var(--c-space-3);
 }
 
-@container analysis-page (max-width: 900px) {
+@container (max-width: 900px) {
   .analysis-dimension-summary__metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@container analysis-page (max-width: 760px) {
+@container (max-width: 760px) {
   .analysis-dimension-summary {
     grid-template-columns: minmax(0, 1fr);
   }

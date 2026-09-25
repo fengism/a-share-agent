@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
-from typing import Any
-
-import httpx
+from typing import Any, cast
 
 from app.core.cache import market_cache as cache
+from app.core.concurrency.rate_limiter import eastmoney_semaphore
+from app.infrastructure.providers.provider_gateway import provider_gateway
+from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +144,16 @@ KEY_COMMODITY_PROFILES: tuple[ExportCommodityProfile, ...] = (
 )
 
 
+def _number(value: Any, *, divisor: int = 1) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+        return round(number / divisor, 2) if math.isfinite(number) else None
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
 async def fetch_macro_customs_data() -> list[dict[str, Any]]:
     """从东方财富数据中心获取近 12 个月全国海关进出口月度总况。
 
@@ -149,47 +161,43 @@ async def fetch_macro_customs_data() -> list[dict[str, Any]]:
     100000 换算为亿美元（与 macro/normalizer._normalize_trade 口径一致）；
     同比百分数字段不换算。
     """
-    url = "https://datacenter-web.eastmoney.com/api/data/v1/get"
-    params = {
-        "reportName": "RPT_ECONOMY_CUSTOMS",
-        "columns": "REPORT_DATE,TIME,EXIT_BASE,IMPORT_BASE,EXIT_BASE_SAME,IMPORT_BASE_SAME,EXIT_ACCUMULATE,IMPORT_ACCUMULATE,EXIT_ACCUMULATE_SAME,IMPORT_ACCUMULATE_SAME",
-        "pageNumber": "1",
-        "pageSize": "12",
-        "sortColumns": "REPORT_DATE",
-        "sortTypes": "-1",
-    }
-    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
-
     rows = []
     try:
-        async with httpx.AsyncClient(timeout=6.0) as client:
-            resp = await client.get(url, params=params, headers=headers)
-            raw_rows = resp.json().get("result", {}).get("data", [])
-            for row in raw_rows:
-                # 逐行容错：单行脏数据只跳过该行，不丢掉剩余月份
-                try:
-                    exit_val = round(float(row.get("EXIT_BASE") or 0.0) / 100000, 2)
-                    import_val = round(float(row.get("IMPORT_BASE") or 0.0) / 100000, 2)
-                    exit_yoy = float(row.get("EXIT_BASE_SAME") or 0.0)
-                    import_yoy = float(row.get("IMPORT_BASE_SAME") or 0.0)
-                    trade_balance = round(exit_val - import_val, 2)
+        raw_rows = await provider_gateway.call_blocking(
+            "eastmoney",
+            "fetch_china_trade",
+            get_provider("eastmoney").fetch_china_trade,
+            semaphore=eastmoney_semaphore,
+        )
+        for row in raw_rows[:12]:
+            # 逐行容错：单行脏数据只跳过该行，不丢掉剩余月份
+            try:
+                exit_val = _number(row.get("EXIT_BASE"), divisor=100000)
+                import_val = _number(row.get("IMPORT_BASE"), divisor=100000)
+                exit_yoy = _number(row.get("EXIT_BASE_SAME"))
+                import_yoy = _number(row.get("IMPORT_BASE_SAME"))
+                trade_balance = round(exit_val - import_val, 2) if exit_val is not None and import_val is not None else None
+                if exit_val is None and import_val is None:
+                    continue
 
-                    rows.append({
+                rows.append(
+                    {
                         "month": row.get("TIME", ""),
                         "report_date": (row.get("REPORT_DATE") or "")[:10],
                         "export_val": exit_val,
                         "import_val": import_val,
                         "trade_balance": trade_balance,
-                        "balance_status": "贸易顺差" if trade_balance >= 0 else "贸易逆差",
+                        "balance_status": "数据不足" if trade_balance is None else "贸易顺差" if trade_balance >= 0 else "贸易逆差",
                         "export_yoy_pct": exit_yoy,
                         "import_yoy_pct": import_yoy,
-                        "export_accumulate": round(float(row.get("EXIT_ACCUMULATE") or 0.0) / 100000, 2),
-                        "import_accumulate": round(float(row.get("IMPORT_ACCUMULATE") or 0.0) / 100000, 2),
-                        "export_accumulate_yoy_pct": float(row.get("EXIT_ACCUMULATE_SAME") or 0.0),
-                        "import_accumulate_yoy_pct": float(row.get("IMPORT_ACCUMULATE_SAME") or 0.0),
-                    })
-                except (TypeError, ValueError) as row_err:
-                    logger.debug("海关数据脏行跳过: row=%s, error=%s", row, row_err)
+                        "export_accumulate": _number(row.get("EXIT_ACCUMULATE"), divisor=100000),
+                        "import_accumulate": _number(row.get("IMPORT_ACCUMULATE"), divisor=100000),
+                        "export_accumulate_yoy_pct": _number(row.get("EXIT_ACCUMULATE_SAME")),
+                        "import_accumulate_yoy_pct": _number(row.get("IMPORT_ACCUMULATE_SAME")),
+                    }
+                )
+            except (TypeError, ValueError) as row_err:
+                logger.debug("海关数据脏行跳过: row=%s, error=%s", row, row_err)
     except Exception as exc:
         logger.warning("海关进出口月度数据获取失败: %s", exc)
 
@@ -212,22 +220,24 @@ def _match_commodity_profiles(commodity_query: str) -> list[ExportCommodityProfi
             or any(clean in chain for chain in prof.industry_chains)
         ):
             matched.append(prof)
-    return matched or list(KEY_COMMODITY_PROFILES)
+    return matched
 
 
 async def get_customs_trade_data(commodity: str = "") -> dict[str, Any]:
     """获取海关进出口月度总览与重点商品出海/进口数据看板。"""
-    cache_key = f"customs_trade_{commodity.strip().lower()}"
+    cache_key = f"customs_trade_v2_{commodity.strip().lower()}"
     cached = cache.get(cache_key)
     if cached is not None:
-        return cached
+        return cast(dict[str, Any], cached)
 
     macro_rows = await fetch_macro_customs_data()
-    latest_macro = macro_rows[0] if macro_rows else {}
+    latest_macro = macro_rows[0] if macro_rows else None
     matched_profiles = _match_commodity_profiles(commodity)
 
     profiles_output = [
         {
+            "data_kind": "static_reference",
+            "source": "builtin_reference",
             "category": prof.category,
             "commodity": prof.commodity,
             "trade_type": prof.trade_type,
@@ -241,6 +251,13 @@ async def get_customs_trade_data(commodity: str = "") -> dict[str, Any]:
     ]
 
     response = {
+        "data_scope": "national_macro",
+        "source": "eastmoney_china_trade",
+        "amount_unit": "USD_100_million",
+        "macro_status": "unavailable" if not macro_rows else "available" if all(row.get("export_val") is not None and row.get("import_val") is not None for row in macro_rows) else "partial",
+        "profile_match_status": "matched" if matched_profiles else "not_found",
+        "commodity_series_available": False,
+        "caveats": ["数值仅为全国进出口总量，不代表查询商品的数量、金额、均价或目的地。", "商品、目标市场、关联公司及投资逻辑为静态研究线索，未由当期海关数据验证。"],
         "query": commodity.strip() or "全国海关外贸与重点出海商品概览",
         "latest_month_summary": latest_macro,
         "recent_12m_macro_trend": macro_rows,
@@ -251,5 +268,6 @@ async def get_customs_trade_data(commodity: str = "") -> dict[str, Any]:
         },
     }
 
-    cache.set(cache_key, response, ttl=_CACHE_TTL_SECONDS)
+    if macro_rows and all(row.get("export_val") is not None and row.get("import_val") is not None for row in macro_rows):
+        cache.set(cache_key, response, ttl=_CACHE_TTL_SECONDS)
     return response

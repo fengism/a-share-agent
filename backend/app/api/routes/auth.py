@@ -20,14 +20,21 @@ from app.modules.auth.public import (
     AuthResponse,
     ChangePasswordRequest,
     ChangePasswordResponse,
+    CleanupInvitesResponse,
     CreateInviteRequest,
     InviteOut,
+    LoginAuditLogItem,
+    LoginAuditLogsResponse,
     LoginRequest,
     NeedsSetupResponse,
     OkResponse,
     RegisterRequest,
     ResetLinkOut,
     ResetPasswordRequest,
+    RevokeSessionsResponse,
+    UpdateMustChangePasswordRequest,
+    UpdateUserRoleRequest,
+    UpdateUserStatusRequest,
     UserOut,
 )
 
@@ -71,7 +78,10 @@ def _client_ip(request: Request) -> str:
 @router.post("/login", response_model=AuthResponse)
 def login(req: LoginRequest, request: Request, response: Response) -> AuthResponse:
     try:
-        session = auth_service.login(req.username, req.password, _client_ip(request))
+        user_agent = request.headers.get("user-agent", "")
+        session = auth_service.login(
+            req.username, req.password, _client_ip(request), user_agent=user_agent
+        )
     except auth_service.AuthServiceError as error:
         raise _http_error(error) from error
     set_auth_cookies(response, session.token, secure=get_settings().auth_cookie_secure)
@@ -152,6 +162,15 @@ def revoke_invite(code: str, admin: AuthenticatedUser = Depends(require_admin)) 
     return OkResponse()
 
 
+@router.post("/invites/cleanup-expired", response_model=CleanupInvitesResponse)
+def cleanup_expired_invites(
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> CleanupInvitesResponse:
+    """Admin: purge expired and unused invites."""
+    count = auth_service.cleanup_expired_invites()
+    return CleanupInvitesResponse(cleaned_count=count)
+
+
 @router.post("/admin/reset-link", response_model=ResetLinkOut)
 def admin_reset_link(
     req: AdminResetLinkRequest,
@@ -189,3 +208,103 @@ def reset_password(req: ResetPasswordRequest, request: Request) -> OkResponse:
     except auth_service.AuthServiceError as error:
         raise _http_error(error) from error
     return OkResponse()
+
+
+@router.get("/admin/users", response_model=list[UserOut])
+def list_users(admin: AuthenticatedUser = Depends(require_admin)) -> list[UserOut]:
+    """Admin: list all registered accounts."""
+    return [_user_out(u) for u in auth_service.list_users()]
+
+
+@router.put("/admin/users/{user_id}/status", response_model=UserOut)
+def update_user_status(
+    user_id: int,
+    req: UpdateUserStatusRequest,
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> UserOut:
+    """Admin: enable or disable a user account."""
+    try:
+        user = auth_service.update_user_status(admin["id"], user_id, req.is_active)
+    except auth_service.AuthServiceError as error:
+        raise _http_error(error) from error
+    return _user_out(user)
+
+
+@router.put("/admin/users/{user_id}/role", response_model=UserOut)
+def update_user_role(
+    user_id: int,
+    req: UpdateUserRoleRequest,
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> UserOut:
+    """Admin: promote or demote a user's admin role."""
+    try:
+        user = auth_service.update_user_role(admin["id"], user_id, req.is_admin)
+    except auth_service.AuthServiceError as error:
+        raise _http_error(error) from error
+    return _user_out(user)
+
+
+@router.delete("/admin/users/{user_id}", response_model=OkResponse)
+def delete_user(
+    user_id: int,
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> OkResponse:
+    """Admin: delete a user account and purge all their sessions/configs."""
+    try:
+        auth_service.delete_user(admin["id"], user_id)
+    except auth_service.AuthServiceError as error:
+        raise _http_error(error) from error
+    return OkResponse()
+
+
+@router.post("/admin/users/{user_id}/revoke-sessions", response_model=RevokeSessionsResponse)
+def revoke_user_sessions(
+    user_id: int,
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> RevokeSessionsResponse:
+    """Admin: force revoke all active sessions for a user."""
+    try:
+        revoked = auth_service.revoke_user_sessions(user_id)
+    except auth_service.AuthServiceError as error:
+        raise _http_error(error) from error
+    return RevokeSessionsResponse(revoked_sessions=revoked)
+
+
+@router.post("/admin/users/{user_id}/must-change-password", response_model=UserOut)
+def update_user_must_change_password(
+    user_id: int,
+    req: UpdateMustChangePasswordRequest,
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> UserOut:
+    """Admin: toggle whether a user must change their password on next login."""
+    try:
+        user = auth_service.update_user_must_change_password(
+            admin["id"], user_id, req.must_change_password
+        )
+    except auth_service.AuthServiceError as error:
+        raise _http_error(error) from error
+    return _user_out(user)
+
+
+@router.get("/admin/audit-logs", response_model=LoginAuditLogsResponse)
+def get_login_audit_logs(
+    limit: int = 50,
+    offset: int = 0,
+    status: str | None = None,
+    username: str | None = None,
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> LoginAuditLogsResponse:
+    """Admin: list login audit log records with filtering and pagination."""
+    logs, total = auth_service.get_login_audit_logs(
+        limit=min(limit, 200),
+        offset=offset,
+        status=status,
+        username=username,
+    )
+    return LoginAuditLogsResponse(
+        items=[LoginAuditLogItem(**log) for log in logs],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+

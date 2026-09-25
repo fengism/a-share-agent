@@ -27,7 +27,7 @@ const capabilities: ChatCapabilitiesResponse = {
       name: "url_content",
       description: "网页阅读",
       triggers: [],
-      tool_names: ["fetch_url"],
+      tool_names: ["web_fetch"],
       rules: [],
       exclusions: [],
       priority: 10,

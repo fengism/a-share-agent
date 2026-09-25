@@ -1,11 +1,12 @@
 import { useCallback, useId, useState } from "react";
-import { LogoutOutlined, SettingOutlined, UserOutlined } from "@ant-design/icons";
+import { ApiOutlined, LogoutOutlined, SettingOutlined, UserOutlined } from "@ant-design/icons";
 import type { AuthUser } from "../types/auth";
 import { useDismissibleLayer } from "../hooks/useDismissibleLayer";
 
 interface AppUserMenuProps {
   user: AuthUser;
   isMobile: boolean;
+  onCapabilities?: () => void;
   onSettings: () => void;
   onLogout: () => void | Promise<void>;
 }
@@ -13,6 +14,7 @@ interface AppUserMenuProps {
 export default function AppUserMenu({
   user,
   isMobile,
+  onCapabilities,
   onSettings,
   onLogout,
 }: AppUserMenuProps) {
@@ -20,6 +22,11 @@ export default function AppUserMenu({
   const menuId = useId();
   const dismiss = useCallback(() => setOpen(false), []);
   const { containerRef, triggerRef } = useDismissibleLayer(open, dismiss);
+
+  const handleCapabilities = () => {
+    setOpen(false);
+    onCapabilities?.();
+  };
 
   const handleSettings = () => {
     setOpen(false);
@@ -57,8 +64,15 @@ export default function AppUserMenu({
           <div className="app-user-menu__separator" />
           <button type="button" role="menuitem" className="app-user-menu__item" onClick={handleSettings}>
             <SettingOutlined aria-hidden="true" />
-            <span>设置</span>
+            <span>系统设置</span>
           </button>
+          {onCapabilities && (
+            <button type="button" role="menuitem" className="app-user-menu__item" onClick={handleCapabilities}>
+              <ApiOutlined aria-hidden="true" />
+              <span>系统能力</span>
+            </button>
+          )}
+          <div className="app-user-menu__separator" />
           <button type="button" role="menuitem" className="app-user-menu__item" onClick={handleLogout}>
             <LogoutOutlined aria-hidden="true" />
             <span>退出登录</span>

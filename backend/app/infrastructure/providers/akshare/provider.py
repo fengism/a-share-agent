@@ -12,6 +12,10 @@ import app.infrastructure.providers.akshare.stock as stock
 class AkshareDataProvider:
     name = "akshare"
 
+    fetch_restricted_shares = staticmethod(stock.fetch_restricted_shares)
+    fetch_interactive_qa = staticmethod(stock.fetch_interactive_qa)
+    fetch_bond_yields = staticmethod(macro.fetch_bond_yields)
+
     fetch_stock_kline = staticmethod(stock.fetch_stock_kline)
     fetch_stock_kline_sina = staticmethod(stock.fetch_stock_kline_sina)
     fetch_stock_intraday_minute_sina = staticmethod(stock.fetch_stock_intraday_minute_sina)

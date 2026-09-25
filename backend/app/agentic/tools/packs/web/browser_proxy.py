@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from urllib.parse import urlsplit, urlunsplit
@@ -24,6 +25,9 @@ _MAX_CONCURRENT_DNS_LOOKUPS = 16
 _MAX_CONCURRENT_PROXY_CONNECTIONS = 64
 _MAX_UPSTREAM_ADDRESSES = 8
 _DEFAULT_MAX_REQUEST_BYTES = 2 * 1024 * 1024
+_PROXY_CLOSE_TIMEOUT_SECONDS = 1.0
+
+logger = logging.getLogger(__name__)
 
 
 class BrowserResourceLimitError(RuntimeError):
@@ -68,6 +72,8 @@ class SafeBrowserProxy:
         self._request_bytes = 0
         self._limit_error: BrowserResourceLimitError | None = None
         self._writers: set[asyncio.StreamWriter] = set()
+        self._client_tasks: set[asyncio.Task[None]] = set()
+        self._closing = False
 
     @property
     def url(self) -> str:
@@ -90,21 +96,63 @@ class SafeBrowserProxy:
         return self
 
     async def __aexit__(self, *_args: object) -> None:
-        if self._server is not None:
-            self._server.close()
-            await self._server.wait_closed()
-            self._server = None
-        for task in self._resolution_tasks.values():
-            if not task.done():
-                task.cancel()
-        await asyncio.gather(*self._resolution_tasks.values(), return_exceptions=True)
+        self._closing = True
+        server, self._server = self._server, None
+        if server is not None:
+            server.close()
+        # Stop handlers before draining writers: a pending DNS/connect must not
+        # add another upstream socket after the writer snapshot is taken.
+        tasks = tuple(self._client_tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        resolutions = tuple(self._resolution_tasks.values())
+        for resolution_task in resolutions:
+            if not resolution_task.done():
+                resolution_task.cancel()
+        await asyncio.gather(*resolutions, return_exceptions=True)
         self._resolution_tasks.clear()
-        for writer in tuple(self._writers):
-            writer.close()
-        for writer in tuple(self._writers):
-            with contextlib.suppress(Exception):
-                await writer.wait_closed()
+        await asyncio.gather(*(self._close_writer(writer) for writer in tuple(self._writers)))
         self._writers.clear()
+        # Python 3.12 waits for active connections here, not just the listener.
+        if server is not None:
+            await server.wait_closed()
+
+    @staticmethod
+    def _closed_transport_error(error: RuntimeError) -> bool:
+        # uvloop uses RuntimeError rather than ConnectionError for this race.
+        # Never classify an arbitrary RuntimeError as a normal disconnect.
+        return "unable to perform operation on" in str(error) and "the handler is closed" in str(error)
+
+    @classmethod
+    async def _write(cls, writer: asyncio.StreamWriter, data: bytes) -> None:
+        if writer.is_closing():
+            raise ConnectionError("代理连接已关闭")
+        try:
+            writer.write(data)
+            await writer.drain()
+        except RuntimeError as error:
+            if not cls._closed_transport_error(error):
+                raise
+            raise ConnectionError("代理连接在写入时关闭") from error
+
+    @classmethod
+    async def _close_writer(cls, writer: asyncio.StreamWriter) -> None:
+        try:
+            writer.close()
+            await asyncio.wait_for(writer.wait_closed(), timeout=_PROXY_CLOSE_TIMEOUT_SECONDS)
+        except TimeoutError:
+            # close() may still be flushing to an unresponsive peer.
+            writer.transport.abort()
+        except (ConnectionError, OSError):
+            pass
+        except RuntimeError as error:
+            if not cls._closed_transport_error(error):
+                raise
+
+    def _ensure_client_open(self, writer: asyncio.StreamWriter) -> None:
+        if self._closing or writer.is_closing():
+            raise ConnectionError("浏览器或代理已关闭连接")
 
     async def _resolve_once(self, url: str) -> ResolvedUrlTarget:
         async with self._dns_slots:
@@ -118,6 +166,8 @@ class SafeBrowserProxy:
 
     async def resolve(self, url: str) -> ResolvedUrlTarget:
         """Return the one cached, validated DNS result used by the proxy."""
+        if self._closing:
+            raise ConnectionError("浏览器安全代理正在关闭")
         scheme, hostname, port = validate_url_syntax(url)
         cache_key = (scheme, hostname, port)
         async with self._resolution_lock:
@@ -176,8 +226,7 @@ class SafeBrowserProxy:
                 await self._charge_response_bytes(len(data))
             else:
                 await self._charge_request_bytes(len(data))
-            writer.write(data)
-            await writer.drain()
+            await self._write(writer, data)
 
     async def _tunnel(
         self,
@@ -190,16 +239,18 @@ class SafeBrowserProxy:
         upstream_to_client = asyncio.create_task(
             self._copy_stream(upstream_reader, client_writer, direction="response")
         )
-        done, pending = await asyncio.wait(
-            {client_to_upstream, upstream_to_client},
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        for task in pending:
-            task.cancel()
-        await asyncio.gather(*pending, return_exceptions=True)
-        for task in done:
-            with contextlib.suppress(ConnectionError, BrokenPipeError, asyncio.CancelledError):
-                task.result()
+        tasks = {client_to_upstream, upstream_to_client}
+        try:
+            done, _pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                with contextlib.suppress(ConnectionError, OSError, asyncio.CancelledError):
+                    task.result()
+        finally:
+            # Also runs when the parent handler is cancelled by proxy shutdown.
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     @staticmethod
     def _connect_url(authority: str) -> str:
@@ -249,25 +300,32 @@ class SafeBrowserProxy:
             output.append("Connection: close")
         return ("\r\n".join(output) + "\r\n\r\n").encode("iso-8859-1")
 
-    @staticmethod
-    async def _send_error(writer: asyncio.StreamWriter, status: int, message: str) -> None:
+    @classmethod
+    async def _send_error(cls, writer: asyncio.StreamWriter, status: int, message: str) -> None:
+        if writer.is_closing():
+            return
         body = message.encode("utf-8", errors="replace")[:1024]
-        writer.write(
-            f"HTTP/1.1 {status} Proxy Error\r\n"
-            f"Content-Type: text/plain; charset=utf-8\r\n"
-            f"Content-Length: {len(body)}\r\n"
-            "Connection: close\r\n\r\n".encode("ascii")
-            + body
-        )
-        with contextlib.suppress(ConnectionError, BrokenPipeError):
-            await writer.drain()
+        # Both write() and drain() can fail; errors raised inside an except
+        # block are not caught by the outer handler's other except clauses.
+        with contextlib.suppress(ConnectionError, OSError):
+            await cls._write(writer, (
+                f"HTTP/1.1 {status} Proxy Error\r\n"
+                f"Content-Type: text/plain; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n\r\n".encode("ascii")
+                + body
+            ))
 
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         upstream_writer: asyncio.StreamWriter | None = None
-        tunnel_established = False
+        response_started = False
         connection_acquired = False
+        task = asyncio.current_task()
+        if task is not None:
+            self._client_tasks.add(task)
         self._writers.add(writer)
         try:
+            self._ensure_client_open(writer)
             if self._connection_slots.locked():
                 await self._send_error(writer, 503, "浏览器代理连接数超过上限")
                 return
@@ -284,11 +342,12 @@ class SafeBrowserProxy:
 
             if method.upper() == "CONNECT":
                 target = await self.resolve(self._connect_url(request_target))
+                self._ensure_client_open(writer)
                 upstream_reader, upstream_writer = await self._open_upstream(target)
                 self._writers.add(upstream_writer)
-                writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
-                await writer.drain()
-                tunnel_established = True
+                self._ensure_client_open(writer)
+                response_started = True
+                await self._write(writer, b"HTTP/1.1 200 Connection Established\r\n\r\n")
                 await self._tunnel(reader, writer, upstream_reader, upstream_writer)
                 return
 
@@ -298,30 +357,38 @@ class SafeBrowserProxy:
             if parsed.scheme.lower() == "https":
                 raise UnsafeUrlError("HTTPS 请求必须使用 CONNECT 隧道")
             target = await self.resolve(request_target)
+            self._ensure_client_open(writer)
+            # Validate the whole header before opening an upstream socket.
+            forwarded_head = self._prepare_http_request(request_head, request_target, target)
             upstream_reader, upstream_writer = await self._open_upstream(target)
             self._writers.add(upstream_writer)
-            upstream_writer.write(self._prepare_http_request(request_head, request_target, target))
-            await upstream_writer.drain()
+            self._ensure_client_open(writer)
+            await self._write(upstream_writer, forwarded_head)
+            response_started = True
             await self._tunnel(reader, writer, upstream_reader, upstream_writer)
         except (UnsafeUrlError, BrowserResourceLimitError) as error:
-            if not tunnel_established:
+            if not response_started and not self._closing:
                 await self._send_error(writer, 403, str(error))
         except (ValueError, UnicodeError, asyncio.IncompleteReadError, asyncio.LimitOverrunError):
-            if not tunnel_established:
+            if not response_started and not self._closing:
                 await self._send_error(writer, 400, "无效代理请求")
         except TimeoutError:
-            if not tunnel_established:
+            if not response_started and not self._closing:
                 await self._send_error(writer, 408, "代理请求头读取超时")
         except (ConnectionError, OSError) as error:
-            if not tunnel_established:
-                await self._send_error(writer, 502, str(error))
+            logger.debug("浏览器代理连接中断: error_type=%s response_started=%s", type(error).__name__, response_started)
+            if not response_started and not self._closing:
+                await self._send_error(writer, 502, "代理连接中断")
         finally:
-            if connection_acquired:
-                self._connection_slots.release()
-            for stream_writer in (upstream_writer, writer):
-                if stream_writer is None:
-                    continue
-                self._writers.discard(stream_writer)
-                stream_writer.close()
-                with contextlib.suppress(Exception):
-                    await stream_writer.wait_closed()
+            try:
+                await asyncio.gather(*(self._close_writer(stream_writer)
+                                       for stream_writer in (upstream_writer, writer)
+                                       if stream_writer is not None))
+            finally:
+                if connection_acquired:
+                    self._connection_slots.release()
+                for stream_writer in (upstream_writer, writer):
+                    if stream_writer is not None:
+                        self._writers.discard(stream_writer)
+                if task is not None:
+                    self._client_tasks.discard(task)

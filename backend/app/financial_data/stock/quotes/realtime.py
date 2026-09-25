@@ -120,7 +120,7 @@ async def _fetch_realtime_quote_set_uncached(codes: list[str]) -> RealtimeQuoteS
             is_fallback_attempt=True,
         )
     except Exception as exc:
-        logger.info("TDX 未能补齐部分实时行情: codes=%s, error=%s", missing_codes, exc)
+        logger.debug("TDX 未能补齐部分实时行情: codes=%s, error=%s", missing_codes, exc)
         return primary
 
     merged_quotes = {**primary.quotes, **fallback.quotes}

@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   DCFValuationResult,
   StockValuationDetail,
@@ -152,16 +152,44 @@ const detail: StockValuationDetail = {
   institution_forecasts: [],
 };
 
-vi.mock("../../api/queries", () => ({
-  useValuationDetail: () => ({
-    data: detail,
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
-}));
+const mocks = vi.hoisted(() => ({ query: vi.fn() }));
+vi.mock("../../api/queries", () => ({ useValuationDetail: () => mocks.query() }));
+beforeEach(() => {
+  mocks.query.mockReturnValue({ data: detail, isLoading: false, error: null, refetch: vi.fn() });
+});
 
 describe("ValuationPanel", () => {
+  it("shows a full-width snapshot without the dimension label or score column", () => {
+    render(<ValuationPanel code="600519" />);
+    const snapshot = screen.getByRole("region", { name: "当前估值快照" });
+    expect(within(snapshot).getByText("PE(TTM)")).toBeVisible();
+    expect(within(snapshot).getByText("股票画像")).toBeVisible();
+    expect(screen.queryByText("估值面")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "估值面评分" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("uses consistent card structure for all five methods without dropping long explanations", () => {
+    const reason = "缺少有效同行样本，当前方法不可用，请结合其他估值结果和风险说明。";
+    mocks.query.mockReturnValue({ data: { ...detail, fair_values: {
+      ...detail.fair_values,
+      pb: { ...method("pb", 105, 0), available: false, reason },
+    } } });
+    render(<ValuationPanel code="600519" />);
+    const methods = screen.getAllByRole("article");
+    expect(methods).toHaveLength(5);
+    expect(methods[0].parentElement).toHaveClass("valuation-method-grid");
+    for (const [index, title] of ["PE 估值法", "PB 估值法", "PS 估值法", "PEG 估值法", "DCF 估值法"].entries()) {
+      expect(methods[index]).toHaveClass("valuation-method-card");
+      expect(within(methods[index]).getByRole("heading", { name: title })).toHaveClass("valuation-method-card__title");
+      expect(methods[index].querySelector(".valuation-method-card__value")).toBeInTheDocument();
+      expect(methods[index].querySelector(".valuation-method-card__tags")).toBeInTheDocument();
+    }
+    expect(within(methods[1]).getByText("不可用")).toBeVisible();
+    expect(within(methods[1]).getByText(reason)).toBeVisible();
+    expect(within(methods[0]).getByText("¥110.00")).toBeVisible();
+  });
+
   it("renders quality-aware DCF analysis and peer sample diagnostics", () => {
     render(<ValuationPanel code="600519" />);
 

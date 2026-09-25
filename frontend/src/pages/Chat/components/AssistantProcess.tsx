@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useId, useState } from "react";
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -14,6 +14,9 @@ import type {
   AgentPlanStepStatus,
   ChatDisplayMessage,
 } from "../../../types/chat";
+import { finalizeChatProcess } from "../../../features/chat/chatProcess";
+import { ChatProcessTimeline } from "./ChatProcessTimeline";
+import { ModelReasoning } from "./ModelReasoning";
 import { ToolCallCard } from "./ToolCallCard";
 
 const PLAN_STATUS_LABELS: Record<AgentPlanStepStatus, string> = {
@@ -49,17 +52,30 @@ function planStepDescription(step: AgentPlanStep): string {
 }
 
 export const AssistantProcess = memo(function AssistantProcess({
-  message,
+  message: inputMessage,
 }: {
   message: ChatDisplayMessage;
 }) {
+  // Defensive projection for old snapshots with stale child execution flags.
+  const message = inputMessage.isStreaming && !inputMessage.processOutcome
+    ? inputMessage : finalizeChatProcess(inputMessage);
   const toolCalls = message.toolCalls || [];
   const planSteps = message.plan?.steps || [];
   const hasPlan = Boolean(message.plan);
   const hasTools = toolCalls.length > 0;
   const hasContent = Boolean(message.content);
+  const hasReasoning = Boolean(message.reasoningContent?.trim());
   const isStreaming = Boolean(message.isStreaming);
-  const hasProcess = hasPlan || hasTools
+  const updates = message.processUpdates || [];
+  const hasUpdates = updates.length > 0;
+  const outcome = message.processOutcome;
+  const rounds = updates.flatMap((update) => update.type === "round" ? [update.round] : []);
+  const runningRound = rounds.find((round) => round.status === "running");
+  const hasDegradedRound = rounds.some((round) => round.status === "degraded");
+  const hasCancelledRound = rounds.some((round) => round.status === "cancelled");
+  const hasFailedRound = rounds.some((round) => round.status === "failed");
+  const hasProcess = hasPlan || hasTools || hasUpdates || hasReasoning
+    || (Boolean(outcome) && outcome !== "completed")
     || (isStreaming && (Boolean(message.status) || !hasContent));
   const runningTool = toolCalls.find((toolCall) => toolCall.isExecuting);
   const runningPlanStep = planSteps.find((step) => step.status === "running");
@@ -74,15 +90,10 @@ export const AssistantProcess = memo(function AssistantProcess({
   const hasToolError = toolCalls.some((toolCall) => toolCall.isError);
   const hasSkippedTool = toolCalls.some((toolCall) => toolCall.isSkipped);
   const hasCancelledTool = toolCalls.some((toolCall) => toolCall.isCancelled);
-  const [expanded, setExpanded] = useState(isStreaming);
-
-  useEffect(() => {
-    if (isStreaming) {
-      setExpanded(true);
-    } else {
-      setExpanded(false);
-    }
-  }, [isStreaming]);
+  // Follow streaming by default, but never override the user's manual choice.
+  const [expandedOverride, setExpandedOverride] = useState<boolean | null>(null);
+  const expanded = expandedOverride ?? isStreaming;
+  const bodyId = useId();
 
   if (!hasProcess) return null;
 
@@ -91,42 +102,52 @@ export const AssistantProcess = memo(function AssistantProcess({
       ? `正在调用 ${runningTool.name}`
       : runningPlanStep
         ? `正在执行 ${runningPlanStep.title}`
-        : message.status || "正在准备回答"
-    : hasPlanCancellation || hasCancelledTool
+        : message.status || (hasContent ? "正在生成回答" : hasReasoning ? "模型正在推理" : runningRound ? `正在调研：${runningRound.objective || `第 ${runningRound.round_index} 轮`}` : "正在准备回答")
+    : outcome === "failed"
+      ? "处理失败"
+      : outcome === "cancelled" || hasPlanCancellation || hasCancelledTool || hasCancelledRound
         ? "处理已停止"
-        : hasPlanFailure
+          : hasPlanFailure || hasFailedRound
           ? "处理完成，部分步骤失败"
           : hasToolError
             ? "处理完成，部分工具失败"
-            : hasPlanDegradation || hasSkippedTool
+            : outcome === "partial" || hasPlanDegradation || hasSkippedTool || hasDegradedRound
               ? "处理完成，存在数据缺口"
             : "已完成处理";
   const detail = isStreaming && hasPlan
     ? `${settledPlanSteps}/${planSteps.length} 个步骤已处理`
-    : [hasPlan ? `${planSteps.length} 个规划步骤` : "", hasTools ? `${toolCalls.length} 次工具调用` : ""]
+    : [hasReasoning ? "模型推理" : "", hasUpdates ? `${updates.length} 条过程记录` : "", hasPlan ? `${planSteps.length} 个规划步骤` : "", hasTools ? `${toolCalls.length} 次工具调用` : ""]
         .filter(Boolean)
         .join(" · ");
 
   return (
-    <section className={`chat-process${isStreaming ? " is-active" : ""}`}>
+    <section className={`chat-process${isStreaming ? " is-active" : ""}`} aria-label="思考与执行过程">
       <button
         type="button"
         className="chat-process-toggle"
         aria-expanded={expanded}
-        onClick={() => setExpanded((current) => !current)}
+        aria-controls={bodyId}
+        onClick={() => setExpandedOverride(!expanded)}
       >
         <span className="chat-process-summary-icon" aria-hidden="true">
-          {isStreaming ? <LoadingOutlined spin /> : <CheckCircleOutlined />}
+          {isStreaming ? <LoadingOutlined spin />
+            : outcome === "failed" ? <CloseCircleOutlined />
+            : outcome === "cancelled" || hasPlanCancellation || hasCancelledTool || hasCancelledRound ? <StopOutlined />
+              : hasPlanFailure || hasToolError || hasFailedRound ? <CloseCircleOutlined />
+                : outcome === "partial" || hasPlanDegradation || hasSkippedTool || hasDegradedRound ? <WarningOutlined />
+                  : <CheckCircleOutlined />}
         </span>
         <span className="chat-process-summary">
           <strong>{summary}</strong>
-          {detail && <span>{detail}</span>}
+          <span>思考与执行过程{detail ? ` · ${detail}` : ""}</span>
         </span>
         <DownOutlined className={`chat-process-chevron${expanded ? " is-expanded" : ""}`} />
       </button>
 
       {expanded && (
-        <div className="chat-process-body">
+        <div className="chat-process-body" id={bodyId}>
+          <p className="chat-process-note">展示模型接口返回的推理、执行进度与调研摘要；推理内容不等同于最终结论。</p>
+          {hasReasoning && <ModelReasoning content={message.reasoningContent!} blocks={message.reasoningBlocks} isStreaming={isStreaming} />}
           {hasPlan && (
             <div className="chat-process-step">
               <span className="chat-process-step-icon is-plan" aria-hidden="true">
@@ -181,11 +202,13 @@ export const AssistantProcess = memo(function AssistantProcess({
             </div>
           ) : null}
 
+          <ChatProcessTimeline updates={updates} isStreaming={isStreaming} />
+
           {toolCalls.map((toolCall) => (
             <ToolCallCard key={toolCall.id} toolCall={toolCall} />
           ))}
 
-          {isStreaming && !hasPlan && !hasTools && (
+          {isStreaming && !hasPlan && !hasTools && !hasUpdates && !hasReasoning && (
             <div className="chat-process-step">
               <span className="chat-process-step-icon" aria-hidden="true">
                 <LoadingOutlined spin />

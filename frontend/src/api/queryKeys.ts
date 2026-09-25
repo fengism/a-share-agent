@@ -90,6 +90,7 @@ export const queryKeys = {
     sentiment: (code: string) => ["sentiment", code] as const,
     retailSentiment: (code: string) => ["retailSentiment", code] as const,
     fundFlow: (code: string) => ["stockFundFlow", code] as const,
+    fundFlowPages: (code: string) => ["stockFundFlowPages", code] as const,
     analysisPage: (code: string) => ["analysisPage", code] as const,
   },
   potential: {
@@ -111,6 +112,8 @@ export const queryKeys = {
     config: ["config"] as const,
     failedBotJobs: ["bot-jobs", "failed"] as const,
     invites: ["invites"] as const,
+    users: ["admin-users"] as const,
+    auditLogs: (params?: unknown) => ["admin-audit-logs", params] as const,
   },
   portfolio: ["portfolio"] as const,
   watchlist: ["watchlist"] as const,

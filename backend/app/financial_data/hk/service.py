@@ -7,7 +7,7 @@ from typing import Protocol
 import pandas as pd
 
 from app.core.cache import market_cache, series_cache
-from app.core.concurrency.rate_limiter import call_blocking, sina_semaphore
+from app.core.concurrency.rate_limiter import sina_semaphore
 from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
 from app.core.market import safe_float
 from app.domain.market import IndexItem, KlineData, KlineItem, MarketIndices
@@ -18,6 +18,7 @@ from app.financial_data.hk.schemas import (
     HKStockSearchResult,
 )
 from app.financial_data.hk.search_index import HKStockSearchIndex, hk_stock_search_index
+from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
 _HK_CODE_PATTERN = re.compile(r"^(?:hk)?(\d{1,5})$", re.IGNORECASE)
@@ -170,9 +171,15 @@ class HKMarketService:
     def provider(self) -> HKProvider:
         return self._provider or get_provider("sina_hk")
 
-    async def _call(self, function, *args):
+    async def _call(self, operation: str, function, *args):
         try:
-            return await call_blocking(function, *args, semaphore=sina_semaphore)
+            return await provider_gateway.call_blocking(
+                "sina_hk",
+                operation,
+                function,
+                *args,
+                semaphore=sina_semaphore,
+            )
         except InvalidRequestError:
             raise
         except Exception as error:
@@ -184,7 +191,7 @@ class HKMarketService:
             cached = market_cache.get(key)
             if isinstance(cached, pd.DataFrame):
                 return cached.copy()
-        frame = await self._call(self.provider.fetch_hk_stocks_spot)
+        frame = await self._call("fetch_hk_stocks_spot", self.provider.fetch_hk_stocks_spot)
         if not isinstance(frame, pd.DataFrame):
             raise UpstreamUnavailableError("新浪港股实时行情返回格式异常")
         if self._cache_enabled:
@@ -195,7 +202,7 @@ class HKMarketService:
         fetch_page = getattr(self.provider, "fetch_hk_stocks_spot_page", None)
         if not callable(fetch_page):
             return None
-        result = await self._call(fetch_page, page, page_size)
+        result = await self._call("fetch_hk_stocks_spot_page", fetch_page, page, page_size)
         if (
             not isinstance(result, tuple)
             or len(result) != 2
@@ -210,7 +217,7 @@ class HKMarketService:
         fetch_by_codes = getattr(self.provider, "fetch_hk_stock_quotes_by_codes", None)
         if not callable(fetch_by_codes):
             return await self._stock_frame()
-        return await self._call(fetch_by_codes, list(codes))
+        return await self._call("fetch_hk_stock_quotes_by_codes", fetch_by_codes, list(codes))
 
     @property
     def search_index(self) -> HKStockSearchIndex:
@@ -323,7 +330,9 @@ class HKMarketService:
             if isinstance(cached, KlineData):
                 return cached
         upstream_adjust = "" if normalized_adjust == "none" else normalized_adjust
-        frame = await self._call(self.provider.fetch_hk_stock_daily, normalized_code, upstream_adjust)
+        frame = await self._call(
+            "fetch_hk_stock_daily", self.provider.fetch_hk_stock_daily, normalized_code, upstream_adjust
+        )
         try:
             normalized = _normalize_history_frame(frame, start_date, end_date)
             result = _to_kline(
@@ -345,7 +354,7 @@ class HKMarketService:
         key = "hk:indices:spot"
         frame = market_cache.get(key) if self._cache_enabled else None
         if not isinstance(frame, pd.DataFrame):
-            frame = await self._call(self.provider.fetch_hk_indices_spot)
+            frame = await self._call("fetch_hk_indices_spot", self.provider.fetch_hk_indices_spot)
             if not isinstance(frame, pd.DataFrame):
                 raise UpstreamUnavailableError("新浪港股指数实时行情返回格式异常")
             if self._cache_enabled:
@@ -385,7 +394,7 @@ class HKMarketService:
             cached = series_cache.get(key)
             if isinstance(cached, KlineData):
                 return cached
-        frame = await self._call(self.provider.fetch_hk_index_daily, normalized_symbol)
+        frame = await self._call("fetch_hk_index_daily", self.provider.fetch_hk_index_daily, normalized_symbol)
         try:
             normalized = _normalize_history_frame(frame, start_date, end_date)
             result = _to_kline(

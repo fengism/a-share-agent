@@ -6,8 +6,9 @@ from typing import Any
 
 from app.agentic.public import AgentEventCallback
 from app.configuration.schema import Settings
+from app.infrastructure.llm.policy import generation_scope
 from app.infrastructure.llm.prompting import run_structured_prompt
-from app.infrastructure.llm.sync_client import create_llm_client
+from app.infrastructure.llm.streaming import streaming_llm_client
 from app.modules.analysis import research as analysis_research
 from app.modules.analysis.models import AnalysisResult
 from app.modules.analysis.prompts import ANALYSIS_PROMPT_SPEC, apply_evidence_gap_degradation
@@ -40,13 +41,20 @@ async def generate_analysis_result(
     prompt_context: dict[str, Any],
     settings: Settings,
 ) -> AnalysisResult:
-    prompt_run = await run_structured_prompt(
-        ANALYSIS_PROMPT_SPEC,
-        prompt_context,
-        settings=settings,
-        client=create_llm_client(settings),
-        temperature=settings.llm_temperature,
-    )
+    timeout = settings.analysis_llm_timeout_seconds
+    report_settings = settings.model_copy(update={"llm_timeout_seconds": min(settings.llm_timeout_seconds, timeout)})
+    async with generation_scope(report_settings, timeout_seconds=timeout, label="模型报告生成"):
+        async with streaming_llm_client(
+            report_settings, max_tokens=settings.analysis_llm_max_completion_tokens,
+        ) as client:
+            prompt_run = await run_structured_prompt(
+                ANALYSIS_PROMPT_SPEC,
+                prompt_context,
+                settings=report_settings,
+                async_client=client,
+                timeout_seconds=timeout,
+                temperature=settings.llm_temperature,
+            )
     gap_labels = tuple(
         str(item)
         for item in prompt_context.get("agent_evidence_gap_labels", ())

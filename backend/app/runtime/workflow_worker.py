@@ -17,6 +17,7 @@ from app.core.request_context import (
     set_current_user,
 )
 from app.domain.identity import UserRecord
+from app.infrastructure.llm.policy import is_llm_failure
 from app.infrastructure.persistence.workflow_jobs import (
     WorkflowJob,
     WorkflowLeaseLostError,
@@ -229,10 +230,11 @@ async def process_next_workflow_job(
             metrics.record_workflow_event(job.kind, "released")
         raise
     except Exception as error:
+        allow_retry = not is_llm_failure(error)
         terminal_event = (
             "error",
             _terminal_error_payload(job, deferred_error),
-        ) if job.attempts >= job.max_attempts else None
+        ) if not allow_retry or job.attempts >= job.max_attempts else None
         retry_delay = settings.workflow_job_retry_base_seconds * (2 ** max(0, job.attempts - 1))
         status = await call_blocking(
             workflow_job_store.fail,
@@ -240,6 +242,7 @@ async def process_next_workflow_job(
             owner_id,
             type(error).__name__,
             retry_delay_seconds=retry_delay,
+            allow_retry=allow_retry,
             terminal_event=terminal_event,
             semaphore=database_semaphore,
         )

@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { toolDisplayName } from "./toolPresentation";
 
-describe("toolDisplayName", () => {
-  it("distinguishes fixed financial formulas from isolated Python", () => {
-    expect(toolDisplayName("financial_calculator")).toBe("财务固定公式");
-    expect(toolDisplayName("python_interpreter")).toBe("隔离 Python 计算");
+describe("web tool presentation", () => {
+  it("labels the canonical single-page tool separately from batch fetching", () => {
+    expect(toolDisplayName("web_fetch")).toBe("网页正文");
+    expect(toolDisplayName("fetch_urls")).toBe("批量网页正文");
   });
 
-  it("preserves unknown tool names", () => {
-    expect(toolDisplayName("custom_tool")).toBe("custom_tool");
+  it("does not advertise the retired single-page tool alias", () => {
+    expect(toolDisplayName("fetch_url")).toBe("fetch_url");
   });
+});
+
+it("labels discovery and measured scope without promising spot or commodity exports", () => {
+  expect(toolDisplayName("get_stock_documents")).toBe("公告与研报目录");
+  expect(toolDisplayName("get_commodity_spot_prices")).toBe("大宗商品期货行情");
+  expect(toolDisplayName("get_customs_trade_data")).toBe("全国进出口总量");
 });

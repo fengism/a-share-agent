@@ -3,7 +3,7 @@
 from datetime import date, timedelta
 from typing import Literal, cast
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class IndustryChainResearchScope(BaseModel):
@@ -13,6 +13,7 @@ class IndustryChainResearchScope(BaseModel):
     end_date: date | None = None
     as_of_date: date | None = None
     company_scope: Literal["a_share", "all_public"] = "a_share"
+    refresh_dimensions: list[Literal["market", "stocks", "competition", "technology", "chain", "drivers_risks", "reports", "events"]] = Field(default_factory=list, max_length=8)
 
     @model_validator(mode="after")
     def validate_custom_range(self) -> "IndustryChainResearchScope":
@@ -20,6 +21,7 @@ class IndustryChainResearchScope(BaseModel):
             raise ValueError("自定义时间范围必须同时提供开始日期和结束日期")
         if self.start_date is not None and self.end_date is not None and self.start_date > self.end_date:
             raise ValueError("开始日期不能晚于结束日期")
+        self.refresh_dimensions = sorted(set(self.refresh_dimensions))
         return self
 
 

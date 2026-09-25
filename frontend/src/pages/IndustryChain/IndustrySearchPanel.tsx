@@ -1,5 +1,5 @@
 import { SearchOutlined } from "@ant-design/icons";
-import { Input, Tag } from "antd";
+import { Alert, Input, Tag } from "antd";
 import type { IndustryChainResearchScope } from "../../types/stock";
 import IndustryResearchScopeControls from "./IndustryResearchScopeControls";
 
@@ -51,6 +51,10 @@ export default function IndustrySearchPanel({
         onSearch={onSearch}
         disabled={disabled}
       />
+      {value.includes("机器人") && !/人形|工业|服务/.test(value) && (
+        <Alert type="info" showIcon style={{ marginTop: 12 }} title="请区分机器人研究边界"
+          description="工业、人形与服务机器人统计口径不同。建议输入具体方向；保持宽泛主题时报告将分别讨论，不合并市场规模。" />
+      )}
       <div className="industry-search-panel__hot-topics">
         <span>🔥 热门赛道:</span>
         {hotIndustries.map((item) => (

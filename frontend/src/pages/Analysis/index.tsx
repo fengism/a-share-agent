@@ -10,24 +10,23 @@ import {
   useAnalysisHistorySnapshot,
   useAnalysisPageData,
   useDeleteWatchlistItem,
-  useStockIntraday,
   useWatchlist,
 } from "../../api/queries";
 import QueryErrorState from "../../components/QueryErrorState";
 import StockWorkspaceNav from "../../features/stock-navigation/StockWorkspaceNav";
-import { loadKlineChart } from "../../charts/klineChartLoader";
 import { usePdfExport } from "../../hooks/usePdfExport";
 import { useWorkflowPush } from "../../hooks/useWorkflowPush";
 import { useColors, useStyles, useTokens } from "../../theme/hooks";
 import type { FundamentalExportData, PushRequest } from "../../types/stock";
-import AnalysisChartsSection from "./AnalysisChartsSection";
 import AnalysisDataStatus from "./AnalysisDataStatus";
 import AnalysisHeaderCard from "./AnalysisHeaderCard";
 import AnalysisHistoryRail from "../../features/investment-research/AnalysisHistoryRail";
 import AnalysisKeyLevels from "./AnalysisKeyLevels";
 import AnalysisPanels from "./AnalysisPanels";
+import AnalysisResultSection from "./AnalysisResultSection";
 import AnalysisStateSection from "./AnalysisStateSection";
 import {
+  buildStockValuationUrl,
   formatAnalysisDate,
   normalizeAnalysisDate,
   parseAnalysisDate,
@@ -56,7 +55,6 @@ export default function Analysis() {
     error: pageError,
     refetch: retryPageData,
   } = useAnalysisPageData(code || "");
-  const { data: liveIntradayData } = useStockIntraday(code || "");
   const {
     data: historicalResult,
     isLoading: isHistoricalLoading,
@@ -138,6 +136,10 @@ export default function Analysis() {
     navigate(`/investment-research/${encodeURIComponent(code)}${suffix}`);
   }, [code, historyDate, navigate]);
 
+  const handleOpenValuation = useCallback(() => {
+    if (code) navigate(buildStockValuationUrl(code, historyDate));
+  }, [code, historyDate, navigate]);
+
   const handlePush = useCallback(async (request: PushRequest) => {
     return Boolean(await push(request));
   }, [push]);
@@ -186,10 +188,7 @@ export default function Analysis() {
         && chartHosts.every((host) => host.querySelector("canvas"));
     },
     beforeCapture: async () => {
-      await Promise.all([
-        preloadAnalysisPanelModules(),
-        loadKlineChart(),
-      ]);
+      await preloadAnalysisPanelModules();
       if (code) {
         setFinancialExportData(await ensureFundamentalData(queryClient, code));
       }
@@ -211,6 +210,9 @@ export default function Analysis() {
   });
 
   const reportDate = normalizeAnalysisDate(displayResult?.analysis_date) || historyDate;
+  const intradayItems = pageData?.intraday?.items ?? [];
+  const latestPrice = intradayItems[intradayItems.length - 1]?.price ?? pageData?.stock_info?.current_price;
+  const useReportPrice = Boolean(historyDate) || latestPrice == null;
 
   const handleExportPdf = useCallback(async () => {
     if (!code) return;
@@ -278,7 +280,7 @@ export default function Analysis() {
             <AnalysisHeaderCard
               code={code}
               pageData={pageData}
-              intradayData={liveIntradayData}
+              intradayData={pageData?.intraday}
               result={displayResult}
               analysisDate={historyDate || undefined}
               isAnalyzing={isAnalyzing}
@@ -313,9 +315,10 @@ export default function Analysis() {
             )}
             <AnalysisDataStatus pageData={pageData} result={displayResult} />
             <AnalysisKeyLevels
-              current={pageData?.key_levels?.current_price}
-              support={pageData?.key_levels?.support}
-              resistance={pageData?.key_levels?.resistance}
+              current={useReportPrice ? displayResult?.current_price : latestPrice}
+              currentLabel={useReportPrice && displayResult ? "分析时价格" : "当前价"}
+              support={displayResult?.technical?.support_level}
+              resistance={displayResult?.technical?.resistance_level}
             />
             <AnalysisStateSection
               isAnalyzing={isAnalyzing}
@@ -325,19 +328,17 @@ export default function Analysis() {
               agentProcess={agentProcess}
             />
           </div>
-          <div className="analysis-workspace__details">
-            <AnalysisChartsSection
-              code={code}
-              pageData={pageData}
-              isExportingPdf={isExportingPdf}
-            />
-            <AnalysisPanels
-              code={code}
-              result={displayResult}
-              isExportingPdf={isExportingPdf}
-              financialExportData={financialExportData}
-            />
-          </div>
+          <AnalysisPanels
+            code={code}
+            result={displayResult}
+            isExportingPdf={isExportingPdf}
+            financialExportData={financialExportData}
+          />
+          <AnalysisResultSection
+            result={displayResult}
+            isExportingPdf={isExportingPdf}
+            onOpenValuation={handleOpenValuation}
+          />
         </div>
       </div>
     </>

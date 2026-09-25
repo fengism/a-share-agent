@@ -3,24 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
-import math
-import random
-import warnings
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from itertools import zip_longest
 from pathlib import Path
 from typing import Literal, TypeVar, cast
 from zoneinfo import ZoneInfo
 
-import httpx
-import pandas as pd
-
 from app.core.cache import TTLCache, market_cache
-from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
+from app.core.concurrency.rate_limiter import call_blocking, eastmoney_semaphore, misc_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
 from app.financial_data.market.quotes.index_kline import get_index_kline
@@ -36,23 +28,27 @@ from app.financial_data.market.quotes.schemas import (
 from app.financial_data.market.trading_session import get_trading_calendar_view
 from app.financial_data.stock.quotes.kline import get_kline
 from app.infrastructure.persistence import national_team_etf_store
+from app.infrastructure.providers.provider_gateway import provider_gateway
+from app.infrastructure.providers.registry import get_provider
 
 _LEGACY_SNAPSHOT_PATH = Path(__file__).resolve().parents[4] / "data" / "national_team_etf" / "shares.json"
 
 logger = logging.getLogger(__name__)
 
+_METHOD = "按 ETF 逐只计算：份额变化 × 当日 ETF 收盘价，并在宽基层级汇总；份额单位为亿份，资金单位为亿元。"
+_DISCLAIMER = (
+    "ETF 份额变化仅是观察国家队资金行为的代理指标，不等于中央汇金真实持仓；申购赎回可能来自其他机构或个人投资者。"
+)
+
+
 _YI = 100_000_000
-_SSE_URL = "https://query.sse.com.cn/commonQuery.do"
 _SZSE_MAX_WINDOW_DAYS = 7
 _SZSE_MAX_WINDOWS_PER_REFRESH = 8
 _SZSE_REQUEST_INTERVAL_SECONDS = 0.15
-_SZSE_FETCH_MAX_ATTEMPTS = 3
-_SZSE_FETCH_RETRY_BASE_SECONDS = 0.5
-_SZSE_FETCH_RETRY_MAX_SECONDS = 3.0
-_REFRESH_TIMEOUT_SECONDS = 10.0
-_PRICE_TIMEOUT_SECONDS = 12.0
-_PRICE_ITEM_TIMEOUT_SECONDS = 4.0
-_SOURCE_TIMEOUT_SECONDS = 8.0
+_REFRESH_TIMEOUT_SECONDS = 15.0
+_PRICE_TIMEOUT_SECONDS = 35.0
+_PRICE_ITEM_TIMEOUT_SECONDS = 15.0
+_SOURCE_TIMEOUT_SECONDS = 10.0
 _price_semaphore = asyncio.Semaphore(4)
 _source_limits = {
     "sse": asyncio.Semaphore(4),
@@ -145,23 +141,6 @@ async def shutdown_national_team_refresh() -> None:
         task.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
     _refresh_tasks.clear()
-
-
-_SZSE_HISTORY_URL = "https://www.szse.cn/api/report/ShowReport"
-_SZSE_CURRENT_URL = "https://fund.szse.cn/api/report/ShowReport"
-_SZSE_UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
-)
-
-
-def _format_szse_date_param(value: str) -> str:
-    return f"{value[:4]}-{value[4:6]}-{value[6:]}"
-
-
-_METHOD = "按 ETF 逐只计算：份额变化 × 当日 ETF 收盘价，并在宽基层级汇总；份额单位为亿份，资金单位为亿元。"
-_DISCLAIMER = (
-    "ETF 份额变化仅是观察国家队资金行为的代理指标，不等于中央汇金真实持仓；申购赎回可能来自其他机构或个人投资者。"
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -479,36 +458,16 @@ def _write_snapshot(
     )
 
 
-async def _fetch_sse_date(client: httpx.AsyncClient, point_date: str) -> tuple[str, dict[str, float]]:
-    response = await client.get(
-        _SSE_URL,
-        params={
-            "isPagination": "true",
-            "pageHelp.pageSize": "10000",
-            "pageHelp.pageNo": "1",
-            "pageHelp.beginPage": "1",
-            "pageHelp.cacheSize": "1",
-            "pageHelp.endPage": "1",
-            "sqlId": "COMMON_SSE_ZQPZ_ETFZL_XXPL_ETFGM_SEARCH_L",
-            "STAT_DATE": point_date,
-        },
-        headers={"Referer": "https://www.sse.com.cn/", "User-Agent": "Mozilla/5.0"},
+async def _fetch_sse_date(point_date: str) -> tuple[str, dict[str, float]]:
+    values = await provider_gateway.call(
+        "exchange",
+        "fetch_sse_etf_shares",
+        lambda: get_provider("exchange").fetch_sse_etf_shares(point_date),
+        max_attempts=1,
     )
-    response.raise_for_status()
-    rows = response.json().get("result") or []
-    target_codes = {code for code, item in ETF_POOL.items() if item.exchange == "SH"}
-    result: dict[str, float] = {}
-    for row in rows:
-        code = str(row.get("SEC_CODE", ""))
-        if code not in target_codes:
-            continue
-        try:
-            shares = float(row["TOT_VOL"]) * 10_000
-            if math.isfinite(shares) and shares >= 0:
-                result[code] = shares
-        except (KeyError, TypeError, ValueError):
-            continue
-    return point_date, result
+    return point_date, {
+        code: shares for code, shares in values.items() if code in ETF_POOL and ETF_POOL[code].exchange == "SH"
+    }
 
 
 async def _backfill_sse_history(
@@ -543,8 +502,7 @@ async def _backfill_sse_history(
             try:
 
                 async def load():
-                    async with httpx.AsyncClient(timeout=8) as client:
-                        return await _fetch_sse_date(client, point_date)
+                    return await _fetch_sse_date(point_date)
 
                 _, values = await _source_request("sse", point_date, load)
             except Exception as error:
@@ -567,137 +525,20 @@ async def _backfill_sse_history(
     return changed
 
 
-def _normalize_fund_code(value: object) -> str:
-    raw = str(value).strip()
-    if raw.endswith(".0") and raw[:-2].isdigit():
-        raw = raw[:-2]
-    return raw.zfill(6)
-
-
-def _parse_szse_current_frame(
-    frame: object,
-    *,
-    code_column: str,
-    share_column: str,
-) -> dict[str, float]:
-    target_codes = {code for code, item in ETF_POOL.items() if item.exchange == "SZ"}
-    result: dict[str, float] = {}
-    for _, row in frame.iterrows():
-        code = _normalize_fund_code(row.get(code_column, ""))
-        if code not in target_codes:
-            continue
-        try:
-            shares = float(row[share_column])
-            if math.isfinite(shares) and shares >= 0:
-                result[code] = shares
-        except (KeyError, TypeError, ValueError):
-            continue
-    return result
-
-
-def _parse_szse_daily_history(
-    frame: object,
-) -> tuple[dict[str, dict[str, float]], set[str]]:
-    target_codes = {code for code, item in ETF_POOL.items() if item.exchange == "SZ"}
-    history: dict[str, dict[str, float]] = {}
-    returned_dates: set[str] = set()
-    for _, row in frame.iterrows():
-        raw_date = row.get("日期")
-        if isinstance(raw_date, datetime):
-            point_date = raw_date.date().isoformat()
-        elif isinstance(raw_date, date):
-            point_date = raw_date.isoformat()
-        else:
-            try:
-                point_date = datetime.fromisoformat(str(raw_date).strip()[:10]).date().isoformat()
-            except ValueError:
-                continue
-        code = _normalize_fund_code(row.get("基金代码", ""))
-        if code not in target_codes:
-            continue
-        try:
-            shares = float(row["基金份额"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        if math.isfinite(shares) and shares >= 0:
-            history.setdefault(code, {})[point_date] = shares
-            returned_dates.add(point_date)
-    return history, returned_dates
-
-
 async def _fetch_szse_history_with_retry(
     start_date: str,
     end_date: str,
 ) -> tuple[dict[str, dict[str, float]], set[str]]:
-    """获取单段深交所历史份额，并对瞬时网络错误做有限重试。"""
-    last_error: Exception | None = None
-    for attempt in range(1, _SZSE_FETCH_MAX_ATTEMPTS + 1):
-        try:
-            return await _fetch_szse_history(start_date, end_date)
-        except (httpx.TransportError, httpx.HTTPStatusError) as error:
-            if (
-                isinstance(error, httpx.HTTPStatusError)
-                and error.response.status_code != 429
-                and error.response.status_code < 500
-            ):
-                raise
-            last_error = error
-            if attempt >= _SZSE_FETCH_MAX_ATTEMPTS:
-                break
-            delay = min(
-                _SZSE_REQUEST_INTERVAL_SECONDS + _SZSE_FETCH_RETRY_BASE_SECONDS * (2 ** (attempt - 1)),
-                _SZSE_FETCH_RETRY_MAX_SECONDS,
-            )
-            logger.warning(
-                "深交所 ETF 历史份额获取失败（将重试 %s/%s） start=%s end=%s error=%r",
-                attempt,
-                _SZSE_FETCH_MAX_ATTEMPTS,
-                start_date,
-                end_date,
-                error,
-            )
-            await asyncio.sleep(delay)
-    raise last_error  # type: ignore[misc]
-
-
-async def _fetch_szse_history(
-    start_date: str,
-    end_date: str,
-) -> tuple[dict[str, dict[str, float]], set[str]]:
-    """直连深交所官方接口（不走代理）获取历史份额。"""
-    headers = {
-        "Host": "www.szse.cn",
-        "Referer": "https://www.szse.cn/market/fund/volume/etf/index.html",
-        "User-Agent": _SZSE_UA,
-    }
-    params = {
-        "SHOWTYPE": "xlsx",
-        "CATALOGID": "scsj_fund_jjgm",
-        "TABKEY": "tab1",
-        "txtStart": _format_szse_date_param(start_date),
-        "txtEnd": _format_szse_date_param(end_date),
-        "jjlb": "ETF",
-        "random": str(random.random()),
-    }
-    async with httpx.AsyncClient(timeout=4.0, trust_env=False) as client:
-        response = await client.get(_SZSE_HISTORY_URL, params=params, headers=headers)
-        response.raise_for_status()
-    return await call_blocking(_parse_szse_history_content, response.content, semaphore=misc_semaphore)
-
-
-def _parse_szse_history_content(content: bytes) -> tuple[dict[str, dict[str, float]], set[str]]:
-    with warnings.catch_warnings(record=True):
-        warnings.simplefilter("always")
-        frame = pd.read_excel(io.BytesIO(content), engine="openpyxl")
-
-    frame = frame.dropna(how="all").copy()
-    if "基金规模(份)" in frame.columns:
-        frame = frame.rename(columns={"基金规模(份)": "基金份额"})
-    if "基金代码" in frame.columns:
-        code_series = pd.to_numeric(frame["基金代码"], errors="coerce")
-        frame = frame[code_series.notna()].copy()
-        frame["基金代码"] = code_series[code_series.notna()].astype(int).astype(str).str.zfill(6)
-    return _parse_szse_daily_history(frame)
+    # 重试只由 gateway 执行；外层仍保留源级超时、冷却和 singleflight。
+    history, _ = await provider_gateway.call(
+        "exchange",
+        "fetch_szse_etf_share_history",
+        lambda: get_provider("exchange").fetch_szse_etf_share_history(start_date, end_date),
+        max_attempts=3,
+        retry_budget_seconds=_SOURCE_TIMEOUT_SECONDS,
+    )
+    history = {code: points for code, points in history.items() if code in ETF_POOL and ETF_POOL[code].exchange == "SZ"}
+    return history, {day for points in history.values() for day in points}
 
 
 def _szse_date_ranges(missing_dates: list[str]) -> list[tuple[str, str]]:
@@ -775,55 +616,26 @@ async def _backfill_szse_history(
 
 
 async def _fetch_szse_current_direct() -> dict[str, float]:
-    """直连深交所官方接口（不走代理）获取当前份额。"""
-    headers = {
-        "Referer": "https://fund.szse.cn/marketdata/fundslist/index.html",
-        "User-Agent": _SZSE_UA,
-    }
-    params = {
-        "SHOWTYPE": "xlsx",
-        "CATALOGID": "1000_lf",
-        "TABKEY": "tab1",
-        "random": str(random.random()),
-    }
-    async with httpx.AsyncClient(timeout=3.0, trust_env=False) as client:
-        response = await client.get(_SZSE_CURRENT_URL, params=params, headers=headers)
-        response.raise_for_status()
-    return await call_blocking(_parse_szse_current_content, response.content, semaphore=misc_semaphore)
-
-
-def _parse_szse_current_content(content: bytes) -> dict[str, float]:
-    with warnings.catch_warnings(record=True):
-        warnings.simplefilter("always")
-        frame = pd.read_excel(io.BytesIO(content), engine="openpyxl", dtype={"基金代码": str})
-    frame = frame.rename(columns={"当前规模(份)": "基金份额"})
-    return _parse_szse_current_frame(
-        frame,
-        code_column="基金代码",
-        share_column="基金份额",
+    return await provider_gateway.call(
+        "exchange",
+        "fetch_szse_etf_current_shares",
+        lambda: get_provider("exchange").fetch_szse_etf_current_shares(),
+        max_attempts=1,
     )
 
 
 async def _fetch_szse_current_eastmoney(missing_codes: set[str]) -> dict[str, float]:
-    """只查询缺失 ETF，避免同源回退和全市场分页请求。"""
     if not missing_codes:
         return {}
-    secids = ",".join(f"0.{code}" for code in sorted(missing_codes))
-    async with httpx.AsyncClient(timeout=2.0) as client:
-        resp = await client.get(
-            "https://push2.eastmoney.com/api/qt/ulist.np/get",
-            params={"secids": secids, "fields": "f12,f38"},
-            headers={"User-Agent": _SZSE_UA},
-        )
-        resp.raise_for_status()
-    diff = (resp.json().get("data") or {}).get("diff", [])
-    result: dict[str, float] = {}
-    for item in diff:
-        code = str(item.get("f12", "")).strip()
-        val = item.get("f38")
-        if code in missing_codes and isinstance(val, (int, float)) and math.isfinite(val) and val > 0:
-            result[code] = float(val)
-    return result
+    return await provider_gateway.call_blocking(
+        "eastmoney",
+        "fetch_etf_current_shares",
+        get_provider("eastmoney").fetch_etf_current_shares,
+        missing_codes,
+        semaphore=eastmoney_semaphore,
+        is_fallback_attempt=True,
+        max_attempts=1,
+    )
 
 
 async def _fetch_szse_current() -> dict[str, NationalTeamShareObservation]:
@@ -889,49 +701,47 @@ async def _load_price_history(
 
     async def load_etf(code: str) -> tuple[str, dict[str, float]]:
         try:
-            async with _price_semaphore, asyncio.timeout(_PRICE_ITEM_TIMEOUT_SECONDS):
-                data = await get_kline(
-                    code,
-                    period="daily",
-                    start_date=start_date,
-                    end_date=end_date,
-                    adjust="",
-                    max_provider_sources=2,
-                )
-                etf_history[code] = {item.date: item.close for item in data.items}
-                return code, etf_history[code]
+            async with _price_semaphore:
+                async with asyncio.timeout(_PRICE_ITEM_TIMEOUT_SECONDS):
+                    data = await get_kline(
+                        code,
+                        period="daily",
+                        start_date=start_date,
+                        end_date=end_date,
+                        adjust="",
+                        max_provider_sources=2,
+                    )
+                    etf_history[code] = {item.date: item.close for item in data.items}
+                    return code, etf_history[code]
         except Exception as error:
             logger.warning("国家队 ETF 行情获取失败 code=%s error=%r", code, error)
             return code, {}
 
     async def load_index(key: str, definition: IndexDefinition) -> tuple[str, dict[str, float]]:
         try:
-            async with _price_semaphore, asyncio.timeout(_PRICE_ITEM_TIMEOUT_SECONDS):
-                symbol = definition.index_code.split(".")[0]
-                data = await get_index_kline(symbol, "daily", start_date, end_date)
-                index_history[key] = {item.date: item.close for item in data.items}
-                return key, index_history[key]
+            async with _price_semaphore:
+                async with asyncio.timeout(_PRICE_ITEM_TIMEOUT_SECONDS):
+                    symbol = definition.index_code.split(".")[0]
+                    data = await get_index_kline(symbol, "daily", start_date, end_date)
+                    index_history[key] = {item.date: item.close for item in data.items}
+                    return key, index_history[key]
         except Exception as error:
             logger.warning("国家队指数行情获取失败 index=%s error=%r", key, error)
             return key, {}
 
-    # 两类行情交替入队，避免 ETF 慢请求耗尽总预算后指数还未开始。
-    tasks = []
-    for code, index in zip_longest(ETF_POOL, INDEX_POOL.items()):
-        if code is not None:
-            tasks.append(asyncio.create_task(load_etf(code)))
-        if index is not None:
-            key, definition = index
-            tasks.append(asyncio.create_task(load_index(key, definition)))
+    # 优先加载 6 只核心指数行情，确保大盘基准与走势图完整呈现；随后加载 12 只 ETF 行情
+    index_tasks = [asyncio.create_task(load_index(key, definition)) for key, definition in INDEX_POOL.items()]
+    etf_tasks = [asyncio.create_task(load_etf(code)) for code in ETF_POOL]
+    all_tasks = index_tasks + etf_tasks
     try:
         async with asyncio.timeout(_PRICE_TIMEOUT_SECONDS):
-            await asyncio.gather(*tasks)
+            await asyncio.gather(*all_tasks)
     except TimeoutError:
         logger.warning("国家队行情获取超时，保留已完成结果 etfs=%s indices=%s", len(etf_history), len(index_history))
     finally:
-        for task in tasks:
+        for task in all_tasks:
             task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*all_tasks, return_exceptions=True)
     return etf_history, index_history
 
 
@@ -1117,43 +927,35 @@ async def get_national_team_etf_holdings(days: int = 120) -> NationalTeamRespons
     days = max(30, min(days, 365))
     cached = market_cache.get(_response_cache_key(days))
     if cached is not None:
-        return NationalTeamResponse.model_validate(cached)
-    stale = _stale_responses.get(str(days))
-    if stale is None:
-        shares, _, _ = await call_blocking(_read_snapshot, semaphore=misc_semaphore)
-        now = datetime.now(ZoneInfo("Asia/Shanghai"))
-        start = (now.date() - timedelta(days=days - 1)).isoformat()
-        end = now.date().isoformat()
-        shares = {
-            code: {day: value for day, value in values.items() if start <= day <= end}
-            for code, values in shares.items()
-        }
-        if any(shares.values()):
-            metadata, observations = await call_blocking(_read_provenance, semaphore=misc_semaphore)
-            stale = build_national_team_response(
-                share_metadata=metadata,
-                observations=observations,
-                share_history=shares,
-                etf_close_history={},
-                index_close_history={},
-                fetched_at=now.isoformat(timespec="seconds"),
-                requested_days=days,
-            )
-            _stale_responses.set(str(days), stale, ttl=3600)
-    if stale is not None:
-        _start_refresh(days)
-        # 不改 fetched_at，不把缓存时间伪装成数据更新时间。
-        response = NationalTeamResponse.model_validate(stale)
-        now = datetime.now(ZoneInfo("Asia/Shanghai"))
-        fetched = datetime.fromisoformat(response.fetched_at).astimezone(ZoneInfo("Asia/Shanghai"))
-        # 跨日或跨过当日发布宽限后，旧日历不能证明当前新鲜度。
-        calendar_expired = _calendar_window(fetched) != _calendar_window(now)
-        return response.model_copy(
-            update={
-                "partial": True,
-                "refreshing": str(days) in _refresh_tasks,
-                "calendar_degraded": response.calendar_degraded or calendar_expired,
-                "expected_date": None if calendar_expired else response.expected_date,
-            }
+        cached_resp = NationalTeamResponse.model_validate(cached)
+        has_indices = any(
+            any(p.index_close is not None for p in idx.points)
+            for idx in cached_resp.indices
         )
+        if has_indices:
+            return cached_resp
+
+    stale = _stale_responses.get(str(days))
+    if stale is not None:
+        has_indices = any(
+            any(p.index_close is not None for p in idx.points)
+            for idx in stale.indices
+        )
+        if has_indices:
+            _start_refresh(days)
+            # 不改 fetched_at，不把缓存时间伪装成数据更新时间。
+            response = NationalTeamResponse.model_validate(stale)
+            now = datetime.now(ZoneInfo("Asia/Shanghai"))
+            fetched = datetime.fromisoformat(response.fetched_at).astimezone(ZoneInfo("Asia/Shanghai"))
+            # 跨日或跨过当日发布宽限后，旧日历不能证明当前新鲜度。
+            calendar_expired = _calendar_window(fetched) != _calendar_window(now)
+            return response.model_copy(
+                update={
+                    "partial": True,
+                    "refreshing": str(days) in _refresh_tasks,
+                    "calendar_degraded": response.calendar_degraded or calendar_expired,
+                    "expected_date": None if calendar_expired else response.expected_date,
+                }
+            )
+
     return await _shared_response(days)

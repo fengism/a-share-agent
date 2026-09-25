@@ -1,7 +1,9 @@
 import type { PropsWithChildren } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { themes } from "../theme/themes";
 import AppSidebar from "./AppSidebar";
+import { getActiveNavKey } from "./navConfig";
 
 const { loadMobileSidebarDrawer, preloadAppRoute } = vi.hoisted(() => ({
   loadMobileSidebarDrawer: vi.fn(),
@@ -153,7 +155,9 @@ describe("AppSidebar", () => {
 
     const navigation = within(screen.getByRole("navigation", { name: "主导航" }));
     const menuItems = navigation.getAllByRole("button").map((item) => item.textContent);
-    expect(menuItems.slice(-4)).toEqual(["交易日历", "主数据管理", "能力", "设置"]);
+    expect(menuItems.slice(-2)).toEqual(["交易日历", "主数据管理"]);
+    expect(menuItems).not.toContain("设置");
+    expect(menuItems).not.toContain("能力");
 
     const calendarItem = navigation.getByRole("button", { name: "交易日历" });
     expect(calendarItem).toHaveAttribute("aria-current", "page");
@@ -322,6 +326,42 @@ describe("AppSidebar", () => {
     );
 
     const aside = screen.getByRole("complementary", { name: "应用侧栏" });
-    expect(aside).toHaveStyle({ background: "#ffffff" });
+    expect(aside).toHaveStyle({ background: themes.light.siderBg });
+  });
+
+  it("renders dividers between groups in collapsed mode", () => {
+    const { container } = render(
+      <AppSidebar
+        activeKey="/"
+        collapsed
+        isMobile={false}
+        mobileNavOpen={false}
+        themeKey="stellar-blue"
+        onCollapse={vi.fn()}
+        onMobileNavClose={vi.fn()}
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    const dividers = container.querySelectorAll(".app-sidebar-nav__divider");
+    expect(dividers.length).toBeGreaterThan(0);
+  });
+
+  it("correctly resolves active navigation keys via getActiveNavKey", () => {
+    expect(getActiveNavKey("/")).toBe("/");
+    expect(getActiveNavKey("/watchlist")).toBe("/watchlist");
+    expect(getActiveNavKey("/hk-market")).toBe("/market");
+    expect(getActiveNavKey("/market/overview")).toBe("/market");
+    expect(getActiveNavKey("/stock/600519")).toBe("/analysis");
+    expect(getActiveNavKey("/investment-research/report")).toBe("/analysis");
+    expect(getActiveNavKey("/analysis/detail")).toBe("/analysis");
+    expect(getActiveNavKey("/industry-classification")).toBe("/master-data");
+    expect(getActiveNavKey("/stock-concept")).toBe("/master-data");
+    expect(getActiveNavKey("/master-data")).toBe("/master-data");
+    expect(getActiveNavKey("/twitter")).toBe("/feed");
+    expect(getActiveNavKey("/feed")).toBe("/feed");
+    expect(getActiveNavKey("/settings")).toBe("/");
+    expect(getActiveNavKey("/capabilities")).toBe("/");
+    expect(getActiveNavKey("/unknown-path")).toBe("/");
   });
 });

@@ -116,11 +116,12 @@ def result_from_payload(name: str, parsed: dict) -> IndustryChainResult:
     driver_insights = _insight_list(parsed.get("driver_insights") or parsed.get("drivers"))
     risk_insights = _insight_list(parsed.get("risk_insights") or parsed.get("risks"))
     result = IndustryChainResult(
-        schema_version=7,
+        schema_version=10,
         name=name,
         aliases=_string_list(parsed.get("aliases")),
         summary=_string_value(parsed.get("summary")),
         positioning=_string_value(parsed.get("positioning")),
+        research_theses=parsed.get("research_theses") or [],
         summary_evidence_ids=_string_list(parsed.get("summary_evidence_ids")),
         positioning_evidence_ids=_string_list(parsed.get("positioning_evidence_ids")),
         market_metrics=_record_list(
@@ -140,6 +141,7 @@ def result_from_payload(name: str, parsed: dict) -> IndustryChainResult:
         capital_moves=_insight_list(parsed.get("capital_moves")),
         key_events=_record_list(parsed.get("key_events"), ("date", "title", "impact", "source", "source_url")),
         key_stocks=_node_list(parsed.get("key_stocks")),
+        relationships=parsed.get("relationships") or [],
         sources=_record_list(parsed.get("sources"), ("title", "publisher", "date", "url")),
         llm_review="",
         charts=[],

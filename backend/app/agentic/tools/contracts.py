@@ -35,6 +35,8 @@ class ToolPolicy:
     timeout_seconds: float | None = None
     max_parallel_calls: int | None = None
     max_result_characters: int = 12_000
+    # Independent of TTL: pure tools may coalesce within a batch even with TTL=0.
+    deduplicate_in_batch: bool = True
 
     def __post_init__(self) -> None:
         if self.cache_ttl_seconds < 0:

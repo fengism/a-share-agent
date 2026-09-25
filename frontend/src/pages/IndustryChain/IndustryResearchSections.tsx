@@ -1,3 +1,4 @@
+import IndustryClaimStatus from "./IndustryClaimStatus";
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Col, Row, Segmented, Table, Tag, Typography } from "antd";
@@ -103,7 +104,7 @@ function EvidenceTags({ ids }: { ids?: string[] }) {
   if (!ids?.length) return null;
   return (
     <div className="industry-wrap-tag-list" style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-      {ids.map((id) => <Tag key={id} className="industry-wrap-tag" style={{ margin: 0, fontSize: "var(--c-font-xs)" }}>证据 {id}</Tag>)}
+      <Tag className="industry-wrap-tag" style={{ margin: 0, fontSize: "var(--c-font-xs)" }}>关联 {new Set(ids).size} 项资料</Tag>
     </div>
   );
 }
@@ -360,10 +361,10 @@ function EvidenceCatalogPanel({ evidence, stats }: { evidence: IndustryChainEvid
         </Text>
       )}
       <div style={{ display: "grid", gap: 10 }}>
-        {evidence.map((item) => (
+        {evidence.map((item, index) => (
           <details key={item.evidence_id} className="industry-evidence-item">
             <summary className="industry-evidence-item__summary" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <Tag className="industry-wrap-tag" style={{ margin: 0 }}>{item.evidence_id}</Tag>
+              <Tag className="industry-wrap-tag" style={{ margin: 0 }}>资料 {index + 1}</Tag>
               <Text className="industry-evidence-item__tool" code>{item.tool_name}</Text>
               {item.provider && <Text className="industry-evidence-item__provider" type="secondary">{item.provider}</Text>}
               <Text className="industry-evidence-item__title" strong>{item.title || "工具调用证据"}</Text>
@@ -566,7 +567,7 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
 
   const metricColumns: TableProps<IndustryChainMetric>["columns"] = [
     { title: "指标", dataIndex: "label", key: "label" },
-    { title: "数据", dataIndex: "value", key: "value", render: (value, record) => <Text strong>{value}{record.growth ? ` · ${record.growth}` : ""}</Text> },
+    { title: "数据", dataIndex: "value", key: "value", render: (value, record) => <><Text strong>{value}{record.growth ? ` · ${record.growth}` : ""}</Text><IndustryClaimStatus claim={record} /></> },
     { title: "期间", dataIndex: "period", key: "period", width: 120 },
     {
       title: "来源",
@@ -593,6 +594,7 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
                     <Text type="secondary" style={{ fontSize: "var(--c-font-xs)" }}>{metric.period || "最新统计"}</Text>
                     <SourceLabel source={metric.source} url={metric.source_url} />
                   </div>
+                  <IndustryClaimStatus claim={metric} />
                   <EvidenceTags ids={metric.evidence_ids} />
                 </div>
               ))}

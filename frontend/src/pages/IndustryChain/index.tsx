@@ -1,8 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ApartmentOutlined,
-  CheckCircleOutlined,
-  LoadingOutlined,
   StopOutlined,
 } from "@ant-design/icons";
 import { Button, Tabs, message } from "antd";
@@ -17,9 +15,7 @@ import {
   useIndustryChainAtlasCatalog,
   useInfiniteIndustryChainHistory,
 } from "../../api/queries";
-import AgentProcessPanel from "../../components/AgentProcessPanel";
 import WorkflowPageHeader from "../../components/workflows/WorkflowPageHeader";
-import WorkflowProgressPanel from "../../components/workflows/WorkflowProgressPanel";
 import WorkflowWorkspace from "../../components/workflows/WorkflowWorkspace";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useWorkflowPush } from "../../hooks/useWorkflowPush";
@@ -28,7 +24,7 @@ import type { IndustryChainHistoryItem, IndustryChainResearchScope } from "../..
 import HistoryPanel from "./HistoryPanel";
 import IndustryAtlas from "./IndustryAtlas";
 import IndustryReport, { type IndustryPushResult } from "./IndustryReport";
-import { INDUSTRY_CHAIN_STAGES } from "./industryWorkflow";
+import IndustryWorkflowProgress from "./IndustryWorkflowProgress";
 import { useIndustryChainWorkflowController } from "../../hooks/useIndustryChainWorkflowController";
 import IndustrySearchPanel from "./IndustrySearchPanel";
 import { useIndustryArchiveAutoLoader } from "./useIndustryArchiveAutoLoader";
@@ -100,6 +96,7 @@ export default function IndustryChain() {
 
   const {
     name: runningName,
+    status: workflowStatus,
     isAnalyzing,
     isCancelling,
     currentStage,
@@ -128,6 +125,8 @@ export default function IndustryChain() {
   const displayedResult = result && runningName === activeName ? result : null;
   const displayedArchiveId = displayedResult ? archiveId : "";
   const isActiveRouteRun = isAnalyzing && runningName === activeName;
+  const isCurrentRouteStopped = runningName === activeName
+    && (workflowStatus === "cancelled" || workflowStatus === "detached");
 
   // URL 直达 /industry-chain/:name 时自动加载最新存档；同一存档只请求一次，
   // 避免 mutation 状态更新触发页面重渲染后形成重复请求循环。
@@ -138,6 +137,7 @@ export default function IndustryChain() {
     isAnalyzing,
     hasDisplayedResult: Boolean(displayedResult),
     hasCurrentRouteError: Boolean(error && runningName === activeName),
+    hasCurrentRouteStopped: isCurrentRouteStopped,
     loadArchive: archiveMutation.mutateAsync,
     loadResult,
   });
@@ -301,28 +301,13 @@ export default function IndustryChain() {
                     />
                   </div>
 
-                  {(isActiveRouteRun || (runningName === activeName && (currentStage >= 0 || error || agentProcess.plan || agentProcess.toolCalls.length > 0 || agentProcess.rounds.length > 0))) && (
-                    <WorkflowProgressPanel
-                      current={currentStage}
-                      status={error ? "error" : isActiveRouteRun ? "running" : "success"}
+                  {(isActiveRouteRun || isCurrentRouteStopped || (runningName === activeName && (currentStage >= 0 || error || agentProcess.plan || agentProcess.toolCalls.length > 0 || agentProcess.rounds.length > 0))) && (
+                    <IndustryWorkflowProgress
+                      currentStage={currentStage}
+                      status={workflowStatus}
                       message={error || stageMessage}
-                      items={INDUSTRY_CHAIN_STAGES.map((stage, index) => ({
-                        title: stage.title,
-                        icon: currentStage === index
-                          ? <LoadingOutlined />
-                          : currentStage > index
-                            ? <CheckCircleOutlined />
-                            : undefined,
-                      }))}
-                    >
-                      <AgentProcessPanel
-                        plan={agentProcess.plan}
-                        status={agentProcess.status}
-                        toolCalls={agentProcess.toolCalls}
-                        rounds={agentProcess.rounds}
-                        isRunning={isActiveRouteRun && currentStage === 0}
-                      />
-                    </WorkflowProgressPanel>
+                      agentProcess={agentProcess}
+                    />
                   )}
 
                   {displayedResult && (
@@ -336,7 +321,7 @@ export default function IndustryChain() {
                       onPush={handlePush}
                     />
                   )}
-                  {!displayedResult && !isActiveRouteRun && !error && !isLatestLoading && (
+                  {!displayedResult && !isActiveRouteRun && !isCurrentRouteStopped && !error && !isLatestLoading && (
                     <div style={{ ...cardStyle, padding: 60, textAlign: "center" }}>
                       <ApartmentOutlined style={{ fontSize: 48, color: colors.textMuted, marginBottom: 16 }} />
                       <div style={{ color: colors.textMuted, fontSize: "var(--c-font-base)" }}>输入产业关键词，开始 AI 产业链分析</div>

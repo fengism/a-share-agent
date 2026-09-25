@@ -374,6 +374,8 @@ def _build_analysis(result: AnalysisResult) -> list[ContentBlock]:
 
 def _build_industry_chain(result) -> list[ContentBlock]:
     """将产业链分析结果渲染为 ContentBlock 列表。"""
+    from app.modules.industry_chain.presentation import presentation_payload
+    result = presentation_payload(result)
     def _get(key, default=""):
         if isinstance(result, dict):
             return result.get(key, default)

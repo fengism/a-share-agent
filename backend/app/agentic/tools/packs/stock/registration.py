@@ -345,8 +345,31 @@ def _register_macro_query_tool() -> None:
     ))
 
 
+def _register_stock_document_tool() -> None:
+    registry.register_tool(Tool(
+        name="get_stock_documents",
+        description="按A股代码定位公司公告、定期报告与券商研报目录。支持发布日期、标题关键词筛选；公告按页读取，研报最多近24个月/3页，空结果不证明无披露。返回原文/PDF链接后必须调用web_fetch/read_pdf阅读，标题不是事实证据，发布日期不是报告期。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _STOCK_CODE_SCHEMA,
+                "kind": {"type": "string", "enum": ["all", "announcement", "periodic_report", "research_report"], "default": "all"},
+                "start_date": {"type": "string", "description": "发布日期下限YYYY-MM-DD，省略不设下限"},
+                "end_date": {"type": "string", "description": "发布日期上限YYYY-MM-DD；历史研究应传分析基准日"},
+                "keyword": {"type": "string", "maxLength": 100, "description": "公告/研报标题关键词（不搜索全文）"},
+                "page": {"type": "integer", "minimum": 1, "maximum": 100, "default": 1},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 30, "default": 20},
+            },
+            "required": ["code"],
+        },
+        policy=ToolPolicy(cost="medium", cache_ttl_seconds=0, timeout_seconds=45, max_parallel_calls=2),
+        executor=helpers.get_stock_documents,
+    ))
+
+
 def register_stock_tools() -> None:
     """Register stock, screening, research, risk, and macro Tool groups."""
+    _register_stock_document_tool()
     _register_stock_lookup_tools()
     _register_stock_analysis_tools()
     _register_stock_news_tools()
