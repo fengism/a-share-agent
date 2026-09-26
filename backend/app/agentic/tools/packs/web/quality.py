@@ -1,34 +1,9 @@
 """Conservative research-body checks; these do not validate the truth of an article."""
 
-import codecs
 import re
 from typing import Any
 
-_CHARSET = re.compile(br"charset\s*=\s*[\"']?\s*([a-zA-Z0-9._-]+)", re.I)
 _SHELL = ("please enable javascript", "enable javascript to continue", "请开启javascript", "请启用javascript", "请打开javascript", "javascript is required")
-
-
-def decode_html_response(response: Any) -> str:
-    raw = getattr(response, "content", None)
-    if not isinstance(raw, bytes):
-        return str(response.text)
-    declared = []
-    header = str(response.headers.get("content-type") or "").encode("ascii", "ignore")
-    for source in (header, raw[:4096]):
-        match = _CHARSET.search(source)
-        if match:
-            declared.append(match[1].decode("ascii"))
-    # Honor declarations/valid UTF-8 before statistical guessing (GBK pages were guessed as Korean).
-    candidates = [*declared, "utf-8", getattr(response, "apparent_encoding", None)]
-    for encoding in candidates:
-        if not encoding:
-            continue
-        try:
-            codecs.lookup(encoding)
-            return raw.decode(encoding, "strict")
-        except (LookupError, UnicodeDecodeError):
-            continue
-    return raw.decode("utf-8", "replace")
 
 
 def body_quality_reason(content: str) -> str:

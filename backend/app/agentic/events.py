@@ -185,6 +185,10 @@ def _tool_result_summary(result: ToolResultInfo) -> AgentToolResultSummary:
                 "web_unreadable_body": "网页正文不可读，请更换原文来源",
                 "web_script_shell": "网页仅返回脚本占位，需要浏览器读取",
                 "web_challenge": "网页返回访问验证，未取得正文",
+                "web_url_not_public": "目标地址指向内网，已拒绝抓取",
+                "web_fetch_failed": "目标站点不可达或响应无效",
+                "web_not_found": "目标页面不存在或已下线",
+                "web_browser_failed": "HTTP 与浏览器两种方式均未取得正文",
             }.get(str(reason), summary)
         return AgentToolResultSummary(summary=summary, status="error")
 
@@ -208,6 +212,12 @@ def _tool_result_summary(result: ToolResultInfo) -> AgentToolResultSummary:
             value = data.get(key)
             if isinstance(value, (str, int, float)) and str(value).strip():
                 metadata[key] = str(value)[:160]
+    if result.name == "web_search" and isinstance(data, dict):
+        # 映射到 source：前端已把该键渲染成「数据源」，且 engine 记录的是降级后
+        # 真正应答的引擎，百度被拦回落 Bing 时前端能直接看出来。
+        engine = data.get("engine")
+        if isinstance(engine, str) and engine.strip():
+            metadata["source"] = engine.strip()[:160]
     if result.name == "web_fetch" and isinstance(data, dict):
         mode = data.get("fetch_mode")
         quality = data.get("body_quality")

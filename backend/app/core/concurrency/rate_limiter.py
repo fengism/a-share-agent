@@ -22,12 +22,16 @@ sina_semaphore = asyncio.Semaphore(2)
 ths_semaphore = asyncio.Semaphore(2)
 iwencai_semaphore = asyncio.Semaphore(1)
 baidu_semaphore = asyncio.Semaphore(2)
+nbs_semaphore = asyncio.Semaphore(1)
 cls_semaphore = asyncio.Semaphore(2)
 kaipanhong_semaphore = asyncio.Semaphore(1)
 tdx_semaphore = asyncio.Semaphore(2)
 tdxhub_semaphore = tdx_semaphore
 misc_semaphore = asyncio.Semaphore(4)
 database_semaphore = asyncio.Semaphore(8)
+# 搜索引擎单独限流：百度按 IP + 指纹判定，并发过高会直接返回安全验证空壳页，
+# 且单次搜索命中拦截时最多重试三次，不应与 misc 共享额度。
+search_semaphore = asyncio.Semaphore(2)
 
 _blocking_executor: ThreadPoolExecutor | None = None
 _blocking_executor_lock = Lock()

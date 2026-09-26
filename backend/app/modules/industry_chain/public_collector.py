@@ -256,7 +256,7 @@ async def collect_public_industry_data(
         if family not in searches:
             query = (f"{name} 政策公告 {resolved_scope.end_date.year}" if family == "events" else packages[family].query)
             searches[family] = asyncio.create_task(public_data.web_search(
-                query, engine="bing_cn", max_results=8,
+                query, max_results=8,
                 time_range=time_range if family == "events" else "any", language=language,
             ))
         return await searches[family]

@@ -19,6 +19,7 @@ _PROVIDER_EXPORTS = {
     "sge": ("app.infrastructure.providers.sge", "sge_provider"),
     "sina": ("app.infrastructure.providers.sina.provider", "sina_provider"),
     "sina_hk": ("app.infrastructure.providers.sina.hk", "sina_hk_provider"),
+    "so360_search": ("app.infrastructure.providers.web_search", "so360_search_provider"),
     "tdxhub": ("app.infrastructure.providers.tdxhub", "tdxhub_provider"),
     "tencent": ("app.infrastructure.providers.tencent", "tencent_provider"),
     "ths": ("app.infrastructure.providers.ths.provider", "ths_provider"),

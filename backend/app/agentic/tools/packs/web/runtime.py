@@ -5,7 +5,7 @@ from typing import cast
 from app.agentic.catalog import registry
 from app.agentic.tools.packs.web import content, fetcher, pdf, registration, search, twitter
 from app.agentic.tools.packs.web.url_security import is_twitter_url
-from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
+from app.core.concurrency.rate_limiter import call_blocking, search_semaphore
 
 _WEB_FETCH_POLICY = registration.WEB_FETCH_POLICY
 _WEB_BATCH_POLICY = registration.WEB_BATCH_POLICY
@@ -77,7 +77,7 @@ async def _execute_web_search(
         time_range,
         language,
         call_blocking_func=call_blocking,
-        semaphore=misc_semaphore,
+        semaphore=search_semaphore,
     )
 
 

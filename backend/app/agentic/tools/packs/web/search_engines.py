@@ -5,6 +5,7 @@ from app.infrastructure.providers.web_search import (
     BaseNoApiKeySearchEngine,
     BingCnSearchNoAPI,
     GoogleSearchNoAPI,
+    So360SearchNoApi,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "BaseNoApiKeySearchEngine",
     "BingCnSearchNoAPI",
     "GoogleSearchNoAPI",
+    "So360SearchNoApi",
 ]

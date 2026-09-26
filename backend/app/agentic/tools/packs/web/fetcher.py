@@ -10,7 +10,7 @@ import requests
 
 from app.agentic.tools.packs.web.content import extract_text, smart_truncate
 from app.agentic.tools.packs.web.pdf import detect_content_type, handle_pdf_response
-from app.agentic.tools.packs.web.quality import body_quality_reason, checked_body, decode_html_response
+from app.agentic.tools.packs.web.quality import body_quality_reason, checked_body
 from app.agentic.tools.packs.web.scrapling import BrowserMode, is_challenge_page, needs_fallback, scrapling_fetch
 from app.agentic.tools.packs.web.transport import request_pinned
 from app.agentic.tools.packs.web.twitter import fetch_tweet
@@ -26,6 +26,7 @@ from app.core.cache_policies import AGENT_WEB_FETCH
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.errors import log_internal_error
 from app.core.metrics import metrics
+from app.infrastructure.http.decode import decode_html_response
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,15 @@ MAX_REDIRECTS = 5
 REDIRECT_STATUS_CODES = {301, 302, 303, 307, 308}
 fetch_cache = TTLCache(maxsize=256, name="agent_web_fetch")
 _browser_singleflight: AsyncSingleFlight[dict[str, Any]] = AsyncSingleFlight()
+
+
+def _url_id(url: str) -> str:
+    """返回 URL 的短哈希，供日志关联使用。
+
+    日志里不能出现完整 URL：query 常带签名或会话 token。只记哈希 + host 即可定位，
+    又不会把凭据写进日志文件。
+    """
+    return hashlib.sha256(url.encode()).hexdigest()[:12]
 
 
 async def http_get_with_retry(
@@ -326,33 +336,54 @@ async def web_fetch(
             return pdf_result
         html = decode_html_response(response)
         meta, (title, content) = text_extractor(html)
-    except UnsafeUrlError as error:
-        logger.warning("拒绝抓取不安全 URL %s: %s", url, error)
-        return {"url": url, "title": "", "content": "", "error": str(error)}
-    except Exception as error:
-        if mode == "http":
-            return {"url": url, "title": "", "content": "", "error": str(error) or type(error).__name__}
-        status_code = getattr(getattr(error, "response", None), "status_code", None)
-        if status_code in {404, 410}:
-            return {
-                "url": str(getattr(getattr(error, "response", None), "url", "") or url),
-                "title": "",
-                "content": "",
-                "error": str(error) or f"HTTP {status_code}",
-                "status_code": status_code,
-            }
-        logger.info("安全 HTTP 抓取失败，尝试浏览器模式: host=%s url_id=%s error_type=%s",
-                    urlparse(url).hostname, hashlib.sha256(url.encode()).hexdigest()[:12], type(error).__name__)
-        fallback_result = await run_browser_fallback(url)
-        if not fallback_result.get("error"):
-            cache.set(cache_key, fallback_result, FETCH_CACHE_TTL)
-            return fallback_result
+    except UnsafeUrlError:
+        # 不回传 str(error)：UnsafeUrlError 的消息里含主机名解析出的内网地址
+        # （10.x / 169.254.169.254 等），会随工具结果进入 prompt 并原样推给浏览器。
+        logger.warning("拒绝抓取不安全 URL: host=%s url_id=%s",
+                       urlparse(url).hostname or "unknown", _url_id(url))
         return {
             "url": url,
             "title": "",
             "content": "",
-            "error": str(error) or type(error).__name__,
-            "note": str(fallback_result["error"]),
+            "error": "目标地址解析到内网或保留网段，已拒绝抓取",
+            "error_reason": "web_url_not_public",
+        }
+    except Exception as error:
+        if mode == "http":
+            # 同理不透出 str(error)：requests 的 HTTPError 文本含带 query 的完整 URL，
+            # 很多站点把签名/会话 token 放在 query 里。
+            logger.info("HTTP 抓取失败: host=%s url_id=%s error_type=%s",
+                        urlparse(url).hostname or "unknown", _url_id(url), type(error).__name__)
+            return {
+                "url": url,
+                "title": "",
+                "content": "",
+                "error": "目标站点不可达或响应无效，请更换来源",
+                "error_reason": "web_fetch_failed",
+            }
+        status_code = getattr(getattr(error, "response", None), "status_code", None)
+        if status_code in {404, 410}:
+            return {
+                "url": url,
+                "title": "",
+                "content": "",
+                "error": "目标页面不存在或已下线",
+                "error_reason": "web_not_found",
+                "status_code": status_code,
+            }
+        logger.info("安全 HTTP 抓取失败，尝试浏览器模式: host=%s url_id=%s error_type=%s",
+                    urlparse(url).hostname or "unknown", _url_id(url), type(error).__name__)
+        fallback_result = await run_browser_fallback(url)
+        if not fallback_result.get("error"):
+            cache.set(cache_key, fallback_result, FETCH_CACHE_TTL)
+            return fallback_result
+        # 浏览器兜底也失败：沿用它自己的受控文案与原因码，不合并原始异常文本。
+        return {
+            "url": url,
+            "title": "",
+            "content": "",
+            "error": "HTTP 与浏览器两种方式均未取得正文",
+            "error_reason": fallback_result.get("error_reason") or "web_browser_failed",
         }
 
     fallback_note = ""
