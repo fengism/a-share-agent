@@ -160,3 +160,155 @@ class TestDailyReviewPushDataBoard:
         card_content = str(card)
         assert "两市成交突破万亿" in card_content
         assert "5-7成" in card_content
+
+
+class TestDailyReviewDepthOptimization:
+    async def test_historical_indices_calculates_change_pct_and_amplitude_when_none(self, monkeypatch):
+        from datetime import date
+        from unittest.mock import AsyncMock
+        from app.domain.market import KlineData, KlineItem
+        from app.modules.daily_review.collector import _historical_indices
+
+        mock_item = KlineItem(
+            date="2026-09-24",
+            open=2910.0,
+            close=3000.0,
+            high=3020.0,
+            low=2905.0,
+            volume=100000,
+            amount=250000000000,
+            pre_close=2900.0,
+            change_pct=None,
+            amplitude=None,
+        )
+        mock_response = KlineData(
+            code="000001",
+            period="daily",
+            adjust="",
+            items=[mock_item],
+            source="test_source",
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_index_kline",
+            AsyncMock(return_value=mock_response),
+        )
+
+        res = await _historical_indices(date(2026, 9, 24))
+        assert len(res.indices) == 4
+        item = res.indices[0]
+        # (3000 - 2900) / 2900 * 100 = 3.45
+        assert item.change_pct == 3.45
+        # (3020 - 2905) / 2900 * 100 = 3.97
+        assert item.amplitude == 3.97
+
+    def test_review_builder_enriches_market_summary_with_limit_pools_and_distribution(self):
+        from app.modules.daily_review.models import DailyReviewDataSnapshot
+        from app.modules.daily_review.review_builder import _market_summary
+
+        snapshot = DailyReviewDataSnapshot(
+            indices=[{"name": "上证指数", "price": 3000.0, "change_pct": 1.5}],
+            market_statistics={
+                "up_count": 3500,
+                "down_count": 1200,
+                "flat_count": 100,
+                "limit_up_count": 58,
+                "limit_down_count": 3,
+                "limit_up_stocks": [
+                    {"name": "常山北明", "board_count": 3, "sector_name": "华为概念"},
+                    {"name": "深圳华强", "board_count": 1, "sector_name": "电子元器件"},
+                ],
+                "limit_down_stocks": [
+                    {"name": "大连重工", "sector_name": "高端装备"},
+                ],
+                "stock_pct_distribution": [
+                    {"label": ">7", "count": 120},
+                    {"label": "0~3", "count": 2200},
+                ],
+            },
+        )
+        summary = _market_summary(snapshot, "当日共整理")
+        assert "全市场上涨 3500 家" in summary
+        assert "涨停 58 家" in summary
+        assert "常山北明(3板[华为概念])" in summary
+        assert "深圳华强(首板[电子元器件])" in summary
+        assert "大连重工[高端装备]" in summary
+        assert ">7%: 120家" in summary
+
+    def test_build_prompt_formats_readable_kline_and_sectors(self):
+        from app.modules.daily_review.models import DailyReviewDataSnapshot
+        from app.modules.daily_review.review_builder import build_prompt
+
+        snapshot = DailyReviewDataSnapshot(
+            indices=[
+                {
+                    "name": "上证指数",
+                    "code": "000001",
+                    "price": 3050.25,
+                    "change_pct": 1.25,
+                    "amount": 420000000000,
+                    "open": 3010.0,
+                    "high": 3060.0,
+                    "low": 3005.0,
+                    "pre_close": 3012.5,
+                    "amplitude": 1.83,
+                }
+            ],
+            top_sectors=[
+                {"name": "半导体", "change_pct": 4.2, "leading_stock": "中芯国际", "leading_change_pct": 7.5}
+            ],
+            bottom_sectors=[
+                {"name": "煤炭", "change_pct": -1.5, "leading_stock": "中国神华", "leading_change_pct": -2.0}
+            ],
+            dragon_tiger=[
+                {"name": "拓维信息", "code": "002261", "net_amount": 150000000, "change_pct": 10.0, "reason": "日涨幅偏离值达7%", "turnover_pct": 15.2}
+            ],
+        )
+        template = "INDICES:\n{indices_placeholder}\nSECTORS:\n{top_sectors_placeholder}\nDRAGON:\n{dragon_tiger_placeholder}\n{market_statistics_placeholder}\n{bottom_sectors_placeholder}\n{hot_concepts_placeholder}\n{hot_industries_placeholder}\n{hot_stocks_placeholder}\n{news_placeholder}\n{market_volume_placeholder}\n{macro_data_placeholder}\n{source_status_placeholder}\n{date}"
+        prompt = build_prompt("2026-09-24", snapshot, template)
+        assert "上证指数(000001)：收盘 3050.25，涨跌幅 +1.25%，成交额 4200.0亿元" in prompt
+        assert "今开:3010.0" in prompt
+        assert "最高:3060.0" in prompt
+        assert "半导体：涨跌幅 4.2%，领涨股 中芯国际(7.5%)" in prompt
+        assert "拓维信息(002261)：净买入 15000.0万元，涨跌幅 10.0%，换手率 15.2%，上榜原因：日涨幅偏离值达7%" in prompt
+
+    def test_report_renderer_produces_clean_report_without_technical_errors(self):
+        from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection, DailyReviewSourceStatus
+        from app.modules.daily_review.report_renderer import render_daily_review_markdown
+
+        snapshot = DailyReviewDataSnapshot(
+            source_status={
+                "hot_stocks": DailyReviewSourceStatus(status="unavailable", error="热门股票不支持历史回溯，未使用当前数据替代"),
+                "indices": DailyReviewSourceStatus(status="complete"),
+            }
+        )
+        result = DailyReviewResult(
+            date="2026-09-24",
+            title="2026-09-24 每日复盘",
+            generated_at="2026-09-24 16:30:00",
+            market_state="attack",
+            position_range="6~7成进攻",
+            market_summary="两市放量突破，科技主线领涨。",
+            index_review=DailyReviewSection(title="指数与量价格局", summary="放量突破长阳线", bullets=["上证指数突破3000点整数关口"]),
+            hotspot_review=DailyReviewSection(title="板块轮动与题材生命周期", summary="科技主线加速", bullets=["半导体启动主升浪"]),
+            dragon_tiger_review=DailyReviewSection(title="情绪周期与资金微观动向", summary="游资与机构共振", bullets=["拓维信息机构大幅加仓"]),
+            opportunities=["低吸半导体设备龙头"],
+            risk_alerts=["警惕次日分时冲高回落"],
+            strategy_notes=["建议仓位6~7成", "超预期：早盘若放量高开则持股待涨"],
+            invalid_conditions=["若早盘竞价大幅低开且跌停个股超20家"],
+            data_gaps=["历史热点个股排行与实时新闻未覆盖"],
+            data_snapshot=snapshot,
+        )
+
+        md = render_daily_review_markdown(result)
+        assert "# 2026-09-24 每日市场复盘" in md
+        assert "## 今日大盘复盘" in md
+        assert "进攻型（多头主导/放量突破）" in md
+        assert "建议仓位：6~7成进攻" in md
+        assert "### 1. 指数与量价格局" in md
+        assert "### 2. 板块轮动与题材生命周期" in md
+        assert "### 3. 情绪周期与资金微观动向" in md
+        assert "### 6. 明日交易计划与情景推演" in md
+        assert "## 数据覆盖与核验状态" in md
+        assert "历史热点个股排行与实时新闻未覆盖" in md
+        assert "热门股票不支持历史回溯，未使用当前数据替代" not in md
+

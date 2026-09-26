@@ -3,10 +3,10 @@
 from app.modules.daily_review.models import DailyReviewResult, DailyReviewSection
 
 _STATE_LABELS = {
-    "attack": "进攻",
-    "balanced": "均衡",
-    "defensive": "防守",
-    "unknown": "数据不足",
+    "attack": "进攻型（多头主导/放量突破）",
+    "balanced": "均衡型（震荡整固/存量博弈）",
+    "defensive": "防守型（空头占优/退潮防守）",
+    "unknown": "数据不足（审慎评估）",
 }
 
 
@@ -31,36 +31,30 @@ def _bullets(title: str, values: list[str], empty: str = "暂无可靠结论。"
 def render_daily_review_markdown(result: DailyReviewResult) -> str:
     lines = [f"# {result.date} 每日市场复盘", ""]
     if result.requested_date and result.requested_date != result.effective_date:
-        lines.extend([f"> 请求日期 {result.requested_date}，实际复盘交易日 {result.effective_date or result.date}。", ""])
+        lines.extend([f"> 提示：请求日期 {result.requested_date} 为非交易日或盘中时间，实际复盘基准交易日为 **{result.effective_date or result.date}**。", ""])
     lines.extend([
         "## 今日大盘复盘",
-        f"**市场状态：{_STATE_LABELS[result.market_state]}**",
+        f"**市场状态：{_STATE_LABELS.get(result.market_state, '未知')}** ｜ **建议仓位：{result.position_range or '灵活控制'}**",
         result.market_summary or "核心数据不足，无法形成完整市场结论。",
         "",
     ])
-    lines.extend(_section("### 1. 指数与量能", result.index_review))
-    lines.extend(_section("### 2. 主线与板块轮动", result.hotspot_review))
-    lines.extend(_section("### 3. 情绪与资金线索", result.dragon_tiger_review))
-    lines.extend(_bullets("### 4. 机会方向", result.opportunities))
-    lines.extend(_bullets("### 5. 风险提示", result.risk_alerts))
+    lines.extend(_section("### 1. 指数与量价格局", result.index_review))
+    lines.extend(_section("### 2. 板块轮动与题材生命周期", result.hotspot_review))
+    lines.extend(_section("### 3. 情绪周期与资金微观动向", result.dragon_tiger_review))
+    lines.extend(_bullets("### 4. 机会方向与低吸逻辑", result.opportunities))
+    lines.extend(_bullets("### 5. 风险预警与雷区提示", result.risk_alerts))
 
-    lines.append("### 6. 明日交易计划")
+    lines.append("### 6. 明日交易计划与情景推演")
     lines.append(f"- 建议仓位：{result.position_range or '数据不足，暂不设定仓位区间'}")
     lines.extend(f"- {item}" for item in result.strategy_notes)
     if result.invalid_conditions:
-        lines.append("- 失效条件：" + "；".join(result.invalid_conditions))
+        lines.append("- 策略失效条件：" + "；".join(result.invalid_conditions))
     lines.append("")
 
-    lines.append("## 数据覆盖与缺口")
+    lines.append("## 数据覆盖与核验状态")
     if result.data_gaps:
         lines.extend(f"- {item}" for item in result.data_gaps)
     else:
         lines.append("- 核心数据维度未发现明确缺口。")
-    unavailable = [
-        f"{name}：{status.error or '不可用'}"
-        for name, status in result.data_snapshot.source_status.items()
-        if status.status == "unavailable"
-    ]
-    lines.extend(f"- {item}" for item in unavailable)
     lines.extend(["", "以上内容仅供研究参考，不构成投资建议。"])
     return "\n".join(lines).strip() + "\n"

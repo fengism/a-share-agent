@@ -59,17 +59,23 @@ async def _historical_indices(target_date: date) -> MarketIndices:
         bar = next((item for item in reversed(result.items) if item.date == date_text), None)
         if bar is None:
             continue
+        change_pct = bar.change_pct
+        if change_pct is None and bar.pre_close and bar.pre_close > 0 and bar.close is not None:
+            change_pct = round((bar.close - bar.pre_close) / bar.pre_close * 100, 2)
+        amplitude = bar.amplitude
+        if amplitude is None and bar.pre_close and bar.pre_close > 0 and bar.high is not None and bar.low is not None:
+            amplitude = round((bar.high - bar.low) / bar.pre_close * 100, 2)
         items.append(IndexItem(
             code=code,
             name=name,
             price=bar.close,
-            change_pct=bar.change_pct,
+            change_pct=change_pct,
             volume=bar.volume,
             amount=bar.amount,
             open=bar.open,
             high=bar.high,
             low=bar.low,
-            amplitude=bar.amplitude,
+            amplitude=amplitude,
             pre_close=bar.pre_close,
         ))
         if result.source and result.source not in sources:
