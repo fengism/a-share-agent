@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.infrastructure.llm.prompting import PromptSpec, prompt_registry
 from app.modules.daily_review.models import DailyReviewSection
@@ -76,6 +76,26 @@ class DailyReviewPromptOutput(BaseModel):
     position_range: str = ""
     invalid_conditions: list[str] = Field(default_factory=list, max_length=6)
     data_gaps: list[str] = Field(default_factory=list, max_length=12)
+
+    @field_validator(
+        "risk_alerts",
+        "opportunities",
+        "strategy_notes",
+        "invalid_conditions",
+        mode="before",
+    )
+    @classmethod
+    def _truncate_six_items(cls, value: object) -> object:
+        if isinstance(value, list):
+            return [str(item) for item in value if item is not None][:6]
+        return value
+
+    @field_validator("data_gaps", mode="before")
+    @classmethod
+    def _truncate_data_gaps(cls, value: object) -> object:
+        if isinstance(value, list):
+            return [str(item) for item in value if item is not None][:12]
+        return value
 
 
 def _build_user_prompt(context) -> str:

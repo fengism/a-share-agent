@@ -166,7 +166,7 @@ class FeishuDocumentClient:
         receiver: str,
         doc_type: str = "docx",
     ) -> None:
-        member_type = "openid" if not receiver.startswith("oc_") else "chat_id"
+        member_type = "openid" if not receiver.startswith("oc_") else "openchat"
         response = self._transport.post(
             PERMISSION_URL.format(token=doc_id),
             params={"type": doc_type, "need_notification": "false"},
