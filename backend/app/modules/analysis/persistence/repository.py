@@ -124,10 +124,20 @@ def save_analysis(result: AnalysisResult, user_id: int) -> Path:
 
 def load_analysis(code: str, date: str, user_id: int) -> AnalysisResult | None:
     """优先读取用户结果，未命中时只读兼容旧全局结果。"""
+    return _load_scoped_analysis(code, date, user_id)[0]
+
+
+def _load_scoped_analysis(code: str, date: str, user_id: int) -> tuple[AnalysisResult | None, bool]:
+    """读取分析结果，并返回是否来自当前用户自己的记录。
+
+    第二个返回值为 ``False`` 表示命中的是 legacy 全局记录。这类记录属于所有用户可见，
+    绝不能写进某个用户的缓存命名空间：``delete_analysis`` 只失效删除者与 scope 两个 key，
+    管理员删掉 legacy 记录后，其他用户此前缓存过的那份不会被清掉，能多读最长 4 小时。
+    """
     user_result = _load_path(_user_stock_dir(user_id, code) / f"{date}.json")
     if user_result is not None:
-        return user_result
-    return _load_path(_legacy_stock_dir(code) / f"{date}.json")
+        return user_result, True
+    return _load_path(_legacy_stock_dir(code) / f"{date}.json"), False
 
 
 def delete_analysis(
@@ -182,8 +192,10 @@ def get_analysis_by_date(
     if cached is not None:
         return cached
 
-    result = load_analysis(code, date, user_id)
-    if result is not None:
+    result, is_user_scoped = _load_scoped_analysis(code, date, user_id)
+    # 只缓存用户自己的记录；legacy 全局记录每次回源读文件，
+    # 这样管理员删除后立即失效，不会有任何用户继续命中缓存副本。
+    if result is not None and is_user_scoped:
         cache.set(cache_key, result, ttl=cache_ttl)
     return result
 

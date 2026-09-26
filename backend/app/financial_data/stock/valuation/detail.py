@@ -8,7 +8,7 @@ from app.core.cache import dated_cache_key
 from app.core.cache_policies import VALUATION_DETAIL
 from app.core.concurrency.rate_limiter import call_blocking, ths_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import normalize_code, safe_float
+from app.core.market import market_today, normalize_code, safe_float
 from app.financial_data.stock.fundamentals.financials import get_financial, get_financial_metrics
 from app.financial_data.stock.fundamentals.schemas import FinancialMetrics
 from app.financial_data.stock.profile.basic_info import get_basic_info
@@ -385,7 +385,7 @@ def _derive_valuation_bases(
     elif parsed_report_date is None:
         balance_sheet_quality = 0.55
     else:
-        age_days = (date.today() - parsed_report_date).days
+        age_days = (market_today() - parsed_report_date).days
         balance_sheet_quality = 0.95 if 0 <= age_days <= 550 else 0.7 if age_days <= 900 else 0.45
     net_profit_annualized = _annualize_report_metric(fundamentals.net_profit, report_date)
     revenue_annualized = _annualize_report_metric(fundamentals.revenue, report_date)

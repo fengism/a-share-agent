@@ -3,11 +3,11 @@
 import asyncio
 import threading
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Any
 
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore, misc_semaphore
-from app.core.market import normalize_code, normalize_index_code
+from app.core.market import market_today, normalize_code, normalize_index_code
 from app.financial_data.market.public import get_completed_market_date, get_index_kline
 from app.financial_data.stock.public import HistoricalBarSet, get_historical_bars, historical_bar_hash
 from app.modules.portfolio.public import list_held_stock_codes
@@ -252,7 +252,7 @@ async def _resolve_request(
     strategy_snapshot: StrategySnapshot | None = None,
 ) -> QuantBacktestPayload:
     payload = request.model_copy(deep=True)
-    if payload.end_date == date.today():
+    if payload.end_date == market_today():
         payload.end_date = await get_completed_market_date(payload.end_date)
         if payload.end_date <= payload.start_date:
             raise ValueError("最近已完成交易日必须晚于开始日期")

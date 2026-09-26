@@ -41,6 +41,7 @@ def _get_sina_provider():
 
 
 async def _load_financial_statement(sym, indicator: str, cache_key: str) -> list[dict]:
+    source = "sina"
     try:
         df = await provider_gateway.call_blocking(
             "sina",
@@ -58,6 +59,9 @@ async def _load_financial_statement(sym, indicator: str, cache_key: str) -> list
             indicator,
             type(sina_error).__name__,
         )
+        # 显式赋值而不是靠 "sina_error" in locals() 推断：PEP 3110 会在 except 块
+        # 结束时删掉异常名，那个判断恒为 False，日志会一直把兜底结果标成 source=sina。
+        source = "akshare"
         try:
             df = await provider_gateway.call_blocking(
                 "akshare",
@@ -77,7 +81,7 @@ async def _load_financial_statement(sym, indicator: str, cache_key: str) -> list
         "financial statement loaded code=%s indicator=%s source=%s rows=%s latest_report_date=%s",
         sym.raw,
         indicator,
-        "akshare" if "sina_error" in locals() else "sina",
+        source,
         len(result),
         next((row.get("REPORT_DATE") or row.get("REPORT_DATE_NAME") for row in result), None),
     )

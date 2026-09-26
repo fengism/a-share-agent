@@ -29,12 +29,14 @@ const DEFINITIONS = [
   ]],
   ["labor", "美国就业", [
     { key: "UNEMPLOYMENT", label: "失业率", unit: "%" },
-    { key: "NON_FARM", label: "非农就业", unit: "万人" },
+    // NON_FARM 是当月新增就业人数（万人），不是就业存量水平，三个数据源口径一致
+    { key: "NON_FARM", label: "新增非农", unit: "万人" },
     { key: "INITIAL_JOBLESS", label: "初请失业金", unit: "万人" },
   ]],
   ["employment_details", "美国就业细项", [
     { key: "CIVILIAN_LABOR_PARTICIPATION", label: "劳动参与率", unit: "%" },
-    { key: "AVG_HOURLY_EARNINGS_MOM", label: "平均时薪环比", unit: "%" },
+    // 时薪环比是变化率（~0.3%），与参与率水平值（~62%）量级差两个数量级，必须走副轴
+    { key: "AVG_HOURLY_EARNINGS_MOM", label: "平均时薪环比", unit: "%", secondaryAxis: true },
   ]],
   ["consumer_confidence", "美国消费者信心", [{ key: "VALUE", label: "信心指数" }]],
   ["credit_spread", "美国信用利差", [{ key: "VALUE", label: "高收益利差", unit: "%" }]],

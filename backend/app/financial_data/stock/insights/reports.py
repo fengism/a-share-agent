@@ -1,13 +1,13 @@
 """个股研报评级服务（新浪 ReportService.getList，聚合最近 N 个月）。"""
 
 import logging
-from datetime import date, timedelta
+from datetime import timedelta
 
 from app.core.cache import dated_cache_key
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import sina_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import normalize_code
+from app.core.market import market_today, normalize_code
 from app.financial_data.stock.insights.schemas import StockReportItem, StockReportPage
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
@@ -57,7 +57,7 @@ async def _load_recent_reports(code: str, months: int) -> StockReportPage:
 
     接口按日期降序返回，遇到早于截止日期的整页即停止翻页。
     """
-    cutoff = (date.today() - timedelta(days=30 * months)).isoformat()
+    cutoff = (market_today() - timedelta(days=30 * months)).isoformat()
     items: list[StockReportItem] = []
     seen_ids: set[str] = set()
     for page in range(1, REPORT_MAX_PAGES + 1):

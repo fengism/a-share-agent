@@ -431,7 +431,10 @@ async def _load_basic_info_spot_df() -> pd.DataFrame | None:
     if spot_df is not None:
         return spot_df
 
-    spot_df = load_spot_snapshot_file()
+    # load_spot_snapshot_file 是同步的（open + json.load 全市场快照，数千行），
+    # 在 async def 里直接调用会阻塞事件循环。同一个函数在
+    # spot_snapshot.py 里是包了 call_blocking 的，这里此前漏了。
+    spot_df = await call_blocking(load_spot_snapshot_file, semaphore=misc_semaphore)
     if spot_df is not None:
         return spot_df
 

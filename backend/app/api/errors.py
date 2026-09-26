@@ -181,11 +181,22 @@ async def application_error_handler(request: Request, exc: ApplicationError) -> 
         status_code = 409
     elif isinstance(exc, UpstreamUnavailableError):
         status_code = 503
+    # 5xx 说明是服务端缺陷，必须留痕。此前这一整类异常在服务端零日志、
+    # 客户端也拿不到可回报的 error_id，只有一串 message。
+    if status_code >= 500:
+        error_id, logged_message = build_internal_error(exc.message)
+        logger.error(
+            "application error: code=%s path=%s error_id=%s detail=%s",
+            exc.code, request.url.path, error_id, logged_message,
+        )
+    else:
+        error_id = None
     return _response(
         request,
         status_code=status_code,
         code=exc.code,
         message=exc.message,
+        error_id=error_id,
     )
 
 

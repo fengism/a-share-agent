@@ -14,9 +14,8 @@ from app.core.concurrency.rate_limiter import (
 )
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
-from app.core.market import safe_float
+from app.core.market import market_today, safe_float
 from app.financial_data.market.trading_session import (
-    SHANGHAI_TIMEZONE,
     get_market_date_on_or_before,
     resolve_market_data_cache_policy,
 )
@@ -26,9 +25,6 @@ from app.infrastructure.providers.registry import get_provider
 logger = logging.getLogger(__name__)
 _industry_rankings_singleflight: AsyncSingleFlight[dict] = AsyncSingleFlight()
 
-
-def _shanghai_today() -> date:
-    return datetime.now(SHANGHAI_TIMEZONE).date()
 
 
 def _get_kaipanhong_provider():
@@ -116,7 +112,7 @@ async def _load_industry_rankings(target_date: date) -> dict:
             ),
         )
         sectors = result.get("sectors") or []
-        if sectors or target_date < _shanghai_today():
+        if sectors or target_date < market_today():
             return {
                 "sectors": sectors,
                 "total": len(sectors),
@@ -130,7 +126,7 @@ async def _load_industry_rankings(target_date: date) -> dict:
         raise RuntimeError("开盘红当日行业排名返回空数据")
     except Exception as error:
         logger.warning("开盘红行业排名获取失败: %s", error)
-        if target_date < _shanghai_today():
+        if target_date < market_today():
             raise UpstreamUnavailableError("开盘红历史行业排行上游暂时不可用") from error
 
     for provider_name, label, fetch_fn, semaphore in [
@@ -187,21 +183,17 @@ async def _load_industry_rankings(target_date: date) -> dict:
         return data
     except Exception as error:
         logger.warning("腾讯行业排名获取失败: %s", error)
-        return {
-            "sectors": [],
-            "total": 0,
-            **_response_metadata(
-                target_date,
-                source="",
-                fund_data_available=False,
-            ),
-        }
+        # 五个数据源全部失败。此前这里返回一个 source="" 的「成功」响应（sectors: []），
+        # 而 load_and_cache 会把它按盘中 TTL 写进缓存——一次全站故障就能把行业排行
+        # 毒化一整天，且前端拿到的 JSON 结构完全合法，无法与「当日无数据」区分。
+        # 抛错更诚实：调用方能明确知道是上游不可用，并且不会污染缓存。
+        raise UpstreamUnavailableError("行业排行上游暂时不可用") from error
 
 
 async def get_industry_rankings(requested_date: date | None = None) -> dict:
     """获取指定日期的行业涨跌与资金排行。"""
-    requested_target = requested_date or _shanghai_today()
-    if requested_target > _shanghai_today():
+    requested_target = requested_date or market_today()
+    if requested_target > market_today():
         raise InvalidRequestError("行业排行不能查询未来日期")
 
     target_date = await get_market_date_on_or_before(requested_target)

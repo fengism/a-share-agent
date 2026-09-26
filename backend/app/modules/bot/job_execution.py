@@ -17,6 +17,13 @@ logger = logging.getLogger(__name__)
 _PROGRESS_COMMANDS = frozenset({"analyze", "market", "batch"})
 
 
+class BotBatchAllFailed(RuntimeError):
+    """批量命令的每一项都失败。
+
+    独立于普通异常，便于调用方与监控按类型区分「上游整体不可用」和「单只股票分析失败」。
+    """
+
+
 async def execute_bot_job(
     job: BotJob,
     owner_id: str,
@@ -64,6 +71,14 @@ async def execute_bot_job(
                 raise RuntimeError("Bot 空响应任务完成状态更新失败")
             metrics.record_bot_event("succeeded")
             return
+        if response.totally_failed:
+            # 在 save_response 之前抛出：响应尚未落库，重试时 response_payload 仍为 None，
+            # 命令会被真正重新执行（而不是重发一份写死的失败文案），也不会重复打扰用户。
+            # 抛错后由 job_processor 走既有的退避重试，终态为 failed，可观测。
+            metrics.record_bot_event("all_items_failed")
+            raise BotBatchAllFailed(
+                f"批量分析全部失败: {response.failure_count}/{response.total_count}"
+            )
         saved = await blocking_runner(
             job_store.save_response,
             job.id,

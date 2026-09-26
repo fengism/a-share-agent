@@ -4,12 +4,12 @@ import asyncio
 import hashlib
 import json
 from collections.abc import Awaitable, Callable
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import cast
 
 from app.core.cache import TTLCache
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import normalize_code
+from app.core.market import market_today, normalize_code
 from app.financial_data.stock.public import get_historical_bars
 from app.modules.quant.engine import strategy_warmup_bars
 from app.modules.quant.public import StrategySnapshot, build_target_positions, get_strategy_registry, strategy_presets
@@ -80,7 +80,7 @@ async def screen_candidates_by_strategy(
     if not normalized_codes:
         raise ValueError("候选股票代码不能为空")
     warmup_bars = strategy_warmup_bars(snapshot)
-    end_date = date.today()
+    end_date = market_today()
     cache_payload = json.dumps(
         {
             "hash": snapshot.definition_hash,

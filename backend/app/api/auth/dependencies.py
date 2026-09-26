@@ -127,7 +127,11 @@ def require_metrics_access(
     credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
 ) -> None:
     """Authorize metrics access with the configured key or an admin session."""
-    cookie_token, _ = request_auth_token(request, credentials)
+    cookie_token, uses_cookie = request_auth_token(request, credentials)
+    # 与 get_current_user 保持一致：这条路径在 API key 不匹配时会回落到 cookie 里的
+    # session token，若不做 CSRF 校验，就成了一条无防护的管理员授权路径。
+    # 目前挂载的端点都是 GET 所以不可利用，但只要有人给它加个写方法就会变成真实漏洞。
+    enforce_cookie_csrf(request, uses_cookie)
     return ensure_metrics_access(
         credentials,
         configured_key=get_settings().metrics_api_key,

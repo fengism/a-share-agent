@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.market import market_today
 from app.domain.market import KlineItem
 from app.modules.quant.strategies.contracts import (
     ComparisonOperator,
@@ -95,7 +96,7 @@ class QuantBacktestCreate(BaseModel):
     def validate_period(self):
         if self.start_date >= self.end_date:
             raise ValueError("开始日期必须早于结束日期")
-        if self.end_date > date.today():
+        if self.end_date > market_today():
             raise ValueError("结束日期不能晚于今天")
         if (self.end_date - self.start_date).days > 5 * 366:
             raise ValueError("回测周期不能超过 5 年")
@@ -345,7 +346,7 @@ class QuantStrategyDraftBacktestRequest(BaseModel):
     def validate_period(self):
         if self.start_date >= self.end_date:
             raise ValueError("开始日期必须早于结束日期")
-        if self.end_date > date.today():
+        if self.end_date > market_today():
             raise ValueError("结束日期不能晚于今天")
         if (self.end_date - self.start_date).days > 5 * 366:
             raise ValueError("回测周期不能超过 5 年")

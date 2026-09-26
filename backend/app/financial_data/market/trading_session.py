@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
 TRADING_WINDOW_START = time(9, 0)
 TRADING_WINDOW_END = time(15, 30)
+# 交易日历源不可用时的降级近似上限：约 32 年工作日，远超任何合理查询区间。
+_FALLBACK_CALENDAR_SPAN_DAYS = 365 * 32
+_FALLBACK_CALENDAR_MAX_DATES = 8000
 STABLE_MARKET_DATA_CACHE_TTL_SECONDS = 24 * 60 * 60
 _TRADING_CALENDAR_CACHE_KEY = "a_share_trading_dates"
 _TRADING_CALENDAR_SUCCESS_TTL_SECONDS = 24 * 60 * 60
@@ -243,11 +246,18 @@ async def get_trading_calendar_view(
         # 日历源不可用时按工作日近似并标记降级
         fallback: list[date] = []
         cursor = start_date or today
-        bound = end_date or (today + timedelta(days=365))
-        while cursor <= bound and len(fallback) <= 8000:
+        bound = end_date or (today + timedelta(days=_FALLBACK_CALENDAR_SPAN_DAYS))
+        while cursor <= bound and len(fallback) < _FALLBACK_CALENDAR_MAX_DATES:
             if cursor.weekday() < 5:
                 fallback.append(cursor)
             cursor += timedelta(days=1)
+        if cursor <= bound:
+            # 此前这里是静默退出：调用方会拿到一个残缺但结构合法的交易日历，
+            # 与「区间本来就只有这么多交易日」无法区分。
+            logger.warning(
+                "交易日历降级近似被截断: 已生成 %s/%s 个工作日，覆盖 %s~%s",
+                len(fallback), _FALLBACK_CALENDAR_MAX_DATES, fallback[0], fallback[-1],
+            )
         dates = fallback
         degraded = True
     else:

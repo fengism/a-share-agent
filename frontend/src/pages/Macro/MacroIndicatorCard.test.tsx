@@ -100,4 +100,53 @@ describe("MacroIndicatorCard", () => {
     });
     expect(option.series.find((item) => item.name === "同比")).toMatchObject({ yAxisIndex: 1 });
   });
+
+  it("splits same-unit series onto a secondary axis when scales diverge", () => {
+    render(
+      <MacroIndicatorCard
+        title="美国就业细项"
+        latest={{ TIME: "2026-08", LEVEL: 61.6, MOM: 0.27 }}
+        trend={[
+          { TIME: "2026-08", LEVEL: 61.6, MOM: 0.27 },
+          { TIME: "2026-07", LEVEL: 61.4, MOM: 0.16 },
+        ]}
+        fields={[
+          { key: "LEVEL", label: "劳动参与率", unit: "%" },
+          { key: "MOM", label: "平均时薪环比", unit: "%", secondaryAxis: true },
+        ]}
+      />,
+    );
+
+    const option = chartMocks.option as {
+      yAxis: Array<{ name?: string; position?: string }>;
+      series: Array<{ name: string; yAxisIndex: number }>;
+    };
+    expect(option.yAxis).toHaveLength(2);
+    // 两组字段都是 %，左轴仍需 % 标注
+    expect(option.yAxis[0].name).toBe("%");
+    expect(option.yAxis[1]).toMatchObject({ name: "%", position: "right" });
+    expect(option.series.find((item) => item.name === "劳动参与率")).toMatchObject({ yAxisIndex: 0 });
+    expect(option.series.find((item) => item.name === "平均时薪环比")).toMatchObject({ yAxisIndex: 1 });
+  });
+
+  it("keeps a single axis when every same-unit series is forced to the primary axis", () => {
+    render(
+      <MacroIndicatorCard
+        title="同量级"
+        latest={{ TIME: "2026-08", A: 3.1, B: 2.4 }}
+        trend={[{ TIME: "2026-08", A: 3.1, B: 2.4 }]}
+        fields={[
+          { key: "A", label: "同比", unit: "%", secondaryAxis: false },
+          { key: "B", label: "核心同比", unit: "%" },
+        ]}
+      />,
+    );
+
+    const option = chartMocks.option as {
+      yAxis: Array<{ name?: string }> | { name?: string };
+      series: Array<{ name: string; yAxisIndex: number }>;
+    };
+    expect(Array.isArray(option.yAxis)).toBe(false);
+    expect(option.series.every((item) => item.yAxisIndex === 0)).toBe(true);
+  });
 });

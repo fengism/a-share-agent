@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+from app.core.market import market_today
+
 
 def get_news_field(item, field: str) -> str:
     """Get a stripped string field from a news dict or object."""
@@ -71,7 +73,7 @@ def parse_news_time(value: str) -> datetime:
         try:
             parsed = datetime.strptime(text, date_format)
             if date_format == "%m-%d %H:%M":
-                return parsed.replace(year=datetime.now().year)
+                return parsed.replace(year=market_today().year)
             return parsed
         except ValueError:
             continue

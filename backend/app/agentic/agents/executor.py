@@ -520,7 +520,9 @@ class AgentExecutor:
                 continue  # 执行结束后回填本轮首次调用结果，不额外消耗预算。
             batch_keys.add(cache_key)
             previous = state.tool_cache.get_cached_result(
-                tool_call, allowed_names=state.effective_tool_names,
+                tool_call,
+                allowed_names=state.effective_tool_names,
+                execution_context=execution_context,
             )
             if previous is not None:
                 tool_results[index] = previous

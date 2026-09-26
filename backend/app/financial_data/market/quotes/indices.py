@@ -1,6 +1,5 @@
 import logging
 from collections.abc import Awaitable
-from datetime import date
 
 from app.core.cache import dated_cache_key
 from app.core.cache import market_cache as cache
@@ -8,7 +7,7 @@ from app.core.cache_policies import MARKET_INDICES
 from app.core.concurrency.rate_limiter import akshare_semaphore, call_blocking, tencent_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
-from app.core.market import safe_float
+from app.core.market import market_today, safe_float
 from app.domain.market import IndexItem, MarketIndices
 from app.financial_data.market.quotes.normalization import build_indices_from_sina, normalize_indices
 from app.financial_data.market.trading_session import resolve_market_data_cache_policy
@@ -219,7 +218,7 @@ async def get_indices() -> MarketIndices:
         MarketIndices 模型对象，附带 total_amount
     """
     cache_key = dated_cache_key("market_indices")
-    cache_policy = await resolve_market_data_cache_policy("daily", date.today())
+    cache_policy = await resolve_market_data_cache_policy("daily", market_today())
     ttl_seconds = (
         MARKET_INDICES.live_seconds
         if not cache_policy.write_cache

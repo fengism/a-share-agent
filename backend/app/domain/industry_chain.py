@@ -5,6 +5,8 @@ from typing import Literal, cast
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.core.market import market_today
+
 
 class IndustryChainResearchScope(BaseModel):
     region: Literal["china", "global", "china_and_global"] = "china_and_global"
@@ -31,7 +33,7 @@ def resolve_industry_chain_scope(
     today: date | None = None,
 ) -> IndustryChainResearchScope:
     current = scope or IndustryChainResearchScope()
-    resolved_today = today or date.today()
+    resolved_today = today or market_today()
     as_of_date = current.as_of_date or resolved_today
     if as_of_date > resolved_today:
         raise ValueError("分析基准日期不能晚于今天")

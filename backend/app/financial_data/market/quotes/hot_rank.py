@@ -33,7 +33,6 @@ async def _get_hot_rank(
     if cached is not None:
         return cached
 
-    result: list[dict] = []
     try:
         method = getattr(get_provider("ths"), provider_method)
         result = await provider_gateway.call(
@@ -42,7 +41,10 @@ async def _get_hot_rank(
             lambda: call_blocking(method, *args),
         )
     except Exception as e:
+        # 上游失败不写缓存：否则同花顺抖一次，这个接口 5 分钟内对外返回空榜单，
+        # 而前端拿到的结构完全合法，无法与「今天确实没有数据」区分。
         logger.warning("同花顺热门数据获取失败 [%s]: %s", cache_prefix, e)
+        return []
 
     cache.set(cache_key, result, ttl=ttl)
     return result

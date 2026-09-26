@@ -14,6 +14,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
+from app.core.market import market_today
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
 
 ALL_ETFS = "all"
@@ -250,7 +251,7 @@ def load_observations(codes: Iterable[str]) -> list[dict]:
 
 def prune(retention_days: int = 370) -> None:
     """清理超过保留期的份额与回填状态（按数据日期裁剪）。"""
-    cutoff = (date.today() - timedelta(days=retention_days)).isoformat()
+    cutoff = (market_today() - timedelta(days=retention_days)).isoformat()
     with unit_of_work() as work:
         work.connection.execute("DELETE FROM national_team_etf_shares WHERE date < ?", (cutoff,))
         work.connection.execute("DELETE FROM national_team_etf_backfill_state WHERE date < ?", (cutoff,))

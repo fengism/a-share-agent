@@ -13,7 +13,13 @@ async def _get_text(url: str, client: httpx.AsyncClient | None = None, *, timeou
     if client is None:
         async with httpx.AsyncClient(timeout=timeout, headers=_HEADERS) as owned:
             return await _get_text(url, owned, timeout=timeout)
-    response = await client.get(url, headers=_HEADERS)
+    # timeout 必须显式传下去：外部传入的 client 可能没有设置默认超时，
+    # 漏传会让这个协程无期限挂住，拖死整条 asyncio.gather。
+    try:
+        response = await client.get(url, headers=_HEADERS, timeout=timeout)
+    except TypeError:
+        # 兼容不接受 timeout 关键字的自定义 client / 测试替身
+        response = await client.get(url, headers=_HEADERS)
     response.raise_for_status()
     return response.content.decode("gbk", errors="ignore")
 

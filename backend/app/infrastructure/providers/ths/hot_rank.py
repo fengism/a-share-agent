@@ -1,10 +1,9 @@
 """同花顺热点排行与强势股归因能力。"""
 
-from datetime import date as current_date
 
 import pandas as pd
 
-from app.core.market import safe_float
+from app.core.market import market_today, safe_float
 from app.infrastructure.providers.ths.transport import ThsTransport
 
 
@@ -69,7 +68,7 @@ def fetch_hot_stock_reasons(
     transport: ThsTransport,
     date: str | None = None,
 ) -> pd.DataFrame:
-    resolved_date = date or current_date.today().strftime("%Y-%m-%d")
+    resolved_date = date or market_today().isoformat()
     url = (
         "http://zx.10jqka.com.cn/event/api/getharden/"
         f"date/{resolved_date}/orderby/date/orderway/desc/charset/GBK/"

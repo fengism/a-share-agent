@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import akshare_semaphore
-from app.core.market import normalize_code
+from app.core.market import market_today, normalize_code
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
@@ -17,15 +16,6 @@ logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 3600
 _SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
-
-
-def _shanghai_today_str() -> str:
-    """解禁日为北京时间自然日，"今日"边界必须按上海时区计算。
-
-    此前用 UTC 日期：北京时间 0-8 点期间 UTC 日期仍是昨天，会把
-    昨日已解禁的批次划入未来抛压统计。
-    """
-    return datetime.now(_SHANGHAI_TZ).strftime("%Y-%m-%d")
 
 
 def _parse_float(val: Any) -> float | None:
@@ -45,7 +35,7 @@ async def get_restricted_shares_lift(code: str) -> dict[str, Any]:
     if cached is not None:
         return cached
 
-    today_str = _shanghai_today_str()
+    today_str = market_today().isoformat()
 
     upcoming_lifts: list[dict[str, Any]] = []
     past_lifts: list[dict[str, Any]] = []

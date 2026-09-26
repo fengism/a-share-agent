@@ -100,6 +100,10 @@ _NBS_FIRST_OPERATIONS = {
 }
 _US_OPERATIONS = {operation for operation in _MACRO_METHODS if operation.startswith("us_")}
 _FRED_ONLY_OPERATIONS = {"us_pce", "us_employment_details", "us_consumer_confidence", "us_credit_spread"}
+# FRED 已下架 ISM PMI 序列：NAPM（制造业）与 NAPMNMI（服务业）均返回
+# "The series does not exist."，FRED 站内已无任何 PMI 序列。这些指标不再走 FRED，
+# 由东财数据中心直连 + akshare 兜底，避免每次刷新都产生 400 噪音与无效重试。
+_FRED_UNSUPPORTED_OPERATIONS = {"us_pmi"}
 # 美国宏观中东财数据中心已有直连实现的指标（akshare 依赖金十页面，当前不可用），akshare 兜底；
 # 其余 us_* 指标东财侧暂无对应序列，仍走 akshare 单源
 _US_EASTMONEY_OPERATIONS = {
@@ -127,7 +131,8 @@ _US_FIELDS = {
     "us_credit_spread": ["TIME", "VALUE"],
 }
 _US_SNAPSHOT_PATH = DATA_DIR / "us_macro_snapshot.json"
-_US_SNAPSHOT_SCHEMA_VERSION = 7
+# 8：us_pmi 的数据源从 FRED 改为东财，旧快照里的 _SOURCE/_IS_FALLBACK 元数据需重算
+_US_SNAPSHOT_SCHEMA_VERSION = 8
 _US_SNAPSHOT_MAX_AGE_SECONDS = 6 * 60 * 60
 _US_METRIC_FETCH_TIMEOUT_SECONDS = 90
 # 单个数据源尝试的上限；前端宏观查询超时为 120s，需为回退链留出多次尝试空间
@@ -236,9 +241,14 @@ def _with_metric_metadata(
 
 
 def _macro_metric_cache_key(operation: str) -> str:
-    source_variant = (
-        "fred" if operation in _US_OPERATIONS and get_settings().fred_api_key.strip() else "default"
+    # 缓存变体必须与实际数据源一致：FRED 参与的指标随 FRED_API_KEY 变化，
+    # 不参与的指标（如 us_pmi）不能因配置了 Key 就换变体，否则会命中旧链路的降级缓存。
+    fred_served = (
+        operation in _US_OPERATIONS
+        and operation not in _FRED_UNSUPPORTED_OPERATIONS
+        and bool(get_settings().fred_api_key.strip())
     )
+    source_variant = "fred" if fred_served else "default"
     return cast(
         str,
         dated_cache_key_no_day("macro_metric", _MACRO_CACHE_VERSION, operation, source_variant),
@@ -267,6 +277,7 @@ async def _load_macro_metric(operation: str) -> object:
     if (
         operation in _US_OPERATIONS
         and operation not in _FRED_ONLY_OPERATIONS
+        and operation not in _FRED_UNSUPPORTED_OPERATIONS
         and fred_configured
     ):
         provider_names = ("fred", *provider_names)

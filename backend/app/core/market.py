@@ -1,9 +1,24 @@
 import logging
 from dataclasses import dataclass
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
+"""A 股与港股业务日期基准时区。"""
+
+
+def market_today() -> date:
+    """返回市场时区（Asia/Shanghai）的当天日期。
+
+    容器通常以 UTC 运行，而用户在浏览器里看到的是 Asia/Shanghai 日期。
+    每天 00:00–08:00 CST 两者相差一天，若用 ``date.today()`` 校验「不能晚于今天」，
+    用户提交的当日日期会被误判为未来日期而报错，因此业务日期一律走本函数。
+    """
+    return datetime.now(SHANGHAI_TIMEZONE).date()
 
 
 @dataclass(frozen=True)

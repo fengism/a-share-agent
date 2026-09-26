@@ -28,11 +28,34 @@ class SharedToolCache:
     def __init__(self) -> None:
         self._cache: dict[str, _SharedToolCacheEntry] = {}
 
-    def _get_entry(self, call: ToolCallInfo) -> _SharedToolCacheEntry | None:
+    @staticmethod
+    def _cache_key(
+        call: ToolCallInfo,
+        execution_context: "AgentExecutionContext | None" = None,
+    ) -> str:
+        """构造缓存 key；scope="user" 的工具按 user 分区。
+
+        此前 key 里没有用户维度，只是因为本类恰好是 per-request 实例（挂在
+        AgentExecutionContext 的 default_factory 字段上）。一旦缓存被提升到模块级、
+        或被后台 workflow 复用，两个用户的私有配置就会互相串用，而没有任何类型或测试能挡住。
+        """
+        policy = registry.get_tool_policy(call.function.name) or ToolPolicy()
+        user_id = (
+            execution_context.user_id
+            if policy.scope == "user" and execution_context is not None
+            else None
+        )
+        return tool_call_cache_key(call, user_id=user_id)
+
+    def _get_entry(
+        self,
+        call: ToolCallInfo,
+        execution_context: "AgentExecutionContext | None" = None,
+    ) -> _SharedToolCacheEntry | None:
         policy = registry.get_tool_policy(call.function.name) or ToolPolicy()
         if policy.cache_ttl_seconds == 0:
             return None
-        key = tool_call_cache_key(call)
+        key = self._cache_key(call, execution_context)
         entry = self._cache.get(key)
         if entry is not None and (
             entry.future.cancelled()
@@ -47,11 +70,12 @@ class SharedToolCache:
         self,
         call: ToolCallInfo,
         allowed_names: Collection[str] | None = None,
+        execution_context: "AgentExecutionContext | None" = None,
     ) -> ToolResultInfo | None:
         """Return a completed, unexpired success without consuming execution budget."""
         if allowed_names is not None and call.function.name not in allowed_names:
             return None
-        entry = self._get_entry(call)
+        entry = self._get_entry(call, execution_context)
         if entry is None or not entry.future.done():
             return None
         result = entry.future.result()
@@ -84,8 +108,9 @@ class SharedToolCache:
                 execution_context=execution_context,
             )
 
-        key = tool_call_cache_key(call)
-        existing = self._get_entry(call)
+        # scope="user" 的工具结果依赖用户私有配置，必须按 user 分区。
+        key = self._cache_key(call, execution_context)
+        existing = self._get_entry(call, execution_context)
         if existing is not None:
             metrics.record_agentic_event("tool_cache_hit")
             cached = await asyncio.shield(existing.future)

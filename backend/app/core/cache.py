@@ -17,8 +17,10 @@ class TTLCache:
 
     def __init__(self, maxsize: int = 1000, name: str = "ttl_cache") -> None:
         """Initialize the TTL cache with empty store and lock."""
-        if maxsize < 0:
-            raise ValueError("TTLCache maxsize 不能小于 0")
+        # maxsize 必须为正。此前只挡负数，maxsize=0 能通过校验，但 set() 里所有容量判断
+        # 都写作 `self._maxsize > 0`，于是它既不淘汰也不清理过期项，静默退化成无界缓存。
+        if maxsize <= 0:
+            raise ValueError("TTLCache maxsize 必须大于 0")
         self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
         self._lock = Lock()
         self._maxsize = maxsize
@@ -71,18 +73,12 @@ class TTLCache:
         if not math.isfinite(ttl) or ttl <= 0:
             raise ValueError("TTLCache ttl 必须是大于 0 的有限秒数")
         with self._lock:
-            at_capacity = (
-                key not in self._store
-                and self._maxsize > 0
-                and len(self._store) >= self._maxsize
-            )
-            if at_capacity:
+            if key not in self._store and len(self._store) >= self._maxsize:
+                # 容量打满时先清过期项再淘汰：一次性清掉所有过期项，
+                # 避免「大量条目同时过期 + 高频写入」时每次 set 只能腾出一个位置，
+                # 反复全表扫描 _store。
                 self._purge_expired_locked(time.monotonic())
-            if (
-                key not in self._store
-                and self._maxsize > 0
-                and len(self._store) >= self._maxsize
-            ):
+            while key not in self._store and len(self._store) >= self._maxsize:
                 evicted_key, _ = self._store.popitem(last=False)
                 self._evictions += 1
                 metrics.record_cache_event(self._name, "eviction", size=len(self._store))

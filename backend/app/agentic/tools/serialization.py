@@ -44,8 +44,12 @@ def has_meaningful_tool_content(content: str) -> bool:
     return _has_meaningful_value(payload)
 
 
-def tool_call_cache_key(call: ToolCallInfo) -> str:
-    """Create a stable cache key independent of JSON whitespace and key order."""
+def tool_call_cache_key(call: ToolCallInfo, *, user_id: int | str | None = None) -> str:
+    """Create a stable cache key independent of JSON whitespace and key order.
+
+    ``user_id`` 用于 scope="user" 的工具：这类工具的结果依赖当前用户的私有配置
+    （LLM api_key / model 等），不按用户分区就可能把一个用户的结果复用给另一个用户。
+    """
     arguments = call.function.arguments
     try:
         arguments = json.dumps(
@@ -56,7 +60,9 @@ def tool_call_cache_key(call: ToolCallInfo) -> str:
         )
     except (TypeError, ValueError, json.JSONDecodeError):
         arguments = arguments.strip()
-    return f"{call.function.name}:{arguments}"
+    if user_id is None:
+        return f"{call.function.name}:{arguments}"
+    return f"{call.function.name}:user:{user_id}:{arguments}"
 
 
 def serialize_truncated_preview(

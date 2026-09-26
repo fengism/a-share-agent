@@ -95,6 +95,18 @@ class Tool:
                 content=serialize_error("tool_unavailable", f"工具 '{self.name}' 暂不可用"),
                 is_error=True,
             )
+        # 整体 deadline 已耗尽时直接短路。不短路的话 bounded_timeout 会返回 ~1ms，
+        # 每次调用都立刻失败，而 LLM 看到的是「可重试的工具错误」会继续调用，
+        # 白白烧掉每轮/总工具配额和一次 LLM 往返。
+        if execution_context is not None and execution_context.deadline_exceeded():
+            return ToolResultInfo(
+                tool_call_id=call.id,
+                name=self.name,
+                content=serialize_error(
+                    "deadline_exceeded", "本次会话时间预算已耗尽，请让 Agent 尽快收敛并作答"
+                ),
+                is_error=True,
+            )
         try:
             arguments = json.loads(call.function.arguments)
             validate_value(arguments, self.parameters)

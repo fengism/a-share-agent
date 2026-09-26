@@ -7,19 +7,16 @@ from app.core.cache_policies import MARKET_LIMIT_HISTORY
 from app.core.concurrency.rate_limiter import call_blocking, kaipanhong_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
+from app.core.market import market_today
 from app.financial_data.market.quotes.schemas import (
     MarketLimitHistoryCategory,
     MarketLimitHistoryResponse,
 )
-from app.financial_data.market.trading_session import SHANGHAI_TIMEZONE
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
 _limit_history_singleflight: AsyncSingleFlight[MarketLimitHistoryResponse] = AsyncSingleFlight()
 
-
-def _shanghai_today() -> date:
-    return datetime.now(SHANGHAI_TIMEZONE).date()
 
 
 async def get_limit_history(
@@ -27,7 +24,7 @@ async def get_limit_history(
     category: MarketLimitHistoryCategory,
 ) -> MarketLimitHistoryResponse:
     """获取开盘红历史涨停、跌停或风向标列表。"""
-    if requested_date >= _shanghai_today():
+    if requested_date >= market_today():
         raise InvalidRequestError("开盘红历史榜单仅支持今天之前的日期")
 
     date_text = requested_date.isoformat()

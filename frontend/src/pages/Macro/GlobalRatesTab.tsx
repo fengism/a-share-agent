@@ -20,6 +20,11 @@ type TimeRange = "3m" | "6m" | "1y" | "all";
 type ChartMode = "10y" | "2y" | "term_spread" | "all_series";
 type CrudeChartMode = "sc_wti" | "all_oils" | "oil_vs_us10y";
 
+// 政策利率一律以后端返回为准，取不到就显示占位符。
+// 此前这里兜底了写死的 "3.10%" / "4.25% - 4.50%"，那些值早已与实际不符，
+// 会在接口失败时把过期数字当成实时数据展示。
+const RATE_PLACEHOLDER = "--";
+
 export default function GlobalRatesTab() {
   const c = useColors();
   const { data, isLoading, error, refetch } = useGlobalMacroRates();
@@ -908,15 +913,15 @@ export default function GlobalRatesTab() {
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ padding: "10px 14px", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid ${c.primary}` }}>
                 <div style={{ fontSize: 12, color: c.textSecondary }}>中国人民银行 · 1年期 LPR</div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.china_lpr_1y ?? "3.10%"}</div>
+                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.china_lpr_1y ?? RATE_PLACEHOLDER}</div>
               </div>
               <div style={{ padding: "10px 14px", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid ${c.accent}` }}>
                 <div style={{ fontSize: 12, color: c.textSecondary }}>中国人民银行 · 5年期以上 LPR (房贷基准)</div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.china_lpr_5y ?? "3.60%"}</div>
+                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.china_lpr_5y ?? RATE_PLACEHOLDER}</div>
               </div>
               <div style={{ padding: "10px 14px", background: c.nestedBg, borderRadius: 6, borderLeft: `3px solid #722ed1` }}>
                 <div style={{ fontSize: 12, color: c.textSecondary }}>美联储 · 联邦基金目标利率 (Fed Funds Rate)</div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.us_fed_funds_rate ?? "4.25% - 4.50%"}</div>
+                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 2 }}>{policy?.us_fed_funds_rate ?? RATE_PLACEHOLDER}</div>
               </div>
             </div>
           </Card>

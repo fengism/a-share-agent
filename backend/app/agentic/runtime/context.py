@@ -45,6 +45,10 @@ class AgentExecutionContext:
             deadline=deadline,
         )
 
+    def deadline_exceeded(self) -> bool:
+        """整体 deadline 是否已耗尽。"""
+        return self.deadline is not None and time.monotonic() >= self.deadline
+
     def bounded_timeout(self, requested_seconds: float) -> float:
         timeout_seconds = max(0.001, float(requested_seconds))
         if self.deadline is None:

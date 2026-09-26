@@ -6,7 +6,7 @@ import pandas as pd
 from app.constants.http import TENCENT_FINANCE_HEADERS
 from app.constants.market import INDEX_FALLBACKS, TENCENT_STOCK_CONCEPT_URL, TENCENT_STOCK_QUOTE_URL
 from app.core.dataframes import rename_columns
-from app.core.market import normalize_code, safe_float
+from app.core.market import market_today, normalize_code, safe_float
 from app.domain.stock import StockConcept, StockConceptInfo
 from app.infrastructure.http.client import get_provider_session as _get_session
 
@@ -66,7 +66,7 @@ class TencentDataProvider:
         normalized_start = start_date.replace("-", "")
         normalized_end = end_date.replace("-", "")
         range_start = int(normalized_start[:4])
-        current_year = datetime.now().year
+        current_year = market_today().year
         range_end = min(int(normalized_end[:4]) + 1, current_year + 1)
         url = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get"
 

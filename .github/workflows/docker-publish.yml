@@ -51,6 +51,10 @@ jobs:
           uv run --frozen mypy
           uv run --frozen mypy ../sandbox
 
+      - name: Test backend
+        working-directory: backend
+        run: uv run --frozen pytest -q
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

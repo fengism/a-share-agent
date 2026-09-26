@@ -1,3 +1,13 @@
+# 容器内 127.0.0.1 指向容器自身，宿主机 shell 里的代理（如 Clash 的 127.0.0.1:10808）
+# 永远不可达；Compose 会把这些变量自动注入容器，导致全部出网请求 Connection refused。
+# 这里显式置空以覆盖注入；确需走代理时改用宿主机可达地址并加
+# extra_hosts: ["host.docker.internal:host-gateway"]。
+x-direct-network-env: &direct-network-env
+  HTTP_PROXY: ""
+  HTTPS_PROXY: ""
+  http_proxy: ""
+  https_proxy: ""
+
 services:
   backend:
     image: ${BACKEND_IMAGE:-fengliu1989/a-share-backend:main}
@@ -24,6 +34,7 @@ services:
       TRUST_PROXY_HEADERS: "true"
       # HOME 指向 data 卷：tdxhub 等库的 ~/.tdxhub 缓存随卷持久化（容器重启不丢）
       HOME: /app/data/home
+      <<: *direct-network-env
     volumes:
       # tdxhub 客户端缓存（镜像内 ~/.tdxhub 软链至此）随 data 卷持久化
       - ./data:/app/data
@@ -68,6 +79,9 @@ services:
     read_only: true
     ports:
       - "${DOCKER_FRONTEND_BIND_ADDRESS:-127.0.0.1}:${DOCKER_FRONTEND_PORT:-8080}:8080"
+    environment:
+      # healthcheck 里的 wget 也会读代理变量，置空后才是真正的本地探活
+      <<: *direct-network-env
     tmpfs:
       - /tmp:size=32m,uid=101,gid=101,mode=0700
     deploy:
@@ -104,6 +118,7 @@ services:
     environment:
       PYTHON_SANDBOX_TOKEN: ${PYTHON_SANDBOX_TOKEN:-}
       PYTHON_SANDBOX_IMAGE: ${PYTHON_SANDBOX_IMAGE:-fengliu1989/a-share-python-sandbox:main}
+      <<: *direct-network-env
     volumes:
       - ${PYTHON_SANDBOX_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro
     networks:

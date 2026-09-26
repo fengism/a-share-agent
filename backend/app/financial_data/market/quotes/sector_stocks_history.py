@@ -8,7 +8,7 @@ from app.core.cache_policies import MARKET_SECTOR_STOCKS_HISTORY
 from app.core.concurrency.rate_limiter import call_blocking, kaipanhong_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
-from app.core.market import normalize_code, safe_float
+from app.core.market import market_today, normalize_code, safe_float
 from app.financial_data.market.quotes.schemas import (
     MarketSectorStocksHistoryResponse,
 )
@@ -32,9 +32,6 @@ _sector_stocks_singleflight: AsyncSingleFlight[MarketSectorStocksHistoryResponse
     AsyncSingleFlight()
 )
 
-
-def _shanghai_today() -> date:
-    return datetime.now(SHANGHAI_TIMEZONE).date()
 
 
 def _response_from_snapshot(
@@ -304,7 +301,7 @@ async def get_sector_stocks_history(
     if not normalized_plate_id:
         raise InvalidRequestError("plate_id 不能为空")
 
-    today = _shanghai_today()
+    today = market_today()
     if requested_date > today:
         raise InvalidRequestError("板块成分股日期不能晚于今天")
     if requested_date < today:

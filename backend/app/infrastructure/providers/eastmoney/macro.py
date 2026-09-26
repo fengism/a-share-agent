@@ -273,8 +273,18 @@ _US_PMI_INDICATOR_IDS = {
 _US_FED_RATE_INDICATOR_ID = "EMG00342250"  # 美国:联邦基金利率目标:上限
 _US_RETAIL_SALES_INDICATOR_ID = "EMG00003721"  # 美国:零售销售:季调:环比
 _US_TRADE_BALANCE_INDICATOR_ID = "EMG00000700"  # 美国:贸易差额:季调（原始单位百万美元）
+# 东财「新增非农就业人数」原始单位为千人，而 FRED 侧 PAYEMS units="chg" 换算后为万人。
+# 两个数据源必须返回同一量纲，否则回退切换时同一指标会出现 10 倍跳变。
+_US_NON_FARM_DIVISOR = 10.0
 _US_ECON_PAGE_SIZE = 60
 _US_ECON_ROW_LIMIT = 24
+
+
+def _scale_us_series(series: dict[str, float], divisor: float) -> dict[str, float]:
+    """按固定除数换算序列量纲，保持报告期键不变。"""
+    if divisor == 1:
+        return series
+    return {period: value / divisor for period, value in series.items()}
 
 
 class UsEconMixin:
@@ -357,10 +367,13 @@ class UsEconMixin:
         return self._combine_us_series(series)
 
     def fetch_us_labor(self) -> list[dict]:
-        """美国失业率与非农就业（该报表无初请失业金序列，初请依赖 akshare 回退）。"""
+        """美国失业率与新增非农就业（该报表无初请失业金序列，初请依赖 akshare 回退）。"""
         series = {
             "UNEMPLOYMENT": self._fetch_us_econ_series(_US_ECON_INDICATOR_IDS["UNEMPLOYMENT"]),
-            "NON_FARM": self._fetch_us_econ_series(_US_ECON_INDICATOR_IDS["NON_FARM"]),
+            "NON_FARM": _scale_us_series(
+                self._fetch_us_econ_series(_US_ECON_INDICATOR_IDS["NON_FARM"]),
+                _US_NON_FARM_DIVISOR,
+            ),
         }
         return self._combine_us_series(series)
 

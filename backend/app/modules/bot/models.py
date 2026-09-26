@@ -28,6 +28,15 @@ class BotResponse:
     text: str
     title: str = "股票分析助手"
     markdown: bool = True
+    # 批量类命令的部分失败计数。缺了它，10 只全失败与 10 只全成功是同型同状态的响应，
+    # 任务会被记为 succeeded，既不重试也观测不到失败率。
+    failure_count: int = 0
+    total_count: int = 0
+
+    @property
+    def totally_failed(self) -> bool:
+        """是否每一项都失败（且确实有任务项）。"""
+        return self.total_count > 0 and self.failure_count >= self.total_count
 
     @classmethod
     def error(cls, message: str) -> "BotResponse":

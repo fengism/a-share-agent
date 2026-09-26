@@ -209,6 +209,13 @@ class FredDataProvider:
         )
 
     def fetch_us_pmi(self) -> list[dict[str, Any]]:
+        """ISM 制造业/服务业 PMI。
+
+        FRED 已下架这两条序列：NAPM 与 NAPMNMI 均返回 "The series does not exist."，
+        站内已无任何 PMI 序列。宏观服务因此不再把 us_pmi 路由到 FRED
+        （见 macro/service.py 的 _FRED_UNSUPPORTED_OPERATIONS），改用东财数据中心。
+        保留本方法以便 FRED 恢复该序列后可直接启用。
+        """
         return self._combine_series(
             self._fetch_series_group(
                 {
@@ -277,7 +284,14 @@ class FredDataProvider:
         )
 
     def fetch_us_credit_spread(self) -> list[dict[str, Any]]:
-        return self._single_series_rows(self._fetch_series("BAMLH0A0HYM2"))
+        """ICE BofA 美国高收益债信用利差（月均，百分点）。
+
+        BAMLH0A0HYM2 是日频序列。不指定 frequency 时 _FRED_ROW_LIMIT 条观测只覆盖
+        约一个月的工作日，再按月归期后仅剩 2 个点，趋势图退化成单点，因此显式按月聚合。
+        """
+        return self._single_series_rows(
+            self._fetch_series("BAMLH0A0HYM2", frequency="m", aggregation_method="avg")
+        )
 
     def fetch_us_fed_rate(self) -> list[dict[str, Any]]:
         series = self._fetch_series(

@@ -1,7 +1,7 @@
 import logging
 import math
-from datetime import datetime
 
+from app.core.market import market_today
 from app.financial_data.stock.profile.schemas import StockBasicInfo
 from app.financial_data.stock.valuation.helpers import (
     _forecast_confidence_adjustment,
@@ -216,7 +216,7 @@ def _derive_peg_growth_rate(
     Return:
         (增长率, 增长依据描述, 置信度) 元组
     """
-    current_year = datetime.now().year
+    current_year = market_today().year
     if (
         net_profit_ttm is not None
         and math.isfinite(net_profit_ttm)

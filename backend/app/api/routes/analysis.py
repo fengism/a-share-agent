@@ -13,6 +13,7 @@ from app.api.auth.dependencies import require_active_user
 from app.api.errors import NotFoundError
 from app.api.routes import analysis_execution
 from app.api.schemas import DeleteResponse
+from app.core.market import market_today
 from app.domain.identity import AuthenticatedUser
 from app.domain.market import KlineData
 from app.financial_data.stock.profile.basic_info import get_basic_info
@@ -41,10 +42,10 @@ def _pdf_market_end_date(analysis_date: str) -> calendar_date:
     for date_format in ("%Y-%m-%d", "%Y%m%d"):
         try:
             parsed = datetime.strptime(analysis_date, date_format).date()
-            return min(parsed, calendar_date.today())
+            return min(parsed, market_today())
         except (TypeError, ValueError):
             continue
-    return calendar_date.today()
+    return market_today()
 
 
 async def _load_pdf_visual_data(
@@ -112,8 +113,10 @@ async def export_custom_analysis_pdf(
         basic_info = await get_basic_info(code)
         if basic_info:
             stock_info_dict = basic_info.model_dump()
-    except Exception:
-        pass
+    except Exception as error:
+        # 基础信息只是 PDF 里的可选抬头，缺失不该阻断导出；但必须留痕，
+        # 否则上游挂掉时 PDF 照常返回 200，运营侧完全看不出少了这段内容。
+        logger.warning("生成 PDF 时获取股票基础信息失败: code=%s error_type=%s", code, type(error).__name__)
 
     kline_data, chip_distribution = await _load_pdf_visual_data(
         code,
@@ -164,8 +167,8 @@ async def export_analysis_pdf(
         basic_info = await get_basic_info(code)
         if basic_info:
             stock_info_dict = basic_info.model_dump()
-    except Exception:
-        pass
+    except Exception as error:
+        logger.warning("导出分析报告时获取股票基础信息失败: code=%s error_type=%s", code, type(error).__name__)
 
     kline_data, chip_distribution = await _load_pdf_visual_data(
         code,

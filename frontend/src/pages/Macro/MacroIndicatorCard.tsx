@@ -20,6 +20,13 @@ interface FieldDef {
   unit?: string;
   precision?: number;
   valueDivisor?: number;
+  /**
+   * 强制该序列使用右侧副坐标轴。
+   *
+   * 默认按单位自动判定（% 与非 % 混排时开双轴），但「水平值 + 变化率」同为 % 时
+   * 量级可能相差两个数量级，共用一根轴会把小值压成直线，需要逐字段显式指定。
+   */
+  secondaryAxis?: boolean;
 }
 
 interface MacroIndicatorCardProps {
@@ -61,7 +68,14 @@ export default function MacroIndicatorCard({
     const chartFields = fields.filter((f) => trend.some((item) => item[f.key] != null));
     const hasRateSeries = chartFields.some((field) => field.unit === "%");
     const hasLevelSeries = chartFields.some((field) => field.unit !== "%");
-    const useDualAxis = hasRateSeries && hasLevelSeries;
+    // 默认规则：% 与非 % 混排时开双轴；secondaryAxis 可逐字段覆盖（true=右轴，false=左轴）。
+    const autoDualAxis = hasRateSeries && hasLevelSeries;
+    const secondaryKeys = new Set(
+      chartFields
+        .filter((field) => field.secondaryAxis ?? (autoDualAxis && field.unit === "%"))
+        .map((field) => field.key),
+    );
+    const useDualAxis = secondaryKeys.size > 0 && secondaryKeys.size < chartFields.length;
     const levelUnits = Array.from(new Set(
       chartFields
         .filter((field) => field.unit !== "%")
@@ -69,6 +83,8 @@ export default function MacroIndicatorCard({
         .filter((unit): unit is string => Boolean(unit)),
     ));
     const levelAxisName = levelUnits.length === 1 ? levelUnits[0] : levelUnits.length > 1 ? "规模" : undefined;
+    // 全部字段都是 % 时（如劳动参与率 + 平均时薪环比），左轴同样需要 % 标注
+    const primaryAxisName = levelAxisName ?? (hasRateSeries ? "%" : undefined);
 
     const series = chartFields.map((f) => ({
       name: f.label,
@@ -77,7 +93,7 @@ export default function MacroIndicatorCard({
       showSymbol: false,
       symbol: "circle",
       symbolSize: 6,
-      yAxisIndex: useDualAxis && f.unit === "%" ? 1 : 0,
+      yAxisIndex: secondaryKeys.has(f.key) ? 1 : 0,
       data: trend
         .map((item) => {
           const value = item[f.key];
@@ -127,7 +143,7 @@ export default function MacroIndicatorCard({
       },
       yAxis: useDualAxis
         ? [
-            { ...valueAxis, name: levelAxisName },
+            { ...valueAxis, name: primaryAxisName },
             {
               ...valueAxis,
               name: "%",

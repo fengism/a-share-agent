@@ -22,8 +22,20 @@ async def resolve_key_levels(code: str) -> KeyLevels:
         return KeyLevels()
 
 
+def _has_levels(levels: KeyLevels) -> bool:
+    """是否真的算出了点位（而不是 resolve_key_levels 失败后的空壳）。"""
+    return levels.support is not None or levels.resistance is not None
+
+
 def apply_key_levels(result: AnalysisResult, levels: KeyLevels) -> AnalysisResult:
-    """用程序计算结果覆盖模型生成的点位，空结果也不回退到模型值。"""
+    """用程序计算结果覆盖模型生成的点位。
+
+    只有真的算出点位时才覆盖。K 线拉取/计算失败时保留模型给出的值：此前空结果会
+    无条件把 support_level / resistance_level 清空，并随 AnalysisResult 落盘 + 进缓存，
+    用户看到的「无支撑/压力位」无法区分「今天算不出来」和「确实没有关键点位」。
+    """
+    if not _has_levels(levels):
+        return result
     technical = result.technical.model_copy(
         update={
             "support_level": levels.support,

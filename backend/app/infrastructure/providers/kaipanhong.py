@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
+from app.core.market import market_today
 from app.infrastructure.http.client import parse_text_json, provider_post
 
 _REALTIME_URL = "https://apphwshhq.kaipanhong.com/w1/api/index.php"
@@ -30,9 +31,6 @@ _HISTORY_CATEGORY_PIDS = {
     "wind_vane": "6",
 }
 
-
-def _shanghai_today() -> date:
-    return datetime.now(_SHANGHAI_TIMEZONE).date()
 
 
 def _safe_int(value: object) -> int:
@@ -230,7 +228,7 @@ class KaipanhongDataProvider:
 
     def fetch_limit_up_ladder(self, requested_date: str) -> dict:
         parsed_date = date.fromisoformat(requested_date)
-        host = _REALTIME_URL if parsed_date == _shanghai_today() else _HISTORY_URL
+        host = _REALTIME_URL if parsed_date == market_today() else _HISTORY_URL
         response = provider_post(
             host,
             data={
@@ -265,7 +263,7 @@ class KaipanhongDataProvider:
             raise ValueError(f"未知历史榜单类别: {category}") from error
 
         parsed_date = date.fromisoformat(requested_date)
-        if parsed_date >= _shanghai_today():
+        if parsed_date >= market_today():
             raise ValueError(f"开盘红历史榜单日期必须早于今天: {requested_date}")
 
         items: list[dict] = []
@@ -325,7 +323,7 @@ class KaipanhongDataProvider:
             raise ValueError(f"plate_id 不能为空: {plate_id}")
 
         parsed_date = date.fromisoformat(requested_date)
-        if parsed_date >= _shanghai_today():
+        if parsed_date >= market_today():
             raise ValueError(f"开盘红板块成分股日期必须早于今天: {requested_date}")
 
         stocks: list[dict] = []
@@ -383,7 +381,7 @@ class KaipanhongDataProvider:
     def fetch_industry_rankings(self, requested_date: str) -> dict:
         """获取开盘红行业涨跌与资金排行。"""
         parsed_date = date.fromisoformat(requested_date)
-        today = _shanghai_today()
+        today = market_today()
         if parsed_date > today:
             raise ValueError(f"开盘红行业排行日期不能晚于今天: {requested_date}")
 

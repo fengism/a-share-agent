@@ -35,9 +35,10 @@ class BatchCommand(BotCommand):
         progress_lock = asyncio.Lock()
         completed = 0
         progress_step = max(1, (len(selected_codes) + 3) // 4)
+        failed = 0
 
         async def analyze(code: str) -> str:
-            nonlocal completed
+            nonlocal completed, failed
             try:
                 async with semaphore:
                     result = await run_analysis(code, context.service_user_id)
@@ -48,6 +49,7 @@ class BatchCommand(BotCommand):
             except Exception:
                 logger.exception("Bot 批量分析失败: code=%s", code)
                 line = f"- `{code}`：分析失败"
+                failed += 1
 
             async with progress_lock:
                 completed += 1
@@ -67,4 +69,13 @@ class BatchCommand(BotCommand):
                 f"- 另有 {len(codes) - len(selected_codes)} 只持仓未执行，"
                 f"本次最多分析 {context.batch_max_stocks} 只"
             )
-        return BotResponse(text="\n".join(lines), title="持仓批量分析")
+        if failed:
+            lines.append(f"\n> ⚠️ {failed}/{len(selected_codes)} 只分析失败。")
+        # failure_count / total_count 让「全灭」与「全成功」在响应里可区分，
+        # execute_bot_job 据此决定是否把任务标记为失败并重试。
+        return BotResponse(
+            text="\n".join(lines),
+            title="持仓批量分析",
+            failure_count=failed,
+            total_count=len(selected_codes),
+        )

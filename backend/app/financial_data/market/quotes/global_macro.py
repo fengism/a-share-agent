@@ -10,13 +10,20 @@ from typing import Any
 import httpx
 
 from app.core.cache import market_cache as cache
-from app.core.concurrency.rate_limiter import akshare_semaphore, eastmoney_semaphore
+from app.core.concurrency.rate_limiter import (
+    akshare_semaphore,
+    call_blocking,
+    eastmoney_semaphore,
+    nbs_semaphore,
+)
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 300
+# 政策利率取不到时的显式占位。刻意不用写死的数值冒充实时数据。
+_RATE_UNAVAILABLE = "暂不可用"
 
 _FX_ROW_KEYS = {
     "UDI": ("dxy", "美元指数 (DXY)", "UDI"),
@@ -502,6 +509,54 @@ async def get_crude_oil_data() -> dict[str, Any]:
     return data
 
 
+async def fetch_policy_rates() -> dict[str, str]:
+    """获取中美政策利率，全部来自实时数据源。
+
+    此前这三个值是写死的字符串，会静默过期且没有任何来源标注——例如美联储目标区间
+    长期停在 4.25%-4.50%，与实际值早已脱节。取不到时明确返回「暂不可用」，
+    宁可让前端显示缺数据，也不输出一个看起来像实时数据的错数字。
+    """
+    result = {
+        "china_lpr_1y": _RATE_UNAVAILABLE,
+        "china_lpr_5y": _RATE_UNAVAILABLE,
+        "us_fed_funds_rate": _RATE_UNAVAILABLE,
+    }
+    lpr_rows, fed_rows = await asyncio.gather(
+        provider_gateway.call(
+            "nbs",
+            "fetch_china_lpr",
+            lambda: call_blocking(get_provider("nbs").fetch_china_lpr, semaphore=nbs_semaphore),
+            is_fallback_attempt=True,
+        ),
+        provider_gateway.call(
+            "eastmoney",
+            "fetch_us_fed_rate",
+            lambda: call_blocking(
+                get_provider("eastmoney").fetch_us_fed_rate, semaphore=eastmoney_semaphore
+            ),
+            is_fallback_attempt=True,
+        ),
+        return_exceptions=True,
+    )
+    if isinstance(lpr_rows, list) and lpr_rows:
+        latest = lpr_rows[0]
+        one_year = _safe_float(latest.get("LPR1Y"))
+        five_year = _safe_float(latest.get("LPR5Y"))
+        if one_year is not None:
+            result["china_lpr_1y"] = f"{one_year:.2f}% (中国1年期贷款市场报价利率)"
+        if five_year is not None:
+            result["china_lpr_5y"] = f"{five_year:.2f}% (中国5年期以上LPR/房贷基准)"
+    if isinstance(fed_rows, list) and fed_rows:
+        # 东财该序列只给目标区间上限，因此只报上限，不臆造下限。
+        upper = _safe_float(fed_rows[0].get("VALUE"))
+        if upper is not None:
+            result["us_fed_funds_rate"] = f"上限 {upper:.2f}% (美联储联邦基金目标利率)"
+    unavailable = [key for key, value in result.items() if value == _RATE_UNAVAILABLE]
+    if unavailable:
+        logger.warning("政策利率数据源不可用: %s", ",".join(unavailable))
+    return result
+
+
 async def get_global_macro_rates() -> dict[str, Any]:
     """获取全球宏观基准利率、国债收益率与美元外汇流动性看板。"""
     cache_key = "global_macro_rates_summary_v4"
@@ -509,19 +564,34 @@ async def get_global_macro_rates() -> dict[str, Any]:
     if cached is not None:
         return cached
 
-    fx_data, bond_bundle, crude_oil_bundle = await asyncio.gather(
+    fx_data, bond_bundle, crude_oil_bundle, policy_rates = await asyncio.gather(
         fetch_fx_and_dollar_index(),
         fetch_us_cn_treasury_yield_history(page_size=300),
         get_crude_oil_data(),
+        fetch_policy_rates(),
         return_exceptions=True,
     )
 
+    failed: list[str] = []
     if isinstance(fx_data, Exception):
+        logger.warning("全球宏观外汇数据获取失败: %s", fx_data)
+        failed.append("dollar_and_fx")
         fx_data = {}
     if isinstance(bond_bundle, Exception):
+        logger.warning("全球宏观美债数据获取失败: %s", bond_bundle)
+        failed.append("treasury_yields_and_spreads")
         bond_bundle = {"history": [], "term_structure": [], "latest": {}, "total_count": 0}
     if isinstance(crude_oil_bundle, Exception):
+        logger.warning("全球宏观原油数据获取失败: %s", crude_oil_bundle)
+        failed.append("crude_oil")
         crude_oil_bundle = {"sc0": None, "wti": None, "brent": None, "history": []}
+    if isinstance(policy_rates, Exception):
+        logger.warning("全球宏观政策利率获取失败: %s", policy_rates)
+        policy_rates = {
+            "china_lpr_1y": _RATE_UNAVAILABLE,
+            "china_lpr_5y": _RATE_UNAVAILABLE,
+            "us_fed_funds_rate": _RATE_UNAVAILABLE,
+        }
 
     latest_bond = bond_bundle.get("latest", {})
 
@@ -534,11 +604,7 @@ async def get_global_macro_rates() -> dict[str, Any]:
             "term_structure": bond_bundle.get("term_structure", []),
             "total_count": bond_bundle.get("total_count", 0),
         },
-        "central_bank_policy_rates": {
-            "china_lpr_1y": "3.10% (中国1年期贷款市场报价利率)",
-            "china_lpr_5y": "3.60% (中国5年期以上LPR/房贷基准)",
-            "us_fed_funds_rate": "4.25% - 4.50% (美联储联邦基金目标利率)",
-        },
+        "central_bank_policy_rates": policy_rates,
         "market_implications": {
             "us_10y_impact": "美债10年期收益率是全球资产定价之锚（折现率），高位压制科技成长股估值，回落有利于成长股估值修复。",
             "us_china_spread_impact": "中美10Y利差倒挂幅度收窄或转正时，有利于人民币汇率企稳及北向资金中长期配置型流入。",
@@ -547,6 +613,11 @@ async def get_global_macro_rates() -> dict[str, Any]:
         "crude_oil": crude_oil_bundle,
     }
 
+    # 上游整体故障时不要写缓存：否则一次抖动会把「数据源挂了」固化成 5 分钟的
+    # 「今天没有数据」，且前端拿到的 JSON 结构完全合法，无法与真实空值区分。
+    if failed:
+        logger.warning("全球宏观看板存在失败分片，跳过缓存: %s", ",".join(failed))
+        return response
     cache.set(cache_key, response, ttl=_CACHE_TTL_SECONDS)
     return response
 

@@ -4,6 +4,8 @@ from datetime import date, timedelta
 
 import pandas as pd
 
+from app.core.market import market_today
+
 _PERIOD_STALE_TOLERANCE_DAYS = {
     "daily": 20,
     "weekly": 45,
@@ -55,7 +57,7 @@ def validate_kline_frame(
     if accepted.empty:
         raise ValueError(f"{source} K 线 OHLC 或日期范围无有效数据")
 
-    expected_end = min(end.date(), today or date.today())
+    expected_end = min(end.date(), today or market_today())
     tolerance = _PERIOD_STALE_TOLERANCE_DAYS.get(period, 20)
     latest_date = accepted_dates.max().date()
     if latest_date < expected_end - timedelta(days=tolerance):

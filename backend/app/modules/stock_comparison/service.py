@@ -62,19 +62,26 @@ async def compare_stocks(codes: Sequence[str] | str) -> list[StockCompareItem]:
                 }
             )
 
+        # 三路数据源各自可能失败。只在「该路确实失败」时把它负责的字段置 None，
+        # 并补 *_error，让上游能区分「没有这个指标」和「这一路挂了」。
+        # 判断一律用 `is None`：用真值判断会把合法的 0（pe_ttm=0 / pb=0）当成缺失。
         if isinstance(valuation, Exception):
-            if not result.get("pe_ttm"):
+            if result.get("pe_ttm") is None:
                 result["pe_ttm"] = None
-            if not result.get("pb"):
+            if result.get("pb") is None:
                 result["pb"] = None
             result["ps_ttm"] = None
+            result["valuation_error"] = type(valuation).__name__
         else:
-            result["pe_ttm"] = result.get("pe_ttm") or valuation.pe_ttm
-            result["pb"] = result.get("pb") or valuation.pb
+            if result.get("pe_ttm") is None:
+                result["pe_ttm"] = valuation.pe_ttm
+            if result.get("pb") is None:
+                result["pb"] = valuation.pb
             result["ps_ttm"] = valuation.ps_ttm
 
         if isinstance(metrics, Exception):
             result.update({"revenue": None, "net_profit": None, "roe": None})
+            result["metrics_error"] = type(metrics).__name__
         else:
             metric_values = metrics.metrics if metrics.metrics else {}
             result.update(

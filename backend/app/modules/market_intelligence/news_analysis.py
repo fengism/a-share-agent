@@ -159,16 +159,17 @@ async def analyze_market_news(user_id: int) -> dict[str, Any]:
     if not items:
         return _fallback_analysis([])
 
-    cache_key = dated_cache_key("news_analysis", f"user:{user_id}")
+    # 内容哈希必须进 singleflight 的去重键。items 是每次请求重新取的，若去重键只有 user_id，
+    # 请求 B 在 A 的 LLM 调用在途时到达，B 会直接拿到「针对旧 feed」的分析，且返回值不带
+    # 任何降级标记，前端与上游都察觉不到。
+    content_hash = hashlib.md5(
+        "\n".join(_get(item, "title") for item in items[:80]).encode()
+    ).hexdigest()
+    cache_key = dated_cache_key("news_analysis", f"user:{user_id}", content_hash)
 
     async def _load() -> dict[str, Any]:
-        top_titles = [_get(item, "title") for item in items[:80]]
-        content_hash = hashlib.md5("\n".join(top_titles).encode()).hexdigest()
-
-        hash_key = dated_cache_key("news_analysis_hash", f"user:{user_id}")
         cached = cache.get(cache_key)
-        cached_hash = cache.get(hash_key)
-        if cached is not None and cached_hash == content_hash:
+        if cached is not None:
             return cast(dict[str, Any], cached)
 
         try:
@@ -192,13 +193,11 @@ async def analyze_market_news(user_id: int) -> dict[str, Any]:
                 raise ValueError("AI 资讯分析输出必须为 JSON 对象")
             _resolve_refs(result, items)
             cache.set(cache_key, result, ttl=300)
-            cache.set(hash_key, content_hash, ttl=300)
             return result
         except Exception as e:
             logger.warning("AI 资讯分析降级: error_type=%s error=%s", type(e).__name__, e)
             fallback = _fallback_analysis(items)
             cache.set(cache_key, fallback, ttl=_FALLBACK_CACHE_TTL_SECONDS)
-            cache.set(hash_key, content_hash, ttl=_FALLBACK_CACHE_TTL_SECONDS)
             return fallback
 
     return cast(dict[str, Any], await _analysis_singleflight.do(cache_key, _load))

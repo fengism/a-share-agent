@@ -16,6 +16,7 @@ from urllib.parse import urljoin
 import pandas as pd
 import requests
 
+from app.core.market import market_today
 from app.infrastructure.http.client import provider_get, provider_post
 
 API_BASE = "https://data.stats.gov.cn/dg/website/publicrelease/web/external"
@@ -397,7 +398,7 @@ class NbsDataProvider:
         spec = cast(dict[str, Any], _SERIES[name])
         freq = str(spec["freq"])
         leaves = cast(tuple[tuple[str, str, int, int | None], ...], spec["leaves"])
-        current_year = datetime.now().year
+        current_year = market_today().year
         requested_start = current_year - 2
         requested_end = current_year
         merged: dict[str, float] = {}
@@ -425,7 +426,7 @@ class NbsDataProvider:
         if groups is None:
             raise ValueError(f"不支持的国家统计局月度指标组: {name}")
 
-        current_year = datetime.now().year
+        current_year = market_today().year
         dts = f"{current_year - 2}01MM-{current_year}12MM"
         values_by_field: dict[str, dict[str, float]] = {}
         for cid, fields in groups:
@@ -505,7 +506,7 @@ class NbsDataProvider:
         ]
 
     def fetch_china_trade(self) -> list[dict[str, Any]]:
-        current_year = datetime.now().year
+        current_year = market_today().year
         dts = f"{current_year - 2}01MM-{current_year}12MM"
         values_by_indicator = fetch_series_batch(
             _TRADE_CID,

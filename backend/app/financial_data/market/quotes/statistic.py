@@ -3,7 +3,6 @@ import logging
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any, TypeVar, cast
 
 import pandas as pd
@@ -20,7 +19,7 @@ from app.core.concurrency.rate_limiter import (
     tencent_semaphore,
 )
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import safe_float
+from app.core.market import market_today, safe_float
 from app.financial_data.market.quotes.schemas import MarketStatistics
 from app.financial_data.market.quotes.sources import (
     BAIDU_MARKET_SECTOR_API,
@@ -42,7 +41,6 @@ from app.financial_data.market.quotes.sources import (
     TENCENT_MARKET_SECTOR_API,
     TENCENT_MARKET_SECTOR_SOURCE_ID,
 )
-from app.financial_data.market.trading_session import SHANGHAI_TIMEZONE
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
@@ -99,10 +97,6 @@ def _get_provider(name: str):
 def _get_eastmoney_provider():
     """Compatibility helper retained for existing tests and callers."""
     return _get_provider("eastmoney")
-
-
-def _shanghai_today() -> str:
-    return datetime.now(SHANGHAI_TIMEZONE).date().isoformat()
 
 
 def _tencent_sector_rankings() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -311,7 +305,7 @@ def _sector_attempts() -> list[_StatisticsAttempt]:
 
 def _distribution_attempts(date: str) -> list[_StatisticsAttempt]:
     attempts: list[_StatisticsAttempt] = []
-    if date == _shanghai_today():
+    if date == market_today().isoformat():
         attempts.append(
             _StatisticsAttempt(
                 "cls",
