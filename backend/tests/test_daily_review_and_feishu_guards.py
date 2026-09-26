@@ -90,3 +90,73 @@ class TestFeishuDocumentPermission:
         assert kwargs["json"]["member_type"] == "openid"
         assert kwargs["json"]["member_id"] == "ou_1234567890abcdef"
         assert kwargs["params"]["type"] == "wiki"
+
+
+class TestDailyReviewPushDataBoard:
+    def test_build_daily_review_includes_structured_data_board(self):
+        from app.infrastructure.integrations.feishu.adapter import to_feishu_card, to_feishu_doc_blocks
+        from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult
+        from app.modules.push.content import build_content
+
+        snapshot = DailyReviewDataSnapshot(
+            indices=[
+                {"name": "上证指数", "price": 3080.5, "change_pct": 0.85, "amount": 450000000000},
+                {"name": "深证成指", "price": 10500.0, "change_pct": 1.20, "amount": 550000000000},
+            ],
+            market_volume={"amount": 1000000000000, "amount_before_one_day": 950000000000},
+            market_statistics={
+                "up_count": 3200,
+                "down_count": 1600,
+                "flat_count": 150,
+                "limit_up_count": 65,
+                "limit_down_count": 5,
+            },
+            top_sectors=[
+                {"name": "半导体", "change_pct": 3.85, "leading_stock": "中芯国际", "leading_change_pct": 6.5},
+            ],
+            bottom_sectors=[
+                {"name": "煤炭开采", "change_pct": -2.10, "leading_stock": "中国神华", "leading_change_pct": -3.2},
+            ],
+            dragon_tiger=[
+                {"name": "拓维信息", "code": "002261", "net_amount": 152000000, "change_pct": 9.98},
+            ],
+            hot_concepts=[
+                {"name": "华为昇腾"},
+                {"name": "CPO"},
+            ],
+        )
+        review = DailyReviewResult(
+            date="2026-09-24",
+            title="每日复盘 - 2026-09-24",
+            generated_at="2026-09-24 16:00:00",
+            market_state="attack",
+            position_range="5-7成",
+            market_summary="两市成交突破万亿，科技主线强势领涨。",
+            llm_review="## 今日大盘复盘\n\n大盘今日放量大涨，主线明确。\n\n### 明日交易计划\n\n- 建议仓位：5-7成\n- 保持进攻节奏",
+            index_review=DailyReviewSection(title="指数", summary="放量反弹", bullets=[]),
+            hotspot_review=DailyReviewSection(title="热点", summary="科技爆发", bullets=[]),
+            dragon_tiger_review=DailyReviewSection(title="龙虎榜", summary="机构大举买入", bullets=[]),
+            data_snapshot=snapshot,
+        )
+
+        blocks = build_content("daily_review", review)
+        texts = [b.text for b in blocks]
+
+        # 验证包含数据看板
+        assert any("核心市场数据看板" in t for t in texts)
+        assert any("上证指数" in t and "+0.85%" in t for t in texts)
+        assert any("两市总成交额" in t and "10000.00 亿元" in t for t in texts)
+        assert any("上涨 3200 家" in t and "下跌 1600 家" in t for t in texts)
+        assert any("半导体" in t and "中芯国际" in t for t in texts)
+        assert any("拓维信息" in t and "1.52 亿元" in t for t in texts)
+        assert any("华为昇腾" in t for t in texts)
+
+        # 验证可转为飞书文档块
+        doc_blocks = to_feishu_doc_blocks(blocks)
+        assert len(doc_blocks) > 10
+
+        # 验证飞书卡片策略提取正确
+        card = to_feishu_card("daily_review", "2026-09-24 复盘", blocks, "https://feishu.cn/docx/123")
+        card_content = str(card)
+        assert "两市成交突破万亿" in card_content
+        assert "5-7成" in card_content

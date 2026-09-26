@@ -6,6 +6,7 @@ import re
 
 from app.domain.content import ContentBlock
 from app.modules.analysis.public import AnalysisResult, FactorAnalysis
+from app.modules.daily_review.models import DailyReviewDataSnapshot
 from app.modules.daily_review.public import DailyReviewResult, DailyReviewSection
 
 _SIGNAL_LABELS = {
@@ -115,31 +116,151 @@ def _build_chat(markdown_text: str) -> list[ContentBlock]:
     return _parse_markdown_blocks(markdown_text)
 
 
+_STATE_LABELS = {
+    "attack": "进攻",
+    "balanced": "均衡",
+    "defensive": "防守",
+    "unknown": "数据不足",
+}
+
+
+def _format_pct(val: float | None) -> str:
+    if val is None:
+        return "-"
+    return f"{'+' if val > 0 else ''}{val:.2f}%"
+
+
+def _format_amt(val: float | None) -> str:
+    if val is None:
+        return "-"
+    abs_val = abs(val)
+    if abs_val >= 1e8:
+        return f"{val / 1e8:.2f} 亿元"
+    if abs_val >= 1e4:
+        return f"{val / 1e4:.2f} 万元"
+    return f"{val:.0f} 元"
+
+
+def _build_daily_review_data_blocks(snapshot: DailyReviewDataSnapshot) -> list[ContentBlock]:
+    blocks: list[ContentBlock] = [
+        ContentBlock(type="heading", level=2, text="📊 核心市场数据看板"),
+    ]
+
+    # 1. 主要指数表现
+    if snapshot.indices:
+        blocks.append(ContentBlock(type="heading", level=3, text="主要指数表现"))
+        for idx in snapshot.indices:
+            name = idx.get("name") or idx.get("code") or "-"
+            price = f"{idx.get('price'):.2f}" if idx.get("price") is not None else "-"
+            chg = _format_pct(idx.get("change_pct"))
+            amt = _format_amt(idx.get("amount"))
+            blocks.append(ContentBlock(type="bullet", text=f"{name}：{price} ({chg}) ｜ 成交额 {amt}"))
+
+    # 2. 量能与市场宽度
+    has_vol = bool(snapshot.market_volume)
+    has_stats = bool(snapshot.market_statistics)
+    if has_vol or has_stats:
+        blocks.append(ContentBlock(type="heading", level=3, text="量能与市场宽度"))
+        if has_vol:
+            total_amt = snapshot.market_volume.get("amount")
+            prev_amt = snapshot.market_volume.get("amount_before_one_day")
+            amt_str = _format_amt(total_amt)
+            diff_str = ""
+            if total_amt is not None and prev_amt is not None:
+                diff = total_amt - prev_amt
+                diff_str = f"（较前日 {'+' if diff > 0 else ''}{_format_amt(diff)}）"
+            blocks.append(ContentBlock(type="bullet", text=f"两市总成交额：{amt_str} {diff_str}".strip()))
+        if has_stats:
+            up = snapshot.market_statistics.get("up_count", 0)
+            down = snapshot.market_statistics.get("down_count", 0)
+            flat = snapshot.market_statistics.get("flat_count", 0)
+            limit_up = snapshot.market_statistics.get("limit_up_count", 0)
+            limit_down = snapshot.market_statistics.get("limit_down_count", 0)
+            blocks.append(ContentBlock(type="bullet", text=f"涨跌分布：上涨 {up} 家 ｜ 平盘 {flat} 家 ｜ 下跌 {down} 家"))
+            blocks.append(ContentBlock(type="bullet", text=f"涨跌停数：涨停 {limit_up} 家 ｜ 跌停 {limit_down} 家"))
+
+    # 3. 行业板块涨跌榜 (TOP 5)
+    if snapshot.top_sectors or snapshot.bottom_sectors:
+        blocks.append(ContentBlock(type="heading", level=3, text="行业板块涨跌榜 (TOP 5)"))
+        if snapshot.top_sectors:
+            top_items = []
+            for s in snapshot.top_sectors[:5]:
+                sec_name = s.get("name") or "-"
+                sec_chg = _format_pct(s.get("change_pct"))
+                lead = s.get("leading_stock") or ""
+                lead_chg = f" ({lead} {_format_pct(s.get('leading_change_pct'))})" if lead else ""
+                top_items.append(f"{sec_name} {sec_chg}{lead_chg}")
+            blocks.append(ContentBlock(type="bullet", text="领涨行业：" + " ｜ ".join(top_items)))
+        if snapshot.bottom_sectors:
+            bot_items = []
+            for s in snapshot.bottom_sectors[:5]:
+                sec_name = s.get("name") or "-"
+                sec_chg = _format_pct(s.get("change_pct"))
+                lead = s.get("leading_stock") or ""
+                lead_chg = f" ({lead} {_format_pct(s.get('leading_change_pct'))})" if lead else ""
+                bot_items.append(f"{sec_name} {sec_chg}{lead_chg}")
+            blocks.append(ContentBlock(type="bullet", text="领跌行业：" + " ｜ ".join(bot_items)))
+
+    # 4. 龙虎榜活跃资金动向 (TOP 5)
+    if snapshot.dragon_tiger:
+        blocks.append(ContentBlock(type="heading", level=3, text="龙虎榜机构与活跃资金 (TOP 5)"))
+        for item in snapshot.dragon_tiger[:5]:
+            stk_name = item.get("name") or item.get("code") or "-"
+            stk_code = item.get("code") or ""
+            net_amt = _format_amt(item.get("net_amount"))
+            chg = _format_pct(item.get("change_pct"))
+            blocks.append(ContentBlock(type="bullet", text=f"{stk_name} ({stk_code})：净买入 {net_amt} ｜ 涨跌幅 {chg}"))
+
+    # 5. 热点题材概念
+    if snapshot.hot_concepts:
+        concepts = [str(c.get("name", "")).strip() for c in snapshot.hot_concepts[:8] if c.get("name")]
+        if concepts:
+            blocks.append(ContentBlock(type="bullet", text="热点概念：" + "、".join(concepts)))
+
+    return blocks
+
+
 def _build_daily_review(review: DailyReviewResult) -> list[ContentBlock]:
     """将每日复盘结果组装为 ContentBlock 列表。"""
-    if review.schema_version >= 3 and review.llm_review.strip():
-        return _parse_markdown_blocks(review.llm_review)
+    date_str = review.effective_date or review.date
+    state_label = _STATE_LABELS.get(review.market_state, "未知")
 
     blocks: list[ContentBlock] = [
-        ContentBlock(type="heading", level=2, text="市场摘要"),
-        ContentBlock(type="paragraph", text=review.market_summary),
-        ContentBlock(type="paragraph", text=f"生成时间：{review.generated_at}"),
+        ContentBlock(type="heading", level=1, text=f"📅 {date_str} A 股每日市场复盘"),
+        ContentBlock(type="paragraph", text=f"市场状态：{state_label} ｜ 建议仓位：{review.position_range or '灵活配置'}"),
     ]
+    if review.market_summary.strip():
+        blocks.append(ContentBlock(type="paragraph", text=review.market_summary.strip()))
+
+    # 插入核心市场数据看板（指数、市场宽度、行业排行、龙虎榜等）
+    if review.data_snapshot:
+        data_blocks = _build_daily_review_data_blocks(review.data_snapshot)
+        if len(data_blocks) > 1:
+            blocks.extend(data_blocks)
+            blocks.append(ContentBlock(type="divider"))
+
+    # 插入 AI 复盘详细报告
+    blocks.append(ContentBlock(type="heading", level=2, text="📝 AI 深度复盘研报"))
     if review.llm_review.strip():
-        blocks.append(ContentBlock(type="heading", level=2, text="AI 复盘报告"))
-        blocks.extend(_parse_markdown_blocks(review.llm_review))
+        parsed = _parse_markdown_blocks(review.llm_review)
+        for b in parsed:
+            if b.type == "heading" and (
+                (b.level == 1 and "每日市场复盘" in b.text)
+                or (b.level == 2 and "今日大盘复盘" in b.text)
+            ):
+                continue
+            blocks.append(b)
     else:
         blocks.extend(_section_blocks(review.index_review))
         blocks.extend(_section_blocks(review.hotspot_review))
         blocks.extend(_section_blocks(review.dragon_tiger_review))
-    blocks.append(ContentBlock(type="heading", level=2, text="机会"))
-    blocks.extend(ContentBlock(type="bullet", text=item) for item in (review.opportunities or ["-"]))
-    blocks.append(ContentBlock(type="heading", level=2, text="风险"))
-    blocks.extend(ContentBlock(type="bullet", text=item) for item in (review.risk_alerts or ["-"]))
-    blocks.append(ContentBlock(type="heading", level=2, text="策略"))
-    blocks.extend(ContentBlock(type="bullet", text=item) for item in (review.strategy_notes or ["-"]))
-    blocks.append(ContentBlock(type="heading", level=2, text="原始数据摘要"))
-    blocks.append(ContentBlock(type="paragraph", text=f"指数样本：{len(review.data_snapshot.indices)}；热点股：{len(review.data_snapshot.hot_stocks)}；龙虎榜：{len(review.data_snapshot.dragon_tiger)}"))
+        blocks.append(ContentBlock(type="heading", level=3, text="机会方向"))
+        blocks.extend(ContentBlock(type="bullet", text=item) for item in (review.opportunities or ["-"]))
+        blocks.append(ContentBlock(type="heading", level=3, text="风险提示"))
+        blocks.extend(ContentBlock(type="bullet", text=item) for item in (review.risk_alerts or ["-"]))
+        blocks.append(ContentBlock(type="heading", level=3, text="策略指引"))
+        blocks.extend(ContentBlock(type="bullet", text=item) for item in (review.strategy_notes or ["-"]))
+
     return blocks
 
 

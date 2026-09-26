@@ -143,12 +143,23 @@ def to_feishu_card(data_type: str, title: str, content: list[ContentBlock], doc_
     extra_elements: list[dict] = []
     if data_type == "daily_review":
         second_line = paragraphs[1] if len(paragraphs) > 1 else ""
-        strategy_bullets = [b.text for b in content if b.type == "bullet"]
-        strategy_text = strategy_bullets[0] if strategy_bullets else ""
+        strategy_text = ""
+        for b in content:
+            if b.type == "bullet" and any(k in b.text for k in ("建议仓位", "仓位", "策略", "计划", "机会")):
+                strategy_text = b.text
+                break
+        if not strategy_text:
+            for b in content:
+                if b.type == "bullet" and not any(k in b.text for k in ("指数", "成交额", "涨跌", "行业", "净买入", "热点")):
+                    strategy_text = b.text
+                    break
+        if not strategy_text:
+            strategy_bullets = [b.text for b in content if b.type == "bullet"]
+            strategy_text = strategy_bullets[0] if strategy_bullets else ""
         if second_line:
             extra_elements.append(_markdown_element(second_line))
         if strategy_text:
-            extra_elements.append(_markdown_element(f"**策略：** {strategy_text}"))
+            extra_elements.append(_markdown_element(f"**策略要点：** {strategy_text}"))
     elif data_type == "analysis":
         # 提取核心研判指标
         metrics = ""
