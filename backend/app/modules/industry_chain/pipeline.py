@@ -373,10 +373,27 @@ async def run_industry_chain_analysis(
             fallback_research = True
             logger.warning("产业链 Agent 证据覆盖不足，结合可用信息降级生成: name=%s, error=%s", name, research_outcome)
             _add_warning(warnings, f"Agent 调研部分证据缺失（{research_outcome}），已使用现有数据综合生成")
-            research_context = {
-                "agent_summary": f"产业链「{name}」调研完成。注意：{research_outcome}。以下分析基于现有可用公开信息综合评估。",
-                "agent_evidence": "部分公开证据缺失，已使用可用数据推演。",
-            }
+            # 异常里带着本轮已采集的证据：fatal 门没过不等于一条证据都没拿到，
+            # 直接丢掉就只能拿公共数据硬推，报告质量与可追溯性都会塌掉。
+            research_evidence = tuple(research_outcome.evidence)
+            summary = research_outcome.summary or ""
+            if research_evidence:
+                _, rendered_evidence, evidence_stats = compact_industry_evidence(
+                    research_evidence,
+                    focus_terms=(name, *select_research_template(name).metrics),
+                )
+                research_context = {
+                    "agent_summary": (
+                        f"产业链「{name}」调研部分完成。注意：{research_outcome}。"
+                        f"{summary}以下分析基于已取得的证据综合评估。"
+                    ),
+                    "agent_evidence": rendered_evidence,
+                }
+            else:
+                research_context = {
+                    "agent_summary": f"产业链「{name}」调研完成。注意：{research_outcome}。以下分析基于现有可用公开信息综合评估。",
+                    "agent_evidence": "本轮未取得可追溯证据，已使用可用数据推演。",
+                }
         elif isinstance(research_outcome, Exception):
             raise research_outcome
         else:

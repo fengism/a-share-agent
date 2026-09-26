@@ -292,6 +292,19 @@ async def analyze_financials(code: str) -> Any:
     result.update(_build_cashflow_sections(cashflow))
     result.update(_build_key_indicators(balance, profit, metrics))
     result["revenue_breakdown"] = _compact_revenue_breakdown(breakdown_value)
+    # 保留失败原因的类型名：全部上游挂掉时要能让调用方与日志区分「限流」「解析失败」
+    # 还是「代码不存在」，否则只能看到一个笼统的空结果。
+    upstream_errors = {
+        name: type(value).__name__
+        for name, value in (
+            ("balance", balance_value),
+            ("profit", profit_value),
+            ("cashflow", cashflow_value),
+            ("metrics", metrics_value),
+            ("revenue_breakdown", breakdown_value),
+        )
+        if isinstance(value, Exception)
+    }
     unavailable_sections = [
         name
         for name, value in (
@@ -327,4 +340,24 @@ async def analyze_financials(code: str) -> Any:
         "unavailable_sections": unavailable_sections,
         "warnings": warnings,
     }
+    if upstream_errors:
+        result["upstream_errors"] = upstream_errors
+
+    # 核心分片（三张表 + 关键指标）全部拿不到时，必须返回错误而不是成功。
+    # 此前这里无条件返回 ok:true + 全 null：Agent 看到「调用成功」就不会换工具，
+    # 而产业链的证据校验又要求 report_date 与利润表数值，于是判定证据缺失 ->
+    # 修复循环用同样参数反复重调 -> 一直失败到 max_rounds 耗尽。
+    # revenue_breakdown 不计入核心：新浪 getGrossRevenue 常年为空属正常，
+    # 不能因为它缺就把整次调用判死。
+    if not any(core_sections.values()):
+        failed = sorted(name for name, ok in core_sections.items() if not ok)
+        causes = "、".join(f"{name}:{upstream_errors[name]}" for name in failed if name in upstream_errors)
+        result["error_code"] = "upstream_unavailable"
+        result["error"] = (
+            f"{code} 的三张报表与关键指标全部取不到（{', '.join(failed)}）"
+            + (f"；上游原因 {causes}" if causes else "；上游返回空数据")
+            + "。这是数据源暂时不可用，不是该公司没有财务数据。"
+            "请改用其他来源（如 get_stock_financial、get_stock_valuation_detail、"
+            "iwencai_search 或 web_search）获取，不要用相同参数重复调用本工具。"
+        )
     return result

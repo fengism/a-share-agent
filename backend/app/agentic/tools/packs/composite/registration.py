@@ -82,12 +82,30 @@ async def _analyze_stock(code: str) -> Any:
         for label, result in sections.items()
         if isinstance(result, dict) and result.get("error")
     ]
-    return {
+    payload: dict[str, Any] = {
         "code": code,
         "partial": bool(unavailable_sections),
         "unavailable_sections": unavailable_sections,
         **sections,
     }
+    # 五个维度全部拿不到时必须报错。此前这里只返回 partial:true、没有顶层 error，
+    # Tool.execute 就判 is_error=False：Agent 看到「调用成功」，拿着五个空分片当结论，
+    # 或者用同样参数原地重试——与 analyze_financials 修过的是同一类问题。
+    if len(unavailable_sections) == len(sections):
+        causes = "、".join(
+            f"{label}:{str(sections[label].get('error'))[:80]}"
+            for label in unavailable_sections
+            if isinstance(sections[label], dict)
+        )
+        payload["error_code"] = "upstream_unavailable"
+        payload["error"] = (
+            f"{code} 的基本信息、估值、技术指标、新闻、情绪五个维度全部取不到"
+            + (f"（{causes}）" if causes else "")
+            + "。这是数据源暂时不可用，不是该公司没有这些数据。"
+            "请改用 get_stock_info、get_stock_valuation_detail、get_stock_news 等单独来源"
+            "或 web_search / iwencai_search 获取，不要用相同参数重复调用本工具。"
+        )
+    return payload
 
 
 async def _sector_analysis(name: str) -> Any:

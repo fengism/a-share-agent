@@ -183,24 +183,38 @@ async def execute_web_search(
     fetch_limit = min(max_results * 2, 20)
     engine_used = engine
     results: list[dict[str, Any]] = []
+    raised: list[BaseException] = []
+    answered = False
     for candidate in (engine, *_FALLBACK_ENGINES.get(engine, ())):
-        results = await provider_gateway.call(
-            _SEARCH_PROVIDERS[candidate],
-            "search",
-            lambda candidate=candidate: call_blocking_func(
-                get_provider(_SEARCH_PROVIDERS[candidate]).search,
-                _engine_query(normalized_query, candidate),
-                max_results=fetch_limit,
-                time_range=time_range,
-                language=language,
-                semaphore=semaphore,
-            ),
-            is_fallback_attempt=candidate != engine,
-        )
+        try:
+            results = await provider_gateway.call(
+                _SEARCH_PROVIDERS[candidate],
+                "search",
+                lambda candidate=candidate: call_blocking_func(
+                    get_provider(_SEARCH_PROVIDERS[candidate]).search,
+                    _engine_query(normalized_query, candidate),
+                    max_results=fetch_limit,
+                    time_range=time_range,
+                    language=language,
+                    semaphore=semaphore,
+                ),
+                is_fallback_attempt=candidate != engine,
+            )
+        except Exception as error:  # noqa: BLE001 — 一个引擎抛异常不该掐断整条降级链
+            raised.append(error)
+            logger.warning("搜索引擎调用异常，降级重试 engine=%s: %s", candidate, error)
+            results = []
+            continue
+        # 空结果与异常要分开记：引擎正常回了 0 条是事实，抛异常才是故障。
+        answered = True
         if results:
             engine_used = candidate
             break
         logger.info("搜索引擎无结果，降级重试 engine=%s", candidate)
+    if raised and not answered:
+        # 所有引擎都抛异常：必须以错误收场。静默返回 count:0 会让「上游挂了」
+        # 看起来像「确实没有相关结果」，模型就不会改用别的来源了。
+        raise raised[-1]
     normalized_results = _normalize_results(results, engine_used, max_results)
     payload = {
         "query": normalized_query,

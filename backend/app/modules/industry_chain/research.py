@@ -26,7 +26,11 @@ from app.modules.industry_chain.chain_reasoning import (
     has_tier_operating_body,
     tier_search_terms,
 )
-from app.modules.industry_chain.evidence_content import extract_evidence_content
+from app.modules.industry_chain.evidence_content import (
+    EvidenceContent,
+    extract_evidence_content,
+    http_url,
+)
 from app.modules.industry_chain.query_plan import DOCUMENT_SEARCH_RULES, render_discovery_plan
 from app.modules.industry_chain.templates import research_guidance
 
@@ -58,14 +62,82 @@ def _count_urls(value: Any) -> int:
     return len(set(_HTTP_URL_PATTERN.findall(_flatten_text(value))))
 
 
+_URL_KEYS = ("url", "source_url", "final_url", "link", "pdf_url")
+# 工具回显的字段：它们描述「这次调用长什么样」，不描述「取回了什么」。零结果的
+# web_search 正是只靠 query / detail_hint 这些字段把文本长度凑过门槛的。
+_ECHO_KEYS = frozenset(
+    {
+        "ok", "error", "meta", "metadata", "status", "arguments", "request",
+        "query", "engine", "language", "time_range", "count", "page", "page_size",
+        "detail_hint", "hint", "tips", "code", "name_hint", "cache_hit", "truncated",
+        "total", "total_items", "returned_items", "returned_characters", "content_length",
+        "fetched_at", "retrieved_at", "generated_at", "elapsed_ms", "fetch_mode",
+        "index", "id", "seq", "row_no", "type", "kind", "source", "provider",
+    }
+)
+# 回显字段被排除后，文本长度已经能代表「真有内容」，门槛只需挡住空壳。
+_MIN_CONTENT_TEXT = 8
+
+
+def _record_text(value: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for key, item in value.items():
+        if key in _ECHO_KEYS or key in _URL_KEYS:
+            continue
+        if isinstance(item, str):
+            parts.append(item.strip())
+        elif isinstance(item, (int, float)) and not isinstance(item, bool):
+            parts.append(str(item))
+    return " ".join(part for part in parts if part)
+
+
+def _content_units(value: Any, parent_url: str = "", depth: int = 0) -> list[EvidenceContent]:
+    """列出证据里「按记录聚合」的内容单元，并标记它绑定到哪个可追溯 URL。
+
+    与 ``_flatten_text`` 的关键差别：排除 ``_ECHO_KEYS`` 里的回显字段，并且按记录
+    （而不是按字段）聚合文本——一条搜索结果的标题+摘要应当算一份内容。
+    """
+    if depth > 8:
+        return []
+    if isinstance(value, list):
+        return [
+            unit
+            for item in value[:60]
+            for unit in _content_units(item, parent_url, depth + 1)
+        ]
+    if not isinstance(value, dict):
+        return []
+    if value.get("ok") is False or value.get("error") or value.get("status") in ("error", "failed"):
+        return []
+    url = next(
+        (valid for key in _URL_KEYS if (valid := http_url(value.get(key)))),
+        parent_url,
+    )
+    units: list[EvidenceContent] = []
+    text = _record_text(value)
+    if len(text) >= _MIN_CONTENT_TEXT:
+        units.append(EvidenceContent(text, url))
+    units.extend(
+        unit
+        for key, child in value.items()
+        if key not in _ECHO_KEYS and isinstance(child, (dict, list))
+        for unit in _content_units(child, url, depth + 1)
+    )
+    return units
+
+
 def _has_market_context(evidence) -> bool:
-    text = _flatten_text(_decoded_content(evidence)).strip()
     dimensions = (
         "市场", "产业", "行业", "上游", "中游", "下游",
         "产品", "规模", "竞争", "需求", "出货", "芯片", "算力",
         "空间", "增速", "渗透", "应用", "客户",
     )
-    return len(text) >= 50 and sum(dimension in text for dimension in dimensions) >= 1
+    # 不要求 URL：结构化数据（get_industry_list / iwencai_select_stock）没有链接，
+    # 但「行业/规模/竞争」这类维度词确实是取回的内容。
+    return any(
+        any(dimension in unit.text for dimension in dimensions)
+        for unit in _content_units(_decoded_content(evidence))
+    )
 
 
 def _has_company_records(evidence) -> bool:
@@ -93,7 +165,16 @@ def _has_public_company_records(evidence) -> bool:
 
 
 def _has_public_sources(evidence) -> bool:
-    return _count_urls(_decoded_content(evidence)) >= 1 or len(_flatten_text(_decoded_content(evidence))) >= 60
+    """必须存在绑定到可追溯 URL 的内容单元。
+
+    修复前只要求「正文 60 字」，于是零结果的 web_search 也能满足这道 fatal 门：
+    它的 ``detail_hint``（约 60 字）加 query 回显就够了。取证门一旦能被空结果满足，
+    报告就会带着「已完成取证」的假象进入合成，下游质量门也拿不到真材料。
+    """
+    units = _content_units(_decoded_content(evidence))
+    if any(unit.source_url and unit.text.strip() for unit in units):
+        return True
+    return _count_urls("\n".join(unit.text for unit in units)) >= 1
 
 
 BODY_TOOLS = ("web_fetch", "fetch_urls", "read_pdf")

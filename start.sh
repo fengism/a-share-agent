@@ -88,6 +88,20 @@ ensure_port_available() {
     exit 1
 }
 
+ensure_writable_dir() {
+    local dir="$1"
+    if mkdir -p "$dir" 2>/dev/null && [ -w "$dir" ]; then
+        return 0
+    fi
+
+    error "目录不可写: $dir"
+    error "常见原因: logs/data 曾被 Docker 守护进程或 sudo 以 root 身份创建。"
+    error "修复方式（任选其一）:"
+    error "  sudo chown -R \"\$(id -u):\$(id -g)\" \"$PROJECT_DIR/logs\" \"$PROJECT_DIR/data\""
+    error "  docker run --rm -v \"$PROJECT_DIR/logs:/l\" -v \"$PROJECT_DIR/data:/d\" redis:8-alpine chown -R \"\$(id -u):\$(id -g)\" /l /d"
+    exit 1
+}
+
 rotate_log() {
     local log_file="$1"
     if [ -s "$log_file" ]; then
@@ -161,7 +175,8 @@ if [ ! -f "$PROJECT_DIR/.env" ]; then
     warn ".env 不存在，部分功能可能不可用。运行 cp .env.example .env 创建"
 fi
 
-mkdir -p "$LOG_DIR" "$RUN_DIR"
+ensure_writable_dir "$LOG_DIR"
+ensure_writable_dir "$RUN_DIR"
 
 printf "=== 停止当前项目的旧进程 ===\n"
 BACKEND_PORT="$BACKEND_PORT" FRONTEND_PORT="$FRONTEND_PORT" \

@@ -43,8 +43,13 @@ TENCENT_STOCK_CONCEPT_URL = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app
 TENCENT_STOCK_QUOTE_URL = "https://qt.gtimg.cn/q="
 BAIDU_STOCK_NAMES_URL = "https://finance.pae.baidu.com/selfselect/getmarketrank"
 
-EASTMONEY_SEARCH_SUGGEST_URL = "https://searchapi.eastmoney.com/api/suggest/get"
-EASTMONEY_SEARCH_SUGGEST_TOKEN = "D43BF722C8E33BDC906FB84D85E326E8"
+# 东财证券代码表搜索接口。老的 searchapi suggest 接口已改为 JSONP 包裹
+# （jQuery…({...})）且返回论坛用户而非证券代码，response.json() 必然 JSONDecodeError。
+EASTMONEY_SEARCH_URL = "https://search-codetable.eastmoney.com/codetable/search"
+# codetable 的板块标签：A 股只有沪/深/京主板与科创板（创业板归在深A、北交所归在京A）。
+# 其余（指数/板块/债券/基金/LOF/B股/港美股/退市）都不是「股票」——注意 000001
+# 上证指数与 000001 平安银行代码完全相同，只能靠标签区分。
+EASTMONEY_A_SHARE_LABELS = frozenset({"沪A", "深A", "京A", "科创"})
 EASTMONEY_API_TOKEN = "fa5fd1943c7b386f172d6893dbfba10b"
 EASTMONEY_UT_TOKEN = "b2884a393a59ad64002292a3e90d46a5"
 EASTMONEY_UT_TOKEN_ALT = "8dec03ba335b81bf4ebdf7b29ec27d15"
@@ -55,5 +60,3 @@ EASTMONEY_FLATTEN_FLAG = "1"
 EASTMONEY_KLINE_FIELDS1 = "f1,f2,f3,f4,f5,f6"
 EASTMONEY_KLINE_FIELDS2 = "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
 EASTMONEY_INDEX_QUOTE_FIELDS = "f1,f2,f3,f4,f5,f6,f7,f10,f12,f13,f14,f15,f16,f17,f18,f152"
-
-A_SHARE_SEARCH_CLASSIFY = {"AStock", "Ashares", "AStockSH", "AStockSZ", "AStockBJ"}

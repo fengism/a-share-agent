@@ -65,6 +65,17 @@ def _summarize_failure_reasons(results: dict[str, AgentExecutionResult]) -> str:
         if not any(base == existing.split(_FAILURE_REASON_ID_SEPARATOR)[0] for existing in ordered):
             ordered.append(reason)
     if not ordered:
+        # 失败结果未必带 errors：预算拒绝/去重只写 warnings（工具一次都没真跑，不会被
+        # 算成「工具失败」）。用 warnings 兜底，否则用户只看到一句没有任何信息量的
+        # 「当前分析未生成有效结果」，不知道是额度、上下文预算还是标记泄漏导致的。
+        warnings = [
+            warning
+            for result in results.values()
+            for warning in result.warnings
+            if warning
+        ]
+        if warnings:
+            return "；".join(dict.fromkeys(warnings))
         return "当前分析未生成有效结果，请稍后重试"
     if len(ordered) == 1:
         return ordered[0]

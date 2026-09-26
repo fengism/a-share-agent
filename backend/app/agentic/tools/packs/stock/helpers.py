@@ -128,15 +128,65 @@ async def get_stock_sentiment(code: str) -> Any:
     return await get_application_tool_handlers().get_stock_sentiment(code)
 
 
-async def screen_stocks(**kwargs) -> Any:
+async def screen_stocks(
+    pe_min: float | None = None,
+    pe_max: float | None = None,
+    pb_min: float | None = None,
+    pb_max: float | None = None,
+    price_min: float | None = None,
+    price_max: float | None = None,
+    market_cap_min: float | None = None,
+    market_cap_max: float | None = None,
+    change_pct_min: float | None = None,
+    change_pct_max: float | None = None,
+    turnover_pct_min: float | None = None,
+    turnover_pct_max: float | None = None,
+    industries: list[str] | None = None,
+    concepts: list[str] | None = None,
+    markets: list[str] | None = None,
+    exclude_st: bool = False,
+    min_listing_days: int | None = None,
+    min_amount_yi: float | None = None,
+    sort_by: str = "market_cap",
+    sort_order: str = "desc",
+    page: int = 1,
+    page_size: int = 20,
+) -> Any:
     """按固定维度筛选股票。
 
-    Param:
-        **kwargs: 筛选参数，如 pe_min、pe_max、industries、page、page_size 等
+    参数必须显式声明：Tool 的 Schema 与 executor 签名要能互相校验（见
+    validate_executor_contract），收成 **kwargs 就没法发现「下游支持但 Schema
+    没声明」的漏参——page/page_size 曾经正是这样漏掉的。
     Return:
         筛选结果字典，包含分页信息和股票列表
     """
-    return await get_application_tool_handlers().screen_stocks(**kwargs)
+    filters: dict[str, Any] = {
+        "pe_min": pe_min,
+        "pe_max": pe_max,
+        "pb_min": pb_min,
+        "pb_max": pb_max,
+        "price_min": price_min,
+        "price_max": price_max,
+        "market_cap_min": market_cap_min,
+        "market_cap_max": market_cap_max,
+        "change_pct_min": change_pct_min,
+        "change_pct_max": change_pct_max,
+        "turnover_pct_min": turnover_pct_min,
+        "turnover_pct_max": turnover_pct_max,
+        "industries": industries,
+        "concepts": concepts,
+        "markets": markets,
+        "exclude_st": exclude_st,
+        "min_listing_days": min_listing_days,
+        "min_amount_yi": min_amount_yi,
+        "sort_by": sort_by,
+        "sort_order": sort_order,
+        "page": page,
+        "page_size": page_size,
+    }
+    return await get_application_tool_handlers().screen_stocks(
+        **{key: value for key, value in filters.items() if value is not None}
+    )
 
 
 async def get_industries() -> Any:
@@ -174,5 +224,22 @@ async def get_interactive_qa(code: str, keyword: str = "", limit: int = 15) -> A
 
 
 
-async def get_stock_documents(**kwargs: Any) -> Any:
-    return await get_application_tool_handlers().get_stock_documents(**kwargs)
+async def get_stock_documents(
+    code: str,
+    kind: str = "all",
+    start_date: str = "",
+    end_date: str = "",
+    keyword: str = "",
+    page: int = 1,
+    limit: int = 20,
+) -> Any:
+    """定位公告/定期报告/研报目录。显式签名，供 Tool 的 Schema 反向校验使用。"""
+    return await get_application_tool_handlers().get_stock_documents(
+        code=code,
+        kind=kind,
+        start_date=start_date,
+        end_date=end_date,
+        keyword=keyword,
+        page=page,
+        limit=limit,
+    )

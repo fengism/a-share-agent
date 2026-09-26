@@ -63,6 +63,12 @@ class ResearchSearchPolicy:
         self.used += count
         self.since_read += count
 
+    def restore(self, count: int) -> None:
+        """退回 consume 记上的额度（调用最终由缓存/合并提供，没有真实发起搜索）。"""
+        returned = max(0, int(count))
+        self.used = max(0, self.used - returned)
+        self.since_read = max(0, self.since_read - returned)
+
     def observe(self, name: str, arguments: str, content: str, *, is_error: bool) -> None:
         """Called only for actual completions, not rejected/replayed cached results."""
         data = _decode(content)

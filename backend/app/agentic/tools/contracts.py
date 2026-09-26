@@ -13,12 +13,16 @@ from app.agentic.tools.serialization import (
     serialize_error,
     serialize_result,
 )
-from app.agentic.tools.validation import ToolArgumentsError, validate_value
+from app.agentic.tools.validation import ToolArgumentsError, coerce_arguments
 from app.configuration import get_settings
-from app.core.errors import log_internal_error
+from app.core.errors import is_transient_error, log_internal_error
 from app.core.exceptions import ApplicationError, UpstreamUnavailableError
 
 logger = logging.getLogger(__name__)
+
+# 等待 max_parallel_calls 额度的上限。排队不该吃掉执行预算，但也不能无限等：
+# 排不上就明确告诉模型「本次未执行」，好过让它以为工具慢而反复重调。
+_MAX_QUEUE_WAIT_SECONDS = 5.0
 
 if TYPE_CHECKING:
     from app.agentic.runtime.context import AgentExecutionContext
@@ -47,6 +51,23 @@ class ToolPolicy:
             raise ValueError("max_parallel_calls 必须大于 0")
         if self.max_result_characters < 512:
             raise ValueError("max_result_characters 不能小于 512")
+
+
+def invalid_arguments_data(error: Exception) -> dict[str, str] | None:
+    """把参数校验失败转成可安全发到界面的受控字段。
+
+    这里只允许透出 ``ToolArgumentsError`` 自带的 reason/field/detail——它们由
+    ``validate_value`` 填充且只来自 schema。JSONDecodeError 不透出任何原文，
+    因为它的 message 里含模型自己输出的片段。
+    """
+    if not isinstance(error, ToolArgumentsError):
+        return {"reason": "invalid_json"} if isinstance(error, json.JSONDecodeError) else None
+    payload = {"reason": error.reason} if error.reason else {}
+    if error.field:
+        payload["field"] = error.field
+    if error.detail:
+        payload["detail"] = error.detail
+    return payload or None
 
 
 class Tool:
@@ -108,19 +129,48 @@ class Tool:
                 is_error=True,
             )
         try:
-            arguments = json.loads(call.function.arguments)
-            validate_value(arguments, self.parameters)
+            arguments = coerce_arguments(json.loads(call.function.arguments), self.parameters)
             settings = execution_context.settings if execution_context is not None else get_settings()
             requested_timeout = self.policy.timeout_seconds or settings.chat_tool_timeout_seconds
             timeout_seconds = max(1.0, float(requested_timeout))
             if execution_context is not None:
                 timeout_seconds = execution_context.bounded_timeout(timeout_seconds)
-            async with asyncio.timeout(timeout_seconds):
-                if self._semaphore is None:
+            if self._semaphore is None:
+                async with asyncio.timeout(timeout_seconds):
                     result = await self.executor(**arguments)
-                else:
-                    async with self._semaphore:
+            else:
+                # 排队时间不计入工具超时。max_parallel_calls 是进程级共享的（工具注册
+                # 在 lifespan 里做一次），一个慢请求就能让后来者把整份预算耗在等待上：
+                # 一次都没执行却被判「执行超时 + 可重试」，模型原样再调一次、又排一次队。
+                queue_timeout = max(1.0, min(_MAX_QUEUE_WAIT_SECONDS, timeout_seconds / 4))
+                if execution_context is not None:
+                    queue_timeout = execution_context.bounded_timeout(queue_timeout)
+                try:
+                    await asyncio.wait_for(
+                        self._semaphore.acquire(), timeout=queue_timeout
+                    )
+                except TimeoutError:
+                    logger.warning(
+                        "Chat 工具 %s 等待并发额度超时: queue_timeout=%.1f",
+                        self.name,
+                        queue_timeout,
+                    )
+                    return ToolResultInfo(
+                        tool_call_id=call.id,
+                        name=call.function.name,
+                        content=serialize_error(
+                            "tool_queue_timeout",
+                            f"工具 {self.name} 等待并发额度超时（{queue_timeout:.0f}秒），本次未执行；"
+                            "请先处理已返回的结果，或改用其他工具，不要立刻重复调用",
+                            retryable=False,
+                        ),
+                        is_error=True,
+                    )
+                try:
+                    async with asyncio.timeout(timeout_seconds):
                         result = await self.executor(**arguments)
+                finally:
+                    self._semaphore.release()
             return ToolResultInfo(
                 tool_call_id=call.id,
                 name=call.function.name,
@@ -147,10 +197,18 @@ class Tool:
                 is_error=True,
             )
         except (json.JSONDecodeError, ToolArgumentsError) as error:
+            diagnostics = invalid_arguments_data(error)
             return ToolResultInfo(
                 tool_call_id=call.id,
                 name=call.function.name,
-                content=serialize_error("invalid_arguments", f"工具参数无效：{error}"),
+                content=serialize_error(
+                    "invalid_arguments",
+                    f"工具参数无效：{error}",
+                    # 诊断必须有自己的命名空间：payload["data"] 同时也承载工具自报的
+                    # 原始返回（见 serialize_result），靠「reason 是否命中枚举」猜来源
+                    # 的话，工具多带一个 reason 字段就会显示成一次没发生过的校验诊断。
+                    data={"argument_error": diagnostics} if diagnostics else None,
+                ),
                 is_error=True,
             )
         except ApplicationError as error:
@@ -177,9 +235,14 @@ class Tool:
                 error,
                 f"工具 {self.name} 执行失败",
             )
+            # 只有瞬时性异常才告诉模型可以原样重试；编程错误/权限错误/配置错误标成
+            # 可重试会诱导它拿着同样参数一直调到 max_rounds 耗尽。
+            retryable = is_transient_error(error)
+            if not retryable:
+                detail = f"{detail}；该错误不会因原样重试而消失，请改用其他工具或调整参数"
             return ToolResultInfo(
                 tool_call_id=call.id,
                 name=call.function.name,
-                content=serialize_error("execution_failed", detail, retryable=True),
+                content=serialize_error("execution_failed", detail, retryable=retryable),
                 is_error=True,
             )

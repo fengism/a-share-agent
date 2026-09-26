@@ -204,15 +204,65 @@ async def stream_execution_plan(
                 else:
                     running[task.task_id] = asyncio.create_task(run_one(task))
 
+            # 回收「已结束但没发出 _TaskCompleted」的任务（被取消的，或内部抛了
+            # CancelledError 的）。此前它们的 key 会永久留在 running 里：
+            # while pending or running 永不退出，生成器空等在 queue.get() 上，整个
+            # 请求占满 max_concurrent_chat_total / per_user 两个额度直到外层 300s
+            # 超时；而 finished 里也缺它们，依赖它们的 task 永远进不了 ready。
+            reconciled = False
+            for task_id, running_task in list(running.items()):
+                if not running_task.done():
+                    continue
+                if not (running_task.cancelled() or running_task.exception() is not None):
+                    continue  # 正常完成的正在排队等自己的 _TaskCompleted
+                running.pop(task_id)
+                task = tasks_by_id[task_id]
+                result = AgentExecutionResult(
+                    agent_name=task.agent_name,
+                    display_name=task.display_name,
+                    analysis="",
+                    status="failed",
+                    errors=[f"{task.display_name}执行被中断"],
+                    retryable=False,
+                )
+                task_results[task_id] = result
+                results[task.agent_name] = result
+                finished.add(task_id)
+                reconciled = True
+                yield build_task_progress_event(
+                    task, "failed", detail="执行被中断", attempt=attempt
+                )
+            if reconciled:
+                # finished 变了，依赖它的任务可能刚变成 ready：重算一轮再决定。
+                continue
+
             if not running:
                 if ready:
                     continue
-                raise RuntimeError("执行计划没有可运行任务")
+                if pending:
+                    # 还有任务没被依赖满足、也没有任何在跑：DAG 无法推进。
+                    raise RuntimeError("执行计划没有可运行任务")
+                break
 
-            event = await queue.get()
+            # 等待必须同时被「队列有事件」和「有任务结束」唤醒。run_one 对
+            # CancelledError 是原样重抛、不发 _TaskCompleted 的，只等 queue.get()
+            # 就会一直挂在上面，直到外层 300s 超时——而这段时间里请求占满了
+            # max_concurrent_chat_total / per_user 两个额度。
+            getter = asyncio.ensure_future(queue.get())
+            try:
+                done, _ = await asyncio.wait(
+                    [getter, *running.values()],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+            finally:
+                getter.cancel()
+            if getter not in done:
+                continue  # 有任务结束了，回循环顶部回收
+            event = getter.result()
             if isinstance(event, _TaskCompleted):
-                finished_task = running.pop(event.task_id)
-                await finished_task
+                finished_task = running.pop(event.task_id, None)
+                if finished_task is not None:
+                    await finished_task
                 finished.add(event.task_id)
                 if is_usable_task_result(tasks_by_id[event.task_id], event.result):
                     usable.add(event.task_id)

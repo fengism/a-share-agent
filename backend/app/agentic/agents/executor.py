@@ -6,7 +6,7 @@ import time
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection
 from contextlib import aclosing
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 from app.agentic.agents.contracts import (
@@ -28,8 +28,11 @@ from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.runtime.llm import create_chat_completion, stream_chat_completion
 from app.agentic.tools.cache import SharedToolCache
 from app.agentic.tools.calls import (
+    ToolCallMarkupStreamFilter,
     build_assistant_tool_message,
     extract_pseudo_tool_calls,
+    normalize_wrapped_tool_call,
+    strip_tool_call_markup,
 )
 from app.agentic.tools.serialization import (
     has_meaningful_tool_content,
@@ -59,6 +62,23 @@ logger = logging.getLogger(__name__)
 _EMPTY_OUTPUT_ERROR = "模型未生成有效回答，请稍后重试"
 _TOOL_CONTEXT_WARNING = "工具上下文预算不足，部分证据已截断或未提供给模型，结论可能受限"
 _TOOL_BUDGET_WARNING = "部分工具请求受单批/总额度、搜索节奏或正文预留限制，已拒绝超额请求；请以剩余额度为准"
+_TOOL_MARKUP_WARNING = "模型以正文形式输出了工具调用标记，已从回答中移除；结论仅基于已取得的证据"
+
+
+def _llm_request_timeout(
+    execution_context: AgentExecutionContext | None, settings: Any
+) -> float:
+    """本次模型请求可用的单次读写上限：不能活过外层请求预算。
+
+    工具调用早就用 ``bounded_timeout`` 跟着执行上下文的 deadline 收缩了，模型调用却一直
+    按客户端构造时固定的 ``llm_timeout_seconds`` 掐断——最内层的传输限制先触发，失败原因
+    被误报成「读取响应超时」，而实际上只是这次回答还没写完。生成总预算是天花板，外层请求
+    预算（对话总时限）是地板：谁更紧听谁的。
+    """
+    budget = float(settings.llm_generation_timeout_seconds)
+    if execution_context is None or execution_context.deadline is None:
+        return budget
+    return min(budget, max(execution_context.bounded_timeout(budget), 1.0))
 
 
 def _termination_error_reason(exc: Exception) -> str:
@@ -225,6 +245,10 @@ class AgentExecutor:
         capabilities: LLMCapabilities,
         reasoning_content: str = "",
     ) -> None:
+        # 必须在拼历史消息、发 tool_call 事件之前拆掉模型多包的参数外壳：
+        # 证据、工具缓存键、search policy 统计都直接读 function.arguments，
+        # 晚一步解包就会让证据里的 code 变成空串，产业链修复循环据此反复建任务。
+        tool_calls = [normalize_wrapped_tool_call(tool_call) for tool_call in tool_calls]
         assistant_message = build_assistant_tool_message(tool_calls, assistant_content)
         if capabilities.replay_tool_reasoning:
             # Some thinking gateways require the original reasoning on tool turns.
@@ -243,9 +267,9 @@ class AgentExecutor:
         )
 
         if capabilities.parallel_tool_calls:
-            accepted_results = await asyncio.gather(
+            accepted_pairs = await asyncio.gather(
                 *(
-                    state.tool_cache.execute(
+                    state.tool_cache.execute_shared(
                         tool_call,
                         allowed_names=state.effective_tool_names,
                         execution_context=execution_context,
@@ -254,15 +278,23 @@ class AgentExecutor:
                 )
             )
         else:
-            accepted_results = []
+            accepted_pairs = []
             for _, tool_call in accepted_calls:
-                accepted_results.append(
-                    await state.tool_cache.execute(
+                accepted_pairs.append(
+                    await state.tool_cache.execute_shared(
                         tool_call,
                         allowed_names=state.effective_tool_names,
                         execution_context=execution_context,
                     )
                 )
+        accepted_results = [result for result, _ in accepted_pairs]
+        # 命中缓存或与并发调用合并的并没有真实执行，额度要退回去：否则同一份数据被
+        # 复用 N 次就扣掉 N 份，chat_max_tool_calls_total 的配置意图会明显低于实际
+        # 可用量，对用户的说明也会自相矛盾。
+        if execution_context is not None:
+            shared_calls = sum(1 for _, shared in accepted_pairs if shared)
+            if shared_calls:
+                await execution_context.refund_tool_calls(shared_calls)
         for (index, tool_call), result in zip(accepted_calls, accepted_results):
             tool_results[index] = result
         if execution_context is not None and execution_context.search_policy is not None:
@@ -273,7 +305,24 @@ class AgentExecutor:
             for (_, call), result in completed:
                 policy.observe(call.function.name, call.function.arguments, result.content, is_error=result.is_error)
             policy.finish_batch()
+        context_exhausted = state.tool_context_characters >= state.max_tool_context_characters
+        # 没真实执行过的调用要能被下游看见：预算拒绝与批内去重都不是「工具成功了」。
+        skipped_indices = {index for index, _ in rejected_calls}
         for index, tool_call in rejected_calls:
+            if context_exhausted:
+                # 与「工具额度不足」区分开：这次不是额度问题，而是结果放不进上下文了。
+                metrics.record_agentic_event("tool_context_budget_exhausted")
+                tool_results[index] = ToolResultInfo(
+                    tool_call_id=tool_call.id,
+                    name=tool_call.function.name,
+                    content=serialize_error(
+                        "tool_context_budget_exhausted",
+                        "本会话的工具结果上下文预算已用尽，本次未执行；"
+                        "请直接基于已有信息作答并记录数据缺口，不要再调用工具",
+                    ),
+                    is_error=False,
+                )
+                continue
             metrics.record_agentic_event("tool_budget_rejected")
             if _TOOL_BUDGET_WARNING not in state.warnings:
                 state.warnings.append(_TOOL_BUDGET_WARNING)
@@ -292,6 +341,7 @@ class AgentExecutor:
             key = tool_call_cache_key(tool_call)
             first_index = first_indices.setdefault(key, index)
             if tool_results[index] is None and first_index != index:
+                skipped_indices.add(index)
                 original = tool_results[first_index]
                 if original is None:
                     raise RuntimeError("重复工具调用缺少原始结果")
@@ -308,8 +358,15 @@ class AgentExecutor:
             [result.content for result in resolved_results],
             state.max_tool_context_characters - state.tool_context_characters,
         )
-        for tool_call, result, context_content in zip(tool_calls, resolved_results, context_contents):
+        for index, (tool_call, result, context_content) in enumerate(
+            zip(tool_calls, resolved_results, context_contents)
+        ):
             await emit(AgentEvent(type="tool_result", tool_result=result))
+            if index in skipped_indices:
+                # 被跳过的调用是控制信息而不是证据：即使上下文预算已满也要让模型看到
+                # 原因。压缩成空串的话，模型既不知道被拒也不知道被为什么拒，只会
+                # 原样再调一次注定被拒的调用。
+                context_content = result.content
             has_evidence = (
                 not result.is_error
                 and has_meaningful_tool_content(result.content)
@@ -322,6 +379,7 @@ class AgentExecutor:
                     context_has_evidence=(
                         has_evidence and has_meaningful_tool_content(context_content)
                     ),
+                    skipped=index in skipped_indices,
                 )
             )
             if context_content != result.content:
@@ -370,8 +428,14 @@ class AgentExecutor:
                 max_completion_tokens=(
                     execution_context.settings.chat_max_completion_tokens
                 ),
+                request_timeout=_llm_request_timeout(
+                    execution_context, execution_context.settings
+                ),
             )
-            analysis = turn.content
+            analysis = strip_tool_call_markup(turn.content)
+            if analysis != turn.content and _TOOL_MARKUP_WARNING not in state.warnings:
+                # 最终轮已经收走工具，模型却仍把调用写成正文：标记不能当结论给用户。
+                state.warnings.append(_TOOL_MARKUP_WARNING)
             reasoning_content = turn.reasoning_content
             self._record_turn_completion(state, turn, allow_tool_calls=False)
             retryable = bool(analysis.strip()) and turn.finish_reason in {None, "stop"}
@@ -425,6 +489,7 @@ class AgentExecutor:
         stream_response: bool,
         emit: Callable[[AgentEvent], Awaitable[None]],
         max_completion_tokens: int | None = None,
+        request_timeout: float | None = None,
     ) -> LLMTurn:
         reasoning_source = AgentReasoningSource(block_id=uuid4().hex)
         capabilities = capabilities_from_client(llm_client)
@@ -450,6 +515,7 @@ class AgentExecutor:
                 llm_client,
                 metric_stage=("agent.final@v1" if tool_choice == "none" else "agent.round@v1"),
                 max_completion_tokens=max_completion_tokens,
+                request_timeout=request_timeout,
                 **kwargs,
             )
             turn = normalize_chat_completion(response)
@@ -459,6 +525,17 @@ class AgentExecutor:
 
         normalizer = ChatCompletionStreamNormalizer()
         stream_text_immediately = tool_choice == "none"
+        # 正文边生成边推送时，工具调用标记一旦进入流就无法撤回：必须在推给用户之前
+        # 拦掉，否则用户看到的「回答」是一串 <｜DSML｜invoke ...>。
+        markup_filter = ToolCallMarkupStreamFilter() if stream_text_immediately else None
+
+        async def flush_markup() -> None:
+            if markup_filter is None:
+                return
+            tail = markup_filter.flush()
+            if tail:
+                await emit(AgentEvent(type="text", content=tail))
+
         stream = stream_chat_completion(
             llm_client,
             metric_stage=("agent.final@v1" if tool_choice == "none" else "agent.round@v1"),
@@ -471,12 +548,15 @@ class AgentExecutor:
                     delta = normalizer.add(chunk)
                     if delta.content:
                         if stream_text_immediately:
-                            await emit(AgentEvent(type="text", content=delta.content))
+                            text = markup_filter.feed(delta.content) if markup_filter else delta.content
+                            if text:
+                                await emit(AgentEvent(type="text", content=text))
                     if delta.reasoning_content:
                         await emit(
                             AgentEvent(type="reasoning", content=delta.reasoning_content, reasoning_source=reasoning_source)
                         )
         except LLMRetryableError:
+            await flush_markup()
             turn = normalizer.finish()
             if not turn.content.strip():
                 raise
@@ -487,6 +567,7 @@ class AgentExecutor:
                 finish_reason="stream_error",
             )
 
+        await flush_markup()
         turn = normalizer.finish()
         if turn.finish_reason is None:
             # Clean transport EOF is not a model completion. Never execute tool
@@ -534,8 +615,16 @@ class AgentExecutor:
         # Prefer body reads within a model batch, but preserve result order by original index.
         if execution_context is not None and execution_context.reserved_tool_names:
             unique_calls.sort(key=lambda pair: pair[1].function.name not in execution_context.reserved_tool_names)
+        # 上下文预算耗尽后不再执行工具：跑了也只会因为 tool_context_characters 已经
+        # 用满而被整条挤掉（serialize_context_results 的 allowance 变 0），模型看不到
+        # 任何结果，工具配额和 LLM 往返却照常消耗。
+        context_exhausted = state.tool_context_characters >= state.max_tool_context_characters
+        if context_exhausted and unique_calls:
+            metrics.record_agentic_event("tool_context_budget_exhausted")
+            if _TOOL_CONTEXT_WARNING not in state.warnings:
+                state.warnings.append(_TOOL_CONTEXT_WARNING)
         for index, tool_call in unique_calls:
-            allowed = len(accepted_calls) < settings.chat_max_tool_calls_per_round
+            allowed = not context_exhausted and len(accepted_calls) < settings.chat_max_tool_calls_per_round
             if allowed and execution_context is not None:
                 allowed = bool(await execution_context.reserve_tool_calls(
                     1, preserve=tool_call_reserve, tool_name=tool_call.function.name,
@@ -629,6 +718,17 @@ class AgentExecutor:
                 tool_definitions = []
                 if _TOOL_BUDGET_WARNING not in state.warnings:
                     state.warnings.append(_TOOL_BUDGET_WARNING)
+            if (
+                tool_definitions
+                and state.tool_context_characters >= state.max_tool_context_characters
+            ):
+                # 工具结果的上下文预算已满：再执行也只会被 _classify_tool_calls 整批拒绝，
+                # 白烧一轮 LLM 往返，而模型因为看得见工具，宁可再调一次也不肯作答
+                # （真实事故：用户看到「上下文预算不足」之后就没有任何输出）。收走工具
+                # 定义，逼它用已有证据收敛——这本就是预算耗尽时对模型的既有要求。
+                tool_definitions = []
+                if _TOOL_CONTEXT_WARNING not in state.warnings:
+                    state.warnings.append(_TOOL_CONTEXT_WARNING)
             tool_choice: ToolChoice = (
                 "required"
                 if tool_definitions
@@ -649,6 +749,9 @@ class AgentExecutor:
                     emit=emit,
                     max_completion_tokens=(
                         execution_context.settings.chat_max_completion_tokens
+                    ),
+                    request_timeout=_llm_request_timeout(
+                        execution_context, execution_context.settings
                     ),
                 )
             except Exception as exc:
@@ -702,6 +805,11 @@ class AgentExecutor:
                     allowed_names=state.effective_tool_names,
                 )
             if not tool_calls:
+                # 没被执行（方言不认识、或工具已被预算收走）的标记绝不能当结论给用户：
+                # 真实事故里用户收到的「回答」是一串 <｜DSML｜invoke ...>。
+                answer_text = strip_tool_call_markup(turn.content or "")
+                if answer_text != (turn.content or "") and _TOOL_MARKUP_WARNING not in state.warnings:
+                    state.warnings.append(_TOOL_MARKUP_WARNING)
                 if (
                     tool_definitions
                     and require_tool_evidence
@@ -720,7 +828,7 @@ class AgentExecutor:
                     if stream_response:
                         await emit(AgentEvent(type="error", error=detail))
                     return self._build_result(profile, state, "", "failed", turn.reasoning_content)
-                if not turn.content.strip():
+                if not answer_text.strip():
                     if state.termination_reason == "stop":
                         state.termination_reason = "empty_response"
                     state.errors.append(_EMPTY_OUTPUT_ERROR)
@@ -734,12 +842,12 @@ class AgentExecutor:
                         turn.reasoning_content,
                         retryable=False,
                     )
-                if stream_response and turn.content and tool_choice != "none":
-                    await emit(AgentEvent(type="text", content=turn.content))
+                if stream_response and answer_text and tool_choice != "none":
+                    await emit(AgentEvent(type="text", content=answer_text))
                 return self._build_result(
                     profile,
                     state,
-                    turn.content,
+                    answer_text,
                     "partial" if state.errors or state.warnings else "completed",
                     turn.reasoning_content,
                     retryable=turn.finish_reason in {None, "stop"},

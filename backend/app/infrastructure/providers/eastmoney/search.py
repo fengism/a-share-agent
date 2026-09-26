@@ -1,10 +1,9 @@
 from app.constants.market import (
-    A_SHARE_SEARCH_CLASSIFY,
-    EASTMONEY_SEARCH_SUGGEST_TOKEN,
-    EASTMONEY_SEARCH_SUGGEST_URL,
+    EASTMONEY_A_SHARE_LABELS,
+    EASTMONEY_SEARCH_URL,
     EASTMONEY_UT_TRADE,
 )
-from app.core.market import classify_exchange
+from app.core.market import is_a_share_code
 from app.domain.stock import StockSearchItem
 
 
@@ -23,13 +22,13 @@ class SearchMixin:
             list[StockSearchItem]: 搜索结果列表，每个元素包含 code 和 name
         """
         params = {
-            "input": query,
-            "type": "14",
-            "token": EASTMONEY_SEARCH_SUGGEST_TOKEN,
-            "count": str(max(count, 5)),
+            "client": "web",
+            "keyword": query,
+            "pageIndex": 1,
+            "pageSize": max(count, 10),
         }
-        response = self.em_get_response(EASTMONEY_SEARCH_SUGGEST_URL, params=params, headers=self.eastmoney_headers, timeout=10)
-        data = response.json().get("QuotationCodeTable", {}).get("Data") or []
+        response = self.em_get_response(EASTMONEY_SEARCH_URL, params=params, headers=self.eastmoney_headers, timeout=10)
+        data = response.json().get("result") or []
         results: list[StockSearchItem] = []
         seen_codes: set[str] = set()
         for item in data:
@@ -46,39 +45,39 @@ class SearchMixin:
         """解析搜索结果项。
 
         Param:
-            item: 东财搜索接口返回的原始字典
+            item: 东财代码表接口返回的原始字典
         Return:
-            StockSearchItem | None: 解析成功返回 StockSearchItem，无效数据返回 None
+            StockSearchItem | None: 解析成功返回 StockSearchItem，非 A 股或无效数据返回 None
         """
-        code = str(item.get("Code") or item.get("SecurityCode") or "").strip()
-        name = str(item.get("Name") or item.get("SecurityName") or item.get("PinYin") or "").strip()
-        if not code or not name or len(code) != 6 or not code.isdigit():
+        code = str(item.get("code") or "").strip()
+        name = str(item.get("shortName") or item.get("name") or "").strip()
+        if not code or not name:
             return None
         if not self._is_a_share_search_item(item):
             return None
         return StockSearchItem(code=code, name=name)
 
     def _is_a_share_search_item(self, item: dict) -> bool:
-        """判断搜索结果是否为 A 股。
+        """判断代码表条目是否为在市的 A 股。
 
-        通过代码、分类和市场信息综合判断。
+        代码表把指数、板块、债券、基金/LOF、B 股、港美股、退市股和真正的 A 股混在
+        一起返回，且 000001「上证指数」与 000001「平安银行」代码完全相同——只按代码
+        判定会把指数当成股票。代码段与板块标签两道都过才认。
 
         Param:
-            item: 东财搜索接口返回的原始字典
+            item: 东财代码表接口返回的原始字典
         Return:
-            bool: True 表示是 A 股，False 表示不是
+            bool: True 表示是可分析的 A 股
         """
-        classify = str(item.get("Classify") or item.get("SecurityTypeName") or "").strip()
-        market = str(item.get("MarketType") or item.get("Market") or "").strip().upper()
-        code = str(item.get("Code") or item.get("SecurityCode") or "").strip()
-        if len(code) == 6 and code.isdigit():
-            try:
-                return classify_exchange(code) in {"SH", "SZ", "BJ"}
-            except ValueError:
-                return False
-        if classify in A_SHARE_SEARCH_CLASSIFY:
-            return True
-        return market in {"SH", "SZ", "BJ", "CN"}
+        code = str(item.get("code") or "").strip()
+        if not is_a_share_code(code):
+            return False
+        # status=30 是终止上市；退市股与在市股代码段相同，必须单独排除。
+        if item.get("status") == 30:
+            return False
+        label = str(item.get("label") or "").strip()
+        # 标签缺失时只信代码段：宁可漏，也不要把指数当股票返回。
+        return not label or label in EASTMONEY_A_SHARE_LABELS
 
     def fetch_stock_names(self) -> list[dict]:
         """获取全市场股票代码和名称列表。

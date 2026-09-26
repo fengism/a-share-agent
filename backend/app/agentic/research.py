@@ -569,7 +569,13 @@ async def run_agentic_research(
         await progress.mark_degraded(degraded_missing)
     if fatal_missing and not stop_reason:
         labels = "、".join(item.label for item in fatal_missing)
-        raise AgentEvidenceInsufficientError(f"Agent 调研证据不足：{labels}")
+        # 必须把已采集的证据一起带出去：丢掉它们，pipeline 只能退化成一句硬编码
+        # 文案 + 公共数据继续合成，本轮读到的几十条正文/财报就全部作废了。
+        raise AgentEvidenceInsufficientError(
+            f"Agent 调研证据不足：{labels}",
+            summary=last_result.summary,
+            evidence=evidence,
+        )
     if missing:
         await progress.emit(AgentEvent(
             type="status",

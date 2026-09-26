@@ -1,10 +1,29 @@
 import json
+import re
 from typing import Any
 
 from app.agentic.protocol import ToolCallInfo
 from app.agentic.tools.document_output import bounded_document
 
 MAX_RESULT_LEN = 12000
+
+# 工具自报的 error_code 只允许是本仓库自己的标识符形态，防止任意字符串成为
+# 事件层的分支条件。
+_REPORTED_ERROR_CODE = re.compile(r"[a-z][a-z0-9_]{0,63}")
+# 框架自己发出的保留码：它们在事件层有专门语义（skipped / 会话预算耗尽）。
+# 工具返回值里的 error_code 是数据，若透传保留码，一次真实执行过的调用会被
+# 显示成「未实际执行」，模型据此认为「我没调过」而重调——正好放大成死循环。
+_RESERVED_ERROR_CODES = frozenset(
+    {
+        "tool_budget_exceeded",
+        "tool_context_budget_exhausted",
+        "duplicate_tool_call",
+        "deadline_exceeded",
+    }
+)
+# 预算耗尽到连 {"ok": false}（12 字符）都放不下时的最小标记。
+_DROPPED_RESULT = "null"
+_MIN_DROPPED_RESULT_LEN = len(_DROPPED_RESULT)
 
 
 def _has_meaningful_value(value: Any) -> bool:
@@ -98,6 +117,92 @@ def serialize_truncated_preview(
     return best
 
 
+def _truncated_error_envelope(
+    code: str,
+    message: str,
+    retryable: bool,
+    note: str,
+    preview: str | None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "ok": False,
+        "error": {"code": code, "message": message, "retryable": retryable},
+    }
+    if preview is not None:
+        payload["data"] = {"preview": preview}
+    payload["meta"] = {"truncated": True, "reason": note}
+    return payload
+
+
+def serialize_truncated_error(
+    error: Any,
+    content: str,
+    note: str,
+    max_result_len: int,
+) -> str:
+    """Shrink an error envelope from the payload outward so ``ok`` never flips to true.
+
+    ``serialize_truncated_preview`` hardcodes ``ok: true`` because truncating a
+    successful payload cannot change the outcome. Applying it to ``ok: false``
+    would rewrite a failure into a success (or into ``{}`` once nothing fit), and
+    downstream readers such as ``result_error_message``/``_error_message`` only
+    look at the outer envelope — so the model would stop retrying a dead call.
+
+    Every candidate is measured against the budget: overshooting it would push
+    the run past its protocol character limit.
+    """
+    limit = max(0, int(max_result_len))
+    if not isinstance(error, dict):
+        error = {"code": "tool_reported_error", "message": str(error or "")}
+    code = str(error.get("code") or "tool_reported_error")[:80]
+    retryable = bool(error.get("retryable"))
+    message = str(error.get("message") or "")
+
+    # 1) 保留完整错误信息，先牺牲载荷预览。
+    if len(json.dumps(_truncated_error_envelope(code, message, retryable, note, ""), ensure_ascii=False)) <= limit:
+        best = _truncated_error_envelope(code, message, retryable, note, "")
+        low, high = 0, min(len(content), limit)
+        while low <= high:
+            middle = (low + high) // 2
+            candidate = _truncated_error_envelope(code, message, retryable, note, content[:middle])
+            if len(json.dumps(candidate, ensure_ascii=False)) <= limit:
+                best = candidate
+                low = middle + 1
+            else:
+                high = middle - 1
+        return json.dumps(best, ensure_ascii=False)
+
+    # 2) 光是错误信息就装不下：削 message，丢掉预览。
+    low, high = 0, len(message)
+    fitted: dict[str, Any] | None = None
+    while low <= high:
+        middle = (low + high) // 2
+        candidate = _truncated_error_envelope(code, message[:middle], retryable, note, None)
+        if len(json.dumps(candidate, ensure_ascii=False)) <= limit:
+            fitted = candidate
+            low = middle + 1
+        else:
+            high = middle - 1
+    if fitted is not None:
+        return json.dumps(fitted, ensure_ascii=False)
+
+    # 3) 只剩错误码可放：报失败但仍不给细节，比谎报成功好。
+    minimal = {"ok": False, "error": {"code": code, "message": "", "retryable": retryable}}
+    if len(json.dumps(minimal, ensure_ascii=False)) <= limit:
+        return json.dumps(minimal, ensure_ascii=False)
+    bare = {"ok": False, "error": {"code": code}}
+    if len(json.dumps(bare, ensure_ascii=False)) <= limit:
+        return json.dumps(bare, ensure_ascii=False)
+    if len(json.dumps({"ok": False})) <= limit:
+        return json.dumps({"ok": False})
+    # 预算只剩几个字符时用 null 而不是空串：空串进 role=tool 的 content 有协议风险
+    # （部分网关 400），而 null 是合法 JSON、不会谎报成功、也不会被当成有效证据
+    # （_has_meaningful_value(None) 为 False）。
+    if limit >= _MIN_DROPPED_RESULT_LEN:
+        return _DROPPED_RESULT
+    return ""
+
+
 def serialize_context_result(content: str, max_result_len: int) -> str:
     limit = max(0, int(max_result_len))
     if len(content) <= limit:
@@ -108,6 +213,9 @@ def serialize_context_result(content: str, max_result_len: int) -> str:
         envelope = json.loads(content)
     except (ValueError, TypeError):
         envelope = None
+    if isinstance(envelope, dict) and envelope.get("ok") is False:
+        note = "Agent 工具上下文预算不足，结果已截断"
+        return serialize_truncated_error(envelope.get("error"), content, note, limit)
     if isinstance(envelope, dict) and envelope.get("ok") is True:
         document = bounded_document(envelope.get("data"), limit, envelope.get("meta") or {})
         if document is not None:
@@ -160,6 +268,29 @@ def result_error_message(result: Any) -> str | None:
     return f"全部 {len(result)} 项失败：{details}"
 
 
+def reported_error_code(result: Any) -> str:
+    """Use the tool's own ``error_code`` when it is one of our identifier-shaped codes.
+
+    Without this every tool-reported failure collapsed into ``tool_reported_error``,
+    so ``invalid_arguments`` from ``financial_calculator``/``python_interpreter``
+    and ``upstream_unavailable`` from ``analyze_financials`` never reached the
+    code-keyed diagnostics in ``events._tool_result_summary``.
+
+    Reserved framework codes are rejected on the way through: ``error_code`` comes
+    from a tool's return value, so letting it impersonate ``tool_budget_exceeded``
+    would render a call that really ran as "未实际执行".
+    """
+    if isinstance(result, dict):
+        code = result.get("error_code")
+        if (
+            isinstance(code, str)
+            and _REPORTED_ERROR_CODE.fullmatch(code)
+            and code not in _RESERVED_ERROR_CODES
+        ):
+            return code
+    return "tool_reported_error"
+
+
 def serialize_result(result: Any, max_result_len: int = MAX_RESULT_LEN) -> str:
     """Serialize a result using the stable JSON tool contract."""
     if error_message := result_error_message(result):
@@ -169,9 +300,19 @@ def serialize_result(result: Any, max_result_len: int = MAX_RESULT_LEN) -> str:
             else result
         )
         return serialize_error(
-            "tool_reported_error",
+            reported_error_code(result),
             error_message,
             data=context or None,
+        )
+
+    if isinstance(result, dict) and result.get("ok") is False:
+        # 工具自报失败却没有可读原因（沙箱就允许 error 为空串）。不能因为
+        # result_error_message 判空就把它包成 ok:true —— 那会让「失败」在模型眼里
+        # 变成「成功但没有数据」。
+        return serialize_error(
+            reported_error_code(result),
+            "工具返回了失败状态但未提供原因；请改用其他工具或来源，不要基于空结果下结论",
+            data={key: value for key, value in result.items() if key != "ok"} or None,
         )
 
     payload = {"ok": True, "data": result}

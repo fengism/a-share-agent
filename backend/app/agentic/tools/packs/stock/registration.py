@@ -193,6 +193,28 @@ def _register_structured_screening_tools() -> None:
                     "uniqueItems": True,
                     "description": "概念题材列表（支持按个股概念库筛选，如'高股息精选'、'人工智能'等）",
                 },
+                "markets": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": ["主板", "科创板", "创业板", "北交所"]},
+                    "maxItems": 4,
+                    "uniqueItems": True,
+                    "description": "市场板块筛选，省略表示全部市场",
+                },
+                "exclude_st": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "剔除 ST/*ST/退市风险股",
+                },
+                "min_listing_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "剔除上市不满 N 天的新股；省略表示不过滤",
+                },
+                "min_amount_yi": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "当日成交额下限（亿元），用于过滤流动性不足的标的；省略表示不过滤",
+                },
                 "sort_by": {
                     "type": "string",
                     "enum": ["market_cap", "pe", "pb", "price", "change_pct", "turnover_pct", "volume"],
@@ -204,6 +226,19 @@ def _register_structured_screening_tools() -> None:
                     "enum": ["asc", "desc"],
                     "default": "desc",
                     "description": "排序方向，默认desc",
+                },
+                "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1,
+                    "description": "页码，从 1 开始；结果集较大时翻页获取",
+                },
+                "page_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200,
+                    "default": 20,
+                    "description": "每页条数，最大 200",
                 },
             },
         },

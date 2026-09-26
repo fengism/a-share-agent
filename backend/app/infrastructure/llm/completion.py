@@ -93,11 +93,17 @@ async def create_chat_completion(
     *,
     metric_stage: str = "agentic.completion@v1",
     max_completion_tokens: int | None = None,
+    request_timeout: float | None = None,
     **kwargs,
 ) -> Any:
     """在全局排队槽位中执行一次非流式 Chat Completion。"""
     settings = call_settings()
     request_kwargs = _prepare_request(client, kwargs, settings=settings, max_completion_tokens=max_completion_tokens)
+    if request_timeout is not None:
+        # 单次读写上限在客户端构造时就固定了（llm_timeout_seconds），不随执行上下文收缩。
+        # 长回答必须显式把它抬到本次调用真正拿到的预算，否则最内层的传输限制会先于
+        # generation_scope 触发，把「预算不够」误报成「读取响应超时」。
+        request_kwargs["timeout"] = max(float(request_timeout), float(settings.llm_timeout_seconds))
     started_at = time.perf_counter()
     async with generation_scope(settings, timeout_seconds=settings.llm_generation_timeout_seconds), _llm_limiter.slot():
         queue_wait_ms = (time.perf_counter() - started_at) * 1000

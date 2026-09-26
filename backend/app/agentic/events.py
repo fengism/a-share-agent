@@ -142,6 +142,54 @@ def _collect_tool_sources(value: Any, sources: list[AgentToolSource], depth: int
         _collect_tool_sources(item, sources, depth + 1)
 
 
+# 只允许用 reason 枚举映射文案，不透传 message 原文：message 里含有模型自己
+# 传入的键名（如「包含未声明参数：<任意字符串>」），直接展示等于把不受控输入
+# 打到界面上。field/detail 由 validate_value 填充，只来自 schema 或白名单。
+_INVALID_ARGUMENT_LABELS: dict[str, str] = {
+    "invalid_json": "参数不是合法 JSON",
+    "type_mismatch": "参数类型不正确",
+    "missing_required": "缺少必填参数",
+    "unexpected_parameter": "包含未声明参数",
+    "enum": "参数取值不在允许范围",
+    "const_mismatch": "参数取值不符合约定",
+    "min_items": "数组项数不足",
+    "max_items": "数组项数超限",
+    "duplicate_items": "数组存在重复项",
+    "min_length": "参数长度不足",
+    "max_length": "参数长度超限",
+    "pattern": "参数格式不正确",
+    "invalid_date": "日期格式不正确",
+    "invalid_url": "URL 格式不正确",
+    "not_finite": "数值必须是有限值",
+    "below_minimum": "参数数值过小",
+    "above_maximum": "参数数值过大",
+    "below_exclusive_minimum": "参数数值过小",
+    "above_exclusive_maximum": "参数数值过大",
+    "not_multiple_of": "参数数值必须是指定步长的倍数",
+}
+
+
+def _invalid_arguments_summary(payload: Any) -> str:
+    """把受控的 reason/field/detail 组装成界面文案；信息缺失时退回通用文案。
+
+    只读 ``data.argument_error`` 这个专属命名空间：该字段只有 ``Tool.execute``
+    的契约校验分支会写，而 ``data`` 本身还会承载工具自报的原始返回。
+    """
+    data = payload.get("data") if isinstance(payload, dict) else None
+    diagnostics = data.get("argument_error") if isinstance(data, dict) else None
+    if not isinstance(diagnostics, dict):
+        return "工具参数无效"
+    label = _INVALID_ARGUMENT_LABELS.get(str(diagnostics.get("reason") or ""))
+    if label is None:
+        return "工具参数无效"
+    field = str(diagnostics.get("field") or "")
+    detail = str(diagnostics.get("detail") or "")
+    text = f"{label}：{field}" if field else label
+    if detail:
+        text = f"{text}（{detail}）" if field else f"{text}：{detail}"
+    return text[:200]
+
+
 def _tool_result_summary(result: ToolResultInfo) -> AgentToolResultSummary:
     payload = _decoded_tool_result(result.content)
     error_code = ""
@@ -152,16 +200,28 @@ def _tool_result_summary(result: ToolResultInfo) -> AgentToolResultSummary:
             summary="本次工具请求受预算限制，未实际执行（可能是单批上限、总额、搜索节奏或正文预留）",
             status="skipped",
         )
+    if error_code == "tool_context_budget_exhausted":
+        return AgentToolResultSummary(
+            summary="工具结果上下文预算已用尽，本次未实际执行",
+            status="skipped",
+        )
     if error_code == "duplicate_tool_call":
         return AgentToolResultSummary(
             summary="已跳过重复调用，继续使用已有结果",
             status="skipped",
         )
     if result.is_error:
+        if error_code == "invalid_arguments":
+            return AgentToolResultSummary(
+                summary=_invalid_arguments_summary(payload),
+                status="error",
+            )
         summary = {
-            "invalid_arguments": "工具参数无效",
             "tool_unavailable": "工具暂时不可用",
             "execution_failed": "工具执行失败",
+            "upstream_unavailable": "数据源暂不可用",
+            "sandbox_unavailable": "沙盒服务不可用",
+            "tool_queue_timeout": "工具并发额度已满，本次未执行",
         }.get(error_code, "工具调用失败")
         # Only publish allowlisted PDF diagnostics, never arbitrary provider error text.
         if result.name == "read_pdf" and isinstance(payload, dict):

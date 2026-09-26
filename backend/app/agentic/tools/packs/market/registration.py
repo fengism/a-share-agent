@@ -189,6 +189,11 @@ def register_market_tools(target_registry=None):
                     "format": "date",
                     "description": "日期，格式 YYYY-MM-DD；省略则生成当天复盘",
                 },
+                "force": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "忽略缓存强制重新生成；仅当已有复盘过期或内容缺失时使用",
+                },
             },
         },
         policy=_REVIEW_POLICY,

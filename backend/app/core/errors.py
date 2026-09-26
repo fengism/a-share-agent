@@ -1,6 +1,7 @@
 """内部错误记录与安全响应。"""
 
 import logging
+from functools import lru_cache
 from uuid import uuid4
 
 
@@ -20,3 +21,76 @@ def log_internal_error(
     error_id, detail = build_internal_error(public_message)
     logger.error("%s失败 error_id=%s: %s", operation, error_id, exc, exc_info=True)
     return error_id, detail
+
+
+# 只有明确的瞬时性异常才允许模型原样重试。默认不可重试：把编程错误（TypeError）、
+# 权限错误（PermissionError）、配置错误（RuntimeError）标成可重试，会诱导 Agent
+# 拿着同样的参数原地重试，直到 max_rounds 耗尽——正是本次排查反复看到的失败模式。
+_TRANSIENT_ERROR_TYPES: frozenset[type[BaseException]] = frozenset({
+    TimeoutError,  # 含 asyncio.TimeoutError；工具级超时有独立分支，这里兜底
+    ConnectionError,  # 连接被拒 / 被重置 / 管道断裂
+    InterruptedError,  # 系统调用被信号中断
+})
+
+# HTTP 状态码里「换个时间重试就能成」的那部分。4xx（除限流/超时）不在此列：
+# 参数错、没权限、未找到，重试一万次也是同样结果。
+_TRANSIENT_HTTP_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
+
+
+@lru_cache(maxsize=1)
+def _third_party_transient_types() -> frozenset[type[BaseException]]:
+    """登记实际在用的 HTTP 客户端的网络异常。
+
+    必须显式登记，不能只判内置类型：``requests.exceptions.ConnectionError`` 与
+    ``Timeout`` 继承 ``RequestException(IOError)``，和内置 ``ConnectionError``
+    （``OSError`` 子类）是**兄弟类而非子类**。只认内置类型会把真实的连接失败、
+    读超时判成「不可重试」，并且还明确告诉模型「原样重试无效」。
+
+    这是兜底而不是正解：正解是各 provider 在 gateway 层就把网络异常归一化成
+    ``UpstreamUnavailableError``（``Tool.execute`` 已按可重试处理那一分支）。
+    """
+    types: set[type[BaseException]] = set()
+    try:
+        from requests import exceptions as requests_exceptions
+    except ImportError:  # pragma: no cover - requests 是既有依赖
+        pass
+    else:
+        types.update({
+            requests_exceptions.ConnectionError,
+            requests_exceptions.Timeout,
+            requests_exceptions.ChunkedEncodingError,
+        })
+    try:
+        import httpx
+    except ImportError:  # pragma: no cover - 可选依赖
+        pass
+    else:
+        types.add(httpx.TransportError)
+    return frozenset(types)
+
+
+def _http_status(error: BaseException) -> int | None:
+    response = getattr(error, "response", None)
+    for candidate in (response, error):
+        status = getattr(candidate, "status_code", None)
+        if isinstance(status, int):
+            return status
+    return None
+
+
+@lru_cache(maxsize=1)
+def _transient_error_types() -> tuple[type[BaseException], ...]:
+    """``isinstance`` 只接受 tuple，两个集合在这里合成一次并缓存。"""
+    return (*_TRANSIENT_ERROR_TYPES, *_third_party_transient_types())
+
+
+def is_transient_error(error: BaseException) -> bool:
+    """该异常是否值得让模型原样重试。
+
+    刻意保守：漏判成不可重试，Agent 只是换个工具或来源；误判成可重试，
+    Agent 会重复同一调用，把工具配额和 LLM 往返全部浪费在同一个死结上。
+    """
+    if isinstance(error, _transient_error_types()):
+        return True
+    status = _http_status(error)
+    return status is not None and status in _TRANSIENT_HTTP_STATUS

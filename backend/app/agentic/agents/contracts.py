@@ -39,6 +39,10 @@ class ToolExecutionSummary:
     is_error: bool
     has_evidence: bool = False  # Raw acquisition succeeded with meaningful data.
     context_has_evidence: bool = False  # Evidence actually included in model context.
+    # 未真实执行（预算拒绝、批内去重）。必须与「成功但没取到东西」区分开：否则
+    # Reviewer 的 any(not is_error) / all(is_error) 两个判定都看不到它，一次零有效
+    # 证据的任务会被当成 usable 注入下游。
+    skipped: bool = False
 
 
 @dataclass(slots=True)

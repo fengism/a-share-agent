@@ -116,9 +116,12 @@ class LiteLLMAsyncCompletions:
         kwargs = prepare_completion_kwargs(kwargs, self.capabilities, expected_model=self._model)
         kwargs.update(
             api_key=self._api_key,
-            timeout=self._timeout,
             drop_params=True,
         )
+        # 构造时固定的超时是默认值；调用方显式给出的（长回答按预算抬过的）必须优先，
+        # 否则 LiteLLM 路径会静默把单次读写上限按回默认，模型调用又被提前掐断。
+        if kwargs.get("timeout") is None:
+            kwargs["timeout"] = self._timeout
         if self._max_retries is not None:
             kwargs["num_retries"] = self._max_retries
         if self._base_url:

@@ -20,6 +20,8 @@ def is_usable_task_result(task: AgentTask, result: AgentExecutionResult | None) 
         and result.analysis.strip()
         and (not task.allowed_tools or result.tools_called)
         and (not result.tool_results or any(not item.is_error for item in result.tool_results))
+        # 全部被跳过的任务没有任何有效证据，不能当依赖上下文注入下游。
+        and not all(item.skipped for item in result.tool_results)
     )
 
 
@@ -63,6 +65,11 @@ def review_execution_plan(
             continue
         if result.tool_results and all(item.is_error for item in result.tool_results):
             add_retry(task.task_id, "任务的工具调用全部失败")
+            continue
+        if result.tool_results and all(item.skipped for item in result.tool_results):
+            # 预算拒绝/去重不算「工具失败」，但同样意味着这次任务零证据：必须让
+            # Reviewer 看见，否则一次什么都没取到的分析会被判为可用。
+            add_retry(task.task_id, "任务的工具调用全部被跳过（预算不足或重复），未取得有效证据")
             continue
         if result.status == "partial":
             issues.append(

@@ -85,6 +85,28 @@ class AgentExecutionContext:
     def reserved_calls_remaining(self) -> int:
         return max(0, min(self.reserved_tool_calls, self.settings.chat_max_tool_calls_total // 2) - self._reserved_calls_used)
 
+    async def refund_tool_calls(self, refunded: int = 1) -> int:
+        """退回此前预留的额度，返回实际退回的数量。
+
+        预留在「决定执行」时发生，但真正执行前可能发现结果已在缓存里、或与另一个
+        并发调用合并成同一次真实执行。那种情况下不该扣预算——否则同一份数据被复用
+        N 次就扣掉 N 份额度，配置意图（chat_max_tool_calls_total）会明显低于实际
+        可用量，/stats 口径也会失真。
+        """
+        count = max(0, int(refunded))
+        if not count:
+            return 0
+        async with self._tool_budget_lock:
+            returned = min(count, self._tool_calls_used)
+            self._tool_calls_used -= returned
+            if self.search_policy is not None:
+                self.search_policy.restore(returned)
+            if self.reserved_tool_names:
+                self._reserved_calls_used = max(
+                    0, self._reserved_calls_used - returned
+                )
+            return returned
+
     @property
     def tool_calls_used(self) -> int:
         return self._tool_calls_used

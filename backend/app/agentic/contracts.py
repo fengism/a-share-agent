@@ -127,7 +127,58 @@ class AgenticResearchResult:
 
 
 class AgentEvidenceInsufficientError(RuntimeError):
-    pass
+    """调研证据不足。
+
+    必须携带本轮已采集的证据：抛异常时把 ``evidence`` 一起丢掉，pipeline 只能退化成
+    一句硬编码文案 + 公共数据继续合成，等于把已经读到的正文/财报全部作废。
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        summary: str = "",
+        evidence: tuple[AgentEvidence, ...] | list[AgentEvidence] = (),
+    ) -> None:
+        super().__init__(message)
+        self.summary = summary
+        self.evidence: tuple[AgentEvidence, ...] = tuple(evidence)
+
+
+# 每次调用都会变的字段：参与内容指纹的话，同一 URL 在主调研与补证阶段各读一次就会
+# 得到两个 evidence_id —— 去重永久失效，重读被计成「新增证据」。
+_VOLATILE_CONTENT_KEYS = frozenset(
+    {
+        "fetched_at",
+        "retrieved_at",
+        "generated_at",
+        "created_at",
+        "cached_at",
+        "elapsed_ms",
+        "elapsed_seconds",
+        "duration_ms",
+    }
+)
+
+
+def _strip_volatile(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _strip_volatile(item)
+            for key, item in value.items()
+            if key not in _VOLATILE_CONTENT_KEYS
+        }
+    if isinstance(value, list):
+        return [_strip_volatile(item) for item in value]
+    return value
+
+
+def _content_fingerprint(content: str) -> str:
+    try:
+        payload = json.loads(content)
+    except (TypeError, ValueError):
+        return content
+    return json.dumps(_strip_volatile(payload), ensure_ascii=False, sort_keys=True, default=str)
 
 
 def agent_evidence_id(evidence: AgentEvidence) -> str:
@@ -141,7 +192,10 @@ def agent_evidence_id(evidence: AgentEvidence) -> str:
     except (TypeError, ValueError, json.JSONDecodeError):
         arguments = evidence.arguments.strip()
     digest = hashlib.sha256(
-        f"{evidence.tool_name}\n{arguments}\n{evidence.is_error}\n{evidence.content}".encode("utf-8")
+        (
+            f"{evidence.tool_name}\n{arguments}\n{evidence.is_error}\n"
+            f"{_content_fingerprint(evidence.content)}"
+        ).encode("utf-8")
     ).hexdigest()[:16]
     return f"ev_{digest}"
 
