@@ -21,6 +21,7 @@ vi.mock("./ConfigCards", () => ({
     </button>
   ),
   DataSourceCookiesCard: () => null,
+  ResearchBudgetCard: () => null,
   FeishuConfigCard: () => null,
   FredConfigCard: ({ form, onChange, onSave }: {
     form: ConfigUpdate;

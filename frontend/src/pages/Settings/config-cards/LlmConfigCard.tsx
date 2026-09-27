@@ -1,6 +1,8 @@
-import { RobotOutlined } from "@ant-design/icons";
-import { Col, Input, Row, Select, Slider, Tag } from "antd";
-import { useStyles } from "../../../styles/ui";
+import { CloudDownloadOutlined, RobotOutlined } from "@ant-design/icons";
+import { AutoComplete, Button, Col, Input, InputNumber, Row, Select, Slider, Tag, message } from "antd";
+import { useState } from "react";
+import { useColors, useStyles } from "../../../styles/ui";
+import { useFetchLlmModels } from "../../../api/queryHooks/settings";
 import type { LlmApiMode, ProviderDefault } from "../../../types/settings";
 import { SettingsCard, type ConfigCardProps } from "../SettingsCard";
 
@@ -36,7 +38,30 @@ export default function LlmConfigCard({
   providerDefaults,
 }: LlmConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
+  const colors = useColors();
   const selectedDefaults = form.llm_provider ? providerDefaults[form.llm_provider] : undefined;
+  const [fetchedModels, setFetchedModels] = useState<string[] | null>(null);
+  const fetchModelsMutation = useFetchLlmModels();
+  const recommendedModels = PROVIDER_RECOMMENDED_MODELS[form.llm_provider] ?? [];
+
+  const handleFetchModels = () => {
+    fetchModelsMutation.mutate(
+      {
+        base_url: form.llm_base_url || "",
+        api_key: form.llm_api_key || "",
+        api_mode: form.llm_api_mode || "",
+        api_version: form.llm_api_version || "",
+      },
+      {
+        onSuccess: (data) => {
+          setFetchedModels(data.models);
+          message.success(`已获取 ${data.models.length} 个模型`);
+        },
+        onError: (error: Error) => message.error(`获取模型列表失败：${error.message}`),
+      },
+    );
+  };
+
   const providerOptions = Object.entries(providerDefaults).map(([value, defaults]) => ({
     value,
     label: defaults.label || value,
@@ -104,11 +129,26 @@ export default function LlmConfigCard({
         </Col>
         <Col span={24} sm={12}>
           <div style={fieldLabelStyle}>Model</div>
-          <Input
-            value={form.llm_model || ""}
-            onChange={(event) => onChange({ llm_model: event.target.value })}
-            placeholder={selectedDefaults?.model || "模型标识符"}
-          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <AutoComplete
+              style={{ flex: 1, minWidth: 0 }}
+              value={form.llm_model || ""}
+              onChange={(value) => onChange({ llm_model: value })}
+              options={(fetchedModels ?? recommendedModels).map((m) => ({ value: m }))}
+              filterOption={(input, option) =>
+                String(option?.value ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              placeholder={selectedDefaults?.model || "输入或从列表选择"}
+            />
+            <Button
+              icon={<CloudDownloadOutlined />}
+              onClick={handleFetchModels}
+              loading={fetchModelsMutation.isPending}
+              title="按 Base URL 与 API Key 拉取可用模型列表"
+            >
+              获取模型
+            </Button>
+          </div>
           {form.llm_provider && PROVIDER_RECOMMENDED_MODELS[form.llm_provider] ? (
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px" }}>
               <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)", alignSelf: "center" }}>常用模型:</span>
@@ -141,6 +181,23 @@ export default function LlmConfigCard({
             value={form.llm_temperature ?? 0.1}
             onChange={(value) => onChange({ llm_temperature: value })}
           />
+        </Col>
+        <Col span={24} sm={12}>
+          <div style={fieldLabelStyle}>模型上下文长度（tokens）</div>
+          <InputNumber
+            min={0}
+            max={2_000_000}
+            step={1000}
+            value={form.llm_context_length_tokens ?? 0}
+            onChange={(value) => onChange({ llm_context_length_tokens: value ?? 0 })}
+            style={{ width: "100%" }}
+            placeholder="0 = 未设置"
+          />
+        </Col>
+        <Col span={24}>
+          <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+            填写模型实际上下文窗口（如 32768 / 131072）。设置后对话历史会按该窗口自动裁剪，避免“超出模型上下文长度”报错；0 表示未设置，沿用默认历史上限。
+          </div>
         </Col>
       </Row>
     </SettingsCard>

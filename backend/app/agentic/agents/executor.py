@@ -172,6 +172,11 @@ class AgentExecutor:
                 max_history_messages,
                 system_prompt=profile.system_prompt,
                 tool_selection_prompt=tool_selection_prompt,
+                context_length_tokens=(
+                    getattr(execution_context.settings, "llm_context_length_tokens", 0)
+                    if execution_context is not None
+                    else 0
+                ),
             ),
             effective_tool_names=effective_tool_names,
             tool_definitions=registry.get_tool_definitions_for(effective_tool_names),

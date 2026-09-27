@@ -17,6 +17,7 @@ class ConfigResponse(BaseModel):
     llm_base_url: str
     llm_model: str
     llm_temperature: float
+    llm_context_length_tokens: int
     feishu_enabled: bool
     feishu_app_id: str
     feishu_app_secret: str
@@ -70,6 +71,12 @@ class ConfigResponse(BaseModel):
     bot_batch_concurrency: int
     bot_batch_max_stocks: int
     bot_admin_users: list[str]
+    industry_chain_repair_timeout_seconds: float
+    industry_chain_tool_calls_total: int
+    industry_chain_repair_tool_calls_total: int
+    analysis_llm_timeout_seconds: float
+    agent_research_timeout_seconds: float
+    chat_max_tool_calls_total: int
     is_admin: bool
 
 
@@ -83,6 +90,7 @@ class ConfigUpdateRequest(BaseModel):
     llm_base_url: str | None = None
     llm_model: str | None = None
     llm_temperature: float | None = None
+    llm_context_length_tokens: int | None = Field(default=None, ge=0)
     feishu_enabled: bool | None = None
     feishu_app_id: str | None = None
     feishu_app_secret: str | None = None
@@ -135,6 +143,25 @@ class ConfigUpdateRequest(BaseModel):
     bot_batch_concurrency: int | None = Field(default=None, ge=1, le=8)
     bot_batch_max_stocks: int | None = Field(default=None, ge=1, le=50)
     bot_admin_users: list[str] | None = None
+    industry_chain_repair_timeout_seconds: float | None = Field(default=None, gt=0)
+    industry_chain_tool_calls_total: int | None = Field(default=None, ge=8, le=128)
+    industry_chain_repair_tool_calls_total: int | None = Field(default=None, ge=4, le=48)
+    analysis_llm_timeout_seconds: float | None = Field(default=None, gt=0)
+    agent_research_timeout_seconds: float | None = Field(default=None, gt=0)
+    chat_max_tool_calls_total: int | None = Field(default=None, ge=1, le=128)
+
+
+class LlmModelsRequest(BaseModel):
+    """按 Base URL + API Key 拉取 OpenAI 兼容 /models 列表的请求。"""
+
+    base_url: str = ""
+    api_key: str = ""
+    api_mode: str = ""
+    api_version: str = ""
+
+
+class LlmModelsResponse(BaseModel):
+    models: list[str] = Field(default_factory=list)
 
 
 CONFIG_RESPONSE_META_FIELDS = frozenset({"provider_defaults", "is_admin"})

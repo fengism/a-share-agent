@@ -18,6 +18,7 @@ export interface ConfigData {
   llm_base_url: string;
   llm_model: string;
   llm_temperature: number;
+  llm_context_length_tokens: number;
   feishu_enabled: boolean;
   feishu_app_id: string;
   feishu_app_secret: string;
@@ -70,6 +71,12 @@ export interface ConfigData {
   bot_batch_concurrency: number;
   bot_batch_max_stocks: number;
   bot_admin_users: string[];
+  analysis_llm_timeout_seconds: number;
+  agent_research_timeout_seconds: number;
+  industry_chain_repair_timeout_seconds: number;
+  industry_chain_tool_calls_total: number;
+  industry_chain_repair_tool_calls_total: number;
+  chat_max_tool_calls_total: number;
   /** Whether the current user may edit instance-global fields. */
   is_admin: boolean;
 }
@@ -96,4 +103,15 @@ export interface BotAdminJob {
 export interface BotAdminJobsResponse {
   counts: Record<BotJobStatus, number>;
   jobs: BotAdminJob[];
+}
+
+export interface LlmModelsRequest {
+  base_url?: string;
+  api_key?: string;
+  api_mode?: string;
+  api_version?: string;
+}
+
+export interface LlmModelsResponse {
+  models: string[];
 }

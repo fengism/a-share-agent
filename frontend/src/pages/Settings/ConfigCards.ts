@@ -1,4 +1,5 @@
 export { default as BotConfigCard } from "./config-cards/BotConfigCard";
+export { default as ResearchBudgetCard } from "./config-cards/ResearchBudgetCard";
 export { default as DataSourceCookiesCard } from "./config-cards/DataSourceCookiesCard";
 export { default as FeishuConfigCard } from "./config-cards/FeishuConfigCard";
 export { default as FredConfigCard } from "./config-cards/FredConfigCard";

@@ -1,9 +1,33 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.agentic.events import AgentEvent
 from app.domain.prompting import PromptTrace
+
+
+def _coerce_str_list(value: Any) -> Any:
+    """LLM 常把列表字段写成整句字符串；宽容地包装为单元素列表。"""
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    return value
+
+
+_CLAIM_TYPE_ALIASES = {
+    # LLM 偶发把证据基础词直接填进 claim_type；映射到最接近的合法枚举。
+    "forecast": "inference",
+    "prediction": "inference",
+    "预测": "inference",
+    "推断": "inference",
+    "事实": "fact",
+    "观点": "opinion",
+}
+
+
+def _normalize_claim_type(value: Any) -> Any:
+    if isinstance(value, str):
+        return _CLAIM_TYPE_ALIASES.get(value.strip().lower(), value)
+    return value
 
 
 class IndustryChainCitation(BaseModel):
@@ -18,6 +42,17 @@ class IndustryChainClaim(BaseModel):
     verification_status: Literal["unverified", "quote_matched"] = "unverified"
     verification_notes: list[str] = Field(default_factory=list)
     evidence_basis: Literal["disclosed", "forecast", "inference", "opinion"] = "disclosed"
+
+    @field_validator("verification_notes", "evidence_ids", mode="before", check_fields=False)
+    @classmethod
+    def _coerce_claim_str_lists(cls, value: Any) -> Any:
+        # evidence_ids 定义在各子类上；check_fields=False 让基类校验器沿继承链生效。
+        return _coerce_str_list(value)
+
+    @field_validator("claim_type", mode="before", check_fields=False)
+    @classmethod
+    def _coerce_claim_type(cls, value: Any) -> Any:
+        return _normalize_claim_type(value)
 
 
 class IndustryChainNode(IndustryChainClaim):
@@ -43,6 +78,11 @@ class IndustryChainNode(IndustryChainClaim):
     evidence_ids: list[str] = Field(default_factory=list)
     claim_type: Literal["fact", "inference", "opinion"] = "fact"
     confidence: Literal["high", "medium", "low"] = "medium"
+
+    @field_validator("companies", "realization_conditions", "invalidation_conditions", "tracking_metrics", mode="before")
+    @classmethod
+    def _coerce_node_str_lists(cls, value: Any) -> Any:
+        return _coerce_str_list(value)
 
 
 class IndustryChainMetric(IndustryChainClaim):
@@ -81,6 +121,11 @@ class IndustryChainThesis(IndustryChainInsight):
     invalidation: str = ""
     tracking_metrics: list[str] = Field(default_factory=list)
     beneficiaries: list[str] = Field(default_factory=list)
+
+    @field_validator("chain_path", "conditions", "tracking_metrics", "beneficiaries", mode="before")
+    @classmethod
+    def _coerce_thesis_str_lists(cls, value: Any) -> Any:
+        return _coerce_str_list(value)
 
 
 class IndustryChainVerificationRepair(BaseModel):

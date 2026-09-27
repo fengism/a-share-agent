@@ -385,6 +385,26 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
 )
 
 
+def render_research_planning_guidance(
+    *,
+    search_total_limit: int,
+    search_burst_limit: int,
+    reserved_tool_calls: int,
+    total_calls: int,
+) -> str:
+    """产业链主调研的调用策略说明；广度优先是环节覆盖完整性的关键。"""
+    return (
+        f"\n规划约束：搜索组累计最多{search_total_limit}次，每批连续最多{search_burst_limit}次；"
+        "web_search与问财搜索/筛选共享上限，不对同一问题机械地双源重复搜。"
+        "先用少量互补问题发现来源，读取正文后再列剩余缺口；不同时扩展所有公司和所有指标。"
+        "公司先选覆盖不同环节的2-3家，优先公告经营章节，估值不是产业传导研究的必做项。"
+        "\n结构发现广度优先：先按上/中/下游各≥2组不同关键词族做web_search铺面（累计建议≥8次），"
+        "上中下游各层拿到5-10个候选环节后再用read_pdf/fetch_urls精读单个环节；"
+        "结构未铺开前把调用集中花在单环节PDF精读上，必然产出粗环节链条。"
+        f"\n本次产业链主调研工具上限{total_calls}次（不是必须用满）；正文预留{reserved_tool_calls}次。"
+    )
+
+
 async def research_industry_chain(
     name: str,
     settings: Any = None,
@@ -406,13 +426,13 @@ async def research_industry_chain(
             validator=lambda item, terms=tier_search_terms(name, tier): has_tier_operating_body(item, terms), fatal=False,
         ) for tier, (label, _) in TIER_QUESTIONS.items()),
     ))
-    guidance += (
-        f"\n规划约束：搜索组累计最多{spec.search_total_limit}次，每批连续最多{spec.search_burst_limit}次；"
-        "web_search与问财搜索/筛选共享上限，不对同一问题机械地双源重复搜。"
-        "先用少量互补问题发现来源，读取正文后再列剩余缺口；不同时扩展所有公司和所有指标。"
-        "公司先选覆盖不同环节的2-3家，优先公告经营章节，估值不是产业传导研究的必做项。"
+    guidance += render_research_planning_guidance(
+        search_total_limit=spec.search_total_limit,
+        search_burst_limit=spec.search_burst_limit,
+        reserved_tool_calls=spec.reserved_tool_calls,
+        total_calls=total_calls,
     )
-    guidance += f"\n本次产业链主调研工具上限{total_calls}次（不是必须用满）；正文预留{spec.reserved_tool_calls}次。\n" + chain_research_plan(name, atlas_prior)
+    guidance += "\n" + chain_research_plan(name, atlas_prior)
     if resolved_scope.company_scope == "all_public":
         spec = replace(
             spec,

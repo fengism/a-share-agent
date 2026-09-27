@@ -537,13 +537,25 @@ def _build_industry_chain(result) -> list[ContentBlock]:
             return result.get(key, default)
         return getattr(result, key, default)
 
+    degraded_warning = (
+        ContentBlock(
+            type="paragraph",
+            text="⚠️ 本次分析为降级稿：部分补证/修订未完成，结论与环节覆盖完整性受限，建议稍后重新生成。",
+        )
+        if str(_get("quality_status", "")) == "degraded"
+        else None
+    )
+
     llm_review = _get("llm_review", "").strip()
     if int(_get("schema_version", 1) or 1) >= 7 and llm_review:
-        return _parse_markdown_blocks(llm_review)
+        parsed = _parse_markdown_blocks(llm_review)
+        return [degraded_warning, *parsed] if degraded_warning else parsed
 
     blocks: list[ContentBlock] = [
         ContentBlock(type="heading", level=2, text=f"{_get('name', '产业链')} 产业链分析"),
     ]
+    if degraded_warning:
+        blocks.append(degraded_warning)
     summary = _get("summary", "").strip()
     if summary:
         blocks.append(ContentBlock(type="paragraph", text=summary))

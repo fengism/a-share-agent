@@ -32,12 +32,25 @@ def _runtime_date_context(current_time: datetime | None = None) -> str:
     )
 
 
+def _history_character_budget(context_length_tokens: int) -> int:
+    """按模型上下文长度推导历史上限字符数；0 表示未设置，沿用默认 40k。
+
+    中文场景按 1 字符 ≈ 1 token 保守估计；为 system prompt、当前消息与
+    补全预留约 6k tokens，且不超过默认预算（大上下文模型不放大）。
+    """
+    if context_length_tokens <= 0:
+        return _MAX_HISTORY_CHARACTERS
+    return min(_MAX_HISTORY_CHARACTERS, max(4_000, context_length_tokens - 6_000))
+
+
 def _compact_history(
     history: list[AgentMessage] | None,
     current_message: str,
     max_history_messages: int,
+    context_length_tokens: int = 0,
 ) -> list[dict[str, str]]:
     """只保留完整、可直接回灌模型的用户/助手文本历史。"""
+    history_budget = _history_character_budget(context_length_tokens)
     compact: list[dict[str, str]] = []
     for item in history or []:
         if item.role not in ("user", "assistant"):
@@ -61,7 +74,7 @@ def _compact_history(
         if len(item["content"]) > item_limit:
             item = {**item, "content": item["content"][-item_limit:]}
         next_total = total_characters + len(item["content"])
-        if next_total > _MAX_HISTORY_CHARACTERS:
+        if next_total > history_budget:
             break
         selected.append(item)
         total_characters = next_total
@@ -80,6 +93,7 @@ def build_messages(
     tool_selection_prompt: str = "",
     *,
     current_time: datetime | None = None,
+    context_length_tokens: int = 0,
 ) -> list[dict]:
     """构造 Agent 执行消息，包含 system prompt、工具规则和截断历史。
 
@@ -101,7 +115,7 @@ def build_messages(
 
     messages: list[dict] = [{"role": "system", "content": content}]
 
-    messages.extend(_compact_history(history, message, max_history_messages))
+    messages.extend(_compact_history(history, message, max_history_messages, context_length_tokens))
 
     messages.append({"role": "user", "content": message})
     return messages

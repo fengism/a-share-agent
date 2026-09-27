@@ -45,7 +45,18 @@ from app.modules.industry_chain.research import (
 
 logger = logging.getLogger(__name__)
 MAX_REPAIR_TARGETS = 6
-MAX_REPAIR_SECONDS = 180
+# 与 Settings.industry_chain_repair_timeout_seconds 的默认值保持一致
+DEFAULT_REPAIR_SECONDS = 600.0
+
+
+def _repair_timeout_seconds(settings: Any) -> float:
+    """补证+修订整体时限；由全局配置 industry_chain_repair_timeout_seconds 控制。"""
+    value = getattr(settings, "industry_chain_repair_timeout_seconds", DEFAULT_REPAIR_SECONDS)
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return DEFAULT_REPAIR_SECONDS
+    return parsed if parsed > 0 else DEFAULT_REPAIR_SECONDS
 
 
 @dataclass(frozen=True)
@@ -185,6 +196,7 @@ def build_repair_spec(result: IndustryChainResult, evidence: list[AgentEvidence]
 async def repair_report(name: str, result: IndustryChainResult, evidence: list[AgentEvidence], *,
                         settings: Any, scope: Any, prompt_context: dict, event_callback=None):
     """Return (report, evidence, audit events). Keep the usable draft on every ordinary failure."""
+    repair_timeout = _repair_timeout_seconds(settings)
     original_result = result
     targets = build_repair_targets(result, evidence)
     if not targets:
@@ -213,7 +225,7 @@ async def repair_report(name: str, result: IndustryChainResult, evidence: list[A
         # A separate, explicitly bounded allowance; never resets into another full research job.
         repair_settings, total_calls = research_budget_settings(settings, repair=True, overrides={
             "chat_max_tool_calls_per_round": min(getattr(settings, "chat_max_tool_calls_per_round", 8), 6),
-            "agent_research_timeout_seconds": min(getattr(settings, "agent_research_timeout_seconds", 180), MAX_REPAIR_SECONDS),
+            "agent_research_timeout_seconds": min(getattr(settings, "agent_research_timeout_seconds", 1200), repair_timeout),
         })
         spec = replace(build_repair_spec(result, evidence, targets), **search_policy_limits(total_calls, repair=True),
                        reserved_tool_names=BODY_TOOLS, reserved_tool_calls=min(8, total_calls // 3))
@@ -233,7 +245,7 @@ async def repair_report(name: str, result: IndustryChainResult, evidence: list[A
             "优先公告/财报/官方数据，目录后必须继续read_pdf/web_fetch；不要只说下一轮读取。"
             f"最多{total_calls}次实际工具调用、2轮缺口补证，每轮最多4次模型工具交互，正文预留{spec.reserved_tool_calls}次，预算不足优先核心判断。"
             "分别记录未执行、失败、已读材料未披露，不把没读到当没披露。\n")
-        async with asyncio.timeout(MAX_REPAIR_SECONDS):
+        async with asyncio.timeout(repair_timeout):
             outcome = await run_agentic_research(spec, instruction + message, settings=repair_settings, event_callback=preserve_event, evidence_callback=preserve_evidence)
         trace = list(outcome.execution_trace)
         repair.attempted_rounds = sum(event.type == "round_started" for event in trace) or 1

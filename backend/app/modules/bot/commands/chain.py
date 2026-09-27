@@ -20,6 +20,13 @@ def _trimmed(text: str, limit: int) -> str:
 
 def _format_chain_reply(result: IndustryChainResult) -> str:
     lines: list[str] = [f"**{result.name or '产业链分析'}**"]
+    if result.quality_status == "degraded":
+        lines.append("⚠️ 本次为降级稿：部分补证/修订未完成，环节覆盖与结论完整性受限，建议重新生成。")
+    tier_counts = " / ".join(
+        f"{label} {len(getattr(result, tier, []) or [])}"
+        for label, tier in (("上游", "upstream"), ("中游", "midstream"), ("下游", "downstream"))
+    )
+    lines.append(f"链路覆盖：{tier_counts} ｜ 关键公司 {len(result.key_stocks)} 家")
     positioning = _trimmed(result.positioning, 300)
     if positioning:
         lines += ["", "**产业链定位**", positioning]

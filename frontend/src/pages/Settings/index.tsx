@@ -54,6 +54,7 @@ export default function SettingsPage() {
       llm_base_url: config.llm_base_url,
       llm_model: config.llm_model,
       llm_temperature: config.llm_temperature,
+      llm_context_length_tokens: config.llm_context_length_tokens,
       feishu_enabled: config.feishu_enabled,
       feishu_app_id: config.feishu_app_id,
       feishu_app_secret: config.feishu_app_secret,
@@ -93,6 +94,12 @@ export default function SettingsPage() {
       bot_batch_concurrency: config.bot_batch_concurrency,
       bot_batch_max_stocks: config.bot_batch_max_stocks,
       bot_admin_users: config.bot_admin_users,
+      analysis_llm_timeout_seconds: config.analysis_llm_timeout_seconds,
+      agent_research_timeout_seconds: config.agent_research_timeout_seconds,
+      industry_chain_repair_timeout_seconds: config.industry_chain_repair_timeout_seconds,
+      industry_chain_tool_calls_total: config.industry_chain_tool_calls_total,
+      industry_chain_repair_tool_calls_total: config.industry_chain_repair_tool_calls_total,
+      chat_max_tool_calls_total: config.chat_max_tool_calls_total,
     });
     setPreviousProvider(config.llm_provider);
     setInitializedUserId(user.id);
@@ -136,6 +143,7 @@ export default function SettingsPage() {
       llm_base_url: form.llm_base_url,
       llm_model: form.llm_model,
       llm_temperature: form.llm_temperature,
+      llm_context_length_tokens: form.llm_context_length_tokens,
     };
     if (form.llm_api_key && !form.llm_api_key.endsWith("***")) {
       patch.llm_api_key = form.llm_api_key;
@@ -217,6 +225,18 @@ export default function SettingsPage() {
     }
     saveConfig(patch, "数据源 Cookie 配置已保存");
   }, [form.baidu_cookie, form.eastmoney_cookie, saveConfig]);
+
+  const handleSaveResearchBudget = useCallback(() => {
+    const patch: ConfigUpdate = {
+      analysis_llm_timeout_seconds: form.analysis_llm_timeout_seconds,
+      agent_research_timeout_seconds: form.agent_research_timeout_seconds,
+      industry_chain_repair_timeout_seconds: form.industry_chain_repair_timeout_seconds,
+      industry_chain_tool_calls_total: form.industry_chain_tool_calls_total,
+      industry_chain_repair_tool_calls_total: form.industry_chain_repair_tool_calls_total,
+      chat_max_tool_calls_total: form.chat_max_tool_calls_total,
+    };
+    saveConfig(patch, "研究预算与超时已保存");
+  }, [form, saveConfig]);
 
   const handleSaveBot = useCallback(() => {
     const patch: ConfigUpdate = {
@@ -375,6 +395,7 @@ export default function SettingsPage() {
                     isSaving={isSaving}
                     sectionTitleStyle={sectionTitleStyle}
                     onSaveBot={handleSaveBot}
+                    onSaveResearchBudget={handleSaveResearchBudget}
                   />
                 </Suspense>
               ),

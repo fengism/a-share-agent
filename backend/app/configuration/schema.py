@@ -30,6 +30,7 @@ PRIVATE_USER_KEYS = frozenset(
         "llm_base_url",
         "llm_model",
         "llm_temperature",
+        "llm_context_length_tokens",
         "notion_enabled",
         "notion_api_token",
         "notion_parent_page_id",
@@ -76,6 +77,12 @@ PERSISTED_GLOBAL_KEYS = frozenset(
         "bot_webhook_max_skew_seconds",
         "bot_event_dedup_ttl_seconds",
         "bot_job_poll_seconds",
+        "industry_chain_repair_timeout_seconds",
+        "industry_chain_tool_calls_total",
+        "industry_chain_repair_tool_calls_total",
+        "analysis_llm_timeout_seconds",
+        "agent_research_timeout_seconds",
+        "chat_max_tool_calls_total",
         "bot_job_lease_seconds",
         "bot_job_max_attempts",
         "bot_job_retry_base_seconds",
@@ -128,6 +135,8 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-v4-flash"
     llm_temperature: float = 0.1
+    # 模型上下文长度（tokens）；0 表示未设置，历史裁剪沿用默认 40k 字符预算。
+    llm_context_length_tokens: int = Field(default=0, ge=0)
     llm_timeout_seconds: int = Field(default=300, gt=0)
     # Deployment policy; current provider/model is never changed by these limits.
     llm_generation_timeout_seconds: float = Field(default=1200.0, gt=0)
@@ -140,7 +149,10 @@ class Settings(BaseSettings):
     agent_research_timeout_seconds: float = Field(default=1200.0, gt=0)
     # Deployment-only research budgets, independent from interactive chat.
     industry_chain_tool_calls_total: int = Field(default=72, ge=8, le=128)
-    industry_chain_repair_tool_calls_total: int = Field(default=24, ge=4, le=48)
+    industry_chain_repair_tool_calls_total: int = Field(default=36, ge=4, le=48)
+    # 产业链定向补证+修订的整体时限；超时按设计保留初稿并标记 degraded。
+    # 环节密度提升后补证目标更多，默认给足 10 分钟，可在管理页继续调大。
+    industry_chain_repair_timeout_seconds: float = Field(default=600.0, gt=0)
     # Long report generation: one deadline shared by streaming and schema repair.
     analysis_llm_timeout_seconds: float = Field(default=1200.0, gt=0)
     analysis_llm_max_completion_tokens: int = Field(default=32768, ge=1)

@@ -1,6 +1,6 @@
 import { Col, Row } from "antd";
 import AdminResetCard from "../../components/AdminResetCard";
-import { BotConfigCard, DataSourceCookiesCard, FredConfigCard, TwitterConfigCard } from "./ConfigCards";
+import { BotConfigCard, DataSourceCookiesCard, FredConfigCard, ResearchBudgetCard, TwitterConfigCard } from "./ConfigCards";
 import BotJobManagerCard from "./BotJobManagerCard";
 import InviteManagerCard from "./InviteManagerCard";
 import SecurityAuditCard from "./SecurityAuditCard";
@@ -43,6 +43,7 @@ export function DataSourcesSettingsSection({
 
 interface AdminSettingsSectionProps extends ConfigSectionProps {
   onSaveBot: () => void;
+  onSaveResearchBudget: () => void;
 }
 
 export function AdminSettingsSection({
@@ -51,6 +52,7 @@ export function AdminSettingsSection({
   isSaving,
   sectionTitleStyle,
   onSaveBot,
+  onSaveResearchBudget,
 }: AdminSettingsSectionProps) {
   return (
     <section aria-labelledby="admin-settings-title">
@@ -60,6 +62,7 @@ export function AdminSettingsSection({
       <SecurityAuditCard />
       <AdminResetCard />
       <BotConfigCard form={form} onChange={onChange} isSaving={isSaving} onSave={onSaveBot} />
+      <ResearchBudgetCard form={form} onChange={onChange} isSaving={isSaving} onSave={onSaveResearchBudget} />
       <BotJobManagerCard />
     </section>
   );

@@ -16,7 +16,14 @@ import {
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { queryKeys } from "../queryKeys";
 import type { AdminUserItem, InviteItem, LoginAuditLogsResponse } from "../../types/auth";
-import type { BotAdminJob, BotAdminJobsResponse, ConfigData, ConfigUpdate } from "../../types/settings";
+import type {
+  BotAdminJob,
+  BotAdminJobsResponse,
+  ConfigData,
+  ConfigUpdate,
+  LlmModelsRequest,
+  LlmModelsResponse,
+} from "../../types/settings";
 
 export function useConfig() {
   return useQuery({
@@ -31,6 +38,12 @@ export function useUpdateConfig() {
   return useMutation({
     mutationFn: (patch: ConfigUpdate) => apiPut<ConfigData>("/config", patch),
     onSuccess: (data) => queryClient.setQueryData(queryKeys.settings.config, data),
+  });
+}
+
+export function useFetchLlmModels() {
+  return useMutation({
+    mutationFn: (payload: LlmModelsRequest) => apiPost<LlmModelsResponse>("/config/llm/models", payload),
   });
 }
 

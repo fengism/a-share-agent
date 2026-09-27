@@ -16,7 +16,11 @@ from app.modules.settings.public import (
     ConfigResponse,
     ConfigUpdateRequest,
     GlobalSettingsPermissionError,
+    LlmModelsRequest,
+    LlmModelsResponse,
+    LlmModelsUnavailableError,
     UnknownChatCapabilityError,
+    fetch_llm_models,
     load_user_settings,
     save_user_settings,
 )
@@ -87,3 +91,20 @@ async def put_config(
     except ConfigEncryptionError as error:
         raise _encryption_unavailable(error) from error
     return _to_response(result.settings, is_admin=bool(user["is_admin"]))
+
+
+@router.post("/llm/models", response_model=LlmModelsResponse)
+async def list_llm_models(
+    request: LlmModelsRequest,
+    user: AuthenticatedUser = Depends(require_active_user),
+) -> LlmModelsResponse:
+    """按 Base URL + API Key 拉取该端点支持的模型列表。"""
+    try:
+        models = await fetch_llm_models(user["id"], request)
+    except LlmModelsUnavailableError as error:
+        raise ApiError(
+            status_code=502,
+            code="llm.models_unavailable",
+            message=str(error),
+        ) from error
+    return LlmModelsResponse(models=models)
