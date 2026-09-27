@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button, Input } from "antd";
-import { CheckOutlined, CloseOutlined, EditOutlined } from "@ant-design/icons";
+import { CheckOutlined, EditOutlined } from "@ant-design/icons";
 import { useColors, useTokens } from "../../../styles/ui";
 import { hexToRgba } from "../../../charts/utils";
 
