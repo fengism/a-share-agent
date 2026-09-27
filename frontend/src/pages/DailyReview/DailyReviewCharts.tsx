@@ -160,6 +160,7 @@ function VolumeChart({ snapshot }: DailyReviewChartsProps) {
   const definitions = [
     ["当日成交额", "amount", PRIMARY_COLOR],
     ["前一日成交额", "amount_before_one_day", "#7c3aed"],
+    ["20 日均值", "amount_average_20_day", "#f59e0b"],
     ["60 日均值", "amount_average_60_day", "#0891b2"],
   ] as const;
   const values = definitions.flatMap(([name, key, color]) => {
@@ -168,20 +169,22 @@ function VolumeChart({ snapshot }: DailyReviewChartsProps) {
   });
   if (!values.length) return null;
   const max = Math.max(...values.map((item) => item.value), 1);
+  const count = values.length;
+  const slot = 560 / count;
+  const width = Math.min(84, slot * 0.65);
 
   return (
-    <ChartCard title="市场成交额" subtitle="当日、前一日与 60 日均值">
+    <ChartCard title="市场成交额" subtitle="当日、前一日、20 日与 60 日均值">
       <svg data-testid="daily-review-volume-chart" role="img" aria-label="市场成交额对比图" viewBox="0 0 560 158">
         <line x1="48" x2="536" y1="124" y2="124" stroke={GRID_COLOR} strokeWidth="1" />
         {values.map((item, index) => {
-          const width = 92;
-          const x = 74 + index * 158;
+          const x = index * slot + (slot - width) / 2;
           const barHeight = (item.value / max) * 82;
           return (
             <g key={item.name}>
               <text x={x + width / 2} y={116 - barHeight} textAnchor="middle" fill={PRIMARY_TEXT_COLOR} fontSize="11" fontWeight="700">{formatAmount(item.value)}</text>
               <rect x={x} y={122 - barHeight} width={width} height={barHeight} rx="6" fill={item.color} opacity="0.9" />
-              <text x={x + width / 2} y="146" textAnchor="middle" fill={TEXT_COLOR} fontSize="12">{item.name}</text>
+              <text x={x + width / 2} y={146} textAnchor="middle" fill={TEXT_COLOR} fontSize="12">{item.name}</text>
             </g>
           );
         })}
@@ -198,8 +201,9 @@ export default function DailyReviewCharts({ snapshot }: DailyReviewChartsProps) 
   const hasIndices = namedValues(snapshot.indices, 6).length > 0;
   const hasSectors = namedValues(snapshot.top_sectors, 5).length > 0
     || namedValues(snapshot.bottom_sectors, 5).length > 0;
-  const hasVolume = ["amount", "amount_before_one_day", "amount_average_60_day"]
+  const hasVolume = ["amount", "amount_before_one_day", "amount_average_20_day", "amount_average_60_day"]
     .some((key) => finiteNumber(volume[key]) !== null);
+
 
   if (!hasBreadth && !hasIndices && !hasSectors && !hasVolume) {
     return <div className="daily-review-charts-empty">暂无可视化数据</div>;

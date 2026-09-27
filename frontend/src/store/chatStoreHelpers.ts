@@ -110,6 +110,50 @@ export function prepareLastAssistantRegeneration(
   };
 }
 
+export function prepareUserMessageEdit(
+  messages: ChatDisplayMessage[],
+  history: ChatMessage[],
+  messageId: string,
+  content: string,
+): PreparedChatRegeneration | null {
+  const trimmed = content.trim();
+  if (!trimmed) return null;
+  const messageIndex = messages.findIndex((message) => message.id === messageId);
+  if (messageIndex < 0 || messages[messageIndex].role !== "user") return null;
+
+  // user 显示消息与 history 中 user 条目按顺序一一对应，
+  // 用序号定位而非内容匹配，重复内容的消息也能编辑正确的一条。
+  let userOrdinal = 0;
+  for (let index = 0; index <= messageIndex; index += 1) {
+    if (messages[index].role === "user") userOrdinal += 1;
+  }
+  let seen = 0;
+  let historyUserIndex = -1;
+  for (let index = 0; index < history.length; index += 1) {
+    if (history[index].role === "user") {
+      seen += 1;
+      if (seen === userOrdinal) {
+        historyUserIndex = index;
+        break;
+      }
+    }
+  }
+  if (historyUserIndex < 0) return null;
+
+  return {
+    message: trimmed,
+    history: history.slice(0, historyUserIndex),
+    nextMessages: [
+      ...messages.slice(0, messageIndex),
+      { ...messages[messageIndex], content: trimmed },
+    ],
+    nextHistory: [
+      ...history.slice(0, historyUserIndex),
+      { ...history[historyUserIndex], content: trimmed },
+    ],
+  };
+}
+
 function findLastAssistantIndex(history: ChatMessage[]) {
   for (let index = history.length - 1; index >= 0; index -= 1) {
     if (history[index].role === "assistant") return index;

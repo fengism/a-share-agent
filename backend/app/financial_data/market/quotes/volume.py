@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import date, timedelta
 
 from app.core.cache import cache_date, dated_cache_key_no_day, one_year_ago_date
 from app.core.cache import market_cache as cache
@@ -120,4 +121,89 @@ async def get_realtime_market_volume() -> MarketVolume:
             get_provider("ths").fetch_market_volume,
             semaphore=ths_semaphore,
         ),
+    )
+
+
+async def get_market_volume_stats(
+    target_date: date | None = None,
+    *,
+    use_realtime: bool = False,
+) -> MarketVolume:
+    """获取指定日期（或最新交易日）的市场成交额，并计算前一日、20日均值与60日均值。
+
+    结合历史指数日K聚合序列（上证+深证）计算严格的前一日成交额、20日成交额移动平均与60日成交额移动平均。
+    若启用实时模式且同花顺分时/日级快照可用，则优先采用实时快照的当日成交额并补充完整均线维度。
+    """
+    if target_date is None:
+        target_date = date.today()
+
+    target_text = target_date.isoformat()
+    start_date = (target_date - timedelta(days=160)).isoformat()
+    response = await get_market_volume(start_date=start_date, end_date=target_text)
+    items = [x for x in response.items if x.date <= target_text]
+
+    cur_item = None
+    prev_item = None
+    avg20 = None
+    avg60 = None
+    series_error: str | None = None
+
+    if response.partial:
+        # 任一市场 K 线缺失时聚合值只含单边市场，直接采用会输出约一半的失真成交额
+        series_error = "市场成交额序列部分市场数据缺失，拒绝以单边市场数据估算"
+        logger.warning(
+            "%s（缺失市场: %s）", series_error, response.unavailable_markets
+        )
+    elif items:
+        # 优先匹配指定目标日；若目标日非交易日（如周末节假日），自动定位至最近的一个已完成交易日
+        matches = [i for i, x in enumerate(items) if x.date == target_text]
+        if matches:
+            target_idx = matches[0]
+        else:
+            latest_dt = date.fromisoformat(items[-1].date)
+            gap_days = (target_date - latest_dt).days
+            if gap_days > 15:
+                series_error = (
+                    f"截止 {target_text} 缺少近期成交额数据"
+                    f"（最新数据 {items[-1].date}，间隔 {gap_days} 天）"
+                )
+            else:
+                target_idx = len(items) - 1
+        if series_error is None:
+            cur_item = items[target_idx]
+            prev_item = items[target_idx - 1] if target_idx > 0 else None
+            h20 = items[max(0, target_idx - 19) : target_idx + 1]
+            avg20 = sum(x.amount for x in h20) / len(h20) if h20 else None
+            h60 = items[max(0, target_idx - 59) : target_idx + 1]
+            avg60 = sum(x.amount for x in h60) / len(h60) if h60 else None
+
+    if use_realtime:
+        try:
+            rt_vol = await get_realtime_market_volume()
+            if rt_vol and rt_vol.amount:
+                return MarketVolume(
+                    date=rt_vol.date or (cur_item.date if cur_item else target_text),
+                    amount=rt_vol.amount,
+                    amount_before_one_day=rt_vol.amount_before_one_day
+                    if rt_vol.amount_before_one_day is not None
+                    else (prev_item.amount if prev_item else None),
+                    amount_average_20_day=avg20,
+                    amount_average_60_day=rt_vol.amount_average_60_day
+                    if rt_vol.amount_average_60_day is not None
+                    else avg60,
+                )
+        except Exception as exc:
+            logger.warning("实时市场成交额获取失败，降级为历史序列聚合: %s", exc)
+
+    if series_error is not None:
+        raise ValueError(series_error)
+    if cur_item is None:
+        raise ValueError(f"未找到截止 {target_text} 的有效市场成交额数据")
+
+    return MarketVolume(
+        date=cur_item.date,
+        amount=cur_item.amount,
+        amount_before_one_day=prev_item.amount if prev_item else None,
+        amount_average_20_day=avg20,
+        amount_average_60_day=avg60,
     )

@@ -46,8 +46,9 @@ _SZSE_MAX_WINDOW_DAYS = 7
 _SZSE_MAX_WINDOWS_PER_REFRESH = 8
 _SZSE_REQUEST_INTERVAL_SECONDS = 0.15
 _REFRESH_TIMEOUT_SECONDS = 15.0
-_PRICE_TIMEOUT_SECONDS = 35.0
-_PRICE_ITEM_TIMEOUT_SECONDS = 15.0
+# TDX 日K在信号量排队与线程池争用下单次可达 20 秒以上，15 秒预算会让整批标的无谓超时
+_PRICE_TIMEOUT_SECONDS = 75.0
+_PRICE_ITEM_TIMEOUT_SECONDS = 30.0
 _SOURCE_TIMEOUT_SECONDS = 10.0
 _price_semaphore = asyncio.Semaphore(4)
 _source_limits = {
@@ -825,6 +826,12 @@ async def _load_expected_trading_dates(start: date, now: datetime) -> tuple[list
     return [], True
 
 
+def _response_window(days: int, now: datetime) -> tuple[date, date]:
+    """计算监测视图的起止日期；行情缓存键依赖该窗口，预热必须复用同一计算。"""
+    end = now.date()
+    return end - timedelta(days=days - 1), end
+
+
 async def _collect_response(days: int = 120) -> NationalTeamResponse:
     """返回核心宽基 ETF 份额与指数价格的国家队代理监测视图。"""
     days = max(30, min(days, 365))
@@ -834,8 +841,7 @@ async def _collect_response(days: int = 120) -> NationalTeamResponse:
     if cached is not None:
         return NationalTeamResponse.model_validate(cached)
 
-    end = now.date()
-    start = end - timedelta(days=days - 1)
+    start, end = _response_window(days, now)
     (expected_trading_dates, calendar_degraded), (etf_closes, index_closes) = await asyncio.gather(
         _load_expected_trading_dates(start, now),
         _load_price_history(start.strftime("%Y%m%d"), end.strftime("%Y%m%d")),
@@ -959,3 +965,41 @@ async def get_national_team_etf_holdings(days: int = 120) -> NationalTeamRespons
             )
 
     return await _shared_response(days)
+
+
+async def prewarm_national_team_prices() -> None:
+    """预热监测页所需的指数与 ETF 日 K 缓存，避免页面首次访问时冷启动批量拉取触发超时。
+
+    使用与 `_collect_response` 默认窗口相同的日期与数据源链路；不带单标的超时，
+    让慢速上游排队完成后正常写入缓存。预热失败仅记录日志，不影响启动。
+    """
+    start, end = _response_window(120, datetime.now(ZoneInfo("Asia/Shanghai")))
+    start_text = start.strftime("%Y%m%d")
+    end_text = end.strftime("%Y%m%d")
+
+    async def load_index(key: str, definition: IndexDefinition) -> None:
+        symbol = definition.index_code.split(".")[0]
+        try:
+            async with _price_semaphore:
+                await get_index_kline(symbol, "daily", start_text, end_text)
+        except Exception as error:
+            logger.info("国家队指数行情预热失败 index=%s error=%r", key, error)
+
+    async def load_etf(code: str) -> None:
+        try:
+            async with _price_semaphore:
+                await get_kline(
+                    code,
+                    period="daily",
+                    start_date=start_text,
+                    end_date=end_text,
+                    adjust="",
+                    max_provider_sources=2,
+                )
+        except Exception as error:
+            logger.info("国家队 ETF 行情预热失败 code=%s error=%r", code, error)
+
+    await asyncio.gather(
+        *[load_index(key, definition) for key, definition in INDEX_POOL.items()],
+        *[load_etf(code) for code in ETF_POOL],
+    )

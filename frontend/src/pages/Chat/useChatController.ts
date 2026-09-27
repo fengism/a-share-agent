@@ -44,6 +44,12 @@ export function useChatController({ inputValue, setInputValue }: UseChatControll
     if (request) startChatRuntime({ input: request.message, history: request.history });
   }, [isStreaming]);
 
+  const handleEditUserMessage = useCallback((messageId: string, content: string) => {
+    if (isStreaming) return;
+    const request = useChatStore.getState().editUserMessage(messageId, content);
+    if (request) startChatRuntime({ input: request.message, history: request.history });
+  }, [isStreaming]);
+
   const handleClear = useCallback(() => {
     stopChatRuntime();
     clearChat();
@@ -57,6 +63,7 @@ export function useChatController({ inputValue, setInputValue }: UseChatControll
     isStreaming,
     handleClear,
     handleDeleteSession,
+    handleEditUserMessage,
     handleNewSession,
     handleRegenerate,
     handleSend,

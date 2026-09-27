@@ -11,6 +11,7 @@ interface ChatConversationProps {
   onRegenerate: () => void;
   onSelectPrompt: (prompt: string) => void;
   onResultAction: ChatResultActionHandler;
+  onEditMessage?: (messageId: string, content: string) => void;
 }
 
 export const ChatConversation = memo(function ChatConversation({
@@ -18,9 +19,11 @@ export const ChatConversation = memo(function ChatConversation({
   onRegenerate,
   onSelectPrompt,
   onResultAction,
+  onEditMessage,
 }: ChatConversationProps) {
   const messages = useChatStore((state) => state.messages);
   const activeSessionId = useChatStore((state) => state.activeSessionId);
+  const isStreaming = useChatStore((state) => state.isStreaming);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -46,6 +49,8 @@ export const ChatConversation = memo(function ChatConversation({
       onRegenerate={onRegenerate}
       onSelectPrompt={onSelectPrompt}
       onResultAction={onResultAction}
+      onEditMessage={onEditMessage}
+      isStreaming={isStreaming}
     />
   );
 });

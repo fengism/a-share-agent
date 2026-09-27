@@ -74,6 +74,8 @@ def _build_snapshot(
         values.get("market_news"),
         values.get("market_volume"),
         values.get("macro_data"),
+        limit_up_ladder=values.get("limit_up_ladder"),
+        northbound_funds=values.get("northbound_funds"),
         requested_date=requested_date,
         effective_date=effective_date,
         source_status=source_status,

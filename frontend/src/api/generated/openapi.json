@@ -4563,6 +4563,11 @@
             "title": "Indices",
             "type": "array"
           },
+          "limit_up_ladder": {
+            "additionalProperties": true,
+            "title": "Limit Up Ladder",
+            "type": "object"
+          },
           "macro_data": {
             "additionalProperties": true,
             "title": "Macro Data",
@@ -4580,6 +4585,11 @@
           },
           "market_volume": {
             "$ref": "#/components/schemas/MarketVolumeSnapshot"
+          },
+          "northbound_funds": {
+            "additionalProperties": true,
+            "title": "Northbound Funds",
+            "type": "object"
           },
           "requested_date": {
             "default": "",
@@ -12143,6 +12153,17 @@
               }
             ],
             "title": "Amount"
+          },
+          "amount_average_20_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Average 20 Day"
           },
           "amount_average_60_day": {
             "anyOf": [

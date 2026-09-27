@@ -8,6 +8,7 @@ from app.domain.content import ContentBlock
 from app.modules.analysis.public import AnalysisResult, FactorAnalysis
 from app.modules.daily_review.models import DailyReviewDataSnapshot
 from app.modules.daily_review.public import DailyReviewResult, DailyReviewSection
+from app.modules.daily_review.review_builder import group_limit_up_by_board
 
 _SIGNAL_LABELS = {
     "strong_buy": "强烈买入",
@@ -164,12 +165,20 @@ def _build_daily_review_data_blocks(snapshot: DailyReviewDataSnapshot) -> list[C
         if has_vol:
             total_amt = snapshot.market_volume.get("amount")
             prev_amt = snapshot.market_volume.get("amount_before_one_day")
+            avg_20 = snapshot.market_volume.get("amount_average_20_day")
+            avg_60 = snapshot.market_volume.get("amount_average_60_day")
             amt_str = _format_amt(total_amt)
-            diff_str = ""
+            extra_parts = []
             if total_amt is not None and prev_amt is not None:
                 diff = total_amt - prev_amt
-                diff_str = f"（较前日 {'+' if diff > 0 else ''}{_format_amt(diff)}）"
-            blocks.append(ContentBlock(type="bullet", text=f"两市总成交额：{amt_str} {diff_str}".strip()))
+                extra_parts.append(f"较前日 {'+' if diff > 0 else ''}{_format_amt(diff)}")
+            if avg_20 is not None:
+                extra_parts.append(f"20日均值 {_format_amt(avg_20)}")
+            if avg_60 is not None:
+                extra_parts.append(f"60日均值 {_format_amt(avg_60)}")
+            extra_str = f"（{'，'.join(extra_parts)}）" if extra_parts else ""
+            blocks.append(ContentBlock(type="bullet", text=f"两市总成交额：{amt_str}{extra_str}".strip()))
+
         if has_stats:
             up = snapshot.market_statistics.get("up_count", 0)
             down = snapshot.market_statistics.get("down_count", 0)
@@ -178,6 +187,32 @@ def _build_daily_review_data_blocks(snapshot: DailyReviewDataSnapshot) -> list[C
             limit_down = snapshot.market_statistics.get("limit_down_count", 0)
             blocks.append(ContentBlock(type="bullet", text=f"涨跌分布：上涨 {up} 家 ｜ 平盘 {flat} 家 ｜ 下跌 {down} 家"))
             blocks.append(ContentBlock(type="bullet", text=f"涨跌停数：涨停 {limit_up} 家 ｜ 跌停 {limit_down} 家"))
+
+    # 2.5 连板天梯与短线情绪
+    if snapshot.limit_up_ladder and snapshot.limit_up_ladder.get("stocks"):
+        ladder_stocks = snapshot.limit_up_ladder.get("stocks") or []
+        by_board = group_limit_up_by_board(ladder_stocks)
+        max_board = max(by_board) if by_board else 0
+        top_stocks = by_board.get(max_board, [])
+        top_names = "、".join(s.get("name") for s in top_stocks[:3] if s.get("name"))
+        ladder_summary = " ｜ ".join(
+            f"{b}板 {len(stks)}家"
+            for b, stks in sorted(by_board.items(), reverse=True)
+            if b > 1
+        )
+        first_count = len(by_board.get(1, []))
+        if first_count:
+            ladder_summary += f" ｜ 首板 {first_count}家"
+        blocks.append(ContentBlock(type="heading", level=3, text="短线连板天梯"))
+        blocks.append(ContentBlock(type="bullet", text=f"最高空间板：{max_board}板（{top_names}）"))
+        if ladder_summary:
+            blocks.append(ContentBlock(type="bullet", text=f"连板梯队分布：{ladder_summary}"))
+
+    # 2.6 北向资金
+    if snapshot.northbound_funds and snapshot.northbound_funds.get("north_money") is not None:
+        north = snapshot.northbound_funds.get("north_money")
+        sign = "+" if north > 0 else ""
+        blocks.append(ContentBlock(type="bullet", text=f"北向资金净买入：{sign}{north:.2f} 亿元"))
 
     # 3. 行业板块涨跌榜 (TOP 5)
     if snapshot.top_sectors or snapshot.bottom_sectors:

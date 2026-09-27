@@ -106,7 +106,7 @@ def _render_breadth_chart(snapshot: DailyReviewDataSnapshot) -> str:
           <text x="422" y="{y + 14}" fill="#0f172a" font-size="13" font-weight="700">{value:,.0f} 家</text>
         """)
     svg = f'<svg data-testid="daily-review-breadth-chart" viewBox="0 0 560 {height}" role="img" aria-label="市场涨跌分布图">{"".join(rows)}</svg>'
-    return _chart_card("市场涨跌分布", "上涨 / 下跌家数与涨跌停情绪", svg)
+    return svg
 
 
 def _render_index_chart(snapshot: DailyReviewDataSnapshot) -> str:
@@ -130,7 +130,7 @@ def _render_index_chart(snapshot: DailyReviewDataSnapshot) -> str:
           <text x="548" y="{y + 14}" text-anchor="end" fill="{color}" font-size="13" font-weight="700">{_esc(_format_percent(value))}</text>
         """)
     svg = f'<svg data-testid="daily-review-index-chart" viewBox="0 0 560 {height}" role="img" aria-label="核心指数涨跌幅图">{"".join(rows)}</svg>'
-    return _chart_card("核心指数表现", "主要指数当日涨跌幅", svg)
+    return svg
 
 
 def _render_sector_chart(snapshot: DailyReviewDataSnapshot) -> str:
@@ -157,7 +157,7 @@ def _render_sector_chart(snapshot: DailyReviewDataSnapshot) -> str:
           <text x="548" y="{y + 13}" text-anchor="end" fill="{color}" font-size="12" font-weight="700">{_esc(_format_percent(value))}</text>
         """)
     svg = f'<svg data-testid="daily-review-sector-chart" viewBox="0 0 560 {height}" role="img" aria-label="板块强弱对比图">{"".join(rows)}</svg>'
-    return _chart_card("板块强弱对比", "领涨与领跌板块双向对照", svg)
+    return svg
 
 
 def _render_volume_chart(snapshot: DailyReviewDataSnapshot) -> str:
@@ -165,6 +165,7 @@ def _render_volume_chart(snapshot: DailyReviewDataSnapshot) -> str:
     definitions = (
         ("当日成交额", "amount", _PRIMARY),
         ("前一日成交额", "amount_before_one_day", "#7c3aed"),
+        ("20 日均值", "amount_average_20_day", "#f59e0b"),
         ("60 日均值", "amount_average_60_day", "#0891b2"),
     )
     values = [
@@ -176,29 +177,40 @@ def _render_volume_chart(snapshot: DailyReviewDataSnapshot) -> str:
         return ""
     maximum = max(max(value for _, value, _ in values), 1)
     rows = []
+    count = len(values)
+    slot = 560.0 / count
+    width = min(84.0, slot * 0.65)
     for index, (label, value, color) in enumerate(values):
-        width = 92
-        x = 74 + index * 158
-        bar_height = value / maximum * 82
+        x = index * slot + (slot - width) / 2.0
+        bar_height = value / maximum * 82.0
         rows.append(f"""
-          <text x="{x + width / 2:.1f}" y="{116 - bar_height:.1f}" text-anchor="middle" fill="#0f172a" font-size="11" font-weight="700">{_esc(_format_amount(value))}</text>
-          <rect x="{x}" y="{122 - bar_height:.1f}" width="{width}" height="{bar_height:.1f}" rx="6" fill="{color}" opacity="0.9"/>
-          <text x="{x + width / 2:.1f}" y="146" text-anchor="middle" fill="{_TEXT}" font-size="12">{_esc(label)}</text>
+          <text x="{x + width / 2.0:.1f}" y="{116 - bar_height:.1f}" text-anchor="middle" fill="#0f172a" font-size="11" font-weight="700">{_esc(_format_amount(value))}</text>
+          <rect x="{x:.1f}" y="{122 - bar_height:.1f}" width="{width:.1f}" height="{bar_height:.1f}" rx="6" fill="{color}" opacity="0.9"/>
+          <text x="{x + width / 2.0:.1f}" y="146" text-anchor="middle" fill="{_TEXT}" font-size="12">{_esc(label)}</text>
         """)
     svg = f'<svg data-testid="daily-review-volume-chart" viewBox="0 0 560 158" role="img" aria-label="市场成交额对比图">{"".join(rows)}</svg>'
-    return _chart_card("市场成交额", "当日、前一日与 60 日均值", svg)
+    return svg
+
+
+def daily_review_chart_svgs(snapshot: DailyReviewDataSnapshot) -> list[tuple[str, str, str]]:
+    """返回复盘图表的 (标题, 副标题, SVG) 列表，供 PDF 渲染与推送图片共用；无数据的图表自动略去。"""
+    charts = (
+        ("市场涨跌分布", "上涨 / 下跌家数与涨跌停情绪", _render_breadth_chart(snapshot)),
+        ("核心指数表现", "主要指数当日涨跌幅", _render_index_chart(snapshot)),
+        ("板块强弱对比", "领涨与领跌板块双向对照", _render_sector_chart(snapshot)),
+        ("市场成交额", "当日、前一日、20 日与 60 日均值", _render_volume_chart(snapshot)),
+    )
+    return [(title, subtitle, svg) for title, subtitle, svg in charts if svg]
 
 
 def _render_charts(snapshot: DailyReviewDataSnapshot) -> str:
-    charts = "".join((
-        _render_breadth_chart(snapshot),
-        _render_index_chart(snapshot),
-        _render_sector_chart(snapshot),
-        _render_volume_chart(snapshot),
-    ))
-    if not charts:
+    cards = "".join(
+        _chart_card(title, subtitle, svg)
+        for title, subtitle, svg in daily_review_chart_svgs(snapshot)
+    )
+    if not cards:
         return '<div class="empty-state">暂无可视化数据</div>'
-    return f'<div class="chart-grid">{charts}</div>'
+    return f'<div class="chart-grid">{cards}</div>'
 
 
 def _render_list(values: Iterable[str], empty: str = "暂无可靠结论") -> str:

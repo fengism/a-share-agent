@@ -100,6 +100,39 @@ describe("chatStore user scope", () => {
     expect(useChatStore.getState().isStreaming).toBe(false);
   });
 
+  it("truncates later conversation when a user message is edited", () => {
+    setActiveUserScope(1);
+    useChatStore.getState().addUserMessage("第一条");
+    useChatStore.getState().addAssistantMessage("assistant-edit-1");
+    useChatStore.getState().appendToAssistant("assistant-edit-1", "答1");
+    useChatStore.getState().finalizeMessage("assistant-edit-1");
+    useChatStore.getState().addUserMessage("第二条");
+
+    const firstId = useChatStore.getState().messages[0].id;
+    const request = useChatStore.getState().editUserMessage(firstId, "第一条（改）");
+
+    expect(request).toEqual({ message: "第一条（改）", history: [] });
+    expect(useChatStore.getState().messages).toEqual([
+      expect.objectContaining({ role: "user", content: "第一条（改）" }),
+    ]);
+    expect(useChatStore.getState().history).toEqual([
+      { role: "user", content: "第一条（改）" },
+    ]);
+  });
+
+  it("rejects user message edits while streaming", () => {
+    setActiveUserScope(1);
+    useChatStore.getState().addUserMessage("第一条");
+    useChatStore.getState().setStreaming(true);
+
+    const firstId = useChatStore.getState().messages[0].id;
+    expect(useChatStore.getState().editUserMessage(firstId, "改")).toBeNull();
+    expect(useChatStore.getState().messages[0].content).toBe("第一条");
+
+    useChatStore.getState().setStreaming(false);
+    expect(useChatStore.getState().editUserMessage(firstId, "改")).not.toBeNull();
+  });
+
   it("removes the previous assistant response before regeneration", () => {
     setActiveUserScope(1);
     useChatStore.getState().addUserMessage("分析贵州茅台");

@@ -61,4 +61,5 @@ export interface ChatState {
   clearChat: () => void;
   finalizeMessage: (messageId: string, outcome?: ChatProcessOutcome) => void;
   regenerateLastAssistant: () => ChatRegenerationRequest | null;
+  editUserMessage: (messageId: string, content: string) => ChatRegenerationRequest | null;
 }

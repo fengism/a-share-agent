@@ -67,6 +67,7 @@ def build_background_task_specs(
     stock_name_map_prewarm: AsyncTaskFactory,
     hk_stock_search_prewarm: AsyncTaskFactory,
     us_macro_prewarm: AsyncTaskFactory,
+    national_team_price_prewarm: AsyncTaskFactory,
     industry_mapping_refresh: AsyncTaskFactory,
     wal_checkpoint: AsyncTaskFactory,
     database_backup: AsyncTaskFactory,
@@ -113,6 +114,15 @@ def build_background_task_specs(
                 us_macro_prewarm,
             ),
             start_message="美国宏观快照预热任务已启动",
+        ),
+        BackgroundTaskSpec(
+            name="national_team_price_prewarm",
+            factory=_supervised_task_factory(
+                supervised_once,
+                "national_team_price_prewarm",
+                national_team_price_prewarm,
+            ),
+            start_message="国家队行情缓存预热任务已启动",
         ),
         BackgroundTaskSpec(
             name="industry_mapping_refresh",
@@ -214,12 +224,19 @@ async def application_lifespan(
     database_integrity_checker: Callable[[], None] = verify_database_integrity,
     blocking_runner=call_blocking,
 ) -> AsyncIterator[None]:
+    from app.infrastructure.browser_runtime import ensure_browser_library_paths
+
+    # 必须在任何浏览器子进程（PDF 渲染、stealth 抓取）启动前合入库搜索路径
+    ensure_browser_library_paths()
     javascript_runtime_initializer()
     logger.info("JavaScript 运行时初始化完成")
 
     from app.financial_data.hk.search_index import prewarm_hk_stock_search_index
     from app.financial_data.market.public import prewarm_us_macro_data
-    from app.financial_data.market.quotes.national_team import initialize_national_team_refresh
+    from app.financial_data.market.quotes.national_team import (
+        initialize_national_team_refresh,
+        prewarm_national_team_prices,
+    )
     from app.financial_data.stock.public import build_industry_mapping, build_stock_name_map
     from app.infrastructure.persistence import init_db
 
@@ -289,6 +306,7 @@ async def application_lifespan(
         stock_name_map_prewarm=build_stock_name_map,
         hk_stock_search_prewarm=prewarm_hk_stock_search_index,
         us_macro_prewarm=prewarm_us_macro_data,
+        national_team_price_prewarm=prewarm_national_team_prices,
         industry_mapping_refresh=industry_mapping_refresh,
         wal_checkpoint=wal_checkpoint,
         database_backup=database_backup,

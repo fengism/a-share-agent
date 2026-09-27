@@ -108,6 +108,7 @@ export default function ChatPage() {
             onRegenerate={chat.handleRegenerate}
             onSelectPrompt={setInputValue}
             onResultAction={resultActions.handleResultAction}
+            onEditMessage={chat.handleEditUserMessage}
           />
           <ChatInput
             value={inputValue}

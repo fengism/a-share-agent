@@ -32,13 +32,15 @@ class MarketVolume(BaseModel):
     date: str | None = None
     amount: float | None = None
     amount_before_one_day: float | None = None
+    amount_average_20_day: float | None = None
     amount_average_60_day: float | None = None
 
     def to_str(self) -> str:
         return (
             f"大盘成交额 {self.date}: {self.amount} "
-            f"(前一日: {self.amount_before_one_day}, 60日平均: {self.amount_average_60_day})"
+            f"(前一日: {self.amount_before_one_day}, 20日平均: {self.amount_average_20_day}, 60日平均: {self.amount_average_60_day})"
         )
+
 
 
 class KlineItem(BaseModel):

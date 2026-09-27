@@ -3,6 +3,7 @@ import type { ToolCallDisplay } from "../types/chat";
 import {
   nextChatMessageId,
   prepareLastAssistantRegeneration,
+  prepareUserMessageEdit,
   updateMessageById,
   upsertAssistantHistory,
 } from "./chatStoreHelpers";
@@ -34,6 +35,7 @@ type ChatMessageSlice = Pick<
   | "setAbortController"
   | "clearChat"
   | "regenerateLastAssistant"
+  | "editUserMessage"
   | "finalizeMessage"
 >;
 
@@ -252,6 +254,16 @@ export function createChatMessageSlice(
       const state = get();
       if (state.isStreaming) return null;
       const prepared = prepareLastAssistantRegeneration(state.messages, state.history);
+      if (!prepared) return null;
+      set({ messages: prepared.nextMessages, history: prepared.nextHistory });
+      persist();
+      return { message: prepared.message, history: prepared.history };
+    },
+
+    editUserMessage: (messageId, content) => {
+      const state = get();
+      if (state.isStreaming) return null;
+      const prepared = prepareUserMessageEdit(state.messages, state.history, messageId, content);
       if (!prepared) return null;
       set({ messages: prepared.nextMessages, history: prepared.nextHistory });
       persist();

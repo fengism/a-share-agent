@@ -96,6 +96,7 @@ class MarketVolumeSnapshot(TypedDict, total=False):
     date: str | None
     amount: float | None
     amount_before_one_day: float | None
+    amount_average_20_day: float | None
     amount_average_60_day: float | None
 
 
@@ -129,6 +130,8 @@ class DailyReviewDataSnapshot(BaseModel):
     bottom_sectors: list[SectorSnapshotItem] = Field(default_factory=list)
     market_volume: MarketVolumeSnapshot = Field(default_factory=dict)
     macro_data: dict[str, Any] = Field(default_factory=dict)
+    limit_up_ladder: dict[str, Any] = Field(default_factory=dict)
+    northbound_funds: dict[str, Any] = Field(default_factory=dict)
 
 
 class DailyReviewResult(BaseModel):

@@ -26,6 +26,7 @@ function createSnapshot(overrides: Partial<DailyReviewDataSnapshot> = {}): Daily
     market_volume: {
       amount: 1_250_000_000_000,
       amount_before_one_day: 1_100_000_000_000,
+      amount_average_20_day: 1_050_000_000_000,
       amount_average_60_day: 980_000_000_000,
     },
     macro_data: {},
@@ -41,7 +42,12 @@ describe("DailyReviewCharts", () => {
     expect(screen.getByTestId("daily-review-index-chart")).toBeInTheDocument();
     expect(screen.getByTestId("daily-review-sector-chart")).toBeInTheDocument();
     expect(screen.getByTestId("daily-review-volume-chart")).toBeInTheDocument();
+    expect(screen.getByText("当日成交额")).toBeInTheDocument();
+    expect(screen.getByText("前一日成交额")).toBeInTheDocument();
+    expect(screen.getByText("20 日均值")).toBeInTheDocument();
+    expect(screen.getByText("60 日均值")).toBeInTheDocument();
     expect(screen.getByText("3,210 家")).toHaveAttribute("fill", expect.stringContaining("var(--c-text-primary"));
+
     expect(screen.getByText("上证指数")).toBeInTheDocument();
     expect(screen.getByText("机器人")).toBeInTheDocument();
     expect(screen.getByText("煤炭")).toBeInTheDocument();

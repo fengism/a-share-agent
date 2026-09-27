@@ -7,17 +7,18 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from app.domain.market import IndexItem, MarketIndices, MarketVolume
+from app.domain.market import IndexItem, MarketIndices
 from app.financial_data.market.public import (
     get_dragon_tiger_list,
     get_hot_stocks,
     get_index_kline,
     get_indices,
+    get_limit_up_ladder,
     get_macro_data,
     get_market_news,
     get_market_statistics,
-    get_market_volume,
-    get_realtime_market_volume,
+    get_market_volume_stats,
+    get_northbound_history,
     get_ths_hot_concept,
     get_ths_hot_industry,
 )
@@ -85,13 +86,16 @@ async def _historical_indices(target_date: date) -> MarketIndices:
     return MarketIndices(date=date_text, indices=items, source=" / ".join(sources))
 
 
-async def _historical_market_volume(target_date: date) -> MarketVolume:
+async def _target_northbound(target_date: date):
     date_text = target_date.isoformat()
-    response = await get_market_volume(date_text, date_text)
-    item = next((row for row in response.items if row.date == date_text), None)
-    if item is None:
-        raise HistoricalReviewDataUnavailableError("历史成交额数据不可用")
-    return MarketVolume(date=date_text, amount=item.amount)
+    try:
+        response = await get_northbound_history(500)
+        point = next((item for item in response.items if item.date == date_text), None)
+        if point is not None:
+            return point
+    except Exception as error:
+        raise HistoricalReviewDataUnavailableError(f"北向资金接口异常: {error}") from error
+    raise HistoricalReviewDataUnavailableError("当日北向资金数据不可用（可能非交易日或未披露）")
 
 
 def _historical_unavailable(label: str) -> HistoricalReviewDataUnavailableError:
@@ -141,36 +145,22 @@ def _status(name: str, value: Any, target_date: str, is_realtime: bool) -> Daily
 
 
 async def collect_daily_review_data(target_date: date, *, use_realtime: bool) -> DailyReviewCollection:
-    if use_realtime:
-        coroutines = {
-            "indices": get_indices(),
-            "hot_stocks": get_hot_stocks(),
-            "hot_concepts": get_ths_hot_concept(),
-            "hot_industries": get_ths_hot_industry(),
-            "dragon_tiger": get_dragon_tiger_list(target_date.isoformat()),
-            "market_statistics": get_market_statistics(target_date.isoformat()),
-            "market_news": get_market_news(),
-            "market_volume": get_realtime_market_volume(),
-            "macro_data": get_macro_data(),
-        }
-    else:
-        coroutines = {
-            "indices": _historical_indices(target_date),
-            "dragon_tiger": get_dragon_tiger_list(target_date.isoformat()),
-            "market_statistics": get_market_statistics(target_date.isoformat()),
-            "market_volume": _historical_market_volume(target_date),
-        }
+    coroutines = {
+        "indices": get_indices() if use_realtime else _historical_indices(target_date),
+        "hot_stocks": get_hot_stocks(),
+        "hot_concepts": get_ths_hot_concept(),
+        "hot_industries": get_ths_hot_industry(),
+        "dragon_tiger": get_dragon_tiger_list(target_date.isoformat()),
+        "market_statistics": get_market_statistics(target_date.isoformat()),
+        "market_news": get_market_news(),
+        "market_volume": get_market_volume_stats(target_date, use_realtime=use_realtime),
+        "macro_data": get_macro_data(),
+        "limit_up_ladder": get_limit_up_ladder(target_date),
+        "northbound_funds": _target_northbound(target_date),
+    }
     names = list(coroutines)
     resolved = await asyncio.gather(*coroutines.values(), return_exceptions=True)
     values = dict(zip(names, resolved, strict=True))
-    if not use_realtime:
-        values.update({
-            "hot_stocks": _historical_unavailable("热门股票"),
-            "hot_concepts": _historical_unavailable("热点概念"),
-            "hot_industries": _historical_unavailable("热点行业"),
-            "market_news": _historical_unavailable("市场新闻"),
-            "macro_data": _historical_unavailable("宏观数据"),
-        })
     target_text = target_date.isoformat()
     statuses = {
         name: _status(name, value, target_text, use_realtime)

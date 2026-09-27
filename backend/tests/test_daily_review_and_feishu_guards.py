@@ -166,6 +166,7 @@ class TestDailyReviewDepthOptimization:
     async def test_historical_indices_calculates_change_pct_and_amplitude_when_none(self, monkeypatch):
         from datetime import date
         from unittest.mock import AsyncMock
+
         from app.domain.market import KlineData, KlineItem
         from app.modules.daily_review.collector import _historical_indices
 
@@ -272,7 +273,12 @@ class TestDailyReviewDepthOptimization:
         assert "拓维信息(002261)：净买入 15000.0万元，涨跌幅 10.0%，换手率 15.2%，上榜原因：日涨幅偏离值达7%" in prompt
 
     def test_report_renderer_produces_clean_report_without_technical_errors(self):
-        from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection, DailyReviewSourceStatus
+        from app.modules.daily_review.models import (
+            DailyReviewDataSnapshot,
+            DailyReviewResult,
+            DailyReviewSection,
+            DailyReviewSourceStatus,
+        )
         from app.modules.daily_review.report_renderer import render_daily_review_markdown
 
         snapshot = DailyReviewDataSnapshot(
@@ -312,3 +318,367 @@ class TestDailyReviewDepthOptimization:
         assert "历史热点个股排行与实时新闻未覆盖" in md
         assert "热门股票不支持历史回溯，未使用当前数据替代" not in md
 
+    def test_format_limit_up_ladder_and_northbound(self):
+        from app.modules.daily_review.review_builder import _format_limit_up_ladder, _format_northbound
+
+        ladder = {
+            "stocks": [
+                {"name": "新华文轩", "board_count": 5, "sector_name": "并购重组"},
+                {"name": "大唐电信", "board_count": 3, "sector_name": "通信设备"},
+                {"name": "常山北明", "board_count": 3, "sector_name": "华为概念"},
+                {"name": "海能达", "board_count": 1, "sector_name": "专网通信"},
+            ],
+            "sectors": [
+                {"sector_name": "并购重组", "stock_count": 5},
+                {"sector_name": "华为概念", "stock_count": 4},
+            ],
+        }
+        ladder_text = _format_limit_up_ladder(ladder)
+        assert "全市场涨停：4家" in ladder_text
+        assert "连板最高高度（空间板）：5板" in ladder_text
+        assert "【5连板】(1家)：新华文轩(并购重组)" in ladder_text
+        assert "【3连板】(2家)" in ladder_text
+        assert "【最强主线涨停分布】：并购重组(5家涨停) ｜ 华为概念(4家涨停)" in ladder_text
+
+        nb = {"north_money": 85.35}
+        nb_text = _format_northbound(nb)
+        assert "北向资金净买入：+85.35 亿元" in nb_text
+
+    def test_build_prompt_with_ladder_and_northbound(self):
+        from app.modules.daily_review.models import DailyReviewDataSnapshot
+        from app.modules.daily_review.prompts import MARKET_USER_PROMPT
+        from app.modules.daily_review.review_builder import build_prompt
+
+        snapshot = DailyReviewDataSnapshot(
+            limit_up_ladder={
+                "stocks": [{"name": "龙头A", "board_count": 4, "sector_name": "算力"}],
+                "sectors": [{"sector_name": "算力", "stock_count": 3}],
+            },
+            northbound_funds={"north_money": 42.1},
+        )
+        prompt = build_prompt("2026-09-24", snapshot, MARKET_USER_PROMPT)
+        assert "连板最高高度（空间板）：4板" in prompt
+        assert "龙头A(算力)" in prompt
+        assert "北向资金净买入：+42.10 亿元" in prompt
+
+    def test_push_content_includes_ladder_and_northbound_blocks(self):
+        from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection
+        from app.modules.push.content import build_content
+
+        snapshot = DailyReviewDataSnapshot(
+            limit_up_ladder={
+                "stocks": [
+                    {"name": "空间龙", "board_count": 6, "sector_name": "低空经济"},
+                    {"name": "二板A", "board_count": 2, "sector_name": "消费电子"},
+                    {"name": "首板B", "board_count": 1, "sector_name": "芯片"},
+                ],
+            },
+            northbound_funds={"north_money": -18.5},
+        )
+        review = DailyReviewResult(
+            date="2026-09-24",
+            title="每日复盘",
+            generated_at="2026-09-24 16:00:00",
+            market_state="balanced",
+            market_summary="市场震荡整理",
+            index_review=DailyReviewSection(title="指数", summary="震荡", bullets=[]),
+            hotspot_review=DailyReviewSection(title="热点", summary="局部活跃", bullets=[]),
+            dragon_tiger_review=DailyReviewSection(title="龙虎榜", summary="游资博弈", bullets=[]),
+            data_snapshot=snapshot,
+        )
+        blocks = build_content("daily_review", review)
+        texts = [b.text for b in blocks]
+        assert any("短线连板天梯" in t for t in texts)
+        assert any("最高空间板：6板（空间龙）" in t for t in texts)
+        assert any("6板 1家" in t and "2板 1家" in t for t in texts)
+        assert any("北向资金净买入：-18.50 亿元" in t for t in texts)
+
+    async def test_historical_collection_fetches_latest_hot_stocks_and_news(self, monkeypatch):
+        from datetime import date
+        from unittest.mock import AsyncMock
+
+        from app.domain.market import MarketIndices, MarketVolume
+        from app.financial_data.market.quotes.schemas import (
+            MarketLimitUpLadderResponse,
+            MarketStatistics,
+            NorthboundHistoryPoint,
+            NorthboundHistoryResponse,
+        )
+        from app.modules.daily_review.collector import collect_daily_review_data
+
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector._historical_indices",
+            AsyncMock(return_value=MarketIndices(date="2026-09-24", indices=[])),
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_dragon_tiger_list",
+            AsyncMock(return_value=[]),
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_market_statistics",
+            AsyncMock(return_value=MarketStatistics(date="2026-09-24")),
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_market_volume_stats",
+            AsyncMock(return_value=MarketVolume(date="2026-09-24", amount=1000000000000)),
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_limit_up_ladder",
+            AsyncMock(return_value=MarketLimitUpLadderResponse(date="2026-09-24", fetched_at="", total=0, stocks=[], sectors=[])),
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_northbound_history",
+            AsyncMock(return_value=NorthboundHistoryResponse(updated_at="", items=[NorthboundHistoryPoint(date="2026-09-24", north_money=50.0)])),
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_hot_stocks",
+            AsyncMock(return_value=[{"name": "最新热门股A"}]),
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_ths_hot_concept",
+            AsyncMock(return_value=[{"name": "最新热点概念B"}]),
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_ths_hot_industry",
+            AsyncMock(return_value=[{"name": "最新热点行业C"}]),
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_market_news",
+            AsyncMock(return_value=[]),
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.collector.get_macro_data",
+            AsyncMock(return_value={"cpi": {}}),
+        )
+
+        collection = await collect_daily_review_data(date(2026, 9, 24), use_realtime=False)
+        assert collection.values["hot_stocks"] == [{"name": "最新热门股A"}]
+        assert collection.source_status["hot_stocks"].status == "complete"
+        assert collection.values["hot_concepts"] == [{"name": "最新热点概念B"}]
+        assert collection.source_status["hot_concepts"].status == "complete"
+        assert collection.values["hot_industries"] == [{"name": "最新热点行业C"}]
+        assert collection.source_status["hot_industries"].status == "complete"
+
+    async def test_render_daily_review_pdf_bytes_success(self):
+        import pytest
+
+        from app.modules.daily_review.pdf_service import render_daily_review_pdf_bytes
+
+        html = """<!doctype html><html><body><h1>每日复盘测试报告</h1><p>内容正常渲染</p></body></html>"""
+        try:
+            pdf_bytes = await render_daily_review_pdf_bytes(html)
+        except Exception as exc:
+            if "Executable doesn't exist" in str(exc) or "playwright install" in str(exc):
+                pytest.skip(f"Playwright Chromium 未安装，跳过 PDF 渲染测试: {exc}")
+            raise
+        assert isinstance(pdf_bytes, bytes)
+        assert pdf_bytes.startswith(b"%PDF-")
+        assert len(pdf_bytes) > 500
+
+    async def test_export_daily_review_pdf_route_handles_render_error(self, monkeypatch):
+        from unittest.mock import AsyncMock
+
+        import pytest
+
+        from app.api.errors import ServiceUnavailableError
+        from app.api.routes.daily_review import export_daily_review_pdf
+        from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection
+
+        mock_review = DailyReviewResult(
+            date="2026-09-24",
+            title="每日复盘",
+            generated_at="2026-09-24 16:00:00",
+            market_state="balanced",
+            market_summary="市场普涨",
+            index_review=DailyReviewSection(title="指数", summary="大涨", bullets=[]),
+            hotspot_review=DailyReviewSection(title="热点", summary="领涨", bullets=[]),
+            dragon_tiger_review=DailyReviewSection(title="龙虎榜", summary="净买入", bullets=[]),
+            data_snapshot=DailyReviewDataSnapshot(),
+        )
+
+        monkeypatch.setattr(
+            "app.api.routes.daily_review.get_daily_review_record",
+            AsyncMock(return_value=mock_review),
+        )
+        monkeypatch.setattr(
+            "app.api.routes.daily_review.render_daily_review_pdf_bytes",
+            AsyncMock(side_effect=RuntimeError("Browser launch failure simulated")),
+        )
+
+        with pytest.raises(ServiceUnavailableError) as exc_info:
+            await export_daily_review_pdf("2026-09-24", user={"id": "test_user", "is_admin": False})
+
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.code == "daily_review.pdf_export_failed"
+        # 对外只暴露固定文案，内部异常细节仅记录日志，不应透传给客户端
+        assert "Browser launch failure simulated" not in exc_info.value.message
+
+    async def test_get_market_volume_stats_computes_20_and_60_day_averages(self, monkeypatch):
+        from datetime import date
+        from unittest.mock import AsyncMock
+
+        from app.financial_data.market.quotes.schemas import MarketVolumeResponse, MarketVolumeSeriesItem
+        from app.financial_data.market.quotes.volume import get_market_volume_stats
+
+        # Mock 70 days of volume series
+        mock_items = [
+            MarketVolumeSeriesItem(date=f"2026-05-{i:02d}", amount=1000.0)
+            for i in range(1, 32)
+        ] + [
+            MarketVolumeSeriesItem(date=f"2026-06-{i:02d}", amount=2000.0)
+            for i in range(1, 31)
+        ] + [
+            MarketVolumeSeriesItem(date=f"2026-07-{i:02d}", amount=3000.0)
+            for i in range(1, 15)
+        ]
+        # target is 2026-07-14 (75 items total)
+        monkeypatch.setattr(
+            "app.financial_data.market.quotes.volume.get_market_volume",
+            AsyncMock(return_value=MarketVolumeResponse(items=mock_items)),
+        )
+
+        vol = await get_market_volume_stats(date(2026, 7, 14), use_realtime=False)
+        assert vol.date == "2026-07-14"
+        assert vol.amount == 3000.0
+        assert vol.amount_before_one_day == 3000.0
+        assert vol.amount_average_20_day is not None
+        assert vol.amount_average_60_day is not None
+        # last 20 items: 6 items of 2000.0 (June 25-30) + 14 items of 3000.0 (July 1-14)
+        # avg20 = (6 * 2000 + 14 * 3000) / 20 = (12000 + 42000) / 20 = 2700.0
+        assert vol.amount_average_20_day == 2700.0
+
+    def test_market_volume_summary_and_push_format_includes_all_averages(self):
+        from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection
+        from app.modules.daily_review.review_builder import _market_volume_summary
+        from app.modules.push.content import build_content
+
+        snapshot = DailyReviewDataSnapshot(
+            market_volume={
+                "date": "2026-09-24",
+                "amount": 1650000000000.0,
+                "amount_before_one_day": 1750000000000.0,
+                "amount_average_20_day": 1850000000000.0,
+                "amount_average_60_day": 2250000000000.0,
+            },
+        )
+        summary = _market_volume_summary(snapshot)
+        assert "成交额: 16500.00亿" in summary
+        assert "昨日成交额: 17500.00亿" in summary
+        assert "20日成交额均值: 18500.00亿" in summary
+        assert "60日成交额均值: 22500.00亿" in summary
+
+        review = DailyReviewResult(
+            date="2026-09-24",
+            title="每日复盘",
+            generated_at="2026-09-24 16:00:00",
+            market_state="balanced",
+            market_summary="整理",
+            index_review=DailyReviewSection(title="指数", summary="整理", bullets=[]),
+            hotspot_review=DailyReviewSection(title="热点", summary="轮动", bullets=[]),
+            dragon_tiger_review=DailyReviewSection(title="龙虎榜", summary="活跃", bullets=[]),
+            data_snapshot=snapshot,
+        )
+        blocks = build_content("daily_review", review)
+        vol_bullet = next((b.text for b in blocks if "两市总成交额" in b.text), None)
+        assert vol_bullet is not None
+        assert "16500.00 亿元" in vol_bullet
+        assert "较前日 -1000.00 亿元" in vol_bullet
+        assert "20日均值 18500.00 亿元" in vol_bullet
+        assert "60日均值 22500.00 亿元" in vol_bullet
+
+
+    async def test_get_daily_review_record_backfills_volume_stats(self, monkeypatch):
+        from unittest.mock import AsyncMock, Mock
+
+        from app.domain.market import MarketVolume
+        from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection
+        from app.modules.daily_review.service import get_daily_review_record
+
+        old_snapshot = DailyReviewDataSnapshot(
+            market_volume={
+                "date": "2026-09-24",
+                "amount": 1653357346816.0,
+                "amount_before_one_day": None,
+                "amount_average_60_day": None,
+            },
+        )
+        old_review = DailyReviewResult(
+            date="2026-09-24",
+            title="每日复盘",
+            generated_at="2026-09-24 16:00:00",
+            market_state="balanced",
+            market_summary="市场普涨",
+            index_review=DailyReviewSection(title="指数", summary="大涨", bullets=[]),
+            hotspot_review=DailyReviewSection(title="热点", summary="领涨", bullets=[]),
+            dragon_tiger_review=DailyReviewSection(title="龙虎榜", summary="净买入", bullets=[]),
+            data_snapshot=old_snapshot,
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.persistence.repository.load_daily_review",
+            lambda date, user_id: old_review,
+        )
+        save_mock = Mock(return_value=None)
+        monkeypatch.setattr(
+            "app.modules.daily_review.persistence.repository.save_daily_review",
+            save_mock,
+        )
+        monkeypatch.setattr(
+            "app.modules.daily_review.service.get_market_volume_stats",
+            AsyncMock(return_value=MarketVolume(
+                date="2026-09-24",
+                amount=1653357346816.0,
+                amount_before_one_day=1764976361472.0,
+                amount_average_20_day=1889728287846.0,
+                amount_average_60_day=2252920235861.0,
+            )),
+        )
+
+        record = await get_daily_review_record("2026-09-24", 1)
+        assert record is not None
+        mv = record.data_snapshot.market_volume
+        assert mv["amount_before_one_day"] == 1764976361472.0
+        assert mv["amount_average_20_day"] == 1889728287846.0
+        assert mv["amount_average_60_day"] == 2252920235861.0
+        # 回填结果写回持久化，避免每次查看重复拉取上游
+        save_mock.assert_called_once_with(old_review, 1)
+
+    async def test_get_daily_review_record_skips_backfill_when_stats_present(self, monkeypatch):
+        from unittest.mock import Mock
+
+        from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection
+        from app.modules.daily_review.service import get_daily_review_record
+
+        complete_snapshot = DailyReviewDataSnapshot(
+            market_volume={
+                "date": "2026-09-24",
+                "amount": 1653357346816.0,
+                "amount_before_one_day": 1764976361472.0,
+                "amount_average_20_day": 1889728287846.0,
+                "amount_average_60_day": 2252920235861.0,
+            },
+        )
+        complete_review = DailyReviewResult(
+            date="2026-09-24",
+            title="每日复盘",
+            generated_at="2026-09-24 16:00:00",
+            market_state="balanced",
+            market_summary="市场普涨",
+            index_review=DailyReviewSection(title="指数", summary="大涨", bullets=[]),
+            hotspot_review=DailyReviewSection(title="热点", summary="领涨", bullets=[]),
+            dragon_tiger_review=DailyReviewSection(title="龙虎榜", summary="净买入", bullets=[]),
+            data_snapshot=complete_snapshot,
+        )
+        load_mock = Mock(return_value=complete_review)
+        monkeypatch.setattr(
+            "app.modules.daily_review.persistence.repository.load_daily_review",
+            load_mock,
+        )
+        save_mock = Mock(return_value=None)
+        monkeypatch.setattr(
+            "app.modules.daily_review.persistence.repository.save_daily_review",
+            save_mock,
+        )
+
+        record = await get_daily_review_record("2026-09-24", 1)
+        assert record is not None
+        save_mock.assert_not_called()

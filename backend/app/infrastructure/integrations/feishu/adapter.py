@@ -57,6 +57,7 @@ def to_feishu_doc_blocks(content: list[ContentBlock]) -> list[dict]:
             })
         elif block.type == "divider":
             blocks.append({"block_type": 22, "divider": {}})
+        # image 块需要 drive 媒体上传接口，文档侧暂不支持，静默跳过
     return blocks
 
 
@@ -202,6 +203,16 @@ def to_feishu_card(data_type: str, title: str, content: list[ContentBlock], doc_
         else [_markdown_element(summary), *extra_elements]
     )
 
+    image_elements = [
+        {
+            "tag": "img",
+            "img_key": block.image_key,
+            "alt": {"tag": "plain_text", "content": block.text or "图表"},
+        }
+        for block in content
+        if block.type == "image" and block.image_key
+    ]
+
     card = {
         "header": {
             "template": template_color,
@@ -209,6 +220,7 @@ def to_feishu_card(data_type: str, title: str, content: list[ContentBlock], doc_
         },
         "elements": [
             *card_elements,
+            *image_elements,
             {"tag": "action", "actions": [
                 {"tag": "button", "text": {"tag": "plain_text", "content": "📄 查看完整研报"}, "url": doc_url, "type": "primary"},
             ]},

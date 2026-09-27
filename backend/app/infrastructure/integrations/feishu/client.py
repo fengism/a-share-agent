@@ -36,6 +36,9 @@ class FeishuClient:
     def grant_doc_edit_permission(self, *args, **kwargs) -> None:
         self.documents.grant_doc_edit_permission(*args, **kwargs)
 
+    def upload_image(self, *args, **kwargs) -> str:
+        return self.messages.upload_image(*args, **kwargs)
+
     def send_card(self, receiver: str, card: dict) -> None:
         self.messages.send_card(receiver, card)
 

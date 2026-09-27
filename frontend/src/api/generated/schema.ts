@@ -5377,6 +5377,10 @@ export interface components {
             hot_stocks?: components["schemas"]["HotRankSnapshotItem"][];
             /** Indices */
             indices?: components["schemas"]["IndexSnapshotItem"][];
+            /** Limit Up Ladder */
+            limit_up_ladder?: {
+                [key: string]: unknown;
+            };
             /** Macro Data */
             macro_data?: {
                 [key: string]: unknown;
@@ -5385,6 +5389,10 @@ export interface components {
             market_news?: components["schemas"]["MarketNewsSnapshotItem"][];
             market_statistics?: components["schemas"]["MarketBreadthSnapshot"];
             market_volume?: components["schemas"]["MarketVolumeSnapshot"];
+            /** Northbound Funds */
+            northbound_funds?: {
+                [key: string]: unknown;
+            };
             /**
              * Requested Date
              * @default
@@ -8798,6 +8806,8 @@ export interface components {
         MarketVolumeSnapshot: {
             /** Amount */
             amount?: number | null;
+            /** Amount Average 20 Day */
+            amount_average_20_day?: number | null;
             /** Amount Average 60 Day */
             amount_average_60_day?: number | null;
             /** Amount Before One Day */

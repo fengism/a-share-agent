@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from app.modules.daily_review.models import (
     DailyReviewDataSnapshot,
@@ -52,6 +53,63 @@ def _format_distribution(rows: list[dict]) -> str:
         if count and count > 0:
             parts.append(f"{label}%: {count}家")
     return "，".join(parts)
+
+
+def group_limit_up_by_board(stocks: list[dict]) -> dict[int, list[dict]]:
+    """按连板高度分组天梯个股；board_count 缺失或为 0 时视作首板。"""
+    by_board: dict[int, list[dict]] = {}
+    for stock in stocks:
+        board = int(stock.get("board_count") or 1)
+        by_board.setdefault(board, []).append(stock)
+    return by_board
+
+
+def _format_limit_up_ladder(ladder: dict[str, Any]) -> str:
+    if not ladder:
+        return "暂无连板天梯数据"
+    stocks = ladder.get("stocks") or []
+    sectors = ladder.get("sectors") or []
+    if not stocks:
+        return "今日无涨停梯队个股"
+
+    by_board = group_limit_up_by_board(stocks)
+
+    max_board = max(by_board) if by_board else 0
+    lines = [f"全市场涨停：{len(stocks)}家，连板最高高度（空间板）：{max_board}板"]
+
+    for board in sorted(by_board.keys(), reverse=True):
+        stk_list = by_board[board]
+        reps = [
+            f"{s.get('name')}({s.get('sector_name', '')})"
+            for s in stk_list[:8]
+            if s.get("name")
+        ]
+        if len(stk_list) > 8:
+            reps.append(f"等共{len(stk_list)}家")
+        tag = f"【{board}连板】({len(stk_list)}家)" if board > 1 else f"【首板】({len(stk_list)}家)"
+        lines.append(f"- {tag}：{'、'.join(reps)}")
+
+    if sectors:
+        top_sec = sorted(sectors, key=lambda x: int(x.get("stock_count") or 0), reverse=True)[:5]
+        sec_strs = [
+            f"{s.get('sector_name')}({s.get('stock_count')}家涨停)"
+            for s in top_sec
+            if s.get("sector_name")
+        ]
+        if sec_strs:
+            lines.append(f"- 【最强主线涨停分布】：{' ｜ '.join(sec_strs)}")
+
+    return "\n".join(lines)
+
+
+def _format_northbound(funds: dict[str, Any]) -> str:
+    if not funds:
+        return "暂无北向资金数据（可能非交易日或未披露）"
+    north = funds.get("north_money")
+    if north is None:
+        return "暂无北向资金净流入数据"
+    sign = "+" if north > 0 else ""
+    return f"北向资金净买入：{sign}{north:.2f} 亿元"
 
 
 def _market_summary(snapshot: DailyReviewDataSnapshot, prefix: str) -> str:
@@ -118,6 +176,24 @@ def build_fallback_review(
         range_str = f"（开盘 {open_p} / 最高 {high} / 最低 {low}）" if open_p and high and low else ""
         index_bullets.append(f"{name}：收盘 {price}，涨跌幅 {chg_str}{amp_str}{amt_str} {range_str}".strip())
 
+    vol = snapshot.market_volume
+    if vol and vol.get("amount"):
+        total_amt = vol.get("amount", 0) / 1e8
+        vol_head = f"两市总成交额：{total_amt:.2f} 亿元"
+        extra = []
+        if vol.get("amount_before_one_day"):
+            diff = (vol["amount"] - vol["amount_before_one_day"]) / 1e8
+            extra.append(f"较前日 {'+' if diff > 0 else ''}{diff:.2f} 亿")
+        if vol.get("amount_average_20_day"):
+            extra.append(f"20日均值 {vol['amount_average_20_day'] / 1e8:.2f} 亿")
+        if vol.get("amount_average_60_day"):
+            extra.append(f"60日均值 {vol['amount_average_60_day'] / 1e8:.2f} 亿")
+        if extra:
+            index_bullets.insert(0, f"{vol_head}（{'，'.join(extra)}）")
+        else:
+            index_bullets.insert(0, vol_head)
+
+
     market_statistics = snapshot.market_statistics or {}
     breadth_available = snapshot.source_status.get("market_statistics", DailyReviewSourceStatus()).status != "unavailable"
 
@@ -155,6 +231,19 @@ def build_fallback_review(
         chg = item.get("change_pct")
         chg_str = f"，涨跌幅 {chg:+.2f}%" if isinstance(chg, (int, float)) else ""
         dragon_bullets.append(f"{name}：净买入 {net_str}{chg_str}，上榜原因：{reason}")
+
+    if snapshot.limit_up_ladder and snapshot.limit_up_ladder.get("stocks"):
+        ladder_stocks = snapshot.limit_up_ladder.get("stocks") or []
+        by_b = group_limit_up_by_board(ladder_stocks)
+        max_b = max(by_b) if by_b else 0
+        top_s = by_b.get(max_b, [])
+        top_names = "、".join(s.get("name") for s in top_s[:3] if s.get("name"))
+        dragon_bullets.insert(0, f"短线连板空间板：{max_b}板（{top_names}），连板家数合计 {sum(len(v) for k, v in by_b.items() if k > 1)} 家")
+
+    if snapshot.northbound_funds and snapshot.northbound_funds.get("north_money") is not None:
+        north = snapshot.northbound_funds.get("north_money")
+        sign = "+" if north > 0 else ""
+        dragon_bullets.append(f"北向资金：当日净流入 {sign}{north:.2f} 亿元")
 
     return DailyReviewResult(
         date=date,
@@ -201,9 +290,10 @@ def build_fallback_review(
 
 def _market_volume_summary(snapshot: DailyReviewDataSnapshot) -> str:
     labels = {
-        "amount": "成交量",
-        "amount_before_one_day": "昨日成交量",
-        "amount_average_60_day": "60日成交量平均值",
+        "amount": "成交额",
+        "amount_before_one_day": "昨日成交额",
+        "amount_average_20_day": "20日成交额均值",
+        "amount_average_60_day": "60日成交额均值",
     }
     parts = []
     for key, label in labels.items():
@@ -214,6 +304,7 @@ def _market_volume_summary(snapshot: DailyReviewDataSnapshot) -> str:
         value_text = f"{value:.2f}" if isinstance(value, (int, float)) else str(value)
         parts.append(f"{label}: {value_text}亿")
     return " ".join(parts) + (" " if parts else "")
+
 
 
 def _macro_summary(snapshot: DailyReviewDataSnapshot) -> str:
@@ -333,6 +424,8 @@ def build_prompt(
         date=date,
         indices_placeholder=indices_text,
         market_statistics_placeholder=_market_summary(snapshot, "当日整理"),
+        limit_up_ladder_placeholder=_format_limit_up_ladder(snapshot.limit_up_ladder),
+        northbound_funds_placeholder=_format_northbound(snapshot.northbound_funds),
         dragon_tiger_placeholder="\n".join(dragon_bullets) if dragon_bullets else json.dumps(snapshot.dragon_tiger[:20], ensure_ascii=False),
         hot_stocks_placeholder="\n".join(hot_stock_bullets) if hot_stock_bullets else json.dumps(snapshot.hot_stocks[:20], ensure_ascii=False),
         hot_concepts_placeholder="\n".join(hot_concept_bullets) if hot_concept_bullets else json.dumps(snapshot.hot_concepts[:8], ensure_ascii=False),
@@ -360,6 +453,8 @@ def build_snapshot(
     market_volume,
     macro_data,
     *,
+    limit_up_ladder=None,
+    northbound_funds=None,
     requested_date: str = "",
     effective_date: str = "",
     source_status: dict[str, DailyReviewSourceStatus] | None = None,
@@ -395,4 +490,8 @@ def build_snapshot(
         snapshot_data["market_volume"] = market_volume.model_dump()
     if not isinstance(macro_data, Exception) and macro_data is not None:
         snapshot_data["macro_data"] = macro_data
+    if not isinstance(limit_up_ladder, Exception) and limit_up_ladder is not None:
+        snapshot_data["limit_up_ladder"] = limit_up_ladder.model_dump() if hasattr(limit_up_ladder, "model_dump") else limit_up_ladder
+    if not isinstance(northbound_funds, Exception) and northbound_funds is not None:
+        snapshot_data["northbound_funds"] = northbound_funds.model_dump() if hasattr(northbound_funds, "model_dump") else northbound_funds
     return DailyReviewDataSnapshot(**snapshot_data)

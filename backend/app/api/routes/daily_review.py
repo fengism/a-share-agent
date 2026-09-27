@@ -1,12 +1,13 @@
 """每日复盘 HTTP API。"""
 
+import logging
 from typing import Annotated
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query, Response
 
 from app.api.auth.dependencies import require_active_user
-from app.api.errors import BadRequestError, NotFoundError
+from app.api.errors import BadRequestError, NotFoundError, ServiceUnavailableError
 from app.api.schemas import DeleteResponse
 from app.domain.identity import AuthenticatedUser
 from app.modules.daily_review.public import (
@@ -20,6 +21,8 @@ from app.modules.daily_review.public import (
     remove_daily_review,
     render_daily_review_pdf_bytes,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -59,8 +62,16 @@ async def export_daily_review_pdf(
         raise NotFoundError("复盘记录不存在", code="daily_review.not_found")
 
     html_content = generate_daily_review_pdf_html(review)
-    pdf_bytes = await render_daily_review_pdf_bytes(html_content)
+    try:
+        pdf_bytes = await render_daily_review_pdf_bytes(html_content)
+    except Exception as exc:
+        logger.exception("导出复盘 PDF 失败: date=%s", date)
+        raise ServiceUnavailableError(
+            "PDF 导出服务暂时不可用，请稍后重试",
+            code="daily_review.pdf_export_failed",
+        ) from exc
     filename = f"每日复盘_{review.date}.pdf"
+
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

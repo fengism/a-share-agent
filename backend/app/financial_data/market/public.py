@@ -104,7 +104,11 @@ from app.financial_data.market.quotes.sector import get_industry_rankings
 from app.financial_data.market.quotes.sector_stocks_history import get_sector_stocks_history
 from app.financial_data.market.quotes.sge_gold import get_sge_gold_history
 from app.financial_data.market.quotes.statistic import get_market_statistics
-from app.financial_data.market.quotes.volume import get_market_volume, get_realtime_market_volume
+from app.financial_data.market.quotes.volume import (
+    get_market_volume,
+    get_market_volume_stats,
+    get_realtime_market_volume,
+)
 from app.financial_data.market.quotes.wind import get_market_wind, get_market_wind_stocks
 from app.financial_data.market.trading_session import (
     get_completed_market_date,
@@ -160,6 +164,7 @@ __all__ = [
     "get_market_news",
     "get_market_statistics",
     "get_market_volume",
+    "get_market_volume_stats",
     "get_market_wind",
     "get_market_wind_stocks",
     "get_realtime_market_volume",

@@ -42,6 +42,30 @@ class FeishuTransport:
         )
         return self.parse_response(response, error_prefix)
 
+    def post_multipart(
+        self,
+        url: str,
+        *,
+        data: dict,
+        files: dict,
+        error_prefix: str,
+        timeout: int = 30,
+    ) -> dict:
+        # multipart 上传必须去掉 JSON Content-Type，由 requests 自动补 boundary
+        headers = {
+            key: value
+            for key, value in self.auth.headers().items()
+            if key.lower() != "content-type"
+        }
+        response = self._session_provider().post(
+            url,
+            headers=headers,
+            data=data,
+            files=files,
+            timeout=timeout,
+        )
+        return self.parse_response(response, error_prefix)
+
     def post(self, url: str, **kwargs):
         return self._session_provider().post(
             url,

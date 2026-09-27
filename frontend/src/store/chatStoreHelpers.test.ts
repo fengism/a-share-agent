@@ -3,6 +3,7 @@ import type { ChatDisplayMessage, ChatMessage } from "../types/chat";
 import {
   loadUserChatState,
   prepareLastAssistantRegeneration,
+  prepareUserMessageEdit,
   updateMessageById,
   upsertAssistantHistory,
 } from "./chatStoreHelpers";
@@ -134,5 +135,80 @@ describe("chat store helpers", () => {
         tool_calls: undefined,
       },
     ]);
+  });
+});
+
+function editUserMessage(id: string, content: string): ChatDisplayMessage {
+  return { id, role: "user", content };
+}
+
+function editAssistantMessage(id: string, content: string): ChatDisplayMessage {
+  return { id, role: "assistant", content };
+}
+
+describe("prepareUserMessageEdit", () => {
+  it("rewrites the target entry and truncates later conversation", () => {
+    const messages = [
+      editUserMessage("m1", "第一条"),
+      editAssistantMessage("m2", "第一个回答"),
+      editUserMessage("m3", "第二条"),
+      editAssistantMessage("m4", "第二个回答"),
+    ];
+    const history: ChatMessage[] = [
+      { role: "user", content: "第一条" },
+      { role: "assistant", content: "第一个回答" },
+      { role: "user", content: "第二条" },
+      { role: "assistant", content: "第二个回答" },
+    ];
+
+    const prepared = prepareUserMessageEdit(messages, history, "m3", "  改后的第二条  ");
+
+    expect(prepared).not.toBeNull();
+    expect(prepared!.message).toBe("改后的第二条");
+    expect(prepared!.history).toEqual([
+      { role: "user", content: "第一条" },
+      { role: "assistant", content: "第一个回答" },
+    ]);
+    expect(prepared!.nextMessages).toEqual([
+      expect.objectContaining({ id: "m1", content: "第一条" }),
+      expect.objectContaining({ id: "m2" }),
+      expect.objectContaining({ id: "m3", content: "改后的第二条" }),
+    ]);
+    expect(prepared!.nextHistory).toEqual([
+      { role: "user", content: "第一条" },
+      { role: "assistant", content: "第一个回答" },
+      { role: "user", content: "改后的第二条" },
+    ]);
+  });
+
+  it("locates entries by ordinal so duplicate contents stay independent", () => {
+    const messages = [
+      editUserMessage("m1", "重复"),
+      editAssistantMessage("m2", "答1"),
+      editUserMessage("m3", "重复"),
+      editAssistantMessage("m4", "答2"),
+    ];
+    const history: ChatMessage[] = [
+      { role: "user", content: "重复" },
+      { role: "assistant", content: "答1" },
+      { role: "user", content: "重复" },
+      { role: "assistant", content: "答2" },
+    ];
+
+    const prepared = prepareUserMessageEdit(messages, history, "m1", "改第一条");
+
+    expect(prepared!.nextMessages).toEqual([expect.objectContaining({ id: "m1", content: "改第一条" })]);
+    expect(prepared!.nextHistory).toEqual([{ role: "user", content: "改第一条" }]);
+    expect(prepared!.history).toEqual([]);
+  });
+
+  it("rejects blank content, unknown or non-user ids, and orphaned history", () => {
+    const messages = [editUserMessage("m1", "第一条"), editAssistantMessage("m2", "回答")];
+    const history: ChatMessage[] = [{ role: "assistant", content: "孤立回答" }];
+
+    expect(prepareUserMessageEdit(messages, history, "m1", "   ")).toBeNull();
+    expect(prepareUserMessageEdit(messages, history, "missing", "新内容")).toBeNull();
+    expect(prepareUserMessageEdit(messages, history, "m2", "新内容")).toBeNull();
+    expect(prepareUserMessageEdit(messages, history, "m1", "新内容")).toBeNull();
   });
 });

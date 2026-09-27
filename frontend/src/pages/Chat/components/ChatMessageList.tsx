@@ -21,6 +21,8 @@ interface ChatMessageListProps {
   onRegenerate: () => void;
   onSelectPrompt: (prompt: string) => void;
   onResultAction: ChatResultActionHandler;
+  onEditMessage?: (messageId: string, content: string) => void;
+  isStreaming?: boolean;
 }
 
 export const ChatMessageList = React.memo(function ChatMessageList({
@@ -30,6 +32,8 @@ export const ChatMessageList = React.memo(function ChatMessageList({
   onRegenerate,
   onSelectPrompt,
   onResultAction,
+  onEditMessage,
+  isStreaming,
 }: ChatMessageListProps) {
   const c = useColors();
   const t = useTokens();
@@ -141,7 +145,11 @@ export const ChatMessageList = React.memo(function ChatMessageList({
               </div>
 
               {message.role === "user" && (
-                <UserMessageBubble content={message.content} />
+                <UserMessageBubble
+                  content={message.content}
+                  disabled={isStreaming}
+                  onEdit={onEditMessage ? (content) => onEditMessage(message.id, content) : undefined}
+                />
               )}
 
               {message.role === "assistant" && (
