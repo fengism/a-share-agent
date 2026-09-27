@@ -718,6 +718,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config/llm/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List Llm Models
+         * @description 按 Base URL + API Key 拉取该端点支持的模型列表。
+         */
+        post: operations["list_llm_models_api_config_llm_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/daily-review/generate": {
         parameters: {
             query?: never;
@@ -4820,6 +4840,10 @@ export interface components {
          * @description Current effective configuration with secrets masked.
          */
         ConfigResponse: {
+            /** Agent Research Timeout Seconds */
+            agent_research_timeout_seconds: number;
+            /** Analysis Llm Timeout Seconds */
+            analysis_llm_timeout_seconds: number;
             /** Baidu Cookie */
             baidu_cookie: string;
             /** Bot Admin Users */
@@ -4856,6 +4880,8 @@ export interface components {
             bot_service_user_id: number;
             /** Bot Webhook Max Skew Seconds */
             bot_webhook_max_skew_seconds: number;
+            /** Chat Max Tool Calls Total */
+            chat_max_tool_calls_total: number;
             /** Disabled Chat Agents */
             disabled_chat_agents: string[];
             /** Disabled Chat Skills */
@@ -4904,6 +4930,12 @@ export interface components {
             fred_api_key: string;
             /** Http Trust Env */
             http_trust_env: boolean;
+            /** Industry Chain Repair Timeout Seconds */
+            industry_chain_repair_timeout_seconds: number;
+            /** Industry Chain Repair Tool Calls Total */
+            industry_chain_repair_tool_calls_total: number;
+            /** Industry Chain Tool Calls Total */
+            industry_chain_tool_calls_total: number;
             /** Is Admin */
             is_admin: boolean;
             /** Iwencai Api Key */
@@ -4925,6 +4957,8 @@ export interface components {
             llm_api_version: string;
             /** Llm Base Url */
             llm_base_url: string;
+            /** Llm Context Length Tokens */
+            llm_context_length_tokens: number;
             /** Llm Model */
             llm_model: string;
             /** Llm Provider */
@@ -4953,6 +4987,10 @@ export interface components {
          * @description Partial configuration update request.
          */
         ConfigUpdateRequest: {
+            /** Agent Research Timeout Seconds */
+            agent_research_timeout_seconds?: number | null;
+            /** Analysis Llm Timeout Seconds */
+            analysis_llm_timeout_seconds?: number | null;
             /** Baidu Cookie */
             baidu_cookie?: string | null;
             /** Bot Admin Users */
@@ -4989,6 +5027,8 @@ export interface components {
             bot_service_user_id?: number | null;
             /** Bot Webhook Max Skew Seconds */
             bot_webhook_max_skew_seconds?: number | null;
+            /** Chat Max Tool Calls Total */
+            chat_max_tool_calls_total?: number | null;
             /** Disabled Chat Agents */
             disabled_chat_agents?: string[] | null;
             /** Disabled Chat Skills */
@@ -5037,6 +5077,12 @@ export interface components {
             fred_api_key?: string | null;
             /** Http Trust Env */
             http_trust_env?: boolean | null;
+            /** Industry Chain Repair Timeout Seconds */
+            industry_chain_repair_timeout_seconds?: number | null;
+            /** Industry Chain Repair Tool Calls Total */
+            industry_chain_repair_tool_calls_total?: number | null;
+            /** Industry Chain Tool Calls Total */
+            industry_chain_tool_calls_total?: number | null;
             /** Iwencai Api Key */
             iwencai_api_key?: string | null;
             /** Iwencai Base Url */
@@ -5053,6 +5099,8 @@ export interface components {
             llm_api_version?: string | null;
             /** Llm Base Url */
             llm_base_url?: string | null;
+            /** Llm Context Length Tokens */
+            llm_context_length_tokens?: number | null;
             /** Llm Model */
             llm_model?: string | null;
             /** Llm Provider */
@@ -7765,6 +7813,37 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /**
+         * LlmModelsRequest
+         * @description 按 Base URL + API Key 拉取 OpenAI 兼容 /models 列表的请求。
+         */
+        LlmModelsRequest: {
+            /**
+             * Api Key
+             * @default
+             */
+            api_key?: string;
+            /**
+             * Api Mode
+             * @default
+             */
+            api_mode?: string;
+            /**
+             * Api Version
+             * @default
+             */
+            api_version?: string;
+            /**
+             * Base Url
+             * @default
+             */
+            base_url?: string;
+        };
+        /** LlmModelsResponse */
+        LlmModelsResponse: {
+            /** Models */
+            models?: string[];
         };
         /** LoginAuditLogItem */
         LoginAuditLogItem: {
@@ -14257,6 +14336,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfigResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_llm_models_api_config_llm_models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmModelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmModelsResponse"];
                 };
             };
             /** @description 统一错误响应 */

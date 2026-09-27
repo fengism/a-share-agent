@@ -2723,6 +2723,14 @@
       "ConfigResponse": {
         "description": "Current effective configuration with secrets masked.",
         "properties": {
+          "agent_research_timeout_seconds": {
+            "title": "Agent Research Timeout Seconds",
+            "type": "number"
+          },
+          "analysis_llm_timeout_seconds": {
+            "title": "Analysis Llm Timeout Seconds",
+            "type": "number"
+          },
           "baidu_cookie": {
             "title": "Baidu Cookie",
             "type": "string"
@@ -2796,6 +2804,10 @@
           },
           "bot_webhook_max_skew_seconds": {
             "title": "Bot Webhook Max Skew Seconds",
+            "type": "integer"
+          },
+          "chat_max_tool_calls_total": {
+            "title": "Chat Max Tool Calls Total",
             "type": "integer"
           },
           "disabled_chat_agents": {
@@ -2900,6 +2912,18 @@
             "title": "Http Trust Env",
             "type": "boolean"
           },
+          "industry_chain_repair_timeout_seconds": {
+            "title": "Industry Chain Repair Timeout Seconds",
+            "type": "number"
+          },
+          "industry_chain_repair_tool_calls_total": {
+            "title": "Industry Chain Repair Tool Calls Total",
+            "type": "integer"
+          },
+          "industry_chain_tool_calls_total": {
+            "title": "Industry Chain Tool Calls Total",
+            "type": "integer"
+          },
           "is_admin": {
             "title": "Is Admin",
             "type": "boolean"
@@ -2940,6 +2964,10 @@
           "llm_base_url": {
             "title": "Llm Base Url",
             "type": "string"
+          },
+          "llm_context_length_tokens": {
+            "title": "Llm Context Length Tokens",
+            "type": "integer"
           },
           "llm_model": {
             "title": "Llm Model",
@@ -2994,6 +3022,7 @@
           "llm_base_url",
           "llm_model",
           "llm_temperature",
+          "llm_context_length_tokens",
           "feishu_enabled",
           "feishu_app_id",
           "feishu_app_secret",
@@ -3047,6 +3076,12 @@
           "bot_batch_concurrency",
           "bot_batch_max_stocks",
           "bot_admin_users",
+          "industry_chain_repair_timeout_seconds",
+          "industry_chain_tool_calls_total",
+          "industry_chain_repair_tool_calls_total",
+          "analysis_llm_timeout_seconds",
+          "agent_research_timeout_seconds",
+          "chat_max_tool_calls_total",
           "is_admin"
         ],
         "title": "ConfigResponse",
@@ -3055,6 +3090,30 @@
       "ConfigUpdateRequest": {
         "description": "Partial configuration update request.",
         "properties": {
+          "agent_research_timeout_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Research Timeout Seconds"
+          },
+          "analysis_llm_timeout_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Llm Timeout Seconds"
+          },
           "baidu_cookie": {
             "anyOf": [
               {
@@ -3280,6 +3339,19 @@
               }
             ],
             "title": "Bot Webhook Max Skew Seconds"
+          },
+          "chat_max_tool_calls_total": {
+            "anyOf": [
+              {
+                "maximum": 128.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Max Tool Calls Total"
           },
           "disabled_chat_agents": {
             "anyOf": [
@@ -3565,6 +3637,44 @@
             ],
             "title": "Http Trust Env"
           },
+          "industry_chain_repair_timeout_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Chain Repair Timeout Seconds"
+          },
+          "industry_chain_repair_tool_calls_total": {
+            "anyOf": [
+              {
+                "maximum": 48.0,
+                "minimum": 4.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Chain Repair Tool Calls Total"
+          },
+          "industry_chain_tool_calls_total": {
+            "anyOf": [
+              {
+                "maximum": 128.0,
+                "minimum": 8.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Chain Tool Calls Total"
+          },
           "iwencai_api_key": {
             "anyOf": [
               {
@@ -3657,6 +3767,18 @@
               }
             ],
             "title": "Llm Base Url"
+          },
+          "llm_context_length_tokens": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Context Length Tokens"
           },
           "llm_model": {
             "anyOf": [
@@ -9932,6 +10054,46 @@
           "status"
         ],
         "title": "LivenessResponse",
+        "type": "object"
+      },
+      "LlmModelsRequest": {
+        "description": "按 Base URL + API Key 拉取 OpenAI 兼容 /models 列表的请求。",
+        "properties": {
+          "api_key": {
+            "default": "",
+            "title": "Api Key",
+            "type": "string"
+          },
+          "api_mode": {
+            "default": "",
+            "title": "Api Mode",
+            "type": "string"
+          },
+          "api_version": {
+            "default": "",
+            "title": "Api Version",
+            "type": "string"
+          },
+          "base_url": {
+            "default": "",
+            "title": "Base Url",
+            "type": "string"
+          }
+        },
+        "title": "LlmModelsRequest",
+        "type": "object"
+      },
+      "LlmModelsResponse": {
+        "properties": {
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "title": "LlmModelsResponse",
         "type": "object"
       },
       "LoginAuditLogItem": {
@@ -23678,7 +23840,7 @@
   },
   "info": {
     "title": "A股智能分析系统",
-    "version": "0.1.0"
+    "version": "0.5.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -25541,6 +25703,53 @@
           }
         ],
         "summary": "Put Config",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/config/llm/models": {
+      "post": {
+        "description": "按 Base URL + API Key 拉取该端点支持的模型列表。",
+        "operationId": "list_llm_models_api_config_llm_models_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmModelsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmModelsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Llm Models",
         "tags": [
           "config"
         ]
