@@ -20,6 +20,7 @@ RUNNING="$DATA_DIR/update-request.running.json"
 STATUS_FILE="$DATA_DIR/update-status.json"
 POLL_SECONDS="${UPDATE_POLL_SECONDS:-15}"
 HEALTH_TIMEOUT="${UPDATE_HEALTH_TIMEOUT_SECONDS:-240}"
+PULL_TIMEOUT_SECONDS="${UPDATE_PULL_TIMEOUT_SECONDS:-900}"
 BACKEND_IMAGE="${UPDATE_BACKEND_IMAGE_REPOSITORY:-fengliu1989/a-share-backend}:main"
 FRONTEND_IMAGE="${UPDATE_FRONTEND_IMAGE_REPOSITORY:-fengliu1989/a-share-frontend}:main"
 
@@ -34,6 +35,21 @@ write_status() {
 }
 
 image_id() { docker image inspect "$1" --format '{{.Id}}' 2>/dev/null || true; }
+
+# 拉取单个镜像：失败自动重试（网络抖动一重试基本能过），并限制单次拉取时长，
+# 避免 Registry 连接挂死占住更新通道。
+pull_with_retry() {
+    _image="$1"
+    _attempt=1
+    while [ "$_attempt" -le 3 ]; do
+        if timeout "$PULL_TIMEOUT_SECONDS" docker pull "$_image"; then
+            return 0
+        fi
+        _attempt=$((_attempt + 1))
+        [ "$_attempt" -le 3 ] && sleep 15
+    done
+    return 1
+}
 
 wait_backend_healthy() {
     _deadline=$(( $(date +%s) + HEALTH_TIMEOUT ))
@@ -56,8 +72,15 @@ update_once() {
     _old_backend_id=$(image_id "$BACKEND_IMAGE")
     _old_frontend_id=$(image_id "$FRONTEND_IMAGE")
 
-    if ! docker pull "$BACKEND_IMAGE" || ! docker pull "$FRONTEND_IMAGE"; then
-        write_status "failed" "镜像拉取失败，服务未变更"
+    if ! pull_with_retry "$BACKEND_IMAGE" || ! pull_with_retry "$FRONTEND_IMAGE"; then
+        write_status "failed" "镜像拉取失败（已重试），服务未变更"
+        rm -f "$RUNNING"
+        return
+    fi
+
+    if [ "$_old_backend_id" = "$(image_id "$BACKEND_IMAGE")" ] \
+        && [ "$_old_frontend_id" = "$(image_id "$FRONTEND_IMAGE")" ]; then
+        write_status "succeeded" "镜像无变化，已是最新版本"
         rm -f "$RUNNING"
         return
     fi

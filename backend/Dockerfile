@@ -10,8 +10,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
+# --no-compile：不生成 .pyc 字节码，压缩镜像体积（容器内只读根文件系统本也无法回写）
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+    uv sync --frozen --no-dev --no-compile-bytecode --no-install-project
 
 FROM python:3.11-slim AS runtime
 
@@ -39,8 +40,9 @@ RUN groupadd --gid "${APP_GID}" app \
 COPY --chown=app:app --from=build /app/.venv /app/.venv
 
 # 所有浏览器调用显式使用完整版 Chromium 的新无头模式；不安装独立 headless shell。
+# ffmpeg 仅供视频录制使用，本项目未用到；删除须与安装同层才能真实减小镜像。
 RUN /app/.venv/bin/patchright install --with-deps --no-shell chromium \
-    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /ms-playwright/ffmpeg-* \
     && chown -R app:app /ms-playwright
 
 COPY --chown=app:app app/ app/
