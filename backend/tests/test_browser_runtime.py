@@ -44,8 +44,18 @@ def test_ensure_browser_library_paths_noop_without_candidates(monkeypatch):
 def test_build_browser_env_merges_process_env_custom_env_and_library_paths(monkeypatch):
     monkeypatch.setattr("app.infrastructure.browser_runtime._extra_library_dirs", lambda: ["/extra-libs"])
     monkeypatch.setenv("BACKEND_VAR", "x")
+    # 隔离运行环境自带的 LD_LIBRARY_PATH（如 CI 的 Python 工具链路径），保证断言确定性
+    monkeypatch.delenv("LD_LIBRARY_PATH", raising=False)
 
     env = _build_browser_env({"PROXY": "1"})
     assert env["BACKEND_VAR"] == "x"
     assert env["PROXY"] == "1"
     assert env["LD_LIBRARY_PATH"] == "/extra-libs"
+
+
+def test_build_browser_env_prepends_candidates_to_existing_library_path(monkeypatch):
+    monkeypatch.setattr("app.infrastructure.browser_runtime._extra_library_dirs", lambda: ["/extra-libs"])
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/opt/python/lib")
+
+    env = _build_browser_env()
+    assert env["LD_LIBRARY_PATH"] == "/extra-libs:/opt/python/lib"
