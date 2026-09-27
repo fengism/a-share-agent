@@ -42,7 +42,7 @@ export default function LlmConfigCard({
   const selectedDefaults = form.llm_provider ? providerDefaults[form.llm_provider] : undefined;
   const [fetchedModels, setFetchedModels] = useState<string[] | null>(null);
   const fetchModelsMutation = useFetchLlmModels();
-  const recommendedModels = PROVIDER_RECOMMENDED_MODELS[form.llm_provider] ?? [];
+  const recommendedModels: string[] = PROVIDER_RECOMMENDED_MODELS[form.llm_provider ?? ""] ?? [];
 
   const handleFetchModels = () => {
     fetchModelsMutation.mutate(
