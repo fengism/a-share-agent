@@ -76,7 +76,7 @@ export default function IndustryChain() {
     isFetchingNextPage: isLoadingMoreHistory,
     refetch: refetchHistory,
   } = useInfiniteIndustryChainHistory(debouncedHistoryFilter);
-  const history = historyPages?.pages.flat() ?? [];
+  const history = useMemo(() => historyPages?.pages.flat() ?? [], [historyPages]);
   const { data: atlasCatalog } = useIndustryChainAtlasCatalog();
   const hotIndustries = useMemo(() => {
     const iconByName = new Map(FALLBACK_HOT_INDUSTRIES.map((item) => [item.name, item.icon]));

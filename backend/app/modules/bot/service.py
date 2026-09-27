@@ -13,6 +13,7 @@ from app.infrastructure.persistence import account_store
 from app.modules.bot.commands import (
     AnalyzeCommand,
     BatchCommand,
+    ChainCommand,
     HelpCommand,
     MarketCommand,
     StatusCommand,
@@ -43,6 +44,7 @@ class BotService:
             TaskCommand(),
             AnalyzeCommand(),
             MarketCommand(),
+            ChainCommand(),
             BatchCommand(),
         ):
             self._dispatcher.register(command)
