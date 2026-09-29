@@ -3,11 +3,14 @@
 # 这里显式置空以覆盖注入；确需走代理时改用宿主机可达地址并加
 # extra_hosts: ["host.docker.internal:host-gateway"]。
 x-direct-network-env: &direct-network-env
+  TZ: "${TZ:-Asia/Shanghai}"
   HTTP_PROXY: ""
   HTTPS_PROXY: ""
   http_proxy: ""
   https_proxy: ""
 
+# 不设置 platform: linux/amd64；多架构镜像由 Docker 按宿主机选择。
+# ARM64/aarch64 与 x86_64/amd64 都运行原生 Chromium，避免 PDF 导出经过 QEMU。
 services:
   backend:
     image: ${BACKEND_IMAGE:-fengliu1989/a-share-backend:main}

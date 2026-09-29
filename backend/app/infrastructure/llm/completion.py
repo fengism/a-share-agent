@@ -190,11 +190,16 @@ async def stream_chat_completion(
     *,
     metric_stage: str = "agentic.stream@v1",
     max_completion_tokens: int | None = None,
+    request_timeout: float | None = None,
     **kwargs,
 ) -> AsyncGenerator[Any, None]:
     """Hold one LLM slot for the stream and retry transient failures before the first chunk."""
     settings = call_settings()
     request_kwargs = _prepare_request(client, kwargs, settings=settings, max_completion_tokens=max_completion_tokens)
+    if request_timeout is not None:
+        # Internal budget name must never reach provider SDKs. OpenAI/LiteLLM
+        # both support the public per-request ``timeout`` option.
+        request_kwargs["timeout"] = max(float(request_timeout), float(settings.llm_timeout_seconds))
     started_at = time.perf_counter()
     usage = None
     ttft_ms = None

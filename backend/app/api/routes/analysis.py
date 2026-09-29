@@ -13,6 +13,7 @@ from app.api.auth.dependencies import require_active_user
 from app.api.errors import NotFoundError
 from app.api.routes import analysis_execution
 from app.api.schemas import DeleteResponse
+from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 from app.core.market import market_today
 from app.domain.identity import AuthenticatedUser
 from app.domain.market import KlineData
@@ -20,6 +21,7 @@ from app.financial_data.stock.profile.basic_info import get_basic_info
 from app.financial_data.stock.quotes.chip_distribution import calculate_chip_distribution
 from app.financial_data.stock.quotes.chip_schemas import ChipDistribution
 from app.financial_data.stock.quotes.kline import get_kline
+from app.modules.analysis.persistence import repository as analysis_repository
 from app.modules.analysis.public import (
     AnalysisHistoryItem,
     AnalysisResult,
@@ -253,6 +255,35 @@ async def delete_analysis_history(
     if not deleted:
         raise NotFoundError("分析记录不存在", code="analysis.history_not_found")
     return DeleteResponse()
+
+
+@router.get("/{code}/versions/{date}")
+async def get_analysis_versions(
+    code: str, date: str,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    user: AuthenticatedUser = Depends(require_active_user),
+) -> list[dict]:
+    try:
+        return await call_blocking(analysis_repository.list_analysis_versions, code, date, user["id"],
+                                  limit=limit, offset=offset, semaphore=misc_semaphore)
+    except ValueError as error:
+        raise NotFoundError("无效的报告版本路径", code="analysis.version_not_found") from error
+
+
+@router.get("/{code}/versions/{date}/{report_id}", response_model=AnalysisResult)
+async def get_analysis_version(
+    code: str, date: str, report_id: str,
+    user: AuthenticatedUser = Depends(require_active_user),
+) -> AnalysisResult:
+    try:
+        result = await call_blocking(analysis_repository.load_analysis_version, code, date, report_id, user["id"],
+                                    semaphore=misc_semaphore)
+    except ValueError as error:
+        raise NotFoundError("无效的报告版本路径", code="analysis.version_not_found") from error
+    if result is None:
+        raise NotFoundError("报告版本不存在", code="analysis.version_not_found")
+    return result
 
 
 # 注意：analysis_execution 包含动态通配路由 POST /{code}，必须放在静态路由之后加载！

@@ -7,11 +7,9 @@ from datetime import date as calendar_date
 from datetime import datetime
 from typing import Any
 
-from playwright.async_api import async_playwright
-
 from app.domain.market import KlineData, KlineItem
 from app.financial_data.stock.quotes.chip_schemas import ChipDistribution
-from app.infrastructure.browser_runtime import launch_full_chromium
+from app.infrastructure.pdf_runtime import render_pdf
 from app.modules.analysis.models import AnalysisResult
 
 logger = logging.getLogger(__name__)
@@ -1048,6 +1046,17 @@ def generate_research_report_html(
         else ""
     )
 
+    provenance = getattr(result, "provenance", None)
+    freshness_note = provenance.freshness_note if provenance else "旧报告未记录数据时效与缓存来源；分析日期不代表数据截至日期。"
+    freshness_rows = "".join(
+        f"<tr><td>{_esc(item.tool_name)}</td><td>{_esc('；'.join(item.data_dates) or '未披露')}</td>"
+        f"<td>{_esc('；'.join(item.report_periods) or '未披露')}</td><td>{_esc(item.cache_status)}</td><td>{_esc('；'.join(item.sources) or '未披露')}</td></tr>"
+        for item in (provenance.evidence if provenance else [])
+    )
+    freshness_html = f"""<div class="section-card"><h3>数据时效与报告版本</h3>
+        <p>报告版本：{_esc(getattr(result, 'report_id', None) or '旧报告未记录')}<br>
+        生成时间：{_esc(getattr(result, 'generated_at', None) or '未记录')}</p>
+        <p>{_esc(freshness_note)}</p><table><tr><th>证据工具</th><th>数据/来源日期</th><th>报告期</th><th>缓存状态</th><th>来源</th></tr>{freshness_rows}</table></div>"""
     overall_summary_text = getattr(result, "overall_summary", "") or getattr(result, "summary", "")
     visual_analysis_html = _render_visual_analysis(result, kline_data, chip_distribution)
 
@@ -1300,6 +1309,8 @@ def generate_research_report_html(
         </div>
     </div>
 
+    {freshness_html}
+
     <!-- 综合投资决策与核心观点总述 -->
     <div class="section-card" style="background:#f0fdfa; border-color:#99f6e4;">
         <div class="section-header" style="border-bottom-color:#99f6e4;">
@@ -1490,23 +1501,9 @@ def generate_research_report_html(
 
 
 async def render_pdf_bytes_from_html(html_content: str) -> bytes:
-    """使用 Playwright 启动无头 Chromium 并将 HTML 渲染为纯矢量 PDF 二进制。"""
-    async with async_playwright() as p:
-        browser = await launch_full_chromium(
-            p.chromium,
-            args=["--no-sandbox", "--disable-setuid-sandbox"],
-        )
-        try:
-            page = await browser.new_page()
-            await page.set_content(html_content, wait_until="networkidle")
-            pdf_bytes = await page.pdf(
-                format="A4",
-                print_background=True,
-                display_header_footer=True,
-                header_template='<div style="font-size:8px; width:100%; text-align:right; color:#94a3b8; padding-right:14mm; font-family:sans-serif;">A股智能投研体系 · 深度个股研究报告</div>',
-                footer_template='<div style="font-size:8px; width:100%; display:flex; justify-content:space-between; color:#94a3b8; padding:0 14mm; font-family:sans-serif;"><span>内部研究参考 · 不构成投资建议</span><span>第 <span class="pageNumber"></span> 页 / 共 <span class="totalPages"></span> 页</span></div>',
-                margin={"top": "16mm", "bottom": "18mm", "left": "14mm", "right": "14mm"},
-            )
-            return pdf_bytes
-        finally:
-            await browser.close()
+    """通过共享的有界 Chromium 队列渲染报告，保留既有页眉页脚和 A4 布局。"""
+    return await render_pdf(
+        html_content,
+        header_template='<div style="font-size:8px; width:100%; text-align:right; color:#94a3b8; padding-right:14mm; font-family:sans-serif;">A股智能投研体系 · 深度个股研究报告</div>',
+        footer_template='<div style="font-size:8px; width:100%; display:flex; justify-content:space-between; color:#94a3b8; padding:0 14mm; font-family:sans-serif;"><span>内部研究参考 · 不构成投资建议</span><span>第 <span class="pageNumber"></span> 页 / 共 <span class="totalPages"></span> 页</span></div>',
+    )

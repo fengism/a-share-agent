@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
+# 构建平台由原生 CI runner / Docker 自动选择；不要固定 amd64 或复制跨架构虚拟环境。
 FROM python:3.11-slim AS build
 
 COPY --from=ghcr.io/astral-sh/uv:0.9.1 /uv /uvx /bin/
@@ -50,7 +51,7 @@ COPY --chown=app:app app/ app/
 COPY --chown=app:app seeds/ seeds/
 COPY --chown=app:app scripts/ scripts/
 
-RUN mkdir -p data logs && chown -R app:app data logs
+RUN mkdir -p data/home logs && chown -R app:app data logs
 
 USER app
 

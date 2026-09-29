@@ -19,7 +19,7 @@ def safe_name(name: str) -> str:
 def archive_id(timestamp: str | None = None) -> str:
     if timestamp:
         return timestamp
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
 
 def legacy_archive_path(

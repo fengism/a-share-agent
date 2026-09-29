@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from app.api.auth.dependencies import require_active_user
 from app.api.errors import BadRequestError, NotFoundError, ServiceUnavailableError
 from app.api.schemas import DeleteResponse
+from app.core.exceptions import UpstreamUnavailableError
 from app.domain.identity import AuthenticatedUser
 from app.modules.daily_review.public import (
     DailyReviewHistoryItem,
@@ -64,6 +65,8 @@ async def export_daily_review_pdf(
     html_content = generate_daily_review_pdf_html(review)
     try:
         pdf_bytes = await render_daily_review_pdf_bytes(html_content)
+    except UpstreamUnavailableError:
+        raise
     except Exception as exc:
         logger.exception("导出复盘 PDF 失败: date=%s", date)
         raise ServiceUnavailableError(

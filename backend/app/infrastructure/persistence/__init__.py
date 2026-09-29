@@ -2,8 +2,10 @@
 
 import logging
 
-from app.infrastructure.persistence.connection import database_path, get_connection
+from app.infrastructure.persistence.concept_stats import rebuild_concept_counts
+from app.infrastructure.persistence.connection import database_path, get_connection, unit_of_work
 from app.infrastructure.persistence.ddl import INDUSTRY_TABLES, MARKET_TABLES, USER_TABLES
+from app.infrastructure.persistence.master_data_repair import backfill_industry_stock_names
 from app.infrastructure.persistence.migrations import (
     INDUSTRY_MIGRATIONS,
     MARKET_MIGRATIONS,
@@ -38,7 +40,13 @@ def init_db() -> None:
         industry_conn.execute(ddl)
     industry_conn.commit()
     apply_migrations(industry_conn, INDUSTRY_MIGRATIONS)
-    seed_industry_database(industry_conn)
+    seeded = seed_industry_database(industry_conn)
+    if "stock_concept_mappings" not in seeded:
+        with unit_of_work(connection=industry_conn, immediate=True):
+            rebuild_concept_counts(industry_conn)
+    repaired_names = backfill_industry_stock_names(industry_conn)
+    if repaired_names:
+        logger.info("行业股票名称补齐: %s 条", repaired_names)
     logger.info(
         "数据库表初始化完成: market=%s user=%s industry=%s",
         database_path("market"),

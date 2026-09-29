@@ -15,7 +15,9 @@ from app.api.errors import (
     NotFoundError,
 )
 from app.domain.identity import AuthenticatedUser
+from app.modules.master_data_revision import MasterDataConflictError
 from app.modules.stock_concept.importer import ConceptImportError
+from app.modules.stock_concept.models import StockConceptUpdateRequest
 from app.modules.stock_concept.public import (
     ConceptImportCommitRequest,
     ConceptImportCommitResponse,
@@ -109,14 +111,16 @@ def create_record(
 )
 def update_record(
     record_id: int,
-    request: StockConceptRecordInput,
+    request: StockConceptUpdateRequest,
     _: AuthenticatedUser = Depends(require_admin),
 ):
     current = get_record_by_id(record_id)
     if current is None:
         raise NotFoundError("要修改的概念记录不存在", code="stock_concept.record_not_found")
     try:
-        success = update_manual(record_id, request)
+        success = update_manual(record_id, request, expected_revision=request.expected_revision)
+    except MasterDataConflictError as exc:
+        raise ConflictError(str(exc), code="master_data.edit_conflict") from exc
     except sqlite3.IntegrityError as exc:
         raise ConflictError(
             f"股票代码 {request.stock_code} 已存在",

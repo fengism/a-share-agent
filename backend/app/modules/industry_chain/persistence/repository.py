@@ -7,6 +7,7 @@ from app.infrastructure.persistence.ddl import (
     INDUSTRY_CHAIN_HISTORY_TABLE,
 )
 from app.infrastructure.persistence.history_index import HistoryIndexCoordinator
+from app.infrastructure.persistence.json_storage import atomic_write_text, durable_unlink
 from app.modules.industry_chain.models import IndustryChainResult
 from app.modules.industry_chain.persistence import archive as archive_store
 from app.modules.industry_chain.persistence import history_index as history_store
@@ -93,30 +94,35 @@ def save_industry_chain(
     user_id: int,
     archive_id: str | None = None,
 ) -> str:
-    """将产业链分析结果以 JSON 格式原子写入当前用户存档。"""
+    """原子保存产业链文件与历史索引；索引失败时回滚文件。"""
     resolved_archive_id = _archive_id(archive_id)
+    path = archive_store.user_archive_path(_DATA_DIR, name, resolved_archive_id, user_id, _safe_name)
+    previous_content = path.read_text(encoding="utf-8") if path.exists() else None
+    previous_archive_id, previous_archive_status = result.archive_id, result.archive_status
     result.archive_id = resolved_archive_id
     result.archive_status = "saved"
-    with _HISTORY_INDEX.mutation() as mutation:
-        path, payload = archive_store.save_archive(
-            _DATA_DIR,
-            name,
-            result,
-            user_id,
-            resolved_archive_id,
-            _safe_name,
-        )
-        try:
-            _upsert_history_item(
-                user_id,
-                _safe_name(name),
-                path,
-                _history_item_from_payload(payload, path.parent, resolved_archive_id),
+    try:
+        with _HISTORY_INDEX.mutation() as mutation:
+            path, payload = archive_store.save_archive(
+                _DATA_DIR, name, result, user_id, resolved_archive_id, _safe_name,
             )
-        except Exception:
-            logger.warning("写入产业链历史索引失败: %s", path, exc_info=True)
-        else:
+            try:
+                _upsert_history_item(
+                    user_id, _safe_name(name), path,
+                    _history_item_from_payload(payload, path.parent, resolved_archive_id),
+                )
+            except Exception:
+                if previous_content is None:
+                    durable_unlink(path)
+                else:
+                    atomic_write_text(path, previous_content)
+                logger.warning("写入产业链历史索引失败，已回滚存档文件: %s", path, exc_info=True)
+                raise
             mutation.complete()
+    except Exception:
+        result.archive_id = previous_archive_id
+        result.archive_status = previous_archive_status
+        raise
     return resolved_archive_id
 
 
@@ -146,14 +152,16 @@ def delete_industry_chain(
         if not path.is_file():
             return False
 
+    previous_content = path.read_text(encoding="utf-8")
     with _HISTORY_INDEX.mutation() as mutation:
-        path.unlink()
+        durable_unlink(path)
         try:
             history_store.delete_history_item(_HISTORY_INDEX, scope_user_id, safe_name, archive_id)
         except Exception:
-            logger.warning("删除产业链历史索引失败: %s", path, exc_info=True)
-        else:
-            mutation.complete()
+            atomic_write_text(path, previous_content)
+            logger.warning("删除产业链历史索引失败，已恢复存档文件: %s", path, exc_info=True)
+            raise
+        mutation.complete()
     logger.info("产业链存档已删除: user_id=%s, scope_user_id=%s, path=%s", user_id, scope_user_id, path)
     return True
 

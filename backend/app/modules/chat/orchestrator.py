@@ -25,6 +25,7 @@ from app.agentic.orchestration.reviewer import (
 from app.agentic.orchestration.synthesis import stream_synthesis
 from app.agentic.protocol import AgentMessage
 from app.agentic.runtime.context import AgentExecutionContext
+from app.agentic.runtime.evidence import build_evidence_gap_report, evidence_gap_reason
 from app.agentic.tools.packs.stock.context import resolve_stock_context
 from app.configuration import get_effective_settings
 from app.core.metrics import metrics
@@ -213,14 +214,19 @@ class Orchestrator:
             if is_usable_task_result(task, results.get(task.agent_name))
         }
         if not usable_results:
-            yield AgentEvent(type="error", error=_summarize_failure_reasons(results))
+            yield AgentEvent(type="text", content=build_evidence_gap_report(
+                results.get(task.agent_name) or AgentExecutionResult(
+                    agent_name=task.agent_name, display_name=task.display_name, analysis="", status="failed",
+                ) for task in plan.tasks
+            ))
             yield AgentEvent(type="done", status="failed")
             return
 
         coverage_review = review_execution_plan(plan, results)
         task_names = {task.task_id: task.display_name for task in plan.tasks}
+        task_results = {task.task_id: results.get(task.agent_name) for task in plan.tasks}
         coverage_warnings = [
-            f"{task_names[issue.task_id]}未完整完成：{issue.reason}"
+            f"{task_names[issue.task_id]}未完整完成：{evidence_gap_reason(result) if (result := task_results.get(issue.task_id)) is not None else issue.reason}"
             for issue in coverage_review.issues
         ]
         if coverage_warnings:
@@ -234,7 +240,7 @@ class Orchestrator:
             yield AgentEvent(type="text", content=result.analysis)
             yield AgentEvent(
                 type="done",
-                status="partial" if coverage_warnings or result.warnings else result.status,
+                status="partial" if coverage_warnings or result.warnings else result.outcome.status,
                 warnings=list(dict.fromkeys(coverage_warnings + result.warnings)),
             )
             return
@@ -363,6 +369,11 @@ class Orchestrator:
 
         review = review_execution_plan(plan, results)
         if not review.should_retry:
+            return
+        if self.execution_context is not None and (
+            self.execution_context.deadline_exceeded() or self.execution_context.tool_calls_available() <= 0
+        ):
+            yield AgentEvent(type="status", content="剩余分析时间或工具预算不足，不再重跑任务；保留已有结果并说明缺口。")
             return
 
         logger.warning(

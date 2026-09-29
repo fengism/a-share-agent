@@ -14,8 +14,8 @@ from app.infrastructure.integrations.feishu.errors import FeishuConfigError
 from app.infrastructure.integrations.notion.adapter import to_notion_blocks
 from app.infrastructure.integrations.notion.client import notion_client
 from app.infrastructure.integrations.notion.errors import NotionConfigError
-from app.modules.analysis.public import AnalysisResult, get_analysis_by_date, get_latest_analysis
-from app.modules.daily_review.public import DailyReviewResult, load_daily_review
+from app.modules.analysis.public import get_analysis_by_date, get_latest_analysis
+from app.modules.daily_review.public import load_daily_review
 from app.modules.industry_chain.public import load_industry_chain
 from app.modules.push.content import build_content
 from app.modules.push.schemas import PushRequest, PushResponse
@@ -33,6 +33,7 @@ class ResolvedPushContent:
     receiver: str = ""
     # (图表标题, PNG 字节) 列表，仅飞书推送装配；上传失败时逐张降级跳过
     chart_pngs: tuple[tuple[str, bytes], ...] = ()
+    chart_request: dict | None = None
 
 
 class PushIntegrationNotConfiguredError(RuntimeError):
@@ -73,16 +74,12 @@ def _resolve_content(
         data = load_daily_review(request.date, user_id)
         if data is None:
             raise ResourceNotFoundError("暂无复盘记录，请先生成")
-        chart_pngs = (
-            _render_review_chart_pngs(data)
-            if request.target == "feishu"
-            else ()
-        )
+        chart_request = {"kind": "daily_review", "data": data.data_snapshot.model_dump(mode="json")} if request.target == "feishu" else None
         return ResolvedPushContent(
             title=f"每日复盘 - {data.date}",
             content=build_content("daily_review", data),
             receiver=receiver,
-            chart_pngs=chart_pngs,
+            chart_request=chart_request,
         )
 
     if request.type == "analysis":
@@ -94,16 +91,15 @@ def _resolve_content(
         )
         if data is None:
             raise ResourceNotFoundError("暂无分析结果，请先生成")
-        chart_pngs = (
-            _render_analysis_chart_pngs(data, analysis_kline)
-            if request.target == "feishu"
-            else ()
-        )
+        chart_request = {
+            "kind": "analysis", "data": data.model_dump(mode="json"),
+            "kline": analysis_kline.model_dump(mode="json") if analysis_kline is not None else None,
+        } if request.target == "feishu" else None
         return ResolvedPushContent(
             title=f"个股研究 - {data.stock_code} - {data.stock_name} - {data.analysis_date}",
             content=build_content("analysis", data),
             receiver=receiver,
-            chart_pngs=chart_pngs,
+            chart_request=chart_request,
         )
 
     if request.type == "industry_chain":
@@ -112,63 +108,15 @@ def _resolve_content(
         data = load_industry_chain(request.industry_name, request.archive_id, user_id)
         if data is None:
             raise LookupError("暂无产业链存档，请先生成")
-        chart_pngs = (
-            _render_industry_chain_chart_pngs(data)
-            if request.target == "feishu"
-            else ()
-        )
+        chart_request = {"kind": "industry_chain", "data": data.model_dump(mode="json")} if request.target == "feishu" else None
         return ResolvedPushContent(
             title=f"产业链分析 - {request.industry_name} - {request.archive_id}",
             content=build_content("industry_chain", data),
             receiver=receiver,
-            chart_pngs=chart_pngs,
+            chart_request=chart_request,
         )
 
     raise ValueError(f"unsupported push type: {request.type}")
-
-
-def _render_industry_chain_chart_pngs(result) -> tuple[tuple[str, bytes], ...]:
-    """将产业链 ECharts 图表渲染为 PNG；渲染失败不阻断推送，降级为纯文本卡片。"""
-    try:
-        from app.modules.industry_chain.chart_images import render_industry_chain_chart_pngs
-
-        return tuple(render_industry_chain_chart_pngs(result))
-    except Exception:
-        logger.warning(
-            "产业链图表 PNG 渲染失败，推送将不包含图表: name=%s",
-            getattr(result, "name", ""),
-            exc_info=True,
-        )
-        return ()
-
-
-def _render_analysis_chart_pngs(
-    result: AnalysisResult,
-    kline_data=None,
-) -> tuple[tuple[str, bytes], ...]:
-    """将个股研究图表卡片渲染为 PNG；渲染失败不阻断推送，降级为纯文本卡片。"""
-    try:
-        from app.modules.analysis.chart_images import render_analysis_chart_pngs
-
-        return tuple(render_analysis_chart_pngs(result, kline_data))
-    except Exception:
-        logger.warning(
-            "个股研究图表 PNG 渲染失败，推送将不包含图表: code=%s",
-            result.stock_code,
-            exc_info=True,
-        )
-        return ()
-
-
-def _render_review_chart_pngs(review: DailyReviewResult) -> tuple[tuple[str, bytes], ...]:
-    """将复盘快照图表渲染为 PNG；渲染失败不阻断推送，降级为纯文本卡片。"""
-    try:
-        from app.modules.daily_review.chart_images import render_daily_review_chart_pngs
-
-        return tuple(render_daily_review_chart_pngs(review.data_snapshot))
-    except Exception:
-        logger.warning("复盘图表 PNG 渲染失败，推送将不包含图表: date=%s", review.date, exc_info=True)
-        return ()
 
 
 def _attach_chart_images(content: list[ContentBlock], chart_pngs: tuple[tuple[str, bytes], ...]) -> list[ContentBlock]:
@@ -280,15 +228,13 @@ def _push_to_feishu(request: PushRequest, resolved: ResolvedPushContent) -> Push
 
 def execute_push(
     request: PushRequest,
-    user_id: int,
-    analysis_kline=None,
+    resolved: ResolvedPushContent,
 ) -> PushResponse:
     """执行推送请求，返回统一响应模型。
 
-    analysis_kline 由异步层在主事件循环预取（个股研究图表用），可为 None。
+    内容解析和受限图表渲染由异步应用层完成，此处只负责发送。
     """
     try:
-        resolved = _resolve_content(request, user_id, analysis_kline=analysis_kline)
         if request.target == "notion":
             return _push_to_notion(resolved)
         if request.target == "feishu":

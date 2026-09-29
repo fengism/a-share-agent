@@ -7,6 +7,11 @@ from app.configuration.crypto_contracts import GLOBAL_CONFIG_SCOPE_ID
 from app.infrastructure.persistence.connection import get_connection
 
 logger = logging.getLogger(__name__)
+_LEGACY_REPAIR_TIMEOUT_KEY = "industry_chain_repair_timeout_seconds"
+_REPAIR_TIMEOUT_KEYS = (
+    "industry_chain_repair_research_timeout_seconds",
+    "industry_chain_repair_synthesis_timeout_seconds",
+)
 
 def _connection():
     return get_connection("user")
@@ -49,6 +54,12 @@ def get_global_config() -> dict:
             continue
         result[key] = value
         secrets_to_encrypt[key] = value
+
+    legacy_timeout = next((row["value"] for row in rows if row["key"] == _LEGACY_REPAIR_TIMEOUT_KEY), None)
+    if legacy_timeout is not None:
+        legacy_value = _deserialize_value(legacy_timeout)
+        for key in _REPAIR_TIMEOUT_KEYS:
+            result.setdefault(key, legacy_value)
 
     if secrets_to_encrypt:
         if config_crypto.encryption_available():

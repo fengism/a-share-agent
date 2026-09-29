@@ -24,6 +24,7 @@ from app.infrastructure.persistence.workflow_jobs import (
     workflow_job_store,
 )
 from app.modules.analysis.public import run_analysis
+from app.modules.analysis.result_service import AnalysisArchiveError
 from app.modules.daily_review.public import DailyReviewRequest, generate_daily_review
 from app.modules.industry_chain.public import IndustryChainResearchScope, run_industry_chain_analysis
 from app.modules.screener.public import ScreenerStrategyRequest, screen_candidates_by_strategy
@@ -139,6 +140,7 @@ async def process_next_workflow_job(
                 scope=scope,
                 force=bool(job.request.get("force", False)),
                 progress_callback=emit,
+                before_persist=ensure_job_owned,
             )
         elif job.kind == "screener_strategy":
             result = await screen_candidates_by_strategy(ScreenerStrategyRequest.model_validate(job.request), emit)
@@ -230,7 +232,7 @@ async def process_next_workflow_job(
             metrics.record_workflow_event(job.kind, "released")
         raise
     except Exception as error:
-        allow_retry = not is_llm_failure(error)
+        allow_retry = not is_llm_failure(error) and not isinstance(error, AnalysisArchiveError)
         terminal_event = (
             "error",
             _terminal_error_payload(job, deferred_error),

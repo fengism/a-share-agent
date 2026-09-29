@@ -77,7 +77,11 @@ PERSISTED_GLOBAL_KEYS = frozenset(
         "bot_webhook_max_skew_seconds",
         "bot_event_dedup_ttl_seconds",
         "bot_job_poll_seconds",
-        "industry_chain_repair_timeout_seconds",
+        "industry_chain_research_timeout_seconds",
+        "industry_chain_repair_research_timeout_seconds",
+        "industry_chain_repair_synthesis_timeout_seconds",
+        "industry_chain_max_rounds",
+        "industry_chain_repair_max_rounds",
         "industry_chain_tool_calls_total",
         "industry_chain_repair_tool_calls_total",
         "analysis_llm_timeout_seconds",
@@ -147,17 +151,23 @@ class Settings(BaseSettings):
     llm_json_mode_enabled: bool = True
     llm_compatibility_overrides: list[LLMCompatibilityOverride] = Field(default_factory=list, repr=False)
     agent_research_timeout_seconds: float = Field(default=1200.0, gt=0)
-    # Deployment-only research budgets, independent from interactive chat.
-    industry_chain_tool_calls_total: int = Field(default=72, ge=8, le=128)
-    industry_chain_repair_tool_calls_total: int = Field(default=36, ge=4, le=48)
-    # 产业链定向补证+修订的整体时限；超时按设计保留初稿并标记 degraded。
-    # 环节密度提升后补证目标更多，默认给足 10 分钟，可在管理页继续调大。
-    industry_chain_repair_timeout_seconds: float = Field(default=600.0, gt=0)
+    # 产业链调研预算独立于交互式 Chat/通用 Agent；有进展时允许更多轮次，无进展仍提前停止。
+    industry_chain_tool_calls_total: int = Field(default=96, ge=8, le=128)
+    industry_chain_repair_tool_calls_total: int = Field(default=48, ge=4, le=64)
+    industry_chain_max_rounds: int = Field(default=6, ge=2, le=10)
+    industry_chain_repair_max_rounds: int = Field(default=3, ge=1, le=6)
+    industry_chain_research_timeout_seconds: float = Field(default=1800.0, gt=0)
+    # 产业链定向补证分为独立的取证与报告重写时限；任一阶段超时都保留初稿并标记 degraded。
+    industry_chain_repair_research_timeout_seconds: float = Field(default=900.0, gt=0)
+    industry_chain_repair_synthesis_timeout_seconds: float = Field(default=600.0, gt=0)
     # Long report generation: one deadline shared by streaming and schema repair.
     analysis_llm_timeout_seconds: float = Field(default=1200.0, gt=0)
     analysis_llm_max_completion_tokens: int = Field(default=32768, ge=1)
 
     # Deployment-only; deliberately absent from private/persisted editable keys.
+    pdf_max_concurrency: int = Field(default=1, ge=1, le=4)
+    pdf_max_waiters: int = Field(default=4, ge=0, le=32)
+    pdf_render_timeout_seconds: float = Field(default=120.0, gt=0, le=240.0)
     python_sandbox_url: str = ""
     python_sandbox_token: str = Field(default="", repr=False)
 
@@ -187,7 +197,8 @@ class Settings(BaseSettings):
     chat_total_timeout_seconds: int = 300
     chat_heartbeat_seconds: int = 15
     chat_tool_timeout_seconds: int = 45
-    chat_max_tool_calls_per_round: int = Field(default=8, ge=1, le=32)
+    # Maximum new calls in an execution batch, not a hard cap on one model turn.
+    chat_max_tool_calls_per_round: int = Field(default=16, ge=1, le=32)
     chat_max_tool_calls_total: int = Field(default=32, ge=1, le=128)
     chat_max_tool_context_characters: int = Field(default=60_000, ge=4_096, le=500_000)
     chat_max_synthesis_characters: int = Field(default=60_000, ge=4_096, le=500_000)

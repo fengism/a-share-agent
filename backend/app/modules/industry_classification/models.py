@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.modules.code_normalization import normalize_stock_identity
 
 MarketGroup = Literal["A", "HK", "OVERSEAS"]
 
@@ -37,14 +39,24 @@ class IndustryRecordInput(BaseModel):
 
     @model_validator(mode="after")
     def normalize_identity(self) -> "IndustryRecordInput":
-        self.exchange_suffix = self.exchange_suffix.upper()
-        self.stock_code = self.stock_code.upper()
-        if "." not in self.stock_code and self.market_group in {"A", "HK"}:
-            self.stock_code = f"{self.stock_code}.{self.exchange_suffix}"
+        code, exchange, market = normalize_stock_identity(
+            self.stock_code,
+            self.exchange_suffix if "exchange_suffix" in self.model_fields_set else "",
+            self.market_group if "market_group" in self.model_fields_set else "",
+        )
+        self.stock_code = code
+        self.exchange_suffix = exchange
+        self.market_group = cast(MarketGroup, market)
+
         return self
 
 
+class IndustryUpdateRequest(IndustryRecordInput):
+    expected_revision: str = Field(min_length=64, max_length=64)
+
+
 class IndustryRecord(IndustryRecordInput):
+    revision: str
     id: int
     source: str
     is_manual_override: bool

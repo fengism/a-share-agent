@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections import Counter
 from collections.abc import Iterable
 from typing import Any
 
+from app.infrastructure.persistence.concept_stats import apply_concept_deltas, concept_delta, rebuild_concept_counts
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
+from app.modules.master_data_revision import check_revision, record_revision
 from app.modules.stock_concept.models import StockConceptRecordInput
+
+
+class ImportBatchStateChangedError(RuntimeError):
+    pass
 
 
 def _connection() -> sqlite3.Connection:
@@ -15,6 +22,7 @@ def _connection() -> sqlite3.Connection:
 
 def _record(row: sqlite3.Row) -> dict[str, Any]:
     result = dict(row)
+    result["revision"] = record_revision(result)
     result["is_manual_override"] = bool(result["is_manual_override"])
     raw_concepts = result.get("concepts_json")
     if isinstance(raw_concepts, str):
@@ -48,9 +56,11 @@ def list_records(
         where.append("market_group = ?")
         params.append(market_group)
     if concept:
-        # SQLite JSON search: concepts_json contains the concept string
-        where.append("concepts_json LIKE ?")
-        params.append(f'%"{concept.strip()}"%')
+        where.append("""EXISTS (
+            SELECT 1 FROM json_each(CASE WHEN json_valid(concepts_json) THEN concepts_json ELSE '[]' END)
+            WHERE type='text' AND value = ?
+        )""")
+        params.append(concept.strip())
 
     clause = f" WHERE {' AND '.join(where)}" if where else ""
     connection = _connection()
@@ -125,12 +135,17 @@ def create_manual(record: StockConceptRecordInput) -> int:
             _manual_values(record),
         )
         record_id = int(cursor.lastrowid)
-        rebuild_stock_concepts(work.connection)
+        apply_concept_deltas(work.connection, concept_delta([], record.concepts))
         return record_id
 
 
-def update_manual(record_id: int, record: StockConceptRecordInput) -> bool:
+def update_manual(record_id: int, record: StockConceptRecordInput, *, expected_revision: str | None = None) -> bool:
     with unit_of_work(connection=_connection(), immediate=True) as work:
+        current = work.connection.execute("SELECT * FROM stock_concept_mappings WHERE id=?", (record_id,)).fetchone()
+        if expected_revision is not None:
+            check_revision(current, expected_revision)
+        if current is None:
+            return False
         cursor = work.connection.execute(
             """
             UPDATE stock_concept_mappings SET
@@ -143,19 +158,20 @@ def update_manual(record_id: int, record: StockConceptRecordInput) -> bool:
         )
         success = cursor.rowcount > 0
         if success:
-            rebuild_stock_concepts(work.connection)
+            apply_concept_deltas(work.connection, concept_delta(current["concepts_json"], record.concepts))
         return success
 
 
 def delete_record(record_id: int) -> bool:
     with unit_of_work(connection=_connection(), immediate=True) as work:
-        cursor = work.connection.execute(
-            "DELETE FROM stock_concept_mappings WHERE id = ?", (record_id,)
-        )
-        success = cursor.rowcount > 0
-        if success:
-            rebuild_stock_concepts(work.connection)
-        return success
+        current = work.connection.execute(
+            "SELECT concepts_json FROM stock_concept_mappings WHERE id=?", (record_id,)
+        ).fetchone()
+        if current is None:
+            return False
+        work.connection.execute("DELETE FROM stock_concept_mappings WHERE id=?", (record_id,))
+        apply_concept_deltas(work.connection, concept_delta(current["concepts_json"], []))
+        return True
 
 
 def get_all_concepts(query: str = "", limit: int = 500) -> list[dict[str, Any]]:
@@ -249,31 +265,8 @@ def get_concepts_for_codes(codes: Iterable[str]) -> dict[str, list[str]]:
 
 
 def rebuild_stock_concepts(connection: sqlite3.Connection) -> None:
-    rows = connection.execute("SELECT concepts_json FROM stock_concept_mappings").fetchall()
-    concept_counts: dict[str, int] = {}
-    for row in rows:
-        raw = row[0]
-        if not raw:
-            continue
-        try:
-            items = json.loads(raw)
-            if isinstance(items, list):
-                for item in set(items):
-                    s = str(item).strip()
-                    if s:
-                        concept_counts[s] = concept_counts.get(s, 0) + 1
-        except Exception:
-            pass
-
-    connection.execute("DELETE FROM stock_concepts")
-    batch_params = [
-        (name, count) for name, count in concept_counts.items()
-    ]
-    if batch_params:
-        connection.executemany(
-            "INSERT INTO stock_concepts(name, stock_count) VALUES (?, ?)",
-            batch_params,
-        )
+    """仅用于初始化/修复，普通写入使用增量计数。"""
+    rebuild_concept_counts(connection)
 
 
 def classify_import_records(
@@ -303,6 +296,7 @@ def upsert_import_records(
     force_override: bool,
 ) -> dict[str, int]:
     counts = {"added": 0, "updated": 0, "unchanged": 0, "skipped": 0}
+    deltas: Counter[str] = Counter()
     connection = _connection()
     with unit_of_work(connection=connection, immediate=True) as work:
         existing = _existing_by_codes(work.connection, (str(record["stock_code"]) for record in records))
@@ -342,9 +336,11 @@ def upsert_import_records(
                     source_version,
                 ),
             )
+            deltas.update(concept_delta(current.get("concepts", []) if current else [], incoming_concepts))
+            existing[stock_code] = {**record, "concepts": incoming_concepts, "is_manual_override": False}
             counts["updated" if current else "added"] += 1
 
-        rebuild_stock_concepts(work.connection)
+        apply_concept_deltas(work.connection, deltas)
     return counts
 
 
@@ -415,13 +411,19 @@ def commit_import_batch(
     source_version: str,
     force_override: bool,
 ) -> dict[str, int]:
-    counts = upsert_import_records(
-        records,
-        source_version=source_version,
-        force_override=force_override,
-    )
     connection = _connection()
     with unit_of_work(connection=connection, immediate=True) as work:
+        current = work.connection.execute(
+            "SELECT status FROM stock_concept_import_batches WHERE import_token=?", (token,)
+        ).fetchone()
+        if current is None or current["status"] != "previewed":
+            raise ImportBatchStateChangedError("导入批次状态已变化，请重新预检")
+        # upsert 的嵌套 unit_of_work 使用 SAVEPOINT；数据、派生统计、批次共同提交。
+        counts = upsert_import_records(
+            records,
+            source_version=source_version,
+            force_override=force_override,
+        )
         work.connection.execute(
             """
             UPDATE stock_concept_import_batches SET

@@ -9,10 +9,13 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from pydantic import ValidationError
 
 from app.modules.code_normalization import normalize_imported_stock_code
+from app.modules.import_limits import MAX_IMPORT_BASE64_CHARS, MAX_IMPORT_FILE_BYTES
+from app.modules.stock_concept.models import StockConceptRecordInput
 
-_MAX_FILE_SIZE = 50 * 1024 * 1024
+_MAX_FILE_SIZE = MAX_IMPORT_FILE_BYTES
 
 
 class ConceptImportError(ValueError):
@@ -29,6 +32,8 @@ class ParsedConceptFile:
 
 
 def decode_file(content_base64: str) -> bytes:
+    if len(content_base64) > MAX_IMPORT_BASE64_CHARS:
+        raise ConceptImportError("上传文件不能超过 50 MiB")
     try:
         content = base64.b64decode(content_base64, validate=True)
     except (ValueError, binascii.Error) as exc:
@@ -90,10 +95,12 @@ def parse_data(content: bytes, filename: str) -> ParsedConceptFile:
             break
 
     name_col = None
-    for candidate in ("股票简称", "简称", "股票名称", "名称", "stock_name", "name"):
+    for candidate in ("公司简称", "股票简称", "简称", "股票名称", "名称", "stock_name", "name"):
         if candidate in frame.columns:
             name_col = candidate
             break
+
+    exchange_col = next((col for col in ("交易所", "市场", "exchange") if col in frame.columns), None)
 
     concept_col = None
     for candidate in ("所属概念", "概念", "概念板块", "concepts", "concept"):
@@ -112,27 +119,39 @@ def parse_data(content: bytes, filename: str) -> ParsedConceptFile:
     seen_codes: set[str] = set()
     duplicate_codes: set[str] = set()
 
-    for index, row in frame.iterrows():
-        stock_code, suffix, market = _normalize_stock_code(row[code_col])
+    for row_number, (_, row) in enumerate(frame.iterrows(), start=2):
+        stock_code, suffix, market = normalize_imported_stock_code(
+            _text(row[code_col]), _text(row[exchange_col]) if exchange_col else ""
+        )
         if not stock_code:
             invalid_rows += 1
+            warnings.append(f"第 {row_number} 行股票代码无效，已跳过")
             continue
         if stock_code in seen_codes:
             invalid_rows += 1
             duplicate_codes.add(stock_code)
             continue
-        seen_codes.add(stock_code)
 
         stock_name = _text(row[name_col]) if name_col else ""
         concepts = _extract_concepts(row[concept_col])
 
-        records.append({
+        values = {
             "market_group": market,
             "exchange_suffix": suffix,
             "stock_code": stock_code,
             "stock_name": stock_name,
             "concepts": concepts,
-        })
+        }
+
+        try:
+            validated = StockConceptRecordInput.model_validate(values)
+        except ValidationError as exc:
+            invalid_rows += 1
+            fields = "、".join(sorted({str(error["loc"][0]) for error in exc.errors() if error["loc"]}))
+            warnings.append(f"第 {row_number} 行字段校验失败（{fields or '股票身份'}），已跳过")
+            continue
+        seen_codes.add(stock_code)
+        records.append(validated.model_dump(include=set(values)))
 
     if duplicate_codes:
         sample = "、".join(sorted(duplicate_codes)[:5])

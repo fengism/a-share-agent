@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
       proxy: apiProxy,
     },
     build: {
+      chunkSizeWarningLimit: 800,
       rollupOptions: {
         output: {
           manualChunks(id) {

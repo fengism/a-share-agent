@@ -8,9 +8,7 @@ import math
 import re
 from typing import Any, Iterable
 
-from playwright.async_api import async_playwright
-
-from app.infrastructure.browser_runtime import launch_full_chromium
+from app.infrastructure.pdf_runtime import render_pdf
 from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection
 
 logger = logging.getLogger(__name__)
@@ -370,22 +368,9 @@ def generate_daily_review_pdf_html(result: DailyReviewResult) -> str:
 
 
 async def render_daily_review_pdf_bytes(html_content: str) -> bytes:
-    """使用 Chromium 将完整 HTML 渲染为带页眉页脚的 A4 PDF。"""
-    async with async_playwright() as playwright:
-        browser = await launch_full_chromium(
-            playwright.chromium,
-            args=["--no-sandbox", "--disable-setuid-sandbox"],
-        )
-        try:
-            page = await browser.new_page()
-            await page.set_content(html_content, wait_until="networkidle")
-            return await page.pdf(
-                format="A4",
-                print_background=True,
-                display_header_footer=True,
-                header_template='<div style="font-size:8px;width:100%;text-align:right;color:#94a3b8;padding-right:14mm;font-family:sans-serif;">A股智能投研体系 · 每日复盘报告</div>',
-                footer_template='<div style="font-size:8px;width:100%;display:flex;justify-content:space-between;color:#94a3b8;padding:0 14mm;font-family:sans-serif;"><span>内部研究参考 · 不构成投资建议</span><span>第 <span class="pageNumber"></span> 页 / 共 <span class="totalPages"></span> 页</span></div>',
-                margin={"top": "16mm", "bottom": "18mm", "left": "14mm", "right": "14mm"},
-            )
-        finally:
-            await browser.close()
+    """通过共享的有界 Chromium 队列渲染报告，保留既有页眉页脚和 A4 布局。"""
+    return await render_pdf(
+        html_content,
+        header_template='<div style="font-size:8px;width:100%;text-align:right;color:#94a3b8;padding-right:14mm;font-family:sans-serif;">A股智能投研体系 · 每日复盘报告</div>',
+        footer_template='<div style="font-size:8px;width:100%;display:flex;justify-content:space-between;color:#94a3b8;padding:0 14mm;font-family:sans-serif;"><span>内部研究参考 · 不构成投资建议</span><span>第 <span class="pageNumber"></span> 页 / 共 <span class="totalPages"></span> 页</span></div>',
+    )

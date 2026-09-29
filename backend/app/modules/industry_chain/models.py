@@ -277,6 +277,9 @@ class IndustryChainAnalysisMetadata(BaseModel):
     total_duration_ms: int = 0
     research_duration_ms: int = 0
     synthesis_duration_ms: int = 0
+    draft_duration_ms: int = 0
+    verification_duration_ms: int = 0
+    finalization_duration_ms: int = 0
     archive_duration_ms: int = 0
     cache_hits: list[str] = Field(default_factory=list)
     cache_misses: list[str] = Field(default_factory=list)
@@ -284,6 +287,7 @@ class IndustryChainAnalysisMetadata(BaseModel):
     successful_dimensions: list[str] = Field(default_factory=list)
     agent_evidence_count: int = 0
     public_item_count: int = 0
+    independent_source_count: int = 0
 
 
 class IndustryChainResult(BaseModel):

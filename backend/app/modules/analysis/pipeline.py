@@ -3,6 +3,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import cast
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from app.agentic.events import AgentEvent, auditable_agent_event
@@ -17,6 +18,7 @@ from app.modules.analysis.events import ANALYSIS_STAGE_NAMES, AnalysisProgress, 
 from app.modules.analysis.key_levels import apply_key_levels, resolve_key_levels
 from app.modules.analysis.models import AnalysisResult
 from app.modules.analysis.persistence import repository as analysis_storage
+from app.modules.analysis.provenance import build_provenance
 
 logger = logging.getLogger(__name__)
 _MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
@@ -86,6 +88,8 @@ async def run_analysis(
         logger.info("忽略旧版个股分析缓存并重新生成: code=%s", code)
 
     settings = get_effective_settings()
+    active_stage = 1
+    research_started_at = datetime.now(_MARKET_TIMEZONE)
     try:
         clock = await _emit_stage_started(
             progress,
@@ -110,13 +114,16 @@ async def run_analysis(
             ),
             resolve_key_levels(code),
         )
+        research_completed_at = datetime.now(_MARKET_TIMEZONE)
         await _emit_stage_completed(progress, 1, clock)
 
+        active_stage = 2
         clock = await _emit_stage_started(progress, 2)
         prompt_context = stages.build_prompt_context(code, analysis_date, research)
         logger.info("[Pipeline] prompt ready: code=%s", code)
         await _emit_stage_completed(progress, 2, clock)
 
+        active_stage = 3
         clock = await _emit_stage_started(
             progress,
             3,
@@ -141,14 +148,23 @@ async def run_analysis(
             thinking_task.cancel()
             await asyncio.gather(thinking_task, return_exceptions=True)
 
+        await _emit_stage_completed(progress, 3, clock)
+        active_stage = 4
+        clock = await _emit_stage_started(progress, 4, detail="校验结构化结果，记录证据来源、报告期与缓存状态")
         result = apply_key_levels(result, key_levels)
         result = cast(
             AnalysisResult,
-            result.model_copy(update={"agent_trace": list(research.execution_trace)}),
+            result.model_copy(update={
+                "agent_trace": list(research.execution_trace),
+                "report_id": uuid4().hex, "analysis_date": analysis_date,
+                "generated_at": datetime.now(_MARKET_TIMEZONE).isoformat(),
+                "provenance": build_provenance(research, started_at=research_started_at, completed_at=research_completed_at, force=force),
+            }),
         )
-        await emit_agent_event(AgentEvent(type="status", content="✨ 8大投研章节已全部生成完毕，正在组装研报…"))
-        await _emit_stage_completed(progress, 3, clock)
-
+        result = AnalysisResult.model_validate(result.model_dump())
+        await _emit_stage_completed(progress, 4, clock)
+        active_stage = 5
+        clock = await _emit_stage_started(progress, 5, detail="写入独立报告版本并更新当天最新报告，成功后才标记完成")
         if before_persist is not None:
             await before_persist()
         await result_service.persist_analysis_result(
@@ -157,6 +173,7 @@ async def run_analysis(
             cache_key=cache_key,
             cache_ttl_seconds=settings.cache_ttl_analysis,
         )
+        await _emit_stage_completed(progress, 5, clock)
         logger.info(
             "[Pipeline] 分析完成: %s, 评分=%s, 信号=%s",
             code,
@@ -167,7 +184,9 @@ async def run_analysis(
         return result
     except Exception as error:
         if progress_callback is not None:
-            if isinstance(error, LLMGenerationTimeoutError):
+            if isinstance(error, result_service.AnalysisArchiveError):
+                detail = str(error)
+            elif isinstance(error, LLMGenerationTimeoutError):
                 detail = str(error)
                 logger.warning("个股分析超时: code=%s, error=%s", code, detail)
             elif isinstance(error, AgentEvidenceInsufficientError):
@@ -180,5 +199,8 @@ async def run_analysis(
                     error,
                     "分析失败，请稍后重试",
                 )
+            await progress.emit(AnalysisProgress(type="stage_failed", stage=AnalysisStage(
+                stage=active_stage, name=ANALYSIS_STAGE_NAMES[active_stage], status="failed", detail=detail,
+            )))
             await progress.emit(AnalysisProgress(type="error", error=detail))
         raise

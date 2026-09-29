@@ -9,8 +9,11 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from pydantic import ValidationError
 
 from app.modules.code_normalization import normalize_imported_stock_code
+from app.modules.import_limits import MAX_IMPORT_BASE64_CHARS, MAX_IMPORT_FILE_BYTES
+from app.modules.industry_classification.models import IndustryRecordInput
 
 _REQUIRED_SW_COLUMNS = (
     "交易所",
@@ -21,7 +24,7 @@ _REQUIRED_SW_COLUMNS = (
     "新版二级行业",
     "新版三级行业",
 )
-_MAX_FILE_SIZE = 50 * 1024 * 1024
+_MAX_FILE_SIZE = MAX_IMPORT_FILE_BYTES
 
 
 class IndustryImportError(ValueError):
@@ -39,6 +42,8 @@ class ParsedIndustryFile:
 
 
 def decode_file(content_base64: str) -> bytes:
+    if len(content_base64) > MAX_IMPORT_BASE64_CHARS:
+        raise IndustryImportError("上传文件不能超过 50 MiB")
     try:
         content = base64.b64decode(content_base64, validate=True)
     except (ValueError, binascii.Error) as exc:
@@ -139,18 +144,17 @@ def parse_data(content: bytes, filename: str = "upload.xlsx") -> ParsedIndustryF
     seen_codes: set[str] = set()
     duplicate_codes: set[str] = set()
 
-    for index, row in frame.iterrows():
+    for row_number, (_, row) in enumerate(frame.iterrows(), start=2):
         exchange_val = _text(row[exchange_col]) if exchange_col else ""
         stock_code, suffix, market = _normalize_code(row[code_col], exchange_val)
         if not stock_code or not suffix:
             invalid_rows += 1
-            warnings.append(f"第 {index + 2} 行股票代码无效，已跳过")
+            warnings.append(f"第 {row_number} 行股票代码无效，已跳过")
             continue
         if stock_code in seen_codes:
             invalid_rows += 1
             duplicate_codes.add(stock_code)
             continue
-        seen_codes.add(stock_code)
 
         stock_name = _text(row[name_col]) if name_col else ""
         industry_code = _text(row[industry_code_col]) if industry_code_col else ""
@@ -169,8 +173,7 @@ def parse_data(content: bytes, filename: str = "upload.xlsx") -> ParsedIndustryF
             elif len(parts) == 1:
                 level1 = parts[0].strip()
 
-        records.append(
-            {
+        values = {
                 "market_group": market,
                 "exchange_suffix": suffix,
                 "stock_code": stock_code,
@@ -179,8 +182,17 @@ def parse_data(content: bytes, filename: str = "upload.xlsx") -> ParsedIndustryF
                 "sw_level2_name": level2,
                 "sw_level3_name": level3,
                 "sw_industry_code": industry_code,
-            }
-        )
+        }
+
+        try:
+            validated = IndustryRecordInput.model_validate(values)
+        except ValidationError as exc:
+            invalid_rows += 1
+            fields = "、".join(sorted({str(error["loc"][0]) for error in exc.errors() if error["loc"]}))
+            warnings.append(f"第 {row_number} 行字段校验失败（{fields or '股票身份'}），已跳过")
+            continue
+        seen_codes.add(stock_code)
+        records.append(validated.model_dump(include=set(values)))
 
     if duplicate_codes:
         sample = "、".join(sorted(duplicate_codes)[:5])

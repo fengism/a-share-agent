@@ -158,7 +158,7 @@ Agent 尚缺维度：{agent_evidence_gaps or "无"}
 {agent_evidence}
 
 ## 公共结构化数据
-证据 ID：{public_evidence_id or "无"}
+分维度证据 ID（格式“维度=ID”，引用时只能使用等号后的单个完整 ID）：{public_evidence_id or "无"}
 {public_data}
 
 请交叉核对公共结构化数据、Agent 摘要与工具证据，逐项检查市场、竞争、技术、上中下游、公司、事件、驱动和风险后，按系统消息定义的 JSON 结构输出。Agent 尚缺维度只能写入 `missing_evidence`，不得用常识补齐。无法确认的市场规模、份额、公司代码和事件必须留空。"""

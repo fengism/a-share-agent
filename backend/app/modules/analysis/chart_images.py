@@ -56,8 +56,14 @@ async def load_analysis_kline(stock_code: str, analysis_date: str) -> KlineData 
             ),
             timeout=_KLINE_TIMEOUT_SECONDS,
         )
+    except TimeoutError:
+        logger.warning(
+            "推送图表行情加载超时 code=%s timeout_seconds=%.1f，略去行情图表",
+            stock_code, _KLINE_TIMEOUT_SECONDS,
+        )
+        return None
     except Exception as error:
-        logger.warning("推送图表行情加载失败 code=%s: %s", stock_code, error)
+        logger.warning("推送图表行情加载失败 code=%s error_type=%s: %s", stock_code, type(error).__name__, error)
         return None
 
 

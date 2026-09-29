@@ -8,6 +8,10 @@ import urllib.parse
 from typing import Any
 
 from app.configuration.paths import DATA_DIR
+from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
+from app.core.exceptions import UpstreamUnavailableError
+from app.financial_data.stock.profile.exchange_master import ExchangeStockMaster
+from app.financial_data.stock.public import get_exchange_stock_master
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 from app.modules.stock_profile import importer
@@ -19,6 +23,7 @@ from app.modules.stock_profile.models import (
     StockProfileEnrichResponse,
     StockProfileImportFileRequest,
     StockProfileImportResponse,
+    StockProfileSyncResponse,
 )
 from app.modules.stock_profile.repository import (
     batch_upsert,
@@ -32,7 +37,6 @@ from app.modules.stock_profile.repository import (
 
 logger = logging.getLogger(__name__)
 
-_EXCHANGE_MASTER_FILE = DATA_DIR / "official_exchange_stock_master.json"
 _BUSINESS_INTRO_DIR = DATA_DIR / "stock_business_intro"
 
 
@@ -82,11 +86,15 @@ def save_profile(
     *,
     source: str = "manual",
     is_manual_override: bool = True,
+    expected_revision: str | None = None,
+    create_only: bool = False,
 ) -> StockBasicProfileRecord:
     row = upsert_record(
         input_data,
         source=source,
         is_manual_override=is_manual_override,
+        expected_revision=expected_revision,
+        create_only=create_only,
     )
     return StockBasicProfileRecord.model_validate(row)
 
@@ -132,8 +140,7 @@ def fetch_eastmoney_company_survey(stock_code: str, exchange: str) -> dict[str, 
 def enrich_stock_profile(stock_code: str, *, force: bool = False) -> StockProfileEnrichResponse:
     """补充个股资料：库中已有主营信息时直接返回，缺失才从 THS/东财抓取并更新库。
 
-    force=True 忽略库内已有数据，强制重新联网抓取。此前无论库内是否
-    有数据都会抓取并覆盖，force 参数形同虚设。
+    普通补充仅写入空字段；force=True 明确允许刷新已有值（包含手工资料）。
     """
     existing = get_record(stock_code)
     if not existing:
@@ -196,28 +203,46 @@ def enrich_stock_profile(stock_code: str, *, force: bool = False) -> StockProfil
         city=city,
         listing_date=listing_date,
         source="ths+eastmoney",
-    )
-
-    if result:
-        for field in (
-            "main_business", "business_scope", "products", "company_intro",
-            "setup_date", "legal_repr", "registered_capital", "website",
-            "province", "city", "listing_date",
-        ):
-            if result.get(field):
-                updated_fields.append(field)
-
-    return StockProfileEnrichResponse(
-        success=True,
-        stock_code=existing["stock_code"],
-        stock_name=existing["stock_name"],
+        force=force,
         updated_fields=updated_fields,
-        message=f"已成功补充 {len(updated_fields)} 项基础资料",
+    )
+
+    if not result:
+        return StockProfileEnrichResponse(
+            success=False, stock_code=existing["stock_code"], stock_name=existing["stock_name"],
+            updated_fields=[], message="补充期间记录已被删除，未写入资料",
+        )
+    has_upstream_data = any(str(value or "").strip() for value in (
+        main_business, business_scope, products, company_intro, setup_date,
+        legal_repr, registered_capital, website, province, city, listing_date,
+    ))
+    if updated_fields:
+        message = f"已成功补充 {len(updated_fields)} 项基础资料"
+    elif has_upstream_data:
+        message = "未新增资料：返回内容无变化或已有字段受保护"
+    else:
+        message = "上游未返回有效资料，未修改现有数据，请稍后重试"
+    return StockProfileEnrichResponse(
+        success=has_upstream_data,
+        stock_code=existing["stock_code"], stock_name=existing["stock_name"],
+        updated_fields=updated_fields, message=message,
     )
 
 
-def sync_exchange_master_data() -> dict[str, int]:
-    """Sync full-market stocks from official_exchange_stock_master.json and sw_industry_classifications."""
+async def sync_exchange_master_data() -> StockProfileSyncResponse:
+    """显式同步会强制请求官方名录；失败可用有时效约束的快照，但须报告降级。"""
+    master = await get_exchange_stock_master(force=True)
+    if not master.records:
+        raise UpstreamUnavailableError("交易所名录同步失败：没有可用数据，现有资料未修改")
+    stats = await call_blocking(_merge_exchange_master, master, semaphore=database_semaphore)
+    return StockProfileSyncResponse(
+        **stats, complete=master.complete and not master.failed_exchanges,
+        failed_exchanges=master.failed_exchanges, stale_exchanges=master.stale_exchanges,
+        fetched_at=master.fetched_at,
+    )
+
+
+def _merge_exchange_master(master: ExchangeStockMaster) -> dict[str, int]:
     from app.infrastructure.persistence.connection import get_connection
 
     records_to_upsert: list[dict[str, Any]] = []
@@ -251,52 +276,20 @@ def sync_exchange_master_data() -> dict[str, int]:
             except Exception:
                 pass
 
-    # 3. Load official exchange master
-    if _EXCHANGE_MASTER_FILE.exists():
-        try:
-            exchange_data = json.loads(_EXCHANGE_MASTER_FILE.read_text(encoding="utf-8"))
-            exchanges_dict = exchange_data.get("exchanges") or {}
-            for ex_key, ex_slice in exchanges_dict.items():
-                for item in ex_slice.get("records") or []:
-                    raw_code = str(item.get("code") or "").strip()
-                    if not raw_code or not raw_code.isdigit():
-                        continue
-                    exchange = str(item.get("exchange") or ex_key).strip().upper()
-                    full_code = f"{raw_code}.{exchange}"
-                    name = str(item.get("name") or "").strip()
-                    board = str(item.get("board") or "").strip()
-                    industry = str(item.get("industry") or "").strip()
-                    listing_date = str(item.get("listing_date") or "").strip() or None
-
-                    # Merge Shenwan industry info
-                    sw_info = sw_map.get(full_code) or sw_map.get(raw_code) or {}
-                    sw1 = sw_info.get("sw_level1_name", "")
-                    sw2 = sw_info.get("sw_level2_name", "")
-                    sw3 = sw_info.get("sw_level3_name", "")
-
-                    # Merge business intro if cached
-                    intro_items = local_intro_map.get(raw_code) or {}
-                    main_business = intro_items.get("主营业务", "")
-                    business_scope = intro_items.get("经营范围", "")
-                    products = intro_items.get("产品名称") or intro_items.get("产品类型") or ""
-
-                    records_to_upsert.append({
-                        "stock_code": full_code,
-                        "stock_name": name,
-                        "market_group": "A",
-                        "exchange": exchange,
-                        "board": board,
-                        "listing_date": listing_date,
-                        "main_business": main_business,
-                        "business_scope": business_scope,
-                        "products": products,
-                        "industry": industry or sw1,
-                        "sw_level1_name": sw1,
-                        "sw_level2_name": sw2,
-                        "sw_level3_name": sw3,
-                    })
-        except Exception as e:
-            logger.error("Failed to parse official_exchange_stock_master.json: %s", e)
+    # 3. 合并经过官方服务校验且带时效信息的名录，不直接读取未校验的快照。
+    for item in master.records:
+        full_code = f"{item.code}.{item.exchange}"
+        sw_info = sw_map.get(full_code) or {}
+        intro_items = local_intro_map.get(item.code) or {}
+        records_to_upsert.append({
+            "stock_code": full_code, "stock_name": item.name,
+            "market_group": "A", "exchange": item.exchange, "board": item.board or "",
+            "listing_date": item.listing_date,
+            "main_business": intro_items.get("主营业务", ""),
+            "business_scope": intro_items.get("经营范围", ""),
+            "products": intro_items.get("产品名称") or intro_items.get("产品类型") or "",
+            "industry": item.industry or sw_info.get("sw_level1_name", ""),
+        })
 
     # 4. Also add HK stocks from sw_industry_classifications
     for code, sw_info in sw_map.items():

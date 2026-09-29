@@ -78,9 +78,12 @@ def commit_import(request: ConceptImportCommitRequest) -> dict[str, int]:
     if actual != expected:
         raise ConceptImportConflictError("文件或导入参数与预检时不一致，请重新预检")
 
-    return repository.commit_import_batch(
-        token=request.import_token,
-        records=parsed.records,
-        source_version=source_version,
-        force_override=request.force_override,
-    )
+    try:
+        return repository.commit_import_batch(
+            token=request.import_token,
+            records=parsed.records,
+            source_version=source_version,
+            force_override=request.force_override,
+        )
+    except repository.ImportBatchStateChangedError as exc:
+        raise ConceptImportConflictError(str(exc)) from exc

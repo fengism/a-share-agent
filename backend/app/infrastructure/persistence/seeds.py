@@ -24,6 +24,7 @@ import sqlite3
 from pathlib import Path
 
 from app.configuration.paths import SEEDS_DIR
+from app.infrastructure.persistence.concept_stats import rebuild_concept_counts
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,8 @@ def seed_industry_database(
                 rows,
             )
             imported[table] = len(rows)
+        if "stock_concept_mappings" in imported:
+            rebuild_concept_counts(connection)
         connection.commit()
     except sqlite3.Error as error:
         connection.rollback()

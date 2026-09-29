@@ -10,6 +10,7 @@ import os
 import re
 import time
 from contextlib import asynccontextmanager, suppress
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 
@@ -25,7 +26,7 @@ IMAGE = os.environ.get("PYTHON_SANDBOX_IMAGE", "fengliu1989/a-share-python-sandb
 image_id = ""
 healthy = False
 dirty: set[str] = set()
-jobs: dict[str, asyncio.Task] = {}
+jobs: dict[str, asyncio.Task[Any]] = {}
 # Prevent a delayed POST from starting after DELETE has already arrived.
 cancelled: dict[str, float] = {}
 
@@ -131,7 +132,7 @@ async def remove_container(name: str) -> None:
         raise
 
 
-async def run_job(name: str, code: str) -> dict:
+async def run_job(name: str, code: str) -> dict[str, Any]:
     try:
         async with asyncio.timeout(WALL_SECONDS):
             # Complete the create operation before removing by name, including on cancellation.
@@ -193,9 +194,19 @@ async def reconcile() -> None:
         await asyncio.sleep(2)
 
 
+def validate_worker_platform(image: dict, host: dict) -> None:
+    aliases = {"aarch64": "arm64", "arm64": "arm64", "x86_64": "amd64", "amd64": "amd64"}
+    host_arch = aliases.get(str(host.get("Architecture", "")).lower())
+    image_arch = aliases.get(str(image.get("Architecture", "")).lower())
+    if host.get("OSType") != "linux" or image.get("Os") != "linux" or not host_arch or image_arch != host_arch:
+        raise RuntimeError("Sandbox worker architecture does not match Docker daemon; pull/build the native worker image")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global image_id, healthy
+    healthy = False
+    image_id = ""
     if len(TOKEN) < 32 or not TOKEN.isascii() or not TOKEN.isprintable():
         raise RuntimeError("PYTHON_SANDBOX_TOKEN must contain at least 32 ASCII characters")
     await reap_orphans()
@@ -203,6 +214,10 @@ async def lifespan(app: FastAPI):
     if status:
         raise RuntimeError("Build the dedicated sandbox image before starting the runner")
     image = json.loads(out)
+    status, host_output, _ = await docker("info", "--format", "{{json .}}")
+    if status:
+        raise RuntimeError("Cannot verify Docker daemon architecture")
+    validate_worker_platform(image, json.loads(host_output))
     if image.get("Config", {}).get("Volumes") or not re.fullmatch(r"sha256:[0-9a-f]{64}", image["Id"]):
         raise RuntimeError("Sandbox image must not define volumes")
     image_id = image["Id"]  # Pin all jobs to the inspected image, not a mutable tag.

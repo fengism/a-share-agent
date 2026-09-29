@@ -17,6 +17,7 @@ from app.api.errors import (
 )
 from app.domain.identity import AuthenticatedUser
 from app.modules.industry_classification.importer import IndustryImportError
+from app.modules.industry_classification.models import IndustryUpdateRequest
 from app.modules.industry_classification.public import (
     ImportCommitRequest,
     ImportCommitResponse,
@@ -47,6 +48,7 @@ from app.modules.industry_classification.public import (
     update_manual,
     update_refresh_state,
 )
+from app.modules.master_data_revision import MasterDataConflictError
 
 router = APIRouter()
 
@@ -113,13 +115,15 @@ def create_record(
 @router.put("/records/{record_id}", response_model=MutationResponse)
 def update_record(
     record_id: int,
-    request: IndustryRecordInput,
+    request: IndustryUpdateRequest,
     _admin: AuthenticatedUser = Depends(require_admin),
 ):
     if get_record_by_id(record_id) is None:
         raise NotFoundError("行业记录不存在", code="industry.record_not_found")
     try:
-        update_manual(record_id, request)
+        update_manual(record_id, request, expected_revision=request.expected_revision)
+    except MasterDataConflictError as exc:
+        raise ConflictError(str(exc), code="master_data.edit_conflict") from exc
     except sqlite3.IntegrityError as exc:
         raise ConflictError("股票代码已存在", code="industry.stock_code_exists") from exc
     return MutationResponse(id=record_id)

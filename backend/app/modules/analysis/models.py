@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.agentic.events import AgentEvent
 from app.domain.prompting import PromptTrace
+from app.modules.analysis.provenance import AnalysisProvenance
 
 InformationGrade = Literal["A", "B", "C", "unknown"]
 AssessmentLevel = Literal["strong", "moderate", "weak", "unclear"]
@@ -177,6 +178,9 @@ class FactorAnalysis(BaseModel):
 
 
 class AnalysisResult(BaseModel):
+    report_id: str | None = None
+    generated_at: str | None = None
+    provenance: AnalysisProvenance | None = None
     stock_code: str
     stock_name: str
     analysis_date: str

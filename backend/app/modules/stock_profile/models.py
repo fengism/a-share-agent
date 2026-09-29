@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.core.market import classify_exchange
+from app.modules.code_normalization import normalize_stock_identity
 
 MarketGroup = Literal["A", "HK", "OVERSEAS"]
 
@@ -20,9 +20,9 @@ class StockBasicProfileInput(BaseModel):
     business_scope: str = Field(default="")
     products: str = Field(default="")
     industry: str = Field(default="", max_length=128)
-    sw_level1_name: str = Field(default="", max_length=64)
-    sw_level2_name: str = Field(default="", max_length=64)
-    sw_level3_name: str = Field(default="", max_length=64)
+    sw_level1_name: str = Field(default="", max_length=128)
+    sw_level2_name: str = Field(default="", max_length=128)
+    sw_level3_name: str = Field(default="", max_length=128)
     city: str = Field(default="", max_length=64)
     province: str = Field(default="", max_length=64)
     legal_repr: str = Field(default="", max_length=64)
@@ -61,23 +61,15 @@ class StockBasicProfileInput(BaseModel):
 
     @model_validator(mode="after")
     def normalize_identity(self) -> "StockBasicProfileInput":
-        self.stock_code = self.stock_code.strip().upper()
-        if not self.exchange:
-            if "." in self.stock_code:
-                self.exchange = self.stock_code.split(".", 1)[1]
-            elif self.market_group == "A":
-                raw_digits = self.stock_code.split(".")[0]
-                if len(raw_digits) == 6 and raw_digits.isdigit():
-                    try:
-                        self.exchange = classify_exchange(raw_digits)
-                    except ValueError:
-                        self.exchange = "SH" if raw_digits.startswith("6") else "SZ"
-            elif self.market_group == "HK":
-                self.exchange = "HK"
-
-        self.exchange = self.exchange.upper()
-        if "." not in self.stock_code and self.market_group in {"A", "HK"} and self.exchange:
-            self.stock_code = f"{self.stock_code}.{self.exchange}"
+        submitted_fields = set(self.model_fields_set)
+        code, exchange, market = normalize_stock_identity(
+            self.stock_code,
+            self.exchange if "exchange" in self.model_fields_set else "",
+            self.market_group if "market_group" in self.model_fields_set else "",
+        )
+        self.stock_code = code
+        self.exchange = exchange
+        self.market_group = cast(MarketGroup, market)
 
         if not self.board and self.market_group == "A":
             raw_code = self.stock_code.split(".")[0]
@@ -94,10 +86,17 @@ class StockBasicProfileInput(BaseModel):
         elif not self.board and self.market_group == "HK":
             self.board = "港股主板"
 
+        # 归一后的缺省值用于新建；不能把自动推断当成手工提交覆盖存量字段。
+        object.__setattr__(self, "__pydantic_fields_set__", submitted_fields)
         return self
 
 
+class StockProfileUpdateRequest(StockBasicProfileInput):
+    expected_revision: str = Field(min_length=64, max_length=64)
+
+
 class StockBasicProfileRecord(StockBasicProfileInput):
+    revision: str
     id: int
     source: str
     is_manual_override: bool
@@ -148,3 +147,14 @@ class StockProfileImportResponse(BaseModel):
     skipped: int
     invalid_rows: int
     warnings: list[str] = Field(default_factory=list)
+
+
+class StockProfileSyncResponse(BaseModel):
+    added: int
+    updated: int
+    unchanged: int
+    skipped: int
+    complete: bool
+    failed_exchanges: dict[str, str]
+    stale_exchanges: list[str]
+    fetched_at: dict[str, float]

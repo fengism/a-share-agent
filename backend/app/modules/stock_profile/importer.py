@@ -12,11 +12,13 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from pydantic import ValidationError
 
 from app.modules.code_normalization import normalize_imported_stock_code
+from app.modules.import_limits import MAX_IMPORT_BASE64_CHARS, MAX_IMPORT_FILE_BYTES
 from app.modules.stock_profile.models import StockBasicProfileInput
 
-_MAX_FILE_SIZE = 50 * 1024 * 1024
+_MAX_FILE_SIZE = MAX_IMPORT_FILE_BYTES
 
 _CODE_CANDIDATES = ("股票代码", "代码", "stock_code", "code")
 _EXCHANGE_HINT_CANDIDATES = ("交易所", "市场", "exchange")
@@ -55,6 +57,8 @@ class ParsedProfileFile:
 
 
 def decode_file(content_base64: str) -> bytes:
+    if len(content_base64) > MAX_IMPORT_BASE64_CHARS:
+        raise ProfileImportError("上传文件不能超过 50 MiB")
     try:
         content = base64.b64decode(content_base64, validate=True)
     except (ValueError, binascii.Error) as exc:
@@ -120,22 +124,24 @@ def parse_data(content: bytes, filename: str) -> ParsedProfileFile:
     records: list[dict[str, Any]] = []
     invalid_rows = 0
     warnings: list[str] = []
+    if any(field_cols[field] for field in ("sw_level1_name", "sw_level2_name", "sw_level3_name")):
+        warnings.append("申万行业列仅供导出参考，导入不更新分类；请在行业基础数据页维护")
     seen_codes: set[str] = set()
     duplicate_codes: set[str] = set()
 
-    for _, row in frame.iterrows():
+    for row_number, (_, row) in enumerate(frame.iterrows(), start=2):
         exchange_hint = _text(row[exchange_col]) if exchange_col else ""
         normalized_code, _suffix, market_group = normalize_imported_stock_code(
             _text(row[code_col]), exchange_hint
         )
         if not normalized_code:
             invalid_rows += 1
+            warnings.append(f"第 {row_number} 行股票代码无效，已跳过")
             continue
         if normalized_code in seen_codes:
             invalid_rows += 1
             duplicate_codes.add(normalized_code)
             continue
-        seen_codes.add(normalized_code)
 
         values: dict[str, Any] = {
             "stock_code": normalized_code,
@@ -165,7 +171,15 @@ def parse_data(content: bytes, filename: str) -> ParsedProfileFile:
             col = field_cols[key]
             values[key] = _text(row[col]) if col else ""
         # 经输入模型归一：板块/交易所缺省时按代码推断，字段长度得到校验
-        records.append(StockBasicProfileInput.model_validate(values).model_dump())
+        try:
+            record = StockBasicProfileInput.model_validate(values).model_dump()
+        except ValidationError as exc:
+            invalid_rows += 1
+            fields = "、".join(sorted({str(error["loc"][0]) for error in exc.errors() if error["loc"]}))
+            warnings.append(f"第 {row_number} 行字段校验失败（{fields or '股票身份'}），已跳过")
+            continue
+        seen_codes.add(normalized_code)
+        records.append(record)
 
     if duplicate_codes:
         sample = "、".join(sorted(duplicate_codes)[:5])

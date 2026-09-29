@@ -118,6 +118,8 @@ def iter_history_files(data_dir: Path, users_dir_name: str) -> Iterator[HistoryF
                 continue
             for filepath in stock_dir.glob("*.json"):
                 yield user_id, stock_dir.name, filepath
+            # versions/ 下是同日不可变快照，历史主列表仍按日期只展示当天最新别名。
+            # 不遍历子目录，避免版本文件被索引成重复历史日期。
 
 
 def rebuild_history_index(

@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any, cast
 
 import pandas as pd
@@ -55,6 +55,7 @@ class ExchangeStockMaster:
     records: list[ExchangeStockRecord]
     failed_exchanges: dict[str, str]
     stale_exchanges: list[str]
+    fetched_at: dict[str, float] = field(default_factory=dict)
 
     @property
     def complete(self) -> bool:
@@ -214,13 +215,13 @@ async def _fetch_exchange_slice(exchange: str) -> list[ExchangeStockRecord]:
     return _normalize_frame(exchange, frame)
 
 
-async def _load_exchange_stock_master() -> ExchangeStockMaster:
+async def _load_exchange_stock_master(*, force: bool = False) -> ExchangeStockMaster:
     persisted = await call_blocking(_load_persisted_slices, semaphore=misc_semaphore)
     now = time.time()
     fresh_exchanges = {
         exchange
         for exchange, item in persisted.items()
-        if max(0.0, now - item.fetched_at) <= _MASTER_CACHE_TTL_SECONDS
+        if not force and max(0.0, now - item.fetched_at) <= _MASTER_CACHE_TTL_SECONDS
     }
     fetch_exchanges = [exchange for exchange in _EXCHANGES if exchange not in fresh_exchanges]
     results = await asyncio.gather(
@@ -249,6 +250,7 @@ async def _load_exchange_stock_master() -> ExchangeStockMaster:
         records=list(records_by_code.values()),
         failed_exchanges=failed,
         stale_exchanges=stale_exchanges,
+        fetched_at={exchange: item.fetched_at for exchange, item in slices.items()},
     )
     if fetch_exchanges and slices:
         await call_blocking(_save_persisted_slices, slices, semaphore=misc_semaphore)
@@ -260,7 +262,9 @@ async def _load_exchange_stock_master() -> ExchangeStockMaster:
     return master
 
 
-async def get_exchange_stock_master() -> ExchangeStockMaster:
+async def get_exchange_stock_master(*, force: bool = False) -> ExchangeStockMaster:
+    if force:
+        return await _master_singleflight.do(f"{_MASTER_CACHE_KEY}:refresh", lambda: _load_exchange_stock_master(force=True))
     cached = cache.get(_MASTER_CACHE_KEY)
     if isinstance(cached, ExchangeStockMaster):
         return cached

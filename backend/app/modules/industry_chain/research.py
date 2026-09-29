@@ -417,8 +417,17 @@ async def research_industry_chain(
     resolved_scope = resolve_industry_chain_scope(scope)
     scope_text = render_industry_chain_scope(resolved_scope)
     guidance = render_discovery_plan(name, resolved_scope) + "\n" + research_guidance(name)
-    spec = replace(INDUSTRY_CHAIN_RESEARCH_SPEC, max_tool_turns=8, **search_policy_limits(total_calls),
-        reserved_tool_names=BODY_TOOLS, reserved_tool_calls=min(20, total_calls // 3), requirements=(
+    max_rounds = int(getattr(settings, "industry_chain_max_rounds", 6))
+    research_timeout = float(getattr(settings, "industry_chain_research_timeout_seconds", 1800.0))
+    settings = settings.model_copy(update={
+        "agent_research_timeout_seconds": research_timeout,
+    })
+    spec = replace(
+        INDUSTRY_CHAIN_RESEARCH_SPEC,
+        max_rounds=max_rounds,
+        max_tool_turns=10,
+        **search_policy_limits(total_calls),
+        reserved_tool_names=BODY_TOOLS, reserved_tool_calls=min(28, total_calls // 3), requirements=(
         *INDUSTRY_CHAIN_RESEARCH_SPEC.requirements,
         *(EvidenceRequirement(
             f"{tier}_operations", f"{label}经营证据",
@@ -426,6 +435,10 @@ async def research_industry_chain(
             validator=lambda item, terms=tier_search_terms(name, tier): has_tier_operating_body(item, terms), fatal=False,
         ) for tier, (label, _) in TIER_QUESTIONS.items()),
     ))
+    guidance += (
+        f"\n自适应调研最多{max_rounds}轮、阶段总时限{int(research_timeout)}秒；"
+        "只有证据缺口持续缩小时才进入下一轮，本轮无进展仍立即停止。"
+    )
     guidance += render_research_planning_guidance(
         search_total_limit=spec.search_total_limit,
         search_burst_limit=spec.search_burst_limit,

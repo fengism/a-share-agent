@@ -7,7 +7,7 @@ from app.modules.industry_chain.models import IndustryChainResult
 
 
 class IndustryChainProgress(BaseModel):
-    type: Literal["stage_started", "stage_completed", "agent_event", "complete", "error"]
+    type: Literal["stage_started", "stage_completed", "stage_failed", "agent_event", "complete", "error"]
     stage: str = ""
     message: str = ""
     agent_event: AgentEvent | None = None

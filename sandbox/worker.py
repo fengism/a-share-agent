@@ -6,12 +6,17 @@ import math
 import re
 import sys
 from decimal import Decimal
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
-import pandas as pd
+if not TYPE_CHECKING:
+    import numpy as np
+    import pandas as pd
 
-pd.set_option("display.max_columns", 20)
-pd.set_option("display.width", 1000)
+    pd.set_option("display.max_columns", 20)
+    pd.set_option("display.width", 1000)
+else:
+    np: Any = None
+    pd: Any = None
 # The container is the security boundary; Python builtin restrictions are not a sandbox.
 namespace = {
     "__name__": "__main__",

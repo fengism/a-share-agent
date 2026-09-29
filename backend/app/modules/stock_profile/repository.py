@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
+from app.modules.master_data_revision import MasterDataConflictError, check_revision, record_revision
 from app.modules.stock_profile.models import StockBasicProfileInput
 
 
@@ -14,8 +15,28 @@ def _connection() -> sqlite3.Connection:
 
 def _record(row: sqlite3.Row) -> dict[str, Any]:
     result = dict(row)
+    result["revision"] = record_revision(result)
     result["is_manual_override"] = bool(result["is_manual_override"])
     return result
+
+
+_SW_FIELDS = ("sw_level1_name", "sw_level2_name", "sw_level3_name")
+
+
+def _with_industries(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # 唯一权威来源为行业库；批量关联，避免逐行查询，也不回退到过期的历史副本。
+    for start in range(0, len(records), 800):
+        batch = records[start:start + 800]
+        codes = [record["stock_code"] for record in batch]
+        rows = _connection().execute(
+            f"SELECT stock_code, {', '.join(_SW_FIELDS)} FROM sw_industry_classifications "
+            f"WHERE stock_code IN ({','.join('?' for _ in codes)})", codes,
+        ).fetchall()
+        mapping = {row["stock_code"]: dict(row) for row in rows}
+        for record in batch:
+            industry = mapping.get(record["stock_code"], {})
+            record.update({field: industry.get(field, "") for field in _SW_FIELDS})
+    return records
 
 
 def list_records(
@@ -98,7 +119,7 @@ def list_records(
             params,
         ).fetchall()
 
-    return [_record(row) for row in rows], total
+    return _with_industries([_record(row) for row in rows]), total
 
 
 def get_record(stock_code: str) -> dict[str, Any] | None:
@@ -113,14 +134,14 @@ def get_record(stock_code: str) -> dict[str, Any] | None:
             "SELECT * FROM stock_basic_profiles WHERE stock_code LIKE ?",
             (f"{code}.%",),
         ).fetchone()
-    return _record(row) if row else None
+    return _with_industries([_record(row)])[0] if row else None
 
 
 def get_record_by_id(record_id: int) -> dict[str, Any] | None:
     row = _connection().execute(
         "SELECT * FROM stock_basic_profiles WHERE id = ?", (record_id,)
     ).fetchone()
-    return _record(row) if row else None
+    return _with_industries([_record(row)])[0] if row else None
 
 
 def upsert_record(
@@ -129,78 +150,40 @@ def upsert_record(
     source: str = "manual",
     source_version: str = "",
     is_manual_override: bool = True,
+    expected_revision: str | None = None,
+    create_only: bool = False,
 ) -> dict[str, Any]:
+    # 手工输入：显式空值表示清空；未提交的字段保持原值。批量导入仍走 batch_upsert 合并。
+    values = record.model_dump(exclude={"expected_revision", *_SW_FIELDS})
+    for field in ("listing_date", "setup_date"):
+        values[field] = values[field] or None
+    values.update({
+        "source": source, "source_version": source_version or record.source_version,
+        "is_manual_override": int(is_manual_override),
+    })
+    columns = list(values)
+    update_columns = [
+        field for field in columns
+        if field != "stock_code" and (field in record.model_fields_set or field in {
+            "source", "source_version", "is_manual_override",
+        })
+    ]
+    assignments = [f"{field}=excluded.{field}" for field in update_columns]
+    assignments.append("updated_at=datetime('now','localtime')")
     connection = _connection()
     with unit_of_work(connection=connection, immediate=True) as work:
+        current = work.connection.execute("SELECT * FROM stock_basic_profiles WHERE stock_code=?", (record.stock_code,)).fetchone()
+        if create_only and current is not None:
+            raise MasterDataConflictError("股票资料已存在，请打开现有记录编辑")
+        if expected_revision is not None:
+            check_revision(current, expected_revision)
         work.connection.execute(
-            """
-            INSERT INTO stock_basic_profiles(
-                market_group, exchange, board, stock_code, stock_name,
-                listing_date, main_business, business_scope, products,
-                industry, sw_level1_name, sw_level2_name, sw_level3_name,
-                city, province, legal_repr, registered_capital, setup_date,
-                website, company_intro, source, source_version, is_manual_override,
-                created_at, updated_at
-            ) VALUES (
-                ?, ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?,
-                datetime('now','localtime'), datetime('now','localtime')
-            )
-            ON CONFLICT(stock_code) DO UPDATE SET
-                market_group=excluded.market_group,
-                exchange=excluded.exchange,
-                board=excluded.board,
-                stock_name=excluded.stock_name,
-                listing_date=COALESCE(NULLIF(excluded.listing_date, ''), stock_basic_profiles.listing_date),
-                main_business=CASE WHEN excluded.main_business <> '' THEN excluded.main_business ELSE stock_basic_profiles.main_business END,
-                business_scope=CASE WHEN excluded.business_scope <> '' THEN excluded.business_scope ELSE stock_basic_profiles.business_scope END,
-                products=CASE WHEN excluded.products <> '' THEN excluded.products ELSE stock_basic_profiles.products END,
-                industry=CASE WHEN excluded.industry <> '' THEN excluded.industry ELSE stock_basic_profiles.industry END,
-                sw_level1_name=CASE WHEN excluded.sw_level1_name <> '' THEN excluded.sw_level1_name ELSE stock_basic_profiles.sw_level1_name END,
-                sw_level2_name=CASE WHEN excluded.sw_level2_name <> '' THEN excluded.sw_level2_name ELSE stock_basic_profiles.sw_level2_name END,
-                sw_level3_name=CASE WHEN excluded.sw_level3_name <> '' THEN excluded.sw_level3_name ELSE stock_basic_profiles.sw_level3_name END,
-                city=CASE WHEN excluded.city <> '' THEN excluded.city ELSE stock_basic_profiles.city END,
-                province=CASE WHEN excluded.province <> '' THEN excluded.province ELSE stock_basic_profiles.province END,
-                legal_repr=CASE WHEN excluded.legal_repr <> '' THEN excluded.legal_repr ELSE stock_basic_profiles.legal_repr END,
-                registered_capital=CASE WHEN excluded.registered_capital <> '' THEN excluded.registered_capital ELSE stock_basic_profiles.registered_capital END,
-                setup_date=COALESCE(NULLIF(excluded.setup_date, ''), stock_basic_profiles.setup_date),
-                website=CASE WHEN excluded.website <> '' THEN excluded.website ELSE stock_basic_profiles.website END,
-                company_intro=CASE WHEN excluded.company_intro <> '' THEN excluded.company_intro ELSE stock_basic_profiles.company_intro END,
-                source=excluded.source,
-                source_version=excluded.source_version,
-                is_manual_override=excluded.is_manual_override,
-                updated_at=datetime('now','localtime')
-            """,
-            (
-                record.market_group,
-                record.exchange,
-                record.board,
-                record.stock_code,
-                record.stock_name,
-                record.listing_date,
-                record.main_business,
-                record.business_scope,
-                record.products,
-                record.industry,
-                record.sw_level1_name,
-                record.sw_level2_name,
-                record.sw_level3_name,
-                record.city,
-                record.province,
-                record.legal_repr,
-                record.registered_capital,
-                record.setup_date,
-                record.website,
-                record.company_intro,
-                source,
-                source_version,
-                1 if is_manual_override else 0,
-            ),
+            f"""INSERT INTO stock_basic_profiles ({', '.join(columns)})
+                VALUES ({', '.join('?' for _ in columns)})
+                ON CONFLICT(stock_code) DO UPDATE SET {', '.join(assignments)}""",
+            tuple(values.values()),
         )
-    return get_record(record.stock_code) or {}
+        return get_record(record.stock_code) or {}
 
 
 def delete_record(record_id: int) -> bool:
@@ -227,63 +210,43 @@ def update_business_info(
     city: str = "",
     listing_date: str | None = None,
     source: str = "enrich",
+    force: bool = False,
+    updated_fields: list[str] | None = None,
 ) -> dict[str, Any] | None:
-    code = stock_code.strip().upper()
-    existing = get_record(code)
-    if not existing:
-        return None
-
-    updates: list[str] = []
-    params: list[object] = []
-
-    if main_business:
-        updates.append("main_business = ?")
-        params.append(main_business)
-    if business_scope:
-        updates.append("business_scope = ?")
-        params.append(business_scope)
-    if products:
-        updates.append("products = ?")
-        params.append(products)
-    if company_intro:
-        updates.append("company_intro = ?")
-        params.append(company_intro)
-    if setup_date:
-        updates.append("setup_date = ?")
-        params.append(setup_date)
-    if legal_repr:
-        updates.append("legal_repr = ?")
-        params.append(legal_repr)
-    if registered_capital:
-        updates.append("registered_capital = ?")
-        params.append(registered_capital)
-    if website:
-        updates.append("website = ?")
-        params.append(website)
-    if province:
-        updates.append("province = ?")
-        params.append(province)
-    if city:
-        updates.append("city = ?")
-        params.append(city)
-    if listing_date and not existing.get("listing_date"):
-        updates.append("listing_date = ?")
-        params.append(listing_date)
-
-    if not updates:
-        return existing
-
-    updates.append("updated_at = datetime('now','localtime')")
-    params.append(existing["id"])
-
+    incoming = {
+        "main_business": main_business, "business_scope": business_scope,
+        "products": products, "company_intro": company_intro, "setup_date": setup_date,
+        "legal_repr": legal_repr, "registered_capital": registered_capital,
+        "website": website, "province": province, "city": city, "listing_date": listing_date,
+    }
     connection = _connection()
+    # 上游请求完成后才进入事务；在写锁内重新读取，保护请求期间的手工编辑。
     with unit_of_work(connection=connection, immediate=True) as work:
+        existing = get_record(stock_code)
+        if not existing:
+            return None
+        changes = {
+            key: str(value).strip()
+            for key, value in incoming.items()
+            if value is not None and str(value).strip()
+            and (force or not str(existing.get(key) or "").strip())
+            and str(value).strip() != str(existing.get(key) or "")
+        }
+        if not changes:
+            return existing
+        assignments = [f"{key} = ?" for key in changes]
+        # 记录混合来源但保留手工锁定，后续普通同步仍不能覆盖。
+        sources = list(dict.fromkeys(
+            (["manual"] if existing["is_manual_override"] else []) + source.split("+")
+        ))
+        assignments.extend(["source = ?", "updated_at = datetime('now','localtime')"])
         work.connection.execute(
-            f"UPDATE stock_basic_profiles SET {', '.join(updates)} WHERE id = ?",
-            params,
+            f"UPDATE stock_basic_profiles SET {', '.join(assignments)} WHERE id = ?",
+            (*changes.values(), "+".join(sources), existing["id"]),
         )
-
-    return get_record_by_id(existing["id"])
+        if updated_fields is not None:
+            updated_fields.extend(changes)
+        return get_record_by_id(existing["id"])
 
 
 _PROFILE_MERGE_TEXT_FIELDS: tuple[str, ...] = (
@@ -343,9 +306,9 @@ def batch_upsert(
             business_scope = str(item.get("business_scope") or "").strip()
             products = str(item.get("products") or "").strip()
             industry = str(item.get("industry") or "").strip()
-            sw_level1_name = str(item.get("sw_level1_name") or "").strip()
-            sw_level2_name = str(item.get("sw_level2_name") or "").strip()
-            sw_level3_name = str(item.get("sw_level3_name") or "").strip()
+            sw_level1_name = ""
+            sw_level2_name = ""
+            sw_level3_name = ""
             city = str(item.get("city") or "").strip()
             province = str(item.get("province") or "").strip()
             legal_repr = str(item.get("legal_repr") or "").strip()

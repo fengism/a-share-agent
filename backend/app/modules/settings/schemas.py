@@ -71,7 +71,11 @@ class ConfigResponse(BaseModel):
     bot_batch_concurrency: int
     bot_batch_max_stocks: int
     bot_admin_users: list[str]
-    industry_chain_repair_timeout_seconds: float
+    industry_chain_research_timeout_seconds: float
+    industry_chain_repair_research_timeout_seconds: float
+    industry_chain_repair_synthesis_timeout_seconds: float
+    industry_chain_max_rounds: int
+    industry_chain_repair_max_rounds: int
     industry_chain_tool_calls_total: int
     industry_chain_repair_tool_calls_total: int
     analysis_llm_timeout_seconds: float
@@ -143,9 +147,13 @@ class ConfigUpdateRequest(BaseModel):
     bot_batch_concurrency: int | None = Field(default=None, ge=1, le=8)
     bot_batch_max_stocks: int | None = Field(default=None, ge=1, le=50)
     bot_admin_users: list[str] | None = None
-    industry_chain_repair_timeout_seconds: float | None = Field(default=None, gt=0)
+    industry_chain_research_timeout_seconds: float | None = Field(default=None, gt=0)
+    industry_chain_repair_research_timeout_seconds: float | None = Field(default=None, gt=0)
+    industry_chain_repair_synthesis_timeout_seconds: float | None = Field(default=None, gt=0)
+    industry_chain_max_rounds: int | None = Field(default=None, ge=2, le=10)
+    industry_chain_repair_max_rounds: int | None = Field(default=None, ge=1, le=6)
     industry_chain_tool_calls_total: int | None = Field(default=None, ge=8, le=128)
-    industry_chain_repair_tool_calls_total: int | None = Field(default=None, ge=4, le=48)
+    industry_chain_repair_tool_calls_total: int | None = Field(default=None, ge=4, le=64)
     analysis_llm_timeout_seconds: float | None = Field(default=None, gt=0)
     agent_research_timeout_seconds: float | None = Field(default=None, gt=0)
     chat_max_tool_calls_total: int | None = Field(default=None, ge=1, le=128)

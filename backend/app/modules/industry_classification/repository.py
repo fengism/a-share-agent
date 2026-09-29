@@ -6,7 +6,9 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
+from app.infrastructure.persistence.master_data_repair import backfill_industry_stock_names
 from app.modules.industry_classification.models import IndustryRecordInput
+from app.modules.master_data_revision import check_revision, record_revision
 
 _PROVIDER = "sina_akshare"
 _RECORD_FIELDS = (
@@ -41,6 +43,7 @@ def _connection() -> sqlite3.Connection:
 
 def _record(row: sqlite3.Row) -> dict[str, Any]:
     result = dict(row)
+    result["revision"] = record_revision(result)
     result["is_manual_override"] = bool(result["is_manual_override"])
     return result
 
@@ -183,8 +186,11 @@ def create_manual(record: IndustryRecordInput) -> int:
         return int(cursor.lastrowid)
 
 
-def update_manual(record_id: int, record: IndustryRecordInput) -> bool:
+def update_manual(record_id: int, record: IndustryRecordInput, *, expected_revision: str | None = None) -> bool:
     with unit_of_work(connection=_connection(), immediate=True) as work:
+        if expected_revision is not None:
+            current = work.connection.execute("SELECT * FROM sw_industry_classifications WHERE id=?", (record_id,)).fetchone()
+            check_revision(current, expected_revision)
         cursor = work.connection.execute(
             """
             UPDATE sw_industry_classifications SET
@@ -446,6 +452,7 @@ def upsert_a_share_mappings(mappings: dict[int, dict[str, str]]) -> dict[str, in
                     (suffix, stock_code, first, second, third),
                 )
                 counts["added"] += 1
+        backfill_industry_stock_names(work.connection)
     return counts
 
 

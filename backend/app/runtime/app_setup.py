@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.runtime.import_body_limit import ImportBodyLimitMiddleware
 from app.runtime.middleware import RequestObservabilityMiddleware, UserContextMiddleware
 
 # 交互式文档与 OpenAPI 描述是应用级端点，不受任何路由依赖保护。
@@ -48,6 +49,7 @@ def create_application(
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
     )
+    application.add_middleware(ImportBodyLimitMiddleware)
     application.add_middleware(UserContextMiddleware)
     application.add_middleware(RequestObservabilityMiddleware)
     return application

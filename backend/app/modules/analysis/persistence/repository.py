@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from app.configuration.paths import DATA_DIR
@@ -107,19 +110,70 @@ def _ensure_history_index() -> None:
     _HISTORY_INDEX.ensure(_rebuild_analysis_history_index_locked)
 
 
+def _version_path(user_id: int, code: str, date: str, report_id: str) -> Path:
+    if not re.fullmatch(r"[0-9]{6}", code) or not re.fullmatch(r"[0-9]{8}", date) or not re.fullmatch(r"[a-f0-9]{32,64}", report_id):
+        raise ValueError("报告版本标识无效")
+    return _user_stock_dir(user_id, code) / "versions" / date / f"{report_id}.json"
+
+
+def _save_version(path: Path, result: AnalysisResult) -> None:
+    if path.exists():
+        existing = _load_path(path)
+        if existing is None or existing.model_dump() != result.model_dump():
+            raise ValueError("报告版本已存在且内容不同，拒绝覆盖")
+        return
+    archive_store.save_result(path, result)
+
+
 def save_analysis(result: AnalysisResult, user_id: int) -> Path:
-    """将分析结果原子写入当前用户的股票日期文件。"""
+    """先保存不可变版本，再更新日期别名和索引；重试保存同一版本不会重复创建。"""
+    if not result.report_id:
+        result.report_id = uuid4().hex
+    if not result.generated_at:
+        result.generated_at = datetime.now(_MARKET_TIMEZONE).isoformat()
+    version = _version_path(user_id, result.stock_code, result.analysis_date, result.report_id)
+    version_existed = version.exists()
     filepath = _user_stock_dir(user_id, result.stock_code) / f"{result.analysis_date}.json"
     with _HISTORY_INDEX.mutation() as mutation:
-        archive_store.save_result(filepath, result)
+        previous = _load_path(filepath)
+        if filepath.exists() and previous is None:
+            raise ValueError("已有日期报告无法读取，拒绝覆盖")
+        if previous is not None:
+            if not previous.report_id:
+                previous.report_id = hashlib.sha256(filepath.read_bytes()).hexdigest()
+            _save_version(_version_path(user_id, previous.stock_code, previous.analysis_date, previous.report_id), previous)
+        _save_version(version, result)
         try:
+            archive_store.save_result(filepath, result)
             _upsert_history_summary(user_id, filepath, archive_store.result_summary(result))
         except Exception:
-            logger.warning("写入分析历史索引失败: %s", filepath, exc_info=True)
-        else:
-            mutation.complete()
-    logger.info("分析结果已保存: user_id=%s, path=%s", user_id, filepath)
+            # 首次写入失败时不留下孤立版本；已存在版本属于同一报告的幂等保存，不能删除。
+            if not version_existed:
+                version.unlink(missing_ok=True)
+            if previous is not None:
+                archive_store.save_result(filepath, previous)
+            else:
+                filepath.unlink(missing_ok=True)
+            raise
+        mutation.complete()
+    logger.info("分析结果已保存: user_id=%s, path=%s, report_id=%s", user_id, filepath, result.report_id)
     return filepath
+
+
+def list_analysis_versions(code: str, date: str, user_id: int, *, limit: int = 50, offset: int = 0) -> list[dict]:
+    directory = _version_path(user_id, code, date, "0" * 32).parent
+    versions = []
+    for path in directory.glob("*.json"):
+        result = _load_path(path)
+        if result is not None:
+            versions.append({**archive_store.result_summary(result), "report_id": result.report_id,
+                             "generated_at": result.generated_at})
+    versions.sort(key=lambda item: (item["generated_at"] or "", item["report_id"] or ""), reverse=True)
+    return versions[offset:offset + limit]
+
+
+def load_analysis_version(code: str, date: str, report_id: str, user_id: int) -> AnalysisResult | None:
+    return _load_path(_version_path(user_id, code, date, report_id))
 
 
 def load_analysis(code: str, date: str, user_id: int) -> AnalysisResult | None:
@@ -161,6 +215,10 @@ def delete_analysis(
             return False
 
     with _HISTORY_INDEX.mutation() as mutation:
+        if scope_user_id != 0:
+            version_dir = _version_path(user_id, code, date, "0" * 32).parent
+            for version_file in version_dir.glob("*.json"):
+                version_file.unlink()
         filepath.unlink()
         try:
             history_store.delete_history_row(_HISTORY_INDEX, scope_user_id, code, date)

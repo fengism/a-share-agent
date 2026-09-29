@@ -13,8 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.api.auth.dependencies import require_admin
-from app.api.errors import BadRequestError, NotFoundError
+from app.api.errors import BadRequestError, ConflictError, NotFoundError
 from app.domain.identity import AuthenticatedUser
+from app.modules.master_data_revision import MasterDataConflictError
 from app.modules.stock_profile.importer import ProfileImportError
 from app.modules.stock_profile.models import (
     StockBasicProfileInput,
@@ -24,6 +25,8 @@ from app.modules.stock_profile.models import (
     StockProfileEnrichResponse,
     StockProfileImportFileRequest,
     StockProfileImportResponse,
+    StockProfileSyncResponse,
+    StockProfileUpdateRequest,
 )
 from app.modules.stock_profile.public import (
     enrich_stock_profile,
@@ -124,14 +127,17 @@ def create_or_update_record(
     payload: StockBasicProfileInput,
     _: AuthenticatedUser = Depends(require_admin),
 ) -> StockBasicProfileRecord:
-    """手动创建或更新个股基础资料。"""
-    return save_profile(payload, source="manual", is_manual_override=True)
+    """手动创建个股基础资料；已存在时返回冲突，请使用带修订标识的编辑接口。"""
+    try:
+        return save_profile(payload, source="manual", is_manual_override=True, create_only=True)
+    except MasterDataConflictError as exc:
+        raise ConflictError(str(exc), code="master_data.record_exists") from exc
 
 
 @router.put("/records/{record_id}", response_model=StockBasicProfileRecord)
 def update_record_by_id(
     record_id: int,
-    payload: StockBasicProfileInput,
+    payload: StockProfileUpdateRequest,
     _: AuthenticatedUser = Depends(require_admin),
 ) -> StockBasicProfileRecord:
     """按记录 ID 手工保存个股基础资料（股票代码不可变更）。"""
@@ -144,7 +150,10 @@ def update_record_by_id(
             "如需变更请删除后重建",
             code="stock_profile.code_immutable",
         )
-    return save_profile(payload, source="manual", is_manual_override=True)
+    try:
+        return save_profile(payload, source="manual", is_manual_override=True, expected_revision=payload.expected_revision)
+    except MasterDataConflictError as exc:
+        raise ConflictError(str(exc), code="master_data.edit_conflict") from exc
 
 
 @router.delete("/records/{record_id}")
@@ -169,7 +178,7 @@ def enrich_record(
     return enrich_stock_profile(code, force=force)
 
 
-@router.post("/sync-master")
-def sync_master(_: AuthenticatedUser = Depends(require_admin)) -> dict[str, int]:
+@router.post("/sync-master", response_model=StockProfileSyncResponse)
+async def sync_master(_: AuthenticatedUser = Depends(require_admin)) -> StockProfileSyncResponse:
     """从官方交易所名录与申万行业数据全量同步/更新个股基础资料库。"""
-    return sync_exchange_master_data()
+    return await sync_exchange_master_data()

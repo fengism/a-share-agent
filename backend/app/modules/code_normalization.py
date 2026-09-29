@@ -1,66 +1,82 @@
-"""导入表格的股票代码归一，概念库与行业分类导入器共用同一套口径。
-
-统一规则：港股为 5 位数字（如 00700.HK，与 financial_data.hk.service.normalize_hk_code
-一致），沪深/北证为 6 位数字；market_group 取 A / HK / OVERSEAS。
-"""
+"""主数据手工维护与导入共用的证券身份归一规则。"""
 
 from __future__ import annotations
 
+import re
+
 _A_SUFFIXES = {"SZ", "SH", "BJ"}
-_HK_EXCHANGE_HINTS = {"港股", "HK", "香港"}
-_A_EXCHANGE_HINTS = {"A股", "A", "沪深", "沪市", "深市"}
+_EXCHANGE_HINTS = {"港股": "HK", "香港": "HK", "沪市": "SH", "深市": "SZ"}
+_A_HINTS = {"A", "A股", "沪深"}
 
 
-def _bare_market_and_suffix(base: str) -> tuple[str, str]:
-    """按裸代码的数字前缀推断市场；5 位纯数字判为港股（A 股代码均为 6 位）。"""
+def _a_suffix(base: str) -> str:
+    base = base.zfill(6)
     if base.startswith(("4", "8", "92")):
-        return "A", "BJ"
+        return "BJ"
     if base.startswith(("5", "6", "9")):
-        return "A", "SH"
-    if base.isdigit() and len(base) == 5:
-        return "HK", "HK"
-    return "A", "SZ"
+        return "SH"
+    return "SZ"
 
 
-def _pad_base(base: str, suffix: str) -> str:
-    if not base.isdigit():
-        return base
-    width = 5 if suffix == "HK" else 6
-    if len(base) <= width:
-        return base.zfill(width)
-    return base
-
-
-def normalize_imported_stock_code(raw: str, exchange_hint: str = "") -> tuple[str, str, str]:
-    """把导入表格里的股票代码归一为 (stock_code, exchange_suffix, market_group)。
-
-    与两个导入器此前的行为保持兼容，差异仅在港股：.HK 代码统一补齐到 5 位；
-    无后缀的 5 位纯数字判为港股（此前因先补齐到 6 位导致该分支永不生效，
-    会被误判成深市 A 股，如 00700 → 000700.SZ）。
-    """
-    value = str(raw or "").strip().replace(" ", "")
+def normalize_stock_identity(
+    raw: str, exchange_hint: str = "", market_group: str = "",
+) -> tuple[str, str, str]:
+    """返回代码、交易所和市场；显式提供的市场/交易所不能与后缀冲突。"""
+    value = str(raw or "").strip().upper()
+    hint = str(exchange_hint or "").strip().upper()
+    hint = _EXCHANGE_HINTS.get(hint, hint)
+    market = market_group.strip().upper()
+    if hint == "OVERSEAS":
+        if market and market != "OVERSEAS":
+            raise ValueError("交易所与市场不一致")
+        market, hint = "OVERSEAS", ""
+    if hint in _A_HINTS:
+        if market and market != "A":
+            raise ValueError("交易所与市场不一致")
+        market, hint = "A", ""
+    # Excel 数值单元格有时会带 .0；不能把它识别成海外交易所后缀。
+    if re.fullmatch(r"[0-9]+\.0+", value):
+        value = value.split(".", 1)[0]
     if not value:
-        return "", "", ""
+        raise ValueError("股票代码不能为空")
 
     if "." in value:
         base, suffix = value.rsplit(".", 1)
-        suffix = suffix.upper()
-        base = _pad_base(base, suffix)
-        market = "A" if suffix in _A_SUFFIXES else ("HK" if suffix == "HK" else "OVERSEAS")
-        return f"{base}.{suffix}", suffix, market
-
-    base = value
-    hint = exchange_hint.strip().upper()
-    if hint in _HK_EXCHANGE_HINTS:
-        market, suffix = "HK", "HK"
-    elif hint in _A_EXCHANGE_HINTS:
-        market = "A"
-        if base.startswith(("4", "8", "92")):
-            suffix = "BJ"
-        elif base.startswith(("5", "6", "9")):
-            suffix = "SH"
-        else:
-            suffix = "SZ"
+        if hint and hint != suffix:
+            raise ValueError("股票代码后缀与交易所不一致")
     else:
-        market, suffix = _bare_market_and_suffix(base)
-    return f"{_pad_base(base, suffix)}.{suffix}", suffix, market
+        base = value
+        if hint:
+            suffix = hint
+        elif market == "HK":
+            suffix = "HK"
+        elif market == "OVERSEAS":
+            suffix = ""
+        elif market == "A":
+            suffix = _a_suffix(base)
+        elif base.isdigit() and len(base) == 5:
+            suffix = "HK"
+        else:
+            suffix = _a_suffix(base)
+
+    inferred_market = "A" if suffix in _A_SUFFIXES else ("HK" if suffix == "HK" else "OVERSEAS")
+    if market and market != inferred_market:
+        raise ValueError("股票代码与市场不一致")
+    if inferred_market in {"A", "HK"}:
+        width = 5 if inferred_market == "HK" else 6
+        if not re.fullmatch(r"[0-9]+", base) or len(base.lstrip("0") or "0") > width:
+            raise ValueError("A 股代码须为 6 位数字，港股代码须为 5 位数字")
+        base = (base.lstrip("0") or "0").zfill(width)
+    elif not re.fullmatch(r"[A-Z0-9][A-Z0-9.-]*", base) or (
+        suffix and not re.fullmatch(r"[A-Z][A-Z0-9]*", suffix)
+    ):
+        raise ValueError("无效的海外股票代码或交易所后缀")
+    return f"{base}.{suffix}" if suffix else base, suffix, inferred_market
+
+
+def normalize_imported_stock_code(raw: str, exchange_hint: str = "") -> tuple[str, str, str]:
+    """导入器将非法身份计入无效行；手工维护则直接返回校验错误。"""
+    try:
+        return normalize_stock_identity(raw, exchange_hint)
+    except ValueError:
+        return "", "", ""
