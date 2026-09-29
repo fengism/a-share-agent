@@ -46,6 +46,21 @@
             ],
             "title": "Error"
           },
+          "phase": {
+            "anyOf": [
+              {
+                "enum": [
+                  "research",
+                  "verification_repair"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
           "plan": {
             "anyOf": [
               {
@@ -802,6 +817,41 @@
         "title": "AnalysisPageData",
         "type": "object"
       },
+      "AnalysisProvenance": {
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceFreshness"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "freshness_note": {
+            "default": "重新生成仅跳过分析报告缓存；工具可能使用各自缓存。未披露的日期与缓存状态均为未知。",
+            "title": "Freshness Note",
+            "type": "string"
+          },
+          "report_regenerated": {
+            "default": false,
+            "title": "Report Regenerated",
+            "type": "boolean"
+          },
+          "research_completed_at": {
+            "title": "Research Completed At",
+            "type": "string"
+          },
+          "research_started_at": {
+            "title": "Research Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "research_started_at",
+          "research_completed_at"
+        ],
+        "title": "AnalysisProvenance",
+        "type": "object"
+      },
       "AnalysisResult": {
         "properties": {
           "agent_trace": {
@@ -874,6 +924,17 @@
           "fundamental": {
             "$ref": "#/components/schemas/FactorAnalysis"
           },
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
           "key_factors": {
             "items": {
               "type": "string"
@@ -900,6 +961,27 @@
                 "type": "null"
               }
             ]
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Id"
           },
           "research_framework": {
             "anyOf": [
@@ -2912,13 +2994,29 @@
             "title": "Http Trust Env",
             "type": "boolean"
           },
-          "industry_chain_repair_timeout_seconds": {
-            "title": "Industry Chain Repair Timeout Seconds",
+          "industry_chain_max_rounds": {
+            "title": "Industry Chain Max Rounds",
+            "type": "integer"
+          },
+          "industry_chain_repair_max_rounds": {
+            "title": "Industry Chain Repair Max Rounds",
+            "type": "integer"
+          },
+          "industry_chain_repair_research_timeout_seconds": {
+            "title": "Industry Chain Repair Research Timeout Seconds",
+            "type": "number"
+          },
+          "industry_chain_repair_synthesis_timeout_seconds": {
+            "title": "Industry Chain Repair Synthesis Timeout Seconds",
             "type": "number"
           },
           "industry_chain_repair_tool_calls_total": {
             "title": "Industry Chain Repair Tool Calls Total",
             "type": "integer"
+          },
+          "industry_chain_research_timeout_seconds": {
+            "title": "Industry Chain Research Timeout Seconds",
+            "type": "number"
           },
           "industry_chain_tool_calls_total": {
             "title": "Industry Chain Tool Calls Total",
@@ -3076,7 +3174,11 @@
           "bot_batch_concurrency",
           "bot_batch_max_stocks",
           "bot_admin_users",
-          "industry_chain_repair_timeout_seconds",
+          "industry_chain_research_timeout_seconds",
+          "industry_chain_repair_research_timeout_seconds",
+          "industry_chain_repair_synthesis_timeout_seconds",
+          "industry_chain_max_rounds",
+          "industry_chain_repair_max_rounds",
           "industry_chain_tool_calls_total",
           "industry_chain_repair_tool_calls_total",
           "analysis_llm_timeout_seconds",
@@ -3637,7 +3739,33 @@
             ],
             "title": "Http Trust Env"
           },
-          "industry_chain_repair_timeout_seconds": {
+          "industry_chain_max_rounds": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 2.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Chain Max Rounds"
+          },
+          "industry_chain_repair_max_rounds": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Chain Repair Max Rounds"
+          },
+          "industry_chain_repair_research_timeout_seconds": {
             "anyOf": [
               {
                 "exclusiveMinimum": 0.0,
@@ -3647,12 +3775,24 @@
                 "type": "null"
               }
             ],
-            "title": "Industry Chain Repair Timeout Seconds"
+            "title": "Industry Chain Repair Research Timeout Seconds"
+          },
+          "industry_chain_repair_synthesis_timeout_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Chain Repair Synthesis Timeout Seconds"
           },
           "industry_chain_repair_tool_calls_total": {
             "anyOf": [
               {
-                "maximum": 48.0,
+                "maximum": 64.0,
                 "minimum": 4.0,
                 "type": "integer"
               },
@@ -3661,6 +3801,18 @@
               }
             ],
             "title": "Industry Chain Repair Tool Calls Total"
+          },
+          "industry_chain_research_timeout_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Chain Research Timeout Seconds"
           },
           "industry_chain_tool_calls_total": {
             "anyOf": [
@@ -5619,6 +5771,50 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "EvidenceFreshness": {
+        "properties": {
+          "cache_status": {
+            "default": "unknown",
+            "title": "Cache Status",
+            "type": "string"
+          },
+          "data_dates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Dates",
+            "type": "array"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "report_periods": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Report Periods",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool_name",
+          "evidence_id"
+        ],
+        "title": "EvidenceFreshness",
+        "type": "object"
+      },
       "FactorAnalysis": {
         "properties": {
           "heat_level": {
@@ -7018,12 +7214,27 @@
             "title": "Cache Misses",
             "type": "array"
           },
+          "draft_duration_ms": {
+            "default": 0,
+            "title": "Draft Duration Ms",
+            "type": "integer"
+          },
           "failed_dimensions": {
             "items": {
               "type": "string"
             },
             "title": "Failed Dimensions",
             "type": "array"
+          },
+          "finalization_duration_ms": {
+            "default": 0,
+            "title": "Finalization Duration Ms",
+            "type": "integer"
+          },
+          "independent_source_count": {
+            "default": 0,
+            "title": "Independent Source Count",
+            "type": "integer"
           },
           "public_item_count": {
             "default": 0,
@@ -7050,6 +7261,11 @@
           "total_duration_ms": {
             "default": 0,
             "title": "Total Duration Ms",
+            "type": "integer"
+          },
+          "verification_duration_ms": {
+            "default": 0,
+            "title": "Verification Duration Ms",
             "type": "integer"
           }
         },
@@ -9258,6 +9474,10 @@
             "title": "Market Group",
             "type": "string"
           },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -9313,6 +9533,7 @@
           "market_group",
           "exchange_suffix",
           "stock_code",
+          "revision",
           "id",
           "source",
           "is_manual_override",
@@ -9463,6 +9684,93 @@
           "refresh"
         ],
         "title": "IndustryStatusResponse",
+        "type": "object"
+      },
+      "IndustryUpdateRequest": {
+        "properties": {
+          "effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Date"
+          },
+          "exchange_suffix": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Exchange Suffix",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Expected Revision",
+            "type": "string"
+          },
+          "market_group": {
+            "enum": [
+              "A",
+              "HK",
+              "OVERSEAS"
+            ],
+            "title": "Market Group",
+            "type": "string"
+          },
+          "source_version": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Source Version",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Stock Name",
+            "type": "string"
+          },
+          "sw_industry_code": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Sw Industry Code",
+            "type": "string"
+          },
+          "sw_level1_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Sw Level1 Name",
+            "type": "string"
+          },
+          "sw_level2_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Sw Level2 Name",
+            "type": "string"
+          },
+          "sw_level3_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Sw Level3 Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "market_group",
+          "exchange_suffix",
+          "stock_code",
+          "expected_revision"
+        ],
+        "title": "IndustryUpdateRequest",
         "type": "object"
       },
       "InformationQuality": {
@@ -18973,19 +19281,19 @@
           },
           "sw_level1_name": {
             "default": "",
-            "maxLength": 64,
+            "maxLength": 128,
             "title": "Sw Level1 Name",
             "type": "string"
           },
           "sw_level2_name": {
             "default": "",
-            "maxLength": 64,
+            "maxLength": 128,
             "title": "Sw Level2 Name",
             "type": "string"
           },
           "sw_level3_name": {
             "default": "",
-            "maxLength": 64,
+            "maxLength": 128,
             "title": "Sw Level3 Name",
             "type": "string"
           },
@@ -19131,6 +19439,10 @@
             "title": "Registered Capital",
             "type": "string"
           },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
           "setup_date": {
             "anyOf": [
               {
@@ -19167,19 +19479,19 @@
           },
           "sw_level1_name": {
             "default": "",
-            "maxLength": 64,
+            "maxLength": 128,
             "title": "Sw Level1 Name",
             "type": "string"
           },
           "sw_level2_name": {
             "default": "",
-            "maxLength": 64,
+            "maxLength": 128,
             "title": "Sw Level2 Name",
             "type": "string"
           },
           "sw_level3_name": {
             "default": "",
-            "maxLength": 64,
+            "maxLength": 128,
             "title": "Sw Level3 Name",
             "type": "string"
           },
@@ -19196,6 +19508,7 @@
         },
         "required": [
           "stock_code",
+          "revision",
           "id",
           "source",
           "is_manual_override",
@@ -19620,6 +19933,10 @@
             "title": "Market Group",
             "type": "string"
           },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -19649,6 +19966,7 @@
         },
         "required": [
           "stock_code",
+          "revision",
           "id",
           "source",
           "is_manual_override",
@@ -19707,6 +20025,64 @@
           "stock_code"
         ],
         "title": "StockConceptRecordInput",
+        "type": "object"
+      },
+      "StockConceptUpdateRequest": {
+        "properties": {
+          "concepts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Concepts",
+            "type": "array"
+          },
+          "exchange_suffix": {
+            "default": "SZ",
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Exchange Suffix",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Expected Revision",
+            "type": "string"
+          },
+          "market_group": {
+            "default": "A",
+            "enum": [
+              "A",
+              "HK",
+              "OVERSEAS"
+            ],
+            "title": "Market Group",
+            "type": "string"
+          },
+          "source_version": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Source Version",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Stock Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "expected_revision"
+        ],
+        "title": "StockConceptUpdateRequest",
         "type": "object"
       },
       "StockDataSource": {
@@ -19976,6 +20352,217 @@
           "invalid_rows"
         ],
         "title": "StockProfileImportResponse",
+        "type": "object"
+      },
+      "StockProfileSyncResponse": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "failed_exchanges": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Failed Exchanges",
+            "type": "object"
+          },
+          "fetched_at": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Fetched At",
+            "type": "object"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "stale_exchanges": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stale Exchanges",
+            "type": "array"
+          },
+          "unchanged": {
+            "title": "Unchanged",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "added",
+          "updated",
+          "unchanged",
+          "skipped",
+          "complete",
+          "failed_exchanges",
+          "stale_exchanges",
+          "fetched_at"
+        ],
+        "title": "StockProfileSyncResponse",
+        "type": "object"
+      },
+      "StockProfileUpdateRequest": {
+        "properties": {
+          "board": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Board",
+            "type": "string"
+          },
+          "business_scope": {
+            "default": "",
+            "title": "Business Scope",
+            "type": "string"
+          },
+          "city": {
+            "default": "",
+            "maxLength": 64,
+            "title": "City",
+            "type": "string"
+          },
+          "company_intro": {
+            "default": "",
+            "title": "Company Intro",
+            "type": "string"
+          },
+          "exchange": {
+            "default": "",
+            "maxLength": 16,
+            "title": "Exchange",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Expected Revision",
+            "type": "string"
+          },
+          "industry": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Industry",
+            "type": "string"
+          },
+          "legal_repr": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Legal Repr",
+            "type": "string"
+          },
+          "listing_date": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listing Date"
+          },
+          "main_business": {
+            "default": "",
+            "title": "Main Business",
+            "type": "string"
+          },
+          "market_group": {
+            "default": "A",
+            "enum": [
+              "A",
+              "HK",
+              "OVERSEAS"
+            ],
+            "title": "Market Group",
+            "type": "string"
+          },
+          "products": {
+            "default": "",
+            "title": "Products",
+            "type": "string"
+          },
+          "province": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Province",
+            "type": "string"
+          },
+          "registered_capital": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Registered Capital",
+            "type": "string"
+          },
+          "setup_date": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setup Date"
+          },
+          "source_version": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Source Version",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          },
+          "stock_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Stock Name",
+            "type": "string"
+          },
+          "sw_level1_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Sw Level1 Name",
+            "type": "string"
+          },
+          "sw_level2_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Sw Level2 Name",
+            "type": "string"
+          },
+          "sw_level3_name": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Sw Level3 Name",
+            "type": "string"
+          },
+          "website": {
+            "default": "",
+            "maxLength": 256,
+            "title": "Website",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stock_code",
+          "expected_revision"
+        ],
+        "title": "StockProfileUpdateRequest",
         "type": "object"
       },
       "StockReportItem": {
@@ -23840,7 +24427,7 @@
   },
   "info": {
     "title": "A股智能分析系统",
-    "version": "0.5.0"
+    "version": "0.6.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -24359,6 +24946,155 @@
           }
         ],
         "summary": "Stream Analysis",
+        "tags": [
+          "analysis"
+        ]
+      }
+    },
+    "/api/analysis/{code}/versions/{date}": {
+      "get": {
+        "operationId": "get_analysis_versions_api_analysis__code__versions__date__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "title": "Date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Analysis Versions Api Analysis  Code  Versions  Date  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Analysis Versions",
+        "tags": [
+          "analysis"
+        ]
+      }
+    },
+    "/api/analysis/{code}/versions/{date}/{report_id}": {
+      "get": {
+        "operationId": "get_analysis_version_api_analysis__code__versions__date___report_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "title": "Date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "title": "Report Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Analysis Version",
         "tags": [
           "analysis"
         ]
@@ -27465,7 +28201,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/IndustryRecordInput"
+                "$ref": "#/components/schemas/IndustryUpdateRequest"
               }
             }
           },
@@ -31977,7 +32713,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/StockConceptRecordInput"
+                "$ref": "#/components/schemas/StockConceptUpdateRequest"
               }
             }
           },
@@ -32429,7 +33165,7 @@
         ]
       },
       "post": {
-        "description": "手动创建或更新个股基础资料。",
+        "description": "手动创建个股基础资料；已存在时返回冲突，请使用带修订标识的编辑接口。",
         "operationId": "create_or_update_record_api_stock_profile_records_post",
         "requestBody": {
           "content": {
@@ -32761,7 +33497,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/StockBasicProfileInput"
+                "$ref": "#/components/schemas/StockProfileUpdateRequest"
               }
             }
           },
@@ -32846,11 +33582,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "integer"
-                  },
-                  "title": "Response Sync Master Api Stock Profile Sync Master Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StockProfileSyncResponse"
                 }
               }
             },

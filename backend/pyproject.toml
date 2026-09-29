@@ -1,6 +1,6 @@
 [project]
 name = "stock-agent-backend"
-version = "0.5.0"
+version = "0.6.0"
 description = "A 股智能分析系统后端，支持分时、K 线、财报、估值与 AI 分析"
 readme = "../README.md"
 requires-python = ">=3.11"
@@ -19,6 +19,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
     "akshare>=1.16.0",
+    "mini-racer==0.14.1",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
     "tenacity>=9.0.0",
@@ -51,6 +52,15 @@ dev = [
     "mypy>=1.17.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.12.0",
+]
+
+[tool.uv]
+# AkShare 的两个旧 Linux 包与 mini-racer 共用 py_mini_racer 命名空间，
+# 不可同时安装。统一使用带 Linux amd64/arm64 原生 wheel 的现代运行时。
+# 不可能成立的 marker 按 uv override 语义移除这两个传递依赖。
+override-dependencies = [
+    "py-mini-racer; sys_platform == 'never'",
+    "akracer; sys_platform == 'never'",
 ]
 
 [tool.pytest.ini_options]
@@ -86,6 +96,8 @@ files = [
     "app/agentic/agents/profiles/risk.py",
     "app/agentic/agents/profiles/technical.py",
     "app/agentic/bootstrap.py",
+    "app/agentic/semantics.py",
+    "app/agentic/contracts.py",
     "app/agentic/catalog.py",
     "app/agentic/orchestration/contracts.py",
     "app/agentic/orchestration/executor.py",
@@ -94,6 +106,9 @@ files = [
     "app/agentic/research.py",
     "app/agentic/runtime/context.py",
     "app/agentic/runtime/llm.py",
+    "app/agentic/runtime/answer.py",
+    "app/agentic/runtime/evidence.py",
+    "app/agentic/runtime/tool_budget.py",
     "app/agentic/skills/contracts.py",
     "app/agentic/skills/packs/industry.py",
     "app/agentic/skills/packs/market.py",
@@ -171,6 +186,11 @@ files = [
     "app/api/auth/http.py",
     "app/domain/identity.py",
     "app/infrastructure/browser_runtime.py",
+    "app/infrastructure/pdf_runtime.py",
+    "app/infrastructure/chart_runtime.py",
+    "app/infrastructure/chart_worker.py",
+    "app/infrastructure/cleanup.py",
+    "app/infrastructure/render_queue.py",
     "app/infrastructure/persistence/chat_state.py",
     "app/infrastructure/http/client.py",
     "app/infrastructure/providers/cls.py",

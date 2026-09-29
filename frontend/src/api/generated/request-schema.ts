@@ -194,6 +194,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/analysis/{code}/versions/{date}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Analysis Versions */
+        get: operations["get_analysis_versions_api_analysis__code__versions__date__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analysis/{code}/versions/{date}/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Analysis Version */
+        get: operations["get_analysis_version_api_analysis__code__versions__date___report_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/admin/audit-logs": {
         parameters: {
             query?: never;
@@ -2996,7 +3030,7 @@ export interface paths {
         put?: never;
         /**
          * Create Or Update Record
-         * @description 手动创建或更新个股基础资料。
+         * @description 手动创建个股基础资料；已存在时返回冲突，请使用带修订标识的编辑接口。
          */
         post: operations["create_or_update_record_api_stock_profile_records_post"];
         delete?: never;
@@ -3863,6 +3897,8 @@ export interface components {
             content?: string | null;
             /** Error */
             error?: string | null;
+            /** Phase */
+            phase?: ("research" | "verification_repair") | null;
             plan?: components["schemas"]["AgentPlan"] | null;
             plan_step?: components["schemas"]["AgentPlanStepUpdate"] | null;
             /** Reasoning Content */
@@ -4101,6 +4137,25 @@ export interface components {
             unavailable_sections?: ("stock_info" | "kline" | "intraday" | "valuation" | "cached_analysis")[];
             valuation?: components["schemas"]["StockValuation"] | null;
         };
+        /** AnalysisProvenance */
+        AnalysisProvenance: {
+            /** Evidence */
+            evidence?: components["schemas"]["EvidenceFreshness"][];
+            /**
+             * Freshness Note
+             * @default 重新生成仅跳过分析报告缓存；工具可能使用各自缓存。未披露的日期与缓存状态均为未知。
+             */
+            freshness_note?: string;
+            /**
+             * Report Regenerated
+             * @default false
+             */
+            report_regenerated?: boolean;
+            /** Research Completed At */
+            research_completed_at: string;
+            /** Research Started At */
+            research_started_at: string;
+        };
         /** AnalysisResult */
         AnalysisResult: {
             /** Agent Trace */
@@ -4124,6 +4179,8 @@ export interface components {
                 number
             ] | null;
             fundamental: components["schemas"]["FactorAnalysis"];
+            /** Generated At */
+            generated_at?: string | null;
             /** Key Factors */
             key_factors?: string[];
             /** Overall Rating */
@@ -4131,6 +4188,9 @@ export interface components {
             /** Overall Summary */
             overall_summary: string;
             prompt_trace?: components["schemas"]["PromptTrace"] | null;
+            provenance?: components["schemas"]["AnalysisProvenance"] | null;
+            /** Report Id */
+            report_id?: string | null;
             research_framework?: components["schemas"]["InvestmentResearchFramework"] | null;
             /** Risk Warnings */
             risk_warnings?: string[];
@@ -4930,10 +4990,18 @@ export interface components {
             fred_api_key: string;
             /** Http Trust Env */
             http_trust_env: boolean;
-            /** Industry Chain Repair Timeout Seconds */
-            industry_chain_repair_timeout_seconds: number;
+            /** Industry Chain Max Rounds */
+            industry_chain_max_rounds: number;
+            /** Industry Chain Repair Max Rounds */
+            industry_chain_repair_max_rounds: number;
+            /** Industry Chain Repair Research Timeout Seconds */
+            industry_chain_repair_research_timeout_seconds: number;
+            /** Industry Chain Repair Synthesis Timeout Seconds */
+            industry_chain_repair_synthesis_timeout_seconds: number;
             /** Industry Chain Repair Tool Calls Total */
             industry_chain_repair_tool_calls_total: number;
+            /** Industry Chain Research Timeout Seconds */
+            industry_chain_research_timeout_seconds: number;
             /** Industry Chain Tool Calls Total */
             industry_chain_tool_calls_total: number;
             /** Is Admin */
@@ -5077,10 +5145,18 @@ export interface components {
             fred_api_key?: string | null;
             /** Http Trust Env */
             http_trust_env?: boolean | null;
-            /** Industry Chain Repair Timeout Seconds */
-            industry_chain_repair_timeout_seconds?: number | null;
+            /** Industry Chain Max Rounds */
+            industry_chain_max_rounds?: number | null;
+            /** Industry Chain Repair Max Rounds */
+            industry_chain_repair_max_rounds?: number | null;
+            /** Industry Chain Repair Research Timeout Seconds */
+            industry_chain_repair_research_timeout_seconds?: number | null;
+            /** Industry Chain Repair Synthesis Timeout Seconds */
+            industry_chain_repair_synthesis_timeout_seconds?: number | null;
             /** Industry Chain Repair Tool Calls Total */
             industry_chain_repair_tool_calls_total?: number | null;
+            /** Industry Chain Research Timeout Seconds */
+            industry_chain_research_timeout_seconds?: number | null;
             /** Industry Chain Tool Calls Total */
             industry_chain_tool_calls_total?: number | null;
             /** Iwencai Api Key */
@@ -5799,6 +5875,24 @@ export interface components {
              */
             request_id?: string | null;
         };
+        /** EvidenceFreshness */
+        EvidenceFreshness: {
+            /**
+             * Cache Status
+             * @default unknown
+             */
+            cache_status?: string;
+            /** Data Dates */
+            data_dates?: string[];
+            /** Evidence Id */
+            evidence_id: string;
+            /** Report Periods */
+            report_periods?: string[];
+            /** Sources */
+            sources?: string[];
+            /** Tool Name */
+            tool_name: string;
+        };
         /** FactorAnalysis */
         FactorAnalysis: {
             /** Heat Level */
@@ -6248,8 +6342,23 @@ export interface components {
             cache_hits?: string[];
             /** Cache Misses */
             cache_misses?: string[];
+            /**
+             * Draft Duration Ms
+             * @default 0
+             */
+            draft_duration_ms?: number;
             /** Failed Dimensions */
             failed_dimensions?: string[];
+            /**
+             * Finalization Duration Ms
+             * @default 0
+             */
+            finalization_duration_ms?: number;
+            /**
+             * Independent Source Count
+             * @default 0
+             */
+            independent_source_count?: number;
             /**
              * Public Item Count
              * @default 0
@@ -6272,6 +6381,11 @@ export interface components {
              * @default 0
              */
             total_duration_ms?: number;
+            /**
+             * Verification Duration Ms
+             * @default 0
+             */
+            verification_duration_ms?: number;
         };
         /** IndustryChainChangeItem */
         IndustryChainChangeItem: {
@@ -7493,6 +7607,8 @@ export interface components {
              * @enum {string}
              */
             market_group: "A" | "HK" | "OVERSEAS";
+            /** Revision */
+            revision: string;
             /** Source */
             source: string;
             /**
@@ -7595,6 +7711,52 @@ export interface components {
         IndustryStatusResponse: {
             refresh: components["schemas"]["RefreshState"];
             stats: components["schemas"]["IndustryStats"];
+        };
+        /** IndustryUpdateRequest */
+        IndustryUpdateRequest: {
+            /** Effective Date */
+            effective_date?: string | null;
+            /** Exchange Suffix */
+            exchange_suffix: string;
+            /** Expected Revision */
+            expected_revision: string;
+            /**
+             * Market Group
+             * @enum {string}
+             */
+            market_group: "A" | "HK" | "OVERSEAS";
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+            /** Stock Code */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @default
+             */
+            stock_name?: string;
+            /**
+             * Sw Industry Code
+             * @default
+             */
+            sw_industry_code?: string;
+            /**
+             * Sw Level1 Name
+             * @default
+             */
+            sw_level1_name?: string;
+            /**
+             * Sw Level2 Name
+             * @default
+             */
+            sw_level2_name?: string;
+            /**
+             * Sw Level3 Name
+             * @default
+             */
+            sw_level3_name?: string;
         };
         /** InformationQuality */
         InformationQuality: {
@@ -11395,6 +11557,8 @@ export interface components {
              * @default
              */
             registered_capital?: string;
+            /** Revision */
+            revision: string;
             /** Setup Date */
             setup_date?: string | null;
             /** Source */
@@ -11626,6 +11790,8 @@ export interface components {
              * @enum {string}
              */
             market_group?: "A" | "HK" | "OVERSEAS";
+            /** Revision */
+            revision: string;
             /** Source */
             source: string;
             /**
@@ -11652,6 +11818,36 @@ export interface components {
              * @default SZ
              */
             exchange_suffix?: string;
+            /**
+             * Market Group
+             * @default A
+             * @enum {string}
+             */
+            market_group?: "A" | "HK" | "OVERSEAS";
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+            /** Stock Code */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @default
+             */
+            stock_name?: string;
+        };
+        /** StockConceptUpdateRequest */
+        StockConceptUpdateRequest: {
+            /** Concepts */
+            concepts?: string[];
+            /**
+             * Exchange Suffix
+             * @default SZ
+             */
+            exchange_suffix?: string;
+            /** Expected Revision */
+            expected_revision: string;
             /**
              * Market Group
              * @default A
@@ -11787,6 +11983,131 @@ export interface components {
             updated: number;
             /** Warnings */
             warnings?: string[];
+        };
+        /** StockProfileSyncResponse */
+        StockProfileSyncResponse: {
+            /** Added */
+            added: number;
+            /** Complete */
+            complete: boolean;
+            /** Failed Exchanges */
+            failed_exchanges: {
+                [key: string]: string;
+            };
+            /** Fetched At */
+            fetched_at: {
+                [key: string]: number;
+            };
+            /** Skipped */
+            skipped: number;
+            /** Stale Exchanges */
+            stale_exchanges: string[];
+            /** Unchanged */
+            unchanged: number;
+            /** Updated */
+            updated: number;
+        };
+        /** StockProfileUpdateRequest */
+        StockProfileUpdateRequest: {
+            /**
+             * Board
+             * @default
+             */
+            board?: string;
+            /**
+             * Business Scope
+             * @default
+             */
+            business_scope?: string;
+            /**
+             * City
+             * @default
+             */
+            city?: string;
+            /**
+             * Company Intro
+             * @default
+             */
+            company_intro?: string;
+            /**
+             * Exchange
+             * @default
+             */
+            exchange?: string;
+            /** Expected Revision */
+            expected_revision: string;
+            /**
+             * Industry
+             * @default
+             */
+            industry?: string;
+            /**
+             * Legal Repr
+             * @default
+             */
+            legal_repr?: string;
+            /** Listing Date */
+            listing_date?: string | null;
+            /**
+             * Main Business
+             * @default
+             */
+            main_business?: string;
+            /**
+             * Market Group
+             * @default A
+             * @enum {string}
+             */
+            market_group?: "A" | "HK" | "OVERSEAS";
+            /**
+             * Products
+             * @default
+             */
+            products?: string;
+            /**
+             * Province
+             * @default
+             */
+            province?: string;
+            /**
+             * Registered Capital
+             * @default
+             */
+            registered_capital?: string;
+            /** Setup Date */
+            setup_date?: string | null;
+            /**
+             * Source Version
+             * @default
+             */
+            source_version?: string;
+            /** Stock Code */
+            stock_code: string;
+            /**
+             * Stock Name
+             * @default
+             */
+            stock_name?: string;
+            /**
+             * Sw Level1 Name
+             * @default
+             */
+            sw_level1_name?: string;
+            /**
+             * Sw Level2 Name
+             * @default
+             */
+            sw_level2_name?: string;
+            /**
+             * Sw Level3 Name
+             * @default
+             */
+            sw_level3_name?: string;
+            /**
+             * Website
+             * @default
+             */
+            website?: string;
         };
         /**
          * StockReportItem
@@ -13421,6 +13742,76 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": string;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_analysis_versions_api_analysis__code__versions__date__get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                code: string;
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_analysis_version_api_analysis__code__versions__date___report_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                date: string;
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisResult"];
                 };
             };
             /** @description 统一错误响应 */
@@ -15376,7 +15767,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["IndustryRecordInput"];
+                "application/json": components["schemas"]["IndustryUpdateRequest"];
             };
         };
         responses: {
@@ -18227,7 +18618,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["StockConceptRecordInput"];
+                "application/json": components["schemas"]["StockConceptUpdateRequest"];
             };
         };
         responses: {
@@ -18611,7 +19002,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["StockBasicProfileInput"];
+                "application/json": components["schemas"]["StockProfileUpdateRequest"];
             };
         };
         responses: {
@@ -18712,9 +19103,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: number;
-                    };
+                    "application/json": components["schemas"]["StockProfileSyncResponse"];
                 };
             };
             /** @description 统一错误响应 */
