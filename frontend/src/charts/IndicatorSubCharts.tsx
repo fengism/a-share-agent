@@ -6,7 +6,7 @@ import type { TechnicalIndicators } from "../types/stock";
 import { useColors } from "../styles/ui";
 import { APP_FONT_SIZE } from "../theme/typography";
 import type { ThemeColors } from "../theme/themes";
-import { shouldFitChartContent } from "./chartLifecycle";
+import { createDebouncedResizeHandler, shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
 
 export type IndicatorType = "macd" | "rsi" | "kdj";
@@ -199,10 +199,12 @@ export default function IndicatorSubCharts({
     chartInstanceRef.current = chart;
     fittedViewKeyRef.current = null;
 
-    const resizeObserver = new ResizeObserver(([entry]) => {
-      const width = Math.floor(entry.contentRect.width);
-      if (width > 0) chart.applyOptions({ width });
-    });
+    const resizeObserver = new ResizeObserver(
+      createDebouncedResizeHandler((entry) => {
+        const width = Math.floor(entry.contentRect.width);
+        if (width > 0) chart.applyOptions({ width });
+      })
+    );
     resizeObserver.observe(chartRef.current);
 
     return () => {

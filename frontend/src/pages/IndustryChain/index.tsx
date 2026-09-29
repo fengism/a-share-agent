@@ -20,7 +20,7 @@ import WorkflowWorkspace from "../../components/workflows/WorkflowWorkspace";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useWorkflowPush } from "../../hooks/useWorkflowPush";
 import { useColors, useStyles } from "../../styles/ui";
-import type { IndustryChainHistoryItem, IndustryChainResearchScope } from "../../types/stock";
+import type { IndustryChainHistoryItem, IndustryChainResearchScope, IndustryChainResult } from "../../types/stock";
 import HistoryPanel from "./HistoryPanel";
 import IndustryAtlas from "./IndustryAtlas";
 import IndustryReport, { type IndustryPushResult } from "./IndustryReport";
@@ -100,6 +100,7 @@ export default function IndustryChain() {
     isAnalyzing,
     isCancelling,
     currentStage,
+    failedStage,
     stageMessage,
     result,
     archiveId,
@@ -110,7 +111,15 @@ export default function IndustryChain() {
     loadResult,
     clearResult,
   } = useIndustryChainWorkflowController({
-    onSuccess: useCallback(() => message.success("产业链分析完成"), []),
+    onSuccess: useCallback((completed: IndustryChainResult) => {
+      if (completed.archive_status === "failed") {
+        message.warning("产业链报告已生成，但存档失败");
+      } else if (completed.quality_status === "degraded") {
+        message.warning("产业链分析完成，但存在证据或质量提示");
+      } else {
+        message.success("产业链分析完成");
+      }
+    }, []),
     onError: useCallback((runError: Error) => message.error(runError.message), []),
     onCancelled: useCallback((cancelResult: "cancelled" | "detached" | "completed") => message.info(
       cancelResult === "cancelled"
@@ -304,6 +313,7 @@ export default function IndustryChain() {
                   {(isActiveRouteRun || isCurrentRouteStopped || (runningName === activeName && (currentStage >= 0 || error || agentProcess.plan || agentProcess.toolCalls.length > 0 || agentProcess.rounds.length > 0))) && (
                     <IndustryWorkflowProgress
                       currentStage={currentStage}
+                      failedStage={failedStage}
                       status={workflowStatus}
                       message={error || stageMessage}
                       agentProcess={agentProcess}

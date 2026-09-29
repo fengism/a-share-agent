@@ -126,4 +126,45 @@ describe("PortfolioTables", () => {
       total_shares: 60,
     }));
   });
+
+  it("supports exporting holdings to CSV and navigating to report analysis", () => {
+    window.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    window.URL.revokeObjectURL = vi.fn();
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    render(
+      <MemoryRouter>
+        <PortfolioTables
+          positions={[]}
+          stocks={[{
+            stock_code: "600519",
+            stock_name: "贵州茅台",
+            position_count: 1,
+            total_shares: 60,
+            average_cost: 10.1,
+            current_price: 11,
+            change_pct: 1,
+            cost_value: 606,
+            market_value: 660,
+            profit_amount: 54,
+            profit_pct: 8.91,
+            realized_profit_amount: 74,
+            total_profit_amount: 128,
+          }]}
+          closedPositions={[]}
+          transactions={[]}
+          onSell={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const exportBtn = screen.getByRole("button", { name: /导出 CSV/ });
+    expect(exportBtn).toBeInTheDocument();
+    fireEvent.click(exportBtn);
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    clickSpy.mockRestore();
+
+    expect(screen.getByRole("link", { name: "查看贵州茅台研报" })).toHaveAttribute("href", "/analysis?code=600519");
+  });
 });

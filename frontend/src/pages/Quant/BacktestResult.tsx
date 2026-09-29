@@ -1,4 +1,5 @@
-import { InfoCircleOutlined } from "@ant-design/icons";
+import { CopyOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { Button, message } from "antd";
 import type { QuantBacktestResult, QuantStrategyConfig } from "../../api/queries";
 import BacktestCharts from "./results/BacktestCharts";
 import BacktestMetrics from "./results/BacktestMetrics";
@@ -8,14 +9,44 @@ import { quantStrategyIdentity, quantStrategyParameterSummary } from "./quantRun
 import "./quant-results.css";
 
 export default function BacktestResult({ result, strategy }: { result: QuantBacktestResult; strategy?: QuantStrategyConfig }) {
+  const handleCopySummary = async () => {
+    const lines = [
+      "### 量化策略回测报告摘要",
+      `- 策略：${strategy ? quantStrategyIdentity(strategy) : "自定义策略"}`,
+      `- 标的：${result.codes.join(", ") || "多标的"}`,
+      `- 累计总收益：${result.metrics.total_return != null ? `${result.metrics.total_return}%` : "-"}`,
+      `- 年化收益率：${result.metrics.annualized_return != null ? `${result.metrics.annualized_return}%` : "-"}`,
+      `- 最大回撤：${result.metrics.max_drawdown != null ? `${result.metrics.max_drawdown}%` : "-"}`,
+      `- 夏普比率：${result.metrics.sharpe_ratio != null ? result.metrics.sharpe_ratio : "-"}`,
+      `- 超额收益：${result.metrics.excess_return != null ? `${result.metrics.excess_return}%` : "-"}`,
+      `- 交易笔数：${result.trades.length} 笔`,
+    ];
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      message.success("回测摘要已复制到剪贴板");
+    } catch {
+      message.error("复制失败，请手动选择");
+    }
+  };
+
   return (
     <section aria-label="回测结果">
-      <nav className="quant-result-nav" aria-label="回测结果导航">
-        <a href="#quant-result-metrics">核心指标</a>
-        <a href="#quant-result-charts">净值与回撤</a>
-        <a href="#quant-result-trades-chart">交易点位</a>
-        <a href="#quant-result-details">收益与成交</a>
-      </nav>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <nav className="quant-result-nav" aria-label="回测结果导航">
+          <a href="#quant-result-metrics">核心指标</a>
+          <a href="#quant-result-charts">净值与回撤</a>
+          <a href="#quant-result-trades-chart">交易点位</a>
+          <a href="#quant-result-details">收益与成交</a>
+        </nav>
+        <Button
+          size="small"
+          icon={<CopyOutlined />}
+          onClick={handleCopySummary}
+          aria-label="复制回测摘要"
+        >
+          复制摘要
+        </Button>
+      </div>
       {strategy ? (
         <div className="quant-result-strategy" aria-label="本次执行策略">
           <strong>{quantStrategyIdentity(strategy)}</strong>

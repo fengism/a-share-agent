@@ -46,13 +46,13 @@ import {
   useUpdateStockConceptRecord,
 } from "../../api/queries";
 import type {
-  ConceptImportFileRequest,
   ConceptImportPreviewResponse,
   StockConceptListFilters,
   StockConceptMarketGroup,
   StockConceptRecord,
   StockConceptRecordInput,
 } from "../../api/stockConcept";
+import { useImportFile } from "./useImportFile";
 import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
 import { useStyles } from "../../styles/ui";
@@ -60,7 +60,6 @@ import "./stock-concept.css";
 
 const { Paragraph, Text, Title } = Typography;
 const PAGE_SIZE = 50;
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const MARKET_OPTIONS = [
   { value: "A", label: "A 股" },
   { value: "HK", label: "港股" },
@@ -74,10 +73,6 @@ const EMPTY_RECORD: StockConceptRecordInput = {
   stock_name: "",
   concepts: [],
   source_version: "manual",
-};
-
-type ImportFileState = Pick<ConceptImportFileRequest, "filename" | "content_base64"> & {
-  size: number;
 };
 
 function errorMessage(error: unknown): string {
@@ -231,10 +226,19 @@ function ImportDrawer({
 }) {
   const previewImport = usePreviewStockConceptImport();
   const commitImport = useCommitStockConceptImport();
-  const [fileState, setFileState] = useState<ImportFileState | null>(null);
+  const upload = useImportFile((text) => { message.error(text); });
+  const { file: fileState, reading: readingFile, clear } = upload;
   const [preview, setPreview] = useState<ConceptImportPreviewResponse | null>(null);
   const [forceOverride, setForceOverride] = useState(false);
-  const [readingFile, setReadingFile] = useState(false);
+  const busy = previewImport.isPending || commitImport.isPending;
+  useEffect(() => {
+    if (!open) {
+      clear();
+      setPreview(null);
+      setForceOverride(false);
+    }
+  }, [open, clear]);
+  const close = () => { if (!busy) onClose(); };
 
   const resetPreview = () => setPreview(null);
   const request = fileState
@@ -248,36 +252,16 @@ function ImportDrawer({
   const uploadProps: UploadProps = {
     accept: ".csv,.xlsx,.xls",
     maxCount: 1,
-    showUploadList: true,
+    fileList: upload.selected ? [upload.selected] : [],
     beforeUpload: (file) => {
-      if (file.size > MAX_FILE_SIZE) {
-        message.error("文件不能超过 50 MB");
-        return Upload.LIST_IGNORE;
-      }
-      setReadingFile(true);
       resetPreview();
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = String(reader.result || "");
-        const base64 = result.includes(",") ? result.split(",")[1] : result;
-        setFileState({ filename: file.name, content_base64: base64, size: file.size });
-        setReadingFile(false);
-      };
-      reader.onerror = () => {
-        setReadingFile(false);
-        message.error("读取文件失败");
-      };
-      reader.readAsDataURL(file);
-      return false;
+      return upload.select(file) ? false : Upload.LIST_IGNORE;
     },
-    onRemove: () => {
-      setFileState(null);
-      resetPreview();
-    },
+    onRemove: () => { clear(); resetPreview(); },
   };
 
   const handlePreview = () => {
-    if (!request) return;
+    if (!request || readingFile || busy) return;
     previewImport.mutate(request, {
       onSuccess: (response) => {
         setPreview(response);
@@ -288,7 +272,7 @@ function ImportDrawer({
   };
 
   const handleCommit = () => {
-    if (!request || !preview) return;
+    if (!request || !preview || readingFile || busy) return;
     commitImport.mutate(
       {
         ...request,
@@ -321,7 +305,10 @@ function ImportDrawer({
     <Drawer
       title="导入概念数据 (CSV / Excel)"
       open={open}
-      onClose={onClose}
+      onClose={close}
+      closable={!busy}
+      mask={{ closable: !busy }}
+      keyboard={!busy}
       width={640}
       destroyOnHidden
     >
@@ -332,7 +319,7 @@ function ImportDrawer({
           message="文件格式要求"
           description="支持 CSV 或 Excel 格式，必须包含【股票代码】和【所属概念】列（如 i问财导出的表头）。多个概念支持分号或逗号分隔。"
         />
-        <Upload.Dragger {...uploadProps} disabled={readingFile || previewImport.isPending}>
+        <Upload.Dragger {...uploadProps} disabled={busy}>
           <p className="ant-upload-drag-icon">
             <FileExcelOutlined />
           </p>
@@ -343,7 +330,7 @@ function ImportDrawer({
           type="primary"
           icon={<SearchOutlined />}
           block
-          disabled={!fileState}
+          disabled={!fileState || readingFile || busy}
           loading={readingFile || previewImport.isPending}
           onClick={handlePreview}
         >
@@ -414,7 +401,7 @@ function ImportDrawer({
                 <Text type="secondary">若未开启，手工维护过的股票将保留原样不被覆盖</Text>
               </div>
             </div>
-            <Switch checked={forceOverride} onChange={setForceOverride} />
+            <Switch disabled={busy} checked={forceOverride} onChange={setForceOverride} />
           </div>
           <Popconfirm
             title="确认写入概念数据库？"
@@ -479,7 +466,7 @@ export default function StockConceptPage() {
       onError: (error: Error) => message.error(`保存失败：${errorMessage(error)}`),
     };
     if (editingRecord) {
-      updateRecord.mutate({ id: editingRecord.id, record: value }, callbacks);
+      updateRecord.mutate({ id: editingRecord.id, record: { ...value, expected_revision: editingRecord.revision } }, callbacks);
       return;
     }
     createRecord.mutate(value, callbacks);
@@ -725,6 +712,10 @@ export default function StockConceptPage() {
           </Button>
         </div>
 
+        <SectionDataState isLoading={recordsQuery.isLoading} error={recordsQuery.error}
+          onRetry={() => recordsQuery.refetch()} errorTitle="概念记录加载失败"
+          isEmpty={!recordsQuery.isLoading && !recordsQuery.error && recordsQuery.data?.total === 0}
+          emptyText="没有符合条件的概念记录">
         <Table
           rowKey="id"
           size="middle"
@@ -741,6 +732,7 @@ export default function StockConceptPage() {
             onChange: (page, pageSize) => setFilters((curr) => ({ ...curr, page, page_size: pageSize })),
           }}
         />
+        </SectionDataState>
       </Card>
 
       <RecordEditorModal

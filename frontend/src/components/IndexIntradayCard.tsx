@@ -24,7 +24,7 @@ export default function IndexIntradayCard({
   price,
   changePct,
   preClose,
-  height = 420,
+  height = 380,
 }: Props) {
   const c = useColors();
   const t = useTokens();
@@ -119,7 +119,7 @@ export default function IndexIntradayCard({
           <IntradayChart
             data={items}
             prevClose={referenceClose}
-            height={560}
+            height={580}
             viewKey={`index-modal:${symbol}`}
           />
         </div>

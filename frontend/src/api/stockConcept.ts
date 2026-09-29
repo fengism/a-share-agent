@@ -10,6 +10,7 @@ export interface StockConceptRecordInput {
 }
 
 export interface StockConceptRecord extends StockConceptRecordInput {
+  revision: string;
   id: number;
   source: string;
   is_manual_override: boolean;

@@ -1,6 +1,6 @@
 import { BulbOutlined, CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined, DownOutlined, LoadingOutlined, RobotOutlined, StopOutlined, ToolOutlined, WarningOutlined } from "@ant-design/icons";
 import type { ReactElement } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Steps, Tag, Typography } from "antd";
 import type { AgentPlan, AgentPlanStepStatus, ToolCallDisplay } from "../types/chat";
 import type { AgentProcessRound, AgentProcessTermination } from "../features/agent-process/agentProcess";
@@ -65,14 +65,14 @@ function groupedToolStatus(tools: ToolCallDisplay[]) {
 }
 
 function ToolCallGroups({ toolCalls }: { toolCalls: ToolCallDisplay[] }) {
-  const toolGroups = Array.from(
+  const toolGroups = useMemo(() => Array.from(
     toolCalls.reduce((groups, tool) => {
       const existing = groups.get(tool.name) ?? [];
       existing.push(tool);
       groups.set(tool.name, existing);
       return groups;
     }, new Map<string, ToolCallDisplay[]>()),
-  );
+  ), [toolCalls]);
 
   if (toolGroups.length === 0) return null;
 
@@ -159,8 +159,8 @@ function ResearchRounds({ rounds }: { rounds: AgentProcessRound[] }) {
           const state = roundStatus(round);
           return (
             <section
-              key={round.roundIndex}
-              aria-label={`第 ${round.roundIndex} 轮调研`}
+              key={`${round.phase ?? "research"}:${round.roundIndex}`}
+              aria-label={`${round.phase === "verification_repair" ? "补证 · " : ""}第 ${round.roundIndex} 轮调研`}
               style={{
                 padding: "var(--c-space-3)",
                 border: "1px solid var(--c-border)",
@@ -171,7 +171,7 @@ function ResearchRounds({ rounds }: { rounds: AgentProcessRound[] }) {
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--c-space-2)", marginBottom: "var(--c-space-3)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--c-space-2)" }}>
-                  <Text strong>第 {round.roundIndex} 轮</Text>
+                  <Text strong>{round.phase === "verification_repair" ? "定向补证 · " : round.phase === "research" ? "主调研 · " : ""}第 {round.roundIndex} 轮</Text>
                   <Text type="secondary">计划最多 {round.roundTotal} 轮</Text>
                 </div>
                 <Tag icon={state.icon} style={semanticTagStyle(state.color)}>{state.label}</Tag>
@@ -230,10 +230,13 @@ export default function AgentProcessPanel({
   termination?: AgentProcessTermination;
 }) {
   const steps = plan?.steps ?? [];
+  // A failed tool call is a local evidence gap, not a failed workflow. The
+  // report may still complete from other tools, so only terminal/plan/round
+  // failures should turn the whole Agent process red.
   const hasFailure = termination === "failed"
     || rounds.some((round) => round.status === "failed")
-    || steps.some((step) => step.status === "failed")
-    || toolCalls.some((tool) => tool.isError);
+    || steps.some((step) => step.status === "failed");
+  const hasFailedTool = toolCalls.some((tool) => tool.isError);
   const hasCancellation = rounds.some((round) => round.status === "cancelled" || round.status === "detached")
     || steps.some((step) => step.status === "cancelled")
     || toolCalls.some((tool) => tool.isCancelled);
@@ -273,9 +276,11 @@ export default function AgentProcessPanel({
         ? { color: "primary" as SemanticTagColor, label: "执行中", icon: <LoadingOutlined spin /> }
         : hasCancellation
           ? { color: "warning" as SemanticTagColor, label: "已停止", icon: <StopOutlined /> }
-          : hasDegradation || hasSkippedTool
-            ? { color: "warning" as SemanticTagColor, label: "数据缺口", icon: <WarningOutlined /> }
-            : { color: "down" as SemanticTagColor, label: "已完成", icon: <CheckCircleOutlined /> };
+          : hasFailedTool
+            ? { color: "warning" as SemanticTagColor, label: "已完成，部分工具失败", icon: <WarningOutlined /> }
+            : hasDegradation || hasSkippedTool
+              ? { color: "warning" as SemanticTagColor, label: "数据缺口", icon: <WarningOutlined /> }
+              : { color: "down" as SemanticTagColor, label: "已完成", icon: <CheckCircleOutlined /> };
   const detail = [
     steps.length > 0 ? `${settledSteps}/${steps.length} 个步骤` : "",
     rounds.length > 0 ? `${rounds.length} 轮调研` : "",

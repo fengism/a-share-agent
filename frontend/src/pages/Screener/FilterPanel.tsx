@@ -3,6 +3,7 @@ import { Row, Col, InputNumber, Select, Button, Space, Switch, Slider, Typograph
 import { SearchOutlined, ReloadOutlined } from "@ant-design/icons";
 import type { ScreenerFilter } from "../../types/stock";
 import { useStyles } from "../../styles/ui";
+import ActiveFiltersBar from "./ActiveFiltersBar";
 
 const { Text } = Typography;
 
@@ -159,6 +160,17 @@ export default function FilterPanel({
           </>
         )}
       </Row>
+
+      <ActiveFiltersBar
+        filters={filters}
+        onFiltersChange={onFiltersChange}
+        onSearch={onSearch}
+        onReset={onReset}
+        showPercentile={showPercentile}
+        onShowPercentileChange={onShowPercentileChange}
+        pePercentileMax={pePercentileMax}
+        pbPercentileMax={pbPercentileMax}
+      />
     </div>
   );
 }

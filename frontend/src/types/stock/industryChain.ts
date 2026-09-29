@@ -223,6 +223,9 @@ export interface IndustryChainAnalysisMetadata {
   total_duration_ms?: number;
   research_duration_ms?: number;
   synthesis_duration_ms?: number;
+  draft_duration_ms?: number;
+  verification_duration_ms?: number;
+  finalization_duration_ms?: number;
   archive_duration_ms?: number;
   cache_hits?: string[];
   cache_misses?: string[];
@@ -230,6 +233,7 @@ export interface IndustryChainAnalysisMetadata {
   successful_dimensions?: string[];
   agent_evidence_count?: number;
   public_item_count?: number;
+  independent_source_count?: number;
 }
 
 export interface IndustryChainResult {

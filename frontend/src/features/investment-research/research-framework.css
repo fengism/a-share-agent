@@ -338,6 +338,19 @@
   font-size: var(--stock-research-label-size, 11px);
   line-height: var(--c-leading-normal);
 }
+.research-gap-list article > strong {
+  display: block;
+  color: var(--c-text-primary);
+  font-size: var(--stock-research-subhead-size, 13px);
+  font-weight: var(--c-weight-semibold);
+  line-height: var(--c-leading-normal);
+}
+.research-gap-list article > p {
+  margin: 6px 0 0;
+  color: var(--c-text-secondary);
+  font-size: var(--stock-research-support-size, 12px);
+  line-height: var(--c-leading-relaxed, 1.55);
+}
 .research-segment-grid dl,
 .research-gap-list dl {
   display: grid;

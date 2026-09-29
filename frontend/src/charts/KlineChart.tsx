@@ -20,7 +20,7 @@ import type { KlineItem } from "../types/stock";
 import type { ChanlunResult, MmdType } from "../utils/chanlun";
 import { useColors } from "../styles/ui";
 import { APP_FONT_FAMILY, APP_FONT_SIZE } from "../theme/typography";
-import { shouldFitChartContent } from "./chartLifecycle";
+import { createDebouncedResizeHandler, shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
 import { buildKlineTradeMarkers, type KlineTradeMarker } from "./klineMarkers";
 import { calculateMA, calculateMAVOL, calculateBOLL, MA_CONFIGS, MAVOL_CONFIGS } from "./movingAverages";
@@ -194,6 +194,61 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
 
   const activeCandle = hoverInfo ?? latestInfo;
 
+  const selectedIndexRef = useRef<number | null>(null);
+
+  const handleRangeSelect = (range: "1M" | "3M" | "1Y" | "ALL") => {
+    const chart = chartRef.current;
+    if (!chart || rows.length === 0) return;
+    if (range === "ALL") {
+      chart.timeScale().fitContent();
+      setIsZoomed(false);
+      return;
+    }
+    const barsCount = range === "1M" ? 22 : range === "3M" ? 66 : 250;
+    const from = Math.max(0, rows.length - barsCount);
+    const to = rows.length + 2;
+    chart.timeScale().setVisibleLogicalRange({ from, to });
+    setIsZoomed(true);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (rows.length === 0) return;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      const currentIdx = selectedIndexRef.current ?? (rows.length - 1);
+      const nextIdx = e.key === "ArrowLeft"
+        ? Math.max(0, currentIdx - 1)
+        : Math.min(rows.length - 1, currentIdx + 1);
+      selectedIndexRef.current = nextIdx;
+      const target = rows[nextIdx];
+      const prev = nextIdx > 0 ? rows[nextIdx - 1] : null;
+      const changePct = target.change_pct ?? (prev && prev.close > 0 ? ((target.close - prev.close) / prev.close) * 100 : null);
+      const dateKey = `${target.date.year}-${String(target.date.month).padStart(2, "0")}-${String(target.date.day).padStart(2, "0")}`;
+      setHoverInfo({
+        dateStr: target.rawDate,
+        open: target.open,
+        high: target.high,
+        low: target.low,
+        close: target.close,
+        changePct,
+        amount: target.amount ?? target.volume ?? null,
+        ma5: calculations.maMaps.get("ma5")?.get(dateKey) ?? null,
+        ma10: calculations.maMaps.get("ma10")?.get(dateKey) ?? null,
+        ma20: calculations.maMaps.get("ma20")?.get(dateKey) ?? null,
+        ma30: calculations.maMaps.get("ma30")?.get(dateKey) ?? null,
+        ma60: calculations.maMaps.get("ma60")?.get(dateKey) ?? null,
+        vol5: calculations.mavolMaps.get("vol5")?.get(dateKey) ?? null,
+        vol10: calculations.mavolMaps.get("vol10")?.get(dateKey) ?? null,
+        bollMid: calculations.bollMidMap.get(dateKey) ?? null,
+        bollUp: calculations.bollUpMap.get(dateKey) ?? null,
+        bollDn: calculations.bollDnMap.get(dateKey) ?? null,
+      });
+    } else if (e.key === "Escape") {
+      selectedIndexRef.current = null;
+      setHoverInfo(null);
+    }
+  };
+
   useEffect(() => {
     if (!wrapperRef.current || !chartElRef.current || !brushRef.current) return;
     chartRef.current?.remove();
@@ -294,9 +349,11 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
 
     const wrapper = wrapperRef.current;
     const brush = brushRef.current;
-    const resizeObserver = new ResizeObserver(([entry]) => {
-      chart.applyOptions({ width: Math.floor(entry.contentRect.width), height: height - 32 });
-    });
+    const resizeObserver = new ResizeObserver(
+      createDebouncedResizeHandler((entry) => {
+        chart.applyOptions({ width: Math.floor(entry.contentRect.width), height: height - 32 });
+      })
+    );
     resizeObserver.observe(chartElRef.current);
     let startX: number | null = null;
 
@@ -352,9 +409,12 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
 
     const handleCrosshairMove = (param: MouseEventParams<Time>) => {
       if (!param.time || !param.seriesData) {
-        setHoverInfo(null);
+        if (selectedIndexRef.current === null) {
+          setHoverInfo(null);
+        }
         return;
       }
+      selectedIndexRef.current = null;
       const cData = param.seriesData.get(candle) as CandlestickData<BusinessDay> | undefined;
       const vData = param.seriesData.get(volume) as { value?: number } | undefined;
       if (cData && typeof param.time === "object" && param.time !== null && "year" in param.time) {
@@ -566,12 +626,33 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       borderUpColor: c.up, borderDownColor: c.down,
       wickUpColor: c.up, wickDownColor: c.down,
     });
+    volumeSeriesRef.current?.setData(rows.map((item) => ({
+      time: item.date,
+      value: item.amount ?? item.volume,
+      color: item.close >= item.open ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
+    })));
     chart.priceScale("right").applyOptions({ borderColor: c.border });
     chart.priceScale("left").applyOptions({ borderColor: c.border });
-  }, [c.cardBg, c.border, c.down, c.textMuted, c.textSecondary, c.up, height]);
+  }, [c.cardBg, c.border, c.down, c.textMuted, c.textSecondary, c.up, height, rows]);
 
   return (
-    <div ref={wrapperRef} className="kline-chart" style={{ position: "relative", width: "100%", minHeight: height, display: "flex", flexDirection: "column", backgroundColor: c.cardBg }}>
+    <div
+      ref={wrapperRef}
+      tabIndex={0}
+      role="region"
+      aria-label="K线图交互区"
+      onKeyDown={handleKeyDown}
+      className="kline-chart"
+      style={{
+        position: "relative",
+        width: "100%",
+        minHeight: height,
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: c.cardBg,
+        outline: "none",
+      }}
+    >
       {/* Allow wrapped quotes to grow without overlapping the toolbar or plot. */}
       <div className="kline-chart__hud" style={{
         minHeight: 32,
@@ -633,8 +714,76 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
           <span>等待K线数据...</span>
         )}
 
-        {/* Overlay toggle */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto", marginLeft: 4 }}>
+        {/* Range & Overlay controls */}
+        <div style={{ display: "flex", alignItems: "center", gap: 3, flex: "0 0 auto", marginLeft: 4 }}>
+          <button
+            type="button"
+            onClick={() => handleRangeSelect("1M")}
+            title="查看近1月 (约22根K线)"
+            style={{
+              padding: "1px 5px",
+              fontSize: "11px",
+              borderRadius: 4,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textSecondary,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            1月
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRangeSelect("3M")}
+            title="查看近3月 (约66根K线)"
+            style={{
+              padding: "1px 5px",
+              fontSize: "11px",
+              borderRadius: 4,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textSecondary,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            3月
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRangeSelect("1Y")}
+            title="查看近1年 (约250根K线)"
+            style={{
+              padding: "1px 5px",
+              fontSize: "11px",
+              borderRadius: 4,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textSecondary,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            1年
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRangeSelect("ALL")}
+            title="查看全部K线"
+            style={{
+              padding: "1px 5px",
+              fontSize: "11px",
+              borderRadius: 4,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textSecondary,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            全部
+          </button>
           <button
             type="button"
             onClick={() => setMainOverlay(mainOverlay === "MA" ? "BOLL" : "MA")}
@@ -661,15 +810,8 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
           position: "absolute", top: 0, bottom: 0, display: "none", pointerEvents: "none",
           background: hexToRgba(c.primary, 0.12), border: `1px solid ${hexToRgba(c.primary, 0.35)}`,
         }} />
-        <div className="pdf-hide" style={{ position: "absolute", right: 12, top: 10, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", zIndex: 5 }}>
-          <div style={{
-            padding: "4px 8px", fontSize: "11px", color: c.textSecondary,
-            background: hexToRgba(c.pageBg, 0.94), border: `1px solid ${c.border}`,
-            borderRadius: 6, boxShadow: "0 1px 3px rgba(0,0,0,0.15)", pointerEvents: "none",
-          }}>
-            拖拽框选缩放 · 双击重置
-          </div>
-          {isZoomed && (
+        {isZoomed && (
+          <div className="pdf-hide" style={{ position: "absolute", right: 12, top: 10, zIndex: 5 }}>
             <button type="button" onClick={() => { chartRef.current?.timeScale().fitContent(); setIsZoomed(false); }}
               style={{
                 padding: "6px 12px", fontSize: "var(--c-font-sm)", fontWeight: "var(--c-weight-semibold)", color: c.primary,
@@ -678,8 +820,8 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
               }}>
               返回全视图
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

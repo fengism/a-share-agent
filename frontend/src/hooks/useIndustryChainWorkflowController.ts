@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "../api/queryKeys";
 import { streamIndustryChain, type IndustryChainProgress, type WorkflowCancelResult } from "../api/sse";
 import { useIndustryChainWorkflowStore } from "../store/industryChainWorkflowStore";
-import type { IndustryChainResearchScope } from "../types/stock";
+import type { IndustryChainResearchScope, IndustryChainResult } from "../types/stock";
 import {
   agentProcessFromEvents,
   applyAgentEvent,
@@ -12,7 +12,7 @@ import {
 import { INDUSTRY_CHAIN_STAGES, industryStageIndex } from "../pages/IndustryChain/industryWorkflow";
 
 interface IndustryChainWorkflowControllerOptions {
-  onSuccess?: () => void;
+  onSuccess?: (result: IndustryChainResult) => void;
   onError?: (error: Error) => void;
   onCancelled?: (result: WorkflowCancelResult) => void;
 }
@@ -33,6 +33,7 @@ export function useIndustryChainWorkflowController({
   const isCancelling = useIndustryChainWorkflowStore((s) => s.isCancelling);
   const currentStage = useIndustryChainWorkflowStore((s) => s.currentStage);
   const stageMessage = useIndustryChainWorkflowStore((s) => s.stageMessage);
+  const failedStage = useIndustryChainWorkflowStore((s) => s.failedStage);
   const result = useIndustryChainWorkflowStore((s) => s.result);
   const archiveId = useIndustryChainWorkflowStore((s) => s.archiveId);
   const error = useIndustryChainWorkflowStore((s) => s.error);
@@ -61,6 +62,13 @@ export function useIndustryChainWorkflowController({
         });
       } else if (event.type === "stage_completed") {
         current.patch(runId, { stageMessage: event.message || "完成" });
+      } else if (event.type === "stage_failed" && event.stage) {
+        const failedStage = industryStageIndex(event.stage);
+        current.patch(runId, {
+          currentStage: failedStage >= 0 ? failedStage : current.currentStage,
+          failedStage,
+          stageMessage: event.message || "阶段执行失败",
+        });
       } else if (event.type === "agent_event" && event.agent_event) {
         current.patch(runId, {
           agentProcess: applyAgentEvent(current.agentProcess, event.agent_event),
@@ -79,11 +87,18 @@ export function useIndustryChainWorkflowController({
       current.patch(runId, {
         result,
         archiveId: result.archive_id || "",
-        currentStage: INDUSTRY_CHAIN_STAGES.length,
-        stageMessage: result.archive_status === "failed" ? "分析完成，但存档失败" : "分析完成",
+        currentStage: result.archive_status === "failed"
+          ? INDUSTRY_CHAIN_STAGES.length - 1
+          : INDUSTRY_CHAIN_STAGES.length,
+        failedStage: result.archive_status === "failed" ? INDUSTRY_CHAIN_STAGES.length - 1 : current.failedStage,
+        stageMessage: result.archive_status === "failed"
+          ? "分析完成，但存档失败"
+          : result.quality_status === "degraded"
+            ? "分析完成，但存在证据或质量提示"
+            : "分析完成",
         isAnalyzing: false,
         isCancelling: false,
-        status: "success",
+        status: result.archive_status === "failed" || result.quality_status === "degraded" ? "warning" : "success",
         agentProcess: current.agentProcess.plan || current.agentProcess.toolCalls.length > 0
           ? current.agentProcess
           : agentProcessFromEvents(result.agent_trace),
@@ -94,7 +109,7 @@ export function useIndustryChainWorkflowController({
         queryClient.invalidateQueries({ queryKey: queryKeys.workflows.industryChainLatest(normalizedName) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active }),
       ]);
-      onSuccess?.();
+      onSuccess?.(result);
     }).catch((unknownError) => {
       const current = useIndustryChainWorkflowStore.getState();
       if (current.runId !== runId || !current.isAnalyzing) return;
@@ -121,10 +136,11 @@ export function useIndustryChainWorkflowController({
       ...store,
       runId,
       name,
-      status: "success",
+      status: result.archive_status === "failed" || result.quality_status === "degraded" ? "warning" : "success",
       isAnalyzing: false,
       isCancelling: false,
       currentStage: -1,
+      failedStage: -1,
       stageMessage: "",
       result,
       archiveId,
@@ -170,6 +186,7 @@ export function useIndustryChainWorkflowController({
     isCancelling,
     currentStage,
     stageMessage,
+    failedStage,
     result,
     archiveId,
     error,

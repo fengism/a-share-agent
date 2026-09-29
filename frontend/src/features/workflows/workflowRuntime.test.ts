@@ -81,8 +81,20 @@ describe("resumed industry workflows", () => {
     const test = setup();
     test.resolve(report);
     await test.promise;
-    expect(store.getState()).toMatchObject({ status: "success", isAnalyzing: false, isCancelling: false, result: report, currentStage: 2 });
+    expect(store.getState()).toMatchObject({ status: "success", isAnalyzing: false, isCancelling: false, result: report, currentStage: 5 });
   });
+
+
+  it("restores an archive-failed industry report as warning", async () => {
+    const test = setup();
+    test.progress({ type: "stage_failed", stage: "archive", message: "报告已生成，但存档失败" });
+    test.resolve({ ...report, archive_status: "failed", quality_status: "complete" });
+    await test.promise;
+    expect(store.getState()).toMatchObject({
+      status: "warning", isAnalyzing: false, currentStage: 4, failedStage: 4,
+    });
+  });
+
 });
 
 const analysisJob: WorkflowJob = { ...job, id: "stock-job", kind: "analysis", request: { code: "600519" }, dedupe_key: "600519" };

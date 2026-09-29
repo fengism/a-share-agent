@@ -121,6 +121,8 @@ describe("AgentProcessPanel", () => {
     );
 
     expect(screen.getByText("2 次工具调用")).toBeInTheDocument();
+    expect(screen.getByText("已完成，部分工具失败")).toBeInTheDocument();
+    expect(screen.queryByText("执行失败")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Agent 思考与执行/ }));
     expect(screen.getAllByText("网页搜索")).toHaveLength(1);
     expect(screen.getByText("1/2 失败")).toBeInTheDocument();

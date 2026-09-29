@@ -1,3 +1,4 @@
+import AnalysisFreshness from "./AnalysisFreshness";
 import { buildStockValuationUrl } from "./analysisHistoryUrl";
 import { ArrowRightOutlined, AuditOutlined, WarningOutlined } from "@ant-design/icons";
 import { Alert, Button, Empty, Progress, Segmented, Tag, Typography } from "antd";
@@ -99,6 +100,24 @@ function formatConfidence(value: number | null) {
 function formatRange(value: [number, number] | null) {
   if (!value) return "证据不足，未给出区间";
   return `¥${value[0].toFixed(2)} – ¥${value[1].toFixed(2)}`;
+}
+
+function formatScenarioFairValue(value: [number, number] | null, valuationView?: string) {
+  if (value) return `¥${value[0].toFixed(2)} – ¥${value[1].toFixed(2)}`;
+
+  const pointEstimateMatch = valuationView?.match(
+    /(?:每股价值|每股估值|目标价)\s*[¥￥]?\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*元?/i,
+  );
+  const pointEstimate = pointEstimateMatch
+    ? Number(pointEstimateMatch[1].replace(/,/g, ""))
+    : null;
+  if (pointEstimate != null && Number.isFinite(pointEstimate) && pointEstimate > 0) {
+    return `模型点估计 ¥${pointEstimate.toFixed(2)}`;
+  }
+  if (valuationView && /(?:点估计|DCF)/i.test(valuationView)) {
+    return "已有模型点估计，未形成区间";
+  }
+  return "证据不足，未给出区间";
 }
 
 function EvidenceMeter({ label, value, description }: { label: string; value: number | null; description: string }) {
@@ -263,6 +282,7 @@ export default function ResearchFrameworkPanel({
 
   return (
     <div className={`research-framework${compact ? " is-compact" : ""}`}>
+      <AnalysisFreshness analysis={analysis} />
       <div className="research-reading-toolbar pdf-hide">
         <nav aria-label="研究结论章节导航">
           {RESEARCH_CHAPTERS.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
@@ -443,7 +463,7 @@ export default function ResearchFrameworkPanel({
             return (
               <article key={name} data-scenario={name}>
                 <span>{SCENARIO_LABELS[name]}</span>
-                <strong>{formatRange(scenario?.fair_value_range ?? null)}</strong>
+                <strong>{formatScenarioFairValue(scenario?.fair_value_range ?? null, scenario?.valuation_view)}</strong>
                 <p>{scenario?.valuation_view || "该情景证据不足"}</p>
                 <h5>关键假设</h5>
                 <TextList items={scenario?.assumptions ?? []} />
@@ -519,8 +539,8 @@ export default function ResearchFrameworkPanel({
           <div className="research-gap-list">
             {research.data_gaps.map((gap, index) => (
               <article key={`${gap.topic}-${index}`}>
-                <strong>{gap.topic}</strong>
-                <p>{gap.missing_data || "缺失内容未说明"}</p>
+                <strong className="research-gap-list__topic">{gap.topic}</strong>
+                <p className="research-gap-list__description">{gap.missing_data || "缺失内容未说明"}</p>
                 <dl>
                   <div><dt>决策影响</dt><dd>{gap.decision_impact || "待评估"}</dd></div>
                   <div><dt>下一步</dt><dd>{gap.follow_up || "待补充核验"}</dd></div>

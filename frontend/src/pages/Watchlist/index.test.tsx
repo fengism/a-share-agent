@@ -259,4 +259,19 @@ describe("WatchlistPage", () => {
     expect(screen.queryByRole("button", { name: /白酒概念.*2 只/ })).not.toBeInTheDocument();
     expect(screen.getByText("当前显示 1 只")).toBeInTheDocument();
   });
+
+  it("supports exporting watchlist to CSV and selecting stocks for batch backtest", () => {
+    renderPage();
+
+    expect(screen.getByRole("button", { name: /导出 CSV/ })).toBeInTheDocument();
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    fireEvent.click(checkboxes[1]);
+
+    expect(screen.getByText("已选 1 只")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /批量回测/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /清空选择/ }));
+    expect(screen.queryByText("已选 1 只")).not.toBeInTheDocument();
+  });
 });

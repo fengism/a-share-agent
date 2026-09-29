@@ -66,4 +66,24 @@ describe("DragonTigerContent", () => {
       expect(mocks.detailQuery).toHaveBeenCalledWith("600000", "2026-09-04");
     });
   });
+
+  it("supports exporting dragon tiger list to CSV", () => {
+    window.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    window.URL.revokeObjectURL = vi.fn();
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    render(
+      <MemoryRouter>
+        <DragonTigerContent />
+      </MemoryRouter>,
+    );
+
+    const exportBtn = screen.getByRole("button", { name: "导出龙虎榜 CSV" });
+    expect(exportBtn).toBeInTheDocument();
+    fireEvent.click(exportBtn);
+
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    clickSpy.mockRestore();
+  });
 });

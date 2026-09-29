@@ -20,3 +20,5 @@ export interface StockProfileListFilters {
   sort_by?: string;
   sort_order?: "asc" | "desc";
 }
+
+export type StockProfileSyncResponse = components["schemas"]["StockProfileSyncResponse"];

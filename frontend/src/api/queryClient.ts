@@ -20,6 +20,7 @@ export const queryClient = new QueryClient({
     queries: {
       retry: shouldRetryQuery,
       refetchOnWindowFocus: false,
+      refetchIntervalInBackground: false,
       staleTime: QUERY_CACHE_POLICIES.defaultQuery.staleMs,
     },
   },

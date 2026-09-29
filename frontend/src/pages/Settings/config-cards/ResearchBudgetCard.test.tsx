@@ -5,22 +5,30 @@ import ResearchBudgetCard from "./ResearchBudgetCard";
 const baseForm = {
   analysis_llm_timeout_seconds: 1200,
   agent_research_timeout_seconds: 1200,
-  industry_chain_repair_timeout_seconds: 600,
-  industry_chain_tool_calls_total: 72,
-  industry_chain_repair_tool_calls_total: 36,
+  industry_chain_research_timeout_seconds: 1800,
+  industry_chain_repair_research_timeout_seconds: 900,
+  industry_chain_repair_synthesis_timeout_seconds: 600,
+  industry_chain_max_rounds: 6,
+  industry_chain_repair_max_rounds: 3,
+  industry_chain_tool_calls_total: 96,
+  industry_chain_repair_tool_calls_total: 48,
   chat_max_tool_calls_total: 32,
 };
 
 describe("ResearchBudgetCard", () => {
-  it("renders all six budget fields with current values", () => {
+  it("renders all ten budget fields with current values", () => {
     render(<ResearchBudgetCard form={baseForm} onChange={vi.fn()} onSave={vi.fn()} isSaving={false} />);
 
     expect(screen.getByText("研究预算与超时（全局）")).toBeInTheDocument();
     // 两个超时字段默认同为 1200，其余值唯一
     expect(screen.getAllByDisplayValue(1200)).toHaveLength(2);
+    expect(screen.getByDisplayValue(1800)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(900)).toBeInTheDocument();
     expect(screen.getByDisplayValue(600)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(72)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(36)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(6)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(3)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(96)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(48)).toBeInTheDocument();
     expect(screen.getByDisplayValue(32)).toBeInTheDocument();
   });
 
@@ -38,6 +46,8 @@ describe("ResearchBudgetCard", () => {
     render(<ResearchBudgetCard form={{}} onChange={vi.fn()} onSave={vi.fn()} isSaving={false} />);
 
     expect(screen.getAllByDisplayValue(1200)).toHaveLength(2);
+    expect(screen.getByDisplayValue(1800)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(900)).toBeInTheDocument();
     expect(screen.getByDisplayValue(600)).toBeInTheDocument();
   });
 });

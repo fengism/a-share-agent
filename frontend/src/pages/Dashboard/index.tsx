@@ -2,6 +2,9 @@ import { useMemo } from "react";
 import {
   AimOutlined,
   ApartmentOutlined,
+  AuditOutlined,
+  CalendarOutlined,
+  DownloadOutlined,
   LineChartOutlined,
   ReloadOutlined,
   RobotOutlined,
@@ -12,6 +15,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useNavigate } from "react-router-dom";
 import { useMarketMainline } from "../../api/queries";
 import ChangeValue from "../../components/ChangeValue";
+import PreloadLink from "../../components/PreloadLink";
 import RefreshBadge from "../../components/RefreshBadge";
 import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
@@ -97,10 +101,10 @@ function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
       extra={
         <span style={{ display: "inline-flex", gap: t.space[1] }}>
           {chance.continued_days != null && chance.continued_days > 0 ? (
-            <Tag style={{ marginInlineEnd: 0 }}>持续 {chance.continued_days} 天</Tag>
+            <Tag className="financial-num" style={{ marginInlineEnd: 0 }}>持续 {chance.continued_days} 天</Tag>
           ) : null}
           {chance.hot != null && chance.hot > 0 ? (
-            <Tag color="volcano" style={{ marginInlineEnd: 0 }}>热度 {chance.hot}</Tag>
+            <Tag className="financial-num" color="volcano" style={{ marginInlineEnd: 0 }}>热度 {chance.hot}</Tag>
           ) : null}
         </span>
       }
@@ -126,7 +130,7 @@ function MainlineChanceCard({ chance }: { chance: MarketMainlineChance }) {
               <Text strong>{plate.name}</Text>
               <ChangeValue value={plate.change_pct} />
               {plate.rise_count != null && plate.rise_count > 0 ? (
-                <Text type="secondary" style={{ fontSize: t.font.xs }}>{plate.rise_count} 家上涨</Text>
+                <Text type="secondary" className="financial-num" style={{ fontSize: t.font.xs }}>{plate.rise_count} 家上涨</Text>
               ) : null}
             </div>
             {plate.reason ? (
@@ -143,7 +147,25 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
   const c = useColors();
   const t = useTokens();
 
-  const columns: ColumnsType<MainlineFaucetRow> = [
+  const handleExportCsv = () => {
+    const headers = ["股票代码", "股票名称", "所属主线", "涨跌幅(%)", "上涨逻辑"];
+    const lines = rows.map((r) => [
+      `\t${r.code}`,
+      `"${r.name.replace(/"/g, '""')}"`,
+      `"${r.origin.replace(/"/g, '""')}"`,
+      r.change_pct != null ? r.change_pct.toFixed(2) : "",
+      `"${(r.reason || "").replace(/"/g, '""')}"`,
+    ].join(","));
+    const blob = new Blob(["\uFEFF" + [headers.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `今日主线龙头_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const columns: ColumnsType<MainlineFaucetRow> = useMemo(() => [
     {
       title: "龙头股",
       key: "stock",
@@ -151,11 +173,11 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
       render: (_value, row) => (
         <span style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[2] }}>
           <StockExternalLink code={row.code} name={row.name}><strong>{row.name}</strong></StockExternalLink>
-          <span style={{ color: c.textSecondary, fontSize: t.font.xs }}>{row.code}</span>
+          <span className="financial-num" style={{ color: c.textSecondary, fontSize: t.font.xs }}>{row.code}</span>
         </span>
       ),
     },
-    { title: "所属主线", dataIndex: "origin", key: "origin", width: 150, ellipsis: true },
+    { title: "所属主线", dataIndex: "origin", key: "origin", width: 140, ellipsis: true },
     {
       title: "涨跌幅",
       dataIndex: "change_pct",
@@ -171,13 +193,39 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
       ellipsis: true,
       render: (value: string) => value || "-",
     },
-  ];
+    {
+      title: "快速下钻",
+      key: "actions",
+      width: 100,
+      render: (_value, row) => (
+        <span style={{ display: "inline-flex", gap: 4 }}>
+          <PreloadLink to={`/analysis?code=${row.code}`}>
+            <Button size="small" type="link" style={{ padding: "0 2px", fontSize: 12 }}>
+              研报
+            </Button>
+          </PreloadLink>
+          <PreloadLink to={`/quant?codes=${row.code}`}>
+            <Button size="small" type="link" style={{ padding: "0 2px", fontSize: 12 }}>
+              回测
+            </Button>
+          </PreloadLink>
+        </span>
+      ),
+    },
+  ], [c.textSecondary, t.font.xs, t.space]);
 
   return (
     <Card
       className="dashboard-mainline-card"
       size="small"
       title={`主线龙头股（${rows.length}）`}
+      extra={
+        rows.length > 0 ? (
+          <Button size="small" icon={<DownloadOutlined />} onClick={handleExportCsv}>
+            导出 CSV
+          </Button>
+        ) : null
+      }
       style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}
     >
       <Table<MainlineFaucetRow>
@@ -196,7 +244,7 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
   const t = useTokens();
   const stockRows = useMemo(() => collectStyleStockRows(style), [style]);
 
-  const indexColumns: ColumnsType<MarketMainlineStyleIndex> = [
+  const indexColumns: ColumnsType<MarketMainlineStyleIndex> = useMemo(() => [
     {
       title: "指数",
       key: "name",
@@ -210,9 +258,9 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
       align: "right",
       render: (value: number | null) => <ChangeValue value={value} />,
     },
-  ];
+  ], []);
 
-  const stockColumns: ColumnsType<MainlineStyleStockRow> = [
+  const stockColumns: ColumnsType<MainlineStyleStockRow> = useMemo(() => [
     {
       title: "个股",
       key: "stock",
@@ -220,7 +268,7 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
       render: (_value, row) => (
         <span style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[2] }}>
           <StockExternalLink code={row.code} name={row.name}><strong>{row.name}</strong></StockExternalLink>
-          <span style={{ color: c.textSecondary, fontSize: t.font.xs }}>{row.code}</span>
+          <span className="financial-num" style={{ color: c.textSecondary, fontSize: t.font.xs }}>{row.code}</span>
         </span>
       ),
     },
@@ -233,7 +281,19 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
       align: "right",
       render: (value: number | null) => <ChangeValue value={value} />,
     },
-  ];
+    {
+      title: "操作",
+      key: "actions",
+      width: 70,
+      render: (_value, row) => (
+        <PreloadLink to={`/analysis?code=${row.code}`}>
+          <Button size="small" type="link" style={{ padding: "0 2px", fontSize: 12 }}>
+            研报
+          </Button>
+        </PreloadLink>
+      ),
+    },
+  ], [c.textSecondary, t.font.xs, t.space]);
 
   return (
     <Card
@@ -394,10 +454,31 @@ export default function Dashboard() {
             size="small"
             shape="round"
             className="dashboard-hero__shortcut-btn"
+            aria-label="产业链图谱"
             icon={<ApartmentOutlined style={{ color: "var(--c-primary)" }} />}
             onClick={() => navigate("/industry-chain")}
           >
             产业链图谱
+          </Button>
+          <Button
+            size="small"
+            shape="round"
+            className="dashboard-hero__shortcut-btn"
+            aria-label="国家队监测"
+            icon={<AuditOutlined style={{ color: "var(--c-primary)" }} />}
+            onClick={() => navigate("/national-team")}
+          >
+            国家队监测
+          </Button>
+          <Button
+            size="small"
+            shape="round"
+            className="dashboard-hero__shortcut-btn"
+            aria-label="每日复盘"
+            icon={<CalendarOutlined style={{ color: "var(--c-primary)" }} />}
+            onClick={() => navigate("/daily-review")}
+          >
+            每日复盘
           </Button>
         </div>
       </header>

@@ -127,6 +127,10 @@ describe("ResearchFrameworkPanel", () => {
     expect(screen.getByText("新投资者")).toBeInTheDocument();
     expect(screen.getByText("已持有者")).toBeInTheDocument();
     expect(screen.getByText("核对公告与渠道调研")).toBeInTheDocument();
+    const gaps = screen.getByRole("heading", { name: "数据缺口与下一步核验" }).closest("section");
+    expect(gaps).not.toBeNull();
+    expect(within(gaps as HTMLElement).getByText("渠道库存")).toHaveClass("research-gap-list__topic");
+    expect(within(gaps as HTMLElement).getByText("缺少统一口径")).toHaveClass("research-gap-list__description");
   });
 
   it("renders all three valuation scenarios and links to the valuation panel", () => {
@@ -146,6 +150,34 @@ describe("ResearchFrameworkPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /查看估值明细/ }));
     expect(screen.getByTestId("location")).toHaveTextContent("/stock/600519?tab=valuation#stock-details");
+  });
+
+  it("shows a structured DCF point estimate without claiming valuation evidence is absent", () => {
+    const frameworkWithPointEstimate: InvestmentResearchFramework = {
+      ...researchFramework,
+      valuation: {
+        ...researchFramework.valuation,
+        scenarios: researchFramework.valuation.scenarios ? {
+          ...researchFramework.valuation.scenarios,
+          bull: {
+            ...researchFramework.valuation.scenarios.bull,
+            fair_value_range: null,
+            valuation_view: "结构化DCF乐观情景每股价值1701.63元，仅为模型点估计。",
+          },
+        } : null,
+      },
+    };
+
+    render(
+      <MemoryRouter>
+        <ResearchFrameworkPanel analysis={{ stock_code: "600519", research_framework: frameworkWithPointEstimate } as AnalysisResult} />
+      </MemoryRouter>,
+    );
+
+    const scenarios = screen.getByRole("heading", { name: "估值假设与三情景" }).closest("section");
+    expect(scenarios).not.toBeNull();
+    expect(within(scenarios as HTMLElement).getByText("模型点估计 ¥1701.63")).toBeInTheDocument();
+    expect(within(scenarios as HTMLElement).getByText("结构化DCF乐观情景每股价值1701.63元，仅为模型点估计。")).toBeInTheDocument();
   });
 
   it("uses an injected valuation action in a standalone workbench", () => {

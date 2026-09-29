@@ -6,12 +6,14 @@ const TABLE_BODY_STYLES = { body: { padding: 0 } };
 
 interface PortfolioTableCardProps {
   title: string;
+  extra?: ReactNode;
   stacked?: boolean;
   children: ReactNode;
 }
 
 export default function PortfolioTableCard({
   title,
+  extra,
   stacked = false,
   children,
 }: PortfolioTableCardProps) {
@@ -22,7 +24,7 @@ export default function PortfolioTableCard({
   );
 
   return (
-    <Card title={title} size="small" style={style} styles={TABLE_BODY_STYLES}>
+    <Card title={title} extra={extra} size="small" style={style} styles={TABLE_BODY_STYLES}>
       {children}
     </Card>
   );

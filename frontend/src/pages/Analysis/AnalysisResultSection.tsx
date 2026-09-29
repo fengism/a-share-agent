@@ -5,6 +5,7 @@ import { buildStockProfileUrl } from "../../utils/stockLinks";
 import { useColors, useStyles } from "../../theme/hooks";
 import type { AnalysisResult } from "../../types/stock";
 import { formatAnalysisDate } from "../../features/investment-research/analysisHistoryUrl";
+import AnalysisReportVersions from "../../features/investment-research/AnalysisReportVersions";
 import AIConclusion from "./AIConclusion";
 import AnalysisDecisionBoard from "./AnalysisDecisionBoard";
 import { loadResearchFrameworkPanel } from "./analysisPanelLoaders";
@@ -36,6 +37,7 @@ export default function AnalysisResultSection({
           {result.stock_code ? <Link to={buildStockProfileUrl(result.stock_code)}>查看个股资料 →</Link> : null}
         </div>
       )}
+      {!isExportingPdf && <AnalysisReportVersions analysis={result} />}
       <div className="analysis-research-overview">
         <AIConclusion result={result} embedded />
         <AnalysisDecisionBoard result={result} embedded />

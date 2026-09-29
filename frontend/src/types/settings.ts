@@ -73,7 +73,11 @@ export interface ConfigData {
   bot_admin_users: string[];
   analysis_llm_timeout_seconds: number;
   agent_research_timeout_seconds: number;
-  industry_chain_repair_timeout_seconds: number;
+  industry_chain_research_timeout_seconds: number;
+  industry_chain_repair_research_timeout_seconds: number;
+  industry_chain_repair_synthesis_timeout_seconds: number;
+  industry_chain_max_rounds: number;
+  industry_chain_repair_max_rounds: number;
   industry_chain_tool_calls_total: number;
   industry_chain_repair_tool_calls_total: number;
   chat_max_tool_calls_total: number;

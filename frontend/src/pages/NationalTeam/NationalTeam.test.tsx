@@ -323,4 +323,17 @@ describe("NationalTeam data quality", () => {
     expect(alert).toHaveTextContent("指数行情缺失：沪深300");
     expect(alert).toHaveTextContent("不计入历史与资金估算");
   });
+
+  it("supports exporting ETF data to CSV and previewing dual-axis chart modal", () => {
+    render(<NationalTeam />);
+
+    const exportBtn = screen.getByRole("button", { name: /导出 CSV/ });
+    expect(exportBtn).toBeInTheDocument();
+
+    const expandBtns = screen.getAllByRole("button", { name: "放大查看大图" });
+    expect(expandBtns.length).toBeGreaterThan(0);
+    fireEvent.click(expandBtns[0]);
+
+    expect(screen.getByText(/份额与指数走势大图/)).toBeInTheDocument();
+  });
 });

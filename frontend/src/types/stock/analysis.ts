@@ -158,7 +158,25 @@ export interface InvestmentResearchFramework {
   data_gaps: DataGap[];
 }
 
+export interface AnalysisProvenance {
+  research_started_at: string;
+  research_completed_at: string;
+  report_regenerated: boolean;
+  freshness_note: string;
+  evidence: Array<{
+    tool_name: string;
+    evidence_id: string;
+    sources: string[];
+    data_dates: string[];
+    report_periods: string[];
+    cache_status: string;
+  }>;
+}
+
 export interface AnalysisResult {
+  report_id?: string | null;
+  generated_at?: string | null;
+  provenance?: AnalysisProvenance | null;
   stock_code: string;
   stock_name: string;
   analysis_date: string;

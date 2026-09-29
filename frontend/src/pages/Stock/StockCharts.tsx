@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { FundProjectionScreenOutlined } from "@ant-design/icons";
-import { Card, Segmented, Skeleton, Switch, Tooltip } from "antd";
+import { FundProjectionScreenOutlined, ReloadOutlined } from "@ant-design/icons";
+import { Button, Card, Segmented, Skeleton, Switch, Tooltip } from "antd";
 import { useKlineData, useStockChipDistribution, useStockIntraday } from "../../api/queries";
 import IndicatorSubCharts from "../../charts/IndicatorSubCharts";
 import IntradayChart from "../../charts/IntradayChart";
@@ -65,20 +65,63 @@ function KlinePanel({ code, chanlunEnabled, onChanlunChange }: { code: string; c
 }
 
 function IntradayPanel({ code }: { code: string }) {
+  const [showAvgLine, setShowAvgLine] = useState(true);
+  const [showPrevClose, setShowPrevClose] = useState(true);
   const query = useStockIntraday(code);
   const items = query.data?.items ?? [];
+  const latestTime = items.length > 0 ? items[items.length - 1].time : null;
+
   return (
-    <SectionDataState
-      isLoading={query.isLoading}
-      error={query.error}
-      onRetry={() => query.refetch()}
-      isEmpty={items.length === 0}
-      emptyText="暂无分时数据"
-      errorTitle="分时数据加载失败"
-      minHeight={380}
-    >
-      <IntradayChart data={items} prevClose={query.data?.prev_close} height={380} viewKey={code} />
-    </SectionDataState>
+    <>
+      <div className="stock-chart-toolbar" style={{ justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "12px", color: "var(--c-text-secondary)" }}>
+          {latestTime && (
+            <span>
+              数据时间: <strong style={{ color: "var(--c-text-primary)", fontFamily: "var(--c-font-mono)" }}>{latestTime}</strong>
+            </span>
+          )}
+          {query.isFetching && <span style={{ color: "var(--c-primary)" }}>刷新中...</span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <label className="stock-chart-chanlun-toggle" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "12px" }}>
+            均价线
+            <Switch aria-label="均价线" size="small" checked={showAvgLine} onChange={setShowAvgLine} />
+          </label>
+          <label className="stock-chart-chanlun-toggle" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "12px" }}>
+            昨收线
+            <Switch aria-label="昨收线" size="small" checked={showPrevClose} onChange={setShowPrevClose} />
+          </label>
+          <Button
+            size="small"
+            type="text"
+            icon={<ReloadOutlined spin={query.isFetching} />}
+            onClick={() => query.refetch()}
+            title="刷新分时数据"
+            style={{ color: "var(--c-text-secondary)" }}
+          >
+            刷新
+          </Button>
+        </div>
+      </div>
+      <SectionDataState
+        isLoading={query.isLoading}
+        error={query.error}
+        onRetry={() => query.refetch()}
+        isEmpty={items.length === 0}
+        emptyText="暂无分时数据"
+        errorTitle="分时数据加载失败"
+        minHeight={380}
+      >
+        <IntradayChart
+          data={items}
+          prevClose={query.data?.prev_close}
+          height={380}
+          viewKey={code}
+          showAvgLine={showAvgLine}
+          showPrevCloseLine={showPrevClose}
+        />
+      </SectionDataState>
+    </>
   );
 }
 
@@ -138,13 +181,13 @@ export default function StockCharts({ code }: { code: string }) {
       ) : activeView === "intraday" ? (
         <IntradayPanel code={code} />
       ) : activeView === "macd" || activeView === "rsi" || activeView === "kdj" ? (
-        <div className="stock-macd-panel">
+        <div className="stock-macd-panel" style={{ minHeight: 436 }}>
           <IndicatorSubCharts
             code={code}
             types={["macd", "rsi", "kdj"]}
             activeType={activeView}
             onTypeChange={(type) => setActiveView(type)}
-            height={260}
+            height={340}
           />
         </div>
       ) : (

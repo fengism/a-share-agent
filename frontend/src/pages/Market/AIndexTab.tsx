@@ -159,7 +159,7 @@ export default function AIndexTab() {
               price={activeIndex.price}
               changePct={activeIndex.change_pct}
               preClose={activeIndex.pre_close}
-              height={420}
+              height={380}
             />
           )}
         </Col>
@@ -194,6 +194,7 @@ export default function AIndexTab() {
               </div>
             }
             style={{ borderRadius: t.radius.md, border: `1px solid ${c.border}`, boxShadow: t.shadow.xs, height: "100%" }}
+            styles={{ body: { padding: "12px 14px" } }}
           >
             <SectionDataState
               isLoading={klineLoading && !hasKlineData}
@@ -202,11 +203,11 @@ export default function AIndexTab() {
               isEmpty={!hasKlineData}
               emptyText="暂无指数 K 线数据"
               errorTitle="指数 K 线加载失败"
-              minHeight={360}
+              minHeight={380}
             >
               <LazyKlineChart
                 data={klineItems}
-                height={360}
+                height={380}
               />
             </SectionDataState>
           </Card>

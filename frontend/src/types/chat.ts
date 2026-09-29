@@ -93,6 +93,7 @@ export interface ReasoningBlock extends ReasoningSource {
 }
 
 export interface ChatStreamDelta {
+  phase?: "research" | "verification_repair" | null;
   type:
     | "status"
     | "plan"

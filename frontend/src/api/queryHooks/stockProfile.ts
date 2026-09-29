@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { apiDelete, apiGet, apiPost, apiPut, API_TIMEOUTS } from "../client";
 import { queryKeys } from "../queryKeys";
 import type {
@@ -10,6 +11,7 @@ import type {
   StockProfileImportFileRequest,
   StockProfileImportResponse,
   StockProfileListFilters,
+  StockProfileSyncResponse,
 } from "../stockProfile";
 
 const BASE_PATH = "/stock-profile";
@@ -18,6 +20,7 @@ export function useStockProfileSummary() {
   return useQuery({
     queryKey: queryKeys.stockProfile.summary,
     queryFn: () => apiGet<StockBasicProfileSummary>(`${BASE_PATH}/summary`),
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
   });
 }
 
@@ -66,7 +69,7 @@ export function useCreateStockProfileRecord() {
 export function useUpdateStockProfileRecord() {
   const invalidate = useInvalidateStockProfileData();
   return useMutation({
-    mutationFn: ({ id, record }: { id: number; record: StockBasicProfileInput }) =>
+    mutationFn: ({ id, record }: { id: number; record: StockBasicProfileInput & { expected_revision: string } }) =>
       apiPut<StockBasicProfileRecord>(`${BASE_PATH}/records/${id}`, record),
     onSuccess: invalidate,
   });
@@ -97,7 +100,7 @@ export function useSyncMasterStockProfiles() {
   const invalidate = useInvalidateStockProfileData();
   return useMutation({
     mutationFn: () =>
-      apiPost<Record<string, number>>(`${BASE_PATH}/sync-master`, {}, { timeoutMs: API_TIMEOUTS.LONG_RUNNING }),
+      apiPost<StockProfileSyncResponse>(`${BASE_PATH}/sync-master`, {}, { timeoutMs: API_TIMEOUTS.LONG_RUNNING }),
     onSuccess: invalidate,
   });
 }

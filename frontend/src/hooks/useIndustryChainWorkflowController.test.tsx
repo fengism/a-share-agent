@@ -62,7 +62,7 @@ describe("industry workflow cancellation", () => {
     expect(test.onCancelled).toHaveBeenCalledWith(outcome);
     expect(test.invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.workflows.active });
     await act(async () => {
-      test.progress({ type: "stage_started", stage: "synthesis", message: "错误的晚到状态" });
+      test.progress({ type: "stage_started", stage: "draft", message: "错误的晚到状态" });
       test.progress({ type: "agent_event", agent_event: { type: "status", content: "仍在运行" } });
       test.completion.resolve(report);
       await test.completion.promise;
@@ -82,7 +82,7 @@ describe("industry workflow cancellation", () => {
     expect(test.result.current).toMatchObject({ status: "running", isAnalyzing: true, result: null });
     expect(store.getState().stream).toBe(test.stream);
     await act(async () => { test.completion.resolve(report); await test.completion.promise; });
-    expect(test.result.current).toMatchObject({ status: "success", result: report, currentStage: 2, isAnalyzing: false, isCancelling: false });
+    expect(test.result.current).toMatchObject({ status: "success", result: report, currentStage: 5, isAnalyzing: false, isCancelling: false });
     expect(test.onSuccess).toHaveBeenCalledOnce();
   });
 
@@ -156,11 +156,39 @@ describe("industry workflow cancellation", () => {
     const next = await setup();
     expect(store.getState().runId).toBeGreaterThan(oldRunId);
     await act(async () => {
-      old.progress({ type: "stage_started", stage: "synthesis" });
+      old.progress({ type: "stage_started", stage: "draft" });
       old.completion.resolve(report);
       await old.completion.promise;
     });
     expect(next.result.current).toMatchObject({ status: "running", currentStage: -1, result: null });
     expect(old.onSuccess).not.toHaveBeenCalled();
   });
+
+  it("surfaces a degraded completion instead of plain success copy", async () => {
+    const test = await setup();
+    await act(async () => {
+      test.completion.resolve({ ...report, quality_status: "degraded" });
+      await test.completion.promise;
+    });
+    expect(test.result.current.status).toBe("warning");
+    expect(test.result.current.stageMessage).toContain("质量提示");
+  });
+
+
+  it("keeps a generated report but marks archive failure as a warning stage", async () => {
+    const test = await setup();
+    act(() => test.progress({ type: "stage_failed", stage: "archive", message: "报告已生成，但存档失败" }));
+    expect(test.result.current).toMatchObject({ currentStage: 4, failedStage: 4 });
+    await act(async () => {
+      test.completion.resolve({ ...report, archive_status: "failed", quality_status: "complete" });
+      await test.completion.promise;
+    });
+    expect(test.result.current).toMatchObject({
+      status: "warning", currentStage: 4, failedStage: 4,
+      result: expect.objectContaining({ archive_status: "failed" }),
+    });
+    expect(test.result.current.stageMessage).toContain("存档失败");
+    expect(test.onError).not.toHaveBeenCalled();
+  });
+
 });

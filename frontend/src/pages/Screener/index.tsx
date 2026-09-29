@@ -1,4 +1,4 @@
-import { InfoCircleOutlined } from "@ant-design/icons";
+import { DownloadOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, InputNumber, message, Modal, Progress, Radio, Space, Tag, Tooltip, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +8,7 @@ import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
 import { useStyles } from "../../styles/ui";
 import type { ScreenerFilter, ScreenerItem, ScreenerStrategyPreset } from "../../types/stock";
+import { downloadScreenerCsv } from "./exportCsv";
 import FilterPanel from "./FilterPanel";
 import ResultsTable from "./ResultsTable";
 import SavedFilterToolbar from "./SavedFilterToolbar";
@@ -21,6 +22,22 @@ interface PresetStrategy {
   description: string;
   icon: string;
   filters: Partial<ScreenerFilter>;
+}
+
+function isPresetActive(presetFilters: Partial<ScreenerFilter>, currentFilters: ScreenerFilter): boolean {
+  const keys = Object.keys(presetFilters) as (keyof ScreenerFilter)[];
+  if (keys.length === 0) return false;
+  return keys.every((key) => {
+    if (key === "sort_by" || key === "sort_order" || key === "page" || key === "page_size") {
+      return true;
+    }
+    const presetVal = presetFilters[key];
+    const currentVal = currentFilters[key];
+    if (presetVal === null || presetVal === undefined) {
+      return currentVal === null || currentVal === undefined;
+    }
+    return currentVal === presetVal;
+  });
 }
 
 const PRESET_STRATEGIES: PresetStrategy[] = [
@@ -345,18 +362,22 @@ export default function Screener() {
         styles={{ body: sectionCardBodyStyle }}
       >
         <div style={{ marginBottom: 14, display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {PRESET_STRATEGIES.map((preset) => (
-            <Button
-              key={preset.label}
-              size="small"
-              shape="round"
-              style={{ fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-medium)" }}
-              onClick={() => filters.applyPreset(preset.filters)}
-              title={preset.description}
-            >
-              {preset.icon} {preset.label}
-            </Button>
-          ))}
+          {PRESET_STRATEGIES.map((preset) => {
+            const active = isPresetActive(preset.filters, filters.filters);
+            return (
+              <Button
+                key={preset.label}
+                size="small"
+                shape="round"
+                type={active ? "primary" : "default"}
+                style={{ fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-medium)" }}
+                onClick={() => filters.applyPreset(preset.filters)}
+                title={preset.description}
+              >
+                {preset.icon} {preset.label}
+              </Button>
+            );
+          })}
         </div>
         <div style={{ marginBottom: 14 }}>
           <div style={{ marginBottom: 8, fontSize: "var(--c-font-md)", fontWeight: "var(--c-weight-semibold)" }}>历史信号选股（应用于候选范围）</div>
@@ -545,6 +566,30 @@ export default function Screener() {
                 </Tag>
                 <Tag>申万覆盖 {Math.round((screenerResult.sw_industry_coverage ?? 0) * 100)}%</Tag>
                 <Tag>交易所行业 {Math.round((screenerResult.exchange_industry_coverage ?? 0) * 100)}%</Tag>
+                <Button
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  onClick={() => {
+                    const items = displayedResult?.items ?? [];
+                    if (items.length === 0) {
+                      message.warning("当前没有可导出的数据");
+                      return;
+                    }
+                    downloadScreenerCsv({
+                      items,
+                      strategySignalDates: strategyResult?.signalDates,
+                      strategySignalAges: strategyResult?.signalAges,
+                      strategyReturnsSinceSignal: strategyResult?.returnsSinceSignal,
+                      strategyAverageAmounts: strategyResult?.averageAmounts,
+                      percentileMap: percentiles.percentileMap,
+                      showPercentile: filters.showPercentile,
+                    });
+                    message.success(`已导出 ${items.length} 只股票数据`);
+                  }}
+                  disabled={!displayedResult?.items?.length}
+                >
+                  导出 CSV
+                </Button>
               </>
             ) : null}
             <DataRefreshIndicator active={isFetching && !!screenerResult} />

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { apiDelete, apiGet, apiPost, apiPut, API_TIMEOUTS } from "../client";
 import { queryKeys } from "../queryKeys";
 import type {
@@ -20,6 +21,7 @@ export function useStockConceptStatus() {
   return useQuery({
     queryKey: queryKeys.stockConcept.status,
     queryFn: () => apiGet<ConceptStatusResponse>(`${BASE_PATH}/status`),
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
   });
 }
 
@@ -27,6 +29,7 @@ export function useConceptTags(query?: string) {
   return useQuery({
     queryKey: queryKeys.stockConcept.concepts(query),
     queryFn: () => apiGet<ConceptListResponse>(`${BASE_PATH}/concepts`, { query, limit: 1000 }),
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
   });
 }
 
@@ -61,7 +64,7 @@ export function useCreateStockConceptRecord() {
 export function useUpdateStockConceptRecord() {
   const invalidate = useInvalidateStockConceptData();
   return useMutation({
-    mutationFn: ({ id, record }: { id: number; record: StockConceptRecordInput }) =>
+    mutationFn: ({ id, record }: { id: number; record: StockConceptRecordInput & { expected_revision: string } }) =>
       apiPut<ConceptMutationResponse>(`${BASE_PATH}/records/${id}`, record),
     onSuccess: invalidate,
   });

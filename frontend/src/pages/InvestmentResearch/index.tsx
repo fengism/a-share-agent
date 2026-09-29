@@ -21,6 +21,7 @@ import AnalysisProgressSteps from "../../components/workflows/AnalysisProgressSt
 import WorkflowPageHeader from "../../components/workflows/WorkflowPageHeader";
 import WorkflowWorkspace from "../../components/workflows/WorkflowWorkspace";
 import AnalysisHistoryRail from "../../features/investment-research/AnalysisHistoryRail";
+import AnalysisReportVersions from "../../features/investment-research/AnalysisReportVersions";
 import ResearchFrameworkPanel from "../../features/investment-research/ResearchFrameworkPanel";
 import {
   buildAnalysisHistoryUrl,
@@ -294,7 +295,8 @@ export default function InvestmentResearch() {
                     </div>
                   </header>
                   <section data-pdf-group>
-                    <ResearchFrameworkPanel
+                    <AnalysisReportVersions analysis={displayResult} />
+                      <ResearchFrameworkPanel
                       analysis={displayResult}
                       onOpenValuation={openValuation}
                       forceFullReport={isExporting}

@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import { DeleteOutlined, DownloadOutlined, EditOutlined } from "@ant-design/icons";
 import { Button, Empty, Popconfirm, Space, Table, Tag, message } from "antd";
 import type { TableColumnsType } from "antd";
 import { memo, useCallback, useMemo, useState } from "react";
@@ -30,6 +30,46 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
     variables: deletingTransactionId,
   } = useDeletePortfolioTransaction();
   const [editingTransaction, setEditingTransaction] = useState<PortfolioTransaction | null>(null);
+
+  const handleExportCsv = () => {
+    const headers = [
+      "流水ID",
+      "交易方向",
+      "股票代码",
+      "股票名称",
+      "成交价",
+      "成交股数",
+      "成交金额",
+      "手续费",
+      "FIFO成本",
+      "已实现盈亏",
+      "交易时间",
+      "备注",
+    ];
+    const lines = transactions.map((t) => [
+      t.id,
+      t.side === "buy" ? "买入" : "卖出",
+      `\t${t.stock_code}`,
+      `"${t.stock_name.replace(/"/g, '""')}"`,
+      t.trade_price.toFixed(2),
+      t.shares,
+      (t.trade_price * t.shares).toFixed(2),
+      t.fee.toFixed(2),
+      t.matched_cost != null ? t.matched_cost.toFixed(2) : "",
+      t.realized_profit_amount != null ? t.realized_profit_amount.toFixed(2) : "",
+      `"${t.trade_time}"`,
+      `"${(t.note || "").replace(/"/g, '""')}"`,
+    ].join(","));
+    const blob = new Blob(["\uFEFF" + [headers.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    if (typeof URL.createObjectURL === "function") {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `投资组合交易流水_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL?.(url);
+    }
+  };
   const handleDelete = useCallback(async (transactionId: number) => {
     try {
       await deleteTransaction(transactionId);
@@ -110,6 +150,7 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       dataIndex: "trade_price",
       width: 105,
       align: "right",
+      className: "financial-num",
       render: formatPrice,
     },
     {
@@ -117,6 +158,7 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       dataIndex: "shares",
       width: 100,
       align: "right",
+      className: "financial-num",
       render: formatInteger,
     },
     {
@@ -124,6 +166,7 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       key: "turnover",
       width: 125,
       align: "right",
+      className: "financial-num",
       render: (_, record) => formatMoney(record.trade_price * record.shares),
     },
     {
@@ -131,6 +174,7 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       dataIndex: "fee",
       width: 105,
       align: "right",
+      className: "financial-num",
       render: formatMoney,
     },
     {
@@ -138,6 +182,7 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       dataIndex: "matched_cost",
       width: 125,
       align: "right",
+      className: "financial-num",
       render: formatMoney,
     },
     {
@@ -145,6 +190,7 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       dataIndex: "realized_profit_amount",
       width: 130,
       align: "right",
+      className: "financial-num",
       render: (value: number | null) => value == null ? "-" : renderProfit(value),
     },
     {
@@ -205,7 +251,16 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
 
   return (
     <>
-      <PortfolioTableCard title="交易流水">
+      <PortfolioTableCard
+        title="交易流水"
+        extra={
+          transactions.length > 0 ? (
+            <Button size="small" icon={<DownloadOutlined />} onClick={handleExportCsv}>
+              导出 CSV
+            </Button>
+          ) : null
+        }
+      >
         <Table<PortfolioTransaction>
           rowKey="id"
           columns={columns}

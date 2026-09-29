@@ -2,6 +2,8 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import {
   DownloadOutlined,
   DownOutlined,
+  FileMarkdownOutlined,
+  FilePdfOutlined,
   FileSearchOutlined,
   HistoryOutlined,
   PlusOutlined,
@@ -10,7 +12,7 @@ import {
   StopOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Button, Tag, Tooltip, Typography } from "antd";
+import { Button, Dropdown, Tag, Tooltip, Typography } from "antd";
 import PushModal from "../../components/PushModal";
 import { useColors, useStyles } from "../../theme/hooks";
 import type { AnalysisPageData, AnalysisResult, IntradayData, PushRequest } from "../../types/stock";
@@ -51,10 +53,12 @@ interface AnalysisHeaderCardProps {
   isPushing: boolean;
   isWatched: boolean;
   isWatchlistPending: boolean;
+  isExportingPdf?: boolean;
   onToggleWatchlist: () => void;
   onAnalyze: () => void;
   onCancel: () => void;
   onExportPdf: () => void;
+  onExportMarkdown?: () => void;
   onShowHistory: () => void;
   onOpenResearchReport: () => void;
   onPush: (request: PushRequest) => Promise<boolean>;
@@ -71,10 +75,12 @@ export default function AnalysisHeaderCard({
   isPushing,
   isWatched,
   isWatchlistPending,
+  isExportingPdf = false,
   onToggleWatchlist,
   onAnalyze,
   onCancel,
   onExportPdf,
+  onExportMarkdown,
   onShowHistory,
   onOpenResearchReport,
   onPush,
@@ -203,13 +209,40 @@ export default function AnalysisHeaderCard({
           )}
         </div>
         <div className="analysis-header-card__actions pdf-hide">
-          <Button
-            icon={<DownloadOutlined />}
-            onClick={onExportPdf}
+          <Dropdown
+            trigger={["click"]}
+            menu={{
+              items: [
+                {
+                  key: "pdf",
+                  label: "导出为 PDF (.pdf)",
+                  icon: <FilePdfOutlined />,
+                  disabled: isExportingPdf,
+                },
+                {
+                  key: "md",
+                  label: "导出为 Markdown (.md)",
+                  icon: <FileMarkdownOutlined />,
+                },
+              ],
+              onClick: ({ key }) => {
+                if (key === "pdf") {
+                  onExportPdf();
+                } else if (key === "md") {
+                  onExportMarkdown?.();
+                }
+              },
+            }}
             disabled={!result}
           >
-            导出 PDF
-          </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              loading={isExportingPdf}
+              aria-label="导出"
+            >
+              导出 <DownOutlined style={{ fontSize: 10, marginLeft: 2 }} />
+            </Button>
+          </Dropdown>
           <Button
             icon={<SendOutlined />}
             aria-label="推送"

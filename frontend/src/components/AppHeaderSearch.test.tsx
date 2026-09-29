@@ -66,4 +66,19 @@ describe("AppHeaderSearch", () => {
     expect(mocks.resolveCode).toHaveBeenCalledWith("600519");
     expect(mocks.clear).toHaveBeenCalledTimes(1);
   });
+
+  it("focuses input when pressing slash key globally", () => {
+    render(
+      <MemoryRouter initialEntries={["/market"]}>
+        <AppHeaderSearch isMobile={false} />
+      </MemoryRouter>,
+    );
+
+    const input = screen.getByRole("combobox", { name: "搜索股票" });
+    input.blur();
+    expect(input).not.toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "/" });
+    expect(input).toHaveFocus();
+  });
 });

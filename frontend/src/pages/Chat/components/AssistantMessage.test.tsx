@@ -57,4 +57,39 @@ describe("AssistantMessage", () => {
     expect(screen.getByRole("button", { name: /设置提醒/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /转为量化策略/ })).toBeInTheDocument();
   });
+
+  it("supports copying and downloading response as markdown", () => {
+    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextSpy,
+      },
+    });
+    window.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    window.URL.revokeObjectURL = vi.fn();
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    render(
+      <AssistantMessage
+        message={{
+          id: "msg-12345678",
+          role: "assistant",
+          content: "深度研究报告正文",
+          isStreaming: false,
+        }}
+      />,
+    );
+
+    // Test copy
+    const copyBtn = screen.getByRole("button", { name: "复制回答" });
+    fireEvent.click(copyBtn);
+    expect(writeTextSpy).toHaveBeenCalledWith("深度研究报告正文");
+
+    // Test download markdown
+    const downloadBtn = screen.getByRole("button", { name: "下载 Markdown" });
+    fireEvent.click(downloadBtn);
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    clickSpy.mockRestore();
+  });
 });

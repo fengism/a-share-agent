@@ -408,7 +408,7 @@ export function resumeAnalysis(jobId: string, onProgress: ProgressHandler): Work
 
 export interface IndustryChainProgress {
   cancelled?: boolean;
-  type: "stage_started" | "stage_completed" | "agent_event" | "complete" | "error";
+  type: "stage_started" | "stage_completed" | "stage_failed" | "agent_event" | "complete" | "error";
   stage?: string;
   message?: string;
   agent_event?: ChatStreamDelta | null;

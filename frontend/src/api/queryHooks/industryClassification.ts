@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { apiDelete, apiGet, apiPost, apiPut, API_TIMEOUTS } from "../client";
 import { queryKeys } from "../queryKeys";
 import type {
@@ -22,6 +23,7 @@ export function useIndustryStatus() {
   return useQuery({
     queryKey: queryKeys.industryClassification.status,
     queryFn: () => apiGet<IndustryStatusResponse>(`${BASE_PATH}/status`),
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
   });
 }
 
@@ -33,6 +35,7 @@ export function useIndustryHierarchy(filters: Pick<IndustryListFilters, "market_
       filters.level2 ?? "",
     ),
     queryFn: () => apiGet<IndustryHierarchyResponse>(`${BASE_PATH}/industries`, filters),
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
   });
 }
 
@@ -54,7 +57,11 @@ export function useIndustryRecords(filters: IndustryListFilters) {
 
 function useInvalidateIndustryData() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: queryKeys.industryClassification.root });
+  return () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.industryClassification.root }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.stockProfile.root }),
+    queryClient.invalidateQueries({ queryKey: ["stockInfo"] }),
+  ]);
 }
 
 export function useCreateIndustryRecord() {
@@ -69,7 +76,7 @@ export function useCreateIndustryRecord() {
 export function useUpdateIndustryRecord() {
   const invalidate = useInvalidateIndustryData();
   return useMutation({
-    mutationFn: ({ id, record }: { id: number; record: IndustryRecordInput }) =>
+    mutationFn: ({ id, record }: { id: number; record: IndustryRecordInput & { expected_revision: string } }) =>
       apiPut<IndustryMutationResponse>(`${BASE_PATH}/records/${id}`, record),
     onSuccess: invalidate,
   });

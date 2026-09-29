@@ -49,13 +49,13 @@ import {
   useUpdateIndustryRefreshPolicy,
 } from "../../api/queries";
 import type {
-  IndustryImportFileRequest,
   IndustryImportPreviewResponse,
   IndustryListFilters,
   IndustryMarketGroup,
   IndustryRecord,
   IndustryRecordInput,
 } from "../../api/industryClassification";
+import { useImportFile } from "./useImportFile";
 import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
 import { useStyles } from "../../styles/ui";
@@ -63,7 +63,6 @@ import "./industry-classification.css";
 
 const { Paragraph, Text, Title } = Typography;
 const PAGE_SIZE = 50;
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const MARKET_OPTIONS = [
   { value: "A", label: "A 股" },
   { value: "HK", label: "港股" },
@@ -89,10 +88,6 @@ const EMPTY_RECORD: IndustryRecordInput = {
   effective_date: null,
 };
 
-type ImportFileState = Pick<IndustryImportFileRequest, "filename" | "content_base64"> & {
-  size: number;
-};
-
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "未知错误";
 }
@@ -109,22 +104,6 @@ function marketLabel(value: string): string {
 
 function marketColor(value: string): string {
   return value === "A" ? "red" : value === "HK" ? "blue" : "purple";
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("文件读取失败，请重新选择"));
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== "string") {
-        reject(new Error("文件读取失败，请重新选择"));
-        return;
-      }
-      resolve(result.slice(result.indexOf(",") + 1));
-    };
-    reader.readAsDataURL(file);
-  });
 }
 
 function RecordEditor({
@@ -241,11 +220,21 @@ function ImportDrawer({
 }) {
   const previewImport = usePreviewIndustryImport();
   const commitImport = useCommitIndustryImport();
-  const [fileState, setFileState] = useState<ImportFileState | null>(null);
+  const upload = useImportFile((text) => { message.error(text); });
+  const { file: fileState, reading: readingFile, clear } = upload;
   const [preview, setPreview] = useState<IndustryImportPreviewResponse | null>(null);
   const [effectiveDate, setEffectiveDate] = useState("");
   const [forceOverride, setForceOverride] = useState(false);
-  const [readingFile, setReadingFile] = useState(false);
+  const busy = previewImport.isPending || commitImport.isPending;
+  useEffect(() => {
+    if (!open) {
+      clear();
+      setPreview(null);
+      setForceOverride(false);
+      setEffectiveDate("");
+    }
+  }, [open, clear]);
+  const close = () => { if (!busy) onClose(); };
 
   const resetPreview = () => setPreview(null);
   const request = fileState ? {
@@ -255,31 +244,13 @@ function ImportDrawer({
     effective_date: effectiveDate || null,
   } : null;
 
-  const beforeUpload: UploadProps["beforeUpload"] = async (file) => {
-    const ext = file.name.toLowerCase();
-    if (!ext.endsWith(".xlsx") && !ext.endsWith(".xls") && !ext.endsWith(".csv")) {
-      message.error("请选择 CSV 或 Excel (.xlsx/.xls) 文件");
-      return Upload.LIST_IGNORE;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      message.error("文件不能超过 50 MB");
-      return Upload.LIST_IGNORE;
-    }
-    setReadingFile(true);
-    try {
-      const content = await fileToBase64(file as File);
-      setFileState({ filename: file.name, content_base64: content, size: file.size });
-      resetPreview();
-    } catch (error) {
-      message.error(errorMessage(error));
-    } finally {
-      setReadingFile(false);
-    }
-    return false;
+  const beforeUpload: UploadProps["beforeUpload"] = (file) => {
+    resetPreview();
+    return upload.select(file) ? false : Upload.LIST_IGNORE;
   };
 
   const handlePreview = () => {
-    if (!request) return;
+    if (!request || readingFile || busy) return;
     previewImport.mutate(request, {
       onSuccess: (result) => setPreview(result),
       onError: (error) => message.error(`预检失败：${errorMessage(error)}`),
@@ -287,12 +258,12 @@ function ImportDrawer({
   };
 
   const handleCommit = () => {
-    if (!request || !preview) return;
+    if (!request || !preview || readingFile || busy) return;
     commitImport.mutate({ ...request, import_token: preview.import_token, force_override: forceOverride }, {
       onSuccess: (result) => {
         message.success(`导入完成：新增 ${result.added}、更新 ${result.updated}、跳过 ${result.skipped}`);
         setPreview(null);
-        setFileState(null);
+        clear();
         onClose();
       },
       onError: (error) => message.error(`导入失败：${errorMessage(error)}`),
@@ -312,10 +283,13 @@ function ImportDrawer({
     <Drawer
       title={<Space><FileExcelOutlined />导入行业数据 (CSV / Excel)</Space>}
       open={open}
-      onClose={onClose}
+      onClose={close}
+      closable={!busy}
+      mask={{ closable: !busy }}
+      keyboard={!busy}
       width={640}
       destroyOnHidden
-      extra={<Button onClick={onClose}>关闭</Button>}
+      extra={<Button disabled={busy} onClick={close}>关闭</Button>}
     >
       <Alert
         showIcon
@@ -329,7 +303,7 @@ function ImportDrawer({
           maxCount={1}
           showUploadList={false}
           beforeUpload={beforeUpload}
-          disabled={readingFile || previewImport.isPending || commitImport.isPending}
+          disabled={busy}
         >
           <p className="ant-upload-drag-icon"><FileExcelOutlined /></p>
           <p className="ant-upload-text">点击或拖拽 CSV / Excel 文件到这里</p>
@@ -339,7 +313,7 @@ function ImportDrawer({
           <Card size="small" className="industry-selected-file">
             <Space direction="vertical" size={2}>
               <Text strong>{fileState.filename}</Text>
-              <Text type="secondary">{(fileState.size / 1024 / 1024).toFixed(2)} MB</Text>
+              <Text type="secondary">{((upload.selected?.size ?? 0) / 1024 / 1024).toFixed(2)} MB</Text>
             </Space>
           </Card>
         )}
@@ -348,6 +322,7 @@ function ImportDrawer({
           <Input
             id="industry-effective-date"
             type="date"
+            disabled={busy}
             value={effectiveDate}
             onChange={(event) => { setEffectiveDate(event.target.value); resetPreview(); }}
           />
@@ -356,7 +331,7 @@ function ImportDrawer({
           type="primary"
           icon={<SearchOutlined />}
           block
-          disabled={!fileState}
+          disabled={!fileState || readingFile || busy}
           loading={readingFile || previewImport.isPending}
           onClick={handlePreview}
         >
@@ -409,7 +384,7 @@ function ImportDrawer({
               <Text strong>强制覆盖手工记录</Text>
               <div><Text type="secondary">仅在确认 Excel 数据优先时开启</Text></div>
             </div>
-            <Switch checked={forceOverride} onChange={setForceOverride} />
+            <Switch disabled={busy} checked={forceOverride} onChange={setForceOverride} />
           </div>
           <Popconfirm
             title="确认写入行业数据库？"
@@ -463,7 +438,7 @@ export default function IndustryClassificationPage() {
       onError: (error: Error) => message.error(`保存失败：${errorMessage(error)}`),
     };
     if (editingRecord) {
-      updateRecord.mutate({ id: editingRecord.id, record: value }, callbacks);
+      updateRecord.mutate({ id: editingRecord.id, record: { ...value, expected_revision: editingRecord.revision } }, callbacks);
       return;
     }
     createRecord.mutate(value, callbacks);

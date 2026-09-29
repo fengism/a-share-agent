@@ -5,6 +5,7 @@ import {
   Card,
   Col,
   Empty,
+  Modal,
   Row,
   Segmented,
   Space,
@@ -13,13 +14,16 @@ import {
   Tag,
   Typography,
   Tooltip,
+  message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   BankOutlined,
   CalendarOutlined,
   DatabaseOutlined,
+  DownloadOutlined,
   FallOutlined,
+  FullscreenOutlined,
   InfoCircleOutlined,
   ReloadOutlined,
   RiseOutlined,
@@ -28,8 +32,10 @@ import {
 import ReactECharts from "echarts-for-react/lib/core";
 import echarts from "../../charts/echarts-setup";
 import { useNationalTeamHoldings } from "../../api/queries";
+import PreloadLink from "../../components/PreloadLink";
 import SectionDataState from "../../components/SectionDataState";
 import { useColors } from "../../styles/ui";
+import { APP_FONT_FAMILY } from "../../theme/typography";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
 import type { NationalTeamEtfSeries, NationalTeamIndexSeries } from "../../types/stock";
 import "./national-team.css";
@@ -37,6 +43,54 @@ import "./national-team.css";
 const { Text, Title } = Typography;
 const HISTORY_WINDOWS = [30, 60, 120, 240, 365] as const;
 const INDEX_ORDER = ["沪深300", "上证50", "中证500", "中证1000", "科创50", "创业板"];
+
+function downloadNationalTeamCsv(etfs: NationalTeamEtfSeries[], asOfDate?: string | null) {
+  const headers = [
+    "宽基板块",
+    "ETF代码",
+    "ETF名称",
+    "基金公司",
+    "市场",
+    "最新日期",
+    "最新份额(亿份)",
+    "1日变化(亿份)",
+    "5日变化(亿份)",
+    "20日变化(亿份)",
+  ];
+
+  const escapeCell = (val: unknown) => {
+    if (val == null) return "";
+    const str = String(val);
+    if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const rows = etfs.map((item) => [
+    item.index_name,
+    item.code,
+    item.name,
+    item.fund_manager || "",
+    item.exchange === "SH" ? "上海" : "深圳",
+    item.latest_date || "",
+    item.latest_shares_100m != null ? item.latest_shares_100m.toFixed(2) : "",
+    item.latest_change_1d_100m != null ? item.latest_change_1d_100m.toFixed(2) : "",
+    item.change_5d_100m != null ? item.change_5d_100m.toFixed(2) : "",
+    item.change_20d_100m != null ? item.change_20d_100m.toFixed(2) : "",
+  ].map(escapeCell).join(","));
+
+  const csvContent = "\uFEFF" + [headers.map(escapeCell).join(","), ...rows].join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `国家队ETF监测_${asOfDate || new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 const INDEX_TAG_COLORS: Record<string, string> = {
   "沪深300": "blue",
@@ -71,6 +125,7 @@ function valueColor(value: number | null | undefined, up: string, down: string, 
 
 function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
   const colors = useColors();
+  const [expanded, setExpanded] = useState(false);
   const points = useMemo(() => item.points ?? [], [item.points]);
   const showPointMarkers = points.length <= 1;
   const shareColor = colors.info || "#20c6e5";
@@ -78,6 +133,7 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
 
   const option = useMemo(() => ({
     animationDuration: 350,
+    textStyle: { fontFamily: APP_FONT_FAMILY },
     tooltip: {
       trigger: "axis",
       axisPointer: {
@@ -89,7 +145,7 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
       borderColor: colors.border,
       borderWidth: 1,
       padding: [8, 12],
-      textStyle: { color: colors.textPrimary, fontSize: 12 },
+      textStyle: { color: colors.textPrimary, fontSize: 12, fontFamily: APP_FONT_FAMILY },
       extraCssText: "box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); border-radius: 8px; backdrop-filter: blur(8px);",
       formatter: (params: Array<{ axisValueLabel: string; marker: string; seriesName: string; value: number | null; dataIndex: number }>) => {
         if (!params.length) return "";
@@ -202,11 +258,24 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
     <Card className="national-team-index-card" styles={{ body: { padding: "12px 14px 10px" } }}>
       <div className="national-team-index-card__header">
         <div className="national-team-index-card__title-col">
-          <div className="national-team-index-card__title-row">
-            <Title level={3} className="national-team-index-card__title">{item.index_name}</Title>
-            <Tag color={INDEX_TAG_COLORS[item.index_name] || "default"} className="national-team-index-card__tag">
-              {item.index_code}
-            </Tag>
+          <div className="national-team-index-card__title-row" style={{ width: "100%", justifyContent: "space-between" }}>
+            <Space size={6} align="center">
+              <Title level={3} className="national-team-index-card__title">{item.index_name}</Title>
+              <Tag color={INDEX_TAG_COLORS[item.index_name] || "default"} className="national-team-index-card__tag">
+                {item.index_code}
+              </Tag>
+            </Space>
+            {points.length > 0 && (
+              <Button
+                type="text"
+                size="small"
+                aria-label="放大查看大图"
+                title="放大查看大图"
+                icon={<FullscreenOutlined />}
+                onClick={() => setExpanded(true)}
+                style={{ color: colors.textSecondary, padding: "0 4px", height: 22 }}
+              />
+            )}
           </div>
           <div className="national-team-index-card__legend" aria-label={`${item.index_name}图例`}>
             <span className="national-team-index-card__legend-item">
@@ -284,6 +353,31 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
       ) : (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无份额与指数历史" style={{ margin: "32px 0" }} />
       )}
+
+      <Modal
+        title={`${item.index_name}（${item.index_code}）- 份额与指数走势大图`}
+        open={expanded}
+        onCancel={() => setExpanded(false)}
+        footer={null}
+        width={920}
+        destroyOnHidden
+      >
+        <div style={{ padding: "8px 0" }}>
+          <ReactECharts
+            echarts={echarts}
+            option={{
+              ...option,
+              grid: { left: 56, right: 56, top: 32, bottom: 44 },
+              dataZoom: [
+                { type: "inside", start: 0, end: 100 },
+                { type: "slider", start: 0, end: 100, height: 22, bottom: 8 },
+              ],
+            }}
+            style={{ width: "100%", height: 480 }}
+            notMerge
+          />
+        </div>
+      </Modal>
     </Card>
   );
 }
@@ -353,16 +447,17 @@ export default function NationalTeam() {
       title: "ETF",
       key: "etf",
       width: 210,
+      fixed: "left",
       render: (_, item) => (
         <div className="national-team-etf-name">
           <div className="national-team-etf-code-row">
-            <a
-              href={buildStockProfileUrl(item.code)}
-              className="national-team-code national-team-code-link"
+            <PreloadLink
+              to={buildStockProfileUrl(item.code)}
+              className="national-team-code national-team-code-link financial-num"
               title={`查看 ${item.name}（${item.code}）行情`}
             >
               {item.code}
-            </a>
+            </PreloadLink>
             <Tag className="national-team-exchange-tag">
               {item.exchange === "SH" ? "沪" : "深"}
             </Tag>
@@ -722,13 +817,30 @@ export default function NationalTeam() {
               <Text type="secondary" className="national-team-section-heading__desc">共 {etfs.length} 只；份额单位为亿份。</Text>
             </div>
             <div className="national-team-table-filters">
-              <Segmented
-                size="small"
-                value={selectedFilterIndex}
-                options={filterOptions}
-                onChange={(val) => setSelectedFilterIndex(String(val))}
-                className="national-team-segmented"
-              />
+              <Space size={8} wrap>
+                <Segmented
+                  size="small"
+                  value={selectedFilterIndex}
+                  options={filterOptions}
+                  onChange={(val) => setSelectedFilterIndex(String(val))}
+                  className="national-team-segmented"
+                />
+                <Button
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  onClick={() => {
+                    if (filteredEtfs.length === 0) {
+                      message.warning("暂无数据可导出");
+                      return;
+                    }
+                    downloadNationalTeamCsv(filteredEtfs, data?.as_of_date);
+                    message.success(`已导出 ${filteredEtfs.length} 只 ETF 监测明细数据`);
+                  }}
+                  disabled={filteredEtfs.length === 0}
+                >
+                  导出 CSV
+                </Button>
+              </Space>
             </div>
           </div>
           <Card className="national-team-table-card" styles={{ body: { padding: 0 } }}>

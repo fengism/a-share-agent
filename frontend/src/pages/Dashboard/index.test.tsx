@@ -340,4 +340,19 @@ describe("Dashboard", () => {
     expect(within(section).queryByText("风格判断")).not.toBeInTheDocument();
   });
 
+  it("renders new shortcuts and supports faucet stock quick actions and csv export", () => {
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: /国家队监测/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /每日复盘/ })).toBeInTheDocument();
+
+    const section = screen.getByRole("region", { name: "今日主线" });
+    expect(within(section).getByRole("button", { name: /导出 CSV/ })).toBeInTheDocument();
+    expect(within(section).getAllByRole("link", { name: "研报" })[0]).toHaveAttribute("href", "/analysis?code=600721");
+    expect(within(section).getAllByRole("link", { name: "回测" })[0]).toHaveAttribute("href", "/quant?codes=600721");
+  });
 });

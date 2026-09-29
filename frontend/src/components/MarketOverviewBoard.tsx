@@ -111,11 +111,11 @@ function MarketDistribution({ distribution }: { distribution: MarketEmotionDistr
       <div className="market-board-distribution__heading">
         <strong>全市场涨跌结构</strong>
         <span>
-          上涨 <b className="is-up">{distribution.rise_num}</b>
+          上涨 <b className="is-up financial-num">{distribution.rise_num}</b>
           <i aria-hidden="true">·</i>
-          平盘 <b>{distribution.flat_num}</b>
+          平盘 <b className="financial-num">{distribution.flat_num}</b>
           <i aria-hidden="true">·</i>
-          下跌 <b className="is-down">{distribution.fall_num}</b>
+          下跌 <b className="is-down financial-num">{distribution.fall_num}</b>
         </span>
       </div>
       <div className="market-board-distribution__header" aria-hidden="true">
@@ -126,7 +126,7 @@ function MarketDistribution({ distribution }: { distribution: MarketEmotionDistr
       {rows.map((row) => (
         <div className="market-board-distribution__row" key={row.label}>
           <div className="market-board-distribution__side market-board-distribution__side--down">
-            <strong>{row.down}</strong>
+            <strong className="financial-num">{row.down}</strong>
             <div className="market-board-distribution__track">
               <span style={{ width: `${barWidth(row.down)}%` }} />
             </div>
@@ -136,7 +136,7 @@ function MarketDistribution({ distribution }: { distribution: MarketEmotionDistr
             <div className="market-board-distribution__track">
               <span style={{ width: `${barWidth(row.up)}%` }} />
             </div>
-            <strong>{row.up}</strong>
+            <strong className="financial-num">{row.up}</strong>
           </div>
         </div>
       ))}
@@ -239,8 +239,8 @@ export default function MarketOverviewBoard({ onNavigate, showRankings = true }:
         {overviewMetrics.map((metric) => (
           <div key={metric.label} className={`market-board-metric market-board-metric--${metric.tone}`}>
             <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small>{metric.note}</small>
+            <strong className="financial-num">{metric.value}</strong>
+            <small className="financial-num">{metric.note}</small>
           </div>
         ))}
       </section>
@@ -252,15 +252,15 @@ export default function MarketOverviewBoard({ onNavigate, showRankings = true }:
             <div className="market-board-emotion">
               <div className="market-board-emotion__score">
                 <span>市场热度</span>
-                <strong>{degree ?? "-"}</strong>
+                <strong className="financial-num">{degree ?? "-"}</strong>
                 <small>{heatLabel(degree)}</small>
                 <div className="market-board-emotion__meter" aria-label={`市场热度 ${degree ?? "暂无"}`}>
                   <span style={{ width: `${degreePercent}%` }} />
                 </div>
               </div>
               <div className="market-board-emotion__breadth">
-                <div><span>上涨</span><strong className="is-up">{riseCount}</strong></div>
-                <div><span>下跌</span><strong className="is-down">{fallCount}</strong></div>
+                <div><span>上涨</span><strong className="is-up financial-num">{riseCount}</strong></div>
+                <div><span>下跌</span><strong className="is-down financial-num">{fallCount}</strong></div>
                 <div className="market-board-emotion__breadth-bar" aria-label={`上涨占比 ${risePercent.toFixed(1)}%`}>
                   <span className="is-up" style={{ width: `${risePercent}%` }} />
                   <span className="is-down" style={{ width: `${100 - risePercent}%` }} />
@@ -280,7 +280,7 @@ export default function MarketOverviewBoard({ onNavigate, showRankings = true }:
                 <div className="market-board-ladder__row" key={stock.code}>
                   <span className={`market-board-rank${index < 3 ? " is-top" : ""}`}>{index + 1}</span>
                   <span className="market-board-ladder__stock"><strong>{stock.name}</strong><small>{stock.sector_name || "其他"}</small></span>
-                  <Tooltip title={`涨停时间 ${stock.limit_up_time || "-"}`}><span className="market-board-ladder__board">{stock.board_count}板</span></Tooltip>
+                  <Tooltip title={`涨停时间 ${stock.limit_up_time || "-"}`}><span className="market-board-ladder__board financial-num">{stock.board_count}板</span></Tooltip>
                 </div>
               ))}
             </div>

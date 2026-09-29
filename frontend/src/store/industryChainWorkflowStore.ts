@@ -8,7 +8,7 @@ import {
 } from "../features/agent-process/agentProcess";
 import { registerUserScopeHandler } from "./userScope";
 
-export type IndustryWorkflowStatus = "idle" | "running" | "success" | "error" | "cancelled" | "detached";
+export type IndustryWorkflowStatus = "idle" | "running" | "success" | "warning" | "error" | "cancelled" | "detached";
 
 interface IndustryChainWorkflowState {
   status: IndustryWorkflowStatus;
@@ -19,6 +19,7 @@ interface IndustryChainWorkflowState {
   isAnalyzing: boolean;
   isCancelling: boolean;
   currentStage: number;
+  failedStage: number;
   stageMessage: string;
   result: IndustryChainResult | null;
   archiveId: string;
@@ -42,6 +43,7 @@ const initialState = () => ({
   isAnalyzing: false,
   isCancelling: false,
   currentStage: -1,
+  failedStage: -1,
   stageMessage: "",
   result: null,
   archiveId: "",

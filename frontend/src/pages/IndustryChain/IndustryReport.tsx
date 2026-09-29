@@ -2,13 +2,17 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   ApartmentOutlined,
   CloudUploadOutlined,
+  CopyOutlined,
   DatabaseOutlined,
+  DownOutlined,
+  DownloadOutlined,
+  FileMarkdownOutlined,
   FilePdfOutlined,
   FileTextOutlined,
   FullscreenOutlined,
   SendOutlined,
 } from "@ant-design/icons";
-import { Alert, Button, Collapse, Input, message, Modal, Popover, Skeleton, Tag, Typography } from "antd";
+import { Alert, Button, Collapse, Dropdown, Input, message, Modal, Popover, Skeleton, Tag, Typography } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { queryKeys } from "../../api/queryKeys";
@@ -16,6 +20,7 @@ import { downloadIndustryChainPdfFromData, useMineIndustryChainAtlas } from "../
 import { useColors, useStyles } from "../../styles/ui";
 import type { IndustryChainChart, IndustryChainResult } from "../../types/stock";
 import { reportPresentation } from "./reportPresentation";
+import { buildIndustryReportMarkdown } from "./industryReportMarkdown";
 import IndustryConclusion from "./IndustryConclusion";
 import IndustryReportChanges from "./IndustryReportChanges";
 import IndustryOpportunityMap from "./IndustryOpportunityMap";
@@ -104,6 +109,31 @@ export default function IndustryReport({
       message.error({ content: `PDF 导出失败${detail}`, key: "export-industry-pdf" });
     } finally {
       setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportMarkdown = () => {
+    const content = buildIndustryReportMarkdown(rawResult, activeName);
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    if (typeof URL.createObjectURL === "function") {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const downloadName = (rawResult.name || activeName || "产业链").replace(/[/\\?%*:|"<>]/g, "_");
+      a.download = `产业链投研报告_${downloadName}_${new Date().toISOString().slice(0, 10)}.md`;
+      a.click();
+      URL.revokeObjectURL?.(url);
+    }
+    message.success("Markdown 研报已导出");
+  };
+
+  const handleCopyMarkdown = async () => {
+    const content = buildIndustryReportMarkdown(rawResult, activeName);
+    try {
+      await navigator.clipboard.writeText(content);
+      message.success("产业链研报已复制到剪贴板");
+    } catch {
+      message.error("复制失败，请手动选择");
     }
   };
   const scope = result.research_scope;
@@ -229,13 +259,47 @@ export default function IndustryReport({
                 推送
               </Button>
             </Popover>
-            <Button
-              icon={<FilePdfOutlined />}
-              size="small"
-              loading={isExportingPdf}
-              onClick={handleExportPdf}
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                items: [
+                  {
+                    key: "pdf",
+                    label: "导出为 PDF (.pdf)",
+                    icon: <FilePdfOutlined />,
+                    disabled: isExportingPdf,
+                  },
+                  {
+                    key: "md",
+                    label: "导出为 Markdown (.md)",
+                    icon: <FileMarkdownOutlined />,
+                  },
+                ],
+                onClick: ({ key }) => {
+                  if (key === "pdf") {
+                    void handleExportPdf();
+                  } else if (key === "md") {
+                    handleExportMarkdown();
+                  }
+                },
+              }}
             >
-              导出 PDF 研报
+              <Button
+                icon={<DownloadOutlined />}
+                size="small"
+                loading={isExportingPdf}
+                aria-label="导出"
+              >
+                导出 <DownOutlined style={{ fontSize: 10, marginLeft: 2 }} />
+              </Button>
+            </Dropdown>
+            <Button
+              icon={<CopyOutlined />}
+              size="small"
+              onClick={handleCopyMarkdown}
+              aria-label="复制研报"
+            >
+              复制
             </Button>
             <MineToAtlasButton name={activeName} archiveId={archiveId} />
           </div>

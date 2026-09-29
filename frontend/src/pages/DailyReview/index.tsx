@@ -5,16 +5,36 @@ import {
   ApartmentOutlined,
   BulbOutlined,
   CompassOutlined,
+  CopyOutlined,
   DeleteOutlined,
+  DownOutlined,
+  DownloadOutlined,
+  FileMarkdownOutlined,
+  FilePdfOutlined,
   FileTextOutlined,
   FireOutlined,
   LineChartOutlined,
   RiseOutlined,
+  SearchOutlined,
   SwapRightOutlined,
   ThunderboltOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
-import { Alert, Button, Card, DatePicker, Divider, message, Popconfirm, Skeleton, Space, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  DatePicker,
+  Divider,
+  Dropdown,
+  Input,
+  message,
+  Popconfirm,
+  Skeleton,
+  Space,
+  Tag,
+  Typography,
+} from "antd";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -121,6 +141,44 @@ function renderReviewContent(value: string) {
   }
 }
 
+function buildDailyReviewMarkdown(review: NonNullable<ReturnType<typeof useDailyReview>["data"]>): string {
+  const parts: string[] = [];
+  parts.push(`# ${review.title}`);
+  parts.push(`> **复盘日期**：${review.date} | **生成时间**：${review.generated_at || "-"} | **质量状态**：${review.quality_status === "degraded" ? "降级" : "完整"}\n`);
+  parts.push(`## 市场总览\n\n${review.market_summary}\n`);
+  parts.push(`## 市场情绪结论\n\n${buildMoodSummary(review)}\n`);
+
+  if (review.llm_review) {
+    parts.push(`## 深度复盘报告\n\n${renderReviewContent(review.llm_review)}\n`);
+  } else {
+    for (const section of [review.index_review, review.hotspot_review, review.dragon_tiger_review]) {
+      if (section?.title) {
+        parts.push(`## ${section.title}\n\n${section.summary || ""}\n`);
+        if (section.bullets?.length) {
+          parts.push(section.bullets.map((b) => `- ${b}`).join("\n"));
+        }
+        parts.push("\n");
+      }
+    }
+  }
+
+  if (review.opportunities?.length || review.risk_alerts?.length || review.strategy_notes?.length) {
+    parts.push("## 机会与风险展望\n");
+    if (review.opportunities?.length) {
+      parts.push(`- **机会**：${review.opportunities.join("；")}`);
+    }
+    if (review.risk_alerts?.length) {
+      parts.push(`- **风险**：${review.risk_alerts.join("；")}`);
+    }
+    if (review.strategy_notes?.length) {
+      parts.push(`- **策略建议**：${review.strategy_notes.join("；")}`);
+    }
+    parts.push("");
+  }
+
+  return parts.join("\n");
+}
+
 export default function DailyReviewPage() {
   const { cardStyle, pageContainerStyle } = useStyles();
   const c = useColors();
@@ -152,6 +210,7 @@ export default function DailyReviewPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
+  const [historyFilter, setHistoryFilter] = useState("");
   const cancelGenerationRef = useRef<(() => Promise<unknown>) | null>(null);
   const detachGenerationRef = useRef<(() => void) | null>(null);
   const cancellationRequestedRef = useRef(false);
@@ -183,7 +242,36 @@ export default function DailyReviewPage() {
     }
   };
 
+  const handleExportMarkdown = () => {
+    if (!review) return;
+    const content = buildDailyReviewMarkdown(review);
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    if (typeof URL.createObjectURL === "function") {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `每日复盘_${review.date}.md`;
+      a.click();
+      URL.revokeObjectURL?.(url);
+    }
+    message.success("Markdown 文件已导出");
+  };
+
+  const handleCopyMarkdown = async () => {
+    if (!review) return;
+    const content = buildDailyReviewMarkdown(review);
+    try {
+      await navigator.clipboard.writeText(content);
+      message.success("复盘内容已复制到剪贴板");
+    } catch {
+      message.error("复制到剪贴板失败，请手动选择复制");
+    }
+  };
+
   const historyItems = historyPages?.pages.flat() ?? [];
+  const filteredHistoryItems = historyItems.filter((item) =>
+    !historyFilter.trim() || item.date.includes(historyFilter.trim()) || item.title.includes(historyFilter.trim()),
+  );
 
   const handleGenerate = async (force = false) => {
     if (!date) {
@@ -271,7 +359,7 @@ export default function DailyReviewPage() {
               onChange={(value) => setDate(formatDate(value))}
               disabledDate={(value) => value.startOf("day").isAfter(dayjs().startOf("day"))}
             />
-            <Button.Group size="middle">
+            <Space.Compact>
               <Button
                 disabled={isGenerating || isExportingPdf}
                 onClick={() => setDate(dayjs().format("YYYY-MM-DD"))}
@@ -284,11 +372,45 @@ export default function DailyReviewPage() {
               >
                 前一日
               </Button>
-            </Button.Group>
+            </Space.Compact>
             <Button type="primary" loading={isGenerating} disabled={isExportingPdf} onClick={() => handleGenerate(false)}>生成复盘</Button>
             <Button loading={isGenerating} disabled={isExportingPdf} onClick={() => handleGenerate(true)}>重新生成</Button>
             {isGenerating && <Button danger onClick={handleCancelGeneration}>取消任务</Button>}
-            <Button loading={isExportingPdf} onClick={handleExportPdf} disabled={!review || isGenerating}>导出 PDF</Button>
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                items: [
+                  {
+                    key: "pdf",
+                    label: "导出为 PDF (.pdf)",
+                    icon: <FilePdfOutlined />,
+                    disabled: isExportingPdf,
+                  },
+                  {
+                    key: "md",
+                    label: "导出为 Markdown (.md)",
+                    icon: <FileMarkdownOutlined />,
+                  },
+                ],
+                onClick: ({ key }) => {
+                  if (key === "pdf") {
+                    void handleExportPdf();
+                  } else if (key === "md") {
+                    handleExportMarkdown();
+                  }
+                },
+              }}
+              disabled={!review || isGenerating}
+            >
+              <Button
+                icon={<DownloadOutlined />}
+                loading={isExportingPdf}
+                aria-label="导出"
+              >
+                导出 <DownOutlined style={{ fontSize: 10, marginLeft: 2 }} />
+              </Button>
+            </Dropdown>
+            <Button icon={<CopyOutlined />} onClick={handleCopyMarkdown} disabled={!review || isGenerating}>复制</Button>
             <Button onClick={() => setPushModalOpen(true)} disabled={!review || isGenerating || isExportingPdf}>推送</Button>
             <PushModal
               open={pushModalOpen}
@@ -326,8 +448,19 @@ export default function DailyReviewPage() {
             skeletonRows={5}
             minHeight={240}
           >
+            {historyItems.length > 3 ? (
+              <Input
+                size="small"
+                prefix={<SearchOutlined style={{ color: "var(--c-text-muted)" }} />}
+                placeholder="搜索历史复盘..."
+                value={historyFilter}
+                onChange={(e) => setHistoryFilter(e.target.value)}
+                allowClear
+                style={{ marginBottom: 8 }}
+              />
+            ) : null}
             <ul aria-label="复盘历史记录" style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {historyItems.map((item) => (
+              {filteredHistoryItems.map((item) => (
                 <li key={item.date} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <button
                     type="button"
@@ -425,11 +558,11 @@ export default function DailyReviewPage() {
                   <Text style={{ marginLeft: 6 }}>{buildMoodSummary(review)}</Text>
                 </div>
                 <Space wrap style={{ marginTop: 8 }}>
-                  <Tag style={{ background: `${c.primary}26`, color: c.primary, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><LineChartOutlined style={{ marginRight: 4 }} />指数 {review.data_snapshot.indices.length}</Tag>
-                  <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><FireOutlined style={{ marginRight: 4 }} />热股 {review.data_snapshot.hot_stocks.length}</Tag>
-                  <Tag style={{ background: `${c.accent}26`, color: c.accent, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><ThunderboltOutlined style={{ marginRight: 4 }} />概念 {review.data_snapshot.hot_concepts.length}</Tag>
-                  <Tag style={{ background: `${c.down}26`, color: c.down, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><ApartmentOutlined style={{ marginRight: 4 }} />行业 {review.data_snapshot.hot_industries.length}</Tag>
-                  <Tag style={{ background: `${c.up}26`, color: c.up, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><SwapRightOutlined style={{ marginRight: 4 }} />龙虎榜 {review.data_snapshot.dragon_tiger.length}</Tag>
+                  <Tag className="financial-num" style={{ background: `${c.primary}26`, color: c.primary, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><LineChartOutlined style={{ marginRight: 4 }} />指数 {review.data_snapshot.indices.length}</Tag>
+                  <Tag className="financial-num" style={{ background: `${c.accent}26`, color: c.accent, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><FireOutlined style={{ marginRight: 4 }} />热股 {review.data_snapshot.hot_stocks.length}</Tag>
+                  <Tag className="financial-num" style={{ background: `${c.accent}26`, color: c.accent, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><ThunderboltOutlined style={{ marginRight: 4 }} />概念 {review.data_snapshot.hot_concepts.length}</Tag>
+                  <Tag className="financial-num" style={{ background: `${c.down}26`, color: c.down, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><ApartmentOutlined style={{ marginRight: 4 }} />行业 {review.data_snapshot.hot_industries.length}</Tag>
+                  <Tag className="financial-num" style={{ background: `${c.up}26`, color: c.up, border: "none", borderRadius: "var(--c-radius-pill)", padding: "2px 10px" }}><SwapRightOutlined style={{ marginRight: 4 }} />龙虎榜 {review.data_snapshot.dragon_tiger.length}</Tag>
                 </Space>
                 <div style={{ marginTop: 12 }}>
                   <Text type="secondary" style={{ fontSize: "var(--c-font-xs)" }}>生成时间：{review.generated_at}</Text>

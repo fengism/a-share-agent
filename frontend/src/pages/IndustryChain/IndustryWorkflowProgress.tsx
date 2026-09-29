@@ -5,8 +5,9 @@ import type { AgentProcessState } from "../../features/agent-process/agentProces
 import type { IndustryWorkflowStatus } from "../../store/industryChainWorkflowStore";
 import { INDUSTRY_CHAIN_STAGES } from "./industryWorkflow";
 
-export default function IndustryWorkflowProgress({ currentStage, status, message, agentProcess }: {
+export default function IndustryWorkflowProgress({ currentStage, failedStage = -1, status, message, agentProcess }: {
   currentStage: number;
+  failedStage?: number;
   status: IndustryWorkflowStatus;
   message: string;
   agentProcess: AgentProcessState;
@@ -19,9 +20,10 @@ export default function IndustryWorkflowProgress({ currentStage, status, message
       message={message}
       items={INDUSTRY_CHAIN_STAGES.map((stage, index) => ({
         title: stage.title,
+        status: index === failedStage ? "error" as const : undefined,
         icon: currentStage === index && isRunning
           ? <LoadingOutlined spin />
-          : currentStage > index ? <CheckCircleOutlined /> : undefined,
+          : currentStage > index && index !== failedStage ? <CheckCircleOutlined /> : undefined,
       }))}
     >
       <AgentProcessPanel

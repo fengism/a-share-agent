@@ -127,10 +127,13 @@ function AnalysisRuntimePanel({ result }: { result: IndustryChainResult }) {
   const metrics = [
     ["总耗时", formatDuration(metadata.total_duration_ms)],
     ["调研", formatDuration(metadata.research_duration_ms)],
-    ["合成", formatDuration(metadata.synthesis_duration_ms)],
+    ["初稿", formatDuration(metadata.draft_duration_ms ?? metadata.synthesis_duration_ms)],
+    ["核验/补证", formatDuration(metadata.verification_duration_ms)],
+    ["质量检查", formatDuration(metadata.finalization_duration_ms)],
     ["存档", formatDuration(metadata.archive_duration_ms)],
     ["Agent 证据", `${metadata.agent_evidence_count || 0} 条`],
     ["公共数据", `${metadata.public_item_count || 0} 项`],
+    ["独立来源", `${metadata.independent_source_count || 0} 个`],
   ];
 
   return (

@@ -5,7 +5,11 @@ import type { KlineItem } from "../../types/stock";
 import StockCharts from "./StockCharts";
 
 const mocks = vi.hoisted(() => ({ kline: vi.fn(), analyze: vi.fn() }));
-vi.mock("../../api/queries", () => ({ useKlineData: mocks.kline, useStockIntraday: vi.fn(), useStockChipDistribution: vi.fn() }));
+vi.mock("../../api/queries", () => ({
+  useKlineData: mocks.kline,
+  useStockIntraday: () => ({ data: { items: [], prev_close: null }, isLoading: false, isFetching: false, error: null, refetch: vi.fn() }),
+  useStockChipDistribution: vi.fn(),
+}));
 vi.mock("../../utils/chanlun", () => ({ analyzeChanlun: mocks.analyze }));
 vi.mock("../../charts/LazyKlineChart", () => ({
   default: ({ chanlun, viewKey }: { chanlun: ChanlunResult | null; viewKey: string }) => (
@@ -82,5 +86,13 @@ describe("stock K-line Chanlun switch", () => {
     rerender(<StockCharts code="600519" />);
     expect(screen.getByText("K 线数据加载失败")).toBeInTheDocument();
     expect(mocks.analyze).not.toHaveBeenCalled();
+  });
+
+  it("renders intraday toolbar with toggles and refresh button when switching to intraday view", () => {
+    render(<StockCharts code="600519" />);
+    fireEvent.click(screen.getByText("分时"));
+    expect(screen.getByRole("switch", { name: "均价线" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "昨收线" })).toBeChecked();
+    expect(screen.getByRole("button", { name: /刷新/ })).toBeInTheDocument();
   });
 });

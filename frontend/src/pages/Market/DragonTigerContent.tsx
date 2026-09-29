@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
-import { Button, Card, Col, DatePicker, Empty, Modal, Row, Statistic, Table, Tag } from "antd";
-import { SwapRightOutlined, ArrowUpOutlined, ArrowDownOutlined } from "@ant-design/icons";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { Button, Card, Col, DatePicker, Empty, message, Modal, Row, Statistic, Table, Tag } from "antd";
+import { SwapRightOutlined, ArrowUpOutlined, ArrowDownOutlined, DownloadOutlined } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { useDragonTigerDetail, useDragonTigerList } from "../../api/queries";
@@ -19,6 +19,23 @@ import {
 } from "../../utils/format";
 import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
 
+function renderBranchName(name: string) {
+  let tag: ReactNode = null;
+  if (name.includes("机构专用")) {
+    tag = <Tag color="purple" style={{ marginRight: 6, fontSize: "11px" }}>机构</Tag>;
+  } else if (name.includes("深股通") || name.includes("沪股通")) {
+    tag = <Tag color="cyan" style={{ marginRight: 6, fontSize: "11px" }}>外资</Tag>;
+  } else if (name.includes("拉萨") || name.includes("东环路") || name.includes("团结路") || name.includes("金珠")) {
+    tag = <Tag color="orange" style={{ marginRight: 6, fontSize: "11px" }}>拉萨天团</Tag>;
+  }
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", maxWidth: "100%" }}>
+      {tag}
+      <span className="u-text-ellipsis" title={name}>{name}</span>
+    </span>
+  );
+}
+
 function DetailModal({
   code,
   name,
@@ -31,7 +48,7 @@ function DetailModal({
   reportDate: string;
   open: boolean;
   onClose: () => void;
-  }) {
+}) {
   const c = useColors();
   const t = useTokens();
   const { data, isLoading, error, refetch } = useDragonTigerDetail(code, reportDate);
@@ -40,14 +57,21 @@ function DetailModal({
   const sellItems = useMemo(() => (data || []).filter((item) => item.side === "sell").slice(0, 5), [data]);
 
   const buyColumns: ColumnsType<DragonTigerDetail> = useMemo(() => [
-    { title: "买入营业部", dataIndex: "operate_name", ellipsis: true, width: 240 },
+    {
+      title: "买入营业部",
+      dataIndex: "operate_name",
+      ellipsis: true,
+      width: 240,
+      render: renderBranchName,
+    },
     {
       title: "买入(万)",
       dataIndex: "buy_amount",
       width: 110,
       align: "right",
+      className: "financial-num",
       render: (value: number | null) => (
-        <span style={{ color: c.up, fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)" }}>
+        <span style={{ color: c.up, fontWeight: Number(t.weight.semibold) }}>
           {formatNumber(value)}
         </span>
       ),
@@ -57,21 +81,29 @@ function DetailModal({
       dataIndex: "buy_ratio",
       width: 90,
       align: "right",
+      className: "financial-num",
       render: (value: number | null) => (
-        <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatRatioPercent(value, 2)}</span>
+        <span>{formatRatioPercent(value, 2)}</span>
       ),
     },
   ], [c.up, t.weight.semibold]);
 
   const sellColumns: ColumnsType<DragonTigerDetail> = useMemo(() => [
-    { title: "卖出营业部", dataIndex: "operate_name", ellipsis: true, width: 240 },
+    {
+      title: "卖出营业部",
+      dataIndex: "operate_name",
+      ellipsis: true,
+      width: 240,
+      render: renderBranchName,
+    },
     {
       title: "卖出(万)",
       dataIndex: "sell_amount",
       width: 110,
       align: "right",
+      className: "financial-num",
       render: (value: number | null) => (
-        <span style={{ color: c.down, fontWeight: Number(t.weight.semibold), fontFamily: "var(--c-font-mono)" }}>
+        <span style={{ color: c.down, fontWeight: Number(t.weight.semibold) }}>
           {formatNumber(value)}
         </span>
       ),
@@ -81,8 +113,9 @@ function DetailModal({
       dataIndex: "sell_ratio",
       width: 90,
       align: "right",
+      className: "financial-num",
       render: (value: number | null) => (
-        <span style={{ fontFamily: "var(--c-font-mono)" }}>{formatRatioPercent(value, 2)}</span>
+        <span>{formatRatioPercent(value, 2)}</span>
       ),
     },
   ], [c.down, t.weight.semibold]);
@@ -188,6 +221,46 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
     setDetailName(record.name);
     setDetailReportDate(record.trade_date || reportDate);
   }, [reportDate]);
+
+  const handleExportCsv = useCallback(() => {
+    if (!data || data.length === 0) return;
+    const headers = [
+      "股票代码",
+      "股票名称",
+      "收盘价",
+      "涨跌幅(%)",
+      "上榜原因",
+      "买入额(万)",
+      "卖出额(万)",
+      "净买入额(万)",
+      "成交额",
+      "占成交比(%)",
+      "换手率(%)",
+    ];
+    const lines = data.map((r) => [
+      `\t${r.code}`,
+      `"${r.name.replace(/"/g, '""')}"`,
+      r.close != null ? r.close.toFixed(2) : "",
+      r.change_pct != null ? r.change_pct.toFixed(2) : "",
+      `"${(r.reason || "").replace(/"/g, '""')}"`,
+      r.buy_amount != null ? r.buy_amount.toFixed(0) : "",
+      r.sell_amount != null ? r.sell_amount.toFixed(0) : "",
+      r.net_amount != null ? r.net_amount.toFixed(0) : "",
+      r.deal_amount != null ? formatWanAmount(r.deal_amount) : "",
+      r.deal_amount_rate != null ? r.deal_amount_rate.toFixed(2) : "",
+      r.turnover_pct != null ? r.turnover_pct.toFixed(2) : "",
+    ].join(","));
+    const blob = new Blob(["\uFEFF" + [headers.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    if (typeof URL.createObjectURL === "function") {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `龙虎榜数据_${actualReportDate}.csv`;
+      a.click();
+      URL.revokeObjectURL?.(url);
+    }
+    message.success("龙虎榜数据已导出为 CSV");
+  }, [actualReportDate, data]);
 
   const columns: ColumnsType<DragonTigerItem> = useMemo(() => {
     if (isNarrow) {
@@ -458,10 +531,22 @@ export function DragonTigerContent({ embedded = false }: { embedded?: boolean })
             </div>
           </Col>
           <Col xs={24} sm={12} style={{ textAlign: isNarrow ? "left" : "right" }}>
-            {embedded && <Tag style={semanticTagStyle("primary")}>东方财富</Tag>}
-            <span style={{ color: c.textSecondary, fontSize: t.font.sm, marginLeft: embedded ? t.space[2] : 0 }}>
-              {data ? `共 ${data.length} 只股票上榜` : "等待榜单数据"}
-            </span>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: t.space[2] }}>
+              {embedded && <Tag style={semanticTagStyle("primary")}>东方财富</Tag>}
+              <span style={{ color: c.textSecondary, fontSize: t.font.sm }}>
+                {data ? `共 ${data.length} 只股票上榜` : "等待榜单数据"}
+              </span>
+              {hasData && (
+                <Button
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  onClick={handleExportCsv}
+                  aria-label="导出龙虎榜 CSV"
+                >
+                  导出 CSV
+                </Button>
+              )}
+            </div>
           </Col>
         </Row>
       </Card>

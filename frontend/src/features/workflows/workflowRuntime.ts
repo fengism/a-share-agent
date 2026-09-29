@@ -95,6 +95,13 @@ function applyIndustryProgress(runId: number, progress: IndustryChainProgress) {
     });
   } else if (progress.type === "stage_completed") {
     state.patch(runId, { stageMessage: progress.message || "完成" });
+  } else if (progress.type === "stage_failed" && progress.stage) {
+    const failedStage = industryStageIndex(progress.stage);
+    state.patch(runId, {
+      currentStage: failedStage >= 0 ? failedStage : state.currentStage,
+      failedStage,
+      stageMessage: progress.message || "阶段执行失败",
+    });
   } else if (progress.type === "agent_event" && progress.agent_event) {
     state.patch(runId, { agentProcess: applyAgentEvent(state.agentProcess, progress.agent_event) });
   }
@@ -118,11 +125,18 @@ export function resumeIndustryChainWorkflow(job: WorkflowJob) {
     state.patch(runId, {
       result,
       archiveId: result.archive_id || "",
-      currentStage: INDUSTRY_CHAIN_STAGES.length,
-      stageMessage: result.archive_status === "failed" ? "分析完成，但存档失败" : "分析完成",
+      currentStage: result.archive_status === "failed"
+        ? INDUSTRY_CHAIN_STAGES.length - 1
+        : INDUSTRY_CHAIN_STAGES.length,
+      failedStage: result.archive_status === "failed" ? INDUSTRY_CHAIN_STAGES.length - 1 : state.failedStage,
+      stageMessage: result.archive_status === "failed"
+        ? "分析完成，但存档失败"
+        : result.quality_status === "degraded"
+          ? "分析完成，但存在证据或质量提示"
+          : "分析完成",
       isAnalyzing: false,
       isCancelling: false,
-      status: "success",
+      status: result.archive_status === "failed" || result.quality_status === "degraded" ? "warning" : "success",
       agentProcess: state.agentProcess.plan || state.agentProcess.toolCalls.length > 0
         ? state.agentProcess
         : agentProcessFromEvents(result.agent_trace),

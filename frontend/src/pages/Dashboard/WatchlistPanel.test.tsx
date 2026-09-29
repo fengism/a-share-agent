@@ -113,4 +113,24 @@ describe("WatchlistPanel", () => {
 
     expect(screen.getByRole("link", { name: /腾讯控股/ })).toHaveAttribute("href", "/stock/00700");
   });
+
+  it("supports report analysis shortcut and toggling sort direction", () => {
+    mocks.items.splice(0, mocks.items.length,
+      { ...defaultItem, id: 1, stock_code: "601991", stock_name: "大唐发电", change_pct: 1.2 },
+      { ...defaultItem, id: 2, stock_code: "600519", stock_name: "贵州茅台", change_pct: 3.5 },
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("button", { name: "查看大唐发电研报" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看贵州茅台研报" })).toBeInTheDocument();
+
+    const sortButton = screen.getByRole("button", { name: "切换自选股排序" });
+    expect(sortButton).toBeInTheDocument();
+    fireEvent.click(sortButton);
+
+    const refreshButton = screen.getByRole("button", { name: "刷新自选股行情" });
+    expect(refreshButton).toBeInTheDocument();
+    fireEvent.click(refreshButton);
+  });
 });

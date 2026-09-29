@@ -33,6 +33,7 @@ import {
 } from "../../features/investment-research/analysisHistoryUrl";
 import { preloadAnalysisPanelModules } from "./analysisPanelLoaders";
 import { useAnalysisWorkflowController } from "../../hooks/useAnalysisWorkflowController";
+import { buildAnalysisMarkdown } from "./analysisMarkdown";
 import "./analysis-workspace.css";
 
 export default function Analysis() {
@@ -232,6 +233,23 @@ export default function Analysis() {
     }
   }, [code, displayResult, exportPdf, messageApi, reportDate]);
 
+  const handleExportMarkdown = useCallback(() => {
+    if (!displayResult) return;
+    const content = buildAnalysisMarkdown(displayResult, pageData?.stock_info);
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    if (typeof URL.createObjectURL === "function") {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fileCode = displayResult.stock_code || code || "stock";
+      const fileDate = normalizeAnalysisDate(displayResult.analysis_date) || historyDate || new Date().toISOString().slice(0, 10);
+      a.download = `投研报告_${fileCode}_${fileDate}.md`;
+      a.click();
+      URL.revokeObjectURL?.(url);
+    }
+    messageApi.success("Markdown 投研报告已导出");
+  }, [code, displayResult, historyDate, messageApi, pageData?.stock_info]);
+
   if (pageLoading || (historyDate && isHistoricalLoading)) {
     return (
       <div style={pageContainerStyle}>
@@ -288,10 +306,12 @@ export default function Analysis() {
               isPushing={isPushing}
               isWatched={isWatched}
               isWatchlistPending={addWatchlistItem.isPending || deleteWatchlistItem.isPending}
+              isExportingPdf={isExportingPdf}
               onToggleWatchlist={handleToggleWatchlist}
               onAnalyze={handleAnalyze}
               onCancel={() => void cancelAnalysis()}
               onExportPdf={handleExportPdf}
+              onExportMarkdown={handleExportMarkdown}
               onShowHistory={handleShowHistory}
               onOpenResearchReport={handleOpenResearchReport}
               onPush={handlePush}

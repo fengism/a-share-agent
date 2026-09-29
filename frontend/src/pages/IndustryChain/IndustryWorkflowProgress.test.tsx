@@ -32,7 +32,7 @@ describe("IndustryWorkflowProgress", () => {
     expect(within(toggle).queryByText("已完成")).not.toBeInTheDocument();
     // Only the previously completed tool remains successful, not the round/workflow.
     expect(screen.getAllByText("已完成")).toHaveLength(1);
-    expect(screen.getByText("数据采集与证据校验")).toBeInTheDocument();
+    expect(screen.getByText("数据采集与 Agent 调研")).toBeInTheDocument();
     expect(screen.getByText("1/2 已停止")).toBeInTheDocument();
     expect(screen.getByText("已取得的证据")).toBeInTheDocument();
     const roundHeader = screen.getByLabelText("第 1 轮调研").firstElementChild as HTMLElement;
@@ -51,17 +51,33 @@ describe("IndustryWorkflowProgress", () => {
   it("keeps successfully finished research visible when cancelling during synthesis", () => {
     const process = stopAgentProcess({ ...createAgentProcessState(), status: "Agent 调研完成" }, "cancelled", "产业研究已取消");
     const { container } = render(<IndustryWorkflowProgress currentStage={1} status="cancelled" message={process.status} agentProcess={process} />);
-    expect(screen.getByText("数据采集与证据校验")).toBeInTheDocument();
-    expect(screen.getByText("AI 生成分析报告")).toBeInTheDocument();
-    expect(container.querySelectorAll('[aria-label="check-circle"]')).toHaveLength(1);
+    expect(screen.getByText("数据采集与 Agent 调研")).toBeInTheDocument();
+    expect(screen.getByText("结构化初稿")).toBeInTheDocument();
+    expect(container.querySelectorAll('.ant-steps [aria-label="check-circle"]')).toHaveLength(1);
     expect(container.querySelector('[aria-label="loading"]')).toBeNull();
     expect(screen.getByText("已停止")).toBeInTheDocument();
   });
 
   it("shows success only for a completed workflow", () => {
-    const { container } = render(<IndustryWorkflowProgress currentStage={2} status="success" message="分析完成" agentProcess={{ ...createAgentProcessState(), status: "Agent 调研完成" }} />);
+    const { container } = render(<IndustryWorkflowProgress currentStage={5} status="success" message="分析完成" agentProcess={{ ...createAgentProcessState(), status: "Agent 调研完成" }} />);
     expect(screen.getByText("已完成")).toBeInTheDocument();
     expect(screen.getByText("分析完成")).toBeInTheDocument();
     expect(container.querySelector('[aria-label="loading"]')).toBeNull();
   });
+
+  it("shows archive failure on the final step without marking the whole report failed", () => {
+    const { container } = render(
+      <IndustryWorkflowProgress
+        currentStage={4}
+        failedStage={4}
+        status="warning"
+        message="分析完成，但存档失败"
+        agentProcess={{ ...createAgentProcessState(), status: "Agent 调研完成" }}
+      />,
+    );
+    expect(screen.getByText("分析完成，但存档失败")).toBeInTheDocument();
+    expect(container.querySelectorAll(".ant-steps-item-error")).toHaveLength(1);
+    expect(container.querySelectorAll('.ant-steps [aria-label="check-circle"]')).toHaveLength(4);
+  });
+
 });

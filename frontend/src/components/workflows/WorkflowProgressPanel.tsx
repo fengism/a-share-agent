@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import { StopOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from "@ant-design/icons";
+import { StopOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, WarningOutlined } from "@ant-design/icons";
 import { Card, Spin, Steps, Typography, type StepsProps } from "antd";
 import { useStyles } from "../../styles/ui";
 
 const { Text } = Typography;
 
-export type WorkflowProgressStatus = "idle" | "running" | "success" | "error" | "cancelled" | "detached";
+export type WorkflowProgressStatus = "idle" | "running" | "success" | "warning" | "error" | "cancelled" | "detached";
 
 interface WorkflowProgressPanelProps {
   current: number;
@@ -29,7 +29,9 @@ export default function WorkflowProgressPanel({
       ? <CloseCircleOutlined />
       : status === "success"
         ? <CheckCircleOutlined />
-        : <StopOutlined />;
+        : status === "warning"
+          ? <WarningOutlined />
+          : <StopOutlined />;
 
   return (
     <Card size="small" style={{ ...cardStyle, marginBottom: 20 }} styles={{ body: { padding: "20px 24px" } }}>
@@ -41,7 +43,7 @@ export default function WorkflowProgressPanel({
           style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}
         >
           {messageIcon}
-          <Text type={status === "error" ? "danger" : "secondary"}>{message}</Text>
+          <Text type={status === "error" ? "danger" : status === "warning" ? "warning" : "secondary"}>{message}</Text>
         </div>
       ) : null}
       {children}

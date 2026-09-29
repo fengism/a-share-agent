@@ -202,4 +202,35 @@ describe("BacktestResult", () => {
     expect(screen.getByLabelText("本次执行策略")).toHaveTextContent("period=6 · buy_threshold=-3 · sell_threshold=3");
   });
 
+  it("supports copying backtest summary and exporting trade details to CSV", () => {
+    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextSpy,
+      },
+    });
+    window.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    window.URL.revokeObjectURL = vi.fn();
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    render(<BacktestResult result={makeResult()} />);
+
+    // Test copy summary
+    const copyBtn = screen.getByRole("button", { name: "复制回测摘要" });
+    expect(copyBtn).toBeInTheDocument();
+    fireEvent.click(copyBtn);
+    expect(writeTextSpy).toHaveBeenCalledWith(expect.stringContaining("### 量化策略回测报告摘要"));
+    expect(writeTextSpy).toHaveBeenCalledWith(expect.stringContaining("600519"));
+
+    // Test export CSV
+    const exportCsvBtn = screen.getByRole("button", { name: "导出成交记录 CSV" });
+    expect(exportCsvBtn).toBeInTheDocument();
+    fireEvent.click(exportCsvBtn);
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    clickSpy.mockRestore();
+
+    // Test stock code link
+    expect(screen.getByRole("link", { name: "查看600519研报" })).toHaveAttribute("href", "/analysis?code=600519");
+  });
 });

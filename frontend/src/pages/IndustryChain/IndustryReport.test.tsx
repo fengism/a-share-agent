@@ -18,7 +18,11 @@ vi.mock("@ant-design/icons", () => ({
   ApartmentOutlined: () => <span />,
   BankOutlined: () => <span />,
   CloudUploadOutlined: () => <span />,
+  CopyOutlined: () => <span />,
   DatabaseOutlined: () => <span />,
+  DownOutlined: () => <span />,
+  DownloadOutlined: () => <span />,
+  FileMarkdownOutlined: () => <span />,
   FilePdfOutlined: () => <span />,
   FileTextOutlined: () => <span />,
   FullscreenOutlined: () => <span />,
@@ -469,6 +473,9 @@ describe("IndustryReport", () => {
         total_duration_ms: 12_500,
         research_duration_ms: 8_000,
         synthesis_duration_ms: 3_500,
+        draft_duration_ms: 1_500,
+        verification_duration_ms: 1_200,
+        finalization_duration_ms: 800,
         archive_duration_ms: 1_000,
         cache_hits: ["technology"],
         cache_misses: ["market", "events"],
@@ -476,6 +483,7 @@ describe("IndustryReport", () => {
         successful_dimensions: ["market", "technology"],
         agent_evidence_count: 7,
         public_item_count: 11,
+        independent_source_count: 5,
       },
     };
 
@@ -510,6 +518,10 @@ describe("IndustryReport", () => {
 
     expect(screen.getByRole("heading", { name: "运行信息" })).toBeInTheDocument();
     expect(screen.getByText("12.5 s")).toBeInTheDocument();
+    expect(screen.getByText("1.50 s")).toBeInTheDocument();
+    expect(screen.getByText("1.20 s")).toBeInTheDocument();
+    expect(screen.getByText("800 ms")).toBeInTheDocument();
+    expect(screen.getByText("5 个")).toBeInTheDocument();
     expect(screen.getByText("缓存命中：技术路线")).toBeInTheDocument();
     expect(screen.getByText("本次刷新：市场、事件")).toBeInTheDocument();
     expect(screen.getByText("失败维度：事件")).toBeInTheDocument();
@@ -535,5 +547,42 @@ describe("IndustryReport", () => {
     expect(screen.getByText("报告未保存")).toBeInTheDocument();
     expect(screen.getByText("报告已生成，但保存失败")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "推送" })).toBeDisabled();
+  });
+
+  it("supports copying industry report and exporting markdown via dropdown", () => {
+    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextSpy,
+      },
+    });
+    window.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    window.URL.revokeObjectURL = vi.fn();
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    renderReport(
+      <IndustryReport
+        result={result}
+        activeName="AI 芯片"
+        archiveId="archive-1"
+        isPushing={false}
+        pushResult={null}
+        onPush={vi.fn()}
+      />,
+    );
+
+    // Test copy
+    const copyBtn = screen.getByRole("button", { name: "复制研报" });
+    fireEvent.click(copyBtn);
+    expect(writeTextSpy).toHaveBeenCalledWith(expect.stringContaining("AI 芯片 产业链投研报告"));
+
+    // Test export markdown via dropdown
+    const exportBtn = screen.getByRole("button", { name: "导出" });
+    fireEvent.click(exportBtn);
+    const exportMdItem = screen.getByText("导出为 Markdown (.md)");
+    fireEvent.click(exportMdItem);
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    clickSpy.mockRestore();
   });
 });

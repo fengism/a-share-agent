@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckOutlined,
   CopyOutlined,
+  DownloadOutlined,
   ExportOutlined,
   RedoOutlined,
 } from "@ant-design/icons";
@@ -59,6 +60,18 @@ export const AssistantMessage = React.memo(function AssistantMessage({
     }
   };
 
+  const handleDownloadMarkdown = () => {
+    const blob = new Blob([message.content], { type: "text/markdown;charset=utf-8" });
+    if (typeof URL.createObjectURL === "function") {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `AI投研回答_${message.id.slice(0, 8)}_${new Date().toISOString().slice(0, 10)}.md`;
+      a.click();
+      URL.revokeObjectURL?.(url);
+    }
+  };
+
   return (
     <div className="chat-assistant-message">
       <AssistantProcess message={message} />
@@ -86,6 +99,17 @@ export const AssistantMessage = React.memo(function AssistantMessage({
                 icon={copied ? <CheckOutlined /> : <CopyOutlined />}
                 onClick={() => void handleCopy()}
                 aria-label="复制回答"
+              />
+            </Tooltip>
+          )}
+          {hasContent && (
+            <Tooltip title="下载 Markdown">
+              <Button
+                type="text"
+                size="small"
+                icon={<DownloadOutlined />}
+                onClick={handleDownloadMarkdown}
+                aria-label="下载 Markdown"
               />
             </Tooltip>
           )}

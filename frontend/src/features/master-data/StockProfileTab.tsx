@@ -40,7 +40,7 @@ import {
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Link } from "react-router-dom";
-import { apiDownload } from "../../api/client";
+import { apiDownload, apiGet } from "../../api/client";
 import {
   useCreateStockProfileRecord,
   useDeleteStockProfileRecord,
@@ -54,15 +54,15 @@ import {
 import type {
   StockBasicProfileInput,
   StockBasicProfileRecord,
-  StockProfileImportFileRequest,
   StockProfileListFilters,
 } from "../../api/stockProfile";
+import SectionDataState from "../../components/SectionDataState";
+import { useImportFile } from "./useImportFile";
 import "./stock-profile.css";
 
 const { Paragraph, Text } = Typography;
 const { TextArea } = Input;
 const PAGE_SIZE = 50;
-const MAX_IMPORT_FILE_SIZE = 50 * 1024 * 1024;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "未知错误";
@@ -91,8 +91,8 @@ const BUSINESS_OPTIONS = [
 
 const EMPTY_INPUT: StockBasicProfileInput = {
   market_group: "A",
-  exchange: "SH",
-  board: "主板",
+  exchange: "",
+  board: "",
   stock_code: "",
   stock_name: "",
   listing_date: "",
@@ -146,13 +146,13 @@ export default function StockProfileTab() {
   const [editingRecord, setEditingRecord] = useState<StockBasicProfileRecord | null>(null);
   const [form] = Form.useForm<StockBasicProfileInput>();
   const [importOpen, setImportOpen] = useState(false);
-  const [importFile, setImportFile] = useState<Pick<StockProfileImportFileRequest, "filename" | "content_base64"> | null>(null);
+  const importFileState = useImportFile((text) => { message.error(text); });
+  const { file: importFile, reading: readingFile } = importFileState;
   const [updateManual, setUpdateManual] = useState(false);
-  const [readingFile, setReadingFile] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const { data: summary, isLoading: isSummaryLoading, refetch: refetchSummary } = useStockProfileSummary();
-  const { data: recordsData, isLoading: isRecordsLoading, isFetching, refetch: refetchRecords } = useStockProfileRecords(filters);
+  const { data: summary, isLoading: isSummaryLoading, error: summaryError, refetch: refetchSummary } = useStockProfileSummary();
+  const { data: recordsData, isLoading: isRecordsLoading, error: recordsError, isFetching, refetch: refetchRecords } = useStockProfileRecords(filters);
 
   const createMutation = useCreateStockProfileRecord();
   const updateMutation = useUpdateStockProfileRecord();
@@ -169,6 +169,8 @@ export default function StockProfileTab() {
         market_group: filters.market_group,
         exchange: filters.exchange,
         board: filters.board,
+        has_business: filters.has_business,
+        has_listing_date: filters.has_listing_date,
       });
       message.success("导出完成");
     } catch (err) {
@@ -178,44 +180,37 @@ export default function StockProfileTab() {
     }
   };
 
+  const closeImport = () => {
+    if (importMutation.isPending) return;
+    setImportOpen(false);
+    importFileState.clear();
+    setUpdateManual(false);
+  };
+
   const importUploadProps: UploadProps = {
     accept: ".csv,.xlsx,.xls",
     maxCount: 1,
-    showUploadList: true,
-    beforeUpload: (file) => {
-      if (file.size > MAX_IMPORT_FILE_SIZE) {
-        message.error("文件不能超过 50 MB");
-        return Upload.LIST_IGNORE;
-      }
-      setReadingFile(true);
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = String(reader.result || "");
-        const base64 = result.includes(",") ? result.split(",")[1] : result;
-        setImportFile({ filename: file.name, content_base64: base64 });
-        setReadingFile(false);
-      };
-      reader.onerror = () => {
-        setReadingFile(false);
-        message.error("读取文件失败");
-      };
-      reader.readAsDataURL(file);
-      return false;
-    },
-    onRemove: () => setImportFile(null),
+    fileList: importFileState.selected ? [importFileState.selected] : [],
+    disabled: importMutation.isPending,
+    beforeUpload: (file) => importFileState.select(file) ? false : Upload.LIST_IGNORE,
+    onRemove: () => { importFileState.clear(); },
   };
 
   const handleImportSubmit = () => {
-    if (!importFile) return;
+    if (!importFile || readingFile || importMutation.isPending) return;
     importMutation.mutate(
       { ...importFile, update_manual: updateManual },
       {
         onSuccess: (result) => {
-          message.success(
-            `导入完成：新增 ${result.added}，更新 ${result.updated}，无变化 ${result.unchanged}，跳过 ${result.skipped}`,
-          );
+          const summary = `导入完成：新增 ${result.added}，更新 ${result.updated}，无变化 ${result.unchanged}，跳过 ${result.skipped}，无效 ${result.invalid_rows}`;
+          if (result.invalid_rows || result.warnings?.length) {
+            Modal.warning({ title: summary, content: result.warnings?.join("；") || "请检查文件中的无效行" });
+          } else {
+            message.success(summary);
+          }
           setImportOpen(false);
-          setImportFile(null);
+          importFileState.clear();
+          setUpdateManual(false);
         },
         onError: (error) => message.error(`导入失败：${errorMessage(error)}`),
       },
@@ -269,9 +264,14 @@ export default function StockProfileTab() {
 
   const handleSave = async () => {
     try {
-      const values = await form.validateFields();
+      await form.validateFields();
+      // 包含未显示但已回填的字段，避免编辑少数字段时丢失身份/三级行业等信息。
+      const values = form.getFieldsValue(true);
+      delete values.sw_level1_name;
+      delete values.sw_level2_name;
+      delete values.sw_level3_name;
       if (editingRecord) {
-        await updateMutation.mutateAsync({ id: editingRecord.id, record: values });
+        await updateMutation.mutateAsync({ id: editingRecord.id, record: { ...values, expected_revision: editingRecord.revision } });
         message.success(`已保存 ${values.stock_name || values.stock_code}`);
       } else {
         await createMutation.mutateAsync(values);
@@ -300,13 +300,20 @@ export default function StockProfileTab() {
   const handleEnrich = async (stockCode: string) => {
     try {
       const res = await enrichMutation.mutateAsync({ code: stockCode });
-      message.success(res.message || "补充成功");
-      refetchRecords();
-      refetchSummary();
-      if (activeRecord && (activeRecord.stock_code === stockCode || activeRecord.stock_code.startsWith(stockCode))) {
-        // refresh active record in drawer if open
-        const updated = recordsData?.items.find((r) => r.stock_code === stockCode);
-        if (updated) setActiveRecord(updated);
+      if (!res.success) {
+        message.error(res.message || "未能补充资料");
+        return;
+      }
+      if (res.updated_fields.length) message.success(res.message || "补充成功");
+      else message.info(res.message || "资料无变化");
+      await Promise.all([refetchRecords(), refetchSummary()]);
+      if (activeRecord?.stock_code === stockCode) {
+        try {
+          const updated = await apiGet<StockBasicProfileRecord>(`/stock-profile/records/${encodeURIComponent(stockCode)}`);
+          setActiveRecord((current) => current?.stock_code === stockCode ? updated : current);
+        } catch {
+          message.warning("补充已完成，详情刷新失败，请重新打开详情");
+        }
       }
     } catch (error: unknown) {
       message.error((error as Error)?.message || "补充数据失败");
@@ -316,7 +323,18 @@ export default function StockProfileTab() {
   const handleSyncMaster = async () => {
     try {
       const res = await syncMasterMutation.mutateAsync();
-      message.success(`同步完成: 新增 ${res.added ?? 0} 条，更新 ${res.updated ?? 0} 条`);
+      const summary = `新增 ${res.added} 条，更新 ${res.updated} 条，无变化 ${res.unchanged} 条，跳过 ${res.skipped} 条`;
+      const timestamps = Object.entries(res.fetched_at).map(([exchange, timestamp]) =>
+        `${exchange}: ${new Date(timestamp * 1000).toLocaleString()}`,
+      ).join("；");
+      if (!res.complete) {
+        Modal.warning({
+          title: `名录同步部分完成：${summary}`,
+          content: `失败交易所：${Object.keys(res.failed_exchanges).join("、") || "无"}；使用旧数据：${res.stale_exchanges.join("、") || "无"}。数据时间：${timestamps || "未知"}`,
+        });
+      } else {
+        Modal.success({ title: `名录同步完成：${summary}`, content: `数据时间：${timestamps}` });
+      }
       refetchRecords();
       refetchSummary();
     } catch (error: unknown) {
@@ -427,6 +445,7 @@ export default function StockProfileTab() {
               type="text"
               size="small"
               icon={<EyeOutlined />}
+              aria-label="查看完整资料"
               onClick={() => handleOpenDetail(record)}
             />
           </Tooltip>
@@ -435,6 +454,7 @@ export default function StockProfileTab() {
               type="text"
               size="small"
               icon={<ThunderboltOutlined />}
+              aria-label="补充资料"
               loading={enrichMutation.isPending && enrichMutation.variables?.code === record.stock_code}
               onClick={() => handleEnrich(record.stock_code)}
             />
@@ -444,6 +464,7 @@ export default function StockProfileTab() {
               type="text"
               size="small"
               icon={<EditOutlined />}
+              aria-label="编辑资料"
               onClick={() => handleOpenEdit(record)}
             />
           </Tooltip>
@@ -470,6 +491,8 @@ export default function StockProfileTab() {
   return (
     <div className="stock-profile-tab">
       {/* Summary Cards */}
+      <SectionDataState isLoading={isSummaryLoading} error={summaryError}
+        onRetry={refetchSummary} errorTitle="个股资料概览加载失败">
       <div className="stock-profile-stat-grid">
         <Row gutter={[12, 12]}>
           <Col xs={24} sm={12} md={6}>
@@ -524,6 +547,8 @@ export default function StockProfileTab() {
           </Col>
         </Row>
       </div>
+
+      </SectionDataState>
 
       {/* Filter and Action Toolbar */}
       <div className="stock-profile-filters">
@@ -580,7 +605,7 @@ export default function StockProfileTab() {
           </Button>
           <Popconfirm
             title="同步交易所官方股票名录？"
-            description="将重新扫描交易所官方名录与申万分类并补齐数据库缺失项。"
+            description="将联网刷新交易所官方名录；部分失败时会标明旧数据与数据时间。"
             onConfirm={handleSyncMaster}
           >
             <Button icon={<SyncOutlined />} loading={syncMasterMutation.isPending}>
@@ -600,11 +625,15 @@ export default function StockProfileTab() {
       </div>
 
       {/* Main Table */}
+      <SectionDataState isLoading={isRecordsLoading} error={recordsError}
+        onRetry={refetchRecords} errorTitle="个股资料加载失败"
+        isEmpty={!isRecordsLoading && !recordsError && recordsData?.total === 0}
+        emptyText="没有符合条件的个股资料">
       <Table<StockBasicProfileRecord>
         rowKey="id"
         columns={columns}
         dataSource={recordsData?.items || []}
-        loading={isRecordsLoading}
+        loading={isFetching && !isRecordsLoading}
         size="middle"
         pagination={{
           current: filters.page,
@@ -628,6 +657,8 @@ export default function StockProfileTab() {
           }
         }}
       />
+
+      </SectionDataState>
 
       {/* Detail Drawer */}
       <Drawer
@@ -653,6 +684,7 @@ export default function StockProfileTab() {
               type="primary"
               size="small"
               icon={<ThunderboltOutlined />}
+              aria-label="在线补充资料"
               loading={enrichMutation.isPending}
               onClick={() => handleEnrich(activeRecord.stock_code)}
             >
@@ -761,6 +793,8 @@ export default function StockProfileTab() {
         title={editingRecord ? `编辑个股资料: ${editingRecord.stock_code}` : "新增个股资料"}
         open={editModalVisible}
         onOk={handleSave}
+        okText="保存"
+        cancelText="取消"
         onCancel={() => setEditModalVisible(false)}
         width={680}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
@@ -826,12 +860,12 @@ export default function StockProfileTab() {
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item name="sw_level1_name" label="申万一级行业">
-                <Input placeholder="如 食品饮料" />
+                <Input disabled placeholder="请在行业基础数据页维护" />
               </Form.Item>
             </Col>
             <Col span={8}>
               <Form.Item name="sw_level2_name" label="申万二级行业">
-                <Input placeholder="如 白酒Ⅱ" />
+                <Input disabled placeholder="请在行业基础数据页维护" />
               </Form.Item>
             </Col>
             <Col span={8}>
@@ -868,18 +902,18 @@ export default function StockProfileTab() {
       <Modal
         title="批量导入个股资料"
         open={importOpen}
-        onCancel={() => {
-          setImportOpen(false);
-          setImportFile(null);
-        }}
+        onCancel={closeImport}
+        closable={!importMutation.isPending}
+        mask={{ closable: !importMutation.isPending }}
+        keyboard={!importMutation.isPending}
         footer={[
-          <Button key="cancel" onClick={() => setImportOpen(false)}>
+          <Button key="cancel" disabled={importMutation.isPending} onClick={closeImport}>
             取消
           </Button>,
           <Button
             key="submit"
             type="primary"
-            disabled={!importFile}
+            disabled={!importFile || readingFile || importMutation.isPending}
             loading={importMutation.isPending || readingFile}
             onClick={handleImportSubmit}
           >
@@ -893,10 +927,11 @@ export default function StockProfileTab() {
           </Upload>
           <Typography.Text type="secondary">
             必须包含【股票代码】列；可选列：股票简称、板块、上市日期、所属行业、申万一/二/三级行业、
-            主营业务、经营范围、主要产品、省份、城市、法定代表人、注册资本、成立日期、网址、公司简介。
+            主营业务、经营范围、主要产品、省份、城市、法定代表人、注册资本、成立日期、网址、公司简介。申万行业列仅作参考，请在行业基础数据页维护。
             港股代码支持 5 位数字或 .HK 后缀。内容与现有记录一致的行会自动跳过。
           </Typography.Text>
           <Checkbox
+            disabled={importMutation.isPending}
             checked={updateManual}
             onChange={(e) => setUpdateManual(e.target.checked)}
           >

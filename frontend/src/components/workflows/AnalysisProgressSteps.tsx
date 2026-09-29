@@ -1,6 +1,8 @@
 import type { AnalysisStage } from "../../api/sse";
 import WorkflowProgressPanel, { type WorkflowProgressStatus } from "./WorkflowProgressPanel";
 
+const STAGE_NAMES = ["Agent 调研与证据校验", "构造结构化请求", "AI 综合分析", "结果校验与数据时效", "报告归档与历史更新"];
+
 interface Props {
   stages: Array<AnalysisStage | null>;
   currentStageIndex: number;
@@ -27,7 +29,7 @@ export default function AnalysisProgressSteps({ stages, currentStageIndex, statu
         : undefined);
 
     return {
-      title: stage?.name || `阶段 ${index + 1}`,
+      title: stage?.name || STAGE_NAMES[index] || `阶段 ${index + 1}`,
       status: stepStatus,
       description,
     };

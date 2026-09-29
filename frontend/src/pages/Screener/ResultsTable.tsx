@@ -182,6 +182,7 @@ export default function ResultsTable({
       title: "代码",
       dataIndex: "code",
       width: 90,
+      fixed: "left",
       render: (code: string) => (
         <PreloadLink className="financial-num" to={buildStockProfileUrl(code)} style={{ color: c.primary, fontWeight: "var(--c-weight-medium)" }}>{code}</PreloadLink>
       ),
@@ -189,8 +190,9 @@ export default function ResultsTable({
     {
       title: "名称",
       dataIndex: "name",
-      width: 100,
+      width: 105,
       ellipsis: true,
+      fixed: "left",
     },
     {
       title: "市场",
@@ -325,7 +327,9 @@ export default function ResultsTable({
         title: "信号日",
         key: "strategy_signal_date",
         width: 100,
-        render: (_: unknown, record: ScreenerItem) => strategySignalDates.get(record.code) ?? "-",
+        render: (_: unknown, record: ScreenerItem) => (
+          <span className="financial-num">{strategySignalDates.get(record.code) ?? "-"}</span>
+        ),
       });
       nextColumns.splice(3, 0, {
         title: "信号年龄",
@@ -336,7 +340,7 @@ export default function ResultsTable({
         sortOrder: localSort?.key === "strategy_signal_age" ? localSort.order : null,
         render: (_: unknown, record: ScreenerItem) => {
           const age = strategySignalAges?.get(record.code);
-          return age == null ? "-" : `${age} 根`;
+          return age == null ? "-" : <span className="financial-num">{`${age} 根`}</span>;
         },
       });
       nextColumns.splice(4, 0, {
@@ -357,9 +361,10 @@ export default function ResultsTable({
         align: "right",
         sorter: true,
         sortOrder: localSort?.key === "strategy_average_amount_20d" ? localSort.order : null,
-        render: (_: unknown, record: ScreenerItem) => (
-          strategyAverageAmounts?.get(record.code)?.toFixed(2) ?? "-"
-        ),
+        render: (_: unknown, record: ScreenerItem) => {
+          const val = strategyAverageAmounts?.get(record.code);
+          return val == null ? "-" : <span className="financial-num">{val.toFixed(2)}</span>;
+        },
       });
       nextColumns.splice(6, 0, {
         title: "K线源",

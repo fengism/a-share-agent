@@ -155,4 +155,44 @@ describe("AnalysisHeaderCard", () => {
     expect(screen.getByRole("link", { name: "查看结论" })).toHaveAttribute("href", "#analysis-result");
     expect(screen.getByRole("button", { name: "更新研究" })).toBeInTheDocument();
   });
+
+  it("supports exporting report as PDF and Markdown via unified dropdown", () => {
+    const onExportPdf = vi.fn();
+    const onExportMarkdown = vi.fn();
+
+    render(
+      <AnalysisHeaderCard
+        code="600519"
+        pageData={pageData}
+        result={{} as AnalysisResult}
+        isAnalyzing={false}
+        isPushing={false}
+        isWatched={false}
+        isWatchlistPending={false}
+        onToggleWatchlist={vi.fn()}
+        onAnalyze={vi.fn()}
+        onCancel={vi.fn()}
+        onExportPdf={onExportPdf}
+        onExportMarkdown={onExportMarkdown}
+        onShowHistory={vi.fn()}
+        onOpenResearchReport={vi.fn()}
+        onPush={vi.fn()}
+      />,
+    );
+
+    const exportBtn = screen.getByRole("button", { name: /导出/ });
+    expect(exportBtn).toBeInTheDocument();
+    fireEvent.click(exportBtn);
+
+    const exportMdItem = screen.getByText("导出为 Markdown (.md)");
+    expect(exportMdItem).toBeInTheDocument();
+    fireEvent.click(exportMdItem);
+    expect(onExportMarkdown).toHaveBeenCalledOnce();
+
+    fireEvent.click(exportBtn);
+    const exportPdfItem = screen.getByText("导出为 PDF (.pdf)");
+    expect(exportPdfItem).toBeInTheDocument();
+    fireEvent.click(exportPdfItem);
+    expect(onExportPdf).toHaveBeenCalledOnce();
+  });
 });

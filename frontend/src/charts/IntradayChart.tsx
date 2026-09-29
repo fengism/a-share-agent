@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AreaSeries, ColorType, HistogramSeries, LineStyle, createChart, type IChartApi, type ISeriesApi, type UTCTimestamp, type MouseEventParams, type Time } from "lightweight-charts";
 import type { IntradayItem } from "../types/stock";
 import { useColors } from "../styles/ui";
-import { APP_FONT_SIZE } from "../theme/typography";
+import { APP_FONT_FAMILY, APP_FONT_SIZE } from "../theme/typography";
+import { createDebouncedResizeHandler } from "./chartLifecycle";
 import { buildIntradayVisibleRange } from "./intradayTimeRange";
 import { hexToRgba } from "./utils";
 
@@ -11,6 +12,8 @@ type Props = {
   prevClose?: number | null;
   height?: number;
   viewKey?: string;
+  showAvgLine?: boolean;
+  showPrevCloseLine?: boolean;
 };
 
 interface DisplayPoint {
@@ -36,7 +39,14 @@ function formatVolume(val: number | null | undefined): string {
   return val.toFixed(0);
 }
 
-export default function IntradayChart({ data, prevClose, height = 320, viewKey }: Props) {
+export default function IntradayChart({
+  data,
+  prevClose,
+  height = 380,
+  viewKey,
+  showAvgLine = true,
+  showPrevCloseLine = true,
+}: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
   colorsRef.current = c;
@@ -62,13 +72,52 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
   const latestPoint = useMemo<DisplayPoint | null>(() => {
     if (rows.length === 0) return null;
     const last = rows[rows.length - 1];
+    const match = String(last.rawTime || "").match(/(\d{2}):(\d{2})/);
+    const timeStr = match ? `${match[1]}:${match[2]}` : String(last.rawTime || "").slice(-5);
     return {
-      timeStr: String(last.rawTime || "").slice(-5),
+      timeStr,
       price: last.price,
       avgPrice: last.avg_price ?? null,
       volume: last.volume ?? null,
     };
   }, [rows]);
+
+  const sessionStats = useMemo(() => {
+    if (rows.length === 0) return null;
+    let high = -Infinity;
+    let low = Infinity;
+    for (const r of rows) {
+      if (r.price > high) high = r.price;
+      if (r.price < low) low = r.price;
+    }
+    return { high, low };
+  }, [rows]);
+
+  const selectedIndexRef = useRef<number | null>(null);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (rows.length === 0) return;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      const currentIdx = selectedIndexRef.current ?? (rows.length - 1);
+      const nextIdx = e.key === "ArrowLeft"
+        ? Math.max(0, currentIdx - 1)
+        : Math.min(rows.length - 1, currentIdx + 1);
+      selectedIndexRef.current = nextIdx;
+      const target = rows[nextIdx];
+      const match = String(target.rawTime || "").match(/(\d{2}):(\d{2})/);
+      const timeStr = match ? `${match[1]}:${match[2]}` : String(target.rawTime || "").slice(-5);
+      setHoverPoint({
+        timeStr,
+        price: target.price,
+        avgPrice: target.avg_price ?? null,
+        volume: target.volume ?? null,
+      });
+    } else if (e.key === "Escape") {
+      selectedIndexRef.current = null;
+      setHoverPoint(null);
+    }
+  };
 
   const activePoint = hoverPoint ?? latestPoint;
 
@@ -85,6 +134,7 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
       layout: {
         background: { type: ColorType.Solid, color: colors.cardBg },
         textColor: colors.textSecondary,
+        fontFamily: APP_FONT_FAMILY,
         fontSize: APP_FONT_SIZE.sm,
         attributionLogo: false,
       },
@@ -113,6 +163,7 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
       bottomColor: hexToRgba(colors.primary, 0.01),
       lineWidth: 2,
       priceLineVisible: false,
+      priceScaleId: "right",
     });
     priceSeriesRef.current = priceSeries;
 
@@ -123,8 +174,15 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
       lineWidth: 1,
       lineStyle: LineStyle.Dotted,
       priceLineVisible: false,
+      priceScaleId: "right",
     });
     avgSeriesRef.current = avgSeries;
+
+    chart.priceScale("right").applyOptions({
+      visible: true,
+      borderColor: colors.border,
+      scaleMargins: { top: 0.05, bottom: 0.22 },
+    });
 
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceScaleId: "left",
@@ -142,21 +200,26 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
     chart.priceScale("left").applyOptions({
       visible: true,
       borderColor: colors.border,
-      scaleMargins: { top: 0.72, bottom: 0 },
+      scaleMargins: { top: 0.82, bottom: 0 },
     });
 
-    const resizeObserver = new ResizeObserver(([entry]) => {
-      const width = Math.floor(entry.contentRect.width);
-      if (width <= 0) return;
-      chart.applyOptions({ width, height: height - 32 });
-    });
+    const resizeObserver = new ResizeObserver(
+      createDebouncedResizeHandler((entry) => {
+        const width = Math.floor(entry.contentRect.width);
+        if (width <= 0) return;
+        chart.applyOptions({ width, height: height - 32 });
+      })
+    );
     resizeObserver.observe(container);
 
     const handleCrosshairMove = (param: MouseEventParams<Time>) => {
       if (!param.time || !param.seriesData) {
-        setHoverPoint(null);
+        if (selectedIndexRef.current === null) {
+          setHoverPoint(null);
+        }
         return;
       }
+      selectedIndexRef.current = null;
       const pData = param.seriesData.get(priceSeries) as { value?: number } | undefined;
       const aData = param.seriesData.get(avgSeries) as { value?: number } | undefined;
       const vData = param.seriesData.get(volumeSeries) as { value?: number } | undefined;
@@ -232,9 +295,13 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
       }
     }
 
-    avgSeries.setData(rows
-      .filter((item) => item.avg_price != null)
-      .map((item) => ({ time: item.time, value: item.avg_price as number })));
+    if (showAvgLine) {
+      avgSeries.setData(rows
+        .filter((item) => item.avg_price != null)
+        .map((item) => ({ time: item.time, value: item.avg_price as number })));
+    } else {
+      avgSeries.setData([]);
+    }
 
     appliedRef.current = { viewKey: effectiveViewKey, firstTime, length: rows.length };
 
@@ -242,17 +309,17 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
       priceSeries.removePriceLine(priceLineRef.current);
       priceLineRef.current = null;
     }
-    if (prevClose != null) {
+    if (prevClose != null && showPrevCloseLine) {
       priceLineRef.current = priceSeries.createPriceLine({
         price: prevClose,
         color: c.textMuted,
         lineStyle: LineStyle.Dashed,
         lineWidth: 1,
         axisLabelVisible: true,
-        title: `昨收 ${prevClose.toFixed(2)}`,
+        title: `昨收 ${prevClose.toFixed(2)} (0.0%)`,
       });
     }
-  }, [c.down, c.up, c.textMuted, height, prevClose, rows, viewKey]);
+  }, [c.down, c.up, c.textMuted, height, prevClose, rows, showAvgLine, showPrevCloseLine, viewKey]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -286,16 +353,32 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
   const priceColor = diffAmount == null || diffAmount === 0 ? c.textPrimary : diffAmount > 0 ? c.up : c.down;
 
   return (
-    <div style={{ width: "100%", height, display: "flex", flexDirection: "column" }}>
+    <div
+      tabIndex={0}
+      role="region"
+      aria-label="分时图交互区"
+      onKeyDown={handleKeyDown}
+      style={{
+        position: "relative",
+        width: "100%",
+        height,
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: c.cardBg,
+        outline: "none",
+      }}
+    >
       {/* Real-time Interactive HUD status bar */}
       <div style={{
-        minHeight: 28,
+        minHeight: 32,
+        flexShrink: 0,
         padding: "4px 8px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         fontSize: "11px",
         color: c.textSecondary,
+        backgroundColor: c.nestedBg,
         borderBottom: `1px solid ${c.border}`,
         fontFamily: "var(--c-font-mono)",
         userSelect: "none",
@@ -318,11 +401,17 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
                 {diffAmount >= 0 ? `+${diffAmount.toFixed(2)}` : diffAmount.toFixed(2)} ({diffPct != null ? (diffPct >= 0 ? `+${diffPct.toFixed(2)}%` : `${diffPct.toFixed(2)}%`) : ""})
               </span>
             )}
-            {activePoint.avgPrice != null && (
+            {activePoint.avgPrice != null && showAvgLine && (
               <span>均价: <strong style={{ color: c.accent }}>{activePoint.avgPrice.toFixed(2)}</strong></span>
             )}
             {activePoint.volume != null && (
               <span>分量: <strong style={{ color: c.textPrimary }}>{formatVolume(activePoint.volume)}</strong></span>
+            )}
+            {sessionStats && (
+              <>
+                <span>高: <strong style={{ color: c.up }}>{sessionStats.high.toFixed(2)}</strong></span>
+                <span>低: <strong style={{ color: c.down }}>{sessionStats.low.toFixed(2)}</strong></span>
+              </>
             )}
           </div>
         ) : (
@@ -333,11 +422,13 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.primary }} />
             分时线
           </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-            <span style={{ width: 6, height: 2, background: c.accent }} />
-            均价线
-          </span>
-          {prevClose != null && (
+          {showAvgLine && (
+            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+              <span style={{ width: 6, height: 2, background: c.accent }} />
+              均价线
+            </span>
+          )}
+          {prevClose != null && showPrevCloseLine && (
             <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
               <span style={{ width: 6, height: 1, borderTop: `1px dashed ${c.textMuted}` }} />
               昨收 {prevClose.toFixed(2)}
@@ -345,7 +436,7 @@ export default function IntradayChart({ data, prevClose, height = 320, viewKey }
           )}
         </div>
       </div>
-      <div ref={containerRef} style={{ flex: 1, width: "100%", minHeight: height - 32 }} />
+      <div ref={containerRef} style={{ flex: 1, width: "100%", minHeight: height - 32, backgroundColor: c.cardBg }} />
     </div>
   );
 }

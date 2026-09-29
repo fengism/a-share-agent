@@ -12,8 +12,6 @@ import {
   TooltipComponent,
   GridComponent,
   LegendComponent,
-  DatasetComponent,
-  TransformComponent,
   DataZoomComponent,
   VisualMapComponent,
 } from "echarts/components";
@@ -29,8 +27,6 @@ echarts.use([
   TooltipComponent,
   GridComponent,
   LegendComponent,
-  DatasetComponent,
-  TransformComponent,
   DataZoomComponent,
   VisualMapComponent,
   // Renderer

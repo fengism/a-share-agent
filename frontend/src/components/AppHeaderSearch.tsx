@@ -30,10 +30,15 @@ export default function AppHeaderSearch({ isMobile, autoFocus = false }: AppHead
   const colors = useColors();
   const tokens = useTokens();
 
-  // Global Cmd+K / Ctrl+K shortcut listener
+  // Global Cmd+K / Ctrl+K and '/' shortcut listener
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      const isInputActive = activeTag === "input" || activeTag === "textarea" || (document.activeElement as HTMLElement)?.isContentEditable;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      } else if (e.key === "/" && !isInputActive && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         inputRef.current?.focus();
       }
@@ -101,7 +106,7 @@ export default function AppHeaderSearch({ isMobile, autoFocus = false }: AppHead
         ref={inputRef}
         className="app-header-search"
         size="large"
-        placeholder={isMobile ? "代码 / 名称" : "输入代码或名称 (⌘K / Ctrl+K)"}
+        placeholder={isMobile ? "代码 / 名称" : "输入代码或名称 (⌘K / /)"}
         prefix={isMobile ? undefined : <SearchOutlined />}
         allowClear
         enterButton

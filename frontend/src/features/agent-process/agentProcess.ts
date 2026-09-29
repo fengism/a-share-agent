@@ -9,6 +9,7 @@ import type {
 export type AgentProcessTermination = "cancelled" | "detached" | "failed";
 
 export interface AgentProcessRound {
+  phase?: "research" | "verification_repair";
   roundIndex: number;
   roundTotal: number;
   status: AgentResearchRoundStatus | AgentProcessTermination;
@@ -30,6 +31,7 @@ export interface AgentProcessState {
   toolCalls: ToolCallDisplay[];
   rounds: AgentProcessRound[];
   activeRoundIndex?: number;
+  activeRoundPhase?: "research" | "verification_repair";
   termination?: AgentProcessTermination;
 }
 
@@ -76,23 +78,26 @@ function toProcessRound(
 function upsertRound(
   rounds: AgentProcessRound[],
   value: AgentResearchRound,
+  phase?: "research" | "verification_repair",
 ): AgentProcessRound[] {
-  const previous = rounds.find((round) => round.roundIndex === value.round_index);
-  const next = toProcessRound(value, previous);
+  const matches = (round: AgentProcessRound) => round.roundIndex === value.round_index && (round.phase ?? "research") === (phase ?? "research");
+  const previous = rounds.find(matches);
+  const next = { ...toProcessRound(value, previous), phase };
   return [
-    ...rounds.filter((round) => round.roundIndex !== value.round_index),
+    ...rounds.filter((round) => !matches(round)),
     next,
-  ].sort((left, right) => left.roundIndex - right.roundIndex);
+  ].sort((left, right) => (left.phase ?? "research").localeCompare(right.phase ?? "research") || left.roundIndex - right.roundIndex);
 }
 
 function updateRound(
   rounds: AgentProcessRound[],
   roundIndex: number | undefined,
   update: (round: AgentProcessRound) => AgentProcessRound,
+  phase?: "research" | "verification_repair",
 ): AgentProcessRound[] {
   if (roundIndex === undefined) return rounds;
   return rounds.map((round) => (
-    round.roundIndex === roundIndex ? update(round) : round
+    round.roundIndex === roundIndex && (round.phase ?? "research") === (phase ?? "research") ? update(round) : round
   ));
 }
 
@@ -136,12 +141,18 @@ export function applyAgentEvent(
     const isStarted = event.type === "round_started";
     return {
       ...state,
-      rounds: upsertRound(state.rounds, event.research_round),
+      rounds: upsertRound(state.rounds, event.research_round, event.phase ?? undefined),
+      activeRoundPhase: isStarted ? event.phase ?? undefined : undefined,
       activeRoundIndex: isStarted ? event.research_round.round_index : undefined,
     };
   }
   if (event.type === "plan" && event.plan) {
-    return { ...state, plan: event.plan };
+    if (!event.phase) return { ...state, plan: event.plan };
+    const phasePrefix = `${event.phase}:`;
+    return { ...state, plan: {
+      summary: event.plan.summary,
+      steps: [...(state.plan?.steps ?? []).filter((step) => !step.id.startsWith(phasePrefix)), ...event.plan.steps],
+    } };
   }
   if (event.type === "plan_step" && event.plan_step && state.plan) {
     const update = event.plan_step;
@@ -165,7 +176,7 @@ export function applyAgentEvent(
       rounds: updateRound(state.rounds, state.activeRoundIndex, (round) => ({
         ...round,
         statusText: status,
-      })),
+      }), state.activeRoundPhase),
     };
   }
   if (event.type === "tool_call" && event.tool_call) {
@@ -181,7 +192,7 @@ export function applyAgentEvent(
       rounds: updateRound(state.rounds, state.activeRoundIndex, (round) => ({
         ...round,
         toolCalls: appendToolCall(round.toolCalls, toolCall),
-      })),
+      }), state.activeRoundPhase),
     };
   }
   if (event.type === "tool_result" && event.tool_result) {
@@ -191,14 +202,14 @@ export function applyAgentEvent(
       rounds: updateRound(state.rounds, state.activeRoundIndex, (round) => ({
         ...round,
         toolCalls: applyToolResult(round.toolCalls, event),
-      })),
+      }), state.activeRoundPhase),
     };
   }
   if (event.type === "error") {
-    return { ...state, status: event.error || "Agent 执行失败", activeRoundIndex: undefined };
+    return { ...state, status: event.error || "Agent 执行失败", activeRoundIndex: undefined, activeRoundPhase: undefined };
   }
   if (event.type === "done") {
-    return { ...state, status: "Agent 调研完成", activeRoundIndex: undefined };
+    return { ...state, status: "Agent 调研完成", activeRoundIndex: undefined, activeRoundPhase: undefined };
   }
   return state;
 }
@@ -219,7 +230,7 @@ export function stopAgentProcess(
     ...state,
     termination,
     status: message,
-    activeRoundIndex: undefined,
+    activeRoundIndex: undefined, activeRoundPhase: undefined,
     plan: state.plan ? {
       ...state.plan,
       steps: state.plan.steps.map((step) => step.status === "running" || step.status === "pending" ? {

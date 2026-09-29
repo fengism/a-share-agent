@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BellOutlined,
   CaretDownOutlined,
   CaretRightOutlined,
   DeleteOutlined,
+  DownloadOutlined,
+  ExperimentOutlined,
   FallOutlined,
   MinusCircleOutlined,
   PlusOutlined,
@@ -139,6 +142,62 @@ function formatCompactNumber(value: number | null): string {
 
 function formatPercent(value: number | null): string {
   return value == null ? "-" : `${value.toFixed(2)}%`;
+}
+
+function downloadWatchlistCsv(items: WatchlistItem[]) {
+  const headers = [
+    "代码",
+    "名称",
+    "最新价",
+    "涨跌幅(%)",
+    "今开",
+    "最高",
+    "最低",
+    "成交额",
+    "换手率(%)",
+    "市盈率(TTM)",
+    "总市值",
+    "所属概念",
+    "备注",
+    "加入时间",
+  ];
+
+  const escapeCell = (val: unknown) => {
+    if (val == null) return "";
+    const str = String(val);
+    if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const rows = items.map((item) => [
+    item.stock_code,
+    item.stock_name,
+    item.current_price != null ? item.current_price.toFixed(2) : "",
+    item.change_pct != null ? item.change_pct.toFixed(2) : "",
+    item.open_price != null ? item.open_price.toFixed(2) : "",
+    item.high_price != null ? item.high_price.toFixed(2) : "",
+    item.low_price != null ? item.low_price.toFixed(2) : "",
+    item.amount != null ? item.amount : "",
+    item.turnover_pct != null ? item.turnover_pct.toFixed(2) : "",
+    item.pe_ttm != null ? item.pe_ttm.toFixed(2) : "",
+    item.market_cap != null ? item.market_cap : "",
+    (item.concepts || []).map((c) => c.name || c.code).join(";"),
+    item.note || "",
+    item.created_at || "",
+  ].map(escapeCell).join(","));
+
+  const csvContent = "\uFEFF" + [headers.map(escapeCell).join(","), ...rows].join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `我的自选股_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function formatDate(value: string): string {
@@ -290,6 +349,8 @@ export default function WatchlistPage() {
   const stockSearch = useStockSearchController();
   const [filterText, setFilterText] = useState("");
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("all");
+  const navigate = useNavigate();
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [sortKey, setSortKey] = useState<WatchlistSortKey>("default");
   const [sortDirection, setSortDirection] = useState<SortDirection>("descend");
   const [viewMode, setViewMode] = useState<WatchlistViewMode>("all");
@@ -298,6 +359,16 @@ export default function WatchlistPage() {
   const [alertStock, setAlertStock] = useState<WatchlistItem | null>(null);
   const [condition, setCondition] = useState<WatchlistAlertCondition>("price_above");
   const [threshold, setThreshold] = useState<number | null>(null);
+
+  const selectedStockCodes = useMemo(() => {
+    const allItems = watchlist.data?.items ?? [];
+    const codeSet = new Set<string>();
+    for (const id of selectedIds) {
+      const match = allItems.find((item) => item.id === id);
+      if (match) codeSet.add(match.stock_code);
+    }
+    return Array.from(codeSet);
+  }, [selectedIds, watchlist.data?.items]);
 
   const addOptions = useMemo(() => stockSearch.currentResults.slice(0, 8).map((stock) => ({
     value: stock.code,
@@ -464,9 +535,10 @@ export default function WatchlistPage() {
       title: "最新价",
       dataIndex: "current_price",
       width: 92,
+      fixed: "left",
       align: "right",
       render: (value: number | null, item) => (
-        <strong className={`watchlist-page__price is-${marketDirection(item.change_pct)}`}>
+        <strong className={`watchlist-page__price is-${marketDirection(item.change_pct)} financial-num`}>
           {formatPrice(value)}
         </strong>
       ),
@@ -475,6 +547,7 @@ export default function WatchlistPage() {
       title: "涨跌幅",
       dataIndex: "change_pct",
       width: 96,
+      fixed: "left",
       align: "right",
       render: (value: number | null) => <ChangeValue value={value} />,
     },
@@ -483,49 +556,49 @@ export default function WatchlistPage() {
       dataIndex: "open_price",
       width: 88,
       align: "right",
-      render: formatPrice,
+      render: (val: number | null) => <span className="financial-num">{formatPrice(val)}</span>,
     },
     {
       title: "最高",
       dataIndex: "high_price",
       width: 88,
       align: "right",
-      render: formatPrice,
+      render: (val: number | null) => <span className="financial-num">{formatPrice(val)}</span>,
     },
     {
       title: "最低",
       dataIndex: "low_price",
       width: 88,
       align: "right",
-      render: formatPrice,
+      render: (val: number | null) => <span className="financial-num">{formatPrice(val)}</span>,
     },
     {
       title: "成交额",
       dataIndex: "amount",
       width: 104,
       align: "right",
-      render: formatCompactNumber,
+      render: (val: number | null) => <span className="financial-num">{formatCompactNumber(val)}</span>,
     },
     {
       title: "换手率",
       dataIndex: "turnover_pct",
       width: 92,
       align: "right",
-      render: formatPercent,
+      render: (val: number | null) => <span className="financial-num">{formatPercent(val)}</span>,
     },
     {
       title: "市盈率",
       dataIndex: "pe_ttm",
       width: 88,
       align: "right",
-      render: formatPrice,
+      render: (val: number | null) => <span className="financial-num">{formatPrice(val)}</span>,
     },
     {
       title: "总市值",
       dataIndex: "market_cap",
       width: 104,
       align: "right",
-      render: formatCompactNumber,
+      render: (val: number | null) => <span className="financial-num">{formatCompactNumber(val)}</span>,
     },
     {
       title: "所属概念",
@@ -604,11 +677,42 @@ export default function WatchlistPage() {
 
   const renderTable = (items: WatchlistItem[], labelledBy?: string) => (
     <div className="watchlist-page__table-wrap" role="region" aria-labelledby={labelledBy}>
+      {selectedStockCodes.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 12px",
+            marginBottom: 8,
+            backgroundColor: "var(--c-nested-bg)",
+            borderRadius: 6,
+            border: "1px solid var(--c-border)",
+          }}
+        >
+          <Tag color="blue" style={{ margin: 0 }}>已选 {selectedStockCodes.length} 只</Tag>
+          <Button
+            size="small"
+            aria-label="批量回测"
+            icon={<ExperimentOutlined />}
+            onClick={() => navigate(`/quant?codes=${encodeURIComponent(selectedStockCodes.join(","))}`)}
+          >
+            批量回测
+          </Button>
+          <Button size="small" type="link" onClick={() => setSelectedIds([])} style={{ padding: "0 4px" }}>
+            清空选择
+          </Button>
+        </div>
+      )}
       <Table<WatchlistItem>
         className="watchlist-page__table"
         columns={columns}
         dataSource={items}
         rowKey="id"
+        rowSelection={{
+          selectedRowKeys: selectedIds,
+          onChange: (keys) => setSelectedIds(keys.map(Number)),
+        }}
         size="small"
         pagination={false}
         scroll={{ x: 1690 }}
@@ -641,6 +745,21 @@ export default function WatchlistPage() {
         <div className="watchlist-page__status">
           <span>行情来源 · {sourceLabel(watchlist.data?.source)}</span>
           <span>更新于 {formatQuotedTime(watchlist.data?.quoted_at)}</span>
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={() => {
+              const exportItems = filteredItems.length > 0 ? filteredItems : (watchlist.data?.items ?? []);
+              if (exportItems.length === 0) {
+                message.warning("暂无自选股数据可导出");
+                return;
+              }
+              downloadWatchlistCsv(exportItems);
+              message.success(`已导出 ${exportItems.length} 只自选股数据`);
+            }}
+            disabled={!watchlist.data?.items?.length}
+          >
+            导出 CSV
+          </Button>
           <Button
             icon={<ReloadOutlined />}
             loading={watchlist.isFetching}

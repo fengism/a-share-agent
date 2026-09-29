@@ -169,6 +169,8 @@ export function useDeleteAnalysisHistory() {
       { path: { code, date } },
     ),
     onSuccess: async (_response, { code, date }) => {
+      queryClient.removeQueries({ queryKey: ["analysisVersions", code, date] });
+      queryClient.removeQueries({ queryKey: ["analysisVersion", code, date] });
       queryClient.removeQueries({
         queryKey: queryKeys.workflows.analysisHistorySnapshot(code, date),
         exact: true,

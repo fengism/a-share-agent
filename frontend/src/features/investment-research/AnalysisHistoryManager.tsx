@@ -132,8 +132,8 @@ export default function AnalysisHistoryManager({
                     </PreloadLink>
                     {item.can_delete ? (
                       <Popconfirm
-                        title="删除这条分析记录？"
-                        description="删除后无法恢复"
+                        title="删除这天的分析记录及全部版本？"
+                        description="当天最新报告与该日所有历史版本都会删除，无法恢复"
                         okText="删除"
                         cancelText="取消"
                         okButtonProps={{ danger: true }}

@@ -1,6 +1,15 @@
 import { useMemo, useState } from "react";
-import { BellOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  BellOutlined,
+  DeleteOutlined,
+  FileSearchOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SortAscendingOutlined,
+  SortDescendingOutlined,
+} from "@ant-design/icons";
 import { AutoComplete, Button, Card, Input, InputNumber, Modal, Select, Space, Tag, Tooltip, Typography, message } from "antd";
+import { useNavigate } from "react-router-dom";
 import {
   useAddWatchlistAlert,
   useAddWatchlistItem,
@@ -47,6 +56,7 @@ function formatQuotedTime(value: string | undefined): string {
 
 export default function WatchlistPanel() {
   const { cardStyle } = useStyles();
+  const navigate = useNavigate();
   const watchlist = useWatchlist();
   const addItem = useAddWatchlistItem();
   const deleteItem = useDeleteWatchlistItem();
@@ -56,6 +66,26 @@ export default function WatchlistPanel() {
   const [alertStock, setAlertStock] = useState<WatchlistItem | null>(null);
   const [condition, setCondition] = useState<WatchlistAlertCondition>("price_above");
   const [threshold, setThreshold] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<"default" | "desc" | "asc">("default");
+
+  const displayItems = useMemo(() => {
+    const list = [...(watchlist.data?.items ?? [])];
+    if (sortBy === "desc") {
+      return list.sort((a, b) => (b.change_pct ?? -Infinity) - (a.change_pct ?? -Infinity));
+    }
+    if (sortBy === "asc") {
+      return list.sort((a, b) => (a.change_pct ?? Infinity) - (b.change_pct ?? Infinity));
+    }
+    return list;
+  }, [watchlist.data?.items, sortBy]);
+
+  const toggleSort = () => {
+    setSortBy((prev) => {
+      if (prev === "default") return "desc";
+      if (prev === "desc") return "asc";
+      return "default";
+    });
+  };
 
   const options = useMemo(() => search.currentResults.slice(0, 8).map((stock) => ({
     value: stock.code,
@@ -106,7 +136,25 @@ export default function WatchlistPanel() {
           <span className="dashboard-watchlist__eyebrow">WATCHLIST</span>
           <h2>我的自选</h2>
         </div>
-        <div className="dashboard-watchlist__header-actions">
+        <div className="dashboard-watchlist__header-actions" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Tooltip title={sortBy === "desc" ? "当前：涨幅优先（点击切换跌幅优先）" : sortBy === "asc" ? "当前：跌幅优先（点击恢复默认）" : "默认排序（点击切换涨幅优先）"}>
+            <Button
+              size="small"
+              type="text"
+              aria-label="切换自选股排序"
+              icon={sortBy === "desc" ? <SortDescendingOutlined style={{ color: "var(--c-up)" }} /> : sortBy === "asc" ? <SortAscendingOutlined style={{ color: "var(--c-down)" }} /> : <SortDescendingOutlined />}
+              onClick={toggleSort}
+            />
+          </Tooltip>
+          <Tooltip title="刷新行情">
+            <Button
+              size="small"
+              type="text"
+              aria-label="刷新自选股行情"
+              icon={<ReloadOutlined spin={watchlist.isFetching} />}
+              onClick={() => void watchlist.refetch()}
+            />
+          </Tooltip>
           <span className="dashboard-watchlist__count">{watchlist.data?.items.length ?? 0} 只</span>
           <PreloadLink className="dashboard-watchlist__view-all" to="/watchlist">查看全部</PreloadLink>
         </div>
@@ -141,7 +189,7 @@ export default function WatchlistPanel() {
       >
         <div className="dashboard-watchlist__scroll">
           <ul className="dashboard-watchlist">
-            {(watchlist.data?.items ?? []).map((item) => (
+            {displayItems.map((item) => (
               <li className={`dashboard-watchlist__item${(item.change_pct ?? 0) > 0 ? " is-up" : (item.change_pct ?? 0) < 0 ? " is-down" : " is-flat"}`} key={item.id}>
                 <div className="dashboard-watchlist__row">
                   <PreloadLink className="dashboard-watchlist__identity" to={buildWatchlistStockUrl(item.stock_code, item.market)}>
@@ -171,6 +219,15 @@ export default function WatchlistPanel() {
                   </div>
                 ) : null}
                 <div className="dashboard-watchlist__actions dashboard-watchlist__actions--overlay">
+                  <Tooltip title="查看个股研报">
+                    <Button
+                      size="small"
+                      type="text"
+                      aria-label={`查看${item.stock_name}研报`}
+                      icon={<FileSearchOutlined />}
+                      onClick={() => navigate(`/analysis?code=${item.stock_code}`)}
+                    />
+                  </Tooltip>
                   <Tooltip title="设置提醒">
                     <Button size="small" type="text" aria-label={`设置${item.stock_name}提醒`} icon={<BellOutlined />} onClick={() => setAlertStock(item)} />
                   </Tooltip>

@@ -229,3 +229,21 @@ describe("industry chain research rounds", () => {
     ]);
   });
 });
+
+
+describe("industry chain phased research rounds", () => {
+  it("keeps primary and verification round one separate", () => {
+    const round = {
+      round_index: 1, round_total: 2, status: "completed" as const,
+      objective: "核验", evidence_gaps: [], tool_names: [], tool_selection_reason: "",
+      evidence_added: [], judgment_basis: [], conclusion: "完成", next_step: "",
+    };
+    const state = [
+      { type: "round_completed" as const, phase: "research" as const, research_round: round },
+      { type: "round_completed" as const, phase: "verification_repair" as const, research_round: round },
+    ].reduce(applyIndustryAgentEvent, createIndustryAgentProcessState());
+
+    expect(state.rounds).toHaveLength(2);
+    expect(state.rounds.map((item) => item.phase)).toEqual(["research", "verification_repair"]);
+  });
+});
