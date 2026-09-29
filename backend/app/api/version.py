@@ -57,7 +57,15 @@ _http_client: httpx.AsyncClient | None = None
 
 
 def current_version() -> str:
-    return os.environ.get("APP_VERSION") or "dev"
+    """当前运行版本。
+
+    与 OpenAPI 元数据共用 app.runtime.app_version 的解析逻辑：注入的
+    APP_VERSION 原样返回（tag 形态），未注入时回退读 pyproject，使源码部署
+    不再被误判成 dev 而禁用在线更新。
+    """
+    from app.runtime.app_version import resolve_app_version
+
+    return resolve_app_version()
 
 
 def _parse_semantic_version(value: str) -> Version | None:

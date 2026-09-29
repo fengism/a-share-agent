@@ -201,6 +201,7 @@ files = [
     "app/infrastructure/providers/provider_chain.py",
     "app/modules/*/public.py",
     "app/runtime/agentic_tools.py",
+    "app/runtime/app_version.py",
     "app/runtime/health.py",
     "app/runtime/job_workers.py",
     "app/runtime/logging_setup.py",

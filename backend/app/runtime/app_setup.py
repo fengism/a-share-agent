@@ -1,9 +1,9 @@
 import os
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.runtime.app_version import resolve_app_version
 from app.runtime.import_body_limit import ImportBodyLimitMiddleware
 from app.runtime.middleware import RequestObservabilityMiddleware, UserContextMiddleware
 
@@ -14,21 +14,6 @@ from app.runtime.middleware import RequestObservabilityMiddleware, UserContextMi
 _EXPOSE_DOCS = os.getenv("APP_EXPOSE_DOCS", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _app_version() -> str:
-    """应用版本：优先取 CI 注入的 APP_VERSION，其次读 pyproject，最后回退。"""
-    env_version = os.environ.get("APP_VERSION", "").strip()
-    if env_version:
-        return env_version.lstrip("v")
-    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
-    try:
-        import tomllib
-
-        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-        return str(data["project"]["version"])
-    except Exception:
-        return "0.1.0"
-
-
 def create_application(
     *,
     lifespan,
@@ -36,7 +21,7 @@ def create_application(
 ) -> FastAPI:
     application = FastAPI(
         title="A股智能分析系统",
-        version=_app_version(),
+        version=resolve_app_version().lstrip("v"),
         lifespan=lifespan,
         docs_url="/docs" if _EXPOSE_DOCS else None,
         redoc_url="/redoc" if _EXPOSE_DOCS else None,
