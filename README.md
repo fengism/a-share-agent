@@ -225,7 +225,7 @@ sudo docker compose logs --tail=100 backend
 
 仓库内置 GitHub Actions 统一工作流 [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)：
 
-- **Pull Request 验证**：任何针对 `main` 分支的 PR 会触发双架构（amd64 与 arm64）的 `verify` 任务，自动运行全量 Lint（Ruff、Mypy）、后端单元测试（pytest）、前端测试（Vitest）、前端静态分析与构建（ESLint、Vite build）以及 OpenAPI 契约检查（`npm run api:check`），确保变更符合质量门禁，**PR 阶段不推送任何镜像**。
+- **Pull Request 验证**：任何针对 `main` 分支的 PR 会触发双架构（amd64 与 arm64）的 `verify` 任务，自动运行全量 Lint（Ruff、Mypy）、后端单元测试（pytest）、前端测试（Vitest）、前端静态分析与构建（ESLint、Vite build）以及 OpenAPI 契约检查（`npm run api:check`），确保变更符合质量门禁，**PR 阶段不推送任何镜像**。后端 `tests/` 目录当前随模块重构移除，pytest 步骤在目录不存在时自动跳过，目录恢复后无需改动 CI 即重新生效。
 - **发布构建**：push 到 `main` 分支、推送 `v*` 版本标签或手动 `workflow_dispatch` 触发时，在 `verify` 通过后由原生 runner 构建多架构镜像，并严格经过容器冒烟自检（真实环境运行应用、浏览器与沙箱）后组装多架构 Index 并发布到 Docker Hub。
 
 - 产物镜像（默认命名空间 `fengliu1989`）：
@@ -772,9 +772,22 @@ npm run dev
 ### 质量验证
 
 ```bash
-make check          # 后端 Ruff/Mypy/pytest + 前端 API 合同/Vitest/ESLint/Build
+make check          # 版本号一致性 + 后端 Ruff/Mypy/pytest + 前端 API 合同/Vitest/ESLint/Build
 make frontend-e2e   # Playwright 登录与 Workflow 重连/取消 smoke 测试
 ```
+
+### 版本发布
+
+版本号以 `backend/pyproject.toml` 为唯一事实来源，跨后端清单、前端清单与 OpenAPI 产物同步：
+
+```bash
+make version-check               # 校验各文件版本号是否一致
+make version-bump V=minor         # 0.6.0 -> 0.7.0（也支持 V=patch / V=major / V=0.7.0）
+make version-bump V=minor ARGS=--dry-run   # 预演，不写文件
+git commit -am "release: 版本升至 v0.7.0" && git tag v0.7.0 && git push --tags
+```
+
+`make version-bump` 会同步 `backend/uv.lock`、`frontend/package.json`、`frontend/package-lock.json`（含 `packages[""]`）与 `frontend/src/api/generated/openapi.json`，并重跑 `npm run api:generate` 刷新类型产物；`make check` 会先跑 `version-check`，版本漂移时直接失败。发布标签必须与 `backend/pyproject.toml` 的版本一致，否则 CI 会拒绝构建。
 
 账号 API 测试使用每例独立的临时 SQLite 数据库，禁止对开发/运行数据库清表或重建管理员。新增持久化测试必须先隔离数据库路径及线程连接缓存，再初始化测试数据；密码重置应保留用户 ID 和个人 AI 配置。
 
@@ -784,10 +797,11 @@ make frontend-e2e   # Playwright 登录与 Workflow 重连/取消 smoke 测试
 ```bash
 cd backend
 uv sync --frozen
+# 以下用例位于后端 tests/ 目录，该目录当前随模块重构移除，命令待测试回填后使用
 # 运行 Provider 统一网关与合约单测（无需外网）
-uv run --frozen pytest tests/infrastructure/providers/ -q
+# uv run --frozen pytest tests/infrastructure/providers/ -q
 # 联网冒烟测试（默认跳过，显式启用后直连 TDX 行情服务器，不走降级）
-TDXHUB_LIVE=1 uv run --frozen pytest tests/infrastructure/providers/test_tdxhub_live.py -v -s
+# TDXHUB_LIVE=1 uv run --frozen pytest tests/infrastructure/providers/test_tdxhub_live.py -v -s
 ```
 
 ## 账号系统与访问控制

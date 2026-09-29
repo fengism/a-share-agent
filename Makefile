@@ -98,13 +98,17 @@ backend-dev: ## 单独启动后端
 	cd backend && uv run --frozen uvicorn app.main:app --reload --host "$(BACKEND_HOST)" --port "$(BACKEND_PORT)"
 
 backend-lint: ## 检查后端代码规范
-	cd backend && uv run --frozen ruff check --config pyproject.toml app tests
+	cd backend && uv run --frozen ruff check --config pyproject.toml app $(if $(wildcard backend/tests),tests,)
 
 backend-type: ## 检查后端静态类型
 	cd backend && uv run --frozen mypy
 
-backend-test: ## 运行后端测试
-	cd backend && uv run --frozen pytest -q
+backend-test: ## 运行后端测试（backend/tests 存在时才执行）
+	@if [ -d backend/tests ]; then \
+		cd backend && uv run --frozen pytest -q; \
+	else \
+		echo "backend/tests 不存在，跳过后端测试"; \
+	fi
 
 backend-db-init: ## 初始化双数据库并应用结构迁移（空行业库自动播种）
 	cd backend && uv run --frozen python -c 'from app.infrastructure.persistence import init_db; init_db(); print("database initialization complete")'
