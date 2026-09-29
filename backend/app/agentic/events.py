@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, Field
 
 from app.agentic.protocol import ToolCallInfo, ToolResultInfo
+from app.agentic.runtime.tool_budget import budget_rejection_message
 
 AgentPlanStepStatus = Literal[
     "pending",
@@ -91,6 +92,7 @@ class AgentEvent(BaseModel):
         "error",
         "done",
     ]
+    phase: Literal["research", "verification_repair"] | None = None
     content: str | None = None
     plan: AgentPlan | None = None
     plan_step: AgentPlanStepUpdate | None = None
@@ -196,10 +198,9 @@ def _tool_result_summary(result: ToolResultInfo) -> AgentToolResultSummary:
     if isinstance(payload, dict) and isinstance(payload.get("error"), dict):
         error_code = str(payload["error"].get("code") or "")[:80]
     if error_code == "tool_budget_exceeded":
-        return AgentToolResultSummary(
-            summary="本次工具请求受预算限制，未实际执行（可能是单批上限、总额、搜索节奏或正文预留）",
-            status="skipped",
-        )
+        data = payload.get("data") if isinstance(payload, dict) else None
+        diagnostics = data.get("budget") if isinstance(data, dict) else None
+        return AgentToolResultSummary(summary=budget_rejection_message(diagnostics), status="skipped")
     if error_code == "tool_context_budget_exhausted":
         return AgentToolResultSummary(
             summary="工具结果上下文预算已用尽，本次未实际执行",

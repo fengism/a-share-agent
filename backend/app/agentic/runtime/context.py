@@ -10,6 +10,17 @@ from app.configuration.schema import Settings
 from app.core.request_context import get_current_request_id, get_current_user_id
 
 
+@dataclass(frozen=True, slots=True, eq=False)
+class ToolCallReservation:
+    """Context-owned single-call receipt. Identity, not caller-supplied fields, authorizes a refund."""
+
+    reservation_id: int
+    tool_name: str | None
+    search: bool
+    reserved: bool
+    search_epoch: int = 0
+
+
 @dataclass(slots=True)
 class AgentExecutionContext:
     settings: Settings
@@ -22,6 +33,8 @@ class AgentExecutionContext:
     search_policy: ResearchSearchPolicy | None = None
     _reserved_calls_used: int = field(default=0, init=False, repr=False)
     _tool_calls_used: int = field(default=0, init=False, repr=False)
+    _reservation_sequence: int = field(default=0, init=False, repr=False)
+    _active_tool_reservations: dict[int, ToolCallReservation] = field(default_factory=dict, init=False, repr=False)
     _tool_budget_lock: asyncio.Lock = field(
         default_factory=asyncio.Lock,
         init=False,
@@ -67,45 +80,103 @@ class AgentExecutionContext:
             available = min(available, self.search_policy.available)
         return available
 
-    async def reserve_tool_calls(self, requested: int, *, preserve: int = 0, tool_name: str | None = None) -> int:
-        requested_calls = max(0, int(requested))
+    def _reserve_one(self, *, preserve: int, tool_name: str | None) -> ToolCallReservation | None:
+        if self.tool_calls_available(preserve=preserve, tool_name=tool_name) <= 0:
+            return None
+        is_search = self.search_policy is not None and tool_name in self.search_policy.tool_names
+        is_reserved = tool_name in self.reserved_tool_names
+        self._tool_calls_used += 1
+        if is_search and self.search_policy is not None:
+            self.search_policy.consume(1)
+        if is_reserved:
+            self._reserved_calls_used += 1
+        self._reservation_sequence += 1
+        token = ToolCallReservation(
+            self._reservation_sequence,
+            tool_name,
+            is_search,
+            is_reserved,
+            self.search_policy.epoch if self.search_policy is not None else 0,
+        )
+        self._active_tool_reservations[token.reservation_id] = token
+        return token
+
+    def _budget_rejection(self, *, preserve: int, tool_name: str | None) -> dict[str, str | int] | None:
+        if self.deadline_exceeded():
+            return {"reason": "deadline"}
+        if self.tool_calls_remaining <= 0:
+            return {"reason": "total_limit", "used": self.tool_calls_used,
+                    "limit": self.settings.chat_max_tool_calls_total}
+        policy = self.search_policy
+        if policy is not None and tool_name in policy.tool_names:
+            if policy.used >= policy.total_limit:
+                return {"reason": "search_total", "used": policy.used, "limit": policy.total_limit}
+            if policy.since_read >= policy.burst_limit:
+                return {"reason": "search_burst", "used": policy.since_read, "limit": policy.burst_limit}
+        followup = min(max(0, int(preserve)), self.settings.chat_max_tool_calls_total // 2)
+        body = self.reserved_calls_remaining if tool_name is not None and tool_name not in self.reserved_tool_names else 0
+        if self.tool_calls_remaining <= max(followup, body):
+            return {"reason": "body_reserve" if body >= followup else "followup_reserve",
+                    "remaining": self.tool_calls_remaining, "reserved": max(followup, body)}
+        return None
+
+    async def reserve_tool_call_with_diagnostics(
+        self, *, preserve: int = 0, tool_name: str | None = None,
+    ) -> tuple[ToolCallReservation | None, dict[str, str | int] | None]:
+        """Decide and snapshot denial under the same lock as the reservation."""
         async with self._tool_budget_lock:
-            accepted = min(
-                requested_calls,
-                self.tool_calls_available(preserve=preserve, tool_name=tool_name),
-            )
-            self._tool_calls_used += accepted
-            if self.search_policy is not None and tool_name in self.search_policy.tool_names:
-                self.search_policy.consume(accepted)
-            if tool_name in self.reserved_tool_names:
-                self._reserved_calls_used += accepted
-            return accepted
+            rejection = self._budget_rejection(preserve=preserve, tool_name=tool_name)
+            if rejection is not None:
+                return None, rejection
+            return self._reserve_one(preserve=preserve, tool_name=tool_name), None
+
+    async def reserve_tool_call(self, *, preserve: int = 0, tool_name: str | None = None) -> ToolCallReservation | None:
+        async with self._tool_budget_lock:
+            return self._reserve_one(preserve=preserve, tool_name=tool_name)
+
+    async def reserve_tool_calls(self, requested: int, *, preserve: int = 0, tool_name: str | None = None) -> int:
+        """Compatibility count API; callers must identify the same tool when refunding."""
+        accepted = 0
+        async with self._tool_budget_lock:
+            for _ in range(max(0, int(requested))):
+                if self._reserve_one(preserve=preserve, tool_name=tool_name) is None:
+                    break
+                accepted += 1
+        return accepted
+
+    def _settle_reservation(self, token: ToolCallReservation, *, refund: bool) -> bool:
+        if self._active_tool_reservations.get(token.reservation_id) is not token:
+            return False
+        self._active_tool_reservations.pop(token.reservation_id)
+        if refund:
+            self._tool_calls_used -= 1
+            if token.search and self.search_policy is not None:
+                self.search_policy.restore(1, epoch=token.search_epoch)
+            if token.reserved:
+                self._reserved_calls_used -= 1
+        return True
+
+    async def settle_tool_reservation(self, token: ToolCallReservation, *, shared: bool = False) -> bool:
+        async with self._tool_budget_lock:
+            return self._settle_reservation(token, refund=shared)
+
+    async def refund_tool_reservation(self, token: ToolCallReservation) -> bool:
+        return await self.settle_tool_reservation(token, shared=True)
 
     @property
     def reserved_calls_remaining(self) -> int:
-        return max(0, min(self.reserved_tool_calls, self.settings.chat_max_tool_calls_total // 2) - self._reserved_calls_used)
+        return max(
+            0, min(self.reserved_tool_calls, self.settings.chat_max_tool_calls_total // 2) - self._reserved_calls_used
+        )
 
-    async def refund_tool_calls(self, refunded: int = 1) -> int:
-        """退回此前预留的额度，返回实际退回的数量。
-
-        预留在「决定执行」时发生，但真正执行前可能发现结果已在缓存里、或与另一个
-        并发调用合并成同一次真实执行。那种情况下不该扣预算——否则同一份数据被复用
-        N 次就扣掉 N 份额度，配置意图（chat_max_tool_calls_total）会明显低于实际
-        可用量，/stats 口径也会失真。
-        """
+    async def refund_tool_calls(self, refunded: int = 1, *, tool_name: str | None = None) -> int:
+        """Refund only active receipts for the named tool; never touch unrelated buckets."""
         count = max(0, int(refunded))
-        if not count:
-            return 0
         async with self._tool_budget_lock:
-            returned = min(count, self._tool_calls_used)
-            self._tool_calls_used -= returned
-            if self.search_policy is not None:
-                self.search_policy.restore(returned)
-            if self.reserved_tool_names:
-                self._reserved_calls_used = max(
-                    0, self._reserved_calls_used - returned
-                )
-            return returned
+            tokens = [token for token in self._active_tool_reservations.values() if token.tool_name == tool_name][
+                :count
+            ]
+            return sum(self._settle_reservation(token, refund=True) for token in tokens)
 
     @property
     def tool_calls_used(self) -> int:
@@ -116,4 +187,4 @@ class AgentExecutionContext:
         return max(0, self.settings.chat_max_tool_calls_total - self._tool_calls_used)
 
 
-__all__ = ["AgentExecutionContext"]
+__all__ = ["AgentExecutionContext", "ToolCallReservation"]

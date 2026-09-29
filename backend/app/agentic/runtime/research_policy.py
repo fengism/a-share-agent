@@ -50,6 +50,7 @@ class ResearchSearchPolicy:
     read_tool_names: tuple[str, ...]
     used: int = 0
     since_read: int = 0
+    epoch: int = 0  # Refunds from older search bursts must not alter a newer burst.
     pending_urls: list[str] = field(default_factory=list)
     attempted_urls: set[str] = field(default_factory=set)
 
@@ -63,11 +64,12 @@ class ResearchSearchPolicy:
         self.used += count
         self.since_read += count
 
-    def restore(self, count: int) -> None:
+    def restore(self, count: int, *, epoch: int | None = None) -> None:
         """退回 consume 记上的额度（调用最终由缓存/合并提供，没有真实发起搜索）。"""
         returned = max(0, int(count))
         self.used = max(0, self.used - returned)
-        self.since_read = max(0, self.since_read - returned)
+        if epoch is None or epoch == self.epoch:
+            self.since_read = max(0, self.since_read - returned)
 
     def observe(self, name: str, arguments: str, content: str, *, is_error: bool) -> None:
         """Called only for actual completions, not rejected/replayed cached results."""
@@ -95,11 +97,13 @@ class ResearchSearchPolicy:
             self.pending_urls = [url for url in self.pending_urls if url not in attempted]
             # A failed real read may unlock source replacement; it never counts as valid evidence.
             self.since_read = 0
+            self.epoch += 1
 
     def finish_batch(self) -> None:
         # Do not demand nonexistent URLs after an empty/failed search batch.
         if not self.pending_urls:
             self.since_read = 0
+            self.epoch += 1
 
     def instruction(self) -> str:
         remaining = max(0, self.total_limit - self.used)

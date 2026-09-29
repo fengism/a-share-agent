@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncGenerator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.agentic.agents.contracts import AgentExecutionResult, AgentProfile
 from app.agentic.agents.executor import agent_executor
@@ -132,6 +132,10 @@ async def stream_execution_plan(
                 status="failed",
                 errors=[detail],
                 retryable=not is_llm_failure(exc),
+                termination_reason=(
+                    "generation_timeout" if isinstance(exc, TimeoutError)
+                    else "generation_error" if is_llm_failure(exc) else "execution_error"
+                ),
             )
         except Exception as exc:
             _, detail = log_internal_error(
@@ -147,7 +151,15 @@ async def stream_execution_plan(
                 status="failed",
                 errors=[detail],
                 retryable=not is_llm_failure(exc),
+                termination_reason=(
+                    "generation_timeout" if isinstance(exc, TimeoutError)
+                    else "generation_error" if is_llm_failure(exc) else "execution_error"
+                ),
             )
+        outcome = result.outcome
+        result = replace(result, status=outcome.status,
+                         retryable=result.retryable and not outcome.reason.fatal,
+                         opinion=None if outcome.status == "failed" else result.opinion)
         if result.status == "failed":
             detail = result.errors[0] if result.errors else f"{task.display_name}执行失败"
             await queue.put(
@@ -164,12 +176,12 @@ async def stream_execution_plan(
             await queue.put(
                 build_task_progress_event(
                     task,
-                    "completed",
+                    "degraded" if result.status == "partial" else "completed",
                     detail=detail,
                     attempt=attempt,
                 )
             )
-            status_content = f"{task.display_name}已完成…"
+            status_content = f"{task.display_name}{'部分完成' if result.status == 'partial' else '已完成'}…"
         await queue.put(AgentEvent(type="status", content=status_content))
         await queue.put(_TaskCompleted(task_id=task.task_id, result=result))
 
@@ -187,6 +199,7 @@ async def stream_execution_plan(
                     names = "、".join(tasks_by_id[dependency].display_name for dependency in blocked)
                     detail = f"前置分析未有效完成（{names}），未执行{task.display_name}"
                     result = AgentExecutionResult(
+                        termination_reason="dependency_unavailable",
                         agent_name=task.agent_name,
                         display_name=task.display_name,
                         analysis="",

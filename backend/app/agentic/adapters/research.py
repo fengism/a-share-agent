@@ -14,34 +14,19 @@ from app.agentic.contracts import (
     AgentEvidence,
     AgentResearchSpec,
     AgentRoundResult,
+    classify_evidence_batch,
 )
 from app.agentic.events import AgentEvent
 from app.agentic.research import AgentEventCallback, build_research_system_prompt
 from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.runtime.research_policy import ResearchSearchPolicy
-from app.agentic.tools.serialization import has_meaningful_tool_content
+from app.agentic.semantics import EvidenceState
 from app.configuration import get_effective_settings
-from app.infrastructure.llm.adapters import LLMInvalidResponseError
+from app.infrastructure.llm.adapters import LLMInvalidResponseError, LLMRetryableError
 from app.infrastructure.llm.policy import generation_scope
 from app.infrastructure.llm.runtime import borrow_async_openai_chat_runtime
 
 logger = logging.getLogger(__name__)
-_INCOMPLETE_SUMMARY_REASONS = {
-    "length": "模型输出达到长度上限",
-    "stream_error": "模型流式响应中断或缺少结束帧",
-    "empty_response": "模型未返回有效摘要",
-}
-_FATAL_REASONS = {
-    "content_filter": "模型内容过滤终止输出",
-    "invalid_response": "模型响应格式不兼容",
-    "generation_error": "模型请求失败",
-    "bad_request": "模型请求参数不被上游接受",
-    "authentication_error": "模型鉴权失败",
-    "permission_error": "模型访问权限不足",
-    "rate_limited": "模型服务限流",
-    "unexpected_finish": "模型返回未知结束状态",
-    "tool_calls": "最终摘要错误地返回工具调用结束状态",
-}
 
 
 def _collect_round_evidence(events: list[AgentEvent]) -> tuple[AgentEvidence, ...]:
@@ -58,7 +43,7 @@ def _collect_round_evidence(events: list[AgentEvent]) -> tuple[AgentEvidence, ..
             and delta.tool_result is not None
             and (
                 delta.tool_result.is_error
-                or has_meaningful_tool_content(delta.tool_result.content)
+                or EvidenceState.from_content(delta.tool_result.content, is_error=delta.tool_result.is_error).usable_acquisition
             )
         ):
             tool_name, arguments = calls.get(
@@ -108,7 +93,8 @@ class _AgentExecutorResearchSession:
                       f"总剩余{self.execution_context.tool_calls_remaining}次，预留{tool_call_reserve}次。")
             if event_callback is not None:
                 await event_callback(AgentEvent(type="status", content=reason))
-            return AgentRoundResult(summary=reason, tool_calls_remaining=self.execution_context.tool_calls_remaining)
+            return AgentRoundResult(summary="", stop_reason=reason, termination_reason="tool_budget_exceeded",
+                                    tool_calls_remaining=self.execution_context.tool_calls_remaining)
         event_queue: asyncio.Queue[
             AgentEvent | _ResearchExecutionCompleted | _ResearchExecutionFailed
         ] = asyncio.Queue()
@@ -145,7 +131,19 @@ class _AgentExecutorResearchSession:
             while True:
                 event = await event_queue.get()
                 if isinstance(event, _ResearchExecutionFailed):
-                    raise event.exception
+                    # Only a known timeout/transport interruption may retain tools.
+                    # Cancellation, SDK argument errors, auth and protocol errors
+                    # keep their original failure semantics and must not be replayed.
+                    recoverable = isinstance(event.exception, (TimeoutError, LLMRetryableError))
+                    acquired = _collect_round_evidence(events) if recoverable else ()
+                    if not self.allow_incomplete_summary or not classify_evidence_batch(acquired).added:
+                        raise event.exception
+                    result = AgentExecutionResult(
+                        agent_name=self.profile.name, display_name=self.profile.display_name,
+                        analysis="", status="failed", retryable=False,
+                        termination_reason="generation_timeout" if isinstance(event.exception, TimeoutError) else "stream_error",
+                    )
+                    break
                 if isinstance(event, _ResearchExecutionCompleted):
                     result = event.result
                     break
@@ -160,22 +158,23 @@ class _AgentExecutorResearchSession:
 
         evidence = _collect_round_evidence(events)
         stop_reason = ""
-        if result.status != "completed" and not result.retryable:
-            # Retryability controls replay, not whether already acquired facts may be retained.
-            reason = result.termination_reason
-            safe_reason = reason if reason in {*_INCOMPLETE_SUMMARY_REASONS, *_FATAL_REASONS} else "unknown"
-            usable_count = sum(not item.is_error and has_meaningful_tool_content(item.content) for item in evidence)
+        outcome = result.outcome
+        # A normal partial answer (e.g. removed tool markup) may still contain
+        # valid analysis. Non-retryable does not itself mean an invalid summary.
+        incomplete_output = outcome.reason.code not in {"", "stop"} or not outcome.has_output
+        if outcome.reason.fatal or (outcome.status != "completed" and not result.retryable and incomplete_output):
+            termination = outcome.reason
+            usable_count = len(classify_evidence_batch(evidence).added)
             logger.warning(
                 "Agent调研非完整结束: agent=%s status=%s reason=%s tool_requests=%d evidence=%d",
-                self.profile.name, result.status, safe_reason, len(result.tools_called), usable_count,
+                self.profile.name, result.status, termination.code, len(result.tools_called), usable_count,
             )
-            if self.allow_incomplete_summary and reason in _INCOMPLETE_SUMMARY_REASONS and usable_count:
-                stop_reason = f"{_INCOMPLETE_SUMMARY_REASONS[reason]}；已保留{usable_count}条有效工具结果，停止继续调研，报告需按证据不足降级。"
+            if self.allow_incomplete_summary and termination.retain_acquired_evidence and not termination.fatal and usable_count:
+                stop_reason = f"{termination.description}；已保留{usable_count}条有效工具结果，停止继续调研，报告需按证据不足降级。"
                 if event_callback is not None:
                     await event_callback(AgentEvent(type="status", content=stop_reason))
             else:
-                description = _INCOMPLETE_SUMMARY_REASONS.get(reason) or _FATAL_REASONS.get(reason) or "模型执行未完成，结束原因未提供"
-                detail = f"Agent 调研停止：{description}（reason={safe_reason}，有效工具结果{usable_count}条）"
+                detail = f"Agent 调研停止：{termination.description}（reason={termination.code or 'unknown'}，有效工具结果{usable_count}条）"
                 if event_callback is not None:
                     await event_callback(AgentEvent(type="error", error=detail))
                 raise LLMInvalidResponseError(detail)
@@ -202,9 +201,11 @@ class _AgentExecutorResearchSession:
                 await event_callback(AgentEvent(type="status", content=warning))
         return AgentRoundResult(
             # Never promote a truncated/empty summary or a tool error body into facts.
-            summary="" if stop_reason else result.analysis.strip(),
+            summary="" if stop_reason or result.status == "failed" else result.analysis.strip(),
             evidence=evidence,
             stop_reason=stop_reason,
+            termination_reason=outcome.reason.code,
+            execution_status=result.status,
             tool_calls_remaining=self.execution_context.tool_calls_remaining,
         )
 

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
 from typing import Any
 
 from app.agentic.events import AgentEvent
-from app.agentic.tools.serialization import has_meaningful_tool_content, serialize_context_result
+from app.agentic.semantics import EvidenceState, ExecutionOutcome, ExecutionStatus, research_outcome
+from app.agentic.tools.serialization import serialize_context_result
 
 MAX_AGENT_SUMMARY_LENGTH = 12_000
 MAX_EVIDENCE_ARGUMENT_LENGTH = 4_000
@@ -25,10 +26,8 @@ class EvidenceRequirement:
 
     def accepts(self, evidence: AgentEvidence) -> bool:
         if (
-            evidence.is_error
-            or
             evidence.tool_name not in self.tool_names
-            or not has_meaningful_tool_content(evidence.content)
+            or not evidence.evidence_state.usable_acquisition
         ):
             return False
         return self.validator(evidence) if self.validator is not None else True
@@ -92,6 +91,10 @@ class AgentEvidence:
     content: str
     is_error: bool = False
 
+    @property
+    def evidence_state(self) -> EvidenceState:
+        return EvidenceState.from_content(self.content, is_error=self.is_error)
+
 
 @dataclass(frozen=True)
 class AgentRoundResult:
@@ -99,6 +102,16 @@ class AgentRoundResult:
     evidence: tuple[AgentEvidence, ...] = ()
     stop_reason: str = ""  # Incomplete summary: retain tools, do not run more research rounds.
     tool_calls_remaining: int | None = None
+    termination_reason: str = ""  # Machine code; stop_reason remains existing human-readable text.
+    execution_status: ExecutionStatus | None = None
+
+    @property
+    def outcome(self) -> ExecutionOutcome:
+        evidence = any(item.evidence_state.usable_acquisition for item in self.evidence)
+        return research_outcome(
+            summary=self.summary, has_evidence=evidence, termination_reason=self.termination_reason,
+            execution_status=self.execution_status, incomplete=bool(self.stop_reason),
+        )
 
 
 @dataclass(frozen=True)
@@ -108,6 +121,16 @@ class AgenticResearchResult:
     evidence_gaps: tuple[str, ...] = ()
     execution_trace: tuple[AgentEvent, ...] = ()
     stopped_early: bool = False
+    termination_reason: str = ""
+    execution_status: ExecutionStatus | None = None
+
+    @property
+    def outcome(self) -> ExecutionOutcome:
+        evidence = any(item.evidence_state.usable_acquisition for item in self.evidence)
+        return research_outcome(
+            summary=self.summary, has_evidence=evidence, termination_reason=self.termination_reason,
+            execution_status=self.execution_status, incomplete=bool(self.evidence_gaps or self.stopped_early),
+        )
 
     def render_prompt_context(self) -> dict[str, Any]:
         return {
@@ -200,6 +223,37 @@ def agent_evidence_id(evidence: AgentEvidence) -> str:
     return f"ev_{digest}"
 
 
+@dataclass(frozen=True)
+class EvidenceBatchStats:
+    """Counts for collected evidence records, not calls, sources or verified claims."""
+
+    added: tuple[AgentEvidence, ...]
+    duplicate_count: int = 0
+    failed_count: int = 0
+    unusable_count: int = 0
+
+
+def classify_evidence_batch(
+    evidence: Iterable[AgentEvidence], *, seen_ids: set[str] | None = None,
+) -> EvidenceBatchStats:
+    seen = set() if seen_ids is None else seen_ids
+    added: list[AgentEvidence] = []
+    duplicates = failed = unusable = 0
+    for item in evidence:
+        if item.is_error:
+            failed += 1
+        elif not item.evidence_state.usable_acquisition:
+            unusable += 1
+        else:
+            identity = agent_evidence_id(item)
+            if identity in seen:
+                duplicates += 1
+            else:
+                seen.add(identity)
+                added.append(item)
+    return EvidenceBatchStats(tuple(added), duplicates, failed, unusable)
+
+
 def render_agent_evidence(
     evidence: tuple[AgentEvidence, ...] | list[AgentEvidence],
     *,
@@ -208,7 +262,7 @@ def render_agent_evidence(
 ) -> str:
     sections: list[str] = []
     total_length = 0
-    successful_evidence = [item for item in evidence if not item.is_error]
+    successful_evidence = classify_evidence_batch(evidence).added
     for index, item in enumerate(successful_evidence, start=1):
         evidence_id = agent_evidence_id(item)
         payload = json.dumps(

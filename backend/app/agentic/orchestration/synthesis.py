@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator, Mapping, Sequence
 from contextlib import aclosing
@@ -9,13 +10,16 @@ from uuid import uuid4
 from app.agentic.agents.contracts import AgentExecutionResult
 from app.agentic.events import AgentEvent, AgentReasoningSource
 from app.agentic.orchestration.opinions import build_synthesis_guidance
+from app.agentic.runtime.answer import AnswerTextStream, clean_answer
 from app.agentic.runtime.completion import completion_warning
 from app.agentic.runtime.llm import stream_chat_completion
-from app.core.errors import build_internal_error, log_internal_error
+from app.agentic.tools.calls import has_tool_call_markup
+from app.core.errors import log_internal_error
 from app.core.metrics import metrics
-from app.infrastructure.llm.adapters import LLMRetryableError, extract_message_text
+from app.infrastructure.llm.adapters import LLMRetryableError
+from app.infrastructure.llm.policy import LLMGenerationTimeoutError
 from app.infrastructure.llm.runtime import describe_llm_account_error
-from app.infrastructure.llm.tool_calling import AsyncLLMClient
+from app.infrastructure.llm.tool_calling import AsyncLLMClient, ChatCompletionStreamNormalizer
 
 logger = logging.getLogger(__name__)
 _PARTIAL_SOURCE_WARNING = "部分专业分析未完整完成，综合结论可能受限"
@@ -118,11 +122,14 @@ async def stream_synthesis(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": synthesis_input},
     ]
-    emitted_content = False
+    normalizer = ChatCompletionStreamNormalizer()
+    output_filter = AnswerTextStream()
+    published = ""
     reasoning_source = AgentReasoningSource(
         block_id=uuid4().hex, source="综合分析", stage="synthesis",
     )
     finish_reason: str | None = None
+    failure_detail = ""
     try:
         stream = stream_chat_completion(
             llm_client,
@@ -135,68 +142,56 @@ async def stream_synthesis(
         )
         async with aclosing(stream):
             async for chunk in stream:
-                if not chunk.choices:
-                    continue
-                choice = chunk.choices[0]
-                chunk_finish_reason = getattr(choice, "finish_reason", None)
-                if chunk_finish_reason is not None:
-                    finish_reason = chunk_finish_reason
-                reasoning = extract_message_text(getattr(choice.delta, "reasoning_content", ""))
+                delta = normalizer.add(chunk)
+                if delta.finish_reason is not None:
+                    finish_reason = delta.finish_reason
+                reasoning = delta.reasoning_content
                 if reasoning:
                     yield AgentEvent(type="reasoning", content=reasoning, reasoning_source=reasoning_source)
-                if choice.delta.content:
-                    emitted_content = emitted_content or bool(choice.delta.content.strip())
-                    yield AgentEvent(type="text", content=choice.delta.content)
-        if not emitted_content:
-            metrics.record_agentic_event("synthesis_fallback")
-            synthesis_warnings.append(_SYNTHESIS_FALLBACK_WARNING)
-            yield AgentEvent(type="text", content="\n综合分析未返回有效内容。\n")
-            for result in results.values():
-                yield AgentEvent(
-                    type="text",
-                    content=f"\n### {result.display_name}\n{result.analysis}\n",
-                )
-        finish_warning = completion_warning(finish_reason or "stream_error")
-        if finish_warning:
-            if finish_reason == "length":
-                metrics.record_agentic_event("synthesis_output_truncated")
-            synthesis_warnings.insert(0, f"综合分析：{finish_warning}")
+                content = delta.content
+                if content:
+                    text = output_filter.feed(content)
+                    if text:
+                        published += text
+                        yield AgentEvent(type="text", content=text)
+    except asyncio.CancelledError:
+        # 已完成句子已交付，不把取消转成成功，也不重新执行综合模型。
+        raise
+    except (LLMRetryableError, LLMGenerationTimeoutError, TimeoutError):
+        synthesis_warnings.append(_SYNTHESIS_STREAM_INTERRUPTED_WARNING)
+        metrics.record_agentic_event("synthesis_stream_interrupted")
     except Exception as exc:
-        if isinstance(exc, LLMRetryableError) and emitted_content:
-            logger.warning(
-                "Agentic synthesis 流式响应中断，保留部分内容: error_type=%s",
-                type(exc).__name__,
-            )
-            metrics.record_agentic_event("synthesis_stream_interrupted")
-            synthesis_warnings.append(_SYNTHESIS_STREAM_INTERRUPTED_WARNING)
-        else:
-            if isinstance(exc, LLMRetryableError):
-                error_id, detail = build_internal_error("模型服务暂时不可用，请稍后重试")
-                logger.warning(
-                    "Agentic synthesis 临时失败 error_id=%s error_type=%s",
-                    error_id,
-                    type(exc).__name__,
-                )
-            else:
-                error_id, detail = log_internal_error(
-                    logger,
-                    "Agentic synthesis",
-                    exc,
-                    "综合分析生成失败",
-                )
-                # 账号/配置类错误（Key 无效、余额不足等）透出真实原因，
-                # 完整异常仍保留在日志供错误编号关联。
-                user_reason = describe_llm_account_error(exc)
-                if user_reason is not None:
-                    detail = f"{user_reason}（错误编号：{error_id}）"
-            metrics.record_agentic_event("synthesis_fallback")
-            synthesis_warnings.append(_SYNTHESIS_FALLBACK_WARNING)
-            yield AgentEvent(type="text", content=f"\n{detail}\n")
-            for result in results.values():
-                yield AgentEvent(
-                    type="text",
-                    content=f"\n### {result.display_name}\n{result.analysis}\n",
-                )
+        error_id, failure_detail = log_internal_error(logger, "Agentic synthesis", exc, "综合分析生成失败")
+        user_reason = describe_llm_account_error(exc)
+        if user_reason is not None:
+            failure_detail = f"{user_reason}（错误编号：{error_id}）"
+        synthesis_warnings.append(_SYNTHESIS_STREAM_INTERRUPTED_WARNING)
+
+    tail = output_filter.flush()
+    if tail:
+        published += tail
+        yield AgentEvent(type="text", content=tail)
+    if has_tool_call_markup(normalizer.finish().content) or normalizer.finish().tool_calls:
+        synthesis_warnings.append("综合分析输出了未执行的工具调用标记，已移除；结论仅基于已有证据")
+    finish_warning = completion_warning(finish_reason or "stream_error")
+    if finish_warning:
+        if finish_reason == "length":
+            metrics.record_agentic_event("synthesis_output_truncated")
+        synthesis_warnings.insert(0, f"综合分析：{finish_warning}")
+    if not clean_answer(published):
+        metrics.record_agentic_event("synthesis_fallback")
+        synthesis_warnings.append(_SYNTHESIS_FALLBACK_WARNING)
+        if failure_detail:
+            yield AgentEvent(type="text", content=f"\n{failure_detail}\n")
+        for result in results.values():
+            text = clean_answer(result.analysis) if result.status != "failed" else ""
+            if text:
+                published += text
+                yield AgentEvent(type="text", content=f"\n### {result.display_name}\n{text}\n")
+        if not clean_answer(published):
+            yield AgentEvent(type="error", error="综合分析未生成有效结论，且没有可保留的有效分析")
+            yield AgentEvent(type="done", status="failed", warnings=list(dict.fromkeys(synthesis_warnings + warnings)))
+            return
 
     bounded_warnings = list(dict.fromkeys([*synthesis_warnings, *warnings]))[:_MAX_SYNTHESIS_WARNINGS]
     status: Literal["completed", "partial"] = (

@@ -26,6 +26,30 @@ _DROPPED_RESULT = "null"
 _MIN_DROPPED_RESULT_LEN = len(_DROPPED_RESULT)
 
 
+# Collection envelopes must be judged by their actual records, not request
+# echoes, pagination counters or instructions describing how to use the tool.
+_RESULT_COLLECTIONS = frozenset({"results", "items", "rows"})
+_COLLECTION_METADATA = frozenset({
+    "query", "engine", "count", "total", "total_count", "page", "page_size", "page_number",
+    "offset", "limit", "has_more", "next_page", "next_cursor", "cursor", "columns",
+    "detail_hint", "message", "status", "code", "url", "source_url", "link", "source",
+    "time_range", "language", "fetched_at", "retrieved_at", "elapsed_ms", "meta", "metadata",
+})
+
+
+def _has_record_content(value: Any) -> bool:
+    if isinstance(value, dict):
+        if value.get("ok") is False or value.get("error"):
+            return False
+        if "data" in value:
+            return _has_record_content(value["data"])
+        return any(_has_record_content(item) for key, item in value.items()
+                   if key not in _COLLECTION_METADATA and key not in {"ok", "error"})
+    if isinstance(value, list):
+        return any(_has_record_content(item) for item in value)
+    return _has_meaningful_value(value)
+
+
 def _has_meaningful_value(value: Any) -> bool:
     if value is None:
         return False
@@ -47,6 +71,8 @@ def _has_meaningful_value(value: Any) -> bool:
                 for key, item in value.items()
                 if key not in {"ok", "error", "meta"}
             )
+        if _RESULT_COLLECTIONS.intersection(value):
+            return _has_record_content(value)
         return any(_has_meaningful_value(item) for item in value.values())
     return bool(str(value).strip())
 

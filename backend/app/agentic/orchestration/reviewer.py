@@ -14,15 +14,11 @@ from app.agentic.orchestration.contracts import (
 
 def is_usable_task_result(task: AgentTask, result: AgentExecutionResult | None) -> bool:
     """只有具有正文和计划要求证据的结果才可作为依赖上下文。"""
-    return bool(
-        result is not None
-        and result.status != "failed"
-        and result.analysis.strip()
-        and (not task.allowed_tools or result.tools_called)
-        and (not result.tool_results or any(not item.is_error for item in result.tool_results))
-        # 全部被跳过的任务没有任何有效证据，不能当依赖上下文注入下游。
-        and not all(item.skipped for item in result.tool_results)
-    )
+    if result is None or result.outcome.status == "failed" or not result.analysis.strip():
+        return False
+    if not task.allowed_tools:
+        return True
+    return bool(result.tools_called and result.has_context_evidence)
 
 
 def review_execution_plan(
@@ -32,53 +28,43 @@ def review_execution_plan(
     issues: list[PlanIssue] = []
     retry_task_ids: list[str] = []
 
-    def add_retry(task_id: str, reason: str) -> None:
-        issues.append(PlanIssue(task_id=task_id, reason=reason, retryable=True))
-        retry_task_ids.append(task_id)
+    def add_issue(task_id: str, reason: str, *, retryable: bool) -> None:
+        issues.append(PlanIssue(task_id=task_id, reason=reason, retryable=retryable))
+        if retryable:
+            retry_task_ids.append(task_id)
 
     for task in plan.tasks:
         result = results.get(task.agent_name)
         if result is None:
-            add_retry(task.task_id, "任务没有返回结果")
+            add_issue(task.task_id, "任务没有返回结果", retryable=True)
             continue
-        if result.status == "failed":
-            if result.retryable:
-                add_retry(task.task_id, "任务执行失败")
+        outcome = result.outcome
+        if outcome.reason.fatal:
+            add_issue(task.task_id, outcome.reason.description, retryable=False)
+            continue
+        # Retryability only controls replay. It must never suppress a coverage
+        # issue, nor turn a failed result into a usable dependency.
+        if outcome.status == "failed":
+            add_issue(task.task_id, "任务执行失败" if result.retryable else "任务执行失败，当前错误不可通过重试恢复",
+                      retryable=result.retryable)
+            continue
+        if task.allowed_tools and not is_usable_task_result(task, result):
+            if not result.tools_called:
+                reason = "任务未调用计划要求的数据工具"
+            elif result.tool_results and all(item.is_error for item in result.tool_results):
+                reason = "任务的工具调用全部失败"
+            elif result.tool_results and all(item.skipped for item in result.tool_results):
+                reason = "任务的工具调用全部被跳过（预算不足或重复），未取得有效证据"
             else:
-                issues.append(
-                    PlanIssue(
-                        task_id=task.task_id,
-                        reason="任务执行失败，当前错误不可通过重试恢复",
-                        retryable=False,
-                    )
-                )
+                reason = "工具结果未形成可用于分析的上下文证据"
+            add_issue(task.task_id, reason, retryable=result.retryable)
             continue
-        if not result.retryable:
-            if result.status == "partial":
-                issues.append(PlanIssue(task_id=task.task_id, reason="模型输出中断，将保留已有分析", retryable=False))
-            continue
-        if not result.analysis.strip():
-            add_retry(task.task_id, "任务没有生成有效分析")
-            continue
-        if task.allowed_tools and not result.tools_called:
-            add_retry(task.task_id, "任务未调用计划要求的数据工具")
-            continue
-        if result.tool_results and all(item.is_error for item in result.tool_results):
-            add_retry(task.task_id, "任务的工具调用全部失败")
-            continue
-        if result.tool_results and all(item.skipped for item in result.tool_results):
-            # 预算拒绝/去重不算「工具失败」，但同样意味着这次任务零证据：必须让
-            # Reviewer 看见，否则一次什么都没取到的分析会被判为可用。
-            add_retry(task.task_id, "任务的工具调用全部被跳过（预算不足或重复），未取得有效证据")
-            continue
-        if result.status == "partial":
-            issues.append(
-                PlanIssue(
-                    task_id=task.task_id,
-                    reason="任务部分完成，将保留已有分析",
-                    retryable=False,
-                )
-            )
+        # Cached/replayed tool results with genuine context evidence are usable,
+        # even if every summary has skipped=True. No redundant research replay.
+        if outcome.status == "partial":
+            reason = (f"{outcome.reason.description}，将保留已有分析" if outcome.reason.code not in {"", "stop"}
+                      else "任务部分完成，将保留已有分析")
+            add_issue(task.task_id, reason, retryable=False)
 
     return PlanReview(
         issues=tuple(issues),

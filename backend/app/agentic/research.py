@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any, AsyncContextManager, Protocol
 from zoneinfo import ZoneInfo
@@ -14,7 +14,9 @@ from app.agentic.contracts import (
     AgenticResearchResult,
     AgentResearchSpec,
     AgentRoundResult,
+    EvidenceBatchStats,
     EvidenceRequirement,
+    classify_evidence_batch,
     render_agent_evidence,
 )
 from app.agentic.events import (
@@ -25,7 +27,8 @@ from app.agentic.events import (
     AgentResearchRound,
     auditable_agent_event,
 )
-from app.agentic.tools.serialization import has_meaningful_tool_content
+from app.agentic.semantics import EvidenceState, ExecutionOutcome
+from app.infrastructure.llm.adapters import LLMInvalidResponseError
 
 AgentEventCallback = Callable[[AgentEvent], Awaitable[None]]
 _MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
@@ -168,17 +171,17 @@ async def _run_round(
     tool_call_reserve: int = 0,
 ) -> AgentRoundResult:
     if event_callback is None:
-        return await session.run(
-            message,
-            allowed_tool_names,
-            tool_call_reserve=tool_call_reserve,
-        )
-    return await session.run(
-        message,
-        allowed_tool_names,
-        event_callback=event_callback,
-        tool_call_reserve=tool_call_reserve,
-    )
+        result = await session.run(message, allowed_tool_names, tool_call_reserve=tool_call_reserve)
+    else:
+        result = await session.run(message, allowed_tool_names, event_callback=event_callback, tool_call_reserve=tool_call_reserve)
+    # The pluggable Runtime interface must enforce the same boundary as the
+    # default adapter: status flags cannot override a fatal or unknown reason.
+    outcome = result.outcome
+    if outcome.reason.fatal:
+        raise LLMInvalidResponseError(f"Agent 调研停止：{outcome.reason.description}（reason={outcome.reason.code}）")
+    if result.execution_status == "failed" or outcome.status == "failed" or result.stop_reason:
+        result = replace(result, summary="")
+    return result
 
 
 @dataclass(slots=True)
@@ -190,6 +193,7 @@ class _ResearchProgress:
     requirements_by_tool: dict[str, tuple[EvidenceRequirement, ...]] = field(init=False)
     tool_arguments: dict[str, str] = field(init=False)
     audit_events: list[AgentEvent] = field(init=False)
+    seen_evidence_ids: set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
         self.step_status = {
@@ -253,7 +257,7 @@ class _ResearchProgress:
         # Private evidence sink before redaction; the public event callback stays metadata-only.
         if self.evidence_callback is not None and event.type == "tool_result" and event.tool_result is not None:
             tool_result = event.tool_result
-            if tool_result.is_error or has_meaningful_tool_content(tool_result.content):
+            if tool_result.is_error or EvidenceState.from_content(tool_result.content, is_error=tool_result.is_error).usable_acquisition:
                 self.evidence_callback(AgentEvidence(
                     tool_call_id=tool_result.tool_call_id, tool_name=tool_result.name,
                     arguments=self.tool_arguments.get(tool_result.tool_call_id, "{}"),
@@ -263,8 +267,7 @@ class _ResearchProgress:
         if (
             event.type == "tool_result"
             and event.tool_result is not None
-            and not event.tool_result.is_error
-            and has_meaningful_tool_content(event.tool_result.content)
+            and EvidenceState.from_content(event.tool_result.content, is_error=event.tool_result.is_error).usable_acquisition
         ):
             tool_name = event.tool_result.name
             candidate = AgentEvidence(
@@ -331,11 +334,13 @@ async def _collect_round_result(
     evidence: list[AgentEvidence],
     summaries: list[str],
     progress: _ResearchProgress,
-) -> None:
+) -> EvidenceBatchStats:
+    stats = classify_evidence_batch(result.evidence, seen_ids=progress.seen_evidence_ids)
     evidence.extend(result.evidence)
     await progress.sync_completed_steps(evidence)
     if result.summary.strip():
         summaries.append(result.summary.strip())
+    return stats
 
 
 def _round_objective(
@@ -358,13 +363,13 @@ def _round_tool_selection_reason(
     return f"仅选择可覆盖{labels}的工具，避免重复首轮已完成的检索"
 
 
-def _round_evidence_added(result: AgentRoundResult) -> list[str]:
-    counts = Counter(item.tool_name for item in result.evidence)
-    return [f"{tool_name}：{count} 条" for tool_name, count in counts.items()]
+def _round_evidence_added(stats: EvidenceBatchStats) -> list[str]:
+    counts = Counter(item.tool_name for item in stats.added)
+    return [f"{tool_name}：{count} 条新增有效证据" for tool_name, count in counts.items()]
 
 
 def _round_judgment_basis(
-    result: AgentRoundResult,
+    stats: EvidenceBatchStats,
     missing_before: list[EvidenceRequirement],
     missing_after: list[EvidenceRequirement],
 ) -> list[str]:
@@ -372,7 +377,10 @@ def _round_judgment_basis(
     satisfied = [
         item.label for item in missing_before if item.key not in missing_after_keys
     ]
-    basis = [f"本轮新增 {len(result.evidence)} 条有效工具证据"]
+    basis = [
+        f"本轮新增 {len(stats.added)} 条有效工具证据（按证据 ID 去重，不代表独立来源或已核实结论数量）",
+        f"本轮证据记录：重复 {stats.duplicate_count} 条、失败 {stats.failed_count} 条、空/控制结果 {stats.unusable_count} 条；这些不计为新增有效证据",
+    ]
     if satisfied:
         basis.append(f"本轮满足证据维度：{'、'.join(satisfied)}")
     if missing_after:
@@ -431,6 +439,7 @@ async def _emit_round_completed(
     *,
     can_continue: bool,
     made_progress: bool,
+    evidence_stats: EvidenceBatchStats,
 ) -> None:
     exhausted = result.tool_calls_remaining == 0 and bool(missing_after)
     budget_note = "本阶段工具额度已耗尽，保留证据与缺口并结束；不再启动无工具额度的调研轮次。" if exhausted else ""
@@ -439,13 +448,13 @@ async def _emit_round_completed(
         research_round=started.model_copy(update={
             "status": (
                 "completed"
-                if not result.stop_reason and not exhausted and (not missing_after or (can_continue and made_progress))
+                if result.outcome.status == "completed" and not result.stop_reason and not exhausted and (not missing_after or (can_continue and made_progress))
                 else "degraded"
             ),
             "evidence_gaps": [item.label for item in missing_after] + ([result.stop_reason] if result.stop_reason else []),
-            "evidence_added": _round_evidence_added(result),
-            "judgment_basis": [result.stop_reason] if result.stop_reason else _round_judgment_basis(
-                result, missing_before, missing_after
+            "evidence_added": _round_evidence_added(evidence_stats),
+            "judgment_basis": ([result.stop_reason] if result.stop_reason else []) + _round_judgment_basis(
+                evidence_stats, missing_before, missing_after
             ),
             "conclusion": (result.stop_reason or result.summary.strip())[:2000],
             "next_step": result.stop_reason or budget_note or _round_next_step(
@@ -467,6 +476,7 @@ async def run_agentic_research(
 ) -> AgenticResearchResult:
     evidence: list[AgentEvidence] = []
     summaries: list[str] = []
+    round_outcomes: list[ExecutionOutcome] = []
     progress = _ResearchProgress(spec, event_callback, evidence_callback)
     await progress.start()
     round_callback = progress.forward_event
@@ -489,7 +499,8 @@ async def run_agentic_research(
             round_callback,
             tool_call_reserve=_FOLLOWUP_TOOL_CALL_RESERVE if max_rounds > 1 else 0,
         )
-        await _collect_round_result(last_result, evidence, summaries, progress)
+        round_outcomes.append(last_result.outcome)
+        evidence_stats = await _collect_round_result(last_result, evidence, summaries, progress)
 
         stop_reason = last_result.stop_reason
         missing = _missing_requirements(spec.requirements, evidence)
@@ -500,7 +511,8 @@ async def run_agentic_research(
             initial_requirements,
             missing,
             can_continue=bool(missing and max_rounds > 1 and not stop_reason and last_result.tool_calls_remaining != 0),
-            made_progress=bool(last_result.evidence),
+            made_progress=bool(evidence_stats.added),
+            evidence_stats=evidence_stats,
         )
         current_round = 2
 
@@ -535,7 +547,8 @@ async def run_agentic_research(
                 # rather than locking the same last eight slots in every round.
                 tool_call_reserve=0,
             )
-            await _collect_round_result(gap_result, evidence, summaries, progress)
+            round_outcomes.append(gap_result.outcome)
+            evidence_stats = await _collect_round_result(gap_result, evidence, summaries, progress)
             last_result = gap_result
             stop_reason = gap_result.stop_reason
             missing = _missing_requirements(spec.requirements, evidence)
@@ -551,9 +564,10 @@ async def run_agentic_research(
                 missing,
                 can_continue=can_continue,
                 made_progress=made_progress,
+                evidence_stats=evidence_stats,
             )
 
-            # 若本轮未获取到任何新的补充证据，说明剩余维度无法通过现有工具继续获取，适时停止避免空转
+            # 新增数据条数不代表缺口缩小；未满足新的证据要求时停止，避免重复或无关材料驱动空转。
             if not made_progress:
                 break
             current_round += 1
@@ -573,7 +587,7 @@ async def run_agentic_research(
         # 文案 + 公共数据继续合成，本轮读到的几十条正文/财报就全部作废了。
         raise AgentEvidenceInsufficientError(
             f"Agent 调研证据不足：{labels}",
-            summary=last_result.summary,
+            summary="\n\n".join(summaries)[:MAX_AGENT_SUMMARY_LENGTH],
             evidence=evidence,
         )
     if missing:
@@ -585,12 +599,27 @@ async def run_agentic_research(
             ),
         ))
 
-    await progress.emit(AgentEvent(type="done"))
-
-    return AgenticResearchResult(
+    # Summaries are accumulated across rounds, so their incomplete status must
+    # also accumulate. A healthy final round cannot repair earlier retained prose.
+    incomplete_rounds = [(i, outcome) for i, outcome in enumerate(round_outcomes, 1) if outcome.status != "completed"]
+    execution_gaps: tuple[str, ...] = ()
+    if incomplete_rounds:
+        details = "、".join(
+            f"第{i}轮：{outcome.reason.description if outcome.reason.code not in {'', 'stop'} else '未完整完成'}"
+            for i, outcome in incomplete_rounds[:8]
+        )
+        execution_gaps = (f"部分调研轮次未完整完成（{details}）；已保留有效证据与分析，结论仍受限",)
+    terminal_reason = last_result.outcome.reason.code
+    if terminal_reason in {"", "stop"}:
+        terminal_reason = next((outcome.reason.code for _, outcome in incomplete_rounds
+                                if outcome.reason.code not in {"", "stop"}), terminal_reason)
+    result = AgenticResearchResult(
         summary="\n\n".join(summaries)[:MAX_AGENT_SUMMARY_LENGTH],
         evidence=tuple(evidence),
-        evidence_gaps=tuple(item.label for item in missing) + ((stop_reason,) if stop_reason else ()),
-        execution_trace=tuple(progress.audit_events),
+        evidence_gaps=tuple(item.label for item in missing) + ((stop_reason,) if stop_reason else ()) + execution_gaps,
         stopped_early=bool(stop_reason),
+        termination_reason=terminal_reason,
+        execution_status="partial" if incomplete_rounds else last_result.outcome.status,
     )
+    await progress.emit(AgentEvent(type="done", status=result.outcome.status))
+    return replace(result, execution_status=result.outcome.status, execution_trace=tuple(progress.audit_events))

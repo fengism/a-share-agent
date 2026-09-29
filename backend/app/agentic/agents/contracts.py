@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
+
+from app.agentic.semantics import EvidenceState, ExecutionOutcome, ExecutionStatus, result_status, stop_reason
 
 if TYPE_CHECKING:
     from app.agentic.orchestration.opinions import AgentOpinion
@@ -43,6 +45,11 @@ class ToolExecutionSummary:
     # Reviewer 的 any(not is_error) / all(is_error) 两个判定都看不到它，一次零有效
     # 证据的任务会被当成 usable 注入下游。
     skipped: bool = False
+    failure_code: str = ""  # Allowlisted category only; no raw provider details.
+
+    @property
+    def evidence_state(self) -> EvidenceState:
+        return EvidenceState(self.has_evidence, self.context_has_evidence, self.is_error, self.skipped)
 
 
 @dataclass(slots=True)
@@ -50,7 +57,7 @@ class AgentExecutionResult:
     agent_name: str
     display_name: str
     analysis: str
-    status: Literal["completed", "partial", "failed"] = "completed"
+    status: ExecutionStatus = "completed"
     tools_called: list[str] = field(default_factory=list)
     tool_results: list[ToolExecutionSummary] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
@@ -60,3 +67,21 @@ class AgentExecutionResult:
     opinion: "AgentOpinion | None" = None
     retryable: bool = True
     termination_reason: str = ""  # Sanitized code, never a provider error body.
+
+    @property
+    def has_context_evidence(self) -> bool:
+        return any(item.evidence_state.usable_context for item in self.tool_results)
+
+    @property
+    def outcome(self) -> ExecutionOutcome:
+        reason = stop_reason(self.termination_reason)
+        has_output = bool(self.analysis.strip())
+        status = result_status(
+            has_output=has_output,
+            failed=self.status == "failed" or reason.fatal,
+            incomplete=self.status == "partial" or reason.retain_acquired_evidence or bool(self.errors or self.warnings),
+        )
+        return ExecutionOutcome(
+            status, reason, has_output,
+            any(item.evidence_state.usable_acquisition for item in self.tool_results),
+        )
