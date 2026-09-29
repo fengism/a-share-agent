@@ -10,6 +10,16 @@ on:
       - "sandbox/**"
       - "docker-compose.yml"
       - ".github/workflows/docker-publish.yml"
+      - "scripts/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "sandbox/**"
+      - "docker-compose.yml"
+      - ".github/workflows/docker-publish.yml"
+      - "scripts/**"
   workflow_dispatch:
 
 concurrency:
@@ -26,7 +36,16 @@ env:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -50,6 +69,10 @@ jobs:
           uv run --frozen ruff check app ../sandbox
           uv run --frozen mypy
           uv run --frozen mypy ../sandbox
+
+      - name: Install native Chromium for rendering tests
+        working-directory: backend
+        run: uv run --frozen patchright install --with-deps --no-shell chromium
 
       - name: Test backend
         working-directory: backend
@@ -75,9 +98,18 @@ jobs:
 
   backend:
     needs: verify
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     outputs:
-      digest: ${{ steps.build.outputs.digest }}
       version: ${{ steps.app-version.outputs.version }}
       release-marker: ${{ steps.app-version.outputs.release-marker }}
     steps:
@@ -111,21 +143,74 @@ jobs:
       - id: build
         uses: docker/build-push-action@v6
         with:
+          platforms: linux/${{ matrix.arch }}
           context: ./backend
           outputs: type=image,name=${{ env.BACKEND_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=backend-${{ matrix.arch }}
           build-args: |
             APP_UID=1000
             APP_GID=1000
             APP_VERSION=${{ steps.app-version.outputs.version }}
             APP_REVISION=${{ github.sha }}
 
+      - name: Smoke-test native image before promotion
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          case "$(uname -m)" in
+            x86_64) host_arch=amd64 ;;
+            aarch64|arm64) host_arch=arm64 ;;
+            *) echo "Unsupported runner architecture" >&2; exit 1 ;;
+          esac
+          test "$host_arch" = "$EXPECTED_ARCH"
+          image="$BACKEND_IMAGE@$IMAGE_DIGEST"
+          docker pull "$image"
+          test "$(docker image inspect --format '{{.Architecture}}' "$image")" = "$EXPECTED_ARCH"
+          docker run --rm --network none --read-only --memory=2g --init \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --tmpfs /tmp:rw,size=512m,mode=1777 \
+            --tmpfs /app/data:rw,size=128m,uid=1000,gid=1000,mode=0700 \
+            --tmpfs /app/logs:rw,size=32m,uid=1000,gid=1000,mode=0700 \
+            -e PYTHONPATH=/app -e EXPECTED_ARCH="$EXPECTED_ARCH" -e VERIFY_NO_HEADLESS_SHELL=1 \
+            --entrypoint python "$image" scripts/verify_browser_runtime.py
+          docker run --rm --network none --read-only --memory=2g --init \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --tmpfs /tmp:rw,size=512m,mode=1777 \
+            --tmpfs /app/data:rw,size=128m,uid=1000,gid=1000,mode=0700 \
+            --tmpfs /app/logs:rw,size=32m,uid=1000,gid=1000,mode=0700 \
+            -e APP_DATA_DIR=/app/data -e PYTHONPATH=/app -e HTTP_TRUST_ENV=false \
+            --entrypoint python "$image" scripts/verify_application_runtime.py
+
+      - name: Export tested digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          printf '%s' "$DIGEST" > "$RUNNER_TEMP/digests/$ARCH"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-backend-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          retention-days: 1
+          if-no-files-found: error
+
   frontend:
     needs: verify
-    runs-on: ubuntu-latest
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -139,16 +224,57 @@ jobs:
       - id: build
         uses: docker/build-push-action@v6
         with:
+          platforms: linux/${{ matrix.arch }}
           context: ./frontend
           outputs: type=image,name=${{ env.FRONTEND_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=frontend-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=frontend-${{ matrix.arch }}
+
+      - name: Smoke-test native image before promotion
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          case "$(uname -m)" in
+            x86_64) host_arch=amd64 ;;
+            aarch64|arm64) host_arch=arm64 ;;
+            *) echo "Unsupported runner architecture" >&2; exit 1 ;;
+          esac
+          test "$host_arch" = "$EXPECTED_ARCH"
+          image="$FRONTEND_IMAGE@$IMAGE_DIGEST"
+          docker pull "$image"
+          test "$(docker image inspect --format '{{.Architecture}}' "$image")" = "$EXPECTED_ARCH"
+          docker run --rm --network none --read-only --tmpfs /tmp:rw,mode=1777 \
+            --add-host backend:127.0.0.1 --entrypoint nginx "$image" -t
+
+      - name: Export tested digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          printf '%s' "$DIGEST" > "$RUNNER_TEMP/digests/$ARCH"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-frontend-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          retention-days: 1
+          if-no-files-found: error
 
   python-runner:
     needs: verify
-    runs-on: ubuntu-latest
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -162,17 +288,58 @@ jobs:
       - id: build
         uses: docker/build-push-action@v6
         with:
+          platforms: linux/${{ matrix.arch }}
           context: ./sandbox
           target: runner
           outputs: type=image,name=${{ env.PYTHON_RUNNER_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=python-runner
-          cache-to: type=gha,mode=max,scope=python-runner
+          cache-from: type=gha,scope=python-runner-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=python-runner-${{ matrix.arch }}
+
+      - name: Smoke-test native image before promotion
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          case "$(uname -m)" in
+            x86_64) host_arch=amd64 ;;
+            aarch64|arm64) host_arch=arm64 ;;
+            *) echo "Unsupported runner architecture" >&2; exit 1 ;;
+          esac
+          test "$host_arch" = "$EXPECTED_ARCH"
+          image="$PYTHON_RUNNER_IMAGE@$IMAGE_DIGEST"
+          docker pull "$image"
+          test "$(docker image inspect --format '{{.Architecture}}' "$image")" = "$EXPECTED_ARCH"
+          docker run --rm --network none --entrypoint python "$image" \
+            -c 'import runner, subprocess; subprocess.run(["docker", "--version"], check=True)'
+
+      - name: Export tested digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          printf '%s' "$DIGEST" > "$RUNNER_TEMP/digests/$ARCH"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-python-runner-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          retention-days: 1
+          if-no-files-found: error
 
   python-sandbox:
     needs: verify
-    runs-on: ubuntu-latest
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -186,14 +353,89 @@ jobs:
       - id: build
         uses: docker/build-push-action@v6
         with:
+          platforms: linux/${{ matrix.arch }}
           context: ./sandbox
           target: worker
           outputs: type=image,name=${{ env.PYTHON_SANDBOX_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=python-sandbox
-          cache-to: type=gha,mode=max,scope=python-sandbox
+          cache-from: type=gha,scope=python-sandbox-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=python-sandbox-${{ matrix.arch }}
+
+      - name: Smoke-test native image before promotion
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          case "$(uname -m)" in
+            x86_64) host_arch=amd64 ;;
+            aarch64|arm64) host_arch=arm64 ;;
+            *) echo "Unsupported runner architecture" >&2; exit 1 ;;
+          esac
+          test "$host_arch" = "$EXPECTED_ARCH"
+          image="$PYTHON_SANDBOX_IMAGE@$IMAGE_DIGEST"
+          docker pull "$image"
+          test "$(docker image inspect --format '{{.Architecture}}' "$image")" = "$EXPECTED_ARCH"
+          docker run --rm --network none --read-only --tmpfs /tmp:rw,mode=1777 \
+            --entrypoint python "$image" -c 'import numpy, pandas; assert numpy.array([1, 2]).sum() == 3'
+
+      - name: Export tested digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          printf '%s' "$DIGEST" > "$RUNNER_TEMP/digests/$ARCH"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-python-sandbox-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          retention-days: 1
+          if-no-files-found: error
+
+  sandbox-integration:
+    needs: [python-runner, python-sandbox]
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: digests-python-runner-${{ matrix.arch }}
+          path: ${{ runner.temp }}/runner
+      - uses: actions/download-artifact@v4
+        with:
+          name: digests-python-sandbox-${{ matrix.arch }}
+          path: ${{ runner.temp }}/worker
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Execute real sandbox jobs on native daemon
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          runner_image="$PYTHON_RUNNER_IMAGE@$(cat "$RUNNER_TEMP/runner/$ARCH")"
+          worker_image="$PYTHON_SANDBOX_IMAGE@$(cat "$RUNNER_TEMP/worker/$ARCH")"
+          docker pull "$runner_image"
+          docker pull "$worker_image"
+          docker run --rm --read-only --init --memory=256m --pids-limit=64 \
+            --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp:size=16m,mode=1777 \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -e PYTHON_SANDBOX_TOKEN=ci-only-not-a-production-secret-0000 \
+            -e PYTHON_SANDBOX_IMAGE="$worker_image" \
+            --entrypoint python "$runner_image" /opt/verify_runtime.py
 
   publish:
-    needs: [backend, frontend, python-runner, python-sandbox]
+    needs: [backend, frontend, python-runner, python-sandbox, sandbox-integration]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: docker/setup-buildx-action@v3
@@ -202,6 +444,92 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digests-backend-*
+          path: ${{ runner.temp }}/digests/backend
+          merge-multiple: true
+
+      - name: Assemble tested backend multi-arch index
+        id: backend-index
+        run: |
+          amd64=$(cat "$RUNNER_TEMP/digests/backend/amd64")
+          arm64=$(cat "$RUNNER_TEMP/digests/backend/arm64")
+          [[ "$amd64" =~ ^sha256:[0-9a-f]{64}$ && "$arm64" =~ ^sha256:[0-9a-f]{64}$ ]]
+          # Run-scoped staging tag; stable aliases are promoted only after all indexes validate.
+          staging="$BACKEND_IMAGE:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker buildx imagetools create --tag "$staging" "$BACKEND_IMAGE@$amd64" "$BACKEND_IMAGE@$arm64"
+          docker buildx imagetools inspect --raw "$staging" > "$RUNNER_TEMP/backend-index.json"
+          python scripts/verify_image_index.py "$RUNNER_TEMP/backend-index.json"
+          digest=$(docker buildx imagetools inspect "$staging" --format '{{json .Manifest}}' | jq -r '.digest')
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digests-frontend-*
+          path: ${{ runner.temp }}/digests/frontend
+          merge-multiple: true
+
+      - name: Assemble tested frontend multi-arch index
+        id: frontend-index
+        run: |
+          amd64=$(cat "$RUNNER_TEMP/digests/frontend/amd64")
+          arm64=$(cat "$RUNNER_TEMP/digests/frontend/arm64")
+          [[ "$amd64" =~ ^sha256:[0-9a-f]{64}$ && "$arm64" =~ ^sha256:[0-9a-f]{64}$ ]]
+          # Run-scoped staging tag; stable aliases are promoted only after all indexes validate.
+          staging="$FRONTEND_IMAGE:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker buildx imagetools create --tag "$staging" "$FRONTEND_IMAGE@$amd64" "$FRONTEND_IMAGE@$arm64"
+          docker buildx imagetools inspect --raw "$staging" > "$RUNNER_TEMP/frontend-index.json"
+          python scripts/verify_image_index.py "$RUNNER_TEMP/frontend-index.json"
+          digest=$(docker buildx imagetools inspect "$staging" --format '{{json .Manifest}}' | jq -r '.digest')
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digests-python-runner-*
+          path: ${{ runner.temp }}/digests/python-runner
+          merge-multiple: true
+
+      - name: Assemble tested python-runner multi-arch index
+        id: python-runner-index
+        run: |
+          amd64=$(cat "$RUNNER_TEMP/digests/python-runner/amd64")
+          arm64=$(cat "$RUNNER_TEMP/digests/python-runner/arm64")
+          [[ "$amd64" =~ ^sha256:[0-9a-f]{64}$ && "$arm64" =~ ^sha256:[0-9a-f]{64}$ ]]
+          # Run-scoped staging tag; stable aliases are promoted only after all indexes validate.
+          staging="$PYTHON_RUNNER_IMAGE:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker buildx imagetools create --tag "$staging" "$PYTHON_RUNNER_IMAGE@$amd64" "$PYTHON_RUNNER_IMAGE@$arm64"
+          docker buildx imagetools inspect --raw "$staging" > "$RUNNER_TEMP/python-runner-index.json"
+          python scripts/verify_image_index.py "$RUNNER_TEMP/python-runner-index.json"
+          digest=$(docker buildx imagetools inspect "$staging" --format '{{json .Manifest}}' | jq -r '.digest')
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digests-python-sandbox-*
+          path: ${{ runner.temp }}/digests/python-sandbox
+          merge-multiple: true
+
+      - name: Assemble tested python-sandbox multi-arch index
+        id: python-sandbox-index
+        run: |
+          amd64=$(cat "$RUNNER_TEMP/digests/python-sandbox/amd64")
+          arm64=$(cat "$RUNNER_TEMP/digests/python-sandbox/arm64")
+          [[ "$amd64" =~ ^sha256:[0-9a-f]{64}$ && "$arm64" =~ ^sha256:[0-9a-f]{64}$ ]]
+          # Run-scoped staging tag; stable aliases are promoted only after all indexes validate.
+          staging="$PYTHON_SANDBOX_IMAGE:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker buildx imagetools create --tag "$staging" "$PYTHON_SANDBOX_IMAGE@$amd64" "$PYTHON_SANDBOX_IMAGE@$arm64"
+          docker buildx imagetools inspect --raw "$staging" > "$RUNNER_TEMP/python-sandbox-index.json"
+          python scripts/verify_image_index.py "$RUNNER_TEMP/python-sandbox-index.json"
+          digest=$(docker buildx imagetools inspect "$staging" --format '{{json .Manifest}}' | jq -r '.digest')
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       - id: frontend-meta
         uses: docker/metadata-action@v5
@@ -238,7 +566,7 @@ jobs:
       - name: Promote frontend image
         shell: bash
         env:
-          DIGEST: ${{ needs.frontend.outputs.digest }}
+          DIGEST: ${{ steps.frontend-index.outputs.digest }}
           METADATA_JSON: ${{ steps.frontend-meta.outputs.json }}
         run: |
           tags=(--tag "$FRONTEND_IMAGE:sha-${GITHUB_SHA::7}")
@@ -250,7 +578,7 @@ jobs:
       - name: Promote python-runner image
         shell: bash
         env:
-          DIGEST: ${{ needs.python-runner.outputs.digest }}
+          DIGEST: ${{ steps.python-runner-index.outputs.digest }}
           METADATA_JSON: ${{ steps.python-runner-meta.outputs.json }}
         run: |
           tags=(--tag "$PYTHON_RUNNER_IMAGE:sha-${GITHUB_SHA::7}")
@@ -262,7 +590,7 @@ jobs:
       - name: Promote python-sandbox image
         shell: bash
         env:
-          DIGEST: ${{ needs.python-sandbox.outputs.digest }}
+          DIGEST: ${{ steps.python-sandbox-index.outputs.digest }}
           METADATA_JSON: ${{ steps.python-sandbox-meta.outputs.json }}
         run: |
           tags=(--tag "$PYTHON_SANDBOX_IMAGE:sha-${GITHUB_SHA::7}")
@@ -274,7 +602,7 @@ jobs:
       - name: Promote backend public aliases
         shell: bash
         env:
-          DIGEST: ${{ needs.backend.outputs.digest }}
+          DIGEST: ${{ steps.backend-index.outputs.digest }}
           METADATA_JSON: ${{ steps.backend-meta.outputs.json }}
         run: |
           tags=()
@@ -288,7 +616,7 @@ jobs:
       - name: Publish backend immutable image
         shell: bash
         env:
-          DIGEST: ${{ needs.backend.outputs.digest }}
+          DIGEST: ${{ steps.backend-index.outputs.digest }}
         run: |
           docker buildx imagetools create \
             --tag "$BACKEND_IMAGE:sha-${GITHUB_SHA::7}" \
@@ -298,7 +626,7 @@ jobs:
       - name: Publish complete release marker
         shell: bash
         env:
-          DIGEST: ${{ needs.backend.outputs.digest }}
+          DIGEST: ${{ steps.backend-index.outputs.digest }}
           RELEASE_MARKER: ${{ needs.backend.outputs.release-marker }}
         run: |
           docker buildx imagetools create \

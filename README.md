@@ -69,6 +69,71 @@ cp .env.example .env
 BACKEND_PORT=8100 FRONTEND_PORT=5174 make dev
 ```
 
+### Agentic 公共结果与证据语义
+
+`app/agentic/semantics.py` 是内部统一判定层，通过 `agentic.public` 暴露类型：
+
+- `EvidenceState`：区分取得有效数据（`usable_acquisition`）与数据进入模型上下文（`usable_context`）。
+  原始 Research 证据没有记录上下文可见性时为 `None`，不默认认为模型读过。缓存/重复结果仍可
+  是有效证据，但预算拒绝、空数据和工具错误不能因 `is_error=False` 就升级为证据。
+- `ExecutionOutcome`：统一 `completed/partial/failed` 视图和机器停止原因；现有 Chat 状态和
+  Research 的 `summary/evidence/evidence_gaps/stop_reason` 接口保留，新增内部字段不注入既有工具 payload。
+- `StopReason`：单一分类表供执行器、Chat 缺口报告、Research 适配器共用。未知停止原因按严格
+  失败处理；认证、权限、内容过滤等错误不允许走证据不足降级。
+- `retryable` 只控制是否重跑，不控制证据是否保留。Research 显式允许降级且已有有效原始数据时，
+  输出截断/断流/无效摘要可保留证据并停止后续调研，不把不完整摘要作为事实。
+
+跨层汇总也遵守同一状态：
+- Chat 不接受“status=completed 但停止原因为认证失败/内容过滤”的矛盾结果，也不会对其自动重跑。
+- Reviewer 无论能否重试都报告证据缺口；有效缓存复用不会误判为“全部跳过”。
+- Research 汇总保留各轮降级信息，最终 `done.status` 与返回结果一致。中间失败摘要不会进入
+  下一轮提示或最终摘要；缺少致命证据时异常携带各轮已保留的有效摘要和证据。
+- 任务进度以 `degraded` 表示部分完成，不再显示为全部完成。累计保留的不完整摘要即使最后一轮
+  正常结束也不会被升级为完整分析，原有 `evidence_gaps` 会携带轮次限制说明。
+
+Research 证据统计与上下文渲染也使用统一口径：
+- 轮次进度的“新增有效证据”只统计有效、且本次调研尚未见过的稳定证据 ID；重复、失败、
+  空/控制记录单独显示。该数量是收到的证据记录口径，不是工具执行次数、独立来源数或已验证结论数。
+- 原始 evidence 列表保留，便于审计；模型上下文视图过滤无效记录并按稳定 ID 去重，避免重复材料
+  挤占上下文预算。相同 URL 的不同正文、不同读取窗口仍保持独立，不按 URL 粗暴合并。
+- 自适应补证仍以 `EvidenceRequirement` 缺口缩小作为进展，不因抓到更多但不相关的页面而持续空转。
+
+模型请求超时也统一经过 transport：内部 `request_timeout` 只用于预算计算，在发给 OpenAI SDK /
+LiteLLM 前转换为它们支持的 `timeout`，且不会低于客户端默认读写上限。流式与非流式共用该语义，
+内部参数不得进入供应商请求。参数不兼容、鉴权或权限错误仍严格失败，不能因为已取得证据而
+掩盖；只有明确可恢复的截断、断流和总预算耗尽才允许保留证据降级。
+
+这些状态**不等于逐条结论已通过来源核验**；具体证据维度仍由业务 `EvidenceRequirement.validator`
+校验，“结论引用哪条证据”的更细粒度约束尚未由本轮引入。
+
+### Agentic 边界保护
+
+- 搜索/列表证据按 `results/items/rows` 中实际记录判断，查询回显、计数、分页和提示文本不能把空结果升级为证据；独立数值 0、布尔值及真实业务字段不受影响。
+- Research 在收集到工具证据后遇到明确超时或已归一化的临时传输故障，可在显式允许降级时返回证据与停止原因，不重试摘要。取消、SDK 参数错误、协议错误、严格模式及零证据仍失败。
+- 工具预留使用上下文绑定的一次性凭据，确认缓存/合并复用后只退款对应类别；实际执行或结果不确定的调用仍计费。搜索批次重置后，旧凭据退款不修改新批次的连续搜索计数。
+- 通用 Chat 的内部结果与最终 `done.status` 和多 Agent 一样使用公共 outcome；致命停止原因不再误显示成部分完成，失败方向意见不传递。
+
+### 对话分析覆盖与工具调用异常
+
+证据不足不再等于空白回答：如果本轮没有可用分析，Chat 会用固定模板返回取证进展、失败或
+缺失类别及下一步建议，不再额外调用模型。说明基于工具结果状态，不复制原始错误正文、
+工具参数、模型未核实结论或凭据。显示为“未形成可靠结论”，最终状态仍是 `failed`；
+该说明不写进 Agent 的 `analysis`、不生成方向意见、也不进入下游依赖或综合分析。
+部分维度有有效证据时继续返回已有分析并说明覆盖缺口。只有实际进入模型上下文的有效工具
+证据才可支撑需要工具的下游任务；无工具的纯推理任务不受这一条件限制。
+Reviewer 最多重跑一次；整体时间或工具预算耗尽后直接保留进展，不再执行无效重试。
+
+
+“分析覆盖限制”表示部分维度未完整完成，不代表该维度已查证或没有风险。
+如果模型把工具调用标记写进正文，执行器只会在工具仍可用时按允许列表执行；无法执行的
+标记不会被当成证据或最终结论。剩余时限允许时，最多补一次不带工具的结论生成，保留已有
+证据与缺口提示；补救后仍无有效正文则明确失败，不把“让我获取更多数据”作为有效分析。
+截断、过滤或断流不触发这次纠正。Agent 和多维度综合回答使用同一套输出过滤：正文按句
+检查后持续推送，剔除工具标记和明确的“让我获取数据”式过程描述。有效正文后混入工具标记时
+保留正文并提示不完整，不再为补救重跑模型；“让我查询，但公告已披露……”等混合句保留
+后半句事实/风险而非整句删除。超时保留有效部分，取消不继续执行或假报完成。
+综合回答不可用时退回已有有效维度分析，不能把工具标记标成完成。
+
 ### 后端日志
 
 本地后端日志位于 `logs/backend.log`。默认 `LOG_LEVEL=INFO`，每个普通 HTTP 请求只保留中间件的一条结构化日志（含 `request_id`、路径、状态码、耗时及用户 ID），不再额外输出 Uvicorn 的原始访问日志；Uvicorn 的启动、关闭和错误日志不受影响。
@@ -89,8 +154,8 @@ cp .env.example .env
 openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n'; echo
 
 # 2. 准备数据目录并启动
-# Linux 若当前用户不是 UID/GID 1000，可先执行：
-# export APP_UID=$(id -u) APP_GID=$(id -g)
+# 官方镜像以 UID/GID 1000:1000 运行，宿主机挂载目录须允许该身份读写。
+# APP_UID/APP_GID 仅在源码构建时改变镜像用户；拉取预构建镜像时仅 export 不会改用户。
 mkdir -p data logs
 docker compose up -d
 # 或者使用 Makefile: make docker-up
@@ -108,13 +173,46 @@ Docker Compose 只会从 `.env` 读取 `CONFIG_ENCRYPTION_KEY`，不会在首次
 
 启动后访问 `http://localhost:8080`。
 
+#### 启动时 HOME 目录 Permission denied
+
+后端以非 root 用户运行，`HOME=/app/data/home`，对应宿主机 `./data/home`。
+若旧版本启动在探测 `~/.local/lib/extra-libs/...` 时出现 `PermissionError`，说明当前用户无法
+访问该路径或某一级父目录，而不是证明缺少 Chromium 系统依赖。新版会跳过无法探测的**可选**
+补充库目录并记录警告；数据库、日志和缓存等必需目录仍须具备正确权限。
+
+在实际部署的 Compose 目录执行以下检查（即使 backend 持续重启，也可用一次性容器查看身份）：
+
+```bash
+sudo docker compose run --rm --no-deps --entrypoint id backend
+sudo namei -l ./data/home/.local/lib/extra-libs/usr/lib/x86_64-linux-gnu
+```
+
+`namei` 用于逐级查看权限，末尾可选目录不存在是正常情况。如果确认只有 `data/home` 及其内部
+目录的属主/权限不正确，可按以下方式修复；自建镜像须将 `1000:1000` 换成上述实际 UID/GID：
+
+```bash
+sudo mkdir -p ./data/home
+sudo chown -R 1000:1000 ./data/home
+sudo chmod -R u+rwX ./data/home
+sudo docker compose restart backend
+sudo docker compose logs --tail=100 backend
+```
+
+同时确认 `./data` 允许容器用户访问和写入；若 `namei` 显示其他父目录受限，应修复实际受限层级。
+不要通过 `chmod -R 777` 或让整个 backend 以 root 运行来绕过权限问题。
+
 #### 服务拓扑结构
 
 默认拓扑包含 4 个协同容器：
 - `backend`：FastAPI 后端主服务（运行 HTTP 接口、后台调度、量化与 Workflow 任务），仅在内部网络暴露，由 Nginx 反代；
-- `frontend`：Nginx 静态资源托管与反向代理，对外映射 `8080` 端口；
+- `frontend`：Nginx 静态资源托管与反向代理，对外映射 `8080` 端口，反向代理请求体上限 `70m` 支持 50 MiB 主数据文件导入；
 - `docker-socket-proxy`：隔离的 Docker Socket 代理（仅开放容器生命周期必要只读与重启接口，不直接暴露宿主机 socket 给业务容器）；
-- `updater`：在线版本更新执行器，轮询管理员触发的更新请求，按需拉取新镜像并平滑重建 `backend`/`frontend`。
+- `updater`：在线版本更新执行器，轮询管理员触发的更新请求，按需拉取新镜像并平滑重建 `backend`/`frontend`。支持拉取失败自动重试 3 次（间隔 15s）、单次 900s 超时保护及镜像无变化跳过重建。
+
+网络与环境统一配置：
+- 全局注入 `TZ="${TZ:-Asia/Shanghai}"` 时区环境变量，确保在不同宿主机与容器环境中日期基准与交易时间严格一致；
+- 容器内显式屏蔽宿主机代理变量注入，确需代理时按需通过 `host.docker.internal` 配置；
+- 数据卷挂载 `./data`（HOME 与持久化数据）及 `./logs`，非 root 用户运行，根文件系统保持只读（read-only）。
 
 可选服务（通过 Compose Profile 启用）：
 - `python-runner`（profile: `python-sandbox`）：隔离 Python 代码执行控制面；
@@ -123,9 +221,12 @@ Docker Compose 只会从 `.env` 读取 `CONFIG_ENCRYPTION_KEY`，不会在首次
 
 通达信数据由后端内置的统一 `tdxhub` 提供商（基于 `tdxhub-sdk`）直连获取，无独立 sidecar，全面整合行情、指数 K 线与 F10 资料。如端口冲突，可在 `.env` 中设置 `DOCKER_FRONTEND_PORT=8081`，再访问对应端口。
 
-#### Docker Hub 自动发布
+#### Docker Hub 自动发布与 CI 流程
 
-仓库内置 GitHub Actions 工作流 [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)：push 到 `main`、推送 `v*` 版本标签或手动触发时，自动构建并发布镜像到 Docker Hub（PR 只构建验证、不推送）。
+仓库内置 GitHub Actions 统一工作流 [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)：
+
+- **Pull Request 验证**：任何针对 `main` 分支的 PR 会触发双架构（amd64 与 arm64）的 `verify` 任务，自动运行全量 Lint（Ruff、Mypy）、后端单元测试（pytest）、前端测试（Vitest）、前端静态分析与构建（ESLint、Vite build）以及 OpenAPI 契约检查（`npm run api:check`），确保变更符合质量门禁，**PR 阶段不推送任何镜像**。
+- **发布构建**：push 到 `main` 分支、推送 `v*` 版本标签或手动 `workflow_dispatch` 触发时，在 `verify` 通过后由原生 runner 构建多架构镜像，并严格经过容器冒烟自检（真实环境运行应用、浏览器与沙箱）后组装多架构 Index 并发布到 Docker Hub。
 
 - 产物镜像（默认命名空间 `fengliu1989`）：
   - `fengliu1989/a-share-backend`
@@ -133,8 +234,85 @@ Docker Compose 只会从 `.env` 读取 `CONFIG_ENCRYPTION_KEY`，不会在首次
   - `fengliu1989/a-share-python-runner`
   - `fengliu1989/a-share-python-sandbox`
 - 标签策略：`main` 分支发布 `:main` 与 `:sha-xxxxxxx`；语义版本发布 `:vX.Y.Z`、`:release-vX.Y.Z-sha-xxxxxxx`。
-- 启用前在 GitHub 仓库 Settings → Secrets and variables → Actions 配置 `DOCKERHUB_USERNAME`（Docker Hub 用户名）与 `DOCKERHUB_TOKEN`（Hub 访问令牌）。
-- 镜像构建 `linux/amd64`；服务器可直接 `docker compose up -d` 自动拉取已发布镜像启动，也可以执行 `docker compose up -d --build` 进行本地源码构建。
+- 启用发布前在 GitHub 仓库 Settings → Secrets and variables → Actions 配置 `DOCKERHUB_USERNAME`（Docker Hub 用户名）与 `DOCKERHUB_TOKEN`（Hub 访问令牌）。
+- 四个应用镜像均发布 `linux/amd64` + `linux/arm64` 的多架构标签；`aarch64` / `arm64` 对应同一 ARM64 目标，`x86_64` 对应 amd64。Docker 按宿主机自动选择，不需要修改镜像名。
+- CI 使用 `ubuntu-24.04` 与 `ubuntu-24.04-arm` 原生 runner，不通过 QEMU 构建或验证 Chromium。每个架构先跑测试，再验证实际镜像；两个架构均通过后才合并 manifest 并发布正式标签，release marker 仍最后发布。
+- 后端镜像验证覆盖 MiniRacer 初始化 / AkShare 调用兼容、Playwright / Patchright 实际 Node 驱动架构、三类 PDF，以及个股 / 复盘 / 产业链同步 PNG 和隔离子进程渲染。个股测试使用真实报告模板，并在非 root、只读根文件系统、2 GiB 内存限制下运行。
+- JavaScript 运行时统一锁定 `mini-racer==0.14.1`（包含 Linux x86_64 / aarch64 wheel），通过 `[tool.uv].override-dependencies` 排除 AkShare 引入的旧 `py-mini-racer` / `akracer`，避免覆盖相同的 `py_mini_racer` 模块。请使用 `uv sync --frozen` 安装，不要额外 `pip install akshare` 或安装旧运行时。
+
+#### 推送 PNG 时 QEMU / Playwright 驱动崩溃
+
+`sync_playwright().__enter__` 中 `_playwright` 属性缺失并伴随
+`Connection closed while reading from the driver`，意味着驱动握手未完成；若同时出现
+`x86_64-binfmt-P: QEMU internal SIGSEGV`，优先核查宿主机与镜像架构是否一致，而不是给
+Chromium 加参数（此时尚未进入 `chromium.launch`）。检查是否有 `platform: linux/amd64`、
+`DOCKER_DEFAULT_PLATFORM` 或 `PLAYWRIGHT_NODEJS_PATH` 覆盖。ARM 主机必须使用发布后的原生
+arm64 镜像；异常捕获只能让推送降级为无图，不能修复 QEMU 崩溃。
+
+`verify_browser_runtime.py` 现会实际运行两种 SDK 的 Node 驱动，随后在线程中验证三种 PNG
+渲染；失败直接阻断镜像发布，不经推送层的无图降级包装。测试使用固定行情和内置 ECharts，
+不访问行情源或发送飞书消息。推送行情加载超时单独记录为 `推送图表行情加载超时`，不与
+浏览器驱动崩溃混为一类。
+
+#### PDF 与 PNG 渲染资源保护
+
+个股、产业链、每日复盘 PDF 与推送 PNG 共用主事件循环的有界 FIFO 渲染队列：默认同时运行 1 个 Chromium，最多
+等待 4 个请求，排队和渲染共享 120 秒总时限。环境变量为 `PDF_MAX_CONCURRENCY`、
+`PDF_MAX_WAITERS`、`PDF_RENDER_TIMEOUT_SECONDS`；2GB 后端建议保持默认并发 1。
+队列满或超时返回可识别的 `pdf.queue_full` / `pdf.timeout` 错误，取消、超时及异常都会先清理
+浏览器和 Playwright 驱动再释放配额；初始化期间取消会先等待驱动就绪再关闭，避免对未就绪的 transport 提前清理。
+重复取消不会中断清理任务；清理额外最多等待 15 秒。若初始化持续卡住，队列隔离并返回
+`render.cleanup_failed`，后台仍会清理迟到的驱动，队列不会自行重新开放。多个 Uvicorn worker 会各自计数，
+扩容时需按 worker 数核算内存。网页抓取仍使用独立并发门限。生产推送 PNG 在一次性子进程运行同步 Playwright，
+输入、输出大小受限；每次任务为 Python/Node/Chromium 继承随机标识；即使 worker 崩溃、Chromium 被重新托管，
+清理仍按任务标识查找并终止进程组（不输出环境变量），完成后才释放配额。清理无法确认完成时
+暂停本进程的新渲染任务并立即唤醒排队请求、返回 `render.cleanup_failed`，需重启后端恢复。
+队列按到达顺序交接配额；排队中或刚获配额时取消均会归还名额，不允许新请求插队。
+PNG 异常允许降级为无图消息，但取消不会触发降级发送。模块内同步 renderer 仅供 worker / 自检使用，
+业务入口必须经过异步渲染队列；不要在线程池里直接调用同步 renderer。
+
+#### 从 amd64 模拟镜像迁移到 ARM 原生镜像
+
+以下步骤须在**包含 ARM64 的新版镜像发布成功后**执行。先备份数据；保留原有 `.env` 和挂载卷，不执行 `down -v`。
+
+```bash
+uname -m
+# 检查发布标签确实包含 linux/amd64 和 linux/arm64
+sudo docker buildx imagetools inspect fengliu1989/a-share-backend:main
+
+# 删除 override 文件中强制设置的 platform: linux/amd64，并取消本 shell 的平台覆盖。
+# 同时检查 .env / 部署脚本是否设置 DOCKER_DEFAULT_PLATFORM。
+unset DOCKER_DEFAULT_PLATFORM
+sudo docker compose pull backend frontend
+sudo docker compose up -d --no-deps --force-recreate backend frontend
+
+CID=$(sudo docker compose ps -q backend)
+IMAGE_ID=$(sudo docker inspect --format '{{.Image}}' "$CID")
+sudo docker image inspect "$IMAGE_ID" --format '{{.Os}}/{{.Architecture}}'
+# ARM 主机上应显示 linux/arm64，而非 linux/amd64
+sudo docker compose run --rm --no-deps -e PYTHONPATH=/app \
+  --entrypoint python backend scripts/verify_browser_runtime.py
+```
+
+可选 Python 沙箱启用时也需更新 `python-runner` / `python-sandbox-image` 镜像。在线更新功能只更新
+前后端，不自动迁移沙箱；ARM 迁移时执行：
+
+```bash
+sudo docker compose --profile python-sandbox --profile python-sandbox-build pull python-runner python-sandbox-image
+sudo docker compose --profile python-sandbox up -d --no-deps --force-recreate python-runner
+```
+
+runner 启动会核对 Docker **服务端**架构与 worker 镜像架构（兼容 `aarch64` / `arm64`、
+`x86_64` / `amd64` 命名），不匹配或无法核实时拒绝 ready，不通过 QEMU 勉强执行。
+CI 双架构额外通过真实 runner 执行 worker，检查 512MB/64 PID/非 root/只读/无网络限制、
+NumPy/Pandas 运算与取消清理；通过后才允许发布。后端镜像还会在空临时数据卷上运行真实
+Uvicorn 启动、数据库初始化与后台任务就绪检查，并用本地页面验证 Scrapling stealth。
+启动自检拒绝已有数据库（含 `data/db`、WAL/SHM 文件）和目录软链接；失败仅输出退出码、异常类型
+与就绪状态计数，不输出原始日志中的初始密码、Key 或第三方错误正文。
+源码本机构建使用 `docker compose build backend frontend`，随后 `docker compose up -d --no-deps backend frontend`；
+不要通过 `platform: linux/amd64` 强行让 ARM 主机模拟运行，否则 Chromium 导出 PDF 仍可能触发 QEMU 崩溃。
+旧 Linux 环境如已安装相互覆盖的 MiniRacer 包，迁移时使用新虚拟环境；如复用旧环境，执行
+`uv sync --frozen --reinstall-package mini-racer`，确保旧包卸载后现代模块文件完整。
 
 #### YAML 量化策略热加载
 
@@ -256,7 +434,35 @@ make backend-seed-hot-stocks  # 为成交额前 50 的热门股抓取经营信�
 
 种子应视为资料库的"存档点"：批量导入或人工整理后，确认无误再执行 `backend-export-seeds` 并提交。程序不会自动更新种子，避免运行时数据灌入提交历史。
 
+主数据维护规则：
+- 手工保存显式空值会清空对应字段；未提交的字段不变。个股资料批量导入仍使用空值不覆盖的合并策略。
+- 普通联网补充仅填空字段；`force=true` 才允许覆盖已有资料（包括手工值），并记录混合来源。上游没有有效资料时返回业务失败，不把旧字段计为新增。
+- 三类主数据的手工录入和导入统一证券身份：港股补齐 5 位，A 股补齐 6 位；无市场提示的 5 位数字按港股识别；显式市场、交易所与代码后缀冲突时拒绝写入。
+- 概念导入的数据、派生概念计数和批次状态原子提交；三类主数据导入均按输入模型逐行校验，跳过非法行并返回行号。文件上限 50 MiB，Nginx 与后端导入请求体上限 70 MiB（包含 Base64 膨胀）；超限返回 413。
+- 三类记录返回 `revision` 修订标识，`PUT /records/{id}` 必须携带打开表单时的 `expected_revision`；服务端在写事务内核验，过期返回 409，缺少标识返回 422。个股资料 `POST /records` 只新建，不再覆盖同码存量记录。
+- 申万一/二/三级分类以行业基础数据为唯一来源；个股资料列表、详情和 CSV 导出实时关联行业库，资料页分类只读。个股资料导入中的申万列仅作参考、不更新行业；历史副本保留但不再用于展示回退。
+- 手动“同步交易所名录”会强制联网刷新，返回 `complete`、`failed_exchanges`、`stale_exchanges` 与各交易所 `fetched_at`。可用旧快照有 7 天时效约束；部分失败展示降级状态，全部无可用数据时返回失败且不写库。
+- 概念筛选使用 JSON 元素精确比较，概念中的 `%`、`_`、引号不会作为匹配表达式。
+- 概念增删改和批量导入仅按标签差集更新计数，与记录写入共用事务；无变化或跳过的行不写统计。初始化会全量校准存量计数，种子导入会同步建立统计，无需等首次人工操作才出现概念列表。
+- 个股资料和概念列表区分加载失败与无匹配数据，并提供独立重试。三类导入窗口共用文件读取保护，替换、移除或关闭后过期回调不再生效；关闭会清空文件/预检/强制覆盖状态，预检或提交期间禁用文件切换与关闭。
+- 行业库在初始化和在线更新后，从同库个股资料补齐空股票名称，不覆盖已有名称、分类或手工标记。存量库可先只读预览，再带备份修复：
+
+```bash
+cd backend
+uv run python -m app.scripts.repair_industry_names          # 只读预览
+uv run python -m app.scripts.repair_industry_names --apply  # 备份到 data/db/backups 后填补
+```
+
+无法从个股资料匹配到名称的记录保持原样，不猜测名称。
+
 #### Workflow 进度与取消
+
+
+#### 个股分析成功语义、版本和数据时效
+
+- 个股分析进度分为 5 段：Agent 调研与证据校验 → 构造结构化请求 → AI 综合分析 → 结果校验与数据时效 → 报告归档与历史更新。归档成功后才发送 `complete`；归档失败会重试保存本身 3 次，不写成功缓存、不重新执行收费模型，并以第 5 阶段失败结束。
+- 每次生成拥有 `report_id` 和 `generated_at`，不可变版本保存在用户目录的 `versions/YYYYMMDD/` 下；原 `YYYYMMDD.json` 仍是当天最新别名，旧日期链接、历史列表、PDF 和删除接口保持兼容。`GET /api/analysis/{code}/versions/{date}` 分页列版本，`GET .../{report_id}` 读取指定版本；删除某日历史会同时删除当前用户该日版本。
+- 新报告带 `provenance`，分别展示调研时间、工具披露的数据/发布日期、报告期、来源及缓存状态。`force=true` 只说明跳过最终分析缓存，不承诺工具数据全部实时；没有显式日期或缓存标识时显示“未披露/未知”，不得用报告生成时间冒充数据日期。旧报告继续可读，并明确标注未记录时效信息。
 
 个股分析和产业链分析先通过 `POST /api/workflows/analysis/{code}` 或 `POST /api/workflows/industry-chain/{name}` 创建持久化任务，再通过 `GET /api/workflows/{job_id}/stream` 接收 SSE 进度。浏览器断线重连时会携带 `Last-Event-ID`，后端从游标之后继续回放事件并去重；取消操作先调用 `DELETE /api/workflows/{job_id}`，再中止本地连接。旧 Analysis/Industry Chain SSE 地址继续作为兼容入口。
 
@@ -310,6 +516,15 @@ ANALYSIS_LLM_TIMEOUT_SECONDS=1200
 ANALYSIS_LLM_MAX_COMPLETION_TOKENS=32768
 # 前置 Agent 调研独立总时限，覆盖所有轮次、追问和工具等待
 AGENT_RESEARCH_TIMEOUT_SECONDS=1200
+# 复杂产业链调研使用独立轮次、时限与工具预算；有进展才继续，无进展提前停止
+INDUSTRY_CHAIN_MAX_ROUNDS=6
+INDUSTRY_CHAIN_REPAIR_MAX_ROUNDS=3
+INDUSTRY_CHAIN_RESEARCH_TIMEOUT_SECONDS=1800
+INDUSTRY_CHAIN_TOOL_CALLS_TOTAL=96
+INDUSTRY_CHAIN_REPAIR_TOOL_CALLS_TOTAL=48
+# 补证工具取证与补证后报告重写分别计时；任一超时都会保留可用初稿并标记质量降级
+INDUSTRY_CHAIN_REPAIR_RESEARCH_TIMEOUT_SECONDS=900
+INDUSTRY_CHAIN_REPAIR_SYNTHESIS_TIMEOUT_SECONDS=600
 
 # Chat 成本与稳定性保护
 MAX_CONCURRENT_CHAT_PER_USER=2
@@ -319,7 +534,7 @@ CHAT_MAX_COMPLETION_TOKENS=4096
 CHAT_TOTAL_TIMEOUT_SECONDS=300
 CHAT_HEARTBEAT_SECONDS=15
 CHAT_TOOL_TIMEOUT_SECONDS=45
-CHAT_MAX_TOOL_CALLS_PER_ROUND=8
+CHAT_MAX_TOOL_CALLS_PER_ROUND=16
 CHAT_MAX_TOOL_CALLS_TOTAL=32
 CHAT_MAX_TOOL_CONTEXT_CHARACTERS=60000
 CHAT_MAX_SYNTHESIS_CHARACTERS=60000
@@ -384,6 +599,9 @@ LLM_COMPATIBILITY_OVERRIDES='[{"provider":"custom","base_url":"https://gateway.e
 - 验收覆盖 OpenAI SDK MockTransport、LiteLLM Mock、Agent 多轮、规则隔离和连接池刷新，不等于已经对某个付费模型/真实网关做过在线认证。
 
 ### 多 Agent 执行与降级
+
+- `CHAT_MAX_TOOL_CALLS_PER_ROUND` 控制每个执行批次的新调用数量（默认 16），不再截掉同一模型轮次的超额请求；剩余请求会在同轮分批执行，不额外消耗模型轮次。逐批检查总额度、搜索策略、预留额度、上下文和时限，取消后不再启动后续批次；实际并发还受单工具及数据源限流约束。
+- `CHAT_MAX_TOOL_CALLS_TOTAL` 仍是单次回答中所有 Agent 共用的总额度（含在途预留），缓存复用按原规则退款；管理员持久化设置优先于 `.env`。总额度、搜索总数、连续搜索、正文/补查预留和时限拒绝会给出具体原因及相关计数，旧记录缺少诊断字段时仅显示未记录原因。
 
 - 下游分析只使用有效的前置结果；前置任务失败时，不会把错误文案当作已完成分析继续执行。
 - Reviewer 最多追加一轮重试，同时重算受影响的全部下游，保留未受影响的有效前置上下文。
