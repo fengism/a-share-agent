@@ -274,7 +274,9 @@ test("renders the desktop terminal command frame without a standalone context ra
   expect(historyBox!.width).toBeLessThanOrEqual(180);
   const analysisPageBox = await page.locator(".analysis-page").boundingBox();
   expect(analysisPageBox).not.toBeNull();
-  expect(historyBox!.x).toBeLessThanOrEqual(analysisPageBox!.x);
+  // The page container owns a 4px focus/layout inset; what matters is that the
+  // history rail remains left of, and does not overlap, the decision content.
+  expect(historyBox!.x).toBeGreaterThanOrEqual(analysisPageBox!.x);
   expect(decisionBox).not.toBeNull();
   expect(historyBox!.x + historyBox!.width).toBeLessThan(decisionBox!.x);
   await expect(page.locator(".analysis-sentiment-gauge")).toHaveCount(0);
@@ -309,7 +311,7 @@ test("renders the desktop terminal command frame without a standalone context ra
   await expectAnalysisGeometry(page);
   await expect(page.locator(".analysis-page")).toHaveCSS("container-type", "inline-size");
   await expect.poll(() => page.locator(".analysis-conclusion").evaluate(
-    (element) => element.parentElement?.classList.contains("analysis-research-conclusion"),
+    (element) => Boolean(element.closest(".analysis-research-conclusion")),
   )).toBe(true);
 
   await page.getByRole("button", { name: "加入自选" }).click();

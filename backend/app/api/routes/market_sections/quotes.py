@@ -2,8 +2,11 @@
 
 from datetime import date as Date
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.api.auth.dependencies import require_admin
+from app.core.market import normalize_code
+from app.domain.identity import AuthenticatedUser
 from app.domain.market import KlineData, MarketIndices
 from app.financial_data.market.public import (
     DragonTigerItem,
@@ -61,6 +64,24 @@ from app.financial_data.market.public import get_sector_stocks_history as get_se
 from app.financial_data.market.public import get_ths_hot_concept as get_ths_hot_concept_service
 from app.financial_data.market.public import get_ths_hot_industry as get_ths_hot_industry_service
 from app.financial_data.market.public import get_trading_calendar_view as get_trading_calendar_view_service
+from app.modules.market_daily.adjustment import (
+    get_adjustment_factor_status,
+    invalidate_adjustment_factors,
+    refresh_adjustment_factors,
+)
+from app.modules.market_daily.models import (
+    MarketAdjustmentFactorInvalidateRequest,
+    MarketAdjustmentFactorRefreshRequest,
+    MarketAdjustmentFactorStatus,
+    MarketDailyBarDeleteRequest,
+    MarketDailyBarDeleteResult,
+    MarketDailyBarPage,
+    MarketDailyBarRefreshHistory,
+    MarketDailyBarRefreshRequest,
+    MarketDailyBarRefreshResult,
+    MarketDailyBarRefreshStatus,
+)
+from app.modules.market_daily.service import market_daily_bar_service
 
 router = APIRouter()
 
@@ -177,6 +198,114 @@ async def get_market_wind():
 async def get_market_wind_stocks(plate_code: str):
     """获取指定风口板块的龙头股。"""
     return await get_market_wind_stocks_service(plate_code)
+
+
+@router.get("/daily-bars", response_model=MarketDailyBarPage)
+async def get_market_daily_bars(
+    market: str | None = Query(None, pattern=r"^(cn|hk)$"),
+    instrument_type: str | None = Query(None, pattern=r"^(stock|index)$"),
+    trade_date: Date | None = Query(None, description="单日查询；不能与日期范围同时使用"),
+    start_date: Date | None = Query(None, description="范围起始日期，需与 end_date 同时提供"),
+    end_date: Date | None = Query(None, description="范围结束日期，需与 start_date 同时提供"),
+    codes: str = Query("", description="逗号分隔的证券代码；不传任何日期时读取最近可用交易日"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=1000),
+    cursor: str | None = Query(None, description="深分页游标；使用时 page 必须为 1"),
+):
+    """按单日或日期范围读取独立 SQLite 中的 A/H 股及指数日行情。"""
+    code_list = [item.strip() for item in codes.split(",") if item.strip()]
+    return await market_daily_bar_service.query(
+        market=market,
+        instrument_type=instrument_type,
+        trade_date=trade_date,
+        start_date=start_date,
+        end_date=end_date,
+        codes=code_list or None,
+        page=page,
+        page_size=page_size,
+        cursor=cursor,
+    )
+
+
+@router.get("/daily-bars/status", response_model=list[MarketDailyBarRefreshStatus])
+async def get_market_daily_bar_refresh_status(
+    trade_date: Date = Query(...),
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    """管理员查看指定日期刷新状态。"""
+    return await market_daily_bar_service.status(trade_date)
+
+
+@router.get("/daily-bars/refresh-history", response_model=MarketDailyBarRefreshHistory)
+async def get_market_daily_bar_refresh_history(
+    start_date: Date | None = Query(None),
+    end_date: Date | None = Query(None),
+    status: str | None = Query(None, pattern=r"^(pending|running|success|skipped|failed)$"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    """管理员分页查看跨日期刷新历史。"""
+    return await market_daily_bar_service.refresh_history(
+        start_date=start_date,
+        end_date=end_date,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.post("/daily-bars/refresh", response_model=MarketDailyBarRefreshResult)
+async def refresh_market_daily_bars(
+    request: MarketDailyBarRefreshRequest,
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    """管理员手动刷新、强制重刷或仅重试失败分区。"""
+    return await market_daily_bar_service.refresh(request)
+
+
+@router.post("/daily-bars/delete", response_model=MarketDailyBarDeleteResult)
+async def delete_market_daily_bars(
+    request: MarketDailyBarDeleteRequest,
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    """管理员清理指定日期数据，并可在清理后立即重建。"""
+    return await market_daily_bar_service.delete_day(
+        trade_date=request.trade_date,
+        segments=request.segments,
+        rebuild=request.rebuild,
+        checkpoint=request.checkpoint,
+    )
+
+
+@router.get("/daily-bars/adjustment-status", response_model=MarketAdjustmentFactorStatus)
+async def get_market_adjustment_factor_status(
+    code: str = Query(..., description="6 位 A 股代码"),
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    """管理员查看指定 A 股的公司行为与复权因子健康状态。"""
+    return await get_adjustment_factor_status(normalize_code(code).raw)
+
+
+@router.post("/daily-bars/adjustment-refresh", response_model=MarketAdjustmentFactorStatus)
+async def refresh_market_adjustment_factors(
+    request: MarketAdjustmentFactorRefreshRequest,
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    """管理员强制复核指定 A 股 XDXR 与仿射复权因子。"""
+    return await refresh_adjustment_factors(
+        normalize_code(request.code).raw,
+        force=request.force,
+    )
+
+
+@router.post("/daily-bars/adjustment-invalidate", response_model=MarketAdjustmentFactorStatus)
+async def invalidate_market_adjustment_factors(
+    request: MarketAdjustmentFactorInvalidateRequest,
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    """管理员使指定 A 股衍生因子失效；保留公司行为审计记录。"""
+    return await invalidate_adjustment_factors(normalize_code(request.code).raw)
 
 
 @router.get("/indices", response_model=MarketIndices)

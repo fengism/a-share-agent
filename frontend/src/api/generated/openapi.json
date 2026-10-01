@@ -2813,6 +2813,10 @@
             "title": "Analysis Llm Timeout Seconds",
             "type": "number"
           },
+          "anysearch_api_key": {
+            "title": "Anysearch Api Key",
+            "type": "string"
+          },
           "baidu_cookie": {
             "title": "Baidu Cookie",
             "type": "string"
@@ -3079,6 +3083,26 @@
             "title": "Llm Temperature",
             "type": "number"
           },
+          "market_daily_attempt_retention_days": {
+            "title": "Market Daily Attempt Retention Days",
+            "type": "integer"
+          },
+          "market_daily_bar_refresh_enabled": {
+            "title": "Market Daily Bar Refresh Enabled",
+            "type": "boolean"
+          },
+          "market_daily_bar_refresh_poll_seconds": {
+            "title": "Market Daily Bar Refresh Poll Seconds",
+            "type": "integer"
+          },
+          "market_daily_bar_refresh_retry_base_seconds": {
+            "title": "Market Daily Bar Refresh Retry Base Seconds",
+            "type": "integer"
+          },
+          "market_daily_observation_retention_days": {
+            "title": "Market Daily Observation Retention Days",
+            "type": "integer"
+          },
           "notion_api_token": {
             "title": "Notion Api Token",
             "type": "string"
@@ -3145,6 +3169,7 @@
           "twitter_feeds",
           "eastmoney_cookie",
           "fred_api_key",
+          "anysearch_api_key",
           "baidu_cookie",
           "ths_cookie",
           "legulegu_token",
@@ -3155,6 +3180,11 @@
           "eastmoney_jitter_max_seconds",
           "eastmoney_cooldown_seconds",
           "eastmoney_transient_failure_threshold",
+          "market_daily_bar_refresh_enabled",
+          "market_daily_bar_refresh_poll_seconds",
+          "market_daily_bar_refresh_retry_base_seconds",
+          "market_daily_observation_retention_days",
+          "market_daily_attempt_retention_days",
           "bot_enabled",
           "bot_command_prefix",
           "bot_service_user_id",
@@ -3215,6 +3245,17 @@
               }
             ],
             "title": "Analysis Llm Timeout Seconds"
+          },
+          "anysearch_api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anysearch Api Key"
           },
           "baidu_cookie": {
             "anyOf": [
@@ -3964,6 +4005,69 @@
               }
             ],
             "title": "Llm Temperature"
+          },
+          "market_daily_attempt_retention_days": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 30.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Daily Attempt Retention Days"
+          },
+          "market_daily_bar_refresh_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Daily Bar Refresh Enabled"
+          },
+          "market_daily_bar_refresh_poll_seconds": {
+            "anyOf": [
+              {
+                "maximum": 3600.0,
+                "minimum": 15.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Daily Bar Refresh Poll Seconds"
+          },
+          "market_daily_bar_refresh_retry_base_seconds": {
+            "anyOf": [
+              {
+                "maximum": 1800.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Daily Bar Refresh Retry Base Seconds"
+          },
+          "market_daily_observation_retention_days": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 7.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Daily Observation Retention Days"
           },
           "notion_api_token": {
             "anyOf": [
@@ -4865,6 +4969,13 @@
             "title": "Northbound Funds",
             "type": "object"
           },
+          "policy_news": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyNewsSnapshotItem"
+            },
+            "title": "Policy News",
+            "type": "array"
+          },
           "requested_date": {
             "default": "",
             "title": "Requested Date",
@@ -4886,6 +4997,98 @@
           }
         },
         "title": "DailyReviewDataSnapshot",
+        "type": "object"
+      },
+      "DailyReviewEventImpact": {
+        "properties": {
+          "affected_sectors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Affected Sectors",
+            "type": "array"
+          },
+          "confirmation_signals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Confirmation Signals",
+            "type": "array"
+          },
+          "direction": {
+            "default": "neutral",
+            "enum": [
+              "positive",
+              "negative",
+              "mixed",
+              "neutral"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "event_title": {
+            "title": "Event Title",
+            "type": "string"
+          },
+          "event_type": {
+            "default": "market",
+            "enum": [
+              "policy",
+              "macro",
+              "global",
+              "industry",
+              "market"
+            ],
+            "title": "Event Type",
+            "type": "string"
+          },
+          "evidence": {
+            "default": "",
+            "title": "Evidence",
+            "type": "string"
+          },
+          "horizon": {
+            "default": "short_term",
+            "enum": [
+              "intraday",
+              "short_term",
+              "medium_term"
+            ],
+            "title": "Horizon",
+            "type": "string"
+          },
+          "invalidation_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Invalidation Conditions",
+            "type": "array"
+          },
+          "market_confirmation": {
+            "default": "",
+            "title": "Market Confirmation",
+            "type": "string"
+          },
+          "timing": {
+            "default": "on_date",
+            "enum": [
+              "before",
+              "on_date",
+              "after"
+            ],
+            "title": "Timing",
+            "type": "string"
+          },
+          "transmission_chain": {
+            "default": "",
+            "title": "Transmission Chain",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_title"
+        ],
+        "title": "DailyReviewEventImpact",
         "type": "object"
       },
       "DailyReviewHistoryItem": {
@@ -4970,6 +5173,13 @@
             "title": "Effective Date",
             "type": "string"
           },
+          "event_impacts": {
+            "items": {
+              "$ref": "#/components/schemas/DailyReviewEventImpact"
+            },
+            "title": "Event Impacts",
+            "type": "array"
+          },
           "generated_at": {
             "title": "Generated At",
             "type": "string"
@@ -5021,6 +5231,9 @@
             "title": "Market Summary",
             "type": "string"
           },
+          "news_policy_review": {
+            "$ref": "#/components/schemas/DailyReviewSection"
+          },
           "opportunities": {
             "items": {
               "type": "string"
@@ -5065,7 +5278,7 @@
             "type": "array"
           },
           "schema_version": {
-            "default": 3,
+            "default": 5,
             "title": "Schema Version",
             "type": "integer"
           },
@@ -10759,6 +10972,210 @@
         "title": "ManagementAssessment",
         "type": "object"
       },
+      "MarketAdjustmentFactorInvalidateRequest": {
+        "properties": {
+          "code": {
+            "maxLength": 8,
+            "minLength": 6,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "MarketAdjustmentFactorInvalidateRequest",
+        "type": "object"
+      },
+      "MarketAdjustmentFactorRefreshRequest": {
+        "properties": {
+          "code": {
+            "maxLength": 8,
+            "minLength": 6,
+            "title": "Code",
+            "type": "string"
+          },
+          "force": {
+            "default": true,
+            "title": "Force",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "MarketAdjustmentFactorRefreshRequest",
+        "type": "object"
+      },
+      "MarketAdjustmentFactorStatus": {
+        "properties": {
+          "action_count": {
+            "minimum": 0.0,
+            "title": "Action Count",
+            "type": "integer"
+          },
+          "action_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Hash"
+          },
+          "algorithm_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm Version"
+          },
+          "bar_count": {
+            "minimum": 0.0,
+            "title": "Bar Count",
+            "type": "integer"
+          },
+          "calculated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calculated At"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "coverage_complete": {
+            "default": false,
+            "title": "Coverage Complete",
+            "type": "boolean"
+          },
+          "factor_count": {
+            "minimum": 0.0,
+            "title": "Factor Count",
+            "type": "integer"
+          },
+          "first_bar_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Bar Date"
+          },
+          "first_factor_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Factor Date"
+          },
+          "last_bar_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Bar Date"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_factor_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Factor Date"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "enum": [
+              "missing",
+              "healthy",
+              "stale",
+              "degraded",
+              "incomplete"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "using_last_good": {
+            "default": false,
+            "title": "Using Last Good",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "status",
+          "bar_count",
+          "factor_count",
+          "action_count"
+        ],
+        "title": "MarketAdjustmentFactorStatus",
+        "type": "object"
+      },
       "MarketBreadthDailySummary": {
         "properties": {
           "date": {
@@ -10963,6 +11380,605 @@
           }
         },
         "title": "MarketBreadthSnapshot",
+        "type": "object"
+      },
+      "MarketDailyBar": {
+        "properties": {
+          "adjustment": {
+            "const": "none",
+            "default": "none",
+            "title": "Adjustment",
+            "type": "string"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "change_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Amount"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "close": {
+            "exclusiveMinimum": 0.0,
+            "title": "Close",
+            "type": "number"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "currency": {
+            "enum": [
+              "CNY",
+              "HKD"
+            ],
+            "title": "Currency",
+            "type": "string"
+          },
+          "first_refreshed_at": {
+            "format": "date-time",
+            "title": "First Refreshed At",
+            "type": "string"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "instrument_type": {
+            "enum": [
+              "stock",
+              "index"
+            ],
+            "title": "Instrument Type",
+            "type": "string"
+          },
+          "last_refreshed_at": {
+            "format": "date-time",
+            "title": "Last Refreshed At",
+            "type": "string"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "market": {
+            "enum": [
+              "cn",
+              "hk"
+            ],
+            "title": "Market",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "open": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open"
+          },
+          "pre_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pre Close"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_quote_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Quote Time"
+          },
+          "trade_date": {
+            "format": "date",
+            "title": "Trade Date",
+            "type": "string"
+          },
+          "verification_status": {
+            "enum": [
+              "provisional",
+              "confirmed"
+            ],
+            "title": "Verification Status",
+            "type": "string"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "required": [
+          "market",
+          "instrument_type",
+          "code",
+          "trade_date",
+          "currency",
+          "close",
+          "source",
+          "verification_status",
+          "revision",
+          "first_refreshed_at",
+          "last_refreshed_at"
+        ],
+        "title": "MarketDailyBar",
+        "type": "object"
+      },
+      "MarketDailyBarDeleteRequest": {
+        "properties": {
+          "checkpoint": {
+            "default": "recheck",
+            "enum": [
+              "initial",
+              "recheck"
+            ],
+            "title": "Checkpoint",
+            "type": "string"
+          },
+          "rebuild": {
+            "default": false,
+            "title": "Rebuild",
+            "type": "boolean"
+          },
+          "segments": {
+            "items": {
+              "enum": [
+                "cn_stock",
+                "cn_index",
+                "hk_stock",
+                "hk_index"
+              ],
+              "type": "string"
+            },
+            "title": "Segments",
+            "type": "array"
+          },
+          "trade_date": {
+            "format": "date",
+            "title": "Trade Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trade_date"
+        ],
+        "title": "MarketDailyBarDeleteRequest",
+        "type": "object"
+      },
+      "MarketDailyBarDeleteResult": {
+        "properties": {
+          "deleted_bars": {
+            "minimum": 0.0,
+            "title": "Deleted Bars",
+            "type": "integer"
+          },
+          "deleted_jobs": {
+            "minimum": 0.0,
+            "title": "Deleted Jobs",
+            "type": "integer"
+          },
+          "deleted_observations": {
+            "minimum": 0.0,
+            "title": "Deleted Observations",
+            "type": "integer"
+          },
+          "rebuild_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarketDailyBarRefreshResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trade_date": {
+            "format": "date",
+            "title": "Trade Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trade_date",
+          "deleted_bars",
+          "deleted_observations",
+          "deleted_jobs"
+        ],
+        "title": "MarketDailyBarDeleteResult",
+        "type": "object"
+      },
+      "MarketDailyBarPage": {
+        "properties": {
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MarketDailyBar"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "trade_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Date"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "MarketDailyBarPage",
+        "type": "object"
+      },
+      "MarketDailyBarRefreshHistory": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MarketDailyBarRefreshStatus"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "minimum": 0.0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "MarketDailyBarRefreshHistory",
+        "type": "object"
+      },
+      "MarketDailyBarRefreshRequest": {
+        "properties": {
+          "checkpoint": {
+            "default": "recheck",
+            "enum": [
+              "initial",
+              "recheck"
+            ],
+            "title": "Checkpoint",
+            "type": "string"
+          },
+          "force": {
+            "default": false,
+            "title": "Force",
+            "type": "boolean"
+          },
+          "retry_failed_only": {
+            "default": false,
+            "title": "Retry Failed Only",
+            "type": "boolean"
+          },
+          "segments": {
+            "items": {
+              "enum": [
+                "cn_stock",
+                "cn_index",
+                "hk_stock",
+                "hk_index"
+              ],
+              "type": "string"
+            },
+            "title": "Segments",
+            "type": "array"
+          },
+          "trade_date": {
+            "format": "date",
+            "title": "Trade Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trade_date"
+        ],
+        "title": "MarketDailyBarRefreshRequest",
+        "type": "object"
+      },
+      "MarketDailyBarRefreshResult": {
+        "properties": {
+          "checkpoint": {
+            "enum": [
+              "initial",
+              "recheck"
+            ],
+            "title": "Checkpoint",
+            "type": "string"
+          },
+          "requested_segments": {
+            "items": {
+              "enum": [
+                "cn_stock",
+                "cn_index",
+                "hk_stock",
+                "hk_index"
+              ],
+              "type": "string"
+            },
+            "title": "Requested Segments",
+            "type": "array"
+          },
+          "statuses": {
+            "items": {
+              "$ref": "#/components/schemas/MarketDailyBarRefreshStatus"
+            },
+            "title": "Statuses",
+            "type": "array"
+          },
+          "trade_date": {
+            "format": "date",
+            "title": "Trade Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trade_date",
+          "checkpoint",
+          "requested_segments",
+          "statuses"
+        ],
+        "title": "MarketDailyBarRefreshResult",
+        "type": "object"
+      },
+      "MarketDailyBarRefreshStatus": {
+        "properties": {
+          "attempts": {
+            "minimum": 0.0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "checkpoint": {
+            "enum": [
+              "initial",
+              "recheck"
+            ],
+            "title": "Checkpoint",
+            "type": "string"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "expected_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Count"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "next_retry_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Retry At"
+          },
+          "segment": {
+            "title": "Segment",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "success",
+              "skipped",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stored_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored Count"
+          },
+          "trade_date": {
+            "format": "date",
+            "title": "Trade Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trade_date",
+          "checkpoint",
+          "segment",
+          "status",
+          "attempts"
+        ],
+        "title": "MarketDailyBarRefreshStatus",
         "type": "object"
       },
       "MarketEmotion": {
@@ -11906,6 +12922,10 @@
             "title": "Author",
             "type": "string"
           },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
           "comment_count": {
             "title": "Comment Count",
             "type": "integer"
@@ -11928,6 +12948,10 @@
           },
           "source": {
             "title": "Source",
+            "type": "string"
+          },
+          "source_api": {
+            "title": "Source Api",
             "type": "string"
           },
           "title": {
@@ -13907,6 +14931,86 @@
         "title": "PeerMetricStats",
         "type": "object"
       },
+      "PolicyNewsSnapshotItem": {
+        "properties": {
+          "content": {
+            "default": "",
+            "title": "Content",
+            "type": "string"
+          },
+          "corroborating_sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Corroborating Sources",
+            "type": "array"
+          },
+          "direction": {
+            "default": "neutral",
+            "enum": [
+              "positive",
+              "negative",
+              "mixed",
+              "neutral"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "event_type": {
+            "default": "market",
+            "enum": [
+              "policy",
+              "macro",
+              "global",
+              "industry",
+              "market"
+            ],
+            "title": "Event Type",
+            "type": "string"
+          },
+          "publish_time": {
+            "default": "",
+            "title": "Publish Time",
+            "type": "string"
+          },
+          "related_sectors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Sectors",
+            "type": "array"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "timing": {
+            "default": "on_date",
+            "enum": [
+              "before",
+              "on_date",
+              "after"
+            ],
+            "title": "Timing",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "PolicyNewsSnapshotItem",
+        "type": "object"
+      },
       "PortfolioAccountSettings": {
         "properties": {
           "initial_cash": {
@@ -14070,6 +15174,186 @@
           "holding_days"
         ],
         "title": "PortfolioClosedPosition",
+        "type": "object"
+      },
+      "PortfolioEquityCurvePoint": {
+        "properties": {
+          "cash_balance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Balance"
+          },
+          "cumulative_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative Return Pct"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "drawdown_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawdown Pct"
+          },
+          "securities_value": {
+            "title": "Securities Value",
+            "type": "number"
+          },
+          "total_assets": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Assets"
+          },
+          "unpriced_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Unpriced Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "securities_value"
+        ],
+        "title": "PortfolioEquityCurvePoint",
+        "type": "object"
+      },
+      "PortfolioEquityCurveResponse": {
+        "properties": {
+          "current_securities_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Securities Value"
+          },
+          "current_total_assets": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Total Assets"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "initial_cash": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Cash"
+          },
+          "max_drawdown_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Pct"
+          },
+          "mode": {
+            "enum": [
+              "total_assets",
+              "securities_only"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioEquityCurvePoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "total_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Return Pct"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "mode",
+          "end_date"
+        ],
+        "title": "PortfolioEquityCurveResponse",
         "type": "object"
       },
       "PortfolioLotMatch": {
@@ -24427,7 +25711,7 @@
   },
   "info": {
     "title": "A股智能分析系统",
-    "version": "0.6.0"
+    "version": "0.6.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -28915,6 +30199,593 @@
         ]
       }
     },
+    "/api/market/daily-bars": {
+      "get": {
+        "description": "按单日或日期范围读取独立 SQLite 中的 A/H 股及指数日行情。",
+        "operationId": "get_market_daily_bars_api_market_daily_bars_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "market",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(cn|hk)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Market"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instrument_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(stock|index)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrument Type"
+            }
+          },
+          {
+            "description": "单日查询；不能与日期范围同时使用",
+            "in": "query",
+            "name": "trade_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "单日查询；不能与日期范围同时使用",
+              "title": "Trade Date"
+            }
+          },
+          {
+            "description": "范围起始日期，需与 end_date 同时提供",
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "范围起始日期，需与 end_date 同时提供",
+              "title": "Start Date"
+            }
+          },
+          {
+            "description": "范围结束日期，需与 start_date 同时提供",
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "范围结束日期，需与 start_date 同时提供",
+              "title": "End Date"
+            }
+          },
+          {
+            "description": "逗号分隔的证券代码；不传任何日期时读取最近可用交易日",
+            "in": "query",
+            "name": "codes",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "逗号分隔的证券代码；不传任何日期时读取最近可用交易日",
+              "title": "Codes",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "深分页游标；使用时 page 必须为 1",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "深分页游标；使用时 page 必须为 1",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDailyBarPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Market Daily Bars",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/daily-bars/adjustment-invalidate": {
+      "post": {
+        "description": "管理员使指定 A 股衍生因子失效；保留公司行为审计记录。",
+        "operationId": "invalidate_market_adjustment_factors_api_market_daily_bars_adjustment_invalidate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarketAdjustmentFactorInvalidateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketAdjustmentFactorStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Invalidate Market Adjustment Factors",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/daily-bars/adjustment-refresh": {
+      "post": {
+        "description": "管理员强制复核指定 A 股 XDXR 与仿射复权因子。",
+        "operationId": "refresh_market_adjustment_factors_api_market_daily_bars_adjustment_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarketAdjustmentFactorRefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketAdjustmentFactorStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Refresh Market Adjustment Factors",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/daily-bars/adjustment-status": {
+      "get": {
+        "description": "管理员查看指定 A 股的公司行为与复权因子健康状态。",
+        "operationId": "get_market_adjustment_factor_status_api_market_daily_bars_adjustment_status_get",
+        "parameters": [
+          {
+            "description": "6 位 A 股代码",
+            "in": "query",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "description": "6 位 A 股代码",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketAdjustmentFactorStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Market Adjustment Factor Status",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/daily-bars/delete": {
+      "post": {
+        "description": "管理员清理指定日期数据，并可在清理后立即重建。",
+        "operationId": "delete_market_daily_bars_api_market_daily_bars_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarketDailyBarDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDailyBarDeleteResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Market Daily Bars",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/daily-bars/refresh": {
+      "post": {
+        "description": "管理员手动刷新、强制重刷或仅重试失败分区。",
+        "operationId": "refresh_market_daily_bars_api_market_daily_bars_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarketDailyBarRefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDailyBarRefreshResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Refresh Market Daily Bars",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/daily-bars/refresh-history": {
+      "get": {
+        "description": "管理员分页查看跨日期刷新历史。",
+        "operationId": "get_market_daily_bar_refresh_history_api_market_daily_bars_refresh_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(pending|running|success|skipped|failed)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDailyBarRefreshHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Market Daily Bar Refresh History",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/daily-bars/status": {
+      "get": {
+        "description": "管理员查看指定日期刷新状态。",
+        "operationId": "get_market_daily_bar_refresh_status_api_market_daily_bars_status_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "trade_date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Trade Date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MarketDailyBarRefreshStatus"
+                  },
+                  "title": "Response Get Market Daily Bar Refresh Status Api Market Daily Bars Status Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Market Daily Bar Refresh Status",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/api/market/dragon-tiger": {
       "get": {
         "description": "获取龙虎榜列表。",
@@ -30627,6 +32498,42 @@
           }
         ],
         "summary": "Add Position",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/api/portfolio/equity-curve": {
+      "get": {
+        "operationId": "get_equity_curve_api_portfolio_equity_curve_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioEquityCurveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Equity Curve",
         "tags": [
           "portfolio"
         ]

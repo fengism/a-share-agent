@@ -63,6 +63,33 @@ import "./daily-review.css";
 
 const { Title, Paragraph, Text } = Typography;
 
+const eventTypeLabels = {
+  policy: "政策",
+  macro: "宏观",
+  global: "海外",
+  industry: "产业",
+  market: "市场",
+} as const;
+
+const eventDirectionLabels = {
+  positive: "偏利好",
+  negative: "偏利空",
+  mixed: "影响分化",
+  neutral: "方向待确认",
+} as const;
+
+const eventHorizonLabels = {
+  intraday: "日内",
+  short_term: "短期",
+  medium_term: "中期",
+} as const;
+
+const eventTimingLabels = {
+  before: "盘前/事前",
+  on_date: "复盘日",
+  after: "事后验证",
+} as const;
+
 function formatDate(value: dayjs.Dayjs | null) {
   return value?.format("YYYY-MM-DD") ?? "";
 }
@@ -151,7 +178,12 @@ function buildDailyReviewMarkdown(review: NonNullable<ReturnType<typeof useDaily
   if (review.llm_review) {
     parts.push(`## 深度复盘报告\n\n${renderReviewContent(review.llm_review)}\n`);
   } else {
-    for (const section of [review.index_review, review.hotspot_review, review.dragon_tiger_review]) {
+    for (const section of [
+      review.index_review,
+      review.hotspot_review,
+      review.dragon_tiger_review,
+      review.news_policy_review,
+    ]) {
       if (section?.title) {
         parts.push(`## ${section.title}\n\n${section.summary || ""}\n`);
         if (section.bullets?.length) {
@@ -571,6 +603,46 @@ export default function DailyReviewPage() {
               <Card title="市场数据图谱" style={cardStyle}>
                 <DailyReviewCharts snapshot={review.data_snapshot} />
               </Card>
+              {review.news_policy_review || review.event_impacts?.length ? (
+                <Card title="新闻政策与影响传导" style={cardStyle}>
+                  {review.news_policy_review ? (
+                    <>
+                      <Paragraph>{review.news_policy_review.summary}</Paragraph>
+                      {review.news_policy_review.bullets.length ? (
+                        <ul className="daily-review-policy-bullets">
+                          {review.news_policy_review.bullets.map((item) => <li key={item}>{item}</li>)}
+                        </ul>
+                      ) : null}
+                    </>
+                  ) : null}
+                  {review.event_impacts?.length ? (
+                    <div className="daily-review-event-grid">
+                      {review.event_impacts.map((impact, index) => (
+                        <article key={`${impact.event_title}-${index}`} className={`daily-review-event-card is-${impact.direction}`}>
+                          <div className="daily-review-event-card__header">
+                            <strong>{impact.event_title}</strong>
+                            <Space size={4} wrap>
+                              <Tag>{eventTypeLabels[impact.event_type]}</Tag>
+                              <Tag>{eventDirectionLabels[impact.direction]}</Tag>
+                              <Tag>{eventHorizonLabels[impact.horizon]}</Tag>
+                              <Tag color={impact.timing === "after" ? "warning" : undefined}>{eventTimingLabels[impact.timing]}</Tag>
+                            </Space>
+                          </div>
+                          <Paragraph><Text strong>影响方向：</Text>{impact.affected_sectors.join("、") || "市场整体"}</Paragraph>
+                          <Paragraph><Text strong>传导链：</Text>{impact.transmission_chain || "待盘面验证"}</Paragraph>
+                          <Paragraph><Text strong>事实证据：</Text>{impact.evidence || "-"}</Paragraph>
+                          <Paragraph><Text strong>盘面验证：</Text>{impact.market_confirmation || "尚未核验"}</Paragraph>
+                          {impact.timing === "after" ? (
+                            <Paragraph type="warning">该事件发布于复盘日之后，仅用于事后验证，不作为当日交易依据。</Paragraph>
+                          ) : null}
+                          <Paragraph><Text strong>确认信号：</Text>{impact.confirmation_signals.join("；") || "待观察"}</Paragraph>
+                          <Paragraph><Text strong>失效条件：</Text>{impact.invalidation_conditions.join("；") || "待观察"}</Paragraph>
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </Card>
+              ) : null}
               {review.data_snapshot.source_status && (
                 <Card title="复盘数据状态" style={cardStyle}>
                   <Space wrap>
@@ -602,7 +674,12 @@ export default function DailyReviewPage() {
                 </Card>
               ) : (
                 <>
-                  {[review.index_review, review.hotspot_review, review.dragon_tiger_review].map((section) => (
+                  {[
+                    review.index_review,
+                    review.hotspot_review,
+                    review.dragon_tiger_review,
+                    review.news_policy_review,
+                  ].filter((section): section is NonNullable<typeof section> => Boolean(section)).map((section) => (
                     <Card key={section.title} title={section.title} style={cardStyle}>
                       <Paragraph>{section.summary}</Paragraph>
                       <ul>

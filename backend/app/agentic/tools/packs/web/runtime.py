@@ -1,6 +1,6 @@
 """Web search, fetch, and Twitter tool orchestration."""
 
-from typing import cast
+from typing import Any, cast
 
 from app.agentic.catalog import registry
 from app.agentic.tools.packs.web import content, fetcher, pdf, registration, search, twitter
@@ -69,6 +69,8 @@ async def _execute_web_search(
     max_results: int = 5,
     time_range: search.SearchTimeRange = "half_year",
     language: search.SearchLanguage = "zh",
+    tag: str | None = None,
+    params: dict[str, Any] | None = None,
 ):
     return await search.execute_web_search(
         query,
@@ -76,6 +78,8 @@ async def _execute_web_search(
         max_results,
         time_range,
         language,
+        tag,
+        params,
         call_blocking_func=call_blocking,
         semaphore=search_semaphore,
     )

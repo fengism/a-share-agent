@@ -12,6 +12,7 @@ export const QUERY_CACHE_POLICIES = {
   socialFeed: { staleMs: 30 * 60_000, pollMs: 30 * 60_000 },
   socialAnalysis: { staleMs: 12 * 60 * 60_000, gcMs: 12 * 60 * 60_000 },
   portfolioRealtime: { staleMs: 15_000, pollMs: 30_000 },
+  portfolioEquityCurve: { staleMs: 5 * 60_000 },
   watchlistRealtime: { staleMs: 30_000, pollMs: 30_000 },
   hkStockSearch: { staleMs: 5 * 60_000, gcMs: 30 * 60_000 },
   capabilitiesCatalog: { staleMs: 5 * 60_000 },

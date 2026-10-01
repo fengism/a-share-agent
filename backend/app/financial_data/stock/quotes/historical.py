@@ -16,6 +16,7 @@ from app.core.concurrency.rate_limiter import (
     call_blocking,
     cls_semaphore,
     eastmoney_semaphore,
+    sina_semaphore,
     tdx_semaphore,
     tencent_semaphore,
 )
@@ -387,6 +388,29 @@ def _historical_source_attempts(
                     request_limiter=request_limiter,
                 ),
                 on_error=f"财联社不复权K线不可用: code={symbol}",
+                max_attempts=1,
+            )
+        )
+    if adjust == "":
+        attempts.append(
+            ProviderAttempt(
+                label="新浪历史K线直连（fallback）",
+                loader=lambda: _load_historical_source(
+                    "sina-direct-unadjusted",
+                    symbol,
+                    period,
+                    start_date,
+                    end_date,
+                    get_provider("sina").fetch_kline,
+                    symbol,
+                    period,
+                    start_date,
+                    end_date,
+                    semaphore=sina_semaphore,
+                    require_turnover=require_turnover,
+                    request_limiter=request_limiter,
+                ),
+                on_error=f"新浪历史 K 线直连 fallback 不可用: code={symbol}",
                 max_attempts=1,
             )
         )

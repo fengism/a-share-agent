@@ -41,10 +41,25 @@ def render_daily_review_markdown(result: DailyReviewResult) -> str:
     lines.extend(_section("### 1. 指数与量价格局", result.index_review))
     lines.extend(_section("### 2. 板块轮动与题材生命周期", result.hotspot_review))
     lines.extend(_section("### 3. 情绪周期与资金微观动向", result.dragon_tiger_review))
-    lines.extend(_bullets("### 4. 机会方向与低吸逻辑", result.opportunities))
-    lines.extend(_bullets("### 5. 风险预警与雷区提示", result.risk_alerts))
+    lines.extend(_section("### 4. 新闻政策与影响传导", result.news_policy_review))
+    if result.event_impacts:
+        lines.append("#### 重点事件传导矩阵")
+        for impact in result.event_impacts:
+            sectors = "、".join(impact.affected_sectors) or "市场整体"
+            lines.extend([
+                f"- **{impact.event_title}**（{impact.direction} / {impact.horizon} / {impact.timing}）",
+                f"  - 影响方向：{sectors}",
+                f"  - 传导链：{impact.transmission_chain or '待盘面验证'}",
+                f"  - 证据：{impact.evidence or '来源不足'}",
+                f"  - 盘面验证：{impact.market_confirmation or '尚未核验'}",
+                f"  - 确认信号：{'；'.join(impact.confirmation_signals) or '待观察'}",
+                f"  - 失效条件：{'；'.join(impact.invalidation_conditions) or '待观察'}",
+            ])
+        lines.append("")
+    lines.extend(_bullets("### 5. 机会方向与低吸逻辑", result.opportunities))
+    lines.extend(_bullets("### 6. 风险预警与雷区提示", result.risk_alerts))
 
-    lines.append("### 6. 明日交易计划与情景推演")
+    lines.append("### 7. 明日交易计划与情景推演")
     lines.append(f"- 建议仓位：{result.position_range or '数据不足，暂不设定仓位区间'}")
     lines.extend(f"- {item}" for item in result.strategy_notes)
     if result.invalid_conditions:

@@ -59,6 +59,7 @@ PERSISTED_GLOBAL_KEYS = frozenset(
         "twitter_feeds",
         "eastmoney_cookie",
         "fred_api_key",
+        "anysearch_api_key",
         "baidu_cookie",
         "ths_cookie",
         "legulegu_token",
@@ -69,6 +70,11 @@ PERSISTED_GLOBAL_KEYS = frozenset(
         "eastmoney_jitter_max_seconds",
         "eastmoney_cooldown_seconds",
         "eastmoney_transient_failure_threshold",
+        "market_daily_bar_refresh_enabled",
+        "market_daily_bar_refresh_poll_seconds",
+        "market_daily_bar_refresh_retry_base_seconds",
+        "market_daily_observation_retention_days",
+        "market_daily_attempt_retention_days",
         "bot_enabled",
         "bot_command_prefix",
         "bot_service_user_id",
@@ -104,6 +110,7 @@ PERSISTED_GLOBAL_KEYS = frozenset(
 SECRET_KEYS = frozenset(
     {
         "python_sandbox_token",
+        "anysearch_api_key",
         "llm_api_key",
         "feishu_app_secret",
         "feishu_verification_token",
@@ -226,6 +233,11 @@ class Settings(BaseSettings):
     background_task_lease_seconds: float = 60.0
     background_task_standby_poll_seconds: float = 10.0
     background_task_readiness_failure_threshold: int = Field(default=3, ge=1, le=100)
+    market_daily_bar_refresh_enabled: bool = True
+    market_daily_bar_refresh_poll_seconds: int = Field(default=60, ge=15, le=3600)
+    market_daily_bar_refresh_retry_base_seconds: int = Field(default=60, ge=1, le=1800)
+    market_daily_observation_retention_days: int = Field(default=1095, ge=7, le=3650)
+    market_daily_attempt_retention_days: int = Field(default=1095, ge=30, le=3650)
     workflow_job_poll_seconds: float = Field(default=0.5, gt=0)
     workflow_job_lease_seconds: int = Field(default=900, ge=30)
     workflow_job_max_attempts: int = Field(default=2, ge=1, le=5)
@@ -237,7 +249,7 @@ class Settings(BaseSettings):
     workflow_job_retention_seconds: int = Field(default=30 * 24 * 60 * 60, ge=3600)
     database_backup_enabled: bool = True
     database_backup_interval_seconds: int = Field(default=24 * 60 * 60, ge=300)
-    database_backup_retention_count: int = Field(default=7, ge=1, le=90)
+    database_backup_retention_count: int = Field(default=3, ge=1, le=90)
     database_backup_dir: Path | None = None
     database_backup_mirror_dir: Path | None = None
 
@@ -280,6 +292,8 @@ class Settings(BaseSettings):
     iwencai_enabled: bool = False
     iwencai_base_url: str = "https://openapi.iwencai.com"
     iwencai_api_key: str = ""
+
+    anysearch_api_key: str = Field(default="", repr=False)
 
     http_trust_env: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"

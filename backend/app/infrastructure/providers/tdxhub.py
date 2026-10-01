@@ -338,6 +338,14 @@ class TdxhubDataProvider:
         normalized = normalize_code(code).raw
         return self.fetch_stock_quotes([normalized]).get(normalized, {})
 
+    def fetch_stock_xdxr(self, code: str) -> pd.DataFrame:
+        """获取 A 股除权除息、送配股及扩缩股事件。"""
+        symbol = normalize_code(code)
+        frame = self._call("xdxr", symbol.raw)
+        if not isinstance(frame, pd.DataFrame):
+            raise TdxhubUnavailableError(f"TDX XDXR 响应格式无效: code={symbol.raw}")
+        return frame.copy()
+
     def fetch_finance_info(self, code: str) -> dict[str, Any]:
         """获取上市日期及股本等基础财务字段。"""
         symbol = normalize_code(code)

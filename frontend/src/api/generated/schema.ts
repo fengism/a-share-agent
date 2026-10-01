@@ -1620,6 +1620,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/daily-bars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Daily Bars
+         * @description 按单日或日期范围读取独立 SQLite 中的 A/H 股及指数日行情。
+         */
+        get: operations["get_market_daily_bars_api_market_daily_bars_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/daily-bars/adjustment-invalidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invalidate Market Adjustment Factors
+         * @description 管理员使指定 A 股衍生因子失效；保留公司行为审计记录。
+         */
+        post: operations["invalidate_market_adjustment_factors_api_market_daily_bars_adjustment_invalidate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/daily-bars/adjustment-refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Market Adjustment Factors
+         * @description 管理员强制复核指定 A 股 XDXR 与仿射复权因子。
+         */
+        post: operations["refresh_market_adjustment_factors_api_market_daily_bars_adjustment_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/daily-bars/adjustment-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Adjustment Factor Status
+         * @description 管理员查看指定 A 股的公司行为与复权因子健康状态。
+         */
+        get: operations["get_market_adjustment_factor_status_api_market_daily_bars_adjustment_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/daily-bars/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Market Daily Bars
+         * @description 管理员清理指定日期数据，并可在清理后立即重建。
+         */
+        post: operations["delete_market_daily_bars_api_market_daily_bars_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/daily-bars/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Market Daily Bars
+         * @description 管理员手动刷新、强制重刷或仅重试失败分区。
+         */
+        post: operations["refresh_market_daily_bars_api_market_daily_bars_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/daily-bars/refresh-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Daily Bar Refresh History
+         * @description 管理员分页查看跨日期刷新历史。
+         */
+        get: operations["get_market_daily_bar_refresh_history_api_market_daily_bars_refresh_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/daily-bars/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Daily Bar Refresh Status
+         * @description 管理员查看指定日期刷新状态。
+         */
+        get: operations["get_market_daily_bar_refresh_status_api_market_daily_bars_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/dragon-tiger": {
         parameters: {
             query?: never;
@@ -2272,6 +2432,23 @@ export interface paths {
         put?: never;
         /** Add Position */
         post: operations["add_position_api_portfolio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/equity-curve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Equity Curve */
+        get: operations["get_equity_curve_api_portfolio_equity_curve_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4904,6 +5081,8 @@ export interface components {
             agent_research_timeout_seconds: number;
             /** Analysis Llm Timeout Seconds */
             analysis_llm_timeout_seconds: number;
+            /** Anysearch Api Key */
+            anysearch_api_key: string;
             /** Baidu Cookie */
             baidu_cookie: string;
             /** Bot Admin Users */
@@ -5033,6 +5212,16 @@ export interface components {
             llm_provider: string;
             /** Llm Temperature */
             llm_temperature: number;
+            /** Market Daily Attempt Retention Days */
+            market_daily_attempt_retention_days: number;
+            /** Market Daily Bar Refresh Enabled */
+            market_daily_bar_refresh_enabled: boolean;
+            /** Market Daily Bar Refresh Poll Seconds */
+            market_daily_bar_refresh_poll_seconds: number;
+            /** Market Daily Bar Refresh Retry Base Seconds */
+            market_daily_bar_refresh_retry_base_seconds: number;
+            /** Market Daily Observation Retention Days */
+            market_daily_observation_retention_days: number;
             /** Notion Api Token */
             notion_api_token: string;
             /** Notion Database Id */
@@ -5059,6 +5248,8 @@ export interface components {
             agent_research_timeout_seconds?: number | null;
             /** Analysis Llm Timeout Seconds */
             analysis_llm_timeout_seconds?: number | null;
+            /** Anysearch Api Key */
+            anysearch_api_key?: string | null;
             /** Baidu Cookie */
             baidu_cookie?: string | null;
             /** Bot Admin Users */
@@ -5183,6 +5374,16 @@ export interface components {
             llm_provider?: string | null;
             /** Llm Temperature */
             llm_temperature?: number | null;
+            /** Market Daily Attempt Retention Days */
+            market_daily_attempt_retention_days?: number | null;
+            /** Market Daily Bar Refresh Enabled */
+            market_daily_bar_refresh_enabled?: boolean | null;
+            /** Market Daily Bar Refresh Poll Seconds */
+            market_daily_bar_refresh_poll_seconds?: number | null;
+            /** Market Daily Bar Refresh Retry Base Seconds */
+            market_daily_bar_refresh_retry_base_seconds?: number | null;
+            /** Market Daily Observation Retention Days */
+            market_daily_observation_retention_days?: number | null;
             /** Notion Api Token */
             notion_api_token?: string | null;
             /** Notion Database Id */
@@ -5517,6 +5718,8 @@ export interface components {
             northbound_funds?: {
                 [key: string]: unknown;
             };
+            /** Policy News */
+            policy_news?: components["schemas"]["PolicyNewsSnapshotItem"][];
             /**
              * Requested Date
              * @default
@@ -5528,6 +5731,56 @@ export interface components {
             };
             /** Top Sectors */
             top_sectors?: components["schemas"]["SectorSnapshotItem"][];
+        };
+        /** DailyReviewEventImpact */
+        DailyReviewEventImpact: {
+            /** Affected Sectors */
+            affected_sectors?: string[];
+            /** Confirmation Signals */
+            confirmation_signals?: string[];
+            /**
+             * Direction
+             * @default neutral
+             * @enum {string}
+             */
+            direction: "positive" | "negative" | "mixed" | "neutral";
+            /** Event Title */
+            event_title: string;
+            /**
+             * Event Type
+             * @default market
+             * @enum {string}
+             */
+            event_type: "policy" | "macro" | "global" | "industry" | "market";
+            /**
+             * Evidence
+             * @default
+             */
+            evidence: string;
+            /**
+             * Horizon
+             * @default short_term
+             * @enum {string}
+             */
+            horizon: "intraday" | "short_term" | "medium_term";
+            /** Invalidation Conditions */
+            invalidation_conditions?: string[];
+            /**
+             * Market Confirmation
+             * @default
+             */
+            market_confirmation: string;
+            /**
+             * Timing
+             * @default on_date
+             * @enum {string}
+             */
+            timing: "before" | "on_date" | "after";
+            /**
+             * Transmission Chain
+             * @default
+             */
+            transmission_chain: string;
         };
         /**
          * DailyReviewHistoryItem
@@ -5571,6 +5824,8 @@ export interface components {
              * @default
              */
             effective_date: string;
+            /** Event Impacts */
+            event_impacts?: components["schemas"]["DailyReviewEventImpact"][];
             /** Generated At */
             generated_at: string;
             /**
@@ -5601,6 +5856,7 @@ export interface components {
             market_state: "attack" | "balanced" | "defensive" | "unknown";
             /** Market Summary */
             market_summary: string;
+            news_policy_review?: components["schemas"]["DailyReviewSection"];
             /** Opportunities */
             opportunities?: string[];
             /**
@@ -5624,7 +5880,7 @@ export interface components {
             risk_alerts?: string[];
             /**
              * Schema Version
-             * @default 3
+             * @default 5
              */
             schema_version: number;
             /**
@@ -8151,6 +8407,67 @@ export interface components {
              */
             track_record: string;
         };
+        /** MarketAdjustmentFactorInvalidateRequest */
+        MarketAdjustmentFactorInvalidateRequest: {
+            /** Code */
+            code: string;
+        };
+        /** MarketAdjustmentFactorRefreshRequest */
+        MarketAdjustmentFactorRefreshRequest: {
+            /** Code */
+            code: string;
+            /**
+             * Force
+             * @default true
+             */
+            force: boolean;
+        };
+        /** MarketAdjustmentFactorStatus */
+        MarketAdjustmentFactorStatus: {
+            /** Action Count */
+            action_count: number;
+            /** Action Hash */
+            action_hash?: string | null;
+            /** Algorithm Version */
+            algorithm_version?: string | null;
+            /** Bar Count */
+            bar_count: number;
+            /** Calculated At */
+            calculated_at?: string | null;
+            /** Code */
+            code: string;
+            /**
+             * Coverage Complete
+             * @default false
+             */
+            coverage_complete: boolean;
+            /** Factor Count */
+            factor_count: number;
+            /** First Bar Date */
+            first_bar_date?: string | null;
+            /** First Factor Date */
+            first_factor_date?: string | null;
+            /** Last Bar Date */
+            last_bar_date?: string | null;
+            /** Last Checked At */
+            last_checked_at?: string | null;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Factor Date */
+            last_factor_date?: string | null;
+            /** Source */
+            source?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "missing" | "healthy" | "stale" | "degraded" | "incomplete";
+            /**
+             * Using Last Good
+             * @default false
+             */
+            using_last_good: boolean;
+        };
         /** MarketBreadthDailySummary */
         MarketBreadthDailySummary: {
             /** Date */
@@ -8252,6 +8569,224 @@ export interface components {
             unavailable_sections?: string[];
             /** Up Count */
             up_count?: number;
+        };
+        /** MarketDailyBar */
+        MarketDailyBar: {
+            /**
+             * Adjustment
+             * @default none
+             * @constant
+             */
+            adjustment: "none";
+            /** Amount */
+            amount?: number | null;
+            /** Change Amount */
+            change_amount?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Close */
+            close: number;
+            /** Code */
+            code: string;
+            /**
+             * Currency
+             * @enum {string}
+             */
+            currency: "CNY" | "HKD";
+            /**
+             * First Refreshed At
+             * Format: date-time
+             */
+            first_refreshed_at: string;
+            /** High */
+            high?: number | null;
+            /**
+             * Instrument Type
+             * @enum {string}
+             */
+            instrument_type: "stock" | "index";
+            /**
+             * Last Refreshed At
+             * Format: date-time
+             */
+            last_refreshed_at: string;
+            /** Low */
+            low?: number | null;
+            /**
+             * Market
+             * @enum {string}
+             */
+            market: "cn" | "hk";
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Open */
+            open?: number | null;
+            /** Pre Close */
+            pre_close?: number | null;
+            /** Revision */
+            revision: number;
+            /** Source */
+            source: string;
+            /** Source Quote Time */
+            source_quote_time?: string | null;
+            /**
+             * Trade Date
+             * Format: date
+             */
+            trade_date: string;
+            /**
+             * Verification Status
+             * @enum {string}
+             */
+            verification_status: "provisional" | "confirmed";
+            /** Volume */
+            volume?: number | null;
+        };
+        /** MarketDailyBarDeleteRequest */
+        MarketDailyBarDeleteRequest: {
+            /**
+             * Checkpoint
+             * @default recheck
+             * @enum {string}
+             */
+            checkpoint: "initial" | "recheck";
+            /**
+             * Rebuild
+             * @default false
+             */
+            rebuild: boolean;
+            /** Segments */
+            segments?: ("cn_stock" | "cn_index" | "hk_stock" | "hk_index")[];
+            /**
+             * Trade Date
+             * Format: date
+             */
+            trade_date: string;
+        };
+        /** MarketDailyBarDeleteResult */
+        MarketDailyBarDeleteResult: {
+            /** Deleted Bars */
+            deleted_bars: number;
+            /** Deleted Jobs */
+            deleted_jobs: number;
+            /** Deleted Observations */
+            deleted_observations: number;
+            rebuild_result?: components["schemas"]["MarketDailyBarRefreshResult"] | null;
+            /**
+             * Trade Date
+             * Format: date
+             */
+            trade_date: string;
+        };
+        /** MarketDailyBarPage */
+        MarketDailyBarPage: {
+            /** End Date */
+            end_date?: string | null;
+            /** Items */
+            items: components["schemas"]["MarketDailyBar"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Start Date */
+            start_date?: string | null;
+            /** Total */
+            total: number;
+            /** Trade Date */
+            trade_date?: string | null;
+        };
+        /** MarketDailyBarRefreshHistory */
+        MarketDailyBarRefreshHistory: {
+            /** Items */
+            items: components["schemas"]["MarketDailyBarRefreshStatus"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** MarketDailyBarRefreshRequest */
+        MarketDailyBarRefreshRequest: {
+            /**
+             * Checkpoint
+             * @default recheck
+             * @enum {string}
+             */
+            checkpoint: "initial" | "recheck";
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+            /**
+             * Retry Failed Only
+             * @default false
+             */
+            retry_failed_only: boolean;
+            /** Segments */
+            segments?: ("cn_stock" | "cn_index" | "hk_stock" | "hk_index")[];
+            /**
+             * Trade Date
+             * Format: date
+             */
+            trade_date: string;
+        };
+        /** MarketDailyBarRefreshResult */
+        MarketDailyBarRefreshResult: {
+            /**
+             * Checkpoint
+             * @enum {string}
+             */
+            checkpoint: "initial" | "recheck";
+            /** Requested Segments */
+            requested_segments: ("cn_stock" | "cn_index" | "hk_stock" | "hk_index")[];
+            /** Statuses */
+            statuses: components["schemas"]["MarketDailyBarRefreshStatus"][];
+            /**
+             * Trade Date
+             * Format: date
+             */
+            trade_date: string;
+        };
+        /** MarketDailyBarRefreshStatus */
+        MarketDailyBarRefreshStatus: {
+            /** Attempts */
+            attempts: number;
+            /**
+             * Checkpoint
+             * @enum {string}
+             */
+            checkpoint: "initial" | "recheck";
+            /** Completed At */
+            completed_at?: string | null;
+            /** Expected Count */
+            expected_count?: number | null;
+            /** Last Error */
+            last_error?: string | null;
+            /** Next Retry At */
+            next_retry_at?: string | null;
+            /** Segment */
+            segment: string;
+            /** Started At */
+            started_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "running" | "success" | "skipped" | "failed";
+            /** Stored Count */
+            stored_count?: number | null;
+            /**
+             * Trade Date
+             * Format: date
+             */
+            trade_date: string;
         };
         /** MarketEmotion */
         MarketEmotion: {
@@ -8779,6 +9314,8 @@ export interface components {
         MarketNewsSnapshotItem: {
             /** Author */
             author?: string;
+            /** Category */
+            category?: string;
             /** Comment Count */
             comment_count?: number;
             /** Content */
@@ -8791,6 +9328,8 @@ export interface components {
             read_count?: number;
             /** Source */
             source?: string;
+            /** Source Api */
+            source_api?: string;
             /** Title */
             title?: string;
             /** Url */
@@ -9538,6 +10077,53 @@ export interface components {
              */
             sample_size: number;
         };
+        /** PolicyNewsSnapshotItem */
+        PolicyNewsSnapshotItem: {
+            /**
+             * Content
+             * @default
+             */
+            content: string;
+            /** Corroborating Sources */
+            corroborating_sources?: string[];
+            /**
+             * Direction
+             * @default neutral
+             * @enum {string}
+             */
+            direction: "positive" | "negative" | "mixed" | "neutral";
+            /**
+             * Event Type
+             * @default market
+             * @enum {string}
+             */
+            event_type: "policy" | "macro" | "global" | "industry" | "market";
+            /**
+             * Publish Time
+             * @default
+             */
+            publish_time: string;
+            /** Related Sectors */
+            related_sectors?: string[];
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /**
+             * Timing
+             * @default on_date
+             * @enum {string}
+             */
+            timing: "before" | "on_date" | "after";
+            /** Title */
+            title: string;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
+        };
         /** PortfolioAccountSettings */
         PortfolioAccountSettings: {
             /** Initial Cash */
@@ -9606,6 +10192,60 @@ export interface components {
             total_shares: number;
             /** Transaction Count */
             transaction_count: number;
+        };
+        /** PortfolioEquityCurvePoint */
+        PortfolioEquityCurvePoint: {
+            /** Cash Balance */
+            cash_balance?: number | null;
+            /** Cumulative Return Pct */
+            cumulative_return_pct?: number | null;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Drawdown Pct */
+            drawdown_pct?: number | null;
+            /** Securities Value */
+            securities_value: number;
+            /** Total Assets */
+            total_assets?: number | null;
+            /**
+             * Unpriced Count
+             * @default 0
+             */
+            unpriced_count: number;
+        };
+        /** PortfolioEquityCurveResponse */
+        PortfolioEquityCurveResponse: {
+            /** Current Securities Value */
+            current_securities_value?: number | null;
+            /** Current Total Assets */
+            current_total_assets?: number | null;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Initial Cash */
+            initial_cash?: number | null;
+            /** Max Drawdown Pct */
+            max_drawdown_pct?: number | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "total_assets" | "securities_only";
+            /** Points */
+            points?: components["schemas"]["PortfolioEquityCurvePoint"][];
+            /** Sources */
+            sources?: string[];
+            /** Start Date */
+            start_date?: string | null;
+            /** Total Return Pct */
+            total_return_pct?: number | null;
+            /** Warnings */
+            warnings?: string[];
         };
         /** PortfolioLotMatch */
         PortfolioLotMatch: {
@@ -16234,6 +16874,280 @@ export interface operations {
             };
         };
     };
+    get_market_daily_bars_api_market_daily_bars_get: {
+        parameters: {
+            query?: {
+                market?: string | null;
+                instrument_type?: string | null;
+                /** @description 单日查询；不能与日期范围同时使用 */
+                trade_date?: string | null;
+                /** @description 范围起始日期，需与 end_date 同时提供 */
+                start_date?: string | null;
+                /** @description 范围结束日期，需与 start_date 同时提供 */
+                end_date?: string | null;
+                /** @description 逗号分隔的证券代码；不传任何日期时读取最近可用交易日 */
+                codes?: string;
+                page?: number;
+                page_size?: number;
+                /** @description 深分页游标；使用时 page 必须为 1 */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDailyBarPage"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    invalidate_market_adjustment_factors_api_market_daily_bars_adjustment_invalidate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarketAdjustmentFactorInvalidateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketAdjustmentFactorStatus"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refresh_market_adjustment_factors_api_market_daily_bars_adjustment_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarketAdjustmentFactorRefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketAdjustmentFactorStatus"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_market_adjustment_factor_status_api_market_daily_bars_adjustment_status_get: {
+        parameters: {
+            query: {
+                /** @description 6 位 A 股代码 */
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketAdjustmentFactorStatus"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_market_daily_bars_api_market_daily_bars_delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarketDailyBarDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDailyBarDeleteResult"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refresh_market_daily_bars_api_market_daily_bars_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarketDailyBarRefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDailyBarRefreshResult"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_market_daily_bar_refresh_history_api_market_daily_bars_refresh_history_get: {
+        parameters: {
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+                status?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDailyBarRefreshHistory"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_market_daily_bar_refresh_status_api_market_daily_bars_status_get: {
+        parameters: {
+            query: {
+                trade_date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDailyBarRefreshStatus"][];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_dragon_tiger_list_api_market_dragon_tiger_get: {
         parameters: {
             query?: {
@@ -17281,6 +18195,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioPosition"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_equity_curve_api_portfolio_equity_curve_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioEquityCurveResponse"];
                 };
             };
             /** @description 统一错误响应 */

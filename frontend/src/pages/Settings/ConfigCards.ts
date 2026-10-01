@@ -1,3 +1,4 @@
+export { default as AnySearchConfigCard } from "./config-cards/AnySearchConfigCard";
 export { default as BotConfigCard } from "./config-cards/BotConfigCard";
 export { default as ResearchBudgetCard } from "./config-cards/ResearchBudgetCard";
 export { default as DataSourceCookiesCard } from "./config-cards/DataSourceCookiesCard";

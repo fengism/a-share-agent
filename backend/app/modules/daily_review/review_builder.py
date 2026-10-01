@@ -1,12 +1,292 @@
 import json
+from datetime import date, time
 from typing import Any
 
+from app.core.news import parse_news_datetime
 from app.modules.daily_review.models import (
     DailyReviewDataSnapshot,
+    DailyReviewEventImpact,
     DailyReviewResult,
     DailyReviewSection,
     DailyReviewSourceStatus,
 )
+from app.modules.daily_review.news_policy import classify_policy_news
+
+_EVENT_TYPE_LABELS = {
+    "policy": "政策",
+    "macro": "宏观",
+    "global": "海外",
+    "industry": "产业",
+    "market": "市场",
+}
+_DIRECTION_LABELS = {
+    "positive": "偏利好",
+    "negative": "偏利空",
+    "mixed": "影响分化",
+    "neutral": "方向待确认",
+}
+_TIMING_LABELS = {
+    "before": "盘前/事前信息",
+    "on_date": "复盘日信息",
+    "after": "事后验证",
+}
+
+
+def _is_housing_interest_subsidy(title: str, content: str) -> bool:
+    text = f"{title} {content}".lower()
+    housing = any(keyword in text for keyword in ("购房", "住房贷款", "房贷", "按揭", "首套房", "mortgage"))
+    subsidy = any(keyword in text for keyword in ("贴息", "利息补贴", "mortgage subsidy", "mortgage subsidies"))
+    return housing and subsidy
+
+
+def _is_post_close_publication(item) -> bool:
+    if item.timing != "on_date":
+        return False
+    published = parse_news_datetime(
+        item.publish_time,
+        allow_relative=False,
+        allow_time_only=False,
+    )
+    # 00:00 通常来自只含日期的 URL 归档值，不能据此断言为盘前发布。
+    return published is not None and published.time() != time.min and published.time() >= time(15, 0)
+
+
+def _apply_publication_cutoff(
+    item,
+    transmission_chain: str,
+    confirmation_signals: list[str],
+) -> tuple[str, list[str]]:
+    if item.timing == "after":
+        return (
+            f"事后发布，不用于解释复盘日走势；{transmission_chain}",
+            ["仅用复盘日后的盘面和数据验证，不反向归因当日行情", *confirmation_signals[:2]],
+        )
+    if _is_post_close_publication(item):
+        return (
+            f"复盘日收盘后发布，不用于解释当日收盘；作为下一交易日及后续基本面线索：{transmission_chain}",
+            ["下一交易日相关板块竞价、成交额与龙头强弱", *confirmation_signals],
+        )
+    return transmission_chain, confirmation_signals
+
+
+def _fallback_impact_details(item) -> tuple[str, str, list[str], list[str]]:
+    if _is_housing_interest_subsidy(item.title, item.content):
+        transmission_chain, confirmation_signals = _apply_publication_cutoff(
+            item,
+            (
+                "财政贴息降低符合条件家庭的实际房贷成本 → 刚性和改善性购房需求边际释放 → "
+                "新房成交与房企回款预期改善 → 地产开发、经纪服务和家居建材估值修复；"
+                "银行端同时观察按揭投放增量能否覆盖息差压力"
+            ),
+            [
+                "住建部门高频成交和网签数据连续改善",
+                "房地产与家居建材成交额放大且龙头相对强势",
+                "新增居民中长期贷款或银行按揭投放回升",
+            ],
+        )
+        return (
+            "medium_term",
+            transmission_chain,
+            confirmation_signals,
+            [
+                "申请门槛、面积或总价限制使实际覆盖面明显低于预期",
+                "政策落地后网签和居民中长期贷款未改善",
+                "地产板块仅高开脉冲、成交额和板块扩散不能维持",
+            ],
+        )
+    sectors = item.related_sectors
+    sector_text = "、".join(sectors) if sectors else "大盘风险偏好与相关产业链"
+    transmission_chain, confirmation_signals = _apply_publication_cutoff(
+        item,
+        (
+            f"{_EVENT_TYPE_LABELS[item.event_type]}事件 → 预期与风险偏好变化 → "
+            f"{sector_text}资金关注度变化 → 观察成交额、龙头强弱与板块扩散确认"
+        ),
+        ["相关板块成交额放大", "中军或龙头相对强势", "板块上涨家数与涨停梯队扩散"],
+    )
+    return (
+        "short_term",
+        transmission_chain,
+        confirmation_signals,
+        ["政策细则弱于预期", "板块高开低走且成交额不能维持", "仅个别概念股脉冲、无行业扩散"],
+    )
+
+
+_SECTOR_CONFIRMATION_ALIASES = {
+    "房地产": ("房地产", "地产", "物业", "房屋建设"),
+    "银行": ("银行",),
+    "券商": ("券商", "证券"),
+    "新能源车": ("新能源车", "汽车"),
+    "人工智能": ("人工智能", "AI", "算力"),
+}
+
+
+def _sector_matches(sector: str, market_name: str) -> bool:
+    aliases = _SECTOR_CONFIRMATION_ALIASES.get(sector, (sector,))
+    normalized_name = market_name.lower()
+    return any(alias.lower() in normalized_name or normalized_name in alias.lower() for alias in aliases)
+
+
+def _market_confirmation(snapshot: DailyReviewDataSnapshot, item) -> str:
+    if item.timing == "after":
+        return "事件发布于复盘日之后，复盘日盘面不能作为该事件的验证证据。"
+    if _is_post_close_publication(item):
+        return "事件在复盘日收盘后发布，当日板块涨跌不构成该政策的市场反馈，需从下一交易日开始验证。"
+    matched: list[tuple[str, float | None, str]] = []
+    for group, rows in (("领涨", snapshot.top_sectors), ("领跌", snapshot.bottom_sectors)):
+        for row in rows:
+            name = str(row.get("name") or "").strip()
+            if not name or not any(_sector_matches(sector, name) for sector in item.related_sectors):
+                continue
+            change = row.get("change_pct")
+            matched.append((name, float(change) if isinstance(change, (int, float)) else None, group))
+    if not matched:
+        return "输入的领涨/领跌板块中未发现与该事件直接对应的方向，尚未获得明确盘面确认。"
+    details = "、".join(
+        f"{name}{f'{change:+.2f}%' if change is not None else ''}（{group}）"
+        for name, change, group in matched[:4]
+    )
+    has_leader = any(group == "领涨" and (change is None or change > 0) for _, change, group in matched)
+    has_laggard = any(group == "领跌" and (change is None or change < 0) for _, change, group in matched)
+    if has_leader and not has_laggard:
+        verdict = "相关方向已出现初步盘面响应，但仍需成交额与持续性确认"
+    elif has_laggard and not has_leader:
+        verdict = "相关方向当日表现偏弱，政策逻辑尚未获得盘面确认"
+    else:
+        verdict = "相关方向表现分化，不能据此认定政策已经被市场定价"
+    return f"{details}；{verdict}。"
+
+
+def _evidence_text(item) -> str:
+    direction_text = _DIRECTION_LABELS[item.direction]
+    corroboration = (
+        f"；交叉来源：{'、'.join(item.corroborating_sources)}"
+        if item.corroborating_sources
+        else ""
+    )
+    publication_note = "；盘后发布，不作为当日收盘归因" if _is_post_close_publication(item) else ""
+    return (
+        f"{item.source or '未知来源'} {item.publish_time or ''}：{item.title}"
+        f"（{direction_text}）{publication_note}；原文：{item.url or '无链接'}{corroboration}"
+    ).strip()
+
+
+def build_fallback_event_impacts(snapshot: DailyReviewDataSnapshot) -> list[DailyReviewEventImpact]:
+    impacts: list[DailyReviewEventImpact] = []
+    for item in snapshot.policy_news[:6]:
+        sectors = item.related_sectors
+        horizon, transmission_chain, confirmation_signals, invalidation_conditions = _fallback_impact_details(item)
+        impacts.append(DailyReviewEventImpact(
+            event_title=item.title,
+            event_type=item.event_type,
+            direction=item.direction,
+            timing=item.timing,
+            horizon=horizon,
+            affected_sectors=sectors,
+            transmission_chain=transmission_chain,
+            evidence=_evidence_text(item),
+            market_confirmation=_market_confirmation(snapshot, item),
+            confirmation_signals=confirmation_signals,
+            invalidation_conditions=invalidation_conditions,
+        ))
+    return impacts
+
+
+def build_fallback_news_policy_section(snapshot: DailyReviewDataSnapshot) -> DailyReviewSection:
+    if not snapshot.policy_news:
+        return DailyReviewSection(
+            title="新闻政策与影响传导",
+            summary="未获取到与目标复盘时点匹配且可核验的政策、宏观或产业事件。",
+            bullets=["不要用当前新闻回填历史复盘；需补齐目标日期附近的政策与新闻源。"],
+        )
+    bullets = []
+    for item in snapshot.policy_news[:8]:
+        sectors = "、".join(item.related_sectors) or "市场整体"
+        corroboration = f"；交叉来源：{'、'.join(item.corroborating_sources)}" if item.corroborating_sources else ""
+        bullets.append(
+            f"[{_EVENT_TYPE_LABELS[item.event_type]}｜{_DIRECTION_LABELS[item.direction]}｜{_TIMING_LABELS[item.timing]}] {item.title}；"
+            f"影响方向：{sectors}；主来源：{item.source or '-'} {item.publish_time or ''}{corroboration}".strip()
+        )
+    return DailyReviewSection(
+        title="新闻政策与影响传导",
+        summary="区分事实、市场解读与盘面验证；新闻本身不直接等同于可交易结论。",
+        bullets=bullets,
+    )
+
+
+def _normalized_event_title(value: str) -> str:
+    return "".join(character.lower() for character in value if character.isalnum())
+
+
+def _matches_event_title(candidate: str, source: str) -> bool:
+    normalized_candidate = _normalized_event_title(candidate)
+    normalized_source = _normalized_event_title(source)
+    if min(len(normalized_candidate), len(normalized_source)) < 6:
+        return normalized_candidate == normalized_source
+    return normalized_candidate in normalized_source or normalized_source in normalized_candidate
+
+
+def ground_event_impacts(
+    snapshot: DailyReviewDataSnapshot,
+    impacts: list[DailyReviewEventImpact],
+) -> list[DailyReviewEventImpact]:
+    """只保留能回溯到真实新闻标题的 LLM 事件，并强制覆盖来源证据。"""
+    grounded: list[DailyReviewEventImpact] = []
+    used_titles: set[str] = set()
+    for impact in impacts:
+        source = next(
+            (
+                item
+                for item in snapshot.policy_news
+                if item.title not in used_titles and _matches_event_title(impact.event_title, item.title)
+            ),
+            None,
+        )
+        if source is None:
+            continue
+        used_titles.add(source.title)
+        transmission_chain, confirmation_signals = _apply_publication_cutoff(
+            source,
+            impact.transmission_chain,
+            impact.confirmation_signals,
+        )
+        grounded.append(impact.model_copy(update={
+            "event_title": source.title,
+            "event_type": source.event_type,
+            "direction": source.direction,
+            "timing": source.timing,
+            "affected_sectors": impact.affected_sectors or source.related_sectors,
+            "transmission_chain": transmission_chain,
+            "market_confirmation": _market_confirmation(snapshot, source),
+            "confirmation_signals": confirmation_signals,
+            "evidence": (
+                f"{source.source or '未知来源'} {source.publish_time or ''}：{source.title}"
+                f"（{source.url or '无链接'}）"
+                + (
+                    f"；交叉来源：{'、'.join(source.corroborating_sources)}"
+                    if source.corroborating_sources
+                    else ""
+                )
+            ).strip(),
+        }))
+    return grounded or build_fallback_event_impacts(snapshot)
+
+
+def ground_news_policy_section(
+    snapshot: DailyReviewDataSnapshot,
+    section: DailyReviewSection,
+) -> DailyReviewSection:
+    """当模型章节未引用任何真实事件时，退回可核验的确定性摘要。"""
+    if not snapshot.policy_news:
+        return build_fallback_news_policy_section(snapshot)
+    content = " ".join([section.summary, *section.bullets])
+    if any(
+        _matches_event_title(content, item.title)
+        or _normalized_event_title(item.title)[:8] in _normalized_event_title(content)
+        for item in snapshot.policy_news
+    ):
+        return section
+    return build_fallback_news_policy_section(snapshot)
 
 
 def _index_move_counts(snapshot: DailyReviewDataSnapshot) -> tuple[int, int]:
@@ -245,6 +525,7 @@ def build_fallback_review(
         sign = "+" if north > 0 else ""
         dragon_bullets.append(f"北向资金：当日净流入 {sign}{north:.2f} 亿元")
 
+    event_impacts = build_fallback_event_impacts(snapshot)
     return DailyReviewResult(
         date=date,
         title=f"{date} 每日复盘",
@@ -261,6 +542,8 @@ def build_fallback_review(
             summary="选取当日活跃席位与异动个股，观察主力资金流动与短线情绪偏好。",
             bullets=dragon_bullets or ["暂无龙虎榜活跃个股数据。"],
         ),
+        news_policy_review=build_fallback_news_policy_section(snapshot),
+        event_impacts=event_impacts,
         risk_alerts=[
             "市场宽度数据缺失，无法判断真实赚钱效应与退潮压力。"
             if not breadth_available
@@ -416,9 +699,18 @@ def build_prompt(
         if item.get("name")
     ]
     news_bullets = [
-        f"{item.get('title', '')}：{item.get('content', '-') }"
+        f"{item.get('publish_time', '-')}｜{item.get('source', '-')}｜{item.get('title', '')}：{str(item.get('content', '-'))[:320]}｜URL:{item.get('url', '-')}"
         for item in snapshot.market_news[:20]
         if item.get("title")
+    ]
+    policy_bullets = [
+        (
+            f"[{_EVENT_TYPE_LABELS[item.event_type]}｜{_DIRECTION_LABELS[item.direction]}｜{_TIMING_LABELS[item.timing]}] "
+            f"{item.publish_time or '-'}｜{item.source or '-'}｜{item.title}｜"
+            f"关联方向:{'、'.join(item.related_sectors) or '待识别'}｜URL:{item.url or '-'}｜"
+            f"交叉来源:{'、'.join(item.corroborating_sources) or '-'}"
+        )
+        for item in snapshot.policy_news[:16]
     ]
     return prompt_template.format(
         date=date,
@@ -431,6 +723,7 @@ def build_prompt(
         hot_concepts_placeholder="\n".join(hot_concept_bullets) if hot_concept_bullets else json.dumps(snapshot.hot_concepts[:8], ensure_ascii=False),
         hot_industries_placeholder="\n".join(hot_industry_bullets) if hot_industry_bullets else json.dumps(snapshot.hot_industries[:15], ensure_ascii=False),
         news_placeholder="\n".join(news_bullets) if news_bullets else json.dumps(snapshot.market_news[:20], ensure_ascii=False),
+        policy_news_placeholder="\n".join(policy_bullets) if policy_bullets else "暂无匹配复盘时点的重点政策事件",
         top_sectors_placeholder="\n".join(top_sector_bullets) if top_sector_bullets else json.dumps(snapshot.top_sectors[:10], ensure_ascii=False),
         bottom_sectors_placeholder="\n".join(bottom_sector_bullets) if bottom_sector_bullets else json.dumps(snapshot.bottom_sectors[:10], ensure_ascii=False),
         market_volume_placeholder=_market_volume_summary(snapshot) or json.dumps(snapshot.market_volume, ensure_ascii=False),
@@ -468,6 +761,16 @@ def build_snapshot(
     bottom_sectors = market_statistics_data.get("bottom_sectors", [])
     market_statistics_data.pop("top_sectors", None)
     market_statistics_data.pop("bottom_sectors", None)
+    market_news_items = (
+        []
+        if isinstance(market_news, Exception) or market_news is None
+        else list(market_news)
+    )
+    try:
+        policy_target_date = date.fromisoformat(effective_date) if effective_date else None
+    except ValueError:
+        policy_target_date = None
+    policy_news = classify_policy_news(market_news_items, target_date=policy_target_date)
     snapshot_data = {
         "requested_date": requested_date,
         "effective_date": effective_date,
@@ -480,9 +783,8 @@ def build_snapshot(
         "hot_industries": [] if isinstance(hot_industries, Exception) or hot_industries is None else hot_industries,
         "dragon_tiger": [] if isinstance(dragon_tiger, Exception) or dragon_tiger is None else dragon_tiger,
         "market_statistics": market_statistics_data,
-        "market_news": []
-        if isinstance(market_news, Exception) or market_news is None
-        else [item.model_dump() for item in market_news],
+        "market_news": [item.model_dump() for item in market_news_items],
+        "policy_news": policy_news,
         "top_sectors": top_sectors,
         "bottom_sectors": bottom_sectors,
     }

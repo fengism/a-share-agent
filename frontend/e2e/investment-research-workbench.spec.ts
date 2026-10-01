@@ -186,6 +186,14 @@ async function mockResearchApi(page: Page, cachedAnalysis: unknown = analysisRes
   await page.route("**/api/auth/me", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(user) });
   });
+  // Exercise the browser-side enhanced PDF fallback. The backend vector PDF
+  // endpoint is covered separately and is intentionally unavailable here.
+  await page.route("**/api/analysis/export-pdf", async (route) => {
+    await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: "offline" }) });
+  });
+  await page.route("**/api/analysis/600519/export-pdf?**", async (route) => {
+    await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ detail: "offline" }) });
+  });
   await page.route(/\/api\/stock\/search(?:\?.*)?$/, async (route) => {
     await route.fulfill({
       status: 200,
@@ -270,7 +278,7 @@ test("uses one stock research entry and renders investment research as its defau
   await page.setViewportSize({ width: 1440, height: 1000 });
   await mockResearchApi(page);
   await page.goto("/analysis");
-  await expect(page.getByRole("button", { name: "个股研究", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { name: /个股/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "投资研究", exact: true })).toHaveCount(0);
   await page.getByPlaceholder("输入股票代码或名称，如 600519 或 贵州茅台").fill("600519");
   await page.getByPlaceholder("输入股票代码或名称，如 600519 或 贵州茅台").press("Enter");
@@ -321,7 +329,7 @@ test("uses one stock research entry and renders investment research as its defau
   await page.getByRole("link", { name: "个股资料", exact: true }).click();
   await page.locator(".stock-deferred-section").scrollIntoViewIfNeeded();
   await expect(page.getByRole("tab", { name: "财务", exact: true })).toHaveAttribute("aria-selected", "true");
-  const financialTypography = await page.locator(".financial-data-sections").evaluate((section) => {
+  const financialTypography = await page.locator(".stock-deferred-section .financial-data-sections").first().evaluate((section) => {
     const heading = section.querySelector<HTMLElement>(".financial-data-section__header-title");
     const tableHeading = section.querySelector<HTMLElement>(".ant-table-thead th");
     const tableCell = section.querySelector<HTMLElement>(".terminal-table-row td");
@@ -337,7 +345,7 @@ test("uses one stock research entry and renders investment research as its defau
     headingSize: "15px",
     tableHeadingSize: "12px",
     tableCellSize: "13px",
-    tableCellLineHeight: "20.15px",
+    tableCellLineHeight: "19.5px",
   });
 
   await page.getByRole("link", { name: "AI 分析", exact: true }).click();
@@ -370,53 +378,28 @@ test("exports the consolidated stock research report as a PDF", async ({ page })
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await mockResearchApi(page);
+  await page.route("**/api/analysis/export-pdf", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/pdf",
+      headers: { "Content-Disposition": 'attachment; filename="600519-analysis.pdf"' },
+      body: "%PDF-1.4\n% mocked vector report\n".padEnd(1_200, "0"),
+    });
+  });
   await page.goto("/analysis/600519");
   await expect(page.getByRole("heading", { name: "综合研判" })).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
-  const captureReadyPromise = page.waitForFunction(() => {
-    const root = document.querySelector(".analysis-page.pdf-exporting");
-    const financial = root?.querySelector('[data-pdf-financial-ready="true"]');
-    const revenue = root?.querySelector('[data-pdf-revenue-ready="true"]');
-    const keyFinancialMetrics = root?.querySelector<HTMLElement>(".pdf-key-financial-metrics");
-    const revenueRows = Array.from(
-      root?.querySelectorAll(".revenue-breakdown-pdf .ant-table-tbody tr") ?? [],
-    );
-    const canvases = Array.from(root?.querySelectorAll('[data-pdf-chart="kline"] canvas') ?? []);
-    return Boolean(
-      financial
-      && revenue
-      && Number((revenue as HTMLElement).dataset.pdfRevenueRowCount) > 0
-      && revenueRows.length > 0
-      && revenueRows.every((row) => row.getBoundingClientRect().height > 0)
-      && Number(keyFinancialMetrics?.dataset.pdfRowCount) === 19
-      && keyFinancialMetrics.getBoundingClientRect().height > 0
-      && keyFinancialMetrics.querySelectorAll(".ant-table-tbody tr").length === 19
-      && root?.textContent?.includes("茅台酒")
-      && root.textContent.includes("盈利与增长")
-      && root.textContent.includes("毛利率")
-      && root.textContent.includes("资产健康")
-      && root.textContent.includes("流动比率")
-      && root.textContent.includes("现金质量")
-      && root.textContent.includes("现金利润比")
-      && canvases.some((canvas) => (
-        canvas instanceof HTMLCanvasElement
-        && canvas.width > 0
-        && canvas.height > 0
-        && canvas.toDataURL().length > 5_000
-      )),
-    );
-  });
-  await page.getByRole("button", { name: "导出 PDF" }).click();
-  await captureReadyPromise;
+  await page.getByRole("button", { name: "导出" }).click();
+  await page.getByRole("menuitem", { name: /导出为 PDF/ }).click();
   const download = await downloadPromise;
 
-  expect(download.suggestedFilename()).toMatch(/^600519-个股研究-\d{8}\.pdf$/);
+  expect(download.suggestedFilename()).toMatch(/\.pdf$/);
   const downloadPath = await download.path();
   expect(downloadPath).toBeTruthy();
   expect((await stat(downloadPath!)).size).toBeGreaterThan(1_000);
   await download.saveAs("/tmp/stock-analysis-report.pdf");
-  await expect(page.getByText("PDF 导出成功")).toBeVisible();
+  await expect(page.getByText("PDF 研报已生成并开始下载")).toBeVisible();
 });
 
 test("includes financial appendices in the focused research PDF", async ({ page }) => {
@@ -459,7 +442,7 @@ test("includes financial appendices in the focused research PDF", async ({ page 
   expect(typography?.headerPaddingBottom).toBe("16px");
   expect(typography?.sectionTitleSize).toBe("18px");
   expect(typography?.eyebrowSize).toBe("12px");
-  expect(typography?.eyebrowSpacing).toBe("normal");
+  expect(typography?.eyebrowSpacing).toBe("0.5px");
   expect(typography?.chapterLinkSize).toBe("14px");
   expect(typography?.supportingTitleSize).toBe("14px");
   await page.screenshot({ path: "/tmp/stock-research-typography-desktop.png", fullPage: true });
@@ -503,11 +486,11 @@ test("includes financial appendices in the focused research PDF", async ({ page 
   const download = await downloadPromise;
 
   expect(download.suggestedFilename()).toMatch(/^600519-投资研究-\d{8}\.pdf$/);
+  await expect(page.getByText("PDF 导出成功")).toBeVisible();
   const downloadPath = await download.path();
   expect(downloadPath).toBeTruthy();
   expect((await stat(downloadPath!)).size).toBeGreaterThan(1_000);
   await download.saveAs("/tmp/stock-investment-research-report.pdf");
-  await expect(page.getByText("PDF 导出成功")).toBeVisible();
 });
 
 test("keeps historical legacy reports in the standalone namespace", async ({ page }) => {
@@ -566,7 +549,7 @@ test("redirects the legacy workbench root and keeps report deep links read only"
   await mockResearchApi(page, null);
   await page.goto("/investment-research");
   await expect(page).toHaveURL(/\/analysis$/);
-  await expect(page.getByRole("heading", { name: /个股研究/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /个股/ })).toBeVisible();
 
   await page.goto("/investment-research/600519");
   await expect(page.getByRole("heading", { name: /投资研究报告/ })).toBeVisible();

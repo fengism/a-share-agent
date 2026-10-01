@@ -1,8 +1,16 @@
 import { Col, Row } from "antd";
 import AdminResetCard from "../../components/AdminResetCard";
-import { BotConfigCard, DataSourceCookiesCard, FredConfigCard, ResearchBudgetCard, TwitterConfigCard } from "./ConfigCards";
+import {
+  AnySearchConfigCard,
+  BotConfigCard,
+  DataSourceCookiesCard,
+  FredConfigCard,
+  ResearchBudgetCard,
+  TwitterConfigCard,
+} from "./ConfigCards";
 import BotJobManagerCard from "./BotJobManagerCard";
 import InviteManagerCard from "./InviteManagerCard";
+import MarketDailyBarManagerCard from "./MarketDailyBarManagerCard";
 import SecurityAuditCard from "./SecurityAuditCard";
 import UserManagerCard from "./UserManagerCard";
 import type { ConfigSectionProps } from "./sectionTypes";
@@ -10,6 +18,8 @@ import type { ConfigSectionProps } from "./sectionTypes";
 interface DataSourcesSettingsSectionProps extends ConfigSectionProps {
   onSaveTwitter: () => void;
   onSaveFred: () => void;
+  anySearchConfigured: boolean;
+  onSaveAnySearch: () => void;
   onSaveDataSourceCookies: () => void;
 }
 
@@ -20,6 +30,8 @@ export function DataSourcesSettingsSection({
   sectionTitleStyle,
   onSaveTwitter,
   onSaveFred,
+  anySearchConfigured,
+  onSaveAnySearch,
   onSaveDataSourceCookies,
 }: DataSourcesSettingsSectionProps) {
   const cardProps = { form, onChange, isSaving };
@@ -34,6 +46,9 @@ export function DataSourcesSettingsSection({
           <FredConfigCard {...cardProps} onSave={onSaveFred} />
         </Col>
         <Col xs={24} lg={12}>
+          <AnySearchConfigCard {...cardProps} configured={anySearchConfigured} onSave={onSaveAnySearch} />
+        </Col>
+        <Col xs={24} lg={12}>
           <DataSourceCookiesCard {...cardProps} onSave={onSaveDataSourceCookies} />
         </Col>
       </Row>
@@ -44,6 +59,7 @@ export function DataSourcesSettingsSection({
 interface AdminSettingsSectionProps extends ConfigSectionProps {
   onSaveBot: () => void;
   onSaveResearchBudget: () => void;
+  onSaveMarketDailyBars: () => void;
 }
 
 export function AdminSettingsSection({
@@ -53,6 +69,7 @@ export function AdminSettingsSection({
   sectionTitleStyle,
   onSaveBot,
   onSaveResearchBudget,
+  onSaveMarketDailyBars,
 }: AdminSettingsSectionProps) {
   return (
     <section aria-labelledby="admin-settings-title">
@@ -63,6 +80,13 @@ export function AdminSettingsSection({
       <AdminResetCard />
       <BotConfigCard form={form} onChange={onChange} isSaving={isSaving} onSave={onSaveBot} />
       <ResearchBudgetCard form={form} onChange={onChange} isSaving={isSaving} onSave={onSaveResearchBudget} />
+      <MarketDailyBarManagerCard
+        form={form}
+        onChange={onChange}
+        isSaving={isSaving}
+        sectionTitleStyle={sectionTitleStyle}
+        onSave={onSaveMarketDailyBars}
+      />
       <BotJobManagerCard />
     </section>
   );

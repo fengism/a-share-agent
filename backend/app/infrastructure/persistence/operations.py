@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import os
 import shutil
@@ -71,24 +72,49 @@ def _verify_checksum(path: Path) -> None:
         raise RuntimeError(f"SQLite 备份校验和不匹配: path={path}")
 
 
+def _list_backups(backup_dir: Path, database: str) -> list[Path]:
+    if not backup_dir.is_dir():
+        return []
+    backups = [
+        *backup_dir.glob(f"{database}-*.sqlite3"),
+        *backup_dir.glob(f"{database}-*.sqlite3.gz"),
+    ]
+    return [path for path in backups if path.is_file()]
+
+
 def _prune_backups(backup_dir: Path, database: str, retention_count: int) -> None:
-    backups = sorted(backup_dir.glob(f"{database}-*.sqlite3"), reverse=True)
+    backups = sorted(
+        _list_backups(backup_dir, database),
+        key=lambda path: (_backup_created_at(path), path.name),
+        reverse=True,
+    )
     for expired in backups[max(1, retention_count):]:
         durable_unlink(expired)
         durable_unlink(_checksum_path(expired))
 
 
 def _cleanup_incomplete_backups(backup_dir: Path, database: str) -> None:
-    for temporary in backup_dir.glob(f"{database}-*.sqlite3.tmp"):
-        durable_unlink(temporary)
-    for checksum in backup_dir.glob(f"{database}-*.sqlite3.sha256"):
+    for pattern in (
+        f"{database}-*.sqlite3.tmp",
+        f"{database}-*.sqlite3.gz.tmp",
+        f".{database}-*.sqlite3.tmp",
+        f".{database}-*.sqlite3.gz.*.tmp",
+    ):
+        for temporary in backup_dir.glob(pattern):
+            durable_unlink(temporary)
+    for checksum in backup_dir.glob(f"{database}-*.sqlite3*.sha256"):
         backup = checksum.with_name(checksum.name.removesuffix(".sha256"))
         if not backup.is_file():
             durable_unlink(checksum)
 
 
 def _backup_created_at(path: Path) -> float:
-    timestamp = path.stem.rsplit("-", maxsplit=1)[-1]
+    name = path.name
+    for suffix in (".sqlite3.gz", ".sqlite3"):
+        if name.endswith(suffix):
+            name = name.removesuffix(suffix)
+            break
+    timestamp = name.rsplit("-", maxsplit=1)[-1]
     try:
         return datetime.strptime(timestamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC).timestamp()
     except ValueError:
@@ -104,7 +130,7 @@ def backup_freshness_snapshot(
     reference_time = (now or datetime.now(UTC)).astimezone(UTC).timestamp()
     snapshot: dict[str, dict[str, float | bool | str | None]] = {}
     for database in databases:
-        backups = list(backup_dir.glob(f"{database}-*.sqlite3")) if backup_dir.is_dir() else []
+        backups = _list_backups(backup_dir, database)
         if not backups:
             snapshot[database] = {
                 "exists": False,
@@ -121,6 +147,100 @@ def backup_freshness_snapshot(
             "latest_file": latest.name,
         }
     return snapshot
+
+
+def backup_databases_due(
+    backup_dir: Path,
+    *,
+    interval_seconds: int,
+    databases: Iterable[DatabaseName] = ALL_DATABASES,
+    now: datetime | None = None,
+) -> tuple[DatabaseName, ...]:
+    """返回缺失、缺校验和或已经超过备份周期的数据库。"""
+    selected = tuple(databases)
+    snapshot = backup_freshness_snapshot(backup_dir, databases=selected, now=now)
+    return tuple(
+        database
+        for database in selected
+        if not snapshot[database]["exists"]
+        or not snapshot[database]["checksum_exists"]
+        or float(snapshot[database]["age_seconds"] or 0) >= interval_seconds
+    )
+
+
+def _compress_sqlite(source: Path, destination: Path, *, compresslevel: int = 9) -> None:
+    durable_unlink(destination)
+    try:
+        with source.open("rb") as raw_source, destination.open("wb") as raw_destination:
+            with gzip.GzipFile(
+                filename="",
+                mode="wb",
+                compresslevel=compresslevel,
+                fileobj=raw_destination,
+                mtime=0,
+            ) as compressed:
+                shutil.copyfileobj(raw_source, compressed, length=1024 * 1024)
+            raw_destination.flush()
+            os.fsync(raw_destination.fileno())
+        os.chmod(destination, 0o600)
+    except Exception:
+        durable_unlink(destination)
+        raise
+
+
+def _decompress_sqlite(source: Path, destination: Path) -> None:
+    durable_unlink(destination)
+    try:
+        with gzip.open(source, "rb") as compressed, destination.open("wb") as raw:
+            shutil.copyfileobj(compressed, raw, length=1024 * 1024)
+            raw.flush()
+            os.fsync(raw.fileno())
+        os.chmod(destination, 0o600)
+    except Exception as error:
+        durable_unlink(destination)
+        raise RuntimeError(f"SQLite gzip 备份解压失败: path={source}") from error
+
+
+def _verify_compressed_backup(path: Path) -> None:
+    """流式读完整个 gzip 包以校验 header、CRC 和未压缩长度。"""
+    try:
+        with gzip.open(path, "rb") as compressed:
+            for _chunk in iter(lambda: compressed.read(1024 * 1024), b""):
+                pass
+    except Exception as error:
+        raise RuntimeError(f"SQLite gzip 备份校验失败: path={path}") from error
+
+
+def _verify_backup_artifact(path: Path) -> None:
+    if path.name.endswith(".sqlite3.gz"):
+        _verify_compressed_backup(path)
+    else:
+        _verify_backup(path)
+
+
+def _publish_compressed_backup(
+    sqlite_temporary: Path,
+    destination: Path,
+    *,
+    compresslevel: int = 9,
+) -> None:
+    _verify_backup(sqlite_temporary)
+    compressed_temporary = destination.with_name(f".{destination.name}.compress.tmp")
+    checksum_path = _checksum_path(destination)
+    if destination.exists() or checksum_path.exists():
+        raise FileExistsError(destination)
+    try:
+        _compress_sqlite(sqlite_temporary, compressed_temporary, compresslevel=compresslevel)
+        _verify_compressed_backup(compressed_temporary)
+        checksum = _write_checksum(destination, content_path=compressed_temporary)
+        try:
+            durable_replace(compressed_temporary, destination)
+        except Exception:
+            durable_unlink(destination)
+            durable_unlink(checksum)
+            raise
+    finally:
+        durable_unlink(compressed_temporary)
 
 
 def _publish_verified_backup(temporary: Path, destination: Path) -> None:
@@ -141,15 +261,25 @@ def _publish_verified_backup(temporary: Path, destination: Path) -> None:
 
 
 def _copy_verified_backup(source: Path, destination: Path) -> None:
-    temporary = destination.with_name(f"{destination.name}.tmp")
+    temporary = destination.with_name(f".{destination.name}.copy.tmp")
     durable_unlink(temporary)
     _verify_checksum(source)
+    _verify_backup_artifact(source)
+    checksum_path = _checksum_path(destination)
+    if destination.exists() or checksum_path.exists():
+        raise FileExistsError(destination)
     try:
         shutil.copy2(source, temporary)
-        _publish_verified_backup(temporary, destination)
-    except Exception:
+        os.chmod(temporary, 0o600)
+        checksum = _write_checksum(destination, content_path=temporary)
+        try:
+            durable_replace(temporary, destination)
+        except Exception:
+            durable_unlink(destination)
+            durable_unlink(checksum)
+            raise
+    finally:
         durable_unlink(temporary)
-        raise
 
 
 def _database_file_group(path: Path) -> tuple[Path, Path, Path]:
@@ -217,6 +347,8 @@ def create_online_backups(
     connection_provider: ConnectionProvider = get_connection,
     mirror_dir: Path | None = None,
     now: datetime | None = None,
+    compression: bool = True,
+    compression_level: int = 9,
 ) -> tuple[Path, ...]:
     backup_dir.mkdir(parents=True, exist_ok=True)
     if mirror_dir is not None:
@@ -229,8 +361,9 @@ def create_online_backups(
         _cleanup_incomplete_backups(backup_dir, database)
         if mirror_dir is not None:
             _cleanup_incomplete_backups(mirror_dir, database)
-        destination = backup_dir / f"{database}-{timestamp}.sqlite3"
-        temporary = destination.with_suffix(".sqlite3.tmp")
+        suffix = ".sqlite3.gz" if compression else ".sqlite3"
+        destination = backup_dir / f"{database}-{timestamp}{suffix}"
+        temporary = backup_dir / f".{database}-{timestamp}.sqlite3.tmp"
         durable_unlink(temporary)
         try:
             target = sqlite3.connect(temporary)
@@ -238,10 +371,19 @@ def create_online_backups(
                 connection_provider(database).backup(target)
             finally:
                 target.close()
-            _publish_verified_backup(temporary, destination)
+            if compression:
+                _publish_compressed_backup(
+                    temporary,
+                    destination,
+                    compresslevel=compression_level,
+                )
+            else:
+                _publish_verified_backup(temporary, destination)
         except Exception:
             durable_unlink(temporary)
             raise
+        finally:
+            durable_unlink(temporary)
         created.append(destination)
         _prune_backups(backup_dir, database, retention_count)
         if mirror_dir is not None:
@@ -263,7 +405,7 @@ def restore_database_backup(
     if not source.is_file():
         raise FileNotFoundError(source)
     _verify_checksum(source)
-    _verify_backup(source)
+    _verify_backup_artifact(source)
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     timestamp = (now or datetime.now(UTC)).astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -279,7 +421,10 @@ def restore_database_backup(
     durable_unlink(temporary)
     destination_modified = False
     try:
-        _copy_file_durable(source, temporary)
+        if source.name.endswith(".sqlite3.gz"):
+            _decompress_sqlite(source, temporary)
+        else:
+            _copy_file_durable(source, temporary)
         _verify_backup(temporary)
         for stale_sidecar in _database_file_group(destination)[1:]:
             destination_modified = destination_modified or stale_sidecar.exists()
@@ -299,6 +444,7 @@ def restore_database_backup(
 
 
 __all__ = [
+    "backup_databases_due",
     "backup_freshness_snapshot",
     "create_online_backups",
     "restore_database_backup",

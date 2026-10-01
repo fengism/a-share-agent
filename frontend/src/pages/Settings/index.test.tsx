@@ -14,7 +14,29 @@ vi.mock("../../api/queries", () => ({
   useUpdateConfig: () => ({ mutate: mocks.mutateConfig, isPending: false }),
 }));
 
+vi.mock("./MarketDailyBarManagerCard", () => ({
+  default: ({ onSave }: { onSave: () => void }) => (
+    <button type="button" onClick={onSave}>保存刷新配置</button>
+  ),
+}));
+
 vi.mock("./ConfigCards", () => ({
+  AnySearchConfigCard: ({ form, onChange, onSave, configured }: {
+    form: ConfigUpdate;
+    onChange: (patch: ConfigUpdate) => void;
+    onSave: () => void;
+    configured?: boolean;
+  }) => (
+    <div>
+      <input
+        aria-label="AnySearch API Key"
+        value={form.anysearch_api_key || ""}
+        placeholder={configured ? "已配置；输入新的 Key 以覆盖现有配置" : "请输入 Key"}
+        onChange={(event) => onChange({ anysearch_api_key: event.target.value })}
+      />
+      <button type="button" onClick={onSave}>保存 AnySearch 配置</button>
+    </div>
+  ),
   BotConfigCard: ({ form, onSave }: { form: ConfigUpdate; onSave: () => void }) => (
     <button type="button" data-prefix={form.bot_command_prefix} onClick={onSave}>
       保存 Bot 配置
@@ -83,6 +105,7 @@ const config: ConfigData = {
   twitter_feeds: [],
   eastmoney_cookie: "",
   fred_api_key: "fred-***-key",
+  anysearch_api_key: "keys***alue",
   baidu_cookie: "",
   ths_cookie: "",
   http_trust_env: false,
@@ -104,6 +127,11 @@ const config: ConfigData = {
   eastmoney_jitter_max_seconds: 0,
   eastmoney_cooldown_seconds: 0,
   eastmoney_transient_failure_threshold: 1,
+  market_daily_bar_refresh_enabled: true,
+  market_daily_bar_refresh_poll_seconds: 60,
+  market_daily_bar_refresh_retry_base_seconds: 60,
+  market_daily_observation_retention_days: 1095,
+  market_daily_attempt_retention_days: 1095,
   bot_enabled: true,
   bot_command_prefix: "/",
   bot_service_user_id: 7,
@@ -199,6 +227,61 @@ describe("SettingsPage Bot config", () => {
     fireEvent.click(saveButton);
 
     expect(mocks.mutateConfig).not.toHaveBeenCalled();
+    queryClient.clear();
+  });
+
+  it("does not write the masked AnySearch API Key back", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "数据源管理" }));
+    const saveButton = await screen.findByRole("button", { name: "保存 AnySearch 配置" });
+    await waitFor(() => {
+      expect(screen.getByLabelText("AnySearch API Key")).toHaveValue("");
+      expect(screen.getByLabelText("AnySearch API Key")).toHaveAttribute(
+        "placeholder",
+        "已配置；输入新的 Key 以覆盖现有配置",
+      );
+    });
+    fireEvent.click(saveButton);
+
+    expect(mocks.mutateConfig).not.toHaveBeenCalled();
+    queryClient.clear();
+  });
+
+  it("submits multiple plaintext AnySearch API Keys", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "数据源管理" }));
+    const input = await screen.findByLabelText("AnySearch API Key");
+    fireEvent.change(input, { target: { value: " key-1,key-2,key-3 " } });
+    fireEvent.click(screen.getByRole("button", { name: "保存 AnySearch 配置" }));
+
+    expect(mocks.mutateConfig).toHaveBeenCalledWith(
+      { anysearch_api_key: "key-1,key-2,key-3" },
+      expect.anything(),
+    );
     queryClient.clear();
   });
 

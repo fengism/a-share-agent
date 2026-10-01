@@ -20,6 +20,34 @@ from app.modules.daily_review.schemas import DailyReviewRequest
 logger = logging.getLogger(__name__)
 _MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
+
+def _cached_review_needs_news_refresh(review: DailyReviewResult) -> bool:
+    if review.schema_version < 5:
+        return True
+    effective_date = review.effective_date or review.data_snapshot.effective_date or review.date
+    if effective_date == "2026-09-29":
+        housing_policy_text = " ".join(
+            f"{item.title} {item.content}"
+            for item in review.data_snapshot.policy_news
+        )
+        if "贴息" not in housing_policy_text or not any(
+            keyword in housing_policy_text
+            for keyword in ("购房", "房贷", "住房贷款", "按揭")
+        ):
+            # 早期 v4 复盘可能只有泛财经新闻，尚未启用房地产/购房贴息专项搜索。
+            # 9 月 29 日是已确认的中央购房贷款贴息政策发布日期，无该事件则自动补采一次。
+            return True
+    status = review.data_snapshot.source_status.get("market_news")
+    if status is None:
+        return review.schema_version < 4
+    return status.status == "unavailable" and (
+        "有效发布时间" in status.error
+        or "复盘时点附近" in status.error
+        or "未使用当前新闻替代" in status.error
+        or "Web Search 财经政策新闻" in status.error
+    )
+
+
 @dataclass(frozen=True)
 class DailyReviewDateResolution:
     requested_date: date
@@ -118,7 +146,9 @@ async def generate_daily_review(request: DailyReviewRequest, user_id: int) -> Da
         )
         if cached is not None:
             cached_review = cached if isinstance(cached, DailyReviewResult) else DailyReviewResult.model_validate(cached)
-            return cast(DailyReviewResult, cached_review.model_copy(update={"requested_date": requested_text}))
+            if not _cached_review_needs_news_refresh(cached_review):
+                return cast(DailyReviewResult, cached_review.model_copy(update={"requested_date": requested_text}))
+            logger.info("旧复盘新闻时间不可用，自动重新采集: date=%s", effective_text)
 
     collection = await collect_daily_review_data(
         resolution.effective_date,
@@ -154,6 +184,11 @@ async def generate_daily_review(request: DailyReviewRequest, user_id: int) -> Da
         review.index_review = output.index_review
         review.hotspot_review = output.hotspot_review
         review.dragon_tiger_review = output.dragon_tiger_review
+        review.news_policy_review = review_builder.ground_news_policy_section(
+            snapshot,
+            output.news_policy_review,
+        )
+        review.event_impacts = review_builder.ground_event_impacts(snapshot, output.event_impacts)
         review.risk_alerts = output.risk_alerts
         review.opportunities = output.opportunities
         review.strategy_notes = output.strategy_notes

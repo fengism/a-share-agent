@@ -45,12 +45,19 @@ async def periodic_wal_checkpoint() -> None:
             semaphore=database_semaphore,
         )
         auth_purged = await call_blocking(purge_expired_auth_data, semaphore=database_semaphore)
+        from app.modules.market_daily.service import market_daily_bar_service
+
+        market_daily_maintained = await market_daily_bar_service.maintain_storage(
+            observation_retention_days=settings.market_daily_observation_retention_days,
+            attempt_retention_days=settings.market_daily_attempt_retention_days,
+        )
         optimized = await call_blocking(optimize_databases, semaphore=database_semaphore)
         checkpointed = await call_blocking(checkpoint_wal, semaphore=database_semaphore)
         logger.info(
-            "SQLite 周期维护完成: auth=%s runtime=%s optimize=%s checkpoint=%s",
+            "SQLite 周期维护完成: auth=%s runtime=%s market_daily=%s optimize=%s checkpoint=%s",
             auth_purged,
             runtime_purged,
+            market_daily_maintained,
             optimized,
             checkpointed,
         )
@@ -65,16 +72,34 @@ async def periodic_wal_checkpoint() -> None:
 
 async def periodic_database_backup() -> None:
     from app.infrastructure.persistence.connection import default_backup_dir
-    from app.infrastructure.persistence.operations import create_online_backups
+    from app.infrastructure.persistence.operations import backup_databases_due, create_online_backups
 
     async def iteration():
         settings = get_settings()
         if not settings.database_backup_enabled:
             return
+        backup_dir = settings.database_backup_dir or default_backup_dir()
+        due = set(await call_blocking(
+            backup_databases_due,
+            backup_dir,
+            interval_seconds=settings.database_backup_interval_seconds,
+            semaphore=database_semaphore,
+        ))
+        if settings.database_backup_mirror_dir is not None:
+            due.update(await call_blocking(
+                backup_databases_due,
+                settings.database_backup_mirror_dir,
+                interval_seconds=settings.database_backup_interval_seconds,
+                semaphore=database_semaphore,
+            ))
+        if not due:
+            logger.debug("SQLite 在线备份未到期，跳过本轮")
+            return
         created = await call_blocking(
             create_online_backups,
-            settings.database_backup_dir or default_backup_dir(),
+            backup_dir,
             retention_count=settings.database_backup_retention_count,
+            databases=tuple(database for database in ("market", "user", "industry", "market_daily") if database in due),
             mirror_dir=settings.database_backup_mirror_dir,
             semaphore=database_semaphore,
         )
@@ -132,6 +157,25 @@ async def twitter_health_check() -> bool:
         return True
     except Exception:
         return False
+
+
+async def refresh_market_daily_bars_periodic() -> None:
+    """盘后归档独立历史日线；实时行情由实时查询链负责，不写入此库。"""
+    from app.modules.market_daily.service import market_daily_bar_service
+
+    service = market_daily_bar_service
+    await service.initialize()
+
+    async def iteration():
+        await service.run_scheduled()
+
+    await task_scheduler.run_periodic(
+        name="market_daily_bar_refresh",
+        coro_factory=iteration,
+        interval_seconds=15,
+        leader_election=True,
+        retry_base_seconds=15,
+    )
 
 
 async def refresh_potential_stocks_daily() -> None:

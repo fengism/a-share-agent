@@ -72,6 +72,35 @@ class MarketNewsSnapshotItem(TypedDict, total=False):
     read_count: int
     comment_count: int
     image_url: str
+    category: str
+    source_api: str
+
+
+class PolicyNewsSnapshotItem(BaseModel):
+    title: str
+    content: str = ""
+    source: str = ""
+    publish_time: str = ""
+    url: str = ""
+    event_type: Literal["policy", "macro", "global", "industry", "market"] = "market"
+    direction: Literal["positive", "negative", "mixed", "neutral"] = "neutral"
+    timing: Literal["before", "on_date", "after"] = "on_date"
+    related_sectors: list[str] = Field(default_factory=list)
+    corroborating_sources: list[str] = Field(default_factory=list)
+
+
+class DailyReviewEventImpact(BaseModel):
+    event_title: str
+    event_type: Literal["policy", "macro", "global", "industry", "market"] = "market"
+    direction: Literal["positive", "negative", "mixed", "neutral"] = "neutral"
+    timing: Literal["before", "on_date", "after"] = "on_date"
+    horizon: Literal["intraday", "short_term", "medium_term"] = "short_term"
+    affected_sectors: list[str] = Field(default_factory=list)
+    transmission_chain: str = ""
+    evidence: str = ""
+    market_confirmation: str = ""
+    confirmation_signals: list[str] = Field(default_factory=list)
+    invalidation_conditions: list[str] = Field(default_factory=list)
 
 
 class MarketBreadthSnapshot(TypedDict, total=False):
@@ -126,6 +155,7 @@ class DailyReviewDataSnapshot(BaseModel):
     dragon_tiger: list[DragonTigerSnapshotItem] = Field(default_factory=list)
     market_statistics: MarketBreadthSnapshot = Field(default_factory=dict)
     market_news: list[MarketNewsSnapshotItem] = Field(default_factory=list)
+    policy_news: list[PolicyNewsSnapshotItem] = Field(default_factory=list)
     top_sectors: list[SectorSnapshotItem] = Field(default_factory=list)
     bottom_sectors: list[SectorSnapshotItem] = Field(default_factory=list)
     market_volume: MarketVolumeSnapshot = Field(default_factory=dict)
@@ -135,7 +165,7 @@ class DailyReviewDataSnapshot(BaseModel):
 
 
 class DailyReviewResult(BaseModel):
-    schema_version: int = 3
+    schema_version: int = 5
     date: str
     requested_date: str = ""
     effective_date: str = ""
@@ -157,6 +187,11 @@ class DailyReviewResult(BaseModel):
     index_review: DailyReviewSection
     hotspot_review: DailyReviewSection
     dragon_tiger_review: DailyReviewSection
+    news_policy_review: DailyReviewSection = Field(default_factory=lambda: DailyReviewSection(
+        title="新闻政策与影响传导",
+        summary="暂无可核验的新闻政策影响分析。",
+    ))
+    event_impacts: list[DailyReviewEventImpact] = Field(default_factory=list)
     risk_alerts: list[str] = Field(default_factory=list)
     opportunities: list[str] = Field(default_factory=list)
     strategy_notes: list[str] = Field(default_factory=list)

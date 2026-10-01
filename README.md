@@ -15,9 +15,10 @@
 - **产业链分析**：输入产业关键词，AI 自动搜索研报数据并生成完整产业链分析报告，支持历史记录和推送。 支持行业研究模板、原文片段核验、关系传导图、公司业务相关度对比、同口径指标修订及按维度刷新公共数据；资料完整度不代表投资评分，原文匹配不等于事实核实。详见 [研究质量与跟踪说明](docs/industry-chain-research-quality.md)。
 - **港股与全球品种**：港股实时行情、搜索与日 K；SGE 黄金全品种行情、大宗商品期货连续/主力合约报价（非现货或基差）、美元指数与中美国债收益率/利差、央行政策利率与全国海关进出口月度总量；商品与公司映射为静态参考，不含细分商品量价序列。
 - **宏观经济**：物价、景气、货币、利率、增速、外贸六大类宏观指标一览，含图表趋势。
-- **每日复盘**：聚合市场、热点、新闻和 LLM 结论，生成结构化复盘。
+- **每日复盘**：聚合市场、热点、资金、宏观和复盘日前后 2 天的财经政策新闻，生成结构化复盘；本地新闻不足时自动使用 Web Search 补充，并把复盘日后的事件明确标记为“事后验证”，不冒充当日已知交易依据。
 - **个股行情**：分时、K 线、MACD、RSI、KDJ 与筹码分布统一在个股页查看。K 线提供缠论开关，按当前周期与复权数据叠加笔、中枢及买卖点；不足 10 根 K 线时显示提示。
 - **个股分析**：聚焦分析执行、历史记录和 AI 研究结论，移除技术面面板与技术面分项评分；估值快照、五种估值方法、DCF 情景与敏感性、机构一致预期和同行对比统一在个股资料的「估值」Tab 查看（旧估值链接自动跳转），基本面摘要、营收与毛利构成及关键财务指标统一在个股资料的「财务」Tab 查看，散户评论并入「资讯」Tab，资金流向作为与财务、资讯并列的独立 Tab，移除独立情绪面面板（完整 PDF 仍保留基本面与估值资料），复用个股页的基础资料与分时行情缓存，不重复展示或加载 K 线及技术指标图表；行情与技术指标仍在个股资料页查看。营收与毛利构成来自新浪最新披露的产品/业务/地区口径，独立缓存 24 小时；上游不提供报告期与币种声明，各维度或条目可能重叠，因此不做跨维度汇总。该构成数据也会作为有界、可选证据进入 AI 财务分析。三张报表使用最新共同报告期生成汇总指标，并保持稳定 raw key；前端中文列名由后端统一字段字典生成，避免新浪与东方财富字段映射漂移。
+- **仓位资产曲线**：仓位管理基于初始资金、交易流水、手续费和不复权历史收盘价生成每日总资产、证券市值、现金余额、累计收益率与最大回撤曲线；未配置初始资金时降级展示证券市值曲线。曲线截止最近已完成交易日，历史行情缺口按最近可用收盘价前向填充并明确提示，不包含未录入的分红、税费和资金转入转出。
 - **个股资金流备选**：百度、东方财富均失败或返回空数据后，尝试 tdxhub 的最近 60 个交易日分笔估算（含超大/大/中/小单及主力净流入）。页面通过 `/fund-flow-pages` 每批加载 20 日，点击「加载更多」再读取下一批，最多 60 日；游标固定数据源和交易日期，不跨源拼接，后续批次失败保留已显示数据。首批仅取得 60 日日 K 日期清单并聚合最新 20 日 `capital_flow`，不额外拉取滚动指标的 19 日预热分笔；完整历史单日结果独立进程内缓存 24 小时（当天不缓存，失败不写入，重启后清空），后续批次及重试可复用已完成日期。游标缓存有效 1 小时，重启或淘汰后需重新加载。原 `/fund-flow` 完整查询接口保持兼容。使用独立连接、并发 1、单次尝试；`TDXHUB_FUND_FLOW_TIMEOUT_SECONDS=60` 控制总 I/O 预算（最大 90 秒）。返回带 `source=tdxhub_stock_fund_flow_estimate`，页面提示估算口径；不与其他源拼接或补零，缺失/超时则沿用最近成功缓存并标为过期。日志区分日 K/历史分笔阶段、失败日期、已完成天数及实际耗时；SDK 0.3.0 的 deadline 内部接口仅封装在 tdxhub 适配器，升级 SDK 时需运行对应契约测试。
 - **AI 综合分析**：LLM 输出评分、评级、目标价格区间和买入/持有/卖出信号，融合机构一致预期数据。
 - **个股研究**：统一入口承载分析执行、历史记录和研究结论，独立的研究结论区展示信息完备度、盈利引擎、护城河反证、管理层、行业位置、风险、三情景估值和条件化行动。带股票代码的 `/investment-research/:code` 保留为专注报告阅读与 PDF 导出地址，无代码旧入口会跳转到 `/analysis`。
@@ -226,7 +227,7 @@ sudo docker compose logs --tail=100 backend
 仓库内置 GitHub Actions 统一工作流 [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)：
 
 - **Pull Request 验证**：任何针对 `main` 分支的 PR 会触发双架构（amd64 与 arm64）的 `verify` 任务，自动运行全量 Lint（Ruff、Mypy）、后端单元测试（pytest）、前端测试（Vitest）、前端静态分析与构建（ESLint、Vite build）以及 OpenAPI 契约检查（`npm run api:check`），确保变更符合质量门禁，**PR 阶段不推送任何镜像**。后端 `tests/` 目录当前随模块重构移除，pytest 步骤在目录不存在时自动跳过，目录恢复后无需改动 CI 即重新生效。
-- **发布构建**：push 到 `main` 分支、推送 `v*` 版本标签或手动 `workflow_dispatch` 触发时，在 `verify` 通过后由原生 runner 构建多架构镜像，并严格经过容器冒烟自检（真实环境运行应用、浏览器与沙箱）后组装多架构 Index 并发布到 Docker Hub。
+- **发布构建**：push 到 `main` 分支、推送 `v*` 版本标签或手动 `workflow_dispatch` 触发时，在双架构 `verify` 与独立的 Node.js 22 / Chromium 完整 E2E 门禁均通过后，由原生 runner 构建多架构镜像；E2E 失败会保留 Playwright trace/test-results，镜像仍需经过容器冒烟自检后才组装多架构 Index 并发布到 Docker Hub。
 
 - 产物镜像（默认命名空间 `fengliu1989`）：
   - `fengliu1989/a-share-backend`
@@ -380,9 +381,29 @@ DSL v1 支持 `sma`、`ema`、`rsi`、`rolling_max`、`rolling_min`、`rolling_s
 docker compose up -d --build
 ```
 
+#### 独立市场日行情库
+
+后端会把 A 股、港股及主要市场指数的日线 OHLCV 行情写入独立文件 `APP_DATA_DIR/db/market_daily.sqlite3`，不复用 `market_data.db`、`user_data.db` 或 `industry_data.db`。该库已纳入统一在线备份、完整性检查、WAL checkpoint 和恢复命令；手工迁移时仍建议停止后端，或同时复制对应的 `-wal` / `-shm` 文件。
+
+- **实时行情与历史日线职责分离**：实时指数、个股报价和分时行情通过实时 Provider 查询链获取，交易时段内前端自动轮询（指数/分时通常 30 秒，市场状态通常 60 秒，热点排行通常 5 分钟），页面退到后台或离开交易时段后停止轮询。`market_daily.sqlite3` 只保存收盘后的历史日线，不保存盘中快照，也不作为实时行情源。
+
+- Asia/Shanghai 时间 **16:20** 首次确认，写入 `provisional`；**17:00** 二次复核后写入 `confirmed`。若服务在 17:00 后才启动，会先补首次确认再执行复核。
+- A 股快照通过独立行情日期哨兵校验为当日，指数使用当日日 K；港股先用 16:00 后且带完整日期的实时报价确认交易日，再接收同批全量行情（低流动性股票可保留 16:00 前的最后成交价），港股指数使用当日日 K，避免把盘中价或前一交易日缓存当成收盘价。
+- A 股个股、A 股指数、港股个股、港股指数四个分区独立记录状态；失败分区指数退避重试，不重跑已经成功的分区。调度器会补偿最近 3 天的跨日失败任务；个股快照仍处于目标日时可以恢复，一旦上游日期已推进则标记为跳过并停止无效重试，指数则继续使用带日期的历史日线补采。`market_daily_bar_observations` 保留两次刷新记录，17:00 数据可修订首次值并增加 `revision`。
+- `market_daily_bars` 始终保存交易所原始未复权 OHLCV（`adjustment=none`），不会被复权结果覆盖。A 股首次请求 `qfq` / `hfq` 时优先按需读取 TDX XDXR，公司行为保存到 `market_corporate_actions`，复权系数保存到 `market_daily_adjustment_factors`，状态保存到 `market_adjustment_factor_state`。不重复保存前复权/后复权 OHLCV。
+- 统一按 `adjusted_price = raw_price × multiplier + offset` 应用因子，分别保存 `qfq_multiplier/qfq_offset` 与 `hfq_multiplier/hfq_offset`；TDX 仿射因子能处理现金分红、配股、送转和扩缩股。仅调整 OHLC/昨收，真实成交量和成交额保持不变。公司行为与因子默认 24 小时复核一次，XDXR 变化或新增本地交易日时事务重算该股票全部本地日期；上游刷新失败时继续使用覆盖完整的 last-good，并在 5 分钟冷却后重试，避免热点请求放大故障。
+- A 股复权日线采用 local-first：本地原始行情和因子覆盖完整时直接生成，单日命中不请求上游；多日由既有复权 Provider Chain 补齐本地缺失历史并由本地结果覆盖同日值。TDX 获取失败且没有完整 last-good 时，使用新浪 `qfq.js` / `hfq.js` 的乘法因子兜底（`qfq=raw/qfq_factor`、`hfq=raw×hfq_factor`，offset 为 0）；该来源不含可审计公司行为，精度能力低于 TDX 仿射因子，因此不会覆盖完整的 TDX last-good，并会在 24 小时后优先重试 TDX。两种本地因子都不可用时才回退原复权链路；空 XDXR 不会覆盖已有复权依据，复权 OHLC 非正或关系非法时也会回退。港股继续使用现有港股复权源，不套用 A 股 XDXR 规则。
+- 独立库 schema 当前为 `PRAGMA user_version=13`，迁移账本保存版本、名称、校验和与执行时间；升级过程会安全合并并删除开发期 `closing_*` 旧表、补齐任务租约和刷新审计、拆分行情内容哈希与来源哈希，并按业务内容清理等价观测快照。历史停牌零值或不能包住收盘价的 OHLC 会归一化为合法区间，不改变收盘价、成交量和成交额。`market_adjustment_factor_state` 记录 `last_checked_at`、`last_error` 与 `using_last_good`，便于后续诊断因子健康度。
+- 管理员设置页可按 A 股代码查看复权因子 `healthy/stale/degraded/incomplete/missing` 状态、日线/因子/公司行为数量与覆盖范围，并可强制复核 XDXR 或使衍生因子失效（公司行为审计记录保留）。对应接口为 `GET /api/market/daily-bars/adjustment-status`、`POST /api/market/daily-bars/adjustment-refresh` 和 `POST /api/market/daily-bars/adjustment-invalidate`，均要求管理员权限。
+- 查询接口：`GET /api/market/daily-bars` 支持 `market`、`instrument_type`、`codes` 和分页；`trade_date` 用于单日查询，`start_date` + `end_date` 用于本地 SQLite 多日范围查询，两种日期模式互斥。不传日期时返回最近可用交易日。刷新状态使用 `GET /api/market/daily-bars/status?trade_date=YYYY-MM-DD`。
+- 后端日 K 读取不判断当前是否已到 17:00，也不要求 `confirmed`：未复权日线命中本地即直接使用；A 股 `qfq` / `hfq` 优先使用本地原始行情与仿射因子，多日缺口或因子不可用时由原 Provider Chain 补齐；港股复权仍使用原港股数据源。
+- 可通过 `MARKET_DAILY_BAR_REFRESH_ENABLED`、`MARKET_DAILY_BAR_REFRESH_POLL_SECONDS`、`MARKET_DAILY_BAR_REFRESH_RETRY_BASE_SECONDS` 控制盘后归档任务；其中 `POLL_SECONDS` 只是收盘任务的到期检查间隔，不是实时行情刷新频率。主行情长期保留，快照明细与任务审计默认都保留 1095 天（3 年），可通过 `MARKET_DAILY_OBSERVATION_RETENTION_DAYS` 和 `MARKET_DAILY_ATTEMPT_RETENTION_DAYS` 调整；管理员设置页保存后动态生效，无需重启。
+- 管理员设置页支持选择今日的确认阶段与市场分区，执行手动刷新、仅重试失败、强制重刷、清理或清理并重建，并查看最近跨日刷新历史与错误。管理接口为 `POST /api/market/daily-bars/refresh`、`POST /api/market/daily-bars/delete` 和 `GET /api/market/daily-bars/refresh-history`，均要求管理员权限。
+- 全市场手动刷新/重建只允许当天，防止把当前快照误写为历史日期；历史日期可以查看或清理，多日历史缺口继续由 K 线 Provider Chain 补齐。未复权 A 股历史 K 线新增新浪 `CN_MarketDataService.getKLineData` 直连备选（项目已有 `SinaDataProvider.fetch_kline`，日线使用 `scale=240`），位于财联社之后、东方财富 fallback 之前；该来源没有成交额/换手率；调用方明确要求换手率时会继续尝试其他来源。
+
 #### Docker 数据备份与恢复
 
-后端默认每天使用 SQLite 在线备份 API 将三个数据库（market/user/industry）备份到 `data/backups/`，写入后执行 `quick_check` 并生成 SHA-256 校验文件，每个数据库保留最近 7 份。可通过 `DATABASE_BACKUP_ENABLED`、`DATABASE_BACKUP_INTERVAL_SECONDS` 和 `DATABASE_BACKUP_RETENTION_COUNT` 调整。生产环境可设置 `DATABASE_BACKUP_DIR` 使用独立备份盘，并设置 `DATABASE_BACKUP_MIRROR_DIR` 将验证通过的备份同步到另一个已挂载的可写目录；使用 Compose 时需在 override 文件中显式挂载这两个目录。
+后端默认每天使用 SQLite 在线备份 API 将四个数据库（market/user/industry/market_daily）备份到 `data/db/backups/`。备份先对临时 SQLite 执行 `quick_check`，再使用 gzip level 9 压缩为 `.sqlite3.gz`，并对压缩包生成 SHA-256 校验文件；每个数据库默认保留最近 3 份，新旧 `.sqlite3` / `.sqlite3.gz` 格式合并计算保留数量。可通过 `DATABASE_BACKUP_ENABLED`、`DATABASE_BACKUP_INTERVAL_SECONDS` 和 `DATABASE_BACKUP_RETENTION_COUNT` 调整。生产环境可设置 `DATABASE_BACKUP_DIR` 使用独立备份盘，并设置 `DATABASE_BACKUP_MIRROR_DIR` 将验证通过的压缩备份同步到另一个已挂载的可写目录；使用 Compose 时需在 override 文件中显式挂载这两个目录。恢复命令兼容历史未压缩 `.sqlite3` 和新的 `.sqlite3.gz`。
 
 执行完整离线归档前仍应暂停后端；归档同时包含在线备份、原始数据和 `.env` 中的加密密钥，请安全保存：
 
@@ -406,15 +427,19 @@ docker compose up -d
 docker compose down
 docker compose run --rm --no-deps backend \
   python -m app.scripts.restore_database_backup market \
-  /app/data/backups/market-YYYYMMDDTHHMMSSZ.sqlite3 \
+  /app/data/db/backups/market-YYYYMMDDTHHMMSSZ.sqlite3.gz \
   --confirm-backend-stopped
 docker compose run --rm --no-deps backend \
   python -m app.scripts.restore_database_backup user \
-  /app/data/backups/user-YYYYMMDDTHHMMSSZ.sqlite3 \
+  /app/data/db/backups/user-YYYYMMDDTHHMMSSZ.sqlite3.gz \
   --confirm-backend-stopped
 docker compose run --rm --no-deps backend \
   python -m app.scripts.restore_database_backup industry \
-  /app/data/backups/industry-YYYYMMDDTHHMMSSZ.sqlite3 \
+  /app/data/db/backups/industry-YYYYMMDDTHHMMSSZ.sqlite3.gz \
+  --confirm-backend-stopped
+docker compose run --rm --no-deps backend \
+  python -m app.scripts.restore_database_backup market_daily \
+  /app/data/db/backups/market_daily-YYYYMMDDTHHMMSSZ.sqlite3.gz \
   --confirm-backend-stopped
 docker compose up -d
 ```
@@ -657,6 +682,35 @@ make backend-browser-install
 - **Provider 合并与标准化**：
   - **通达信统一归一化**：彻底合并原先分散的 `tdx` 与 `tdxhub` 模块，收敛为统一的 `tdxhub` 提供商（`TdxhubDataProvider`，基于 `tdxhub-sdk`），单一入口完整承接实时分笔、日/周/月 K 线、指数历史 K 线（`fetch_index_kline`）与 F10 财务基本面资料。
   - **标准化品种覆盖**：`akshare`（宏观与行业）、`eastmoney`（行情/异动/龙虎榜）、`sina`（行情/期货/财务构成）、`exchange`（沪深北交易所名录）、`exchange_etf`（ETF 份额与资金）、`sge`（上海黄金交易所现货行情）、`web_search`（公开网页搜索）与 `legulegu` 等均注册为标准 Provider。
+
+### AnySearch 搜索配置
+
+`web_search` 默认使用 `engine=auto`：配置 Key 后自动优先 AnySearch，未配置时使用百度；AnySearch 失败会依次降级到百度、360 和 Bing。`tag` 与 `params` 仅用于垂直搜索且均为可选参数。AnySearch 没有原生时间过滤字段，因此 `day` / `week` / `month` / `half_year` 会自动转换为包含北京时间起止日期的查询约束，`any` 不追加时间。
+API Key 可选；支持配置一个或多个 Key。多个 Key 会在当前后端进程内按每次请求轮询；某个 Key 返回鉴权失败、配额耗尽或限流时，同一次搜索会自动切换下一个可用 Key，全部不可用后才降级到其他搜索引擎。`auto` 在未配置 Key 时直接使用百度；只有显式选择 `engine=anysearch` 时才会按 AnySearch 官方规则尝试匿名额度。
+管理员也可在前端“系统配置 → 数据源管理”中保存；支持逗号、换行或 JSON 字符串数组格式：
+
+```env
+# 单 Key
+ANYSEARCH_API_KEY=your_anysearch_api_key
+
+# 多 Key（推荐）
+ANYSEARCH_API_KEY=key_1,key_2,key_3
+
+# 也支持 JSON 数组
+# ANYSEARCH_API_KEY='["key_1","key_2","key_3"]'
+```
+
+示例工具参数：
+
+```json
+{
+  "query": "Go 1.26 release notes",
+  "engine": "anysearch",
+  "tag": "code.doc",
+  "params": {"library": "golang"},
+  "max_results": 10
+}
+```
 
 ### 问财数据源配置
 

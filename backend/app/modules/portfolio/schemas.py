@@ -1,6 +1,6 @@
 """Portfolio API 与领域数据模型。"""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -153,6 +153,30 @@ class PortfolioSummary(BaseModel):
     estimated_securities_value: float
     total_asset_value: float | None = None
     total_position_pct: float | None = None
+
+
+class PortfolioEquityCurvePoint(BaseModel):
+    date: date
+    cash_balance: float | None = None
+    securities_value: float
+    total_assets: float | None = None
+    cumulative_return_pct: float | None = None
+    drawdown_pct: float | None = None
+    unpriced_count: int = Field(default=0, ge=0)
+
+
+class PortfolioEquityCurveResponse(BaseModel):
+    mode: Literal["total_assets", "securities_only"]
+    start_date: date | None = None
+    end_date: date
+    initial_cash: float | None = None
+    current_total_assets: float | None = None
+    current_securities_value: float | None = None
+    total_return_pct: float | None = None
+    max_drawdown_pct: float | None = None
+    points: list[PortfolioEquityCurvePoint] = Field(default_factory=list)
+    sources: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class PortfolioClosedPosition(BaseModel):

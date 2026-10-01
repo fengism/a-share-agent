@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiPut } from "../client";
+import { apiGet, apiPost, apiPut, API_TIMEOUTS } from "../client";
 import {
   cleanupExpiredInvitesApi,
   createInviteApi,
@@ -23,6 +23,12 @@ import type {
   ConfigUpdate,
   LlmModelsRequest,
   LlmModelsResponse,
+  MarketDailyBarDeleteRequest,
+  MarketDailyBarDeleteResult,
+  MarketDailyBarRefreshHistory,
+  MarketDailyBarRefreshRequest,
+  MarketAdjustmentFactorStatus,
+  MarketDailyBarRefreshResult,
 } from "../../types/settings";
 
 export function useConfig() {
@@ -139,5 +145,69 @@ export function useLoginAuditLogs(
     queryFn: ({ signal }) => fetchLoginAuditLogsApi(params, signal),
     enabled,
     staleTime: QUERY_CACHE_POLICIES.settingsAuditLogs.staleMs,
+  });
+}
+
+
+export function useMarketDailyRefreshHistory(enabled: boolean) {
+  return useQuery<MarketDailyBarRefreshHistory>({
+    queryKey: queryKeys.settings.marketDailyRefreshHistory,
+    queryFn: () => apiGet<MarketDailyBarRefreshHistory>(
+      "/market/daily-bars/refresh-history",
+      { limit: 100 },
+    ),
+    enabled,
+    refetchInterval: enabled ? 30_000 : false,
+  });
+}
+
+export function useRefreshMarketDailyBars() {
+  return useMutation({
+    mutationFn: (payload: MarketDailyBarRefreshRequest) => apiPost<MarketDailyBarRefreshResult>(
+      "/market/daily-bars/refresh",
+      payload,
+      { timeoutMs: API_TIMEOUTS.LONG_RUNNING },
+    ),
+  });
+}
+
+export function useDeleteMarketDailyBars() {
+  return useMutation({
+    mutationFn: (payload: MarketDailyBarDeleteRequest) => apiPost<MarketDailyBarDeleteResult>(
+      "/market/daily-bars/delete",
+      payload,
+      { timeoutMs: API_TIMEOUTS.LONG_RUNNING },
+    ),
+  });
+}
+
+
+export function useMarketAdjustmentFactorStatus(code: string, enabled: boolean) {
+  return useQuery<MarketAdjustmentFactorStatus>({
+    queryKey: queryKeys.settings.marketAdjustmentFactor(code),
+    queryFn: () => apiGet<MarketAdjustmentFactorStatus>(
+      "/market/daily-bars/adjustment-status",
+      { code },
+    ),
+    enabled: enabled && /^\d{6}$/.test(code),
+  });
+}
+
+export function useRefreshMarketAdjustmentFactor() {
+  return useMutation({
+    mutationFn: (code: string) => apiPost<MarketAdjustmentFactorStatus>(
+      "/market/daily-bars/adjustment-refresh",
+      { code, force: true },
+      { timeoutMs: API_TIMEOUTS.LONG_RUNNING },
+    ),
+  });
+}
+
+export function useInvalidateMarketAdjustmentFactor() {
+  return useMutation({
+    mutationFn: (code: string) => apiPost<MarketAdjustmentFactorStatus>(
+      "/market/daily-bars/adjustment-invalidate",
+      { code },
+    ),
   });
 }

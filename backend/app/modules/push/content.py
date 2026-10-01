@@ -289,6 +289,7 @@ def _build_daily_review(review: DailyReviewResult) -> list[ContentBlock]:
         blocks.extend(_section_blocks(review.index_review))
         blocks.extend(_section_blocks(review.hotspot_review))
         blocks.extend(_section_blocks(review.dragon_tiger_review))
+        blocks.extend(_section_blocks(review.news_policy_review))
         blocks.append(ContentBlock(type="heading", level=3, text="机会方向"))
         blocks.extend(ContentBlock(type="bullet", text=item) for item in (review.opportunities or ["-"]))
         blocks.append(ContentBlock(type="heading", level=3, text="风险提示"))

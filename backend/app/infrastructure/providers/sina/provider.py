@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import re
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -32,6 +33,40 @@ from app.infrastructure.providers.sina.parsing import parse_jsonp
 from app.infrastructure.providers.sina.quotes import get_last_trade_date
 
 logger = logging.getLogger(__name__)
+
+_SINA_FACTOR_PATTERN = re.compile(r"^[^=]*=\s*", re.DOTALL)
+
+
+def _parse_adjustment_factor_payload(text: str, method: str) -> pd.DataFrame:
+    match = _SINA_FACTOR_PATTERN.match(text.strip())
+    if not match:
+        raise ValueError(f"新浪 {method} 复权因子响应格式无效")
+    try:
+        payload, _ = json.JSONDecoder().raw_decode(text.strip()[match.end():].lstrip())
+    except (json.JSONDecodeError, TypeError) as error:
+        raise ValueError(f"新浪 {method} 复权因子响应格式无效") from error
+    if not isinstance(payload, dict):
+        raise ValueError(f"新浪 {method} 复权因子响应格式无效")
+    rows = payload.get("data", [])
+    if not rows:
+        raise ValueError(f"新浪 {method} 复权因子不可用")
+    frame = pd.DataFrame(rows)
+    if {"d", "f"}.issubset(frame.columns):
+        frame = frame.rename(columns={"d": "date", "f": "factor"})
+    elif len(frame.columns) >= 2:
+        frame = frame.iloc[:, :2].copy()
+        frame.columns = ["date", "factor"]
+    else:
+        raise ValueError(f"新浪 {method} 复权因子字段无效")
+    frame["date"] = pd.to_datetime(frame["date"], errors="raise")
+    frame["factor"] = pd.to_numeric(frame["factor"], errors="raise")
+    finite_positive = frame["factor"].map(lambda value: math.isfinite(float(value)) and value > 0)
+    if not finite_positive.all():
+        raise ValueError(f"新浪 {method} 复权因子包含非正或非有限值")
+    frame = frame.sort_values("date").drop_duplicates("date", keep="last")
+    if frame.empty:
+        raise ValueError(f"新浪 {method} 复权因子无有效值")
+    return frame.reset_index(drop=True)
 
 
 class SinaDataProvider:
@@ -125,6 +160,20 @@ class SinaDataProvider:
             df = df[df["日期"] <= end_dt]
         df["日期"] = df["日期"].dt.strftime("%Y-%m-%d")
         return df
+
+    def fetch_adjustment_factors(self, code: str) -> dict[str, pd.DataFrame]:
+        """获取新浪 qfq/hfq 除权日乘法因子；不等同于 TDX 仿射公司行为。"""
+        symbol = normalize_code(code).prefixed_lower
+        result: dict[str, pd.DataFrame] = {}
+        for method in ("qfq", "hfq"):
+            response = self._session.get(
+                f"https://finance.sina.com.cn/realstock/company/{symbol}/{method}.js",
+                headers=SINA_FINANCE_HEADERS,
+                timeout=10,
+            )
+            response.raise_for_status()
+            result[method] = _parse_adjustment_factor_payload(response.text, method)
+        return result
 
     def fetch_index_intraday(self, symbol: str) -> pd.DataFrame:
         """Fetch and normalize the current-session minute line for a market index."""

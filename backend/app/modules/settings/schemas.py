@@ -42,6 +42,7 @@ class ConfigResponse(BaseModel):
     twitter_feeds: list[str]
     eastmoney_cookie: str
     fred_api_key: str
+    anysearch_api_key: str
     baidu_cookie: str
     ths_cookie: str
     legulegu_token: str
@@ -52,6 +53,11 @@ class ConfigResponse(BaseModel):
     eastmoney_jitter_max_seconds: float
     eastmoney_cooldown_seconds: float
     eastmoney_transient_failure_threshold: int
+    market_daily_bar_refresh_enabled: bool
+    market_daily_bar_refresh_poll_seconds: int
+    market_daily_bar_refresh_retry_base_seconds: int
+    market_daily_observation_retention_days: int
+    market_daily_attempt_retention_days: int
     bot_enabled: bool
     bot_command_prefix: str
     bot_service_user_id: int
@@ -118,6 +124,7 @@ class ConfigUpdateRequest(BaseModel):
     twitter_feeds: list[str] | None = None
     eastmoney_cookie: str | None = None
     fred_api_key: str | None = None
+    anysearch_api_key: str | None = None
     baidu_cookie: str | None = None
     ths_cookie: str | None = None
     legulegu_token: str | None = None
@@ -128,6 +135,11 @@ class ConfigUpdateRequest(BaseModel):
     eastmoney_jitter_max_seconds: float | None = Field(default=None, ge=0, le=60)
     eastmoney_cooldown_seconds: float | None = Field(default=None, ge=0, le=86400)
     eastmoney_transient_failure_threshold: int | None = Field(default=None, ge=1, le=100)
+    market_daily_bar_refresh_enabled: bool | None = None
+    market_daily_bar_refresh_poll_seconds: int | None = Field(default=None, ge=15, le=3600)
+    market_daily_bar_refresh_retry_base_seconds: int | None = Field(default=None, ge=1, le=1800)
+    market_daily_observation_retention_days: int | None = Field(default=None, ge=7, le=3650)
+    market_daily_attempt_retention_days: int | None = Field(default=None, ge=30, le=3650)
     bot_enabled: bool | None = None
     bot_command_prefix: str | None = Field(default=None, min_length=1, max_length=4)
     bot_service_user_id: int | None = Field(default=None, ge=0)

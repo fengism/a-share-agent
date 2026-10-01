@@ -8,6 +8,7 @@ import { usePageVisibility } from "../../hooks/usePageVisibility";
 import type {
   PortfolioAccountSettings,
   PortfolioAccountSettingsUpdate,
+  PortfolioEquityCurveResponse,
   PortfolioResponse,
   PortfolioTransaction,
   PortfolioTransactionCreate,
@@ -27,12 +28,24 @@ export function usePortfolio() {
   });
 }
 
+export function usePortfolioEquityCurve() {
+  return useQuery({
+    queryKey: queryKeys.portfolioEquityCurve,
+    queryFn: () => apiGet<PortfolioEquityCurveResponse>("/portfolio/equity-curve"),
+    staleTime: QUERY_CACHE_POLICIES.portfolioEquityCurve.staleMs,
+  });
+}
+
+
 export function useCreatePortfolioTransaction() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (transaction: PortfolioTransactionCreate) =>
       apiPost<PortfolioTransaction>("/portfolio/transactions", transaction),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portfolio });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portfolioEquityCurve });
+    },
   });
 }
 
@@ -41,7 +54,10 @@ export function useUpdatePortfolioSettings() {
   return useMutation({
     mutationFn: (settings: PortfolioAccountSettingsUpdate) =>
       apiPut<PortfolioAccountSettings>("/portfolio/settings", settings),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portfolio });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portfolioEquityCurve });
+    },
   });
 }
 
@@ -77,7 +93,10 @@ export function useUpdatePortfolioTransaction() {
       transactionId: number;
       transaction: PortfolioTransactionCreate;
     }) => apiPut<PortfolioTransaction>(`/portfolio/transactions/${transactionId}`, transaction),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portfolio });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portfolioEquityCurve });
+    },
   });
 }
 
@@ -86,6 +105,9 @@ export function useDeletePortfolioTransaction() {
   return useMutation({
     mutationFn: (transactionId: number) =>
       apiDelete<DeleteResponse>(`/portfolio/transactions/${transactionId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portfolio });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portfolioEquityCurve });
+    },
   });
 }

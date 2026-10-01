@@ -8,7 +8,7 @@ from app.core.cache import cache_date, dated_cache_key_no_day, one_year_ago_date
 from app.core.concurrency.rate_limiter import akshare_semaphore, call_blocking, eastmoney_semaphore, tdx_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
-from app.core.market import safe_float
+from app.core.market import normalize_index_code, safe_float
 from app.domain.market import KlineData, KlineItem
 from app.financial_data.dates import parse_market_date
 from app.financial_data.kline_quality import validate_kline_frame
@@ -16,6 +16,7 @@ from app.financial_data.market.quotes.normalization import filter_index_hist_ran
 from app.financial_data.market.trading_session import resolve_market_data_cache_policy
 from app.infrastructure.providers.provider_chain import BaseProviderChain, ProviderAttempt
 from app.infrastructure.providers.registry import get_provider
+from app.modules.market_daily.reader import load_local_daily_kline, merge_local_daily_kline
 
 logger = logging.getLogger(__name__)
 
@@ -247,16 +248,32 @@ async def get_index_kline(symbol: str, period: str = "daily", start_date: str = 
     if not start_date:
         start_date = one_year_ago_date()
 
+    parsed_start_date = parse_market_date(start_date, "start_date")
     parsed_end_date = parse_market_date(end_date, "end_date")
+    if parsed_start_date > parsed_end_date:
+        raise ValueError("start_date 不能晚于 end_date")
+    local = None
+    if period == "daily":
+        local = await load_local_daily_kline(
+            market="cn",
+            instrument_type="index",
+            code=normalize_index_code(symbol),
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+        )
+        if parsed_start_date == parsed_end_date and local is not None:
+            return local
+
     policy = await resolve_market_data_cache_policy(period, parsed_end_date)
     cache_key = dated_cache_key_no_day("market_index_kline", symbol, period, start_date, end_date)
     if policy.read_cache:
         cached = series_cache.get(cache_key)
         if cached is not None:
-            return cached
+            return merge_local_daily_kline(cached, local)
 
     async def load_and_cache() -> KlineData:
         result = await _load_index_kline(symbol, period, start_date, end_date)
+        result = merge_local_daily_kline(result, local)
         if policy.write_cache and policy.ttl_seconds is not None:
             series_cache.set(cache_key, result, ttl=policy.ttl_seconds)
         return result

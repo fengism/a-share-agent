@@ -14,3 +14,5 @@ export type PortfolioAccountSettings = components["schemas"]["PortfolioAccountSe
 export type PortfolioAccountSettingsUpdate = components["schemas"]["PortfolioAccountSettingsUpdate"];
 export type PortfolioSectorAllocation = components["schemas"]["PortfolioSectorAllocation"];
 export type PortfolioResponse = components["schemas"]["PortfolioResponse"];
+export type PortfolioEquityCurvePoint = components["schemas"]["PortfolioEquityCurvePoint"];
+export type PortfolioEquityCurveResponse = components["schemas"]["PortfolioEquityCurveResponse"];

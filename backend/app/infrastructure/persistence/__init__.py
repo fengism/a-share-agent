@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def init_db() -> None:
-    """启动时分别初始化市场库、用户库和行业库，并应用各自的结构迁移。
+    """启动时初始化核心业务库，并由专属仓储迁移独立日行情库。
 
     Return:
         无。
@@ -47,9 +47,16 @@ def init_db() -> None:
     repaired_names = backfill_industry_stock_names(industry_conn)
     if repaired_names:
         logger.info("行业股票名称补齐: %s 条", repaired_names)
+    # 提前建好独立日行情库结构，再注册统一连接，避免启动后的首次在线备份
+    # 抢在行情后台任务初始化之前生成一个空结构备份。
+    from app.modules.market_daily.repository import MarketDailyBarRepository
+
+    MarketDailyBarRepository(database_path("market_daily")).initialize()
+    get_connection("market_daily")
     logger.info(
-        "数据库表初始化完成: market=%s user=%s industry=%s",
+        "数据库表初始化完成: market=%s user=%s industry=%s market_daily=%s",
         database_path("market"),
         database_path("user"),
         database_path("industry"),
+        database_path("market_daily"),
     )

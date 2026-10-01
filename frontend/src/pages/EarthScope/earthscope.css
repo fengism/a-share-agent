@@ -1,0 +1,294 @@
+.earthscope-scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+.earthscope-page {
+  --es-bg: #05070a;
+  --es-surface: #0a0e14;
+  --es-surface-2: #101620;
+  --es-border: #26303d;
+  --es-border-strong: #3b4655;
+  --es-text: #f5f7fa;
+  --es-muted: #96a0ad;
+  --es-dim: #5f6a78;
+  --es-accent: #54e7ff;
+  --es-accent-2: #8af2ff;
+  min-height: 100vh;
+  overflow: hidden;
+  color: var(--es-text);
+  background: var(--es-bg);
+  font-family: "IBM Plex Sans", "Aptos", "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+.earthscope-page *,
+.earthscope-page *::before,
+.earthscope-page *::after { box-sizing: border-box; }
+
+.earthscope-page a { color: inherit; text-decoration: none; }
+.earthscope-page button { font: inherit; }
+
+.earthscope-announcement {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 7px 24px;
+  border-bottom: 1px solid #1d2631;
+  color: #bec6d0;
+  background: #080b10;
+  font-size: 12px;
+  letter-spacing: .01em;
+}
+
+.earthscope-announcement > span {
+  padding: 2px 7px;
+  border: 1px solid #2e8190;
+  border-radius: 4px;
+  color: var(--es-accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.earthscope-announcement a { color: var(--es-text); font-weight: 650; }
+.earthscope-announcement a:hover { color: var(--es-accent); }
+
+.earthscope-header {
+  position: relative;
+  z-index: 20;
+  display: grid;
+  min-height: 70px;
+  padding: 0 clamp(22px, 6vw, 96px);
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  border-bottom: 1px solid #202833;
+  background: #06090d;
+}
+
+.earthscope-brand { display: inline-flex; width: max-content; align-items: center; gap: 10px; font-size: 18px; font-weight: 750; letter-spacing: -.02em; }
+.earthscope-logo-mark { position: relative; display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid #3b6974; border-radius: 50%; color: var(--es-accent); background: #0a1218; }
+.earthscope-logo-mark > .anticon { font-size: 20px; }
+.earthscope-logo-orbit { position: absolute; width: 43px; height: 15px; border: 1px solid #5dddf2; border-radius: 50%; opacity: .55; transform: rotate(-24deg); }
+
+.earthscope-nav { display: flex; align-items: center; justify-content: center; gap: 28px; }
+.earthscope-nav a { color: #aeb7c3; font-size: 13px; font-weight: 560; }
+.earthscope-nav a:hover { color: #fff; }
+.earthscope-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 18px; }
+.earthscope-login-link { color: #b8c1cc; font-size: 13px; font-weight: 600; }
+.earthscope-login-link:hover { color: var(--es-accent); }
+.earthscope-menu-button { display: none; width: 38px; height: 38px; border: 1px solid var(--es-border); border-radius: 6px; color: #fff; background: #0b1017; cursor: pointer; }
+
+.earthscope-button {
+  display: inline-flex;
+  min-height: 46px;
+  padding: 0 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid #7fefff;
+  border-radius: 6px;
+  color: #031014 !important;
+  background: var(--es-accent);
+  box-shadow: 0 0 24px rgba(84, 231, 255, .17);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .01em;
+  transition: transform .18s ease, background .18s ease;
+}
+.earthscope-button:hover { background: #a2f5ff; transform: translateY(-2px); }
+.earthscope-button--small { min-height: 36px; padding: 0 15px; font-size: 12px; }
+
+.earthscope-hero {
+  position: relative;
+  display: grid;
+  min-height: 720px;
+  padding: clamp(74px, 9vw, 130px) clamp(24px, 7vw, 112px) 80px;
+  grid-template-columns: minmax(0, .9fr) minmax(420px, 1.1fr);
+  align-items: center;
+  gap: 42px;
+  border-bottom: 1px solid #212936;
+  background: #05080c;
+}
+.earthscope-hero::before { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: #111923; opacity: .65; content: ""; pointer-events: none; }
+.earthscope-hero-copy { position: relative; z-index: 2; max-width: 690px; }
+.earthscope-kicker, .earthscope-eyebrow { display: flex; align-items: center; gap: 10px; color: var(--es-accent); font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; font-weight: 700; letter-spacing: .17em; }
+.earthscope-kicker > span { width: 28px; height: 1px; background: var(--es-accent); }
+.earthscope-hero h1 { max-width: 760px; margin: 24px 0; font-size: clamp(52px, 6.2vw, 92px); font-weight: 760; letter-spacing: -.065em; line-height: .96; }
+.earthscope-hero h1 em { color: var(--es-accent); font-style: normal; }
+.earthscope-hero-copy > p { max-width: 650px; margin: 0; color: #aeb8c5; font-size: clamp(17px, 1.55vw, 22px); line-height: 1.65; }
+.earthscope-hero-actions { display: flex; margin-top: 34px; align-items: center; gap: 24px; }
+.earthscope-text-button { display: inline-flex; align-items: center; gap: 9px; color: #e9edf2; font-size: 14px; font-weight: 680; }
+.earthscope-text-button:hover { color: var(--es-accent); }
+.earthscope-proof { display: flex; margin-top: 25px; flex-wrap: wrap; gap: 10px 22px; color: #738090; font-size: 12px; }
+.earthscope-proof .anticon { color: var(--es-accent); }
+
+.earthscope-orbit-stage { position: relative; z-index: 1; min-height: 560px; overflow: hidden; border-left: 1px solid #1c2631; }
+.earthscope-star { position: absolute; border-radius: 50%; background: #d8fbff; box-shadow: 0 0 7px rgba(132, 238, 255, .8); }
+.earthscope-orbit { position: absolute; top: 48%; left: 51%; border: 1px solid #435160; border-radius: 50%; transform: translate(-50%, -50%) rotate(-18deg); }
+.earthscope-orbit--one { width: 94%; height: 42%; }
+.earthscope-orbit--two { width: 74%; height: 70%; transform: translate(-50%, -50%) rotate(33deg); }
+.earthscope-orbit--three { width: 58%; height: 88%; border-color: #2c7784; transform: translate(-50%, -50%) rotate(71deg); }
+.earthscope-planet { position: absolute; top: 50%; left: 52%; display: grid; width: min(36vw, 390px); aspect-ratio: 1; place-items: center; overflow: hidden; border: 1px solid #4f8792; border-radius: 50%; color: #62d9ea; background: #0c161d; box-shadow: inset -45px -36px 0 #05090d, inset 25px 18px 0 #172731, 0 0 74px rgba(62, 202, 226, .16); transform: translate(-50%, -50%); }
+.earthscope-planet > .anticon { font-size: clamp(180px, 23vw, 330px); opacity: .72; }
+.earthscope-planet-grid { position: absolute; border: 1px solid #68c8d7; border-radius: 50%; opacity: .28; }
+.earthscope-planet-grid--one { width: 78%; height: 100%; }
+.earthscope-planet-grid--two { width: 100%; height: 42%; }
+.earthscope-satellite { position: absolute; display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid #5f7d87; border-radius: 6px; color: var(--es-accent); background: #0c1319; box-shadow: 0 0 22px rgba(84, 231, 255, .16); }
+.earthscope-satellite--one { top: 17%; left: 20%; transform: rotate(-18deg); }
+.earthscope-satellite--two { top: 24%; right: 12%; transform: rotate(15deg); }
+.earthscope-satellite--three { right: 23%; bottom: 12%; transform: rotate(-8deg); }
+.earthscope-signal { position: absolute; width: 130px; height: 130px; border: 1px solid #4fdcec; border-radius: 50%; opacity: .16; }
+.earthscope-signal--one { top: 9%; right: 4%; }
+.earthscope-signal--two { bottom: 2%; left: 14%; }
+.earthscope-orbit-status { position: absolute; right: 18px; bottom: 22px; display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; padding: 12px 15px; border: 1px solid var(--es-border); border-radius: 6px; color: #8994a2; background: #080d12; font-family: "SFMono-Regular", Consolas, monospace; font-size: 9px; letter-spacing: .12em; }
+.earthscope-orbit-status strong { grid-column: 2; color: #e4eaf0; font-size: 12px; letter-spacing: 0; }
+.earthscope-live-dot { width: 7px; height: 7px; margin-top: 3px; border-radius: 50%; background: #5cffb3; box-shadow: 0 0 9px rgba(92,255,179,.8); }
+
+.earthscope-trust-strip { display: grid; padding: 0 clamp(24px, 7vw, 112px); grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid #252d38; background: #080b10; }
+.earthscope-trust-strip > div { display: grid; min-height: 116px; place-content: center; gap: 5px; border-right: 1px solid #252d38; text-align: center; }
+.earthscope-trust-strip > div:first-child { border-left: 1px solid #252d38; }
+.earthscope-trust-strip strong { color: #f4f7fa; font-family: "SFMono-Regular", Consolas, monospace; font-size: 23px; }
+.earthscope-trust-strip span { color: #6f7a88; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+
+.earthscope-section, .earthscope-feature-stack { padding: 112px clamp(24px, 7vw, 112px); border-bottom: 1px solid #212936; }
+.earthscope-section-heading { max-width: 760px; margin: 0 auto 58px; text-align: center; }
+.earthscope-section-heading--left { margin-inline: 0; text-align: left; }
+.earthscope-section-heading > span { color: var(--es-accent); font-family: "SFMono-Regular", Consolas, monospace; font-size: 10px; font-weight: 800; letter-spacing: .18em; }
+.earthscope-section-heading h2, .earthscope-feature-copy h2, .earthscope-final-cta h2 { margin: 15px 0; font-size: clamp(34px, 4vw, 58px); letter-spacing: -.045em; line-height: 1.05; }
+.earthscope-section-heading p, .earthscope-feature-copy p, .earthscope-final-cta p { color: var(--es-muted); font-size: 16px; line-height: 1.75; }
+
+.earthscope-intro { background: #070a0f; }
+.earthscope-capability-row { display: grid; max-width: 1180px; margin: 0 auto; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; align-items: center; gap: 18px; }
+.earthscope-capability-row > div { display: grid; min-height: 188px; padding: 28px; align-content: start; gap: 10px; border: 1px solid var(--es-border); background: #0a0e14; }
+.earthscope-capability-row > div > .anticon { color: var(--es-accent); font-size: 26px; }
+.earthscope-capability-row strong { margin-top: 12px; font-size: 17px; }
+.earthscope-capability-row span { color: var(--es-muted); font-size: 13px; line-height: 1.6; }
+.earthscope-capability-row > .anticon { color: #53606e; }
+
+.earthscope-feature-stack { display: grid; gap: 0; padding-block: 40px; background: #05070a; }
+.earthscope-feature { display: grid; min-height: 590px; padding: 72px 0; grid-template-columns: minmax(0, .9fr) minmax(450px, 1.1fr); align-items: center; gap: clamp(48px, 8vw, 120px); border-bottom: 1px solid #202833; }
+.earthscope-feature:last-child { border-bottom: 0; }
+.earthscope-feature--reverse .earthscope-feature-copy { order: 2; }
+.earthscope-feature-copy { max-width: 620px; }
+.earthscope-feature-icon { display: grid; width: 54px; height: 54px; margin-bottom: 24px; place-items: center; border: 1px solid #356872; border-radius: 6px; color: var(--es-accent); background: #091117; font-size: 24px; }
+.earthscope-feature-copy h2 { font-size: clamp(36px, 4.2vw, 62px); }
+.earthscope-feature-copy ul, .earthscope-pricing-grid ul { display: grid; margin: 28px 0; padding: 0; gap: 12px; list-style: none; }
+.earthscope-feature-copy li, .earthscope-pricing-grid li { color: #c0c8d2; font-size: 13px; }
+.earthscope-feature-copy li .anticon, .earthscope-pricing-grid li .anticon { margin-right: 8px; color: var(--es-accent); }
+.earthscope-feature-copy > a { display: inline-flex; align-items: center; gap: 8px; color: var(--es-accent); font-weight: 720; }
+
+.earthscope-feature-console, .earthscope-sdk-grid, .earthscope-network-map { min-height: 410px; border: 1px solid var(--es-border-strong); background: #080c12; box-shadow: 18px 18px 0 #0d1219; }
+.earthscope-console-bar { display: flex; height: 48px; padding: 0 15px; align-items: center; gap: 7px; border-bottom: 1px solid var(--es-border); background: #0d1219; }
+.earthscope-console-bar > span { width: 8px; height: 8px; border-radius: 50%; background: #485260; }
+.earthscope-console-bar small { margin-left: auto; color: #77818e; font-family: monospace; }
+.earthscope-feature-console pre { margin: 0; padding: 34px; color: #dce5ee; font: 13px/1.8 "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; }
+.earthscope-feature-console pre b { color: var(--es-accent); }
+.earthscope-console-result { margin: 0 24px 24px; padding: 13px 16px; border: 1px solid #254852; color: #8ef6cb; background: #091411; font-family: monospace; font-size: 12px; }
+.earthscope-sdk-grid { display: grid; padding: 26px; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--es-border); }
+.earthscope-sdk-grid > div { display: grid; min-height: 178px; padding: 24px; align-content: center; justify-items: center; gap: 8px; background: #090d13; }
+.earthscope-sdk-grid .anticon, .earthscope-language-mark { color: var(--es-accent); font-size: 30px; }
+.earthscope-sdk-grid strong { margin-top: 8px; }
+.earthscope-sdk-grid span:last-child { color: var(--es-muted); font-size: 12px; }
+.earthscope-network-map { position: relative; overflow: hidden; }
+.earthscope-network-map::before { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: #151e29; content: ""; }
+.earthscope-network-node { position: absolute; z-index: 2; display: grid; width: 58px; height: 58px; place-items: center; border: 1px solid #3a6f79; border-radius: 50%; color: var(--es-accent); background: #0b151b; font-size: 23px; }
+.earthscope-network-node--a { top: 14%; left: 13%; }.earthscope-network-node--b { top: 18%; right: 15%; }.earthscope-network-node--c { bottom: 14%; left: 20%; }.earthscope-network-node--d { right: 22%; bottom: 18%; }
+.earthscope-network-line { position: absolute; z-index: 1; height: 1px; background: #356d78; transform-origin: left center; }
+.earthscope-network-line--one { top: 24%; left: 20%; width: 61%; transform: rotate(3deg); }.earthscope-network-line--two { top: 27%; left: 20%; width: 51%; transform: rotate(39deg); }.earthscope-network-line--three { top: 30%; right: 21%; width: 49%; transform: rotate(131deg); }
+.earthscope-network-caption { position: absolute; right: 18px; bottom: 16px; color: #76818e; font: 10px monospace; letter-spacing: .12em; text-transform: uppercase; }
+
+.earthscope-developers { background: #080b10; }
+.earthscope-api-explorer { display: grid; min-height: 520px; grid-template-columns: 260px minmax(0, 1fr); border: 1px solid var(--es-border-strong); background: #05080d; }
+.earthscope-api-sidebar { display: flex; padding: 24px 16px; flex-direction: column; border-right: 1px solid var(--es-border); background: #0b0f15; }
+.earthscope-api-sidebar > small { padding: 0 12px 18px; color: #697583; font: 10px monospace; letter-spacing: .16em; }
+.earthscope-api-sidebar button { display: flex; padding: 13px 12px; align-items: center; gap: 10px; border: 0; border-left: 2px solid transparent; color: #98a3b0; background: transparent; text-align: left; cursor: pointer; }
+.earthscope-api-sidebar button span { min-width: 40px; color: #6b7683; font: 9px monospace; }
+.earthscope-api-sidebar button.is-active { border-left-color: var(--es-accent); color: #fff; background: #111821; }
+.earthscope-api-sidebar button.is-active span { color: var(--es-accent); }
+.earthscope-api-health { display: flex; margin-top: auto; padding: 16px 12px 0; align-items: center; gap: 8px; border-top: 1px solid var(--es-border); color: #798592; font-size: 10px; }
+.earthscope-api-health span { width: 7px; height: 7px; border-radius: 50%; background: #5cffb3; }
+.earthscope-api-panel { position: relative; padding: 32px; }
+.earthscope-api-path { display: flex; align-items: center; gap: 15px; padding-bottom: 26px; border-bottom: 1px solid var(--es-border); }
+.earthscope-api-path b { padding: 5px 8px; border: 1px solid #347884; border-radius: 3px; color: var(--es-accent); font: 10px monospace; }
+.earthscope-api-path code { color: #d8e0e9; font-size: 15px; }
+.earthscope-api-panel pre { min-height: 340px; margin: 0; padding: 34px 0; color: #d0dae4; font: 14px/1.9 "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; }
+.earthscope-copy-button { position: absolute; top: 27px; right: 28px; padding: 8px 11px; border: 1px solid var(--es-border); border-radius: 4px; color: #9ba6b3; background: #0d1218; cursor: pointer; }
+.earthscope-copy-button:hover { color: var(--es-accent); border-color: #3b8490; }
+
+.earthscope-pricing { background: #05070a; }
+.earthscope-billing-toggle { display: flex; width: max-content; margin: -28px auto 38px; padding: 4px; border: 1px solid var(--es-border); border-radius: 6px; background: #0a0e14; }
+.earthscope-billing-toggle button { padding: 9px 15px; border: 0; border-radius: 4px; color: #8c97a4; background: transparent; cursor: pointer; }
+.earthscope-billing-toggle button.is-active { color: #051015; background: var(--es-accent); font-weight: 750; }
+.earthscope-billing-toggle span { font-size: 10px; }
+.earthscope-pricing-grid { display: grid; max-width: 1160px; margin: 0 auto; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--es-border); }
+.earthscope-pricing-grid article { position: relative; min-height: 480px; padding: 36px; background: #090d12; }
+.earthscope-pricing-grid article.is-featured { background: #0c151b; box-shadow: inset 0 3px 0 var(--es-accent); }
+.earthscope-plan-badge { position: absolute; top: 0; right: 0; padding: 7px 10px; color: #031014; background: var(--es-accent); font-size: 9px; font-weight: 850; letter-spacing: .1em; }
+.earthscope-pricing-grid article > span { color: var(--es-accent); font: 10px monospace; letter-spacing: .16em; }
+.earthscope-pricing-grid h3 { margin: 22px 0 12px; font-size: 44px; letter-spacing: -.04em; }
+.earthscope-pricing-grid h3 small { margin-left: 7px; color: #7b8795; font-size: 13px; font-weight: 500; }
+.earthscope-pricing-grid p { min-height: 52px; color: var(--es-muted); line-height: 1.6; }
+.earthscope-pricing-grid article > a { position: absolute; right: 36px; bottom: 34px; left: 36px; display: grid; height: 44px; place-items: center; border: 1px solid #53606e; color: #eef2f6; font-weight: 700; }
+.earthscope-pricing-grid article.is-featured > a { border-color: var(--es-accent); color: #031014; background: var(--es-accent); }
+
+.earthscope-testimonials { background: #080b10; }
+.earthscope-testimonial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.earthscope-testimonial-grid figure { display: grid; min-height: 320px; margin: 0; padding: 30px; align-content: space-between; border: 1px solid var(--es-border); background: #0a0e14; }
+.earthscope-testimonial-grid blockquote { margin: 0; color: #dbe2ea; font-size: 18px; line-height: 1.7; }
+.earthscope-testimonial-grid figcaption { display: flex; align-items: center; gap: 12px; }
+.earthscope-testimonial-grid figcaption > span { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid #426e76; border-radius: 50%; color: var(--es-accent); background: #0c171d; font: 12px monospace; }
+.earthscope-testimonial-grid figcaption div { display: grid; gap: 2px; }.earthscope-testimonial-grid small { color: #77828f; }
+
+.earthscope-faq { display: grid; grid-template-columns: .75fr 1.25fr; gap: 70px; background: #05070a; }
+.earthscope-faq-list { border-top: 1px solid var(--es-border); }
+.earthscope-faq-list article { border-bottom: 1px solid var(--es-border); }
+.earthscope-faq-list button { display: flex; width: 100%; min-height: 76px; padding: 18px 0; align-items: center; justify-content: space-between; border: 0; color: #e6ebf0; background: transparent; text-align: left; cursor: pointer; }
+.earthscope-faq-list button span { font-size: 16px; font-weight: 650; }.earthscope-faq-list button b { color: var(--es-accent); font-size: 22px; }
+.earthscope-faq-list p { margin: 0; padding: 0 50px 24px 0; color: var(--es-muted); line-height: 1.7; }
+
+.earthscope-final-cta { display: grid; padding: 88px clamp(24px, 7vw, 112px); grid-template-columns: 1fr auto; align-items: end; gap: 50px; border-bottom: 1px solid #26313d; background: #0b1118; box-shadow: inset 0 3px 0 #284a54; }
+.earthscope-final-cta > div:first-child { max-width: 760px; }.earthscope-final-cta > div:first-child > span { color: var(--es-accent); font: 10px monospace; letter-spacing: .18em; }
+.earthscope-final-cta > div:last-child { display: flex; align-items: center; gap: 22px; }.earthscope-final-cta > div:last-child > a:last-child { color: #b5bec9; font-weight: 650; }
+
+.earthscope-footer { display: grid; padding: 58px clamp(24px, 7vw, 112px) 28px; grid-template-columns: 2fr repeat(3, 1fr); gap: 34px; background: #040609; }
+.earthscope-footer > div:not(.earthscope-footer-brand) { display: grid; align-content: start; gap: 12px; }
+.earthscope-footer strong { margin-bottom: 6px; color: #eef2f6; font-size: 12px; }.earthscope-footer a { color: #7f8a97; font-size: 12px; }.earthscope-footer a:hover { color: var(--es-accent); }
+.earthscope-footer-brand p { max-width: 270px; color: #737e8b; font-size: 13px; }
+.earthscope-footer > small { grid-column: 1 / -1; padding-top: 30px; border-top: 1px solid #1d252f; color: #56616e; font: 10px monospace; letter-spacing: .08em; }
+
+@media (max-width: 1050px) {
+  .earthscope-header { grid-template-columns: 1fr auto; }
+  .earthscope-nav { position: absolute; top: 70px; right: 20px; left: 20px; display: none; padding: 20px; align-items: stretch; flex-direction: column; border: 1px solid var(--es-border); background: #080c11; }
+  .earthscope-nav.is-open { display: flex; }.earthscope-menu-button { display: grid; place-items: center; }.earthscope-login-link { display: none; }
+  .earthscope-hero { grid-template-columns: 1fr; }.earthscope-orbit-stage { min-height: 500px; border-top: 1px solid #1c2631; border-left: 0; }
+  .earthscope-planet { width: min(54vw, 390px); }
+  .earthscope-trust-strip { grid-template-columns: repeat(3, 1fr); }.earthscope-trust-strip > div:first-child { border-left: 0; }
+  .earthscope-capability-row { grid-template-columns: 1fr 1fr; }.earthscope-capability-row > .anticon { display: none; }
+  .earthscope-feature, .earthscope-feature--reverse { grid-template-columns: 1fr; }.earthscope-feature--reverse .earthscope-feature-copy { order: initial; }
+  .earthscope-feature-console, .earthscope-sdk-grid, .earthscope-network-map { min-height: 390px; }
+  .earthscope-testimonial-grid { grid-template-columns: 1fr; }
+  .earthscope-faq { grid-template-columns: 1fr; gap: 20px; }
+}
+
+@media (max-width: 720px) {
+  .earthscope-announcement { justify-content: flex-start; overflow-x: auto; white-space: nowrap; }
+  .earthscope-header { min-height: 62px; padding-inline: 18px; }.earthscope-nav { top: 62px; }.earthscope-brand { font-size: 16px; }
+  .earthscope-header-actions .earthscope-button--small { display: none; }
+  .earthscope-hero { min-height: auto; padding: 70px 20px 48px; }.earthscope-hero h1 { font-size: clamp(46px, 14vw, 70px); }.earthscope-hero-actions { align-items: stretch; flex-direction: column; }.earthscope-text-button { justify-content: center; }
+  .earthscope-orbit-stage { min-height: 390px; }.earthscope-planet { width: min(74vw, 300px); }.earthscope-orbit-status { right: 8px; bottom: 8px; }
+  .earthscope-trust-strip { padding: 0; grid-template-columns: 1fr 1fr; }.earthscope-trust-strip > div { min-height: 92px; border-bottom: 1px solid #252d38; }
+  .earthscope-section, .earthscope-feature-stack { padding: 78px 20px; }.earthscope-section-heading { margin-bottom: 40px; }
+  .earthscope-capability-row { grid-template-columns: 1fr; }.earthscope-capability-row > div { min-height: 150px; }
+  .earthscope-feature { min-height: auto; padding: 52px 0; gap: 36px; }.earthscope-feature-copy h2 { font-size: 38px; }
+  .earthscope-feature-console, .earthscope-network-map { min-height: 320px; box-shadow: 8px 8px 0 #0d1219; }.earthscope-sdk-grid { min-height: auto; grid-template-columns: 1fr; }.earthscope-sdk-grid > div { min-height: 130px; }
+  .earthscope-api-explorer { grid-template-columns: 1fr; }.earthscope-api-sidebar { border-right: 0; border-bottom: 1px solid var(--es-border); }.earthscope-api-health { display: none; }.earthscope-api-panel { padding: 22px; }.earthscope-api-panel pre { min-height: 300px; overflow-x: auto; font-size: 12px; }.earthscope-copy-button { position: static; }
+  .earthscope-pricing-grid { grid-template-columns: 1fr; }.earthscope-pricing-grid article { min-height: 430px; }
+  .earthscope-final-cta { grid-template-columns: 1fr; align-items: start; }.earthscope-final-cta > div:last-child { align-items: stretch; flex-direction: column; }
+  .earthscope-footer { grid-template-columns: 1fr 1fr; }.earthscope-footer-brand { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { scroll-behavior: auto; }
+  .earthscope-page *, .earthscope-page *::before, .earthscope-page *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}

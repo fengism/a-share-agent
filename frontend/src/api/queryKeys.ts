@@ -111,11 +111,14 @@ export const queryKeys = {
   settings: {
     config: ["config"] as const,
     failedBotJobs: ["bot-jobs", "failed"] as const,
+    marketDailyRefreshHistory: ["market-daily-bars", "refresh-history"] as const,
+    marketAdjustmentFactor: (code: string) => ["market-daily-bars", "adjustment-factor", code] as const,
     invites: ["invites"] as const,
     users: ["admin-users"] as const,
     auditLogs: (params?: unknown) => ["admin-audit-logs", params] as const,
   },
   portfolio: ["portfolio"] as const,
+  portfolioEquityCurve: ["portfolio-equity-curve"] as const,
   watchlist: ["watchlist"] as const,
   quant: {
     presets: ["quant", "strategy-presets"] as const,

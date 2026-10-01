@@ -42,12 +42,17 @@ def fetch_market_kuaixun(
             code_name,
         ):
             continue
+        parsed_publish_time = timestamp_parser(item.get("publish_time"))
         results.append(
             NewsSearchItem(
                 title=title,
                 content=content[:500],
                 source="百度 7x24 快讯",
-                publish_time=str(timestamp_parser(item.get("publish_time"))),
+                publish_time=(
+                    parsed_publish_time.isoformat(sep=" ")
+                    if hasattr(parsed_publish_time, "isoformat")
+                    else str(parsed_publish_time or "")
+                ),
                 url=item.get("third_url", ""),
                 author=item.get("author", ""),
                 read_count=int(item.get("read_count", 0)),

@@ -19,6 +19,7 @@ import RoutePreloadProvider from "./routes/RoutePreloadProvider";
 
 // ── 路由级代码分割 ──
 const AppLayout = lazy(pageLoaders.appLayout);
+const EarthScope = lazy(pageLoaders.earthscope);
 const Dashboard = lazy(pageLoaders.dashboard);
 const Watchlist = lazy(pageLoaders.watchlist);
 const Market = lazy(pageLoaders.market);
@@ -179,6 +180,7 @@ export default function App() {
             <ErrorBoundary>
               <Suspense fallback={<RouteLoadingFallback />}>
                 <Routes>
+                <Route path="/earthscope" element={<EarthScope />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/reset-password" element={<ResetPassword />} />

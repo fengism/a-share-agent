@@ -7,12 +7,8 @@ from app.agentic.catalog import CapabilityCatalog, registry
 from app.agentic.tools.contracts import Tool, ToolPolicy
 from app.agentic.tools.packs.web.search import DEFAULT_SEARCH_ENGINE
 
-WEB_FETCH_POLICY = ToolPolicy(
-    cost="high", cache_ttl_seconds=300, timeout_seconds=90, max_parallel_calls=2
-)
-WEB_BATCH_POLICY = ToolPolicy(
-    cost="high", cache_ttl_seconds=300, timeout_seconds=120, max_parallel_calls=1
-)
+WEB_FETCH_POLICY = ToolPolicy(cost="high", cache_ttl_seconds=300, timeout_seconds=90, max_parallel_calls=2)
+WEB_BATCH_POLICY = ToolPolicy(cost="high", cache_ttl_seconds=300, timeout_seconds=120, max_parallel_calls=1)
 WEB_SEARCH_POLICY = ToolPolicy(cost="medium", cache_ttl_seconds=300)
 TWITTER_ANALYSIS_POLICY = ToolPolicy(
     cost="high",
@@ -47,7 +43,7 @@ def register_web_tools(
             description=(
                 "搜索公开互联网网页，返回标题、URL 和摘要。"
                 "当用户要求搜索网页、查找公开资料，或尚未提供具体 URL 时调用。"
-                "默认使用百度、优先中文结果并限定最近半年；百度被拦截时会自动降级到 360 或 Bing 中国。"
+                "默认自动选择搜索源：配置 AnySearch Key 时优先 AnySearch，否则使用百度；失败时自动降级。"
                 "搜索结果不是网页全文；用户需要详细内容时，必须使用返回的 URL 继续调用 web_fetch，"
                 "需要阅读多个结果时调用 fetch_urls。"
             ),
@@ -66,11 +62,11 @@ def register_web_tools(
                     },
                     "engine": {
                         "type": "string",
-                        "enum": ["baidu", "so360", "bing_cn", "google"],
+                        "enum": ["auto", "baidu", "so360", "bing_cn", "google", "anysearch"],
                         "default": DEFAULT_SEARCH_ENGINE,
                         "description": (
-                            "搜索引擎；默认百度。百度被反爬拦截时会自动降级到 360 再到 Bing 中国，"
-                            "需要海外站点时显式选 Bing 中国或 Google（Google 通常需要配置代理）。"
+                            "搜索引擎；默认 auto：已配置 AnySearch Key 时优先 AnySearch，否则使用百度。"
+                            "AnySearch 失败自动降级到百度、360、Bing；显式选择其他引擎时尊重指定值。"
                         ),
                     },
                     "max_results": {
@@ -87,7 +83,7 @@ def register_web_tools(
                         "description": (
                             "搜索结果时间范围：day 最近一天、week 最近一周、"
                             "month 最近一月、half_year 最近半年、any 不限时间。"
-                            "实时资讯优先使用 day 或 week。"
+                            "实时资讯优先使用 day 或 week；AnySearch 会把范围转换为包含北京时间起止日期的查询约束。"
                         ),
                     },
                     "language": {
@@ -95,6 +91,16 @@ def register_web_tools(
                         "enum": ["zh", "any"],
                         "default": "zh",
                         "description": "结果语言偏好：zh 优先中文结果，any 不限制语言。",
+                    },
+                    "tag": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "description": "AnySearch 专用能力标签，例如 code.doc；其他引擎忽略。",
+                    },
+                    "params": {
+                        "type": "object",
+                        "additionalProperties": True,
+                        "description": 'AnySearch 专用扩展参数，例如 {"library": "golang"}；其他引擎忽略。',
                     },
                 },
                 "required": ["query"],
@@ -151,7 +157,7 @@ def register_web_tools(
                         "minItems": 1,
                         "maxItems": 10,
                         "uniqueItems": True,
-                        "description": "要抓取的 URL 列表，如 [\"https://...\", \"https://...\"]",
+                        "description": '要抓取的 URL 列表，如 ["https://...", "https://..."]',
                     },
                     "mode": {
                         "type": "string",
@@ -196,11 +202,14 @@ def register_web_tools(
                             "description": "本次提取的最大页数（默认 20 页）",
                         },
                         "window_hash": {
-                            "type": "string", "maxLength": 64,
+                            "type": "string",
+                            "maxLength": 64,
                             "description": "续读时原样传入next_read中的页窗口指纹；原文变化时拒绝错位拼接",
                         },
                         "content_offset": {
-                            "type": "integer", "minimum": 0, "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 0,
                             "description": "本页窗口的续读字符偏移，首次0；仅使用返回的next_read值，不自行猜测",
                         },
                         "extract_tables": {

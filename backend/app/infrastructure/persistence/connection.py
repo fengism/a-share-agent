@@ -15,8 +15,8 @@ from app.core.metrics import metrics
 
 logger = logging.getLogger(__name__)
 
-DatabaseName = Literal["market", "user", "industry"]
-ALL_DATABASES: tuple[DatabaseName, ...] = ("market", "user", "industry")
+DatabaseName = Literal["market", "user", "industry", "market_daily"]
+ALL_DATABASES: tuple[DatabaseName, ...] = ("market", "user", "industry", "market_daily")
 
 _DATA_DIR = DATA_DIR
 DB_DIR = _DATA_DIR / "db"
@@ -24,6 +24,7 @@ _DATABASE_FILENAMES: dict[DatabaseName, str] = {
     "market": "market_data.db",
     "user": "user_data.db",
     "industry": "industry_data.db",
+    "market_daily": "market_daily.sqlite3",
 }
 _storage_migration_lock = threading.Lock()
 _storage_migration_done = False
@@ -40,7 +41,10 @@ _connection_generation = 0
 
 def _legacy_and_target_pairs(data_dir: Path, db_dir: Path) -> list[tuple[Path, Path]]:
     pairs: list[tuple[Path, Path]] = []
-    for filename in _DATABASE_FILENAMES.values():
+    # 只有最初三个数据库曾使用过 DATA_DIR 根目录。market_daily 从引入起就位于
+    # data/db，不能把开发期同名遗留文件纳入全局迁移冲突检测。
+    for database in ("market", "user", "industry"):
+        filename = _DATABASE_FILENAMES[database]
         for suffix in ("", "-wal", "-shm"):
             pairs.append((data_dir / f"{filename}{suffix}", db_dir / f"{filename}{suffix}"))
     pairs.append((data_dir / "backups", db_dir / "backups"))
@@ -313,7 +317,7 @@ def reset_for_tests() -> None:
 
 
 def checkpoint_wal() -> dict[str, dict[str, int | bool | str]]:
-    """主动触发两个数据库的 WAL checkpoint，控制 WAL 文件大小。"""
+    """主动触发全部已注册数据库的 WAL checkpoint，控制 WAL 文件大小。"""
     snapshot: dict[str, dict[str, int | bool | str]] = {}
     for database in ALL_DATABASES:
         started_at = perf_counter()

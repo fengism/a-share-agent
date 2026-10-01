@@ -2,6 +2,7 @@ from importlib import import_module
 
 _PROVIDER_EXPORTS = {
     "akshare": ("app.infrastructure.providers.akshare.provider", "akshare_provider"),
+    "anysearch": ("app.infrastructure.providers.anysearch", "anysearch_provider"),
     "baidu_search": ("app.infrastructure.providers.web_search", "baidu_search_provider"),
     "bing_cn_search": ("app.infrastructure.providers.web_search", "bing_cn_search_provider"),
     "baidu": ("app.infrastructure.providers.baidu.provider", "baidu_provider"),

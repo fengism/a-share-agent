@@ -55,10 +55,16 @@
 .analysis-conclusion__summary {
   margin: 0;
   color: var(--c-text-primary);
-  font-size: var(--c-font-base, 14px);
+  font-size: 18px;
   font-weight: var(--c-weight-medium);
   line-height: var(--c-leading-relaxed, 1.6);
   overflow-wrap: anywhere;
+}
+
+@container analysis-page (max-width: 760px) {
+  .analysis-conclusion__summary {
+    font-size: 16px;
+  }
 }
 .analysis-conclusion__signal-cluster {
   display: flex;
@@ -76,7 +82,7 @@
 }
 .analysis-conclusion__content {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding: 0 0 16px;
 }
 .analysis-conclusion__metrics {
@@ -105,7 +111,7 @@
 }
 .analysis-conclusion__metric strong {
   color: var(--c-text-primary);
-  font-size: var(--c-font-base, 14px);
+  font-size: var(--stock-research-metric-size, 20px);
   font-weight: var(--c-weight-bold);
   line-height: var(--c-leading-tight);
   font-variant-numeric: tabular-nums;
@@ -136,7 +142,7 @@
 .analysis-conclusion__decision-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: 16px;
   align-items: stretch;
 }
 @media (min-width: 1360px) {
@@ -237,7 +243,7 @@
     justify-content: space-between;
   }
   .analysis-conclusion__summary {
-    font-size: var(--c-font-base, 14px);
+    font-size: 16px;
   }
   .analysis-conclusion__metrics {
     grid-template-columns: minmax(0, 1fr);

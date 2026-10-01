@@ -22,10 +22,36 @@ export interface DailyReviewDataSnapshot {
   dragon_tiger: Record<string, unknown>[];
   market_statistics: Record<string, unknown>;
   market_news: Record<string, unknown>[];
+  policy_news?: Array<{
+    title: string;
+    content?: string;
+    source?: string;
+    publish_time?: string;
+    url?: string;
+    event_type?: "policy" | "macro" | "global" | "industry" | "market";
+    direction?: "positive" | "negative" | "mixed" | "neutral";
+    timing?: "before" | "on_date" | "after";
+    related_sectors?: string[];
+    corroborating_sources?: string[];
+  }>;
   top_sectors: Record<string, unknown>[];
   bottom_sectors: Record<string, unknown>[];
   market_volume: Record<string, unknown>;
   macro_data: Record<string, unknown>;
+}
+
+export interface DailyReviewEventImpact {
+  event_title: string;
+  event_type: "policy" | "macro" | "global" | "industry" | "market";
+  direction: "positive" | "negative" | "mixed" | "neutral";
+  timing: "before" | "on_date" | "after";
+  horizon: "intraday" | "short_term" | "medium_term";
+  affected_sectors: string[];
+  transmission_chain: string;
+  evidence: string;
+  market_confirmation?: string;
+  confirmation_signals: string[];
+  invalidation_conditions: string[];
 }
 
 export interface DailyReviewResult {
@@ -51,6 +77,8 @@ export interface DailyReviewResult {
   index_review: DailyReviewSection;
   hotspot_review: DailyReviewSection;
   dragon_tiger_review: DailyReviewSection;
+  news_policy_review?: DailyReviewSection;
+  event_impacts?: DailyReviewEventImpact[];
   risk_alerts: string[];
   opportunities: string[];
   strategy_notes: string[];

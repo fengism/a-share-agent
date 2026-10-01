@@ -684,7 +684,7 @@ class ClsDataProvider:
                         title=title,
                         content=content[:500],
                         source=item.get("source", "财联社头条"),
-                        publish_time=str(publish_time),
+                        publish_time=publish_time.isoformat(sep=" ") if publish_time else "",
                         url=item.get("external_link", ""),
                         author=item.get("author", ""),
                         read_count=int(item.get("read_count", 0)),

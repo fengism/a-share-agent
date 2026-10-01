@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 from collections.abc import Awaitable, Callable
 from typing import Any, Literal, cast
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit
 
+from app.configuration import get_settings
 from app.core.cache import TTLCache
 from app.core.cache_policies import AGENT_WEB_SEARCH
 from app.core.concurrency.rate_limiter import call_blocking, search_semaphore
@@ -17,10 +19,10 @@ logger = logging.getLogger(__name__)
 SEARCH_CACHE_TTL = AGENT_WEB_SEARCH.ttl_seconds
 search_cache = TTLCache(maxsize=128, name="agent_web_search")
 
-SearchEngineName = Literal["baidu", "so360", "bing_cn", "google"]
+SearchEngineName = Literal["auto", "baidu", "so360", "bing_cn", "google", "anysearch"]
 SearchTimeRange = Literal["day", "week", "month", "half_year", "any"]
 SearchLanguage = Literal["zh", "any"]
-DEFAULT_SEARCH_ENGINE: SearchEngineName = "baidu"
+DEFAULT_SEARCH_ENGINE: SearchEngineName = "auto"
 _BAIJIAHAO_HOST = "baijiahao.baidu.com"
 _BAIJIAHAO_EXCLUSION = f"-site:{_BAIJIAHAO_HOST}"
 # 保留 RFC 3986 的保留字与分隔符，只把裸中文/空格转成 %XX，已有转义不会被二次编码。
@@ -51,13 +53,23 @@ _SEARCH_PROVIDERS = {
     "so360": "so360_search",
     "bing_cn": "bing_cn_search",
     "google": "google_search",
+    "anysearch": "anysearch",
 }
 # 百度会按 IP + 指纹拦机器人，命中安全验证时返回空页面。降级顺序按中文相关性排：
 # 360 分词明显优于 Bing（同一个「宁德时代 储能产业链」，Bing 只给得出「宁德市」百科）。
 # Google 需要代理，不作为降级目标。
 _FALLBACK_ENGINES: dict[str, tuple[SearchEngineName, ...]] = {
     "baidu": ("so360", "bing_cn"),
+    "anysearch": ("baidu", "so360", "bing_cn"),
 }
+
+
+def _resolve_search_engine(engine: SearchEngineName) -> SearchEngineName:
+    """Resolve automatic routing without relying on the model to select AnySearch."""
+    if engine != "auto":
+        return engine
+    api_key = str(getattr(get_settings(), "anysearch_api_key", "") or "").strip()
+    return "anysearch" if api_key else "baidu"
 
 
 def _engine_query(query: str, engine: SearchEngineName) -> str:
@@ -91,9 +103,7 @@ def _url_identity(url: str) -> str:
     host = (parsed.hostname or "").lower().rstrip(".").removeprefix("www.")
     path = parsed.path.rstrip("/") or "/"
     kept = [
-        (key, value)
-        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
-        if not _is_tracking_param(key)
+        (key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if not _is_tracking_param(key)
     ]
     query = urlencode(sorted(kept))
     return f"{host}{path}?{query}"
@@ -150,14 +160,16 @@ def _normalize_results(
             continue
         seen_urls.add(identity)
         seen_titles.add(title_identity)
-        normalized.append(
-            {
-                "title": title[:300],
-                "url": url[:2048],
-                "snippet": " ".join(str(item.get("body") or "").split())[:1000],
-                "engine": str(item.get("engine") or engine)[:32],
-            }
-        )
+        normalized_item = {
+            "title": title[:300],
+            "url": url[:2048],
+            "snippet": " ".join(str(item.get("body") or "").split())[:1000],
+            "engine": str(item.get("engine") or engine)[:32],
+        }
+        published_at = item.get("published_at")
+        if published_at not in (None, ""):
+            normalized_item["published_at"] = str(published_at)[:100]
+        normalized.append(normalized_item)
     return normalized[:max_results]
 
 
@@ -167,25 +179,32 @@ async def execute_web_search(
     max_results: int = 5,
     time_range: SearchTimeRange = "half_year",
     language: SearchLanguage = "zh",
+    tag: str | None = None,
+    params: dict[str, Any] | None = None,
     *,
     call_blocking_func: Callable[..., Awaitable] = call_blocking,
     semaphore=search_semaphore,
     cache: TTLCache = search_cache,
 ) -> dict[str, Any]:
-    if engine not in _SEARCH_PROVIDERS:
+    if engine != "auto" and engine not in _SEARCH_PROVIDERS:
         raise ValueError(f"unsupported search engine: {engine}")
+    resolved_engine = _resolve_search_engine(engine)
     normalized_query = query.strip()
     # 缓存整份出参：engine_used 也在里面，所以命中缓存时前端显示的数据源依旧正确。
-    cache_key = f"search:{engine}:{max_results}:{time_range}:{language}:{normalized_query}"
+    params_key = json.dumps(params or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    cache_key = (
+        f"search:{engine}:{resolved_engine}:{max_results}:{time_range}:{language}:"
+        f"{tag or ''}:{params_key}:{normalized_query}"
+    )
     cached = cache.get(cache_key)
     if cached is not None:
         return cast(dict[str, Any], cached)
-    fetch_limit = min(max_results * 2, 20)
-    engine_used = engine
+    fetch_limit = max_results if resolved_engine == "anysearch" else min(max_results * 2, 20)
+    engine_used = resolved_engine
     results: list[dict[str, Any]] = []
     raised: list[BaseException] = []
     answered = False
-    for candidate in (engine, *_FALLBACK_ENGINES.get(engine, ())):
+    for candidate in (resolved_engine, *_FALLBACK_ENGINES.get(resolved_engine, ())):
         try:
             results = await provider_gateway.call(
                 _SEARCH_PROVIDERS[candidate],
@@ -196,9 +215,10 @@ async def execute_web_search(
                     max_results=fetch_limit,
                     time_range=time_range,
                     language=language,
+                    **({"tag": tag, "params": params} if candidate == "anysearch" else {}),
                     semaphore=semaphore,
                 ),
-                is_fallback_attempt=candidate != engine,
+                is_fallback_attempt=candidate != resolved_engine,
             )
         except Exception as error:  # noqa: BLE001 — 一个引擎抛异常不该掐断整条降级链
             raised.append(error)

@@ -17,6 +17,35 @@ const mockReview = {
   opportunities: ["机器人产业利好持续释放", "算力硬件需求增加"],
   risk_alerts: ["高位消费股获利了结风险"],
   strategy_notes: ["控制半仓，逢低布局低估核心资产"],
+  news_policy_review: {
+    title: "新闻政策与影响传导",
+    summary: "政策催化需要盘面确认，不能把新闻直接等同于交易结论。",
+    bullets: ["央行宣布降准，观察银行与券商成交额是否放大。"],
+  },
+  event_impacts: [{
+    event_title: "央行宣布降准",
+    event_type: "policy",
+    direction: "positive",
+    timing: "on_date",
+    horizon: "short_term",
+    affected_sectors: ["银行", "券商"],
+    transmission_chain: "流动性释放 → 风险偏好改善 → 金融权重获得增量资金关注",
+    evidence: "中国人民银行 2026-08-25：央行宣布降准",
+    market_confirmation: "银行板块放量领涨，获得初步盘面确认。",
+    confirmation_signals: ["银行与券商成交额放大"],
+    invalidation_conditions: ["金融权重高开低走"],
+  }, {
+    event_title: "次日政策细则落地",
+    event_type: "policy",
+    direction: "mixed",
+    timing: "after",
+    horizon: "short_term",
+    affected_sectors: ["新能源车"],
+    transmission_chain: "细则落地 → 核对补贴力度 → 验证汽车板块持续性",
+    evidence: "国务院 2026-08-26：次日政策细则落地",
+    confirmation_signals: ["汽车板块次日放量"],
+    invalidation_conditions: ["板块冲高回落"],
+  }],
   warnings: [],
   data_snapshot: {
     indices: [{ code: "000001", name: "上证指数", change_pct: 1.2 }],
@@ -36,6 +65,7 @@ const mockReview = {
     market_volume: {
       amount: 1_200_000_000_000,
     },
+    policy_news: [{ title: "央行宣布降准", event_type: "policy", direction: "positive" }],
   },
   llm_review: "## 市场综述\n\n今日三大指数集体走强，成交量显著放大。\n\n## 行业表现\n\n科技板块全线爆发。",
 };
@@ -114,6 +144,12 @@ describe("DailyReviewPage", () => {
     expect(screen.getByText(/指数 1/)).toBeInTheDocument();
     expect(screen.getByText(/热股 1/)).toBeInTheDocument();
     expect(screen.getByText(/概念 1/)).toBeInTheDocument();
+    expect(screen.getAllByText("新闻政策与影响传导").length).toBeGreaterThan(0);
+    expect(screen.getByText(/银行板块放量领涨/)).toBeInTheDocument();
+    expect(screen.getByText("流动性释放 → 风险偏好改善 → 金融权重获得增量资金关注")).toBeInTheDocument();
+    expect(screen.getByText(/银行与券商成交额放大/)).toBeInTheDocument();
+    expect(screen.getByText("事后验证")).toBeInTheDocument();
+    expect(screen.getByText(/仅用于事后验证，不作为当日交易依据/)).toBeInTheDocument();
   });
 
   it("supports copying review to clipboard and exporting via dropdown", () => {

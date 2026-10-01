@@ -10,6 +10,11 @@
 }
 
 .investment-research-report {
+  --stock-research-body-size: 15px;
+  --stock-research-label-size: 12px;
+  --stock-research-support-size: 14px;
+  --stock-research-section-size: 18px;
+  --stock-research-title-size: 28px;
   width: min(100%, 1120px);
   min-width: 0;
   margin-inline: auto;
@@ -85,6 +90,7 @@
 
 @container investment-research-page (max-width: 700px) {
   .investment-research-report {
+    --stock-research-title-size: 24px;
     padding: 16px;
   }
   .investment-research-report__header {

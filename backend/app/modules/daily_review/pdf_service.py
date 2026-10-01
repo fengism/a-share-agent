@@ -9,7 +9,12 @@ import re
 from typing import Any, Iterable
 
 from app.infrastructure.pdf_runtime import render_pdf
-from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult, DailyReviewSection
+from app.modules.daily_review.models import (
+    DailyReviewDataSnapshot,
+    DailyReviewEventImpact,
+    DailyReviewResult,
+    DailyReviewSection,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -226,6 +231,77 @@ def _render_section(section: DailyReviewSection) -> str:
     """
 
 
+_EVENT_TYPE_LABELS = {
+    "policy": "政策",
+    "macro": "宏观",
+    "global": "海外",
+    "industry": "产业",
+    "market": "市场",
+}
+_DIRECTION_LABELS = {
+    "positive": "偏利好",
+    "negative": "偏利空",
+    "mixed": "影响分化",
+    "neutral": "方向待确认",
+}
+_TIMING_LABELS = {
+    "before": "盘前/事前",
+    "on_date": "复盘日",
+    "after": "事后验证",
+}
+_HORIZON_LABELS = {
+    "intraday": "日内",
+    "short_term": "短期",
+    "medium_term": "中期",
+}
+
+
+def _impact_row(label: str, value: str, *, class_name: str = "") -> str:
+    classes = f"impact-row {class_name}".strip()
+    return (
+        f'<div class="{classes}"><div class="impact-label">{_esc(label)}</div>'
+        f'<div class="impact-value">{_esc(value) or "-"}</div></div>'
+    )
+
+
+def _render_policy_summary(section: DailyReviewSection) -> str:
+    return f"""
+      <div class="policy-summary-copy">
+        <p>{_esc(section.summary) or '暂无摘要'}</p>
+        {_render_list(section.bullets, '暂无补充要点')}
+      </div>
+    """
+
+
+def _render_event_impact(impact: DailyReviewEventImpact, index: int) -> str:
+    sectors = "、".join(impact.affected_sectors) or "市场整体"
+    confirmation = "；".join(impact.confirmation_signals) or "待观察"
+    invalidation = "；".join(impact.invalidation_conditions) or "待观察"
+    timing_class = " is-after" if impact.timing == "after" else ""
+    return f"""
+      <article class="policy-impact-card{timing_class}">
+        <div class="impact-header">
+          <span class="impact-index">{index:02d}</span>
+          <div class="impact-title">{_esc(impact.event_title)}</div>
+          <div class="impact-tags">
+            <span>{_esc(_EVENT_TYPE_LABELS.get(impact.event_type, impact.event_type))}</span>
+            <span>{_esc(_DIRECTION_LABELS.get(impact.direction, impact.direction))}</span>
+            <span>{_esc(_HORIZON_LABELS.get(impact.horizon, impact.horizon))}</span>
+            <span>{_esc(_TIMING_LABELS.get(impact.timing, impact.timing))}</span>
+          </div>
+        </div>
+        <div class="impact-rows">
+          {_impact_row("影响方向", sectors)}
+          {_impact_row("传导链", impact.transmission_chain)}
+          {_impact_row("事实证据", impact.evidence, class_name="is-evidence")}
+          {_impact_row("盘面验证", impact.market_confirmation or "尚未核验", class_name="is-confirmation")}
+          {_impact_row("确认信号", confirmation)}
+          {_impact_row("失效条件", invalidation, class_name="is-risk")}
+        </div>
+      </article>
+    """
+
+
 def _render_safe_markdown(value: str) -> str:
     """渲染常用标题、列表和段落；所有文本先转义，不执行任意 HTML。"""
     text = str(value or "").replace("\\n", "\n").strip()
@@ -274,11 +350,21 @@ def generate_daily_review_pdf_html(result: DailyReviewResult) -> str:
     state_labels = {"attack": "进攻", "balanced": "均衡", "defensive": "防守", "unknown": "数据不足"}
     quality_label = "完整" if result.quality_status == "complete" else "降级"
     generation_label = "AI 生成" if result.generation_status == "llm" else "确定性兜底"
-    body_html = _render_safe_markdown(result.llm_review)
-    if not body_html:
-        body_html = "".join(_render_section(section) for section in (
-            result.index_review, result.hotspot_review, result.dragon_tiger_review,
-        ))
+    # PDF 使用结构化字段独立排版，避免 Markdown 的二级列表被压平成同一层，
+    # 导致“新闻政策与影响传导”的标签和值错位。llm_review 仍用于页面正文和复制导出。
+    core_sections_html = "".join(_render_section(section) for section in (
+        result.index_review,
+        result.hotspot_review,
+        result.dragon_tiger_review,
+    ))
+    policy_section_html = _render_policy_summary(result.news_policy_review)
+    policy_impacts = list(result.event_impacts)
+    first_policy_impact = _render_event_impact(policy_impacts[0], 1) if policy_impacts else ""
+    remaining_policy_impacts = "".join(
+        _render_event_impact(impact, index)
+        for index, impact in enumerate(policy_impacts[1:], start=2)
+    )
+    empty_policy_impacts = '<div class="empty-state">暂无可核验的重点政策事件</div>' if not policy_impacts else ""
     warnings = [*result.warnings, *result.source_errors.values()]
     invalid = [f"失效条件：{item}" for item in result.invalid_conditions]
 
@@ -312,7 +398,28 @@ def generate_daily_review_pdf_html(result: DailyReviewResult) -> str:
   .chart-heading strong {{ font-size: 12px; }}
   .chart-heading span {{ color: #64748b; font-size: 9px; }}
   .chart-card svg {{ display: block; width: 100%; height: auto; }}
-  .review-block {{ break-inside: avoid; }}
+  .review-block {{ margin-bottom: 12px; break-inside: avoid; }}
+  .review-block:last-child {{ margin-bottom: 0; }}
+  .policy-opening {{ break-inside: avoid; page-break-inside: avoid; }}
+  .policy-summary {{ margin-bottom: 10px; padding: 9px 12px; border-radius: 7px; background: #f8fafc; }}
+  .policy-summary-copy p {{ margin-top: 0; }}
+  .policy-summary-copy ul {{ margin-bottom: 0; }}
+  .policy-impact-card {{ width: 100%; margin: 0 0 8px; border: 1px solid #dbe3ef; border-left: 4px solid #2563eb; border-radius: 8px; background: #fff; break-inside: avoid; page-break-inside: avoid; overflow: hidden; }}
+  .policy-impact-card.is-after {{ border-left-color: #d97706; }}
+  .impact-header {{ display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 8px; row-gap: 5px; align-items: start; padding: 8px 10px 7px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }}
+  .impact-index {{ display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 22px; color: #fff; border-radius: 5px; background: #2563eb; font-size: 9px; font-weight: 700; line-height: 22px; text-align: center; }}
+  .is-after .impact-index {{ background: #d97706; }}
+  .impact-title {{ min-width: 0; color: #172554; font-size: 12px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }}
+  .impact-tags {{ grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }}
+  .impact-tags span {{ display: inline-block; padding: 1px 6px; color: #334155; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; font-size: 8px; line-height: 1.5; white-space: nowrap; }}
+  .impact-rows {{ padding: 3px 10px 6px; }}
+  .impact-row {{ display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 10px; align-items: start; padding: 5px 0; border-bottom: 1px solid #eef2f7; }}
+  .impact-row:last-child {{ border-bottom: 0; }}
+  .impact-label {{ color: #64748b; font-size: 9px; font-weight: 700; line-height: 1.65; text-align: right; white-space: nowrap; }}
+  .impact-value {{ min-width: 0; color: #1e293b; font-size: 9.5px; line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; }}
+  .impact-row.is-evidence .impact-value {{ color: #475569; font-size: 8.5px; }}
+  .impact-row.is-confirmation .impact-value {{ color: #0f4c81; }}
+  .impact-row.is-risk .impact-value {{ color: #9a3412; }}
   .callout-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }}
   .callout {{ min-width: 0; padding: 10px; border-radius: 7px; border-left: 3px solid; background: #f8fafc; break-inside: avoid; }}
   .callout.opportunity {{ border-color: {_UP}; background: #fff7f7; }}
@@ -345,11 +452,21 @@ def generate_daily_review_pdf_html(result: DailyReviewResult) -> str:
 
   <section class="section allow-break">
     <h2>02 · 每日复盘正文</h2>
-    {body_html}
+    {core_sections_html}
+  </section>
+
+  <section class="section allow-break policy-section">
+    <div class="policy-opening">
+      <h2>03 · 新闻政策与影响传导</h2>
+      <div class="policy-summary">{policy_section_html}</div>
+      {first_policy_impact}
+      {empty_policy_impacts}
+    </div>
+    {remaining_policy_impacts}
   </section>
 
   <section class="section allow-break">
-    <h2>03 · 机会、风险与明日策略</h2>
+    <h2>04 · 机会、风险与明日策略</h2>
     <div class="callout-grid">
       <div class="callout opportunity"><strong>机会方向</strong>{_render_list(result.opportunities)}</div>
       <div class="callout risk"><strong>风险提示</strong>{_render_list(result.risk_alerts)}</div>
@@ -358,7 +475,7 @@ def generate_daily_review_pdf_html(result: DailyReviewResult) -> str:
   </section>
 
   <section class="section notice">
-    <h2>04 · 数据覆盖与缺口</h2>
+    <h2>05 · 数据覆盖与缺口</h2>
     {_render_list([*result.data_gaps, *warnings], '核心数据维度未发现明确缺口')}
   </section>
 

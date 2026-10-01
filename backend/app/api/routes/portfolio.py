@@ -10,6 +10,7 @@ from app.modules.portfolio.public import (
     InsufficientSharesError,
     PortfolioAccountSettings,
     PortfolioAccountSettingsUpdate,
+    PortfolioEquityCurveResponse,
     PortfolioPosition,
     PortfolioPositionCreate,
     PortfolioResponse,
@@ -23,6 +24,7 @@ from app.modules.portfolio.public import add_position as add_position_service
 from app.modules.portfolio.public import create_transaction as create_transaction_service
 from app.modules.portfolio.public import delete_position as delete_position_service
 from app.modules.portfolio.public import delete_transaction as delete_transaction_service
+from app.modules.portfolio.public import get_equity_curve as get_equity_curve_service
 from app.modules.portfolio.public import get_portfolio as get_portfolio_service
 from app.modules.portfolio.public import preview_transaction as preview_transaction_service
 from app.modules.portfolio.public import preview_transaction_update as preview_transaction_update_service
@@ -35,6 +37,11 @@ router = APIRouter()
 @router.get("", response_model=PortfolioResponse)
 async def get_portfolio(user: AuthenticatedUser = Depends(require_active_user)):
     return await get_portfolio_service(user["id"])
+
+
+@router.get("/equity-curve", response_model=PortfolioEquityCurveResponse)
+async def get_equity_curve(user: AuthenticatedUser = Depends(require_active_user)):
+    return await get_equity_curve_service(user["id"])
 
 
 @router.put("/settings", response_model=PortfolioAccountSettings)

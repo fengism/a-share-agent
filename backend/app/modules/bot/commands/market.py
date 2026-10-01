@@ -59,6 +59,7 @@ def _format_market_reply(result: DailyReviewResult) -> str:
     )
     opportunities = [item for item in (result.opportunities or []) if item] or ["暂无"]
     risks = [item for item in (result.risk_alerts or []) if item] or ["暂无"]
+    events = [impact for impact in result.event_impacts if impact.event_title]
     head_text = "\n".join([
         header,
         "",
@@ -68,6 +69,14 @@ def _format_market_reply(result: DailyReviewResult) -> str:
         *[f"- {item}" for item in opportunities[:3]],
         "**风险提示**",
         *[f"- {item}" for item in risks[:3]],
+        "**政策与事件影响**",
+        *(
+            [
+                f"- {impact.event_title}：{impact.transmission_chain or '待盘面确认'}"
+                for impact in events[:2]
+            ]
+            or ["- 暂无可核验的重点政策事件"]
+        ),
     ])
     remaining = _REPLY_CHAR_BUDGET - len(head_text) - 40
     parts: list[str] = [head_text]

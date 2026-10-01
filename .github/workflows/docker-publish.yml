@@ -101,8 +101,44 @@ jobs:
           npm run build
           npm run api:check
 
+  frontend-e2e:
+    name: Frontend E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run full frontend E2E gate
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-e2e-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
   backend:
-    needs: verify
+    needs: [verify, frontend-e2e]
     if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
@@ -204,7 +240,7 @@ jobs:
           if-no-files-found: error
 
   frontend:
-    needs: verify
+    needs: [verify, frontend-e2e]
     if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
@@ -268,7 +304,7 @@ jobs:
           if-no-files-found: error
 
   python-runner:
-    needs: verify
+    needs: [verify, frontend-e2e]
     if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
@@ -333,7 +369,7 @@ jobs:
           if-no-files-found: error
 
   python-sandbox:
-    needs: verify
+    needs: [verify, frontend-e2e]
     if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false

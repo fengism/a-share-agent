@@ -58,12 +58,12 @@ test("switches the index intraday chart without hiding K-line", async ({ page })
 
   await page.goto("/market?tab=a-index");
   await expect(page.locator(".index-intraday-card")).toContainText("上证指数 分时");
-  await expect(page.getByText("上证指数 K线")).toBeVisible();
+  await expect(page.getByText("上证指数 · K线趋势")).toBeVisible();
   await expect.poll(() => requestedSymbols).toContain("000001");
 
   await page.getByRole("button", { name: /深证成指/ }).click();
   await expect(page.locator(".index-intraday-card")).toContainText("深证成指 分时");
-  await expect(page.getByText("深证成指 K线")).toBeVisible();
+  await expect(page.getByText("深证成指 · K线趋势")).toBeVisible();
   await expect.poll(() => requestedSymbols).toContain("399001");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });

@@ -74,6 +74,12 @@ export default function SettingsPage() {
       twitter_feeds: config.twitter_feeds,
       eastmoney_cookie: config.eastmoney_cookie,
       fred_api_key: config.fred_api_key,
+      market_daily_bar_refresh_enabled: config.market_daily_bar_refresh_enabled,
+      market_daily_bar_refresh_poll_seconds: config.market_daily_bar_refresh_poll_seconds,
+      market_daily_bar_refresh_retry_base_seconds: config.market_daily_bar_refresh_retry_base_seconds,
+      market_daily_observation_retention_days: config.market_daily_observation_retention_days,
+      market_daily_attempt_retention_days: config.market_daily_attempt_retention_days,
+      anysearch_api_key: "",
       baidu_cookie: config.baidu_cookie,
       bot_enabled: config.bot_enabled,
       bot_command_prefix: config.bot_command_prefix,
@@ -215,6 +221,19 @@ export default function SettingsPage() {
     saveConfig({ fred_api_key: value }, "FRED API Key 已保存");
   }, [config?.fred_api_key, form.fred_api_key, saveConfig]);
 
+  const handleSaveAnySearch = useCallback(() => {
+    const value = (form.anysearch_api_key ?? "").trim();
+    if (!value || value.includes("***")) {
+      message.info("没有需要保存的变更");
+      return;
+    }
+    saveConfig(
+      { anysearch_api_key: value },
+      "AnySearch API Key 已保存",
+      () => updateForm({ anysearch_api_key: "" }),
+    );
+  }, [form.anysearch_api_key, saveConfig, updateForm]);
+
   const handleSaveDataSourceCookies = useCallback(() => {
     const patch: ConfigUpdate = {};
     if (form.eastmoney_cookie && !form.eastmoney_cookie.endsWith("***")) {
@@ -244,6 +263,19 @@ export default function SettingsPage() {
       chat_max_tool_calls_total: form.chat_max_tool_calls_total,
     };
     saveConfig(patch, "研究预算与超时已保存");
+  }, [form, saveConfig]);
+
+  const handleSaveMarketDailyBars = useCallback(() => {
+    saveConfig(
+      {
+        market_daily_bar_refresh_enabled: form.market_daily_bar_refresh_enabled,
+        market_daily_bar_refresh_poll_seconds: form.market_daily_bar_refresh_poll_seconds,
+        market_daily_bar_refresh_retry_base_seconds: form.market_daily_bar_refresh_retry_base_seconds,
+        market_daily_observation_retention_days: form.market_daily_observation_retention_days,
+        market_daily_attempt_retention_days: form.market_daily_attempt_retention_days,
+      },
+      "市场日行情刷新配置已保存",
+    );
   }, [form, saveConfig]);
 
   const handleSaveBot = useCallback(() => {
@@ -386,6 +418,8 @@ export default function SettingsPage() {
                     sectionTitleStyle={sectionTitleStyle}
                     onSaveTwitter={handleSaveTwitter}
                     onSaveFred={handleSaveFred}
+                    anySearchConfigured={Boolean(config.anysearch_api_key)}
+                    onSaveAnySearch={handleSaveAnySearch}
                     onSaveDataSourceCookies={handleSaveDataSourceCookies}
                   />
                 </Suspense>
@@ -404,6 +438,7 @@ export default function SettingsPage() {
                     sectionTitleStyle={sectionTitleStyle}
                     onSaveBot={handleSaveBot}
                     onSaveResearchBudget={handleSaveResearchBudget}
+                    onSaveMarketDailyBars={handleSaveMarketDailyBars}
                   />
                 </Suspense>
               ),

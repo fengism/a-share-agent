@@ -5,10 +5,12 @@ from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
 from app.infrastructure.persistence import portfolio as portfolio_store
 from app.modules.industry_classification.public import get_records_by_stock_codes
 from app.modules.portfolio.accounting import replay_transactions
+from app.modules.portfolio.equity_curve import load_equity_curve
 from app.modules.portfolio.quotes import fetch_quote_batch
 from app.modules.portfolio.schemas import (
     PortfolioAccountSettings,
     PortfolioAccountSettingsUpdate,
+    PortfolioEquityCurveResponse,
     PortfolioResponse,
 )
 
@@ -37,6 +39,25 @@ async def get_portfolio(user_id: int) -> PortfolioResponse:
     )
 
 
+async def get_equity_curve(user_id: int) -> PortfolioEquityCurveResponse:
+    rows, settings_row = await asyncio.gather(
+        call_blocking(
+            portfolio_store.list_transactions,
+            user_id,
+            semaphore=database_semaphore,
+        ),
+        call_blocking(
+            portfolio_store.get_account_settings,
+            user_id,
+            semaphore=database_semaphore,
+        ),
+    )
+    return await load_equity_curve(
+        replay_transactions(rows),
+        PortfolioAccountSettings.model_validate(settings_row),
+    )
+
+
 async def update_account_settings(
     request: PortfolioAccountSettingsUpdate,
     user_id: int,
@@ -50,4 +71,4 @@ async def update_account_settings(
     return PortfolioAccountSettings.model_validate(row)
 
 
-__all__ = ["get_portfolio", "update_account_settings"]
+__all__ = ["get_equity_curve", "get_portfolio", "update_account_settings"]

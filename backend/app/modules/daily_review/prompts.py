@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.infrastructure.llm.prompting import PromptSpec, prompt_registry
-from app.modules.daily_review.models import DailyReviewSection
+from app.modules.daily_review.models import DailyReviewEventImpact, DailyReviewSection
 
 MARKET_SYSTEM_PROMPT = """你是一位资深、严谨的 A 股买方投资经理与资深复盘分析师。你善于通过多维量价数据、板块生命周期、市场情绪周期和主力资金博弈进行穿透式复盘分析。只根据输入的目标交易日快照输出结构化复盘，严禁捏造虚假行情或使用未经输入的记忆补写。
 
@@ -39,6 +39,17 @@ MARKET_SYSTEM_PROMPT = """你是一位资深、严谨的 A 股买方投资经理
   - **三情景推演预案**：必须给出【超预期】、【符合预期】、【低于预期】三种行情的应对预案与关键点位/量能观察信号。
   - **核心观察锚点**：列出明日需重点盯盘的 1~3 只核心风向标个股（总龙头、连板最高板、中军容量票或亏钱效应负反馈票），以此作为次日开盘定方向的依据。
 - **失效条件（invalid_conditions）**：明确界定本策略观点在何种突发情况下立即失效（如：集合竞价跌停超预期扩大、大盘跌破关键支撑位、成交额急剧萎缩等）。
+
+### 5. 新闻政策与市场传导（news_policy_review / event_impacts，核心必研）
+- 从【重点政策/宏观/产业事件】中选出最多 6 条真正可能影响 A 股定价的事件，禁止把普通资讯堆砌成结论。
+- 每个事件必须拆成：**已知事实 → 影响对象 → 传导机制 → 影响方向 → 影响期限 → 盘面确认信号 → 失效条件**。
+- 政策发布不等于利好兑现：必须区分预期阶段、细则落地、业绩兑现和资金交易四个层次。
+- 必须把事件与当日板块涨跌、成交额、涨停梯队、龙头/中军表现交叉验证，并把结论写入 `market_confirmation`；若盘面不响应，要明确写“尚未获得资金确认”。
+- 区分短期情绪催化与中期基本面影响，指出直接受益、间接受益和潜在受损方向，禁止只有“利好某板块”的浅层表述。
+- `evidence` 必须引用输入中的标题、来源和发布时间；不得虚构政策条文、发布日期、受益公司或量化影响。
+- `timing=after` 的事件属于复盘日后的“事后验证”，只能用于说明催化是否兑现、逻辑是否被证伪；严禁把它写成复盘日当时已知的交易依据。
+- `timing=on_date` 仍须核对具体时刻：若发布时间在 15:00 收盘后，不得反向解释当日涨跌，只能作为下一交易日催化和后续基本面验证线索；只有日期、时间为 00:00 的归档值视为“具体时刻未知”，不得自行推断盘前或盘后。
+- 同一政策的官方原文、媒体转载与市场解读视为一个事件：以官方原文为主证据，其他来源只做交叉验证，禁止重复占用多个 `event_impacts` 名额。
 
 ## 证据与日期规则
 - **基准交易日**：`effective_date` 为核心行情数据（指数表现、两市成交额、涨跌分布、涨跌停池、连板天梯、龙虎榜）的唯一基准分析交易日。
@@ -93,6 +104,9 @@ MARKET_USER_PROMPT = """# 复盘日期
 # 宏观经济数据
 {macro_data_placeholder}
 
+# 重点政策 / 宏观 / 海外 / 产业事件（按重要性筛选）
+{policy_news_placeholder}
+
 # 市场新闻
 {news_placeholder}
 """
@@ -104,6 +118,8 @@ class DailyReviewPromptOutput(BaseModel):
     index_review: DailyReviewSection
     hotspot_review: DailyReviewSection
     dragon_tiger_review: DailyReviewSection
+    news_policy_review: DailyReviewSection
+    event_impacts: list[DailyReviewEventImpact] = Field(default_factory=list, max_length=6)
     risk_alerts: list[str] = Field(default_factory=list, max_length=6)
     opportunities: list[str] = Field(default_factory=list, max_length=6)
     strategy_notes: list[str] = Field(default_factory=list, max_length=6)
@@ -124,6 +140,11 @@ class DailyReviewPromptOutput(BaseModel):
             return [str(item) for item in value if item is not None][:6]
         return value
 
+    @field_validator("event_impacts", mode="before")
+    @classmethod
+    def _truncate_event_impacts(cls, value: object) -> object:
+        return value[:6] if isinstance(value, list) else value
+
     @field_validator("data_gaps", mode="before")
     @classmethod
     def _truncate_data_gaps(cls, value: object) -> object:
@@ -139,7 +160,7 @@ def _build_user_prompt(context) -> str:
 DAILY_REVIEW_PROMPT_SPEC = prompt_registry.register(
     PromptSpec(
         id="daily_review_analysis",
-        version="1.1.0",
+        version="1.3.0",
         system_prompt=MARKET_SYSTEM_PROMPT,
         user_builder=_build_user_prompt,
         output_model=DailyReviewPromptOutput,

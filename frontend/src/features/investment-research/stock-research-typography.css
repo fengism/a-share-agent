@@ -3,15 +3,15 @@
 .research-framework,
 .financial-data-sections {
   --stock-research-font-family: var(--c-font-sans);
-  --stock-research-body-size: var(--c-font-base);
+  --stock-research-body-size: 15px;
   --stock-research-body-leading: var(--c-leading-relaxed);
-  --stock-research-label-size: var(--c-font-xs);
-  --stock-research-table-size: var(--c-font-sm);
-  --stock-research-support-size: var(--c-font-sm);
-  --stock-research-subhead-size: var(--c-font-md);
-  --stock-research-section-size: var(--c-font-lg);
-  --stock-research-metric-size: var(--c-font-xl);
-  --stock-research-title-size: var(--c-font-2xl);
+  --stock-research-label-size: 12px;
+  --stock-research-table-size: 13px;
+  --stock-research-support-size: 14px;
+  --stock-research-subhead-size: 14px;
+  --stock-research-section-size: 18px;
+  --stock-research-metric-size: 20px;
+  --stock-research-title-size: 28px;
   color: var(--c-text-primary);
   font-family: var(--stock-research-font-family);
   font-size: var(--stock-research-body-size);
@@ -33,6 +33,6 @@
   .analysis-research-conclusion,
   .research-framework,
   .financial-data-sections {
-    --stock-research-title-size: var(--c-font-2xl);
+    --stock-research-title-size: 24px;
   }
 }

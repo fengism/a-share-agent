@@ -1,5 +1,6 @@
 export const pageLoaders = {
   appLayout: () => import("../components/AppLayout"),
+  earthscope: () => import("../pages/EarthScope"),
   dashboard: () => import("../pages/Dashboard"),
   watchlist: () => import("../pages/Watchlist"),
   market: () => import("../pages/Market"),
@@ -33,6 +34,7 @@ export const pageLoaders = {
 type PageLoader = () => Promise<unknown>;
 
 const routeLoaders: Record<string, PageLoader> = {
+  "/earthscope": pageLoaders.earthscope,
   "/": pageLoaders.dashboard,
   "/watchlist": pageLoaders.watchlist,
   "/market": pageLoaders.market,

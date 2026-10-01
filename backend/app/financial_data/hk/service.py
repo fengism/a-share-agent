@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from datetime import date
 from typing import Protocol
 
 import pandas as pd
@@ -9,7 +10,7 @@ import pandas as pd
 from app.core.cache import market_cache, series_cache
 from app.core.concurrency.rate_limiter import sina_semaphore
 from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
-from app.core.market import safe_float
+from app.core.market import market_today, safe_float
 from app.domain.market import IndexItem, KlineData, KlineItem, MarketIndices
 from app.financial_data.hk.schemas import (
     HKStockQuote,
@@ -20,6 +21,7 @@ from app.financial_data.hk.schemas import (
 from app.financial_data.hk.search_index import HKStockSearchIndex, hk_stock_search_index
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
+from app.modules.market_daily.reader import load_local_daily_kline, merge_local_daily_kline
 
 _HK_CODE_PATTERN = re.compile(r"^(?:hk)?(\d{1,5})$", re.IGNORECASE)
 _HK_INDEX_SYMBOLS = frozenset({"HSI", "HSCEI", "HSTECH"})
@@ -30,6 +32,7 @@ _ADJUSTMENTS = frozenset({"none", "qfq", "hfq"})
 class HKProvider(Protocol):
     def fetch_hk_stocks_spot(self) -> pd.DataFrame: ...
     def fetch_hk_stocks_spot_page(self, page: int, page_size: int) -> tuple[pd.DataFrame, int]: ...
+    def fetch_hk_stock_quotes_by_codes(self, codes: Sequence[str]) -> pd.DataFrame: ...
     def fetch_hk_stock_daily(self, code: str, adjust: str) -> pd.DataFrame: ...
     def fetch_hk_indices_spot(self) -> pd.DataFrame: ...
     def fetch_hk_index_daily(self, symbol: str) -> pd.DataFrame: ...
@@ -324,11 +327,27 @@ class HKMarketService:
         normalized_code = normalize_hk_code(code)
         normalized_period = _validate_period(period)
         normalized_adjust = _validate_adjust(adjust)
+        local = None
+        start_boundary = _parse_boundary(start_date, "start_date")
+        end_boundary = _parse_boundary(end_date, "end_date")
+        local_start = start_boundary.date() if start_boundary is not None else date.min
+        local_end = end_boundary.date() if end_boundary is not None else market_today()
+        if normalized_period == "daily" and normalized_adjust == "none":
+            local = await load_local_daily_kline(
+                market="hk",
+                instrument_type="stock",
+                code=normalized_code,
+                start_date=local_start,
+                end_date=local_end,
+                adjust=normalized_adjust,
+            )
+            if local_start == local_end and local is not None:
+                return local
         key = f"hk:stock:history:{normalized_code}:{normalized_period}:{normalized_adjust}:{start_date}:{end_date}"
         if self._cache_enabled:
             cached = series_cache.get(key)
             if isinstance(cached, KlineData):
-                return cached
+                return merge_local_daily_kline(cached, local)
         upstream_adjust = "" if normalized_adjust == "none" else normalized_adjust
         frame = await self._call(
             "fetch_hk_stock_daily", self.provider.fetch_hk_stock_daily, normalized_code, upstream_adjust
@@ -341,6 +360,7 @@ class HKMarketService:
                 normalized_adjust,
                 _resample_history(normalized, normalized_period),
             )
+            result = merge_local_daily_kline(result, local)
         except InvalidRequestError:
             raise
         except Exception as error:
@@ -389,11 +409,26 @@ class HKMarketService:
     ) -> KlineData:
         normalized_symbol = normalize_hk_index_symbol(symbol)
         normalized_period = _validate_period(period)
+        local = None
+        start_boundary = _parse_boundary(start_date, "start_date")
+        end_boundary = _parse_boundary(end_date, "end_date")
+        local_start = start_boundary.date() if start_boundary is not None else date.min
+        local_end = end_boundary.date() if end_boundary is not None else market_today()
+        if normalized_period == "daily":
+            local = await load_local_daily_kline(
+                market="hk",
+                instrument_type="index",
+                code=normalized_symbol,
+                start_date=local_start,
+                end_date=local_end,
+            )
+            if local_start == local_end and local is not None:
+                return local
         key = f"hk:index:history:{normalized_symbol}:{normalized_period}:{start_date}:{end_date}"
         if self._cache_enabled:
             cached = series_cache.get(key)
             if isinstance(cached, KlineData):
-                return cached
+                return merge_local_daily_kline(cached, local)
         frame = await self._call("fetch_hk_index_daily", self.provider.fetch_hk_index_daily, normalized_symbol)
         try:
             normalized = _normalize_history_frame(frame, start_date, end_date)
@@ -403,6 +438,7 @@ class HKMarketService:
                 "none",
                 _resample_history(normalized, normalized_period),
             )
+            result = merge_local_daily_kline(result, local)
         except InvalidRequestError:
             raise
         except Exception as error:

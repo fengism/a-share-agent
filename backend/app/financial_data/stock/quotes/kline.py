@@ -12,6 +12,8 @@ from app.financial_data.stock.quotes.historical import (
     HistoricalRequestLimiter,
     get_historical_bars,
 )
+from app.modules.market_daily.adjustment import load_local_adjusted_daily_kline
+from app.modules.market_daily.reader import load_local_daily_kline, merge_local_daily_kline
 
 _kline_singleflight = AsyncSingleFlight[KlineData]()
 
@@ -106,6 +108,24 @@ async def get_kline(
     if parsed_start_date > parsed_end_date:
         raise ValueError("start_date 不能晚于 end_date")
 
+    local = None
+    if period == "daily" and adjust in {"qfq", "hfq"}:
+        local = await load_local_adjusted_daily_kline(
+            sym.raw, parsed_start_date, parsed_end_date, adjust
+        )
+        if parsed_start_date == parsed_end_date and local is not None and not require_turnover:
+            return local
+    if period == "daily" and adjust == "":
+        local = await load_local_daily_kline(
+            market="cn",
+            instrument_type="stock",
+            code=sym.raw,
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+        )
+        if parsed_start_date == parsed_end_date and local is not None and not require_turnover:
+            return local
+
     policy = await resolve_market_data_cache_policy(period, parsed_end_date)
     cache_key_parts: list[object] = [
         "kline",
@@ -122,7 +142,7 @@ async def get_kline(
     if policy.read_cache:
         cached = series_cache.get(cache_key)
         if cached is not None:
-            return cached
+            return merge_local_daily_kline(cached, local)
 
     async def load_and_cache() -> KlineData:
         """加载 K 线数据并写入缓存。
@@ -152,6 +172,7 @@ async def get_kline(
                 max_provider_sources=max_provider_sources,
                 request_limiter=request_limiter,
             )
+        result = merge_local_daily_kline(result, local)
         if policy.write_cache and policy.ttl_seconds is not None:
             series_cache.set(cache_key, result, ttl=policy.ttl_seconds)
         return result

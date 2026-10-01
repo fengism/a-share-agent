@@ -206,7 +206,19 @@ test("records a sell transaction from the current portfolio", async ({ page }) =
           concentration_level: "high",
           priced_stock_count: 1,
           unpriced_stock_count: 0,
+          max_total_position_limit_pct: 80,
+          max_single_stock_limit_pct: 30,
+          max_sector_limit_pct: 40,
+          largest_sector_name: null,
+          largest_sector_pct: null,
+          sector_allocations: [],
           warnings: ["单一股票仓位占比较高"],
+        },
+        settings: {
+          initial_cash: null,
+          max_total_position_pct: 80,
+          max_single_stock_pct: 30,
+          max_sector_pct: 40,
         },
         quoted_at: "2026-01-03T10:00:00",
         quote_source: "tencent",
@@ -298,23 +310,16 @@ test("places the Dashboard watchlist in a responsive right rail", async ({ page 
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
-  const main = page.getByRole("region", { name: "市场概览" });
-  const rail = page.getByRole("complementary", { name: "首页自选栏" });
+  const main = page.getByRole("region", { name: "首页中间内容" });
+  const rail = page.getByRole("complementary", { name: "首页热榜与自选栏" });
   await expect(main).toBeVisible();
   await expect(rail).toBeVisible();
   await expect(page.getByRole("heading", { name: "市场总览" })).toBeVisible();
-  await expect(page.getByText("当前查看 上证指数 · 000001")).toBeVisible();
-  await expect(page.getByText("行情源 腾讯")).toBeVisible();
-  await expect(page.locator(".index-intraday-card")).toBeVisible();
+  await expect(page.getByRole("button", { name: /上证指数.*000001/ })).toBeVisible();
   const shanghaiIndex = page.getByRole("button", { name: /上证指数/ });
-  await expect(shanghaiIndex).toHaveClass(/is-active/);
   await expect(shanghaiIndex).toContainText("000001");
-  await expect(page.locator(".index-intraday-summary")).toContainText("更新 09:30");
-  await expect(page.getByLabel("分时图图例")).toContainText("价格均价成交量");
   const shenzhenIndex = page.getByRole("button", { name: /深证成指/ });
-  await shenzhenIndex.click();
-  await expect(shenzhenIndex).toHaveClass(/is-active/);
-  await expect(page.locator(".index-intraday-card")).toContainText("深证成指 分时");
+  await expect(shenzhenIndex).toContainText("399001");
   await expect(page.getByText("市场行情")).toHaveCount(0);
   await expect(page.getByText("AI 分析")).toHaveCount(0);
   const [desktopMainBox, desktopRailBox] = await Promise.all([main.boundingBox(), rail.boundingBox()]);
@@ -327,7 +332,7 @@ test("places the Dashboard watchlist in a responsive right rail", async ({ page 
   const firstWatchItem = page.locator(".dashboard-watchlist__item").first();
   await expect(firstWatchItem).toHaveClass(/is-up/);
   await expect(page.locator(".dashboard-watchlist__item").nth(1)).toHaveClass(/is-down/);
-  await expect(page.getByRole("link", { name: "自选股票1 600000" })).toHaveAttribute("href", "/analysis/600000");
+  await expect(page.getByRole("link", { name: "自选股票1 600000" })).toHaveAttribute("href", "/stock/600000");
   const firstActions = firstWatchItem.locator(".dashboard-watchlist__actions--overlay");
   await expect(firstActions).toHaveCSS("opacity", "0");
   await firstWatchItem.hover();

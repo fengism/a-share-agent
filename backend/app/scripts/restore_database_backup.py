@@ -5,13 +5,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from app.infrastructure.persistence.connection import database_path
+from app.infrastructure.persistence.connection import ALL_DATABASES, database_path
 from app.infrastructure.persistence.operations import restore_database_backup
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Restore a verified stock-agent SQLite backup")
-    parser.add_argument("database", choices=("market", "user", "industry"))
+    parser.add_argument("database", choices=ALL_DATABASES)
     parser.add_argument("source", type=Path)
     parser.add_argument("--safety-dir", type=Path)
     parser.add_argument(

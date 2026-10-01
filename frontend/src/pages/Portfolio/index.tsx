@@ -10,6 +10,7 @@ import PortfolioTables from "./PortfolioTables";
 import PortfolioTradeKline from "./PortfolioTradeKline";
 import PortfolioQuoteStatus from "./PortfolioQuoteStatus";
 import PortfolioRiskPanel from "./PortfolioRiskPanel";
+import PortfolioEquityCurve from "./PortfolioEquityCurve";
 import PortfolioSettingsCard from "./PortfolioSettingsCard";
 import TransactionEntryCard, { type TransactionEntryCardHandle } from "./TransactionEntryCard";
 import type { PortfolioStockSummary } from "../../types/portfolio";
@@ -98,6 +99,7 @@ export default function PortfolioPage() {
         <>
           <PortfolioSettingsCard settings={data.settings} />
           <PortfolioSummaryCards summary={data.summary} />
+          <PortfolioEquityCurve />
           <PortfolioRiskPanel risk={data.risk} />
           <TransactionEntryCard ref={transactionEntryRef} stocks={data.stocks} />
           <PortfolioTradeKline stocks={data.stocks} transactions={data.transactions} />

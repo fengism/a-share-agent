@@ -42,6 +42,7 @@ export interface ConfigData {
   twitter_feeds: string[];
   eastmoney_cookie: string;
   fred_api_key: string;
+  anysearch_api_key: string;
   baidu_cookie: string;
   ths_cookie: string;
   http_trust_env: boolean;
@@ -52,6 +53,11 @@ export interface ConfigData {
   eastmoney_jitter_max_seconds: number;
   eastmoney_cooldown_seconds: number;
   eastmoney_transient_failure_threshold: number;
+  market_daily_bar_refresh_enabled: boolean;
+  market_daily_bar_refresh_poll_seconds: number;
+  market_daily_bar_refresh_retry_base_seconds: number;
+  market_daily_observation_retention_days: number;
+  market_daily_attempt_retention_days: number;
   bot_enabled: boolean;
   bot_command_prefix: string;
   bot_service_user_id: number;
@@ -118,4 +124,83 @@ export interface LlmModelsRequest {
 
 export interface LlmModelsResponse {
   models: string[];
+}
+
+
+export type MarketDailySegment = "cn_stock" | "cn_index" | "hk_stock" | "hk_index";
+export type MarketDailyRefreshCheckpoint = "initial" | "recheck";
+export type MarketDailyRefreshStatus = "pending" | "running" | "success" | "skipped" | "failed";
+
+export interface MarketDailyBarRefreshStatusItem {
+  trade_date: string;
+  checkpoint: MarketDailyRefreshCheckpoint;
+  segment: MarketDailySegment;
+  status: MarketDailyRefreshStatus;
+  attempts: number;
+  next_retry_at: string | null;
+  expected_count: number | null;
+  stored_count: number | null;
+  last_error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface MarketDailyBarRefreshHistory {
+  items: MarketDailyBarRefreshStatusItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface MarketDailyBarRefreshRequest {
+  trade_date: string;
+  checkpoint: MarketDailyRefreshCheckpoint;
+  segments: MarketDailySegment[];
+  retry_failed_only?: boolean;
+  force?: boolean;
+}
+
+export interface MarketDailyBarRefreshResult {
+  trade_date: string;
+  checkpoint: MarketDailyRefreshCheckpoint;
+  requested_segments: MarketDailySegment[];
+  statuses: MarketDailyBarRefreshStatusItem[];
+}
+
+export interface MarketDailyBarDeleteRequest {
+  trade_date: string;
+  segments: MarketDailySegment[];
+  rebuild?: boolean;
+  checkpoint?: MarketDailyRefreshCheckpoint;
+}
+
+export interface MarketDailyBarDeleteResult {
+  trade_date: string;
+  deleted_bars: number;
+  deleted_observations: number;
+  deleted_jobs: number;
+  rebuild_result: MarketDailyBarRefreshResult | null;
+}
+
+
+export type MarketAdjustmentFactorHealth = "missing" | "healthy" | "stale" | "degraded" | "incomplete";
+
+export interface MarketAdjustmentFactorStatus {
+  code: string;
+  status: MarketAdjustmentFactorHealth;
+  bar_count: number;
+  factor_count: number;
+  action_count: number;
+  first_bar_date: string | null;
+  last_bar_date: string | null;
+  first_factor_date: string | null;
+  last_factor_date: string | null;
+  action_hash: string | null;
+  algorithm_version: string | null;
+  source: string | null;
+  calculated_at: string | null;
+  last_checked_at: string | null;
+  last_error: string | null;
+  using_last_good: boolean;
+  coverage_complete: boolean;
 }
