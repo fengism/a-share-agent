@@ -5,6 +5,10 @@ from fastapi import APIRouter, Query
 from app.domain.market import KlineData, MarketIndices
 from app.financial_data.hk.schemas import HKStockQuotePage, HKStockSearchResult
 from app.financial_data.hk.service import hk_market_service
+from app.financial_data.stock.public import get_technical_indicators as get_technical_indicators_service
+from app.financial_data.stock.quotes.indicators import TechnicalIndicators
+from app.financial_data.stock.quotes.intraday import get_intraday
+from app.financial_data.stock.quotes.schemas import IntradayData
 
 router = APIRouter()
 
@@ -41,8 +45,8 @@ async def search_hk_stocks(
 @router.get("/stocks/{code}/history", response_model=KlineData)
 async def get_hk_stock_history(
     code: str,
-    period: str = Query("daily", pattern=r"^(daily|weekly|monthly)$"),
-    adjust: str = Query("none", pattern=r"^(none|qfq|hfq)$"),
+    period: str = Query("daily", pattern=r"^(daily|weekly|monthly|annual)$"),
+    adjust: str = Query("none", pattern=r"^(none|qfq|hfq|)$"),
     start_date: str = Query("", description="起始日期 YYYYMMDD 或 YYYY-MM-DD"),
     end_date: str = Query("", description="结束日期 YYYYMMDD 或 YYYY-MM-DD"),
 ):
@@ -50,9 +54,28 @@ async def get_hk_stock_history(
     return await hk_market_service.get_stock_history(
         code,
         period=period,
-        adjust=adjust,
+        adjust=adjust or "none",
         start_date=start_date,
         end_date=end_date,
+    )
+
+
+@router.get("/stocks/{code}/intraday", response_model=IntradayData)
+async def get_hk_stock_intraday(code: str):
+    """获取港股个股分时行情数据。"""
+    return await get_intraday(code)
+
+
+@router.get("/stocks/{code}/indicators", response_model=TechnicalIndicators)
+async def get_hk_stock_indicators(
+    code: str,
+    period: str = Query("daily", pattern=r"^(daily|weekly|monthly|annual)$"),
+    start_date: str = Query("", description="起始日期，留空默认一年前"),
+    end_date: str = Query("", description="结束日期，留空默认当天"),
+):
+    """获取港股指定周期的技术指标（均线、MACD、RSI、布林带、KDJ、成交量均线）。"""
+    return await get_technical_indicators_service(
+        code, period=period, start_date=start_date, end_date=end_date
     )
 
 
@@ -67,7 +90,7 @@ async def get_hk_index_quotes(
 @router.get("/indices/{symbol}/history", response_model=KlineData)
 async def get_hk_index_history(
     symbol: str,
-    period: str = Query("daily", pattern=r"^(daily|weekly|monthly)$"),
+    period: str = Query("daily", pattern=r"^(daily|weekly|monthly|annual)$"),
     start_date: str = Query("", description="起始日期 YYYYMMDD 或 YYYY-MM-DD"),
     end_date: str = Query("", description="结束日期 YYYYMMDD 或 YYYY-MM-DD"),
 ):

@@ -274,16 +274,29 @@ async function mockResearchApi(page: Page, cachedAnalysis: unknown = analysisRes
   return { cancelledJobs };
 }
 
-test("uses one stock research entry and renders investment research as its default dimension", async ({ page }) => {
+test("sends the stock picker entry to the stock profile page, not AI analysis", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await mockResearchApi(page);
   await page.goto("/analysis");
   await expect(page.getByRole("heading", { name: /个股/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "投资研究", exact: true })).toHaveCount(0);
-  await page.getByPlaceholder("输入股票代码或名称，如 600519 或 贵州茅台").fill("600519");
-  await page.getByPlaceholder("输入股票代码或名称，如 600519 或 贵州茅台").press("Enter");
 
-  await expect(page).toHaveURL(/\/analysis\/600519$/);
+  // 用前缀匹配而不是完整文案：placeholder 已随港股搜索支持改为
+  // "如 600519、00700 或 贵州茅台、腾讯控股"，全量匹配会随文案调整而失效
+  const stockSearchInput = page.getByPlaceholder(/输入股票代码或名称/);
+  await stockSearchInput.fill("600519");
+  await stockSearchInput.press("Enter");
+
+  // 个股入口默认进入个股资料页
+  await expect(page).toHaveURL(/\/stock\/600519$/);
+});
+
+test("renders investment research as the default dimension of the stock research page", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockResearchApi(page);
+  // 个股选股入口（/analysis）的搜索框现在默认进入个股资料页（/stock/:code），
+  // 投资研判页改为直接访问，不再由选股入口跳转。
+  await page.goto("/analysis/600519");
+
   await expect(page.getByRole("tab", { name: "研究结论" })).toHaveAttribute("aria-selected", "true");
   const researchConclusion = page.locator(".analysis-research-conclusion");
   await expect(researchConclusion.getByRole("heading", { name: "综合研判" })).toBeVisible();

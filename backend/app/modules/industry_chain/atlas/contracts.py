@@ -9,10 +9,10 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 _SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
-_CODE_PATTERN = re.compile(r"^\d{6}$")
+_CODE_PATTERN = re.compile(r"^\d{5,6}$")  # A 股 6 位；港股 5 位（如 09988）
 
 
 class AtlasCompany(BaseModel):
@@ -21,13 +21,22 @@ class AtlasCompany(BaseModel):
     name: str
     code: str
     note: str = ""
+    """市场标识；未显式给出时按代码长度推导（5 位为港股，6 位为 A 股）"""
+    market: Literal["cn", "hk"] | None = None
 
     @field_validator("code")
     @classmethod
     def _validate_code(cls, value: str) -> str:
         if not _CODE_PATTERN.match(value):
-            raise ValueError(f"股票代码必须是 6 位数字: {value!r}")
+            raise ValueError(f"股票代码必须是 5~6 位数字（A 股 6 位，港股 5 位）: {value!r}")
         return value
+
+    @model_validator(mode="after")
+    def _infer_market(self) -> "AtlasCompany":
+        if self.market is None:
+            # 5 位为港股（00700/09988），6 位为 A 股；显式给出时不覆盖
+            self.market = "hk" if len(self.code) == 5 else "cn"
+        return self
 
 
 class AtlasSegment(BaseModel):
@@ -61,6 +70,10 @@ class AtlasChain(BaseModel):
     source: Literal["builtin", "imported", "mined"] = "builtin"
     """mined=由 AI 产业链分析结果自动挖掘生成（落盘在导入目录）"""
     mined: bool = False
+    """挖掘入库时间（ISO 字符串）；仅 mined 来源有值"""
+    mined_at: str = ""
+    """挖掘所依据的产业链分析存档 ID；仅 mined 来源有值，用于回链源研报"""
+    archive_id: str = ""
 
     @field_validator("slug")
     @classmethod

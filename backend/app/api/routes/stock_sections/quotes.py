@@ -12,16 +12,23 @@ from app.financial_data.stock.public import get_technical_indicators as get_tech
 router = APIRouter()
 
 
+def _normalize_adjust(adjust: str) -> str:
+    """归一化复权参数：'none' 与 '' 均视作不复权。"""
+    return "" if adjust == "none" else adjust
+
+
 @router.get("/{code}/kline", response_model=KlineData)
 async def get_kline(
     code: str,
-    period: str = Query("daily", pattern="^(daily|weekly|monthly)$"),
+    period: str = Query("daily", pattern="^(daily|weekly|monthly|annual)$"),
     start_date: str = Query(""),
     end_date: str = Query(""),
-    adjust: str = Query("qfq", pattern="^(qfq|hfq|)$"),
+    adjust: str = Query("qfq", pattern="^(qfq|hfq|none|)$"),
 ):
     """获取个股 K 线数据。"""
-    return await get_stock_kline_service(code, period, start_date, end_date, adjust)
+    return await get_stock_kline_service(
+        code, period, start_date, end_date, _normalize_adjust(adjust)
+    )
 
 
 @router.get("/{code}/intraday", response_model=IntradayData)
@@ -31,9 +38,19 @@ async def get_intraday(code: str):
 
 
 @router.get("/{code}/indicators", response_model=TechnicalIndicators)
-async def get_indicators(code: str):
-    """基于日 K 线计算个股常用技术指标。"""
-    return await get_technical_indicators_service(code)
+async def get_indicators(
+    code: str,
+    period: str = Query("daily", pattern="^(daily|weekly|monthly|annual)$"),
+    start_date: str = Query(""),
+    end_date: str = Query(""),
+):
+    """基于指定周期与日期范围的 K 线计算个股常用技术指标。"""
+    return await get_technical_indicators_service(
+        code,
+        period=period,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 @router.get("/{code}/chip-distribution", response_model=ChipDistribution)

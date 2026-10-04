@@ -57,10 +57,10 @@ async def _get_stock_valuation_detail(code: str) -> Any:
     return (await stock_data.get_valuation_detail(code)).model_dump()
 
 
-async def _get_stock_technical_indicators(code: str) -> Any:
+async def _get_stock_technical_indicators(code: str, period: str = "daily") -> Any:
     from app.financial_data.stock import public as stock_data
 
-    return (await stock_data.get_technical_indicators(code)).model_dump(exclude={"series"})
+    return (await stock_data.get_technical_indicators(code, period=period)).model_dump(exclude={"series"})
 
 
 async def _get_stock_kline(code: str, period: str = "daily") -> Any:

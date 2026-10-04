@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -39,8 +40,13 @@ class RealtimeQuoteSet:
 
 
 def _has_usable_price(quote: dict) -> bool:
+    # 必须排除 inf/nan：``inf > 0`` 成立，只判>0 会把上游异常值当正常价透传，
+    # 在前端表现为Infinity 涨跌幅。safe_float 只做类型转换，不做有限性检查。
+    def usable(value: float | None) -> bool:
+        return value is not None and math.isfinite(value) and value > 0
+
     return any(
-        price is not None and price > 0
+        usable(price)
         for price in (safe_float(quote.get("price")), safe_float(quote.get("last_close")))
     )
 

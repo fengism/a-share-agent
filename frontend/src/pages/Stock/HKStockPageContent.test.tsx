@@ -84,8 +84,33 @@ vi.mock("../../api/queryHooks/watchlist", () => ({
   }),
 }));
 
+vi.mock("../../charts/IntradayChart", () => ({
+  default: ({ viewKey }: { viewKey: string }) => <div data-testid="intraday-chart">{viewKey}</div>,
+}));
+
+vi.mock("../../api/queryHooks/stock", () => ({
+  useStockIntraday: () => ({
+    data: {
+      items: [
+        { time: "2026-10-02 09:30", price: 385.4, avg_price: 384.0, volume: 1000, amount: 384000, change_pct: 2.17 },
+      ],
+      prev_close: 377.2,
+      source: "腾讯港股分时",
+    },
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock("../../charts/LazyKlineChart", () => ({
   default: ({ viewKey }: { viewKey: string }) => <div data-testid="kline-chart">{viewKey}</div>,
+}));
+
+vi.mock("../../charts/IndicatorSubCharts", () => ({
+  default: ({ activeType }: { activeType: string }) => (
+    <div data-testid="indicator-chart">{activeType}指标图</div>
+  ),
 }));
 
 describe("HKStockPageContent", () => {
@@ -95,7 +120,7 @@ describe("HKStockPageContent", () => {
     mocks.navigate.mockReset();
   });
 
-  it("renders HK stock quote details and trading rules", () => {
+  it("renders HK stock quote details, intraday chart, and switches to kline", () => {
     render(
       <MemoryRouter>
         <HKStockPageContent code="00700" />
@@ -109,6 +134,10 @@ describe("HKStockPageContent", () => {
     expect(screen.getByText("港股主板")).toBeInTheDocument();
     expect(screen.getByText("TENCENT")).toBeInTheDocument();
     expect(screen.getByText("T+0 回转交易 · 无单日涨跌幅限制")).toBeInTheDocument();
+    expect(screen.getByTestId("intraday-chart")).toBeInTheDocument();
+
+    // Switch to K-line
+    fireEvent.click(screen.getByText("K线"));
     expect(screen.getByTestId("kline-chart")).toBeInTheDocument();
   });
 
@@ -131,16 +160,35 @@ describe("HKStockPageContent", () => {
     });
   });
 
-  it("navigates to HK market overview on button click", () => {
+  it("does not render link or button to enter HK market overview", () => {
     render(
       <MemoryRouter>
         <HKStockPageContent code="00700" />
       </MemoryRouter>,
     );
 
-    const marketBtn = screen.getByRole("button", { name: "查看H股大盘市场" });
-    fireEvent.click(marketBtn);
+    expect(screen.queryByRole("button", { name: "查看H股大盘市场" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "H股市场" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/进入.*H股市场/)).not.toBeInTheDocument();
+  });
 
-    expect(mocks.navigate).toHaveBeenCalledWith("/market?market=hk");
+  it("switches to MACD, RSI, and KDJ indicator charts", () => {
+    render(
+      <MemoryRouter>
+        <HKStockPageContent code="00700" />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: "MACD" }));
+    expect(screen.getByText("MACD 技术指标")).toBeInTheDocument();
+    expect(screen.getByTestId("indicator-chart")).toHaveTextContent("macd指标图");
+
+    fireEvent.click(screen.getByRole("radio", { name: "RSI" }));
+    expect(screen.getByText("RSI 技术指标")).toBeInTheDocument();
+    expect(screen.getByTestId("indicator-chart")).toHaveTextContent("rsi指标图");
+
+    fireEvent.click(screen.getByRole("radio", { name: "KDJ" }));
+    expect(screen.getByText("KDJ 技术指标")).toBeInTheDocument();
+    expect(screen.getByTestId("indicator-chart")).toHaveTextContent("kdj指标图");
   });
 });

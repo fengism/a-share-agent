@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { buildStockProfileUrl, normalizeAshareStockCode } from "../utils/stockLinks";
+import { buildStockProfileUrl, parseStockCode } from "../utils/stockLinks";
 
 interface StockExternalLinkProps {
   code: string;
@@ -17,7 +17,8 @@ export default function StockExternalLink({
   className,
   style,
 }: StockExternalLinkProps) {
-  const normalizedCode = normalizeAshareStockCode(code);
+  const parsed = parseStockCode(code);
+  const normalizedCode = parsed?.code;
   if (!normalizedCode) {
     return <span className={className} style={style}>{children}</span>;
   }

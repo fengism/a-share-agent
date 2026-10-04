@@ -13,10 +13,7 @@ export default function StockWorkspaceNav({
     return (
       <nav className="stock-workspace-nav pdf-hide" aria-label="港股页面">
         <NavLink className="stock-workspace-nav__link" end to={buildStockProfileUrl(code)}>
-          港股资料
-        </NavLink>
-        <NavLink className="stock-workspace-nav__link" end to="/market?market=hk">
-          H股市场
+          个股资料
         </NavLink>
         <NavLink className="stock-workspace-nav__link" end to="/watchlist">
           我的自选

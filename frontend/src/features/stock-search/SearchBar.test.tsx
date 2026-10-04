@@ -47,4 +47,23 @@ describe("SearchBar destinations", () => {
     fireEvent.keyDown(screen.getByPlaceholderText(/输入股票代码或名称/), { key: "Enter" });
     expect(screen.getByTestId("location")).toHaveTextContent("/analysis/600519");
   });
+
+  it("navigates to HK stock profile when an HK stock code is resolved", () => {
+    useStockSearchController.mockReturnValue({
+      inputValue: "00700",
+      normalizedInput: "00700",
+      currentResults: [{ code: "00700", name: "腾讯控股", price: 380, market: "hk" }],
+      isPending: false,
+      isError: false,
+      error: null,
+      retry: vi.fn(),
+      setInputValue: vi.fn(),
+      clear: vi.fn(),
+      resolveCode: () => "00700",
+    });
+
+    renderSearch();
+    fireEvent.keyDown(screen.getByPlaceholderText(/输入股票代码或名称/), { key: "Enter" });
+    expect(screen.getByTestId("location")).toHaveTextContent("/stock/00700");
+  });
 });

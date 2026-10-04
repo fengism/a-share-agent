@@ -4,6 +4,7 @@ export const pageLoaders = {
   dashboard: () => import("../pages/Dashboard"),
   watchlist: () => import("../pages/Watchlist"),
   market: () => import("../pages/Market"),
+  concept: () => import("../pages/Concept"),
   nationalTeam: () => import("../pages/NationalTeam"),
   hkMarket: () => import("../pages/HKMarket"),
   tradingCalendar: () => import("../pages/TradingCalendar"),

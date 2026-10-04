@@ -29,6 +29,7 @@ def _to_kline_item(bar: MarketDailyBar) -> KlineItem:
         low=bar.low if bar.low is not None else bar.close,
         volume=bar.volume or 0,
         amount=bar.amount or 0,
+        turnover_pct=bar.turnover_pct,
         amplitude=amplitude,
         change_pct=bar.change_pct,
         pre_close=bar.pre_close,

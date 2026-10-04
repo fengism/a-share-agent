@@ -17,10 +17,14 @@ from app.api.schemas import DeleteResponse
 from app.api.streaming import SSE_RESPONSES
 from app.domain.identity import AuthenticatedUser
 from app.modules.industry_chain.atlas import (
+    AtlasBatchMineResponse,
     AtlasCatalog,
     AtlasChain,
+    AtlasGraph,
     AtlasImportError,
+    batch_mine_atlas_chains,
     build_atlas_catalog,
+    build_atlas_graph,
     delete_imported_chain,
     get_atlas_chain,
     import_atlas_chains,
@@ -41,6 +45,9 @@ from app.modules.industry_chain.public import (
 )
 
 router = APIRouter()
+
+# 批量挖掘单次扫描的历史存档上限，避免管理员误触把全部存档读入内存
+_BATCH_MINE_SCAN_LIMIT = 200
 
 
 @router.post("/export-pdf")
@@ -141,6 +148,16 @@ class AtlasMineRequest(BaseModel):
     archive_id: str = ""
 
 
+@router.get("/atlas/graph", response_model=AtlasGraph)
+async def get_industry_chain_atlas_graph(
+    chains: Annotated[str | None, Query()] = None,
+    user: AuthenticatedUser = Depends(require_active_user),
+) -> AtlasGraph:
+    """跨链全局产业链图谱；chains 传逗号分隔 slug 时只统计这些链。"""
+    slugs = [item.strip() for item in chains.split(",") if item.strip()] if chains else None
+    return build_atlas_graph(slugs)
+
+
 @router.post("/atlas/mine", response_model=AtlasChain)
 async def mine_industry_chain_atlas(
     request: AtlasMineRequest,
@@ -164,6 +181,34 @@ async def mine_industry_chain_atlas(
     if chain is None:
         raise BadRequestError("分析结果可挖掘内容不足（至少 2 个环节、3 家公司），未入库")
     return chain
+
+
+@router.post("/atlas/mine-batch", response_model=AtlasBatchMineResponse)
+async def batch_mine_industry_chain_atlas(
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> AtlasBatchMineResponse:
+    """批量挖掘历史产业链存档（管理员）。
+
+    逐条加载存档并挖掘，未通过质量门或内容不足的存档计入 skipped 而非中断整批。
+    """
+    items = await list_industry_chain_history(
+        admin["id"], name=None, limit=_BATCH_MINE_SCAN_LIMIT, offset=0, can_delete_legacy=True,
+    )
+    targets: list[tuple[str, IndustryChainResult]] = []
+    skipped = 0
+    for item in items:
+        result = await load_industry_chain_archive(item.name, item.archive_id, admin["id"])
+        if result is None:
+            skipped += 1
+            continue
+        if result.quality_status != "complete":
+            skipped += 1
+            continue
+        targets.append((item.name, result))
+
+    response = await batch_mine_atlas_chains(targets)
+    response.skipped += skipped
+    return response
 
 
 @router.post("/atlas/import", response_model=list[AtlasChain])

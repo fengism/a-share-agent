@@ -73,7 +73,18 @@ export default function StockHeaderCard({
           >
             {info.current_price == null ? "-" : `¥${info.current_price.toFixed(2)}`}
           </strong>
-          <small>行情快照</small>
+          <small>
+            {changePct != null ? (
+              <span style={{ color: changePct > 0 ? colors.up : changePct < 0 ? colors.down : colors.textSecondary }}>
+                {changePct > 0 ? `+${changePct.toFixed(2)}%` : `${changePct.toFixed(2)}%`}
+                {info.turnover_pct != null ? ` · 换手 ${info.turnover_pct.toFixed(2)}%` : ""}
+              </span>
+            ) : info.turnover_pct != null ? (
+              `换手 ${info.turnover_pct.toFixed(2)}%`
+            ) : (
+              "行情快照"
+            )}
+          </small>
         </div>
         <div className="stock-header-card__actions">
           <Button

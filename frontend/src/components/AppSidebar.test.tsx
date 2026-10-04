@@ -108,7 +108,7 @@ describe("AppSidebar", () => {
       .getAllByRole("button")
       .map((item) => item.textContent);
 
-    expect(menuItems.slice(0, 5)).toEqual(["首页", "自选", "市场", "国家队", "资讯"]);
+    expect(menuItems.slice(0, 6)).toEqual(["首页", "自选", "市场", "概念", "国家队", "资讯"]);
     expect(menuItems).not.toContain("港股市场");
   });
 

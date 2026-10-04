@@ -11,7 +11,7 @@ import DataRefreshIndicator from "./DataRefreshIndicator";
 import ResponsiveMetricGrid from "./ResponsiveMetricGrid";
 import SectionDataState from "./SectionDataState";
 import StockExternalLink from "./StockExternalLink";
-import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useContainerWidth } from "../hooks/useContainerWidth";
 import {
   useThsHotConcept,
   useThsHotIndustry,
@@ -23,6 +23,26 @@ import { useColors, useTokens, semanticTagStyle } from "../styles/ui";
 import { rankBadge } from "./rankBadge";
 
 type TabKey = "stock" | "concept" | "industry";
+
+/** 宽屏表格的内容宽度（= 各列 width 之和）。 */
+const WIDE_STOCK_TABLE_WIDTH = 635;
+const WIDE_PLATE_TABLE_WIDTH = 655;
+/** 窄屏表格的内容宽度。 */
+const NARROW_TABLE_WIDTH = 316;
+
+/**
+ * 是否使用窄屏（紧凑）表格。
+ *
+ * 判断依据必须是**容器宽度**而不是视口宽度：本看板在首页是放在 ~400px 宽的侧栏卡片里，
+ * 1600px 视口下依然很窄。用 `max-width: 768px` 的视口断点会误判成宽屏，把 635px 的
+ * 表格塞进 406px 容器，而横向滚动区是 `overflow-x: hidden` 的自定义拖拽容器、
+ * 没有可见滚动条，导致右侧的涨跌幅/热度/关联概念列被永久裁掉、用户根本看不到。
+ *
+ * 容器尚未测量（首帧 width=0）时保守按窄屏渲染，避免先撑出宽表再跳变。
+ */
+function useIsNarrowContainer(containerWidth: number, wideWidth: number): boolean {
+  return containerWidth === 0 || containerWidth < wideWidth;
+}
 
 const TAB_OPTIONS = [
   { label: <span><FireOutlined /> 热股榜</span>, value: "stock" as TabKey },
@@ -122,7 +142,8 @@ function HorizontalScrollArea({ children, contentWidth, label }: HorizontalScrol
 function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number }) {
   const c = useColors();
   const t = useTokens();
-  const isNarrow = useMediaQuery("(max-width: 768px)");
+  const [containerRef, containerWidth] = useContainerWidth<HTMLDivElement>();
+  const isNarrow = useIsNarrowContainer(containerWidth, WIDE_STOCK_TABLE_WIDTH);
   const { data, isLoading, isFetching, error, refetch } = useThsHotRank(enabled);
   const hasData = (data?.length ?? 0) > 0;
 
@@ -245,7 +266,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
   ), []);
 
   return (
-    <div>
+    <div ref={containerRef}>
       <div style={{ minHeight: 22, display: "flex", justifyContent: "flex-end" }}>
         <DataRefreshIndicator active={isFetching && !isLoading} />
       </div>
@@ -259,7 +280,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
         minHeight={320}
       >
         <HorizontalScrollArea
-          contentWidth={isNarrow ? 316 : 635}
+          contentWidth={isNarrow ? NARROW_TABLE_WIDTH : WIDE_STOCK_TABLE_WIDTH}
           label="热股榜左右滑动区域"
         >
           <Table
@@ -273,7 +294,7 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
               expandedRowRender: renderExpandedRow,
               columnWidth: 36,
             } : undefined}
-            scroll={{ x: isNarrow ? 316 : 635, y: scrollY }}
+            scroll={{ x: isNarrow ? NARROW_TABLE_WIDTH : WIDE_STOCK_TABLE_WIDTH, y: scrollY }}
           />
         </HorizontalScrollArea>
       </SectionDataState>
@@ -292,7 +313,8 @@ function PlateTable({
 }) {
   const c = useColors();
   const t = useTokens();
-  const isNarrow = useMediaQuery("(max-width: 768px)");
+  const [containerRef, containerWidth] = useContainerWidth<HTMLDivElement>();
+  const isNarrow = useIsNarrowContainer(containerWidth, WIDE_PLATE_TABLE_WIDTH);
   const hook = type === "concept" ? useThsHotConcept : useThsHotIndustry;
   const { data, isLoading, isFetching, error, refetch } = hook(enabled);
   const hasData = (data?.length ?? 0) > 0;
@@ -382,7 +404,7 @@ function PlateTable({
   ), []);
 
   return (
-    <div>
+    <div ref={containerRef}>
       <div style={{ minHeight: 22, display: "flex", justifyContent: "flex-end" }}>
         <DataRefreshIndicator active={isFetching && !isLoading} />
       </div>
@@ -401,7 +423,7 @@ function PlateTable({
           rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
           size="small"
           pagination={false}
-          scroll={{ x: 655, y: scrollY }}
+          scroll={{ x: isNarrow ? NARROW_TABLE_WIDTH : WIDE_PLATE_TABLE_WIDTH, y: scrollY }}
           expandable={isNarrow ? {
             expandedRowRender: renderExpandedRow,
             columnWidth: 36,

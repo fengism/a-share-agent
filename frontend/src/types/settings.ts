@@ -40,11 +40,10 @@ export interface ConfigData {
   disabled_chat_agents: string[];
   provider_defaults: Record<string, ProviderDefault>;
   twitter_feeds: string[];
-  eastmoney_cookie: string;
   fred_api_key: string;
   anysearch_api_key: string;
-  baidu_cookie: string;
   ths_cookie: string;
+  fuyao_api_key: string;
   http_trust_env: boolean;
   eastmoney_min_interval_seconds: number;
   eastmoney_datacenter_min_interval_seconds: number;
@@ -58,6 +57,7 @@ export interface ConfigData {
   market_daily_bar_refresh_retry_base_seconds: number;
   market_daily_observation_retention_days: number;
   market_daily_attempt_retention_days: number;
+  database_backup_retention_count: number;
   bot_enabled: boolean;
   bot_command_prefix: string;
   bot_service_user_id: number;

@@ -4,7 +4,7 @@ import logging
 from app.configuration import PERSISTED_GLOBAL_KEYS
 from app.configuration import crypto as config_crypto
 from app.configuration.crypto_contracts import GLOBAL_CONFIG_SCOPE_ID
-from app.infrastructure.persistence.connection import get_connection
+from app.infrastructure.persistence.connection import get_connection, unit_of_work
 
 logger = logging.getLogger(__name__)
 _LEGACY_REPAIR_TIMEOUT_KEY = "industry_chain_repair_timeout_seconds"
@@ -63,21 +63,21 @@ def get_global_config() -> dict:
 
     if secrets_to_encrypt:
         if config_crypto.encryption_available():
-            _connection().executemany(
-                "UPDATE global_config SET value = ?, updated_at = datetime('now','localtime') WHERE key = ?",
-                [
-                    (
-                        config_crypto.encrypt_config_value(
-                            GLOBAL_CONFIG_SCOPE_ID,
+            with unit_of_work("user", immediate=True) as work:
+                work.connection.executemany(
+                    "UPDATE global_config SET value = ?, updated_at = datetime('now','localtime') WHERE key = ?",
+                    [
+                        (
+                            config_crypto.encrypt_config_value(
+                                GLOBAL_CONFIG_SCOPE_ID,
+                                key,
+                                value,
+                            ),
                             key,
-                            value,
-                        ),
-                        key,
-                    )
-                    for key, value in secrets_to_encrypt.items()
-                ],
-            )
-            _connection().commit()
+                        )
+                        for key, value in secrets_to_encrypt.items()
+                    ],
+                )
             logger.info("已迁移或轮换全局敏感配置 keys=%s", sorted(secrets_to_encrypt))
         else:
             logger.warning(
@@ -110,13 +110,12 @@ def set_global_config(items: dict) -> None:
             )
         values.append((key, serialized))
 
-    connection = _connection()
-    connection.executemany(
-        "INSERT INTO global_config(key, value) VALUES (?, ?) "
-        "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now','localtime')",
-        values,
-    )
-    connection.commit()
+    with unit_of_work("user", immediate=True) as work:
+        work.connection.executemany(
+            "INSERT INTO global_config(key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now','localtime')",
+            values,
+        )
     if SECRET_KEYS.intersection(persisted_items):
         from app.infrastructure.persistence.user_config_store import (
             invalidate_config_encryption_status_cache,

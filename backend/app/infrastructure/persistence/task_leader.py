@@ -3,6 +3,7 @@ import logging
 
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
 from app.infrastructure.persistence import task_lease_store
+from app.infrastructure.persistence.connection import is_busy_error
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +26,19 @@ class TaskLeaderLease:
             return True
         if self._held:
             await self.close()
-        acquired = await call_blocking(
-            task_lease_store.acquire_task_lease,
-            self.task_name,
-            self.owner_id,
-            self.lease_seconds,
-            semaphore=database_semaphore,
-        )
+        try:
+            acquired = await call_blocking(
+                task_lease_store.acquire_task_lease,
+                self.task_name,
+                self.owner_id,
+                self.lease_seconds,
+                semaphore=database_semaphore,
+            )
+        except Exception as exc:
+            if is_busy_error(exc):
+                logger.info("获取后台任务主节点租约遇数据库繁忙 task=%s", self.task_name)
+                return False
+            raise
         if not acquired:
             return False
         self._held = True
@@ -70,8 +77,14 @@ class TaskLeaderLease:
                     self.owner_id,
                     semaphore=database_semaphore,
                 )
-            except Exception:
-                logger.warning("释放后台任务租约失败 task=%s", self.task_name, exc_info=True)
+            except Exception as exc:
+                if is_busy_error(exc):
+                    logger.info(
+                        "后台任务主节点租约释放遇数据库繁忙，租约将在到期后自动失效 task=%s",
+                        self.task_name,
+                    )
+                else:
+                    logger.warning("释放后台任务租约失败 task=%s", self.task_name, exc_info=True)
         self._held = False
 
     async def _heartbeat(self) -> None:
@@ -86,10 +99,14 @@ class TaskLeaderLease:
                     self.lease_seconds,
                     semaphore=database_semaphore,
                 )
-            except Exception:
-                logger.error("续租后台任务主节点失败 task=%s", self.task_name, exc_info=True)
+            except Exception as exc:
+                if is_busy_error(exc):
+                    logger.warning("续租后台任务主节点遇数据库繁忙 task=%s", self.task_name)
+                else:
+                    logger.error("续租后台任务主节点失败 task=%s", self.task_name, exc_info=True)
                 renewed = False
             if not renewed:
                 self._lost.set()
                 logger.warning("后台任务主节点租约已丢失 task=%s", self.task_name)
                 return
+

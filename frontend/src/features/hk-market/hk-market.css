@@ -115,10 +115,13 @@
 }
 
 .hk-index-price {
-  font-size: 26px;
+  font-size: clamp(18px, 4.5vw, 26px);
   font-weight: 700;
   line-height: 1.2;
   font-family: var(--c-font-mono, monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hk-index-change-wrap {
@@ -137,6 +140,8 @@
   border-top: 1px dashed var(--c-border);
   font-size: 12px;
   color: var(--c-text-secondary);
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .hk-index-mini-stats span {
@@ -331,8 +336,11 @@
     max-width: 100%;
     overflow-x: auto;
   }
+  .hk-index-button .ant-card-body {
+    padding: 10px 12px !important;
+  }
   .hk-index-price {
-    font-size: 22px;
+    font-size: clamp(16px, 4.2vw, 20px);
   }
   .hk-selection-toolbar,
   .hk-selection-summary {

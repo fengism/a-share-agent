@@ -183,17 +183,23 @@ export function useMarketIndexIntraday(symbol: string) {
   });
 }
 
-export function useMarketIndexKline(symbol: string, period = "daily") {
-  const startDate = oneYearAgoDate();
+export function useMarketIndexKline(
+  symbol: string,
+  period = "daily",
+  options?: { startDate?: string; endDate?: string; enabled?: boolean },
+) {
+  const startDate = options?.startDate || oneYearAgoDate();
+  const endDate = options?.endDate || "";
   return useQuery({
     queryKey: queryKeys.market.indexKline(symbol, period, startDate),
     queryFn: () => openApiGet("/api/market/index-kline", {
-      query: { symbol, period, start_date: startDate },
+      query: { symbol, period, start_date: startDate, end_date: endDate },
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<KlineData>(),
-    enabled: !!symbol,
+    enabled: options?.enabled !== undefined ? options.enabled && !!symbol : !!symbol,
     staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
+    placeholderData: (previous) => previous,
   });
 }
 

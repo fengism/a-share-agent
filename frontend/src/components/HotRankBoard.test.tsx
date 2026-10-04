@@ -4,9 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HotRankContent } from "./HotRankBoard";
 
-let isNarrowMock = false;
-vi.mock("../hooks/useMediaQuery", () => ({
-  useMediaQuery: () => isNarrowMock,
+/**
+ * 看板按**容器宽度**（不是视口宽度）切换宽/窄布局：首页侧栏卡片只有 ~400px 宽，
+ * 用视口断点会把 635px 的宽表塞进去，右侧列被 overflow:hidden 永久裁掉。
+ * 这里直接桩掉容器宽度来覆盖两种布局。
+ */
+let containerWidthMock = 0;
+vi.mock("../hooks/useContainerWidth", () => ({
+  useContainerWidth: () => [() => {}, containerWidthMock] as const,
 }));
 
 function queryResult<T>(data: T) {
@@ -56,8 +61,8 @@ vi.mock("../api/queries", () => ({
 }));
 
 describe("HotRankContent", () => {
-  it("keeps complete columns and supports two-axis scrolling in the dashboard rail", () => {
-    isNarrowMock = false;
+  it("keeps complete columns and supports two-axis scrolling when the container is wide", () => {
+    containerWidthMock = 900;
     const { container } = render(
       <MemoryRouter>
         <HotRankContent embedded />
@@ -127,8 +132,29 @@ describe("HotRankContent", () => {
     expect(conceptTable).toHaveStyle({ width: "655px" });
   });
 
-  it("renders clickable stock links in narrow mobile mode", () => {
-    isNarrowMock = true;
+  it("switches to the compact layout when the container is too narrow for the wide table", () => {
+    // 首页侧栏卡片 ~400px：即使视口 1600px 也必须用紧凑布局，否则右列被裁掉
+    containerWidthMock = 406;
+    render(
+      <MemoryRouter>
+        <HotRankContent embedded />
+      </MemoryRouter>,
+    );
+
+    // 紧凑布局：合并"代码+名称"为一列，只保留涨跌幅与热度
+    expect(screen.getByRole("columnheader", { name: "股票" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "涨跌幅" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "热度" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "关联概念" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "排名" })).not.toBeInTheDocument();
+
+    // 横向滚动区宽度必须跟着切到 316px，否则仍会把表格撑出容器
+    const scroller = screen.getByRole("region", { name: "热股榜左右滑动区域" });
+    expect(scroller.firstElementChild).toHaveStyle({ minWidth: "316px" });
+  });
+
+  it("renders clickable stock links in the compact layout", () => {
+    containerWidthMock = 406;
     render(
       <MemoryRouter>
         <HotRankContent embedded />

@@ -23,3 +23,4 @@ class StockSearchItem(BaseModel):
     name: str
     price: float | None = None
     change_pct: float | None = None
+    market: str = "cn"

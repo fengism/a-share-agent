@@ -31,7 +31,7 @@ body {
 [data-theme="light"] .app-shell-root {
   background-color: var(--c-page-bg);
   background-image:
-    radial-gradient(ellipse 70% 320px at 50% -80px, rgba(37, 99, 235, 0.04), transparent 70%);
+    radial-gradient(ellipse 70% 320px at 50% -80px, rgba(180, 83, 9, 0.03), transparent 70%);
   background-attachment: fixed;
 }
 
@@ -70,7 +70,24 @@ body {
 
 [data-theme="light"] .ant-card {
   border-color: var(--c-border) !important;
+  background: var(--c-card-bg) !important;
   box-shadow: var(--c-card-shadow);
+}
+
+[data-theme="light"] .ant-table-thead > tr > th {
+  background: var(--c-nested-bg) !important;
+  color: var(--c-text-secondary) !important;
+  border-bottom: 1px solid var(--c-border) !important;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+[data-theme="light"] .ant-table-tbody > tr:hover > td {
+  background: var(--c-hover-bg) !important;
+}
+
+[data-theme="light"] .ant-table {
+  background: transparent !important;
 }
 
 /* 柔和呼吸灯动效 */
@@ -1853,6 +1870,8 @@ samp {
   font-family: var(--c-font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+  /* 数字永不折行：窄列里 "+206.59%" 被拆成两行会读成两个数 */
+  white-space: nowrap;
 }
 
 /* Live pulse dot for real-time streaming & running indicators */

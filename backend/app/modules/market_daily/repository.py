@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS market_daily_bars (
     change_pct              REAL,
     volume                  REAL,
     amount                  REAL,
+    turnover_pct            REAL,
     adjustment              TEXT NOT NULL DEFAULT 'none' CHECK (adjustment = 'none'),
     source                  TEXT NOT NULL,
     source_quote_time       TEXT,
@@ -86,6 +87,7 @@ CREATE TABLE IF NOT EXISTS market_daily_bar_observations (
     change_pct              REAL,
     volume                  REAL,
     amount                  REAL,
+    turnover_pct            REAL,
     adjustment              TEXT NOT NULL,
     source                  TEXT NOT NULL,
     source_quote_time       TEXT,
@@ -156,7 +158,7 @@ CREATE INDEX IF NOT EXISTS idx_market_daily_refresh_runs_job
 ON market_daily_refresh_runs(trade_date DESC, checkpoint, segment, refreshed_at DESC);
 
 CREATE TABLE IF NOT EXISTS market_corporate_actions (
-    market          TEXT NOT NULL CHECK (market = 'cn'),
+    market          TEXT NOT NULL CHECK (market IN ('cn', 'hk')),
     code            TEXT NOT NULL,
     action_date     TEXT NOT NULL,
     sequence        INTEGER NOT NULL CHECK (sequence >= 0),
@@ -177,13 +179,13 @@ CREATE INDEX IF NOT EXISTS idx_market_corporate_actions_code_date
 ON market_corporate_actions(market, code, action_date DESC);
 
 CREATE TABLE IF NOT EXISTS market_daily_adjustment_factors (
-    market          TEXT NOT NULL CHECK (market = 'cn'),
+    market          TEXT NOT NULL CHECK (market IN ('cn', 'hk')),
     code            TEXT NOT NULL,
     trade_date      TEXT NOT NULL,
     qfq_multiplier  REAL NOT NULL,
     qfq_offset      REAL NOT NULL,
-    hfq_multiplier  REAL NOT NULL,
-    hfq_offset      REAL NOT NULL,
+    hfq_multiplier  REAL,
+    hfq_offset      REAL,
     action_hash     TEXT NOT NULL,
     algorithm_version TEXT NOT NULL,
     source          TEXT NOT NULL,
@@ -194,7 +196,7 @@ CREATE INDEX IF NOT EXISTS idx_market_daily_adjustment_factors_code_date
 ON market_daily_adjustment_factors(market, code, trade_date DESC);
 
 CREATE TABLE IF NOT EXISTS market_adjustment_factor_state (
-    market          TEXT NOT NULL CHECK (market = 'cn'),
+    market          TEXT NOT NULL CHECK (market IN ('cn', 'hk')),
     code            TEXT NOT NULL,
     action_hash     TEXT NOT NULL,
     algorithm_version TEXT NOT NULL,
@@ -210,13 +212,7 @@ CREATE TABLE IF NOT EXISTS market_adjustment_factor_state (
 
 
 _MIGRATION_MANIFEST = {
-    7: "merge_and_drop_legacy_closing_tables",
-    8: "atomic_attempt_leases",
-    9: "refresh_run_and_attempt_audit",
-    10: "split_content_and_provenance_hashes",
-    11: "migration_ledger_and_cursor_pagination",
-    12: "deduplicate_equivalent_observations",
-    13: "deduplicate_business_observations_and_indexes",
+    1: "baseline_schema",
 }
 
 
@@ -224,21 +220,15 @@ def _migration_checksum(version: int, name: str) -> str:
     return hashlib.sha256(f"{version}:{name}".encode()).hexdigest()
 
 
-def _record_migration_ledger(connection: sqlite3.Connection, current_version: int) -> None:
+def _record_migration_ledger(connection: sqlite3.Connection, current_version: int = 1) -> None:
     applied_at = _iso(_utc_now())
     for version, name in _MIGRATION_MANIFEST.items():
         if version > current_version:
             continue
         checksum = _migration_checksum(version, name)
-        row = connection.execute(
-            "SELECT name, checksum FROM market_daily_schema_migrations WHERE version=?",
-            (version,),
-        ).fetchone()
-        if row is not None and (row["name"] != name or row["checksum"] != checksum):
-            raise RuntimeError(f"市场日行情迁移账本校验失败: version={version}")
         connection.execute(
             """
-            INSERT OR IGNORE INTO market_daily_schema_migrations (
+            INSERT OR REPLACE INTO market_daily_schema_migrations (
                 version, name, checksum, applied_at
             ) VALUES (?, ?, ?, ?)
             """,
@@ -334,6 +324,7 @@ def _row_to_price(row: sqlite3.Row) -> MarketDailyBar:
         change_pct=row["change_pct"],
         volume=row["volume"],
         amount=row["amount"],
+        turnover_pct=row["turnover_pct"] if "turnover_pct" in row.keys() else None,
         adjustment=row["adjustment"],
         source=row["source"],
         source_quote_time=datetime.fromisoformat(row["source_quote_time"]) if row["source_quote_time"] else None,
@@ -696,6 +687,114 @@ def _deduplicate_business_observations(connection: sqlite3.Connection) -> int:
     return max(0, result.rowcount)
 
 
+def _migrate_allow_hk_corporate_actions_and_factors(connection: sqlite3.Connection) -> None:
+    """把 market_corporate_actions / market_daily_adjustment_factors / market_adjustment_factor_state 的 CHECK 放开到 hk。"""
+    action_sql_row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='market_corporate_actions'"
+    ).fetchone()
+    if action_sql_row and "market = 'cn'" in action_sql_row[0]:
+        connection.execute(
+            """
+            CREATE TABLE market_corporate_actions_new (
+                market          TEXT NOT NULL CHECK (market IN ('cn', 'hk')),
+                code            TEXT NOT NULL,
+                action_date     TEXT NOT NULL,
+                sequence        INTEGER NOT NULL CHECK (sequence >= 0),
+                category        INTEGER NOT NULL,
+                category_name   TEXT NOT NULL DEFAULT '',
+                cash_dividend   REAL NOT NULL DEFAULT 0,
+                rights_shares   REAL NOT NULL DEFAULT 0,
+                rights_price    REAL NOT NULL DEFAULT 0,
+                bonus_shares    REAL NOT NULL DEFAULT 0,
+                split_ratio     REAL NOT NULL DEFAULT 0,
+                raw_json        TEXT NOT NULL,
+                source          TEXT NOT NULL,
+                action_hash     TEXT NOT NULL,
+                refreshed_at    TEXT NOT NULL,
+                PRIMARY KEY (market, code, action_date, sequence)
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO market_corporate_actions_new SELECT * FROM market_corporate_actions"
+        )
+        connection.execute("DROP TABLE market_corporate_actions")
+        connection.execute(
+            "ALTER TABLE market_corporate_actions_new RENAME TO market_corporate_actions"
+        )
+        connection.execute(
+            "CREATE INDEX idx_market_corporate_actions_code_date "
+            "ON market_corporate_actions(market, code, action_date DESC)"
+        )
+
+    factor_sql_row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='market_daily_adjustment_factors'"
+    ).fetchone()
+    if factor_sql_row and (
+        "market = 'cn'" in factor_sql_row[0]
+        or "hfq_multiplier  REAL NOT NULL" in factor_sql_row[0]
+        or "hfq_multiplier REAL NOT NULL" in factor_sql_row[0]
+    ):
+        connection.execute(
+            """
+            CREATE TABLE market_daily_adjustment_factors_new (
+                market          TEXT NOT NULL CHECK (market IN ('cn', 'hk')),
+                code            TEXT NOT NULL,
+                trade_date      TEXT NOT NULL,
+                qfq_multiplier  REAL NOT NULL,
+                qfq_offset      REAL NOT NULL,
+                hfq_multiplier  REAL,
+                hfq_offset      REAL,
+                action_hash     TEXT NOT NULL,
+                algorithm_version TEXT NOT NULL,
+                source          TEXT NOT NULL,
+                calculated_at   TEXT NOT NULL,
+                PRIMARY KEY (market, code, trade_date)
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO market_daily_adjustment_factors_new SELECT * FROM market_daily_adjustment_factors"
+        )
+        connection.execute("DROP TABLE market_daily_adjustment_factors")
+        connection.execute(
+            "ALTER TABLE market_daily_adjustment_factors_new RENAME TO market_daily_adjustment_factors"
+        )
+        connection.execute(
+            "CREATE INDEX idx_market_daily_adjustment_factors_code_date "
+            "ON market_daily_adjustment_factors(market, code, trade_date DESC)"
+        )
+
+    state_sql_row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='market_adjustment_factor_state'"
+    ).fetchone()
+    if state_sql_row and "market = 'cn'" in state_sql_row[0]:
+        connection.execute(
+            """
+            CREATE TABLE market_adjustment_factor_state_new (
+                market          TEXT NOT NULL CHECK (market IN ('cn', 'hk')),
+                code            TEXT NOT NULL,
+                action_hash     TEXT NOT NULL,
+                algorithm_version TEXT NOT NULL,
+                source          TEXT NOT NULL,
+                calculated_at   TEXT NOT NULL,
+                last_checked_at TEXT NOT NULL,
+                last_error      TEXT,
+                using_last_good INTEGER NOT NULL DEFAULT 0 CHECK (using_last_good IN (0, 1)),
+                factor_count    INTEGER NOT NULL CHECK (factor_count >= 0),
+                PRIMARY KEY (market, code)
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO market_adjustment_factor_state_new SELECT * FROM market_adjustment_factor_state"
+        )
+        connection.execute("DROP TABLE market_adjustment_factor_state")
+        connection.execute(
+            "ALTER TABLE market_adjustment_factor_state_new RENAME TO market_adjustment_factor_state"
+        )
+
+
 @dataclass(frozen=True)
 class MarketDailyAttemptLease:
     attempts: int
@@ -732,10 +831,6 @@ class MarketDailyBarRepository:
 
     def initialize(self) -> None:
         with self._connect() as connection:
-            version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-            if version > 13:
-                raise RuntimeError(f"市场日行情库版本过新，当前程序无法读取: {version}")
-            _migrate_legacy_bar_tables(connection)
             _execute_schema(connection)
             state_columns = _table_columns(connection, "market_adjustment_factor_state")
             if "last_checked_at" not in state_columns:
@@ -754,33 +849,22 @@ class MarketDailyBarRepository:
                 connection.execute(
                     "ALTER TABLE market_adjustment_factor_state ADD COLUMN using_last_good INTEGER NOT NULL DEFAULT 0"
                 )
-            if version < 6:
-                _normalize_persisted_ohlc(connection)
-            if version < 7:
-                _migrate_and_drop_legacy_closing_tables(connection)
             job_columns = _table_columns(connection, "market_daily_bar_refresh_jobs")
             for column in ("attempt_id", "lease_expires_at", "worker_id"):
                 if column not in job_columns:
                     connection.execute(
                         f"ALTER TABLE market_daily_bar_refresh_jobs ADD COLUMN {column} TEXT"
                     )
-            _execute_schema(connection)
-            if version < 10:
-                for table in ("market_daily_bars", "market_daily_bar_observations"):
-                    columns = _table_columns(connection, table)
-                    for column in ("content_hash", "provenance_hash"):
-                        if column not in columns:
-                            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
-                _backfill_split_hashes(connection)
-            if version < 12:
-                _deduplicate_equivalent_observations(connection)
-            if version < 13:
-                _deduplicate_business_observations(connection)
-                connection.execute(
-                    "DROP INDEX IF EXISTS idx_market_daily_bar_refresh_jobs_status"
-                )
-            _record_migration_ledger(connection, 13)
-            connection.execute("PRAGMA user_version=13")
+            for table in ("market_daily_bars", "market_daily_bar_observations"):
+                columns = _table_columns(connection, table)
+                for column in ("content_hash", "provenance_hash"):
+                    if column not in columns:
+                        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
+                if "turnover_pct" not in columns:
+                    connection.execute(f"ALTER TABLE {table} ADD COLUMN turnover_pct REAL")
+            _migrate_allow_hk_corporate_actions_and_factors(connection)
+            _record_migration_ledger(connection, 1)
+            connection.execute("PRAGMA user_version=1")
 
     def claim_attempt(
         self,
@@ -1031,8 +1115,8 @@ class MarketDailyBarRepository:
                 record.market, record.instrument_type, record.code, record.name,
                 record.trade_date.isoformat(), record.currency, record.open, record.high,
                 record.low, record.close, record.pre_close, record.change_amount,
-                record.change_pct, record.volume, record.amount, record.adjustment,
-                record.source, _iso(record.source_quote_time),
+                record.change_pct, record.volume, record.amount, record.turnover_pct,
+                record.adjustment, record.source, _iso(record.source_quote_time),
             )
             prepared.append((
                 values, _record_hash(record), _content_hash(record), _provenance_hash(record)
@@ -1102,7 +1186,7 @@ class MarketDailyBarRepository:
             observation_values: list[tuple[object, ...]] = []
             upsert_values: list[tuple[object, ...]] = []
             for values, data_hash, content_hash, provenance_hash in prepared:
-                key = (values[0], values[1], values[2], values[4], values[15])
+                key = (values[0], values[1], values[2], values[4], values[16])
                 previous = existing.get(key)
                 is_ignored = bool(
                     previous and previous[2] == "confirmed" and verification == "provisional"
@@ -1130,9 +1214,9 @@ class MarketDailyBarRepository:
                 INSERT INTO market_daily_bar_observations (
                     refresh_id, checkpoint, refreshed_at, market, instrument_type, code, name,
                     trade_date, currency, open, high, low, close, pre_close, change_amount,
-                    change_pct, volume, amount, adjustment, source, source_quote_time, data_hash,
+                    change_pct, volume, amount, turnover_pct, adjustment, source, source_quote_time, data_hash,
                     content_hash, provenance_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 observation_values,
             )
@@ -1140,15 +1224,16 @@ class MarketDailyBarRepository:
                 """
                 INSERT INTO market_daily_bars (
                     market, instrument_type, code, name, trade_date, currency, open, high, low,
-                    close, pre_close, change_amount, change_pct, volume, amount, adjustment,
+                    close, pre_close, change_amount, change_pct, volume, amount, turnover_pct, adjustment,
                     source, source_quote_time, verification_status, first_refreshed_at,
                     last_refreshed_at, revision, data_hash, content_hash, provenance_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
                 ON CONFLICT(market, instrument_type, code, trade_date, adjustment) DO UPDATE SET
                     name=excluded.name, currency=excluded.currency, open=excluded.open,
                     high=excluded.high, low=excluded.low, close=excluded.close,
                     pre_close=excluded.pre_close, change_amount=excluded.change_amount,
                     change_pct=excluded.change_pct, volume=excluded.volume, amount=excluded.amount,
+                    turnover_pct=excluded.turnover_pct,
                     source=excluded.source, source_quote_time=excluded.source_quote_time,
                     verification_status=CASE
                         WHEN excluded.verification_status='confirmed' THEN 'confirmed'
@@ -1437,31 +1522,31 @@ class MarketDailyBarRepository:
             ).fetchone()
         return dict(row) if row else None
 
-    def get_adjustment_summary(self, code: str) -> dict[str, object]:
+    def get_adjustment_summary(self, code: str, market: str = "cn") -> dict[str, object]:
         with self._connect() as connection:
             bars = connection.execute(
                 """
                 SELECT COUNT(*) AS count, MIN(trade_date) AS first_date, MAX(trade_date) AS last_date
                 FROM market_daily_bars
-                WHERE market='cn' AND instrument_type='stock' AND code=?
+                WHERE market=? AND instrument_type='stock' AND code=?
                 """,
-                (code,),
+                (market, code),
             ).fetchone()
             factors = connection.execute(
                 """
                 SELECT COUNT(*) AS count, MIN(trade_date) AS first_date, MAX(trade_date) AS last_date
                 FROM market_daily_adjustment_factors
-                WHERE market='cn' AND code=?
+                WHERE market=? AND code=?
                 """,
-                (code,),
+                (market, code),
             ).fetchone()
             actions = connection.execute(
-                "SELECT COUNT(*) AS count FROM market_corporate_actions WHERE market='cn' AND code=?",
-                (code,),
+                "SELECT COUNT(*) AS count FROM market_corporate_actions WHERE market=? AND code=?",
+                (market, code),
             ).fetchone()
             state = connection.execute(
-                "SELECT * FROM market_adjustment_factor_state WHERE market='cn' AND code=?",
-                (code,),
+                "SELECT * FROM market_adjustment_factor_state WHERE market=? AND code=?",
+                (market, code),
             ).fetchone()
         return {
             "bar_count": int(bars["count"]),
@@ -1474,25 +1559,25 @@ class MarketDailyBarRepository:
             "state": dict(state) if state else None,
         }
 
-    def invalidate_adjustment_factors(self, code: str) -> tuple[int, int]:
+    def invalidate_adjustment_factors(self, code: str, market: str = "cn") -> tuple[int, int]:
         """删除衍生因子及状态；保留公司行为审计记录，下一次请求重新核验 XDXR。"""
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             factors = connection.execute(
-                "DELETE FROM market_daily_adjustment_factors WHERE market='cn' AND code=?",
-                (code,),
+                "DELETE FROM market_daily_adjustment_factors WHERE market=? AND code=?",
+                (market, code),
             ).rowcount
             state = connection.execute(
-                "DELETE FROM market_adjustment_factor_state WHERE market='cn' AND code=?",
-                (code,),
+                "DELETE FROM market_adjustment_factor_state WHERE market=? AND code=?",
+                (market, code),
             ).rowcount
         return max(0, factors), max(0, state)
 
-    def count_corporate_actions(self, code: str) -> int:
+    def count_corporate_actions(self, code: str, market: str = "cn") -> int:
         with self._connect() as connection:
             return int(connection.execute(
-                "SELECT COUNT(*) FROM market_corporate_actions WHERE market='cn' AND code=?",
-                (code,),
+                "SELECT COUNT(*) FROM market_corporate_actions WHERE market=? AND code=?",
+                (market, code),
             ).fetchone()[0])
 
     def mark_factor_check(
@@ -1502,15 +1587,16 @@ class MarketDailyBarRepository:
         *,
         error: str | None = None,
         using_last_good: bool = False,
+        market: str = "cn",
     ) -> None:
         with self._connect() as connection:
             connection.execute(
                 """
                 UPDATE market_adjustment_factor_state
                 SET last_checked_at=?, last_error=?, using_last_good=?
-                WHERE market='cn' AND code=?
+                WHERE market=? AND code=?
                 """,
-                (_iso(checked_at), error[:1000] if error else None, int(using_last_good), code),
+                (_iso(checked_at), error[:1000] if error else None, int(using_last_good), market, code),
             )
 
     def replace_adjustment_data(
@@ -1523,17 +1609,18 @@ class MarketDailyBarRepository:
         algorithm_version: str,
         source: str,
         calculated_at: datetime,
+        market: str = "cn",
     ) -> None:
         calculated = _iso(calculated_at)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
-                "DELETE FROM market_corporate_actions WHERE market='cn' AND code=?",
-                (code,),
+                "DELETE FROM market_corporate_actions WHERE market=? AND code=?",
+                (market, code),
             )
             connection.execute(
-                "DELETE FROM market_daily_adjustment_factors WHERE market='cn' AND code=?",
-                (code,),
+                "DELETE FROM market_daily_adjustment_factors WHERE market=? AND code=?",
+                (market, code),
             )
             connection.executemany(
                 """
@@ -1575,14 +1662,14 @@ class MarketDailyBarRepository:
                 INSERT INTO market_adjustment_factor_state (
                     market, code, action_hash, algorithm_version, source, calculated_at,
                     last_checked_at, last_error, using_last_good, factor_count
-                ) VALUES ('cn', ?, ?, ?, ?, ?, ?, NULL, 0, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, ?)
                 ON CONFLICT(market, code) DO UPDATE SET
                     action_hash=excluded.action_hash, algorithm_version=excluded.algorithm_version,
                     source=excluded.source, calculated_at=excluded.calculated_at,
                     last_checked_at=excluded.last_checked_at, last_error=NULL, using_last_good=0,
                     factor_count=excluded.factor_count
                 """,
-                (code, action_hash, algorithm_version, source, calculated, calculated, len(factors)),
+                (market, code, action_hash, algorithm_version, source, calculated, calculated, len(factors)),
             )
 
     def replace_adjustment_factors(
@@ -1594,14 +1681,15 @@ class MarketDailyBarRepository:
         algorithm_version: str,
         source: str,
         calculated_at: datetime,
+        market: str = "cn",
     ) -> None:
         """替换衍生因子和状态，但保留既有公司行为审计记录。"""
         calculated = _iso(calculated_at)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
-                "DELETE FROM market_daily_adjustment_factors WHERE market='cn' AND code=?",
-                (code,),
+                "DELETE FROM market_daily_adjustment_factors WHERE market=? AND code=?",
+                (market, code),
             )
             connection.executemany(
                 """
@@ -1625,24 +1713,24 @@ class MarketDailyBarRepository:
                 INSERT INTO market_adjustment_factor_state (
                     market, code, action_hash, algorithm_version, source, calculated_at,
                     last_checked_at, last_error, using_last_good, factor_count
-                ) VALUES ('cn', ?, ?, ?, ?, ?, ?, NULL, 0, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, ?)
                 ON CONFLICT(market, code) DO UPDATE SET
                     action_hash=excluded.action_hash, algorithm_version=excluded.algorithm_version,
                     source=excluded.source, calculated_at=excluded.calculated_at,
                     last_checked_at=excluded.last_checked_at, last_error=NULL, using_last_good=0,
                     factor_count=excluded.factor_count
                 """,
-                (code, factor_hash, algorithm_version, source, calculated, calculated, len(factors)),
+                (market, code, factor_hash, algorithm_version, source, calculated, calculated, len(factors)),
             )
 
-    def list_adjustment_factor_dates(self, code: str) -> list[date]:
+    def list_adjustment_factor_dates(self, code: str, market: str = "cn") -> list[date]:
         with self._connect() as connection:
             rows = connection.execute(
                 """
                 SELECT trade_date FROM market_daily_adjustment_factors
-                WHERE market='cn' AND code=? ORDER BY trade_date
+                WHERE market=? AND code=? ORDER BY trade_date
                 """,
-                (code,),
+                (market, code),
             ).fetchall()
         return [date.fromisoformat(row["trade_date"]) for row in rows]
 
@@ -1651,19 +1739,20 @@ class MarketDailyBarRepository:
         code: str,
         start_date: date,
         end_date: date,
+        market: str = "cn",
     ) -> list[MarketDailyAdjustmentFactor]:
         with self._connect() as connection:
             rows = connection.execute(
                 """
                 SELECT * FROM market_daily_adjustment_factors
-                WHERE market='cn' AND code=? AND trade_date>=? AND trade_date<=?
+                WHERE market=? AND code=? AND trade_date>=? AND trade_date<=?
                 ORDER BY trade_date
                 """,
-                (code, start_date.isoformat(), end_date.isoformat()),
+                (market, code, start_date.isoformat(), end_date.isoformat()),
             ).fetchall()
         return [
             MarketDailyAdjustmentFactor(
-                market="cn", code=row["code"], trade_date=date.fromisoformat(row["trade_date"]),
+                market=row["market"], code=row["code"], trade_date=date.fromisoformat(row["trade_date"]),
                 qfq_multiplier=row["qfq_multiplier"], qfq_offset=row["qfq_offset"],
                 hfq_multiplier=row["hfq_multiplier"], hfq_offset=row["hfq_offset"],
                 action_hash=row["action_hash"], algorithm_version=row["algorithm_version"],

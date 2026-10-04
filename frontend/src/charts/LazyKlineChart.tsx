@@ -14,6 +14,8 @@ interface LazyKlineChartProps {
   tradeMarkers?: KlineTradeMarker[];
   chanlun?: ChanlunResult | null;
   forceRender?: boolean;
+  onReachLeftEdge?: () => void;
+  historyLimitReached?: boolean;
 }
 
 export default function LazyKlineChart({
@@ -23,6 +25,8 @@ export default function LazyKlineChart({
   tradeMarkers,
   chanlun,
   forceRender = false,
+  onReachLeftEdge,
+  historyLimitReached,
 }: LazyKlineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(() => typeof IntersectionObserver === "undefined");
@@ -44,7 +48,15 @@ export default function LazyKlineChart({
     <div ref={containerRef} style={{ minHeight: height, backgroundColor: "var(--c-card-bg)" }}>
       {renderChart ? (
         <Suspense fallback={<Skeleton active paragraph={{ rows: 8 }} />}>
-          <KlineChart data={data} height={height} viewKey={viewKey} tradeMarkers={tradeMarkers} chanlun={chanlun} />
+          <KlineChart
+            data={data}
+            height={height}
+            viewKey={viewKey}
+            tradeMarkers={tradeMarkers}
+            chanlun={chanlun}
+            onReachLeftEdge={onReachLeftEdge}
+            historyLimitReached={historyLimitReached}
+          />
         </Suspense>
       ) : (
         <div aria-label="K线图即将加载" style={{ minHeight: height }}>

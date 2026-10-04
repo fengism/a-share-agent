@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createChart,
   createSeriesMarkers,
@@ -24,6 +24,10 @@ import { createDebouncedResizeHandler, shouldFitChartContent } from "./chartLife
 import { toBusinessDay, hexToRgba } from "./utils";
 import { buildKlineTradeMarkers, type KlineTradeMarker } from "./klineMarkers";
 import { calculateMA, calculateMAVOL, calculateBOLL, MA_CONFIGS, MAVOL_CONFIGS } from "./movingAverages";
+import { VOLUME_PANE_INDEX, PRICE_PANE_RATIO, applyVolumePaneLayout, getChartPaneThemeConfig } from "./chartPaneLayout";
+
+/** 可视区左缘距离第一根 K 线多少根以内触发扩充历史。 */
+const LEFT_EDGE_TRIGGER_INDEX = 8;
 
 type Props = {
   data: KlineItem[];
@@ -32,6 +36,12 @@ type Props = {
   tradeMarkers?: KlineTradeMarker[];
   /** 缠论分析结果：叠加笔、中枢区间与买卖点标记 */
   chanlun?: ChanlunResult | null;
+  /** 可视区滚动到左缘时回调，用于按需向左扩充更早的历史数据 */
+  onReachLeftEdge?: () => void;
+  /** 已达到可回溯上限；为 true 时不再触发扩充 */
+  historyLimitReached?: boolean;
+  /** 是否在可视区自动标注最高价与最低价，默认为 true */
+  showHighLowMarkers?: boolean;
 };
 type ChartItem = Omit<KlineItem, "date"> & { date: BusinessDay; rawDate: string };
 
@@ -43,6 +53,8 @@ interface HoverCandleInfo {
   close: number;
   changePct: number | null;
   amount: number | null;
+  turnoverPct?: number | null;
+  amplitude?: number | null;
   ma5: number | null;
   ma10: number | null;
   ma20: number | null;
@@ -82,14 +94,23 @@ function buildChanlunMarkers(
   return markers;
 }
 
-function formatAmount(val: number | null | undefined): string {
+function formatVolume(val: number | null | undefined): string {
   if (val == null || isNaN(val)) return "-";
   if (Math.abs(val) >= 1e8) return `${(val / 1e8).toFixed(2)}亿`;
   if (Math.abs(val) >= 1e4) return `${(val / 1e4).toFixed(2)}万`;
   return val.toFixed(0);
 }
 
-export default function KlineChart({ data, height = 500, viewKey = "default", tradeMarkers = [], chanlun = null }: Props) {
+export default function KlineChart({
+  data,
+  height = 500,
+  viewKey = "default",
+  tradeMarkers = [],
+  chanlun = null,
+  onReachLeftEdge,
+  historyLimitReached = false,
+  showHighLowMarkers = true,
+}: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
   colorsRef.current = c;
@@ -105,9 +126,65 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
   const tradeMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const chanlunSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const fittedViewKeyRef = useRef<string | null>(null);
+  const onReachLeftEdgeRef = useRef(onReachLeftEdge);
+  onReachLeftEdgeRef.current = onReachLeftEdge;
+  const leftEdgePendingRef = useRef(false);
+  const historyLimitRef = useRef(historyLimitReached);
+  historyLimitRef.current = historyLimitReached;
+  const anchoredLogicalRangeRef = useRef<{ from: number; to: number; length: number; viewKey: string } | null>(null);
+  const rowCountRef = useRef(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [hoverInfo, setHoverInfo] = useState<HoverCandleInfo | null>(null);
   const [mainOverlay, setMainOverlay] = useState<"MA" | "BOLL">("MA");
+  const hudRef = useRef<HTMLDivElement>(null);
+  const [paneRatio, setPaneRatio] = useState<number>(PRICE_PANE_RATIO);
+  const [pane0Height, setPane0Height] = useState<number>(() => Math.floor((height - 32) * PRICE_PANE_RATIO));
+  const [rightScaleWidth, setRightScaleWidth] = useState<number>(58);
+
+  const updateLayoutMetrics = () => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    try {
+      const h = chart.panes()[0]?.getHeight?.();
+      if (h && h > 0) setPane0Height(h);
+      const w = chart.priceScale("right", 0)?.width?.();
+      if (w && w > 0) setRightScaleWidth(w);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSeparatorMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startRatio = paneRatio;
+    const chart = chartRef.current;
+    if (!chart) return;
+    const hudHeight = hudRef.current?.clientHeight ?? 32;
+    const plotHeight = Math.max(100, height - hudHeight);
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const deltaRatio = deltaY / plotHeight;
+      const newRatio = Math.max(0.4, Math.min(0.85, startRatio + deltaRatio));
+      setPaneRatio(newRatio);
+      applyVolumePaneLayout(chart, newRatio);
+      try {
+        const h = chart.panes()[0]?.getHeight?.();
+        if (h && h > 0) setPane0Height(h);
+      } catch {
+        // ignore
+      }
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
 
   const rows = useMemo<ChartItem[]>(
     () => data
@@ -118,6 +195,91 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       .filter((item): item is ChartItem => item !== null),
     [data]
   );
+  rowCountRef.current = rows.length;
+  const rowsRef = useRef<ChartItem[]>(rows);
+  rowsRef.current = rows;
+
+  const showHighLowMarkersRef = useRef(showHighLowMarkers);
+  showHighLowMarkersRef.current = showHighLowMarkers;
+  const baseMarkersRef = useRef<SeriesMarker<Time>[]>([]);
+
+  const updateHighLowMarkers = useCallback((logicalRange?: { from: number; to: number } | null) => {
+    if (!tradeMarkersRef.current) return;
+    const currentRows = rowsRef.current;
+    if (!showHighLowMarkersRef.current || currentRows.length === 0) {
+      tradeMarkersRef.current.setMarkers(baseMarkersRef.current);
+      return;
+    }
+
+    const chart = chartRef.current;
+    let range = logicalRange ?? chart?.timeScale().getVisibleLogicalRange?.() ?? null;
+    if (!range && currentRows.length > 0) {
+      const count = Math.min(80, currentRows.length);
+      range = { from: currentRows.length - count, to: currentRows.length + 2 };
+    }
+    if (!range) {
+      tradeMarkersRef.current.setMarkers(baseMarkersRef.current);
+      return;
+    }
+
+    const startIdx = Math.max(0, Math.min(currentRows.length - 1, Math.floor(range.from)));
+    const endIdx = Math.max(0, Math.min(currentRows.length - 1, Math.ceil(range.to)));
+    if (startIdx > endIdx) {
+      tradeMarkersRef.current.setMarkers(baseMarkersRef.current);
+      return;
+    }
+
+    let maxItem: ChartItem = currentRows[startIdx];
+    let minItem: ChartItem = currentRows[startIdx];
+    for (let i = startIdx + 1; i <= endIdx; i++) {
+      const item = currentRows[i];
+      if (item.high > maxItem.high) {
+        maxItem = item;
+      }
+      if (item.low < minItem.low) {
+        minItem = item;
+      }
+    }
+
+    const highLowMarkers: SeriesMarker<Time>[] = [];
+    const colors = colorsRef.current;
+    if (maxItem) {
+      highLowMarkers.push({
+        time: maxItem.date,
+        position: "aboveBar",
+        shape: "arrowDown",
+        color: colors.up,
+        text: `高 ${maxItem.high.toFixed(2)}`,
+        size: 1,
+      });
+    }
+    if (minItem && (minItem !== maxItem || minItem.low !== maxItem.high)) {
+      highLowMarkers.push({
+        time: minItem.date,
+        position: "belowBar",
+        shape: "arrowUp",
+        color: colors.down,
+        text: `低 ${minItem.low.toFixed(2)}`,
+        size: 1,
+      });
+    }
+
+    const timeKey = (time: Time) => {
+      const day = time as BusinessDay;
+      return `${day.year ?? 0}-${String(day.month ?? 0).padStart(2, "0")}-${String(day.day ?? 0).padStart(2, "0")}`;
+    };
+
+    const combined = [...baseMarkersRef.current, ...highLowMarkers].sort((a, b) => {
+      const ka = timeKey(a.time);
+      const kb = timeKey(b.time);
+      if (ka !== kb) return ka < kb ? -1 : 1;
+      return (a.position || "").localeCompare(b.position || "");
+    });
+    tradeMarkersRef.current.setMarkers(combined);
+  }, []);
+
+  const updateHighLowMarkersRef = useRef(updateHighLowMarkers);
+  updateHighLowMarkersRef.current = updateHighLowMarkers;
 
   // Precompute MA & MAVOL & BOLL maps for fast crosshair lookup
   const calculations = useMemo(() => {
@@ -162,8 +324,22 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       bollDnMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
     }
 
-    return { maMaps, mavolMaps, boll, bollMidMap, bollUpMap, bollDnMap };
+    const rowMap = new Map<string, { row: ChartItem; prevClose: number | null; changePct: number | null }>();
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const prev = i > 0 ? rows[i - 1] : null;
+      const prevClose = prev ? prev.close : null;
+      const changePct = row.change_pct ?? (prevClose && prevClose > 0 ? ((row.close - prevClose) / prevClose) * 100 : null);
+      const key = `${row.date.year}-${String(row.date.month).padStart(2, "0")}-${String(row.date.day).padStart(2, "0")}`;
+      rowMap.set(key, { row, prevClose, changePct });
+    }
+
+    return { maMaps, mavolMaps, boll, bollMidMap, bollUpMap, bollDnMap, rowMap };
   }, [rows]);
+
+  // 建图只依赖 height；指标计算结果通过 ref 读取，避免数据变化时销毁重建整张图。
+  const calculationsRef = useRef(calculations);
+  calculationsRef.current = calculations;
 
   const latestInfo = useMemo<HoverCandleInfo | null>(() => {
     if (rows.length === 0) return null;
@@ -179,6 +355,8 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       close: last.close,
       changePct,
       amount: last.amount ?? last.volume ?? null,
+      turnoverPct: last.turnover_pct ?? null,
+      amplitude: last.amplitude ?? null,
       ma5: calculations.maMaps.get("ma5")?.get(dateKey) ?? null,
       ma10: calculations.maMaps.get("ma10")?.get(dateKey) ?? null,
       ma20: calculations.maMaps.get("ma20")?.get(dateKey) ?? null,
@@ -232,6 +410,8 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
         close: target.close,
         changePct,
         amount: target.amount ?? target.volume ?? null,
+        turnoverPct: target.turnover_pct ?? null,
+        amplitude: target.amplitude ?? null,
         ma5: calculations.maMaps.get("ma5")?.get(dateKey) ?? null,
         ma10: calculations.maMaps.get("ma10")?.get(dateKey) ?? null,
         ma20: calculations.maMaps.get("ma20")?.get(dateKey) ?? null,
@@ -254,26 +434,34 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
     chartRef.current?.remove();
     const colors = colorsRef.current;
 
+    const initialHudHeight = hudRef.current?.clientHeight || 32;
     const chart = createChart(chartElRef.current, {
       width: chartElRef.current.clientWidth,
-      height: height - 32,
+      height: Math.max(100, height - initialHudHeight),
       layout: {
         background: { type: ColorType.Solid, color: colors.cardBg },
         textColor: colors.textSecondary,
         fontFamily: APP_FONT_FAMILY,
         fontSize: APP_FONT_SIZE.sm,
         attributionLogo: false,
+        panes: getChartPaneThemeConfig(colors).panes,
       },
-      grid: { vertLines: { color: colors.border }, horzLines: { color: colors.border } },
+      grid: getChartPaneThemeConfig(colors).grid,
       timeScale: { timeVisible: false, borderColor: colors.border },
+      // 价格与成交量各自独立窗格、各自独立量纲，两条轴都放右侧（同花顺/通达信布局）。
+      // 左侧轴必须整体关闭：lightweight-charts 5.2.1 判断要不要画轴时只读 0 号窗格的
+      // visible，却对所有窗格 ensureNotNull(轴 widget)，单独隐藏非 0 窗格的轴会让每帧
+      // draw 抛 "Value is null"，整张图不渲染。
       rightPriceScale: { visible: true, borderColor: colors.border },
-      leftPriceScale: { visible: true, borderColor: colors.border },
+      leftPriceScale: { visible: false, borderColor: colors.border },
       crosshair: {
         vertLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
         horzLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
       },
-      handleScroll: { mouseWheel: true, pressedMouseMove: false, horzTouchDrag: true, vertTouchDrag: false },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
+      kineticScroll: { touch: true, mouse: false },
+      trackingMode: { exitMode: 0 },
     });
     chartRef.current = chart;
     fittedViewKeyRef.current = null;
@@ -286,24 +474,27 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
     });
     candleSeriesRef.current = candle;
     tradeMarkersRef.current = createSeriesMarkers(candle, []);
-    chart.priceScale("right").applyOptions({
-      visible: true, borderColor: colors.border,
-      scaleMargins: { top: 0.05, bottom: 0.22 },
+    chart.priceScale("right", 0).applyOptions({
+      borderColor: colors.border,
+      scaleMargins: { top: 0.08, bottom: 0.12 },
     });
 
+    // 成交量放到独立的下窗格：与价格量纲差几个数量级，共享一个绘图区会被压成一条线
     const volume = chart.addSeries(HistogramSeries, {
       priceFormat: {
         type: "custom", minMove: 1,
         formatter: (value: number) => Math.abs(value) >= 1e8
           ? `${(value / 1e8).toFixed(2)}亿` : `${(value / 1e4).toFixed(2)}万`,
       },
-      priceScaleId: "left",
-    });
+      priceScaleId: "right",
+    }, VOLUME_PANE_INDEX);
     volumeSeriesRef.current = volume;
-    chart.priceScale("left").applyOptions({
-      visible: true, borderColor: colors.border,
-      scaleMargins: { top: 0.82, bottom: 0 },
+    chart.priceScale("right", VOLUME_PANE_INDEX).applyOptions({
+      borderColor: colors.border,
+      scaleMargins: { top: 0.18, bottom: 0 },
     });
+    applyVolumePaneLayout(chart, paneRatio);
+    updateLayoutMetrics();
 
     // Initialize MA Line Series
     const maMap = new Map<string, ISeriesApi<"Line">>();
@@ -329,8 +520,8 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
         priceLineVisible: false,
         lastValueVisible: false,
         crosshairMarkerVisible: false,
-        priceScaleId: "left",
-      });
+        priceScaleId: "right",
+      }, VOLUME_PANE_INDEX);
       mavolMap.set(cfg.key, volLine);
     }
     mavolSeriesMapRef.current = mavolMap;
@@ -351,7 +542,9 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
     const brush = brushRef.current;
     const resizeObserver = new ResizeObserver(
       createDebouncedResizeHandler((entry) => {
-        chart.applyOptions({ width: Math.floor(entry.contentRect.width), height: height - 32 });
+        const hudHeight = hudRef.current?.clientHeight ?? 32;
+        chart.applyOptions({ width: Math.floor(entry.contentRect.width), height: Math.max(100, height - hudHeight) });
+        updateLayoutMetrics();
       })
     );
     resizeObserver.observe(chartElRef.current);
@@ -360,7 +553,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
     const resetBrush = () => { brush.style.display = "none"; brush.style.left = "0px"; brush.style.width = "0px"; };
 
     const handleMouseDown = (event: MouseEvent) => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || !event.shiftKey) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest("button")) return;
       event.preventDefault();
@@ -407,6 +600,19 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       setIsZoomed(false);
     };
 
+    const handleKeyDownWindow = (event: KeyboardEvent) => {
+      if (event.key === "Shift") {
+        wrapper.style.cursor = "crosshair";
+      }
+    };
+    const handleKeyUpWindow = (event: KeyboardEvent) => {
+      if (event.key === "Shift" && startX == null) {
+        wrapper.style.cursor = "default";
+      }
+    };
+    window.addEventListener("keydown", handleKeyDownWindow);
+    window.addEventListener("keyup", handleKeyUpWindow);
+
     const handleCrosshairMove = (param: MouseEventParams<Time>) => {
       if (!param.time || !param.seriesData) {
         if (selectedIndexRef.current === null) {
@@ -420,30 +626,61 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       if (cData && typeof param.time === "object" && param.time !== null && "year" in param.time) {
         const day = param.time as BusinessDay;
         const dateKey = `${day.year}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`;
-        const changePct = cData.open > 0 ? ((cData.close - cData.open) / cData.open) * 100 : null;
+        const rowInfo = calculationsRef.current.rowMap?.get(dateKey);
+        const changePct = rowInfo?.changePct ?? (cData.open > 0 ? ((cData.close - cData.open) / cData.open) * 100 : null);
+        const amount = rowInfo?.row.amount ?? rowInfo?.row.volume ?? vData?.value ?? null;
+        const turnoverPct = rowInfo?.row.turnover_pct ?? null;
+        const amplitude = rowInfo?.row.amplitude ?? null;
         setHoverInfo({
-          dateStr: dateKey,
+          dateStr: rowInfo?.row.rawDate ?? dateKey,
           open: cData.open,
           high: cData.high,
           low: cData.low,
           close: cData.close,
           changePct,
-          amount: vData?.value ?? null,
-          ma5: calculations.maMaps.get("ma5")?.get(dateKey) ?? null,
-          ma10: calculations.maMaps.get("ma10")?.get(dateKey) ?? null,
-          ma20: calculations.maMaps.get("ma20")?.get(dateKey) ?? null,
-          ma30: calculations.maMaps.get("ma30")?.get(dateKey) ?? null,
-          ma60: calculations.maMaps.get("ma60")?.get(dateKey) ?? null,
-          vol5: calculations.mavolMaps.get("vol5")?.get(dateKey) ?? null,
-          vol10: calculations.mavolMaps.get("vol10")?.get(dateKey) ?? null,
-          bollMid: calculations.bollMidMap.get(dateKey) ?? null,
-          bollUp: calculations.bollUpMap.get(dateKey) ?? null,
-          bollDn: calculations.bollDnMap.get(dateKey) ?? null,
+          amount,
+          turnoverPct,
+          amplitude,
+          ma5: calculationsRef.current.maMaps.get("ma5")?.get(dateKey) ?? null,
+          ma10: calculationsRef.current.maMaps.get("ma10")?.get(dateKey) ?? null,
+          ma20: calculationsRef.current.maMaps.get("ma20")?.get(dateKey) ?? null,
+          ma30: calculationsRef.current.maMaps.get("ma30")?.get(dateKey) ?? null,
+          ma60: calculationsRef.current.maMaps.get("ma60")?.get(dateKey) ?? null,
+          vol5: calculationsRef.current.mavolMaps.get("vol5")?.get(dateKey) ?? null,
+          vol10: calculationsRef.current.mavolMaps.get("vol10")?.get(dateKey) ?? null,
+          bollMid: calculationsRef.current.bollMidMap.get(dateKey) ?? null,
+          bollUp: calculationsRef.current.bollUpMap.get(dateKey) ?? null,
+          bollDn: calculationsRef.current.bollDnMap.get(dateKey) ?? null,
         });
       }
     };
 
     chart.subscribeCrosshairMove(handleCrosshairMove);
+
+    // 左缘触底：用户滚动/拖拽到最早一根 K 线时，向外层请求更早的数据。
+    // 用 ref 记录触底前的逻辑区间，数据补齐后按新增条数平移，保持视窗不跳。
+    const handleVisibleRangeChange = (range: { from: number; to: number } | null) => {
+      updateHighLowMarkersRef.current(range);
+
+      if (!range || historyLimitRef.current) {
+        leftEdgePendingRef.current = false;
+        return;
+      }
+      if (range.from > LEFT_EDGE_TRIGGER_INDEX) {
+        leftEdgePendingRef.current = false;
+        return;
+      }
+      if (leftEdgePendingRef.current) return;
+      leftEdgePendingRef.current = true;
+      anchoredLogicalRangeRef.current = {
+        from: range.from,
+        to: range.to,
+        length: rowCountRef.current,
+        viewKey,
+      };
+      onReachLeftEdgeRef.current?.();
+    };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
 
     wrapper.addEventListener("mousedown", handleMouseDown);
     wrapper.addEventListener("mousemove", handleMouseMove);
@@ -453,7 +690,10 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
 
     return () => {
       resizeObserver.disconnect();
+      window.removeEventListener("keydown", handleKeyDownWindow);
+      window.removeEventListener("keyup", handleKeyUpWindow);
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
       wrapper.removeEventListener("mousedown", handleMouseDown);
       wrapper.removeEventListener("mousemove", handleMouseMove);
       wrapper.removeEventListener("mouseup", handleMouseUp);
@@ -469,7 +709,9 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       tradeMarkersRef.current = null;
       chanlunSeriesRef.current = [];
     };
-  }, [height, calculations]);
+    // 建图只依赖 height；viewKey 变化由下方数据 effect 负责重置视窗，不应重建图表。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [height]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -484,11 +726,21 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       low: item.low,
       close: item.close,
     })));
-    volume.setData(rows.map((item) => ({
-      time: item.date,
-      value: item.amount ?? item.volume,
-      color: item.close >= item.open ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
-    })));
+    volume.setData(rows.map((item, index) => {
+      const prevClose = index > 0 ? rows[index - 1].close : null;
+      const isUp = item.close > item.open
+        ? true
+        : item.close < item.open
+          ? false
+          : prevClose != null
+            ? item.close >= prevClose
+            : true;
+      return {
+        time: item.date,
+        value: item.amount ?? item.volume,
+        color: isUp ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
+      };
+    }));
 
     // Set MA Lines Data
     for (const cfg of MA_CONFIGS) {
@@ -535,15 +787,25 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
     const chanlunMarkerList = chanlun
       ? buildChanlunMarkers(chanlun, { up: c.up, down: c.down }, validDates)
       : [];
-    const timeKey = (time: Time) => {
-      const day = time as BusinessDay;
-      return `${day.year ?? 0}-${String(day.month ?? 0).padStart(2, "0")}-${String(day.day ?? 0).padStart(2, "0")}`;
-    };
-    tradeMarkersRef.current?.setMarkers(
-      [...tradeMarkerList, ...chanlunMarkerList].sort((a, b) => (timeKey(a.time) < timeKey(b.time) ? -1 : 1)),
-    );
+    baseMarkersRef.current = [...tradeMarkerList, ...chanlunMarkerList];
+    updateHighLowMarkers(chart.timeScale().getVisibleLogicalRange?.() ?? null);
 
-    if (rows.length > 0 && shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
+    // 历史扩充后按新增条数平移视窗，避免图表跳回首日。
+    // 锚点只在同一 viewKey 且数据确实变长时生效；切换标的或数据变短都要丢弃，
+    // 否则会用上一只票的行数平移当前视窗。
+    const anchor = anchoredLogicalRangeRef.current;
+    if (anchor && (anchor.viewKey !== viewKey || rows.length <= anchor.length)) {
+      anchoredLogicalRangeRef.current = null;
+    }
+    const pendingAnchor = anchoredLogicalRangeRef.current;
+    if (pendingAnchor && rows.length > pendingAnchor.length) {
+      anchoredLogicalRangeRef.current = null;
+      const added = rows.length - pendingAnchor.length;
+      chart.timeScale().setVisibleLogicalRange({
+        from: pendingAnchor.from + added,
+        to: pendingAnchor.to + added,
+      });
+    } else if (rows.length > 0 && shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
       if (rows.length > 80) {
         chart.timeScale().setVisibleLogicalRange({ from: rows.length - 80, to: rows.length + 2 });
       } else {
@@ -552,7 +814,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       fittedViewKeyRef.current = viewKey;
       setIsZoomed(false);
     }
-  }, [c.down, c.up, data, height, rows, tradeMarkers, viewKey, chanlun, mainOverlay, calculations]);
+  }, [c.down, c.up, data, height, rows, tradeMarkers, viewKey, chanlun, mainOverlay, calculations, showHighLowMarkers, updateHighLowMarkers]);
 
   // 缠论图层：笔折线 + 中枢上下沿虚线
   useEffect(() => {
@@ -609,9 +871,14 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
     const chart = chartRef.current;
     if (!chart) return;
 
+    const paneConfig = getChartPaneThemeConfig(c);
     chart.applyOptions({
-      layout: { background: { type: ColorType.Solid, color: c.cardBg }, textColor: c.textSecondary },
-      grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
+      layout: {
+        background: { type: ColorType.Solid, color: c.cardBg },
+        textColor: c.textSecondary,
+        panes: paneConfig.panes,
+      },
+      grid: paneConfig.grid,
       timeScale: { borderColor: c.border },
       rightPriceScale: { borderColor: c.border },
       leftPriceScale: { borderColor: c.border },
@@ -626,14 +893,24 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       borderUpColor: c.up, borderDownColor: c.down,
       wickUpColor: c.up, wickDownColor: c.down,
     });
-    volumeSeriesRef.current?.setData(rows.map((item) => ({
-      time: item.date,
-      value: item.amount ?? item.volume,
-      color: item.close >= item.open ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
-    })));
-    chart.priceScale("right").applyOptions({ borderColor: c.border });
-    chart.priceScale("left").applyOptions({ borderColor: c.border });
-  }, [c.cardBg, c.border, c.down, c.textMuted, c.textSecondary, c.up, height, rows]);
+    volumeSeriesRef.current?.setData(rows.map((item, index) => {
+      const prevClose = index > 0 ? rows[index - 1].close : null;
+      const isUp = item.close > item.open
+        ? true
+        : item.close < item.open
+          ? false
+          : prevClose != null
+            ? item.close >= prevClose
+            : true;
+      return {
+        time: item.date,
+        value: item.amount ?? item.volume,
+        color: isUp ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
+      };
+    }));
+    chart.priceScale("right", 0).applyOptions({ borderColor: c.border });
+    chart.priceScale("right", VOLUME_PANE_INDEX).applyOptions({ borderColor: c.border });
+  }, [c.border, c.cardBg, c.down, c.primary, c.accent, c.isLight, c.textMuted, c.textSecondary, c.up, height, rows]);
 
   return (
     <div
@@ -641,11 +918,13 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       tabIndex={0}
       role="region"
       aria-label="K线图交互区"
+      title="左键拖拽平移画布，按住 Shift 拖拽框选放大，双击重置全景"
       onKeyDown={handleKeyDown}
       className="kline-chart"
       style={{
         position: "relative",
         width: "100%",
+        height,
         minHeight: height,
         display: "flex",
         flexDirection: "column",
@@ -654,20 +933,22 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
       }}
     >
       {/* Allow wrapped quotes to grow without overlapping the toolbar or plot. */}
-      <div className="kline-chart__hud" style={{
+      <div ref={hudRef} className="kline-chart__hud" style={{
         minHeight: 32,
-        flexShrink: 0,
-        padding: "4px 8px",
+        padding: "4px 10px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        flexWrap: "wrap",
+        rowGap: 4,
+        columnGap: 8,
+        flexShrink: 0,
         fontSize: "11px",
         color: c.textSecondary,
         backgroundColor: c.nestedBg,
         borderBottom: `1px solid ${c.border}`,
         fontFamily: "var(--c-font-mono)",
         userSelect: "none",
-        gap: 8,
       }}>
         {activeCandle ? (
           <div style={{
@@ -679,49 +960,60 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
             minWidth: 0,
             lineHeight: 1.4,
           }}>
-            <span>日期: <strong style={{ color: c.textPrimary }}>{activeCandle.dateStr}</strong></span>
-            <span>开: <strong style={{ color: activeCandle.close >= activeCandle.open ? c.up : c.down }}>{activeCandle.open.toFixed(2)}</strong></span>
-            <span>高: <strong style={{ color: c.up }}>{activeCandle.high.toFixed(2)}</strong></span>
-            <span>低: <strong style={{ color: c.down }}>{activeCandle.low.toFixed(2)}</strong></span>
-            <span>收: <strong style={{ color: activeCandle.close >= activeCandle.open ? c.up : c.down }}>{activeCandle.close.toFixed(2)}</strong></span>
+            <span style={{
+              color: c.textPrimary,
+              fontWeight: 700,
+              minWidth: 80,
+              flexShrink: 0,
+              paddingRight: 6,
+              borderRight: `1px solid ${c.border}`,
+              marginRight: 2,
+            }}>
+              {activeCandle.dateStr}
+            </span>
+            <span style={{ whiteSpace: "nowrap" }}>开: <strong style={{ color: activeCandle.close >= activeCandle.open ? c.up : c.down }}>{activeCandle.open.toFixed(2)}</strong></span>
+            <span style={{ whiteSpace: "nowrap" }}>高: <strong style={{ color: c.up }}>{activeCandle.high.toFixed(2)}</strong></span>
+            <span style={{ whiteSpace: "nowrap" }}>低: <strong style={{ color: c.down }}>{activeCandle.low.toFixed(2)}</strong></span>
+            <span style={{ whiteSpace: "nowrap" }}>收: <strong style={{ color: activeCandle.close >= activeCandle.open ? c.up : c.down }}>{activeCandle.close.toFixed(2)}</strong></span>
             {activeCandle.changePct != null && (
-              <span style={{ color: activeCandle.changePct >= 0 ? c.up : c.down }}>
+              <span style={{ whiteSpace: "nowrap", color: activeCandle.changePct >= 0 ? c.up : c.down }}>
                 ({activeCandle.changePct >= 0 ? `+${activeCandle.changePct.toFixed(2)}%` : `${activeCandle.changePct.toFixed(2)}%`})
               </span>
             )}
-            {activeCandle.amount != null && (
-              <span>额: <strong style={{ color: c.textPrimary }}>{formatAmount(activeCandle.amount)}</strong></span>
+            {activeCandle.turnoverPct != null && (
+              <span style={{ whiteSpace: "nowrap" }}>换: <strong style={{ color: c.textPrimary }}>{activeCandle.turnoverPct.toFixed(2)}%</strong></span>
+            )}
+            {activeCandle.amplitude != null && (
+              <span style={{ whiteSpace: "nowrap" }}>振: <strong style={{ color: c.textPrimary }}>{activeCandle.amplitude.toFixed(2)}%</strong></span>
             )}
             {mainOverlay === "MA" ? (
               <>
-                <span style={{ color: "#f0b90b" }}>MA5: {activeCandle.ma5 != null ? activeCandle.ma5.toFixed(2) : "-"}</span>
-                <span style={{ color: "#1890ff" }}>MA10: {activeCandle.ma10 != null ? activeCandle.ma10.toFixed(2) : "-"}</span>
-                <span style={{ color: "#9254de" }}>MA20: {activeCandle.ma20 != null ? activeCandle.ma20.toFixed(2) : "-"}</span>
-                <span style={{ color: "#13c2c2" }}>MA30: {activeCandle.ma30 != null ? activeCandle.ma30.toFixed(2) : "-"}</span>
-                <span style={{ color: "#ff7a45" }}>MA60: {activeCandle.ma60 != null ? activeCandle.ma60.toFixed(2) : "-"}</span>
+                <span style={{ whiteSpace: "nowrap", color: "#f0b90b" }}>MA5: {activeCandle.ma5 != null ? activeCandle.ma5.toFixed(2) : "-"}</span>
+                <span style={{ whiteSpace: "nowrap", color: "#1890ff" }}>MA10: {activeCandle.ma10 != null ? activeCandle.ma10.toFixed(2) : "-"}</span>
+                <span style={{ whiteSpace: "nowrap", color: "#9254de" }}>MA20: {activeCandle.ma20 != null ? activeCandle.ma20.toFixed(2) : "-"}</span>
+                <span style={{ whiteSpace: "nowrap", color: "#13c2c2" }}>MA30: {activeCandle.ma30 != null ? activeCandle.ma30.toFixed(2) : "-"}</span>
+                <span style={{ whiteSpace: "nowrap", color: "#ff7a45" }}>MA60: {activeCandle.ma60 != null ? activeCandle.ma60.toFixed(2) : "-"}</span>
               </>
             ) : (
               <>
-                <span style={{ color: "#f0b90b" }}>MID: {activeCandle.bollMid != null ? activeCandle.bollMid.toFixed(2) : "-"}</span>
-                <span style={{ color: "#ff7a45" }}>UP: {activeCandle.bollUp != null ? activeCandle.bollUp.toFixed(2) : "-"}</span>
-                <span style={{ color: "#9254de" }}>DN: {activeCandle.bollDn != null ? activeCandle.bollDn.toFixed(2) : "-"}</span>
+                <span style={{ whiteSpace: "nowrap", color: "#f0b90b" }}>MID: {activeCandle.bollMid != null ? activeCandle.bollMid.toFixed(2) : "-"}</span>
+                <span style={{ whiteSpace: "nowrap", color: "#ff7a45" }}>UP: {activeCandle.bollUp != null ? activeCandle.bollUp.toFixed(2) : "-"}</span>
+                <span style={{ whiteSpace: "nowrap", color: "#9254de" }}>DN: {activeCandle.bollDn != null ? activeCandle.bollDn.toFixed(2) : "-"}</span>
               </>
             )}
-            <span style={{ color: "#f0b90b", opacity: 0.9 }}>V5: {formatAmount(activeCandle.vol5)}</span>
-            <span style={{ color: "#1890ff", opacity: 0.9 }}>V10: {formatAmount(activeCandle.vol10)}</span>
           </div>
         ) : (
           <span>等待K线数据...</span>
         )}
 
         {/* Range & Overlay controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: 3, flex: "0 0 auto", marginLeft: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto", marginLeft: "auto", flexWrap: "wrap" }}>
           <button
             type="button"
             onClick={() => handleRangeSelect("1M")}
             title="查看近1月 (约22根K线)"
             style={{
-              padding: "1px 5px",
+              padding: "1px 6px",
               fontSize: "11px",
               borderRadius: 4,
               border: `1px solid ${c.border}`,
@@ -738,7 +1030,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
             onClick={() => handleRangeSelect("3M")}
             title="查看近3月 (约66根K线)"
             style={{
-              padding: "1px 5px",
+              padding: "1px 6px",
               fontSize: "11px",
               borderRadius: 4,
               border: `1px solid ${c.border}`,
@@ -755,7 +1047,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
             onClick={() => handleRangeSelect("1Y")}
             title="查看近1年 (约250根K线)"
             style={{
-              padding: "1px 5px",
+              padding: "1px 6px",
               fontSize: "11px",
               borderRadius: 4,
               border: `1px solid ${c.border}`,
@@ -772,7 +1064,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
             onClick={() => handleRangeSelect("ALL")}
             title="查看全部K线"
             style={{
-              padding: "1px 5px",
+              padding: "1px 6px",
               fontSize: "11px",
               borderRadius: 4,
               border: `1px solid ${c.border}`,
@@ -788,7 +1080,7 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
             type="button"
             onClick={() => setMainOverlay(mainOverlay === "MA" ? "BOLL" : "MA")}
             style={{
-              padding: "1px 6px",
+              padding: "1px 7px",
               fontSize: "11px",
               borderRadius: 4,
               border: `1px solid ${c.border}`,
@@ -804,12 +1096,82 @@ export default function KlineChart({ data, height = 500, viewKey = "default", tr
         </div>
       </div>
 
-      <div className="kline-chart__plot" style={{ position: "relative", flex: "0 0 auto", width: "100%", height: height - 32, backgroundColor: c.cardBg }}>
+      <div className="kline-chart__plot" style={{ position: "relative", flex: 1, width: "100%", minHeight: 0, backgroundColor: c.cardBg }}>
         <div ref={chartElRef} style={{ width: "100%", height: "100%", backgroundColor: c.cardBg }} />
-        <div ref={brushRef} style={{
+        <div ref={brushRef} className="kline-chart__brush" style={{
           position: "absolute", top: 0, bottom: 0, display: "none", pointerEvents: "none",
           background: hexToRgba(c.primary, 0.12), border: `1px solid ${hexToRgba(c.primary, 0.35)}`,
         }} />
+
+        {/* 股价与成交量窗格中间区分栏 (带背景色、带指标说明、左右不穿透坐标轴) */}
+        <div
+          style={{
+            position: "absolute",
+            top: pane0Height - 11,
+            left: 0,
+            right: rightScaleWidth + 1,
+            height: 22,
+            backgroundColor: c.nestedBg,
+            borderTop: `1px solid ${c.border}`,
+            borderBottom: `1px solid ${c.border}`,
+            boxShadow: c.isLight ? "0 1px 2px rgba(44, 34, 20, 0.04)" : "0 1px 3px rgba(0, 0, 0, 0.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 8px",
+            zIndex: 3,
+            cursor: "row-resize",
+            userSelect: "none",
+          }}
+          onMouseDown={handleSeparatorMouseDown}
+          title="上下拖拽可调整K线图与成交量高度比例"
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{
+              fontSize: "11px",
+              fontWeight: 700,
+              color: c.textSecondary,
+              letterSpacing: "0.02em",
+            }}>
+              成交量 VOL
+            </span>
+            {activeCandle && (
+              <>
+                <span style={{ fontSize: "11px", color: c.textMuted }}>
+                  VOL: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.amount)}</strong>
+                </span>
+                {activeCandle.turnoverPct != null && (
+                  <span style={{ fontSize: "11px", color: c.textMuted }}>
+                    换手: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{activeCandle.turnoverPct.toFixed(2)}%</strong>
+                  </span>
+                )}
+                {activeCandle.vol5 != null && (
+                  <span style={{ fontSize: "11px", color: "#f0b90b" }}>
+                    MA5: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.vol5)}</strong>
+                  </span>
+                )}
+                {activeCandle.vol10 != null && (
+                  <span style={{ fontSize: "11px", color: "#00d4d4" }}>
+                    MA10: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.vol10)}</strong>
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{
+              width: 22,
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: c.border,
+              opacity: 0.8,
+            }} />
+            <span style={{ fontSize: "10px", color: c.textMuted, opacity: 0.75 }}>
+              单位: 股/元
+            </span>
+          </div>
+        </div>
         {isZoomed && (
           <div className="pdf-hide" style={{ position: "absolute", right: 12, top: 10, zIndex: 5 }}>
             <button type="button" onClick={() => { chartRef.current?.timeScale().fitContent(); setIsZoomed(false); }}

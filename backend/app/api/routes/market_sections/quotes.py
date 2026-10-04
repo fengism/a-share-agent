@@ -325,7 +325,7 @@ async def get_index_intraday(
 @router.get("/index-kline", response_model=KlineData)
 async def get_index_kline(
     symbol: str = Query(..., description="指数代码，例如 000001"),
-    period: str = Query("daily", description="daily / weekly / monthly"),
+    period: str = Query("daily", description="daily / weekly / monthly / annual"),
     start_date: str = Query(""),
     end_date: str = Query(""),
 ):

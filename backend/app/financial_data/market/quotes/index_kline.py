@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from collections.abc import Awaitable
+from datetime import date
 
 import pandas as pd
 
@@ -10,10 +11,16 @@ from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
 from app.core.market import normalize_index_code, safe_float
 from app.domain.market import KlineData, KlineItem
+from app.financial_data.dates import clamp_kline_history_start_date as _clamp_start_date
 from app.financial_data.dates import parse_market_date
 from app.financial_data.kline_quality import validate_kline_frame
 from app.financial_data.market.quotes.normalization import filter_index_hist_range
 from app.financial_data.market.trading_session import resolve_market_data_cache_policy
+from app.financial_data.stock.quotes.historical import _resample_adjusted_daily_frame
+from app.financial_data.stock.quotes.kline import (
+    _merge_upstream_parts,
+    _upstream_windows,
+)
 from app.infrastructure.providers.provider_chain import BaseProviderChain, ProviderAttempt
 from app.infrastructure.providers.registry import get_provider
 from app.modules.market_daily.reader import load_local_daily_kline, merge_local_daily_kline
@@ -80,6 +87,11 @@ def _build_index_kline_source_attempts(
 ) -> list[ProviderAttempt[pd.DataFrame]]:
     """构造指数 K 线多数据源回退链。
 
+    * daily：直接请求各数据源。
+    * weekly / monthly / annual：先从日线数据源取全量日线，再本地聚合为目标周期；
+      确保 K 线边界与真实交易日对齐，并与个股周/月/年线使用完全相同的合成逻辑。
+      东财直连与 AkShare 东财接口作为 fallback（它们原生支持非日线，但依赖外部 API）。
+
     Param:
         symbol: 指数代码
         period: K 线周期标识
@@ -88,11 +100,123 @@ def _build_index_kline_source_attempts(
     Return:
         Provider 尝试列表，按优先级排序
     """
+    if period == "daily":
+        # ── 日线：直接请求各数据源 ──────────────────────────────────────
+        return [
+            ProviderAttempt(
+                label="TDX 指数K线",
+                loader=lambda: _require_index_kline_frame(
+                    "TDX 指数K线",
+                    call_blocking(
+                        _get_tdxhub_provider().fetch_index_kline,
+                        symbol=symbol,
+                        start_date=start_date,
+                        end_date=end_date,
+                        semaphore=tdx_semaphore,
+                    ),
+                    period=period,
+                    start_date=start_date,
+                    end_date=end_date,
+                ),
+                on_error=f"TDX 指数K线不可用，尝试 Akshare 腾讯指数K线: symbol={symbol}",
+            ),
+            ProviderAttempt(
+                label="Akshare 腾讯指数K线",
+                loader=lambda: _require_index_kline_frame(
+                    "Akshare 腾讯指数K线",
+                    _load_and_filter(
+                        _get_akshare_provider().fetch_index_kline_tencent,
+                        symbol,
+                        start_date,
+                        end_date,
+                    ),
+                    period=period,
+                    start_date=start_date,
+                    end_date=end_date,
+                ),
+                on_error=f"Akshare 腾讯指数K线不可用，尝试 Akshare 新浪指数K线: symbol={symbol}",
+            ),
+            ProviderAttempt(
+                label="Akshare 新浪指数K线",
+                loader=lambda: _require_index_kline_frame(
+                    "Akshare 新浪指数K线",
+                    _load_and_filter(
+                        _get_akshare_provider().fetch_index_kline_sina,
+                        symbol,
+                        start_date,
+                        end_date,
+                    ),
+                    period=period,
+                    start_date=start_date,
+                    end_date=end_date,
+                ),
+                on_error=f"Akshare 新浪指数K线不可用，尝试东方财富 fallback: symbol={symbol}",
+            ),
+            ProviderAttempt(
+                label="东方财富指数K线直连（fallback）",
+                loader=lambda: _require_index_kline_frame(
+                    "东方财富指数K线直连",
+                    call_blocking(
+                        _get_eastmoney_provider().fetch_index_kline,
+                        symbol,
+                        period,
+                        start_date,
+                        end_date,
+                        semaphore=eastmoney_semaphore,
+                    ),
+                    period=period,
+                    start_date=start_date,
+                    end_date=end_date,
+                ),
+                on_error=f"东方财富指数K线直连 fallback 不可用，尝试 Akshare 东方财富最终 fallback: symbol={symbol}",
+            ),
+            ProviderAttempt(
+                label="Akshare 东方财富指数K线（fallback）",
+                loader=lambda: _require_index_kline_frame(
+                    "Akshare 东方财富指数K线",
+                    call_blocking(
+                        _get_akshare_provider().fetch_index_kline,
+                        symbol=symbol,
+                        period=period,
+                        start_date=start_date,
+                        end_date=end_date,
+                        semaphore=akshare_semaphore,
+                    ),
+                    period=period,
+                    start_date=start_date,
+                    end_date=end_date,
+                ),
+                on_error=f"Akshare 东方财富指数K线最终 fallback 不可用: symbol={symbol}",
+            ),
+        ]
+
+    # ── 非日线（weekly / monthly / annual）：取日线后本地聚合 ──────────
+    period_label = {"weekly": "周", "monthly": "月", "annual": "年"}.get(period, period)
+
+    async def _load_daily_then_resample(
+        source_label: str,
+        raw_loader: Awaitable[pd.DataFrame],
+    ) -> pd.DataFrame:
+        """取日线 frame 后聚合为目标周期，并校验结果。"""
+        daily_frame = await raw_loader
+        if daily_frame.empty:
+            raise ValueError(f"{source_label} 未返回有效日线数据")
+        resampled = await asyncio.to_thread(_resample_adjusted_daily_frame, daily_frame, period)
+        if resampled.empty:
+            raise ValueError(f"{source_label} 聚合后为空")
+        return validate_kline_frame(
+            source_label,
+            resampled,
+            start_date=start_date,
+            end_date=end_date,
+            period=period,
+        )
+
     return [
         ProviderAttempt(
-            label="TDX 指数K线",
-            loader=lambda: _require_index_kline_frame(
-                "TDX 指数K线",
+            label=f"TDX 日线聚合指数{period_label}K线",
+            loader=lambda: _load_daily_then_resample(
+                f"TDX 日线聚合指数{period_label}K线",
                 call_blocking(
                     _get_tdxhub_provider().fetch_index_kline,
                     symbol=symbol,
@@ -100,48 +224,39 @@ def _build_index_kline_source_attempts(
                     end_date=end_date,
                     semaphore=tdx_semaphore,
                 ),
-                period=period,
-                start_date=start_date,
-                end_date=end_date,
             ),
-            on_error=f"TDX 指数K线不可用，尝试 Akshare 腾讯指数K线: symbol={symbol}",
+            on_error=f"TDX 日线聚合指数{period_label}K线不可用: symbol={symbol}",
         ),
         ProviderAttempt(
-            label="Akshare 腾讯指数K线",
-            loader=lambda: _require_index_kline_frame(
-                "Akshare 腾讯指数K线",
+            label=f"Akshare 腾讯日线聚合指数{period_label}K线",
+            loader=lambda: _load_daily_then_resample(
+                f"Akshare 腾讯日线聚合指数{period_label}K线",
                 _load_and_filter(
                     _get_akshare_provider().fetch_index_kline_tencent,
                     symbol,
                     start_date,
                     end_date,
                 ),
-                period=period,
-                start_date=start_date,
-                end_date=end_date,
             ),
-            on_error=f"Akshare 腾讯指数K线不可用，尝试 Akshare 新浪指数K线: symbol={symbol}",
+            on_error=f"Akshare 腾讯日线聚合指数{period_label}K线不可用: symbol={symbol}",
         ),
         ProviderAttempt(
-            label="Akshare 新浪指数K线",
-            loader=lambda: _require_index_kline_frame(
-                "Akshare 新浪指数K线",
+            label=f"Akshare 新浪日线聚合指数{period_label}K线",
+            loader=lambda: _load_daily_then_resample(
+                f"Akshare 新浪日线聚合指数{period_label}K线",
                 _load_and_filter(
                     _get_akshare_provider().fetch_index_kline_sina,
                     symbol,
                     start_date,
                     end_date,
                 ),
-                period=period,
-                start_date=start_date,
-                end_date=end_date,
             ),
-            on_error=f"Akshare 新浪指数K线不可用，尝试东方财富 fallback: symbol={symbol}",
+            on_error=f"Akshare 新浪日线聚合指数{period_label}K线不可用，尝试东财原生: symbol={symbol}",
         ),
         ProviderAttempt(
-            label="东方财富指数K线直连（fallback）",
+            label=f"东方财富指数{period_label}K线直连（fallback）",
             loader=lambda: _require_index_kline_frame(
-                "东方财富指数K线直连",
+                f"东方财富指数{period_label}K线直连",
                 call_blocking(
                     _get_eastmoney_provider().fetch_index_kline,
                     symbol,
@@ -154,12 +269,12 @@ def _build_index_kline_source_attempts(
                 start_date=start_date,
                 end_date=end_date,
             ),
-            on_error=f"东方财富指数K线直连 fallback 不可用，尝试 Akshare 东方财富最终 fallback: symbol={symbol}",
+            on_error=f"东方财富指数{period_label}K线直连 fallback 不可用: symbol={symbol}",
         ),
         ProviderAttempt(
-            label="Akshare 东方财富指数K线（fallback）",
+            label=f"Akshare 东方财富指数{period_label}K线（fallback）",
             loader=lambda: _require_index_kline_frame(
-                "Akshare 东方财富指数K线",
+                f"Akshare 东方财富指数{period_label}K线",
                 call_blocking(
                     _get_akshare_provider().fetch_index_kline,
                     symbol=symbol,
@@ -172,7 +287,7 @@ def _build_index_kline_source_attempts(
                 start_date=start_date,
                 end_date=end_date,
             ),
-            on_error=f"Akshare 东方财富指数K线最终 fallback 不可用: symbol={symbol}",
+            on_error=f"Akshare 东方财富指数{period_label}K线最终 fallback 不可用: symbol={symbol}",
         ),
     ]
 
@@ -252,6 +367,8 @@ async def get_index_kline(symbol: str, period: str = "daily", start_date: str = 
     parsed_end_date = parse_market_date(end_date, "end_date")
     if parsed_start_date > parsed_end_date:
         raise ValueError("start_date 不能晚于 end_date")
+    parsed_start_date = _clamp_start_date(parsed_start_date, parsed_end_date)
+
     local = None
     if period == "daily":
         local = await load_local_daily_kline(
@@ -264,18 +381,58 @@ async def get_index_kline(symbol: str, period: str = "daily", start_date: str = 
         if parsed_start_date == parsed_end_date and local is not None:
             return local
 
+    upstream_windows: list[tuple[date, date]] = [(parsed_start_date, parsed_end_date)]
+    if period == "daily" and local is not None:
+        windows = _upstream_windows(local, parsed_start_date, parsed_end_date)
+        if windows is None:
+            return local
+        if windows:
+            upstream_windows = windows
+
     policy = await resolve_market_data_cache_policy(period, parsed_end_date)
-    cache_key = dated_cache_key_no_day("market_index_kline", symbol, period, start_date, end_date)
+    cache_key_parts: list[object] = [
+        "market_index_kline",
+        symbol,
+        period,
+        parsed_start_date.isoformat(),
+        parsed_end_date.isoformat(),
+    ]
+    if upstream_windows != [(parsed_start_date, parsed_end_date)]:
+        cache_key_parts.append(
+            "upstream-" + ",".join(f"{start.isoformat()}_{end.isoformat()}" for start, end in upstream_windows)
+        )
+    cache_key = dated_cache_key_no_day(*cache_key_parts)
     if policy.read_cache:
         cached = series_cache.get(cache_key)
         if cached is not None:
             return merge_local_daily_kline(cached, local)
 
     async def load_and_cache() -> KlineData:
-        result = await _load_index_kline(symbol, period, start_date, end_date)
+        try:
+            parts: list[KlineData] = []
+            for window_start, window_end in upstream_windows:
+                parts.append(
+                    await _load_index_kline(
+                        symbol,
+                        period,
+                        window_start.isoformat(),
+                        window_end.isoformat(),
+                    )
+                )
+            result = _merge_upstream_parts(parts)
+        except Exception:
+            if local is not None and local.items:
+                logger.info(
+                    "指数K线缺口补采失败，回退本地历史: symbol=%s windows=%s",
+                    symbol,
+                    upstream_windows,
+                )
+                return local
+            raise
         result = merge_local_daily_kline(result, local)
         if policy.write_cache and policy.ttl_seconds is not None:
             series_cache.set(cache_key, result, ttl=policy.ttl_seconds)
         return result
 
     return await _index_kline_singleflight.do(cache_key, load_and_cache)
+

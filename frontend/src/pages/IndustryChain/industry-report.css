@@ -201,6 +201,94 @@
   word-break: break-word;
 }
 
+.industry-conclusion__summary-content {
+  min-width: 0;
+  max-width: 1000px;
+}
+
+.industry-conclusion__summary-content.is-collapsed {
+  max-height: 280px;
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to bottom, black calc(100% - 70px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 70px), transparent 100%);
+}
+
+.industry-conclusion__summary-content.is-expanded {
+  max-height: none;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+.industry-conclusion__summary-toggle {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--c-border);
+}
+
+.industry-conclusion__summary-toggle .ant-btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--c-font-sm);
+  color: var(--c-primary);
+  font-weight: var(--c-weight-medium);
+  padding: 0 8px;
+  height: auto;
+}
+
+.industry-conclusion__summary-content .industry-markdown {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  line-height: var(--c-leading-relaxed);
+}
+
+.industry-conclusion__summary-content .industry-markdown > :first-child {
+  margin-top: 0;
+}
+
+.industry-conclusion__summary-content .industry-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.industry-conclusion__summary-content .industry-markdown h1 {
+  margin: 14px 0 8px;
+  font-size: var(--c-font-xl);
+  font-weight: var(--c-weight-bold);
+  color: var(--c-text-primary);
+}
+
+.industry-conclusion__summary-content .industry-markdown h2 {
+  margin: 16px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--c-border);
+  font-size: var(--c-font-lg);
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
+}
+
+.industry-conclusion__summary-content .industry-markdown h3 {
+  margin: 12px 0 6px;
+  font-size: var(--c-font-base);
+  font-weight: var(--c-weight-semibold);
+  color: var(--c-text-primary);
+}
+
+.industry-conclusion__summary-content .industry-markdown p {
+  margin: 6px 0 10px;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-base);
+  line-height: var(--c-leading-relaxed);
+}
+
+.industry-conclusion__summary-content .industry-markdown hr {
+  margin: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--c-border);
+}
+
 .industry-conclusion__positioning {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
@@ -916,6 +1004,12 @@
 
 .industry-markdown a {
   color: var(--c-primary);
+}
+
+.industry-markdown hr {
+  margin: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--c-border);
 }
 
 .industry-markdown-table-wrap {

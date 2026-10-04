@@ -85,16 +85,21 @@ export function useKlineData(
 ) {
   const startDate = dateRange?.startDate || oneYearAgoDate();
   const endDate = dateRange?.endDate || "";
+  // 空串会被 API 客户端当作"未传"丢弃，后端会套用默认 qfq，表现为选不复权仍显示前复权价；
+  // 这里显式发 none，与港股接口约定一致。
+  const adjustParam = adjust || "none";
 
   return useQuery({
     queryKey: queryKeys.stock.kline(code, period, adjust, startDate, endDate),
     queryFn: () => openApiGet("/api/stock/{code}/kline", {
       path: { code },
-      query: { period, adjust, start_date: startDate, end_date: endDate },
+      query: { period, adjust: adjustParam, start_date: startDate, end_date: endDate },
     }),
     select: asApiModel<KlineData>(),
     enabled: enabled && !!code,
     staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
+    // 向左扩充历史时保留上一批数据，避免图表闪空
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -199,14 +204,25 @@ export function useValuationDetail(code: string) {
   });
 }
 
-export function useIndicators(code: string) {
+export function useIndicators(
+  code: string,
+  period = "daily",
+  options: { startDate?: string; endDate?: string; enabled?: boolean } = {},
+) {
+  const startDate = options.startDate ?? "";
+  const endDate = options.endDate ?? "";
   return useQuery({
-    queryKey: queryKeys.stock.indicators(code),
+    queryKey: queryKeys.stock.indicators(code, period, startDate, endDate),
     queryFn: () => openApiGet("/api/stock/{code}/indicators", {
       path: { code },
+      query: {
+        period,
+        ...(startDate ? { start_date: startDate } : {}),
+        ...(endDate ? { end_date: endDate } : {}),
+      },
     }),
     select: asApiModel<TechnicalIndicators>(),
-    enabled: !!code,
+    enabled: !!code && (options.enabled ?? true),
     staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
   });
 }

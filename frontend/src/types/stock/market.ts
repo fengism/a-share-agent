@@ -86,7 +86,7 @@ export interface MarketLimitUpBoardItem {
 }
 
 export interface MarketEmotion {
-  source: "财联社";
+  source: "财联社" | "fuyao";
   fetched_at: string;
   market_degree: number | null;
   shsz_balance: string;
@@ -126,7 +126,7 @@ export interface MarketLimitUpLadderSector {
 }
 
 export interface MarketLimitUpLadder {
-  source: "开盘红";
+  source: "开盘红" | "fuyao";
   date: string;
   fetched_at: string;
   total: number;
@@ -156,7 +156,7 @@ export interface MarketLimitHistoryItem {
 }
 
 export interface MarketLimitHistory {
-  source: "开盘红";
+  source: "开盘红" | "fuyao";
   date: string;
   category: MarketLimitHistoryCategory;
   fetched_at: string;

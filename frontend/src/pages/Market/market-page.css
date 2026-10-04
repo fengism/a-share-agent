@@ -54,3 +54,47 @@
   background: var(--c-primary) !important;
   box-shadow: none !important;
 }
+
+/* ── 大盘核心指数卡片响应式适配 ── */
+.market-index-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.market-index-card .ant-card-body {
+  padding: 16px;
+}
+
+.market-index-card .ant-statistic {
+  overflow: hidden;
+}
+
+.market-index-card .ant-statistic-content {
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.market-index-card .ant-statistic-content-value {
+  font-size: clamp(16px, 4.2vw, 26px) !important;
+  line-height: 1.2;
+  font-weight: 700;
+  font-family: var(--c-font-mono);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+@media (max-width: 576px) {
+  .market-index-card .ant-card-body {
+    padding: 10px 10px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .market-page .stock-chart-hint {
+    display: none;
+  }
+}
+

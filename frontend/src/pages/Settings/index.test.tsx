@@ -42,7 +42,20 @@ vi.mock("./ConfigCards", () => ({
       保存 Bot 配置
     </button>
   ),
-  DataSourceCookiesCard: () => null,
+  DataSourceCredentialsCard: ({ form, onChange, onSave }: {
+    form: ConfigUpdate;
+    onChange: (patch: ConfigUpdate) => void;
+    onSave: () => void;
+  }) => (
+    <div>
+      <input
+        aria-label="fuyao API Key"
+        value={form.fuyao_api_key || ""}
+        onChange={(event) => onChange({ fuyao_api_key: event.target.value })}
+      />
+      <button type="button" onClick={onSave}>保存 fuyao API Key</button>
+    </div>
+  ),
   ResearchBudgetCard: () => null,
   FeishuConfigCard: () => null,
   FredConfigCard: ({ form, onChange, onSave }: {
@@ -103,11 +116,11 @@ const config: ConfigData = {
   disabled_chat_agents: [],
   provider_defaults: {},
   twitter_feeds: [],
-  eastmoney_cookie: "",
+  
   fred_api_key: "fred-***-key",
   anysearch_api_key: "keys***alue",
-  baidu_cookie: "",
   ths_cookie: "",
+  fuyao_api_key: "fuyao-***-key",
   http_trust_env: false,
   analysis_llm_timeout_seconds: 1200,
   agent_research_timeout_seconds: 1200,
@@ -132,6 +145,7 @@ const config: ConfigData = {
   market_daily_bar_refresh_retry_base_seconds: 60,
   market_daily_observation_retention_days: 1095,
   market_daily_attempt_retention_days: 1095,
+  database_backup_retention_count: 2,
   bot_enabled: true,
   bot_command_prefix: "/",
   bot_service_user_id: 7,

@@ -1,6 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import HKMarket from ".";
+
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="location">{location.pathname}{location.search}</span>;
+}
 
 const mocks = vi.hoisted(() => ({
   useHKIndices: vi.fn(),
@@ -94,18 +100,42 @@ describe("HKMarket", () => {
     });
   });
 
-  it("renders indices and selects a stock for history", () => {
-    render(<HKMarket />);
+  it("renders indices and navigates to stock profile on click", () => {
+    render(
+      <MemoryRouter initialEntries={["/market?market=hk"]}>
+        <Routes>
+          <Route path="/market" element={<HKMarket />} />
+          <Route path="/stock/:code" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText("港股行情")).toBeInTheDocument();
     expect(screen.getByText("恒生科技指数")).toBeInTheDocument();
     fireEvent.click(screen.getByText("腾讯控股"));
 
+    expect(screen.getByTestId("location")).toHaveTextContent("/stock/00700");
+  });
+
+  it("renders defaultStockCode and fetches stock history", () => {
+    render(
+      <MemoryRouter>
+        <HKMarket defaultStockCode="00700" />
+      </MemoryRouter>,
+    );
+
     expect(mocks.useHKStockHistory).toHaveBeenLastCalledWith("00700", "daily", "qfq");
   });
 
-  it("debounces indexed search and opens the selected stock history", async () => {
-    render(<HKMarket />);
+  it("debounces indexed search and navigates to stock profile on select", async () => {
+    render(
+      <MemoryRouter initialEntries={["/market?market=hk"]}>
+        <Routes>
+          <Route path="/market" element={<HKMarket />} />
+          <Route path="/stock/:code" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
 
     expect(mocks.useHKStocks).toHaveBeenLastCalledWith("", 1, 50);
     fireEvent.change(screen.getByRole("combobox", { name: "搜索港股" }), {
@@ -115,12 +145,15 @@ describe("HKMarket", () => {
     await waitFor(() => expect(mocks.useHKStockSearch).toHaveBeenLastCalledWith("腾讯"));
     fireEvent.click(await screen.findByText("TENCENT"));
 
-    expect(mocks.useHKStockSearch).toHaveBeenLastCalledWith("");
-    expect(mocks.useHKStockHistory).toHaveBeenLastCalledWith("00700", "daily", "qfq");
+    expect(screen.getByTestId("location")).toHaveTextContent("/stock/00700");
   });
 
   it("selects up to five stocks and renders the comparison table", () => {
-    render(<HKMarket />);
+    render(
+      <MemoryRouter>
+        <HKMarket />
+      </MemoryRouter>,
+    );
 
     fireEvent.click(screen.getByRole("checkbox", { name: "选择腾讯控股" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "选择阿里巴巴-W" }));
@@ -137,7 +170,11 @@ describe("HKMarket", () => {
   });
 
   it("limits comparison selection to five stocks", () => {
-    render(<HKMarket />);
+    render(
+      <MemoryRouter>
+        <HKMarket />
+      </MemoryRouter>,
+    );
 
     ["腾讯控股", "阿里巴巴-W", "汇丰控股", "中国移动", "友邦保险"].forEach((name) => {
       fireEvent.click(screen.getByRole("checkbox", { name: `选择${name}` }));
@@ -148,7 +185,11 @@ describe("HKMarket", () => {
   });
 
   it("adds every selected Hong Kong stock to the shared watchlist", async () => {
-    render(<HKMarket />);
+    render(
+      <MemoryRouter>
+        <HKMarket />
+      </MemoryRouter>,
+    );
 
     fireEvent.click(screen.getByRole("checkbox", { name: "选择腾讯控股" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "选择阿里巴巴-W" }));

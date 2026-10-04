@@ -145,7 +145,9 @@ async def refresh_twitter_feed_periodic() -> None:
 def _check_twitter_database() -> None:
     from app.infrastructure.persistence.connection import get_connection
 
-    get_connection().execute("SELECT 1")
+    cursor = get_connection().execute("SELECT 1")
+    cursor.fetchone()
+    cursor.close()
 
 
 async def twitter_health_check() -> bool:
@@ -191,3 +193,4 @@ async def refresh_potential_stocks_daily() -> None:
         interval_seconds=1800,
         leader_election=True,
     )
+

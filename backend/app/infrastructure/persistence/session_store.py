@@ -8,7 +8,7 @@ from app.core.security import (
     session_expiry,
 )
 from app.domain.identity import UserRecord
-from app.infrastructure.persistence.connection import get_connection
+from app.infrastructure.persistence.connection import get_connection, unit_of_work
 from app.infrastructure.persistence.retention import PurgeResult, purge_rows_in_batches
 
 
@@ -18,12 +18,11 @@ def _connection():
 
 def create_session(user_id: int) -> str:
     token = generate_session_token()
-    connection = _connection()
-    connection.execute(
-        "INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
-        (hash_token(token), user_id, session_expiry()),
-    )
-    connection.commit()
+    with unit_of_work("user", immediate=True) as work:
+        work.connection.execute(
+            "INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
+            (hash_token(token), user_id, session_expiry()),
+        )
     return token
 
 
@@ -49,11 +48,11 @@ def resolve_and_renew_session_with_status(token: str) -> tuple[UserRecord | None
         return None, False
     renewed = False
     if row["_session_expires"] <= session_expiry(SESSION_RENEW_THRESHOLD_DAYS):
-        connection.execute(
-            "UPDATE auth_sessions SET expires_at = ? WHERE token_hash = ?",
-            (session_expiry(), token_hash),
-        )
-        connection.commit()
+        with unit_of_work("user", immediate=True) as work:
+            work.connection.execute(
+                "UPDATE auth_sessions SET expires_at = ? WHERE token_hash = ?",
+                (session_expiry(), token_hash),
+            )
         renewed = True
     user = dict(row)
     user.pop("_session_expires", None)
@@ -66,9 +65,8 @@ def resolve_and_renew_session(token: str) -> UserRecord | None:
 
 
 def delete_session(token: str) -> None:
-    connection = _connection()
-    connection.execute("DELETE FROM auth_sessions WHERE token_hash = ?", (hash_token(token),))
-    connection.commit()
+    with unit_of_work("user", immediate=True) as work:
+        work.connection.execute("DELETE FROM auth_sessions WHERE token_hash = ?", (hash_token(token),))
 
 
 def purge_expired() -> dict[str, int]:

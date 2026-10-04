@@ -72,15 +72,15 @@ export default function SettingsPage() {
       iwencai_base_url: config.iwencai_base_url,
       iwencai_api_key: config.iwencai_api_key,
       twitter_feeds: config.twitter_feeds,
-      eastmoney_cookie: config.eastmoney_cookie,
       fred_api_key: config.fred_api_key,
       market_daily_bar_refresh_enabled: config.market_daily_bar_refresh_enabled,
       market_daily_bar_refresh_poll_seconds: config.market_daily_bar_refresh_poll_seconds,
       market_daily_bar_refresh_retry_base_seconds: config.market_daily_bar_refresh_retry_base_seconds,
       market_daily_observation_retention_days: config.market_daily_observation_retention_days,
       market_daily_attempt_retention_days: config.market_daily_attempt_retention_days,
+      database_backup_retention_count: config.database_backup_retention_count,
+      fuyao_api_key: config.fuyao_api_key,
       anysearch_api_key: "",
-      baidu_cookie: config.baidu_cookie,
       bot_enabled: config.bot_enabled,
       bot_command_prefix: config.bot_command_prefix,
       bot_service_user_id: config.bot_service_user_id,
@@ -234,20 +234,23 @@ export default function SettingsPage() {
     );
   }, [form.anysearch_api_key, saveConfig, updateForm]);
 
-  const handleSaveDataSourceCookies = useCallback(() => {
-    const patch: ConfigUpdate = {};
-    if (form.eastmoney_cookie && !form.eastmoney_cookie.endsWith("***")) {
-      patch.eastmoney_cookie = form.eastmoney_cookie;
-    }
-    if (form.baidu_cookie && !form.baidu_cookie.endsWith("***")) {
-      patch.baidu_cookie = form.baidu_cookie;
-    }
-    if (Object.keys(patch).length === 0) {
+  const handleSaveDataSourceCredentials = useCallback(() => {
+    const value = (form.fuyao_api_key ?? "").trim();
+    if (!value || value.includes("***") || value === (config?.fuyao_api_key ?? "")) {
       message.info("没有需要保存的变更");
       return;
     }
-    saveConfig(patch, "数据源 Cookie 配置已保存");
-  }, [form.baidu_cookie, form.eastmoney_cookie, saveConfig]);
+    saveConfig({ fuyao_api_key: value }, "fuyao API Key 已保存", () =>
+      updateForm({ fuyao_api_key: "" }),
+    );
+  }, [config?.fuyao_api_key, form.fuyao_api_key, saveConfig, updateForm]);
+
+  const handleSaveBackupRetention = useCallback(() => {
+    saveConfig(
+      { database_backup_retention_count: form.database_backup_retention_count },
+      "数据库备份保留份数已保存",
+    );
+  }, [form.database_backup_retention_count, saveConfig]);
 
   const handleSaveResearchBudget = useCallback(() => {
     const patch: ConfigUpdate = {
@@ -420,7 +423,8 @@ export default function SettingsPage() {
                     onSaveFred={handleSaveFred}
                     anySearchConfigured={Boolean(config.anysearch_api_key)}
                     onSaveAnySearch={handleSaveAnySearch}
-                    onSaveDataSourceCookies={handleSaveDataSourceCookies}
+                    fuyaoConfigured={Boolean(config.fuyao_api_key)}
+                    onSaveDataSourceCredentials={handleSaveDataSourceCredentials}
                   />
                 </Suspense>
               ),
@@ -439,6 +443,7 @@ export default function SettingsPage() {
                     onSaveBot={handleSaveBot}
                     onSaveResearchBudget={handleSaveResearchBudget}
                     onSaveMarketDailyBars={handleSaveMarketDailyBars}
+                    onSaveBackupRetention={handleSaveBackupRetention}
                   />
                 </Suspense>
               ),

@@ -26,4 +26,17 @@ describe("StockWorkspaceNav", () => {
     expect(screen.getByRole("link", { name: "AI 分析" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "个股资料" })).not.toHaveAttribute("aria-current");
   });
+
+  it("renders stock profile and watchlist links for HK stock without H market link", () => {
+    render(
+      <MemoryRouter initialEntries={["/stock/00700"]}>
+        <StockWorkspaceNav code="00700" market="hk" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "个股资料" })).toHaveAttribute("href", "/stock/00700");
+    expect(screen.getByRole("link", { name: "个股资料" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "我的自选" })).toHaveAttribute("href", "/watchlist");
+    expect(screen.queryByRole("link", { name: "H股市场" })).not.toBeInTheDocument();
+  });
 });

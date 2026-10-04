@@ -3,6 +3,8 @@ export const QUERY_CACHE_POLICIES = {
   marketRealtime: { staleMs: 60_000, pollMs: 60_000 },
   marketMinute: { staleMs: 5 * 60_000, pollMs: 5 * 60_000 },
   marketTenMinutes: { staleMs: 10 * 60_000 },
+  // 合成概念指数：后端按 concept+days 缓存 6 小时，翻区间不必反复请求
+  conceptIndex: { staleMs: 30 * 60_000 },
   marketThirtyMinutes: { staleMs: 30 * 60_000 },
   marketDaily: { staleMs: 24 * 60 * 60_000 },
   macro: { staleMs: 60 * 60_000 },

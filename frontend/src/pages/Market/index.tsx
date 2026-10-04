@@ -73,7 +73,7 @@ export default function Market() {
     allowedValues: [...TOP_MARKET_TABS, "h"],
   });
   const activeMarket: TopMarketTabKey = rawMarket === "h" ? "hk" : (rawMarket as TopMarketTabKey);
-  const [activeStockCode, setActiveStockCode] = useUrlSearchParam("code", "");
+  const [activeStockCode] = useUrlSearchParam("code", "");
 
   const isTradingDay = useIsTradingDay();
   const [activeTab, setActiveTab] = useUrlSearchParam("tab", "a-index", { allowedValues: MARKET_TABS });
@@ -123,7 +123,6 @@ export default function Market() {
           <HKMarketTab
             embedded
             defaultStockCode={activeStockCode || undefined}
-            onStockSelect={(code) => setActiveStockCode(code ?? "")}
           />
         </Suspense>
       ),

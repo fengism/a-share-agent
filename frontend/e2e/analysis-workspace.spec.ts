@@ -446,7 +446,16 @@ for (const width of [1920, 390]) {
     await toggle.click();
     await expect(toggle).toBeChecked();
     await page.getByText("周K", { exact: true }).click();
-    await expect.poll(() => requests.filter((url) => url.includes("/kline?") && url.includes("period=weekly")).length).toBe(1);
+    // 切换周期后周 K 请求次数必须稳定下来，而不是持续增长。
+    // 不能断言“恰好 1 次”：CI 的 E2E 跑 dev server，React StrictMode 会双调用 effect，
+    // 且首屏可能在 StrictMode 卸载重挂前已发过一次。这里真正要防的是
+    // “向左回溯历史”与左缘回调形成的无界循环（曾观测到同一周期被打 10 次）。
+    const weeklyRequestCount = () =>
+      requests.filter((url) => url.includes("/kline?") && url.includes("period=weekly")).length;
+    await expect.poll(weeklyRequestCount, { timeout: 10_000 }).toBeGreaterThan(0);
+    const settled = await weeklyRequestCount();
+    await page.waitForTimeout(1_500);
+    expect(weeklyRequestCount()).toBe(settled);
     await expect(page.locator("#stock-charts canvas").first()).toBeAttached();
     const chartLayout = await page.locator("#stock-charts").evaluate((element) => {
       const toolbar = element.querySelector(".stock-chart-toolbar")!.getBoundingClientRect();

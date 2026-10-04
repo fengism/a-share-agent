@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BarChartOutlined,
   CompassOutlined,
   FullscreenOutlined,
+  FundProjectionScreenOutlined,
   GlobalOutlined,
   LineChartOutlined,
   PlusOutlined,
+  ReloadOutlined,
   StarFilled,
 } from "@ant-design/icons";
 import {
@@ -15,21 +17,25 @@ import {
   Modal,
   Segmented,
   Space,
+  Switch,
   Tag,
   Typography,
 } from "antd";
-import { useNavigate } from "react-router-dom";
 import { useHKStockHistory, useHKStockQuote } from "../../api/queryHooks/hk";
+import { useStockIntraday } from "../../api/queryHooks/stock";
 import {
   useAddWatchlistItem,
   useDeleteWatchlistItem,
   useWatchlist,
 } from "../../api/queryHooks/watchlist";
+import IndicatorSubCharts from "../../charts/IndicatorSubCharts";
+import IntradayChart from "../../charts/IntradayChart";
 import LazyKlineChart from "../../charts/LazyKlineChart";
 import SectionDataState from "../../components/SectionDataState";
 import StockWorkspaceNav from "../../features/stock-navigation/StockWorkspaceNav";
 import { useColors, useStyles } from "../../styles/ui";
 import type { KlineItem } from "../../types/stock";
+import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
 import StockSectionTitle from "./StockSectionTitle";
 
 const { Title, Text } = Typography;
@@ -50,18 +56,37 @@ function formatAmount(value: number | null | undefined) {
   return formatNumber(value, 0);
 }
 
+type HKChartView = "intraday" | "kline" | "macd" | "rsi" | "kdj";
+
 export default function HKStockPageContent({ code }: { code: string }) {
-  const navigate = useNavigate();
   const colors = useColors();
   const { pageContainerStyle, cardStyle } = useStyles();
   const [messageApi, contextHolder] = message.useMessage();
 
+  const [activeView, setActiveView] = useState<HKChartView>("intraday");
+  const [showAvgLine, setShowAvgLine] = useState(true);
+  const [showPrevClose, setShowPrevClose] = useState(true);
   const [period, setPeriod] = useState<string>("daily");
   const [adjust, setAdjust] = useState<string>("qfq");
   const [expanded, setExpanded] = useState<boolean>(false);
+  const [historyYears, setHistoryYears] = useState(1);
+
+  const startDate = useMemo(() => yearsAgoDate(historyYears), [historyYears]);
+  const historyLimitReached = historyYears >= MAX_KLINE_HISTORY_YEARS;
+
+  useEffect(() => {
+    setHistoryYears(1);
+  }, [code, period]);
+
+  const handleReachLeftEdge = useCallback(() => {
+    setHistoryYears((years) => Math.min(years + 1, MAX_KLINE_HISTORY_YEARS));
+  }, []);
 
   const quoteQuery = useHKStockQuote(code);
-  const historyQuery = useHKStockHistory(code, period, adjust);
+  const historyQuery = useHKStockHistory(code, period, adjust, startDate);
+  const intradayQuery = useStockIntraday(code);
+  const intradayItems = intradayQuery.data?.items ?? [];
+  const latestIntradayTime = intradayItems.length > 0 ? intradayItems[intradayItems.length - 1].time : null;
   const watchlistQuery = useWatchlist();
   const addWatchlistItem = useAddWatchlistItem();
   const deleteWatchlistItem = useDeleteWatchlistItem();
@@ -199,14 +224,6 @@ export default function HKStockPageContent({ code }: { code: string }) {
                 >
                   {isWatched ? "已自选" : "加入自选"}
                 </Button>
-                <Button
-                  type="primary"
-                  icon={<LineChartOutlined />}
-                  aria-label="查看H股大盘市场"
-                  onClick={() => navigate("/market?market=hk")}
-                >
-                  进入 H股市场
-                </Button>
               </div>
             </div>
           </Card>
@@ -283,38 +300,73 @@ export default function HKStockPageContent({ code }: { code: string }) {
         </Card>
       </section>
 
-      {/* ── 走势与历史行情 K线图 ── */}
+      {/* ── 走势与历史行情 分时/K线/指标图 ── */}
       <Card
         className="stock-section-card"
         title={
           <StockSectionTitle
-            icon={<LineChartOutlined />}
-            title="走势与历史行情"
-            description={`${quote?.name || code} 多周期K线与技术走势`}
+            icon={
+              activeView === "intraday"
+                ? <BarChartOutlined />
+                : activeView === "kline"
+                ? <LineChartOutlined />
+                : <FundProjectionScreenOutlined />
+            }
+            title={
+              activeView === "intraday"
+                ? "分时走势"
+                : activeView === "kline"
+                ? "走势与历史行情"
+                : `${activeView.toUpperCase()} 技术指标`
+            }
+            description={`${quote?.name || code} ${
+              activeView === "intraday"
+                ? "当日分时与成交走势"
+                : activeView === "kline"
+                ? "多周期K线与技术走势"
+                : `${activeView.toUpperCase()} 动量与趋势分析`
+            }`}
           />
         }
         extra={
           <Space wrap>
             <Segmented
-              aria-label="K线周期"
+              aria-label="走势类型"
               options={[
-                { label: "日K", value: "daily" },
-                { label: "周K", value: "weekly" },
-                { label: "月K", value: "monthly" },
+                { label: "分时", value: "intraday" },
+                { label: "K线", value: "kline" },
+                { label: "MACD", value: "macd" },
+                { label: "RSI", value: "rsi" },
+                { label: "KDJ", value: "kdj" },
               ]}
-              value={period}
-              onChange={(val) => setPeriod(String(val))}
+              value={activeView}
+              onChange={(val) => setActiveView(val as HKChartView)}
             />
-            <Segmented
-              aria-label="复权方式"
-              options={[
-                { label: "前复权", value: "qfq" },
-                { label: "后复权", value: "hfq" },
-                { label: "不复权", value: "none" },
-              ]}
-              value={adjust}
-              onChange={(val) => setAdjust(String(val))}
-            />
+            {activeView === "kline" && (
+              <>
+                <Segmented
+                  aria-label="K线周期"
+                  options={[
+                    { label: "日K", value: "daily" },
+                    { label: "周K", value: "weekly" },
+                    { label: "月K", value: "monthly" },
+                    { label: "年K", value: "annual" },
+                  ]}
+                  value={period}
+                  onChange={(val) => setPeriod(String(val))}
+                />
+                <Segmented
+                  aria-label="复权方式"
+                  options={[
+                    { label: "前复权", value: "qfq" },
+                    { label: "后复权", value: "hfq" },
+                    { label: "不复权", value: "none" },
+                  ]}
+                  value={adjust}
+                  onChange={(val) => setAdjust(String(val))}
+                />
+              </>
+            )}
             <Button
               type="text"
               size="small"
@@ -326,23 +378,94 @@ export default function HKStockPageContent({ code }: { code: string }) {
         }
         style={cardStyle}
       >
-        <SectionDataState
-          isLoading={historyQuery.isLoading}
-          error={historyQuery.error}
-          onRetry={() => historyQuery.refetch()}
-          isEmpty={!chartData.length}
-          emptyText="暂无港股历史行情数据"
-          minHeight={420}
-        >
-          <LazyKlineChart
-            data={chartData}
-            height={440}
-            viewKey={`hk-stock-page-${code}-${period}-${adjust}`}
-          />
-        </SectionDataState>
+        {activeView === "intraday" ? (
+          <>
+            <div className="stock-chart-toolbar" style={{ justifyContent: "space-between", marginBottom: 12, display: "flex", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "12px", color: "var(--c-text-secondary)" }}>
+                {latestIntradayTime && (
+                  <span>
+                    数据时间: <strong style={{ color: "var(--c-text-primary)", fontFamily: "var(--c-font-mono)" }}>{latestIntradayTime}</strong>
+                  </span>
+                )}
+                {intradayQuery.isFetching && <span style={{ color: "var(--c-primary)" }}>刷新中...</span>}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <label style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "12px" }}>
+                  均价线
+                  <Switch aria-label="均价线" size="small" checked={showAvgLine} onChange={setShowAvgLine} />
+                </label>
+                <label style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "12px" }}>
+                  昨收线
+                  <Switch aria-label="昨收线" size="small" checked={showPrevClose} onChange={setShowPrevClose} />
+                </label>
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<ReloadOutlined spin={intradayQuery.isFetching} />}
+                  onClick={() => intradayQuery.refetch()}
+                  title="刷新分时数据"
+                  style={{ color: "var(--c-text-secondary)" }}
+                >
+                  刷新
+                </Button>
+              </div>
+            </div>
+            <SectionDataState
+              isLoading={intradayQuery.isLoading}
+              error={intradayQuery.error}
+              onRetry={() => intradayQuery.refetch()}
+              isEmpty={!intradayItems.length}
+              emptyText="暂无港股分时行情数据"
+              minHeight={420}
+            >
+              <IntradayChart
+                data={intradayItems}
+                prevClose={intradayQuery.data?.prev_close}
+                height={440}
+                viewKey={`hk-intraday-${code}`}
+                showAvgLine={showAvgLine}
+                showPrevCloseLine={showPrevClose}
+                market="hk"
+              />
+            </SectionDataState>
+          </>
+        ) : activeView === "kline" ? (
+          <SectionDataState
+            isLoading={historyQuery.isLoading}
+            error={historyQuery.error}
+            onRetry={() => historyQuery.refetch()}
+            isEmpty={!chartData.length}
+            emptyText="暂无港股历史行情数据"
+            minHeight={420}
+          >
+            <LazyKlineChart
+              data={chartData}
+              height={440}
+              viewKey={`hk-stock-page-${code}-${period}-${adjust}`}
+              onReachLeftEdge={handleReachLeftEdge}
+              historyLimitReached={historyLimitReached}
+            />
+          </SectionDataState>
+        ) : (
+          <div className="stock-macd-panel" style={{ minHeight: 436 }}>
+            <IndicatorSubCharts
+              code={code}
+              types={["macd", "rsi", "kdj"]}
+              activeType={activeView}
+              onTypeChange={(type) => setActiveView(type as HKChartView)}
+              period={period}
+              onPeriodChange={setPeriod}
+              startDate={startDate}
+              historyYears={historyYears}
+              onReachLeftEdge={handleReachLeftEdge}
+              historyLimitReached={historyLimitReached}
+              height={340}
+            />
+          </div>
+        )}
       </Card>
 
-      {/* ── 全屏K线模态框 ── */}
+      {/* ── 全屏模态框 ── */}
       <Modal
         open={expanded}
         onCancel={() => setExpanded(false)}
@@ -350,14 +473,50 @@ export default function HKStockPageContent({ code }: { code: string }) {
         width="94vw"
         style={{ top: 20 }}
         destroyOnHidden
-        title={`${quote?.name || code}（${code}）· ${period === "daily" ? "日K" : period === "weekly" ? "周K" : "月K"}线全屏`}
+        title={`${quote?.name || code}（${code}）· ${
+          activeView === "intraday"
+            ? "分时图全屏"
+            : activeView === "kline"
+            ? (period === "daily" ? "日K" : period === "weekly" ? "周K" : period === "monthly" ? "月K" : "年K") + "线全屏"
+            : `${activeView.toUpperCase()} 技术副图全屏`
+        }`}
       >
         <div style={{ height: "80vh", minHeight: 480 }}>
-          <LazyKlineChart
-            data={chartData}
-            height={window.innerHeight * 0.76}
-            viewKey={`hk-stock-modal-${code}-${period}-${adjust}`}
-          />
+          {activeView === "intraday" ? (
+            <IntradayChart
+              data={intradayItems}
+              prevClose={intradayQuery.data?.prev_close}
+              height={window.innerHeight * 0.76}
+              viewKey={`hk-intraday-modal-${code}`}
+              showAvgLine={showAvgLine}
+              showPrevCloseLine={showPrevClose}
+              market="hk"
+            />
+          ) : activeView === "kline" ? (
+            <LazyKlineChart
+              data={chartData}
+              height={window.innerHeight * 0.76}
+              viewKey={`hk-stock-modal-${code}-${period}-${adjust}`}
+              onReachLeftEdge={handleReachLeftEdge}
+              historyLimitReached={historyLimitReached}
+            />
+          ) : (
+            <div className="stock-macd-panel" style={{ minHeight: 600 }}>
+              <IndicatorSubCharts
+                code={code}
+                types={["macd", "rsi", "kdj"]}
+                activeType={activeView}
+                onTypeChange={(type) => setActiveView(type as HKChartView)}
+                period={period}
+                onPeriodChange={setPeriod}
+                startDate={startDate}
+                historyYears={historyYears}
+                onReachLeftEdge={handleReachLeftEdge}
+                historyLimitReached={historyLimitReached}
+                height={580}
+              />
+            </div>
+          )}
         </div>
       </Modal>
     </main>

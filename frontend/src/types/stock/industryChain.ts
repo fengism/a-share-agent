@@ -301,6 +301,8 @@ export interface IndustryChainHistoryItem {
 export interface AtlasCompany {
   name: string;
   code: string;
+  /** 市场标识；缺省时前端按代码长度兜底推断（5 位视为港股） */
+  market?: "cn" | "hk";
   note?: string;
 }
 
@@ -326,6 +328,8 @@ export interface AtlasChain {
   tags?: string[];
   drivers?: string[];
   layers: AtlasLayer[];
+  mined_at?: string;
+  archive_id?: string;
 }
 
 export interface AtlasChainSummary {
@@ -338,6 +342,8 @@ export interface AtlasChainSummary {
   tags?: string[];
   segment_count: number;
   company_count: number;
+  mined_at?: string;
+  archive_id?: string;
 }
 
 export interface AtlasCatalog {
@@ -346,3 +352,71 @@ export interface AtlasCatalog {
   total_chains: number;
   total_companies: number;
 }
+
+export interface AtlasGraphNode {
+  id: string;
+  name: string;
+  chains: string[];
+  layer: string;
+  segments: string[];
+  chain_count: number;
+}
+
+export interface AtlasGraphEdge {
+  source: string;
+  target: string;
+  chain_slug: string;
+  chain_name: string;
+  relation: string;
+}
+
+export interface AtlasGraphSummary {
+  total_nodes: number;
+  total_edges: number;
+  total_chains: number;
+  categories: string[];
+}
+
+export interface AtlasHubCompany {
+  id: string;
+  name: string;
+  chain_count: number;
+  chains: string[];
+  chain_names: string[];
+  layer: string;
+  segments: string[];
+}
+
+export interface AtlasChainSynergy {
+  source_slug: string;
+  source_name: string;
+  target_slug: string;
+  target_name: string;
+  shared_companies_count: number;
+  shared_companies: string[];
+}
+
+export interface AtlasGraph {
+  nodes: AtlasGraphNode[];
+  edges: AtlasGraphEdge[];
+  summary: AtlasGraphSummary;
+  chain_index: Record<string, string>;
+  hub_companies?: AtlasHubCompany[];
+  chain_synergies?: AtlasChainSynergy[];
+}
+
+export interface AtlasBatchMineItem {
+  name: string;
+  slug: string;
+  action: "created" | "merged";
+  company_count: number;
+  segment_count: number;
+}
+
+export interface AtlasBatchMineResponse {
+  scanned: number;
+  succeeded: number;
+  skipped: number;
+  chains: AtlasBatchMineItem[];
+}
+

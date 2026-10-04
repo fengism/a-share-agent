@@ -3,6 +3,7 @@ export interface StockSearchItem {
   name: string;
   price: number | null;
   change_pct: number | null;
+  market?: "cn" | "hk";
 }
 
 export interface StockConcept {

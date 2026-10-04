@@ -15,6 +15,11 @@ describe("stock search helpers", () => {
     expect(resolveStockSearchCode(" 600519 ", "", [])).toBe("600519");
   });
 
+  it("uses a 5-digit HK code or HK prefix code without waiting for results", () => {
+    expect(resolveStockSearchCode(" 00700 ", "", [])).toBe("00700");
+    expect(resolveStockSearchCode("HK00700", "", [])).toBe("00700");
+  });
+
   it("rejects results belonging to an older query", () => {
     expect(resolveStockSearchCode("宁德时代", "贵州茅台", [{ code: "600519" }])).toBeNull();
   });

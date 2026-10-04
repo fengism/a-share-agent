@@ -2,16 +2,20 @@ import IndustryClaimStatus from "./IndustryClaimStatus";
 import {
   AimOutlined,
   BankOutlined,
+  DownOutlined,
   RiseOutlined,
+  UpOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
-import { Tag, Typography } from "antd";
+import { Button, Tag, Typography } from "antd";
+import { useState } from "react";
 import type {
   IndustryChainEvidence,
   IndustryChainInsight,
   IndustryChainResult,
 } from "../../types/stock";
 import EvidenceLinkedText from "./EvidenceLinkedText";
+import MarkdownReport from "./MarkdownReport";
 
 const { Text } = Typography;
 
@@ -95,6 +99,9 @@ export default function IndustryConclusion({ result }: { result: IndustryChainRe
     + Math.min(risks.length, 3)
     + companies.length;
 
+  const isLongSummary = (result.summary?.length ?? 0) > 400 || (result.summary?.split("\n").length ?? 0) > 6;
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
     <section
       id="industry-judgment"
@@ -112,7 +119,24 @@ export default function IndustryConclusion({ result }: { result: IndustryChainRe
 
       <div className="industry-conclusion__summary">
         <div className="industry-conclusion__label"><AimOutlined />核心判断</div>
-        <p><EvidenceLinkedText text={result.summary || "当前证据不足，暂未形成可靠的产业判断。"} evidenceCatalog={evidenceCatalog} /></p>
+        <div className={`industry-conclusion__summary-content ${isLongSummary && !isExpanded ? "is-collapsed" : "is-expanded"}`}>
+          <MarkdownReport
+            content={result.summary || "当前证据不足，暂未形成可靠的产业判断。"}
+            evidenceCatalog={evidenceCatalog}
+          />
+        </div>
+        {isLongSummary && (
+          <div className="industry-conclusion__summary-toggle">
+            <Button
+              type="link"
+              size="small"
+              icon={isExpanded ? <UpOutlined /> : <DownOutlined />}
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? "收起研判正文" : "展开完整研判正文"}
+            </Button>
+          </div>
+        )}
         {result.positioning && (
           <div className="industry-conclusion__positioning">
             <Text type="secondary">产业定位</Text>

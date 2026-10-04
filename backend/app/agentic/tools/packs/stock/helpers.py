@@ -55,15 +55,16 @@ async def get_stock_valuation_detail(code: str) -> Any:
     return await get_application_tool_handlers().get_stock_valuation_detail(code)
 
 
-async def get_stock_technical_indicators(code: str) -> Any:
+async def get_stock_technical_indicators(code: str, period: str = "daily") -> Any:
     """计算股票技术指标。
 
     Param:
         code: 6位股票代码
+        period: K线周期，daily/weekly/monthly/annual，默认 daily
     Return:
         技术指标字典（不含 series）
     """
-    return await get_application_tool_handlers().get_stock_technical_indicators(code)
+    return await get_application_tool_handlers().get_stock_technical_indicators(code, period=period)
 
 
 async def get_stock_kline(code: str, period: str = "daily") -> Any:

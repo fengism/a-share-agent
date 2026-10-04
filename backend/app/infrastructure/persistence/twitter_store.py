@@ -52,12 +52,11 @@ def save_twitter_posts(posts: list[dict]) -> None:
     Return:
         无。
     """
-    connection = get_connection()
     rows = _post_rows(posts)
     if not rows:
         return
-    _upsert_twitter_posts(connection, rows)
-    connection.commit()
+    with unit_of_work("market", immediate=True) as work:
+        _upsert_twitter_posts(work.connection, rows)
     logger.info(f"写入 Twitter 数据: rows={len(rows)}, authors={set(p.get('author', '') for p in posts)}")
 
 
@@ -228,3 +227,4 @@ def get_stale_authors(authors: list[str], *, now: float | None = None) -> list[s
     fresh = {row["author"] for row in cursor.fetchall()}
     stale = [author for author in normalized_authors if author not in fresh]
     return stale
+

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import IndicatorSubCharts from "./IndicatorSubCharts";
 
@@ -25,6 +25,8 @@ const mocks = vi.hoisted(() => {
     applyOptions: vi.fn(),
     priceScale: vi.fn(() => priceScales.right),
     timeScale: vi.fn(() => timeScale),
+    subscribeCrosshairMove: vi.fn(),
+    unsubscribeCrosshairMove: vi.fn(),
     removeSeries: vi.fn(),
     remove: vi.fn(),
   };
@@ -131,5 +133,40 @@ describe("IndicatorSubCharts", () => {
 
     expect(screen.getByText("K")).toBeInTheDocument();
     expect(screen.getByText("D")).toBeInTheDocument();
+  });
+
+  it("enables pressedMouseMove drag panning and updates indicator values on crosshair move", () => {
+    render(
+      <IndicatorSubCharts
+        code="600519"
+        types={["macd"]}
+      />,
+    );
+
+    expect(mocks.createChart).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({
+        handleScroll: expect.objectContaining({ pressedMouseMove: true }),
+      }),
+    );
+
+    // Initial state shows latest values from mockIndicatorsData (index 2: 2026-09-12)
+    expect(screen.getByText("2026-09-12")).toBeInTheDocument();
+    expect(screen.getByText("0.70")).toBeInTheDocument(); // DIF
+    expect(screen.getByText("0.50")).toBeInTheDocument(); // DEA
+    expect(screen.getByText("+0.20")).toBeInTheDocument(); // MACD column
+
+    // Crosshair hover on 2026-09-10 (index 0)
+    const crosshairHandler = mocks.chart.subscribeCrosshairMove.mock.calls[0]?.[0];
+    act(() => {
+      crosshairHandler?.({
+        time: { year: 2026, month: 9, day: 10 },
+      });
+    });
+
+    expect(screen.getByText("2026-09-10")).toBeInTheDocument();
+    expect(screen.getByText("0.50")).toBeInTheDocument(); // DIF
+    expect(screen.getByText("0.40")).toBeInTheDocument(); // DEA
+    expect(screen.getByText("+0.10")).toBeInTheDocument(); // MACD column
   });
 });

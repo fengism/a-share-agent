@@ -390,7 +390,7 @@ export default function IndustryReport({
             {result.charts.map((chart, index) => {
               const chartHeight = chart.type === "tree"
                 ? "clamp(400px, 55vh, 900px)"
-                : "clamp(300px, 40vh, 550px)";
+                : "clamp(450px, 60vh, 750px)";
               const hasValidOption = Boolean(chart.option && typeof chart.option === "object");
               return (
                 <div key={index} style={{ ...cardStyle, padding: "16px 20px", marginBottom: 16 }}>
@@ -454,7 +454,7 @@ export default function IndustryReport({
             items={[{
               key: "full-report",
               label: <span><FileTextOutlined />04 · 完整研究正文</span>,
-              children: <MarkdownReport content={result.llm_review} />,
+              children: <MarkdownReport content={result.llm_review} evidenceCatalog={result.evidence_catalog} />,
             }]}
           />
         </div>

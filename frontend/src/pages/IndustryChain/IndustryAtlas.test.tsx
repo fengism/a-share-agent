@@ -54,11 +54,30 @@ const fixtures = vi.hoisted(() => {
 
 vi.mock("@ant-design/icons", () => ({
   ApartmentOutlined: () => <span />,
+  AppstoreOutlined: () => <span />,
   ArrowLeftOutlined: () => <span />,
+  BarsOutlined: () => <span />,
+  CameraOutlined: () => <span />,
+  CloudDownloadOutlined: () => <span />,
   DeleteOutlined: () => <span />,
   ExperimentOutlined: () => <span />,
+  FileTextOutlined: () => <span />,
+  FireOutlined: () => <span />,
   ImportOutlined: () => <span />,
+  InfoCircleOutlined: () => <span />,
+  NodeIndexOutlined: () => <span />,
+  RobotOutlined: () => <span />,
   SearchOutlined: () => <span />,
+  ShareAltOutlined: () => <span />,
+  TrophyOutlined: () => <span />,
+}));
+
+vi.mock("echarts-for-react/lib/core", () => ({
+  default: () => <div data-testid="echarts-graph-mock" />,
+}));
+
+vi.mock("../../charts/echarts-setup", () => ({
+  default: { use: vi.fn() },
 }));
 
 vi.mock("../../api/queryHooks/workflows", () => ({
@@ -69,8 +88,12 @@ vi.mock("../../api/queryHooks/workflows", () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  useIndustryChainAtlasGraph: () => ({ data: undefined, isLoading: false, isError: false }),
   useImportIndustryChainAtlas: () => ({ mutate: vi.fn(), isPending: false }),
+  useMineIndustryChainAtlas: () => ({ mutate: vi.fn(), isPending: false }),
+  useBatchMineIndustryChainAtlas: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteIndustryChainAtlasChain: () => ({ mutate: vi.fn(), isPending: false }),
+  downloadIndustryChainAtlasYaml: vi.fn(),
 }));
 
 vi.mock("../../store/authStore", () => ({

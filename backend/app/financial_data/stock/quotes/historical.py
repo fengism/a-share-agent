@@ -113,8 +113,12 @@ def historical_bar_hash(code: str, period: str, adjust: str, items: list[KlineIt
 
 
 def _resample_adjusted_daily_frame(frame: pd.DataFrame, period: str) -> pd.DataFrame:
-    """Aggregate adjusted daily bars without inventing non-trading period-end dates."""
-    frequency = {"weekly": "W-FRI", "monthly": "M"}.get(period)
+    """Aggregate adjusted daily bars without inventing non-trading period-end dates.
+
+    Supports both Chinese column names (个股 providers) and English column names
+    (index providers such as TDX / tencent / sina wrappers).
+    """
+    frequency = {"weekly": "W-FRI", "monthly": "M", "annual": "Y-DEC"}.get(period)
     if frequency is None:
         raise ValueError(f"不支持从日线聚合为 {period}")
 
@@ -298,7 +302,7 @@ def _historical_source_attempts(
             )
         )
     else:
-        period_label = "周" if period == "weekly" else "月"
+        period_label = {"weekly": "周", "monthly": "月", "annual": "年"}.get(period, period)
         attempts.append(
             ProviderAttempt(
                 label=f"TDX 日线聚合复权{period_label}K线",
@@ -474,7 +478,9 @@ async def get_historical_bars(
 ) -> HistoricalBarSet:
     """通过支持显式复权的 Provider Chain 加载历史行情。"""
     symbol = normalize_code(code).raw
-    if period not in {"daily", "weekly", "monthly"}:
+    if adjust == "none":
+        adjust = ""
+    if period not in {"daily", "weekly", "monthly", "annual"}:
         raise ValueError("不支持的 K 线周期")
     if adjust not in {"qfq", "hfq", ""}:
         raise ValueError("不支持的复权方式")

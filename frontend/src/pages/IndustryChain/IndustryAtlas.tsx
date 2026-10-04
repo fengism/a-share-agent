@@ -1,25 +1,66 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ApartmentOutlined,
+  AppstoreOutlined,
   ArrowLeftOutlined,
+  BarsOutlined,
+  CameraOutlined,
+  CloudDownloadOutlined,
   DeleteOutlined,
   ExperimentOutlined,
+  FileTextOutlined,
+  FireOutlined,
   ImportOutlined,
+  InfoCircleOutlined,
+  NodeIndexOutlined,
+  RobotOutlined,
   SearchOutlined,
+  ShareAltOutlined,
+  TrophyOutlined,
 } from "@ant-design/icons";
-import { Button, Empty, Input, Modal, Popconfirm, Spin, Switch, Tag, Upload, message } from "antd";
+import {
+  Button,
+  Card,
+  Col,
+  Empty,
+  Input,
+  Modal,
+  Popover,
+  Popconfirm,
+  Radio,
+  Row,
+  Segmented,
+  Select,
+  Spin,
+  Switch,
+  Table,
+  Tag,
+  Upload,
+  message,
+} from "antd";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import ReactEChartsCore from "echarts-for-react/lib/core";
+import echarts from "../../charts/echarts-setup";
 import {
+  downloadIndustryChainAtlasYaml,
+  useBatchMineIndustryChainAtlas,
   useDeleteIndustryChainAtlasChain,
   useImportIndustryChainAtlas,
   useIndustryChainAtlasCatalog,
   useIndustryChainAtlasChain,
+  useIndustryChainAtlasGraph,
+  useMineIndustryChainAtlas,
 } from "../../api/queryHooks/workflows";
 import { queryKeys } from "../../api/queryKeys";
 import { useAuthStore } from "../../store/authStore";
 import { useColors, useStyles } from "../../styles/ui";
-import type { AtlasLayer } from "../../types/stock";
+import type {
+  AtlasBatchMineResponse,
+  AtlasChain,
+  AtlasHubCompany,
+  AtlasLayer,
+} from "../../types/stock";
 import QueryErrorState from "../../components/QueryErrorState";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
 
@@ -41,10 +82,22 @@ layers:
 # 也支持批量：顶层写 chains: [ ... ]，或直接给数组；JSON 同样可导入`;
 
 const LAYER_ACCENTS = {
-  upstream: "info",
+  upstream: "warning",
   midstream: "primary",
   downstream: "success",
 } as const;
+
+const LAYER_COLORS: Record<string, string> = {
+  upstream: "#f59e0b",
+  midstream: "#3b82f6",
+  downstream: "#10b981",
+};
+
+const LAYER_NAMES: Record<string, string> = {
+  upstream: "上游",
+  midstream: "中游",
+  downstream: "下游",
+};
 
 interface IndustryAtlasProps {
   onAnalyze: (name: string) => void;
@@ -56,32 +109,53 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.is_admin ?? false);
+
+  const [activeView, setActiveView] = useState<"catalog" | "graph" | "reverse">("catalog");
   const [selectedSlug, setSelectedSlug] = useState("");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [reverseStockKeyword, setReverseStockKeyword] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+  const [mineOpen, setMineOpen] = useState(false);
+  const [batchMineOpen, setBatchMineOpen] = useState(false);
 
   const catalogQuery = useIndustryChainAtlasCatalog();
   const chainQuery = useIndustryChainAtlasChain(selectedSlug);
+  const graphQuery = useIndustryChainAtlasGraph();
   const importMutation = useImportIndustryChainAtlas();
   const deleteMutation = useDeleteIndustryChainAtlasChain();
   const catalog = catalogQuery.data;
+  const graphData = graphQuery.data;
 
+  // 产业链目录过滤
   const filteredChains = useMemo(() => {
     if (!catalog) return [];
     const keyword = search.trim().toLowerCase();
     return catalog.chains.filter((chain) => {
       if (category && chain.category !== category) return false;
+      if (sourceFilter !== "all" && chain.source !== sourceFilter) return false;
       if (!keyword) return true;
       return (
-        chain.name.toLowerCase().includes(keyword)
-        || chain.summary.toLowerCase().includes(keyword)
-        || (chain.aliases ?? []).some((alias) => alias.toLowerCase().includes(keyword))
-        || (chain.tags ?? []).some((tag) => tag.toLowerCase().includes(keyword))
+        chain.name.toLowerCase().includes(keyword) ||
+        chain.summary.toLowerCase().includes(keyword) ||
+        (chain.aliases ?? []).some((alias) => alias.toLowerCase().includes(keyword)) ||
+        (chain.tags ?? []).some((tag) => tag.toLowerCase().includes(keyword))
       );
     });
-  }, [catalog, category, search]);
+  }, [catalog, category, search, sourceFilter]);
 
+  // 股票反查产业链匹配
+  const reverseMatchedChains = useMemo(() => {
+    if (!graphData || !reverseStockKeyword.trim()) return [];
+    const kw = reverseStockKeyword.trim().toLowerCase();
+    const matchedNodes = graphData.nodes.filter(
+      (n) => n.name.toLowerCase().includes(kw) || n.id.includes(kw)
+    );
+    return matchedNodes;
+  }, [graphData, reverseStockKeyword]);
+
+  // 查看单条链详情
   if (selectedSlug) {
     return (
       <div>
@@ -118,191 +192,1576 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
 
   return (
     <div>
+      {/* 头部控制栏：模式切换、自动挖掘状态与管理操作 */}
       <div style={{ ...cardStyle, padding: "16px 20px", marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <Input
-            allowClear
-            prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
-            placeholder="搜索产业链、标签或别名…"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            style={{ maxWidth: 320 }}
+          <Segmented
+            value={activeView}
+            onChange={(val) => setActiveView(val as "catalog" | "graph" | "reverse")}
+            options={[
+              { label: "知识库目录", value: "catalog", icon: <AppstoreOutlined /> },
+              { label: "全景关系图谱", value: "graph", icon: <ShareAltOutlined /> },
+              { label: "个股反查产业链", value: "reverse", icon: <NodeIndexOutlined /> },
+            ]}
           />
+
+          {activeView === "catalog" && (
+            <Input
+              allowClear
+              prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+              placeholder="搜索产业链、标签或别名…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              style={{ maxWidth: 260 }}
+            />
+          )}
+
           <span style={{ color: colors.textMuted, fontSize: "var(--c-font-md)" }}>
             {catalog
-              ? `${catalog.total_chains} 条产业链 · ${catalog.total_companies} 家公司`
+              ? `${catalog.total_chains} 条产业链 · ${catalog.total_companies} 家核心公司`
               : "加载中…"}
           </span>
-          {isAdmin && (
-            <Button
-              icon={<ImportOutlined />}
-              style={{ marginLeft: "auto" }}
-              onClick={() => setImportOpen(true)}
+
+          <Popover
+            title="产业链知识库与自动挖掘机制"
+            content={
+              <div style={{ maxWidth: 360, fontSize: "var(--c-font-sm)", lineHeight: 1.6 }}>
+                <p style={{ margin: "0 0 8px" }}>
+                  <b>AI 自动挖掘已启用</b>：每次执行产业链深度研究并生成分析报告后，后台将自动提取上中下游企业节点与所属环节。
+                </p>
+                <p style={{ margin: "0 0 8px" }}>
+                  <b>双向核验防幻觉</b>：公司名称与股票代码必须完全通过 A 股官方名录校验才允许入库，防止模型幻觉污染知识库。
+                </p>
+                <p style={{ margin: "0 0 8px" }}>
+                  <b>质量门禁与更新</b>：仅通过质量校验且具备完整环节与标的之报告才沉淀为知识库，同名链条稳定覆盖更新。
+                </p>
+                <p style={{ margin: 0, color: colors.textMuted }}>
+                  知识库条目后续在同主题分析时将作为先验证据输入模型，形成持续演进的正向反馈闭环。
+                </p>
+              </div>
+            }
+          >
+            <Tag
+              icon={<RobotOutlined />}
+              color="cyan"
+              style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
             >
-              导入产业链
-            </Button>
-          )}
+              自动挖掘已开启 <InfoCircleOutlined style={{ fontSize: 11 }} />
+            </Tag>
+          </Popover>
+
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+            {isAdmin && (
+              <>
+                <Button
+                  icon={<CloudDownloadOutlined />}
+                  onClick={() => setMineOpen(true)}
+                >
+                  从分析挖掘
+                </Button>
+                <Button
+                  icon={<RobotOutlined />}
+                  onClick={() => setBatchMineOpen(true)}
+                >
+                  批量挖掘历史研报
+                </Button>
+                <Button
+                  icon={<ImportOutlined />}
+                  onClick={() => setImportOpen(true)}
+                >
+                  导入产业链
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-        {catalog && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-            <CategoryChip
-              label="全部"
-              active={!category}
-              colors={colors}
-              onClick={() => setCategory("")}
-            />
-            {catalog.categories.map((item) => (
+
+        {/* 目录视图：分类与来源标签 */}
+        {activeView === "catalog" && catalog && (
+          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginRight: 4 }}>
+                分类:
+              </span>
               <CategoryChip
-                key={item}
-                label={item}
-                active={category === item}
+                label="全部"
+                active={!category}
                 colors={colors}
-                onClick={() => setCategory(category === item ? "" : item)}
+                onClick={() => setCategory("")}
               />
+              {catalog.categories.map((item) => (
+                <CategoryChip
+                  key={item}
+                  label={item}
+                  active={category === item}
+                  colors={colors}
+                  onClick={() => setCategory(category === item ? "" : item)}
+                />
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginRight: 4 }}>
+                来源:
+              </span>
+              <Radio.Group
+                size="small"
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
+              >
+                <Radio.Button value="all">全部来源</Radio.Button>
+                <Radio.Button value="builtin">内置策划</Radio.Button>
+                <Radio.Button value="mined">AI 自动挖掘</Radio.Button>
+                <Radio.Button value="imported">外部导入</Radio.Button>
+              </Radio.Group>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 视图内容分发 */}
+      {activeView === "reverse" ? (
+        <AtlasReverseLookup
+          keyword={reverseStockKeyword}
+          onKeywordChange={setReverseStockKeyword}
+          matchedNodes={reverseMatchedChains}
+          chainIndex={graphData?.chain_index ?? {}}
+          onSelectChain={(slug) => setSelectedSlug(slug)}
+          onCompanyClick={(code) => navigate(buildStockProfileUrl(code))}
+        />
+      ) : activeView === "graph" ? (
+        <AtlasGlobalGraph
+          catalog={catalog}
+          onCompanyClick={(code) => navigate(buildStockProfileUrl(code))}
+          onSelectChain={(slug) => setSelectedSlug(slug)}
+        />
+      ) : (
+        <>
+          {catalogQuery.isLoading && (
+            <div style={{ ...cardStyle, padding: 60, textAlign: "center" }}>
+              <Spin />
+              <div style={{ marginTop: 12, color: colors.textMuted }}>正在加载产业链知识库…</div>
+            </div>
+          )}
+          {catalogQuery.isError && (
+            <QueryErrorState
+              error={catalogQuery.error}
+              onRetry={() => catalogQuery.refetch()}
+            />
+          )}
+          {catalog && filteredChains.length === 0 && (
+            <div style={{ ...cardStyle, padding: 40 }}>
+              <Empty description="没有匹配的产业链" />
+            </div>
+          )}
+          {catalog && filteredChains.length > 0 && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))",
+                gap: 14,
+              }}
+            >
+              {filteredChains.map((chain) => (
+                <div
+                  key={chain.slug}
+                  className="atlas-chain-card"
+                  style={{
+                    ...cardStyle,
+                    padding: "16px 18px",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                  onClick={() => setSelectedSlug(chain.slug)}
+                >
+                  <div
+                    className="atlas-chain-card__heading"
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <span
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: `linear-gradient(135deg, ${colors.primary}26, ${colors.accent}26)`,
+                        color: colors.primary,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <ApartmentOutlined />
+                    </span>
+                    <strong
+                      className="atlas-chain-card__name"
+                      style={{ fontSize: "var(--c-font-lg)", color: colors.textPrimary }}
+                    >
+                      {chain.name}
+                    </strong>
+                    {chain.source === "mined" && <Tag color="processing">AI 挖掘</Tag>}
+                    {chain.source === "imported" && <Tag color="gold">外部导入</Tag>}
+                    <Tag className="atlas-wrap-tag" style={{ marginLeft: "auto" }}>
+                      {chain.category}
+                    </Tag>
+                  </div>
+                  <div
+                    className="atlas-chain-card__summary"
+                    style={{
+                      color: colors.textSecondary,
+                      fontSize: "var(--c-font-md)",
+                      lineHeight: "var(--c-leading-normal)",
+                      flex: 1,
+                    }}
+                  >
+                    {chain.summary}
+                  </div>
+                  <div
+                    className="atlas-chain-card__stats"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      fontSize: "var(--c-font-sm)",
+                      color: colors.textMuted,
+                    }}
+                  >
+                    <span>{chain.segment_count} 个环节</span>
+                    <span>·</span>
+                    <span>{chain.company_count} 家公司</span>
+                    {isAdmin && (chain.source === "imported" || chain.source === "mined") && (
+                      <Popconfirm
+                        title="删除这条产业链？"
+                        onConfirm={(event) => {
+                          event?.stopPropagation();
+                          deleteMutation.mutate(chain.slug, {
+                            onSuccess: async () => {
+                              message.success(`已删除产业链：${chain.name}`);
+                              await queryClient.invalidateQueries({
+                                queryKey: queryKeys.workflows.industryChainAtlasCatalog,
+                              });
+                              await queryClient.invalidateQueries({
+                                queryKey: ["industryChainAtlas", "graph"],
+                              });
+                            },
+                            onError: (error: Error) => message.error(error.message),
+                          });
+                        }}
+                        onCancel={(event) => event?.stopPropagation()}
+                      >
+                        <Button
+                          danger
+                          type="text"
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                      </Popconfirm>
+                    )}
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<ExperimentOutlined />}
+                      style={{
+                        marginLeft: isAdmin && chain.source !== "builtin" ? 0 : "auto",
+                        padding: 0,
+                        height: "auto",
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onAnalyze(chain.name);
+                      }}
+                    >
+                      AI 深度分析
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 导入与挖掘模态框 */}
+      {isAdmin && (
+        <>
+          <AtlasImportModal
+            open={importOpen}
+            onClose={() => setImportOpen(false)}
+            importing={importMutation.isPending}
+            onSubmit={(content, overwrite) => {
+              importMutation.mutate(
+                { content, overwrite },
+                {
+                  onSuccess: async (chains) => {
+                    message.success(`导入成功：${chains.map((chain) => chain.name).join("、")}`);
+                    setImportOpen(false);
+                    await queryClient.invalidateQueries({
+                      queryKey: queryKeys.workflows.industryChainAtlasCatalog,
+                    });
+                    await queryClient.invalidateQueries({
+                      queryKey: ["industryChainAtlas", "graph"],
+                    });
+                  },
+                  onError: (error: Error) =>
+                    message.error({
+                      content: error.message,
+                      duration: 8,
+                    }),
+                },
+              );
+            }}
+          />
+
+          <AtlasMineModal
+            open={mineOpen}
+            onClose={() => setMineOpen(false)}
+            onSuccess={async (name) => {
+              message.success(`已从「${name}」分析报告成功挖掘知识库条目！`);
+              setMineOpen(false);
+              await queryClient.invalidateQueries({
+                queryKey: queryKeys.workflows.industryChainAtlasCatalog,
+              });
+              await queryClient.invalidateQueries({
+                queryKey: ["industryChainAtlas", "graph"],
+              });
+            }}
+          />
+
+          <AtlasBatchMineModal
+            open={batchMineOpen}
+            onClose={() => setBatchMineOpen(false)}
+            onSuccess={async () => {
+              await queryClient.invalidateQueries({
+                queryKey: queryKeys.workflows.industryChainAtlasCatalog,
+              });
+              await queryClient.invalidateQueries({
+                queryKey: ["industryChainAtlas", "graph"],
+              });
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── 模式：个股反查产业链 ──────────────────────────────────────────────────────
+
+function AtlasReverseLookup({
+  keyword,
+  onKeywordChange,
+  matchedNodes,
+  chainIndex,
+  onSelectChain,
+  onCompanyClick,
+}: {
+  keyword: string;
+  onKeywordChange: (val: string) => void;
+  matchedNodes: NonNullable<ReturnType<typeof useIndustryChainAtlasGraph>["data"]>["nodes"];
+  chainIndex: Record<string, string>;
+  onSelectChain: (slug: string) => void;
+  onCompanyClick: (code: string) => void;
+}) {
+  const colors = useColors();
+  const { cardStyle } = useStyles();
+
+  return (
+    <Card style={cardStyle} bodyStyle={{ padding: 20 }}>
+      <div style={{ maxWidth: 600, marginBottom: 20 }}>
+        <h3 style={{ fontSize: "var(--c-font-lg)", marginBottom: 8, color: colors.textPrimary }}>
+          🔍 从个股反查产业链分布
+        </h3>
+        <p style={{ color: colors.textSecondary, fontSize: "var(--c-font-sm)", marginBottom: 12 }}>
+          输入股票代码（如 002371）或企业名称（如 北方华创、中科创达），即可穿透查看该企业在全市场知识库中参与的所有产业链、所属上中下游及具体细分环节。
+        </p>
+        <Input
+          allowClear
+          prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+          placeholder="输入股票代码或名称，如：中科创达、300496、宁德时代"
+          value={keyword}
+          onChange={(e) => onKeywordChange(e.target.value)}
+          size="large"
+        />
+      </div>
+
+      {!keyword.trim() ? (
+        <div style={{ textAlign: "center", padding: "40px 0", color: colors.textMuted }}>
+          请输入股票代码或名称开始反查
+        </div>
+      ) : matchedNodes.length === 0 ? (
+        <Empty description="未在现有产业链知识库中检索到该股票" />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {matchedNodes.map((node) => (
+            <div
+              key={node.id}
+              style={{
+                border: `1px solid ${colors.border}`,
+                borderRadius: 10,
+                background: colors.nestedBg,
+                padding: "16px 20px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <span
+                  style={{
+                    fontSize: "var(--c-font-xl)",
+                    fontWeight: 600,
+                    color: colors.textPrimary,
+                    cursor: "pointer",
+                  }}
+                  onClick={() => onCompanyClick(node.id)}
+                >
+                  {node.name}
+                </span>
+                <Tag color="blue" style={{ fontSize: 13, cursor: "pointer" }} onClick={() => onCompanyClick(node.id)}>
+                  {node.id}
+                </Tag>
+                <Tag color={node.layer === "upstream" ? "orange" : node.layer === "midstream" ? "blue" : "green"}>
+                  主要层级: {LAYER_NAMES[node.layer] || node.layer}
+                </Tag>
+                <span style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginLeft: "auto" }}>
+                  覆盖 <b>{node.chain_count}</b> 条产业链 · {node.segments.length} 个环节
+                </span>
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: "var(--c-font-sm)", color: colors.textSecondary }}>所属产业链：</span>
+                {node.chains.map((slug) => {
+                  const chainName = chainIndex[slug] || slug;
+                  return (
+                    <Button
+                      key={slug}
+                      size="small"
+                      type="dashed"
+                      icon={<ApartmentOutlined />}
+                      onClick={() => onSelectChain(slug)}
+                    >
+                      {chainName}
+                    </Button>
+                  );
+                })}
+              </div>
+
+              {node.segments.length > 0 && (
+                <div style={{ marginTop: 10, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+                  细分环节：{node.segments.join("、")}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ── 模式：全局跨链图谱与枢纽龙头榜 ──────────────────────────────────────────────
+
+function AtlasGlobalGraph({
+  catalog,
+  onCompanyClick,
+  onSelectChain,
+}: {
+  catalog: ReturnType<typeof useIndustryChainAtlasCatalog>["data"];
+  onCompanyClick: (code: string) => void;
+  onSelectChain: (slug: string) => void;
+}) {
+  const colors = useColors();
+  const { cardStyle } = useStyles();
+  const chartRef = useRef<ReactEChartsCore | null>(null);
+
+  const [graphTab, setGraphTab] = useState<"topology" | "hubs" | "synergy">("topology");
+  const [selectedChains, setSelectedChains] = useState<string[]>([]);
+  const [layerFilter, setLayerFilter] = useState<string>("all");
+  const [nodeSearch, setNodeSearch] = useState("");
+  const [onlyHubs, setOnlyHubs] = useState(false);
+
+  const chainFilterParam = selectedChains.length > 0 ? selectedChains.join(",") : undefined;
+  const graphQuery = useIndustryChainAtlasGraph(chainFilterParam);
+  const graphData = graphQuery.data;
+
+  const handleExportImage = () => {
+    const chart = chartRef.current?.getEchartsInstance?.();
+    if (!chart) return;
+    const url = chart.getDataURL({
+      type: "png",
+      pixelRatio: 2,
+      backgroundColor: colors.cardBg,
+    });
+    const link = document.createElement("a");
+    link.download = "A股产业链全景关系图谱.png";
+    link.href = url;
+    link.click();
+  };
+
+  const chainOptions = useMemo(() => {
+    if (!catalog) return [];
+    return catalog.chains.map((c) => ({
+      label: `${c.name} (${c.company_count}家)`,
+      value: c.slug,
+    }));
+  }, [catalog]);
+
+  const chartOption = useMemo(() => {
+    if (!graphData) return {};
+
+    const searchKeyword = nodeSearch.trim().toLowerCase();
+
+    // 过滤层级与枢纽标的
+    const visibleNodes = graphData.nodes.filter((node) => {
+      if (layerFilter !== "all" && node.layer !== layerFilter) return false;
+      if (onlyHubs && node.chain_count < 2) return false;
+      return true;
+    });
+
+    const visibleNodeIds = new Set(visibleNodes.map((n) => n.id));
+
+    const nodes = visibleNodes.map((node) => {
+      const color = LAYER_COLORS[node.layer] || colors.primary;
+      const isMatch =
+        searchKeyword &&
+        (node.name.toLowerCase().includes(searchKeyword) || node.id.includes(searchKeyword));
+      const baseSize = Math.max(20, Math.min(18 + node.chain_count * 8, 44));
+      const symbolSize = isMatch ? baseSize * 1.35 : baseSize;
+
+      return {
+        id: node.id,
+        name: node.name,
+        symbolSize,
+        category: node.layer,
+        value: node.chain_count,
+        itemStyle: {
+          color,
+          borderColor: isMatch ? colors.accent : colors.cardBg,
+          borderWidth: isMatch ? 3.5 : 1.5,
+          shadowColor: isMatch ? `${colors.accent}90` : `${color}30`,
+          shadowBlur: isMatch ? 16 : 6,
+        },
+        label: {
+          show: true,
+          position: "bottom",
+          color: isMatch ? colors.primary : colors.textSecondary,
+          fontWeight: isMatch ? "bold" : "normal",
+          fontSize: 11,
+          formatter: "{b}",
+        },
+        rawNode: node,
+      };
+    });
+
+    const edges = graphData.edges
+      .filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target))
+      .map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        chain_name: edge.chain_name,
+        lineStyle: {
+          color: colors.border,
+          width: 1.2,
+          curveness: 0.15,
+          opacity: 0.5,
+        },
+      }));
+
+    return {
+      backgroundColor: "transparent",
+      tooltip: {
+        trigger: "item",
+        backgroundColor: colors.cardBg,
+        borderColor: colors.border,
+        textStyle: { color: colors.textPrimary },
+        formatter: (params: { dataType?: string; name?: string; data?: { rawNode?: { layer: string; chains: string[]; name: string; id: string; segments: string[]; chain_count: number }; chain_name?: string } }) => {
+          if (params.dataType === "node") {
+            const raw = params.data?.rawNode;
+            if (!raw) return params.name || "";
+            const layerName = LAYER_NAMES[raw.layer] || raw.layer || "产业环节";
+            const chainNames = raw.chains
+              .map((slug: string) => graphData.chain_index[slug] || slug)
+              .join("、");
+            return `
+              <div style="font-weight:600;font-size:14px;margin-bottom:4px;color:${colors.textPrimary};">
+                ${raw.name} <span style="font-size:12px;color:${colors.textMuted};">(${raw.id})</span>
+              </div>
+              <div style="font-size:12px;color:${colors.textSecondary};margin-bottom:2px;">
+                产业链层级：<b style="color:${LAYER_COLORS[raw.layer] || colors.primary};">${layerName}</b>
+              </div>
+              ${raw.segments.length > 0 ? `<div style="font-size:12px;color:${colors.textSecondary};margin-bottom:2px;">覆盖环节：${raw.segments.join("、")}</div>` : ""}
+              <div style="font-size:12px;color:${colors.textSecondary};margin-bottom:4px;">
+                跨链分布 (${raw.chain_count})：${chainNames}
+              </div>
+              <div style="font-size:11px;color:${colors.primary};margin-top:6px;">
+                💡 点击节点直接跳转个股主页
+              </div>
+            `;
+          }
+          if (params.dataType === "edge") {
+            const edge = params.data;
+            return `<div style="font-size:12px;color:${colors.textPrimary};">产业链传导连接：<b>${edge?.chain_name || ""}</b></div>`;
+          }
+          return "";
+        },
+      },
+      legend: {
+        top: 12,
+        left: 16,
+        orient: "horizontal",
+        data: [
+          { name: "upstream", itemStyle: { color: LAYER_COLORS.upstream } },
+          { name: "midstream", itemStyle: { color: LAYER_COLORS.midstream } },
+          { name: "downstream", itemStyle: { color: LAYER_COLORS.downstream } },
+        ],
+        formatter: (name: string) => LAYER_NAMES[name] || name,
+        textStyle: { color: colors.textSecondary },
+      },
+      series: [
+        {
+          type: "graph",
+          layout: "force",
+          force: {
+            repulsion: 220,
+            edgeLength: [60, 160],
+            gravity: 0.08,
+            friction: 0.65,
+          },
+          roam: true,
+          draggable: true,
+          edgeSymbol: ["none", "arrow"],
+          edgeSymbolSize: [4, 8],
+          data: nodes,
+          links: edges,
+          categories: [
+            { name: "upstream" },
+            { name: "midstream" },
+            { name: "downstream" },
+          ],
+          emphasis: {
+            focus: "adjacency",
+            lineStyle: {
+              width: 2.8,
+              opacity: 0.9,
+            },
+          },
+        },
+      ],
+    };
+  }, [graphData, layerFilter, nodeSearch, onlyHubs, colors]);
+
+  const onChartClick = (params: { dataType?: string; data?: { id?: string } }) => {
+    if (params.dataType === "node" && params.data?.id) {
+      onCompanyClick(params.data.id);
+    }
+  };
+
+  return (
+    <Card style={cardStyle} bodyStyle={{ padding: 18 }}>
+      {/* 子标签：力导向图谱 / 跨链枢纽龙头榜 / 产业协同矩阵 */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+        <Segmented
+          value={graphTab}
+          onChange={(v) => setGraphTab(v as "topology" | "hubs" | "synergy")}
+          options={[
+            { label: "全局拓扑图谱", value: "topology", icon: <ShareAltOutlined /> },
+            { label: "跨链枢纽龙头榜", value: "hubs", icon: <TrophyOutlined /> },
+            { label: "产业协同共振矩阵", value: "synergy", icon: <FireOutlined /> },
+          ]}
+        />
+
+        {graphData && (
+          <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+            <span>已合并 <b>{graphData.summary.total_nodes}</b> 家公司</span>
+            <span style={{ margin: "0 6px" }}>·</span>
+            <span><b>{graphData.summary.total_edges}</b> 条上下游传导关系</span>
+            <span style={{ margin: "0 6px" }}>·</span>
+            <span>覆盖 <b>{graphData.summary.total_chains}</b> 条产业链</span>
+          </div>
+        )}
+      </div>
+
+      {graphTab === "topology" && (
+        <>
+          {/* 筛选过滤工具栏 */}
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              flexWrap: "wrap",
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder="筛选特定产业链（默认展示全部）"
+              style={{ minWidth: 260, flex: 1, maxWidth: 440 }}
+              value={selectedChains}
+              onChange={setSelectedChains}
+              options={chainOptions}
+              maxTagCount="responsive"
+            />
+
+            <Radio.Group
+              size="small"
+              value={layerFilter}
+              onChange={(e) => setLayerFilter(e.target.value)}
+            >
+              <Radio.Button value="all">全层级</Radio.Button>
+              <Radio.Button value="upstream">仅上游</Radio.Button>
+              <Radio.Button value="midstream">仅中游</Radio.Button>
+              <Radio.Button value="downstream">仅下游</Radio.Button>
+            </Radio.Group>
+
+            <Input
+              allowClear
+              prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+              placeholder="高亮公司代码或名称…"
+              style={{ width: 190 }}
+              value={nodeSearch}
+              onChange={(e) => setNodeSearch(e.target.value)}
+            />
+
+            <Switch
+              checkedChildren="仅跨链枢纽"
+              unCheckedChildren="全部标的"
+              checked={onlyHubs}
+              onChange={setOnlyHubs}
+            />
+
+            <Button
+              icon={<CameraOutlined />}
+              onClick={handleExportImage}
+            >
+              导出全景图
+            </Button>
+          </div>
+
+          {graphQuery.isLoading && (
+            <div style={{ height: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Spin tip="正在构建全局产业链图谱…" />
+            </div>
+          )}
+
+          {graphQuery.isError && (
+            <QueryErrorState error={graphQuery.error} onRetry={() => graphQuery.refetch()} />
+          )}
+
+          {graphData && graphData.nodes.length === 0 && (
+            <div style={{ height: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Empty description="所选产业链中未包含公司节点" />
+            </div>
+          )}
+
+          {graphData && graphData.nodes.length > 0 && (
+            <div
+              style={{
+                height: 640,
+                position: "relative",
+                border: `1px solid ${colors.border}`,
+                borderRadius: 8,
+              }}
+            >
+              <ReactEChartsCore
+                ref={chartRef}
+                echarts={echarts}
+                option={chartOption}
+                notMerge
+                onEvents={{ click: onChartClick }}
+                style={{ width: "100%", height: "100%" }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 12,
+                  right: 16,
+                  fontSize: "var(--c-font-xs)",
+                  color: colors.textMuted,
+                  pointerEvents: "none",
+                }}
+              >
+                支持鼠标滚轮缩放与拖拽画布 · 节点尺寸随跨链协同度动态缩放
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {graphTab === "hubs" && (
+        <HubCompaniesRanking
+          hubCompanies={graphData?.hub_companies ?? []}
+          onCompanyClick={onCompanyClick}
+          onSelectChain={onSelectChain}
+        />
+      )}
+
+      {graphTab === "synergy" && (
+        <ChainSynergyMatrix
+          synergies={graphData?.chain_synergies ?? []}
+          onSelectChain={onSelectChain}
+        />
+      )}
+    </Card>
+  );
+}
+
+// ── 跨链枢纽龙头排行榜组件 ────────────────────────────────────────────────────
+
+function HubCompaniesRanking({
+  hubCompanies,
+  onCompanyClick,
+  onSelectChain,
+}: {
+  hubCompanies: AtlasHubCompany[];
+  onCompanyClick: (code: string) => void;
+  onSelectChain: (slug: string) => void;
+}) {
+  const colors = useColors();
+
+  if (hubCompanies.length === 0) {
+    return <Empty description="暂无跨足多条产业链的枢纽龙头" style={{ padding: 40 }} />;
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12, color: colors.textSecondary, fontSize: "var(--c-font-sm)" }}>
+        💡 <b>跨链枢纽标的</b>：跨足 2 条及以上结构性高景气产业链的平台型或核心龙头企业，具备极强的跨产业抗周期与协同共振特征。
+      </div>
+
+      <Row gutter={[12, 12]}>
+        {hubCompanies.map((comp, idx) => (
+          <Col xs={24} sm={12} md={8} key={comp.id}>
+            <div
+              style={{
+                border: `1px solid ${colors.border}`,
+                borderRadius: 10,
+                background: colors.nestedBg,
+                padding: "14px 16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: "50%",
+                    background: idx < 3 ? colors.primary : `${colors.primary}26`,
+                    color: idx < 3 ? "#fff" : colors.primary,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {idx + 1}
+                </span>
+                <strong
+                  style={{ fontSize: "var(--c-font-base)", color: colors.textPrimary, cursor: "pointer" }}
+                  onClick={() => onCompanyClick(comp.id)}
+                >
+                  {comp.name}
+                </strong>
+                <Tag color="blue" style={{ cursor: "pointer", fontSize: 11 }} onClick={() => onCompanyClick(comp.id)}>
+                  {comp.id}
+                </Tag>
+                <Tag color="purple" style={{ marginLeft: "auto", fontSize: 11 }}>
+                  跨 {comp.chain_count} 链
+                </Tag>
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {comp.chains.map((slug, i) => (
+                  <Tag
+                    key={slug}
+                    color="cyan"
+                    style={{ cursor: "pointer", fontSize: 11 }}
+                    onClick={() => onSelectChain(slug)}
+                  >
+                    {comp.chain_names[i] || slug}
+                  </Tag>
+                ))}
+              </div>
+
+              {comp.segments.length > 0 && (
+                <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>
+                  环节：{comp.segments.slice(0, 3).join("、")}
+                </div>
+              )}
+            </div>
+          </Col>
+        ))}
+      </Row>
+    </div>
+  );
+}
+
+// ── 产业协同共振矩阵组件 ────────────────────────────────────────────────────────
+
+function ChainSynergyMatrix({
+  synergies,
+  onSelectChain,
+}: {
+  synergies: NonNullable<ReturnType<typeof useIndustryChainAtlasGraph>["data"]>["chain_synergies"];
+  onSelectChain: (slug: string) => void;
+}) {
+  const colors = useColors();
+
+  if (!synergies || synergies.length === 0) {
+    return <Empty description="暂无跨产业链共现协同分析数据" style={{ padding: 40 }} />;
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12, color: colors.textSecondary, fontSize: "var(--c-font-sm)" }}>
+        ⚡ <b>跨产业链协同共振</b>：两两产业之间共有供应链企业越多，表明产业间的需求协同、技术传导与共振效应越强。
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {synergies.map((s) => (
+          <div
+            key={`${s.source_slug}-${s.target_slug}`}
+            style={{
+              border: `1px solid ${colors.border}`,
+              borderRadius: 8,
+              background: colors.nestedBg,
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 10,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Button type="link" style={{ padding: 0 }} onClick={() => onSelectChain(s.source_slug)}>
+                <b>{s.source_name}</b>
+              </Button>
+              <span style={{ color: colors.accent, fontWeight: 700 }}>⇄</span>
+              <Button type="link" style={{ padding: 0 }} onClick={() => onSelectChain(s.target_slug)}>
+                <b>{s.target_name}</b>
+              </Button>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Tag color="volcano" style={{ fontWeight: 600 }}>
+                共享 {s.shared_companies_count} 家龙头
+              </Tag>
+              <span style={{ fontSize: "var(--c-font-sm)", color: colors.textSecondary }}>
+                共有关联企业：{s.shared_companies.join("、")}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── 单链详情与拓扑流向图 ────────────────────────────────────────────────────────
+
+function ChainAtlasDetail({
+  chain,
+  onAnalyze,
+  onCompanyClick,
+}: {
+  chain: AtlasChain;
+  onAnalyze: (name: string) => void;
+  onCompanyClick: (code: string) => void;
+}) {
+  const colors = useColors();
+  const { cardStyle } = useStyles();
+  const navigate = useNavigate();
+  const [detailMode, setDetailMode] = useState<"cards" | "graph">("cards");
+
+  return (
+    <div>
+      <div style={{ ...cardStyle, padding: "18px 22px", marginBottom: 16 }}>
+        <div
+          className="atlas-detail__heading"
+          style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}
+        >
+          <strong
+            className="atlas-detail__name"
+            style={{ fontSize: "var(--c-font-xl)", color: colors.textPrimary }}
+          >
+            {chain.name}
+          </strong>
+          {chain.source === "mined" && <Tag color="processing">AI 自动挖掘</Tag>}
+          {chain.source === "imported" && <Tag color="gold">外部导入</Tag>}
+          <Tag className="atlas-wrap-tag">{chain.category}</Tag>
+          {(chain.tags ?? []).map((tag) => (
+            <Tag key={tag} className="atlas-wrap-tag" color="processing">
+              {tag}
+            </Tag>
+          ))}
+
+          {chain.mined_at && (
+            <span style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>
+              挖掘入库: {chain.mined_at}
+            </span>
+          )}
+
+          <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
+            {chain.archive_id && (
+              <Button
+                icon={<FileTextOutlined />}
+                size="small"
+                onClick={() =>
+                  navigate(
+                    `/industry-chain/${encodeURIComponent(chain.name)}?archive_id=${chain.archive_id}`
+                  )
+                }
+              >
+                查看源研报
+              </Button>
+            )}
+            <Segmented
+              value={detailMode}
+              onChange={(val) => setDetailMode(val as "cards" | "graph")}
+              options={[
+                { label: "分层环节", value: "cards", icon: <BarsOutlined /> },
+                { label: "拓扑流向", value: "graph", icon: <ApartmentOutlined /> },
+              ]}
+            />
+            <Button
+              icon={<CloudDownloadOutlined />}
+              onClick={() => downloadIndustryChainAtlasYaml(chain.slug, chain.name)}
+            >
+              导出 YAML
+            </Button>
+            <Button
+              type="primary"
+              icon={<ExperimentOutlined />}
+              onClick={() => onAnalyze(chain.name)}
+            >
+              AI 深度分析
+            </Button>
+          </div>
+        </div>
+
+        <div
+          className="atlas-detail__summary"
+          style={{
+            color: colors.textSecondary,
+            fontSize: "var(--c-font-md)",
+            lineHeight: "var(--c-leading-relaxed)",
+            marginTop: 8,
+          }}
+        >
+          {chain.summary}
+        </div>
+
+        {(chain.drivers ?? []).length > 0 && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            {(chain.drivers ?? []).map((driver) => (
+              <span
+                key={driver}
+                className="atlas-driver-chip"
+                style={{
+                  fontSize: "var(--c-font-sm)",
+                  color: colors.warning,
+                  background: `${colors.warning}14`,
+                  border: `1px solid ${colors.warning}33`,
+                  borderRadius: 6,
+                  padding: "2px 8px",
+                }}
+              >
+                驱动 · {driver}
+              </span>
             ))}
           </div>
         )}
       </div>
 
-      {catalogQuery.isLoading && (
-        <div style={{ ...cardStyle, padding: 60, textAlign: "center" }}>
-          <Spin />
-          <div style={{ marginTop: 12, color: colors.textMuted }}>正在加载产业链知识库…</div>
-        </div>
-      )}
-      {catalogQuery.isError && (
-        <QueryErrorState
-          error={catalogQuery.error}
-          onRetry={() => catalogQuery.refetch()}
-        />
-      )}
-      {catalog && filteredChains.length === 0 && (
-        <div style={{ ...cardStyle, padding: 40 }}>
-          <Empty description="没有匹配的产业链" />
-        </div>
-      )}
-      {catalog && filteredChains.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-            gap: 14,
-          }}
-        >
-          {filteredChains.map((chain) => (
-            <div
-              key={chain.slug}
-              className="atlas-chain-card"
-              style={{
-                ...cardStyle,
-                padding: "16px 18px",
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-              onClick={() => setSelectedSlug(chain.slug)}
-            >
-              <div className="atlas-chain-card__heading" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
+      {detailMode === "graph" ? (
+        <SingleChainGraph chain={chain} onCompanyClick={onCompanyClick} />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {chain.layers.map((layer, index) => (
+            <div key={layer.key}>
+              <AtlasLayerBand layer={layer} onCompanyClick={onCompanyClick} />
+              {index < chain.layers.length - 1 && (
+                <div
                   style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 8,
-                    display: "inline-flex",
-                    alignItems: "center",
+                    display: "flex",
                     justifyContent: "center",
-                    background: `linear-gradient(135deg, ${colors.primary}26, ${colors.accent}26)`,
-                    color: colors.primary,
-                    flexShrink: 0,
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 0",
+                    color: colors.textMuted,
                   }}
                 >
-                  <ApartmentOutlined />
-                </span>
-                <strong className="atlas-chain-card__name" style={{ fontSize: "var(--c-font-lg)", color: colors.textPrimary }}>{chain.name}</strong>
-                {chain.source === "mined" && <Tag color="processing">AI 挖掘</Tag>}
-                {chain.source === "imported" && <Tag color="gold">外部导入</Tag>}
-                <Tag className="atlas-wrap-tag" style={{ marginLeft: "auto" }}>{chain.category}</Tag>
-              </div>
-              <div className="atlas-chain-card__summary" style={{ color: colors.textSecondary, fontSize: "var(--c-font-md)", lineHeight: "var(--c-leading-normal)", flex: 1 }}>
-                {chain.summary}
-              </div>
-              <div className="atlas-chain-card__stats" style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
-                <span>{chain.segment_count} 个环节</span>
-                <span>·</span>
-                <span>{chain.company_count} 家公司</span>
-                {isAdmin && (chain.source === "imported" || chain.source === "mined") && (
-                  <Popconfirm
-                    title="删除这条导入的产业链？"
-                    onConfirm={(event) => {
-                      event?.stopPropagation();
-                      deleteMutation.mutate(chain.slug, {
-                        onSuccess: async () => {
-                          message.success(`已删除导入的产业链：${chain.name}`);
-                          await queryClient.invalidateQueries({
-                            queryKey: queryKeys.workflows.industryChainAtlasCatalog,
-                          });
-                        },
-                        onError: (error: Error) => message.error(error.message),
-                      });
-                    }}
-                    onCancel={(event) => event?.stopPropagation()}
-                  >
-                    <Button
-                      danger
-                      type="text"
-                      size="small"
-                      icon={<DeleteOutlined />}
-                      onClick={(event) => event.stopPropagation()}
-                    />
-                  </Popconfirm>
-                )}
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<ExperimentOutlined />}
-                  style={{ marginLeft: isAdmin && chain.source !== "builtin" ? 0 : "auto", padding: 0, height: "auto" }}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onAnalyze(chain.name);
-                  }}
-                >
-                  AI 深度分析
-                </Button>
-              </div>
+                  <span style={{ height: 1, width: 40, background: colors.border }} />
+                  <span style={{ fontSize: 12, opacity: 0.7, letterSpacing: 2 }}>↓ 传导流向</span>
+                  <span style={{ height: 1, width: 40, background: colors.border }} />
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {isAdmin && (
-        <AtlasImportModal
-          open={importOpen}
-          onClose={() => setImportOpen(false)}
-          importing={importMutation.isPending}
-          onSubmit={(content, overwrite) => {
-            importMutation.mutate(
-              { content, overwrite },
-              {
-                onSuccess: async (chains) => {
-                  message.success(`导入成功：${chains.map((chain) => chain.name).join("、")}`);
-                  setImportOpen(false);
-                  await queryClient.invalidateQueries({
-                    queryKey: queryKeys.workflows.industryChainAtlasCatalog,
-                  });
-                },
-                onError: (error: Error) => message.error({
-                  content: error.message,
-                  duration: 8,
-                }),
-              },
-            );
-          }}
-        />
-      )}
+      <div
+        style={{
+          color: colors.textMuted,
+          fontSize: "var(--c-font-sm)",
+          marginTop: 16,
+          textAlign: "center",
+        }}
+      >
+        点击公司节点可跳转个股研究 · 知识库由官方名录核验并持续支持 AI 分析闭环挖掘
+      </div>
     </div>
   );
 }
+
+// ── 单链清晰层次有向流向图（从左到右分列布局）──────────────────────────────
+
+function SingleChainGraph({
+  chain,
+  onCompanyClick,
+}: {
+  chain: AtlasChain;
+  onCompanyClick: (code: string) => void;
+}) {
+  const colors = useColors();
+  const { cardStyle } = useStyles();
+  const chartRef = useRef<ReactEChartsCore | null>(null);
+  const [search, setSearch] = useState("");
+
+  const handleExport = () => {
+    const chart = chartRef.current?.getEchartsInstance?.();
+    if (!chart) return;
+    const url = chart.getDataURL({
+      type: "png",
+      pixelRatio: 2,
+      backgroundColor: colors.cardBg,
+    });
+    const link = document.createElement("a");
+    link.download = `${chain.name}_产业链价值传导拓扑图.png`;
+    link.href = url;
+    link.click();
+  };
+
+  const chartOption = useMemo(() => {
+    const nodes: Record<string, unknown>[] = [];
+    const edges: Record<string, unknown>[] = [];
+    const searchKeyword = search.trim().toLowerCase();
+
+    // 计算三层（上中下游）列坐标
+    const layerXMap: Record<string, number> = {
+      upstream: 120,
+      midstream: 480,
+      downstream: 840,
+    };
+
+    const layerCompanyMap: Record<string, string[]> = {
+      upstream: [],
+      midstream: [],
+      downstream: [],
+    };
+
+    // 统计每层的公司数量以便均匀垂直排布
+    const layerCounts: Record<string, number> = { upstream: 0, midstream: 0, downstream: 0 };
+    for (const layer of chain.layers) {
+      for (const seg of layer.segments) {
+        layerCounts[layer.key] += seg.companies.length;
+      }
+    }
+
+    const layerCurY: Record<string, number> = { upstream: 0, midstream: 0, downstream: 0 };
+
+    for (const layer of chain.layers) {
+      const color = LAYER_COLORS[layer.key] || colors.primary;
+      const x = layerXMap[layer.key] || 480;
+      const totalInLayer = layerCounts[layer.key] || 1;
+      const ySpacing = Math.max(48, Math.min(72, 600 / totalInLayer));
+
+      for (const segment of layer.segments) {
+        for (const company of segment.companies) {
+          if (!layerCompanyMap[layer.key].includes(company.code)) {
+            layerCompanyMap[layer.key].push(company.code);
+            const y = 40 + layerCurY[layer.key] * ySpacing;
+            layerCurY[layer.key] += 1;
+
+            const isMatch =
+              searchKeyword &&
+              (company.name.toLowerCase().includes(searchKeyword) ||
+                company.code.includes(searchKeyword) ||
+                segment.name.toLowerCase().includes(searchKeyword));
+            const isDimmed = searchKeyword && !isMatch;
+
+            nodes.push({
+              id: company.code,
+              name: company.name,
+              x,
+              y,
+              symbolSize: isMatch ? 34 : 26,
+              category: layer.key,
+              itemStyle: {
+                color,
+                borderColor: isMatch ? colors.accent : colors.cardBg,
+                borderWidth: isMatch ? 3.5 : 2,
+                shadowBlur: isMatch ? 16 : 6,
+                shadowColor: isMatch ? `${colors.accent}90` : `${color}40`,
+                opacity: isDimmed ? 0.35 : 1,
+              },
+              label: {
+                show: true,
+                position: "right",
+                color: isMatch ? colors.primary : colors.textPrimary,
+                fontWeight: isMatch ? "bold" : "normal",
+                fontSize: 11,
+                formatter: "{b}",
+                opacity: isDimmed ? 0.35 : 1,
+              },
+              market: company.market || (company.code.length === 5 ? "hk" : "cn"),
+              note: company.note,
+              segment: segment.name,
+              layerName: LAYER_NAMES[layer.key] || layer.key,
+            });
+          }
+        }
+      }
+    }
+
+    // 建立上游 -> 中游，中游 -> 下游的平滑贝塞尔传导流向边
+    const connectLayers = (fromKey: string, toKey: string) => {
+      const fromCodes = layerCompanyMap[fromKey] || [];
+      const toCodes = layerCompanyMap[toKey] || [];
+      if (!fromCodes.length || !toCodes.length) return;
+
+      fromCodes.forEach((src, srcIdx) => {
+        // 均匀按垂直相对高度映射到目标层相邻的 1-2 个节点，避免全部连线堆叠在顶部前3个节点
+        const ratio = fromCodes.length > 1 ? srcIdx / (fromCodes.length - 1) : 0.5;
+        const centerTgtIdx = Math.round(ratio * (toCodes.length - 1));
+        const targetIndices = new Set<number>();
+        targetIndices.add(centerTgtIdx);
+        if (centerTgtIdx + 1 < toCodes.length && toCodes.length > 2) {
+          targetIndices.add(centerTgtIdx + 1);
+        } else if (centerTgtIdx - 1 >= 0 && toCodes.length > 2) {
+          targetIndices.add(centerTgtIdx - 1);
+        }
+
+        targetIndices.forEach((tgtIdx) => {
+          const tgt = toCodes[tgtIdx];
+          if (!tgt) return;
+          const curve = (tgtIdx - srcIdx) * 0.035;
+          edges.push({
+            source: src,
+            target: tgt,
+            lineStyle: {
+              color: colors.border,
+              width: 1.2,
+              curveness: Math.max(-0.25, Math.min(0.25, curve || 0.08)),
+              opacity: 0.48,
+            },
+          });
+        });
+      });
+    };
+
+    connectLayers("upstream", "midstream");
+    connectLayers("midstream", "downstream");
+    if (layerCompanyMap.midstream.length === 0) {
+      connectLayers("upstream", "downstream");
+    }
+
+    const maxHeight = Math.max(
+      480,
+      Math.max(layerCounts.upstream, layerCounts.midstream, layerCounts.downstream) * 55 + 80
+    );
+
+    return {
+      backgroundColor: "transparent",
+      tooltip: {
+        trigger: "item",
+        backgroundColor: colors.cardBg,
+        borderColor: colors.border,
+        textStyle: { color: colors.textPrimary },
+        formatter: (params: { dataType?: string; data?: { name?: string; id?: string; layerName?: string; segment?: string; note?: string; market?: string } }) => {
+          if (params.dataType === "node") {
+            const data = params.data;
+            if (!data) return "";
+            const isHk = data.market === "hk" || data.id?.length === 5;
+            const marketBadge = isHk
+              ? `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(14,165,233,0.15);color:#0284c7;font-weight:600;margin-left:6px;">港股</span>`
+              : `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(22,119,255,0.12);color:#1677ff;font-weight:600;margin-left:6px;">A股</span>`;
+            return `
+              <div style="font-weight:600;font-size:14px;margin-bottom:4px;color:${colors.textPrimary};display:flex;align-items:center;">
+                ${data.name} <span style="font-size:12px;color:${colors.textMuted};margin-left:4px;">(${data.id})</span>${marketBadge}
+              </div>
+              <div style="font-size:12px;color:${colors.textSecondary};margin-bottom:2px;">
+                层级环节：<b>${data.layerName} · ${data.segment}</b>
+              </div>
+              ${data.note ? `<div style="font-size:12px;color:${colors.textMuted};margin-bottom:4px;">业务定位：${data.note}</div>` : ""}
+              <div style="font-size:11px;color:${colors.primary};margin-top:4px;">
+                💡 点击跳转个股研究主页
+              </div>
+            `;
+          }
+          return "";
+        },
+      },
+      legend: {
+        top: 10,
+        left: 20,
+        data: [
+          { name: "upstream", itemStyle: { color: LAYER_COLORS.upstream } },
+          { name: "midstream", itemStyle: { color: LAYER_COLORS.midstream } },
+          { name: "downstream", itemStyle: { color: LAYER_COLORS.downstream } },
+        ],
+        formatter: (name: string) => LAYER_NAMES[name] || name,
+        textStyle: { color: colors.textSecondary },
+      },
+      series: [
+        {
+          type: "graph",
+          layout: "none",
+          roam: true,
+          edgeSymbol: ["none", "arrow"],
+          edgeSymbolSize: [4, 8],
+          data: nodes,
+          links: edges,
+          categories: [
+            { name: "upstream" },
+            { name: "midstream" },
+            { name: "downstream" },
+          ],
+          emphasis: {
+            focus: "adjacency",
+            lineStyle: {
+              width: 3,
+              opacity: 0.95,
+            },
+            itemStyle: {
+              shadowBlur: 16,
+            },
+          },
+        },
+      ],
+      maxHeight,
+    };
+  }, [chain, colors, search]);
+
+  const onChartClick = (params: { dataType?: string; data?: { id?: string } }) => {
+    if (params.dataType === "node" && params.data?.id) {
+      onCompanyClick(params.data.id);
+    }
+  };
+
+  return (
+    <Card style={cardStyle} bodyStyle={{ padding: 16 }}>
+      {/* 搜索与导出工具栏 */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+        <Input
+          allowClear
+          placeholder="在当前拓扑图中高亮公司或细分环节…"
+          prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: 260 }}
+        />
+        <Button
+          icon={<CameraOutlined />}
+          onClick={handleExport}
+        >
+          导出高清拓扑图
+        </Button>
+      </div>
+
+      {/* 层次列标题横幅 */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 12,
+          padding: "8px 16px",
+          background: `${colors.primary}08`,
+          borderRadius: 6,
+          marginBottom: 12,
+          textAlign: "center",
+          fontSize: "var(--c-font-sm)",
+          fontWeight: 600,
+        }}
+      >
+        <span style={{ color: LAYER_COLORS.upstream }}>上游 · 核心原材料 / 关键设备</span>
+        <span style={{ color: LAYER_COLORS.midstream }}>中游 · 制造封测 / 模组与系统集成</span>
+        <span style={{ color: LAYER_COLORS.downstream }}>下游 · 终端产品 / 行业应用场景</span>
+      </div>
+
+      <div style={{ height: Math.max(540, Math.min(chartOption.maxHeight || 540, 880)), position: "relative" }}>
+        <ReactEChartsCore
+          ref={chartRef}
+          echarts={echarts}
+          option={chartOption}
+          notMerge
+          onEvents={{ click: onChartClick }}
+          style={{ width: "100%", height: "100%" }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: 8,
+            right: 16,
+            fontSize: "var(--c-font-xs)",
+            color: colors.textMuted,
+            pointerEvents: "none",
+          }}
+        >
+          从左向右：上游原材料/设备 → 中游制造/方案 → 下游应用场景
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function AtlasLayerBand({
+  layer,
+  onCompanyClick,
+}: {
+  layer: AtlasLayer;
+  onCompanyClick: (code: string) => void;
+}) {
+  const colors = useColors();
+  const accentKey = LAYER_ACCENTS[layer.key] || "primary";
+  const accent = colors[accentKey];
+
+  return (
+    <div
+      style={{
+        border: `1px solid ${colors.border}`,
+        borderRadius: 12,
+        background: colors.cardBg,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        className="atlas-layer__heading"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 16px",
+          borderBottom: `1px solid ${colors.border}`,
+          background: `linear-gradient(90deg, ${accent}14, transparent)`,
+        }}
+      >
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 999,
+            background: accent,
+            boxShadow: `0 0 8px ${accent}`,
+            flexShrink: 0,
+          }}
+        />
+        <strong
+          className="atlas-layer__name"
+          style={{ color: colors.textPrimary, fontSize: "var(--c-font-base)" }}
+        >
+          {layer.name}
+        </strong>
+        <span
+          className="atlas-layer__count"
+          style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}
+        >
+          {layer.segments.length} 个环节
+        </span>
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+          gap: 12,
+          padding: 14,
+        }}
+      >
+        {layer.segments.map((segment) => (
+          <div
+            key={segment.name}
+            className="atlas-segment"
+            style={{
+              border: `1px solid ${colors.border}`,
+              borderRadius: 10,
+              background: colors.nestedBg,
+              padding: "10px 12px",
+            }}
+          >
+            <div
+              className="atlas-segment__heading"
+              style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <span style={{ width: 3, height: 12, borderRadius: 2, background: accent }} />
+              <strong
+                className="atlas-segment__name"
+                style={{ fontSize: "var(--c-font-md)", color: colors.textPrimary }}
+              >
+                {segment.name}
+              </strong>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {segment.companies.map((company) => (
+                <button
+                  key={`${company.code}-${company.name}`}
+                  type="button"
+                  className="atlas-company-chip"
+                  title={company.note || company.name}
+                  onClick={() => onCompanyClick(company.code)}
+                  style={{
+                    border: `1px solid ${colors.border}`,
+                    background: colors.cardBg,
+                    borderRadius: 8,
+                    padding: "4px 9px",
+                    fontSize: "var(--c-font-sm)",
+                    color: colors.textPrimary,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <span className="atlas-company-chip__name">{company.name}</span>
+                  <span
+                    className="financial-num atlas-company-chip__code"
+                    style={{ color: accent, fontSize: "var(--c-font-xs)" }}
+                  >
+                    {company.code}
+                  </span>
+                  {(company.market === "hk" || company.code.length === 5) && (
+                    <span
+                      className="atlas-company-chip__market-tag"
+                      style={{
+                        fontSize: "10px",
+                        padding: "1px 4px",
+                        borderRadius: 4,
+                        background: "rgba(14, 165, 233, 0.12)",
+                        color: "#0284c7",
+                        fontWeight: 600,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      港股
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── 导入与挖掘模态框 ──────────────────────────────────────────────────────────
 
 function AtlasImportModal({
   open,
@@ -343,8 +1802,17 @@ function AtlasImportModal({
         >
           <Button size="small">选择文件（.yaml / .json）</Button>
         </Upload>
-        <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>或直接粘贴内容</span>
-        <label style={{ marginLeft: "auto", fontSize: "var(--c-font-md)", color: colors.textSecondary, cursor: "pointer" }}>
+        <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+          或直接粘贴内容
+        </span>
+        <label
+          style={{
+            marginLeft: "auto",
+            fontSize: "var(--c-font-md)",
+            color: colors.textSecondary,
+            cursor: "pointer",
+          }}
+        >
           覆盖同名产业链
           <Switch
             size="small"
@@ -361,6 +1829,201 @@ function AtlasImportModal({
         rows={16}
         style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}
       />
+    </Modal>
+  );
+}
+
+function AtlasMineModal({
+  open,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: (name: string) => void;
+}) {
+  const colors = useColors();
+  const [industryName, setIndustryName] = useState("");
+  const mineMutation = useMineIndustryChainAtlas();
+
+  const handleMine = () => {
+    const name = industryName.trim();
+    if (!name) return;
+    mineMutation.mutate(
+      { name },
+      {
+        onSuccess: () => {
+          onSuccess(name);
+        },
+        onError: (err: Error) => {
+          message.error({
+            content: err.message || "挖掘失败，请确保该产业已有合格的完整深度分析存档",
+            duration: 6,
+          });
+        },
+      },
+    );
+  };
+
+  return (
+    <Modal
+      title="从历史分析结果挖掘知识库条目"
+      open={open}
+      onCancel={onClose}
+      onOk={handleMine}
+      okText="执行挖掘"
+      confirmLoading={mineMutation.isPending}
+      okButtonProps={{ disabled: !industryName.trim() }}
+      destroyOnClose
+    >
+      <div style={{ marginBottom: 12, color: colors.textSecondary, fontSize: "var(--c-font-sm)" }}>
+        系统将读取该产业最近一份通过质量检验的分析报告，自动解析各环节公司并与 A 股官方名录校验配对，合格后自动沉淀为知识库条目。
+      </div>
+
+      <div style={{ marginBottom: 8, fontSize: "var(--c-font-sm)", color: colors.textPrimary }}>
+        产业链名称：
+      </div>
+      <Input
+        placeholder="例如：半导体、低空经济、人形机器人"
+        value={industryName}
+        onChange={(e) => setIndustryName(e.target.value)}
+        onPressEnter={handleMine}
+      />
+    </Modal>
+  );
+}
+
+function AtlasBatchMineModal({
+  open,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const colors = useColors();
+  const [result, setResult] = useState<AtlasBatchMineResponse | null>(null);
+  const batchMineMutation = useBatchMineIndustryChainAtlas();
+
+  const handleStart = async () => {
+    try {
+      const res = await batchMineMutation.mutateAsync();
+      setResult(res);
+      message.success(`批量挖掘完成！扫描 ${res.scanned} 份研报，成功挖掘/更新 ${res.succeeded} 条产业链`);
+      onSuccess();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "批量挖掘失败";
+      message.error(msg);
+    }
+  };
+
+  const handleModalClose = () => {
+    setResult(null);
+    onClose();
+  };
+
+  return (
+    <Modal
+      title="批量挖掘历史产业链研报"
+      open={open}
+      onCancel={handleModalClose}
+      footer={[
+        <Button key="close" onClick={handleModalClose}>
+          {result ? "完成并关闭" : "取消"}
+        </Button>,
+        !result && (
+          <Button
+            key="start"
+            type="primary"
+            loading={batchMineMutation.isPending}
+            icon={<RobotOutlined />}
+            onClick={handleStart}
+          >
+            开始扫描历史研报
+          </Button>
+        ),
+      ]}
+      width={680}
+      destroyOnClose
+    >
+      <div style={{ color: colors.textSecondary, marginBottom: 16, fontSize: "var(--c-font-sm)", lineHeight: "var(--c-leading-relaxed)" }}>
+        系统将自动遍历所有已完成且通过质量门禁的产业链深度研究研报，按时间先后顺序智能增量提取上/中/下游代表公司与业务定位，经 A 股官方名录校验防幻觉后，智能增量合并沉淀到知识库图谱中。
+      </div>
+
+      {batchMineMutation.isPending && (
+        <div style={{ textAlign: "center", padding: "36px 0" }}>
+          <Spin />
+          <div style={{ marginTop: 12, color: colors.textMuted }}>
+            正在扫描历史研报并智能增量合并产业链…请稍候
+          </div>
+        </div>
+      )}
+
+      {result && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 12,
+              padding: 14,
+              background: `${colors.primary}10`,
+              borderRadius: 8,
+              border: `1px solid ${colors.primary}30`,
+              textAlign: "center",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: colors.textPrimary }}>
+                {result.scanned}
+              </div>
+              <div style={{ fontSize: 12, color: colors.textMuted }}>扫描历史研报</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: colors.success }}>
+                {result.succeeded}
+              </div>
+              <div style={{ fontSize: 12, color: colors.textMuted }}>成功入库/更新</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: colors.textMuted }}>
+                {result.skipped}
+              </div>
+              <div style={{ fontSize: 12, color: colors.textMuted }}>跳过/无需更新</div>
+            </div>
+          </div>
+
+          {result.chains.length > 0 ? (
+            <div style={{ maxHeight: 280, overflowY: "auto", border: `1px solid ${colors.border}`, borderRadius: 8 }}>
+              <Table
+                size="small"
+                pagination={false}
+                dataSource={result.chains.map((c, i) => ({ ...c, key: i }))}
+                columns={[
+                  { title: "产业链名称", dataIndex: "name", key: "name", render: (name) => <b>{name}</b> },
+                  {
+                    title: "动作",
+                    dataIndex: "action",
+                    key: "action",
+                    render: (action) => (
+                      <Tag color={action === "created" ? "success" : "processing"}>
+                        {action === "created" ? "新增入库" : "增量合并"}
+                      </Tag>
+                    ),
+                  },
+                  { title: "细分环节", dataIndex: "segment_count", key: "segment_count", align: "right" },
+                  { title: "公司数", dataIndex: "company_count", key: "company_count", align: "right" },
+                ]}
+              />
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", padding: 24, color: colors.textMuted }}>
+              暂无可挖掘的有效历史研报（需要完成状态且通过质量检验）
+            </div>
+          )}
+        </div>
+      )}
     </Modal>
   );
 }
@@ -394,185 +2057,5 @@ function CategoryChip({
     >
       {label}
     </button>
-  );
-}
-
-function ChainAtlasDetail({
-  chain,
-  onAnalyze,
-  onCompanyClick,
-}: {
-  chain: NonNullable<ReturnType<typeof useIndustryChainAtlasChain>["data"]>;
-  onAnalyze: (name: string) => void;
-  onCompanyClick: (code: string) => void;
-}) {
-  const colors = useColors();
-  const { cardStyle } = useStyles();
-
-  return (
-    <div>
-      <div style={{ ...cardStyle, padding: "18px 22px", marginBottom: 16 }}>
-        <div className="atlas-detail__heading" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <strong className="atlas-detail__name" style={{ fontSize: "var(--c-font-xl)", color: colors.textPrimary }}>{chain.name}</strong>
-          <Tag className="atlas-wrap-tag">{chain.category}</Tag>
-          {(chain.tags ?? []).map((tag) => (
-            <Tag key={tag} className="atlas-wrap-tag" color="processing">{tag}</Tag>
-          ))}
-          <Button
-            type="primary"
-            icon={<ExperimentOutlined />}
-            style={{ marginLeft: "auto" }}
-            onClick={() => onAnalyze(chain.name)}
-          >
-            AI 深度分析
-          </Button>
-        </div>
-        <div className="atlas-detail__summary" style={{ color: colors.textSecondary, fontSize: "var(--c-font-md)", lineHeight: "var(--c-leading-relaxed)", marginTop: 8 }}>
-          {chain.summary}
-        </div>
-        {(chain.drivers ?? []).length > 0 && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-            {(chain.drivers ?? []).map((driver) => (
-              <span
-                key={driver}
-                className="atlas-driver-chip"
-                style={{
-                  fontSize: "var(--c-font-sm)",
-                  color: colors.warning,
-                  background: `${colors.warning}14`,
-                  border: `1px solid ${colors.warning}33`,
-                  borderRadius: 6,
-                  padding: "2px 8px",
-                }}
-              >
-                驱动 · {driver}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {chain.layers.map((layer, index) => (
-          <div key={layer.key}>
-            <AtlasLayerBand layer={layer} onCompanyClick={onCompanyClick} />
-            {index < chain.layers.length - 1 && (
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, padding: "8px 0", color: colors.textMuted }}>
-                <span style={{ height: 1, width: 40, background: colors.border }} />
-                <span style={{ fontSize: 12, opacity: 0.7, letterSpacing: 2 }}>↓ 传导流向</span>
-                <span style={{ height: 1, width: 40, background: colors.border }} />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", marginTop: 16, textAlign: "center" }}>
-        点击公司节点可跳转个股研究 · 数据为静态策划知识库，深度结论请使用个股研究
-      </div>
-    </div>
-  );
-}
-
-function AtlasLayerBand({
-  layer,
-  onCompanyClick,
-}: {
-  layer: AtlasLayer;
-  onCompanyClick: (code: string) => void;
-}) {
-  const colors = useColors();
-  const accent = colors[LAYER_ACCENTS[layer.key]];
-
-  return (
-    <div
-      style={{
-        border: `1px solid ${colors.border}`,
-        borderRadius: 12,
-        background: colors.cardBg,
-        overflow: "hidden",
-      }}
-    >
-      <div
-        className="atlas-layer__heading"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "10px 16px",
-          borderBottom: `1px solid ${colors.border}`,
-          background: `linear-gradient(90deg, ${accent}14, transparent)`,
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: 999,
-            background: accent,
-            boxShadow: `0 0 8px ${accent}`,
-            flexShrink: 0,
-          }}
-        />
-        <strong className="atlas-layer__name" style={{ color: colors.textPrimary, fontSize: "var(--c-font-base)" }}>{layer.name}</strong>
-        <span className="atlas-layer__count" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
-          {layer.segments.length} 个环节
-        </span>
-      </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-          gap: 12,
-          padding: 14,
-        }}
-      >
-        {layer.segments.map((segment) => (
-          <div
-            key={segment.name}
-            className="atlas-segment"
-            style={{
-              border: `1px solid ${colors.border}`,
-              borderRadius: 10,
-              background: colors.nestedBg,
-              padding: "10px 12px",
-            }}
-          >
-            <div className="atlas-segment__heading" style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 3, height: 12, borderRadius: 2, background: accent }} />
-              <strong className="atlas-segment__name" style={{ fontSize: "var(--c-font-md)", color: colors.textPrimary }}>{segment.name}</strong>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {segment.companies.map((company) => (
-                <button
-                  key={`${company.code}-${company.name}`}
-                  type="button"
-                  className="atlas-company-chip"
-                  title={company.note || company.name}
-                  onClick={() => onCompanyClick(company.code)}
-                  style={{
-                    border: `1px solid ${colors.border}`,
-                    background: colors.cardBg,
-                    borderRadius: 8,
-                    padding: "4px 9px",
-                    fontSize: "var(--c-font-sm)",
-                    color: colors.textPrimary,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <span className="atlas-company-chip__name">{company.name}</span>
-                  <span className="financial-num atlas-company-chip__code" style={{ color: accent, fontSize: "var(--c-font-xs)" }}>
-                    {company.code}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }

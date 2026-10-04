@@ -1,4 +1,5 @@
 import type { StockSearchItem } from "../types/stock";
+import { parseStockCode } from "./stockLinks";
 
 export function normalizeStockSearchInput(value: string): string {
   return value.trim();
@@ -28,6 +29,10 @@ export function resolveStockSearchCode(
 ): string | null {
   const normalizedInput = normalizeStockSearchInput(input);
   if (/^\d{6}$/.test(normalizedInput)) return normalizedInput;
+  const parsed = parseStockCode(normalizedInput);
+  if (parsed && (parsed.market === "cn" || normalizedInput.length >= 4 || /^(?:hk)?\d{5}(?:\.hk)?$/i.test(normalizedInput))) {
+    return parsed.code;
+  }
   if (!normalizedInput || normalizedInput !== normalizeStockSearchInput(resultQuery)) return null;
   return results[0]?.code ?? null;
 }

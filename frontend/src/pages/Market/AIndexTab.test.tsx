@@ -29,8 +29,8 @@ vi.mock("../../api/queries", () => ({
       refetch: vi.fn(),
     };
   },
-  useMarketIndexKline: (symbol: string, period: string) => {
-    mocks.kline(symbol, period);
+  useMarketIndexKline: (symbol: string, period: string, options?: { startDate?: string }) => {
+    mocks.kline(symbol, period, options);
     return {
       data: { items: [{ date: "2026-08-12", open: 1, close: 2, high: 2, low: 1, volume: 10 }] },
       isLoading: false,
@@ -41,7 +41,25 @@ vi.mock("../../api/queries", () => ({
 }));
 
 vi.mock("../../charts/LazyKlineChart", () => ({
-  default: () => <div>指数K线图</div>,
+  default: ({
+    viewKey,
+    onReachLeftEdge,
+    historyLimitReached,
+  }: {
+    viewKey?: string;
+    onReachLeftEdge?: () => void;
+    historyLimitReached?: boolean;
+  }) => (
+    <div data-testid="lazy-kline-chart" data-view-key={viewKey}>
+      <span>指数K线图</span>
+      {onReachLeftEdge ? (
+        <button type="button" data-testid="kline-expand-history" onClick={onReachLeftEdge}>
+          向左滑动
+        </button>
+      ) : null}
+      <span data-testid="kline-history-limit">{historyLimitReached ? "limit" : "more"}</span>
+    </div>
+  ),
 }));
 vi.mock("../../charts/IntradayChart", () => ({
   default: () => <div>指数分时图</div>,
@@ -66,18 +84,18 @@ describe("AIndexTab", () => {
       </MemoryRouter>,
     );
 
-    expect(mocks.kline).toHaveBeenCalledWith("399001", "weekly");
+    expect(mocks.kline).toHaveBeenCalledWith("399001", "weekly", { startDate: expect.any(String) });
     expect(mocks.intraday).toHaveBeenCalledWith("399001");
     expect(screen.getByText("指数分时图")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /深证成指/ })).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.click(screen.getByRole("button", { name: /上证指数/ }));
-    await waitFor(() => expect(mocks.kline).toHaveBeenCalledWith("000001", "weekly"));
+    await waitFor(() => expect(mocks.kline).toHaveBeenCalledWith("000001", "weekly", { startDate: expect.any(String) }));
     await waitFor(() => expect(mocks.intraday).toHaveBeenCalledWith("000001"));
     expect(screen.getByTestId("location-search")).not.toHaveTextContent("index=");
 
     fireEvent.click(screen.getByText("月K"));
-    await waitFor(() => expect(mocks.kline).toHaveBeenCalledWith("000001", "monthly"));
+    await waitFor(() => expect(mocks.kline).toHaveBeenCalledWith("000001", "monthly", { startDate: expect.any(String) }));
     expect(screen.getByTestId("location-search")).toHaveTextContent("period=monthly");
   });
 
@@ -100,6 +118,40 @@ describe("AIndexTab", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /上证指数/ })).toHaveAttribute("aria-pressed", "true"));
     expect(screen.getByRole("button", { name: /上证指数/ }).closest(".ant-col")).toHaveClass("ant-col-lg-6");
     expect(screen.getByTestId("location-search")).not.toHaveTextContent("index=");
-    expect(mocks.kline).toHaveBeenLastCalledWith("000001", "daily");
+    expect(mocks.kline).toHaveBeenLastCalledWith("000001", "daily", { startDate: expect.any(String) });
+  });
+
+  it("defaults to one year of history and extends by one year per left-edge request up to ten years", async () => {
+    render(
+      <MemoryRouter initialEntries={["/market?tab=a-index&index=000001"]}>
+        <AIndexTab />
+      </MemoryRouter>,
+    );
+
+    const rangeHint = () => screen.getByTestId("index-kline-history-range").textContent ?? "";
+    expect(rangeHint()).toContain("近 1 年");
+    expect(rangeHint()).toContain("最多 10 年");
+
+    // 左缘触底逐年前扩，最多 10 年
+    for (let years = 2; years <= 10; years += 1) {
+      fireEvent.click(screen.getByTestId("kline-expand-history"));
+      expect(rangeHint()).toContain(years === 10 ? "已加载近 10 年" : `近 ${years} 年`);
+    }
+    // 到达上限后不再挂载扩充按钮
+    expect(screen.queryByTestId("kline-expand-history")).not.toBeInTheDocument();
+  });
+
+  it("resets the history window when index or period changes", async () => {
+    render(
+      <MemoryRouter initialEntries={["/market?tab=a-index&index=000001"]}>
+        <AIndexTab />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByTestId("kline-expand-history"));
+    expect(screen.getByTestId("index-kline-history-range")).toHaveTextContent("近 2 年");
+
+    fireEvent.click(screen.getByText("周K"));
+    expect(screen.getByTestId("index-kline-history-range")).toHaveTextContent("近 1 年");
   });
 });

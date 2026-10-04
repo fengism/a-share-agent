@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CloseOutlined,
   FullscreenOutlined,
-  LineChartOutlined,
   ReloadOutlined,
   SearchOutlined,
   StarOutlined,
@@ -32,15 +31,17 @@ import {
   useHKStocks,
   type HKKlineData,
   type HKStockQuote,
-  type HKStockSearchItem,
 } from "../../api/queryHooks/hk";
 import { useAddWatchlistItem } from "../../api/queryHooks/watchlist";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useNavigate } from "react-router-dom";
 import LazyKlineChart from "../../charts/LazyKlineChart";
 import ChangeValue from "../../components/ChangeValue";
+import PreloadLink from "../../components/PreloadLink";
 import SectionDataState from "../../components/SectionDataState";
 import { useColors, useStyles, useTokens, type ThemeColors } from "../../styles/ui";
 import type { KlineItem } from "../../types/stock";
+import { buildStockProfileUrl } from "../../utils/stockLinks";
 import "./hk-market.css";
 
 const { Title, Paragraph, Text } = Typography;
@@ -50,6 +51,7 @@ const PERIOD_OPTIONS = [
   { label: "日K", value: "daily" },
   { label: "周K", value: "weekly" },
   { label: "月K", value: "monthly" },
+  { label: "年K", value: "annual" },
 ];
 const ADJUST_OPTIONS = [
   { label: "不复权", value: "none" },
@@ -112,6 +114,7 @@ export default function HKMarketTab({
 }: HKMarketTabProps = {}) {
   const colors = useColors();
   const tokens = useTokens();
+  const navigate = useNavigate();
   const { pageContainerStyle, pageHeaderStyle, pageTitleStyle, pageDescriptionStyle } = useStyles();
   const [activeIndex, setActiveIndex] = useState("HSI");
   const [indexPeriod, setIndexPeriod] = useState("daily");
@@ -218,7 +221,14 @@ export default function HKMarketTab({
       dataIndex: "code",
       key: "code",
       width: 96,
-      render: (value: string) => <Text className="financial-num" strong style={{ color: colors.primary }}>{value}</Text>,
+      render: (value: string) => (
+        <PreloadLink
+          to={buildStockProfileUrl(value)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Text className="financial-num" strong style={{ color: colors.primary, cursor: "pointer" }}>{value}</Text>
+        </PreloadLink>
+      ),
     },
     {
       title: "名称",
@@ -227,10 +237,15 @@ export default function HKMarketTab({
       width: 170,
       ellipsis: true,
       render: (_: unknown, record: HKStockQuote) => (
-        <div className="hk-stock-name-cell">
-          <Text strong ellipsis style={{ color: colors.textPrimary }}>{record.name}</Text>
+        <PreloadLink
+          to={buildStockProfileUrl(record.code)}
+          onClick={(e) => e.stopPropagation()}
+          className="hk-stock-name-cell"
+          style={{ display: "block" }}
+        >
+          <Text strong ellipsis style={{ color: colors.textPrimary, cursor: "pointer" }}>{record.name}</Text>
           {record.english_name && <span className="hk-stock-english-name">{record.english_name}</span>}
-        </div>
+        </PreloadLink>
       ),
     },
     {
@@ -301,14 +316,13 @@ export default function HKMarketTab({
         <Button
           type="link"
           size="small"
-          icon={<LineChartOutlined />}
-          aria-label={`查看${record.name}走势`}
+          aria-label={`查看${record.name}资料`}
           onClick={(e) => {
             e.stopPropagation();
             handleStockRowClick(record);
           }}
         >
-          走势
+          资料
         </Button>
       ),
     },
@@ -326,13 +340,8 @@ export default function HKMarketTab({
   };
 
   const selectSearchItem = (code: string) => {
-    const stock = searchItems.find((item: HKStockSearchItem) => item.code === code);
-    if (stock) {
-      setSearch(stock.name);
-      setSelectedSearchValue(stock.name.trim());
-      setActiveStock(stock);
-      onStockSelect?.(stock.code);
-    }
+    onStockSelect?.(code);
+    navigate(buildStockProfileUrl(code));
   };
 
   const handleSearchChange = (value: string) => {
@@ -341,8 +350,8 @@ export default function HKMarketTab({
   };
 
   const handleStockRowClick = (record: HKStockQuote) => {
-    setActiveStock(record);
     onStockSelect?.(record.code);
+    navigate(buildStockProfileUrl(record.code));
   };
 
   const handleCloseStock = () => {
@@ -555,6 +564,13 @@ export default function HKMarketTab({
                 onChange={(value) => setAdjust(String(value))}
               />
               <Button
+                type="primary"
+                size="small"
+                onClick={() => navigate(buildStockProfileUrl(activeStock.code))}
+              >
+                个股资料
+              </Button>
+              <Button
                 type="text"
                 size="small"
                 icon={<FullscreenOutlined />}
@@ -732,6 +748,7 @@ export default function HKMarketTab({
             onRow={(record) => ({
               onClick: () => handleStockRowClick(record),
               tabIndex: 0,
+              style: { cursor: "pointer" },
               onKeyDown: (event) => {
                 if (event.key === "Enter") handleStockRowClick(record);
               },
@@ -760,13 +777,21 @@ export default function HKMarketTab({
             dataSource={selectedStocks}
             pagination={false}
             scroll={{ x: 760 }}
+            onRow={(record) => ({
+              onClick: () => handleStockRowClick(record),
+              tabIndex: 0,
+              style: { cursor: "pointer" },
+              onKeyDown: (event) => {
+                if (event.key === "Enter") handleStockRowClick(record);
+              },
+            })}
           />
         </Card>
       )}
 
       {/* ── 指数全屏模态框 ── */}
       <Modal
-        title={`${activeIndexObj?.name ?? activeIndex} · ${indexPeriod === "daily" ? "日K" : indexPeriod === "weekly" ? "周K" : "月K"}线全屏`}
+        title={`${activeIndexObj?.name ?? activeIndex} · ${indexPeriod === "daily" ? "日K" : indexPeriod === "weekly" ? "周K" : indexPeriod === "monthly" ? "月K" : "年K"}线全屏`}
         open={indexChartExpanded}
         onCancel={() => setIndexChartExpanded(false)}
         footer={null}
@@ -783,7 +808,7 @@ export default function HKMarketTab({
       {/* ── 个股全屏模态框 ── */}
       {activeStock && (
         <Modal
-          title={`${activeStock.name}（${activeStock.code}）· ${stockPeriod === "daily" ? "日K" : stockPeriod === "weekly" ? "周K" : "月K"}线全屏`}
+          title={`${activeStock.name}（${activeStock.code}）· ${stockPeriod === "daily" ? "日K" : stockPeriod === "weekly" ? "周K" : stockPeriod === "monthly" ? "月K" : "年K"}线全屏`}
           open={stockChartExpanded}
           onCancel={() => setStockChartExpanded(false)}
           footer={null}

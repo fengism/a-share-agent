@@ -1,5 +1,5 @@
 from app.core.security import hash_token, now_ts
-from app.infrastructure.persistence.connection import get_connection
+from app.infrastructure.persistence.connection import get_connection, unit_of_work
 
 
 def _connection():
@@ -7,12 +7,11 @@ def _connection():
 
 
 def create_invite(created_by: int, code: str, expires_at: str | None = None) -> dict:
-    connection = _connection()
-    connection.execute(
-        "INSERT INTO invites (code, created_by, expires_at) VALUES (?, ?, ?)",
-        (code, created_by, expires_at),
-    )
-    connection.commit()
+    with unit_of_work("user", immediate=True) as work:
+        work.connection.execute(
+            "INSERT INTO invites (code, created_by, expires_at) VALUES (?, ?, ?)",
+            (code, created_by, expires_at),
+        )
     return get_invite(code)
 
 
@@ -47,49 +46,45 @@ def revoke_invite(code: str, created_by: int | None = None) -> str:
         return "not_found"
     if invite["used_by"] is not None:
         return "used"
-    connection = _connection()
-    cursor = connection.execute(
-        "DELETE FROM invites WHERE code = ? AND used_by IS NULL",
-        (code,),
-    )
-    connection.commit()
-    return "revoked" if cursor.rowcount == 1 else "used"
+    with unit_of_work("user", immediate=True) as work:
+        cursor = work.connection.execute(
+            "DELETE FROM invites WHERE code = ? AND used_by IS NULL",
+            (code,),
+        )
+        return "revoked" if cursor.rowcount == 1 else "used"
 
 
 def cleanup_expired_invites() -> int:
-    connection = _connection()
     current_time = now_ts()
-    cursor = connection.execute(
-        "DELETE FROM invites WHERE used_by IS NULL AND expires_at IS NOT NULL AND expires_at < ?",
-        (current_time,),
-    )
-    connection.commit()
-    return cursor.rowcount
+    with unit_of_work("user", immediate=True) as work:
+        cursor = work.connection.execute(
+            "DELETE FROM invites WHERE used_by IS NULL AND expires_at IS NOT NULL AND expires_at < ?",
+            (current_time,),
+        )
+        return cursor.rowcount
 
 
 def create_password_reset(user_id: int, created_by: int, token: str, expires_at: str) -> None:
-    connection = _connection()
-    connection.execute(
-        "INSERT INTO password_resets (token_hash, user_id, created_by, expires_at) VALUES (?, ?, ?, ?)",
-        (hash_token(token), user_id, created_by, expires_at),
-    )
-    connection.commit()
+    with unit_of_work("user", immediate=True) as work:
+        work.connection.execute(
+            "INSERT INTO password_resets (token_hash, user_id, created_by, expires_at) VALUES (?, ?, ?, ?)",
+            (hash_token(token), user_id, created_by, expires_at),
+        )
 
 
 def consume_password_reset(token: str) -> int | None:
-    connection = _connection()
     token_hash = hash_token(token)
     current_time = now_ts()
-    cursor = connection.execute(
-        "UPDATE password_resets SET used_at = ? "
-        "WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?",
-        (current_time, token_hash, current_time),
-    )
-    connection.commit()
-    if cursor.rowcount != 1:
-        return None
-    row = connection.execute(
-        "SELECT user_id FROM password_resets WHERE token_hash = ?",
-        (token_hash,),
-    ).fetchone()
-    return row["user_id"] if row else None
+    with unit_of_work("user", immediate=True) as work:
+        cursor = work.connection.execute(
+            "UPDATE password_resets SET used_at = ? "
+            "WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?",
+            (current_time, token_hash, current_time),
+        )
+        if cursor.rowcount != 1:
+            return None
+        row = work.connection.execute(
+            "SELECT user_id FROM password_resets WHERE token_hash = ?",
+            (token_hash,),
+        ).fetchone()
+        return row["user_id"] if row else None

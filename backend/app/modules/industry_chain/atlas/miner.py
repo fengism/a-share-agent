@@ -9,6 +9,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 from app.configuration import get_settings
 from app.core.market import is_a_share_code
@@ -129,6 +133,8 @@ async def build_mined_chain(result: IndustryChainResult) -> AtlasChain | None:
         "drivers": (result.drivers or [])[:3],
         "layers": layers,
         "mined": True,
+        "mined_at": datetime.now().isoformat(timespec="seconds"),
+        "archive_id": result.archive_id or "",
     })
 
 
@@ -162,3 +168,54 @@ async def auto_mine_from_result(result: IndustryChainResult) -> None:
         logger.warning(
             "产业链知识库自动挖掘失败: name=%s", result.name, exc_info=True,
         )
+
+
+class AtlasBatchMineItem(BaseModel):
+    """批量挖掘的单条结果。action=created 新建条目，merged 覆盖同 slug 旧条目。"""
+
+    name: str
+    slug: str
+    action: Literal["created", "merged"]
+    company_count: int = 0
+    segment_count: int = 0
+
+
+class AtlasBatchMineResponse(BaseModel):
+    """批量挖掘汇总；scanned 为扫描存档数，skipped 为未通过质量门或内容不足的存档数。"""
+
+    scanned: int = 0
+    succeeded: int = 0
+    skipped: int = 0
+    chains: list[AtlasBatchMineItem] = Field(default_factory=list)
+
+
+async def batch_mine_atlas_chains(
+    results: list[tuple[str, IndustryChainResult]],
+) -> AtlasBatchMineResponse:
+    """批量挖掘多条存档；单条失败只跳过，不影响其余条目。"""
+    existing_slugs = set(_registry.current().chains)
+    response = AtlasBatchMineResponse(scanned=len(results))
+    for name, result in results:
+        try:
+            slug = mining_slug(result.name or name)
+            action: Literal["created", "merged"] = "merged" if slug in existing_slugs else "created"
+            chain = await mine_and_save_atlas_chain(result)
+        except Exception:
+            logger.warning("产业链知识库批量挖掘失败: name=%s", name, exc_info=True)
+            response.skipped += 1
+            continue
+        if chain is None:
+            response.skipped += 1
+            continue
+        existing_slugs.add(chain.slug)
+        response.succeeded += 1
+        response.chains.append(
+            AtlasBatchMineItem(
+                name=chain.name,
+                slug=chain.slug,
+                action=action,
+                company_count=chain.company_count,
+                segment_count=chain.segment_count,
+            )
+        )
+    return response

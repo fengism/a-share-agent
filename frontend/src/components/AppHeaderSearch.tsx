@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { AutoComplete, Input, type InputRef } from "antd";
+import { AutoComplete, Input, Tag, type InputRef } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useStockSearchController } from "../hooks/useStockSearchController";
@@ -47,34 +47,42 @@ export default function AppHeaderSearch({ isMobile, autoFocus = false }: AppHead
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
-  const searchOptions = useMemo(() => currentResults.map((item) => ({
-    value: item.code,
-    label: (
-      <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: tokens.space[3] }}>
-        <span style={{ display: "flex", alignItems: "center", gap: tokens.space[2], minWidth: 0 }}>
-          <span style={{ color: colors.primary, fontWeight: Number(tokens.weight.semibold), fontSize: tokens.font.md, fontFamily: "var(--c-font-mono)" }}>{item.code}</span>
-          <span style={{ color: colors.textPrimary, fontSize: tokens.font.md, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {item.name}
-          </span>
-        </span>
-        {!isMobile && item.price != null && (
-          <span style={{
-            fontSize: tokens.font.sm,
-            fontWeight: Number(tokens.weight.medium),
-            flexShrink: 0,
-            color: item.change_pct != null
-              ? (item.change_pct > 0 ? colors.up : item.change_pct < 0 ? colors.down : colors.textSecondary)
-              : colors.textSecondary,
-          }}>
-            {item.price.toFixed(2)}
-            {item.change_pct != null && (
-              <span style={{ marginLeft: tokens.space[1] }}>{item.change_pct > 0 ? "+" : ""}{item.change_pct.toFixed(2)}%</span>
+  const searchOptions = useMemo(() => currentResults.map((item) => {
+    const isHk = item.market === "hk" || /^\d{5}$/.test(item.code);
+    return {
+      value: item.code,
+      label: (
+        <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: tokens.space[3] }}>
+          <span style={{ display: "flex", alignItems: "center", gap: tokens.space[2], minWidth: 0 }}>
+            {isHk && (
+              <Tag color="blue" style={{ fontSize: 10, lineHeight: "16px", padding: "0 4px", margin: 0 }}>
+                港股
+              </Tag>
             )}
+            <span style={{ color: colors.primary, fontWeight: Number(tokens.weight.semibold), fontSize: tokens.font.md, fontFamily: "var(--c-font-mono)" }}>{item.code}</span>
+            <span style={{ color: colors.textPrimary, fontSize: tokens.font.md, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {item.name}
+            </span>
           </span>
-        )}
-      </span>
-    ),
-  })), [colors, tokens, currentResults, isMobile]);
+          {!isMobile && item.price != null && (
+            <span style={{
+              fontSize: tokens.font.sm,
+              fontWeight: Number(tokens.weight.medium),
+              flexShrink: 0,
+              color: item.change_pct != null
+                ? (item.change_pct > 0 ? colors.up : item.change_pct < 0 ? colors.down : colors.textSecondary)
+                : colors.textSecondary,
+            }}>
+              {isHk ? "HK$" : "¥"}{item.price.toFixed(2)}
+              {item.change_pct != null && (
+                <span style={{ marginLeft: tokens.space[1] }}>{item.change_pct > 0 ? "+" : ""}{item.change_pct.toFixed(2)}%</span>
+              )}
+            </span>
+          )}
+        </span>
+      ),
+    };
+  }), [colors, tokens, currentResults, isMobile]);
 
   const handleSelect = useCallback((code: string) => {
     navigate(buildStockProfileUrl(code));
@@ -106,7 +114,7 @@ export default function AppHeaderSearch({ isMobile, autoFocus = false }: AppHead
         ref={inputRef}
         className="app-header-search"
         size="large"
-        placeholder={isMobile ? "代码 / 名称" : "输入代码或名称 (⌘K / /)"}
+        placeholder={isMobile ? "代码 / 名称" : "输入A股/港股代码或名称 (⌘K / /)"}
         prefix={isMobile ? undefined : <SearchOutlined />}
         allowClear
         enterButton

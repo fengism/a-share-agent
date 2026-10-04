@@ -35,6 +35,7 @@ export function useHKIndexHistory(symbol: string, period: string) {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     enabled: Boolean(symbol),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -65,15 +66,17 @@ export function useHKStockSearch(query: string) {
   });
 }
 
-export function useHKStockHistory(code: string, period: string, adjust: string) {
+export function useHKStockHistory(code: string, period: string, adjust: string, startDate = "") {
+  const adjustParam = adjust || "none";
   return useQuery({
-    queryKey: queryKeys.hk.stockHistory(code, period, adjust),
+    queryKey: queryKeys.hk.stockHistory(code, period, adjustParam, startDate),
     queryFn: () => openApiGet("/api/hk/stocks/{code}/history", {
       path: { code },
-      query: { period, adjust, start_date: "", end_date: "" },
+      query: { period, adjust: adjustParam, start_date: startDate || "", end_date: "" },
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     enabled: Boolean(code),
+    placeholderData: (previous) => previous,
   });
 }
 

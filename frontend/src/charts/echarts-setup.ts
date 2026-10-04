@@ -6,7 +6,7 @@
  */
 
 import * as echarts from "echarts/core";
-import { BarChart, HeatmapChart, LineChart } from "echarts/charts";
+import { BarChart, GraphChart, HeatmapChart, LineChart } from "echarts/charts";
 import {
   TitleComponent,
   TooltipComponent,
@@ -20,6 +20,7 @@ import { CanvasRenderer } from "echarts/renderers";
 echarts.use([
   // Chart types
   BarChart,
+  GraphChart,
   HeatmapChart,
   LineChart,
   // Components

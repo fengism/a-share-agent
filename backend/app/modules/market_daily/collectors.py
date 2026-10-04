@@ -5,14 +5,17 @@ from __future__ import annotations
 import re
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime, time
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from app.core.concurrency.rate_limiter import call_blocking, sina_semaphore
 from app.core.market import SHANGHAI_TIMEZONE, safe_float
 from app.domain.market import MarketIndices
-from app.financial_data.hk.service import HKMarketService, hk_market_service
 from app.financial_data.stock.quotes.sources import get_spot_source
+
+if TYPE_CHECKING:
+    from app.financial_data.hk.service import HKMarketService
 from app.financial_data.stock.quotes.spot_snapshot import (
     _fetch_spot_akshare,
     _fetch_spot_east,
@@ -112,6 +115,7 @@ def normalize_cn_stocks(frame: pd.DataFrame, trade_date: date, source: str) -> l
             change_pct=safe_float(_first(row, "涨跌幅", "change_pct", "changepercent")) or calculated_pct,
             volume=safe_float(_first(row, "成交量", "volume")),
             amount=safe_float(_first(row, "成交额", "amount")),
+            turnover_pct=safe_float(_first(row, "换手率", "turnover_pct", "turnoverrate", "turnover")),
             source=source,
             source_quote_time=_parse_quote_time(_first(row, "日期时间", "更新时间", "time"), trade_date),
         ))
@@ -173,6 +177,7 @@ def normalize_hk_stocks(
             change_pct=safe_float(_first(row, "涨跌幅", "change_pct", "changepercent")) or calculated_pct,
             volume=safe_float(_first(row, "成交量", "volume")),
             amount=safe_float(_first(row, "成交额", "amount")),
+            turnover_pct=safe_float(_first(row, "换手率", "turnover_pct", "turnoverrate", "turnover")),
             source=source,
             source_quote_time=source_quote_time,
         ))
@@ -322,7 +327,11 @@ def _attach_verified_hk_date(frame: pd.DataFrame, trade_date: date) -> pd.DataFr
     return result
 
 
-async def fetch_hk_stocks(trade_date: date, service: HKMarketService = hk_market_service) -> CollectedMarketDailyBars:
+async def fetch_hk_stocks(trade_date: date, service: HKMarketService | None = None) -> CollectedMarketDailyBars:
+    if service is None:
+        from app.financial_data.hk.service import hk_market_service
+
+        service = hk_market_service
     await _verify_hk_trade_date(trade_date, service)
     frame = await service._call("fetch_hk_stocks_spot", service.provider.fetch_hk_stocks_spot)
     if not isinstance(frame, pd.DataFrame):
@@ -394,7 +403,11 @@ async def fetch_cn_indices(trade_date: date) -> CollectedMarketDailyBars:
     )
 
 
-async def fetch_hk_indices(trade_date: date, service: HKMarketService = hk_market_service) -> CollectedMarketDailyBars:
+async def fetch_hk_indices(trade_date: date, service: HKMarketService | None = None) -> CollectedMarketDailyBars:
+    if service is None:
+        from app.financial_data.hk.service import hk_market_service
+
+        service = hk_market_service
     records: list[MarketDailyBarRecord] = []
     for symbol in ("HSI", "HSCEI", "HSTECH"):
         frame = await service._call(

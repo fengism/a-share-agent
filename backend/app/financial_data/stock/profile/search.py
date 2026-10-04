@@ -1,6 +1,6 @@
-"""股票搜索服务。"""
-
+import asyncio
 import logging
+import re
 
 import pandas as pd
 
@@ -14,7 +14,7 @@ from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
-_SEARCH_RESULT_LIMIT = 5
+_SEARCH_RESULT_LIMIT = 8
 
 
 def _get_eastmoney_provider():
@@ -23,40 +23,42 @@ def _get_eastmoney_provider():
 
 
 def _merge_search_results(base: list[StockSearchItem], extra: list[StockSearchItem], limit: int = _SEARCH_RESULT_LIMIT) -> list[StockSearchItem]:
-    """合并基础结果与远程结果，按代码去重并限制总数。
+    """合并基础结果与补充结果，按(market, code)去重并限制总数。
 
     Param:
         base: 基础搜索结果列表
-        extra: 远程补充结果列表
+        extra: 补充搜索结果列表
         limit: 返回数量上限
     Return:
         去重合并后的结果列表
     """
     merged = list(base)
-    seen_codes = {item.code for item in base}
+    seen = {(item.market, item.code) for item in base}
     for item in extra:
-        if item.code in seen_codes:
+        key = (item.market, item.code)
+        if key in seen:
             continue
         merged.append(item)
-        seen_codes.add(item.code)
+        seen.add(key)
         if len(merged) >= limit:
             break
     return merged
 
 
-def _append_search_result(results: list[StockSearchItem], code: str, name: str) -> bool:
+def _append_search_result(results: list[StockSearchItem], code: str, name: str, market: str = "cn") -> bool:
     """向结果列表追加一项，返回是否达到上限。
 
     Param:
         results: 待追加的结果列表
         code: 股票代码
         name: 股票名称
+        market: 市场标识（'cn' 或 'hk'）
     Return:
         达到结果上限返回 True，否则 False
     """
-    if any(item.code == code for item in results):
+    if any(item.code == code and item.market == market for item in results):
         return False
-    results.append(StockSearchItem(code=code, name=name))
+    results.append(StockSearchItem(code=code, name=name, market=market))
     return len(results) >= _SEARCH_RESULT_LIMIT
 
 
@@ -132,6 +134,8 @@ def _enrich_search_results_with_spot(results: list[StockSearchItem], spot_df: pd
     enriched = list(results)
     try:
         for i, item in enumerate(enriched):
+            if item.market != "cn":
+                continue
             row = spot_df[spot_df["代码"] == item.code]
             if row.empty:
                 continue
@@ -140,6 +144,7 @@ def _enrich_search_results_with_spot(results: list[StockSearchItem], spot_df: pd
                 name=item.name,
                 price=safe_float(row.iloc[0].get("最新价")),
                 change_pct=safe_float(row.iloc[0].get("涨跌幅")),
+                market=item.market,
             )
     except Exception as e:
         logger.warning("行情数据补充失败，返回原结果: %s", e)
@@ -147,8 +152,25 @@ def _enrich_search_results_with_spot(results: list[StockSearchItem], spot_df: pd
     return enriched
 
 
+async def _search_hk_stocks(query: str, limit: int = _SEARCH_RESULT_LIMIT) -> list[StockSearchItem]:
+    try:
+        from app.financial_data.hk.service import hk_market_service
+        hk_result = await hk_market_service.search_stocks(query, limit=limit)
+        return [
+            StockSearchItem(
+                code=item.code,
+                name=item.name,
+                market="hk",
+            )
+            for item in hk_result.items
+        ]
+    except Exception as e:
+        logger.warning("港股搜索异常: %s", e)
+        return []
+
+
 async def search_stocks(query: str) -> list[StockSearchItem]:
-    """按代码或名称搜索股票，自动融合本地映射与远程建议。
+    """按代码或名称搜索股票，自动融合本地映射、港股索引与远程建议。
 
     Param:
         query: 查询关键词（代码、名称或拼音首字母）
@@ -159,10 +181,23 @@ async def search_stocks(query: str) -> list[StockSearchItem]:
     if not query:
         return []
 
-    name_map = await get_stock_name_map()
-    results = _search_local_by_code(query, name_map) if query.isdigit() else _search_local_by_name(query, name_map)
+    # 港股代码特征检测（例如 HK00700、00700、700.HK）
+    raw_hk_code = query.upper().removeprefix("HK").removesuffix(".HK").strip()
+    is_hk_code = bool(re.match(r"^\d{1,5}$", raw_hk_code)) and (
+        query.upper().startswith("HK")
+        or query.upper().endswith(".HK")
+        or (query.isdigit() and len(query) <= 5 and not (len(query) == 6))
+    )
 
-    if not results:
+    hk_stocks_task = asyncio.create_task(_search_hk_stocks(query, limit=_SEARCH_RESULT_LIMIT))
+
+    name_map = await get_stock_name_map()
+    if query.isdigit():
+        results = _search_local_by_code(query, name_map)
+    else:
+        results = _search_local_by_name(query, name_map)
+
+    if not results and not is_hk_code:
         try:
             remote_results = await provider_gateway.call(
                 "eastmoney",
@@ -179,6 +214,15 @@ async def search_stocks(query: str) -> list[StockSearchItem]:
             )
             results = _merge_search_results(results, remote_results)
         except Exception as e:
-            logger.info(f"EastMoney 搜索建议 fallback 失败: {query}, error={e}")
+            logger.info("EastMoney 搜索建议 fallback 失败: %s, error=%s", query, e)
 
-    return _enrich_search_results_with_spot(results, cache.get("stock_spot_all"))
+    hk_results = await hk_stocks_task
+
+    if is_hk_code:
+        # 用户输入港股特征代码，港股结果置前
+        merged_results = _merge_search_results(hk_results, results)
+    else:
+        # 默认 A 股置前，港股合并在后（搜“腾讯”、“美团”可命中港股，搜“中芯国际”可兼顾 A+H）
+        merged_results = _merge_search_results(results, hk_results)
+
+    return _enrich_search_results_with_spot(merged_results, cache.get("stock_spot_all"))

@@ -1,0 +1,77 @@
+slug: ai-application
+name: AI 应用
+category: 软件与AI
+summary: 覆盖底层基础算力与模型接口(MaaS)、中游行业垂直模型与多模态AI中间件/智能体系统、下游智能办公/金融投研/企业服务/电商营销/智能硬件等终端落地全链路。
+aliases: [AI应用, 人工智能应用, AI大模型应用, AI Agent, AI软件, 垂类模型, 具身应用]
+tags: [人工智能, 大模型, 软件SaaS, 智能体, 金融科技, 办公软件]
+drivers:
+  - 大模型从参数竞赛走向落地变现，Token 消耗量指数级暴增
+  - 企业级业务场景与专有知识库深度整合，Agent 智能体架构普及
+  - 端侧 AI (AI PC、AI 手机、具身终端) 本地推理加速渗透
+  - 国产自主大模型生态成熟与行业合规备案体系完善
+layers:
+  - key: upstream
+    name: 上游 · 算力基础设施、模型底座与高质量语料
+    segments:
+      - name: 算力芯片与智算基础设施
+        description: 云端训练与推理芯片、AI 服务器及集群网络互联
+        companies:
+          - { name: 寒武纪, code: "688256", note: 自研云端训推一体 AI 芯片架构 }
+          - { name: 海光信息, code: "688041", note: 国产 DCU 加速卡与兼容生态 }
+          - { name: 浪潮信息, code: "000977", note: 全栈 AI 服务器软硬件基础设施 }
+          - { name: 工业富联, code: "601138", note: 全球算力整机与高速网络制造 }
+      - name: 基础大模型与模型 API/MaaS
+        description: 通用基础大模型、开源权重底座与模型即服务平台
+        companies:
+          - { name: 阿里巴巴-W, code: "09988", note: 阿里云百炼平台与通义千问开源/闭源全模态大模型矩阵 }
+          - { name: 腾讯控股, code: "00700", note: 腾讯云智算平台与混元多模态大模型及元宝生态 }
+          - { name: 百度集团-SW, code: "09888", note: 百度智能云与文心一言通用大模型底座 }
+          - { name: 昆仑万维, code: "300418", note: 天工大模型与海外内容商业化 }
+          - { name: 三六零, code: "601360", note: 360智脑通用模型与安全防护 }
+      - name: 训练语料、数据要素与数据标注
+        description: 高质量多模态训练数据、数据清洗加工与合规确权
+        companies:
+          - { name: 海天瑞声, code: "688787", note: 全球多语言语音/文本/图像训练数据龙头 }
+          - { name: 中文在线, code: "300364", note: 海量数字版权语料与 IP 赋能 }
+  - key: midstream
+    name: 中游 · 垂直行业模型、智能体(Agent)与开发中间件
+    segments:
+      - name: 智能体 (Agent) 与垂类行业大模型
+        description: 聚焦金融/政务/工业等行业场景的垂类推理模型与智能体开发框架
+        companies:
+          - { name: 科大讯飞, code: "002230", note: 讯飞星火大模型与教育/医疗全栈落地 }
+          - { name: 拓尔思, code: "300229", note: 语义理解、海天政务与媒体垂直大模型 }
+          - { name: 云从科技, code: "688327", note: 从容多模态大模型与人机协同系统 }
+      - name: 多模态生成与 AI 创意工具中间件
+        description: AI 生图、音视频编辑、数字人驱动与创意生成工具链
+        companies:
+          - { name: 万兴科技, code: "300624", note: 万兴喵影/播姐多模态 AI 创意工具出海 }
+      - name: 端侧 AI 操作系统与交互中间件
+        description: 边缘端推理引擎、车载智能座舱与终端设备交互中间件
+        companies:
+          - { name: 中科创达, code: "300496", note: 滴水 OS 操作系统与端侧 AI 智能底座 }
+          - { name: 德赛西威, code: "002920", note: 高算力智能座舱与自动驾驶域控制器 }
+  - key: downstream
+    name: 下游 · 办公协同、金融投研、商业营销与垂直应用
+    segments:
+      - name: 智能办公与企业级协同 (AI SaaS)
+        description: 智能公文写作、表格数据分析与企业知识库问答
+        companies:
+          - { name: 金山办公, code: "688111", note: WPS AI 办公套件重塑企业与个人办公效率 }
+          - { name: 彩讯股份, code: "300634", note: Rich AI 邮箱与移动协同办公解决方案 }
+          - { name: 致远互联, code: "688369", note: AI-COP 协同运营平台与企业智能助理 }
+      - name: 金融投研、量化分析与智能投顾
+        description: 金融问财大模型、多因子投研决策与智能客服应用
+        companies:
+          - { name: 同花顺, code: "300033", note: 问财金融大模型、智能投研与金融信息服务 }
+          - { name: 东方财富, code: "300059", note: 妙想金融大模型与财富管理生态赋能 }
+          - { name: 恒生电子, code: "600570", note: 光子金融核心系统与资产管理 AI 工具 }
+      - name: 跨境电商、数字营销与内容出海
+        description: AI 独立站搭建、智能选品、跨境营销与虚拟人直播
+        companies:
+          - { name: 焦点科技, code: "002315", note: AI 麦可外贸全链路智能助理平台 }
+          - { name: 易点天下, code: "301171", note: Kreado AI 营销出海与创意生成平台 }
+      - name: AI 智慧医疗与辅助诊疗
+        description: 检验结果智能解读、临床知识库推荐与病历结构化
+        companies:
+          - { name: 润达医疗, code: "603108", note: 慧检 AI 智慧检验大模型与检验报告智能解读 }

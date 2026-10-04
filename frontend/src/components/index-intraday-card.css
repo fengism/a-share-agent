@@ -79,6 +79,10 @@
 .index-intraday-summary__legend .is-volume::before { background: var(--c-text-muted); }
 
 @media (max-width: 560px) {
+  .index-intraday-card__header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
   .index-intraday-summary { align-items: flex-start; flex-direction: column; }
   .index-intraday-summary__legend { justify-content: flex-start; }
 }

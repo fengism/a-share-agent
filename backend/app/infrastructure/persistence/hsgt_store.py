@@ -1,6 +1,6 @@
 import logging
 
-from app.infrastructure.persistence.connection import get_connection
+from app.infrastructure.persistence.connection import get_connection, unit_of_work
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,6 @@ def save_hsgt_flow(date: str, points: list[dict], updated_at: str) -> None:
     Return:
         无。
     """
-    conn = get_connection()
     rows = [
         (date, p["time"], p.get("hgt"), p.get("sgt"), p.get("total"), updated_at)
         for p in points
@@ -23,12 +22,12 @@ def save_hsgt_flow(date: str, points: list[dict], updated_at: str) -> None:
     ]
     if not rows:
         return
-    conn.executemany(
-        "INSERT OR REPLACE INTO hsgt_flow (date, time, hgt, sgt, total, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        rows,
-    )
-    conn.commit()
+    with unit_of_work("market", immediate=True) as work:
+        work.connection.executemany(
+            "INSERT OR REPLACE INTO hsgt_flow (date, time, hgt, sgt, total, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            rows,
+        )
     logger.debug(f"写入北向数据: date={date}, rows={len(rows)}")
 
 

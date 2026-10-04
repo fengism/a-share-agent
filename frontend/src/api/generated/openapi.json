@@ -1054,6 +1054,73 @@
         "title": "AnalysisResult",
         "type": "object"
       },
+      "AtlasBatchMineItem": {
+        "description": "批量挖掘的单条结果。action=created 新建条目，merged 覆盖同 slug 旧条目。",
+        "properties": {
+          "action": {
+            "enum": [
+              "created",
+              "merged"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "company_count": {
+            "default": 0,
+            "title": "Company Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "segment_count": {
+            "default": 0,
+            "title": "Segment Count",
+            "type": "integer"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "slug",
+          "action"
+        ],
+        "title": "AtlasBatchMineItem",
+        "type": "object"
+      },
+      "AtlasBatchMineResponse": {
+        "description": "批量挖掘汇总；scanned 为扫描存档数，skipped 为未通过质量门或内容不足的存档数。",
+        "properties": {
+          "chains": {
+            "items": {
+              "$ref": "#/components/schemas/AtlasBatchMineItem"
+            },
+            "title": "Chains",
+            "type": "array"
+          },
+          "scanned": {
+            "default": 0,
+            "title": "Scanned",
+            "type": "integer"
+          },
+          "skipped": {
+            "default": 0,
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "succeeded": {
+            "default": 0,
+            "title": "Succeeded",
+            "type": "integer"
+          }
+        },
+        "title": "AtlasBatchMineResponse",
+        "type": "object"
+      },
       "AtlasCatalog": {
         "properties": {
           "categories": {
@@ -1098,6 +1165,11 @@
             "title": "Aliases",
             "type": "array"
           },
+          "archive_id": {
+            "default": "",
+            "title": "Archive Id",
+            "type": "string"
+          },
           "category": {
             "title": "Category",
             "type": "string"
@@ -1121,6 +1193,11 @@
             "default": false,
             "title": "Mined",
             "type": "boolean"
+          },
+          "mined_at": {
+            "default": "",
+            "title": "Mined At",
+            "type": "string"
           },
           "name": {
             "title": "Name",
@@ -1231,6 +1308,21 @@
             "title": "Code",
             "type": "string"
           },
+          "market": {
+            "anyOf": [
+              {
+                "enum": [
+                  "cn",
+                  "hk"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -1246,6 +1338,50 @@
           "code"
         ],
         "title": "AtlasCompany",
+        "type": "object"
+      },
+      "AtlasGraph": {
+        "properties": {
+          "chain_index": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Chain Index",
+            "type": "object"
+          },
+          "chain_synergies": {
+            "items": {
+              "$ref": "#/components/schemas/ChainSynergy"
+            },
+            "title": "Chain Synergies",
+            "type": "array"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "hub_companies": {
+            "items": {
+              "$ref": "#/components/schemas/HubCompany"
+            },
+            "title": "Hub Companies",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/GraphSummary"
+          }
+        },
+        "title": "AtlasGraph",
         "type": "object"
       },
       "AtlasImportRequest": {
@@ -1576,6 +1712,46 @@
           "us_fed_funds_rate"
         ],
         "title": "CentralBankPolicyRates",
+        "type": "object"
+      },
+      "ChainSynergy": {
+        "properties": {
+          "shared_companies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Shared Companies",
+            "type": "array"
+          },
+          "shared_companies_count": {
+            "title": "Shared Companies Count",
+            "type": "integer"
+          },
+          "source_name": {
+            "title": "Source Name",
+            "type": "string"
+          },
+          "source_slug": {
+            "title": "Source Slug",
+            "type": "string"
+          },
+          "target_name": {
+            "title": "Target Name",
+            "type": "string"
+          },
+          "target_slug": {
+            "title": "Target Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_slug",
+          "source_name",
+          "target_slug",
+          "target_name",
+          "shared_companies_count"
+        ],
+        "title": "ChainSynergy",
         "type": "object"
       },
       "ChangePasswordRequest": {
@@ -2528,6 +2704,130 @@
         "title": "CommodityItem",
         "type": "object"
       },
+      "ConceptConstituentItem": {
+        "description": "成分股列表中的单只股票，含实时行情（行情不可用时各字段为 null）。",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "quote_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Source"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "title": "ConceptConstituentItem",
+        "type": "object"
+      },
+      "ConceptConstituentResponse": {
+        "description": "``GET /market/concept/{concept}/constituents`` 响应体。",
+        "properties": {
+          "concept": {
+            "title": "Concept",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptConstituentItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "quote_covered": {
+            "default": 0,
+            "title": "Quote Covered",
+            "type": "integer"
+          },
+          "quote_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Source"
+          },
+          "quoted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quoted At"
+          },
+          "related_concepts": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedConceptItem"
+            },
+            "title": "Related Concepts",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "concept",
+          "total",
+          "items"
+        ],
+        "title": "ConceptConstituentResponse",
+        "type": "object"
+      },
       "ConceptImportCommitRequest": {
         "properties": {
           "content_base64": {
@@ -2692,6 +2992,134 @@
         "title": "ConceptImportPreviewResponse",
         "type": "object"
       },
+      "ConceptIndexPoint": {
+        "description": "概念等权指数的单根 K 线。",
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "change_pct": {
+            "title": "Change Pct",
+            "type": "number"
+          },
+          "close": {
+            "title": "Close",
+            "type": "number"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "down_count": {
+            "default": 0,
+            "title": "Down Count",
+            "type": "integer"
+          },
+          "high": {
+            "title": "High",
+            "type": "number"
+          },
+          "limit_down_count": {
+            "default": 0,
+            "title": "Limit Down Count",
+            "type": "integer"
+          },
+          "limit_up_count": {
+            "default": 0,
+            "title": "Limit Up Count",
+            "type": "integer"
+          },
+          "low": {
+            "title": "Low",
+            "type": "number"
+          },
+          "open": {
+            "title": "Open",
+            "type": "number"
+          },
+          "sample_count": {
+            "default": 0,
+            "title": "Sample Count",
+            "type": "integer"
+          },
+          "up_count": {
+            "default": 0,
+            "title": "Up Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "open",
+          "high",
+          "low",
+          "close",
+          "change_pct"
+        ],
+        "title": "ConceptIndexPoint",
+        "type": "object"
+      },
+      "ConceptIndexResponse": {
+        "description": "``GET /market/concept/{concept}/index`` 响应体。",
+        "properties": {
+          "base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "concept": {
+            "title": "Concept",
+            "type": "string"
+          },
+          "constituent_total": {
+            "title": "Constituent Total",
+            "type": "integer"
+          },
+          "constituent_used": {
+            "title": "Constituent Used",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptIndexPoint"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "concept",
+          "method",
+          "constituent_total",
+          "constituent_used",
+          "items"
+        ],
+        "title": "ConceptIndexResponse",
+        "type": "object"
+      },
       "ConceptItem": {
         "properties": {
           "name": {
@@ -2708,27 +3136,6 @@
           "stock_count"
         ],
         "title": "ConceptItem",
-        "type": "object"
-      },
-      "ConceptListResponse": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ConceptItem"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "total": {
-            "title": "Total",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "items",
-          "total"
-        ],
-        "title": "ConceptListResponse",
         "type": "object"
       },
       "ConceptMutationResponse": {
@@ -2800,6 +3207,25 @@
           "stats"
         ],
         "title": "ConceptStatusResponse",
+        "type": "object"
+      },
+      "ConceptSummaryItem": {
+        "description": "概念列表中的单条摘要（名称 + 成分股只数）。",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "stock_count": {
+            "title": "Stock Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "stock_count"
+        ],
+        "title": "ConceptSummaryItem",
         "type": "object"
       },
       "ConfigResponse": {
@@ -2894,6 +3320,10 @@
           },
           "chat_max_tool_calls_total": {
             "title": "Chat Max Tool Calls Total",
+            "type": "integer"
+          },
+          "database_backup_retention_count": {
+            "title": "Database Backup Retention Count",
             "type": "integer"
           },
           "disabled_chat_agents": {
@@ -3214,6 +3644,7 @@
           "analysis_llm_timeout_seconds",
           "agent_research_timeout_seconds",
           "chat_max_tool_calls_total",
+          "database_backup_retention_count",
           "is_admin"
         ],
         "title": "ConfigResponse",
@@ -3495,6 +3926,19 @@
               }
             ],
             "title": "Chat Max Tool Calls Total"
+          },
+          "database_backup_retention_count": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database Backup Retention Count"
           },
           "disabled_chat_agents": {
             "anyOf": [
@@ -6376,6 +6820,109 @@
         "title": "GlobalMacroRatesResponse",
         "type": "object"
       },
+      "GraphEdge": {
+        "properties": {
+          "chain_name": {
+            "default": "",
+            "title": "Chain Name",
+            "type": "string"
+          },
+          "chain_slug": {
+            "default": "",
+            "title": "Chain Slug",
+            "type": "string"
+          },
+          "relation": {
+            "default": "",
+            "title": "Relation",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "GraphEdge",
+        "type": "object"
+      },
+      "GraphNode": {
+        "properties": {
+          "chain_count": {
+            "default": 0,
+            "title": "Chain Count",
+            "type": "integer"
+          },
+          "chains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Chains",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "layer": {
+            "default": "",
+            "title": "Layer",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "segments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Segments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "GraphNode",
+        "type": "object"
+      },
+      "GraphSummary": {
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "total_chains": {
+            "default": 0,
+            "title": "Total Chains",
+            "type": "integer"
+          },
+          "total_edges": {
+            "default": 0,
+            "title": "Total Edges",
+            "type": "integer"
+          },
+          "total_nodes": {
+            "default": 0,
+            "title": "Total Nodes",
+            "type": "integer"
+          }
+        },
+        "title": "GraphSummary",
+        "type": "object"
+      },
       "HKStockQuote": {
         "properties": {
           "amount": {
@@ -6875,6 +7422,55 @@
           }
         },
         "title": "HsgtFlowResponse",
+        "type": "object"
+      },
+      "HubCompany": {
+        "properties": {
+          "chain_count": {
+            "title": "Chain Count",
+            "type": "integer"
+          },
+          "chain_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Chain Names",
+            "type": "array"
+          },
+          "chains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Chains",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "layer": {
+            "default": "",
+            "title": "Layer",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "segments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Segments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "chain_count"
+        ],
+        "title": "HubCompany",
         "type": "object"
       },
       "ImportCommitRequest": {
@@ -11540,6 +12136,17 @@
             "format": "date",
             "title": "Trade Date",
             "type": "string"
+          },
+          "turnover_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnover Pct"
           },
           "verification_status": {
             "enum": [
@@ -18702,6 +19309,30 @@
         "title": "RegisterRequest",
         "type": "object"
       },
+      "RelatedConceptItem": {
+        "description": "与当前概念重叠最多的相关概念。",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "overlap": {
+            "title": "Overlap",
+            "type": "integer"
+          },
+          "ratio": {
+            "title": "Ratio",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "overlap",
+          "ratio"
+        ],
+        "title": "RelatedConceptItem",
+        "type": "object"
+      },
       "ResetLinkOut": {
         "properties": {
           "expires_at": {
@@ -21966,6 +22597,11 @@
           },
           "code": {
             "title": "Code",
+            "type": "string"
+          },
+          "market": {
+            "default": "cn",
+            "title": "Market",
             "type": "string"
           },
           "name": {
@@ -25700,6 +26336,49 @@
         ],
         "title": "WorkflowSubmissionResponse",
         "type": "object"
+      },
+      "app__financial_data__market__quotes__schemas__ConceptListResponse": {
+        "description": "``GET /market/concepts`` 响应体。",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptSummaryItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ConceptListResponse",
+        "type": "object"
+      },
+      "app__modules__stock_concept__models__ConceptListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ConceptListResponse",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -25711,7 +26390,7 @@
   },
   "info": {
     "title": "A股智能分析系统",
-    "version": "0.6.1"
+    "version": "0.7.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -28200,7 +28879,7 @@
             "required": false,
             "schema": {
               "default": "daily",
-              "pattern": "^(daily|weekly|monthly)$",
+              "pattern": "^(daily|weekly|monthly|annual)$",
               "title": "Period",
               "type": "string"
             }
@@ -28434,7 +29113,7 @@
             "required": false,
             "schema": {
               "default": "daily",
-              "pattern": "^(daily|weekly|monthly)$",
+              "pattern": "^(daily|weekly|monthly|annual)$",
               "title": "Period",
               "type": "string"
             }
@@ -28445,7 +29124,7 @@
             "required": false,
             "schema": {
               "default": "none",
-              "pattern": "^(none|qfq|hfq)$",
+              "pattern": "^(none|qfq|hfq|)$",
               "title": "Adjust",
               "type": "string"
             }
@@ -28503,6 +29182,137 @@
           }
         ],
         "summary": "Get Hk Stock History",
+        "tags": [
+          "hk"
+        ]
+      }
+    },
+    "/api/hk/stocks/{code}/indicators": {
+      "get": {
+        "description": "获取港股指定周期的技术指标（均线、MACD、RSI、布林带、KDJ、成交量均线）。",
+        "operationId": "get_hk_stock_indicators_api_hk_stocks__code__indicators_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "daily",
+              "pattern": "^(daily|weekly|monthly|annual)$",
+              "title": "Period",
+              "type": "string"
+            }
+          },
+          {
+            "description": "起始日期，留空默认一年前",
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "起始日期，留空默认一年前",
+              "title": "Start Date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "结束日期，留空默认当天",
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "结束日期，留空默认当天",
+              "title": "End Date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TechnicalIndicators"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Hk Stock Indicators",
+        "tags": [
+          "hk"
+        ]
+      }
+    },
+    "/api/hk/stocks/{code}/intraday": {
+      "get": {
+        "description": "获取港股个股分时行情数据。",
+        "operationId": "get_hk_stock_intraday_api_hk_stocks__code__intraday_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntradayData"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Hk Stock Intraday",
         "tags": [
           "hk"
         ]
@@ -28639,6 +29449,61 @@
         ]
       }
     },
+    "/api/industry-chain/atlas/graph": {
+      "get": {
+        "description": "跨链全局产业链图谱；chains 传逗号分隔 slug 时只统计这些链。",
+        "operationId": "get_industry_chain_atlas_graph_api_industry_chain_atlas_graph_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "chains",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chains"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtlasGraph"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Industry Chain Atlas Graph",
+        "tags": [
+          "industry-chain"
+        ]
+      }
+    },
     "/api/industry-chain/atlas/import": {
       "post": {
         "description": "导入外部产业链定义（管理员），校验通过后写入导入目录并立即生效。",
@@ -28732,6 +29597,43 @@
           }
         ],
         "summary": "Mine Industry Chain Atlas",
+        "tags": [
+          "industry-chain"
+        ]
+      }
+    },
+    "/api/industry-chain/atlas/mine-batch": {
+      "post": {
+        "description": "批量挖掘历史产业链存档（管理员）。\n\n逐条加载存档并挖掘，未通过质量门或内容不足的存档计入 skipped 而非中断整批。",
+        "operationId": "batch_mine_industry_chain_atlas_api_industry_chain_atlas_mine_batch_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtlasBatchMineResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Batch Mine Industry Chain Atlas",
         "tags": [
           "industry-chain"
         ]
@@ -30199,6 +31101,180 @@
         ]
       }
     },
+    "/api/market/concept/{concept}/constituents": {
+      "get": {
+        "description": "获取概念成分股及其实时行情；每只股票带全部所属概念用于反向联动。",
+        "operationId": "get_concept_constituents_api_market_concept__concept__constituents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept",
+            "required": true,
+            "schema": {
+              "title": "Concept",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConceptConstituentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Concept Constituents",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/concept/{concept}/index": {
+      "get": {
+        "description": "获取本地合成的等权概念指数（成分股前复权日线链式复利）。",
+        "operationId": "get_concept_index_api_market_concept__concept__index_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept",
+            "required": true,
+            "schema": {
+              "title": "Concept",
+              "type": "string"
+            }
+          },
+          {
+            "description": "回溯自然日天数，上限 10 年",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 365,
+              "description": "回溯自然日天数，上限 10 年",
+              "maximum": 3650,
+              "minimum": 30,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConceptIndexResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Concept Index",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/concepts": {
+      "get": {
+        "description": "获取概念列表，按成分股只数降序，用于概念选择器。",
+        "operationId": "list_concepts_api_market_concepts_get",
+        "parameters": [
+          {
+            "description": "概念名称模糊搜索",
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "概念名称模糊搜索",
+              "maxLength": 64,
+              "title": "Query",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 2000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__financial_data__market__quotes__schemas__ConceptListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Concepts",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/api/market/daily-bars": {
       "get": {
         "description": "按单日或日期范围读取独立 SQLite 中的 A/H 股及指数日行情。",
@@ -31243,13 +32319,13 @@
             }
           },
           {
-            "description": "daily / weekly / monthly",
+            "description": "daily / weekly / monthly / annual",
             "in": "query",
             "name": "period",
             "required": false,
             "schema": {
               "default": "daily",
-              "description": "daily / weekly / monthly",
+              "description": "daily / weekly / monthly / annual",
               "title": "Period",
               "type": "string"
             }
@@ -34322,7 +35398,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConceptListResponse"
+                  "$ref": "#/components/schemas/app__modules__stock_concept__models__ConceptListResponse"
                 }
               }
             },
@@ -36172,7 +37248,7 @@
     },
     "/api/stock/{code}/indicators": {
       "get": {
-        "description": "基于日 K 线计算个股常用技术指标。",
+        "description": "基于指定周期与日期范围的 K 线计算个股常用技术指标。",
         "operationId": "get_indicators_api_stock__code__indicators_get",
         "parameters": [
           {
@@ -36181,6 +37257,37 @@
             "required": true,
             "schema": {
               "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "daily",
+              "pattern": "^(daily|weekly|monthly|annual)$",
+              "title": "Period",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Start Date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "End Date",
               "type": "string"
             }
           }
@@ -36334,7 +37441,7 @@
             "required": false,
             "schema": {
               "default": "daily",
-              "pattern": "^(daily|weekly|monthly)$",
+              "pattern": "^(daily|weekly|monthly|annual)$",
               "title": "Period",
               "type": "string"
             }
@@ -36365,7 +37472,7 @@
             "required": false,
             "schema": {
               "default": "qfq",
-              "pattern": "^(qfq|hfq|)$",
+              "pattern": "^(qfq|hfq|none|)$",
               "title": "Adjust",
               "type": "string"
             }

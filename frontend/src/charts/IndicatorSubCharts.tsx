@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Segmented, Skeleton } from "antd";
-import { createChart, LineSeries, HistogramSeries, ColorType, type IChartApi, type ISeriesApi, type BusinessDay } from "lightweight-charts";
+import { createChart, LineSeries, HistogramSeries, ColorType, type IChartApi, type ISeriesApi, type BusinessDay, type MouseEventParams, type Time } from "lightweight-charts";
 import { useIndicators } from "../api/queries";
 import type { TechnicalIndicators } from "../types/stock";
 import { useColors } from "../styles/ui";
@@ -8,6 +8,7 @@ import { APP_FONT_SIZE } from "../theme/typography";
 import type { ThemeColors } from "../theme/themes";
 import { createDebouncedResizeHandler, shouldFitChartContent } from "./chartLifecycle";
 import { toBusinessDay, hexToRgba } from "./utils";
+import { MAX_KLINE_HISTORY_YEARS } from "../utils/date";
 
 export type IndicatorType = "macd" | "rsi" | "kdj";
 type Props = {
@@ -16,6 +17,12 @@ type Props = {
   height?: number;
   activeType?: IndicatorType;
   onTypeChange?: (type: IndicatorType) => void;
+  period?: string;
+  onPeriodChange?: (period: string) => void;
+  startDate?: string;
+  historyYears?: number;
+  onReachLeftEdge?: () => void;
+  historyLimitReached?: boolean;
 };
 const DEFAULT_INDICATOR_TYPES: readonly IndicatorType[] = ["macd", "rsi", "kdj"];
 type IndicatorSeries = ISeriesApi<"Line"> | ISeriesApi<"Histogram">;
@@ -160,10 +167,18 @@ export default function IndicatorSubCharts({
   height = 180,
   activeType: controlledActiveType,
   onTypeChange,
+  period: controlledPeriod,
+  onPeriodChange,
+  startDate,
+  historyYears = 1,
+  onReachLeftEdge,
+  historyLimitReached = false,
 }: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
   colorsRef.current = c;
+  const [internalPeriod, setInternalPeriod] = useState("daily");
+  const activePeriod = controlledPeriod ?? internalPeriod;
   const [internalIndicatorType, setInternalIndicatorType] = useState<IndicatorType>(
     controlledActiveType ?? types[0] ?? "macd",
   );
@@ -171,7 +186,40 @@ export default function IndicatorSubCharts({
   const activeIndicatorType = controlledActiveType ?? (
     availableTypes.includes(internalIndicatorType) ? internalIndicatorType : availableTypes[0]
   );
-  const { data: indicators, isLoading } = useIndicators(code);
+  const { data: indicators, isLoading } = useIndicators(code, activePeriod, { startDate });
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  const onReachLeftEdgeRef = useRef(onReachLeftEdge);
+  onReachLeftEdgeRef.current = onReachLeftEdge;
+  const historyLimitRef = useRef(historyLimitReached);
+  historyLimitRef.current = historyLimitReached;
+  const leftEdgePendingRef = useRef(false);
+  const anchoredLogicalRangeRef = useRef<{ from: number; to: number; length: number; viewKey: string } | null>(null);
+
+  const dates = useMemo(() => {
+    return indicators?.series?.dates ?? [];
+  }, [indicators]);
+
+  const dateToIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < dates.length; i++) {
+      map.set(dates[i], i);
+    }
+    return map;
+  }, [dates]);
+  const dateToIndexMapRef = useRef(dateToIndexMap);
+  dateToIndexMapRef.current = dateToIndexMap;
+
+  const activeIdx = hoverIndex ?? (dates.length > 0 ? dates.length - 1 : null);
+  const activeDate = activeIdx != null ? dates[activeIdx] : null;
+  const difVal = activeIdx != null ? indicators?.series?.dif?.[activeIdx] ?? null : null;
+  const deaVal = activeIdx != null ? indicators?.series?.dea?.[activeIdx] ?? null : null;
+  const macdHistVal = activeIdx != null ? indicators?.series?.macd_hist?.[activeIdx] ?? null : null;
+  const rsiVal = activeIdx != null ? indicators?.series?.rsi?.[activeIdx] ?? null : null;
+  const kVal = activeIdx != null ? indicators?.series?.k?.[activeIdx] ?? null : null;
+  const dVal = activeIdx != null ? indicators?.series?.d?.[activeIdx] ?? null : null;
+  const jVal = activeIdx != null ? indicators?.series?.j?.[activeIdx] ?? null : null;
+
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<IChartApi | null>(null);
   const seriesRefs = useRef<IndicatorSeries[]>([]);
@@ -193,8 +241,10 @@ export default function IndicatorSubCharts({
         vertLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
         horzLine: { color: colors.textMuted, labelBackgroundColor: colors.border },
       },
-      handleScroll: { mouseWheel: true, pressedMouseMove: false, horzTouchDrag: true, vertTouchDrag: false },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
+      kineticScroll: { touch: true, mouse: false },
+      trackingMode: { exitMode: 0 },
     });
     chartInstanceRef.current = chart;
     fittedViewKeyRef.current = null;
@@ -207,8 +257,46 @@ export default function IndicatorSubCharts({
     );
     resizeObserver.observe(chartRef.current);
 
+    const handleCrosshairMove = (param: MouseEventParams<Time>) => {
+      if (!param.time || typeof param.time !== "object" || !("year" in param.time)) {
+        setHoverIndex(null);
+        return;
+      }
+      const day = param.time as BusinessDay;
+      const dateKey = `${day.year}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`;
+      const idx = dateToIndexMapRef.current.get(dateKey);
+      setHoverIndex(idx ?? null);
+    };
+
+    chart.subscribeCrosshairMove(handleCrosshairMove);
+
+    const handleVisibleRangeChange = (range: { from: number; to: number } | null) => {
+      if (!range || historyLimitRef.current) {
+        leftEdgePendingRef.current = false;
+        return;
+      }
+      if (range.from > 8) {
+        leftEdgePendingRef.current = false;
+        return;
+      }
+      if (leftEdgePendingRef.current) return;
+      leftEdgePendingRef.current = true;
+      const currentLength = dateToIndexMapRef.current.size;
+      anchoredLogicalRangeRef.current = {
+        from: range.from,
+        to: range.to,
+        length: currentLength,
+        viewKey: fittedViewKeyRef.current ?? "",
+      };
+      onReachLeftEdgeRef.current?.();
+    };
+
+    chart.timeScale()?.subscribeVisibleLogicalRangeChange?.(handleVisibleRangeChange);
+
     return () => {
       resizeObserver.disconnect();
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
+      chart.timeScale()?.unsubscribeVisibleLogicalRangeChange?.(handleVisibleRangeChange);
       chart.remove();
       chartInstanceRef.current = null;
       seriesRefs.current = [];
@@ -243,12 +331,28 @@ export default function IndicatorSubCharts({
         break;
     }
 
-    const viewKey = `${code}:${activeIndicatorType}`;
-    if (shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
-      chart.timeScale().fitContent();
+    const viewKey = `${code}:${activeIndicatorType}:${activePeriod}`;
+    const anchor = anchoredLogicalRangeRef.current;
+    if (anchor && (anchor.viewKey !== viewKey || dates.length <= anchor.length)) {
+      anchoredLogicalRangeRef.current = null;
+    }
+    const pendingAnchor = anchoredLogicalRangeRef.current;
+    if (pendingAnchor && dates.length > pendingAnchor.length) {
+      anchoredLogicalRangeRef.current = null;
+      const added = dates.length - pendingAnchor.length;
+      chart.timeScale().setVisibleLogicalRange({
+        from: pendingAnchor.from + added,
+        to: pendingAnchor.to + added,
+      });
+    } else if (dates.length > 0 && shouldFitChartContent(fittedViewKeyRef.current, viewKey)) {
+      if (dates.length > 80) {
+        chart.timeScale().setVisibleLogicalRange({ from: dates.length - 80, to: dates.length + 2 });
+      } else {
+        chart.timeScale().fitContent();
+      }
       fittedViewKeyRef.current = viewKey;
     }
-  }, [activeIndicatorType, c, code, indicators]);
+  }, [activeIndicatorType, activePeriod, c, code, indicators]);
 
   useEffect(() => {
     const chart = chartInstanceRef.current;
@@ -270,43 +374,82 @@ export default function IndicatorSubCharts({
     onTypeChange?.(val);
   };
 
+  const handlePeriodChange = (val: string) => {
+    setInternalPeriod(val);
+    onPeriodChange?.(val);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-        {availableTypes.length > 1 ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {availableTypes.length > 1 ? (
+            <Segmented
+              value={activeIndicatorType}
+              onChange={(val) => handleIndicatorChange(val as IndicatorType)}
+              options={[
+                { label: "MACD(12,26,9)", value: "macd" as const },
+                { label: "RSI(14)", value: "rsi" as const },
+                { label: "KDJ(9,3,3)", value: "kdj" as const },
+              ].filter((option) => availableTypes.includes(option.value))}
+              size="small"
+            />
+          ) : (
+            <strong className="indicator-subchart__label">
+              {activeIndicatorType === "macd" ? "MACD(12,26,9)" : activeIndicatorType === "rsi" ? "RSI(14)" : "KDJ(9,3,3)"}
+            </strong>
+          )}
           <Segmented
-            value={activeIndicatorType}
-            onChange={(val) => handleIndicatorChange(val as IndicatorType)}
+            aria-label="指标周期"
+            value={activePeriod}
+            onChange={(val) => handlePeriodChange(String(val))}
             options={[
-              { label: "MACD(12,26,9)", value: "macd" as const },
-              { label: "RSI(14)", value: "rsi" as const },
-              { label: "KDJ(9,3,3)", value: "kdj" as const },
-            ].filter((option) => availableTypes.includes(option.value))}
+              { label: "日K", value: "daily" },
+              { label: "周K", value: "weekly" },
+              { label: "月K", value: "monthly" },
+              { label: "年K", value: "annual" },
+            ]}
             size="small"
           />
-        ) : (
-          <strong className="indicator-subchart__label">
-            {activeIndicatorType === "macd" ? "MACD(12,26,9)" : activeIndicatorType === "rsi" ? "RSI(14)" : "KDJ(9,3,3)"}
-          </strong>
-        )}
-        <div style={{ display: "flex", gap: 12, alignItems: "center", fontSize: "var(--c-font-xs)", color: c.textSecondary }}>
+          <span className="stock-chart-hint" data-testid="indicator-history-range">
+            {historyLimitReached
+              ? `已加载近 ${MAX_KLINE_HISTORY_YEARS} 年（上限）`
+              : `近 ${historyYears} 年 · 向左滑动加载更早数据（最多 ${MAX_KLINE_HISTORY_YEARS} 年）`}
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: "var(--c-font-xs)", color: c.textSecondary, flexWrap: "wrap" }}>
+          {activeDate && (
+            <span style={{ color: c.textMuted, fontFamily: "var(--c-font-mono)", fontSize: "11px" }}>{activeDate}</span>
+          )}
           {activeIndicatorType === "macd" && (
             <>
               <span style={{ color: c.primary, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.primary, display: "inline-block" }} /> DIF
+                <span style={{ width: 8, height: 2, background: c.primary, display: "inline-block" }} />
+                <span>DIF</span>
+                {difVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{difVal.toFixed(2)}</strong>}
               </span>
               <span style={{ color: c.accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} /> DEA
+                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} />
+                <span>DEA</span>
+                {deaVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{deaVal.toFixed(2)}</strong>}
               </span>
-              <span style={{ color: c.up, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 6, height: 6, background: c.up, display: "inline-block" }} /> MACD柱
+              <span style={{ color: macdHistVal != null && macdHistVal >= 0 ? c.up : c.down, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 6, height: 6, background: macdHistVal != null && macdHistVal >= 0 ? c.up : c.down, display: "inline-block" }} />
+                <span>MACD柱</span>
+                {macdHistVal != null && (
+                  <strong style={{ fontFamily: "var(--c-font-mono)" }}>
+                    {macdHistVal >= 0 ? `+${macdHistVal.toFixed(2)}` : macdHistVal.toFixed(2)}
+                  </strong>
+                )}
               </span>
             </>
           )}
           {activeIndicatorType === "rsi" && (
             <>
               <span style={{ color: c.accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} /> RSI(14)
+                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} />
+                <span>RSI(14)</span>
+                {rsiVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{rsiVal.toFixed(1)}</strong>}
               </span>
               <span style={{ color: c.up, opacity: 0.8, display: "inline-flex", alignItems: "center", gap: 4 }}>
                 ┄ 70超买
@@ -319,13 +462,19 @@ export default function IndicatorSubCharts({
           {activeIndicatorType === "kdj" && (
             <>
               <span style={{ color: c.primary, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.primary, display: "inline-block" }} /> K
+                <span style={{ width: 8, height: 2, background: c.primary, display: "inline-block" }} />
+                <span>K</span>
+                {kVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{kVal.toFixed(2)}</strong>}
               </span>
               <span style={{ color: c.accent, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} /> D
+                <span style={{ width: 8, height: 2, background: c.accent, display: "inline-block" }} />
+                <span>D</span>
+                {dVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{dVal.toFixed(2)}</strong>}
               </span>
               <span style={{ color: c.warning, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 2, background: c.warning, display: "inline-block" }} /> J
+                <span style={{ width: 8, height: 2, background: c.warning, display: "inline-block" }} />
+                <span>J</span>
+                {jVal != null && <strong style={{ fontFamily: "var(--c-font-mono)" }}>{jVal.toFixed(2)}</strong>}
               </span>
             </>
           )}

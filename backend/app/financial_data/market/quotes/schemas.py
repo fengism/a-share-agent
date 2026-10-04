@@ -615,3 +615,84 @@ class NationalTeamResponse(BaseModel):
     summary: NationalTeamSummary = Field(default_factory=NationalTeamSummary)
     indices: list[NationalTeamIndexSeries] = Field(default_factory=list)
     etfs: list[NationalTeamEtfSeries] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# 概念板块联动 schemas
+# ---------------------------------------------------------------------------
+
+
+class ConceptSummaryItem(BaseModel):
+    """概念列表中的单条摘要（名称 + 成分股只数）。"""
+
+    name: str
+    stock_count: int
+
+
+class ConceptListResponse(BaseModel):
+    """``GET /market/concepts`` 响应体。"""
+
+    items: List[ConceptSummaryItem]
+    total: int
+
+
+class ConceptConstituentItem(BaseModel):
+    """成分股列表中的单只股票，含实时行情（行情不可用时各字段为 null）。"""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    code: str
+    name: str
+    price: float | None = None
+    change_pct: float | None = None
+    amount: int | None = None
+    quote_source: str | None = None
+
+
+class RelatedConceptItem(BaseModel):
+    """与当前概念重叠最多的相关概念。"""
+
+    name: str
+    overlap: int
+    ratio: float
+
+
+class ConceptConstituentResponse(BaseModel):
+    """``GET /market/concept/{concept}/constituents`` 响应体。"""
+
+    concept: str
+    total: int
+    items: List[ConceptConstituentItem]
+    related_concepts: List[RelatedConceptItem] = Field(default_factory=list)
+    quoted_at: str | None = None
+    quote_source: str | None = None
+    quote_covered: int = 0
+
+
+class ConceptIndexPoint(BaseModel):
+    """概念等权指数的单根 K 线。"""
+
+    date: str
+    open: float
+    high: float
+    low: float
+    close: float
+    change_pct: float
+    amount: float | None = None
+    up_count: int = 0
+    down_count: int = 0
+    limit_up_count: int = 0
+    limit_down_count: int = 0
+    sample_count: int = 0
+
+
+class ConceptIndexResponse(BaseModel):
+    """``GET /market/concept/{concept}/index`` 响应体。"""
+
+    concept: str
+    method: str
+    base: float | None = None
+    constituent_total: int
+    constituent_used: int
+    truncated: bool = False
+    items: List[ConceptIndexPoint]

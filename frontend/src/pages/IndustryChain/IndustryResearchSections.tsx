@@ -169,8 +169,8 @@ function ChainNodeCard({ node, framed = false }: { node: IndustryChainNode; fram
   const navigate = useSafeNavigate();
 
   const handleCompanyClick = (company: string, code?: string | null) => {
-    const codeMatch = company.match(/\d{6}/);
-    const targetCode = codeMatch ? codeMatch[0] : code;
+    const codeMatch = company.match(/(?:\D|^)(\d{5,6})(?:\D|$)/);
+    const targetCode = codeMatch ? codeMatch[1] : code;
     if (targetCode) {
       navigate(buildStockProfileUrl(targetCode));
     } else {
@@ -187,11 +187,11 @@ function ChainNodeCard({ node, framed = false }: { node: IndustryChainNode; fram
         {node.code && (
           <Tag
             className="industry-nowrap-tag"
-            color="cyan"
+            color={node.code.length === 5 ? "processing" : "cyan"}
             style={{ margin: 0, flexShrink: 0, cursor: "pointer" }}
             onClick={() => navigate(buildStockProfileUrl(node.code!))}
           >
-            {node.code} ↗
+            {node.code} {node.code.length === 5 ? "港股 ↗" : "↗"}
           </Tag>
         )}
       </div>
@@ -553,8 +553,8 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
                 color="geekblue"
                 style={{ cursor: "pointer", fontSize: 12 }}
                 onClick={() => {
-                  const match = company.match(/\d{6}/);
-                  const code = match ? match[0] : node.code;
+                  const match = company.match(/(?:\D|^)(\d{5,6})(?:\D|$)/);
+                  const code = match ? match[1] : node.code;
                   if (code) navigate(buildStockProfileUrl(code));
                   else navigate(buildStockAnalysisUrl(company));
                 }}
@@ -645,9 +645,9 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
             </div>
           )}
           {chainViewMode === "graph" && (
-            <div style={{ minHeight: isNarrow ? 540 : 620, width: "100%", overflow: "hidden" }}>
+            <div style={{ minHeight: isNarrow ? 540 : 660, width: "100%", overflow: "hidden" }}>
               {result.charts[0]?.option ? (
-                <LazyIndustryChart option={result.charts[0].option} height={isNarrow ? "540px" : "620px"} />
+                <LazyIndustryChart option={result.charts[0].option} height={isNarrow ? "540px" : "660px"} />
               ) : (
                 <div style={{ textAlign: "center", padding: 40, color: colors.textMuted }}>关系图生成中...</div>
               )}

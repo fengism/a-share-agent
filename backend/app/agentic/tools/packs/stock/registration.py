@@ -75,11 +75,17 @@ def _register_stock_analysis_tools() -> None:
 
     registry.register_tool(Tool(
         name="get_stock_technical_indicators",
-        description="计算股票技术指标，包括均线、MACD、RSI、布林带、KDJ等。个股分析时必调用的核心工具。",
+        description="计算股票技术指标，包括均线、MACD、RSI、布林带、KDJ等。可指定周期（daily/weekly/monthly/annual）。",
         parameters={
             "type": "object",
             "properties": {
                 "code": _STOCK_CODE_SCHEMA,
+                "period": {
+                    "type": "string",
+                    "description": "K线周期：daily（日线，默认）、weekly（周线）、monthly（月线）、annual（年线）",
+                    "enum": ["daily", "weekly", "monthly", "annual"],
+                    "default": "daily",
+                },
             },
             "required": ["code"],
         },

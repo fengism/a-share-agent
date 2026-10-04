@@ -49,6 +49,7 @@ export const NAV_GROUPS: NavGroupConfig[] = [
         label: "市场",
         match: (p) => p.startsWith("/market") || p.startsWith("/hk-market"),
       },
+      { key: "/concept", icon: <ApartmentOutlined />, label: "概念", match: (p) => p.startsWith("/concept") },
       { key: "/national-team", icon: <BankOutlined />, label: "国家队", match: (p) => p.startsWith("/national-team") },
       {
         key: "/feed",

@@ -125,7 +125,8 @@ function StockPageContent({ code }: { code: string }) {
         ) : null}
       </SectionDataState>
       <section className="stock-page__overview-grid" aria-label="公司经营与关键指标">
-        {infoQuery.data ? <StockMetrics info={infoQuery.data} /> : null}
+        {/* 关键指标即使数据未到也要占住第一列，否则兄弟卡片会从宽列跳到窄列、整页重排 */}
+        <StockMetrics info={infoQuery.data} />
         <StockBusinessIntro code={code} />
       </section>
       <StockCharts code={code} />

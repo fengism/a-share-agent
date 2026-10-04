@@ -24,8 +24,9 @@ import re
 import shutil
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = ROOT / "backend" / "pyproject.toml"
@@ -102,7 +103,7 @@ def _set_uv_lock_version(text: str, version: str) -> str:
 
 def _set_package_json_version(text: str, version: str, path: Path) -> str:
     updated, count = re.subn(
-        r'^(  "version": )"[^"]+"', lambda match: f'{match.group(1)}"{version}"', text, count=1, flags=re.M
+        r'^(  "version": )"[^"]+"', lambda match: f'{match.group(1)}"{version}"', text, count=1, flags=re.MULTILINE
     )
     if count != 1:
         raise VersionError(f"{path.relative_to(ROOT)} 顶层找不到 version 字段")

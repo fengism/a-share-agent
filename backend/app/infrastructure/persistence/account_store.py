@@ -42,13 +42,13 @@ def create_user(
     must_change_password: bool = False,
     is_active: bool = True,
 ) -> UserRecord:
-    connection = _connection()
-    cursor = connection.execute(
-        "INSERT INTO users (username, password_hash, is_admin, must_change_password, is_active) VALUES (?, ?, ?, ?, ?)",
-        (username.strip().lower(), hash_password(password), int(is_admin), int(must_change_password), int(is_active)),
-    )
-    connection.commit()
-    return cast(UserRecord, get_user_by_id(cursor.lastrowid))
+    with unit_of_work(connection=_connection(), immediate=True) as work:
+        cursor = work.connection.execute(
+            "INSERT INTO users (username, password_hash, is_admin, must_change_password, is_active) VALUES (?, ?, ?, ?, ?)",
+            (username.strip().lower(), hash_password(password), int(is_admin), int(must_change_password), int(is_active)),
+        )
+        user_id = cursor.lastrowid
+    return cast(UserRecord, get_user_by_id(user_id))
 
 
 def ensure_default_admin(user_count: Callable[[], int] | None = None) -> str | None:
@@ -211,25 +211,23 @@ def count_active_admins() -> int:
 
 
 def set_user_active(user_id: int, is_active: bool) -> bool:
-    connection = _connection()
-    cursor = connection.execute(
-        "UPDATE users SET is_active = ? WHERE id = ?",
-        (int(is_active), user_id),
-    )
-    if not is_active:
-        connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
-    connection.commit()
-    return cursor.rowcount > 0
+    with unit_of_work(connection=_connection(), immediate=True) as work:
+        cursor = work.connection.execute(
+            "UPDATE users SET is_active = ? WHERE id = ?",
+            (int(is_active), user_id),
+        )
+        if not is_active:
+            work.connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+        return cursor.rowcount > 0
 
 
 def set_user_role(user_id: int, is_admin: bool) -> bool:
-    connection = _connection()
-    cursor = connection.execute(
-        "UPDATE users SET is_admin = ? WHERE id = ?",
-        (int(is_admin), user_id),
-    )
-    connection.commit()
-    return cursor.rowcount > 0
+    with unit_of_work(connection=_connection(), immediate=True) as work:
+        cursor = work.connection.execute(
+            "UPDATE users SET is_admin = ? WHERE id = ?",
+            (int(is_admin), user_id),
+        )
+        return cursor.rowcount > 0
 
 
 def delete_user(user_id: int) -> bool:
@@ -243,20 +241,18 @@ def delete_user(user_id: int) -> bool:
 
 
 def revoke_user_sessions(user_id: int) -> int:
-    connection = _connection()
-    cursor = connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
-    connection.commit()
-    return cursor.rowcount
+    with unit_of_work(connection=_connection(), immediate=True) as work:
+        cursor = work.connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+        return cursor.rowcount
 
 
 def set_user_must_change_password(user_id: int, must_change: bool) -> bool:
-    connection = _connection()
-    cursor = connection.execute(
-        "UPDATE users SET must_change_password = ? WHERE id = ?",
-        (int(must_change), user_id),
-    )
-    connection.commit()
-    return cursor.rowcount > 0
+    with unit_of_work(connection=_connection(), immediate=True) as work:
+        cursor = work.connection.execute(
+            "UPDATE users SET must_change_password = ? WHERE id = ?",
+            (int(must_change), user_id),
+        )
+        return cursor.rowcount > 0
 
 
 def reset_password_direct(
@@ -294,15 +290,14 @@ def record_login_audit(
     status: str,
     details: str = "",
 ) -> None:
-    connection = _connection()
-    connection.execute(
-        """
-        INSERT INTO login_audit_logs (username, user_id, ip_address, user_agent, status, details)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (username, user_id, ip_address, user_agent, status, details),
-    )
-    connection.commit()
+    with unit_of_work(connection=_connection(), immediate=True) as work:
+        work.connection.execute(
+            """
+            INSERT INTO login_audit_logs (username, user_id, ip_address, user_agent, status, details)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (username, user_id, ip_address, user_agent, status, details),
+        )
 
 
 def list_login_audit_logs(
@@ -361,16 +356,15 @@ def count_all_accounts() -> dict[str, int]:
 
 def reset_all_accounts() -> dict[str, int]:
     before = count_all_accounts()
-    connection = _connection()
-    for table in (
-        "bot_command_jobs",
-        "bot_rate_limit_events",
-        "auth_sessions",
-        "password_resets",
-        "invites",
-        "user_config",
-        "users",
-    ):
-        connection.execute(f"DELETE FROM {table}")
-    connection.commit()
+    with unit_of_work(connection=_connection(), immediate=True) as work:
+        for table in (
+            "bot_command_jobs",
+            "bot_rate_limit_events",
+            "auth_sessions",
+            "password_resets",
+            "invites",
+            "user_config",
+            "users",
+        ):
+            work.connection.execute(f"DELETE FROM {table}")
     return before

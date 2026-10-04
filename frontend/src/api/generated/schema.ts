@@ -1049,6 +1049,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hk/stocks/{code}/indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Hk Stock Indicators
+         * @description 获取港股指定周期的技术指标（均线、MACD、RSI、布林带、KDJ、成交量均线）。
+         */
+        get: operations["get_hk_stock_indicators_api_hk_stocks__code__indicators_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hk/stocks/{code}/intraday": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Hk Stock Intraday
+         * @description 获取港股个股分时行情数据。
+         */
+        get: operations["get_hk_stock_intraday_api_hk_stocks__code__intraday_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/industry-chain/atlas/chains": {
         parameters: {
             query?: never;
@@ -1093,6 +1133,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/industry-chain/atlas/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Industry Chain Atlas Graph
+         * @description 跨链全局产业链图谱；chains 传逗号分隔 slug 时只统计这些链。
+         */
+        get: operations["get_industry_chain_atlas_graph_api_industry_chain_atlas_graph_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/industry-chain/atlas/import": {
         parameters: {
             query?: never;
@@ -1127,6 +1187,28 @@ export interface paths {
          * @description 把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目（管理员）。
          */
         post: operations["mine_industry_chain_atlas_api_industry_chain_atlas_mine_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/industry-chain/atlas/mine-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch Mine Industry Chain Atlas
+         * @description 批量挖掘历史产业链存档（管理员）。
+         *
+         *     逐条加载存档并挖掘，未通过质量门或内容不足的存档计入 skipped 而非中断整批。
+         */
+        post: operations["batch_mine_industry_chain_atlas_api_industry_chain_atlas_mine_batch_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1612,6 +1694,66 @@ export interface paths {
          * @description 获取申万2级行业市场宽度热力图（收盘价站上 MA20 股票占比）。
          */
         get: operations["get_market_breadth_api_market_breadth_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/concept/{concept}/constituents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concept Constituents
+         * @description 获取概念成分股及其实时行情；每只股票带全部所属概念用于反向联动。
+         */
+        get: operations["get_concept_constituents_api_market_concept__concept__constituents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/concept/{concept}/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concept Index
+         * @description 获取本地合成的等权概念指数（成分股前复权日线链式复利）。
+         */
+        get: operations["get_concept_index_api_market_concept__concept__index_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/concepts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Concepts
+         * @description 获取概念列表，按成分股只数降序，用于概念选择器。
+         */
+        get: operations["list_concepts_api_market_concepts_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3577,7 +3719,7 @@ export interface paths {
         };
         /**
          * Get Indicators
-         * @description 基于日 K 线计算个股常用技术指标。
+         * @description 基于指定周期与日期范围的 K 线计算个股常用技术指标。
          */
         get: operations["get_indicators_api_stock__code__indicators_get"];
         put?: never;
@@ -4385,6 +4527,54 @@ export interface components {
             /** Valuation View */
             valuation_view?: string | null;
         };
+        /**
+         * AtlasBatchMineItem
+         * @description 批量挖掘的单条结果。action=created 新建条目，merged 覆盖同 slug 旧条目。
+         */
+        AtlasBatchMineItem: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "created" | "merged";
+            /**
+             * Company Count
+             * @default 0
+             */
+            company_count: number;
+            /** Name */
+            name: string;
+            /**
+             * Segment Count
+             * @default 0
+             */
+            segment_count: number;
+            /** Slug */
+            slug: string;
+        };
+        /**
+         * AtlasBatchMineResponse
+         * @description 批量挖掘汇总；scanned 为扫描存档数，skipped 为未通过质量门或内容不足的存档数。
+         */
+        AtlasBatchMineResponse: {
+            /** Chains */
+            chains?: components["schemas"]["AtlasBatchMineItem"][];
+            /**
+             * Scanned
+             * @default 0
+             */
+            scanned: number;
+            /**
+             * Skipped
+             * @default 0
+             */
+            skipped: number;
+            /**
+             * Succeeded
+             * @default 0
+             */
+            succeeded: number;
+        };
         /** AtlasCatalog */
         AtlasCatalog: {
             /** Categories */
@@ -4400,6 +4590,11 @@ export interface components {
         AtlasChain: {
             /** Aliases */
             aliases?: string[];
+            /**
+             * Archive Id
+             * @default
+             */
+            archive_id: string;
             /** Category */
             category: string;
             /** Drivers */
@@ -4411,6 +4606,11 @@ export interface components {
              * @default false
              */
             mined: boolean;
+            /**
+             * Mined At
+             * @default
+             */
+            mined_at: string;
             /** Name */
             name: string;
             /** Slug */
@@ -4455,6 +4655,8 @@ export interface components {
         AtlasCompany: {
             /** Code */
             code: string;
+            /** Market */
+            market?: ("cn" | "hk") | null;
             /** Name */
             name: string;
             /**
@@ -4462,6 +4664,22 @@ export interface components {
              * @default
              */
             note: string;
+        };
+        /** AtlasGraph */
+        AtlasGraph: {
+            /** Chain Index */
+            chain_index?: {
+                [key: string]: string;
+            };
+            /** Chain Synergies */
+            chain_synergies?: components["schemas"]["ChainSynergy"][];
+            /** Edges */
+            edges?: components["schemas"]["GraphEdge"][];
+            /** Hub Companies */
+            hub_companies?: components["schemas"]["HubCompany"][];
+            /** Nodes */
+            nodes?: components["schemas"]["GraphNode"][];
+            summary?: components["schemas"]["GraphSummary"];
         };
         /**
          * AtlasImportRequest
@@ -4604,6 +4822,21 @@ export interface components {
             china_lpr_5y: string;
             /** Us Fed Funds Rate */
             us_fed_funds_rate: string;
+        };
+        /** ChainSynergy */
+        ChainSynergy: {
+            /** Shared Companies */
+            shared_companies?: string[];
+            /** Shared Companies Count */
+            shared_companies_count: number;
+            /** Source Name */
+            source_name: string;
+            /** Source Slug */
+            source_slug: string;
+            /** Target Name */
+            target_name: string;
+            /** Target Slug */
+            target_slug: string;
         };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
@@ -4962,6 +5195,47 @@ export interface components {
             /** Volume */
             volume?: number | null;
         };
+        /**
+         * ConceptConstituentItem
+         * @description 成分股列表中的单只股票，含实时行情（行情不可用时各字段为 null）。
+         */
+        ConceptConstituentItem: {
+            /** Amount */
+            amount?: number | null;
+            /** Change Pct */
+            change_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Price */
+            price?: number | null;
+            /** Quote Source */
+            quote_source?: string | null;
+        };
+        /**
+         * ConceptConstituentResponse
+         * @description ``GET /market/concept/{concept}/constituents`` 响应体。
+         */
+        ConceptConstituentResponse: {
+            /** Concept */
+            concept: string;
+            /** Items */
+            items: components["schemas"]["ConceptConstituentItem"][];
+            /**
+             * Quote Covered
+             * @default 0
+             */
+            quote_covered: number;
+            /** Quote Source */
+            quote_source?: string | null;
+            /** Quoted At */
+            quoted_at?: string | null;
+            /** Related Concepts */
+            related_concepts?: components["schemas"]["RelatedConceptItem"][];
+            /** Total */
+            total: number;
+        };
         /** ConceptImportCommitRequest */
         ConceptImportCommitRequest: {
             /** Content Base64 */
@@ -5031,19 +5305,80 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /**
+         * ConceptIndexPoint
+         * @description 概念等权指数的单根 K 线。
+         */
+        ConceptIndexPoint: {
+            /** Amount */
+            amount?: number | null;
+            /** Change Pct */
+            change_pct: number;
+            /** Close */
+            close: number;
+            /** Date */
+            date: string;
+            /**
+             * Down Count
+             * @default 0
+             */
+            down_count: number;
+            /** High */
+            high: number;
+            /**
+             * Limit Down Count
+             * @default 0
+             */
+            limit_down_count: number;
+            /**
+             * Limit Up Count
+             * @default 0
+             */
+            limit_up_count: number;
+            /** Low */
+            low: number;
+            /** Open */
+            open: number;
+            /**
+             * Sample Count
+             * @default 0
+             */
+            sample_count: number;
+            /**
+             * Up Count
+             * @default 0
+             */
+            up_count: number;
+        };
+        /**
+         * ConceptIndexResponse
+         * @description ``GET /market/concept/{concept}/index`` 响应体。
+         */
+        ConceptIndexResponse: {
+            /** Base */
+            base?: number | null;
+            /** Concept */
+            concept: string;
+            /** Constituent Total */
+            constituent_total: number;
+            /** Constituent Used */
+            constituent_used: number;
+            /** Items */
+            items: components["schemas"]["ConceptIndexPoint"][];
+            /** Method */
+            method: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
         /** ConceptItem */
         ConceptItem: {
             /** Name */
             name: string;
             /** Stock Count */
             stock_count: number;
-        };
-        /** ConceptListResponse */
-        ConceptListResponse: {
-            /** Items */
-            items: components["schemas"]["ConceptItem"][];
-            /** Total */
-            total: number;
         };
         /** ConceptMutationResponse */
         ConceptMutationResponse: {
@@ -5071,6 +5406,16 @@ export interface components {
         /** ConceptStatusResponse */
         ConceptStatusResponse: {
             stats: components["schemas"]["ConceptStats"];
+        };
+        /**
+         * ConceptSummaryItem
+         * @description 概念列表中的单条摘要（名称 + 成分股只数）。
+         */
+        ConceptSummaryItem: {
+            /** Name */
+            name: string;
+            /** Stock Count */
+            stock_count: number;
         };
         /**
          * ConfigResponse
@@ -5121,6 +5466,8 @@ export interface components {
             bot_webhook_max_skew_seconds: number;
             /** Chat Max Tool Calls Total */
             chat_max_tool_calls_total: number;
+            /** Database Backup Retention Count */
+            database_backup_retention_count: number;
             /** Disabled Chat Agents */
             disabled_chat_agents: string[];
             /** Disabled Chat Skills */
@@ -5288,6 +5635,8 @@ export interface components {
             bot_webhook_max_skew_seconds?: number | null;
             /** Chat Max Tool Calls Total */
             chat_max_tool_calls_total?: number | null;
+            /** Database Backup Retention Count */
+            database_backup_retention_count?: number | null;
             /** Disabled Chat Agents */
             disabled_chat_agents?: string[] | null;
             /** Disabled Chat Skills */
@@ -6247,6 +6596,69 @@ export interface components {
             treasury_curve?: components["schemas"]["TreasuryCurve"];
             treasury_yields_and_spreads?: components["schemas"]["TreasuryLatest"];
         };
+        /** GraphEdge */
+        GraphEdge: {
+            /**
+             * Chain Name
+             * @default
+             */
+            chain_name: string;
+            /**
+             * Chain Slug
+             * @default
+             */
+            chain_slug: string;
+            /**
+             * Relation
+             * @default
+             */
+            relation: string;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+        };
+        /** GraphNode */
+        GraphNode: {
+            /**
+             * Chain Count
+             * @default 0
+             */
+            chain_count: number;
+            /** Chains */
+            chains?: string[];
+            /** Id */
+            id: string;
+            /**
+             * Layer
+             * @default
+             */
+            layer: string;
+            /** Name */
+            name: string;
+            /** Segments */
+            segments?: string[];
+        };
+        /** GraphSummary */
+        GraphSummary: {
+            /** Categories */
+            categories?: string[];
+            /**
+             * Total Chains
+             * @default 0
+             */
+            total_chains: number;
+            /**
+             * Total Edges
+             * @default 0
+             */
+            total_edges: number;
+            /**
+             * Total Nodes
+             * @default 0
+             */
+            total_nodes: number;
+        };
         /** HKStockQuote */
         HKStockQuote: {
             /** Amount */
@@ -6418,6 +6830,26 @@ export interface components {
              * @default
              */
             updated_at: string;
+        };
+        /** HubCompany */
+        HubCompany: {
+            /** Chain Count */
+            chain_count: number;
+            /** Chain Names */
+            chain_names?: string[];
+            /** Chains */
+            chains?: string[];
+            /** Id */
+            id: string;
+            /**
+             * Layer
+             * @default
+             */
+            layer: string;
+            /** Name */
+            name: string;
+            /** Segments */
+            segments?: string[];
         };
         /** ImportCommitRequest */
         ImportCommitRequest: {
@@ -8637,6 +9069,8 @@ export interface components {
              * Format: date
              */
             trade_date: string;
+            /** Turnover Pct */
+            turnover_pct?: number | null;
             /**
              * Verification Status
              * @enum {string}
@@ -11416,6 +11850,18 @@ export interface components {
             /** Username */
             username: string;
         };
+        /**
+         * RelatedConceptItem
+         * @description 与当前概念重叠最多的相关概念。
+         */
+        RelatedConceptItem: {
+            /** Name */
+            name: string;
+            /** Overlap */
+            overlap: number;
+            /** Ratio */
+            ratio: number;
+        };
         /** ResetLinkOut */
         ResetLinkOut: {
             /** Expires At */
@@ -12830,6 +13276,11 @@ export interface components {
             change_pct?: number | null;
             /** Code */
             code: string;
+            /**
+             * Market
+             * @default cn
+             */
+            market: string;
             /** Name */
             name: string;
             /** Price */
@@ -14095,6 +14546,23 @@ export interface components {
             /** Attached */
             attached: boolean;
             job: components["schemas"]["WorkflowJobResponse"];
+        };
+        /**
+         * ConceptListResponse
+         * @description ``GET /market/concepts`` 响应体。
+         */
+        app__financial_data__market__quotes__schemas__ConceptListResponse: {
+            /** Items */
+            items: components["schemas"]["ConceptSummaryItem"][];
+            /** Total */
+            total: number;
+        };
+        /** ConceptListResponse */
+        app__modules__stock_concept__models__ConceptListResponse: {
+            /** Items */
+            items: components["schemas"]["ConceptItem"][];
+            /** Total */
+            total: number;
         };
     };
     responses: never;
@@ -15847,6 +16315,74 @@ export interface operations {
             };
         };
     };
+    get_hk_stock_indicators_api_hk_stocks__code__indicators_get: {
+        parameters: {
+            query?: {
+                period?: string;
+                /** @description 起始日期，留空默认一年前 */
+                start_date?: string;
+                /** @description 结束日期，留空默认当天 */
+                end_date?: string;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TechnicalIndicators"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_hk_stock_intraday_api_hk_stocks__code__intraday_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntradayData"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_industry_chain_atlas_catalog_api_industry_chain_atlas_chains_get: {
         parameters: {
             query?: never;
@@ -15938,6 +16474,37 @@ export interface operations {
             };
         };
     };
+    get_industry_chain_atlas_graph_api_industry_chain_atlas_graph_get: {
+        parameters: {
+            query?: {
+                chains?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtlasGraph"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     import_industry_chain_atlas_api_industry_chain_atlas_import_post: {
         parameters: {
             query?: never;
@@ -15991,6 +16558,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AtlasChain"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    batch_mine_industry_chain_atlas_api_industry_chain_atlas_mine_batch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtlasBatchMineResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -16874,6 +17470,104 @@ export interface operations {
             };
         };
     };
+    get_concept_constituents_api_market_concept__concept__constituents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                concept: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptConstituentResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_concept_index_api_market_concept__concept__index_get: {
+        parameters: {
+            query?: {
+                /** @description 回溯自然日天数，上限 10 年 */
+                days?: number;
+            };
+            header?: never;
+            path: {
+                concept: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptIndexResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_concepts_api_market_concepts_get: {
+        parameters: {
+            query?: {
+                /** @description 概念名称模糊搜索 */
+                query?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__financial_data__market__quotes__schemas__ConceptListResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_market_daily_bars_api_market_daily_bars_get: {
         parameters: {
             query?: {
@@ -17452,7 +18146,7 @@ export interface operations {
             query: {
                 /** @description 指数代码，例如 000001 */
                 symbol: string;
-                /** @description daily / weekly / monthly */
+                /** @description daily / weekly / monthly / annual */
                 period?: string;
                 start_date?: string;
                 end_date?: string;
@@ -19404,7 +20098,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConceptListResponse"];
+                    "application/json": components["schemas"]["app__modules__stock_concept__models__ConceptListResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -20422,7 +21116,11 @@ export interface operations {
     };
     get_indicators_api_stock__code__indicators_get: {
         parameters: {
-            query?: never;
+            query?: {
+                period?: string;
+                start_date?: string;
+                end_date?: string;
+            };
             header?: never;
             path: {
                 code: string;

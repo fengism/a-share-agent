@@ -3,11 +3,12 @@ import AdminResetCard from "../../components/AdminResetCard";
 import {
   AnySearchConfigCard,
   BotConfigCard,
-  DataSourceCookiesCard,
+  DataSourceCredentialsCard,
   FredConfigCard,
   ResearchBudgetCard,
   TwitterConfigCard,
 } from "./ConfigCards";
+import BackupRetentionCard from "./BackupRetentionCard";
 import BotJobManagerCard from "./BotJobManagerCard";
 import InviteManagerCard from "./InviteManagerCard";
 import MarketDailyBarManagerCard from "./MarketDailyBarManagerCard";
@@ -20,7 +21,8 @@ interface DataSourcesSettingsSectionProps extends ConfigSectionProps {
   onSaveFred: () => void;
   anySearchConfigured: boolean;
   onSaveAnySearch: () => void;
-  onSaveDataSourceCookies: () => void;
+  fuyaoConfigured: boolean;
+  onSaveDataSourceCredentials: () => void;
 }
 
 export function DataSourcesSettingsSection({
@@ -32,7 +34,8 @@ export function DataSourcesSettingsSection({
   onSaveFred,
   anySearchConfigured,
   onSaveAnySearch,
-  onSaveDataSourceCookies,
+  fuyaoConfigured,
+  onSaveDataSourceCredentials,
 }: DataSourcesSettingsSectionProps) {
   const cardProps = { form, onChange, isSaving };
   return (
@@ -49,7 +52,11 @@ export function DataSourcesSettingsSection({
           <AnySearchConfigCard {...cardProps} configured={anySearchConfigured} onSave={onSaveAnySearch} />
         </Col>
         <Col xs={24} lg={12}>
-          <DataSourceCookiesCard {...cardProps} onSave={onSaveDataSourceCookies} />
+          <DataSourceCredentialsCard
+            {...cardProps}
+            fuyaoConfigured={fuyaoConfigured}
+            onSave={onSaveDataSourceCredentials}
+          />
         </Col>
       </Row>
     </section>
@@ -60,6 +67,7 @@ interface AdminSettingsSectionProps extends ConfigSectionProps {
   onSaveBot: () => void;
   onSaveResearchBudget: () => void;
   onSaveMarketDailyBars: () => void;
+  onSaveBackupRetention: () => void;
 }
 
 export function AdminSettingsSection({
@@ -70,6 +78,7 @@ export function AdminSettingsSection({
   onSaveBot,
   onSaveResearchBudget,
   onSaveMarketDailyBars,
+  onSaveBackupRetention,
 }: AdminSettingsSectionProps) {
   return (
     <section aria-labelledby="admin-settings-title">
@@ -88,6 +97,7 @@ export function AdminSettingsSection({
         onSave={onSaveMarketDailyBars}
       />
       <BotJobManagerCard />
+      <BackupRetentionCard form={form} onChange={onChange} isSaving={isSaving} onSave={onSaveBackupRetention} />
     </section>
   );
 }

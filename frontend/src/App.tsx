@@ -27,6 +27,7 @@ const NationalTeam = lazy(pageLoaders.nationalTeam);
 const TradingCalendar = lazy(pageLoaders.tradingCalendar);
 const Screener = lazy(pageLoaders.screener);
 const Analysis = lazy(pageLoaders.analysis);
+const Concept = lazy(pageLoaders.concept);
 const Stock = lazy(pageLoaders.stock);
 const AnalysisEntry = lazy(pageLoaders.analysisEntry);
 const InvestmentResearch = lazy(pageLoaders.investmentResearch);
@@ -199,6 +200,7 @@ export default function App() {
                   <Route path="/feed" element={<ErrorBoundary><Feed /></ErrorBoundary>} />
                   <Route path="/twitter" element={<Navigate to="/feed?tab=twitter" replace />} />
                   <Route path="/analysis" element={<ErrorBoundary><AnalysisEntry /></ErrorBoundary>} />
+                  <Route path="/stock" element={<Navigate to="/analysis" replace />} />
                   <Route path="/investment-research" element={<Navigate to="/analysis" replace />} />
                   <Route path="/investment-research/:code" element={<ErrorBoundary><InvestmentResearch /></ErrorBoundary>} />
                   <Route path="/macro" element={<ErrorBoundary><Macro /></ErrorBoundary>} />
@@ -213,6 +215,7 @@ export default function App() {
                   <Route path="/stock-concept" element={<Navigate to="/master-data?tab=concept" replace />} />
                   <Route path="/industry-classification" element={<Navigate to="/master-data?tab=industry" replace />} />
                   <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
+                  <Route path="/concept" element={<ErrorBoundary><Concept /></ErrorBoundary>} />
                   <Route path="/stock/:code" element={<ErrorBoundary><Stock /></ErrorBoundary>} />
                   <Route path="/analysis/:code" element={<ErrorBoundary><Analysis /></ErrorBoundary>} />
                 </Route>

@@ -31,6 +31,7 @@ class MarketDailyBarRecord(BaseModel):
     change_pct: float | None = None
     volume: float | None = None
     amount: float | None = None
+    turnover_pct: float | None = None
     # 日行情始终保留交易所原始（未复权）价格；复权信息独立存储。
     adjustment: Literal["none"] = "none"
     source: str
@@ -45,6 +46,8 @@ class MarketDailyBarRecord(BaseModel):
             raise ValueError("volume 不能为负数")
         if self.amount is not None and self.amount < 0:
             raise ValueError("amount 不能为负数")
+        if self.turnover_pct is not None and self.turnover_pct < 0:
+            raise ValueError("turnover_pct 不能为负数")
         if self.open is not None and self.open <= 0:
             raise ValueError("open 必须大于 0")
         if self.high is not None and self.high < max(self.close, self.open or self.close):
@@ -57,7 +60,7 @@ class MarketDailyBarRecord(BaseModel):
 
 
 class MarketCorporateAction(BaseModel):
-    market: Literal["cn"] = "cn"
+    market: Market = "cn"
     code: str
     action_date: date
     sequence: int = Field(ge=0)
@@ -73,13 +76,13 @@ class MarketCorporateAction(BaseModel):
 
 
 class MarketDailyAdjustmentFactor(BaseModel):
-    market: Literal["cn"] = "cn"
+    market: Market = "cn"
     code: str
     trade_date: date
     qfq_multiplier: float
     qfq_offset: float
-    hfq_multiplier: float
-    hfq_offset: float
+    hfq_multiplier: float | None = None
+    hfq_offset: float | None = None
     action_hash: str
     algorithm_version: str
     source: str = "tdxhub.gbbq.adjustment_factors"

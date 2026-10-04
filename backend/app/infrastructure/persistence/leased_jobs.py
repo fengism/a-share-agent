@@ -139,18 +139,17 @@ class LeasedJobStateStore:
         *,
         now: float,
     ) -> bool:
-        connection = self._connection_provider()
-        cursor = connection.execute(
-            f"""
-            UPDATE {self.table_name}
-            SET lease_until = ?, updated_at = ?
-            WHERE id = ? AND status = 'running' AND lease_owner = ?
-              AND lease_until > ?
-            """,
-            (now + max(1.0, lease_seconds), now, job_id, owner_id, now),
-        )
-        connection.commit()
-        return cursor.rowcount == 1
+        with unit_of_work(connection=self._connection_provider(), immediate=True) as work:
+            cursor = work.connection.execute(
+                f"""
+                UPDATE {self.table_name}
+                SET lease_until = ?, updated_at = ?
+                WHERE id = ? AND status = 'running' AND lease_owner = ?
+                  AND lease_until > ?
+                """,
+                (now + max(1.0, lease_seconds), now, job_id, owner_id, now),
+            )
+            return bool(cursor.rowcount == 1)
 
     def complete(
         self,
@@ -173,17 +172,16 @@ class LeasedJobStateStore:
             assignments.append(f"{_validate_identifier(column)} = ?")
             values.append(value)
         values.extend((job_id, owner_id))
-        connection = self._connection_provider()
-        cursor = connection.execute(
-            f"""
-            UPDATE {self.table_name}
-            SET {', '.join(assignments)}
-            WHERE id = ? AND status = 'running' AND lease_owner = ?
-            """,
-            values,
-        )
-        connection.commit()
-        return cursor.rowcount == 1
+        with unit_of_work(connection=self._connection_provider(), immediate=True) as work:
+            cursor = work.connection.execute(
+                f"""
+                UPDATE {self.table_name}
+                SET {', '.join(assignments)}
+                WHERE id = ? AND status = 'running' AND lease_owner = ?
+                """,
+                values,
+            )
+            return bool(cursor.rowcount == 1)
 
     def release(
         self,
@@ -193,19 +191,18 @@ class LeasedJobStateStore:
         *,
         now: float,
     ) -> bool:
-        connection = self._connection_provider()
-        cursor = connection.execute(
-            f"""
-            UPDATE {self.table_name}
-            SET status = 'pending', attempts = MAX(0, attempts - 1),
-                available_at = ?, last_error = ?, updated_at = ?,
-                lease_owner = NULL, lease_until = NULL
-            WHERE id = ? AND status = 'running' AND lease_owner = ?
-            """,
-            (now, reason[:1000], now, job_id, owner_id),
-        )
-        connection.commit()
-        return cursor.rowcount == 1
+        with unit_of_work(connection=self._connection_provider(), immediate=True) as work:
+            cursor = work.connection.execute(
+                f"""
+                UPDATE {self.table_name}
+                SET status = 'pending', attempts = MAX(0, attempts - 1),
+                    available_at = ?, last_error = ?, updated_at = ?,
+                    lease_owner = NULL, lease_until = NULL
+                WHERE id = ? AND status = 'running' AND lease_owner = ?
+                """,
+                (now, reason[:1000], now, job_id, owner_id),
+            )
+            return bool(cursor.rowcount == 1)
 
     def cancel_owned(
         self,
@@ -215,18 +212,17 @@ class LeasedJobStateStore:
         *,
         now: float,
     ) -> bool:
-        connection = self._connection_provider()
-        cursor = connection.execute(
-            f"""
-            UPDATE {self.table_name}
-            SET status = 'cancelled', completed_at = ?, updated_at = ?,
-                lease_owner = NULL, lease_until = NULL, last_error = ?
-            WHERE id = ? AND status = 'running' AND lease_owner = ?
-            """,
-            (now, now, reason[:1000], job_id, owner_id),
-        )
-        connection.commit()
-        return cursor.rowcount == 1
+        with unit_of_work(connection=self._connection_provider(), immediate=True) as work:
+            cursor = work.connection.execute(
+                f"""
+                UPDATE {self.table_name}
+                SET status = 'cancelled', completed_at = ?, updated_at = ?,
+                    lease_owner = NULL, lease_until = NULL, last_error = ?
+                WHERE id = ? AND status = 'running' AND lease_owner = ?
+                """,
+                (now, now, reason[:1000], job_id, owner_id),
+            )
+            return bool(cursor.rowcount == 1)
 
     def fail(
         self,
@@ -284,19 +280,18 @@ class LeasedJobStateStore:
         for column, value in (filters or {}).items():
             predicates.append(f"{_validate_identifier(column)} = ?")
             values.append(value)
-        connection = self._connection_provider()
-        cursor = connection.execute(
-            f"""
-            UPDATE {self.table_name}
-            SET status = 'pending', attempts = 0, available_at = ?,
-                updated_at = ?, lease_owner = NULL, lease_until = NULL,
-                last_error = NULL, completed_at = NULL
-            WHERE {' AND '.join(predicates)}
-            """,
-            values,
-        )
-        connection.commit()
-        return cursor.rowcount == 1
+        with unit_of_work(connection=self._connection_provider(), immediate=True) as work:
+            cursor = work.connection.execute(
+                f"""
+                UPDATE {self.table_name}
+                SET status = 'pending', attempts = 0, available_at = ?,
+                    updated_at = ?, lease_owner = NULL, lease_until = NULL,
+                    last_error = NULL, completed_at = NULL
+                WHERE {' AND '.join(predicates)}
+                """,
+                values,
+            )
+            return bool(cursor.rowcount == 1)
 
     def purge_completed_with_status(
         self,

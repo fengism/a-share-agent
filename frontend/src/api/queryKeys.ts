@@ -23,8 +23,8 @@ export const queryKeys = {
     indexHistory: (symbol: string, period: string) => ["hk", "index-history", symbol, period] as const,
     stocks: (query: string, page: number, pageSize: number) => ["hk", "stocks", query, page, pageSize] as const,
     stockSearch: (query: string) => ["hk", "stock-search", query] as const,
-    stockHistory: (code: string, period: string, adjust: string) =>
-      ["hk", "stock-history", code, period, adjust] as const,
+    stockHistory: (code: string, period: string, adjust: string, startDate = "") =>
+      ["hk", "stock-history", code, period, adjust, startDate] as const,
     stockQuote: (code: string) => ["hk", "stock-quote", code] as const,
   },
   market: {
@@ -34,6 +34,9 @@ export const queryKeys = {
     limitHistory: (date: string, category: string) => ["marketLimitHistory", date, category] as const,
     sectorStocksHistory: (date: string, plateId: string) =>
       ["marketSectorStocksHistory", date, plateId] as const,
+    concepts: (limit: number) => ["marketConcepts", limit] as const,
+    conceptConstituents: (concept: string) => ["marketConceptConstituents", concept] as const,
+    conceptIndex: (concept: string, days: number) => ["marketConceptIndex", concept, days] as const,
     wind: ["marketWind"] as const,
     mainline: ["marketMainline"] as const,
     windStocks: (plateCode: string) => ["marketWindStocks", plateCode] as const,
@@ -82,7 +85,8 @@ export const queryKeys = {
     financial: (code: string, type: string) => ["financial", code, type] as const,
     revenueBreakdown: (code: string) => ["revenueBreakdown", code] as const,
     valuationDetail: (code: string) => ["valuationDetail", code] as const,
-    indicators: (code: string) => ["indicators", code] as const,
+    indicators: (code: string, period = "daily", startDate = "", endDate = "") =>
+      ["indicators", code, period, startDate, endDate] as const,
     categorizedNews: (code: string) => ["categorizedNews", code] as const,
     bulletins: (code: string, page: number, pageSize: number) =>
       ["stockBulletins", code, page, pageSize] as const,
@@ -143,6 +147,7 @@ export const queryKeys = {
     industryChainLatest: (name: string) => ["industryChainLatest", name] as const,
     industryChainAtlasCatalog: ["industryChainAtlas", "catalog"] as const,
     industryChainAtlasChain: (slug: string) => ["industryChainAtlas", "chain", slug] as const,
+    industryChainAtlasGraph: (chains?: string) => ["industryChainAtlas", "graph", chains ?? "all"] as const,
   },
   capabilities: {
     catalog: ["chat-capabilities"] as const,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Col, Modal, Row, Segmented, Statistic, Typography } from "antd";
 import { FullscreenOutlined } from "@ant-design/icons";
 import { useMarketIndexKline, useMarketIndices } from "../../api/queries";
@@ -9,6 +9,7 @@ import SectionDataState from "../../components/SectionDataState";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useColors, useTokens } from "../../styles/ui";
 import type { ThemeColors } from "../../styles/ui";
+import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
 
 const { Text } = Typography;
 const INDEX_CODES = ["000001", "399001", "399006", "000688", "000300", "000905"] as const;
@@ -38,6 +39,10 @@ export default function AIndexTab() {
   const [period, setPeriod] = useUrlSearchParam("period", "daily", {
     allowedValues: KLINE_PERIODS,
   });
+  // 默认展示近 1 年，向左滑动触底时每次再向前扩充 1 年，最多到 10 年
+  const [historyYears, setHistoryYears] = useState(1);
+  const startDate = useMemo(() => yearsAgoDate(historyYears), [historyYears]);
+  const historyLimitReached = historyYears >= MAX_KLINE_HISTORY_YEARS;
   const {
     data: marketData,
     isLoading: indicesLoading,
@@ -49,7 +54,16 @@ export default function AIndexTab() {
     isLoading: klineLoading,
     error: klineError,
     refetch: refetchKline,
-  } = useMarketIndexKline(activeSymbol, period);
+  } = useMarketIndexKline(activeSymbol, period, { startDate });
+
+  // 切换指数或周期时回到默认 1 年窗口
+  useEffect(() => {
+    setHistoryYears(1);
+  }, [activeSymbol, period]);
+
+  const handleReachLeftEdge = useCallback(() => {
+    setHistoryYears((years) => Math.min(years + 1, MAX_KLINE_HISTORY_YEARS));
+  }, []);
 
   const mainIndices = useMemo(
     () => INDEX_CODES.map((code) => (marketData?.indices || []).find((item) => item.code === code)).filter((item) => item != null),
@@ -79,6 +93,7 @@ export default function AIndexTab() {
           errorTitle="大盘指数加载失败"
           minHeight={180}
         >
+          {/* antd v6 的 Row gutter 不接受响应式对象（类型为 number | [number, number]），固定间距即可 */}
           <Row gutter={[16, 16]}>
             {mainIndices.map((idx) => {
               const isActive = idx.code === activeSymbol;
@@ -100,6 +115,7 @@ export default function AIndexTab() {
                   >
                     <Card
                       hoverable
+                      className="market-index-card"
                       style={{
                         borderRadius: t.radius.md,
                         border: `1px solid ${isActive ? c.primary : c.border}`,
@@ -109,17 +125,24 @@ export default function AIndexTab() {
                           : "var(--c-card-bg)",
                         boxShadow: isActive ? "0 4px 14px rgba(22, 119, 255, 0.12)" : t.shadow.xs,
                         transition: "all 0.2s ease",
+                        overflow: "hidden",
                       }}
-                      styles={{ body: { padding: t.space[4] } }}
                     >
                       <Statistic
                         title={
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ color: isActive ? c.primary : c.textSecondary, fontSize: t.font.md, fontWeight: isActive ? 600 : 500 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", minWidth: 0, gap: 4 }}>
+                            <span style={{
+                              color: isActive ? c.primary : c.textSecondary,
+                              fontSize: t.font.md,
+                              fontWeight: isActive ? 600 : 500,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}>
                               {idx.name}
                             </span>
                             {isActive && (
-                              <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: c.primary }} />
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: c.primary, flexShrink: 0 }} />
                             )}
                           </div>
                         }
@@ -128,18 +151,24 @@ export default function AIndexTab() {
                         styles={{
                           content: {
                             color: getChangeColor(idx.change_pct, c),
-                            fontSize: t.font["3xl"],
+                            fontSize: "clamp(16px, 4.2vw, 26px)",
+                            lineHeight: 1.2,
                             fontWeight: Number(t.weight.bold),
                             fontFamily: "var(--c-font-mono)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: "100%",
+                            display: "block",
                           },
                         }}
                       />
-                      <div style={{ marginTop: t.space[2], display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ marginTop: t.space[2], display: "flex", justifyContent: "space-between", alignItems: "center", minWidth: 0, gap: 4, flexWrap: "wrap" }}>
                         <ChangeValue value={idx.change_pct} showIcon />
-                        <Text type="secondary" style={{ fontSize: t.font.sm, fontFamily: "var(--c-font-mono)" }}>{idx.code}</Text>
+                        <Text type="secondary" style={{ fontSize: t.font.xs, fontFamily: "var(--c-font-mono)", flexShrink: 0 }}>{idx.code}</Text>
                       </div>
-                      <div style={{ marginTop: t.space[2], display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <Text type="secondary" style={{ fontSize: t.font.sm }}>成交额 {formatAmount(idx.amount)}</Text>
+                      <div style={{ marginTop: t.space[2], display: "flex", alignItems: "center", justifyContent: "space-between", minWidth: 0, overflow: "hidden" }}>
+                        <Text type="secondary" ellipsis style={{ fontSize: t.font.xs, maxWidth: "100%" }}>成交额 {formatAmount(idx.amount)}</Text>
                       </div>
                     </Card>
                   </button>
@@ -172,13 +201,23 @@ export default function AIndexTab() {
               </span>
             }
             extra={
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span
+                  className="stock-chart-hint"
+                  data-testid="index-kline-history-range"
+                  style={{ fontSize: t.font.xs, color: c.textSecondary }}
+                >
+                  {historyLimitReached
+                    ? `已加载近 ${MAX_KLINE_HISTORY_YEARS} 年（上限）`
+                    : `近 ${historyYears} 年 · 向左滑动加载更早数据（最多 ${MAX_KLINE_HISTORY_YEARS} 年）`}
+                </span>
                 <Segmented
                   aria-label="K线周期"
                   options={[
                     { label: "日K", value: "daily" },
                     { label: "周K", value: "weekly" },
                     { label: "月K", value: "monthly" },
+                    { label: "年K", value: "annual" },
                   ]}
                   value={period}
                   onChange={(value) => setPeriod(String(value))}
@@ -208,6 +247,9 @@ export default function AIndexTab() {
               <LazyKlineChart
                 data={klineItems}
                 height={380}
+                viewKey={`${activeSymbol}-${period}`}
+                onReachLeftEdge={historyLimitReached ? undefined : handleReachLeftEdge}
+                historyLimitReached={historyLimitReached}
               />
             </SectionDataState>
           </Card>
@@ -215,7 +257,16 @@ export default function AIndexTab() {
       </Row>
 
       <Modal
-        title={`${activeIndex?.name || "大盘指数"} · ${period === "daily" ? "日K" : period === "weekly" ? "周K" : "月K"}线全屏`}
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", paddingRight: 32, flexWrap: "wrap", minWidth: 0 }}>
+            <span>{`${activeIndex?.name || "大盘指数"} · ${period === "daily" ? "日K" : period === "weekly" ? "周K" : period === "monthly" ? "月K" : "年K"}线全屏`}</span>
+            <span style={{ fontSize: t.font.xs, color: c.textSecondary, fontWeight: "normal" }}>
+              {historyLimitReached
+                ? `已加载近 ${MAX_KLINE_HISTORY_YEARS} 年（上限）`
+                : `近 ${historyYears} 年 · 向左滑动加载更早数据（最多 ${MAX_KLINE_HISTORY_YEARS} 年）`}
+            </span>
+          </div>
+        }
         open={klineExpanded}
         onCancel={() => setKlineExpanded(false)}
         footer={null}
@@ -225,6 +276,9 @@ export default function AIndexTab() {
         <LazyKlineChart
           data={klineItems}
           height={580}
+          viewKey={`${activeSymbol}-${period}-fullscreen`}
+          onReachLeftEdge={historyLimitReached ? undefined : handleReachLeftEdge}
+          historyLimitReached={historyLimitReached}
         />
       </Modal>
     </div>

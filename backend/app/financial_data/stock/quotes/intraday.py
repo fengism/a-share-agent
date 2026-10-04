@@ -1,10 +1,10 @@
-"""个股分时行情服务。"""
-
 import asyncio
 import logging
+import re
 from typing import cast
 
 import pandas as pd
+import requests
 
 from app.core.cache import dated_cache_key, series_cache
 from app.core.cache_policies import STOCK_INTRADAY
@@ -178,14 +178,84 @@ async def _load_intraday(sym, date: str | None) -> IntradayData:
     return IntradayData(code=sym.raw, source=selected_source, prev_close=prev_close, items=items)
 
 
+def _fetch_hk_intraday_tencent(norm_code: str) -> IntradayData:
+    url = f"https://web.ifzq.gtimg.cn/appstock/app/minute/query?code=hk{norm_code}"
+    resp = requests.get(url, headers={"Referer": "https://gu.qq.com/"}, timeout=10)
+    resp.raise_for_status()
+    payload = resp.json().get("data", {}).get(f"hk{norm_code}", {})
+    min_data = payload.get("data", {})
+    trade_date = str(min_data.get("date", "") or "").strip()
+    date_str = f"{trade_date[:4]}-{trade_date[4:6]}-{trade_date[6:8]}" if len(trade_date) == 8 else ""
+
+    qt = payload.get("qt", {}).get(f"hk{norm_code}", [])
+    prev_close = safe_float(qt[4]) if len(qt) > 4 else None
+
+    raw_rows = min_data.get("data", [])
+    items: list[IntradayItem] = []
+    prev_vol = 0.0
+    prev_amt = 0.0
+    for row_str in raw_rows:
+        parts = row_str.split()
+        if len(parts) < 2:
+            continue
+        time_part = parts[0]
+        formatted_time = f"{date_str} {time_part[:2]}:{time_part[2:]}" if date_str else f"{time_part[:2]}:{time_part[2:]}"
+        price = safe_float(parts[1])
+        if price is None:
+            continue
+        cum_vol = safe_float(parts[2]) if len(parts) > 2 else None
+        cum_amt = safe_float(parts[3]) if len(parts) > 3 else None
+        vol = max(0.0, cum_vol - prev_vol) if (cum_vol is not None and cum_vol >= prev_vol) else cum_vol
+        amt = max(0.0, cum_amt - prev_amt) if (cum_amt is not None and cum_amt >= prev_amt) else cum_amt
+        prev_vol = cum_vol if cum_vol is not None else prev_vol
+        prev_amt = cum_amt if cum_amt is not None else prev_amt
+        avg_price = round(cum_amt / cum_vol, 4) if (cum_amt and cum_vol and cum_vol > 0) else price
+        change_pct = (
+            round((price - prev_close) / prev_close * 100, 2)
+            if (price is not None and prev_close and prev_close > 0)
+            else None
+        )
+        items.append(
+            IntradayItem(
+                time=formatted_time,
+                price=price,
+                avg_price=avg_price,
+                volume=vol,
+                amount=amt,
+                change_pct=change_pct,
+            )
+        )
+    return IntradayData(code=norm_code, source="腾讯港股分时", prev_close=prev_close, items=items)
+
+
 async def get_intraday(code: str) -> IntradayData:
-    """获取股票分时数据，带 single-flight 与 30 秒缓存。
+    """获取股票分时数据，支持 A 股与港股，带 single-flight 与 30 秒缓存。
 
     Param:
         code: 股票代码
     Return:
         IntradayData 模型对象，包含逐分钟成交点
     """
+    cleaned = code.strip().upper()
+    is_hk = (
+        cleaned.startswith("HK")
+        or cleaned.endswith(".HK")
+        or (cleaned.isdigit() and len(cleaned) <= 5 and not (len(cleaned) == 6))
+    )
+    if is_hk:
+        norm_code = re.sub(r"\D", "", cleaned).zfill(5)
+        cache_key = dated_cache_key("hk_intraday", norm_code, "")
+        cached = series_cache.get(cache_key)
+        if isinstance(cached, IntradayData):
+            return cached
+
+        async def load_hk() -> IntradayData:
+            result = await call_blocking(_fetch_hk_intraday_tencent, norm_code)
+            series_cache.set(cache_key, result, ttl=STOCK_INTRADAY.ttl_seconds)
+            return result
+
+        return cast(IntradayData, await _intraday_singleflight.do(cache_key, load_hk))
+
     sym = normalize_code(code)
     try:
         date = await asyncio.wait_for(

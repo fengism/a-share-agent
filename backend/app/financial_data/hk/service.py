@@ -12,6 +12,7 @@ from app.core.concurrency.rate_limiter import sina_semaphore
 from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
 from app.core.market import market_today, safe_float
 from app.domain.market import IndexItem, KlineData, KlineItem, MarketIndices
+from app.financial_data.dates import clamp_kline_history_start_date as _clamp_start_date
 from app.financial_data.hk.schemas import (
     HKStockQuote,
     HKStockQuotePage,
@@ -21,11 +22,12 @@ from app.financial_data.hk.schemas import (
 from app.financial_data.hk.search_index import HKStockSearchIndex, hk_stock_search_index
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
+from app.modules.market_daily.adjustment import load_local_adjusted_daily_kline
 from app.modules.market_daily.reader import load_local_daily_kline, merge_local_daily_kline
 
 _HK_CODE_PATTERN = re.compile(r"^(?:hk)?(\d{1,5})$", re.IGNORECASE)
 _HK_INDEX_SYMBOLS = frozenset({"HSI", "HSCEI", "HSTECH"})
-_PERIODS = frozenset({"daily", "weekly", "monthly"})
+_PERIODS = frozenset({"daily", "weekly", "monthly", "annual"})
 _ADJUSTMENTS = frozenset({"none", "qfq", "hfq"})
 
 
@@ -59,7 +61,7 @@ def normalize_hk_index_symbol(symbol: str) -> str:
 def _validate_period(period: str) -> str:
     value = str(period or "").strip().lower()
     if value not in _PERIODS:
-        raise InvalidRequestError("period 仅支持 daily、weekly、monthly")
+        raise InvalidRequestError("period 仅支持 daily、weekly、monthly、annual")
     return value
 
 
@@ -123,7 +125,7 @@ def _normalize_history_frame(data: pd.DataFrame, start_date: str, end_date: str)
 def _resample_history(frame: pd.DataFrame, period: str) -> pd.DataFrame:
     if period == "daily" or frame.empty:
         return frame
-    frequency = "W-FRI" if period == "weekly" else "M"
+    frequency = {"weekly": "W-FRI", "monthly": "M", "annual": "Y"}.get(period, "M")
     grouped = frame.assign(_bucket=frame["date"].dt.to_period(frequency)).groupby("_bucket", sort=True)
     return grouped.agg(
         date=("date", "max"),
@@ -332,6 +334,7 @@ class HKMarketService:
         end_boundary = _parse_boundary(end_date, "end_date")
         local_start = start_boundary.date() if start_boundary is not None else date.min
         local_end = end_boundary.date() if end_boundary is not None else market_today()
+        local_start = _clamp_start_date(local_start, local_end)
         if normalized_period == "daily" and normalized_adjust == "none":
             local = await load_local_daily_kline(
                 market="hk",
@@ -341,9 +344,30 @@ class HKMarketService:
                 end_date=local_end,
                 adjust=normalized_adjust,
             )
-            if local_start == local_end and local is not None:
-                return local
-        key = f"hk:stock:history:{normalized_code}:{normalized_period}:{normalized_adjust}:{start_date}:{end_date}"
+            if local is not None and local.items:
+                if local_start == local_end:
+                    return local
+                first = date.fromisoformat(local.items[0].date)
+                last = date.fromisoformat(local.items[-1].date)
+                if first <= local_start and last >= local_end:
+                    return local
+        elif normalized_period == "daily" and normalized_adjust == "qfq":
+            # 港股 qfq 因子来自一次性 CSV 导入（2016 年起）。hfq 推不出官方口径，
+            # 因此只覆盖 qfq；hfq 依旧走新浪上游。
+            local_adjusted = await load_local_adjusted_daily_kline(
+                normalized_code,
+                local_start,
+                local_end,
+                normalized_adjust,
+                market="hk",
+            )
+            if local_adjusted is not None and local_adjusted.items:
+                first = date.fromisoformat(local_adjusted.items[0].date)
+                last = date.fromisoformat(local_adjusted.items[-1].date)
+                if first <= local_start and last >= local_end:
+                    return local_adjusted
+                local = local_adjusted
+        key = f"hk:stock:history:{normalized_code}:{normalized_period}:{normalized_adjust}:{local_start}:{local_end}"
         if self._cache_enabled:
             cached = series_cache.get(key)
             if isinstance(cached, KlineData):
@@ -449,3 +473,4 @@ class HKMarketService:
 
 
 hk_market_service = HKMarketService()
+

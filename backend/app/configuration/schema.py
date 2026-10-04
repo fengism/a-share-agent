@@ -75,6 +75,7 @@ PERSISTED_GLOBAL_KEYS = frozenset(
         "market_daily_bar_refresh_retry_base_seconds",
         "market_daily_observation_retention_days",
         "market_daily_attempt_retention_days",
+        "database_backup_retention_count",
         "bot_enabled",
         "bot_command_prefix",
         "bot_service_user_id",

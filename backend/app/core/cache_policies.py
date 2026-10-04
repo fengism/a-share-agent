@@ -44,3 +44,5 @@ AGENT_WEB_FETCH = TtlPolicy(ttl_seconds=10 * 60)
 # 搜索结果短缓存：Agent 改写一次查询重试、或并行搜相近关键词时会重复打同一引擎，
 # 而百度单次搜索要传 1-2MB HTML 且命中反爬时最多重试三次，重复请求代价高。
 AGENT_WEB_SEARCH = TtlPolicy(ttl_seconds=3 * 60)
+# 概念：成分股行情 + 合成等权指数，日线数据日内缓存一次即可。
+CONCEPT_LINKAGE = TtlPolicy(ttl_seconds=24 * 60 * 60)

@@ -192,8 +192,11 @@ class NewsMixin:
         ]
         temp_df["title"] = _strip_em_tags(temp_df["title"])
         temp_df["content"] = _strip_em_tags(temp_df["content"])
-        temp_df["content"] = temp_df["content"].str.replace(r"\u3000", "", regex=True)
-        temp_df["content"] = temp_df["content"].str.replace(r"\r\n", " ", regex=True)
+        # 必须走 regex=False 的字面量替换：pandas 3 的字符串 dtype 底层是 pyarrow，
+        # 其正则引擎（RE2）不支持 ``\u3000`` 这类转义，会抛
+        # ArrowInvalid: Invalid regular expression: invalid escape sequence: \u。
+        temp_df["content"] = temp_df["content"].str.replace("\u3000", "", regex=False)
+        temp_df["content"] = temp_df["content"].str.replace("\r\n", " ", regex=False)
         results: list[NewsSearchItem] = []
         if temp_df is not None and not temp_df.empty:
             for _, row in temp_df.head(20).iterrows():

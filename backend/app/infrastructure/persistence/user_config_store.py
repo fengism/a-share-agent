@@ -5,7 +5,7 @@ from threading import Lock
 
 from app.configuration import crypto as config_crypto
 from app.configuration.crypto_contracts import GLOBAL_CONFIG_SCOPE_ID
-from app.infrastructure.persistence.connection import database_path, get_connection
+from app.infrastructure.persistence.connection import database_path, get_connection, unit_of_work
 
 logger = logging.getLogger(__name__)
 
@@ -83,14 +83,14 @@ def get_user_config(user_id: int) -> dict[str, str]:
 
     if secrets_to_encrypt:
         if config_crypto.encryption_available():
-            connection.executemany(
-                "UPDATE user_config SET value = ? WHERE user_id = ? AND key = ?",
-                [
-                    (config_crypto.encrypt_config_value(user_id, key, value), user_id, key)
-                    for key, value in secrets_to_encrypt.items()
-                ],
-            )
-            connection.commit()
+            with unit_of_work("user", immediate=True) as work:
+                work.connection.executemany(
+                    "UPDATE user_config SET value = ? WHERE user_id = ? AND key = ?",
+                    [
+                        (config_crypto.encrypt_config_value(user_id, key, value), user_id, key)
+                        for key, value in secrets_to_encrypt.items()
+                    ],
+                )
             logger.info("已迁移或轮换用户敏感配置 user_id=%s keys=%s", user_id, sorted(secrets_to_encrypt))
         else:
             logger.warning(
@@ -154,12 +154,11 @@ def set_user_config(user_id: int, items: dict) -> None:
             serialized = config_crypto.encrypt_config_value(user_id, key, str(value))
         values.append((user_id, key, serialized))
 
-    connection = _connection()
-    connection.executemany(
-        "INSERT INTO user_config (user_id, key, value) VALUES (?, ?, ?) "
-        "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
-        values,
-    )
-    connection.commit()
+    with unit_of_work("user", immediate=True) as work:
+        work.connection.executemany(
+            "INSERT INTO user_config (user_id, key, value) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
+            values,
+        )
     if SECRET_KEYS.intersection(items):
         invalidate_config_encryption_status_cache()

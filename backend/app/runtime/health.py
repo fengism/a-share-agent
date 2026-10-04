@@ -25,7 +25,9 @@ def check_database() -> bool:
 
     for database in ALL_DATABASES:
         try:
-            get_connection(database).execute("SELECT 1")
+            cursor = get_connection(database).execute("SELECT 1")
+            cursor.fetchone()
+            cursor.close()
         except Exception:
             logger.warning("数据库健康检查失败: database=%s", database, exc_info=True)
             return False

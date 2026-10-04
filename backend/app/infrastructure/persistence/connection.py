@@ -181,7 +181,7 @@ def database_storage_snapshot(
     return snapshot
 
 
-def _is_busy_error(error: BaseException | None) -> bool:
+def is_busy_error(error: BaseException | None) -> bool:
     if not isinstance(error, sqlite3.Error):
         return False
     error_code = getattr(error, "sqlite_errorcode", None)
@@ -189,6 +189,9 @@ def _is_busy_error(error: BaseException | None) -> bool:
         return True
     message = str(error).lower()
     return "database is locked" in message or "database is busy" in message
+
+
+_is_busy_error = is_busy_error
 
 
 class SQLiteUnitOfWork:
@@ -220,7 +223,15 @@ class SQLiteUnitOfWork:
         self._active = True
         self._started_at = perf_counter()
         try:
-            if self.connection.in_transaction:
+            depth = getattr(_local, "uow_depth", 0)
+            if depth == 0 and self.connection.in_transaction:
+                logger.warning(
+                    "检测到 SQLite 线程连接存在未闭合的残留事务，自动回滚重置: database=%s thread=%s",
+                    self._database,
+                    threading.get_ident(),
+                )
+                self.connection.rollback()
+            if depth > 0:
                 counter = getattr(_local, "savepoint_counter", 0) + 1
                 _local.savepoint_counter = counter
                 self._savepoint = f"uow_{counter}"
@@ -228,6 +239,7 @@ class SQLiteUnitOfWork:
             else:
                 statement = "BEGIN IMMEDIATE" if self._immediate else "BEGIN"
                 self.connection.execute(statement)
+            _local.uow_depth = depth + 1
         except Exception as error:
             self._active = False
             self._record(error)
@@ -261,6 +273,7 @@ class SQLiteUnitOfWork:
                 raise
             self._record(exc)
         finally:
+            _local.uow_depth = max(0, getattr(_local, "uow_depth", 1) - 1)
             self._active = False
         return False
 
@@ -286,6 +299,12 @@ def close_connection():
         for conn in conns:
             _connection_names.pop(id(conn), None)
         _connection_generation += 1
+    for conn in conns:
+        try:
+            if conn.in_transaction:
+                conn.rollback()
+        except Exception:
+            pass
     checkpointed_paths: set[str] = set()
     for conn in conns:
         try:
@@ -293,7 +312,16 @@ def close_connection():
             database_file = str(main_row[2])
             if database_file in checkpointed_paths:
                 continue
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            try:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except sqlite3.OperationalError as checkpoint_err:
+                if is_busy_error(checkpoint_err):
+                    try:
+                        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                    except Exception:
+                        pass
+                else:
+                    raise
             checkpointed_paths.add(database_file)
         except Exception as exc:
             logger.warning("关闭前 WAL checkpoint 失败: %s", exc)
@@ -305,6 +333,7 @@ def close_connection():
     _local.connections = {}
     _local.generation = _connection_generation
     _local.savepoint_counter = 0
+    _local.uow_depth = 0
     logger.info("SQLite 连接已全部关闭")
 
 
@@ -383,3 +412,4 @@ def optimize_databases() -> dict[str, dict[str, bool | int | str]]:
             snapshot[database] = {"success": False, "error": type(exc).__name__}
             logger.warning("SQLite optimize 失败: database=%s error=%s", database, exc)
     return snapshot
+

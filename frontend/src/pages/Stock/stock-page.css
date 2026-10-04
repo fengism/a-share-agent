@@ -444,6 +444,16 @@
   content: "";
 }
 
+/* 指标数值为骨架时的占位：去掉 antd 骨架默认外边距，保证与真实数值同高 */
+.stock-metric__placeholder {
+  margin: 0;
+}
+
+.stock-metric__placeholder .ant-skeleton-element,
+.stock-metric__placeholder .ant-skeleton-button {
+  margin: 0;
+}
+
 .stock-metric dt {
   color: var(--c-text-muted);
   font-size: var(--c-font-xs);
@@ -640,6 +650,12 @@
 .stock-chart-card { scroll-margin-top: 84px; }
 .stock-chart-chanlun-toggle { display: inline-flex; align-items: center; gap: 8px; }
 .stock-chart-hint { color: var(--c-text-secondary); font-size: var(--c-font-sm); }
+
+@media (max-width: 640px) {
+  .stock-chart-hint {
+    display: none;
+  }
+}
 
 .stock-detail-tabs {
   min-width: 0;

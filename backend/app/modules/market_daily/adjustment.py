@@ -406,9 +406,9 @@ def _safe_int(value: object) -> int:
         return 0
 
 
-async def get_adjustment_factor_status(code: str) -> MarketAdjustmentFactorStatus:
+async def get_adjustment_factor_status(code: str, market: str = "cn") -> MarketAdjustmentFactorStatus:
     await asyncio.to_thread(_repository.initialize)
-    summary = await asyncio.to_thread(_repository.get_adjustment_summary, code)
+    summary = await asyncio.to_thread(_repository.get_adjustment_summary, code, market=market)
     state = summary.get("state")
     state_dict = state if isinstance(state, dict) else {}
     bar_count = _safe_int(summary.get("bar_count"))
@@ -453,10 +453,10 @@ async def refresh_adjustment_factors(code: str, *, force: bool = True) -> Market
     return await get_adjustment_factor_status(code)
 
 
-async def invalidate_adjustment_factors(code: str) -> MarketAdjustmentFactorStatus:
+async def invalidate_adjustment_factors(code: str, market: str = "cn") -> MarketAdjustmentFactorStatus:
     await asyncio.to_thread(_repository.initialize)
-    await asyncio.to_thread(_repository.invalidate_adjustment_factors, code)
-    return await get_adjustment_factor_status(code)
+    await asyncio.to_thread(_repository.invalidate_adjustment_factors, code, market=market)
+    return await get_adjustment_factor_status(code, market=market)
 
 
 def _adjust_price(value: float | None, multiplier: float, offset: float) -> float | None:
@@ -483,6 +483,8 @@ def apply_adjustment(
         factor = factor_by_date[bar.trade_date]
         multiplier = factor.qfq_multiplier if method == "qfq" else factor.hfq_multiplier
         offset = factor.qfq_offset if method == "qfq" else factor.hfq_offset
+        if multiplier is None or offset is None:
+            return None
         adjusted = {field: _adjust_price(getattr(bar, field), multiplier, offset) for field in _OHLC}
         fallback_pre_close = _adjust_price(bar.pre_close, multiplier, offset)
         pre_close = previous_adjusted_close if previous_adjusted_close is not None else fallback_pre_close
@@ -546,6 +548,8 @@ async def load_local_adjusted_daily_kline(
     start_date: date,
     end_date: date,
     method: str,
+    *,
+    market: str = "cn",
 ) -> KlineData | None:
     if method not in {"qfq", "hfq"}:
         return None
@@ -553,20 +557,26 @@ async def load_local_adjusted_daily_kline(
         await asyncio.to_thread(_repository.initialize)
         bars = await asyncio.to_thread(
             _repository.list_bars,
-            market="cn",
+            market=market,
             instrument_type="stock",
             code=code,
             start_date=date.min,
             end_date=end_date,
         )
-        if not bars or not await ensure_adjustment_factors(code):
+        if not bars:
             return None
+        if market == "cn":
+            if not await ensure_adjustment_factors(code):
+                return None
         factors = await asyncio.to_thread(
             _repository.list_adjustment_factors,
             code,
             date.min,
             end_date,
+            market=market,
         )
+        if not factors:
+            return None
         adjusted = apply_adjustment(bars, factors, method)
         if adjusted is None:
             return None
@@ -575,5 +585,5 @@ async def load_local_adjusted_daily_kline(
             return None
         return adjusted.model_copy(update={"items": filtered})
     except Exception:
-        logger.warning("本地 A 股复权行情读取失败，回退既有 K 线上游: code=%s", code, exc_info=True)
+        logger.warning("本地复权行情读取失败，回退既有 K 线上游: market=%s code=%s", market, code, exc_info=True)
         return None

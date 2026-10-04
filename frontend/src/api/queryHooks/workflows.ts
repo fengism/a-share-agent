@@ -20,8 +20,10 @@ import type {
   AnalysisHistoryItem,
   AnalysisPageData,
   AnalysisResult,
+  AtlasBatchMineResponse,
   AtlasCatalog,
   AtlasChain,
+  AtlasGraph,
   IndustryChainHistoryItem,
   IndustryChainResult,
   PushRequest,
@@ -253,6 +255,17 @@ export function useIndustryChainAtlasChain(slug: string) {
   });
 }
 
+export function useIndustryChainAtlasGraph(chains?: string) {
+  return useQuery({
+    queryKey: queryKeys.workflows.industryChainAtlasGraph(chains),
+    queryFn: () => openApiGet("/api/industry-chain/atlas/graph", {
+      query: { chains: chains || undefined },
+    }),
+    select: asApiModel<AtlasGraph>(),
+    staleTime: QUERY_CACHE_POLICIES.workflowAtlas.staleMs,
+  });
+}
+
 export function useImportIndustryChainAtlas() {
   return useMutation({
     mutationFn: (request: { content: string; overwrite?: boolean }) => openApiPost(
@@ -275,6 +288,23 @@ export function useMineIndustryChainAtlas() {
       },
     ).then(asApiModel<AtlasChain>()),
   });
+}
+
+export function useBatchMineIndustryChainAtlas() {
+  return useMutation({
+    mutationFn: () => openApiPost(
+      "/api/industry-chain/atlas/mine-batch",
+      {
+        options: { timeoutMs: API_TIMEOUTS.LONG_RUNNING },
+      },
+    ).then(asApiModel<AtlasBatchMineResponse>()),
+  });
+}
+
+export async function downloadIndustryChainAtlasYaml(slug: string, name?: string): Promise<void> {
+  const { apiDownload } = await import("../client");
+  const fallback = `${slug || name || "industry-chain"}.yaml`;
+  await apiDownload(`/industry-chain/atlas/chains/${slug}/export-yaml`, fallback);
 }
 
 export function useDeleteIndustryChainAtlasChain() {
