@@ -11,10 +11,43 @@ from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app.infrastructure.persistence.connection import ALL_DATABASES, DatabaseName, get_connection
+from app.infrastructure.persistence.connection import ALL_DATABASES, DB_DIR, DatabaseName, get_connection
 from app.infrastructure.persistence.json_storage import atomic_write_text, durable_replace, durable_unlink
 
 ConnectionProvider = Callable[[DatabaseName], sqlite3.Connection]
+
+
+def _clean_shutdown_marker_path() -> Path:
+    """正常关机标记的存放位置。
+
+    必须与数据库同目录：容器重建会重新挂载 data 卷，放到临时目录会让"上次正常
+    关机"的判断在重启后失效，导致每次都退回全量 quick_check。
+    """
+    return Path(DB_DIR) / ".clean_shutdown"
+
+
+def mark_clean_shutdown() -> None:
+    """记录本次进程是正常关闭的。"""
+    atomic_write_text(_clean_shutdown_marker_path(), datetime.now(UTC).isoformat())
+
+
+def consume_clean_shutdown_marker() -> bool:
+    """若存在正常关机标记则消费掉并返回 True。
+
+    语义：正常关机后重启不需要全库 quick_check——损坏只可能来自非正常退出
+    （崩溃、断电、kill -9），这时标记不存在（或陈旧）才付全量检查的成本。
+    读取后立即删除，使下一次启动仍会检查，避免"检查过一次就永久信任"。
+    """
+    marker = _clean_shutdown_marker_path()
+    if not marker.is_file():
+        return False
+    try:
+        durable_unlink(marker)
+    except OSError:
+        # 删除失败时仍返回 True：本次启动跳过检查，下一次启动若标记仍在会再跳过一次，
+        # 优于每次都卡在数小时的 quick_check 上。
+        return True
+    return True
 
 
 def _quick_check(connection: sqlite3.Connection, *, label: str) -> None:

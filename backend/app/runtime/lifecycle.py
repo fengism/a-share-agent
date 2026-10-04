@@ -43,9 +43,30 @@ def load_persisted_global_settings() -> None:
 
 
 def verify_database_integrity() -> None:
+    """启动时的完整性检查。
+
+    只在上次进程**非正常**退出（崩溃/断电/kill -9）后才执行全库 quick_check：
+    正常关机会在退出时写标记（``mark_clean_shutdown``），此时损坏不可能发生，
+    无需为 12GiB 的 market_daily 再付一次全量扫描。
+
+    这样正常重启接近零成本，只有崩溃恢复才走慢路径。
+    """
+    from app.infrastructure.persistence.operations import consume_clean_shutdown_marker
+
+    if consume_clean_shutdown_marker():
+        logger.info("检测到上次为正常关机，跳过 SQLite 全库完整性检查")
+        return
+
     from app.infrastructure.persistence.operations import verify_database_integrity as verify
 
     verify()
+
+
+def mark_database_clean_shutdown() -> None:
+    """退出时记录正常关机，供下次启动跳过全库完整性检查。"""
+    from app.infrastructure.persistence.operations import mark_clean_shutdown
+
+    mark_clean_shutdown()
 
 
 def _supervised_task_factory(
@@ -357,4 +378,14 @@ async def application_lifespan(
                 try:
                     await blocking_runner(close_connection, semaphore=database_semaphore)
                 finally:
-                    shutdown_blocking_executor()
+                    # 连接全部关闭后再写正常关机标记：下次启动据此跳过全库 quick_check。
+                    # 放在 close_connection 之后，确保此刻已无写入者。
+                    try:
+                        await blocking_runner(
+                            mark_database_clean_shutdown, semaphore=database_semaphore,
+                        )
+                    except Exception:
+                        # 写标记失败只会让下次启动多做一次检查，不应影响本次退出。
+                        logger.warning("写入正常关机标记失败", exc_info=True)
+                    finally:
+                        shutdown_blocking_executor()
