@@ -152,6 +152,7 @@ async def test_resolve_stock_hk_search_fallback():
     )
 
     with patch("app.modules.portfolio.transactions.fetch_quotes", new=AsyncMock(return_value={})), \
+         patch("app.modules.portfolio.transactions.portfolio_store.get_latest_stock_name", return_value=""), \
          patch("app.financial_data.hk.search_index.hk_stock_search_index.search", new=AsyncMock(return_value=[HKStockSearchRecord(code="00700", name="腾讯控股")])):
         resolved = await _resolve_stock(request, user_id=999)
         assert resolved is not None
