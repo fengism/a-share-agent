@@ -163,13 +163,22 @@ def test_invite_store_with_uow():
     """Verify invite_store functions run cleanly with unit_of_work."""
     import time
 
-    from app.infrastructure.persistence import invite_store
+    from app.infrastructure.persistence import account_store, invite_store
+
+    # invites.created_by 外键指向 users(id)，必须先建真实用户；
+    # 早先硬编码 created_by=1 只在本地库恰好存在 id=1 时才成立，CI 全新库会报
+    # FOREIGN KEY constraint failed。
+    creator = account_store.create_user(
+        f"test_inviter_{time.time_ns()}", "password123", is_admin=False,
+    )
 
     code = f"INV_{time.time_ns()}"
-    invite = invite_store.create_invite(1, code, expires_at=None)
+    invite = invite_store.create_invite(creator["id"], code, expires_at=None)
     assert invite["code"] == code
     assert invite_store.invite_is_valid(code) is True
 
     revoked = invite_store.revoke_invite(code)
     assert revoked == "revoked"
     assert invite_store.invite_is_valid(code) is False
+
+    account_store.delete_user(creator["id"])
