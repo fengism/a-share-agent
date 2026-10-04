@@ -122,6 +122,14 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      # Chromium 没有中文字体时会回退到默认字体，中文换行与行高随之改变，
+      # 导致依赖像素布局的 E2E 在 CI 上失败（本地与 runner 渲染不一致）。
+      - name: Install CJK fonts for deterministic layout
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk fontconfig
+          fc-cache -f
+
       - name: Run full frontend E2E gate
         working-directory: frontend
         run: npm run test:e2e

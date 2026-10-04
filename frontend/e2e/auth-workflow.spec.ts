@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const user = {
   id: 7,
@@ -21,6 +21,29 @@ async function routeFallbackApi(page: Page) {
         : [];
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
+}
+
+/** 单列布局下的亚像素/字体渲染误差容限（px）。 */
+const LAYOUT_TOLERANCE_PX = 1;
+
+/**
+ * 断言 rail 已堆叠到 main 下方（窄屏单列布局）。
+ *
+ * 不能只测一次：``setViewportSize`` 之后容器查询（@container）与字体度量仍在
+ * 重新布局，立刻取boundingBox 会拿到中间态；字体缺失时中文换行还会持续变化。
+ * 这里轮询到条件满足为止，并留1px 容差吸收亚像素舍入。
+ */
+async function expectStackedVertically(main: Locator, rail: Locator) {
+  await expect
+    .poll(
+      async () => {
+        const [mainBox, railBox] = await Promise.all([main.boundingBox(), rail.boundingBox()]);
+        if (!mainBox || !railBox) return null;
+        return railBox.y - (mainBox.y + mainBox.height);
+      },
+      { timeout: 10_000, message: "rail 应堆叠在 main 下方（单列布局）" },
+    )
+    .toBeGreaterThan(-LAYOUT_TOLERANCE_PX);
 }
 
 test("logs in through the authenticated browser flow", async ({ page }) => {
@@ -345,16 +368,10 @@ test("places the Dashboard watchlist in a responsive right rail", async ({ page 
   expect(scrollMetrics.scrollHeight).toBeGreaterThan(scrollMetrics.clientHeight);
 
   await page.setViewportSize({ width: 1100, height: 900 });
-  const [compactMainBox, compactRailBox] = await Promise.all([main.boundingBox(), rail.boundingBox()]);
-  expect(compactMainBox).not.toBeNull();
-  expect(compactRailBox).not.toBeNull();
-  expect(compactRailBox!.y).toBeGreaterThan(compactMainBox!.y + compactMainBox!.height);
+  await expectStackedVertically(main, rail);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  const [mobileMainBox, mobileRailBox] = await Promise.all([main.boundingBox(), rail.boundingBox()]);
-  expect(mobileMainBox).not.toBeNull();
-  expect(mobileRailBox).not.toBeNull();
-  expect(mobileRailBox!.y).toBeGreaterThan(mobileMainBox!.y + mobileMainBox!.height);
+  await expectStackedVertically(main, rail);
   await expect(firstActions).toHaveCSS("opacity", "1");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
