@@ -42,65 +42,25 @@ def load_persisted_global_settings() -> None:
         logger.info("已加载持久化全局配置 keys=%s", sorted(persisted))
 
 
-# 本次启动的上次退出是否正常。verify_database_integrity 在启动关键路径上
-# 消费标记，后台大库检查需要据此决定是否白跑数小时，故在此共享结果。
-_last_exit_was_clean: bool | None = None
-
-
 def verify_database_integrity() -> None:
-    """启动关键路径的完整性检查：只查小库，失败即拒绝启动。
+    """启动时的完整性检查：只查小库，失败即拒绝启动。
 
-    两个层面的"跳过"，避免被大库拖死：
+    只查 market/user/industry（约 10 MiB，秒级）。market_daily 不查——它是
+    可从 dump 重建的派生数据，12.94 GiB 的全量 quick_check 受磁盘带宽限制
+    （冷缓存单流约 49 MiB/s）需数小时，期间挤占 K 线拉取与 WAL 维护，且检查
+    本身不能自愈。详见operations.STARTUP_CRITICAL_DATABASES 的说明。
 
-    1. 上次进程正常关机（退出时写了标记）时全部跳过——损坏只可能来自崩溃/断电。
-    2. 否则只查 market/user/industry 三个小库（约 10 MiB，秒级）。market_daily
-       有 12.94 GiB，全量 quick_check 受磁盘带宽限制需数小时，放在 uvicorn 监听
-       端口之前串行 await 会导致端口迟迟不开、healthcheck 必然 refused；
-       它改为后台检查（``verify_deferred_database_integrity``）。
+    上次进程正常关机（退出时写了标记）时整体跳过——损坏只可能来自崩溃/断电。
     """
-    global _last_exit_was_clean
-
     from app.infrastructure.persistence.operations import consume_clean_shutdown_marker
 
     if consume_clean_shutdown_marker():
-        _last_exit_was_clean = True
         logger.info("检测到上次为正常关机，跳过 SQLite 启动完整性检查")
         return
-
-    _last_exit_was_clean = False
 
     from app.infrastructure.persistence.operations import verify_startup_critical_databases
 
     verify_startup_critical_databases()
-
-
-async def verify_deferred_database_integrity() -> None:
-    """后台检查大库（market_daily）；失败只告警，不影响已启动的服务。
-
-    作为后台任务运行：端口已经可用，检查耗时数小时也不会阻塞启动或被
-    healthcheck 判为 unhealthy。上次是正常关机时直接跳过——那时没有损坏，
-    白跑数小时毫无意义。
-    """
-    from app.infrastructure.persistence.operations import (
-        STARTUP_DEFERRED_DATABASES,
-        verify_deferred_databases,
-    )
-
-    if _last_exit_was_clean:
-        logger.info("上次为正常关机，跳过大库后台完整性检查")
-        return
-
-    logger.info("开始在后台检查大库完整性: databases=%s", list(STARTUP_DEFERRED_DATABASES))
-    try:
-        await call_blocking(verify_deferred_databases, semaphore=database_semaphore)
-    except Exception:
-        logger.error(
-            "后台大库完整性检查失败: databases=%s",
-            list(STARTUP_DEFERRED_DATABASES),
-            exc_info=True,
-        )
-        return
-    logger.info("后台大库完整性检查通过: databases=%s", list(STARTUP_DEFERRED_DATABASES))
 
 
 def mark_database_clean_shutdown() -> None:
@@ -126,7 +86,6 @@ def build_background_task_specs(
     settings_provider: Callable[[], Settings],
     supervised_once: SupervisedRunner,
     industry_mapping_prewarm: AsyncTaskFactory,
-    deferred_integrity_check: AsyncTaskFactory,
     stock_name_map_prewarm: AsyncTaskFactory,
     hk_stock_search_prewarm: AsyncTaskFactory,
     us_macro_prewarm: AsyncTaskFactory,
@@ -151,20 +110,6 @@ def build_background_task_specs(
                 industry_mapping_prewarm,
             ),
             start_message="行业映射预热任务已启动",
-        ),
-        # market_daily（12.94 GiB）的完整性检查放在后台：串行 await 会挡住
-        # uvicorn 监听端口，导致 healthcheck refused。critical=False 表示
-        # 失败只告警不重启服务；long_running=True 表示它会跑数小时。
-        BackgroundTaskSpec(
-            name="deferred_integrity_check",
-            factory=_supervised_task_factory(
-                supervised_once,
-                "deferred_integrity_check",
-                deferred_integrity_check,
-            ),
-            long_running=True,
-            critical=False,
-            start_message="大库完整性后台检查已启动",
         ),
         BackgroundTaskSpec(
             name="stock_name_map_prewarm",
@@ -391,7 +336,6 @@ async def application_lifespan(
         settings_provider=settings_provider,
         supervised_once=supervised_once,
         industry_mapping_prewarm=build_industry_mapping,
-        deferred_integrity_check=verify_deferred_database_integrity,
         stock_name_map_prewarm=build_stock_name_map,
         hk_stock_search_prewarm=prewarm_hk_stock_search_index,
         us_macro_prewarm=prewarm_us_macro_data,

@@ -66,17 +66,19 @@ def verify_database_integrity(
         _quick_check(connection_provider(database), label=database)
 
 
-# 启动时同步做完整性检查的库：三个小库合计约 10 MiB，秒级完成，可以放心
-# fail-fast——库坏了就直接拒绝启动。
+# 启动时做完整性检查的库：三个小库合计约 10 MiB，秒级完成，可以放心 fail-fast
+# ——库坏了就直接拒绝启动。
+#
+# market_daily 不在其中（12.94 GiB，实测 quick_check 需数小时）。理由：
+#   1. 它是派生数据，可再生——``refresh_market_daily_bars_periodic`` 持续归档，
+#      且仓库自带重建脚本（scripts/init_market_daily_from_dump.py 等）；
+#   2. 它不是实时行情来源（"实时行情由实时查询链负责，不写入此库"），
+#      损坏时仍可由腾讯/TDX 链路服务；
+#   3. 全量扫描受磁盘带宽限制（冷缓存单流约 49 MiB/s，CPU 仅约 3%，
+#      mmap 与多线程并行实测都无法提升上限），期间会挤占 K 线拉取与 WAL 维护；
+#   4. 检查本身也不能自愈，只能报个 error。
+# 出问题时的正确处置是从 dump 重建，而非花数小时确认它是否损坏。
 STARTUP_CRITICAL_DATABASES: tuple[DatabaseName, ...] = ("market", "user", "industry")
-
-# 启动时不做同步检查的大库。market_daily 实测 12.94 GiB，``quick_check`` 是
-# 全量扫描，瓶颈在磁盘带宽（冷缓存单流约 49 MiB/s，全扫需数小时），且 CPU 仅
-# 占用约 3%——把它放在 uvicorn 监听端口之前串行 await，会让端口迟迟不开、
-# healthcheck 必然 refused。实测 mmap 与多线程并行都无法提升带宽上限
-# （顺序读与 quick_check 同为约 530 MiB/s，2 线程仅 +12%），因此改为后台检查：
-# 服务立即可用，检查在后台跑完并记录结果。
-STARTUP_DEFERRED_DATABASES: tuple[DatabaseName, ...] = ("market_daily",)
 
 
 def verify_startup_critical_databases(
@@ -85,14 +87,6 @@ def verify_startup_critical_databases(
 ) -> None:
     """启动关键路径的完整性检查：只查小库，失败即拒绝启动。"""
     verify_database_integrity(STARTUP_CRITICAL_DATABASES, connection_provider=connection_provider)
-
-
-def verify_deferred_databases(
-    *,
-    connection_provider: ConnectionProvider = get_connection,
-) -> None:
-    """后台完整性检查：只查大库；失败只记日志，不影响已启动的服务。"""
-    verify_database_integrity(STARTUP_DEFERRED_DATABASES, connection_provider=connection_provider)
 
 
 def _verify_backup(path: Path) -> None:

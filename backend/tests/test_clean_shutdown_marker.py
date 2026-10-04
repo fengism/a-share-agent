@@ -8,7 +8,6 @@
 from pathlib import Path
 
 from app.infrastructure.persistence import operations
-from app.infrastructure.persistence.connection import ALL_DATABASES
 
 
 def test_no_marker_means_verify_runs() -> None:
@@ -37,87 +36,42 @@ def test_marker_lives_next_to_databases() -> None:
     assert operations._clean_shutdown_marker_path().parent == Path(DB_DIR)
 
 
-def test_lifecycle_skips_everything_after_clean_shutdown(tmp_path, monkeypatch) -> None:
-    """上次正常关机：启动检查与后台大库检查都跳过。"""
-    import asyncio
-
-    from app.runtime import lifecycle
-
-    marker = tmp_path / ".clean_shutdown"
-    marker.write_text("2026-10-04T00:00:00+00:00", encoding="utf-8")
-    monkeypatch.setattr(operations, "_clean_shutdown_marker_path", lambda: marker)
-
-    critical_called = False
-    deferred_called = False
-
-    def _fail_critical(**_kwargs) -> None:
-        nonlocal critical_called
-        critical_called = True
-
-    def _fail_deferred(**_kwargs) -> None:
-        nonlocal deferred_called
-        deferred_called = True
-
-    monkeypatch.setattr(
-        "app.infrastructure.persistence.operations.verify_startup_critical_databases", _fail_critical,
-    )
-    monkeypatch.setattr(
-        "app.infrastructure.persistence.operations.verify_deferred_databases", _fail_deferred,
-    )
-
-    lifecycle.verify_database_integrity()
-    asyncio.run(lifecycle.verify_deferred_database_integrity())
-    assert critical_called is False, "正常关机后不应检查小库"
-    assert deferred_called is False, "正常关机后不应白跑数小时检查大库"
-
-
-def test_lifecycle_checks_only_small_libs_synchronously(tmp_path, monkeypatch) -> None:
-    """崩溃恢复：启动路径只查小库，大库交给后台。"""
-    import asyncio
-
+def test_lifecycle_checks_only_small_libs(tmp_path, monkeypatch) -> None:
+    """崩溃恢复：启动路径只查小库，且不触碰 12.94 GiB 的market_daily。"""
     from app.runtime import lifecycle
 
     marker = tmp_path / ".clean_shutdown"
     monkeypatch.setattr(operations, "_clean_shutdown_marker_path", lambda: marker)
 
-    checked: list[str] = []
+    checked: list[tuple[str, ...]] = []
     monkeypatch.setattr(
-        operations, "verify_startup_critical_databases", lambda **_kw: checked.append("small"),
-    )
-    monkeypatch.setattr(
-        operations, "verify_deferred_databases", lambda **_kw: checked.append("big"),
+        operations,
+        "verify_startup_critical_databases",
+        lambda **_kw: checked.append(operations.STARTUP_CRITICAL_DATABASES),
     )
 
     lifecycle.verify_database_integrity()
-    # 启动关键路径此刻只能有 small，big 必须还没开始
-    assert checked == ["small"], f"启动路径不应同步检查大库，实际={checked}"
-
-    asyncio.run(lifecycle.verify_deferred_database_integrity())
-    assert checked == ["small", "big"], "大库应在后台阶段检查"
+    assert checked == [("market", "user", "industry")], "应只检查三个小库"
 
 
-def test_startup_and_deferred_partition_all_databases() -> None:
-    """分层必须覆盖全部库且不重叠，否则某个库会永远不被检查。"""
-    assert set(operations.STARTUP_CRITICAL_DATABASES) | set(operations.STARTUP_DEFERRED_DATABASES) == set(
-        ALL_DATABASES
-    )
-    assert not set(operations.STARTUP_CRITICAL_DATABASES) & set(operations.STARTUP_DEFERRED_DATABASES)
-    # market_daily 必须落在延迟侧——它才是那个 12.94 GiB 的大库
-    assert "market_daily" in operations.STARTUP_DEFERRED_DATABASES
+def test_startup_check_excludes_rebuildable_large_database() -> None:
+    """market_daily 是可从 dump 重建的派生数据，不应出现在启动检查里。
+
+    它的全量 quick_check 需数小时（冷缓存单流约 49 MiB/s，CPU 约 3%），
+    期间挤占K 线拉取与 WAL 维护，且检查本身不能自愈。
+    """
     assert "market_daily" not in operations.STARTUP_CRITICAL_DATABASES
+    # 只查用户数据与元数据这类不可重建的库
+    assert set(operations.STARTUP_CRITICAL_DATABASES) == {"market", "user", "industry"}
 
 
-def test_deferred_check_failure_does_not_raise(monkeypatch) -> None:
-    """后台检查失败只记日志，不得把已经启动的服务带崩。"""
-    import asyncio
+def test_deferred_database_check_is_gone() -> None:
+    """大库后台检查已移除——不存在延迟检查入口，也不再注册后台任务。"""
+    assert not hasattr(operations, "STARTUP_DEFERRED_DATABASES")
+    assert not hasattr(operations, "verify_deferred_databases")
 
     from app.runtime import lifecycle
 
-    monkeypatch.setattr(lifecycle, "_last_exit_was_clean", False)
-
-    def _boom(**_kwargs) -> None:
-        raise RuntimeError("SQLite 完整性检查失败: database=market_daily")
-
-    monkeypatch.setattr(operations, "verify_deferred_databases", _boom)
-    # 不应抛异常
-    asyncio.run(lifecycle.verify_deferred_database_integrity())
+    assert not hasattr(lifecycle, "verify_deferred_database_integrity")
+    spec_source = __import__("inspect").getsource(lifecycle.build_background_task_specs)
+    assert "deferred_integrity_check" not in spec_source
