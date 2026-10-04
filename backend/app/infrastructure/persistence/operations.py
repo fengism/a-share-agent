@@ -362,7 +362,7 @@ def _publish_compressed_backup(
     sqlite_temporary: Path,
     destination: Path,
     *,
-    compresslevel: int = 9,
+    compresslevel: int = 1,
 ) -> None:
     _verify_backup(sqlite_temporary, database=destination.name.split("-", 1)[0])
     compressed_temporary = destination.with_name(f".{destination.name}.compress.tmp")
@@ -488,7 +488,7 @@ def create_online_backups(
     mirror_dir: Path | None = None,
     now: datetime | None = None,
     compression: bool = True,
-    compression_level: int = 9,
+    compression_level: int = 1,
 ) -> tuple[Path, ...]:
     backup_dir.mkdir(parents=True, exist_ok=True)
     if mirror_dir is not None:

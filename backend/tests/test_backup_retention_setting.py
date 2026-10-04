@@ -62,3 +62,57 @@ def test_env_override_is_respected() -> None:
     """显式传入的值必须覆盖默认值（``.env`` 与环境变量都能生效）。"""
     assert Settings(database_backup_retention_count=2).database_backup_retention_count == 2
     assert Settings(database_backup_retention_count=7).database_backup_retention_count == 7
+
+
+def test_market_daily_backup_settings_are_persisted_global() -> None:
+    for key in (
+        "database_backup_include_market_daily",
+        "market_daily_backup_interval_days",
+        "market_daily_backup_compression_level",
+    ):
+        assert key in PERSISTED_GLOBAL_KEYS
+        assert key in ConfigUpdateRequest.model_fields
+        assert key in ConfigResponse.model_fields
+
+
+def test_market_daily_backup_settings_apply_without_restart() -> None:
+    orig_include = get_settings().database_backup_include_market_daily
+    orig_interval = get_settings().market_daily_backup_interval_days
+    orig_level = get_settings().market_daily_backup_compression_level
+    try:
+        updated = update_settings({
+            "database_backup_include_market_daily": False,
+            "market_daily_backup_interval_days": 14,
+            "market_daily_backup_compression_level": 3,
+        })
+        assert updated.database_backup_include_market_daily is False
+        assert updated.market_daily_backup_interval_days == 14
+        assert updated.market_daily_backup_compression_level == 3
+        assert get_settings().database_backup_include_market_daily is False
+        assert get_settings().market_daily_backup_interval_days == 14
+        assert get_settings().market_daily_backup_compression_level == 3
+    finally:
+        update_settings({
+            "database_backup_include_market_daily": orig_include,
+            "market_daily_backup_interval_days": orig_interval,
+            "market_daily_backup_compression_level": orig_level,
+        })
+
+
+@pytest.mark.parametrize("interval", [0, 91, -1])
+def test_market_daily_backup_interval_rejects_out_of_range(interval: int) -> None:
+    with pytest.raises(ValidationError):
+        ConfigUpdateRequest(market_daily_backup_interval_days=interval)
+
+
+@pytest.mark.parametrize("level", [0, 10, -1])
+def test_market_daily_backup_compression_level_rejects_out_of_range(level: int) -> None:
+    with pytest.raises(ValidationError):
+        ConfigUpdateRequest(market_daily_backup_compression_level=level)
+
+
+def test_market_daily_backup_defaults_from_schema() -> None:
+    assert Settings.model_fields["database_backup_include_market_daily"].default is True
+    assert Settings.model_fields["market_daily_backup_interval_days"].default == 7
+    assert Settings.model_fields["market_daily_backup_compression_level"].default == 1
+

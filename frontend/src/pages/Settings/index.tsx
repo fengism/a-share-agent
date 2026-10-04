@@ -79,6 +79,9 @@ export default function SettingsPage() {
       market_daily_observation_retention_days: config.market_daily_observation_retention_days,
       market_daily_attempt_retention_days: config.market_daily_attempt_retention_days,
       database_backup_retention_count: config.database_backup_retention_count,
+      database_backup_include_market_daily: config.database_backup_include_market_daily,
+      market_daily_backup_interval_days: config.market_daily_backup_interval_days,
+      market_daily_backup_compression_level: config.market_daily_backup_compression_level,
       fuyao_api_key: config.fuyao_api_key,
       anysearch_api_key: "",
       bot_enabled: config.bot_enabled,
@@ -247,10 +250,21 @@ export default function SettingsPage() {
 
   const handleSaveBackupRetention = useCallback(() => {
     saveConfig(
-      { database_backup_retention_count: form.database_backup_retention_count },
-      "数据库备份保留份数已保存",
+      {
+        database_backup_retention_count: form.database_backup_retention_count,
+        database_backup_include_market_daily: form.database_backup_include_market_daily,
+        market_daily_backup_interval_days: form.market_daily_backup_interval_days,
+        market_daily_backup_compression_level: form.market_daily_backup_compression_level,
+      },
+      "数据库备份设置已保存",
     );
-  }, [form.database_backup_retention_count, saveConfig]);
+  }, [
+    form.database_backup_retention_count,
+    form.database_backup_include_market_daily,
+    form.market_daily_backup_interval_days,
+    form.market_daily_backup_compression_level,
+    saveConfig,
+  ]);
 
   const handleSaveResearchBudget = useCallback(() => {
     const patch: ConfigUpdate = {
@@ -346,8 +360,8 @@ export default function SettingsPage() {
           系统配置
         </h2>
         <p style={pageDescriptionStyle}>
-          大模型、飞书、Notion、问财等为<strong>每账号独立的私密配置</strong>，仅对当前登录用户生效；
-          修改后即时生效无需重启。
+          配置 AI 模型思考引擎、行情与资讯数据输入源，以及研报外部协同导出渠道。
+          个人配置（大模型、问财 Key、飞书私有空间）独立生效；系统公共数据源与运维策略由管理员统一维护。
           {user && (
             <span style={{ marginLeft: 8, color: colors.textMuted }}>
               当前账号：<strong style={{ color: colors.textSecondary }}>{user.username}</strong>
@@ -362,7 +376,7 @@ export default function SettingsPage() {
           {
             key: "account",
             label: "账号与安全",
-            group: "个人",
+            group: "个人配置",
             children: (
               <section aria-labelledby="account-settings-title">
                 <h3 id="account-settings-title" style={sectionTitleStyle}>账号与安全</h3>
@@ -373,8 +387,8 @@ export default function SettingsPage() {
           },
           {
             key: "ai",
-            label: "AI 配置",
-            group: "个人",
+            label: "AI 模型配置",
+            group: "个人配置",
             children: (
               <Suspense fallback={<SettingsSectionFallback />}>
                 <AiSettingsSection
@@ -390,9 +404,32 @@ export default function SettingsPage() {
             ),
           },
           {
+            key: "data-sources",
+            label: "数据源管理",
+            group: "个人配置",
+            children: (
+              <Suspense fallback={<SettingsSectionFallback />}>
+                <DataSourcesSettingsSection
+                  form={form}
+                  onChange={updateForm}
+                  isSaving={isSaving}
+                  isAdmin={isAdmin}
+                  sectionTitleStyle={sectionTitleStyle}
+                  onSaveIwencai={handleSaveIwencai}
+                  onSaveTwitter={handleSaveTwitter}
+                  onSaveFred={handleSaveFred}
+                  anySearchConfigured={Boolean(config.anysearch_api_key)}
+                  onSaveAnySearch={handleSaveAnySearch}
+                  fuyaoConfigured={Boolean(config.fuyao_api_key)}
+                  onSaveDataSourceCredentials={handleSaveDataSourceCredentials}
+                />
+              </Suspense>
+            ),
+          },
+          {
             key: "integrations",
-            label: "内容集成",
-            group: "个人",
+            label: "协同与研报导出",
+            group: "个人配置",
             children: (
               <Suspense fallback={<SettingsSectionFallback />}>
                 <IntegrationsSettingsSection
@@ -402,37 +439,15 @@ export default function SettingsPage() {
                   sectionTitleStyle={sectionTitleStyle}
                   onSaveFeishu={handleSaveFeishu}
                   onSaveNotion={handleSaveNotion}
-                  onSaveIwencai={handleSaveIwencai}
                 />
               </Suspense>
             ),
           },
           ...(isAdmin ? [
             {
-              key: "data-sources",
-              label: "数据源管理",
-              group: "管理员",
-              children: (
-                <Suspense fallback={<SettingsSectionFallback />}>
-                  <DataSourcesSettingsSection
-                    form={form}
-                    onChange={updateForm}
-                    isSaving={isSaving}
-                    sectionTitleStyle={sectionTitleStyle}
-                    onSaveTwitter={handleSaveTwitter}
-                    onSaveFred={handleSaveFred}
-                    anySearchConfigured={Boolean(config.anysearch_api_key)}
-                    onSaveAnySearch={handleSaveAnySearch}
-                    fuyaoConfigured={Boolean(config.fuyao_api_key)}
-                    onSaveDataSourceCredentials={handleSaveDataSourceCredentials}
-                  />
-                </Suspense>
-              ),
-            },
-            {
               key: "admin",
               label: "管理员工具",
-              group: "管理员",
+              group: "系统管理",
               children: (
                 <Suspense fallback={<SettingsSectionFallback />}>
                   <AdminSettingsSection

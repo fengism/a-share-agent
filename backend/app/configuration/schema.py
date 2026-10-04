@@ -76,6 +76,9 @@ PERSISTED_GLOBAL_KEYS = frozenset(
         "market_daily_observation_retention_days",
         "market_daily_attempt_retention_days",
         "database_backup_retention_count",
+        "database_backup_include_market_daily",
+        "market_daily_backup_interval_days",
+        "market_daily_backup_compression_level",
         "bot_enabled",
         "bot_command_prefix",
         "bot_service_user_id",
@@ -251,6 +254,9 @@ class Settings(BaseSettings):
     database_backup_enabled: bool = True
     database_backup_interval_seconds: int = Field(default=24 * 60 * 60, ge=300)
     database_backup_retention_count: int = Field(default=3, ge=1, le=90)
+    database_backup_include_market_daily: bool = True
+    market_daily_backup_interval_days: int = Field(default=7, ge=1, le=90)
+    market_daily_backup_compression_level: int = Field(default=1, ge=1, le=9)
     database_backup_dir: Path | None = None
     database_backup_mirror_dir: Path | None = None
 

@@ -88,6 +88,9 @@ class ConfigResponse(BaseModel):
     agent_research_timeout_seconds: float
     chat_max_tool_calls_total: int
     database_backup_retention_count: int
+    database_backup_include_market_daily: bool
+    market_daily_backup_interval_days: int
+    market_daily_backup_compression_level: int
     is_admin: bool
 
 
@@ -142,6 +145,9 @@ class ConfigUpdateRequest(BaseModel):
     market_daily_observation_retention_days: int | None = Field(default=None, ge=7, le=3650)
     market_daily_attempt_retention_days: int | None = Field(default=None, ge=30, le=3650)
     database_backup_retention_count: int | None = Field(default=None, ge=1, le=90)
+    database_backup_include_market_daily: bool | None = None
+    market_daily_backup_interval_days: int | None = Field(default=None, ge=1, le=90)
+    market_daily_backup_compression_level: int | None = Field(default=None, ge=1, le=9)
     bot_enabled: bool | None = None
     bot_command_prefix: str | None = Field(default=None, min_length=1, max_length=4)
     bot_service_user_id: int | None = Field(default=None, ge=0)

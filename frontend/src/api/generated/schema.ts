@@ -1710,10 +1710,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Concept Constituents
+         * Get Concept Constituents Route
          * @description 获取概念成分股及其实时行情；每只股票带全部所属概念用于反向联动。
          */
-        get: operations["get_concept_constituents_api_market_concept__concept__constituents_get"];
+        get: operations["get_concept_constituents_route_api_market_concept__concept__constituents_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5466,6 +5466,8 @@ export interface components {
             bot_webhook_max_skew_seconds: number;
             /** Chat Max Tool Calls Total */
             chat_max_tool_calls_total: number;
+            /** Database Backup Include Market Daily */
+            database_backup_include_market_daily: boolean;
             /** Database Backup Retention Count */
             database_backup_retention_count: number;
             /** Disabled Chat Agents */
@@ -5561,6 +5563,10 @@ export interface components {
             llm_temperature: number;
             /** Market Daily Attempt Retention Days */
             market_daily_attempt_retention_days: number;
+            /** Market Daily Backup Compression Level */
+            market_daily_backup_compression_level: number;
+            /** Market Daily Backup Interval Days */
+            market_daily_backup_interval_days: number;
             /** Market Daily Bar Refresh Enabled */
             market_daily_bar_refresh_enabled: boolean;
             /** Market Daily Bar Refresh Poll Seconds */
@@ -5635,6 +5641,8 @@ export interface components {
             bot_webhook_max_skew_seconds?: number | null;
             /** Chat Max Tool Calls Total */
             chat_max_tool_calls_total?: number | null;
+            /** Database Backup Include Market Daily */
+            database_backup_include_market_daily?: boolean | null;
             /** Database Backup Retention Count */
             database_backup_retention_count?: number | null;
             /** Disabled Chat Agents */
@@ -5725,6 +5733,10 @@ export interface components {
             llm_temperature?: number | null;
             /** Market Daily Attempt Retention Days */
             market_daily_attempt_retention_days?: number | null;
+            /** Market Daily Backup Compression Level */
+            market_daily_backup_compression_level?: number | null;
+            /** Market Daily Backup Interval Days */
+            market_daily_backup_interval_days?: number | null;
             /** Market Daily Bar Refresh Enabled */
             market_daily_bar_refresh_enabled?: boolean | null;
             /** Market Daily Bar Refresh Poll Seconds */
@@ -17470,9 +17482,12 @@ export interface operations {
             };
         };
     };
-    get_concept_constituents_api_market_concept__concept__constituents_get: {
+    get_concept_constituents_route_api_market_concept__concept__constituents_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 逗号分隔的成分股代码；只对这些代码拉取实时行情，其余行行情为 null。前端虚拟滚动按可见区传入以避免全量拉取。 */
+                codes?: string | null;
+            };
             header?: never;
             path: {
                 concept: string;

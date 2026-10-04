@@ -171,3 +171,144 @@ def test_get_concept_constituents_raises_for_unknown_concept(monkeypatch: pytest
 
     with pytest.raises(ResourceNotFoundError):
         asyncio.run(module.get_concept_constituents("不存在的概念"))
+
+
+def _patch_local_closes(
+    monkeypatch: pytest.MonkeyPatch,
+    rows: dict[str, dict],
+) -> list[str]:
+    """桩掉本地当日收盘兜底，并记录被请求的代码。"""
+    seen: list[str] = []
+
+    def _fake(codes: list[str]) -> dict[str, dict]:
+        seen.extend(codes)
+        return {code: rows[code] for code in codes if code in rows}
+
+    monkeypatch.setattr(module, "_confirmed_local_closes", _fake)
+    return seen
+
+
+def test_get_concept_constituents_falls_back_to_confirmed_local_close(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """实时行情缺失时，用本地当日已确认收盘价兜底，并标注来源。"""
+    _patch_connection(
+        monkeypatch,
+        mapping_rows=[("000002.SZ", "万科A", '["机器人概念"]')],
+        concept_rows=[],
+    )
+
+    async def _boom(codes: list[str]):
+        raise RuntimeError("行情上游不可用")
+
+    monkeypatch.setattr(module, "fetch_realtime_quote_set", _boom)
+    _patch_local_closes(
+        monkeypatch,
+        {
+            "000002": {
+                "close": 4.26,
+                "change_pct": 4.41,
+                "amount": 5158052403,
+                "source": "market_daily_close:2026-10-02",
+            }
+        },
+    )
+
+    result = asyncio.run(module.get_concept_constituents("机器人概念"))
+
+    item = result["items"][0]
+    assert item["price"] == 4.26
+    assert item["change_pct"] == 4.41
+    assert item["amount"] == 5158052403
+    # 兜底数据必须能与其他来源区分开，前端据此标注"收盘价"
+    assert item["quote_source"] == "market_daily_close:2026-10-02"
+
+
+def test_get_concept_constituents_keeps_uncovered_codes_empty_without_local_close(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """本地没有当日已确认数据时，保持空值，绝不拿昨日价冒充今日价。"""
+    _patch_connection(
+        monkeypatch,
+        mapping_rows=[("000002.SZ", "万科A", '["机器人概念"]')],
+        concept_rows=[],
+    )
+
+    async def _boom(codes: list[str]):
+        raise RuntimeError("行情上游不可用")
+
+    monkeypatch.setattr(module, "fetch_realtime_quote_set", _boom)
+    _patch_local_closes(monkeypatch, {})
+
+    result = asyncio.run(module.get_concept_constituents("机器人概念"))
+
+    assert result["items"][0]["price"] is None
+    assert result["items"][0]["quote_source"] is None
+
+
+def test_get_concept_constituents_prefers_realtime_over_local_close(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """实时行情已有的代码不再查本地兜底，两者不冲突。"""
+
+    class _QuoteSet:
+        quoted_at = "2026-10-02T15:00:00+08:00"
+        source = "tdx"
+        quotes = {"000002": {"price": 5.0, "change_pct": 17.4, "amount": 999}}
+        quote_sources = {"000002": "tdx"}
+
+    async def _fake_fetch(codes: list[str]):
+        return _QuoteSet()
+
+    _patch_connection(
+        monkeypatch,
+        mapping_rows=[("000002.SZ", "万科A", '["机器人概念"]')],
+        concept_rows=[],
+    )
+    monkeypatch.setattr(module, "fetch_realtime_quote_set", _fake_fetch)
+
+    requested = _patch_local_closes(
+        monkeypatch,
+        {"000002": {"close": 4.26, "change_pct": 4.41, "amount": 1, "source": "local"}},
+    )
+
+    result = asyncio.run(module.get_concept_constituents("机器人概念"))
+
+    assert result["items"][0]["price"] == 5.0
+    assert result["items"][0]["quote_source"] == "tdx"
+    # 实时已覆盖的代码不应再去查本地
+    assert requested == []
+
+
+def test_confirmed_local_closes_computes_change_pct_from_previous_close(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """库内 change_pct 为 NULL 时，用前一个交易日 close 补算涨跌幅。"""
+    _patch_connection(monkeypatch, mapping_rows=[], concept_rows=[])
+
+    monkeypatch.setattr(
+        module.market_daily_bar_service.repository,
+        "list_confirmed_closes",
+        lambda codes, trade_date: {
+            "000002": {"close": 4.26, "pre_close": 4.08, "amount": 5158052403.74, "turnover_pct": None}
+        },
+    )
+
+    result = module._confirmed_local_closes(["000002"])
+
+    assert result["000002"]["change_pct"] == pytest.approx(4.41, abs=0.01)
+    assert result["000002"]["amount"] == 5158052403
+    assert result["000002"]["source"].startswith("market_daily_close:")
+
+
+def test_confirmed_local_closes_skips_rows_without_close(monkeypatch: pytest.MonkeyPatch) -> None:
+    """close 缺失的脏数据不应被填成 0。"""
+    _patch_connection(monkeypatch, mapping_rows=[], concept_rows=[])
+
+    monkeypatch.setattr(
+        module.market_daily_bar_service.repository,
+        "list_confirmed_closes",
+        lambda codes, trade_date: {"000002": {"close": None, "pre_close": 4.08, "amount": None}},
+    )
+
+    assert module._confirmed_local_closes(["000002"]) == {}

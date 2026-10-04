@@ -1,11 +1,31 @@
 """Portfolio API 与领域数据模型。"""
 
+import re
 from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.market import normalize_code
+from app.financial_data.hk.service import normalize_hk_code
+
+_HK_CODE_PATTERN = re.compile(r"^(?:hk)?(\d{1,5})$", re.IGNORECASE)
+
+
+def is_hk_stock_code(code: str) -> bool:
+    cleaned = str(code or "").strip()
+    if cleaned.upper().endswith(".HK"):
+        cleaned = cleaned[:-3].strip()
+    return bool(_HK_CODE_PATTERN.fullmatch(cleaned))
+
+
+def normalize_portfolio_stock_code(value: str) -> str:
+    cleaned = str(value or "").strip()
+    if cleaned.upper().endswith(".HK"):
+        cleaned = cleaned[:-3].strip()
+    if is_hk_stock_code(cleaned):
+        return normalize_hk_code(cleaned)
+    return normalize_code(cleaned).raw
 
 
 class PortfolioPositionCreate(BaseModel):
@@ -17,7 +37,7 @@ class PortfolioPositionCreate(BaseModel):
     @field_validator("stock_code")
     @classmethod
     def validate_stock_code(cls, value: str) -> str:
-        return normalize_code(value).raw
+        return normalize_portfolio_stock_code(value)
 
 
 class PortfolioTransactionCreate(BaseModel):
@@ -32,7 +52,7 @@ class PortfolioTransactionCreate(BaseModel):
     @field_validator("stock_code")
     @classmethod
     def validate_stock_code(cls, value: str) -> str:
-        return normalize_code(value).raw
+        return normalize_portfolio_stock_code(value)
 
     @field_validator("note")
     @classmethod

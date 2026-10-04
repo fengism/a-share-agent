@@ -3,7 +3,7 @@ import { Col, Input, Row } from "antd";
 import { useColors, useStyles } from "../../../styles/ui";
 import { SettingsCard, type ConfigCardProps } from "../SettingsCard";
 
-export default function FredConfigCard({ form, onChange, onSave, isSaving }: ConfigCardProps) {
+export default function FredConfigCard({ form, onChange, onSave, isSaving, stretch }: ConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
 
@@ -14,6 +14,7 @@ export default function FredConfigCard({ form, onChange, onSave, isSaving }: Con
       saveLabel="保存 FRED 配置"
       onSave={onSave}
       isSaving={isSaving}
+      stretch={stretch}
     >
       <Row gutter={[24, 16]}>
         <Col span={24}>
@@ -24,8 +25,8 @@ export default function FredConfigCard({ form, onChange, onSave, isSaving }: Con
             onChange={(event) => onChange({ fred_api_key: event.target.value })}
             placeholder="从 FRED 官网申请 API Key"
           />
-          <div style={{ marginTop: 4, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
-            由管理员统一配置，对所有用户生效；密钥会加密保存且不会明文展示。
+          <div style={{ marginTop: 6, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+            美联储宏观经济数据库，提供美债收益率、通胀率与非农就业等指标。
           </div>
         </Col>
       </Row>

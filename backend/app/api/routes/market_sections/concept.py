@@ -33,9 +33,19 @@ def list_concepts(
 
 
 @router.get("/concept/{concept}/constituents", response_model=ConceptConstituentResponse)
-async def get_concept_constituents(concept: str):
+async def get_concept_constituents_route(
+    concept: str,
+    codes: str | None = Query(
+        default=None,
+        description="逗号分隔的成分股代码；只对这些代码拉取实时行情，"
+        "其余行行情为 null。前端虚拟滚动按可见区传入以避免全量拉取。",
+    ),
+):
     """获取概念成分股及其实时行情；每只股票带全部所属概念用于反向联动。"""
-    return await get_concept_constituents_service(concept)
+    quote_codes = None
+    if codes is not None:
+        quote_codes = [code for code in codes.split(",") if code]
+    return await get_concept_constituents_service(concept, quote_codes=quote_codes)
 
 
 @router.get("/concept/{concept}/index", response_model=ConceptIndexResponse)

@@ -10,8 +10,10 @@ from pathlib import Path
 from app.infrastructure.persistence import operations
 
 
-def test_no_marker_means_verify_runs() -> None:
+def test_no_marker_means_verify_runs(tmp_path, monkeypatch) -> None:
     """崩溃/首次启动：无标记，必须执行全量检查。"""
+    marker = tmp_path / ".clean_shutdown"
+    monkeypatch.setattr(operations, "_clean_shutdown_marker_path", lambda: marker)
     assert operations.consume_clean_shutdown_marker() is False
 
 

@@ -11,6 +11,8 @@ from app.modules.portfolio.schemas import (
     PortfolioTransaction,
     PortfolioTransactionCreate,
     PortfolioTransactionPreview,
+    is_hk_stock_code,
+    normalize_portfolio_stock_code,
 )
 from app.modules.portfolio.service import get_equity_curve, get_portfolio, update_account_settings
 from app.modules.portfolio.transactions import (
@@ -46,6 +48,8 @@ __all__ = [
     "list_held_stock_codes",
     "preview_transaction",
     "preview_transaction_update",
+    "is_hk_stock_code",
+    "normalize_portfolio_stock_code",
     "update_transaction",
     "update_account_settings",
 ]

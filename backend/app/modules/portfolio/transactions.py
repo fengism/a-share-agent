@@ -20,6 +20,7 @@ from app.modules.portfolio.schemas import (
     PortfolioTransaction,
     PortfolioTransactionCreate,
     PortfolioTransactionPreview,
+    is_hk_stock_code,
 )
 
 
@@ -73,7 +74,14 @@ async def _resolve_stock(request: PortfolioTransactionCreate, user_id: int) -> t
     quote = quotes.get(request.stock_code, {})
     stock_name = str(quote.get("name") or existing_name).strip()
     if not stock_name:
-        stock_name = (await get_stock_name_map()).get(request.stock_code, "")
+        if is_hk_stock_code(request.stock_code):
+            from app.financial_data.hk.search_index import hk_stock_search_index
+
+            matches = await hk_stock_search_index.search(request.stock_code, limit=1)
+            if matches and matches[0].code == request.stock_code:
+                stock_name = matches[0].name
+        else:
+            stock_name = (await get_stock_name_map()).get(request.stock_code, "")
     if not stock_name:
         return None
     return stock_name, quote

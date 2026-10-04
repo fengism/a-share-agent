@@ -58,6 +58,9 @@ export interface ConfigData {
   market_daily_observation_retention_days: number;
   market_daily_attempt_retention_days: number;
   database_backup_retention_count: number;
+  database_backup_include_market_daily: boolean;
+  market_daily_backup_interval_days: number;
+  market_daily_backup_compression_level: number;
   bot_enabled: boolean;
   bot_command_prefix: string;
   bot_service_user_id: number;

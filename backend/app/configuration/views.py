@@ -82,6 +82,9 @@ class RuntimeSettingsView:
     database_backup_enabled: bool
     database_backup_interval_seconds: int
     database_backup_retention_count: int
+    database_backup_include_market_daily: bool
+    market_daily_backup_interval_days: int
+    market_daily_backup_compression_level: int
     database_backup_dir: Path | None
     database_backup_mirror_dir: Path | None
 
@@ -104,6 +107,9 @@ class RuntimeSettingsView:
             database_backup_enabled=settings.database_backup_enabled,
             database_backup_interval_seconds=settings.database_backup_interval_seconds,
             database_backup_retention_count=settings.database_backup_retention_count,
+            database_backup_include_market_daily=settings.database_backup_include_market_daily,
+            market_daily_backup_interval_days=settings.market_daily_backup_interval_days,
+            market_daily_backup_compression_level=settings.market_daily_backup_compression_level,
             database_backup_dir=settings.database_backup_dir,
             database_backup_mirror_dir=settings.database_backup_mirror_dir,
         )

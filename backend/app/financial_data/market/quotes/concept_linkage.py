@@ -17,7 +17,7 @@ import logging
 import sqlite3
 from collections import Counter
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from app.core.cache import market_cache as cache
 from app.core.cache_policies import CONCEPT_LINKAGE
@@ -26,6 +26,7 @@ from app.core.market import normalize_code, safe_float
 from app.financial_data.stock.quotes.realtime import fetch_realtime_quote_set
 from app.infrastructure.persistence.connection import get_connection
 from app.modules.market_daily.concept_index import load_concept_index, sample_constituents
+from app.modules.market_daily.service import MARKET_TIMEZONE, market_daily_bar_service
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,34 @@ def _concept_sizes(names: list[str]) -> dict[str, int]:
     return {str(row["name"]): int(row["stock_count"]) for row in rows}
 
 
+def _confirmed_local_closes(codes: list[str]) -> dict[str, dict]:
+    """读取**当日已确认**的本地收盘数据，用于实时行情缺失时兜底。
+
+    仅当本地已有当日 confirmed 收盘时才返回数据，因此绝不会把昨日收盘价
+    当作今日价展示：非交易日、盘中未归档、或数据仍为 provisional 时都查不到行。
+    涨跌幅由 close 与前一个交易日 close 计算（库内 change_pct 多为 NULL）。
+    """
+    today = datetime.now(MARKET_TIMEZONE).date().isoformat()
+    rows = market_daily_bar_service.repository.list_confirmed_closes(codes, today)
+    result: dict[str, dict] = {}
+    for code, payload in rows.items():
+        close = payload.get("close")
+        pre_close = payload.get("pre_close")
+        if close is None:
+            continue
+        change_pct = None
+        if pre_close:
+            change_pct = (close / pre_close - 1) * 100
+        raw_amount = payload.get("amount")
+        result[code] = {
+            "close": close,
+            "change_pct": change_pct,
+            "amount": int(raw_amount) if raw_amount is not None else None,
+            "source": f"market_daily_close:{today}",
+        }
+    return result
+
+
 def _related_concepts(concept: str, constituents: list[ConceptConstituent]) -> list[RelatedConcept]:
     """统计与当前概念重叠最多的其他概念。
 
@@ -180,10 +209,15 @@ def _related_concepts(concept: str, constituents: list[ConceptConstituent]) -> l
     return ranked
 
 
-async def get_concept_constituents(concept: str) -> dict:
+async def get_concept_constituents(concept: str, quote_codes: list[str] | None = None) -> dict:
     """概念成分股 + 实时行情 + 重叠最多的相关概念。
 
     行情缺失只降级为 ``None``，不影响成分身份与相关概念统计。
+
+    ``quote_codes`` 用于按需加载：前端虚拟滚动只请求当前可见区的代码，
+    避免为一个概念同步拉取全部（融资融券这类可达 1500 只）实时行情——
+    上游按 80 条一批串行处理（TDX 客户端非线程安全，统一锁内串行），
+    全量请求在上游故障时会拖到数十秒。缺省为 None 表示仍然全量拉取。
     """
     constituents, total = await asyncio.to_thread(list_constituents, concept)
     if not constituents:
@@ -192,18 +226,41 @@ async def get_concept_constituents(concept: str) -> dict:
     quotes: dict[str, dict] = {}
     quoted_at: str | None = None
     quote_source: str | None = None
-    codes = [item.code for item in constituents]
-    try:
-        quote_set = await fetch_realtime_quote_set(codes)
-        quoted_at = quote_set.quoted_at
-        quote_source = quote_set.source
-        for raw_code, quote in quote_set.quotes.items():
-            if isinstance(quote, dict):
-                quotes[raw_code] = quote
-    except Exception as error:  # 行情不可用不应让成分股列表整体失败
-        logger.warning("概念成分股行情不可用: concept=%s, error=%s", concept, error)
+    quote_set = None
+
+    # 只对成分股内的代码取行情，避免请求方传入无关代码放大上游压力
+    known_codes = {item.code for item in constituents}
+    if quote_codes is None:
+        codes = [item.code for item in constituents]
+    else:
+        codes = [code for code in dict.fromkeys(quote_codes) if code in known_codes]
+    if not codes:
+        # 没有需要取行情的代码，直接走降级路径
+        logger.debug("概念成分股无需拉取行情: concept=%s", concept)
+    else:
+        try:
+            quote_set = await fetch_realtime_quote_set(codes)
+            quoted_at = quote_set.quoted_at
+            quote_source = quote_set.source
+            for raw_code, quote in quote_set.quotes.items():
+                if isinstance(quote, dict):
+                    quotes[raw_code] = quote
+        except Exception as error:  # 行情不可用不应让成分股列表整体失败
+            logger.warning("概念成分股行情不可用: concept=%s, error=%s", concept, error)
 
     items: list[dict] = []
+    # 实时行情没覆盖到的行，若本地已有**当日已确认**的收盘数据则用它兜底。
+    # 只认verification_status='confirmed'：它由 17:00 之后的 recheck 写入，
+    # 天然等价于"当日已定稿"，无需再判断时间；16:20~17:00 只有 provisional，
+    # 查不到行也就不会拿未定稿数据冒充今日价。
+    local_codes = [item.code for item in constituents if item.code not in quotes]
+    local_closes: dict[str, dict] = {}
+    if local_codes:
+        try:
+            local_closes = await asyncio.to_thread(_confirmed_local_closes, local_codes)
+        except Exception:
+            logger.warning("概念成分股本地收盘兜底失败: concept=%s", concept, exc_info=True)
+
     for item in constituents:
         quote = quotes.get(item.code)
         price = change_pct = None
@@ -215,6 +272,13 @@ async def get_concept_constituents(concept: str) -> dict:
             raw_amount = safe_float(quote.get("amount"))
             amount = int(raw_amount) if raw_amount is not None else None
             source = quote_set.quote_sources.get(item.code) if quote_set is not None else None
+        else:
+            local = local_closes.get(item.code)
+            if local is not None:
+                price = local["close"]
+                change_pct = local["change_pct"]
+                amount = local["amount"]
+                source = local["source"]
         items.append(
             {
                 "code": item.code,

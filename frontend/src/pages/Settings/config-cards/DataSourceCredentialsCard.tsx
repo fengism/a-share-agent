@@ -13,6 +13,7 @@ export default function DataSourceCredentialsCard({
   onSave,
   isSaving,
   fuyaoConfigured,
+  stretch,
 }: DataSourceCredentialsCardProps) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
@@ -24,6 +25,7 @@ export default function DataSourceCredentialsCard({
       saveLabel="保存 fuyao API Key"
       onSave={onSave}
       isSaving={isSaving}
+      stretch={stretch}
     >
       <Row gutter={[24, 16]}>
         <Col span={24}>
@@ -35,8 +37,8 @@ export default function DataSourceCredentialsCard({
               fuyaoConfigured ? "已配置；输入新的 Key 以覆盖现有配置" : "留空则不启用备用源"
             }
           />
-          <div style={{ marginTop: 4, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
-            涨跌停、炸板与连板天梯的备用数据源，仅在主数据源不可用时兜底；Key 在 fuyao.aicubes.cn 后台申请
+          <div style={{ marginTop: 6, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+            涨跌停与连板天梯备用兜底源，仅在主源异常时自动接管。
           </div>
         </Col>
       </Row>

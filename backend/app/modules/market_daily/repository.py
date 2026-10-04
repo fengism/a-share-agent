@@ -1522,6 +1522,63 @@ class MarketDailyBarRepository:
             ).fetchone()
         return dict(row) if row else None
 
+    def list_confirmed_closes(
+        self,
+        codes: list[str],
+        trade_date: str,
+    ) -> dict[str, dict[str, object]]:
+        """批量读取指定交易日**已确认**的收盘数据。
+
+        ``verification_status='confirmed'`` 由 recheck 检查点写入，而 recheck 只在
+        17:00 之后触发——因此这个条件本身就等价于"当日已定稿"，无需再判断时间。
+        16:20~17:00 之间只有 provisional，这里查不到任何行，兜底自然不生效。
+
+        同时返回前一个交易日收盘，用于补 ``change_pct``（库里该列常为 NULL）。
+        """
+        if not codes:
+            return {}
+        result: dict[str, dict[str, object]] = {}
+        with self._connect() as connection:
+            placeholders = ",".join("?" * len(codes))
+            rows = connection.execute(
+                f"""
+                SELECT code, close, amount, turnover_pct
+                FROM market_daily_bars
+                WHERE market='cn' AND instrument_type='stock'
+                  AND verification_status='confirmed'
+                  AND trade_date=?
+                  AND code IN ({placeholders})
+                """,
+                (trade_date, *codes),
+            ).fetchall()
+            for row in rows:
+                result[str(row["code"])] = {
+                    "close": row["close"],
+                    "amount": row["amount"],
+                    "turnover_pct": row["turnover_pct"],
+                }
+            if not result:
+                return {}
+            # 前一交易日收盘：用于计算涨跌幅（库里 change_pct 多为 NULL）
+            previous_rows = connection.execute(
+                f"""
+                SELECT code, close FROM (
+                    SELECT code, close, MAX(trade_date) AS trade_date
+                    FROM market_daily_bars
+                    WHERE market='cn' AND instrument_type='stock'
+                      AND verification_status='confirmed'
+                      AND trade_date < ?
+                      AND code IN ({placeholders})
+                    GROUP BY code
+                )
+                """,
+                (trade_date, *codes),
+            ).fetchall()
+            previous = {str(row["code"]): row["close"] for row in previous_rows}
+        for code, payload in result.items():
+            payload["pre_close"] = previous.get(code)
+        return result
+
     def get_adjustment_summary(self, code: str, market: str = "cn") -> dict[str, object]:
         with self._connect() as connection:
             bars = connection.execute(

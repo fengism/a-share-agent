@@ -13,6 +13,7 @@ export default function AnySearchConfigCard({
   onSave,
   isSaving,
   configured = false,
+  stretch,
 }: AnySearchConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
@@ -24,6 +25,7 @@ export default function AnySearchConfigCard({
       saveLabel="保存 AnySearch 配置"
       onSave={onSave}
       isSaving={isSaving}
+      stretch={stretch}
     >
       <Row gutter={[24, 16]}>
         <Col span={24}>
@@ -38,9 +40,8 @@ export default function AnySearchConfigCard({
                 : "单个 Key，或用英文逗号分隔多个 Key"
             }
           />
-          <div style={{ marginTop: 4, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
-            配置后，Agent 的普通网页搜索会自动优先使用 AnySearch，无需显式选择引擎；失败时自动降级。
-            支持单 Key、英文逗号分隔或 JSON 数组；多个 Key 按请求轮询，限流或失效时自动切换；密钥会加密保存。
+          <div style={{ marginTop: 6, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+            普通网页搜索会自动优先使用 AnySearch，支持英文逗号分隔多 Key 轮询容灾。
           </div>
         </Col>
       </Row>

@@ -72,44 +72,89 @@ async def periodic_wal_checkpoint() -> None:
 
 async def periodic_database_backup() -> None:
     from app.infrastructure.persistence.connection import default_backup_dir
-    from app.infrastructure.persistence.operations import backup_databases_due, create_online_backups
+    from app.infrastructure.persistence.operations import (
+        STARTUP_CRITICAL_DATABASES,
+        backup_databases_due,
+        create_online_backups,
+    )
 
     async def iteration():
         settings = get_settings()
         if not settings.database_backup_enabled:
             return
         backup_dir = settings.database_backup_dir or default_backup_dir()
-        due = set(await call_blocking(
+
+        due_critical = set(await call_blocking(
             backup_databases_due,
             backup_dir,
             interval_seconds=settings.database_backup_interval_seconds,
+            databases=STARTUP_CRITICAL_DATABASES,
             semaphore=database_semaphore,
         ))
         if settings.database_backup_mirror_dir is not None:
-            due.update(await call_blocking(
+            due_critical.update(await call_blocking(
                 backup_databases_due,
                 settings.database_backup_mirror_dir,
                 interval_seconds=settings.database_backup_interval_seconds,
+                databases=STARTUP_CRITICAL_DATABASES,
                 semaphore=database_semaphore,
             ))
-        if not due:
+
+        due_market_daily = False
+        if getattr(settings, "database_backup_include_market_daily", True):
+            market_daily_interval = max(3600, int(settings.market_daily_backup_interval_days * 86400))
+            market_daily_due = set(await call_blocking(
+                backup_databases_due,
+                backup_dir,
+                interval_seconds=market_daily_interval,
+                databases=("market_daily",),
+                semaphore=database_semaphore,
+            ))
+            if settings.database_backup_mirror_dir is not None:
+                market_daily_due.update(await call_blocking(
+                    backup_databases_due,
+                    settings.database_backup_mirror_dir,
+                    interval_seconds=market_daily_interval,
+                    databases=("market_daily",),
+                    semaphore=database_semaphore,
+                ))
+            due_market_daily = bool(market_daily_due)
+
+        if not due_critical and not due_market_daily:
             logger.debug("SQLite 在线备份未到期，跳过本轮")
             return
-        created = await call_blocking(
-            create_online_backups,
-            backup_dir,
-            retention_count=settings.database_backup_retention_count,
-            databases=tuple(database for database in ("market", "user", "industry", "market_daily") if database in due),
-            mirror_dir=settings.database_backup_mirror_dir,
-            semaphore=database_semaphore,
-        )
+
+        created = []
+        if due_critical:
+            created_critical = await call_blocking(
+                create_online_backups,
+                backup_dir,
+                retention_count=settings.database_backup_retention_count,
+                databases=tuple(database for database in STARTUP_CRITICAL_DATABASES if database in due_critical),
+                mirror_dir=settings.database_backup_mirror_dir,
+                semaphore=database_semaphore,
+            )
+            created.extend(created_critical)
+
+        if due_market_daily:
+            created_market_daily = await call_blocking(
+                create_online_backups,
+                backup_dir,
+                retention_count=settings.database_backup_retention_count,
+                databases=("market_daily",),
+                mirror_dir=settings.database_backup_mirror_dir,
+                compression_level=settings.market_daily_backup_compression_level,
+                semaphore=database_semaphore,
+            )
+            created.extend(created_market_daily)
+
         logger.info("SQLite 在线备份完成: files=%s", [str(path) for path in created])
 
     settings = get_settings()
     await task_scheduler.run_periodic(
         name="database_backup",
         coro_factory=iteration,
-        interval_seconds=settings.database_backup_interval_seconds,
+        interval_seconds=min(settings.database_backup_interval_seconds, 3600),
         leader_election=True,
     )
 

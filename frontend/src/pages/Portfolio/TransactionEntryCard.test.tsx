@@ -1,6 +1,6 @@
 import { act, createRef } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TransactionEntryCard, { type TransactionEntryCardHandle } from "./TransactionEntryCard";
 
 const mocks = vi.hoisted(() => ({
@@ -39,6 +39,8 @@ vi.mock("../../hooks/useStockSearchController", () => ({
 }));
 
 describe("TransactionEntryCard", () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     mocks.createTransaction.mockReset().mockResolvedValue({ id: 9 });
     mocks.previewTransaction.mockReset();

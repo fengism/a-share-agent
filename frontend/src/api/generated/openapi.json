@@ -3322,6 +3322,10 @@
             "title": "Chat Max Tool Calls Total",
             "type": "integer"
           },
+          "database_backup_include_market_daily": {
+            "title": "Database Backup Include Market Daily",
+            "type": "boolean"
+          },
           "database_backup_retention_count": {
             "title": "Database Backup Retention Count",
             "type": "integer"
@@ -3517,6 +3521,14 @@
             "title": "Market Daily Attempt Retention Days",
             "type": "integer"
           },
+          "market_daily_backup_compression_level": {
+            "title": "Market Daily Backup Compression Level",
+            "type": "integer"
+          },
+          "market_daily_backup_interval_days": {
+            "title": "Market Daily Backup Interval Days",
+            "type": "integer"
+          },
           "market_daily_bar_refresh_enabled": {
             "title": "Market Daily Bar Refresh Enabled",
             "type": "boolean"
@@ -3645,6 +3657,9 @@
           "agent_research_timeout_seconds",
           "chat_max_tool_calls_total",
           "database_backup_retention_count",
+          "database_backup_include_market_daily",
+          "market_daily_backup_interval_days",
+          "market_daily_backup_compression_level",
           "is_admin"
         ],
         "title": "ConfigResponse",
@@ -3926,6 +3941,17 @@
               }
             ],
             "title": "Chat Max Tool Calls Total"
+          },
+          "database_backup_include_market_daily": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database Backup Include Market Daily"
           },
           "database_backup_retention_count": {
             "anyOf": [
@@ -4462,6 +4488,32 @@
               }
             ],
             "title": "Market Daily Attempt Retention Days"
+          },
+          "market_daily_backup_compression_level": {
+            "anyOf": [
+              {
+                "maximum": 9.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Daily Backup Compression Level"
+          },
+          "market_daily_backup_interval_days": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Daily Backup Interval Days"
           },
           "market_daily_bar_refresh_enabled": {
             "anyOf": [
@@ -31104,7 +31156,7 @@
     "/api/market/concept/{concept}/constituents": {
       "get": {
         "description": "获取概念成分股及其实时行情；每只股票带全部所属概念用于反向联动。",
-        "operationId": "get_concept_constituents_api_market_concept__concept__constituents_get",
+        "operationId": "get_concept_constituents_route_api_market_concept__concept__constituents_get",
         "parameters": [
           {
             "in": "path",
@@ -31113,6 +31165,24 @@
             "schema": {
               "title": "Concept",
               "type": "string"
+            }
+          },
+          {
+            "description": "逗号分隔的成分股代码；只对这些代码拉取实时行情，其余行行情为 null。前端虚拟滚动按可见区传入以避免全量拉取。",
+            "in": "query",
+            "name": "codes",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "逗号分隔的成分股代码；只对这些代码拉取实时行情，其余行行情为 null。前端虚拟滚动按可见区传入以避免全量拉取。",
+              "title": "Codes"
             }
           }
         ],
@@ -31143,7 +31213,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Get Concept Constituents",
+        "summary": "Get Concept Constituents Route",
         "tags": [
           "market"
         ]

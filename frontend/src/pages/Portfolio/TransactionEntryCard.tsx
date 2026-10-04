@@ -107,7 +107,7 @@ const TransactionEntryCard = forwardRef<TransactionEntryCardHandle, TransactionE
   const buildTransaction = (values: TransactionFormValues): PortfolioTransactionCreate | null => {
     const stockCode = values.side === "buy" ? resolveCode() : values.sell_stock_code;
     if (!stockCode) {
-      message.warning(values.side === "buy" ? "请选择搜索结果中的股票，或输入 6 位股票代码" : "请选择持仓股票");
+      message.warning(values.side === "buy" ? "请选择搜索结果中的股票，或输入股票代码（如 600519、00700）" : "请选择持仓股票");
       return null;
     }
     return {

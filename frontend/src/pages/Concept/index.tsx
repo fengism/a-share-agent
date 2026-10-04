@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AutoComplete, Card, Col, Input, Row, Tag } from "antd";
 import { ApartmentOutlined } from "@ant-design/icons";
 import {
@@ -37,8 +37,21 @@ export default function Concept() {
   }, [conceptParam]);
 
   const concept = conceptParam;
-  const constituentsQuery = useConceptConstituents(concept);
+  // 行情按需加载：undefined = 只取本地身份列表（零上游调用），
+  // 之后每次传入更大的代码集，后端仍返回完整成分股，只是行情逐段补齐。
+  const [quoteCodes, setQuoteCodes] = useState<string[] | undefined>(undefined);
+
+  // 换概念时回到「不拉行情」，让新概念的身份列表先秒出
+  useEffect(() => {
+    setQuoteCodes(undefined);
+  }, [concept]);
+
+  const constituentsQuery = useConceptConstituents(concept, quoteCodes);
   const indexQuery = useConceptIndex(concept, days);
+
+  const handleRequestQuotes = useCallback((codes: string[]) => {
+    setQuoteCodes(codes);
+  }, []);
 
   const handleSelectConcept = (next: string) => {
     setConceptParam(next);
@@ -132,6 +145,9 @@ export default function Concept() {
               error={constituentsQuery.error}
               onRetry={() => void constituentsQuery.refetch()}
               quoteSource={constituentsQuery.data?.quote_source ?? null}
+              quoteRequested={quoteCodes?.length ?? 0}
+              quotePending={constituentsQuery.isFetching}
+              onRequestQuotes={handleRequestQuotes}
               onSelectConcept={handleSelectConcept}
             />
           </Card>

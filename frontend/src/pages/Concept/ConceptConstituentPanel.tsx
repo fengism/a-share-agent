@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Segmented, Table, Tag, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { RiseOutlined } from "@ant-design/icons";
@@ -7,6 +7,7 @@ import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
 import { useColors, semanticTagStyle } from "../../styles/ui";
 import type { ConceptConstituent, RelatedConcept } from "../../api/queryHooks/concept";
+import { closeSourceDate } from "./quoteSource";
 
 type SortKey = "change_pct" | "amount" | "code";
 
@@ -19,9 +20,21 @@ interface Props {
   error: unknown;
   onRetry: () => void;
   quoteSource: string | null;
+  /** 已请求过行情的代码数量（0 = 尚未请求，走纯本地身份列表） */
+  quoteRequested: number;
+  /** 行情请求进行中 */
+  quotePending: boolean;
+  /** 请求行情：传全部代码则补齐，传部分则只补该窗口 */
+  onRequestQuotes: (codes: string[]) => void;
   /** 点击相关概念 → 切换左侧概念，实现概念间联动 */
   onSelectConcept: (concept: string) => void;
 }
+
+/** 首屏按需加载的行情窗口（约两屏），够用户看清前几十行 */
+const INITIAL_QUOTE_WINDOW = 80;
+
+/** 每次滚动触底追加的行情窗口 */
+const QUOTE_WINDOW_STEP = 120;
 
 function formatAmount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "-";
@@ -39,10 +52,13 @@ export default function ConceptConstituentPanel({
   error,
   onRetry,
   quoteSource,
+  quoteRequested,
+  quotePending,
+  onRequestQuotes,
   onSelectConcept,
 }: Props) {
   const c = useColors();
-  const [sortKey, setSortKey] = useState<SortKey>("change_pct");
+  const [sortKey, setSortKey] = useState<SortKey>("code");
   const [descending, setDescending] = useState(true);
 
   const sorted = useMemo(() => {
@@ -60,6 +76,11 @@ export default function ConceptConstituentPanel({
     return rows;
   }, [items, sortKey, descending]);
 
+  /**
+   * 涨跌家数与涨幅/成交额排序都依赖全量行情，而全量行情在上游故障时
+   * 要几十秒（上游按 80 只一批串行）。这里只在用户主动点这两个排序时
+   * 才补齐全量行情，否则 breadth 只统计已加载的部分并标注覆盖率。
+   */
   const breadth = useMemo(() => {
     let up = 0;
     let down = 0;
@@ -74,6 +95,46 @@ export default function ConceptConstituentPanel({
     }
     return { up, down, flat, quoted };
   }, [items]);
+
+  const totalCount = total ?? 0;
+  const quotedCount = breadth.quoted;
+  const partial = quotedCount > 0 && quotedCount < totalCount;
+
+  const loadedWindow = useRef(0);
+  const inFlight = useRef(false);
+
+  const allCodes = useMemo(() => (items ?? []).map((item) => item.code), [items]);
+
+  /** 按需加载：首屏先取一小段，滚动到底再追加一段 */
+  const loadMore = useCallback(() => {
+    if (inFlight.current || !allCodes.length) return;
+    const start = loadedWindow.current;
+    if (start >= allCodes.length) return;
+    const next = allCodes.slice(start, start + QUOTE_WINDOW_STEP);
+    inFlight.current = true;
+    loadedWindow.current = start + next.length;
+    onRequestQuotes([...allCodes.slice(0, loadedWindow.current)]);
+  }, [allCodes, onRequestQuotes]);
+
+  // 首屏：身份列表到齐后自动拉一小段行情
+  useEffect(() => {
+    if (!allCodes.length || quoteRequested > 0) return;
+    const next = allCodes.slice(0, INITIAL_QUOTE_WINDOW);
+    loadedWindow.current = next.length;
+    onRequestQuotes(next);
+    // 只在首次拿到列表时触发
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allCodes.length]);
+
+  useEffect(() => {
+    inFlight.current = false;
+  }, [quotePending]);
+
+  // 补齐全量：用户点了依赖全量行情的排序/涨跌家数时才做
+  const requestFullQuotes = useCallback(() => {
+    loadedWindow.current = allCodes.length;
+    onRequestQuotes(allCodes);
+  }, [allCodes, onRequestQuotes]);
 
   const columns: ColumnsType<ConceptConstituent> = [
     {
@@ -108,11 +169,25 @@ export default function ConceptConstituentPanel({
       dataIndex: "price",
       width: 84,
       align: "right",
-      render: (value: number | null) => (
-        <span style={{ fontFamily: "var(--c-font-mono)", color: c.textPrimary }}>
-          {value == null ? "-" : value.toFixed(2)}
-        </span>
-      ),
+      render: (value: number | null, record: ConceptConstituent) => {
+        // 实时行情缺失时后端会用本地当日已确认收盘价兜底，此时必须显式区分，
+        // 否则用户会把收盘价误读成盘中实时价。
+        const closeDate = closeSourceDate(record.quote_source);
+        return (
+          <Tooltip
+            title={closeDate ? `收盘价（${closeDate}）` : undefined}
+          >
+            <span
+              style={{
+                fontFamily: "var(--c-font-mono)",
+                color: closeDate ? c.textSecondary : c.textPrimary,
+              }}
+            >
+              {value == null ? "-" : value.toFixed(2)}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: "涨跌幅",
@@ -151,8 +226,21 @@ export default function ConceptConstituentPanel({
           <strong style={{ fontSize: 15, color: c.textPrimary }}>成分股</strong>
           <span style={{ fontSize: 12, color: c.textMuted }}>
             {total} 只
-            {breadth.quoted > 0 ? ` · 上涨 ${breadth.up} / 下跌 ${breadth.down}` : ""}
+            {quotedCount > 0
+              ? partial
+                ? ` · 上涨 ${breadth.up} / 下跌 ${breadth.down}（已加载 ${quotedCount} 只）`
+                : ` · 上涨 ${breadth.up} / 下跌 ${breadth.down}`
+              : ""}
             {quoteSource ? ` · 行情 ${quoteSource}` : ""}
+            {partial ? (
+              <a
+                role="button"
+                onClick={requestFullQuotes}
+                style={{ marginInlineStart: 6, color: c.primary, cursor: quotePending ? "wait" : "pointer" }}
+              >
+                {quotePending ? "加载中…" : "加载全部行情"}
+              </a>
+            ) : null}
           </span>
         </div>
         <Segmented
@@ -168,6 +256,8 @@ export default function ConceptConstituentPanel({
             setSortKey(next);
             // 代码按字典序升序更自然，其余默认从高到低
             setDescending(next !== "code");
+            // 涨幅/成交额排序与涨跌家数依赖全量行情，未补齐时结果会误导
+            if (next !== "code" && partial) requestFullQuotes();
           }}
         />
       </div>
@@ -207,14 +297,21 @@ export default function ConceptConstituentPanel({
           pagination={false}
           virtual
           scroll={{ x: 472, y: 360 }}
+          onScroll={(event) => {
+            // 触底前 120px 时预取下一段，避免滚到底出现空白
+            const el = event.currentTarget as HTMLElement;
+            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 120) loadMore();
+          }}
           onChange={(_pagination, _filters, sorter) => {
             const target = Array.isArray(sorter) ? sorter[0] : sorter;
             if (target?.field === "change_pct") {
               setSortKey("change_pct");
               setDescending(target.order !== "ascend");
+              if (partial) requestFullQuotes();
             } else if (target?.field === "amount") {
               setSortKey("amount");
               setDescending(target.order !== "ascend");
+              if (partial) requestFullQuotes();
             }
           }}
         />
@@ -222,7 +319,8 @@ export default function ConceptConstituentPanel({
 
       <p style={{ margin: 0, fontSize: 11, lineHeight: 1.6, color: c.textMuted }}>
         成分股取自本地概念映射表（同花顺全A 口径），点「重叠概念」可跳到关联概念，
-        点个股代码或名称进入个股详情。表格可横向滚动查看完整列。
+        点个股代码或名称进入个股详情。行情按可见区逐段加载（上游按 80 只一批串行，
+        一次拉全部上千只在上游故障时会等几十秒）；按涨幅/成交额排序会先补齐全量。
       </p>
     </div>
   );

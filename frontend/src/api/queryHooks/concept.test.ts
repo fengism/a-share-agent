@@ -81,8 +81,24 @@ describe("useConceptConstituents", () => {
     const { result } = renderHook(() => useConceptConstituents("X"), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // 不传 codes = 只取本地身份列表，零上游行情调用
     expect(openApiGet).toHaveBeenCalledWith("/api/market/concept/{concept}/constituents", {
       path: { concept: "X" },
+      query: {},
+    });
+  });
+
+  /** 回归：按需加载行情时只把请求的代码集传给后端，避免全量拉上游行情。 */
+  it("scopes the request to the requested quote window", async () => {
+    openApiGet.mockResolvedValue({ concept: "X", total: 2, items: [] });
+    const { result } = renderHook(() => useConceptConstituents("X", ["000002", "600519"]), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(openApiGet).toHaveBeenCalledWith("/api/market/concept/{concept}/constituents", {
+      path: { concept: "X" },
+      query: { codes: "000002,600519" },
     });
   });
 

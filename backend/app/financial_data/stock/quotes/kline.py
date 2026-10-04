@@ -1,6 +1,7 @@
 """个股 K 线服务。"""
 
 import logging
+import re
 from datetime import date, timedelta
 
 from app.core.cache import cache_date, dated_cache_key_no_day, one_year_ago_date, series_cache
@@ -17,6 +18,7 @@ from app.modules.market_daily.adjustment import load_local_adjusted_daily_kline
 from app.modules.market_daily.reader import load_local_daily_kline, merge_local_daily_kline
 from app.modules.market_daily.service import is_cn_trading_day
 
+_HK_CODE_PATTERN = re.compile(r"^(?:hk)?(\d{1,5})$", re.IGNORECASE)
 _kline_singleflight = AsyncSingleFlight[KlineData]()
 logger = logging.getLogger(__name__)
 
@@ -196,6 +198,20 @@ async def get_kline(
     Return:
         KlineData 模型对象
     """
+    raw_code = code.strip()
+    if _HK_CODE_PATTERN.fullmatch(raw_code):
+        from app.financial_data.hk.service import hk_market_service, normalize_hk_code
+
+        hk_code = normalize_hk_code(raw_code)
+        hk_adjust = "none" if adjust in {"", "none"} else adjust
+        return await hk_market_service.get_stock_history(
+            hk_code,
+            period=period,
+            adjust=hk_adjust,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
     sym = normalize_code(code)
     if adjust == "none":
         adjust = ""

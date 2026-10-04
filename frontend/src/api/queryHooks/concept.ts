@@ -23,12 +23,15 @@ export function useConceptList(limit = 1200) {
   });
 }
 
-export function useConceptConstituents(concept: string) {
+export function useConceptConstituents(concept: string, quoteCodes?: string[]) {
+  // 按需加载时把代码集并入 key：不同窗口是不同结果，避免缓存串味。
+  const codesKey = quoteCodes && quoteCodes.length ? [...quoteCodes].sort().join(",") : "";
   return useQuery({
-    queryKey: queryKeys.market.conceptConstituents(concept),
+    queryKey: [...queryKeys.market.conceptConstituents(concept), codesKey],
     queryFn: () =>
       openApiGet("/api/market/concept/{concept}/constituents", {
         path: { concept },
+        query: quoteCodes && quoteCodes.length ? { codes: codesKey } : {},
       }),
     enabled: Boolean(concept),
     // 成分股身份是低频数据，但行情要新；沿用市场实时缓存档位
