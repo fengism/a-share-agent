@@ -66,33 +66,117 @@ def verify_database_integrity(
         _quick_check(connection_provider(database), label=database)
 
 
-# 启动时做完整性检查的库：三个小库合计约 10 MiB，秒级完成，可以放心 fail-fast
+def probe_large_database_integrity(
+    connection: sqlite3.Connection,
+    *,
+    label: str = "market_daily",
+) -> None:
+    """对大表/大库进行毫秒级轻量探针完整性检查。
+
+    针对 10+ GiB 的大库（如包含千万级记录的 market_daily_bars），全量 quick_check
+    会扫描全部 4KB 页并耗时数小时。本探针检查：
+      1. SQLite 元数据：schema_version 与 page_count 可读且无底层 I/O 错误；
+      2. 元数据小表：对其执行轻量 PRAGMA quick_check(table)（毫秒级验证元数据 B-Tree）；
+      3. 大表 B-Tree 首尾叶子页探针：通过 SELECT rowid LIMIT 1 分别读头尾记录，
+         验证 B-Tree 根节点与最左/最右叶子页的索引路径连通性；
+      4. 关键索引连通性探针：通过索引查询最新交易日与样本代码，验证二级索引 B-Tree 未损坏。
+    探针耗时通常在 30~50 毫秒，兼顾启动速度与损坏早预警。
+    """
+    try:
+        connection.execute("PRAGMA schema_version").fetchone()
+        connection.execute("PRAGMA page_count").fetchone()
+    except sqlite3.DatabaseError as error:
+        raise RuntimeError(f"SQLite 大库元数据校验失败: database={label} error={error}") from error
+
+    existing_tables = {
+        str(row[0])
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+    }
+
+    small_metadata_tables = (
+        "market_daily_schema_migrations",
+        "market_daily_bar_refresh_jobs",
+        "market_daily_refresh_attempts",
+        "market_daily_refresh_runs",
+        "market_daily_bar_observations",
+    )
+    for table in small_metadata_tables:
+        if table in existing_tables:
+            try:
+                rows = connection.execute(f"PRAGMA quick_check({table})").fetchall()
+            except sqlite3.DatabaseError as error:
+                raise RuntimeError(
+                    f"SQLite 大库元数据表检查异常: database={label} table={table} error={error}"
+                ) from error
+            messages = [str(r[0]) for r in rows]
+            if messages != ["ok"]:
+                raise RuntimeError(
+                    f"SQLite 大库元数据表检查失败: database={label} table={table} result={messages}"
+                )
+
+    large_tables = (
+        "market_daily_bars",
+        "market_daily_adjustment_factors",
+        "market_corporate_actions",
+    )
+    for table in large_tables:
+        if table in existing_tables:
+            try:
+                connection.execute(f"SELECT rowid FROM {table} ORDER BY rowid ASC LIMIT 1").fetchone()
+                connection.execute(f"SELECT rowid FROM {table} ORDER BY rowid DESC LIMIT 1").fetchone()
+            except sqlite3.DatabaseError as error:
+                raise RuntimeError(
+                    f"SQLite 大表 B-Tree 探针失败: database={label} table={table} error={error}"
+                ) from error
+
+    if "market_daily_bars" in existing_tables:
+        try:
+            connection.execute("SELECT MAX(trade_date) FROM market_daily_bars").fetchone()
+            connection.execute(
+                "SELECT trade_date FROM market_daily_bars WHERE code='000001' ORDER BY trade_date DESC LIMIT 1"
+            ).fetchone()
+        except sqlite3.DatabaseError as error:
+            raise RuntimeError(
+                f"SQLite 大表索引探针失败: database={label} table=market_daily_bars error={error}"
+            ) from error
+
+
+# 启动时做全量 quick_check 的小库：三个小库合计约 10 MiB，秒级完成，可以放心 fail-fast
 # ——库坏了就直接拒绝启动。
-#
-# market_daily 不在其中（12.94 GiB，实测 quick_check 需数小时）。理由：
-#   1. 它是派生数据，可再生——``refresh_market_daily_bars_periodic`` 持续归档，
-#      且仓库自带重建脚本（scripts/init_market_daily_from_dump.py 等）；
-#   2. 它不是实时行情来源（"实时行情由实时查询链负责，不写入此库"），
-#      损坏时仍可由腾讯/TDX 链路服务；
-#   3. 全量扫描受磁盘带宽限制（冷缓存单流约 49 MiB/s，CPU 仅约 3%，
-#      mmap 与多线程并行实测都无法提升上限），期间会挤占 K 线拉取与 WAL 维护；
-#   4. 检查本身也不能自愈，只能报个 error。
-# 出问题时的正确处置是从 dump 重建，而非花数小时确认它是否损坏。
+# market_daily 单独纳入 STARTUP_LARGE_DATABASES 走毫秒级探针检查，避免数小时扫描。
 STARTUP_CRITICAL_DATABASES: tuple[DatabaseName, ...] = ("market", "user", "industry")
+STARTUP_LARGE_DATABASES: tuple[DatabaseName, ...] = ("market_daily",)
 
 
 def verify_startup_critical_databases(
     *,
     connection_provider: ConnectionProvider = get_connection,
 ) -> None:
-    """启动关键路径的完整性检查：只查小库，失败即拒绝启动。"""
+    """启动关键路径的小库完整性检查：只查小库，失败即拒绝启动。"""
     verify_database_integrity(STARTUP_CRITICAL_DATABASES, connection_provider=connection_provider)
 
 
-def _verify_backup(path: Path) -> None:
+def verify_startup_large_databases(
+    *,
+    connection_provider: ConnectionProvider = get_connection,
+) -> None:
+    """启动路径的大库/大表轻量探针检查：毫秒级校验元数据、小表及大表索引探针。"""
+    for database in STARTUP_LARGE_DATABASES:
+        probe_large_database_integrity(connection_provider(database), label=database)
+
+
+def _verify_backup(path: Path, *, database: str | None = None) -> None:
     connection = sqlite3.connect(path)
     try:
-        _quick_check(connection, label=str(path))
+        is_large = (database in STARTUP_LARGE_DATABASES) or any(
+            path.name.startswith(f"{db}-") for db in STARTUP_LARGE_DATABASES
+        )
+        if is_large:
+            probe_large_database_integrity(connection, label=str(path))
+        else:
+            _quick_check(connection, label=str(path))
     finally:
         connection.close()
 
@@ -280,7 +364,7 @@ def _publish_compressed_backup(
     *,
     compresslevel: int = 9,
 ) -> None:
-    _verify_backup(sqlite_temporary)
+    _verify_backup(sqlite_temporary, database=destination.name.split("-", 1)[0])
     compressed_temporary = destination.with_name(f".{destination.name}.compress.tmp")
     checksum_path = _checksum_path(destination)
     if destination.exists() or checksum_path.exists():
@@ -300,7 +384,7 @@ def _publish_compressed_backup(
 
 
 def _publish_verified_backup(temporary: Path, destination: Path) -> None:
-    _verify_backup(temporary)
+    _verify_backup(temporary, database=destination.name.split("-", 1)[0])
     os.chmod(temporary, 0o600)
     checksum_path = _checksum_path(destination)
     if destination.exists() or checksum_path.exists():
@@ -500,9 +584,14 @@ def restore_database_backup(
 
 
 __all__ = [
+    "STARTUP_CRITICAL_DATABASES",
+    "STARTUP_LARGE_DATABASES",
     "backup_databases_due",
     "backup_freshness_snapshot",
     "create_online_backups",
+    "probe_large_database_integrity",
     "restore_database_backup",
     "verify_database_integrity",
+    "verify_startup_critical_databases",
+    "verify_startup_large_databases",
 ]

@@ -154,10 +154,11 @@ export function useMarketDailyRefreshHistory(enabled: boolean) {
     queryKey: queryKeys.settings.marketDailyRefreshHistory,
     queryFn: () => apiGet<MarketDailyBarRefreshHistory>(
       "/market/daily-bars/refresh-history",
-      { limit: 100 },
+      { limit: 40 },
     ),
     enabled,
     refetchInterval: enabled ? 30_000 : false,
+    staleTime: 15_000,
   });
 }
 

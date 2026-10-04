@@ -101,10 +101,22 @@ export default function MarketDailyBarManagerCard({ form, onChange, onSave, isSa
   const remove = useDeleteMarketDailyBars();
 
   const selectedDate = tradeDate.format("YYYY-MM-DD");
-  const selectedHistory = useMemo(
-    () => (history.data?.items ?? []).filter((item) => item.trade_date === selectedDate),
-    [history.data?.items, selectedDate],
-  );
+  const groupedHistory = useMemo(() => {
+    const items = history.data?.items ?? [];
+    const uniqueDates = Array.from(new Set(items.map((item) => item.trade_date))).sort((a, b) => b.localeCompare(a));
+    const top3Dates = uniqueDates.slice(0, 3);
+    const datesToShow = top3Dates.length > 0 ? top3Dates : [selectedDate];
+
+    if (!datesToShow.includes(selectedDate) && items.some((item) => item.trade_date === selectedDate)) {
+      datesToShow.push(selectedDate);
+      datesToShow.sort((a, b) => b.localeCompare(a));
+    }
+
+    return datesToShow.map((date) => ({
+      date,
+      items: items.filter((item) => item.trade_date === date),
+    }));
+  }, [history.data?.items, selectedDate]);
 
   const executeRefresh = (options: { retryFailedOnly?: boolean; force?: boolean }) => {
     refresh.mutate(
@@ -299,31 +311,116 @@ export default function MarketDailyBarManagerCard({ form, onChange, onSave, isSa
       </Row>
 
       <div style={{ borderTop: `1px solid ${colors.border}`, margin: "20px 0 12px" }} />
-      <div style={{ color: colors.textPrimary, fontWeight: 600, marginBottom: 8 }}>
-        {selectedDate} 刷新状态
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ color: colors.textPrimary, fontWeight: 600 }}>
+          日线归档状态（最新 3 天）
+        </div>
+        <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+          当前操作日期：{selectedDate}
+        </span>
       </div>
-      {selectedHistory.length === 0 ? (
-        <div style={{ color: colors.textMuted }}>暂无该日期的刷新记录</div>
+      {groupedHistory.every((g) => g.items.length === 0) ? (
+        <div style={{ color: colors.textMuted }}>暂无刷新记录</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, opacity: busy ? 0.7 : 1 }}>
-          {selectedHistory.map((item) => (
-            <div
-              key={`${item.trade_date}-${item.checkpoint}-${item.segment}`}
-              style={{ border: `1px solid ${colors.border}`, padding: "10px 12px", borderRadius: 8 }}
-            >
-              <Space wrap>
-                <strong>{segmentOptions.find((option) => option.value === item.segment)?.label ?? item.segment}</strong>
-                <Tag>{item.checkpoint === "initial" ? "16:20" : "17:00"}</Tag>
-                <Tag style={semanticTagStyle(statusStyles[item.status])}>{statusLabels[item.status]}</Tag>
-                <span style={{ color: colors.textMuted }}>
-                  尝试 {item.attempts} 次 · 接收 {item.expected_count ?? 0} 条 · 变更 {item.stored_count ?? 0} 条
-                </span>
-              </Space>
-              {item.last_error && (
-                <div style={{ color: "var(--c-error)", marginTop: 6, fontSize: "var(--c-font-sm)" }}>{item.last_error}</div>
-              )}
-            </div>
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, opacity: busy ? 0.7 : 1 }}>
+          {groupedHistory.map((group) => {
+            const hasFailed = group.items.some((i) => i.status === "failed");
+            const isRunning = group.items.some((i) => i.status === "running");
+            const allSuccess = group.items.length > 0 && group.items.every((i) => i.status === "success" || i.status === "skipped");
+
+            return (
+              <div
+                key={group.date}
+                style={{
+                  border: `1px solid ${group.date === selectedDate ? "var(--c-primary)" : colors.border}`,
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  background: colors.cardBg,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <Space size="middle">
+                    <span style={{ fontWeight: 600, fontSize: "var(--c-font-base)", color: colors.textPrimary }}>
+                      {group.date}
+                    </span>
+                    {hasFailed ? (
+                      <Tag color="error">存在失败</Tag>
+                    ) : isRunning ? (
+                      <Tag color="processing">同步中</Tag>
+                    ) : allSuccess ? (
+                      <Tag color="success">全部完成</Tag>
+                    ) : null}
+                    {group.date === selectedDate ? (
+                      <Tag color="blue">当前操作日期</Tag>
+                    ) : null}
+                  </Space>
+                  {group.date !== selectedDate && (
+                    <Button
+                      type="link"
+                      size="small"
+                      style={{ padding: 0, height: "auto", fontSize: "var(--c-font-xs)" }}
+                      onClick={() => setTradeDate(dayjs(group.date))}
+                    >
+                      设为操作日期
+                    </Button>
+                  )}
+                </div>
+                {group.items.length === 0 ? (
+                  <div style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>暂无记录</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {segmentOptions.map((seg) => {
+                      const initialJob = group.items.find((i) => i.segment === seg.value && i.checkpoint === "initial");
+                      const recheckJob = group.items.find((i) => i.segment === seg.value && i.checkpoint === "recheck");
+                      if (!initialJob && !recheckJob) return null;
+                      const errorMsg = recheckJob?.last_error || initialJob?.last_error;
+                      const storedCount = (recheckJob?.stored_count ?? initialJob?.stored_count) ?? 0;
+                      const expectedCount = (recheckJob?.expected_count ?? initialJob?.expected_count) ?? 0;
+
+                      return (
+                        <div
+                          key={seg.value}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            padding: "6px 10px",
+                            background: "var(--c-bg-subtle, rgba(0,0,0,0.02))",
+                            borderRadius: 6,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                            <span style={{ fontWeight: 500, minWidth: 70, color: colors.textPrimary }}>{seg.label}</span>
+                            <Space wrap size="small">
+                              {initialJob && (
+                                <Space size={4}>
+                                  <span style={{ color: colors.textMuted, fontSize: "var(--c-font-xs)" }}>16:20</span>
+                                  <Tag style={semanticTagStyle(statusStyles[initialJob.status])}>{statusLabels[initialJob.status]}</Tag>
+                                </Space>
+                              )}
+                              {recheckJob && (
+                                <Space size={4}>
+                                  <span style={{ color: colors.textMuted, fontSize: "var(--c-font-xs)" }}>17:00</span>
+                                  <Tag style={semanticTagStyle(statusStyles[recheckJob.status])}>{statusLabels[recheckJob.status]}</Tag>
+                                </Space>
+                              )}
+                              <span style={{ color: colors.textMuted, fontSize: "var(--c-font-xs)" }}>
+                                接收 {expectedCount} 条 · 变更 {storedCount} 条
+                              </span>
+                            </Space>
+                          </div>
+                          {errorMsg && (
+                            <div style={{ color: "var(--c-error)", marginTop: 4, fontSize: "var(--c-font-xs)", wordBreak: "break-all" }}>
+                              {errorMsg}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

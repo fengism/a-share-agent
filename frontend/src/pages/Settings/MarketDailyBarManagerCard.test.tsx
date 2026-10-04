@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
-import dayjs from "dayjs";
 import { describe, expect, it, vi } from "vitest";
 import MarketDailyBarManagerCard from "./MarketDailyBarManagerCard";
 
@@ -16,19 +15,73 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../api/queries", () => ({
   useMarketDailyRefreshHistory: () => ({
     data: {
-      items: [{
-        trade_date: dayjs().format("YYYY-MM-DD"),
-        checkpoint: "recheck",
-        segment: "cn_stock",
-        status: "failed",
-        attempts: 2,
-        next_retry_at: null,
-        expected_count: null,
-        stored_count: null,
-        last_error: "temporary",
-        started_at: null,
-        completed_at: null,
-      }],
+      items: [
+        {
+          trade_date: "2026-10-05",
+          checkpoint: "recheck",
+          segment: "cn_stock",
+          status: "failed",
+          attempts: 2,
+          next_retry_at: null,
+          expected_count: null,
+          stored_count: null,
+          last_error: "temporary",
+          started_at: null,
+          completed_at: null,
+        },
+        {
+          trade_date: "2026-10-04",
+          checkpoint: "recheck",
+          segment: "hk_stock",
+          status: "success",
+          attempts: 1,
+          next_retry_at: null,
+          expected_count: 10,
+          stored_count: 10,
+          last_error: null,
+          started_at: null,
+          completed_at: null,
+        },
+        {
+          trade_date: "2026-10-03",
+          checkpoint: "recheck",
+          segment: "cn_index",
+          status: "success",
+          attempts: 1,
+          next_retry_at: null,
+          expected_count: 5,
+          stored_count: 5,
+          last_error: null,
+          started_at: null,
+          completed_at: null,
+        },
+        {
+          trade_date: "2026-10-02",
+          checkpoint: "recheck",
+          segment: "hk_index",
+          status: "success",
+          attempts: 1,
+          next_retry_at: null,
+          expected_count: 2,
+          stored_count: 2,
+          last_error: null,
+          started_at: null,
+          completed_at: null,
+        },
+        {
+          trade_date: "2026-10-01",
+          checkpoint: "recheck",
+          segment: "cn_stock",
+          status: "success",
+          attempts: 1,
+          next_retry_at: null,
+          expected_count: 100,
+          stored_count: 100,
+          last_error: null,
+          started_at: null,
+          completed_at: null,
+        },
+      ],
     },
     isFetching: false,
     refetch: mocks.refetch,
@@ -104,6 +157,32 @@ describe("MarketDailyBarManagerCard", () => {
     expect(screen.getByText("xdxr offline")).toBeInTheDocument();
     fireEvent.click(screen.getByText("强制复核 XDXR").closest("button")!);
     expect(mocks.factorRefreshMutate).toHaveBeenCalledWith("600519", expect.any(Object));
+    client.clear();
+  });
+
+  it("displays only the latest 3 days of refresh history by default", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MarketDailyBarManagerCard
+          form={{}}
+          onChange={vi.fn()}
+          onSave={vi.fn()}
+          isSaving={false}
+          sectionTitleStyle={{}}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("日线归档状态（最新 3 天）")).toBeInTheDocument();
+    // Top 3 dates: 2026-10-05, 2026-10-04, 2026-10-03
+    expect(screen.getByText("2026-10-05")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-04")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-03")).toBeInTheDocument();
+    // 4th and 5th dates should not be shown
+    expect(screen.queryByText("2026-10-02")).not.toBeInTheDocument();
+    expect(screen.queryByText("2026-10-01")).not.toBeInTheDocument();
+
     client.clear();
   });
 });

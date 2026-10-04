@@ -43,14 +43,13 @@ def load_persisted_global_settings() -> None:
 
 
 def verify_database_integrity() -> None:
-    """启动时的完整性检查：只查小库，失败即拒绝启动。
+    """启动时的完整性检查：小库 fail-fast 全检，大库（大表）毫秒级探针检查。
 
-    只查 market/user/industry（约 10 MiB，秒级）。market_daily 不查——它是
-    可从 dump 重建的派生数据，12.94 GiB 的全量 quick_check 受磁盘带宽限制
-    （冷缓存单流约 49 MiB/s）需数小时，期间挤占 K 线拉取与 WAL 维护，且检查
-    本身不能自愈。详见operations.STARTUP_CRITICAL_DATABASES 的说明。
+    market/user/industry（约 10 MiB，秒级）执行全量 quick_check；
+    market_daily（约 13 GiB，含千万级 market_daily_bars 大表）执行毫秒级探针检查
+    （元数据、小表 quick_check、大表首尾叶子页与二级索引探针），兼顾快速启动与损坏预警。
 
-    上次进程正常关机（退出时写了标记）时整体跳过——损坏只可能来自崩溃/断电。
+    上次进程正常关机（退出时写了标记）时跳过——损坏只可能来自崩溃/断电。
     """
     from app.infrastructure.persistence.operations import consume_clean_shutdown_marker
 
@@ -58,9 +57,13 @@ def verify_database_integrity() -> None:
         logger.info("检测到上次为正常关机，跳过 SQLite 启动完整性检查")
         return
 
-    from app.infrastructure.persistence.operations import verify_startup_critical_databases
+    from app.infrastructure.persistence.operations import (
+        verify_startup_critical_databases,
+        verify_startup_large_databases,
+    )
 
     verify_startup_critical_databases()
+    verify_startup_large_databases()
 
 
 def mark_database_clean_shutdown() -> None:
