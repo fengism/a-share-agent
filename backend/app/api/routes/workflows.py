@@ -11,6 +11,7 @@ from app.api.auth.dependencies import require_active_user
 from app.api.errors import BadRequestError, ConflictError, NotFoundError, TooManyRequestsError
 from app.api.schemas import WorkflowJobResponse, WorkflowSubmissionResponse
 from app.api.streaming import SSE_RESPONSES
+from app.core.market import STOCK_CODE_PATH_PATTERN
 from app.domain.identity import AuthenticatedUser
 from app.modules.daily_review.public import DailyReviewRequest
 from app.modules.industry_chain.public import IndustryChainResearchScope
@@ -70,10 +71,14 @@ def _capacity_error(error: WorkflowCapacityError) -> TooManyRequestsError:
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def submit_analysis_job(
-    code: Annotated[str, Path(pattern=r"^\d{6}$")],
+    code: Annotated[str, Path(pattern=STOCK_CODE_PATH_PATTERN)],
     force: Annotated[bool, Query(description="是否跳过当天缓存并重新生成")] = False,
     user: AuthenticatedUser = Depends(require_active_user),
 ) -> WorkflowSubmissionResponse:
+    """提交个股分析任务。
+
+    港股为 1-5 位代码、A 股为 6 位，两者长度不同，因此不能用单一的 6 位约束。
+    """
     try:
         return _submission_response(await submit_analysis_workflow(code, user["id"], force=force))
     except WorkflowRequestConflictError as error:

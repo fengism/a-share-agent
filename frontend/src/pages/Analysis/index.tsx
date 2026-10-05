@@ -31,6 +31,7 @@ import {
   normalizeAnalysisDate,
   parseAnalysisDate,
 } from "../../features/investment-research/analysisHistoryUrl";
+import { isHkStockCode } from "../../utils/stockLinks";
 import { preloadAnalysisPanelModules } from "./analysisPanelLoaders";
 import { useAnalysisWorkflowController } from "../../hooks/useAnalysisWorkflowController";
 import { buildAnalysisMarkdown } from "./analysisMarkdown";
@@ -42,6 +43,9 @@ export default function Analysis() {
   const queryClient = useQueryClient();
   const { pageContainerStyle } = useStyles();
   const { code } = useParams<{ code: string }>();
+  // 港股没有 A 股口径的财务/估值面板，且分析页 PDF 走后端矢量渲染；据此关闭
+  // 只服务 A 股的客户端导出兜底与面板预加载。
+  const isHk = isHkStockCode(code || "");
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const dateState = parseAnalysisDate(searchParams.get("date"));
@@ -176,19 +180,25 @@ export default function Analysis() {
     isCaptureReady: () => {
       const root = exportRef.current;
       if (!root) return false;
-      const financialPanel = root.querySelector<HTMLElement>("[data-pdf-financial-ready]");
-      const revenueBreakdown = root.querySelector<HTMLElement>("[data-pdf-revenue-ready]");
-      const keyFinancialMetrics = root.querySelector<HTMLElement>(
-        "[data-testid='pdf-key-financial-metrics']",
-      );
+      // 港股没有三表与营收拆分面板，这些就绪标记永远不会置位；继续等下去只会让
+      // 客户端导出必然超时，因此港股只等图表渲染完成。
+      const financialPanel = isHk ? null : root.querySelector<HTMLElement>("[data-pdf-financial-ready]");
+      const revenueBreakdown = isHk ? null : root.querySelector<HTMLElement>("[data-pdf-revenue-ready]");
+      const keyFinancialMetrics = isHk
+        ? null
+        : root.querySelector<HTMLElement>("[data-testid='pdf-key-financial-metrics']");
       const chartHosts = Array.from(root.querySelectorAll<HTMLElement>("[data-pdf-chart]"));
+      const chartHostsReady = chartHosts.every((host) => host.querySelector("canvas"));
+      if (isHk) return chartHostsReady;
       return financialPanel?.dataset.pdfFinancialReady === "true"
         && revenueBreakdown?.dataset.pdfRevenueReady === "true"
         && Number(revenueBreakdown.dataset.pdfRevenueRowCount) > 0
         && Number(keyFinancialMetrics?.dataset.pdfRowCount) > 0
-        && chartHosts.every((host) => host.querySelector("canvas"));
+        && chartHostsReady;
     },
     beforeCapture: async () => {
+      // 港股没有 A 股口径财务数据，预加载面板只会触发注定失败的请求
+      if (isHk) return;
       await preloadAnalysisPanelModules();
       if (code) {
         setFinancialExportData(await ensureFundamentalData(queryClient, code));
@@ -351,7 +361,7 @@ export default function Analysis() {
           <AnalysisPanels
             code={code}
             result={displayResult}
-            isExportingPdf={isExportingPdf}
+            isExportingPdf={isExportingPdf && !isHk}
             financialExportData={financialExportData}
           />
           <AnalysisResultSection

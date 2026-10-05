@@ -6,6 +6,7 @@ from typing import Any
 
 from app.agentic.public import AgentEventCallback
 from app.configuration.schema import Settings
+from app.core.market import is_hk_code
 from app.infrastructure.llm.policy import generation_scope
 from app.infrastructure.llm.prompting import run_structured_prompt
 from app.infrastructure.llm.streaming import streaming_llm_client
@@ -32,6 +33,7 @@ def build_prompt_context(code: str, analysis_date: str, research: Any) -> dict[s
     return {
         "stock_code": code,
         "analysis_date": analysis_date,
+        "market": "hk" if is_hk_code(code) else "cn",
         **research.render_prompt_context(),
     }
 

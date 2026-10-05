@@ -106,6 +106,18 @@ async def _get_stock_risk_data(code: str) -> Any:
     return (await stock_data.get_stock_risk_data(code)).model_dump(mode="json")
 
 
+async def _get_hk_stock_profile(code: str) -> Any:
+    from app.financial_data.hk.analysis_support import get_hk_stock_profile
+
+    return await get_hk_stock_profile(code)
+
+
+async def _get_hk_market_overview() -> Any:
+    from app.financial_data.hk.analysis_support import get_hk_market_overview
+
+    return await get_hk_market_overview()
+
+
 async def _get_market_overview() -> Any:
     from app.financial_data.market import public as market_data
 
@@ -347,6 +359,8 @@ def configure_application_tools() -> None:
             get_stock_sentiment=_get_stock_sentiment,
             get_stock_technical_indicators=_get_stock_technical_indicators,
             get_stock_valuation_detail=_get_stock_valuation_detail,
+            get_hk_stock_profile=_get_hk_stock_profile,
+            get_hk_market_overview=_get_hk_market_overview,
             iwencai_market_macro=_iwencai_market_macro,
             iwencai_query=_iwencai_query,
             iwencai_search=_iwencai_search,

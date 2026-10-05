@@ -13,8 +13,10 @@ export interface RevenueBreakdown {
   code: string;
   symbol: string;
   name: string;
-  source: "sina";
-  amount_unit: "CNY_yuan";
+  /** sina=A股（金额+占比）；ths=港股同花顺 F10（只有占比，金额为空） */
+  source: "sina" | "ths";
+  /** 港股口径不声明币种（同花顺表头随公司报表而定，且金额本身缺失） */
+  amount_unit: "CNY_yuan" | null;
   amount_unit_inferred: boolean;
   by_product: RevenueBreakdownItem[];
   by_business: RevenueBreakdownItem[];

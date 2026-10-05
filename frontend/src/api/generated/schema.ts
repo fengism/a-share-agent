@@ -61,7 +61,7 @@ export interface paths {
          * @description 触发指定股票的同步 AI 分析。
          *
          *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
+         *         code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。
          *     Return:
          *         AnalysisResult: 完整的结构化分析结果，包含评级、信号与目标价等字段。
          */
@@ -104,7 +104,7 @@ export interface paths {
          * @description 读取指定股票的历史分析索引列表。
          *
          *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
+         *         code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。
          *     Return:
          *         list[AnalysisHistoryItem]: 按日期排序的历史分析摘要条目。
          */
@@ -129,7 +129,7 @@ export interface paths {
          * @description 读取指定股票在指定日期的分析结果，命中缓存优先。
          *
          *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
+         *         code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。
          *         date: 分析日期（路径参数），格式 YYYYMMDD。
          *     Return:
          *         AnalysisResult: 该日的完整分析结果；若不存在则返回 404。
@@ -156,7 +156,7 @@ export interface paths {
          * @description 读取指定股票当天的最新分析结果，优先返回缓存。
          *
          *     Param:
-         *         code: 股票代码（路径参数），6 位数字。
+         *         code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。
          *     Return:
          *         dict | AnalysisResult: 缓存或落盘的最近一次分析结果；若不存在则抛出 404。
          */
@@ -181,7 +181,7 @@ export interface paths {
          * @description SSE 端点，流式推送分析进度事件。
          *
          *     Param:
-         *         code: 股票代码（路径参数），6 位数字；同一代码并发请求会附着到已有任务。
+         *         code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字；同一代码并发请求会附着到已有任务。
          *     Return:
          *         EventSourceResponse: SSE 流，依次发送 progress 事件并以哨兵结束。
          */
@@ -4102,7 +4102,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Submit Analysis Job */
+        /**
+         * Submit Analysis Job
+         * @description 提交个股分析任务。
+         *
+         *     港股为 1-5 位代码、A 股为 6 位，两者长度不同，因此不能用单一的 6 位约束。
+         */
         post: operations["submit_analysis_job_api_workflows_analysis__code__post"];
         delete?: never;
         options?: never;
@@ -11947,15 +11952,18 @@ export interface components {
         };
         /**
          * RevenueBreakdown
-         * @description 新浪最新披露口径下的营收与毛利构成；上游不提供报告期。
+         * @description 最新披露口径下的营收与毛利构成；上游不提供报告期。
+         *
+         *     A 股来自新浪 ``getGrossRevenue``（金额+占比）；港股来自同花顺 F10 主营构成
+         *     分析，静态页面**只有占比、没有金额**，因此港股的 revenue/cost/gross_profit
+         *     一律为空——不按占比反推金额，那会把编造值当成披露值。
          */
         RevenueBreakdown: {
             /**
              * Amount Unit
              * @default CNY_yuan
-             * @constant
              */
-            amount_unit: "CNY_yuan";
+            amount_unit: "CNY_yuan" | null;
             /**
              * Amount Unit Inferred
              * @default true
@@ -11977,9 +11985,9 @@ export interface components {
             /**
              * Source
              * @default sina
-             * @constant
+             * @enum {string}
              */
-            source: "sina";
+            source: "sina" | "ths";
             /** Symbol */
             symbol: string;
         };

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import HKStockPageContent from "./HKStockPageContent";
@@ -101,6 +101,40 @@ vi.mock("../../api/queryHooks/stock", () => ({
     error: null,
     refetch: vi.fn(),
   }),
+  useStockBusinessIntro: () => ({
+    data: {
+      code: "00700",
+      source: "ths",
+      items: {
+        主营业务: "公司乃一间投资控股公司。集团主要提供增值服务、营销服务，以及金融科技及企业服务。",
+      },
+    },
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useRevenueBreakdown: () => ({
+    data: {
+      code: "00700",
+      symbol: "HK0700",
+      name: "",
+      source: "ths",
+      amount_unit: null,
+      amount_unit_inferred: false,
+      by_product: [],
+      by_business: [
+        {
+          id: null, class_name: "增值服务", is_sub_item: false,
+          revenue: null, cost: null, gross_profit: null,
+          revenue_share_pct: 48.06, gross_margin_pct: null,
+        },
+      ],
+      by_region: [],
+    },
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock("../../charts/LazyKlineChart", () => ({
@@ -170,6 +204,43 @@ describe("HKStockPageContent", () => {
     expect(screen.queryByRole("button", { name: "查看H股大盘市场" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "H股市场" })).not.toBeInTheDocument();
     expect(screen.queryByText(/进入.*H股市场/)).not.toBeInTheDocument();
+  });
+
+  it("renders the HK main business section like the A-share page", () => {
+    render(
+      <MemoryRouter>
+        <HKStockPageContent code="00700" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "主营业务" })).toBeInTheDocument();
+    expect(
+      screen.getByText("公司乃一间投资控股公司。集团主要提供增值服务、营销服务，以及金融科技及企业服务。"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("来源：THS")).toBeInTheDocument();
+    // 交易规则卡与主营业务卡是两件事，不能互相顶替
+    expect(screen.getByRole("heading", { name: "港股交易规则" })).toBeInTheDocument();
+  });
+
+  it("renders the HK revenue composition with shares only and no amount columns", () => {
+    render(
+      <MemoryRouter>
+        <HKStockPageContent code="00700" />
+      </MemoryRouter>,
+    );
+
+    // 港股口径：标题/说明必须来自数据源，不能沿用「新浪…毛利构成」
+    expect(screen.getByText("同花顺 F10 主营构成分析 · 仅占比，无金额")).toBeInTheDocument();
+    expect(screen.queryByText("新浪最新披露口径")).not.toBeInTheDocument();
+
+    // 交互表格与 PDF 表格会各渲染一份，按 testid 收窄避免重复匹配
+    const table = within(screen.getByTestId("revenue-breakdown-interactive"));
+    expect(table.getByText("增值服务")).toBeInTheDocument();
+    expect(table.getByText("48.06%")).toBeInTheDocument();
+    // 没有金额就不该摆出三列全是「-」的金额列
+    expect(table.queryByText("营业收入")).not.toBeInTheDocument();
+    expect(table.queryByText("营业成本")).not.toBeInTheDocument();
+    expect(table.queryByText("毛利率")).not.toBeInTheDocument();
   });
 
   it("switches to MACD, RSI, and KDJ indicator charts", () => {

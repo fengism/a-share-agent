@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 from app.configuration.paths import DATA_DIR
 from app.core.cache import analysis_cache as cache
+from app.core.market import is_hk_code
 from app.infrastructure.persistence.ddl import (
     ANALYSIS_HISTORY_INDEXES,
     ANALYSIS_HISTORY_TABLE,
@@ -201,7 +202,10 @@ def delete_analysis(
     can_delete_legacy: bool = False,
 ) -> bool:
     """删除当前用户记录；管理员可在用户记录不存在时删除旧版全局记录。"""
-    if len(code) != 6 or not code.isdigit() or len(date) != 8 or not date.isdigit():
+    if not code.isdigit() or len(date) != 8 or not date.isdigit():
+        return False
+    # 港股为 1-5 位代码，A 股为 6 位；此前只放行 6 位，导致港股分析记录无法删除。
+    if len(code) != 6 and not is_hk_code(code):
         return False
 
     scope_user_id = user_id

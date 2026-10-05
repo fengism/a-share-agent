@@ -1,4 +1,5 @@
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -102,6 +103,28 @@ def is_a_share_code(code: str) -> bool:
     if len(text) != 6 or not text.isdigit():
         return False
     return text[:2] in _A_SHARE_CODE_PREFIXES or text[:3] == "920"
+
+
+HK_STOCK_CODE_PATTERN_TEXT = r"(?:hk)?\d{1,5}"
+"""港股代码正则文本（1-5 位数字，可带 ``hk`` 前缀）。
+
+同时供运行时判定（``is_hk_code``）与 HTTP 路径约束使用，避免两处口径漂移：
+路径只放行 6 位会让港股分析在提交阶段就被 422 挡掉。
+"""
+
+_HK_CODE_PATTERN = re.compile(rf"^({HK_STOCK_CODE_PATTERN_TEXT})$", re.IGNORECASE)
+
+STOCK_CODE_PATH_PATTERN = rf"^(?:{A_SHARE_CODE_PATTERN_TEXT}|{HK_STOCK_CODE_PATTERN_TEXT})$"
+"""A 股或港股代码的 HTTP 路径约束。"""
+
+
+def is_hk_code(code: str) -> bool:
+    """校验港股代码（1-5 位数字，可带 ``hk`` 前缀）。
+
+    与 A 股 6 位口径天然互斥，因此调用方只凭代码即可判断市场归属，不必额外传参。
+    与 ``financial_data.hk.service.normalize_hk_code`` 的正则保持一致。
+    """
+    return _HK_CODE_PATTERN.fullmatch(str(code or "").strip()) is not None
 
 
 def contains_stock_reference(text: str, code: str, code_name: str) -> bool:

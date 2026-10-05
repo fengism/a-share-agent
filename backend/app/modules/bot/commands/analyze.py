@@ -2,6 +2,7 @@
 
 import re
 
+from app.core.market import STOCK_CODE_PATH_PATTERN
 from app.modules.analysis.models import AnalysisResult
 from app.modules.analysis.public import run_analysis
 from app.modules.bot.commands.base import BotCommand
@@ -70,15 +71,15 @@ def _format_analysis_result(result: AnalysisResult) -> str:
 class AnalyzeCommand(BotCommand):
     name = "analyze"
     aliases = ("a", "分析", "查")
-    description = "分析指定 A 股"
-    usage = "/analyze <6位股票代码>"
+    description = "分析指定 A 股或港股"
+    usage = "/analyze <股票代码>"
     requires_service_user = True
 
     def validate_args(self, args: list[str]) -> str | None:
         if not args:
             return f"请输入股票代码，用法：{self.usage}"
-        if re.fullmatch(r"\d{6}", args[0]) is None:
-            return "股票代码必须是 6 位数字"
+        if re.fullmatch(STOCK_CODE_PATH_PATTERN, args[0], re.IGNORECASE) is None:
+            return "股票代码必须是 6 位 A 股代码或 1-5 位港股代码"
         return None
 
     async def execute(

@@ -10,10 +10,11 @@ import pandas as pd
 from app.constants.financial_labels import FINANCIAL_METRIC_ALIASES, FINANCIAL_METRIC_LABELS
 from app.core.cache import dated_cache_key_no_day
 from app.core.cache import reference_cache as cache
-from app.core.concurrency.rate_limiter import akshare_semaphore, sina_semaphore
+from app.core.concurrency.rate_limiter import akshare_semaphore, sina_semaphore, ths_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
-from app.core.market import normalize_code, safe_float
+from app.core.market import is_hk_code, normalize_code, safe_float
+from app.financial_data.hk.service import normalize_hk_code
 from app.financial_data.stock.fundamentals.schemas import FinancialMetrics, RevenueBreakdown
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
@@ -38,6 +39,11 @@ def _get_akshare_provider():
 def _get_sina_provider():
     """Lazily resolve the Sina provider singleton."""
     return get_provider("sina")
+
+
+def _get_ths_provider():
+    """Lazily resolve the THS provider singleton."""
+    return get_provider("ths")
 
 
 async def _load_financial_statement(sym, indicator: str, cache_key: str) -> list[dict]:
@@ -90,7 +96,13 @@ async def _load_financial_statement(sym, indicator: str, cache_key: str) -> list
 
 
 async def get_revenue_breakdown(code: str) -> RevenueBreakdown:
-    """获取新浪最新披露的分产品、业务和地区营收与毛利构成。"""
+    """获取最新披露的分产品、业务和地区营收构成。
+
+    A 股走新浪 ``getGrossRevenue``；港股该接口恒返回空，必须走同花顺 F10 主营
+    构成分析（那边只有占比、没有金额）。
+    """
+    if is_hk_code(code):
+        return await _get_hk_revenue_breakdown(code)
     sym = normalize_code(code)
     cache_key = dated_cache_key_no_day("revenue_breakdown", "v1", sym.prefixed_upper)
     cached = cache.get(cache_key)
@@ -112,6 +124,35 @@ async def get_revenue_breakdown(code: str) -> RevenueBreakdown:
             result = RevenueBreakdown.model_validate(payload)
         except Exception as error:
             raise UpstreamUnavailableError(f"{sym.raw} 营收与毛利构成上游暂时不可用") from error
+        cache.set(cache_key, result, ttl=_FINANCIAL_CACHE_TTL_SECONDS)
+        return result
+
+    return await _revenue_breakdown_singleflight.do(cache_key, load_and_cache)
+
+
+async def _get_hk_revenue_breakdown(code: str) -> RevenueBreakdown:
+    """港股营收构成：同花顺 F10 静态表，只有占比。"""
+    hk_code = normalize_hk_code(code)
+    cache_key = dated_cache_key_no_day("revenue_breakdown", "ths-v1", hk_code)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return RevenueBreakdown.model_validate(cached)
+
+    async def load_and_cache() -> RevenueBreakdown:
+        cached_inside_flight = cache.get(cache_key)
+        if cached_inside_flight is not None:
+            return RevenueBreakdown.model_validate(cached_inside_flight)
+        try:
+            payload = await provider_gateway.call_blocking(
+                "ths",
+                "hk_revenue_breakdown",
+                _get_ths_provider().fetch_hk_revenue_breakdown,
+                hk_code,
+                semaphore=ths_semaphore,
+            )
+            result = RevenueBreakdown.model_validate(payload)
+        except Exception as error:
+            raise UpstreamUnavailableError(f"{hk_code} 营收构成上游暂时不可用") from error
         cache.set(cache_key, result, ttl=_FINANCIAL_CACHE_TTL_SECONDS)
         return result
 

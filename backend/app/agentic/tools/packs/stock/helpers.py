@@ -129,6 +129,26 @@ async def get_stock_sentiment(code: str) -> Any:
     return await get_application_tool_handlers().get_stock_sentiment(code)
 
 
+async def get_hk_stock_profile(code: str) -> Any:
+    """获取港股行情快照（名称、现价、涨跌、成交额）。
+
+    Param:
+        code: 港股代码，1-5 位数字，例如 00700
+    Return:
+        港股行情快照字典
+    """
+    return await get_application_tool_handlers().get_hk_stock_profile(code)
+
+
+async def get_hk_market_overview() -> Any:
+    """获取港股主要指数（恒指、国企指数、恒生科技）实时行情。
+
+    Return:
+        港股指数行情字典
+    """
+    return await get_application_tool_handlers().get_hk_market_overview()
+
+
 async def screen_stocks(
     pe_min: float | None = None,
     pe_max: float | None = None,

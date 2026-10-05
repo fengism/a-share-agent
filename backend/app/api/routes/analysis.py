@@ -208,7 +208,7 @@ async def get_analysis_history(
     """读取指定股票的历史分析索引列表。
 
     Param:
-        code: 股票代码（路径参数），6 位数字。
+        code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。
     Return:
         list[AnalysisHistoryItem]: 按日期排序的历史分析摘要条目。
     """
@@ -226,7 +226,7 @@ async def get_analysis_by_date(code: str, date: str, user: AuthenticatedUser = D
     """读取指定股票在指定日期的分析结果，命中缓存优先。
 
     Param:
-        code: 股票代码（路径参数），6 位数字。
+        code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。
         date: 分析日期（路径参数），格式 YYYYMMDD。
     Return:
         AnalysisResult: 该日的完整分析结果；若不存在则返回 404。

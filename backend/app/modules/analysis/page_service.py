@@ -8,6 +8,7 @@ from datetime import date, datetime
 from typing import Any
 
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
+from app.core.market import is_hk_code
 from app.domain.market import KlineData
 from app.financial_data.market.trading_session import SHANGHAI_TIMEZONE, completed_market_date
 from app.financial_data.stock.public import (
@@ -64,6 +65,29 @@ class AnalysisPageLoaders:
     cached_analysis: Callable[[str, int, int], Awaitable[AnalysisResult | None]]
 
 
+async def _load_hk_stock_info(code: str) -> StockBasicInfo:
+    """港股基础资料：只映射行情能证明的字段，其余保持 None。
+
+    A 股口径的 get_basic_info 对港股无效（行业分类、上市日期、概念板块都没有
+    可靠来源），因此这里不做任何跨市场口径映射。
+    """
+    from app.financial_data.hk.analysis_support import get_hk_stock_profile
+
+    profile = await get_hk_stock_profile(code)
+    quote = profile.get("quote") or {}
+    return StockBasicInfo(
+        code=str(quote.get("code") or code),
+        name=str(quote.get("name") or code),
+        current_price=quote.get("price"),
+    )
+
+
+async def _load_stock_info(code: str) -> StockBasicInfo:
+    if is_hk_code(code):
+        return await _load_hk_stock_info(code)
+    return await get_basic_info(code)
+
+
 async def _load_cached_analysis(code: str, user_id: int, cache_ttl: int) -> AnalysisResult | None:
     return await call_blocking(
         get_latest_analysis,
@@ -75,7 +99,7 @@ async def _load_cached_analysis(code: str, user_id: int, cache_ttl: int) -> Anal
 
 
 DEFAULT_ANALYSIS_PAGE_LOADERS = AnalysisPageLoaders(
-    stock_info=get_basic_info,
+    stock_info=_load_stock_info,
     kline=get_kline,
     intraday=get_intraday,
     valuation=get_valuation,
@@ -119,9 +143,12 @@ async def get_analysis_page_data(
             ),
         ),
         ("intraday", active_loaders.intraday(code)),
-        ("valuation", active_loaders.valuation(code)),
         ("cached_analysis", active_loaders.cached_analysis(code, user_id, cache_ttl)),
     ]
+    # 港股没有 A 股口径的估值接口：与其建好协程再等它超时降级，不如根本不发起，
+    # 由下面的 unavailable_sections 明确说明这一项对港股不适用。
+    if not is_hk_code(code):
+        requests.insert(3, ("valuation", active_loaders.valuation(code)))
     results = await asyncio.gather(
         *(
             asyncio.wait_for(
@@ -133,8 +160,16 @@ async def get_analysis_page_data(
         return_exceptions=True,
     )
 
-    values: dict[AnalysisPageSection, Any] = {}
-    unavailable_sections: list[AnalysisPageSection] = []
+    values: dict[AnalysisPageSection, Any] = {
+        "stock_info": None,
+        "kline": None,
+        "intraday": None,
+        "valuation": None,
+        "cached_analysis": None,
+    }
+    unavailable_sections: list[AnalysisPageSection] = (
+        ["valuation"] if is_hk_code(code) else []
+    )
     for (section, _), result in zip(requests, results, strict=True):
         if isinstance(result, TimeoutError):
             effective_timeout = min(section_timeout_seconds, _SECTION_TIMEOUT_CAPS[section])

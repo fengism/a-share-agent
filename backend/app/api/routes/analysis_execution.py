@@ -32,7 +32,7 @@ async def trigger_analysis(code: str, user: AuthenticatedUser = Depends(require_
     """触发指定股票的同步 AI 分析。
 
     Param:
-        code: 股票代码（路径参数），6 位数字。
+        code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。
     Return:
         AnalysisResult: 完整的结构化分析结果，包含评级、信号与目标价等字段。
     """
@@ -72,7 +72,7 @@ async def get_analysis_result(code: str, user: AuthenticatedUser = Depends(requi
     """读取指定股票当天的最新分析结果，优先返回缓存。
 
     Param:
-        code: 股票代码（路径参数），6 位数字。
+        code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。
     Return:
         dict | AnalysisResult: 缓存或落盘的最近一次分析结果；若不存在则抛出 404。
     """
@@ -89,7 +89,7 @@ async def stream_analysis(code: str, user: AuthenticatedUser = Depends(require_a
     """SSE 端点，流式推送分析进度事件。
 
     Param:
-        code: 股票代码（路径参数），6 位数字；同一代码并发请求会附着到已有任务。
+        code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字；同一代码并发请求会附着到已有任务。
     Return:
         EventSourceResponse: SSE 流，依次发送 progress 事件并以哨兵结束。
     """

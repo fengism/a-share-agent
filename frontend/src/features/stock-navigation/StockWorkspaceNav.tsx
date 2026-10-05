@@ -15,6 +15,9 @@ export default function StockWorkspaceNav({
         <NavLink className="stock-workspace-nav__link" end to={buildStockProfileUrl(code)}>
           个股资料
         </NavLink>
+        <NavLink className="stock-workspace-nav__link" end to={buildStockAnalysisUrl(code)}>
+          AI 分析
+        </NavLink>
         <NavLink className="stock-workspace-nav__link" end to="/watchlist">
           我的自选
         </NavLink>

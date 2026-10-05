@@ -36,6 +36,8 @@ import StockWorkspaceNav from "../../features/stock-navigation/StockWorkspaceNav
 import { useColors, useStyles } from "../../styles/ui";
 import type { KlineItem } from "../../types/stock";
 import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
+import StockBusinessIntro from "./StockBusinessIntro";
+import RevenueBreakdownSection from "../../features/investment-research/RevenueBreakdownSection";
 import StockSectionTitle from "./StockSectionTitle";
 
 const { Title, Text } = Typography;
@@ -299,6 +301,13 @@ export default function HKStockPageContent({ code }: { code: string }) {
           </div>
         </Card>
       </section>
+
+      {/* 与 A 股页对齐：主营业务独立成卡，不塞进上面的两列栅格（那会把
+          「港股交易规则」挤到下一行留白）。首次访问即触发抓取并落库。 */}
+      <StockBusinessIntro code={code} />
+
+      {/* 港股营收构成：同花顺 F10 主营构成分析，仅占比无金额 */}
+      <RevenueBreakdownSection code={code} />
 
       {/* ── 走势与历史行情 分时/K线/指标图 ── */}
       <Card

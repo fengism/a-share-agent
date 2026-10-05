@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, Segmented, Table, Typography } from "antd";
-import type { ColumnsType } from "antd/es/table";
+import type { ColumnsType, ColumnType } from "antd/es/table";
 import { useRevenueBreakdown } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { useColors, useStyles } from "../../theme/hooks";
@@ -23,6 +23,22 @@ function formatPercentage(value: number | null) {
 function amountCell(value: number | null, color: string) {
   return <span className="financial-data-table__number" style={{ color }}>{formatAmount(value)}</span>;
 }
+
+/** 数据源口径说明：A股含金额，港股同花顺静态页只给占比。 */
+const SOURCE_COPY: Record<string, { title: string; note: string; emptyText: string; errorTitle: string }> = {
+  sina: {
+    title: "营收与毛利构成",
+    note: "新浪最新披露口径",
+    emptyText: "暂无营收与毛利构成数据",
+    errorTitle: "营收与毛利构成加载失败",
+  },
+  ths: {
+    title: "营收构成",
+    note: "同花顺 F10 主营构成分析 · 仅占比，无金额",
+    emptyText: "暂无营收构成数据",
+    errorTitle: "营收构成加载失败",
+  },
+};
 
 export default function RevenueBreakdownSection({
   code,
@@ -62,8 +78,17 @@ export default function RevenueBreakdownSection({
     })),
     [activeDimension, data],
   );
-  const columns = useMemo<ColumnsType<RevenueBreakdownItem & { row_key: string }>>(() => [
-    {
+  // 没有数据时也要按数据源给文案：A股空态仍是「营收与毛利构成」
+  const copy = SOURCE_COPY[data?.source ?? "sina"] ?? SOURCE_COPY.sina;
+  // 港股口径没有任何金额列，保留它们只会得到三列「-」，反而淹没占比信息
+  const hasAmounts = useMemo(
+    () => availableDimensions.some(({ key }) => (data?.[key] ?? []).some((item) => item.revenue != null)),
+    [availableDimensions, data],
+  );
+
+  const columns = useMemo<ColumnsType<RevenueBreakdownItem & { row_key: string }>>(() => {
+    type Row = RevenueBreakdownItem & { row_key: string };
+    const nameColumn: ColumnType<Row> = {
       title: "构成项",
       dataIndex: "class_name",
       key: "class_name",
@@ -78,48 +103,53 @@ export default function RevenueBreakdownSection({
           {value}
         </Text>
       ),
-    },
-    {
-      title: "营业收入",
-      dataIndex: "revenue",
-      key: "revenue",
-      width: 130,
-      align: "right",
-      render: (value: number | null) => amountCell(value, value !== null && value < 0 ? c.down : c.textPrimary),
-    },
-    {
-      title: "营业成本",
-      dataIndex: "cost",
-      key: "cost",
-      width: 130,
-      align: "right",
-      render: (value: number | null) => amountCell(value, value !== null && value < 0 ? c.down : c.textSecondary),
-    },
-    {
-      title: "毛利润",
-      dataIndex: "gross_profit",
-      key: "gross_profit",
-      width: 130,
-      align: "right",
-      render: (value: number | null) => amountCell(value, value === null ? c.textMuted : value >= 0 ? c.up : c.down),
-    },
-    {
+    };
+    const shareColumn: ColumnType<Row> = {
       title: "营收占比",
       dataIndex: "revenue_share_pct",
       key: "revenue_share_pct",
       width: 110,
-      align: "right",
+      align: "right" as const,
       render: (value: number | null) => <span className="financial-data-table__number">{formatPercentage(value)}</span>,
-    },
-    {
-      title: "毛利率",
-      dataIndex: "gross_margin_pct",
-      key: "gross_margin_pct",
-      width: 100,
-      align: "right",
-      render: (value: number | null) => <span className="financial-data-table__number">{formatPercentage(value)}</span>,
-    },
-  ], [c.down, c.textMuted, c.textPrimary, c.textSecondary, c.up, isExportingPdf]);
+    };
+    if (!hasAmounts) return [nameColumn, shareColumn];
+    return [
+      nameColumn,
+      {
+        title: "营业收入",
+        dataIndex: "revenue",
+        key: "revenue",
+        width: 130,
+        align: "right",
+        render: (value: number | null) => amountCell(value, value !== null && value < 0 ? c.down : c.textPrimary),
+      },
+      {
+        title: "营业成本",
+        dataIndex: "cost",
+        key: "cost",
+        width: 130,
+        align: "right",
+        render: (value: number | null) => amountCell(value, value !== null && value < 0 ? c.down : c.textSecondary),
+      },
+      {
+        title: "毛利润",
+        dataIndex: "gross_profit",
+        key: "gross_profit",
+        width: 130,
+        align: "right",
+        render: (value: number | null) => amountCell(value, value === null ? c.textMuted : value >= 0 ? c.up : c.down),
+      },
+      shareColumn,
+      {
+        title: "毛利率",
+        dataIndex: "gross_margin_pct",
+        key: "gross_margin_pct",
+        width: 100,
+        align: "right",
+        render: (value: number | null) => <span className="financial-data-table__number">{formatPercentage(value)}</span>,
+      } satisfies ColumnType<Row>,
+    ];
+  }, [c.down, c.textMuted, c.textPrimary, c.textSecondary, c.up, hasAmounts, isExportingPdf]);
 
   const totalRows = availableDimensions.reduce(
     (count, { key }) => count + (data?.[key]?.length ?? 0),
@@ -134,16 +164,16 @@ export default function RevenueBreakdownSection({
       className="financial-data-section"
     >
       <div style={sectionHeaderStyle}>
-        <Text strong className="financial-data-section__header-title">营收与毛利构成</Text>
-        <Text type="secondary" className="financial-data-section__header-note">新浪最新披露口径</Text>
+        <Text strong className="financial-data-section__header-title">{copy.title}</Text>
+        <Text type="secondary" className="financial-data-section__header-note">{copy.note}</Text>
       </div>
       <SectionDataState
         isLoading={isLoading}
         error={error}
         onRetry={() => query.refetch()}
         isEmpty={!data || availableDimensions.length === 0}
-        emptyText="暂无营收与毛利构成数据"
-        errorTitle="营收与毛利构成加载失败"
+        emptyText={copy.emptyText}
+        errorTitle={copy.errorTitle}
         skeletonRows={4}
         minHeight={180}
       >
@@ -164,7 +194,7 @@ export default function RevenueBreakdownSection({
               rowKey="row_key"
               size="small"
               pagination={false}
-              scroll={isExportingPdf ? undefined : { x: 790 }}
+              scroll={isExportingPdf ? undefined : { x: hasAmounts ? 790 : 300 }}
             />
           </div>
           <div className="revenue-breakdown-pdf">

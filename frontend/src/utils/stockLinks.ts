@@ -31,6 +31,11 @@ export function normalizeHkStockCode(code: string): string | null {
   return match?.[1] ? match[1].padStart(5, "0") : null;
 }
 
+/** 港股代码为 1-5 位，与 6 位 A 股天然互斥，因此无需额外市场参数即可判定。 */
+export function isHkStockCode(code: string): boolean {
+  return normalizeHkStockCode(code) !== null;
+}
+
 export function buildStockProfileUrl(code: string): string {
   return `/stock/${encodeURIComponent(code.trim())}`;
 }

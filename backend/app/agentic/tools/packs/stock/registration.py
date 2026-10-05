@@ -9,6 +9,12 @@ _STOCK_CODE_SCHEMA = {
     "pattern": r"^\d{6}$",
     "description": "6位股票代码，如 600519",
 }
+# 港股为 1-5 位数字，与 A 股 6 位天然互斥；港股工具不能复用 A 股的代码约束。
+_HK_CODE_SCHEMA = {
+    "type": "string",
+    "pattern": r"^(?:hk)?\d{1,5}$",
+    "description": "港股代码，1-5 位数字，可省略前导 0，如 00700、700",
+}
 _QUERY_SCHEMA = {
     "type": "string",
     "minLength": 1,
@@ -54,6 +60,77 @@ def _register_stock_lookup_tools() -> None:
         },
         policy=_REALTIME_POLICY,
         executor=helpers.get_stock_info,
+    ))
+
+
+def _register_hk_stock_tools() -> None:
+    """Register HK-specific tools.
+
+    港股只提供行情口径的事实：A 股口径的财务、估值、情绪、资金流工具对港股无效，
+    不注册以免 Agent 反复重试不存在的接口。K 线与技术指标复用同一执行器
+    （``get_kline`` / ``get_technical_indicators`` 内部已按港股代码分流），
+    这里只是把参数约束从 6 位 A 股代码换成港股代码。
+    """
+    registry.register_tool(Tool(
+        name="get_hk_stock_profile",
+        description="获取港股行情快照，包含名称、现价、涨跌额/幅、昨收、开盘、最高、最低、成交量与成交额。港股分析的基础事实来源。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _HK_CODE_SCHEMA,
+            },
+            "required": ["code"],
+        },
+        policy=_REALTIME_POLICY,
+        executor=helpers.get_hk_stock_profile,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_hk_stock_kline",
+        description="获取港股K线数据（日K/周K/月K），含开高低收、成交量等。港股无涨跌停且可做空港股，量价含义与A股不同，解读时需说明。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _HK_CODE_SCHEMA,
+                "period": {
+                    "type": "string",
+                    "enum": ["daily", "weekly", "monthly"],
+                    "default": "daily",
+                    "description": "K线周期，默认daily",
+                },
+            },
+            "required": ["code"],
+        },
+        policy=_MEDIUM_REALTIME_POLICY,
+        executor=helpers.get_stock_kline,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_hk_stock_technical_indicators",
+        description="计算港股技术指标，包括均线、MACD、RSI、布林带、KDJ等。可指定周期（daily/weekly/monthly/annual）。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _HK_CODE_SCHEMA,
+                "period": {
+                    "type": "string",
+                    "description": "K线周期：daily（日线，默认）、weekly（周线）、monthly（月线）、annual（年线）",
+                    "enum": ["daily", "weekly", "monthly", "annual"],
+                    "default": "daily",
+                },
+            },
+            "required": ["code"],
+        },
+        policy=_MEDIUM_REALTIME_POLICY,
+        executor=helpers.get_stock_technical_indicators,
+    ))
+
+    registry.register_tool(Tool(
+        name="get_hk_market_overview",
+        description="获取港股主要指数实时行情（恒生指数、恒生国企指数、恒生科技指数）。分析港股时的市场环境证据。",
+        parameters={"type": "object", "properties": {}},
+        policy=_REALTIME_POLICY,
+        executor=helpers.get_hk_market_overview,
     ))
 
 
@@ -412,6 +489,7 @@ def register_stock_tools() -> None:
     """Register stock, screening, research, risk, and macro Tool groups."""
     _register_stock_document_tool()
     _register_stock_lookup_tools()
+    _register_hk_stock_tools()
     _register_stock_analysis_tools()
     _register_stock_news_tools()
     _register_structured_screening_tools()

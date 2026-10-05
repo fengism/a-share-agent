@@ -3,6 +3,7 @@ import {
   buildStockAnalysisUrl,
   buildStockProfileUrl,
   buildWatchlistStockUrl,
+  isHkStockCode,
   normalizeAshareStockCode,
   normalizeHkStockCode,
   parseStockCode,
@@ -62,5 +63,24 @@ describe("stockLinks", () => {
     expect(buildWatchlistStockUrl("700", "hk")).toBe("/stock/00700");
     expect(buildWatchlistStockUrl("", "hk")).toBe("/market?market=hk");
     expect(buildWatchlistStockUrl("600519", "cn")).toBe("/stock/600519");
+  });
+
+  it.each(["00700", "700", "hk00700", "HK700", "00700.HK"])(
+    "detects %s as an HK code",
+    (input) => {
+      expect(isHkStockCode(input)).toBe(true);
+    },
+  );
+
+  it.each(["600519", "000001", "123456", "abcdef", ""])(
+    "does not treat %s as an HK code",
+    (input) => {
+      expect(isHkStockCode(input)).toBe(false);
+    },
+  );
+
+  it("agrees with parseStockCode on the market of a code", () => {
+    expect(isHkStockCode("00700")).toBe(parseStockCode("00700")?.market === "hk");
+    expect(isHkStockCode("600519")).toBe(parseStockCode("600519")?.market === "hk");
   });
 });

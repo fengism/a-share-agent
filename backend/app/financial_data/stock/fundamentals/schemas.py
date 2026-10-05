@@ -31,13 +31,20 @@ class RevenueBreakdownItem(BaseModel):
 
 
 class RevenueBreakdown(BaseModel):
-    """新浪最新披露口径下的营收与毛利构成；上游不提供报告期。"""
+    """最新披露口径下的营收与毛利构成；上游不提供报告期。
+
+    A 股来自新浪 ``getGrossRevenue``（金额+占比）；港股来自同花顺 F10 主营构成
+    分析，静态页面**只有占比、没有金额**，因此港股的 revenue/cost/gross_profit
+    一律为空——不按占比反推金额，那会把编造值当成披露值。
+    """
 
     code: str
     symbol: str
     name: str = ""
-    source: Literal["sina"] = "sina"
-    amount_unit: Literal["CNY_yuan"] = "CNY_yuan"
+    source: Literal["sina", "ths"] = "sina"
+    # 同花顺口径的金额单位随公司报表币种而定（人民币/港元都有），无法统一断言，
+    # 因此允许为空；A 股仍固定为 CNY_yuan。
+    amount_unit: Literal["CNY_yuan"] | None = "CNY_yuan"
     amount_unit_inferred: bool = True
     by_product: list[RevenueBreakdownItem] = Field(default_factory=list)
     by_business: list[RevenueBreakdownItem] = Field(default_factory=list)
