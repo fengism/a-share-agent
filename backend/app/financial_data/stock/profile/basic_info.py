@@ -15,6 +15,7 @@ from app.core.cache import reference_cache as cache
 from app.core.cache_policies import BASIC_INFO_FINAL, BASIC_INFO_STATIC
 from app.core.concurrency.rate_limiter import (
     call_blocking,
+    database_semaphore,
     eastmoney_semaphore,
     exchange_semaphore,
     misc_semaphore,
@@ -22,7 +23,7 @@ from app.core.concurrency.rate_limiter import (
     tencent_semaphore,
 )
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import SymbolFormats, normalize_code, safe_float, safe_string
+from app.core.market import SymbolFormats, is_a_share_code, normalize_code, safe_float, safe_string
 from app.domain.stock import StockConcept, StockConceptInfo
 from app.financial_data.stock.profile.industry_normalization import normalize_exchange_industry
 from app.financial_data.stock.profile.merger import (
@@ -600,7 +601,37 @@ async def _load_basic_info(sym: SymbolFormats, cache_key: str) -> StockBasicInfo
                 )
 
     cache.set(cache_key, result, ttl=BASIC_INFO_FINAL.ttl_seconds)
+    await _persist_basic_profile_skeleton(sym, result)
     return result
+
+
+async def _persist_basic_profile_skeleton(sym: SymbolFormats, info: StockBasicInfo) -> None:
+    """把 /info 融合到的稳定身份字段落库建档，减少后续全量回源。
+
+    仅在库中尚无该股行时创建一行最小档案；已存在（含手工维护）不改动任何字段。
+    只落交易所来源的稳定身份字段（名称/上市日期/交易所行业）；申万行业由行业库
+    权威维护，估值/价格/概念等波动字段一律不落。失败不影响本次 /info 响应。
+    """
+    if not is_a_share_code(sym.raw):
+        return
+    if not (info.name or info.listing_date or info.exchange_industry):
+        return
+    try:
+        from app.modules.stock_profile.repository import ensure_basic_skeleton
+
+        await call_blocking(
+            ensure_basic_skeleton,
+            stock_code=f"{sym.raw}.{sym.exchange}",
+            stock_name=info.name or "",
+            market_group="A",
+            exchange=sym.exchange,
+            listing_date=info.listing_date or None,
+            industry=info.exchange_industry or "",
+            source="basic_info",
+            semaphore=database_semaphore,
+        )
+    except Exception as error:
+        logger.debug("基础信息建档失败: code=%s, error=%s", sym.raw, _describe_error(error))
 
 
 async def get_basic_info(code: str) -> StockBasicInfo:

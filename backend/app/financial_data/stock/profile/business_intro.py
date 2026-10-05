@@ -15,7 +15,8 @@ from app.configuration.paths import DATA_DIR
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore, ths_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
-from app.core.market import is_a_share_code, normalize_code
+from app.core.market import is_a_share_code, is_hk_code, normalize_code
+from app.financial_data.hk.service import normalize_hk_code
 from app.financial_data.stock.profile.schemas import StockBusinessIntro
 from app.infrastructure.persistence.file_lock import exclusive_file_lock
 from app.infrastructure.persistence.json_storage import atomic_write_json
@@ -51,6 +52,9 @@ class StockBusinessIntroService:
 
     @staticmethod
     def _normalize_code(code: str) -> str:
+        if is_hk_code(code):
+            # 港股统一归一到 5 位补零，与 hk_market_service、组合等模块保持同一标识
+            return normalize_hk_code(code)
         try:
             normalized = normalize_code(code).raw
         except ValueError as error:
@@ -124,10 +128,25 @@ class StockBusinessIntroService:
         )
         if self._data_dir == _DEFAULT_DATA_DIR:
             try:
-                from app.modules.stock_profile.repository import update_business_info
+                from app.modules.code_normalization import normalize_stock_identity
+                from app.modules.stock_profile.repository import (
+                    ensure_basic_skeleton,
+                    update_business_info,
+                )
+
+                full_code, exchange, market = normalize_stock_identity(result.code)
+                main_business = result.items.get("主营业务", "")
+                # 库里没有该股行时先建档，主营业务才能落进 stock_basic_profiles；
+                # 已存在则 ensure 不改动任何字段，仍由 update_business_info 只补空值。
+                ensure_basic_skeleton(
+                    stock_code=full_code,
+                    exchange=exchange,
+                    market_group=market,
+                    source="ths",
+                )
                 update_business_info(
-                    result.code,
-                    main_business=result.items.get("主营业务", ""),
+                    full_code,
+                    main_business=main_business,
                     business_scope=result.items.get("经营范围", ""),
                     products=result.items.get("产品名称") or result.items.get("产品类型") or "",
                     source="ths",

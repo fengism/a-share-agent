@@ -137,12 +137,34 @@ def fetch_eastmoney_company_survey(stock_code: str, exchange: str) -> dict[str, 
         return {}
 
 
+def _ensure_skeleton_for_enrich(stock_code: str) -> bool:
+    """为显式补充建档；代码无法归一或非 A 股时返回 False。"""
+    try:
+        from app.modules.code_normalization import normalize_stock_identity
+        from app.modules.stock_profile.repository import ensure_basic_skeleton
+
+        full_code, exchange, market = normalize_stock_identity(stock_code)
+        return ensure_basic_skeleton(
+            stock_code=full_code,
+            exchange=exchange,
+            market_group=market,
+            source="enrich",
+        )
+    except Exception as error:
+        logger.debug("补充建档失败: code=%s error=%s", stock_code, error)
+        return False
+
+
 def enrich_stock_profile(stock_code: str, *, force: bool = False) -> StockProfileEnrichResponse:
     """补充个股资料：库中已有主营信息时直接返回，缺失才从 THS/东财抓取并更新库。
 
     普通补充仅写入空字段；force=True 明确允许刷新已有值（包含手工资料）。
     """
     existing = get_record(stock_code)
+    if not existing:
+        # 显式补充是管理员动作：允许为新股票先建最小档案，再填充主营/公司资料。
+        if _ensure_skeleton_for_enrich(stock_code):
+            existing = get_record(stock_code)
     if not existing:
         return StockProfileEnrichResponse(
             success=False,

@@ -144,6 +144,76 @@ def get_record_by_id(record_id: int) -> dict[str, Any] | None:
     return _with_industries([_record(row)])[0] if row else None
 
 
+def _infer_a_share_board(raw_code: str, exchange: str) -> str:
+    if raw_code.startswith("688"):
+        return "科创板"
+    if raw_code.startswith("30"):
+        return "创业板"
+    if raw_code.startswith(("4", "8", "920")):
+        return "北交所"
+    if exchange in {"SH", "SZ"}:
+        return "主板"
+    return ""
+
+
+def ensure_basic_skeleton(
+    *,
+    stock_code: str,
+    stock_name: str = "",
+    market_group: str = "A",
+    exchange: str = "",
+    board: str = "",
+    listing_date: str | None = None,
+    industry: str = "",
+    sw_level1_name: str = "",
+    sw_level2_name: str = "",
+    sw_level3_name: str = "",
+    source: str = "auto_ensure",
+) -> bool:
+    """记录不存在时为该股创建一行最小档案；已存在（含手工维护）时不做任何修改。
+
+    个股资料按需补全用：抓到主营/基础信息但库里还没有该股行时先建档，随后的
+    ``update_business_info`` 才能把内容写进去。只落可长期复用的稳定身份字段，
+    估值/概念等波动字段一律不落。
+    """
+    code = str(stock_code or "").strip().upper()
+    if not code:
+        return False
+    raw_code = code.split(".", 1)[0]
+    connection = _connection()
+    # 无写锁快路径：绝大多数请求记录已存在，避免在只读路径上开写事务。
+    existing = connection.execute(
+        "SELECT 1 FROM stock_basic_profiles WHERE stock_code = ? OR stock_code = ? OR stock_code LIKE ?",
+        (code, raw_code, f"{raw_code}.%"),
+    ).fetchone()
+    if existing is not None:
+        return False
+    resolved_exchange = (exchange or (code.split(".", 1)[1] if "." in code else "")).strip().upper()
+    resolved_board = board.strip() or _infer_a_share_board(raw_code, resolved_exchange)
+    with unit_of_work(connection=connection, immediate=True) as work:
+        # 事务内二次确认，避免并发下重复插入。
+        if work.connection.execute(
+            "SELECT 1 FROM stock_basic_profiles WHERE stock_code = ?", (code,)
+        ).fetchone() is not None:
+            return False
+        work.connection.execute(
+            """
+            INSERT INTO stock_basic_profiles(
+                market_group, exchange, board, stock_code, stock_name,
+                listing_date, industry, sw_level1_name, sw_level2_name, sw_level3_name,
+                source, is_manual_override
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            """,
+            (
+                market_group or "A", resolved_exchange, resolved_board, code,
+                stock_name.strip(), listing_date or None, industry.strip(),
+                sw_level1_name.strip(), sw_level2_name.strip(), sw_level3_name.strip(),
+                source or "auto_ensure",
+            ),
+        )
+    return True
+
+
 def upsert_record(
     record: StockBasicProfileInput,
     *,
