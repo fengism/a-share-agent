@@ -84,6 +84,30 @@ def _normalize_ohlc(
     return normalized_open, normalized_high, normalized_low
 
 
+def _widen_ohlc_bounds(
+    close: float,
+    open_price: float | None,
+    high: float | None,
+    low: float | None,
+) -> tuple[float | None, float | None, float | None]:
+    """只放宽已有的 high/low；上游缺失的字段保持 None，绝不编造数值。
+
+    与 ``_normalize_ohlc`` 的分工：后者会把缺失或非正的 high/low 填成 close，
+    适合必须产出一根完整 bar 的日线来源（停牌/低流动性也需要可用 K 线）；
+    这里服务于本身可能缺字段的实时快照——把缺失的 high 填成 close 等于把
+    「盘中未触及过其他价位」谎报成真实波动区间。
+
+    非法的 open（非正数）会被丢弃为 None：模型明确要求 open > 0，留着只会让
+    整条记录校验失败，而丢弃并不丢失任何真实价格信息。
+    """
+    normalized_open = open_price if open_price is not None and open_price > 0 else None
+    ceiling = max(close, normalized_open) if normalized_open is not None else close
+    floor = min(close, normalized_open) if normalized_open is not None else close
+    widened_high = ceiling if high is not None and high < ceiling else high
+    widened_low = floor if low is not None and low > floor else low
+    return normalized_open, widened_high, widened_low
+
+
 def normalize_cn_stocks(frame: pd.DataFrame, trade_date: date, source: str) -> list[MarketDailyBarRecord]:
     records: list[MarketDailyBarRecord] = []
     for _, row in frame.iterrows():
@@ -198,6 +222,7 @@ def normalize_indices(
         if close is None or close <= 0:
             continue
         change_amount, calculated_pct = _change(close, item.pre_close)
+        open_price, high, low = _widen_ohlc_bounds(close, item.open, item.high, item.low)
         records.append(MarketDailyBarRecord(
             market=market,
             instrument_type="index",
@@ -205,9 +230,9 @@ def normalize_indices(
             name=item.name,
             trade_date=trade_date,
             currency=currency,
-            open=item.open,
-            high=item.high,
-            low=item.low,
+            open=open_price,
+            high=high,
+            low=low,
             close=close,
             pre_close=item.pre_close,
             change_amount=change_amount,
@@ -377,6 +402,10 @@ async def fetch_cn_indices(trade_date: date) -> CollectedMarketDailyBars:
         if item is None or item.close <= 0:
             errors.append(f"{symbol}:missing")
             continue
+        # 与港股指数同源的风险：某些指数在收于当日最高/最低点时，上游会把 close
+        # 还原成精度更高的值而略微越过 high/low，直接构造记录会让整个 cn_index
+        # 分区反复重试。日线来源的 high/low 本身是必填浮点，故用 _normalize_ohlc。
+        open_price, high, low = _normalize_ohlc(item.close, item.open, item.high, item.low)
         records.append(MarketDailyBarRecord(
             market="cn",
             instrument_type="index",
@@ -384,9 +413,9 @@ async def fetch_cn_indices(trade_date: date) -> CollectedMarketDailyBars:
             name=name,
             trade_date=trade_date,
             currency="CNY",
-            open=item.open,
-            high=item.high,
-            low=item.low,
+            open=open_price,
+            high=high,
+            low=low,
             close=item.close,
             pre_close=item.pre_close,
             change_pct=item.change_pct,
@@ -434,6 +463,17 @@ async def fetch_hk_indices(trade_date: date, service: HKMarketService | None = N
         close = safe_float(row.get("close"))
         if close is None or close <= 0:
             continue
+        # 新浪港股指数日线的 close 是 float32 还原值（如 8051.67041），而
+        # open/high/low 是两位小数。当指数恰好收在当日最高或最低点时，float32
+        # 还原会略微越过 high/low，直接构造记录会被「high 不能低于 close/open」
+        # 校验拒绝，进而让整个 hk_index 分区反复重试。与其余三个采集器保持一致：
+        # 只放宽 high/low 去包住真实收盘价，绝不改写收盘价本身。
+        open_price, high, low = _normalize_ohlc(
+            close,
+            safe_float(row.get("open")),
+            safe_float(row.get("high")),
+            safe_float(row.get("low")),
+        )
         records.append(MarketDailyBarRecord(
             market="hk",
             instrument_type="index",
@@ -441,9 +481,9 @@ async def fetch_hk_indices(trade_date: date, service: HKMarketService | None = N
             name=symbol,
             trade_date=trade_date,
             currency="HKD",
-            open=safe_float(row.get("open")),
-            high=safe_float(row.get("high")),
-            low=safe_float(row.get("low")),
+            open=open_price,
+            high=high,
+            low=low,
             close=close,
             volume=safe_float(row.get("volume")),
             amount=safe_float(row.get("amount")),
