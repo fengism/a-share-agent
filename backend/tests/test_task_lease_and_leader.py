@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.infrastructure.persistence import init_db, task_lease_store
+from app.infrastructure.persistence import task_lease_store
 from app.infrastructure.persistence.connection import get_connection, reset_for_tests
 from app.infrastructure.persistence.task_leader import TaskLeaderLease
 
