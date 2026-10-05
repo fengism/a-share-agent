@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import math
+import time
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -33,6 +34,9 @@ SINA_ALGORITHM_VERSION = "sina-multiplicative-v1"
 LOCAL_ALGORITHM_VERSIONS = frozenset({ALGORITHM_VERSION, SINA_ALGORITHM_VERSION})
 FACTOR_REFRESH_TTL = timedelta(hours=24)
 FACTOR_FAILURE_RETRY_TTL = timedelta(minutes=5)
+# 读本地复权 K 线时，向 start_date 之前多取的自然日数，仅用于拿到"前一根"做
+# 前收/涨跌幅衔接；14 天足以跨过春节/国庆等最长连续休市。
+_ADJUSTMENT_ANCHOR_LOOKBACK_DAYS = 14
 _FACTOR_SOURCE = "tdxhub.gbbq.adjustment_factors"
 _SINA_FACTOR_SOURCE = "sina.qfq_hfq"
 _ACTION_SOURCE = "tdxhub.xdxr"
@@ -226,6 +230,32 @@ def _state_is_fresh(state: dict[str, object] | None, expected_count: int, now: d
     return now.astimezone(UTC) - checked_at.astimezone(UTC) < FACTOR_REFRESH_TTL
 
 
+_HEALTHY_CONFIRMATION_TTL_SECONDS = 5 * 60
+_HEALTHY_CACHE_MAXSIZE = 4096
+# code -> 到期单调时刻。命中即代表 DB 中因子覆盖完整且新鲜，可跳过 4 次点查。
+_healthy_cache: dict[str, float] = {}
+
+
+def _healthy_cache_get(code: str, now_monotonic: float) -> bool:
+    expires_at = _healthy_cache.get(code)
+    if expires_at is None:
+        return False
+    if expires_at <= now_monotonic:
+        _healthy_cache.pop(code, None)
+        return False
+    return True
+
+
+def _healthy_cache_set(code: str, now_monotonic: float) -> None:
+    if len(_healthy_cache) >= _HEALTHY_CACHE_MAXSIZE:
+        _healthy_cache.clear()
+    _healthy_cache[code] = now_monotonic + _HEALTHY_CONFIRMATION_TTL_SECONDS
+
+
+def _healthy_cache_clear(code: str) -> None:
+    _healthy_cache.pop(code, None)
+
+
 def _last_good_failure_is_cooling_down(
     state: dict[str, object] | None,
     now: datetime,
@@ -250,6 +280,10 @@ async def ensure_adjustment_factors(code: str, *, force: bool = False) -> bool:
     """确保 A 股本地交易日有可用复权系数；TDX 仿射优先，新浪乘法兜底。"""
     lock = await _lock_for(code)
     async with lock:
+        # 已确认健康则直接返回，跳过 3 次点查 + 1 次 DDL 检查；盘中高频读取的主要开销在此。
+        now_monotonic = time.monotonic()
+        if not force and _healthy_cache_get(code, now_monotonic):
+            return True
         await asyncio.to_thread(_repository.initialize)
         trading_dates = await asyncio.to_thread(_repository.list_stock_dates, code)
         if not trading_dates:
@@ -263,9 +297,12 @@ async def ensure_adjustment_factors(code: str, *, force: bool = False) -> bool:
             and factor_dates == trading_dates
         )
         if not force and last_good_complete and _state_is_fresh(state, len(trading_dates), now):
+            _healthy_cache_set(code, now_monotonic)
             return True
         if not force and last_good_complete and _last_good_failure_is_cooling_down(state, now):
+            _healthy_cache_set(code, now_monotonic)
             return True
+        _healthy_cache_clear(code)
         try:
             raw = await call_blocking(
                 get_provider("tdxhub").fetch_stock_xdxr,
@@ -454,6 +491,7 @@ async def refresh_adjustment_factors(code: str, *, force: bool = True) -> Market
 
 
 async def invalidate_adjustment_factors(code: str, market: str = "cn") -> MarketAdjustmentFactorStatus:
+    _healthy_cache_clear(code)
     await asyncio.to_thread(_repository.initialize)
     await asyncio.to_thread(_repository.invalidate_adjustment_factors, code, market=market)
     return await get_adjustment_factor_status(code, market=market)
@@ -555,15 +593,19 @@ async def load_local_adjusted_daily_kline(
         return None
     try:
         await asyncio.to_thread(_repository.initialize)
+        # 只读区间 + 之前一个自然日窗口作为锚点：复制 apply_adjustment 全量读取时
+        # 首根 bar 的前收衔接语义（依赖紧随其前的那一根），无需扫描全部历史。
+        read_start = max(date.min, start_date - timedelta(days=_ADJUSTMENT_ANCHOR_LOOKBACK_DAYS))
         bars = await asyncio.to_thread(
             _repository.list_bars,
             market=market,
             instrument_type="stock",
             code=code,
-            start_date=date.min,
+            start_date=read_start,
             end_date=end_date,
         )
-        if not bars:
+        # 区间内没有真实 bar 时不再取锚点，交由调用方回退上游（与全量读取一致）。
+        if not any(start_date <= bar.trade_date <= end_date for bar in bars):
             return None
         if market == "cn":
             if not await ensure_adjustment_factors(code):
@@ -571,7 +613,7 @@ async def load_local_adjusted_daily_kline(
         factors = await asyncio.to_thread(
             _repository.list_adjustment_factors,
             code,
-            date.min,
+            read_start,
             end_date,
             market=market,
         )

@@ -82,12 +82,17 @@ export function useKlineData(
   adjust = "qfq",
   enabled = true,
   dateRange?: { startDate: string; endDate?: string },
+  options: { liveRefresh?: boolean } = {},
 ) {
   const startDate = dateRange?.startDate || oneYearAgoDate();
   const endDate = dateRange?.endDate || "";
   // 空串会被 API 客户端当作"未传"丢弃，后端会套用默认 qfq，表现为选不复权仍显示前复权价；
   // 这里显式发 none，与港股接口约定一致。
   const adjustParam = adjust || "none";
+  const isTradingSession = useAStockTradingSession();
+  // 仅当显式要求（查看当前股票日线）、处于交易时段、且未限定历史区间时才轮询，
+  // 让进行中的当日 K 线随之刷新；回测/持仓等历史固定区间不轮询。
+  const livePolling = (options.liveRefresh ?? false) && isTradingSession && !endDate;
 
   return useQuery({
     queryKey: queryKeys.stock.kline(code, period, adjust, startDate, endDate),
@@ -97,7 +102,10 @@ export function useKlineData(
     }),
     select: asApiModel<KlineData>(),
     enabled: enabled && !!code,
-    staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
+    staleTime: livePolling
+      ? QUERY_CACHE_POLICIES.stockKline.staleMs
+      : QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
+    refetchInterval: livePolling ? QUERY_CACHE_POLICIES.stockKline.pollMs : false,
     // 向左扩充历史时保留上一批数据，避免图表闪空
     placeholderData: (previous) => previous,
   });

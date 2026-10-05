@@ -23,6 +23,9 @@ TRADING_WINDOW_END = time(15, 30)
 _FALLBACK_CALENDAR_SPAN_DAYS = 365 * 32
 _FALLBACK_CALENDAR_MAX_DATES = 8000
 STABLE_MARKET_DATA_CACHE_TTL_SECONDS = 24 * 60 * 60
+# 交易时段内的当日行情短缓存：既保持近实时（10 秒），又能合并同一秒/相邻秒的
+# 重复回源。single-flight 只能挡并发请求，挡不住秒级先后到达的重复调用。
+LIVE_MARKET_DATA_CACHE_TTL_SECONDS = 10
 _TRADING_CALENDAR_CACHE_KEY = "a_share_trading_dates"
 _TRADING_CALENDAR_SUCCESS_TTL_SECONDS = 24 * 60 * 60
 _TRADING_CALENDAR_FAILURE_TTL_SECONDS = 5 * 60
@@ -36,6 +39,9 @@ class MarketDataCachePolicy:
     read_cache: bool
     write_cache: bool
     ttl_seconds: int | None
+    # 是否处于交易时段的“当日进行中”状态。调用方可据此改用短 TTL 缓存：
+    # 需要近实时但又要合并重复回源的链路（K 线）依赖此标志。
+    is_live: bool = False
 
 
 @dataclass(frozen=True)
@@ -105,7 +111,12 @@ def build_market_data_cache_policy(
         and TRADING_WINDOW_START <= local_now.time().replace(tzinfo=None) <= TRADING_WINDOW_END
     )
     if is_live:
-        return MarketDataCachePolicy(read_cache=False, write_cache=False, ttl_seconds=None)
+        return MarketDataCachePolicy(
+            read_cache=False,
+            write_cache=False,
+            ttl_seconds=None,
+            is_live=True,
+        )
 
     next_open = _next_trading_open(local_now, effective_trading_dates)
     ttl_seconds = max(1, math.ceil((next_open - local_now).total_seconds()))

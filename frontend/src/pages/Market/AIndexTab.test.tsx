@@ -84,18 +84,18 @@ describe("AIndexTab", () => {
       </MemoryRouter>,
     );
 
-    expect(mocks.kline).toHaveBeenCalledWith("399001", "weekly", { startDate: expect.any(String) });
+    expect(mocks.kline).toHaveBeenCalledWith("399001", "weekly", { startDate: expect.any(String), liveRefresh: false });
     expect(mocks.intraday).toHaveBeenCalledWith("399001");
     expect(screen.getByText("指数分时图")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /深证成指/ })).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.click(screen.getByRole("button", { name: /上证指数/ }));
-    await waitFor(() => expect(mocks.kline).toHaveBeenCalledWith("000001", "weekly", { startDate: expect.any(String) }));
+    await waitFor(() => expect(mocks.kline).toHaveBeenCalledWith("000001", "weekly", { startDate: expect.any(String), liveRefresh: false }));
     await waitFor(() => expect(mocks.intraday).toHaveBeenCalledWith("000001"));
     expect(screen.getByTestId("location-search")).not.toHaveTextContent("index=");
 
     fireEvent.click(screen.getByText("月K"));
-    await waitFor(() => expect(mocks.kline).toHaveBeenCalledWith("000001", "monthly", { startDate: expect.any(String) }));
+    await waitFor(() => expect(mocks.kline).toHaveBeenCalledWith("000001", "monthly", { startDate: expect.any(String), liveRefresh: false }));
     expect(screen.getByTestId("location-search")).toHaveTextContent("period=monthly");
   });
 
@@ -118,7 +118,7 @@ describe("AIndexTab", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /上证指数/ })).toHaveAttribute("aria-pressed", "true"));
     expect(screen.getByRole("button", { name: /上证指数/ }).closest(".ant-col")).toHaveClass("ant-col-lg-6");
     expect(screen.getByTestId("location-search")).not.toHaveTextContent("index=");
-    expect(mocks.kline).toHaveBeenLastCalledWith("000001", "daily", { startDate: expect.any(String) });
+    expect(mocks.kline).toHaveBeenLastCalledWith("000001", "daily", { startDate: expect.any(String), liveRefresh: true });
   });
 
   it("defaults to one year of history and extends by one year per left-edge request up to ten years", async () => {

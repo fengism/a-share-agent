@@ -44,7 +44,8 @@ function KlinePanel({
   const setPeriod = onPeriodChange ?? setInternalPeriod;
   const [adjust, setAdjust] = useState("qfq");
   const startDate = useMemo(() => yearsAgoDate(historyYears), [historyYears]);
-  const query = useKlineData(code, period, adjust, true, { startDate });
+  // 日 K 在交易时段盘中轮询，让当日进行中的那根 K 线随行情更新；周/月/年不轮询。
+  const query = useKlineData(code, period, adjust, true, { startDate }, { liveRefresh: period === "daily" });
   const items = query.data?.items;
   const chanlun = useMemo(
     () => chanlunEnabled && items && items.length >= 10 ? analyzeChanlun(items) : null,

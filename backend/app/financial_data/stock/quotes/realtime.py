@@ -10,7 +10,12 @@ from typing import cast
 
 from app.configuration import get_settings
 from app.core.cache_policies import REALTIME_STOCK_QUOTES
-from app.core.concurrency.rate_limiter import call_blocking, tdx_semaphore, tencent_semaphore
+from app.core.concurrency.rate_limiter import (
+    call_blocking,
+    fuyao_semaphore,
+    tdx_semaphore,
+    tencent_semaphore,
+)
 from app.core.exceptions import UpstreamUnavailableError
 from app.core.market import normalize_code, safe_float
 from app.core.metrics import metrics
@@ -76,7 +81,7 @@ def _summarize_sources(codes: list[str], quote_sources: dict[str, str]) -> str:
 
 
 async def _fetch_realtime_quote_set_uncached(codes: list[str]) -> RealtimeQuoteSet:
-    """优先使用腾讯行情，并通过 TDX 补齐缺失代码。"""
+    """优先使用腾讯行情，再用 TDX 补齐缺失代码；主源全挂时回退 fuyao。"""
     if not codes:
         return RealtimeQuoteSet(source="tencent", quotes={}, quote_sources={})
     normalized_codes = list(dict.fromkeys(normalize_code(code).raw for code in codes))
@@ -100,6 +105,18 @@ async def _fetch_realtime_quote_set_uncached(codes: list[str]) -> RealtimeQuoteS
                 semaphore=tdx_semaphore,
             ),
             on_error="TDX 实时行情不可用",
+        ),
+        # 第三顺位兜底：同花顺 fuyao。主源全挂时避免直接抛错；未配置 API Key
+        # 会以 FuyaoNotConfiguredError 失败并继续抛出，行为与只有两源时一致。
+        ProviderAttempt(
+            label="fuyao",
+            loader=lambda: _load_quote_source(
+                "fuyao",
+                get_provider("fuyao").fetch_stock_quotes,
+                normalized_codes,
+                semaphore=fuyao_semaphore,
+            ),
+            on_error="fuyao 实时行情不可用",
         ),
     ]
     try:

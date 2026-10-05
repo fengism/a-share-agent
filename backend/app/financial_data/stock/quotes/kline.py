@@ -1,15 +1,17 @@
 """个股 K 线服务。"""
 
 import logging
-import re
 from datetime import date, timedelta
 
 from app.core.cache import cache_date, dated_cache_key_no_day, one_year_ago_date, series_cache
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import SymbolFormats, normalize_code
+from app.core.market import SymbolFormats, is_hk_code, normalize_code
 from app.domain.market import KlineData
 from app.financial_data.dates import clamp_kline_history_start_date, parse_market_date
-from app.financial_data.market.trading_session import resolve_market_data_cache_policy
+from app.financial_data.market.trading_session import (
+    LIVE_MARKET_DATA_CACHE_TTL_SECONDS,
+    resolve_market_data_cache_policy,
+)
 from app.financial_data.stock.quotes.historical import (
     HistoricalRequestLimiter,
     get_historical_bars,
@@ -18,7 +20,6 @@ from app.modules.market_daily.adjustment import load_local_adjusted_daily_kline
 from app.modules.market_daily.reader import load_local_daily_kline, merge_local_daily_kline
 from app.modules.market_daily.service import is_cn_trading_day
 
-_HK_CODE_PATTERN = re.compile(r"^(?:hk)?(\d{1,5})$", re.IGNORECASE)
 _kline_singleflight = AsyncSingleFlight[KlineData]()
 logger = logging.getLogger(__name__)
 
@@ -199,7 +200,7 @@ async def get_kline(
         KlineData 模型对象
     """
     raw_code = code.strip()
-    if _HK_CODE_PATTERN.fullmatch(raw_code):
+    if is_hk_code(raw_code):
         from app.financial_data.hk.service import hk_market_service, normalize_hk_code
 
         hk_code = normalize_hk_code(raw_code)
@@ -277,7 +278,15 @@ async def get_kline(
         cache_key_parts.append(f"providers-{max_provider_sources}")
     cache_key_parts.append("turnover-required" if require_turnover else "turnover-optional")
     cache_key = dated_cache_key_no_day(*cache_key_parts)
-    if policy.read_cache:
+    # 交易时段内单一 flight 只挡并发：把当日“进行中”的 K 线按短 TTL 缓存，
+    # 合并秒级先后到达的重复回源，同时保持近实时观感。更早的历史窗口已由
+    # 本地库覆盖，不会因短 TTL 而被反复重取。
+    write_ttl = (
+        LIVE_MARKET_DATA_CACHE_TTL_SECONDS
+        if policy.is_live
+        else policy.ttl_seconds if policy.write_cache else None
+    )
+    if policy.read_cache or policy.is_live:
         cached = series_cache.get(cache_key)
         if cached is not None:
             return merge_local_daily_kline(cached, local)
@@ -329,8 +338,8 @@ async def get_kline(
                 return local
             raise
         result = merge_local_daily_kline(result, local)
-        if policy.write_cache and policy.ttl_seconds is not None:
-            series_cache.set(cache_key, result, ttl=policy.ttl_seconds)
+        if write_ttl is not None:
+            series_cache.set(cache_key, result, ttl=write_ttl)
         return result
 
     return await _kline_singleflight.do(cache_key, load_and_cache)

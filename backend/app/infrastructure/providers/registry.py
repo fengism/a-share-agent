@@ -11,6 +11,7 @@ _PROVIDER_EXPORTS = {
     "eastmoney": ("app.infrastructure.providers.eastmoney", "eastmoney_provider"),
     "exchange": ("app.infrastructure.providers.exchange", "exchange_provider"),
     "fred": ("app.infrastructure.providers.fred", "fred_provider"),
+    "fuyao": ("app.infrastructure.providers.fuyao", "fuyao_provider"),
     "google_search": ("app.infrastructure.providers.web_search", "google_search_provider"),
     "iwencai": ("app.infrastructure.providers.iwencai", "iwencai_provider"),
     "kaipanhong": ("app.infrastructure.providers.kaipanhong", "kaipanhong_provider"),

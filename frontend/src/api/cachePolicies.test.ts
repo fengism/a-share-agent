@@ -36,6 +36,7 @@ describe("query cache policies", () => {
     expect(QUERY_CACHE_POLICIES.marketIndices).toEqual({ staleMs: 30_000, pollMs: 30_000 });
     expect(QUERY_CACHE_POLICIES.indexIntraday).toEqual({ staleMs: 30_000, pollMs: 30_000 });
     expect(QUERY_CACHE_POLICIES.stockIntraday).toEqual({ staleMs: 30_000, pollMs: 30_000 });
+    expect(QUERY_CACHE_POLICIES.stockKline).toEqual({ staleMs: 30_000, pollMs: 60_000 });
     expect(QUERY_CACHE_POLICIES.thsHotRank).toEqual({ staleMs: 300_000, pollMs: 300_000 });
   });
 

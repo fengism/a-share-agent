@@ -54,7 +54,7 @@ export default function AIndexTab() {
     isLoading: klineLoading,
     error: klineError,
     refetch: refetchKline,
-  } = useMarketIndexKline(activeSymbol, period, { startDate });
+  } = useMarketIndexKline(activeSymbol, period, { startDate, liveRefresh: period === "daily" });
 
   // 切换指数或周期时回到默认 1 年窗口
   useEffect(() => {

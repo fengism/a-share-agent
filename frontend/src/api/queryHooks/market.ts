@@ -186,10 +186,13 @@ export function useMarketIndexIntraday(symbol: string) {
 export function useMarketIndexKline(
   symbol: string,
   period = "daily",
-  options?: { startDate?: string; endDate?: string; enabled?: boolean },
+  options?: { startDate?: string; endDate?: string; enabled?: boolean; liveRefresh?: boolean },
 ) {
   const startDate = options?.startDate || oneYearAgoDate();
   const endDate = options?.endDate || "";
+  const isTradingSession = useAStockTradingSession();
+  // 与个股日 K 一致：仅当日线且处于交易时段时轮询进行中的当日指数 K 线。
+  const livePolling = (options?.liveRefresh ?? false) && isTradingSession && !endDate;
   return useQuery({
     queryKey: queryKeys.market.indexKline(symbol, period, startDate),
     queryFn: () => openApiGet("/api/market/index-kline", {
@@ -198,7 +201,10 @@ export function useMarketIndexKline(
     }),
     select: asApiModel<KlineData>(),
     enabled: options?.enabled !== undefined ? options.enabled && !!symbol : !!symbol,
-    staleTime: QUERY_CACHE_POLICIES.marketMinute.staleMs,
+    staleTime: livePolling
+      ? QUERY_CACHE_POLICIES.stockKline.staleMs
+      : QUERY_CACHE_POLICIES.marketMinute.staleMs,
+    refetchInterval: livePolling ? QUERY_CACHE_POLICIES.stockKline.pollMs : false,
     placeholderData: (previous) => previous,
   });
 }

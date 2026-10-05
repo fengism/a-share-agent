@@ -15,7 +15,10 @@ from app.financial_data.dates import clamp_kline_history_start_date as _clamp_st
 from app.financial_data.dates import parse_market_date
 from app.financial_data.kline_quality import validate_kline_frame
 from app.financial_data.market.quotes.normalization import filter_index_hist_range
-from app.financial_data.market.trading_session import resolve_market_data_cache_policy
+from app.financial_data.market.trading_session import (
+    LIVE_MARKET_DATA_CACHE_TTL_SECONDS,
+    resolve_market_data_cache_policy,
+)
 from app.financial_data.stock.quotes.historical import _resample_adjusted_daily_frame
 from app.financial_data.stock.quotes.kline import (
     _merge_upstream_parts,
@@ -402,7 +405,13 @@ async def get_index_kline(symbol: str, period: str = "daily", start_date: str = 
             "upstream-" + ",".join(f"{start.isoformat()}_{end.isoformat()}" for start, end in upstream_windows)
         )
     cache_key = dated_cache_key_no_day(*cache_key_parts)
-    if policy.read_cache:
+    # 与个股 K 线一致：交易时段内用短 TTL 替代“完全不缓存”，合并重复回源。
+    write_ttl = (
+        LIVE_MARKET_DATA_CACHE_TTL_SECONDS
+        if policy.is_live
+        else policy.ttl_seconds if policy.write_cache else None
+    )
+    if policy.read_cache or policy.is_live:
         cached = series_cache.get(cache_key)
         if cached is not None:
             return merge_local_daily_kline(cached, local)
@@ -430,8 +439,8 @@ async def get_index_kline(symbol: str, period: str = "daily", start_date: str = 
                 return local
             raise
         result = merge_local_daily_kline(result, local)
-        if policy.write_cache and policy.ttl_seconds is not None:
-            series_cache.set(cache_key, result, ttl=policy.ttl_seconds)
+        if write_ttl is not None:
+            series_cache.set(cache_key, result, ttl=write_ttl)
         return result
 
     return await _index_kline_singleflight.do(cache_key, load_and_cache)

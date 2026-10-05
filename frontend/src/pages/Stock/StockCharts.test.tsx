@@ -69,6 +69,7 @@ describe("stock K-line Chanlun switch", () => {
       "qfq",
       true,
       { startDate: dayjs().subtract(1, "year").format("YYYYMMDD") },
+      { liveRefresh: false },
     );
     expect(mocks.analyze).toHaveBeenLastCalledWith(weekly);
     const adjusted = [...weekly];
@@ -80,6 +81,7 @@ describe("stock K-line Chanlun switch", () => {
       "hfq",
       true,
       { startDate: dayjs().subtract(1, "year").format("YYYYMMDD") },
+      { liveRefresh: false },
     );
     expect(mocks.analyze).toHaveBeenLastCalledWith(adjusted);
     mocks.kline.mockReturnValue({ data: { items: bars }, isLoading: false, error: null });
@@ -90,6 +92,7 @@ describe("stock K-line Chanlun switch", () => {
       "hfq",
       true,
       { startDate: dayjs().subtract(1, "year").format("YYYYMMDD") },
+      { liveRefresh: false },
     );
     expect(mocks.analyze).toHaveBeenLastCalledWith(bars);
   });
@@ -129,13 +132,14 @@ describe("stock K-line Chanlun switch", () => {
     const rangeHint = () => screen.getByTestId("kline-history-range").textContent ?? "";
     expect(rangeHint()).toContain("近 1 年");
     expect(rangeHint()).toContain("最多 10 年");
-    // 默认窗口：一年前
+    // 默认窗口：一年前；日 K 开启盘中轮询
     expect(mocks.kline).toHaveBeenLastCalledWith(
       "600519",
       "daily",
       "qfq",
       true,
       { startDate: dayjs().subtract(1, "year").format("YYYYMMDD") },
+      { liveRefresh: true },
     );
 
     // 左缘触底逐年前扩，最多 10 年
@@ -149,6 +153,7 @@ describe("stock K-line Chanlun switch", () => {
       "qfq",
       true,
       { startDate: dayjs().subtract(10, "year").format("YYYYMMDD") },
+      { liveRefresh: true },
     );
     // 到达上限后不再挂载扩充按钮
     expect(screen.queryByTestId("kline-expand-history")).not.toBeInTheDocument();

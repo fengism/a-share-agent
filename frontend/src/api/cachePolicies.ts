@@ -25,6 +25,8 @@ export const QUERY_CACHE_POLICIES = {
   marketMainline: { staleMs: 60_000, activePollMs: 60_000, idlePollMs: 5 * 60_000 },
   indexIntraday: { staleMs: 30_000, pollMs: 30_000 },
   stockIntraday: { staleMs: 30_000, pollMs: 30_000 },
+  // 日 K 盘中轮询：仅在交易时段且查看当日日线时启用（见 useKlineData 的 liveRefresh）。
+  stockKline: { staleMs: 30_000, pollMs: 60_000 },
   thsHotRank: { staleMs: 5 * 60_000, pollMs: 5 * 60_000 },
   marketLimitHistory: { staleMs: 24 * 60 * 60_000 },
   marketSectorStocksHistory: { staleMs: 24 * 60 * 60_000 },

@@ -371,6 +371,7 @@ async def application_lifespan(
         from app.infrastructure.llm.runtime import close_async_runtime_pool
         from app.infrastructure.llm.sync_client import close_llm_client_pool
         from app.infrastructure.persistence.connection import close_connection
+        from app.modules.market_daily.repository import close_all_connections
 
         try:
             close_llm_client_pool()
@@ -379,6 +380,8 @@ async def application_lifespan(
             try:
                 close_session()
             finally:
+                # 关闭复用的市场日行情连接，避免退出时残留 WAL 句柄。
+                await blocking_runner(close_all_connections, semaphore=database_semaphore)
                 try:
                     await blocking_runner(close_connection, semaphore=database_semaphore)
                 finally:

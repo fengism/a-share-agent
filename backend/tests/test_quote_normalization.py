@@ -60,3 +60,30 @@ def test_rejects_negative_price() -> None:
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), "abc", ""])
 def test_rejects_non_numeric_price(bad: object) -> None:
     assert _has_usable_price({"price": bad, "last_close": None}) is False
+
+
+@pytest.mark.asyncio
+async def test_realtime_quote_chain_lists_fuyao_as_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """实时行情主链应包含 tencent→tdxhub→fuyao，fuyao 承接主源全挂的兜底。"""
+    import app.financial_data.stock.quotes.realtime as realtime
+
+    attempts: list[str] = []
+
+    class _RecordingChain:
+        def __init__(self, attempt_list, operation: str = "provider_chain"):
+            attempts.extend(attempt.label for attempt in attempt_list)
+
+        async def run(self):
+            # 主源返回完整行情，走 primary 短路分支，避免触发补齐子链。
+            return realtime.RealtimeQuoteSet(
+                source="tencent",
+                quotes={"600519": {"code": "600519", "price": 10.0, "last_close": 9.5}},
+                quote_sources={"600519": "tencent"},
+            )
+
+    monkeypatch.setattr(realtime, "BaseProviderChain", _RecordingChain)
+
+    result = await realtime._fetch_realtime_quote_set_uncached(["600519"])
+
+    assert attempts == ["tencent", "tdxhub", "fuyao"]
+    assert result.source == "tencent"

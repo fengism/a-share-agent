@@ -10,6 +10,7 @@ import base64
 import hashlib
 import json
 import sqlite3
+import threading
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -805,31 +806,95 @@ class StaleMarketDailyAttemptError(RuntimeError):
     """任务租约已被更新的 worker 取代。"""
 
 
+class _ConnectionScope:
+    """复用连接的单次操作作用域，保持 ``with sqlite3.connect()`` 的提交/回滚语义。
+
+    成功退出（无异常）提交；抛异常则回滚。方法内显式 ``BEGIN IMMEDIATE`` 的事务
+    其结束时 ``in_transaction`` 为假，这里的 commit/rollback 都是无害的空操作。
+    """
+
+    __slots__ = ("_connection",)
+
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+
+    def __enter__(self) -> sqlite3.Connection:
+        return self._connection
+
+    def __exit__(self, exc_type, exc, traceback) -> bool:
+        if exc_type is not None:
+            self._connection.rollback()
+        elif self._connection.in_transaction:
+            self._connection.commit()
+        return False
+
+
+# 线程本地连接：按 (线程, 库文件) 复用，避免每个方法都新建连接 + PRAGMA。
+# 逐方法新建连接 = 一次盘中 K 线读取开约 7 个连接。
+_local = threading.local()
+_close_lock = threading.Lock()
+_open_connections: list[sqlite3.Connection] = []
+_initialized_paths: set[str] = set()
+
+
+def close_all_connections() -> None:
+    """关闭所有复用的连接并清空初始化标记（进程退出或文件被替换后调用）。"""
+    with _close_lock:
+        connections = list(_open_connections)
+        _open_connections.clear()
+        _initialized_paths.clear()
+    for connection in connections:
+        try:
+            if connection.in_transaction:
+                connection.rollback()
+            connection.close()
+        except Exception:  # noqa: BLE001 - 关闭清理不应抛出
+            pass
+    _local.connections = {}
+
+
 class MarketDailyBarRepository:
-    """每次操作建立短连接，便于单文件搬迁、测试和多线程调用。"""
+    """复用线程本地连接；每次操作在连接上开一个作用域事务。"""
 
     def __init__(self, path: Path) -> None:
-        self.path = path
+        self.path = Path(path)
 
-    def _connect(self) -> sqlite3.Connection:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            self.path.parent.chmod(0o700)
-        except OSError:
-            pass
-        connection = sqlite3.connect(self.path, timeout=10)
-        connection.row_factory = sqlite3.Row
-        try:
-            self.path.chmod(0o600)
-        except OSError:
-            pass
-        connection.execute("PRAGMA journal_mode=WAL")
-        connection.execute("PRAGMA synchronous=NORMAL")
-        connection.execute("PRAGMA foreign_keys=ON")
-        connection.execute("PRAGMA busy_timeout=10000")
+    def _connection(self) -> sqlite3.Connection:
+        key = str(self.path)
+        connections = getattr(_local, "connections", None)
+        if connections is None:
+            connections = {}
+            _local.connections = connections
+        connection = connections.get(key)
+        if connection is None:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                self.path.parent.chmod(0o700)
+            except OSError:
+                pass
+            connection = sqlite3.connect(self.path, timeout=10, check_same_thread=False)
+            connection.row_factory = sqlite3.Row
+            try:
+                self.path.chmod(0o600)
+            except OSError:
+                pass
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("PRAGMA synchronous=NORMAL")
+            connection.execute("PRAGMA foreign_keys=ON")
+            connection.execute("PRAGMA busy_timeout=10000")
+            connections[key] = connection
+            with _close_lock:
+                _open_connections.append(connection)
         return connection
 
+    def _connect(self) -> _ConnectionScope:
+        return _ConnectionScope(self._connection())
+
     def initialize(self) -> None:
+        key = str(self.path)
+        with _close_lock:
+            if key in _initialized_paths:
+                return
         with self._connect() as connection:
             _execute_schema(connection)
             state_columns = _table_columns(connection, "market_adjustment_factor_state")
@@ -865,6 +930,8 @@ class MarketDailyBarRepository:
             _migrate_allow_hk_corporate_actions_and_factors(connection)
             _record_migration_ledger(connection, 1)
             connection.execute("PRAGMA user_version=1")
+        with _close_lock:
+            _initialized_paths.add(key)
 
     def claim_attempt(
         self,
