@@ -37,6 +37,15 @@ class IndustryRecordInput(BaseModel):
     def strip_text(cls, value: object) -> str:
         return "" if value is None else str(value).strip()
 
+    @field_validator("effective_date", mode="before")
+    @classmethod
+    def empty_effective_date_is_none(cls, value: object) -> object:
+        # 历史/种子数据把缺失的 effective_date 存成空串，直接交给 date 解析会抛
+        # ValidationError，导致整个 /stocks 列表 400。空串统一视为缺失。
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @model_validator(mode="after")
     def normalize_identity(self) -> "IndustryRecordInput":
         code, exchange, market = normalize_stock_identity(
