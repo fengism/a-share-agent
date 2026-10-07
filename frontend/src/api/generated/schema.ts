@@ -1089,6 +1089,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hk/stocks/{code}/valuation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Hk Stock Valuation
+         * @description 获取港股个股估值与市值指标（市盈率 TTM、市净率、总市值、流通市值等）。
+         */
+        get: operations["get_hk_stock_valuation_api_hk_stocks__code__valuation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/industry-chain/atlas/chains": {
         parameters: {
             query?: never;
@@ -6690,16 +6710,29 @@ export interface components {
             change_pct?: number | null;
             /** Code */
             code: string;
+            /**
+             * Currency
+             * @default HKD
+             */
+            currency: string;
             /** English Name */
             english_name?: string | null;
+            /** Float Market Cap */
+            float_market_cap?: number | null;
             /** High */
             high?: number | null;
             /** Low */
             low?: number | null;
+            /** Market Cap */
+            market_cap?: number | null;
             /** Name */
             name: string;
             /** Open */
             open?: number | null;
+            /** Pb */
+            pb?: number | null;
+            /** Pe Ttm */
+            pe_ttm?: number | null;
             /** Pre Close */
             pre_close?: number | null;
             /** Price */
@@ -6742,6 +6775,35 @@ export interface components {
         HKStockSearchResult: {
             /** Items */
             items: components["schemas"]["HKStockSearchItem"][];
+        };
+        /**
+         * HKStockValuation
+         * @description 港股个股估值与市值指标。
+         */
+        HKStockValuation: {
+            /** Circulating Shares */
+            circulating_shares?: number | null;
+            /** Code */
+            code: string;
+            /**
+             * Currency
+             * @default HKD
+             */
+            currency: string;
+            /** Float Market Cap */
+            float_market_cap?: number | null;
+            /** Market Cap */
+            market_cap?: number | null;
+            /** Name */
+            name?: string | null;
+            /** Pb */
+            pb?: number | null;
+            /** Pe Ttm */
+            pe_ttm?: number | null;
+            /** Ps Ttm */
+            ps_ttm?: number | null;
+            /** Total Shares */
+            total_shares?: number | null;
         };
         /** HealthMetricsResponse */
         HealthMetricsResponse: {
@@ -16390,6 +16452,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IntradayData"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_hk_stock_valuation_api_hk_stocks__code__valuation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HKStockValuation"];
                 };
             };
             /** @description 统一错误响应 */

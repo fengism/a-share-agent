@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 from datetime import datetime
 
 import pandas as pd
@@ -280,5 +281,77 @@ class TencentDataProvider:
         """
         normalized = normalize_code(code).raw
         return self.fetch_stock_quotes([normalized]).get(normalized, {})
+
+    def fetch_hk_stock_quotes(self, codes: Sequence[str]) -> dict[str, dict]:
+        """批量拉取腾讯港股实时行情与估值指标。
+
+        Param:
+            codes: 港股代码列表（如 ["00700", "09988"]）
+        Return:
+            code -> 港股行情指标字典（包含 code, name, price, pe_ttm, pb, mcap, float_mcap, total_shares, circulating_shares, currency 等）
+        """
+        clean_codes: list[str] = []
+        for c in codes:
+            raw = str(c or "").strip().lower()
+            if raw.startswith("hk"):
+                raw = raw[2:]
+            if raw.isdigit() and 1 <= len(raw) <= 5:
+                clean_codes.append(raw.zfill(5))
+        if not clean_codes:
+            return {}
+
+        symbols = [f"r_hk{code}" for code in dict.fromkeys(clean_codes)]
+        quotes: dict[str, dict] = {}
+        for start in range(0, len(symbols), 50):
+            batch = symbols[start : start + 50]
+            url = TENCENT_STOCK_QUOTE_URL + ",".join(batch)
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
+                ),
+            }
+            response = _get_session().get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            for line in response.text.split(";"):
+                if not line.strip() or '="' not in line:
+                    continue
+                raw_val = line.split('"', 2)[1]
+                vals = raw_val.split("~")
+                if len(vals) < 48:
+                    continue
+                code = str(vals[2]).strip().zfill(5)
+                quotes[code] = {
+                    "code": code,
+                    "name": vals[1],
+                    "price": _quote_number(vals[3]),
+                    "last_close": _quote_number(vals[4]),
+                    "open": _quote_number(vals[5]),
+                    "high": _quote_number(vals[33]),
+                    "low": _quote_number(vals[34]),
+                    "volume": _quote_number(vals[6]),
+                    "amount": _quote_number(vals[37], 1),
+                    "change_amt": _quote_number(vals[31]),
+                    "change_pct": _quote_number(vals[32]),
+                    "pe_ttm": _quote_number(vals[39]),
+                    "pb": _quote_number(vals[47]),
+                    "float_mcap": _quote_number(vals[44], 100000000),
+                    "mcap": _quote_number(vals[45], 100000000),
+                    "english_name": vals[46] if len(vals) > 46 and vals[46] else None,
+                    "total_shares": _quote_number(vals[69]) if len(vals) > 69 else None,
+                    "circulating_shares": _quote_number(vals[70]) if len(vals) > 70 else None,
+                    "currency": vals[75] if len(vals) > 75 and vals[75] else "HKD",
+                }
+        return quotes
+
+    def fetch_hk_stock_quote(self, code: str) -> dict:
+        """拉取单只港股的腾讯行情与估值指标。"""
+        digits = str(code or "").strip().lower()
+        if digits.startswith("hk"):
+            digits = digits[2:]
+        if not digits.isdigit() or not (1 <= len(digits) <= 5):
+            return {}
+        normalized = digits.zfill(5)
+        return self.fetch_hk_stock_quotes([normalized]).get(normalized, {})
 
 tencent_provider = TencentDataProvider()

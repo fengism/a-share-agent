@@ -44,6 +44,21 @@ async def _request_deadline(deadline: float | None):
         raise LLMGenerationTimeoutError("模型生成总时限已耗尽，请检查模型网关状态或缩小任务范围后重试") from error
 
 
+@asynccontextmanager
+async def _stream_read_guard(deadline: float | None, read_timeout: float):
+    """同时受全局 deadline 与单块读超时（read_timeout）双重保护，防止流挂起死等。"""
+    now = asyncio.get_running_loop().time()
+    effective_deadline = min(deadline, now + read_timeout) if deadline is not None else now + read_timeout
+    scope = asyncio.timeout_at(effective_deadline)
+    try:
+        async with scope:
+            yield
+    except TimeoutError as error:
+        if deadline is not None and now >= deadline:
+            raise LLMGenerationTimeoutError("模型生成总时限已耗尽，请检查模型网关状态或缩小任务范围后重试") from error
+        raise httpx.ReadTimeout(f"模型流式响应读取超时（超过 {read_timeout:.1f} 秒无响应）") from error
+
+
 class _AdaptiveConcurrencyLimiter:
     def __init__(self) -> None:
         self._active = 0
@@ -66,6 +81,15 @@ class _AdaptiveConcurrencyLimiter:
 
 logger = logging.getLogger(__name__)
 _STREAM_RETRY_BASE_SECONDS = 0.25
+_RATE_LIMIT_RETRY_BASE_SECONDS = 2.0
+
+
+def _compute_retry_delay(normalized: Exception, attempt: int) -> float:
+    """计算重试延迟：针对 429 限流使用更大的退避等待（2s, 4s...），其他临时错误沿用 0.25s。"""
+    is_rate_limit = getattr(normalized, "status_code", None) == 429 or "429" in str(normalized)
+    base = _RATE_LIMIT_RETRY_BASE_SECONDS if is_rate_limit else _STREAM_RETRY_BASE_SECONDS
+    return float(base * (2 ** (attempt - 1)))
+
 
 _llm_limiter = _AdaptiveConcurrencyLimiter()
 
@@ -119,7 +143,7 @@ async def create_chat_completion(
                         if normalized is error:
                             raise
                         raise normalized from error
-                    await asyncio.sleep(_STREAM_RETRY_BASE_SECONDS * 2 ** (attempt - 1))
+                    await asyncio.sleep(_compute_retry_delay(normalized, attempt))
         except asyncio.CancelledError:
             duration_ms = (time.perf_counter() - started_at) * 1000
             metrics.record_llm_prompt(
@@ -208,14 +232,15 @@ async def stream_chat_completion(
     async with _llm_limiter.slot(deadline=deadline):
         queue_wait_ms = (time.perf_counter() - started_at) * 1000
         for attempt in range(1, settings.llm_max_attempts + 1):
+            read_timeout = float(settings.llm_timeout_seconds)
             try:
-                async with _request_deadline(deadline):
+                async with _stream_read_guard(deadline, read_timeout):
                     stream = await client.chat.completions.create(**request_kwargs)
                 try:
                     iterator = aiter(stream)
                     while True:
                         try:
-                            async with _request_deadline(deadline):
+                            async with _stream_read_guard(deadline, read_timeout):
                                 chunk = await anext(iterator)
                         except StopAsyncIteration:
                             break
@@ -255,7 +280,7 @@ async def stream_chat_completion(
                     and attempt < settings.llm_max_attempts
                 )
                 if can_retry:
-                    delay = _STREAM_RETRY_BASE_SECONDS * (2 ** (attempt - 1))
+                    delay = _compute_retry_delay(normalized, attempt)
                     metrics.record_provider_attempt(
                         "llm_chat",
                         operation="stream",

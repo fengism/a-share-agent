@@ -419,3 +419,18 @@ def test_delete_analysis_rejects_invalid_code(tmp_path):
         mock_dir.assert_not_called()
 
     assert record.exists()
+
+
+def test_version_path_accepts_hk_codes():
+    """验证报告版本持久化路径放行 1-5 位港股代码与 6 位 A 股代码。"""
+    from app.modules.analysis.persistence.repository import _version_path
+
+    report_id = "a" * 32
+    for code in ("00001", "00700", "700", "600519", "000001"):
+        path = _version_path(1, code, "20261006", report_id)
+        assert path.name == f"{report_id}.json"
+        assert str(path).endswith(f"{code}/versions/20261006/{report_id}.json")
+
+    for invalid_code in ("1234567", "abc", "", "60051a"):
+        with pytest.raises(ValueError, match="报告版本标识无效"):
+            _version_path(1, invalid_code, "20261006", report_id)

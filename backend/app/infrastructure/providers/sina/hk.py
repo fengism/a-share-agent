@@ -66,6 +66,7 @@ _HK_STOCK_COLUMNS = {
     "amount": "成交额",
     "buy": "买一",
     "sell": "卖一",
+    "pe_ratio": "市盈率",
 }
 _HK_STOCK_OUTPUT_COLUMNS = list(dict.fromkeys(_HK_STOCK_COLUMNS.values()))
 _HK_STOCK_NUMERIC_COLUMNS = [
@@ -80,6 +81,7 @@ _HK_STOCK_NUMERIC_COLUMNS = [
     "成交额",
     "买一",
     "卖一",
+    "市盈率",
 ]
 
 
@@ -281,6 +283,7 @@ class SinaHKProvider:
                     "成交额": _to_float_or_none(fields[11]),
                     "买一": _to_float_or_none(fields[9]),
                     "卖一": _to_float_or_none(fields[10]),
+                    "市盈率": _to_float_or_none(fields[13]) if len(fields) > 13 else None,
                     "日期时间": f"{fields[17].replace('/', '-')} {fields[18]}",
                 })
         if not rows:

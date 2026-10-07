@@ -308,6 +308,32 @@ export default function HKMarketTab({
       render: (value: number | null) => <span className="financial-num" style={{ color: colors.textPrimary }}>{formatAmount(value)}</span>,
     },
     {
+      title: "市盈率",
+      dataIndex: "pe_ttm",
+      key: "pe_ttm",
+      align: "right" as const,
+      responsive: ["xl"],
+      sorter: (a, b) => (a.pe_ttm ?? 0) - (b.pe_ttm ?? 0),
+      render: (value: number | null) => (
+        <span className="financial-num" style={{ color: colors.textPrimary }}>
+          {value != null ? value.toFixed(2) : "-"}
+        </span>
+      ),
+    },
+    {
+      title: "总市值",
+      dataIndex: "market_cap",
+      key: "market_cap",
+      align: "right" as const,
+      responsive: ["lg"],
+      sorter: (a, b) => (a.market_cap ?? 0) - (b.market_cap ?? 0),
+      render: (value: number | null) => (
+        <span className="financial-num" style={{ color: colors.textPrimary }}>
+          {formatAmount(value)}
+        </span>
+      ),
+    },
+    {
       title: "操作",
       key: "actions",
       align: "center" as const,

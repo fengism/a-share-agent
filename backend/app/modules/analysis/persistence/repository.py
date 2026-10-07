@@ -112,7 +112,8 @@ def _ensure_history_index() -> None:
 
 
 def _version_path(user_id: int, code: str, date: str, report_id: str) -> Path:
-    if not re.fullmatch(r"[0-9]{6}", code) or not re.fullmatch(r"[0-9]{8}", date) or not re.fullmatch(r"[a-f0-9]{32,64}", report_id):
+    valid_code = bool(re.fullmatch(r"[0-9]{6}", code)) or is_hk_code(code)
+    if not valid_code or not re.fullmatch(r"[0-9]{8}", date) or not re.fullmatch(r"[a-f0-9]{32,64}", report_id):
         raise ValueError("报告版本标识无效")
     return _user_stock_dir(user_id, code) / "versions" / date / f"{report_id}.json"
 

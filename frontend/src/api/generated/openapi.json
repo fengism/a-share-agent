@@ -7036,6 +7036,11 @@
             "title": "Code",
             "type": "string"
           },
+          "currency": {
+            "default": "HKD",
+            "title": "Currency",
+            "type": "string"
+          },
           "english_name": {
             "anyOf": [
               {
@@ -7046,6 +7051,17 @@
               }
             ],
             "title": "English Name"
+          },
+          "float_market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Float Market Cap"
           },
           "high": {
             "anyOf": [
@@ -7069,6 +7085,17 @@
             ],
             "title": "Low"
           },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -7083,6 +7110,28 @@
               }
             ],
             "title": "Open"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "pe_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe Ttm"
           },
           "pre_close": {
             "anyOf": [
@@ -7240,6 +7289,113 @@
           "items"
         ],
         "title": "HKStockSearchResult",
+        "type": "object"
+      },
+      "HKStockValuation": {
+        "description": "港股个股估值与市值指标。",
+        "properties": {
+          "circulating_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Circulating Shares"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "currency": {
+            "default": "HKD",
+            "title": "Currency",
+            "type": "string"
+          },
+          "float_market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Float Market Cap"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "pe_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe Ttm"
+          },
+          "ps_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ps Ttm"
+          },
+          "total_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Shares"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "HKStockValuation",
         "type": "object"
       },
       "HealthMetricsResponse": {
@@ -29375,6 +29531,54 @@
           }
         ],
         "summary": "Get Hk Stock Intraday",
+        "tags": [
+          "hk"
+        ]
+      }
+    },
+    "/api/hk/stocks/{code}/valuation": {
+      "get": {
+        "description": "获取港股个股估值与市值指标（市盈率 TTM、市净率、总市值、流通市值等）。",
+        "operationId": "get_hk_stock_valuation_api_hk_stocks__code__valuation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HKStockValuation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Hk Stock Valuation",
         "tags": [
           "hk"
         ]

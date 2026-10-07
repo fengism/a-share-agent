@@ -23,6 +23,21 @@ const TOOL_LABELS: Record<string, string> = {
   python_interpreter: "隔离 Python 计算",
   read_pdf: "阅读 PDF 研报/公告",
   web_search: "网页搜索",
+  // 港股相关工具
+  get_hk_stock_profile: "港股基本面画像",
+  get_hk_stock_kline: "港股 K 线行情",
+  get_hk_stock_quote: "港股实时行情",
+  get_hk_financial_statements: "港股财务报表",
+  // 核心财务与投研数据工具
+  get_stock_profile: "公司画像与基本面",
+  get_financial_statements: "财务三大报表",
+  get_financial_metrics: "关键财务指标",
+  get_valuation_metrics: "估值模型分析",
+  get_industry_chain_analysis: "产业链图谱",
+  get_northbound_flow: "北向资金动向",
+  get_margin_trading_data: "融资融券数据",
+  get_macro_economic_data: "宏观经济数据",
+  browse_page: "网页内容查验",
 };
 
 export function toolDisplayName(name: string): string {

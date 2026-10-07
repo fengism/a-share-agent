@@ -195,6 +195,7 @@ ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
         EvidenceRequirement("risk", "风险与熊市线索", ("get_stock_risk_data",)),
         EvidenceRequirement("market", "市场环境", ("get_market_overview",)),
     ),
+    allow_incomplete_summary=True,
 )
 
 
@@ -263,6 +264,7 @@ HK_ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
             fatal=False,
         ),
     ),
+    allow_incomplete_summary=True,
 )
 
 

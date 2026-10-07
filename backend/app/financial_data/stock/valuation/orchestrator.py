@@ -5,7 +5,7 @@ from app.core.cache import dated_cache_key
 from app.core.cache_policies import VALUATION
 from app.core.concurrency.rate_limiter import akshare_semaphore, call_blocking
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import normalize_code, safe_float
+from app.core.market import is_hk_code, normalize_code, safe_float
 from app.financial_data.stock.profile.basic_info import get_basic_info
 from app.financial_data.stock.valuation.helpers import _get_akshare_provider
 from app.financial_data.stock.valuation.schemas import StockValuation, ValuationPeer
@@ -23,6 +23,25 @@ async def _load_valuation(code: str) -> StockValuation:
     Return:
         StockValuation 模型对象
     """
+    if is_hk_code(code):
+        from app.financial_data.hk.service import hk_market_service, normalize_hk_code
+
+        norm_code = normalize_hk_code(code)
+        cache_key = dated_cache_key("valuation", norm_code)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return StockValuation.model_validate(cached)
+        hk_val = await hk_market_service.get_stock_valuation(norm_code)
+        result = StockValuation(
+            code=norm_code,
+            pe_ttm=hk_val.pe_ttm,
+            pb=hk_val.pb,
+            ps_ttm=hk_val.ps_ttm,
+            peers=[],
+        )
+        cache.set(cache_key, result, ttl=VALUATION.ttl_seconds)
+        return result
+
     sym = normalize_code(code)
     cache_key = dated_cache_key("valuation", sym.raw)
     cached = cache.get(cache_key)
@@ -89,6 +108,16 @@ async def _load_valuation(code: str) -> StockValuation:
 
 async def get_valuation(code: str) -> StockValuation:
     """获取股票估值，并合并相同股票的并发缓存未命中请求。"""
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        norm_code = normalize_hk_code(code)
+        cache_key = dated_cache_key("valuation", norm_code)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return StockValuation.model_validate(cached)
+        return await _valuation_singleflight.do(cache_key, lambda: _load_valuation(norm_code))
+
     sym = normalize_code(code)
     cache_key = dated_cache_key("valuation", sym.raw)
     cached = cache.get(cache_key)

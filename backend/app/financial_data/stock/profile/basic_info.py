@@ -23,7 +23,7 @@ from app.core.concurrency.rate_limiter import (
     tencent_semaphore,
 )
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import SymbolFormats, is_a_share_code, normalize_code, safe_float, safe_string
+from app.core.market import SymbolFormats, is_a_share_code, is_hk_code, normalize_code, safe_float, safe_string
 from app.domain.stock import StockConcept, StockConceptInfo
 from app.financial_data.stock.profile.industry_normalization import normalize_exchange_industry
 from app.financial_data.stock.profile.merger import (
@@ -636,6 +636,36 @@ async def _persist_basic_profile_skeleton(sym: SymbolFormats, info: StockBasicIn
 
 async def get_basic_info(code: str) -> StockBasicInfo:
     """获取股票基本信息，融合东财、交易所、腾讯等多数据源。"""
+    if is_hk_code(code):
+        from app.financial_data.hk.service import hk_market_service, normalize_hk_code
+
+        norm_code = normalize_hk_code(code)
+        cache_key = dated_cache_key("stock_basic_info", norm_code)
+        cached = cache.get(cache_key)
+        if isinstance(cached, StockBasicInfo):
+            return cached
+
+        async def _load_hk_basic_info() -> StockBasicInfo:
+            val = await hk_market_service.get_stock_valuation(norm_code)
+            quotes = await hk_market_service.get_stock_quotes(codes=[norm_code])
+            quote = quotes.items[0] if quotes.items else None
+            price = quote.price if quote else None
+            info = StockBasicInfo(
+                code=norm_code,
+                name=val.name or (quote.name if quote else norm_code),
+                total_shares=val.total_shares,
+                circulating_shares=val.circulating_shares,
+                pe_ttm=val.pe_ttm,
+                pb=val.pb,
+                market_cap=val.market_cap,
+                float_market_cap=val.float_market_cap,
+                current_price=price,
+            )
+            cache.set(cache_key, info, ttl=BASIC_INFO_FINAL.ttl_seconds)
+            return info
+
+        return await _basic_info_singleflight.do(cache_key, _load_hk_basic_info)
+
     sym = normalize_code(code)
     cache_key = dated_cache_key("stock_basic_info", sym.raw)
     cached = cache.get(cache_key)

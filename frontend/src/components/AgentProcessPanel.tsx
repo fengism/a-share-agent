@@ -288,7 +288,7 @@ export default function AgentProcessPanel({
   ].filter(Boolean).join(" · ");
 
   return (
-    <section style={{ marginTop: "var(--c-space-5)", paddingTop: "var(--c-space-4)", borderTop: "1px solid var(--c-border)" }}>
+    <section className="agent-process-panel pdf-hide" style={{ marginTop: "var(--c-space-5)", paddingTop: "var(--c-space-4)", borderTop: "1px solid var(--c-border)" }}>
       <button
         type="button"
         aria-expanded={expanded}

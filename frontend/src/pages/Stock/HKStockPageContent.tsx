@@ -262,6 +262,22 @@ export default function HKStockPageContent({ code }: { code: string }) {
               <dd>{amplitude != null ? `${amplitude.toFixed(2)}%` : "-"}</dd>
             </div>
             <div className="stock-metric">
+              <dt>市盈率 (TTM)</dt>
+              <dd>{quote?.pe_ttm != null ? quote.pe_ttm.toFixed(2) : "-"}</dd>
+            </div>
+            <div className="stock-metric">
+              <dt>市净率</dt>
+              <dd>{quote?.pb != null ? quote.pb.toFixed(2) : "-"}</dd>
+            </div>
+            <div className="stock-metric">
+              <dt>总市值</dt>
+              <dd>{quote?.market_cap != null ? `${formatAmount(quote.market_cap)} 港元` : "-"}</dd>
+            </div>
+            <div className="stock-metric">
+              <dt>流通市值</dt>
+              <dd>{quote?.float_market_cap != null ? `${formatAmount(quote.float_market_cap)} 港元` : "-"}</dd>
+            </div>
+            <div className="stock-metric">
               <dt>成交额</dt>
               <dd>{formatAmount(quote?.amount)} 港元</dd>
             </div>

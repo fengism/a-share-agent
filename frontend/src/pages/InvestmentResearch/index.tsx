@@ -35,7 +35,7 @@ import { usePdfExport } from "../../hooks/usePdfExport";
 import FinancialDataSections from "../../features/investment-research/FinancialDataSections";
 import { useColors, useStyles, useTokens } from "../../styles/ui";
 import type { FundamentalExportData } from "../../types/stock";
-import { buildStockAnalysisUrl } from "../../utils/stockLinks";
+import { buildStockAnalysisUrl, isHkStockCode } from "../../utils/stockLinks";
 import "./investment-research.css";
 
 const { Paragraph, Text, Title } = Typography;
@@ -47,6 +47,7 @@ const buildResearchHistoryUrl = (code: string, date: string) => (
 export default function InvestmentResearch() {
   const queryClient = useQueryClient();
   const { code = "" } = useParams<{ code: string }>();
+  const isHk = isHkStockCode(code);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const dateState = parseAnalysisDate(searchParams.get("date"));
@@ -126,13 +127,14 @@ export default function InvestmentResearch() {
     pageMargin: 8,
     showPageNumbers: true,
     beforeCapture: async () => {
-      if (code) {
+      if (code && !isHk) {
         setFinancialExportData(await ensureFundamentalData(queryClient, code));
       }
     },
     isCaptureReady: () => {
       const root = reportRef.current;
       if (!root) return false;
+      if (isHk) return true;
       const financialPanel = root.querySelector<HTMLElement>("[data-pdf-financial-ready]");
       const revenueBreakdown = root.querySelector<HTMLElement>("[data-pdf-revenue-ready]");
       const keyFinancialMetrics = root.querySelector<HTMLElement>(
@@ -222,21 +224,23 @@ export default function InvestmentResearch() {
         >
           {code ? (
             <div className="investment-research-content">
-              {(isAnalyzing || analysisError || agentProcess.termination) && stages.length > 0 ? (
-                <AnalysisProgressSteps
-                  stages={stages}
-                  currentStageIndex={currentStageIndex}
-                  status={analysisError || agentProcess.termination === "failed" ? "error" : agentProcess.termination ?? "running"}
+              <div className="pdf-hide">
+                {(isAnalyzing || analysisError || agentProcess.termination) && stages.length > 0 ? (
+                  <AnalysisProgressSteps
+                    stages={stages}
+                    currentStageIndex={currentStageIndex}
+                    status={analysisError || agentProcess.termination === "failed" ? "error" : agentProcess.termination ?? "running"}
+                  />
+                ) : null}
+                <AgentProcessPanel
+                  plan={agentProcess.plan}
+                  status={agentProcess.status}
+                  toolCalls={agentProcess.toolCalls}
+                  rounds={agentProcess.rounds}
+                  termination={agentProcess.termination}
+                  isRunning={isAnalyzing}
                 />
-              ) : null}
-              <AgentProcessPanel
-                plan={agentProcess.plan}
-                status={agentProcess.status}
-                toolCalls={agentProcess.toolCalls}
-                rounds={agentProcess.rounds}
-                termination={agentProcess.termination}
-                isRunning={isAnalyzing}
-              />
+              </div>
               {analysisError && !isAnalyzing ? (
                 <Alert
                   type="error"
@@ -302,7 +306,7 @@ export default function InvestmentResearch() {
                       forceFullReport={isExporting}
                     />
                   </section>
-                  {isExporting ? (
+                  {isExporting && !isHk ? (
                     <section className="investment-research-report__financial" data-pdf-capture>
                       <Title level={3} data-pdf-group>营收构成与关键财务指标</Title>
                       <FinancialDataSections

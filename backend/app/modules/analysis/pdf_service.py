@@ -7,6 +7,7 @@ from datetime import date as calendar_date
 from datetime import datetime
 from typing import Any
 
+from app.core.market import is_hk_code
 from app.domain.market import KlineData, KlineItem
 from app.financial_data.stock.quotes.chip_schemas import ChipDistribution
 from app.infrastructure.pdf_runtime import render_pdf
@@ -71,6 +72,66 @@ ACTION_LABELS = {
     "insufficient_evidence": "待进一步核验",
 }
 
+_TOOL_NAME_MAP: dict[str, str] = {
+    # 港股相关数据源
+    "get_hk_stock_profile": "港股基本面画像与行业属性",
+    "get_hk_stock_kline": "港股历史行情与K线走势",
+    "get_hk_stock_quote": "港股实时行情与挂单",
+    "get_hk_financial_statements": "港股财务报表与经营指标",
+    # A股与通用投研数据源
+    "get_stock_profile": "公司基本面画像与主营业务",
+    "get_stock_info": "公司基础资料与主营业务",
+    "get_stock_kline": "历史行情走势与技术形态",
+    "get_stock_news": "公司公开新闻与重大动态",
+    "get_stock_documents": "权威公告与研报目录",
+    "get_stock_technical_indicators": "量化技术面与动量指标",
+    "get_stock_valuation_detail": "估值指标与历史分位",
+    "get_stock_risk_data": "质押减持与风险警示",
+    "get_stock_sentiment": "市场情绪与舆情指标",
+    "get_financial_statements": "企业三大财务报表数据",
+    "get_financial_metrics": "盈利质量与关键财务指标",
+    "get_valuation_metrics": "估值模型与分位数分析",
+    "get_industry_chain_analysis": "产业链图谱与上下游格局",
+    "get_northbound_flow": "北向资金与机构持股动向",
+    "get_margin_trading_data": "融资融券与杠杆交易数据",
+    "get_market_overview": "宏观全市场流动性与风格",
+    "get_macro_economic_data": "宏观经济数据与宏观政策",
+    "get_global_macro_rates": "全球无风险利率与外汇汇率",
+    "get_commodity_spot_prices": "大宗商品现货与期货价格",
+    "get_customs_trade_data": "全国海关进出口贸易数据",
+    "get_restricted_shares_lift": "限售股解禁日程与规模",
+    "get_interactive_qa": "交易所互动易投资者问答",
+    "public_industry_data": "行业公共宏观统计与运行指标",
+    # 公开资讯与研报检索
+    "web_search": "公开市场资讯与权威研报",
+    "web_fetch": "公开网页原文查验",
+    "fetch_urls": "多渠道资讯交叉核验",
+    "browse_page": "官方公告与信息页面查证",
+    "read_pdf": "深度研报与官方公告全文精读",
+    "iwencai_search": "自然语言选股与财务检索",
+    "iwencai_query": "结构化多维财务数据查询",
+    "python_interpreter": "量化与财务模型沙箱计算",
+    "analyze_financials": "杜邦分析与财务穿透核算",
+    "financial_calculator": "财务固定公式与模型测算",
+}
+
+_CACHE_STATUS_LABELS: dict[str, str] = {
+    "cached": "本地缓存",
+    "live": "实时采集",
+    "stale": "历史存档",
+    "mixed": "混合状态",
+    "unknown": "公开披露",
+}
+
+
+def _format_tool_name(tool_name: str) -> str:
+    """将内部工具名称转换为规范的投研数据维度名称。"""
+    if tool_name in _TOOL_NAME_MAP:
+        return _TOOL_NAME_MAP[tool_name]
+    clean = tool_name.removeprefix("get_").replace("_", " ").title()
+    return f"{clean} (公开数据)"
+
+
 
 def _esc(text: Any) -> str:
     """安全转义 HTML 字符串。"""
@@ -119,8 +180,8 @@ def _number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def _format_price(value: float) -> str:
-    return f"¥{value:,.2f}"
+def _format_price(value: float, currency: str = "¥") -> str:
+    return f"{currency}{value:,.2f}"
 
 
 def _format_percent(value: float, *, signed: bool = True) -> str:
@@ -239,7 +300,7 @@ def _line_path(
     return " ".join(parts)
 
 
-def _render_price_chart(result: AnalysisResult, kline_data: KlineData | None) -> str:
+def _render_price_chart(result: AnalysisResult, kline_data: KlineData | None, currency: str = "¥") -> str:
     bars = _valid_bars(kline_data, end_date=getattr(result, "analysis_date", None))
     if len(bars) < 2:
         return ""
@@ -288,7 +349,7 @@ def _render_price_chart(result: AnalysisResult, kline_data: KlineData | None) ->
             f'<line x1="{left}" x2="{width - right}" y1="{y:.2f}" y2="{y:.2f}" '
             f'stroke="{color}" stroke-width="1.2" stroke-dasharray="5 4"/>'
             f'<text x="{width - right - 3}" y="{y - 4:.2f}" text-anchor="end" fill="{color}" '
-            f'font-size="10" font-weight="700">{_esc(label)} {_esc(_format_price(value))}</text>'
+            f'font-size="10" font-weight="700">{_esc(label)} {_esc(_format_price(value, currency))}</text>'
         )
 
     close_path = _line_path(closes, x_for=x_for, y_for=y_for)
@@ -322,7 +383,7 @@ def _render_price_chart(result: AnalysisResult, kline_data: KlineData | None) ->
             f'<line x1="{width - right + 3}" x2="{width - right + 10}" y1="{actual_y:.2f}" '
             f'y2="{label_y:.2f}" stroke="{color}" stroke-width="0.8"/>'
             f'<text x="{width - right + 13}" y="{label_y + 3.5:.2f}" fill="{color}" '
-            f'font-size="9.5" font-weight="700">{_esc(label)} {_esc(_format_price(value))}</text>'
+            f'font-size="9.5" font-weight="700">{_esc(label)} {_esc(_format_price(value, currency))}</text>'
         )
 
     label_indices = sorted({round((len(bars) - 1) * ratio / 4) for ratio in range(5)})
@@ -480,7 +541,7 @@ def _price_range(value: Any) -> tuple[float, float] | None:
     return min(low, high), max(low, high)
 
 
-def _render_valuation_chart(result: AnalysisResult) -> str:
+def _render_valuation_chart(result: AnalysisResult, currency: str = "¥") -> str:
     current = _number(getattr(result, "current_price", None))
     technical = getattr(result, "technical", None)
     support = _number(getattr(technical, "support_level", None))
@@ -538,7 +599,7 @@ def _render_valuation_chart(result: AnalysisResult) -> str:
         parts.append(
             f'<line x1="{x:.2f}" x2="{x:.2f}" y1="26" y2="{height - 22}" stroke="#e2e8f0"/>'
             f'<text x="{x:.2f}" y="18" text-anchor="{anchor}" fill="#64748b" font-size="9.5">'
-            f'{_esc(_format_price(value))}</text>'
+            f'{_esc(_format_price(value, currency))}</text>'
         )
     for index, (label, value_range, color) in enumerate(rows):
         y = top + index * row_height
@@ -554,9 +615,9 @@ def _render_valuation_chart(result: AnalysisResult) -> str:
                 f'<rect x="{x1:.2f}" y="{y + 5}" width="{max(x2 - x1, 4):.2f}" height="14" rx="7" fill="{color}" opacity="0.86"/>'
             )
         range_text = (
-            _format_price(value_range[0])
+            _format_price(value_range[0], currency)
             if value_range[0] == value_range[1]
-            else f"{_format_price(value_range[0])} - {_format_price(value_range[1])}"
+            else f"{_format_price(value_range[0], currency)} - {_format_price(value_range[1], currency)}"
         )
         parts.append(
             f'<text x="{min(max(x2 + 6, left + 4), width - right):.2f}" y="{y + 31}" '
@@ -569,7 +630,7 @@ def _render_valuation_chart(result: AnalysisResult) -> str:
             f'stroke="#0f172a" stroke-width="1.5" stroke-dasharray="4 3"/>'
             f'<rect x="{current_x - 44:.2f}" y="1" width="88" height="20" rx="5" fill="#0f172a"/>'
             f'<text x="{current_x:.2f}" y="15" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="700">'
-            f"当前 {_esc(_format_price(current))}</text>"
+            f"当前 {_esc(_format_price(current, currency))}</text>"
         )
     svg = (
         f'<svg data-testid="analysis-valuation-chart" viewBox="0 0 {width} {height}" role="img" '
@@ -624,7 +685,7 @@ def _compress_histogram(chip_distribution: ChipDistribution, *, limit: int = 80)
     return compressed
 
 
-def _render_chip_chart(chip_distribution: ChipDistribution | None) -> str:
+def _render_chip_chart(chip_distribution: ChipDistribution | None, currency: str = "¥") -> str:
     if chip_distribution is None:
         return ""
     values = _compress_histogram(chip_distribution)
@@ -681,7 +742,7 @@ def _render_chip_chart(chip_distribution: ChipDistribution | None) -> str:
         parts.append(
             f'<line x1="{left}" x2="{width - right}" y1="{y:.2f}" y2="{y:.2f}" stroke="{color}" stroke-width="1.3" stroke-dasharray="5 3"/>'
             f'<text x="{width - right}" y="{y - 4:.2f}" text-anchor="end" fill="{color}" font-size="10" font-weight="700">'
-            f"{_esc(label)} {_esc(_format_price(number))}</text>"
+            f"{_esc(label)} {_esc(_format_price(number, currency))}</text>"
         )
     parts.append(
         f'<text x="{left}" y="{height - 9}" fill="#475569" font-size="10">获利筹码比例 '
@@ -724,6 +785,7 @@ def _render_chip_chart(chip_distribution: ChipDistribution | None) -> str:
 def _render_decision_dashboard(
     result: AnalysisResult,
     kline_data: KlineData | None,
+    currency: str = "¥",
 ) -> str:
     bars = _valid_bars(kline_data, end_date=getattr(result, "analysis_date", None))
     current = _number(getattr(result, "current_price", None))
@@ -732,7 +794,7 @@ def _render_decision_dashboard(
 
     metrics: list[tuple[str, str, str, str]] = []
     if current is not None:
-        metrics.append(("当前价", _format_price(current), "报告参考价格", "neutral"))
+        metrics.append(("当前价", _format_price(current, currency), "报告参考价格", "neutral"))
 
     if len(bars) >= 2:
         closes = [float(item.close) for item in bars]
@@ -785,7 +847,7 @@ def _render_decision_dashboard(
             (
                 "目标空间",
                 _format_percent(target_upside),
-                f"目标中值 {_format_price(target_midpoint)}",
+                f"目标中值 {_format_price(target_midpoint, currency)}",
                 "positive" if target_upside >= 0 else "negative",
             )
         )
@@ -794,7 +856,7 @@ def _render_decision_dashboard(
     support = _number(getattr(technical, "support_level", None))
     if current is not None and current > 0 and support is not None:
         stop_space = (support / current - 1) * 100
-        metrics.append(("止损空间", _format_percent(stop_space), f"参考位 {_format_price(support)}", "negative"))
+        metrics.append(("止损空间", _format_percent(stop_space), f"参考位 {_format_price(support, currency)}", "negative"))
 
     if not metrics:
         return ""
@@ -819,13 +881,14 @@ def _render_visual_analysis(
     result: AnalysisResult,
     kline_data: KlineData | None,
     chip_distribution: ChipDistribution | None,
+    currency: str = "¥",
 ) -> str:
-    dashboard = _render_decision_dashboard(result, kline_data)
+    dashboard = _render_decision_dashboard(result, kline_data, currency=currency)
     cards = [
-        _render_price_chart(result, kline_data),
+        _render_price_chart(result, kline_data, currency=currency),
         _render_volume_chart(kline_data, end_date=getattr(result, "analysis_date", None)),
-        _render_valuation_chart(result),
-        _render_chip_chart(chip_distribution),
+        _render_valuation_chart(result, currency=currency),
+        _render_chip_chart(chip_distribution, currency=currency),
     ]
     content = "".join(card for card in cards if card)
     if not content:
@@ -857,6 +920,10 @@ def generate_research_report_html(
 ) -> str:
     """生成完整展开 8 大投研维度、全量数据与结论的机构级 A4 研报 HTML。"""
     code = getattr(result, "stock_code", None) or getattr(result, "code", "")
+    is_hk = is_hk_code(code)
+    curr = "HK$" if is_hk else "¥"
+    default_industry = "港股上市公司" if is_hk else "A股上市公司"
+    platform_name = "港股智能投研体系" if is_hk else "A股智能投研体系"
     name = getattr(result, "stock_name", None) or getattr(result, "name", "") or (stock_info.get("name") if stock_info else "") or code
     analysis_date = getattr(result, "analysis_date", "") or "最新"
     raw_signal = getattr(result, "signal", "hold")
@@ -867,7 +934,7 @@ def generate_research_report_html(
     
     est_range = getattr(result, "estimated_price_range", None)
     if est_range and len(est_range) == 2:
-        target_range_str = f"¥{est_range[0]:.2f} - ¥{est_range[1]:.2f}"
+        target_range_str = f"{curr}{est_range[0]:.2f} - {curr}{est_range[1]:.2f}"
     else:
         target_range_str = str(getattr(result, "target_price_range", "--") or "--")
 
@@ -971,9 +1038,9 @@ def generate_research_report_html(
     sc = getattr(val_framework, "scenarios", None) if val_framework else getattr(result, "scenarios", None)
     sc_html = ""
     if sc and getattr(sc, "bull", None) and getattr(sc, "base", None) and getattr(sc, "bear", None):
-        bull_range = f"¥{sc.bull.fair_value_range[0]:.2f} - ¥{sc.bull.fair_value_range[1]:.2f}" if getattr(sc.bull, "fair_value_range", None) else "--"
-        base_range = f"¥{sc.base.fair_value_range[0]:.2f} - ¥{sc.base.fair_value_range[1]:.2f}" if getattr(sc.base, "fair_value_range", None) else "--"
-        bear_range = f"¥{sc.bear.fair_value_range[0]:.2f} - ¥{sc.bear.fair_value_range[1]:.2f}" if getattr(sc.bear, "fair_value_range", None) else "--"
+        bull_range = f"{curr}{sc.bull.fair_value_range[0]:.2f} - {curr}{sc.bull.fair_value_range[1]:.2f}" if getattr(sc.bull, "fair_value_range", None) else "--"
+        base_range = f"{curr}{sc.base.fair_value_range[0]:.2f} - {curr}{sc.base.fair_value_range[1]:.2f}" if getattr(sc.base, "fair_value_range", None) else "--"
+        bear_range = f"{curr}{sc.bear.fair_value_range[0]:.2f} - {curr}{sc.bear.fair_value_range[1]:.2f}" if getattr(sc.bear, "fair_value_range", None) else "--"
 
         sc_html = f"""
         <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:8px;">
@@ -1014,7 +1081,7 @@ def generate_research_report_html(
     act = getattr(rf, "actions", None) if rf else None
     new_inv_act = ACTION_LABELS.get(act.new_investor_action, act.new_investor_action) if act else "重点关注"
     holder_act = ACTION_LABELS.get(act.holder_action, act.holder_action) if act else "继续持有"
-    buy_range_str = f"¥{act.buy_or_add_range[0]:.2f} - ¥{act.buy_or_add_range[1]:.2f}" if act and act.buy_or_add_range and len(act.buy_or_add_range) == 2 else target_range_str
+    buy_range_str = f"{curr}{act.buy_or_add_range[0]:.2f} - {curr}{act.buy_or_add_range[1]:.2f}" if act and act.buy_or_add_range and len(act.buy_or_add_range) == 2 else target_range_str
 
     # ---------------- 08 数据缺口 ----------------
     data_gaps = getattr(rf, "data_gaps", []) if rf else []
@@ -1048,17 +1115,90 @@ def generate_research_report_html(
 
     provenance = getattr(result, "provenance", None)
     freshness_note = provenance.freshness_note if provenance else "旧报告未记录数据时效与缓存来源；分析日期不代表数据截至日期。"
-    freshness_rows = "".join(
-        f"<tr><td>{_esc(item.tool_name)}</td><td>{_esc('；'.join(item.data_dates) or '未披露')}</td>"
-        f"<td>{_esc('；'.join(item.report_periods) or '未披露')}</td><td>{_esc(item.cache_status)}</td><td>{_esc('；'.join(item.sources) or '未披露')}</td></tr>"
-        for item in (provenance.evidence if provenance else [])
-    )
-    freshness_html = f"""<div class="section-card"><h3>数据时效与报告版本</h3>
-        <p>报告版本：{_esc(getattr(result, 'report_id', None) or '旧报告未记录')}<br>
-        生成时间：{_esc(getattr(result, 'generated_at', None) or '未记录')}</p>
-        <p>{_esc(freshness_note)}</p><table><tr><th>证据工具</th><th>数据/来源日期</th><th>报告期</th><th>缓存状态</th><th>来源</th></tr>{freshness_rows}</table></div>"""
+
+    report_id_str = _esc(getattr(result, "report_id", None) or "未记录")
+    generated_at_str = _esc(getattr(result, "generated_at", None) or "未记录")
+    short_report_id = report_id_str[:16] if len(report_id_str) > 16 else report_id_str
+
+    freshness_html = f"""<div class="section-card" style="padding:7px 12px; margin-bottom:10px; background:#f8fafc; border:1px solid #e2e8f0; font-size:10.5px; color:#475569;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+            <div>
+                <strong>报告版本:</strong> {short_report_id} &nbsp;|&nbsp;
+                <strong>生成时间:</strong> {generated_at_str}
+            </div>
+            <div style="color:#64748b; font-size:10px;">
+                {_esc(freshness_note)}
+            </div>
+        </div>
+    </div>"""
+
+    # 聚合证据维度，消除重复工具调用与技术标识噪音
+    aggregated_evidence: dict[str, dict[str, Any]] = {}
+    if provenance and getattr(provenance, "evidence", None):
+        for item in provenance.evidence:
+            name = item.tool_name
+            if name not in aggregated_evidence:
+                aggregated_evidence[name] = {
+                    "tool_name": name,
+                    "data_dates": set(),
+                    "report_periods": set(),
+                    "cache_statuses": set(),
+                    "sources": set(),
+                }
+            entry = aggregated_evidence[name]
+            entry["data_dates"].update(item.data_dates)
+            entry["report_periods"].update(item.report_periods)
+            entry["cache_statuses"].add(item.cache_status)
+            entry["sources"].update(item.sources)
+
+    if aggregated_evidence:
+        def _format_status(statuses: set[str]) -> str:
+            if "live" in statuses and "cached" in statuses:
+                return "混合采集"
+            if "live" in statuses:
+                return "实时采集"
+            if "cached" in statuses:
+                return "本地缓存"
+            if len(statuses) == 1:
+                return _CACHE_STATUS_LABELS.get(next(iter(statuses)), "公开披露")
+            return "公开披露"
+
+        appendix_rows = "".join(
+            f"<tr><td><strong>{_esc(_format_tool_name(k))}</strong></td>"
+            f"<td>{_esc('；'.join(sorted(v['data_dates'])[-3:]) or '跟随最新交易日')}</td>"
+            f"<td>{_esc('；'.join(sorted(v['report_periods'])[-2:]) or '最新已披露期')}</td>"
+            f"<td>{_esc(_format_status(v['cache_statuses']))}</td>"
+            f"<td>{_esc('；'.join(sorted(v['sources'])[:2]) or '公开信息渠道')}</td></tr>"
+            for k, v in aggregated_evidence.items()
+        )
+        appendix_html = f"""
+        <div class="section-card section-card--splittable">
+            <div class="section-header">
+                <div class="section-title">附录 · 数据时效与信息来源审计 (Data Provenance & Audit)</div>
+            </div>
+            <p style="font-size:10.5px; color:#64748b; margin-top:0; margin-bottom:8px;">
+                本报告在自动化调研过程中查验了以下 {len(aggregated_evidence)} 类数据维度，全部数据依据上市公司公开披露信息、交易所规范行情及专业研报综合归纳：
+            </p>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:26%;">数据考察维度</th>
+                        <th style="width:22%;">数据/来源日期</th>
+                        <th style="width:14%;">报告期</th>
+                        <th style="width:13%;">采集时效</th>
+                        <th style="width:25%;">主要信息渠道</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {appendix_rows}
+                </tbody>
+            </table>
+        </div>
+        """
+    else:
+        appendix_html = ""
     overall_summary_text = getattr(result, "overall_summary", "") or getattr(result, "summary", "")
-    visual_analysis_html = _render_visual_analysis(result, kline_data, chip_distribution)
+    visual_analysis_html = _render_visual_analysis(result, kline_data, chip_distribution, currency=curr)
 
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -1275,6 +1415,27 @@ def generate_research_report_html(
             break-inside: avoid;
             page-break-inside: avoid;
         }}
+        table.data-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+            font-size: 10px;
+        }}
+        table.data-table th, table.data-table td {{
+            border: 1px solid #e2e8f0;
+            padding: 5px 8px;
+            text-align: left;
+            line-height: 1.4;
+        }}
+        table.data-table th {{
+            background: #f1f5f9;
+            color: #475569;
+            font-weight: 700;
+            font-size: 10px;
+        }}
+        table.data-table tr:nth-child(even) td {{
+            background: #fafcfd;
+        }}
         .disclaimer-box {{
             background: #f1f5f9;
             border: 1px solid #cbd5e1;
@@ -1295,9 +1456,9 @@ def generate_research_report_html(
         <div>
             <h1 class="hero-title">{_esc(name)} ({_esc(code)}) · 深度价值投资研报</h1>
             <div class="hero-meta">
-                所属行业：{_esc(industry_text or 'A股上市公司')} &nbsp;|&nbsp; 
+                所属行业：{_esc(industry_text or default_industry)} &nbsp;|&nbsp; 
                 研究基准日：{_esc(analysis_date)} &nbsp;|&nbsp; 
-                最新参考价：{f'¥{current_price:.2f}' if current_price is not None else '--'} &nbsp;|&nbsp;
+                最新参考价：{f'{curr}{current_price:.2f}' if current_price is not None else '--'} &nbsp;|&nbsp;
                 系统置信度：{confidence}%
             </div>
         </div>
@@ -1488,10 +1649,13 @@ def generate_research_report_html(
     <!-- 09 数据缺口与待核验 -->
     {data_gaps_html}
 
+    <!-- 附录：数据时效与信息来源审计 -->
+    {appendix_html}
+
     <!-- 研报合规免责声明 -->
     <div class="disclaimer-box">
         <strong>【研究声明与免责提示】</strong><br>
-        1. 本报告由 A股智能投研体系（AI Agentic Financial Platform）基于上市公司公开披露信息、市场公开行情及算法模型自动生成，旨在辅助投资者进行客观框架化研究，不构成任何形式的直接投资建议或保本承诺。<br>
+        1. 本报告由 {_esc(platform_name)}（AI Agentic Financial Platform）基于上市公司公开披露信息、市场公开行情及算法模型自动生成，旨在辅助投资者进行客观框架化研究，不构成任何形式的直接投资建议或保本承诺。<br>
         2. 证券市场有风险，投资决策需建立在独立判断之上。过往数据与模型情景推演不代表未来真实收益。
     </div>
 
@@ -1500,10 +1664,11 @@ def generate_research_report_html(
 """
 
 
-async def render_pdf_bytes_from_html(html_content: str) -> bytes:
+async def render_pdf_bytes_from_html(html_content: str, *, is_hk: bool = False) -> bytes:
     """通过共享的有界 Chromium 队列渲染报告，保留既有页眉页脚和 A4 布局。"""
+    platform_name = "港股智能投研体系" if is_hk else "A股智能投研体系"
     return await render_pdf(
         html_content,
-        header_template='<div style="font-size:8px; width:100%; text-align:right; color:#94a3b8; padding-right:14mm; font-family:sans-serif;">A股智能投研体系 · 深度个股研究报告</div>',
+        header_template=f'<div style="font-size:8px; width:100%; text-align:right; color:#94a3b8; padding-right:14mm; font-family:sans-serif;">{platform_name} · 深度个股研究报告</div>',
         footer_template='<div style="font-size:8px; width:100%; display:flex; justify-content:space-between; color:#94a3b8; padding:0 14mm; font-family:sans-serif;"><span>内部研究参考 · 不构成投资建议</span><span>第 <span class="pageNumber"></span> 页 / 共 <span class="totalPages"></span> 页</span></div>',
     )

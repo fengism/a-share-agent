@@ -3,7 +3,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 
 from app.domain.market import KlineData, MarketIndices
-from app.financial_data.hk.schemas import HKStockQuotePage, HKStockSearchResult
+from app.financial_data.hk.schemas import (
+    HKStockQuotePage,
+    HKStockSearchResult,
+    HKStockValuation,
+)
 from app.financial_data.hk.service import hk_market_service
 from app.financial_data.stock.public import get_technical_indicators as get_technical_indicators_service
 from app.financial_data.stock.quotes.indicators import TechnicalIndicators
@@ -77,6 +81,12 @@ async def get_hk_stock_indicators(
     return await get_technical_indicators_service(
         code, period=period, start_date=start_date, end_date=end_date
     )
+
+
+@router.get("/stocks/{code}/valuation", response_model=HKStockValuation)
+async def get_hk_stock_valuation(code: str):
+    """获取港股个股估值与市值指标（市盈率 TTM、市净率、总市值、流通市值等）。"""
+    return await hk_market_service.get_stock_valuation(code)
 
 
 @router.get("/indices/realtime", response_model=MarketIndices)

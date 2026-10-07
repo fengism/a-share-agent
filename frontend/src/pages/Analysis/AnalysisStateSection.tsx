@@ -24,7 +24,7 @@ export default memo(function AnalysisStateSection({
   const t = useTokens();
 
   return (
-    <>
+    <div className="pdf-hide">
       {(isAnalyzing || error || agentProcess.termination) && stages.length > 0 && (
         <AnalysisProgressSteps
           stages={stages}
@@ -49,6 +49,6 @@ export default memo(function AnalysisStateSection({
           style={{ marginBottom: t.space[4], borderRadius: t.radius.md }}
         />
       )}
-    </>
+    </div>
   );
 });

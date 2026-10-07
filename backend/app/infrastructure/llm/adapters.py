@@ -27,6 +27,10 @@ class LLMRetryableError(RuntimeError):
 class LLMUpstreamResponseError(LLMRetryableError):
     """The provider returned an empty or non-JSON HTTP response."""
 
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
 
 class LLMInvalidResponseError(RuntimeError):
     """The provider returned a non-retryable, incompatible completion response."""
@@ -59,7 +63,7 @@ def normalize_retryable_llm_error(error: Exception) -> Exception:
         status_code = getattr(response, "status_code", None)
     message = str(error).strip().lower()
     if status_code in {408, 409, 429} or (isinstance(status_code, int) and status_code >= 500):
-        return LLMUpstreamResponseError("LLM 上游暂时不可用")
+        return LLMUpstreamResponseError("LLM 上游暂时不可用", status_code=status_code)
     if isinstance(status_code, int):
         return error  # Never classify a 400/401/403 by matching its response body.
     if any(marker in message for marker in _TRANSIENT_LLM_ERROR_MARKERS):

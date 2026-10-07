@@ -14,7 +14,7 @@ from app.api.errors import NotFoundError
 from app.api.routes import analysis_execution
 from app.api.schemas import DeleteResponse
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
-from app.core.market import market_today
+from app.core.market import is_hk_code, market_today
 from app.domain.identity import AuthenticatedUser
 from app.domain.market import KlineData
 from app.financial_data.stock.profile.basic_info import get_basic_info
@@ -130,7 +130,7 @@ async def export_custom_analysis_pdf(
         kline_data=kline_data,
         chip_distribution=chip_distribution,
     )
-    pdf_bytes = await render_pdf_bytes_from_html(html_content)
+    pdf_bytes = await render_pdf_bytes_from_html(html_content, is_hk=is_hk_code(code))
 
     stock_name = getattr(result, "stock_name", None) or getattr(result, "name", "") or code
     report_date = getattr(result, "analysis_date", "") or "最新"
@@ -182,7 +182,7 @@ async def export_analysis_pdf(
         kline_data=kline_data,
         chip_distribution=chip_distribution,
     )
-    pdf_bytes = await render_pdf_bytes_from_html(html_content)
+    pdf_bytes = await render_pdf_bytes_from_html(html_content, is_hk=is_hk_code(code))
 
     stock_name = getattr(result, "stock_name", None) or getattr(result, "name", "") or code
     report_date = getattr(result, "analysis_date", "") or "最新"

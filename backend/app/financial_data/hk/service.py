@@ -18,6 +18,7 @@ from app.financial_data.hk.schemas import (
     HKStockQuotePage,
     HKStockSearchItem,
     HKStockSearchResult,
+    HKStockValuation,
 )
 from app.financial_data.hk.search_index import HKStockSearchIndex, hk_stock_search_index
 from app.infrastructure.providers.provider_gateway import provider_gateway
@@ -282,6 +283,7 @@ class HKMarketService:
                 continue
             if keyword and keyword not in code.lower() and keyword not in name.lower() and keyword not in (english_name or "").lower():
                 continue
+            pe_val = safe_float(row.get("市盈率"))
             items.append(HKStockQuote(
                 code=code,
                 name=name,
@@ -299,6 +301,8 @@ class HKMarketService:
                 bid=safe_float(row.get("买一")),
                 ask=safe_float(row.get("卖一")),
                 updated_at=_first_text(row, "日期时间", "时间"),
+                pe_ttm=pe_val,
+                currency="HKD",
             ))
         if upstream_total is None:
             total = len(items)
@@ -307,6 +311,7 @@ class HKMarketService:
         else:
             total = upstream_total
             page_items = items
+        await self._enrich_quotes_with_metrics(page_items)
         updated_at = next((item.updated_at for item in page_items if item.updated_at), None)
         return HKStockQuotePage(
             items=page_items,
@@ -316,6 +321,93 @@ class HKMarketService:
             source="sina",
             updated_at=updated_at,
         )
+
+    async def _fetch_tencent_metrics(self, codes: Sequence[str]) -> dict[str, dict]:
+        """批量获取腾讯港股估值、市值和股本指标。"""
+        if not codes:
+            return {}
+        try:
+            tencent_prov = get_provider("tencent")
+            fetch_func = getattr(tencent_prov, "fetch_hk_stock_quotes", None)
+            if not callable(fetch_func):
+                return {}
+            return await provider_gateway.call_blocking(
+                "tencent",
+                "fetch_hk_stock_quotes",
+                fetch_func,
+                list(codes),
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).debug("获取腾讯港股指标失败: %s", exc)
+            return {}
+
+    async def _enrich_quotes_with_metrics(self, quotes: list[HKStockQuote]) -> None:
+        """为港股行情补充腾讯估值、市值和股本指标。"""
+        if not quotes:
+            return
+        metrics = await self._fetch_tencent_metrics([q.code for q in quotes])
+        for q in quotes:
+            m = metrics.get(q.code)
+            if not m:
+                continue
+            if m.get("pe_ttm") is not None:
+                q.pe_ttm = m["pe_ttm"]
+            if m.get("pb") is not None:
+                q.pb = m["pb"]
+            if m.get("mcap") is not None:
+                q.market_cap = m["mcap"]
+            if m.get("float_mcap") is not None:
+                q.float_market_cap = m["float_mcap"]
+            if m.get("currency"):
+                q.currency = m["currency"]
+            if not q.english_name and m.get("english_name"):
+                q.english_name = m["english_name"]
+
+    async def get_stock_valuation(self, code: str) -> HKStockValuation:
+        """获取港股个股估值指标（市盈率 TTM、市净率、总市值、流通市值等）。"""
+        normalized = normalize_hk_code(code)
+        key = f"hk:stock:valuation:{normalized}"
+        if self._cache_enabled:
+            cached = market_cache.get(key)
+            if isinstance(cached, HKStockValuation):
+                return cached
+
+        metrics = await self._fetch_tencent_metrics([normalized])
+        item = metrics.get(normalized)
+        if item:
+            val = HKStockValuation(
+                code=normalized,
+                name=item.get("name"),
+                pe_ttm=item.get("pe_ttm"),
+                pb=item.get("pb"),
+                ps_ttm=None,
+                market_cap=item.get("mcap"),
+                float_market_cap=item.get("float_mcap"),
+                total_shares=item.get("total_shares"),
+                circulating_shares=item.get("circulating_shares"),
+                currency=item.get("currency", "HKD"),
+            )
+            if self._cache_enabled:
+                market_cache.set(key, val, ttl=60)
+            return val
+
+        # 腾讯缺失时的兜底：从实时行情中回退
+        page = await self.get_stock_quotes(codes=[normalized])
+        quote = page.items[0] if page.items else None
+        val = HKStockValuation(
+            code=normalized,
+            name=quote.name if quote else None,
+            pe_ttm=quote.pe_ttm if quote else None,
+            pb=quote.pb if quote else None,
+            ps_ttm=None,
+            market_cap=quote.market_cap if quote else None,
+            float_market_cap=quote.float_market_cap if quote else None,
+            currency=quote.currency if quote and quote.currency else "HKD",
+        )
+        if self._cache_enabled:
+            market_cache.set(key, val, ttl=60)
+        return val
 
     async def get_stock_history(
         self,

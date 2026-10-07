@@ -12,6 +12,7 @@ export type HKStockSearchResult = OpenApiResponse<"/api/hk/stocks/search", "get"
 export type HKStockSearchItem = HKStockSearchResult["items"][number];
 export type HKIndices = OpenApiResponse<"/api/hk/indices/realtime", "get">;
 export type HKKlineData = OpenApiResponse<"/api/hk/indices/{symbol}/history", "get">;
+export type HKStockValuation = OpenApiResponse<"/api/hk/stocks/{code}/valuation", "get">;
 
 export function useHKIndices() {
   const isTradingSession = useHKStockTradingSession();
@@ -94,5 +95,16 @@ export function useHKStockQuote(code: string) {
     },
     enabled: Boolean(code),
     refetchInterval: isTradingSession && isVisible ? 30_000 : false,
+  });
+}
+
+export function useHKStockValuation(code: string) {
+  return useQuery({
+    queryKey: queryKeys.hk.stockValuation(code),
+    queryFn: () => openApiGet("/api/hk/stocks/{code}/valuation", {
+      path: { code },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    enabled: Boolean(code),
   });
 }

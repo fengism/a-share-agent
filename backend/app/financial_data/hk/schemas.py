@@ -20,6 +20,26 @@ class HKStockQuote(BaseModel):
     bid: float | None = None
     ask: float | None = None
     updated_at: str | None = None
+    pe_ttm: float | None = None
+    market_cap: float | None = None
+    float_market_cap: float | None = None
+    pb: float | None = None
+    currency: str = "HKD"
+
+
+class HKStockValuation(BaseModel):
+    """港股个股估值与市值指标。"""
+
+    code: str
+    name: str | None = None
+    pe_ttm: float | None = None
+    pb: float | None = None
+    ps_ttm: float | None = None
+    market_cap: float | None = None
+    float_market_cap: float | None = None
+    total_shares: float | None = None
+    circulating_shares: float | None = None
+    currency: str = "HKD"
 
 
 class HKStockQuotePage(BaseModel):
