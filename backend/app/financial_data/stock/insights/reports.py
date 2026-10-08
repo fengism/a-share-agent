@@ -7,7 +7,7 @@ from app.core.cache import dated_cache_key
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import sina_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import market_today, normalize_code
+from app.core.market import is_hk_code, market_today, normalize_code
 from app.financial_data.stock.insights.schemas import StockReportItem, StockReportPage
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
@@ -32,11 +32,21 @@ async def get_stock_reports(code: str, months: int = DEFAULT_REPORT_MONTHS) -> S
     """获取个股最近 N 个月的研报评级列表（按日期降序）。
 
     Param:
-        code: 6 位股票代码
+        code: 6 位股票代码或 5 位港股代码
         months: 回溯月数（1-24），默认 6 个月
     Return:
         StockReportPage，含过滤后的研报条目与总数
     """
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        return StockReportPage(
+            code=normalize_hk_code(code),
+            months=months,
+            total_count=0,
+            items=[],
+        )
+
     sym = normalize_code(code)
     months = min(max(1, months), REPORT_MAX_MONTHS)
     cache_key = dated_cache_key("stock_reports", sym.raw, months)

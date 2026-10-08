@@ -207,6 +207,8 @@ async def _fetch_cached_tencent_concepts(code: str) -> StockConceptInfo | None:
 
 async def get_stock_concepts(code: str) -> list[StockConcept]:
     """获取单只股票的概念列表，优先从本地概念库获取，未配置则回退到腾讯接口。"""
+    if is_hk_code(code):
+        return []
     sym = normalize_code(code)
     try:
         from app.modules.stock_concept.repository import get_record as get_concept_record
@@ -226,8 +228,15 @@ async def get_stock_concept_map(codes: list[str]) -> dict[str, list[StockConcept
     """批量获取股票概念，单只失败不影响其余股票。优先使用本地数据库。"""
     normalized_codes: list[str] = []
     seen: set[str] = set()
+    hk_codes: list[str] = []
     for code in codes:
-        normalized = normalize_code(code).raw
+        if is_hk_code(code):
+            hk_codes.append(code)
+            continue
+        try:
+            normalized = normalize_code(code).raw
+        except ValueError:
+            continue
         if normalized not in seen:
             seen.add(normalized)
             normalized_codes.append(normalized)
@@ -260,6 +269,8 @@ async def get_stock_concept_map(codes: list[str]) -> dict[str, list[StockConcept
                 concept_map[code] = []
             else:
                 concept_map[code] = list(result.concepts)
+    for hk_code in hk_codes:
+        concept_map[hk_code] = []
     return concept_map
 
 

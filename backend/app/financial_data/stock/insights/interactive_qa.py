@@ -7,7 +7,7 @@ from typing import Any
 
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import akshare_semaphore
-from app.core.market import normalize_code
+from app.core.market import is_hk_code, normalize_code
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
@@ -18,6 +18,19 @@ _CACHE_TTL_SECONDS = 600
 
 async def get_interactive_qa(code: str, keyword: str = "", limit: int = 15) -> dict[str, Any]:
     """获取上市公司在交易所互动平台（互动易/e互动）上的董秘官方问答记录，支持按关键词过滤。"""
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        clean_kw = keyword.strip().lower()
+        return {
+            "code": normalize_hk_code(code),
+            "company_name": "",
+            "keyword_filter": clean_kw if clean_kw else None,
+            "total_matched_count": 0,
+            "items": [],
+            "compliance_note": "港股上市公司不适用深交所互动易与上证e互动平台。",
+        }
+
     normalized_code = normalize_code(code).raw
     clean_kw = keyword.strip().lower()
     cache_key = f"interactive_qa_{normalized_code}_{clean_kw}_{limit}"

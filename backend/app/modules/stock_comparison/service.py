@@ -45,10 +45,15 @@ async def compare_stocks(codes: Sequence[str] | str) -> list[StockCompareItem]:
             result["info_error"] = str(info)
         else:
             info_data = info.model_dump()
+            resolved_price = (
+                info_data.get("current_price")
+                if info_data.get("current_price") is not None
+                else info_data.get("price")
+            )
             result.update(
                 {
                     "name": info_data.get("name") or code,
-                    "price": info_data.get("price"),
+                    "price": resolved_price,
                     "change_pct": info_data.get("change_pct"),
                     "pe_ttm": info_data.get("pe_ttm"),
                     "pb": info_data.get("pb"),
@@ -61,6 +66,30 @@ async def compare_stocks(codes: Sequence[str] | str) -> list[StockCompareItem]:
                     ),
                 }
             )
+
+        # 港股额外从港股行情源补足涨跌幅、最新价与估值指标，并规范行业标识
+        from app.core.market import is_hk_code
+        if is_hk_code(code):
+            from app.financial_data.hk.service import hk_market_service, normalize_hk_code
+            try:
+                norm_code = normalize_hk_code(code)
+                quotes = await hk_market_service.get_stock_quotes(codes=[norm_code])
+                quote = quotes.items[0] if quotes.items else None
+                if quote:
+                    if result.get("price") is None:
+                        result["price"] = quote.price
+                    if result.get("change_pct") is None:
+                        result["change_pct"] = quote.change_pct
+                    if result.get("pe_ttm") is None:
+                        result["pe_ttm"] = quote.pe_ttm
+                    if result.get("pb") is None:
+                        result["pb"] = quote.pb
+                    if result.get("market_cap") is None:
+                        result["market_cap"] = quote.market_cap
+            except Exception:
+                pass
+            if not result.get("industry"):
+                result["industry"] = "港股上市公司"
 
         # 三路数据源各自可能失败。只在「该路确实失败」时把它负责的字段置 None，
         # 并补 *_error，让上游能区分「没有这个指标」和「这一路挂了」。
@@ -81,7 +110,8 @@ async def compare_stocks(codes: Sequence[str] | str) -> list[StockCompareItem]:
 
         if isinstance(metrics, Exception):
             result.update({"revenue": None, "net_profit": None, "roe": None})
-            result["metrics_error"] = type(metrics).__name__
+            if not is_hk_code(code):
+                result["metrics_error"] = type(metrics).__name__
         else:
             metric_values = metrics.metrics if metrics.metrics else {}
             result.update(

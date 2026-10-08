@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from bisect import bisect_right
 
+from app.core.exceptions import InvalidRequestError
+from app.core.market import is_hk_code
 from app.domain.market import KlineItem
 from app.financial_data.stock.quotes.chip_schemas import (
     ChipCostRange,
@@ -157,6 +159,9 @@ async def get_chip_distribution(
     decay: float = 1.0,
 ) -> ChipDistribution:
     """加载前复权日 K 后在本地计算个股筹码分布。"""
+    if is_hk_code(code):
+        raise InvalidRequestError("港股暂无每日换手率数据，暂不支持筹码分布计算")
+
     kline = await get_kline(
         code,
         period="daily",

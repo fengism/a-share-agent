@@ -7,7 +7,7 @@ from app.core.cache import dated_cache_key
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import cls_semaphore, eastmoney_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import normalize_code
+from app.core.market import is_hk_code, normalize_code
 from app.core.news import dedupe_news_items, filter_recent_news_items, news_sort_key
 from app.domain.news import CategorizedStockNews, NewsSearchItem
 from app.financial_data.stock.profile.name_map import get_stock_name_map
@@ -90,10 +90,20 @@ async def get_stock_news(code: str) -> list[NewsSearchItem]:
     """Get the recent news items for a stock, using cache and single-flight deduplication.
 
     Param:
-        code: 6-digit stock code
+        code: 6-digit stock code or HK code
     Return:
         list of up to 20 NewsSearchItem sorted by publish time descending
     """
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        norm_code = normalize_hk_code(code)
+        cache_key = dated_cache_key("news", norm_code)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        return []
+
     sym = normalize_code(code)
     cache_key = dated_cache_key("news", sym.raw)
     cached = cache.get(cache_key)
@@ -110,10 +120,20 @@ async def get_stock_news_categorized(code: str) -> CategorizedStockNews:
     """Get stock news split into Eastmoney and CLS categories with daily caching.
 
     Param:
-        code: 6-digit stock code
+        code: 6-digit stock code or HK code
     Return:
         dict with keys "code", "eastmoney_news", and "cls_news"
     """
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        norm_code = normalize_hk_code(code)
+        return CategorizedStockNews(
+            code=norm_code,
+            eastmoney_news=[],
+            cls_news=[],
+        )
+
     sym = normalize_code(code)
     cache_key = dated_cache_key("news_categorized", sym.raw)
     cached = cache.get(cache_key)

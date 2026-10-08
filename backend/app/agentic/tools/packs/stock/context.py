@@ -5,6 +5,7 @@ import re
 from collections.abc import Collection
 
 from app.agentic.tools.packs.stock import helpers as stock_helpers
+from app.core.market import is_hk_code
 
 _STOCK_NAME_SUFFIX_PATTERN = re.compile(r"(股份|集团|科技|控股|实业|发展|国际|A|B)$")
 
@@ -52,6 +53,20 @@ async def _resolve_stock(stock: dict) -> str:
     name = stock.get("name", "")
     if not code:
         return ""
+
+    if is_hk_code(code):
+        hk_res = await stock_helpers.get_hk_stock_profile(code=code)
+        if isinstance(hk_res, dict) and not hk_res.get("error"):
+            quote = hk_res.get("quote", {})
+            name = name or quote.get("name") or code
+            price = quote.get("price")
+            price_str = f"{price} HKD" if price is not None else "-"
+            market_cap = quote.get("market_cap")
+            cap_str = f"{market_cap}亿" if market_cap is not None else "-"
+            pe = quote.get("pe_ttm")
+            pe_str = f"{pe:.2f}" if isinstance(pe, (int, float)) else (str(pe) if pe else "-")
+            return f"- [港股] {name}（{code}）：现价={price_str}，市值={cap_str}，PE={pe_str}"
+        return f"- [港股] {name}（{code}）"
 
     info = await stock_helpers.get_stock_info(code=code)
     if isinstance(info, dict) and not info.get("error"):

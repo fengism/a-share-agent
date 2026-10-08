@@ -11,7 +11,7 @@ from app.core.cache import dated_cache_key
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, eastmoney_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import normalize_code, safe_float, safe_int
+from app.core.market import is_hk_code, normalize_code, safe_float, safe_int
 from app.core.news import filter_recent_news_items
 from app.financial_data.stock.insights.news import get_stock_news
 from app.financial_data.stock.insights.schemas import RetailSentiment, StockSentiment
@@ -259,10 +259,16 @@ async def get_stock_sentiment(code: str) -> StockSentiment:
     """Get aggregated stock sentiment data with typed cache and request deduplication.
 
     Param:
-        code: 6-digit stock code
+        code: 6-digit stock code or HK code
     Return:
         StockSentiment model
     """
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        norm_code = normalize_hk_code(code)
+        return StockSentiment(code=norm_code, heat_score=None, hot_rank=None, news_count=0)
+
     sym = normalize_code(code)
     cache_key = dated_cache_key("sentiment", sym.raw)
     cached = cache.get(cache_key)
@@ -340,10 +346,16 @@ async def get_retail_sentiment(code: str) -> RetailSentiment:
     """Get typed retail-sentiment metrics with cache and request deduplication.
 
     Param:
-        code: 6-digit stock code
+        code: 6-digit stock code or HK code
     Return:
         RetailSentiment model
     """
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        norm_code = normalize_hk_code(code)
+        return RetailSentiment(code=norm_code, guba_post_count=0)
+
     sym = normalize_code(code)
     cache_key = dated_cache_key("retail_sentiment", sym.raw)
     cached = cache.get(cache_key)

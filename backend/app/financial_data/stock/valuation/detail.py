@@ -8,7 +8,7 @@ from app.core.cache import dated_cache_key
 from app.core.cache_policies import VALUATION_DETAIL
 from app.core.concurrency.rate_limiter import call_blocking, ths_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import market_today, normalize_code, safe_float
+from app.core.market import is_hk_code, market_today, normalize_code, safe_float
 from app.financial_data.stock.fundamentals.financials import get_financial, get_financial_metrics
 from app.financial_data.stock.fundamentals.schemas import FinancialMetrics
 from app.financial_data.stock.profile.basic_info import get_basic_info
@@ -771,8 +771,58 @@ async def _load_valuation_detail(code: str) -> ValuationDetail:
     return result
 
 
+async def _load_hk_valuation_detail(norm_code: str) -> ValuationDetail:
+    from app.financial_data.hk.service import hk_market_service
+
+    cache_key = dated_cache_key("valuation_detail_v4", norm_code)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    hk_val = await hk_market_service.get_stock_valuation(norm_code)
+    quotes = await hk_market_service.get_stock_quotes(codes=[norm_code])
+    quote = quotes.items[0] if quotes.items else None
+    price = quote.price if quote else None
+
+    result = ValuationDetail(
+        code=norm_code,
+        report_date=None,
+        current_price=price,
+        market_cap=hk_val.market_cap,
+        total_shares=hk_val.total_shares,
+        industry="港股上市公司",
+        multiples=ValuationMultiples(
+            pe_ttm=hk_val.pe_ttm,
+            pb=hk_val.pb,
+            ps_ttm=hk_val.ps_ttm,
+            peg=None,
+        ),
+        percentiles=ValuationPercentiles(),
+        fundamentals=ValuationFundamentals(),
+        peer_summary=ValuationPeerSummary(),
+        fair_values={},
+        blended_fair_value=None,
+        fair_value_range=None,
+        valuation_view="港股提供实时行情与估值倍数（PE/PB），暂无A股DCF多模型深度测算",
+        valuation_summary="港股估值基于实时行情与披露市值计算",
+        notes=["港股暂未提供历史估值分位数与DCF模型"],
+    )
+    cache.set(cache_key, result, ttl=VALUATION_DETAIL.ttl_seconds)
+    return result
+
+
 async def get_valuation_detail(code: str) -> ValuationDetail:
     """获取详细估值，并合并相同股票的并发缓存未命中请求。"""
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        norm_code = normalize_hk_code(code)
+        cache_key = dated_cache_key("valuation_detail_v4", norm_code)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return ValuationDetail.model_validate(cached)
+        return await _valuation_detail_singleflight.do(cache_key, lambda: _load_hk_valuation_detail(norm_code))
+
     sym = normalize_code(code)
     cache_key = dated_cache_key("valuation_detail_v4", sym.raw)
     cached = cache.get(cache_key)

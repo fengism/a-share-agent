@@ -6,7 +6,7 @@ from app.core.cache import dated_cache_key
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, eastmoney_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import normalize_code
+from app.core.market import is_hk_code, normalize_code
 from app.financial_data.stock.insights.fund_flow import get_stock_fund_flow
 from app.financial_data.stock.insights.schemas import (
     BlockTradeItem,
@@ -92,6 +92,21 @@ async def _load_stock_risk_data(code: str, cache_key: str) -> StockRiskData:
 
 
 async def get_stock_risk_data(code: str) -> StockRiskData:
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        return StockRiskData(
+            code=normalize_hk_code(code),
+            fund_flow=[],
+            margin_trading=[],
+            block_trade=[],
+            holder_change=[],
+            partial=False,
+            unavailable_sections=[],
+            field_sources={},
+            source_apis={},
+        )
+
     sym = normalize_code(code)
     cache_key = dated_cache_key("stock_risk", sym.raw)
     cached = cache.get(cache_key)

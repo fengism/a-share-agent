@@ -10,7 +10,7 @@ from uuid import uuid4
 from app.core.cache import TTLCache, dated_cache_key, dated_cache_key_no_day
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import ResourceNotFoundError, UpstreamUnavailableError
-from app.core.market import normalize_code
+from app.core.market import is_hk_code, normalize_code
 from app.financial_data.stock.insights import fund_flow as legacy
 from app.financial_data.stock.insights.schemas import StockFundFlowItem, StockFundFlowPage
 from app.infrastructure.providers.registry import get_provider
@@ -140,6 +140,8 @@ async def _next_page(token: str, session: _Session, offset: int) -> StockFundFlo
 
 
 async def get_stock_fund_flow_page(code: str, cursor: str | None = None) -> StockFundFlowPage:
+    if is_hk_code(code):
+        return StockFundFlowPage(items=[], total=0, source="none", source_api="none")
     code = normalize_code(code).raw
     if cursor is None:
         key = dated_cache_key("stock_fund_flow_page", code)

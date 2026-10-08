@@ -7,7 +7,7 @@ from app.core.cache import analysis_cache as cache
 from app.core.cache import dated_cache_key
 from app.core.concurrency.rate_limiter import call_blocking
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import normalize_code
+from app.core.market import is_hk_code, normalize_code
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
@@ -33,6 +33,10 @@ def _percentile_key(code: str, indicator: str, period: str) -> tuple[str, str, s
     Return:
         归一化代码与参数组合的三元组
     """
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        return normalize_hk_code(code), indicator, period
     return normalize_code(code).raw, indicator, period
 
 
@@ -46,6 +50,9 @@ async def compute_percentile(code: str, indicator: str = "市盈率(TTM)", perio
     Return:
         百分位浮点数（0-100），数据不足时返回 None
     """
+    if is_hk_code(code):
+        return None
+
     cache_key = dated_cache_key("percentile", code, indicator, period)
     cached = cache.get(cache_key)
     if cached is not None:

@@ -170,6 +170,8 @@ async def get_financial(code: str, indicator: str = "balance") -> list[dict]:
     """
     if indicator not in _FINANCIAL_INDICATORS:
         raise ValueError(f"不支持的财报类型: {indicator}")
+    if is_hk_code(code):
+        return []
     sym = normalize_code(code)
     cache_key = dated_cache_key_no_day("financial", _FINANCIAL_CACHE_SCHEMA, sym.prefixed_upper, indicator)
     cached = cache.get(cache_key)
@@ -403,6 +405,10 @@ async def get_financial_metrics(code: str) -> FinancialMetrics:
     Return:
         FinancialMetrics 模型对象，包含本地化字段名的指标字典
     """
+    if is_hk_code(code):
+        norm_code = normalize_hk_code(code)
+        return FinancialMetrics(code=norm_code, latest_report_date=None, metrics={})
+
     sym = normalize_code(code)
     cache_key = dated_cache_key_no_day("financial_metrics", _FINANCIAL_CACHE_SCHEMA, sym.prefixed_upper)
     cached = cache.get(cache_key)

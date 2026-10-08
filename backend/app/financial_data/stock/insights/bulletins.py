@@ -6,7 +6,7 @@ from app.core.cache import dated_cache_key
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import sina_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.market import normalize_code
+from app.core.market import is_hk_code, normalize_code
 from app.financial_data.stock.insights.schemas import StockBulletinItem, StockBulletinPage
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
@@ -28,15 +28,21 @@ async def get_stock_bulletins(code: str, page: int = 1, page_size: int = 10) -> 
     """获取个股公告分页列表。
 
     Param:
-        code: 6 位股票代码
+        code: 6 位股票代码或港股代码
         page: 页码，从 1 开始
         page_size: 每页条数（1-30）
     Return:
         StockBulletinPage，含公告条目与总页数
     """
-    sym = normalize_code(code)
     page = max(1, page)
     page_size = min(max(1, page_size), BULLETIN_MAX_PAGE_SIZE)
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        norm_code = normalize_hk_code(code)
+        return StockBulletinPage(code=norm_code, items=[], total=0, page=page, page_size=page_size)
+
+    sym = normalize_code(code)
     cache_key = dated_cache_key("stock_bulletins", sym.raw, page, page_size)
     cached = cache.get(cache_key)
     if cached is not None:

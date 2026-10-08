@@ -11,7 +11,7 @@ from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import baidu_semaphore, eastmoney_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
-from app.core.market import normalize_code
+from app.core.market import is_hk_code, normalize_code
 from app.financial_data.stock.insights.schemas import StockFundFlowItem
 from app.financial_data.stock.insights.sources import (
     BAIDU_FUND_FLOW_API,
@@ -179,6 +179,9 @@ async def _load_stock_fund_flow(
 
 async def get_stock_fund_flow(code: str) -> list[StockFundFlowItem]:
     """获取股票最近最多 60 个交易日的分级资金净流入。"""
+    if is_hk_code(code):
+        return []
+
     sym = normalize_code(code)
     cache_key = dated_cache_key("stock_fund_flow", sym.raw)
     last_good_key = dated_cache_key_no_day("stock_fund_flow_last_good", sym.raw)

@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import akshare_semaphore
-from app.core.market import market_today, normalize_code
+from app.core.market import is_hk_code, market_today, normalize_code
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
@@ -29,6 +29,22 @@ def _parse_float(val: Any) -> float | None:
 
 async def get_restricted_shares_lift(code: str) -> dict[str, Any]:
     """获取指定个股未来及历史限售股解禁批次、解禁规模、股东数与流通盘抛压测算。"""
+    if is_hk_code(code):
+        from app.financial_data.hk.service import normalize_hk_code
+
+        return {
+            "code": normalize_hk_code(code),
+            "query_date": market_today().isoformat(),
+            "has_upcoming_lifts": False,
+            "upcoming_lifts_count": 0,
+            "next_lift_detail": None,
+            "pressure_risk_assessment": "港股暂无 A 股限售解禁机制数据",
+            "total_upcoming_shares": 0,
+            "total_upcoming_ratio_float_pct": 0.0,
+            "upcoming_lifts": [],
+            "recent_past_lifts": [],
+        }
+
     normalized_code = normalize_code(code).raw
     cache_key = f"restricted_shares_lift_{normalized_code}"
     cached = cache.get(cache_key)
