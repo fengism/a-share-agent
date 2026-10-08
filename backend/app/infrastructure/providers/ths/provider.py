@@ -7,6 +7,7 @@ import requests
 import app.infrastructure.providers.ths.business_intro as business_intro
 import app.infrastructure.providers.ths.forecast as forecast
 import app.infrastructure.providers.ths.hk_composition as hk_composition
+import app.infrastructure.providers.ths.hk_field as hk_field
 import app.infrastructure.providers.ths.hot_rank as hot_rank
 import app.infrastructure.providers.ths.hsgt as hsgt
 import app.infrastructure.providers.ths.volume as volume
@@ -55,6 +56,9 @@ class ThsDataProvider:
 
     def fetch_hk_revenue_breakdown(self, code: str):
         return hk_composition.fetch_hk_revenue_breakdown(self._transport, code)
+
+    def fetch_hk_industry_comparison(self, code: str):
+        return hk_field.fetch_hk_industry_comparison(self._transport, code)
 
     def fetch_stock_forecast_reports(self, code: str):
         return forecast.fetch_stock_forecast_reports(self._transport, code)

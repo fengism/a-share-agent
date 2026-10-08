@@ -37,6 +37,7 @@ def test_hk_spec_only_exposes_hk_capable_tools():
     assert "get_hk_stock_kline" in tool_names
     assert "get_hk_stock_technical_indicators" in tool_names
     assert "get_hk_market_overview" in tool_names
+    assert "get_hk_stock_industry_comparison" in tool_names
     for a_share_only in (
         "get_stock_info",
         "get_stock_valuation_detail",
@@ -57,6 +58,13 @@ def test_hk_spec_only_exposes_hk_capable_tools():
     assert fatal_keys == {"profile", "technical", "market"}
     assert "valuation" not in fatal_keys
     assert "fundamental" not in fatal_keys
+
+
+def test_hk_and_a_share_research_specs_align_budget_and_execution_limits():
+    """验证港股与 A 股个股动态调研规范在轮次与执行限制上严格对齐。"""
+    assert HK_ANALYSIS_RESEARCH_SPEC.max_rounds == ANALYSIS_RESEARCH_SPEC.max_rounds
+    assert HK_ANALYSIS_RESEARCH_SPEC.max_tool_turns == ANALYSIS_RESEARCH_SPEC.max_tool_turns
+    assert HK_ANALYSIS_RESEARCH_SPEC.allow_incomplete_summary == ANALYSIS_RESEARCH_SPEC.allow_incomplete_summary
 
 
 def test_hk_spec_requirements_only_reference_declared_tools():

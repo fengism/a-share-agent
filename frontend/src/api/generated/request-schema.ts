@@ -1069,6 +1069,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hk/stocks/{code}/industry-comparison": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Hk Stock Industry Comparison Endpoint
+         * @description 获取同花顺港股 F10 所属行业地位与同行业对手公司对比数据。
+         */
+        get: operations["get_hk_stock_industry_comparison_endpoint_api_hk_stocks__code__industry_comparison_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/hk/stocks/{code}/intraday": {
         parameters: {
             query?: never;
@@ -6695,6 +6715,93 @@ export interface components {
              * @default 0
              */
             total_nodes?: number;
+        };
+        /**
+         * HKIndustryComparison
+         * @description 港股所属行业分类与同业公司对比总览。
+         */
+        HKIndustryComparison: {
+            /** All Period Data */
+            all_period_data?: {
+                [key: string]: components["schemas"]["HKIndustryPeerItem"][];
+            };
+            /** Code */
+            code: string;
+            /**
+             * Company Count
+             * @default 0
+             */
+            company_count?: number;
+            /** Current Period */
+            current_period?: string | null;
+            /**
+             * Industry
+             * @default
+             */
+            industry?: string;
+            /**
+             * Industry Path
+             * @default
+             */
+            industry_path?: string;
+            /** Peers */
+            peers?: components["schemas"]["HKIndustryPeerItem"][];
+            /** Periods */
+            periods?: string[];
+            /**
+             * Segment
+             * @default
+             */
+            segment?: string;
+            /**
+             * Source
+             * @default ths
+             */
+            source?: string;
+            /**
+             * Source Url
+             * @default
+             */
+            source_url?: string;
+            /**
+             * Sub Industry
+             * @default
+             */
+            sub_industry?: string;
+        };
+        /**
+         * HKIndustryPeerItem
+         * @description 单个同业竞争公司的关键财务与估值对比指标。
+         */
+        HKIndustryPeerItem: {
+            /** Code */
+            code: string;
+            /** Current Assets */
+            current_assets?: number | null;
+            /** Debt To Assets Ratio */
+            debt_to_assets_ratio?: number | null;
+            /**
+             * Is Pe Loss
+             * @default false
+             */
+            is_pe_loss?: boolean;
+            /**
+             * Name
+             * @default
+             */
+            name?: string;
+            /** Net Profit */
+            net_profit?: number | null;
+            /** Pb */
+            pb?: number | null;
+            /** Pe */
+            pe?: number | null;
+            /** Total Assets */
+            total_assets?: number | null;
+            /** Total Liabilities */
+            total_liabilities?: number | null;
+            /** Total Shares */
+            total_shares?: number | null;
         };
         /** HKStockQuote */
         HKStockQuote: {
@@ -16421,6 +16528,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TechnicalIndicators"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_hk_stock_industry_comparison_endpoint_api_hk_stocks__code__industry_comparison_get: {
+        parameters: {
+            query?: {
+                /** @description 指定财务报告期，如 2026中报、2025年报，默认最新 */
+                period?: string;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HKIndustryComparison"];
                 };
             };
             /** @description 统一错误响应 */

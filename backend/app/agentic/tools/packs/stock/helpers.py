@@ -149,6 +149,18 @@ async def get_hk_market_overview() -> Any:
     return await get_application_tool_handlers().get_hk_market_overview()
 
 
+async def get_hk_stock_industry_comparison(code: str, period: str | None = None) -> Any:
+    """获取港股所属行业分类与同行业对手公司财务及估值对比数据。
+
+    Param:
+        code: 港股代码，1-5 位数字，例如 00700
+        period: 可选财务报告期，例如 2026中报、2025年报
+    Return:
+        港股行业对比字典
+    """
+    return await get_application_tool_handlers().get_hk_stock_industry_comparison(code, period)
+
+
 async def screen_stocks(
     pe_min: float | None = None,
     pe_max: float | None = None,

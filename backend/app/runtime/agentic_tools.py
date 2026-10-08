@@ -118,6 +118,12 @@ async def _get_hk_market_overview() -> Any:
     return await get_hk_market_overview()
 
 
+async def _get_hk_stock_industry_comparison(code: str, period: str | None = None) -> Any:
+    from app.financial_data.hk.industry_comparison import get_hk_stock_industry_comparison
+
+    return (await get_hk_stock_industry_comparison(code, period=period or None)).model_dump(mode="json")
+
+
 async def _get_market_overview() -> Any:
     from app.financial_data.market import public as market_data
 
@@ -361,6 +367,7 @@ def configure_application_tools() -> None:
             get_stock_valuation_detail=_get_stock_valuation_detail,
             get_hk_stock_profile=_get_hk_stock_profile,
             get_hk_market_overview=_get_hk_market_overview,
+            get_hk_stock_industry_comparison=_get_hk_stock_industry_comparison,
             iwencai_market_macro=_iwencai_market_macro,
             iwencai_query=_iwencai_query,
             iwencai_search=_iwencai_search,

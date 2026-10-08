@@ -63,6 +63,26 @@ vi.mock("../../api/queryHooks/hk", () => ({
     error: null,
     refetch: vi.fn(),
   }),
+  useHKIndustryComparison: () => ({
+    data: {
+      code: "00700",
+      industry: "资讯科技业",
+      sub_industry: "软件服务",
+      segment: "数码解决方案服务",
+      industry_path: "资讯科技业 - 软件服务 - 数码解决方案服务",
+      company_count: 3,
+      periods: ["2026中报"],
+      current_period: "2026中报",
+      peers: [
+        { code: "00700", name: "腾讯控股", pe: 22.5, pb: 3.8, net_profit: 45000000000 },
+        { code: "09660", name: "地平线机器人-W", pe: null, is_pe_loss: true, pb: 3.37 },
+      ],
+      all_period_data: {},
+    },
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock("../../api/queryHooks/watchlist", () => ({
@@ -162,7 +182,7 @@ describe("HKStockPageContent", () => {
     );
 
     expect(screen.getByRole("heading", { name: "腾讯控股" })).toBeInTheDocument();
-    expect(screen.getByText("00700")).toBeInTheDocument();
+    expect(screen.getAllByText("00700")[0]).toBeInTheDocument();
     expect(screen.getByText("HK$385.40")).toBeInTheDocument();
     expect(screen.getByText("+8.20 (+2.17%)")).toBeInTheDocument();
     expect(screen.getByText("港股主板")).toBeInTheDocument();
@@ -262,4 +282,18 @@ describe("HKStockPageContent", () => {
     expect(screen.getByText("KDJ 技术指标")).toBeInTheDocument();
     expect(screen.getByTestId("indicator-chart")).toHaveTextContent("kdj指标图");
   });
+
+  it("renders the HK industry comparison section with industry path and peers", () => {
+    render(
+      <MemoryRouter>
+        <HKStockPageContent code="00700" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("行业地位与同业对比")).toBeInTheDocument();
+    expect(screen.getByText("数码解决方案服务")).toBeInTheDocument();
+    expect(screen.getByText(/共 3 家公司/)).toBeInTheDocument();
+    expect(screen.getByText("地平线机器人-W")).toBeInTheDocument();
+  });
 });
+

@@ -59,6 +59,7 @@ from app.financial_data.stock.valuation.schemas import (
     ValuationFundamentals,
     ValuationMethodResult,
     ValuationMultiples,
+    ValuationPeer,
     ValuationPeerSummary,
     ValuationPercentiles,
     ValuationProfile,
@@ -784,13 +785,46 @@ async def _load_hk_valuation_detail(norm_code: str) -> ValuationDetail:
     quote = quotes.items[0] if quotes.items else None
     price = quote.price if quote else None
 
+    industry = "港股上市公司"
+    peers: list[ValuationPeer] = []
+    try:
+        from app.financial_data.hk.industry_comparison import get_hk_stock_industry_comparison
+
+        comp = await get_hk_stock_industry_comparison(norm_code)
+        if comp.industry_path:
+            industry = comp.industry_path
+        for p in comp.peers:
+            if p.code == norm_code:
+                continue
+            peers.append(
+                ValuationPeer(
+                    name=p.name,
+                    code=p.code,
+                    pe_ttm=p.pe,
+                    pb=p.pb,
+                    ps_ttm=None,
+                )
+            )
+    except Exception as exc:
+        logger.debug("港股行业对比加载跳过: %s", exc)
+
+    peer_summary = _build_peer_summary(
+        StockValuation(
+            code=norm_code,
+            pe_ttm=hk_val.pe_ttm,
+            pb=hk_val.pb,
+            ps_ttm=hk_val.ps_ttm,
+            peers=peers,
+        )
+    )
+
     result = ValuationDetail(
         code=norm_code,
         report_date=None,
         current_price=price,
         market_cap=hk_val.market_cap,
         total_shares=hk_val.total_shares,
-        industry="港股上市公司",
+        industry=industry,
         multiples=ValuationMultiples(
             pe_ttm=hk_val.pe_ttm,
             pb=hk_val.pb,
@@ -799,12 +833,12 @@ async def _load_hk_valuation_detail(norm_code: str) -> ValuationDetail:
         ),
         percentiles=ValuationPercentiles(),
         fundamentals=ValuationFundamentals(),
-        peer_summary=ValuationPeerSummary(),
+        peer_summary=peer_summary,
         fair_values={},
         blended_fair_value=None,
         fair_value_range=None,
-        valuation_view="港股提供实时行情与估值倍数（PE/PB），暂无A股DCF多模型深度测算",
-        valuation_summary="港股估值基于实时行情与披露市值计算",
+        valuation_view="港股提供实时行情与估值倍数（PE/PB），已整合行业可比公司",
+        valuation_summary="港股估值基于实时行情、披露市值与同行业对比数据计算",
         notes=["港股暂未提供历史估值分位数与DCF模型"],
     )
     cache.set(cache_key, result, ttl=VALUATION_DETAIL.ttl_seconds)

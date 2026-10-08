@@ -19,6 +19,7 @@ PROFILE = AgentProfile(
         "get_industries",
         "iwencai_query",
         "get_hk_stock_profile",
+        "get_hk_stock_industry_comparison",
     ),
     skill_names=("stock_analysis", "stock_screening", "financial_calculations"),
     max_rounds=3,

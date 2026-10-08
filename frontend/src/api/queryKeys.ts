@@ -27,6 +27,7 @@ export const queryKeys = {
       ["hk", "stock-history", code, period, adjust, startDate] as const,
     stockQuote: (code: string) => ["hk", "stock-quote", code] as const,
     stockValuation: (code: string) => ["hk", "stock-valuation", code] as const,
+    industryComparison: (code: string, period = "") => ["hk", "industry-comparison", code, period] as const,
   },
   market: {
     indices: ["marketIndices"] as const,

@@ -176,6 +176,8 @@ async def generate_daily_review(request: DailyReviewRequest, user_id: int) -> Da
             DAILY_REVIEW_PROMPT_SPEC,
             {"prompt": user_content},
             settings=settings,
+            max_tokens=settings.analysis_llm_max_completion_tokens,
+            timeout_seconds=settings.analysis_llm_timeout_seconds,
         )
         output = prompt_run.value
         generation_status = "llm"

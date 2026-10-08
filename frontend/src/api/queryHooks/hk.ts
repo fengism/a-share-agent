@@ -13,6 +13,8 @@ export type HKStockSearchItem = HKStockSearchResult["items"][number];
 export type HKIndices = OpenApiResponse<"/api/hk/indices/realtime", "get">;
 export type HKKlineData = OpenApiResponse<"/api/hk/indices/{symbol}/history", "get">;
 export type HKStockValuation = OpenApiResponse<"/api/hk/stocks/{code}/valuation", "get">;
+export type HKIndustryComparison = OpenApiResponse<"/api/hk/stocks/{code}/industry-comparison", "get">;
+export type HKIndustryPeerItem = NonNullable<HKIndustryComparison["peers"]>[number];
 
 export function useHKIndices() {
   const isTradingSession = useHKStockTradingSession();
@@ -106,5 +108,18 @@ export function useHKStockValuation(code: string) {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     enabled: Boolean(code),
+  });
+}
+
+export function useHKIndustryComparison(code: string, period = "") {
+  return useQuery({
+    queryKey: queryKeys.hk.industryComparison(code, period),
+    queryFn: () => openApiGet("/api/hk/stocks/{code}/industry-comparison", {
+      path: { code },
+      query: { period },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    enabled: Boolean(code),
+    staleTime: 60 * 60 * 1000, // 1 hour
   });
 }

@@ -205,8 +205,8 @@ HK_ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
     system_prompt="""你是严谨的港股研究 Agent。你的任务是围绕指定港股和分析日期自主规划调研，并通过工具获取可验证证据。
 
 要求：
-- 行情数据权威性：港股行情快照、K 线与技术指标（get_hk_stock_profile, get_hk_stock_kline, get_hk_stock_technical_indicators）以及港股指数（get_hk_market_overview）返回的数据具有最高事实优先级。若搜索或抓取结果与其冲突，必须以这些接口为准。
-- 数据可得性：本环境不提供港股的结构化财务、估值分位、资金流、龙虎榜、情绪打分与概念板块数据。不要反复尝试推断或用常识补齐这些数字；缺少即在摘要的数据缺口中明确列出，并说明这对结论的影响。
+- 行情与估值数据权威性：港股行情快照、K 线与技术指标（get_hk_stock_profile, get_hk_stock_kline, get_hk_stock_technical_indicators）、港股行业地位与同业对比（get_hk_stock_industry_comparison）以及港股指数（get_hk_market_overview）返回的数据具有最高事实优先级。若搜索或抓取结果与其冲突，必须以这些接口为准。
+- 数据可得性：本环境不提供港股的资金流、龙虎榜、情绪打分与A股概念板块数据。不要反复尝试推断或用常识补齐这些数字；缺少即在摘要的数据缺口中明确列出，并说明这对结论的影响。
 - 港股口径：交易货币为港元；无涨跌幅限制；可做空；财报按 IFRS / 港交所披露口径，与 A 股准则不可直接比较；股份面值、股息税率与除净规则也与 A 股不同。涉及跨市场比较时必须说明口径差异。
 - 自主决定工具调用顺序，可多轮调用并根据结果补充调查。
 - 长期研究需调查盈利引擎与分部质量、护城河及反证、管理层与资本配置、行业与价值链、失败路径。
@@ -221,7 +221,9 @@ HK_ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
         "get_hk_stock_kline",
         "get_hk_stock_technical_indicators",
         "get_hk_market_overview",
+        "get_hk_stock_industry_comparison",
         "iwencai_query",
+        "iwencai_search",
         "web_search",
         "web_fetch",
         "fetch_urls",
@@ -229,6 +231,12 @@ HK_ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
     ),
     requirements=(
         EvidenceRequirement("profile", "基础行情快照", ("get_hk_stock_profile",)),
+        EvidenceRequirement(
+            "valuation",
+            "行业地位与同业估值对比",
+            ("get_hk_stock_industry_comparison",),
+            fatal=False,
+        ),
         EvidenceRequirement(
             "technical",
             "技术择时",
@@ -238,28 +246,28 @@ HK_ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
         EvidenceRequirement(
             "industry_research",
             "行业与价值链公开资料",
-            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf"),
+            ("iwencai_query", "iwencai_search", "web_fetch", "fetch_urls", "read_pdf"),
             validator=_has_industry_research_evidence,
             fatal=False,
         ),
         EvidenceRequirement(
             "moat_research",
             "护城河与反证公开资料",
-            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf"),
+            ("iwencai_query", "iwencai_search", "web_fetch", "fetch_urls", "read_pdf"),
             validator=_has_moat_research_evidence,
             fatal=False,
         ),
         EvidenceRequirement(
             "management_research",
             "管理层与资本配置公开资料",
-            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf"),
+            ("iwencai_query", "iwencai_search", "web_fetch", "fetch_urls", "read_pdf"),
             validator=_has_management_research_evidence,
             fatal=False,
         ),
         EvidenceRequirement(
             "fundamental_public",
             "港股财务公开披露资料",
-            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf"),
+            ("iwencai_query", "iwencai_search", "web_fetch", "fetch_urls", "read_pdf"),
             validator=_has_financial_evidence,
             fatal=False,
         ),

@@ -38,6 +38,7 @@ import type { KlineItem } from "../../types/stock";
 import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
 import StockBusinessIntro from "./StockBusinessIntro";
 import RevenueBreakdownSection from "../../features/investment-research/RevenueBreakdownSection";
+import HKIndustryComparisonSection from "./HKIndustryComparisonSection";
 import StockSectionTitle from "./StockSectionTitle";
 
 const { Title, Text } = Typography;
@@ -324,6 +325,9 @@ export default function HKStockPageContent({ code }: { code: string }) {
 
       {/* 港股营收构成：同花顺 F10 主营构成分析，仅占比无金额 */}
       <RevenueBreakdownSection code={code} />
+
+      {/* 港股行业地位与同业对比：同花顺 F10 行业对比 */}
+      <HKIndustryComparisonSection code={code} />
 
       {/* ── 走势与历史行情 分时/K线/指标图 ── */}
       <Card

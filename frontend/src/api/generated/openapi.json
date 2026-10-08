@@ -6975,6 +6975,202 @@
         "title": "GraphSummary",
         "type": "object"
       },
+      "HKIndustryComparison": {
+        "description": "港股所属行业分类与同业公司对比总览。",
+        "properties": {
+          "all_period_data": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/HKIndustryPeerItem"
+              },
+              "type": "array"
+            },
+            "title": "All Period Data",
+            "type": "object"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "company_count": {
+            "default": 0,
+            "title": "Company Count",
+            "type": "integer"
+          },
+          "current_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Period"
+          },
+          "industry": {
+            "default": "",
+            "title": "Industry",
+            "type": "string"
+          },
+          "industry_path": {
+            "default": "",
+            "title": "Industry Path",
+            "type": "string"
+          },
+          "peers": {
+            "items": {
+              "$ref": "#/components/schemas/HKIndustryPeerItem"
+            },
+            "title": "Peers",
+            "type": "array"
+          },
+          "periods": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Periods",
+            "type": "array"
+          },
+          "segment": {
+            "default": "",
+            "title": "Segment",
+            "type": "string"
+          },
+          "source": {
+            "default": "ths",
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "default": "",
+            "title": "Source Url",
+            "type": "string"
+          },
+          "sub_industry": {
+            "default": "",
+            "title": "Sub Industry",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "HKIndustryComparison",
+        "type": "object"
+      },
+      "HKIndustryPeerItem": {
+        "description": "单个同业竞争公司的关键财务与估值对比指标。",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "current_assets": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Assets"
+          },
+          "debt_to_assets_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debt To Assets Ratio"
+          },
+          "is_pe_loss": {
+            "default": false,
+            "title": "Is Pe Loss",
+            "type": "boolean"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "net_profit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Profit"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "total_assets": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Assets"
+          },
+          "total_liabilities": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Liabilities"
+          },
+          "total_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Shares"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "HKIndustryPeerItem",
+        "type": "object"
+      },
       "HKStockQuote": {
         "properties": {
           "amount": {
@@ -29483,6 +29679,66 @@
           }
         ],
         "summary": "Get Hk Stock Indicators",
+        "tags": [
+          "hk"
+        ]
+      }
+    },
+    "/api/hk/stocks/{code}/industry-comparison": {
+      "get": {
+        "description": "获取同花顺港股 F10 所属行业地位与同行业对手公司对比数据。",
+        "operationId": "get_hk_stock_industry_comparison_endpoint_api_hk_stocks__code__industry_comparison_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "指定财务报告期，如 2026中报、2025年报，默认最新",
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "指定财务报告期，如 2026中报、2025年报，默认最新",
+              "title": "Period",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HKIndustryComparison"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Hk Stock Industry Comparison Endpoint",
         "tags": [
           "hk"
         ]

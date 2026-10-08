@@ -16,6 +16,7 @@ from app.agentic.agents.profiles.technical import PROFILE as TECHNICAL_ANALYST_P
 from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
 from app.agentic.tools.packs.stock.context import _resolve_stock
+from app.core.cache import analysis_cache, market_cache, reference_cache, series_cache
 from app.core.exceptions import InvalidRequestError
 from app.financial_data.hk.schemas import HKStockQuote, HKStockQuotePage, HKStockValuation
 from app.financial_data.stock.fundamentals.financials import (
@@ -39,7 +40,6 @@ from app.financial_data.stock.quotes.chip_distribution import get_chip_distribut
 from app.financial_data.stock.valuation.detail import get_valuation_detail
 from app.financial_data.stock.valuation.percentiles import compute_percentile, compute_percentiles
 from app.modules.stock_comparison.service import compare_stocks
-from app.core.cache import analysis_cache, market_cache, reference_cache, series_cache
 
 
 @pytest.fixture(autouse=True)

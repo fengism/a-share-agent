@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -85,9 +86,23 @@ class StreamingLLMClient:
                     logger.warning("LLM流关闭失败: error_type=%s", type(error).__name__)
 
         turn = normalizer.finish()
-        # Valid JSON alone is not proof of success: reject truncation and missing terminal chunks.
-        if turn.finish_reason != "stop" or turn.tool_calls:
-            raise LLMInvalidResponseError("LLM 输出未正常结束，未保存不完整内容")
+        _success_finish_reasons = {"stop", "end_turn", "eos", "stop_sequence"}
+        if turn.finish_reason == "length":
+            raise LLMInvalidResponseError(
+                f"LLM 输出达到最大 Token 上限被截断 (finish_reason='length', max_tokens={self.max_tokens})，未保存不完整内容"
+            )
+        if turn.tool_calls:
+            raise LLMInvalidResponseError("LLM 输出异常包含工具调用，未保存不完整内容")
+        if turn.finish_reason is not None and turn.finish_reason not in _success_finish_reasons:
+            raise LLMInvalidResponseError(f"LLM 输出未正常结束 (finish_reason={turn.finish_reason!r})，未保存不完整内容")
+        if turn.finish_reason is None:
+            if json_format:
+                try:
+                    json.loads(turn.content.strip())
+                except Exception:
+                    raise LLMInvalidResponseError("LLM 输出未正常结束且内容不完整 (finish_reason=None)，未保存不完整内容")
+            elif not turn.content.strip():
+                raise LLMEmptyResponseError("LLM 返回了空内容")
         if not turn.content.strip():
             raise LLMEmptyResponseError("LLM 返回了空内容")
         logger.info("LLM流式生成完成: model=%s elapsed=%.2fs", self.model, time.monotonic() - started)

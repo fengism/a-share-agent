@@ -1,6 +1,7 @@
 """验证分析报告 PDF 生成去除执行工具等技术噪音，并支持港股/A股市扬与货币规范。"""
 
 from types import SimpleNamespace
+
 from app.modules.analysis.pdf_service import generate_research_report_html
 from app.modules.analysis.provenance import AnalysisProvenance, EvidenceFreshness
 

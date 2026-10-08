@@ -133,6 +133,24 @@ def _register_hk_stock_tools() -> None:
         executor=helpers.get_hk_market_overview,
     ))
 
+    registry.register_tool(Tool(
+        name="get_hk_stock_industry_comparison",
+        description="获取港股所属行业分类与同行业对手公司财务及估值对比数据（含总股本、总资产、PE、PB、流动资产、负债、净利润等及行业排名）。",
+        parameters={
+            "type": "object",
+            "properties": {
+                "code": _HK_CODE_SCHEMA,
+                "period": {
+                    "type": "string",
+                    "description": "财务报告期，如 2026中报、2025年报，默认最新报告期",
+                },
+            },
+            "required": ["code"],
+        },
+        policy=_STATIC_POLICY,
+        executor=helpers.get_hk_stock_industry_comparison,
+    ))
+
 
 def _register_stock_analysis_tools() -> None:
     """Register valuation, technical, K-line, and financial tools."""

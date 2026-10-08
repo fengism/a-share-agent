@@ -37,6 +37,7 @@ class ApplicationToolHandlers:
     get_stock_valuation_detail: AsyncHandler
     get_hk_stock_profile: AsyncHandler
     get_hk_market_overview: AsyncHandler
+    get_hk_stock_industry_comparison: AsyncHandler
     iwencai_market_macro: AsyncHandler
     iwencai_query: AsyncHandler
     iwencai_search: AsyncHandler

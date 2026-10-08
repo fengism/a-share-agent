@@ -3,6 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 
 from app.domain.market import KlineData, MarketIndices
+from app.financial_data.hk.industry_comparison import (
+    HKIndustryComparison,
+    get_hk_stock_industry_comparison,
+)
 from app.financial_data.hk.schemas import (
     HKStockQuotePage,
     HKStockSearchResult,
@@ -87,6 +91,15 @@ async def get_hk_stock_indicators(
 async def get_hk_stock_valuation(code: str):
     """获取港股个股估值与市值指标（市盈率 TTM、市净率、总市值、流通市值等）。"""
     return await hk_market_service.get_stock_valuation(code)
+
+
+@router.get("/stocks/{code}/industry-comparison", response_model=HKIndustryComparison)
+async def get_hk_stock_industry_comparison_endpoint(
+    code: str,
+    period: str = Query("", description="指定财务报告期，如 2026中报、2025年报，默认最新"),
+):
+    """获取同花顺港股 F10 所属行业地位与同行业对手公司对比数据。"""
+    return await get_hk_stock_industry_comparison(code, period=period or None)
 
 
 @router.get("/indices/realtime", response_model=MarketIndices)

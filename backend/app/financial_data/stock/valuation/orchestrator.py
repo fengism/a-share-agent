@@ -32,12 +32,32 @@ async def _load_valuation(code: str) -> StockValuation:
         if cached is not None:
             return StockValuation.model_validate(cached)
         hk_val = await hk_market_service.get_stock_valuation(norm_code)
+        peers: list[ValuationPeer] = []
+        try:
+            from app.financial_data.hk.industry_comparison import get_hk_stock_industry_comparison
+
+            comp = await get_hk_stock_industry_comparison(norm_code)
+            for p in comp.peers:
+                if p.code == norm_code:
+                    continue
+                peers.append(
+                    ValuationPeer(
+                        name=p.name,
+                        code=p.code,
+                        pe_ttm=p.pe,
+                        pb=p.pb,
+                        ps_ttm=None,
+                    )
+                )
+        except Exception as exc:
+            logger.debug("获取港股同行对比失败: %s", exc)
+
         result = StockValuation(
             code=norm_code,
             pe_ttm=hk_val.pe_ttm,
             pb=hk_val.pb,
             ps_ttm=hk_val.ps_ttm,
-            peers=[],
+            peers=peers,
         )
         cache.set(cache_key, result, ttl=VALUATION.ttl_seconds)
         return result
