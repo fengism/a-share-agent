@@ -487,7 +487,7 @@ class SinaDataProvider:
             },
         )
         if "成交量" in df.columns:
-            df["成交量"] = pd.to_numeric(df["成交量"], errors="coerce") * 100
+            df["成交量"] = pd.to_numeric(df["成交量"], errors="coerce")
         if "总市值" in df.columns:
             df["总市值"] = pd.to_numeric(df["总市值"], errors="coerce") * 10000
         if "流通市值" in df.columns:
