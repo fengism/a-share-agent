@@ -7,6 +7,7 @@ const isDev = import.meta.env.DEV;
 export const API_TIMEOUTS = {
   DEFAULT: 15_000,
   EXTERNAL: 120_000,
+  SCREENER: 300_000,
   LONG_RUNNING: 300_000,
 } as const;
 

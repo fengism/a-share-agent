@@ -90,6 +90,24 @@ def render_prometheus_metrics(
         ):
             lines.append(_sample(f"a_share_browser_fetch_{field}", values.get(field, 0), **labels))
 
+    market_snapshots = snapshot.get("market_snapshots", {})
+    for source, values in market_snapshots.items():
+        labels = {"source": source}
+        status = str(values.get("status", "unknown"))
+        lines.append(_sample("a_share_market_snapshot_healthy", status == "healthy", **labels))
+        for field in (
+            "rows",
+            "expected_count",
+            "pages",
+            "duration_ms",
+            "page_ms_avg",
+            "page_ms_max",
+            "retried_pages",
+        ):
+            lines.append(
+                _sample(f"a_share_market_snapshot_{field}", values.get(field, 0), **labels)
+            )
+
     workflow = snapshot.get("workflow", {})
     for kind, events in workflow.get("events", {}).items():
         for event, count in events.items():

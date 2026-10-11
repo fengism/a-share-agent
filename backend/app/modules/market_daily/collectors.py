@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime, time
@@ -9,9 +10,10 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from app.core.concurrency.rate_limiter import call_blocking, sina_semaphore
+from app.core.concurrency.rate_limiter import call_blocking, sina_semaphore, tdx_semaphore
 from app.core.market import SHANGHAI_TIMEZONE, safe_float
 from app.domain.market import MarketIndices
+from app.financial_data.stock.profile.exchange_master import get_exchange_stock_master
 from app.financial_data.stock.quotes.sources import get_spot_source
 
 if TYPE_CHECKING:
@@ -25,12 +27,23 @@ from app.financial_data.stock.quotes.spot_snapshot import (
 from app.infrastructure.providers.registry import get_provider
 from app.modules.market_daily.models import CollectedMarketDailyBars, MarketDailyBarRecord
 
+logger = logging.getLogger(__name__)
+
 _CN_MIN_STOCK_COUNT = 3000
+_CN_MIN_MASTER_COVERAGE = 0.98
+_CN_CROSSCHECK_MIN_SAMPLES = 3
+_CN_CROSSCHECK_MAX_PRICE_ERROR = 0.005
+_CN_CROSSCHECK_MAX_VOLUME_ERROR = 0.03
+_CN_CROSSCHECK_MAX_AMOUNT_ERROR = 0.03
 _HK_MIN_STOCK_COUNT = 1000
 
 
 class SnapshotDateExpiredError(RuntimeError):
     """全市场快照已经推进到目标日之后，继续重试无法恢复历史个股。"""
+
+
+class SnapshotCrosscheckUnavailableError(RuntimeError):
+    """盘后抽样校验源暂时不可用；不等同于业务数据冲突。"""
 
 
 def _first(row: pd.Series, *names: str):
@@ -141,7 +154,9 @@ def normalize_cn_stocks(frame: pd.DataFrame, trade_date: date, source: str) -> l
             amount=safe_float(_first(row, "成交额", "amount")),
             turnover_pct=safe_float(_first(row, "换手率", "turnover_pct", "turnoverrate", "turnover")),
             source=source,
-            source_quote_time=_parse_quote_time(_first(row, "日期时间", "更新时间", "time"), trade_date),
+            source_quote_time=_parse_quote_time(
+                _first(row, "日期时间", "更新时间", "时间", "time"), trade_date
+            ),
         ))
     return records
 
@@ -275,6 +290,122 @@ async def _verify_cn_trade_date(trade_date: date) -> None:
     )
 
 
+async def _validate_cn_master_coverage(
+    records: list[MarketDailyBarRecord],
+    trade_date: date,
+) -> dict[str, float]:
+    """按官方沪深京股票主表校验盘后有效快照覆盖率。"""
+    master = await get_exchange_stock_master()
+    if not master.complete:
+        raise RuntimeError(
+            f"官方 A 股股票主表不完整: failed={master.failed_exchanges} stale={master.stale_exchanges}"
+        )
+    expected_by_exchange: dict[str, set[str]] = {"SH": set(), "SZ": set(), "BJ": set()}
+    code_exchange: dict[str, str] = {}
+    for stock in master.records:
+        if stock.exchange not in expected_by_exchange:
+            continue
+        if stock.listing_date and stock.listing_date > trade_date.isoformat():
+            continue
+        expected_by_exchange[stock.exchange].add(stock.code)
+        code_exchange[stock.code] = stock.exchange
+    actual_by_exchange: dict[str, set[str]] = {"SH": set(), "SZ": set(), "BJ": set()}
+    for record in records:
+        exchange = code_exchange.get(record.code)
+        if exchange is not None:
+            actual_by_exchange[exchange].add(record.code)
+    coverage: dict[str, float] = {}
+    failures: list[str] = []
+    for exchange, expected in expected_by_exchange.items():
+        if not expected:
+            failures.append(f"{exchange}:official-empty")
+            continue
+        actual = actual_by_exchange[exchange]
+        ratio = len(actual & expected) / len(expected)
+        coverage[exchange] = ratio
+        if ratio < _CN_MIN_MASTER_COVERAGE:
+            missing = sorted(expected - actual)[:10]
+            failures.append(
+                f"{exchange}:{ratio:.2%}({len(actual & expected)}/{len(expected)}),missing={missing}"
+            )
+    if failures:
+        raise RuntimeError("A 股市场日行情官方主表覆盖不足: " + "; ".join(failures))
+    return coverage
+
+
+def _relative_error(left: float, right: float) -> float:
+    return abs(left - right) / max(abs(left), abs(right), 1e-12)
+
+
+async def _crosscheck_cn_snapshot(records: list[MarketDailyBarRecord]) -> dict[str, object]:
+    """用 TDX 抽样比对盘后收盘价、成交量和成交额；TDX volume 单位为手。"""
+    record_by_code = {record.code: record for record in records}
+    fixed_codes = ["600519", "000001", "920000"]
+    liquid_codes = [
+        record.code
+        for record in sorted(records, key=lambda item: item.amount or 0, reverse=True)[:5]
+    ]
+    sample_codes = list(dict.fromkeys([*fixed_codes, *liquid_codes]))
+    try:
+        quotes = await call_blocking(
+            get_provider("tdxhub").fetch_stock_quotes,
+            sample_codes,
+            semaphore=tdx_semaphore,
+        )
+    except Exception as error:
+        raise SnapshotCrosscheckUnavailableError(
+            f"TDX 盘后抽样校验暂时不可用: {type(error).__name__}"
+        ) from error
+    comparisons: list[dict[str, object]] = []
+    for code in sample_codes:
+        record = record_by_code.get(code)
+        quote = quotes.get(code) if isinstance(quotes, dict) else None
+        if record is None or not isinstance(quote, dict):
+            continue
+        price = safe_float(quote.get("price"))
+        volume_lots = safe_float(quote.get("volume"))
+        amount = safe_float(quote.get("amount"))
+        if price is None or price <= 0:
+            continue
+        price_error = _relative_error(record.close, price)
+        volume_error = None
+        if record.volume is not None and record.volume > 0 and volume_lots is not None and volume_lots > 0:
+            volume_error = _relative_error(record.volume, volume_lots * 100)
+        amount_error = None
+        if record.amount is not None and record.amount > 0 and amount is not None and amount > 0:
+            amount_error = _relative_error(record.amount, amount)
+        comparisons.append({
+            "code": code,
+            "price_error": price_error,
+            "volume_error": volume_error,
+            "amount_error": amount_error,
+        })
+    if len(comparisons) < _CN_CROSSCHECK_MIN_SAMPLES:
+        raise SnapshotCrosscheckUnavailableError(
+            f"TDX 盘后抽样有效样本不足: {len(comparisons)}/{_CN_CROSSCHECK_MIN_SAMPLES}"
+        )
+    failures = [
+        item for item in comparisons
+        if item["price_error"] > _CN_CROSSCHECK_MAX_PRICE_ERROR
+        or (item["volume_error"] is not None and item["volume_error"] > _CN_CROSSCHECK_MAX_VOLUME_ERROR)
+        or (item["amount_error"] is not None and item["amount_error"] > _CN_CROSSCHECK_MAX_AMOUNT_ERROR)
+    ]
+    if failures:
+        raise RuntimeError(f"TDX 盘后抽样数据不一致: {failures[:5]}")
+    return {
+        "samples": len(comparisons),
+        "max_price_error": max(float(item["price_error"]) for item in comparisons),
+        "max_volume_error": max(
+            (float(item["volume_error"]) for item in comparisons if item["volume_error"] is not None),
+            default=0.0,
+        ),
+        "max_amount_error": max(
+            (float(item["amount_error"]) for item in comparisons if item["amount_error"] is not None),
+            default=0.0,
+        ),
+    }
+
+
 async def fetch_cn_stocks(trade_date: date) -> CollectedMarketDailyBars:
     """绕过五分钟文件缓存，按现有多源顺序抓取盘后全量 A 股。"""
     await _verify_cn_trade_date(trade_date)
@@ -299,6 +430,30 @@ async def fetch_cn_stocks(trade_date: date) -> CollectedMarketDailyBars:
         if len(records) < _CN_MIN_STOCK_COUNT:
             errors.append(f"{source}:only-{len(records)}")
             continue
+        try:
+            coverage = await _validate_cn_master_coverage(records, trade_date)
+        except Exception as error:
+            errors.append(f"{source}:coverage:{error}")
+            continue
+        try:
+            crosscheck = await _crosscheck_cn_snapshot(records)
+        except SnapshotCrosscheckUnavailableError as error:
+            crosscheck = {"status": "degraded", "reason": str(error)}
+            logger.warning(
+                "A 股盘后快照抽样校验降级: source=%s reason=%s",
+                source,
+                error,
+            )
+        except Exception as error:
+            errors.append(f"{source}:crosscheck:{error}")
+            continue
+        logger.info(
+            "A 股盘后快照验收通过: source=%s rows=%s coverage=%s crosscheck=%s",
+            source,
+            len(records),
+            {key: f"{value:.2%}" for key, value in coverage.items()},
+            crosscheck,
+        )
         return CollectedMarketDailyBars(segment="cn_stock", trade_date=trade_date, source=source, records=records)
     raise RuntimeError(f"A 股市场日行情不完整: {', '.join(errors)}")
 

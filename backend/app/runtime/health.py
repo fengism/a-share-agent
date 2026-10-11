@@ -73,6 +73,11 @@ async def operational_snapshots() -> OperationalSnapshot:
         semaphore=database_semaphore,
     )
     application_metrics = metrics.snapshot()
+    from app.infrastructure.providers.sina.provider import sina_snapshot_health_snapshot
+
+    application_metrics["market_snapshots"] = {
+        "sina_full_market": sina_snapshot_health_snapshot(),
+    }
     persistence_metrics = dict(application_metrics.get("persistence", {}))
     persistence_metrics["databases"] = databases
     persistence_metrics["history_indexes"] = history_indexes

@@ -33,6 +33,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  CloudSyncOutlined,
 } from "@ant-design/icons";
 import { apiDownload } from "../../api/client";
 import {
@@ -43,6 +44,7 @@ import {
   usePreviewStockConceptImport,
   useStockConceptRecords,
   useStockConceptStatus,
+  useTriggerStockConceptEnrich,
   useUpdateStockConceptRecord,
 } from "../../api/queries";
 import type {
@@ -447,6 +449,26 @@ export default function StockConceptPage() {
   const createRecord = useCreateStockConceptRecord();
   const updateRecord = useUpdateStockConceptRecord();
   const deleteRecord = useDeleteStockConceptRecord();
+  const triggerEnrich = useTriggerStockConceptEnrich();
+
+  const handleTriggerEnrich = () => {
+    triggerEnrich.mutate(
+      { batch_size: 20, delay_seconds: 0.5 },
+      {
+        onSuccess: (res) => {
+          const { enriched, processed, remaining } = res.data;
+          if (enriched > 0) {
+            message.success(`已在线补全 ${enriched} 只股票的官方概念 (剩余未录入: ${remaining})`);
+          } else if (processed > 0) {
+            message.info(`本次处理 ${processed} 只股票，无新概念增量 (剩余未录入: ${remaining})`);
+          } else {
+            message.success("当前所有 A 股概念均已录入齐全，无需补充");
+          }
+        },
+        onError: (err) => message.error(`在线补全失败: ${errorMessage(err)}`),
+      }
+    );
+  };
 
   const updateFilter = (patch: Partial<StockConceptListFilters>) => {
     setFilters((current) => ({ ...current, ...patch, page: patch.page ?? 1 }));
@@ -615,6 +637,17 @@ export default function StockConceptPage() {
           >
             刷新数据
           </Button>
+          {isAdmin && (
+            <Tooltip title="针对缺失概念的 A 股，免 Token 从同花顺官方在线爬取最新概念并入库">
+              <Button
+                icon={<CloudSyncOutlined />}
+                loading={triggerEnrich.isPending}
+                onClick={handleTriggerEnrich}
+              >
+                在线自动补全
+              </Button>
+            </Tooltip>
+          )}
           <Button
             icon={<DownloadOutlined />}
             loading={exporting}

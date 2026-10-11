@@ -1,5 +1,5 @@
 import { DatabaseOutlined } from "@ant-design/icons";
-import { Col, InputNumber, Row, Switch } from "antd";
+import { Col, InputNumber, Row, Space, Switch } from "antd";
 import { useColors, useStyles } from "../../styles/ui";
 import { SettingsCard, type ConfigCardProps } from "./SettingsCard";
 
@@ -14,6 +14,8 @@ export default function BackupRetentionCard({
   onChange,
   onSave,
   isSaving,
+  isDirty,
+  onReset,
 }: ConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
@@ -28,6 +30,8 @@ export default function BackupRetentionCard({
       saveLabel="保存备份配置"
       onSave={onSave}
       isSaving={isSaving}
+      isDirty={isDirty}
+      onReset={onReset}
     >
       <Row gutter={[16, 16]}>
         <Col xs={12} md={6}>
@@ -61,40 +65,44 @@ export default function BackupRetentionCard({
 
         <Col xs={12} md={6}>
           <div style={fieldLabelStyle}>大库备份周期 (天)</div>
-          <InputNumber
-            aria-label="大库备份周期"
-            min={1}
-            max={90}
-            addonAfter="天"
-            disabled={!includeMarketDaily}
-            value={form.market_daily_backup_interval_days ?? DEFAULT_MARKET_DAILY_INTERVAL_DAYS}
-            onChange={(value) =>
-              onChange({
-                market_daily_backup_interval_days:
-                  value ?? DEFAULT_MARKET_DAILY_INTERVAL_DAYS,
-              })
-            }
-            style={{ width: "100%" }}
-          />
+          <Space.Compact style={{ width: "100%" }}>
+            <InputNumber
+              aria-label="大库备份周期"
+              min={1}
+              max={90}
+              disabled={!includeMarketDaily}
+              value={form.market_daily_backup_interval_days ?? DEFAULT_MARKET_DAILY_INTERVAL_DAYS}
+              onChange={(value) =>
+                onChange({
+                  market_daily_backup_interval_days:
+                    value ?? DEFAULT_MARKET_DAILY_INTERVAL_DAYS,
+                })
+              }
+              style={{ width: "100%" }}
+            />
+            <span className="ant-input-group-addon" style={{ display: "inline-flex", alignItems: "center", padding: "0 11px", background: "var(--c-nested-bg)", border: "1px solid var(--c-border)", borderLeft: 0, borderRadius: "0 6px 6px 0", color: "var(--c-text-secondary)", fontSize: "var(--c-font-sm)" }}>天</span>
+          </Space.Compact>
         </Col>
 
         <Col xs={12} md={6}>
           <div style={fieldLabelStyle}>大库压缩级别 (1-9)</div>
-          <InputNumber
-            aria-label="大库压缩级别"
-            min={1}
-            max={9}
-            addonAfter="级"
-            disabled={!includeMarketDaily}
-            value={form.market_daily_backup_compression_level ?? DEFAULT_MARKET_DAILY_COMPRESSION_LEVEL}
-            onChange={(value) =>
-              onChange({
-                market_daily_backup_compression_level:
-                  value ?? DEFAULT_MARKET_DAILY_COMPRESSION_LEVEL,
-              })
-            }
-            style={{ width: "100%" }}
-          />
+          <Space.Compact style={{ width: "100%" }}>
+            <InputNumber
+              aria-label="大库压缩级别"
+              min={1}
+              max={9}
+              disabled={!includeMarketDaily}
+              value={form.market_daily_backup_compression_level ?? DEFAULT_MARKET_DAILY_COMPRESSION_LEVEL}
+              onChange={(value) =>
+                onChange({
+                  market_daily_backup_compression_level:
+                    value ?? DEFAULT_MARKET_DAILY_COMPRESSION_LEVEL,
+                })
+              }
+              style={{ width: "100%" }}
+            />
+            <span className="ant-input-group-addon" style={{ display: "inline-flex", alignItems: "center", padding: "0 11px", background: "var(--c-nested-bg)", border: "1px solid var(--c-border)", borderLeft: 0, borderRadius: "0 6px 6px 0", color: "var(--c-text-secondary)", fontSize: "var(--c-font-sm)" }}>级</span>
+          </Space.Compact>
         </Col>
 
         <Col span={24}>

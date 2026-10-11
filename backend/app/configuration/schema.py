@@ -222,6 +222,7 @@ class Settings(BaseSettings):
     provider_retry_jitter_seconds: float = 0.1
 
     tdxhub_timeout_seconds: float = Field(default=10.0, gt=0)
+    sina_hq_page_workers: int = Field(default=4, ge=1, le=8)
     # 单次历史资金流备选查询的总 I/O 预算（包含连接、分页和逐日聚合）。
     tdxhub_fund_flow_timeout_seconds: float = Field(default=60.0, gt=0, le=90)
 

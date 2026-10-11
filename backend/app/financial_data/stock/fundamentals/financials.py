@@ -159,6 +159,35 @@ async def _get_hk_revenue_breakdown(code: str) -> RevenueBreakdown:
     return await _revenue_breakdown_singleflight.do(cache_key, load_and_cache)
 
 
+async def _load_hk_financial_statement(
+    hk_code: str,
+    indicator: str,
+    cache_key: str,
+) -> list[dict]:
+    try:
+        records = await provider_gateway.call_blocking(
+            "ths",
+            f"hk_financials_{indicator}",
+            _get_ths_provider().fetch_hk_financial_statement,
+            hk_code,
+            indicator,
+            limit=_FINANCIAL_FETCH_PERIODS,
+            semaphore=ths_semaphore,
+        )
+    except Exception as error:
+        raise UpstreamUnavailableError(f"{hk_code} 财务报表上游暂时不可用") from error
+    result = _normalize_financial_statement_records(records)
+    logger.info(
+        "HK financial statement loaded code=%s indicator=%s source=ths rows=%s latest_report_date=%s",
+        hk_code,
+        indicator,
+        len(result),
+        next((row.get("REPORT_DATE") for row in result), None),
+    )
+    cache.set(cache_key, result, ttl=_FINANCIAL_CACHE_TTL_SECONDS)
+    return result
+
+
 async def get_financial(code: str, indicator: str = "balance") -> list[dict]:
     """获取股票最近 4 期财报数据，并复用同类型报表加载结果。
 
@@ -171,7 +200,25 @@ async def get_financial(code: str, indicator: str = "balance") -> list[dict]:
     if indicator not in _FINANCIAL_INDICATORS:
         raise ValueError(f"不支持的财报类型: {indicator}")
     if is_hk_code(code):
-        return []
+        hk_code = normalize_hk_code(code)
+        cache_key = dated_cache_key_no_day(
+            "financial", _FINANCIAL_CACHE_SCHEMA, f"HK{hk_code}", indicator
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            try:
+                return _normalize_financial_statement_records(cached)
+            except (TypeError, ValueError) as error:
+                logger.warning(
+                    "港股财务报表缓存格式异常，重新回源: code=%s indicator=%s error_type=%s",
+                    hk_code,
+                    indicator,
+                    type(error).__name__,
+                )
+        return await _financial_statement_singleflight.do(
+            cache_key,
+            lambda: _load_hk_financial_statement(hk_code, indicator, cache_key),
+        )
     sym = normalize_code(code)
     cache_key = dated_cache_key_no_day("financial", _FINANCIAL_CACHE_SCHEMA, sym.prefixed_upper, indicator)
     cached = cache.get(cache_key)
@@ -406,8 +453,35 @@ async def get_financial_metrics(code: str) -> FinancialMetrics:
         FinancialMetrics 模型对象，包含本地化字段名的指标字典
     """
     if is_hk_code(code):
-        norm_code = normalize_hk_code(code)
-        return FinancialMetrics(code=norm_code, latest_report_date=None, metrics={})
+        hk_code = normalize_hk_code(code)
+        cache_key = dated_cache_key_no_day(
+            "financial_metrics", _FINANCIAL_CACHE_SCHEMA, f"HK{hk_code}"
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return FinancialMetrics.model_validate(cached)
+
+        async def load_hk_and_cache() -> FinancialMetrics:
+            cached_inside_flight = cache.get(cache_key)
+            if cached_inside_flight is not None:
+                return FinancialMetrics.model_validate(cached_inside_flight)
+            try:
+                payload = await provider_gateway.call_blocking(
+                    "ths",
+                    "hk_financial_metrics",
+                    _get_ths_provider().fetch_hk_financial_metrics,
+                    hk_code,
+                    semaphore=ths_semaphore,
+                )
+                result = FinancialMetrics.model_validate(payload)
+            except Exception as error:
+                raise UpstreamUnavailableError(
+                    f"{hk_code} 财务指标上游暂时不可用"
+                ) from error
+            cache.set(cache_key, result, ttl=_FINANCIAL_CACHE_TTL_SECONDS)
+            return result
+
+        return await _financial_metrics_singleflight.do(cache_key, load_hk_and_cache)
 
     sym = normalize_code(code)
     cache_key = dated_cache_key_no_day("financial_metrics", _FINANCIAL_CACHE_SCHEMA, sym.prefixed_upper)

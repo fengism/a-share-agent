@@ -14,6 +14,8 @@ export default function AnySearchConfigCard({
   isSaving,
   configured = false,
   stretch,
+  isDirty,
+  onReset,
 }: AnySearchConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
@@ -26,6 +28,8 @@ export default function AnySearchConfigCard({
       onSave={onSave}
       isSaving={isSaving}
       stretch={stretch}
+      isDirty={isDirty}
+      onReset={onReset}
     >
       <Row gutter={[24, 16]}>
         <Col span={24}>

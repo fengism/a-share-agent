@@ -10,7 +10,13 @@ from app.modules.industry_chain.atlas.miner import mining_slug
 def matching_atlas_chain(name: str) -> AtlasChain | None:
     normalized = name.strip()
     chains = list_atlas_chains()
-    exact = [chain for chain in chains if chain.name == normalized or normalized in (chain.aliases or [])]
+    # 优先严格匹配 chain.name
+    name_matches = [chain for chain in chains if chain.name == normalized]
+    if name_matches:
+        curated_name = [chain for chain in name_matches if not chain.slug.startswith("auto-")]
+        return (curated_name or name_matches)[0]
+
+    exact = [chain for chain in chains if normalized in (chain.aliases or [])]
     curated = [chain for chain in exact if not chain.slug.startswith("auto-")]
     matched = (curated or exact)[0] if len(curated or exact) == 1 else None
     if matched is None and not exact:

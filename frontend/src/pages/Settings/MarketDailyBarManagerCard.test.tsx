@@ -8,11 +8,18 @@ const mocks = vi.hoisted(() => ({
   deleteMutate: vi.fn(),
   factorRefreshMutate: vi.fn(),
   factorInvalidateMutate: vi.fn(),
+  backfillCreateMutate: vi.fn(),
+  backfillCancelMutate: vi.fn(),
+  backfillRetryMutate: vi.fn(),
   refetch: vi.fn(),
   factorRefetch: vi.fn(),
 }));
 
 vi.mock("../../api/queries", () => ({
+  useMarketDailyBackfills: () => ({ data: { items: [], total: 0 }, isFetching: false }),
+  useCreateMarketDailyBackfill: () => ({ mutate: mocks.backfillCreateMutate, isPending: false }),
+  useCancelMarketDailyBackfill: () => ({ mutate: mocks.backfillCancelMutate, isPending: false }),
+  useRetryFailedMarketDailyBackfill: () => ({ mutate: mocks.backfillRetryMutate, isPending: false }),
   useMarketDailyRefreshHistory: () => ({
     data: {
       items: [
@@ -139,6 +146,8 @@ describe("MarketDailyBarManagerCard", () => {
     );
 
     expect(screen.getByText("实时行情由行情页面自动拉取")).toBeInTheDocument();
+    expect(screen.getByText("A 股全市场历史回填")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /创建历史回填任务/ })).toBeInTheDocument();
     expect(screen.getByText(/不会把盘中价格写入日线库/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "保存归档配置" }));
     expect(onSave).toHaveBeenCalledTimes(1);

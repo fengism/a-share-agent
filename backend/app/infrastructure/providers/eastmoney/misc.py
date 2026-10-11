@@ -27,7 +27,43 @@ class MiscMixin:
 
     def fetch_company_survey(self, stock_code: str, exchange: str = ""):
         raw_code = stock_code.split(".")[0]
-        ex = exchange.upper() if exchange else ("SH" if raw_code.startswith("6") else "SZ")
+        ex = exchange.upper() if exchange else ("HK" if "." in stock_code and stock_code.upper().endswith(".HK") else ("SH" if raw_code.startswith("6") else "SZ"))
+        if ex == "HK" or len(raw_code) == 5:
+            # 港股 F10 接口
+            response = self.em_get_response(
+                "https://emweb.securities.eastmoney.com/PC_HKF10/CompanyProfile/PageAjax",
+                params={"code": raw_code.zfill(5)},
+                headers={"Referer": "https://emweb.securities.eastmoney.com/"},
+                timeout=8,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise ValueError("东方财富港股公司概况返回格式无效")
+            # 转换为通用字段结构
+            gszl = payload.get("gszl") or {}
+            zqzl = payload.get("zqzl") or {}
+            ssrq = zqzl.get("ssrq")
+            if ssrq and " " in str(ssrq):
+                ssrq = str(ssrq).split(" ")[0].replace("/", "-")
+            return {
+                "jbzl": {
+                    "gsmc": gszl.get("gsmc"),
+                    "frdb": gszl.get("dsz"),
+                    "zczb": gszl.get("zczb"),
+                    "gswz": gszl.get("gswz"),
+                    "qy": gszl.get("zcd"),
+                    "bgdz": gszl.get("bgdz"),
+                    "zcdz": gszl.get("zcdz"),
+                    "gsjj": gszl.get("gsjs") or gszl.get("gsms"),
+                    "sshy": gszl.get("sshy"),
+                },
+                "fxxg": {
+                    "clrq": gszl.get("gsclrq"),
+                    "ssrq": ssrq,
+                },
+            }
+
         response = self.em_get_response(
             "https://emweb.securities.eastmoney.com/PC_HSF10/CompanySurvey/CompanySurveyAjax",
             params={"code": f"{ex}{raw_code}"},

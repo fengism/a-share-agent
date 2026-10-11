@@ -69,10 +69,14 @@ from app.modules.market_daily.adjustment import (
     invalidate_adjustment_factors,
     refresh_adjustment_factors,
 )
+from app.modules.market_daily.backfill import market_daily_backfill_service
 from app.modules.market_daily.models import (
     MarketAdjustmentFactorInvalidateRequest,
     MarketAdjustmentFactorRefreshRequest,
     MarketAdjustmentFactorStatus,
+    MarketDailyBackfillJob,
+    MarketDailyBackfillJobList,
+    MarketDailyBackfillRequest,
     MarketDailyBarDeleteRequest,
     MarketDailyBarDeleteResult,
     MarketDailyBarPage,
@@ -198,6 +202,49 @@ async def get_market_wind():
 async def get_market_wind_stocks(plate_code: str):
     """获取指定风口板块的龙头股。"""
     return await get_market_wind_stocks_service(plate_code)
+
+
+@router.post("/daily-bars/backfill", response_model=MarketDailyBackfillJob)
+async def create_market_daily_backfill(
+    request: MarketDailyBackfillRequest,
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    """创建 A 股全市场历史日线后台回填任务。"""
+    return await market_daily_backfill_service.create(request)
+
+
+@router.get("/daily-bars/backfill", response_model=MarketDailyBackfillJobList)
+async def list_market_daily_backfills(
+    limit: int = Query(20, ge=1, le=100),
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    """查看历史日线回填任务与进度。"""
+    return await market_daily_backfill_service.list_jobs(limit=limit)
+
+
+@router.get("/daily-bars/backfill/{job_id}", response_model=MarketDailyBackfillJob)
+async def get_market_daily_backfill(
+    job_id: str,
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    return await market_daily_backfill_service.get(job_id)
+
+
+@router.post("/daily-bars/backfill/{job_id}/retry-failed", response_model=MarketDailyBackfillJob)
+async def retry_failed_market_daily_backfill(
+    job_id: str,
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    """仅重试历史回填任务中的失败股票。"""
+    return await market_daily_backfill_service.retry_failed(job_id)
+
+
+@router.post("/daily-bars/backfill/{job_id}/cancel", response_model=MarketDailyBackfillJob)
+async def cancel_market_daily_backfill(
+    job_id: str,
+    _user: AuthenticatedUser = Depends(require_admin),
+):
+    return await market_daily_backfill_service.cancel(job_id)
 
 
 @router.get("/daily-bars", response_model=MarketDailyBarPage)

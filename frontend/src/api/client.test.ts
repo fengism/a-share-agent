@@ -15,6 +15,11 @@ describe("api client request lifecycle", () => {
     vi.unstubAllGlobals();
   });
 
+  it("keeps screener requests on a five-minute timeout budget", () => {
+    expect(API_TIMEOUTS.SCREENER).toBe(300_000);
+    expect(API_TIMEOUTS.SCREENER).toBeGreaterThan(API_TIMEOUTS.DEFAULT);
+  });
+
   it("propagates a caller abort signal to the underlying fetch", async () => {
     let fetchSignal: AbortSignal | undefined;
     let resolveFetch: ((value: Response) => void) | undefined;

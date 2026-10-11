@@ -87,7 +87,8 @@ def _normalize_kline_rows(rows: list[dict], start_date: date, end_date: date) ->
     normalized["收盘"] = _numeric_column(frame, "close_px")
     normalized["最高"] = _numeric_column(frame, "high_px")
     normalized["最低"] = _numeric_column(frame, "low_px")
-    normalized["成交量"] = _numeric_column(frame, "business_amount") / 100
+    # 财联社 business_amount 原始单位为股；统一历史日线契约使用股。
+    normalized["成交量"] = _numeric_column(frame, "business_amount")
     normalized["成交额"] = _numeric_column(frame, "business_balance")
     normalized["振幅"] = (_numeric_column(frame, "amp") * 100).round(6)
     normalized["换手率"] = (_numeric_column(frame, "tr") * 100).round(6)

@@ -36,6 +36,8 @@ export default function LlmConfigCard({
   isSaving,
   onProviderChange,
   providerDefaults,
+  isDirty,
+  onReset,
 }: LlmConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
@@ -74,6 +76,8 @@ export default function LlmConfigCard({
       saveLabel="保存大模型配置"
       onSave={onSave}
       isSaving={isSaving}
+      isDirty={isDirty}
+      onReset={onReset}
     >
       <p style={{ color: "var(--c-text-muted)", marginTop: 0 }}>
         全局 Key 仅可用于全局调用目标。自定义 Provider、Base URL、API 模式 / 版本或 LiteLLM 模型时，
@@ -125,7 +129,28 @@ export default function LlmConfigCard({
           <Input
             value={form.llm_base_url || ""}
             onChange={(event) => onChange({ llm_base_url: event.target.value })}
+            placeholder={selectedDefaults?.base_url || "https://api.openai.com/v1"}
           />
+          {selectedDefaults?.base_url ? (
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px", alignItems: "center" }}>
+              <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>预设地址:</span>
+              <Tag
+                style={{
+                  cursor: "pointer",
+                  fontSize: "var(--c-font-xs)",
+                  marginInlineEnd: 0,
+                  borderRadius: "4px",
+                  background: form.llm_base_url === selectedDefaults.base_url ? "var(--c-primary-soft)" : undefined,
+                  borderColor: form.llm_base_url === selectedDefaults.base_url ? "var(--c-primary)" : undefined,
+                  color: form.llm_base_url === selectedDefaults.base_url ? "var(--c-primary)" : undefined,
+                }}
+                onClick={() => onChange({ llm_base_url: selectedDefaults.base_url })}
+                title="点击填充官方默认 Base URL"
+              >
+                {selectedDefaults.base_url}
+              </Tag>
+            </div>
+          ) : null}
         </Col>
         <Col span={24} sm={12}>
           <div style={fieldLabelStyle}>Model</div>

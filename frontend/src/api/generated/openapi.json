@@ -12382,6 +12382,251 @@
         "title": "MarketBreadthSnapshot",
         "type": "object"
       },
+      "MarketDailyBackfillJob": {
+        "properties": {
+          "average_quality_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Quality Score"
+          },
+          "cancel_requested": {
+            "default": false,
+            "title": "Cancel Requested",
+            "type": "boolean"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "completed_instruments": {
+            "minimum": 0.0,
+            "title": "Completed Instruments",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Code"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "failed_instruments": {
+            "minimum": 0.0,
+            "title": "Failed Instruments",
+            "type": "integer"
+          },
+          "failure_details": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Failure Details",
+            "type": "array"
+          },
+          "instrument_type": {
+            "const": "stock",
+            "title": "Instrument Type",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "market": {
+            "const": "cn",
+            "title": "Market",
+            "type": "string"
+          },
+          "max_provider_sources": {
+            "title": "Max Provider Sources",
+            "type": "integer"
+          },
+          "overwrite_existing": {
+            "title": "Overwrite Existing",
+            "type": "boolean"
+          },
+          "retryable_failed_instruments": {
+            "minimum": 0.0,
+            "title": "Retryable Failed Instruments",
+            "type": "integer"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stored_bars": {
+            "minimum": 0.0,
+            "title": "Stored Bars",
+            "type": "integer"
+          },
+          "succeeded_instruments": {
+            "minimum": 0.0,
+            "title": "Succeeded Instruments",
+            "type": "integer"
+          },
+          "total_instruments": {
+            "minimum": 0.0,
+            "title": "Total Instruments",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "market",
+          "instrument_type",
+          "start_date",
+          "end_date",
+          "overwrite_existing",
+          "max_provider_sources",
+          "status",
+          "total_instruments",
+          "completed_instruments",
+          "succeeded_instruments",
+          "failed_instruments",
+          "retryable_failed_instruments",
+          "stored_bars",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "MarketDailyBackfillJob",
+        "type": "object"
+      },
+      "MarketDailyBackfillJobList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MarketDailyBackfillJob"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "MarketDailyBackfillJobList",
+        "type": "object"
+      },
+      "MarketDailyBackfillRequest": {
+        "properties": {
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "instrument_type": {
+            "const": "stock",
+            "default": "stock",
+            "title": "Instrument Type",
+            "type": "string"
+          },
+          "market": {
+            "const": "cn",
+            "default": "cn",
+            "title": "Market",
+            "type": "string"
+          },
+          "max_provider_sources": {
+            "default": 4,
+            "maximum": 6.0,
+            "minimum": 2.0,
+            "title": "Max Provider Sources",
+            "type": "integer"
+          },
+          "overwrite_existing": {
+            "default": false,
+            "title": "Overwrite Existing",
+            "type": "boolean"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_date",
+          "end_date"
+        ],
+        "title": "MarketDailyBackfillRequest",
+        "type": "object"
+      },
       "MarketDailyBar": {
         "properties": {
           "adjustment": {
@@ -26804,7 +27049,7 @@
   },
   "info": {
     "title": "A股智能分析系统",
-    "version": "0.7.0"
+    "version": "0.7.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -32142,6 +32387,244 @@
         ]
       }
     },
+    "/api/market/daily-bars/backfill": {
+      "get": {
+        "description": "查看历史日线回填任务与进度。",
+        "operationId": "list_market_daily_backfills_api_market_daily_bars_backfill_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDailyBackfillJobList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Market Daily Backfills",
+        "tags": [
+          "market"
+        ]
+      },
+      "post": {
+        "description": "创建 A 股全市场历史日线后台回填任务。",
+        "operationId": "create_market_daily_backfill_api_market_daily_bars_backfill_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarketDailyBackfillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDailyBackfillJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Market Daily Backfill",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/daily-bars/backfill/{job_id}": {
+      "get": {
+        "operationId": "get_market_daily_backfill_api_market_daily_bars_backfill__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDailyBackfillJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Market Daily Backfill",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/daily-bars/backfill/{job_id}/cancel": {
+      "post": {
+        "operationId": "cancel_market_daily_backfill_api_market_daily_bars_backfill__job_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDailyBackfillJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cancel Market Daily Backfill",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/daily-bars/backfill/{job_id}/retry-failed": {
+      "post": {
+        "description": "仅重试历史回填任务中的失败股票。",
+        "operationId": "retry_failed_market_daily_backfill_api_market_daily_bars_backfill__job_id__retry_failed_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDailyBackfillJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retry Failed Market Daily Backfill",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/api/market/daily-bars/delete": {
       "post": {
         "description": "管理员清理指定日期数据，并可在清理后立即重建。",
@@ -35961,6 +36444,66 @@
           }
         ],
         "summary": "Get Concepts",
+        "tags": [
+          "stock-concept"
+        ]
+      }
+    },
+    "/api/stock-concept/enrich": {
+      "post": {
+        "operationId": "trigger_auto_enrich_api_stock_concept_enrich_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "batch_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Batch Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "delay_seconds",
+            "required": false,
+            "schema": {
+              "default": 0.5,
+              "maximum": 5.0,
+              "minimum": 0.1,
+              "title": "Delay Seconds",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Trigger Auto Enrich",
         "tags": [
           "stock-concept"
         ]

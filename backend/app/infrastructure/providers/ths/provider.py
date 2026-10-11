@@ -5,9 +5,11 @@ from collections.abc import Callable
 import requests
 
 import app.infrastructure.providers.ths.business_intro as business_intro
+import app.infrastructure.providers.ths.concept as concept
 import app.infrastructure.providers.ths.forecast as forecast
 import app.infrastructure.providers.ths.hk_composition as hk_composition
 import app.infrastructure.providers.ths.hk_field as hk_field
+import app.infrastructure.providers.ths.hk_financials as hk_financials
 import app.infrastructure.providers.ths.hot_rank as hot_rank
 import app.infrastructure.providers.ths.hsgt as hsgt
 import app.infrastructure.providers.ths.volume as volume
@@ -54,11 +56,33 @@ class ThsDataProvider:
     def fetch_stock_business_intro(self, code: str):
         return business_intro.fetch_stock_business_intro(self._transport, code)
 
+    def fetch_stock_concepts(self, code: str) -> list[str]:
+        return concept.fetch_stock_concepts(self._transport, code)
+
     def fetch_hk_revenue_breakdown(self, code: str):
         return hk_composition.fetch_hk_revenue_breakdown(self._transport, code)
 
     def fetch_hk_industry_comparison(self, code: str):
         return hk_field.fetch_hk_industry_comparison(self._transport, code)
+
+    def fetch_hk_financial_statement(
+        self,
+        code: str,
+        indicator: str,
+        *,
+        period_type: str = "report",
+        limit: int = 4,
+    ):
+        return hk_financials.fetch_hk_financial_statement(
+            self._transport,
+            code,
+            indicator,
+            period_type=period_type,
+            limit=limit,
+        )
+
+    def fetch_hk_financial_metrics(self, code: str):
+        return hk_financials.fetch_hk_financial_metrics(self._transport, code)
 
     def fetch_stock_forecast_reports(self, code: str):
         return forecast.fetch_stock_forecast_reports(self._transport, code)

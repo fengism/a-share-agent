@@ -107,7 +107,8 @@ class TencentDataProvider:
         big_df["close"] = pd.to_numeric(big_df["close"], errors="coerce")
         big_df["high"] = pd.to_numeric(big_df["high"], errors="coerce")
         big_df["low"] = pd.to_numeric(big_df["low"], errors="coerce")
-        big_df["volume"] = pd.to_numeric(big_df["volume"], errors="coerce")
+        # 腾讯日线 volume 单位为手、amount 单位为万元；统一为股和元。
+        big_df["volume"] = pd.to_numeric(big_df["volume"], errors="coerce") * 100
         big_df["amount"] = pd.to_numeric(big_df["amount"], errors="coerce") * 10000
         big_df["turnover_pct"] = pd.to_numeric(big_df["turnover_pct"], errors="coerce")
         big_df = big_df.dropna(subset=["date"]).drop_duplicates(ignore_index=True)

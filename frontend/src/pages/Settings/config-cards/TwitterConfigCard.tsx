@@ -3,7 +3,15 @@ import { Col, Input, Row } from "antd";
 import { useColors, useStyles } from "../../../styles/ui";
 import { SettingsCard, type ConfigCardProps } from "../SettingsCard";
 
-export default function TwitterConfigCard({ form, onChange, onSave, isSaving, stretch }: ConfigCardProps) {
+export default function TwitterConfigCard({
+  form,
+  onChange,
+  onSave,
+  isSaving,
+  stretch,
+  isDirty,
+  onReset,
+}: ConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
 
@@ -15,6 +23,8 @@ export default function TwitterConfigCard({ form, onChange, onSave, isSaving, st
       onSave={onSave}
       isSaving={isSaving}
       stretch={stretch}
+      isDirty={isDirty}
+      onReset={onReset}
     >
       <Row gutter={[24, 16]}>
         <Col span={24}>

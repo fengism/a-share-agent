@@ -158,6 +158,58 @@ CREATE TABLE IF NOT EXISTS market_daily_refresh_runs (
 CREATE INDEX IF NOT EXISTS idx_market_daily_refresh_runs_job
 ON market_daily_refresh_runs(trade_date DESC, checkpoint, segment, refreshed_at DESC);
 
+
+CREATE TABLE IF NOT EXISTS market_daily_backfill_jobs (
+    job_id                   TEXT PRIMARY KEY,
+    market                   TEXT NOT NULL CHECK (market = 'cn'),
+    instrument_type          TEXT NOT NULL CHECK (instrument_type = 'stock'),
+    start_date               TEXT NOT NULL,
+    end_date                 TEXT NOT NULL,
+    overwrite_existing       INTEGER NOT NULL DEFAULT 0 CHECK (overwrite_existing IN (0, 1)),
+    max_provider_sources     INTEGER NOT NULL DEFAULT 4 CHECK (max_provider_sources BETWEEN 2 AND 6),
+    status                   TEXT NOT NULL CHECK (status IN ('pending', 'running', 'succeeded', 'failed', 'cancelled')),
+    total_instruments        INTEGER NOT NULL DEFAULT 0 CHECK (total_instruments >= 0),
+    completed_instruments    INTEGER NOT NULL DEFAULT 0 CHECK (completed_instruments >= 0),
+    succeeded_instruments    INTEGER NOT NULL DEFAULT 0 CHECK (succeeded_instruments >= 0),
+    failed_instruments       INTEGER NOT NULL DEFAULT 0 CHECK (failed_instruments >= 0),
+    retryable_failed_instruments INTEGER NOT NULL DEFAULT 0 CHECK (retryable_failed_instruments >= 0),
+    average_quality_score    REAL,
+    stored_bars              INTEGER NOT NULL DEFAULT 0 CHECK (stored_bars >= 0),
+    current_code             TEXT,
+    last_error               TEXT,
+    failure_details_json     TEXT NOT NULL DEFAULT '[]',
+    cancel_requested         INTEGER NOT NULL DEFAULT 0 CHECK (cancel_requested IN (0, 1)),
+    lease_owner              TEXT,
+    lease_expires_at         TEXT,
+    created_at               TEXT NOT NULL,
+    started_at               TEXT,
+    completed_at             TEXT,
+    updated_at               TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_market_daily_backfill_jobs_status_created
+ON market_daily_backfill_jobs(status, created_at);
+
+
+CREATE TABLE IF NOT EXISTS market_daily_backfill_items (
+    job_id                   TEXT NOT NULL,
+    code                     TEXT NOT NULL,
+    name                     TEXT NOT NULL DEFAULT '',
+    exchange                 TEXT NOT NULL,
+    status                   TEXT NOT NULL CHECK (status IN ('pending', 'running', 'succeeded', 'failed', 'skipped')),
+    attempts                 INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    stored_bars              INTEGER NOT NULL DEFAULT 0 CHECK (stored_bars >= 0),
+    source                   TEXT,
+    quality_score            REAL,
+    validation_json          TEXT,
+    failure_kind             TEXT,
+    last_error               TEXT,
+    updated_at               TEXT NOT NULL,
+    PRIMARY KEY (job_id, code),
+    FOREIGN KEY (job_id) REFERENCES market_daily_backfill_jobs(job_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_market_daily_backfill_items_status
+ON market_daily_backfill_items(job_id, status, code);
+
 CREATE TABLE IF NOT EXISTS market_corporate_actions (
     market          TEXT NOT NULL CHECK (market IN ('cn', 'hk')),
     code            TEXT NOT NULL,
@@ -833,6 +885,7 @@ class _ConnectionScope:
 # 逐方法新建连接 = 一次盘中 K 线读取开约 7 个连接。
 _local = threading.local()
 _close_lock = threading.Lock()
+_init_lock = threading.Lock()
 _open_connections: list[sqlite3.Connection] = []
 _initialized_paths: set[str] = set()
 
@@ -895,43 +948,67 @@ class MarketDailyBarRepository:
         with _close_lock:
             if key in _initialized_paths:
                 return
-        with self._connect() as connection:
-            _execute_schema(connection)
-            state_columns = _table_columns(connection, "market_adjustment_factor_state")
-            if "last_checked_at" not in state_columns:
-                connection.execute(
-                    "ALTER TABLE market_adjustment_factor_state ADD COLUMN last_checked_at TEXT"
-                )
-                connection.execute(
-                    "UPDATE market_adjustment_factor_state SET last_checked_at=calculated_at "
-                    "WHERE last_checked_at IS NULL"
-                )
-            if "last_error" not in state_columns:
-                connection.execute(
-                    "ALTER TABLE market_adjustment_factor_state ADD COLUMN last_error TEXT"
-                )
-            if "using_last_good" not in state_columns:
-                connection.execute(
-                    "ALTER TABLE market_adjustment_factor_state ADD COLUMN using_last_good INTEGER NOT NULL DEFAULT 0"
-                )
-            job_columns = _table_columns(connection, "market_daily_bar_refresh_jobs")
-            for column in ("attempt_id", "lease_expires_at", "worker_id"):
-                if column not in job_columns:
+        with _init_lock:
+            with _close_lock:
+                if key in _initialized_paths:
+                    return
+            with self._connect() as connection:
+                _execute_schema(connection)
+                state_columns = _table_columns(connection, "market_adjustment_factor_state")
+                if "last_checked_at" not in state_columns:
                     connection.execute(
-                        f"ALTER TABLE market_daily_bar_refresh_jobs ADD COLUMN {column} TEXT"
+                        "ALTER TABLE market_adjustment_factor_state ADD COLUMN last_checked_at TEXT"
                     )
-            for table in ("market_daily_bars", "market_daily_bar_observations"):
-                columns = _table_columns(connection, table)
-                for column in ("content_hash", "provenance_hash"):
-                    if column not in columns:
-                        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
-                if "turnover_pct" not in columns:
-                    connection.execute(f"ALTER TABLE {table} ADD COLUMN turnover_pct REAL")
-            _migrate_allow_hk_corporate_actions_and_factors(connection)
-            _record_migration_ledger(connection, 1)
-            connection.execute("PRAGMA user_version=1")
-        with _close_lock:
-            _initialized_paths.add(key)
+                    connection.execute(
+                        "UPDATE market_adjustment_factor_state SET last_checked_at=calculated_at "
+                        "WHERE last_checked_at IS NULL"
+                    )
+                if "last_error" not in state_columns:
+                    connection.execute(
+                        "ALTER TABLE market_adjustment_factor_state ADD COLUMN last_error TEXT"
+                    )
+                if "using_last_good" not in state_columns:
+                    connection.execute(
+                        "ALTER TABLE market_adjustment_factor_state ADD COLUMN using_last_good INTEGER NOT NULL DEFAULT 0"
+                    )
+                backfill_job_columns = _table_columns(connection, "market_daily_backfill_jobs")
+                if "retryable_failed_instruments" not in backfill_job_columns:
+                    connection.execute(
+                        "ALTER TABLE market_daily_backfill_jobs "
+                        "ADD COLUMN retryable_failed_instruments INTEGER NOT NULL DEFAULT 0"
+                    )
+                if "average_quality_score" not in backfill_job_columns:
+                    connection.execute(
+                        "ALTER TABLE market_daily_backfill_jobs ADD COLUMN average_quality_score REAL"
+                    )
+                backfill_item_columns = _table_columns(connection, "market_daily_backfill_items")
+                for column, definition in (
+                    ("quality_score", "REAL"),
+                    ("validation_json", "TEXT"),
+                    ("failure_kind", "TEXT"),
+                ):
+                    if column not in backfill_item_columns:
+                        connection.execute(
+                            f"ALTER TABLE market_daily_backfill_items ADD COLUMN {column} {definition}"
+                        )
+                job_columns = _table_columns(connection, "market_daily_bar_refresh_jobs")
+                for column in ("attempt_id", "lease_expires_at", "worker_id"):
+                    if column not in job_columns:
+                        connection.execute(
+                            f"ALTER TABLE market_daily_bar_refresh_jobs ADD COLUMN {column} TEXT"
+                        )
+                for table in ("market_daily_bars", "market_daily_bar_observations"):
+                    columns = _table_columns(connection, table)
+                    for column in ("content_hash", "provenance_hash"):
+                        if column not in columns:
+                            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
+                    if "turnover_pct" not in columns:
+                        connection.execute(f"ALTER TABLE {table} ADD COLUMN turnover_pct REAL")
+                _migrate_allow_hk_corporate_actions_and_factors(connection)
+                _record_migration_ledger(connection, 1)
+                connection.execute("PRAGMA user_version=1")
+            with _close_lock:
+                _initialized_paths.add(key)
 
     def claim_attempt(
         self,
@@ -1884,6 +1961,69 @@ class MarketDailyBarRepository:
             )
             for row in rows
         ]
+
+    def upsert_historical_bars(
+        self,
+        records: Iterable[MarketDailyBarRecord],
+        *,
+        overwrite_existing: bool = False,
+        stored_at: datetime | None = None,
+    ) -> int:
+        """批量写入历史未复权日线，不生成盘后 observation/job 审计。"""
+        rows = [MarketDailyBarRecord.model_validate(record.model_dump()) for record in records]
+        if not rows:
+            return 0
+        keys = [
+            (record.market, record.instrument_type, record.code, record.trade_date, record.adjustment)
+            for record in rows
+        ]
+        if len(keys) != len(set(keys)):
+            raise ValueError("历史日线批次包含重复证券日期")
+        captured = _iso(stored_at or _utc_now())
+        values = []
+        for record in rows:
+            base = (
+                record.market, record.instrument_type, record.code, record.name,
+                record.trade_date.isoformat(), record.currency, record.open, record.high,
+                record.low, record.close, record.pre_close, record.change_amount,
+                record.change_pct, record.volume, record.amount, record.turnover_pct,
+                record.adjustment, record.source, _iso(record.source_quote_time),
+                captured, captured, _record_hash(record), _content_hash(record),
+                _provenance_hash(record),
+            )
+            values.append(base)
+        conflict = """
+            ON CONFLICT(market, instrument_type, code, trade_date, adjustment) DO UPDATE SET
+                name=CASE WHEN excluded.name='' THEN market_daily_bars.name ELSE excluded.name END,
+                currency=excluded.currency, open=excluded.open, high=excluded.high,
+                low=excluded.low, close=excluded.close, pre_close=excluded.pre_close,
+                change_amount=excluded.change_amount, change_pct=excluded.change_pct,
+                volume=excluded.volume, amount=excluded.amount,
+                turnover_pct=excluded.turnover_pct, source=excluded.source,
+                source_quote_time=excluded.source_quote_time,
+                verification_status='confirmed', last_refreshed_at=excluded.last_refreshed_at,
+                revision=market_daily_bars.revision + CASE
+                    WHEN market_daily_bars.content_hash <> excluded.content_hash THEN 1 ELSE 0 END,
+                data_hash=excluded.data_hash, content_hash=excluded.content_hash,
+                provenance_hash=excluded.provenance_hash
+            WHERE market_daily_bars.content_hash <> excluded.content_hash
+               OR market_daily_bars.provenance_hash <> excluded.provenance_hash
+        """ if overwrite_existing else "ON CONFLICT DO NOTHING"
+        sql = f"""
+            INSERT INTO market_daily_bars (
+                market, instrument_type, code, name, trade_date, currency, open, high, low,
+                close, pre_close, change_amount, change_pct, volume, amount, turnover_pct,
+                adjustment, source, source_quote_time, verification_status,
+                first_refreshed_at, last_refreshed_at, revision, data_hash,
+                content_hash, provenance_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                      'confirmed', ?, ?, 1, ?, ?, ?)
+            {conflict}
+        """
+        with self._connect() as connection:
+            before = connection.total_changes
+            connection.executemany(sql, values)
+            return max(0, connection.total_changes - before)
 
     def query(
         self,

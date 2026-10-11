@@ -130,6 +130,11 @@ class HKStockSearchIndex:
     def provider(self) -> HKStockMasterProvider:
         return self._provider or get_provider("sina_hk")
 
+    async def get_all_records(self) -> tuple[HKStockSearchRecord, ...]:
+        """获取全量港股股票名录记录。"""
+        state = await self._ensure_state()
+        return state.records
+
     async def search(self, query: str, *, limit: int = 8) -> list[HKStockSearchRecord]:
         keyword = _normalize_text(query)
         if not keyword or limit <= 0:

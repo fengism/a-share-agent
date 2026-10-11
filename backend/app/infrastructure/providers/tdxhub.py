@@ -297,7 +297,10 @@ class TdxhubDataProvider:
                     "close": safe_float(row.get("close")),
                     "high": safe_float(row.get("high")),
                     "low": safe_float(row.get("low")),
-                    "volume": safe_float(row.get("vol")),
+                    # tdxhub bars_all 的 vol 单位为手；统一历史日线契约使用股。
+                    "volume": (
+                        value * 100 if (value := safe_float(row.get("vol"))) is not None else None
+                    ),
                     "amount": safe_float(row.get("amount")),
                     "turnover_pct": safe_float(row.get("turnover")) if include_turnover else None,
                 }

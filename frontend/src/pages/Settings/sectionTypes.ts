@@ -6,4 +6,6 @@ export interface ConfigSectionProps {
   onChange: (patch: ConfigUpdate) => void;
   isSaving: boolean;
   sectionTitleStyle: CSSProperties;
+  isDirty?: boolean;
 }
+

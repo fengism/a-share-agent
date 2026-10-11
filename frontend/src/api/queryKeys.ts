@@ -118,6 +118,7 @@ export const queryKeys = {
     config: ["config"] as const,
     failedBotJobs: ["bot-jobs", "failed"] as const,
     marketDailyRefreshHistory: ["market-daily-bars", "refresh-history"] as const,
+    marketDailyBackfills: ["market-daily-bars", "backfills"] as const,
     marketAdjustmentFactor: (code: string) => ["market-daily-bars", "adjustment-factor", code] as const,
     invites: ["invites"] as const,
     users: ["admin-users"] as const,

@@ -1,14 +1,28 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Select, Table, Tag } from "antd";
 import type { IndustryChainResult } from "../../types/stock";
 import EvidenceLinkedText from "./EvidenceLinkedText";
 import { buildStockAnalysisUrl, buildStockProfileUrl } from "../../utils/stockLinks";
+
+function useSafeNavigate() {
+  try {
+    return useNavigate();
+  } catch {
+    return (path: string) => {
+      if (typeof window !== "undefined") {
+        window.location.href = path;
+      }
+    };
+  }
+}
 
 const RELATION = { supply: "供货", purchase: "采购", substitute: "替代", compete: "竞争", transmission: "定性传导" };
 const RELEVANCE = { unverified: "待验证", concept: "概念布局", business: "业务相关（待复核）", earnings: "收入相关（待复核）" };
 const DIRECTION = { positive: "正向", negative: "负向", mixed: "双向", unknown: "尚不明确" };
 
 export default function IndustryDecisionResearch({ result }: { result: IndustryChainResult }) {
+  const navigate = useSafeNavigate();
   const [selected, setSelected] = useState<string[]>([]);
   const companies = result.key_stocks.map((node, index) => ({
     ...node, key: `${node.code || node.name || "company"}-${index}`,
@@ -43,7 +57,34 @@ export default function IndustryDecisionResearch({ result }: { result: IndustryC
         style={{ width: "100%", marginBottom: 12 }} value={selected} onChange={setSelected}
         options={companies.map(node => ({ value: node.key, label: node.name || node.company || node.code }))} />
       <Table size="small" pagination={false} scroll={{ x: 1100 }} dataSource={filtered} columns={[
-        { title: "公司 / 环节", key: "company", width: 160, render: (_, node) => <><strong>{node.name || node.company || node.code}</strong><p>{node.role || "待补充"}</p>{node.code && <p><a href={buildStockProfileUrl(node.code)}>公司资料</a>{" · "}<a href={buildStockAnalysisUrl(node.code)}>深入研究</a></p>}</> },
+        { title: "公司 / 环节", key: "company", width: 170, render: (_, node) => (
+          <>
+            <strong>{node.name || node.company || node.code}</strong>
+            <p style={{ margin: "2px 0 4px", fontSize: 12, color: "var(--c-text-secondary, #666)" }}>{node.role || "待补充"}</p>
+            {node.code && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                <Tag
+                  color={node.code.length === 5 ? "processing" : "cyan"}
+                  style={{ cursor: "pointer", margin: 0 }}
+                  onClick={() => navigate(buildStockProfileUrl(node.code!))}
+                  title="点击查看公司资料"
+                >
+                  {node.code} 资料 ↗
+                </Tag>
+                <a
+                  href={buildStockAnalysisUrl(node.code)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate(buildStockAnalysisUrl(node.code!));
+                  }}
+                  style={{ fontSize: 12 }}
+                >
+                  深度研究 ↗
+                </a>
+              </div>
+            )}
+          </>
+        ) },
         { title: "业务相关度", key: "relevance", width: 150, render: (_, node) => RELEVANCE[node.business_relevance || "unverified"] },
         { title: "相关收入占比", key: "revenue", width: 130, render: (_, node) => node.revenue_share ? `${node.revenue_share}（${node.revenue_period || "统计期待核实"}）` : "未验证" },
         { title: "受益路径", dataIndex: "benefit_path", width: 180, render: value => value || "待补充" },

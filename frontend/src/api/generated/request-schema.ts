@@ -1882,6 +1882,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/daily-bars/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Market Daily Backfills
+         * @description 查看历史日线回填任务与进度。
+         */
+        get: operations["list_market_daily_backfills_api_market_daily_bars_backfill_get"];
+        put?: never;
+        /**
+         * Create Market Daily Backfill
+         * @description 创建 A 股全市场历史日线后台回填任务。
+         */
+        post: operations["create_market_daily_backfill_api_market_daily_bars_backfill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/daily-bars/backfill/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Market Daily Backfill */
+        get: operations["get_market_daily_backfill_api_market_daily_bars_backfill__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/daily-bars/backfill/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Market Daily Backfill */
+        post: operations["cancel_market_daily_backfill_api_market_daily_bars_backfill__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/daily-bars/backfill/{job_id}/retry-failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Failed Market Daily Backfill
+         * @description 仅重试历史回填任务中的失败股票。
+         */
+        post: operations["retry_failed_market_daily_backfill_api_market_daily_bars_backfill__job_id__retry_failed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/daily-bars/delete": {
         parameters: {
             query?: never;
@@ -3211,6 +3289,23 @@ export interface paths {
         get: operations["get_concepts_api_stock_concept_concepts_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock-concept/enrich": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trigger Auto Enrich */
+        post: operations["trigger_auto_enrich_api_stock_concept_enrich_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9187,6 +9282,123 @@ export interface components {
             unavailable_sections?: string[];
             /** Up Count */
             up_count?: number;
+        };
+        /** MarketDailyBackfillJob */
+        MarketDailyBackfillJob: {
+            /** Average Quality Score */
+            average_quality_score?: number | null;
+            /**
+             * Cancel Requested
+             * @default false
+             */
+            cancel_requested?: boolean;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Completed Instruments */
+            completed_instruments: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Code */
+            current_code?: string | null;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Failed Instruments */
+            failed_instruments: number;
+            /** Failure Details */
+            failure_details?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Instrument Type
+             * @constant
+             */
+            instrument_type: "stock";
+            /** Job Id */
+            job_id: string;
+            /** Last Error */
+            last_error?: string | null;
+            /**
+             * Market
+             * @constant
+             */
+            market: "cn";
+            /** Max Provider Sources */
+            max_provider_sources: number;
+            /** Overwrite Existing */
+            overwrite_existing: boolean;
+            /** Retryable Failed Instruments */
+            retryable_failed_instruments: number;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Started At */
+            started_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
+            /** Stored Bars */
+            stored_bars: number;
+            /** Succeeded Instruments */
+            succeeded_instruments: number;
+            /** Total Instruments */
+            total_instruments: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** MarketDailyBackfillJobList */
+        MarketDailyBackfillJobList: {
+            /** Items */
+            items: components["schemas"]["MarketDailyBackfillJob"][];
+            /** Total */
+            total: number;
+        };
+        /** MarketDailyBackfillRequest */
+        MarketDailyBackfillRequest: {
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Instrument Type
+             * @default stock
+             * @constant
+             */
+            instrument_type?: "stock";
+            /**
+             * Market
+             * @default cn
+             * @constant
+             */
+            market?: "cn";
+            /**
+             * Max Provider Sources
+             * @default 4
+             */
+            max_provider_sources?: number;
+            /**
+             * Overwrite Existing
+             * @default false
+             */
+            overwrite_existing?: boolean;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
         };
         /** MarketDailyBar */
         MarketDailyBar: {
@@ -17967,6 +18179,163 @@ export interface operations {
             };
         };
     };
+    list_market_daily_backfills_api_market_daily_bars_backfill_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDailyBackfillJobList"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_market_daily_backfill_api_market_daily_bars_backfill_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarketDailyBackfillRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDailyBackfillJob"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_market_daily_backfill_api_market_daily_bars_backfill__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDailyBackfillJob"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_market_daily_backfill_api_market_daily_bars_backfill__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDailyBackfillJob"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    retry_failed_market_daily_backfill_api_market_daily_bars_backfill__job_id__retry_failed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketDailyBackfillJob"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     delete_market_daily_bars_api_market_daily_bars_delete_post: {
         parameters: {
             query?: never;
@@ -20356,6 +20725,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__modules__stock_concept__models__ConceptListResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    trigger_auto_enrich_api_stock_concept_enrich_post: {
+        parameters: {
+            query?: {
+                batch_size?: number;
+                delay_seconds?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description 统一错误响应 */

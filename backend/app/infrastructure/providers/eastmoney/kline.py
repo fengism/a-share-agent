@@ -58,7 +58,8 @@ class KlineMixin:
             data=data,
             columns=["日期", "开盘", "收盘", "最高", "最低", "成交量", "成交额", "振幅", "涨跌幅", "涨跌额", "换手率"],
         )
-        df["成交量"] = pd.to_numeric(df["成交量"], errors="coerce")
+        # 东方财富 K 线成交量单位为手；统一为股。
+        df["成交量"] = pd.to_numeric(df["成交量"], errors="coerce") * 100
         if "振幅" in df.columns:
             df["振幅"] = pd.to_numeric(df["振幅"], errors="coerce")
         return df

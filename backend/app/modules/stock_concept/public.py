@@ -29,6 +29,7 @@ from app.modules.stock_concept.repository import (
 from app.modules.stock_concept.service import (
     ConceptImportConflictError,
     ConceptImportTokenNotFoundError,
+    auto_enrich_pending_concepts,
     commit_import,
     preview_import,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "StockConceptRecord",
     "StockConceptRecordInput",
     "a_share_all_concepts_mapping",
+    "auto_enrich_pending_concepts",
     "commit_import",
     "create_manual",
     "delete_record",

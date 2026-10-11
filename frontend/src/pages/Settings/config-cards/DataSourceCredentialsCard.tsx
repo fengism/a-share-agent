@@ -14,6 +14,8 @@ export default function DataSourceCredentialsCard({
   isSaving,
   fuyaoConfigured,
   stretch,
+  isDirty,
+  onReset,
 }: DataSourceCredentialsCardProps) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
@@ -26,6 +28,8 @@ export default function DataSourceCredentialsCard({
       onSave={onSave}
       isSaving={isSaving}
       stretch={stretch}
+      isDirty={isDirty}
+      onReset={onReset}
     >
       <Row gutter={[24, 16]}>
         <Col span={24}>

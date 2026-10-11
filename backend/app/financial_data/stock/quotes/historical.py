@@ -47,6 +47,19 @@ class HistoricalBarSet:
     items: list[KlineItem]
 
 
+@dataclass(frozen=True)
+class HistoricalSourceFailure:
+    source_label: str
+    error_type: str
+    error_message: str
+
+
+@dataclass(frozen=True)
+class HistoricalBarCandidates:
+    candidates: list[HistoricalBarSet]
+    failures: list[HistoricalSourceFailure]
+
+
 def _column_value(row: pd.Series, *names: str):
     for name in names:
         if name in row:
@@ -94,9 +107,9 @@ def _normalize_frame(code: str, frame: pd.DataFrame) -> list[KlineItem]:
     for index in range(1, len(normalized_items)):
         current = normalized_items[index]
         previous = normalized_items[index - 1]
-        if current.pre_close is None:
+        if current.pre_close is None and previous.close is not None:
             current.pre_close = previous.close
-        if current.change_pct is None and previous.close != 0:
+        if current.change_pct is None and previous.close is not None and previous.close != 0 and current.close is not None:
             current.change_pct = round((current.close - previous.close) / previous.close * 100, 2)
     return normalized_items
 
@@ -232,237 +245,179 @@ def _historical_source_attempts(
     *,
     request_limiter: HistoricalRequestLimiter | None = None,
 ) -> list[ProviderAttempt[tuple[str, list[KlineItem]]]]:
-    attempts: list[ProviderAttempt[tuple[str, list[KlineItem]]]] = []
-    if period == "daily":
-        attempts.append(
-            ProviderAttempt(
-                label="TDX 复权K线",
-                loader=lambda: _load_historical_source(
-                    "tdxhub",
-                    symbol,
-                    period,
-                    start_date,
-                    end_date,
-                    get_provider("tdxhub").fetch_stock_kline,
-                    symbol,
-                    start_date,
-                    end_date,
-                    adjust,
-                    require_turnover,
-                    semaphore=tdx_semaphore,
-                    require_turnover=require_turnover,
-                    request_limiter=request_limiter,
-                ),
-                on_error=f"TDX 复权K线不可用: code={symbol}",
-                max_attempts=1,
-            )
-        )
-        attempts.append(
-            ProviderAttempt(
-                label="腾讯财经复权K线",
-                loader=lambda: _load_historical_source(
-                    "tencent",
-                    symbol,
-                    period,
-                    start_date,
-                    end_date,
-                    get_provider("tencent").fetch_stock_kline,
-                    symbol,
-                    start_date,
-                    end_date,
-                    adjust,
-                    semaphore=tencent_semaphore,
-                    require_turnover=require_turnover,
-                    request_limiter=request_limiter,
-                ),
-                on_error=f"腾讯财经复权K线不可用: code={symbol}",
-                max_attempts=1,
-            )
-        )
-        attempts.append(
-            ProviderAttempt(
-                label="AkShare 新浪复权K线",
-                loader=lambda: _load_historical_source(
-                    "akshare-sina",
-                    symbol,
-                    period,
-                    start_date,
-                    end_date,
-                    get_provider("akshare").fetch_stock_kline_sina,
-                    symbol,
-                    start_date,
-                    end_date,
-                    adjust,
-                    semaphore=akshare_semaphore,
-                    require_turnover=require_turnover,
-                    request_limiter=request_limiter,
-                ),
-                on_error=f"新浪复权K线不可用: code={symbol}",
-                max_attempts=1,
-            )
-        )
-    else:
-        period_label = {"weekly": "周", "monthly": "月", "annual": "年"}.get(period, period)
-        attempts.append(
-            ProviderAttempt(
-                label=f"TDX 日线聚合复权{period_label}K线",
-                loader=lambda: _load_historical_source(
-                    "tdxhub-daily-aggregate",
-                    symbol,
-                    period,
-                    start_date,
-                    end_date,
-                    get_provider("tdxhub").fetch_stock_kline,
-                    symbol,
-                    start_date,
-                    end_date,
-                    adjust,
-                    require_turnover,
-                    semaphore=tdx_semaphore,
-                    aggregate_period=period,
-                    require_turnover=require_turnover,
-                    request_limiter=request_limiter,
-                ),
-                on_error=f"TDX 日线聚合复权{period_label}K线不可用: code={symbol}",
-                max_attempts=1,
-            )
-        )
-        attempts.extend([
-            ProviderAttempt(
-                label=f"腾讯财经日线聚合复权{period_label}K线",
-                loader=lambda: _load_historical_source(
-                    "tencent-daily-aggregate",
-                    symbol,
-                    period,
-                    start_date,
-                    end_date,
-                    get_provider("tencent").fetch_stock_kline,
-                    symbol,
-                    start_date,
-                    end_date,
-                    adjust,
-                    semaphore=tencent_semaphore,
-                    aggregate_period=period,
-                    require_turnover=require_turnover,
-                    request_limiter=request_limiter,
-                ),
-                on_error=f"腾讯财经日线聚合复权{period_label}K线不可用: code={symbol}",
-                max_attempts=1,
+    """构造历史行情源链；未复权日线优先高一致性来源，财联社仅作末级兜底。"""
+
+    def attempt(
+        *,
+        label: str,
+        source: str,
+        fetcher: Callable[..., pd.DataFrame],
+        fetch_args: tuple[object, ...],
+        semaphore: asyncio.Semaphore,
+        aggregate_period: str | None = None,
+        error: str,
+    ) -> ProviderAttempt[tuple[str, list[KlineItem]]]:
+        return ProviderAttempt(
+            label=label,
+            loader=lambda: _load_historical_source(
+                source,
+                symbol,
+                period,
+                start_date,
+                end_date,
+                fetcher,
+                *fetch_args,
+                semaphore=semaphore,
+                aggregate_period=aggregate_period,
+                require_turnover=require_turnover,
+                request_limiter=request_limiter,
             ),
-            ProviderAttempt(
-                label=f"AkShare 新浪日线聚合复权{period_label}K线",
-                loader=lambda: _load_historical_source(
-                    "akshare-sina-daily-aggregate",
-                    symbol,
-                    period,
-                    start_date,
-                    end_date,
-                    get_provider("akshare").fetch_stock_kline_sina,
-                    symbol,
-                    start_date,
-                    end_date,
-                    adjust,
-                    semaphore=akshare_semaphore,
-                    aggregate_period=period,
-                    require_turnover=require_turnover,
-                    request_limiter=request_limiter,
-                ),
-                on_error=f"新浪日线聚合复权{period_label}K线不可用: code={symbol}",
-                max_attempts=1,
+            on_error=error,
+            max_attempts=1,
+        )
+
+    tdx_source = "tdxhub" if period == "daily" else "tdxhub-daily-aggregate"
+    tencent_source = "tencent" if period == "daily" else "tencent-daily-aggregate"
+    akshare_sina_source = "akshare-sina" if period == "daily" else "akshare-sina-daily-aggregate"
+    aggregate_period = None if period == "daily" else period
+    period_label = {"weekly": "周", "monthly": "月", "annual": "年"}.get(period, "")
+    attempts = [
+        attempt(
+            label=f"TDX {'复权' if period == 'daily' else '日线聚合复权' + period_label}K线",
+            source=tdx_source,
+            fetcher=get_provider("tdxhub").fetch_stock_kline,
+            fetch_args=(symbol, start_date, end_date, adjust, require_turnover),
+            semaphore=tdx_semaphore,
+            aggregate_period=aggregate_period,
+            error=f"TDX 历史K线不可用: code={symbol}",
+        ),
+        attempt(
+            label=f"腾讯财经{'复权' if period == 'daily' else '日线聚合复权' + period_label}K线",
+            source=tencent_source,
+            fetcher=get_provider("tencent").fetch_stock_kline,
+            fetch_args=(symbol, start_date, end_date, adjust),
+            semaphore=tencent_semaphore,
+            aggregate_period=aggregate_period,
+            error=f"腾讯财经历史K线不可用: code={symbol}",
+        ),
+        attempt(
+            label=f"AkShare 新浪{'复权' if period == 'daily' else '日线聚合复权' + period_label}K线",
+            source=akshare_sina_source,
+            fetcher=get_provider("akshare").fetch_stock_kline_sina,
+            fetch_args=(symbol, start_date, end_date, adjust),
+            semaphore=akshare_semaphore,
+            aggregate_period=aggregate_period,
+            error=f"AkShare 新浪历史K线不可用: code={symbol}",
+        ),
+    ]
+    if adjust == "":
+        attempts.extend([
+            attempt(
+                label="东方财富不复权K线直连（fallback）",
+                source="eastmoney-direct-fallback",
+                fetcher=get_provider("eastmoney").fetch_kline,
+                fetch_args=(symbol, period, start_date, end_date, adjust),
+                semaphore=eastmoney_semaphore,
+                error=f"东方财富直连不复权K线不可用: code={symbol}",
+            ),
+            attempt(
+                label="新浪历史K线直连（fallback）",
+                source="sina-direct-unadjusted",
+                fetcher=get_provider("sina").fetch_kline,
+                fetch_args=(symbol, period, start_date, end_date),
+                semaphore=sina_semaphore,
+                error=f"新浪历史K线直连不可用: code={symbol}",
+            ),
+            attempt(
+                label="财联社不复权K线（last-resort）",
+                source="cls-last-resort",
+                fetcher=get_provider("cls").fetch_stock_kline,
+                fetch_args=(symbol, period, start_date, end_date, adjust),
+                semaphore=cls_semaphore,
+                error=f"财联社不复权K线不可用: code={symbol}",
             ),
         ])
-    if adjust == "":
-        attempts.append(
-            ProviderAttempt(
-                label="财联社不复权K线",
-                loader=lambda: _load_historical_source(
-                    "cls",
-                    symbol,
-                    period,
-                    start_date,
-                    end_date,
-                    get_provider("cls").fetch_stock_kline,
-                    symbol,
-                    period,
-                    start_date,
-                    end_date,
-                    adjust,
-                    semaphore=cls_semaphore,
-                    require_turnover=require_turnover,
-                    request_limiter=request_limiter,
-                ),
-                on_error=f"财联社不复权K线不可用: code={symbol}",
-                max_attempts=1,
-            )
-        )
-    if adjust == "":
-        attempts.append(
-            ProviderAttempt(
-                label="新浪历史K线直连（fallback）",
-                loader=lambda: _load_historical_source(
-                    "sina-direct-unadjusted",
-                    symbol,
-                    period,
-                    start_date,
-                    end_date,
-                    get_provider("sina").fetch_kline,
-                    symbol,
-                    period,
-                    start_date,
-                    end_date,
-                    semaphore=sina_semaphore,
-                    require_turnover=require_turnover,
-                    request_limiter=request_limiter,
-                ),
-                on_error=f"新浪历史 K 线直连 fallback 不可用: code={symbol}",
-                max_attempts=1,
-            )
-        )
-    attempts.extend([
-        ProviderAttempt(
-            label="东方财富复权K线直连（fallback）",
-            loader=lambda: _load_historical_source(
-                "eastmoney-direct-fallback",
-                symbol,
-                period,
-                start_date,
-                end_date,
-                get_provider("eastmoney").fetch_kline,
-                symbol,
-                period,
-                start_date,
-                end_date,
-                adjust,
+    else:
+        attempts.extend([
+            attempt(
+                label="东方财富复权K线直连（fallback）",
+                source="eastmoney-direct-fallback",
+                fetcher=get_provider("eastmoney").fetch_kline,
+                fetch_args=(symbol, period, start_date, end_date, adjust),
                 semaphore=eastmoney_semaphore,
-                require_turnover=require_turnover,
-                request_limiter=request_limiter,
+                error=f"东方财富直连复权K线不可用: code={symbol}",
             ),
-            on_error=f"东方财富直连复权K线 fallback 不可用: code={symbol}",
-            max_attempts=1,
-        ),
-        ProviderAttempt(
-            label="AkShare 东方财富复权K线（fallback）",
-            loader=lambda: _load_historical_source(
-                "akshare-eastmoney-fallback",
-                symbol,
-                period,
-                start_date,
-                end_date,
-                get_provider("akshare").fetch_stock_kline,
-                symbol,
-                period,
-                start_date,
-                end_date,
-                adjust,
+            attempt(
+                label="AkShare 东方财富复权K线（fallback）",
+                source="akshare-eastmoney-fallback",
+                fetcher=get_provider("akshare").fetch_stock_kline,
+                fetch_args=(symbol, period, start_date, end_date, adjust),
                 semaphore=akshare_semaphore,
-                require_turnover=require_turnover,
-                request_limiter=request_limiter,
+                error=f"AkShare 东方财富复权K线不可用: code={symbol}",
             ),
-            on_error=f"AkShare 东方财富复权K线最终 fallback 不可用: code={symbol}",
-            max_attempts=1,
-        ),
-    ])
+        ])
     return attempts
+
+
+async def get_historical_bar_candidates(
+    code: str,
+    start_date: date,
+    end_date: date,
+    *,
+    period: str = "daily",
+    adjust: str = "",
+    require_turnover: bool = False,
+    max_provider_sources: int = 6,
+    max_successes: int = 2,
+    request_limiter: HistoricalRequestLimiter | None = None,
+) -> HistoricalBarCandidates:
+    """按优先级收集多个成功来源，供批量入库做跨源一致性校验。"""
+    symbol = normalize_code(code).raw
+    if adjust == "none":
+        adjust = ""
+    if max_provider_sources < 1:
+        raise ValueError("max_provider_sources 必须大于 0")
+    if max_successes < 1:
+        raise ValueError("max_successes 必须大于 0")
+    attempts = _historical_source_attempts(
+        symbol,
+        period,
+        start_date.strftime("%Y%m%d"),
+        end_date.strftime("%Y%m%d"),
+        adjust,
+        require_turnover,
+        request_limiter=request_limiter,
+    )[:max_provider_sources]
+    candidates: list[HistoricalBarSet] = []
+    failures: list[HistoricalSourceFailure] = []
+    for attempt in attempts:
+        try:
+            source, items = await BaseProviderChain(
+                [attempt], operation="strict_stock_history_crosscheck"
+            ).run()
+        except Exception as error:
+            failures.append(
+                HistoricalSourceFailure(
+                    source_label=attempt.label,
+                    error_type=type(error).__name__,
+                    error_message=str(error)[:1000],
+                )
+            )
+            continue
+        candidates.append(
+            HistoricalBarSet(
+                code=symbol,
+                period=period,
+                adjust=adjust,
+                source=source,
+                adjustment_verified=True,
+                data_hash=historical_bar_hash(symbol, period, adjust, items),
+                items=items,
+            )
+        )
+        if len(candidates) >= max_successes:
+            break
+    return HistoricalBarCandidates(candidates=candidates, failures=failures)
 
 
 async def get_historical_bars(

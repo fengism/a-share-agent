@@ -97,3 +97,22 @@ export function useCommitStockConceptImport() {
     onSuccess: invalidate,
   });
 }
+
+export function useTriggerStockConceptEnrich() {
+  const invalidate = useInvalidateStockConceptData();
+  return useMutation({
+    mutationFn: (params?: { batch_size?: number; delay_seconds?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.batch_size) qs.set("batch_size", String(params.batch_size));
+      if (params?.delay_seconds) qs.set("delay_seconds", String(params.delay_seconds));
+      const url = qs.toString() ? `${BASE_PATH}/enrich?${qs.toString()}` : `${BASE_PATH}/enrich`;
+      return apiPost<{ success: boolean; data: { processed: number; enriched: number; remaining: number } }>(
+        url,
+        null,
+        { timeoutMs: API_TIMEOUTS.LONG_RUNNING }
+      );
+    },
+    onSuccess: invalidate,
+  });
+}
+

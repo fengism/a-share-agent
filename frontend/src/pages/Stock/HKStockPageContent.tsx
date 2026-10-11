@@ -37,6 +37,7 @@ import { useColors, useStyles } from "../../styles/ui";
 import type { KlineItem } from "../../types/stock";
 import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
 import StockBusinessIntro from "./StockBusinessIntro";
+import KeyFinancialMetricsSection from "../../features/investment-research/KeyFinancialMetricsSection";
 import RevenueBreakdownSection from "../../features/investment-research/RevenueBreakdownSection";
 import HKIndustryComparisonSection from "./HKIndustryComparisonSection";
 import StockSectionTitle from "./StockSectionTitle";
@@ -325,6 +326,22 @@ export default function HKStockPageContent({ code }: { code: string }) {
 
       {/* 港股营收构成：同花顺 F10 主营构成分析，仅占比无金额 */}
       <RevenueBreakdownSection code={code} />
+
+      {/* 港股财务报表：同花顺 F10 最近四个报告期，金额保留公司原始披露币种。 */}
+      <Card
+        data-testid="hk-financial-data"
+        className="stock-section-card stock-financial-card"
+        title={(
+          <StockSectionTitle
+            icon={<BarChartOutlined />}
+            title="财务数据"
+            description="同花顺 F10 · 最近四个报告期 · 金额按公司原始披露币种"
+          />
+        )}
+        style={cardStyle}
+      >
+        <KeyFinancialMetricsSection code={code} showHeader={false} />
+      </Card>
 
       {/* 港股行业地位与同业对比：同花顺 F10 行业对比 */}
       <HKIndustryComparisonSection code={code} />

@@ -21,11 +21,13 @@ vi.mock("./MarketDailyBarManagerCard", () => ({
 }));
 
 vi.mock("./ConfigCards", () => ({
-  AnySearchConfigCard: ({ form, onChange, onSave, configured }: {
+  AnySearchConfigCard: ({ form, onChange, onSave, configured, isDirty, onReset }: {
     form: ConfigUpdate;
     onChange: (patch: ConfigUpdate) => void;
     onSave: () => void;
     configured?: boolean;
+    isDirty?: boolean;
+    onReset?: () => void;
   }) => (
     <div>
       <input
@@ -35,6 +37,9 @@ vi.mock("./ConfigCards", () => ({
         onChange={(event) => onChange({ anysearch_api_key: event.target.value })}
       />
       <button type="button" onClick={onSave}>保存 AnySearch 配置</button>
+      {isDirty && onReset && (
+        <button type="button" onClick={onReset}>撤销更改</button>
+      )}
     </div>
   ),
   BotConfigCard: ({ form, onSave }: { form: ConfigUpdate; onSave: () => void }) => (
@@ -58,10 +63,12 @@ vi.mock("./ConfigCards", () => ({
   ),
   ResearchBudgetCard: () => null,
   FeishuConfigCard: () => null,
-  FredConfigCard: ({ form, onChange, onSave }: {
+  FredConfigCard: ({ form, onChange, onSave, isDirty, onReset }: {
     form: ConfigUpdate;
     onChange: (patch: ConfigUpdate) => void;
     onSave: () => void;
+    isDirty?: boolean;
+    onReset?: () => void;
   }) => (
     <div>
       <input
@@ -70,6 +77,9 @@ vi.mock("./ConfigCards", () => ({
         onChange={(event) => onChange({ fred_api_key: event.target.value })}
       />
       <button type="button" onClick={onSave}>保存 FRED 配置</button>
+      {isDirty && onReset && (
+        <button type="button" onClick={onReset}>撤销更改</button>
+      )}
     </div>
   ),
   IwencaiConfigCard: () => null,
@@ -194,6 +204,7 @@ describe("SettingsPage Bot config", () => {
     expect(screen.queryByText("账号能力配置")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存 Bot 配置" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "管理员工具" }));
+    fireEvent.click(await screen.findByText(/自动化与推送机器人/));
     const saveButton = await screen.findByRole("button", { name: "保存 Bot 配置" });
     await waitFor(() => expect(saveButton).toHaveAttribute("data-prefix", "/"));
     fireEvent.click(saveButton);
@@ -322,6 +333,75 @@ describe("SettingsPage Bot config", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存 FRED 配置" }));
 
     expect(mocks.mutateConfig).toHaveBeenCalledWith({ fred_api_key: "new-fred-key" }, expect.anything());
+    queryClient.clear();
+  });
+
+  it("supports card-level revert for unsaved changes", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "数据源管理" }));
+    const input = await screen.findByLabelText("FRED API Key");
+    
+    // 初始状态下没有撤销按钮
+    expect(screen.queryAllByRole("button", { name: "撤销更改" })).toHaveLength(0);
+
+    // 修改输入触发 isDirty
+    fireEvent.change(input, { target: { value: "edited-fred-key" } });
+    
+    // 此时应该出现该卡片的“撤销更改”按钮
+    const revertBtns = screen.getAllByRole("button", { name: "撤销更改" });
+    expect(revertBtns).toHaveLength(1);
+
+    // 点击撤销更改
+    fireEvent.click(revertBtns[0]);
+
+    // 应该恢复并隐藏撤销按钮
+    expect(screen.queryAllByRole("button", { name: "撤销更改" })).toHaveLength(0);
+    queryClient.clear();
+  });
+
+  it("card-level revert buttons appear independently per dirty card", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "数据源管理" }));
+
+    // 同时让 FRED 和 AnySearch 都 dirty
+    const fredInput = await screen.findByLabelText("FRED API Key");
+    const anySearchInput = screen.getByLabelText("AnySearch API Key");
+    fireEvent.change(fredInput, { target: { value: "edited-fred-key" } });
+    fireEvent.change(anySearchInput, { target: { value: "edited-anysearch-key" } });
+
+    // 两个卡片各有一个撤销按钮
+    const revertBtns = screen.getAllByRole("button", { name: "撤销更改" });
+    expect(revertBtns).toHaveLength(2);
+
+    // 点击第一个（FRED）撤销
+    fireEvent.click(revertBtns[0]);
+
+    // FRED 卡片的撤销按钮消失，AnySearch 的仍在
+    expect(screen.getAllByRole("button", { name: "撤销更改" })).toHaveLength(1);
     queryClient.clear();
   });
 });

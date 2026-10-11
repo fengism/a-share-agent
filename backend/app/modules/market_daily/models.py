@@ -199,3 +199,56 @@ class MarketAdjustmentFactorRefreshRequest(BaseModel):
 
 class MarketAdjustmentFactorInvalidateRequest(BaseModel):
     code: str = Field(min_length=6, max_length=8)
+
+
+MarketDailyBackfillStatus = Literal["pending", "running", "succeeded", "failed", "cancelled"]
+
+
+class MarketDailyBackfillRequest(BaseModel):
+    start_date: date
+    end_date: date
+    market: Literal["cn"] = "cn"
+    instrument_type: Literal["stock"] = "stock"
+    overwrite_existing: bool = False
+    max_provider_sources: int = Field(default=4, ge=2, le=6)
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "MarketDailyBackfillRequest":
+        if self.start_date > self.end_date:
+            raise ValueError("start_date 不能晚于 end_date")
+        if (self.end_date - self.start_date).days > 3653:
+            raise ValueError("单个回填任务最多支持约 10 年")
+        if self.end_date >= date.today():
+            raise ValueError("历史回填的 end_date 必须早于今天；当天数据请使用盘后归档")
+        return self
+
+
+class MarketDailyBackfillJob(BaseModel):
+    job_id: str
+    market: Literal["cn"]
+    instrument_type: Literal["stock"]
+    start_date: date
+    end_date: date
+    overwrite_existing: bool
+    max_provider_sources: int
+    status: MarketDailyBackfillStatus
+    total_instruments: int = Field(ge=0)
+    completed_instruments: int = Field(ge=0)
+    succeeded_instruments: int = Field(ge=0)
+    failed_instruments: int = Field(ge=0)
+    retryable_failed_instruments: int = Field(ge=0)
+    average_quality_score: float | None = Field(default=None, ge=0, le=100)
+    stored_bars: int = Field(ge=0)
+    current_code: str | None = None
+    last_error: str | None = None
+    failure_details: list[dict[str, object]] = Field(default_factory=list)
+    cancel_requested: bool = False
+    created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    updated_at: datetime
+
+
+class MarketDailyBackfillJobList(BaseModel):
+    items: list[MarketDailyBackfillJob]
+    total: int = Field(ge=0)

@@ -3,7 +3,14 @@ import { Col, InputNumber, Row } from "antd";
 import { useColors, useStyles } from "../../../styles/ui";
 import { SettingsCard, type ConfigCardProps } from "../SettingsCard";
 
-export default function ResearchBudgetCard({ form, onChange, onSave, isSaving }: ConfigCardProps) {
+export default function ResearchBudgetCard({
+  form,
+  onChange,
+  onSave,
+  isSaving,
+  isDirty,
+  onReset,
+}: ConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
 
@@ -14,6 +21,8 @@ export default function ResearchBudgetCard({ form, onChange, onSave, isSaving }:
       saveLabel="保存研究预算"
       onSave={onSave}
       isSaving={isSaving}
+      isDirty={isDirty}
+      onReset={onReset}
     >
       <div style={{ color: colors.textMuted, marginTop: -4, marginBottom: 16, fontSize: "var(--c-font-sm)" }}>
         控制 AI Agent 在生成深度研报和梳理产业链图谱时的思考耗时与调用轮次上限。默认参数经过实测调优，超时越长研究越详实，轮次上限可防止推理死循环。

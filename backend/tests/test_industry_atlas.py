@@ -228,3 +228,29 @@ def test_ai_application_contains_cloud_giants():
     assert any("腾讯" in name for name in company_names)
     assert any("阿里" in name for name in company_names)
     assert any("百度" in name for name in company_names)
+
+
+def test_newly_added_atlas_chains():
+    from app.modules.industry_chain.atlas.context import matching_atlas_chain
+
+    # 1. CPO光模块
+    cpo_chain = matching_atlas_chain("CPO光模块")
+    assert cpo_chain is not None
+    assert cpo_chain.slug == "cpo-optical-module"
+    assert any("光芯片" in seg.name for layer in cpo_chain.layers for seg in layer.segments)
+    assert any(c.code == "300308" for layer in cpo_chain.layers for seg in layer.segments for c in seg.companies)
+
+    # 2. 固态电池
+    ssb_chain = matching_atlas_chain("固态电池")
+    assert ssb_chain is not None
+    assert ssb_chain.slug == "solid-state-battery"
+    assert any("固态电解质" in seg.name for layer in ssb_chain.layers for seg in layer.segments)
+    assert any(c.name == "当升科技" for layer in ssb_chain.layers for seg in layer.segments for c in seg.companies)
+
+    # 3. 商业航天
+    aero_chain = matching_atlas_chain("商业航天")
+    assert aero_chain is not None
+    assert aero_chain.slug == "commercial-aerospace"
+    assert any("相控阵" in seg.name for layer in aero_chain.layers for seg in layer.segments)
+    assert any(c.code == "600118" for layer in aero_chain.layers for seg in layer.segments for c in seg.companies)
+

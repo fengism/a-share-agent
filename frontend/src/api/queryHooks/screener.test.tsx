@@ -4,6 +4,12 @@ import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../client", () => ({
+  API_TIMEOUTS: {
+    DEFAULT: 15_000,
+    EXTERNAL: 120_000,
+    SCREENER: 300_000,
+    LONG_RUNNING: 300_000,
+  },
   apiGet: vi.fn(),
   apiPost: vi.fn(),
 }));
@@ -77,6 +83,11 @@ describe("useRunScreenerStrategy", () => {
       expect.objectContaining({ code: "688836", name: "N宇树" }),
     ]);
     expect(result.current.data?.total).toBe(1);
+    expect(apiPost).toHaveBeenCalledWith(
+      "/screener/screen",
+      filters,
+      { timeoutMs: 300_000 },
+    );
   });
 
   it("returns each matched strategy item only once", async () => {
@@ -181,7 +192,10 @@ describe("useRunScreenerStrategy", () => {
     expect(apiPost).toHaveBeenCalledWith(
       "/screener/screen",
       expect.objectContaining({ page: 1, page_size: 200 }),
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        timeoutMs: 300_000,
+      }),
     );
     expect(streamScreenerStrategy).toHaveBeenCalledWith(
       expect.objectContaining({ codes: ["600000", "000001"] }),

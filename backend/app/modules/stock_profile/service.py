@@ -8,7 +8,7 @@ import urllib.parse
 from typing import Any
 
 from app.configuration.paths import DATA_DIR
-from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
+from app.core.concurrency.rate_limiter import call_blocking, database_semaphore, misc_semaphore
 from app.core.exceptions import UpstreamUnavailableError
 from app.financial_data.stock.profile.exchange_master import ExchangeStockMaster
 from app.financial_data.stock.public import get_exchange_stock_master
@@ -229,6 +229,30 @@ def enrich_stock_profile(stock_code: str, *, force: bool = False) -> StockProfil
         updated_fields=updated_fields,
     )
 
+    # 3. 联动补充个股概念（若该股票尚未维护概念）
+    try:
+        from app.infrastructure.providers.ths.provider import ths_provider
+        from app.modules.stock_concept.repository import get_record as get_concept_record
+        from app.modules.stock_concept.repository import upsert_import_records
+        c_record = get_concept_record(stock_code)
+        if not c_record or not c_record.get("concepts"):
+            live_concepts = ths_provider.fetch_stock_concepts(code_raw)
+            if live_concepts:
+                upsert_import_records(
+                    [{
+                        "stock_code": stock_code,
+                        "stock_name": existing.get("stock_name", ""),
+                        "market_group": existing.get("market_group", "A"),
+                        "exchange_suffix": existing.get("exchange", "SZ"),
+                        "concepts": live_concepts,
+                    }],
+                    source_version="ths_online_auto",
+                    force_override=False,
+                )
+                updated_fields.append("concepts")
+    except Exception as e:
+        logger.debug("个股资料补充时联动获取概念跳过 code=%s: %s", stock_code, e)
+
     if not result:
         return StockProfileEnrichResponse(
             success=False, stock_code=existing["stock_code"], stock_name=existing["stock_name"],
@@ -251,12 +275,46 @@ def enrich_stock_profile(stock_code: str, *, force: bool = False) -> StockProfil
     )
 
 
+async def auto_enrich_pending_profiles(batch_size: int = 50, delay_seconds: float = 0.5) -> dict[str, int]:
+    """在后台自动为缺失主营业务的股票平滑补充资料（免 Token，使用同花顺/东财公开源）。"""
+    import asyncio
+    rows, total = list_records(has_business=False, page=1, page_size=batch_size, sort_by="stock_code")
+    if not rows:
+        return {"processed": 0, "enriched": 0, "remaining": 0}
+
+    enriched_count = 0
+    for record in rows:
+        code = record.get("stock_code")
+        if not code:
+            continue
+        try:
+            res = await call_blocking(enrich_stock_profile, code, force=False, semaphore=misc_semaphore)
+            if res.success and res.updated_fields:
+                enriched_count += 1
+        except Exception as exc:
+            logger.debug("后台自动补充个股资料异常 code=%s: %s", code, exc)
+        await asyncio.sleep(delay_seconds)
+
+    remaining = max(0, total - len(rows))
+    return {"processed": len(rows), "enriched": enriched_count, "remaining": remaining}
+
+
 async def sync_exchange_master_data() -> StockProfileSyncResponse:
-    """显式同步会强制请求官方名录；失败可用有时效约束的快照，但须报告降级。"""
+    """显式同步官方 A 股三大交易所名录与港股全量官方股票名录。"""
+    from app.financial_data.hk.search_index import hk_stock_search_index
+
     master = await get_exchange_stock_master(force=True)
     if not master.records:
         raise UpstreamUnavailableError("交易所名录同步失败：没有可用数据，现有资料未修改")
-    stats = await call_blocking(_merge_exchange_master, master, semaphore=database_semaphore)
+
+    # 并发获取港股全量名录
+    try:
+        hk_records = await hk_stock_search_index.get_all_records()
+    except Exception as exc:
+        logger.warning("港股名录获取异常，将仅使用申万港股映射: %s", exc)
+        hk_records = ()
+
+    stats = await call_blocking(_merge_exchange_master, master, hk_records, semaphore=database_semaphore)
     return StockProfileSyncResponse(
         **stats, complete=master.complete and not master.failed_exchanges,
         failed_exchanges=master.failed_exchanges, stale_exchanges=master.stale_exchanges,
@@ -264,7 +322,7 @@ async def sync_exchange_master_data() -> StockProfileSyncResponse:
     )
 
 
-def _merge_exchange_master(master: ExchangeStockMaster) -> dict[str, int]:
+def _merge_exchange_master(master: ExchangeStockMaster, hk_records: tuple[Any, ...] = ()) -> dict[str, int]:
     from app.infrastructure.persistence.connection import get_connection
 
     records_to_upsert: list[dict[str, Any]] = []
@@ -313,9 +371,37 @@ def _merge_exchange_master(master: ExchangeStockMaster) -> dict[str, int]:
             "industry": item.industry or sw_info.get("sw_level1_name", ""),
         })
 
-    # 4. Also add HK stocks from sw_industry_classifications
+    # 4. 合并全量港股股票名录（来自港交所/新浪官方索引）
+    seen_hk_codes: set[str] = set()
+    for hk_item in hk_records:
+        raw_digits = str(hk_item.code).strip()
+        code_5 = raw_digits.zfill(5)
+        full_code = f"{code_5}.HK"
+        seen_hk_codes.add(full_code)
+        seen_hk_codes.add(code_5)
+
+        sw_info = sw_map.get(full_code) or sw_map.get(code_5) or {}
+        intro_items = local_intro_map.get(code_5) or local_intro_map.get(raw_digits) or {}
+        records_to_upsert.append({
+            "stock_code": full_code,
+            "stock_name": hk_item.name,
+            "market_group": "HK",
+            "exchange": "HK",
+            "board": "港股主板",
+            "main_business": intro_items.get("主营业务", ""),
+            "business_scope": intro_items.get("经营范围", ""),
+            "products": intro_items.get("产品名称") or intro_items.get("产品类型") or "",
+            "industry": sw_info.get("sw_level1_name", ""),
+            "sw_level1_name": sw_info.get("sw_level1_name", ""),
+            "sw_level2_name": sw_info.get("sw_level2_name", ""),
+            "sw_level3_name": sw_info.get("sw_level3_name", ""),
+        })
+
+    # 5. 补充 sw_industry_classifications 中可能存在但不在 hk_records 里的港股通标的
     for code, sw_info in sw_map.items():
         if sw_info.get("market_group") == "HK" and "." in code:
+            if code in seen_hk_codes:
+                continue
             raw_code = code.split(".")[0]
             intro_items = local_intro_map.get(raw_code) or {}
             records_to_upsert.append({

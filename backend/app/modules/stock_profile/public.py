@@ -19,6 +19,7 @@ from app.modules.stock_profile.repository import (
     list_records as list_stock_profile_records,
 )
 from app.modules.stock_profile.service import (
+    auto_enrich_pending_profiles,
     enrich_stock_profile,
     export_profiles_csv,
     get_profile,
@@ -31,6 +32,7 @@ from app.modules.stock_profile.service import (
 )
 
 __all__ = [
+    "auto_enrich_pending_profiles",
     "StockBasicProfileInput",
     "StockBasicProfileRecord",
     "StockBasicProfileListResponse",

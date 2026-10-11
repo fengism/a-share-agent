@@ -163,6 +163,48 @@ export interface MarketDailyBarRefreshRequest {
   force?: boolean;
 }
 
+export type MarketDailyBackfillStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
+
+export interface MarketDailyBackfillRequest {
+  start_date: string;
+  end_date: string;
+  market?: "cn";
+  instrument_type?: "stock";
+  overwrite_existing?: boolean;
+  max_provider_sources?: number;
+}
+
+export interface MarketDailyBackfillJob {
+  job_id: string;
+  market: "cn";
+  instrument_type: "stock";
+  start_date: string;
+  end_date: string;
+  overwrite_existing: boolean;
+  max_provider_sources: number;
+  status: MarketDailyBackfillStatus;
+  total_instruments: number;
+  completed_instruments: number;
+  succeeded_instruments: number;
+  failed_instruments: number;
+  retryable_failed_instruments: number;
+  average_quality_score: number | null;
+  stored_bars: number;
+  current_code: string | null;
+  last_error: string | null;
+  failure_details: Array<{ code: string; kind?: string; retryable?: boolean; error: string }>;
+  cancel_requested: boolean;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export interface MarketDailyBackfillJobList {
+  items: MarketDailyBackfillJob[];
+  total: number;
+}
+
 export interface MarketDailyBarRefreshResult {
   trade_date: string;
   checkpoint: MarketDailyRefreshCheckpoint;

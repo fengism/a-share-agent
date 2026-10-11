@@ -2,19 +2,24 @@ import json
 import logging
 import math
 import re
+import time
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from datetime import time as datetime_time
+from threading import Lock
 from typing import cast
 
 import pandas as pd
 import requests
 
+from app.configuration import get_settings
 from app.constants.http import SINA_FINANCE_HEADERS
 from app.constants.market import (
     SINA_CN_RANK_URL,
     SINA_INDEX_INTRADAY_URL,
     SINA_INDEX_QUOTE_URL,
+    SINA_MARKET_HQ_COUNT_URL,
     SINA_MARKET_HQ_URL,
     SINA_STOCK_KLINE_URL,
 )
@@ -35,6 +40,36 @@ from app.infrastructure.providers.sina.quotes import get_last_trade_date
 logger = logging.getLogger(__name__)
 
 _SINA_FACTOR_PATTERN = re.compile(r"^[^=]*=\s*", re.DOTALL)
+
+
+class SinaSnapshotIncompleteError(RuntimeError):
+    """新浪全市场分页未完整结束，禁止返回或缓存部分快照。"""
+
+
+_sina_snapshot_health_lock = Lock()
+_sina_snapshot_health: dict[str, object] = {
+    "status": "unknown",
+    "updated_at": None,
+    "rows": 0,
+    "expected_count": 0,
+    "pages": 0,
+    "duration_ms": 0.0,
+    "page_ms_avg": 0.0,
+    "page_ms_max": 0.0,
+    "error_type": None,
+    "error_message": None,
+}
+
+
+def _update_sina_snapshot_health(**updates: object) -> None:
+    with _sina_snapshot_health_lock:
+        _sina_snapshot_health.update(updates)
+        _sina_snapshot_health["updated_at"] = datetime.now().isoformat(timespec="seconds")
+
+
+def sina_snapshot_health_snapshot() -> dict[str, object]:
+    with _sina_snapshot_health_lock:
+        return dict(_sina_snapshot_health)
 
 
 def _parse_adjustment_factor_payload(text: str, method: str) -> pd.DataFrame:
@@ -77,9 +112,12 @@ class SinaDataProvider:
     fetch_futures_history = staticmethod(sina_futures.fetch_futures_history)
     fetch_last_trade_date = staticmethod(get_last_trade_date)
 
-    HQ_PAGE_SIZE = 80
+    HQ_PAGE_SIZE = 100
     HQ_MAX_PAGES = 80
+    HQ_PAGE_MAX_ATTEMPTS = 3
+    HQ_PAGE_WORKERS = 4
     HQ_RETRY_DELAY_SECONDS = 0.3
+    HQ_MIN_RECORDS = 4_000
     RANK_PAGE_SIZE = 30
     RANK_BATCH_SIZE = 8
     RANK_WORKERS = 8
@@ -145,7 +183,9 @@ class SinaDataProvider:
             return pd.DataFrame()
 
         df = pd.DataFrame(records)
-        df["volume"] = pd.to_numeric(df["volume"], errors="coerce") / 100
+        # CN_MarketDataService.getKLineData 的 volume 原始单位为股；历史回填库也统一存股。
+        # 这里不能除以 100，否则该无成交额 fallback 无法在回填层自动识别并恢复单位。
+        df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
         df = rename_columns(
             df,
             {"day": "日期", "open": "开盘", "high": "最高", "low": "最低", "close": "收盘", "volume": "成交量"},
@@ -442,13 +482,25 @@ class SinaDataProvider:
             if item.get("code") and item.get("name")
         ]
 
+    @staticmethod
+    def _spot_snapshot_ttl(now: datetime | None = None) -> int:
+        """交易时段保持较短 TTL，休市后降低全市场重复抓取频率。"""
+        current = now or datetime.now()
+        is_live = (
+            current.weekday() < 5
+            and datetime_time(9, 0) <= current.time() <= datetime_time(15, 30)
+        )
+        return SINA_SPOT_SNAPSHOT.ttl_seconds if is_live else 30 * 60
+
     def fetch_spot_snapshot(self) -> pd.DataFrame:
         """获取全市场 A 股实时行情快照（新浪行情列表，60 秒内复用缓存）。
 
         Return:
             包含代码、名称、最新价、OHLCV、市盈率、市净率、换手率等的 DataFrame
         """
-        records = self._fetch_market_hq_records(ttl=self.SNAPSHOT_CACHE_TTL, cache_scope="spot_snapshot")
+        records = self._fetch_market_hq_records(
+            ttl=self._spot_snapshot_ttl(), cache_scope="spot_snapshot"
+        )
         return self._records_to_snapshot_df(records)
 
     def _records_to_snapshot_df(self, records: list[dict]) -> pd.DataFrame:
@@ -484,61 +536,210 @@ class SinaDataProvider:
                 "mktcap": "总市值",
                 "nmc": "流通市值",
                 "turnoverratio": "换手率",
+                "ticktime": "时间",
             },
         )
         if "成交量" in df.columns:
+            # Market_Center.getHQNodeData 的 volume 已按“股”返回。这里仅做数值化；
+            # 不要套用东方财富等以“手”为单位的数据源所需的 ×100 转换。
             df["成交量"] = pd.to_numeric(df["成交量"], errors="coerce")
         if "总市值" in df.columns:
             df["总市值"] = pd.to_numeric(df["总市值"], errors="coerce") * 10000
         if "流通市值" in df.columns:
             df["流通市值"] = pd.to_numeric(df["流通市值"], errors="coerce") * 10000
+        codes = df.get("代码", pd.Series(dtype="object")).astype(str)
+        price = pd.to_numeric(df.get("最新价"), errors="coerce")
+        volume = pd.to_numeric(df.get("成交量"), errors="coerce")
+        amount = pd.to_numeric(df.get("成交额"), errors="coerce")
+        valid_ratio = (price > 0) & (volume > 0) & (amount > 0)
+        ratios = (amount[valid_ratio] / (volume[valid_ratio] * price[valid_ratio])).dropna()
+        quality = {
+            "rows": len(df),
+            "unique_codes": int(codes.nunique()),
+            "duplicate_codes": int(codes.duplicated().sum()),
+            "positive_prices": int((price > 0).sum()),
+            "positive_volume": int((volume > 0).sum()),
+            "positive_amount": int((amount > 0).sum()),
+            "amount_volume_price_ratio_median": (
+                round(float(ratios.median()), 6) if not ratios.empty else None
+            ),
+        }
+        df.attrs["stock_spot_quality"] = quality
+        logger.info("新浪全市场快照质量: %s", quality)
         return df
 
-    def _load_market_hq_records(self, ttl: int | None = None, cache_scope: str = "default") -> list[dict]:
-        """分页拉取新浪沪深 A 股行情原始 JSON 记录，带缓存。
+    def _fetch_market_hq_expected_count(self) -> int:
+        last_error: Exception | None = None
+        for attempt in range(1, self.HQ_PAGE_MAX_ATTEMPTS + 1):
+            try:
+                response = self._session.get(
+                    SINA_MARKET_HQ_COUNT_URL,
+                    params={"node": "hs_a"},
+                    timeout=15,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                expected = int(payload)
+                if expected < self.HQ_MIN_RECORDS:
+                    raise SinaSnapshotIncompleteError(
+                        f"新浪全市场预期数量异常: expected={expected} minimum={self.HQ_MIN_RECORDS}"
+                    )
+                return expected
+            except Exception as error:
+                last_error = error
+                if attempt < self.HQ_PAGE_MAX_ATTEMPTS:
+                    time.sleep(self.HQ_RETRY_DELAY_SECONDS * attempt)
+        raise SinaSnapshotIncompleteError("新浪全市场计数接口连续失败") from last_error
 
-        Param:
-            ttl: 缓存秒数；为 None 表示不缓存（每次都请求网络）
-            cache_scope: 缓存键的作用域标识，不同 scope 互不影响
-        Return:
-            单只股票行情记录字典列表
-        """
+    def _fetch_market_hq_page(self, page: int) -> tuple[list[dict], float, int]:
+        last_error: Exception | None = None
+        for attempt in range(1, self.HQ_PAGE_MAX_ATTEMPTS + 1):
+            page_started_at = time.perf_counter()
+            try:
+                response = self._session.get(
+                    SINA_MARKET_HQ_URL,
+                    params={
+                        "page": page,
+                        "num": self.HQ_PAGE_SIZE,
+                        "sort": "symbol",
+                        "asc": 1,
+                        "node": "hs_a",
+                        "_s_r_a": "init",
+                    },
+                    timeout=15,
+                )
+                response.raise_for_status()
+                if not response.text.strip():
+                    raise SinaSnapshotIncompleteError(f"新浪全市场快照第 {page} 页响应为空")
+                payload = response.json()
+                if not isinstance(payload, list):
+                    raise SinaSnapshotIncompleteError(
+                        f"新浪全市场快照第 {page} 页返回类型无效: {type(payload).__name__}"
+                    )
+                if not payload:
+                    raise SinaSnapshotIncompleteError(f"新浪全市场快照第 {page} 页意外为空")
+                if any(not isinstance(row, Mapping) for row in payload):
+                    raise SinaSnapshotIncompleteError(f"新浪全市场快照第 {page} 页包含无效记录")
+                latency_ms = round((time.perf_counter() - page_started_at) * 1000, 2)
+                return [dict(row) for row in payload], latency_ms, attempt
+            except Exception as error:
+                last_error = error
+                if attempt < self.HQ_PAGE_MAX_ATTEMPTS:
+                    time.sleep(self.HQ_RETRY_DELAY_SECONDS * attempt)
+        raise SinaSnapshotIncompleteError(
+            f"新浪全市场快照第 {page} 页连续失败 {self.HQ_PAGE_MAX_ATTEMPTS} 次"
+        ) from last_error
+
+    def _load_market_hq_records(self, ttl: int | None = None, cache_scope: str = "default") -> list[dict]:
+        """按官方总数并发拉取完整 A 股快照；任一页失败则整批失败且不缓存。"""
         cache_key: str | None = dated_cache_key("sina", "hq_records", cache_scope) if ttl else None
         if cache_key is not None:
             cached = cache.get(cache_key)
             if cached is not None:
                 return cast(list[dict], cached)
 
-        records: list[dict] = []
-        page = 1
-        while True:
-            response = self._session.get(
-                SINA_MARKET_HQ_URL,
-                params={
-                    "page": page,
-                    "num": self.HQ_PAGE_SIZE,
-                    "sort": "symbol",
-                    "asc": 1,
-                    "node": "hs_a",
-                    "_s_r_a": "init",
-                },
-                timeout=15,
-            )
-            if response.status_code != 200 or not response.text.strip():
-                break
-            page_records = json.loads(response.text)
-            if not page_records:
-                break
-            records.extend(page_records)
-            if len(page_records) < self.HQ_PAGE_SIZE:
-                break
-            page += 1
-            if page > self.HQ_MAX_PAGES:
-                break
+        started_at = time.perf_counter()
+        _update_sina_snapshot_health(
+            status="fetching",
+            error_type=None,
+            error_message=None,
+        )
+        try:
+            expected_count = self._fetch_market_hq_expected_count()
+            total_pages = math.ceil(expected_count / self.HQ_PAGE_SIZE)
+            if total_pages > self.HQ_MAX_PAGES:
+                raise SinaSnapshotIncompleteError(
+                    f"新浪全市场快照预期页数超过上限: pages={total_pages} max={self.HQ_MAX_PAGES}"
+                )
 
-        if cache_key is not None:
-            cache.set(cache_key, records, ttl=ttl)
-        return records
+            page_results: dict[int, tuple[list[dict], float, int]] = {}
+            page_workers = max(
+                1,
+                min(get_settings().sina_hq_page_workers, self.HQ_PAGE_WORKERS, total_pages),
+            )
+            with ThreadPoolExecutor(
+                max_workers=page_workers,
+                thread_name_prefix="sina-market-hq",
+            ) as executor:
+                futures = {
+                    page: executor.submit(self._fetch_market_hq_page, page)
+                    for page in range(1, total_pages + 1)
+                }
+                for page in range(1, total_pages + 1):
+                    page_results[page] = futures[page].result()
+
+            records: list[dict] = []
+            page_latencies: list[float] = []
+            page_attempts: list[int] = []
+            for page in range(1, total_pages + 1):
+                page_records, latency_ms, attempts = page_results[page]
+                expected_page_size = (
+                    self.HQ_PAGE_SIZE
+                    if page < total_pages
+                    else expected_count - self.HQ_PAGE_SIZE * (total_pages - 1)
+                )
+                if len(page_records) != expected_page_size:
+                    raise SinaSnapshotIncompleteError(
+                        f"新浪全市场快照第 {page} 页数量异常: "
+                        f"rows={len(page_records)} expected={expected_page_size}"
+                    )
+                records.extend(page_records)
+                page_latencies.append(latency_ms)
+                page_attempts.append(attempts)
+
+            codes = [str(row.get("code") or "").strip() for row in records]
+            valid_codes = [code for code in codes if len(code) == 6 and code.isdigit()]
+            duplicate_count = len(valid_codes) - len(set(valid_codes))
+            if len(records) != expected_count:
+                raise SinaSnapshotIncompleteError(
+                    f"新浪全市场快照数量与计数接口不一致: rows={len(records)} expected={expected_count}"
+                )
+            if len(valid_codes) != len(records):
+                raise SinaSnapshotIncompleteError(
+                    f"新浪全市场快照证券代码无效: rows={len(records)} valid_codes={len(valid_codes)}"
+                )
+            if duplicate_count:
+                raise SinaSnapshotIncompleteError(
+                    f"新浪全市场快照存在重复代码: duplicates={duplicate_count}"
+                )
+
+            if ttl:
+                for scope, scope_ttl in (
+                    (cache_scope, ttl),
+                    ("stock_names", self.NAMES_CACHE_TTL),
+                ):
+                    cache.set(dated_cache_key("sina", "hq_records", scope), records, ttl=scope_ttl)
+            elapsed_ms = round((time.perf_counter() - started_at) * 1000, 2)
+            page_ms_avg = sum(page_latencies) / len(page_latencies) if page_latencies else 0.0
+            page_ms_max = max(page_latencies, default=0.0)
+            _update_sina_snapshot_health(
+                status="healthy",
+                rows=len(records),
+                expected_count=expected_count,
+                pages=total_pages,
+                duration_ms=elapsed_ms,
+                page_ms_avg=round(page_ms_avg, 2),
+                page_ms_max=round(page_ms_max, 2),
+                retried_pages=sum(1 for attempts in page_attempts if attempts > 1),
+                error_type=None,
+                error_message=None,
+            )
+            logger.info(
+                "新浪全市场快照完整拉取: rows=%s expected=%s pages=%s workers=%s "
+                "retried_pages=%s elapsed_ms=%.2f page_ms_avg=%.2f page_ms_max=%.2f",
+                len(records), expected_count, total_pages, page_workers,
+                sum(1 for attempts in page_attempts if attempts > 1),
+                elapsed_ms, page_ms_avg, page_ms_max,
+            )
+            return records
+        except Exception as error:
+            _update_sina_snapshot_health(
+                status="error",
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+                error_type=type(error).__name__,
+                error_message=str(error)[:1000],
+            )
+            raise
 
     def _fetch_market_hq_records(
         self,

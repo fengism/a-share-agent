@@ -133,6 +133,37 @@ vi.mock("../../api/queryHooks/stock", () => ({
     error: null,
     refetch: vi.fn(),
   }),
+  useFinancial: (_code: string, type: "balance" | "profit" | "cashflow") => ({
+    data: {
+      balance: [{
+        REPORT_DATE: "2026-06-30",
+        CURRENCY: "人民币",
+        TOTAL_ASSETS: 232208136000,
+        TOTAL_LIABILITIES: 60646442000,
+        MONETARYFUNDS: 42900000000,
+        INVENTORY: 1800000000,
+        TOTAL_CURRENT_ASSETS: 100000000000,
+        TOTAL_CURRENT_LIAB: 40000000000,
+      }],
+      profit: [{
+        REPORT_DATE: "2026-06-30",
+        CURRENCY: "人民币",
+        OPERATE_INCOME: 60697827000,
+        OPERATE_COST: 31000000000,
+        PARENT_NETPROFIT: 17654762000,
+        BASIC_EPS: 5.52,
+      }],
+      cashflow: [{
+        REPORT_DATE: "2026-06-30",
+        CURRENCY: "人民币",
+        NETCASH_OPERATE: 23706000000,
+        NETCASH_INVEST: -42422456000,
+      }],
+    }[type],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
   useRevenueBreakdown: () => ({
     data: {
       code: "00700",
@@ -261,6 +292,30 @@ describe("HKStockPageContent", () => {
     expect(table.queryByText("营业收入")).not.toBeInTheDocument();
     expect(table.queryByText("营业成本")).not.toBeInTheDocument();
     expect(table.queryByText("毛利率")).not.toBeInTheDocument();
+  });
+
+  it("renders the HK financial statements in the stock profile", () => {
+    render(
+      <MemoryRouter>
+        <HKStockPageContent code="00700" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "财务数据" })).toBeInTheDocument();
+    expect(screen.getByText("同花顺 F10 · 最近四个报告期 · 金额按公司原始披露币种")).toBeInTheDocument();
+    const financial = within(screen.getByTestId("hk-financial-data"));
+    expect(financial.getByText("盈利与增长")).toBeInTheDocument();
+    expect(financial.getByRole("table")).toHaveTextContent("营业收入");
+    expect(financial.getByRole("table")).toHaveTextContent("归母净利润");
+    expect(financial.getByRole("table")).toHaveTextContent("2026-06-30");
+
+    fireEvent.click(financial.getByText("资产健康"));
+    expect(financial.getByRole("table")).toHaveTextContent("总资产");
+    expect(financial.getByRole("table")).toHaveTextContent("资产负债率");
+
+    fireEvent.click(financial.getByText("现金质量"));
+    expect(financial.getByRole("table")).toHaveTextContent("经营活动现金流净额");
+    expect(financial.getByRole("table")).toHaveTextContent("自由现金流");
   });
 
   it("switches to MACD, RSI, and KDJ indicator charts", () => {

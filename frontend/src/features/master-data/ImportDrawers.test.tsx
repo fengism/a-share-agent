@@ -17,6 +17,7 @@ vi.mock("../../api/queries", () => {
     useStockConceptStatus: query, useConceptTags: query, useStockConceptRecords: records,
     useCreateStockConceptRecord: mutation, useUpdateStockConceptRecord: mutation, useDeleteStockConceptRecord: mutation,
     usePreviewStockConceptImport: preview, useCommitStockConceptImport: commit,
+    useTriggerStockConceptEnrich: mutation,
     useIndustryStatus: query, useIndustryHierarchy: query, useIndustryRecords: records,
     useCreateIndustryRecord: mutation, useUpdateIndustryRecord: mutation, useDeleteIndustryRecord: mutation,
     useUpdateIndustryRefreshPolicy: mutation, useRefreshIndustries: mutation,

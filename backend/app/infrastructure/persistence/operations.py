@@ -100,6 +100,8 @@ def probe_large_database_integrity(
         "market_daily_bar_refresh_jobs",
         "market_daily_refresh_attempts",
         "market_daily_refresh_runs",
+        "market_daily_backfill_jobs",
+        "market_daily_backfill_items",
         "market_daily_bar_observations",
     )
     for table in small_metadata_tables:

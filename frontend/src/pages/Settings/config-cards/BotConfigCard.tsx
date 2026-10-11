@@ -3,7 +3,14 @@ import { Col, Input, InputNumber, Row, Switch } from "antd";
 import { useColors, useStyles } from "../../../styles/ui";
 import { SettingsCard, type ConfigCardProps } from "../SettingsCard";
 
-export default function BotConfigCard({ form, onChange, onSave, isSaving }: ConfigCardProps) {
+export default function BotConfigCard({
+  form,
+  onChange,
+  onSave,
+  isSaving,
+  isDirty,
+  onReset,
+}: ConfigCardProps) {
   const { fieldLabelStyle } = useStyles();
   const colors = useColors();
 
@@ -14,6 +21,8 @@ export default function BotConfigCard({ form, onChange, onSave, isSaving }: Conf
       saveLabel="保存 Bot 配置"
       onSave={onSave}
       isSaving={isSaving}
+      isDirty={isDirty}
+      onReset={onReset}
     >
       <Row gutter={[24, 16]}>
         <Col span={24} sm={8}>

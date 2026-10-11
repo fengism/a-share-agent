@@ -23,6 +23,9 @@ import type {
   ConfigUpdate,
   LlmModelsRequest,
   LlmModelsResponse,
+  MarketDailyBackfillJob,
+  MarketDailyBackfillJobList,
+  MarketDailyBackfillRequest,
   MarketDailyBarDeleteRequest,
   MarketDailyBarDeleteResult,
   MarketDailyBarRefreshHistory,
@@ -148,6 +151,52 @@ export function useLoginAuditLogs(
   });
 }
 
+
+export function useMarketDailyBackfills(enabled: boolean) {
+  return useQuery<MarketDailyBackfillJobList>({
+    queryKey: queryKeys.settings.marketDailyBackfills,
+    queryFn: () => apiGet<MarketDailyBackfillJobList>("/market/daily-bars/backfill", { limit: 20 }),
+    enabled,
+    refetchInterval: (query) => {
+      if (!enabled) return false;
+      const items = query.state.data?.items ?? [];
+      const hasActive = items.some((j) => j.status === "pending" || j.status === "running");
+      return hasActive ? 5_000 : false;
+    },
+    staleTime: 2_000,
+  });
+}
+
+export function useCreateMarketDailyBackfill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: MarketDailyBackfillRequest) => apiPost<MarketDailyBackfillJob>(
+      "/market/daily-bars/backfill",
+      payload,
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.marketDailyBackfills }),
+  });
+}
+
+export function useRetryFailedMarketDailyBackfill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => apiPost<MarketDailyBackfillJob>(
+      `/market/daily-bars/backfill/${jobId}/retry-failed`,
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.marketDailyBackfills }),
+  });
+}
+
+export function useCancelMarketDailyBackfill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => apiPost<MarketDailyBackfillJob>(
+      `/market/daily-bars/backfill/${jobId}/cancel`,
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.settings.marketDailyBackfills }),
+  });
+}
 
 export function useMarketDailyRefreshHistory(enabled: boolean) {
   return useQuery<MarketDailyBarRefreshHistory>({

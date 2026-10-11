@@ -10,6 +10,7 @@ INDEX_FALLBACKS = [
 SINA_INDEX_QUOTE_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple"
 SINA_INDEX_INTRADAY_URL = "https://cn.finance.sina.com.cn/minline/getMinlineData"
 SINA_MARKET_HQ_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData"
+SINA_MARKET_HQ_COUNT_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeStockCount"
 SINA_MARKET_NODES_URL = "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodes"
 SINA_CN_RANK_URL = "https://cnrank.finance.sina.cn/getSymRankByNode"
 SINA_STOCK_KLINE_URL = "https://quotes.sina.cn/cn/api/jsonp_v2.php/=/CN_MarketDataService.getKLineData"

@@ -33,6 +33,10 @@ from app.infrastructure.providers.registry import get_provider
 logger = logging.getLogger(__name__)
 
 _SPOT_SNAPSHOT_FILE = DATA_DIR / "stock_spot_snapshot.json"
+_SPOT_FILE_FRESH_SECONDS = 5 * 60
+_SPOT_FILE_MAX_STALE_SECONDS = 24 * 60 * 60
+_SPOT_AS_OF_ATTR = "stock_spot_as_of"
+_SPOT_IS_STALE_ATTR = "stock_spot_is_stale"
 _spot_snapshot_service = BaseFileSnapshotService[pd.DataFrame](
     cache_key="stock_spot_all",
     ttl=300,
@@ -68,7 +72,8 @@ def _normalize_market_cap_units(df: pd.DataFrame) -> pd.DataFrame:
     if "总市值" not in result.columns:
         return result
     market_cap = pd.to_numeric(result["总市值"], errors="coerce")
-    if market_cap.max(skipna=True) and market_cap.max(skipna=True) < 1e10:
+    max_cap = market_cap.max(skipna=True)
+    if pd.notna(max_cap) and 0 < max_cap < 1e10:
         result["总市值"] = market_cap * 10000
         if "流通市值" in result.columns:
             result["流通市值"] = pd.to_numeric(result["流通市值"], errors="coerce") * 10000
@@ -89,7 +94,21 @@ def load_spot_snapshot_file() -> pd.DataFrame | None:
         with open(_SPOT_SNAPSHOT_FILE, "r", encoding="utf-8") as f:
             payload = json.load(f)
         rows = payload.get("rows") if isinstance(payload, dict) else None
-        if not rows:
+        updated_at = payload.get("updated_at") if isinstance(payload, dict) else None
+        if not rows or not isinstance(updated_at, str):
+            return None
+        parsed_updated_at = datetime.fromisoformat(updated_at)
+        if parsed_updated_at.tzinfo is not None:
+            now = datetime.now(parsed_updated_at.tzinfo)
+        else:
+            now = datetime.now()
+        age_seconds = max(0.0, (now - parsed_updated_at).total_seconds())
+        if age_seconds > _SPOT_FILE_MAX_STALE_SECONDS:
+            logger.warning(
+                "本地全市场快照已过期，拒绝作为实时行情: age_seconds=%.0f updated_at=%s",
+                age_seconds,
+                updated_at,
+            )
             return None
         df = pd.DataFrame(rows)
         if "代码" not in df.columns or len(df.index) < 3000:
@@ -99,7 +118,12 @@ def load_spot_snapshot_file() -> pd.DataFrame | None:
         if not isinstance(source_id, str) or source_id not in KNOWN_SPOT_SOURCE_IDS:
             source_id = LEGACY_SPOT_SOURCE_ID
         mark_spot_source(df, source_id)
-        logger.info(f"从本地文件加载全市场快照: {len(df)} 条")
+        df.attrs[_SPOT_AS_OF_ATTR] = parsed_updated_at.isoformat()
+        df.attrs[_SPOT_IS_STALE_ATTR] = age_seconds > _SPOT_FILE_FRESH_SECONDS
+        logger.info(
+            "从本地文件加载全市场快照: rows=%s age_seconds=%.0f stale=%s",
+            len(df), age_seconds, df.attrs[_SPOT_IS_STALE_ATTR],
+        )
         return df
     except Exception as e:
         logger.warning(f"读取本地全市场快照失败: {e}")
@@ -117,8 +141,9 @@ def _save_spot_snapshot_file(df: pd.DataFrame) -> None:
     try:
         _SPOT_SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
         normalized_df = _normalize_market_cap_units(df)
+        updated_at = datetime.now().isoformat()
         payload = {
-            "updated_at": datetime.now().isoformat(),
+            "updated_at": updated_at,
             "source_id": get_spot_source(normalized_df),
             "rows": normalized_df.to_dict(orient="records"),
         }
@@ -126,6 +151,8 @@ def _save_spot_snapshot_file(df: pd.DataFrame) -> None:
             _SPOT_SNAPSHOT_FILE,
             json.dumps(payload, ensure_ascii=False),
         )
+        df.attrs[_SPOT_AS_OF_ATTR] = updated_at
+        df.attrs[_SPOT_IS_STALE_ATTR] = False
         logger.info(f"全市场快照已写入本地文件: {len(df)} 条")
     except Exception as e:
         logger.warning(f"保存本地全市场快照失败: {e}")

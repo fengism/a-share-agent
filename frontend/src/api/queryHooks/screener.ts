@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiGet, apiPost } from "../client";
+import { API_TIMEOUTS, apiGet, apiPost } from "../client";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { streamScreenerStrategy, type ScreenerStrategyProgress } from "../sse";
 import { queryKeys } from "../queryKeys";
@@ -43,7 +43,9 @@ export function useScreenerScreen(filters: ScreenerFilter, enabled = true) {
   return useQuery({
     queryKey: queryKeys.screener.screen(filters),
     queryFn: async () => normalizeScreenerResult(
-      await apiPost<ScreenerResult>("/screener/screen", filters),
+      await apiPost<ScreenerResult>("/screener/screen", filters, {
+        timeoutMs: API_TIMEOUTS.SCREENER,
+      }),
     ),
     enabled,
     staleTime: QUERY_CACHE_POLICIES.screenerResults.staleMs,
@@ -118,7 +120,10 @@ export function useRunScreenerStrategy() {
             ...request.candidate_filters,
             page: 1,
             page_size: 200,
-          }, { signal: candidateController.signal });
+          }, {
+            signal: candidateController.signal,
+            timeoutMs: API_TIMEOUTS.SCREENER,
+          });
         } catch (error) {
           if (cancelRequested) throw new Error("已取消");
           throw error;

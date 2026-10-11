@@ -20,7 +20,7 @@ def fetch_stock_kline(
     end_date: str,
     adjust: str,
 ) -> pd.DataFrame:
-    return ak.stock_zh_a_hist(
+    frame = ak.stock_zh_a_hist(
         symbol=code,
         period=period,
         start_date=start_date,
@@ -28,6 +28,11 @@ def fetch_stock_kline(
         adjust=adjust,
         timeout=_HISTORICAL_REQUEST_TIMEOUT_SECONDS,
     )
+    if not frame.empty and "成交量" in frame.columns:
+        # AkShare 东方财富日线成交量单位为手；统一为股。
+        frame = frame.copy()
+        frame["成交量"] = pd.to_numeric(frame["成交量"], errors="coerce") * 100
+    return frame
 
 
 def fetch_stock_kline_sina(
@@ -48,7 +53,8 @@ def fetch_stock_kline_sina(
     frame["date"] = pd.to_datetime(frame["date"])
     for column in ("open", "high", "low", "close", "amount"):
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
-    frame["volume"] = pd.to_numeric(frame["volume"], errors="coerce") / 100
+    # AkShare 新浪日线的 volume 原始单位为股；保持统一的股口径。
+    frame["volume"] = pd.to_numeric(frame["volume"], errors="coerce")
     frame["turnover"] = pd.to_numeric(frame["turnover"], errors="coerce") * 100
     del frame["outstanding_share"]
     return rename_columns(

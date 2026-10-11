@@ -145,6 +145,9 @@ describe("NationalTeam page", () => {
     expect(screen.getByRole("heading", { name: "国家队" })).toBeInTheDocument();
     expect(screen.getByText(/不等于中央汇金真实持仓/)).toBeInTheDocument();
     expect(screen.getByText(/数据不完整/)).toBeInTheDocument();
+
+    // Toggle details to view full description
+    fireEvent.click(screen.getByRole("button", { name: /查看明细/ }));
     expect(screen.getByText(/份额缺失或区间不完整/)).toBeInTheDocument();
     expect(screen.getByText(/不代表零变化/)).toBeInTheDocument();
     expect(screen.getAllByText(/159629/).length).toBeGreaterThan(0);
@@ -277,6 +280,16 @@ describe("NationalTeam page", () => {
     // Switch back to All
     fireEvent.click(screen.getByRole("radio", { name: /全部 \(12\)/ }));
     expect(screen.getByText("588080")).toBeInTheDocument();
+
+    // Search by ETF code or manager
+    const searchInput = screen.getByPlaceholderText("搜索代码 / 名称 / 基金公司");
+    fireEvent.change(searchInput, { target: { value: "华夏" } });
+    expect(screen.getByText("510330")).toBeInTheDocument();
+    expect(screen.queryByText("510310")).not.toBeInTheDocument();
+
+    // Clear search
+    fireEvent.change(searchInput, { target: { value: "" } });
+    expect(screen.getByText("510310")).toBeInTheDocument();
   });
 });
 
@@ -316,6 +329,7 @@ describe("NationalTeam data quality", () => {
     render(<NationalTeam />);
     expect(screen.getByText("数据不完整 · 后台更新中")).toBeInTheDocument();
     expect(screen.getByText(new RegExp("覆盖 8/12 只宽基 ETF"))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /查看明细/ }));
     const alert = screen.getByText("数据不完整 · 后台更新中").closest(".national-team-partial-alert");
     expect(alert).toHaveTextContent("预期交易日 2026-09-18");
     expect(alert).toHaveTextContent("交易日历暂不可用");

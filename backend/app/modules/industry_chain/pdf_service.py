@@ -344,6 +344,39 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             """)
         risks_html = "".join(r_items)
 
+    # 6.5 产业链传导与利润弹性机制
+    relationships_rows_html = ""
+    if result.relationships:
+        direction_map = {"positive": ("正向传导", "#16a34a", "#f0fdf4"), "negative": ("负向传导", "#dc2626", "#fef2f2"), "mixed": ("双向波动", "#d97706", "#fffbeb"), "unknown": ("定性关联", "#475569", "#f8fafc")}
+        rel_map = {"supply": "供货配套", "purchase": "大客户采购", "substitute": "技术替代", "compete": "同业竞争", "transmission": "利润传导"}
+        for r in result.relationships:
+            dir_label, dir_fg, dir_bg = direction_map.get(r.impact_direction or "unknown", ("定性关联", "#475569", "#f8fafc"))
+            rel_label = rel_map.get(r.relation_type, r.relation_type or "定性关联")
+            dir_badge = f'<span style="display:inline-block; font-size:10px; color:{dir_fg}; background:{dir_bg}; border:1px solid {dir_fg}33; padding:1px 6px; border-radius:3px;">{dir_label}</span>'
+            rel_badge = f'<span style="display:inline-block; font-size:10px; color:#0284c7; background:#e0f2fe; padding:1px 6px; border-radius:3px; margin-left:4px;">{rel_label}</span>'
+            driver_info = f'<div style="font-size:10px; color:#64748b; margin-top:2px;"><b>驱动冲击：</b>{_esc(r.driver)}</div>' if r.driver else ""
+            conditions_info = f'<div style="font-size:10px; color:#475569; margin-top:2px;"><b>兑现条件：</b>{_esc("；".join(r.conditions))}</div>' if r.conditions else ""
+            invalidation_info = f'<div style="font-size:10px; color:#b91c1c; margin-top:2px;"><b>失效风险：</b>{_esc(r.invalidation)}</div>' if r.invalidation else ""
+            evidence_tags = _render_evidence_tags(r.evidence_ids)
+
+            relationships_rows_html += f"""
+            <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:7px 10px; font-weight:700; color:#0f172a; font-size:11px; width:170px;">
+                    {_esc(r.source_node)} → {_esc(r.target_node)}
+                    <div style="margin-top:3px;">{dir_badge}{rel_badge}</div>
+                </td>
+                <td style="padding:7px 10px; font-size:11px; color:#334155; line-height:1.45;">
+                    <div>{_esc(r.detail or r.title)}</div>
+                    {driver_info}
+                    {conditions_info}
+                    {invalidation_info}
+                </td>
+                <td style="padding:7px 10px; width:90px; text-align:right;">
+                    <div>{evidence_tags}</div>
+                </td>
+            </tr>
+            """
+
     # 7. 重点股票标的
     stocks_rows_html = ""
     if result.key_stocks:
@@ -627,9 +660,26 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
         </div>
     </div>
 
-    <!-- 05 重点上市公司标的映射 -->
+    <!-- 05 产业链传导机制与利润弹性 -->
     <div class="section-card">
-        <div class="section-title">05 · 核心关注标的与产业链映射</div>
+        <div class="section-title">05 · 产业链传导机制与利润弹性假定</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>传导链路与类型</th>
+                    <th>传导机制、成立条件与失效风险</th>
+                    <th style="text-align:right;">核验状态/证据</th>
+                </tr>
+            </thead>
+            <tbody>
+                {relationships_rows_html or '<tr><td colspan="3" style="text-align:center; padding:12px; color:#94a3b8; font-size:11px;">暂无明确传导关系结构化数据</td></tr>'}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 06 重点上市公司标的映射 -->
+    <div class="section-card">
+        <div class="section-title">06 · 核心关注标的与产业链映射</div>
         <table>
             <thead>
                 <tr>
@@ -645,15 +695,15 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
         </table>
     </div>
 
-    <!-- 06 重大产业事件与催化剂 -->
+    <!-- 07 重大产业事件与催化剂 -->
     <div class="section-card">
-        <div class="section-title">06 · 重大产业事件与催化剂跟踪</div>
+        <div class="section-title">07 · 重大产业事件与催化剂跟踪</div>
         {events_html or '<div style="color:#94a3b8; font-size:11px;">暂无重大事件记录</div>'}
     </div>
 
-    <!-- 07 证据链审计与权威信息源 -->
+    <!-- 08 证据链审计与权威信息源 -->
     <div class="section-card">
-        <div class="section-title">07 · 证据链审计、权威信息源与数据缺口</div>
+        <div class="section-title">08 · 证据链审计、权威信息源与数据缺口</div>
         <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:12px;">
             <div>
                 <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:6px;">📚 权威信息源与研报清单</div>

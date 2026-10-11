@@ -86,6 +86,17 @@ def get_status():
     return ConceptStatusResponse(stats=stats())
 
 
+@router.post("/enrich")
+async def trigger_auto_enrich(
+    batch_size: int = Query(default=20, ge=1, le=100),
+    delay_seconds: float = Query(default=0.5, ge=0.1, le=5.0),
+    _: AuthenticatedUser = Depends(require_admin),
+):
+    from app.modules.stock_concept.public import auto_enrich_pending_concepts
+    res = await auto_enrich_pending_concepts(batch_size=batch_size, delay_seconds=delay_seconds)
+    return {"success": True, "data": res}
+
+
 @router.post(
     "/records",
     response_model=ConceptMutationResponse,

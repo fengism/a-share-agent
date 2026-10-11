@@ -640,7 +640,7 @@ INDUSTRY_TABLES = [
     CREATE TABLE IF NOT EXISTS sw_industry_refresh_state (
         provider             TEXT PRIMARY KEY,
         enabled              INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
-        interval_seconds     INTEGER NOT NULL DEFAULT 86400,
+        interval_seconds     INTEGER NOT NULL DEFAULT 604800,
         last_started_at      TEXT,
         last_succeeded_at    TEXT,
         last_failed_at       TEXT,

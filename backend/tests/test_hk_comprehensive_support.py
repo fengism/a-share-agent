@@ -4,10 +4,10 @@
 1. Agentic Skills 覆盖与 Agent Profiles 工具分配（validate_skill_coverage, profiles）
 2. Agent 上下文解析（_resolve_stock 识别港股）
 3. 多股对比服务（compare_stocks 支持纯港股与 A/H 混合对比，指标降级不抛错）
-4. 财务、估值、舆情与深度洞察模块在港股代码下的平滑回退，杜绝 500
+4. 港股财务接入同花顺，其他估值、舆情与深度洞察模块保持防御性行为
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -17,7 +17,7 @@ from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
 from app.agentic.tools.packs.stock.context import _resolve_stock
 from app.core.cache import analysis_cache, market_cache, reference_cache, series_cache
-from app.core.exceptions import InvalidRequestError
+from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
 from app.financial_data.hk.schemas import HKStockQuote, HKStockQuotePage, HKStockValuation
 from app.financial_data.stock.fundamentals.financials import (
     get_financial,
@@ -151,15 +151,56 @@ async def test_compare_stocks_hk_and_mixed():
 
 
 @pytest.mark.asyncio
-async def test_hk_financials_defensive_fallback():
-    """港股财务报表与核心指标平滑回退，不抛错。"""
-    assert await get_financial("00700", "balance") == []
-    assert await get_financial("hk00700", "profit") == []
+async def test_hk_financials_use_ths_and_cache_results():
+    """港股财务报表和核心指标走同花顺，并复用 24 小时缓存。"""
+    provider = MagicMock()
+    provider.fetch_hk_financial_statement = MagicMock(return_value=[{
+        "REPORT_DATE": "2025-06-30",
+        "REPORT_DATE_NAME": "2025-06-30",
+        "CURRENCY": "港元",
+        "TOTAL_ASSETS": 1000.0,
+    }])
+    provider.fetch_hk_financial_metrics = MagicMock(return_value={
+        "code": "00700",
+        "latest_report_date": "2025-06-30",
+        "metrics": {"净资产收益率": 0.1056},
+    })
 
-    metrics = await get_financial_metrics("00700")
+    with patch(
+        "app.financial_data.stock.fundamentals.financials._get_ths_provider",
+        return_value=provider,
+    ):
+        first = await get_financial("00700", "balance")
+        second = await get_financial("hk00700", "balance")
+        metrics = await get_financial_metrics("00700")
+        cached_metrics = await get_financial_metrics("hk00700")
+
+    assert first == second
+    assert first[0]["TOTAL_ASSETS"] == 1000.0
+    provider.fetch_hk_financial_statement.assert_called_once_with(
+        "00700", "balance", limit=8
+    )
+    assert metrics == cached_metrics
     assert metrics.code == "00700"
-    assert metrics.latest_report_date is None
-    assert metrics.metrics == {}
+    assert metrics.latest_report_date == "2025-06-30"
+    assert metrics.metrics["净资产收益率"] == 0.1056
+    provider.fetch_hk_financial_metrics.assert_called_once_with("00700")
+
+
+@pytest.mark.asyncio
+async def test_hk_financials_raise_upstream_error():
+    """同花顺失败时返回明确的上游异常，不再把故障伪装成空数据。"""
+    provider = MagicMock()
+    provider.fetch_hk_financial_statement = MagicMock(side_effect=RuntimeError("boom"))
+    provider.fetch_hk_financial_metrics = MagicMock(side_effect=RuntimeError("boom"))
+    with patch(
+        "app.financial_data.stock.fundamentals.financials._get_ths_provider",
+        return_value=provider,
+    ):
+        with pytest.raises(UpstreamUnavailableError, match="财务报表上游暂时不可用"):
+            await get_financial("00700", "profit")
+        with pytest.raises(UpstreamUnavailableError, match="财务指标上游暂时不可用"):
+            await get_financial_metrics("00700")
 
 
 @pytest.mark.asyncio

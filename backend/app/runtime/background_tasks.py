@@ -10,22 +10,67 @@ logger = logging.getLogger(__name__)
 
 
 async def refresh_industry_mapping_file_daily() -> None:
+    """定期（默认每周）自动更新申万行业分类并联动同步官方股票名录。"""
     from app.modules.industry_classification.public import scheduled_refresh
+    from app.modules.stock_profile.public import (
+        auto_enrich_pending_profiles,
+        sync_exchange_master_data,
+    )
 
     async def iteration():
+        # 1. 尝试按配置周期（默认每周）更新申万行业
         result = await scheduled_refresh()
         if result is not None:
             logger.info(
-                "申万行业数据库更新完成: added=%s updated=%s unchanged=%s",
+                "申万行业数据库周期更新完成: added=%s updated=%s unchanged=%s",
                 result.added,
                 result.updated,
                 result.unchanged,
             )
+            # 2. 行业更新成功后，联动同步官方交易所股票名录，自动绑定最新申万行业
+            try:
+                sync_res = await sync_exchange_master_data()
+                logger.info(
+                    "交易所股票名录联动周更完成: added=%s updated=%s unchanged=%s skipped=%s",
+                    sync_res.added,
+                    sync_res.updated,
+                    sync_res.unchanged,
+                    sync_res.skipped,
+                )
+            except Exception as e:
+                logger.warning("交易所股票名录联动更新失败，保留当前资料: %s", e)
+
+        # 3. 后台平滑跑批：每次为缺失主营资料的股票补充 50 只（使用同花顺/东财公开源，免 Token）
+        try:
+            enrich_stats = await auto_enrich_pending_profiles(batch_size=50, delay_seconds=0.5)
+            if enrich_stats["enriched"] > 0:
+                logger.info(
+                    "后台个股主营资料补充进度: enriched=%s processed=%s remaining=%s",
+                    enrich_stats["enriched"],
+                    enrich_stats["processed"],
+                    enrich_stats["remaining"],
+                )
+        except Exception as e:
+            logger.debug("后台自动补充主营资料跳过: %s", e)
+
+        # 4. 后台平滑跑批：每次为缺失概念的股票补充同花顺概念（免 Token 公开源）
+        try:
+            from app.modules.stock_concept.public import auto_enrich_pending_concepts
+            concept_stats = await auto_enrich_pending_concepts(batch_size=20, delay_seconds=0.5)
+            if concept_stats["enriched"] > 0:
+                logger.info(
+                    "后台个股概念补充进度: enriched=%s processed=%s remaining=%s",
+                    concept_stats["enriched"],
+                    concept_stats["processed"],
+                    concept_stats["remaining"],
+                )
+        except Exception as e:
+            logger.debug("后台自动补充个股概念跳过: %s", e)
 
     await task_scheduler.run_periodic(
         name="industry_mapping_refresh",
         coro_factory=iteration,
-        interval_seconds=60 * 60,
+        interval_seconds=60 * 60,  # 每小时检查一次（行业按7天周更，未录入主营按批平滑补充）
         leader_election=True,
     )
 
@@ -239,3 +284,10 @@ async def refresh_potential_stocks_daily() -> None:
         leader_election=True,
     )
 
+
+
+async def run_market_daily_backfill_worker() -> None:
+    """执行管理员提交的 A 股全市场历史日线回填任务。"""
+    from app.modules.market_daily.backfill import market_daily_backfill_service
+
+    await market_daily_backfill_service.run_worker()
