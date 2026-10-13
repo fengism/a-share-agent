@@ -71,3 +71,16 @@ async def test_warm_up_is_exported_from_public_module() -> None:
     from app.financial_data.market.public import warm_up_sge_gold_snapshots
 
     assert callable(warm_up_sge_gold_snapshots)
+
+
+def test_lifecycle_registers_sge_gold_snapshot_refresh() -> None:
+    """生命周期必须注册并正确传递上金所快照预热后台任务。"""
+    import inspect
+
+    from app.runtime import lifecycle
+
+    sig = inspect.signature(lifecycle.build_background_task_specs)
+    assert "sge_gold_snapshot_refresh" in sig.parameters
+
+    lifespan_source = inspect.getsource(lifecycle.application_lifespan)
+    assert "sge_gold_snapshot_refresh=sge_gold_snapshot_refresh" in lifespan_source

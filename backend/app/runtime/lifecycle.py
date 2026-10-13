@@ -370,6 +370,7 @@ async def application_lifespan(
         potential_stock_daily=potential_stock_daily,
         market_daily_bar_refresh=market_daily_bar_refresh,
         market_daily_backfill_worker=market_daily_backfill_worker,
+        sge_gold_snapshot_refresh=sge_gold_snapshot_refresh,
         bot_job_worker=bot_job_worker,
         quant_strategy_reload=quant_strategy_reload,
         quant_job_worker=quant_job_worker,
