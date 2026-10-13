@@ -15,10 +15,10 @@ from app.api.errors import ApiError
 from app.configuration import PROVIDER_DEFAULTS, SECRET_KEYS, get_settings
 from app.configuration.crypto import ConfigEncryptionError
 from app.configuration.effective import mask_secret
-from app.infrastructure.http.proxy import ProxyConfigError, resolve_proxy_request
-from app.infrastructure.providers.eastmoney.base import PROXY_SCOPE
 from app.domain.identity import AuthenticatedUser
 from app.domain.llm import LLMConfigurationError
+from app.infrastructure.http.proxy import ProxyConfigError, resolve_proxy_request
+from app.infrastructure.providers.eastmoney.base import PROXY_SCOPE
 from app.modules.settings.public import (
     CONFIG_VALUE_FIELDS,
     ConfigResponse,
