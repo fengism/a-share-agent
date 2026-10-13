@@ -8,14 +8,12 @@ from typing import cast
 
 from app.core.cache import dated_cache_key, dated_cache_key_no_day
 from app.core.cache import market_cache as cache
-from app.core.concurrency.rate_limiter import baidu_semaphore, eastmoney_semaphore
+from app.core.concurrency.rate_limiter import eastmoney_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
 from app.core.market import is_hk_code, normalize_code
 from app.financial_data.stock.insights.schemas import StockFundFlowItem
 from app.financial_data.stock.insights.sources import (
-    BAIDU_FUND_FLOW_API,
-    BAIDU_FUND_FLOW_SOURCE_ID,
     EASTMONEY_FUND_FLOW_API,
     EASTMONEY_FUND_FLOW_SOURCE_ID,
     TDXHUB_FUND_FLOW_API,
@@ -46,14 +44,6 @@ class _FundFlowAttempt:
 
 _FUND_FLOW_ATTEMPTS = (
     _FundFlowAttempt(
-        provider="baidu",
-        operation="stock_fund_flow_history",
-        method="fetch_stock_fund_flow_history",
-        source_id=BAIDU_FUND_FLOW_SOURCE_ID,
-        source_api=BAIDU_FUND_FLOW_API,
-        semaphore=baidu_semaphore,
-    ),
-    _FundFlowAttempt(
         provider="eastmoney",
         operation="stock_fund_flow",
         method="fetch_stock_fund_flow",
@@ -70,6 +60,15 @@ _FUND_FLOW_ATTEMPTS = (
         semaphore=_tdxhub_fund_flow_semaphore,
         max_attempts=1,
     ),
+    # 百度资金流接口目前因 WAF 风控拦截，暂不参与调度；代码与接口逻辑予以保留
+    # _FundFlowAttempt(
+    #     provider="baidu",
+    #     operation="stock_fund_flow_history",
+    #     method="fetch_stock_fund_flow_history",
+    #     source_id=BAIDU_FUND_FLOW_SOURCE_ID,
+    #     source_api=BAIDU_FUND_FLOW_API,
+    #     semaphore=baidu_semaphore,
+    # ),
 )
 
 
