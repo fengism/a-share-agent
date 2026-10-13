@@ -75,6 +75,28 @@ async def refresh_industry_mapping_file_daily() -> None:
     )
 
 
+async def refresh_sge_gold_snapshots() -> None:
+    """每日预热上金所全部品种快照。
+
+    上金所按请求频率风控（串行 5s 间隔），若等用户逐个点击品种才拉取，
+    首个请求会被整条队列阻塞。这里每日主动预热一次，让页面始终命中本地快照。
+    """
+
+    async def iteration():
+        from app.financial_data.market.public import warm_up_sge_gold_snapshots
+
+        stats = await warm_up_sge_gold_snapshots()
+        if stats["failed"]:
+            logger.warning("上金所快照预热存在失败品种: %s", stats)
+
+    await task_scheduler.run_periodic(
+        name="sge_gold_snapshot_refresh",
+        coro_factory=iteration,
+        interval_seconds=60 * 60,
+        leader_election=True,
+    )
+
+
 async def periodic_wal_checkpoint() -> None:
     from app.infrastructure.persistence.connection import checkpoint_wal, optimize_databases
     from app.runtime.maintenance import purge_expired_auth_data, purge_expired_runtime_data

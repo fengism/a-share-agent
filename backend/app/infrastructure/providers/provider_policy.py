@@ -4,7 +4,7 @@ import httpx
 import requests
 from curl_cffi.requests import exceptions as curl_errors
 
-from app.core.exceptions import UpstreamUnavailableError
+from app.core.exceptions import UpstreamRateLimitedError, UpstreamUnavailableError
 
 
 class ProviderErrorCategory(StrEnum):
@@ -22,6 +22,9 @@ class ProviderCircuitOpenError(UpstreamUnavailableError):
 def classify_provider_error(exc: Exception) -> ProviderErrorCategory:
     if isinstance(exc, ProviderCircuitOpenError):
         return ProviderErrorCategory.CIRCUIT_OPEN
+    if isinstance(exc, UpstreamRateLimitedError):
+        # 上游明确按频率拒绝，等待退避后重试可恢复。
+        return ProviderErrorCategory.RATE_LIMIT
     if isinstance(exc, (requests.Timeout, httpx.TimeoutException, curl_errors.Timeout, TimeoutError)):
         return ProviderErrorCategory.TIMEOUT
     if isinstance(exc, (requests.HTTPError, httpx.HTTPStatusError, curl_errors.HTTPError)):

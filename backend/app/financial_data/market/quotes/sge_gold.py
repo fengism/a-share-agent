@@ -6,7 +6,7 @@ import json
 import logging
 import math
 from collections.abc import Callable, Mapping, Sequence
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Protocol
 from zoneinfo import ZoneInfo
@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 _SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 _SNAPSHOT_VERSION = 1
 _SOURCE = "上海黄金交易所"
+# 最新交易日滞后超过该天数即视为合约停止交易。
+# 上金所行情按交易日更新，正常情况下滞后最多几个自然日（长假会更长），
+# 因此阈值取 10 天：既能识别停更合约，又不会被长假误判。
+_DELISTED_STALE_DAYS = 10
 
 # slug 同时用于快照文件名，显式映射可避免括号、加号等字符进入路径。
 _SGE_SYMBOLS: dict[str, tuple[str, str, str]] = {
@@ -202,7 +206,18 @@ class SgeGoldService:
             history=points,
             updated_at=fetched_at,
             is_stale=is_stale,
+            is_delisted=self._is_delisted(points),
         )
+
+    def _is_delisted(self, points: list[SgeGoldHistoryPoint]) -> bool:
+        """最新交易日滞后超过阈值即视为合约已停止交易。"""
+        if not points:
+            return False
+        try:
+            latest = date.fromisoformat(points[-1].date)
+        except ValueError:
+            return False
+        return (self._now_shanghai().date() - latest).days > _DELISTED_STALE_DAYS
 
     def _write_snapshot(self, symbol: str, fetched_at: str, history: list[dict[str, float | str]]) -> None:
         atomic_write_json(
@@ -227,7 +242,10 @@ class SgeGoldService:
                         "sge",
                         "fetch_gold_history",
                         lambda: self._provider.fetch(symbol),
-                        max_attempts=1,
+                        # 上金所 403 属于频率限制，退避重试可恢复；重试预算需覆盖
+                        # 单次 10s 最小间隔，故不沿用全局默认预算。
+                        max_attempts=3,
+                        retry_budget_seconds=45.0,
                     )
                 )
             except Exception as error:
@@ -259,3 +277,37 @@ _sge_gold_service = SgeGoldService()
 
 async def get_sge_gold_history(symbol: str = "Au99.99") -> SgeGoldResponse:
     return await _sge_gold_service.get(symbol)
+
+
+async def warm_up_sge_gold_snapshots(symbols: Sequence[str] | None = None) -> dict[str, int]:
+    """预热全部品种的每日快照。
+
+    上金所有严格频率限制（串行 5s 间隔），冷启动下逐个点击切换会把全部请求
+    排到队列末尾，首个用户等待可达 80 秒以上。这里主动串行预热一次，
+    之后所有品种都命中本地快照，页面秒开。
+
+    Param:
+        symbols: 待预热的品种；默认覆盖 _SGE_SYMBOLS 全部品种
+    Return:
+        dict: {"succeeded": 成功数, "failed": 失败数}
+    """
+    targets = list(symbols) if symbols is not None else list(_SGE_SYMBOLS)
+    succeeded = 0
+    failed = 0
+    for symbol in targets:
+        if symbol not in _SGE_SYMBOLS:
+            logger.warning("跳过不支持的上金所品种: %s", symbol)
+            continue
+        try:
+            await _sge_gold_service.get(symbol)
+            succeeded += 1
+        except Exception as error:
+            failed += 1
+            logger.warning(
+                "上金所快照预热失败 symbol=%s error_type=%s error=%s",
+                symbol,
+                type(error).__name__,
+                error,
+            )
+    logger.info("上金所快照预热完成: succeeded=%s failed=%s total=%s", succeeded, failed, len(targets))
+    return {"succeeded": succeeded, "failed": failed}

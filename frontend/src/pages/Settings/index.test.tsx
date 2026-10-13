@@ -7,11 +7,16 @@ import SettingsPage from ".";
 
 const mocks = vi.hoisted(() => ({
   mutateConfig: vi.fn(),
+  testOutboundProxy: vi.fn(),
 }));
 
 vi.mock("../../api/queries", () => ({
   useConfig: () => ({ data: config, isLoading: false, error: null, refetch: vi.fn() }),
   useUpdateConfig: () => ({ mutate: mocks.mutateConfig, isPending: false }),
+  useTestOutboundProxy: () => ({
+    mutate: mocks.testOutboundProxy,
+    isPending: false,
+  }),
 }));
 
 vi.mock("./MarketDailyBarManagerCard", () => ({
@@ -21,6 +26,16 @@ vi.mock("./MarketDailyBarManagerCard", () => ({
 }));
 
 vi.mock("./ConfigCards", () => ({
+  // 页面用这个常量做脏检查、保存与撤销，这里提供与真实实现一致的键集合
+  EASTMONEY_RATE_LIMIT_KEYS: [
+    "eastmoney_min_interval_seconds",
+    "eastmoney_datacenter_min_interval_seconds",
+    "eastmoney_cooldown_seconds",
+    "eastmoney_datacenter_cooldown_seconds",
+    "eastmoney_jitter_min_seconds",
+    "eastmoney_jitter_max_seconds",
+    "eastmoney_transient_failure_threshold",
+  ],
   AnySearchConfigCard: ({ form, onChange, onSave, configured, isDirty, onReset }: {
     form: ConfigUpdate;
     onChange: (patch: ConfigUpdate) => void;
@@ -61,6 +76,44 @@ vi.mock("./ConfigCards", () => ({
       <button type="button" onClick={onSave}>保存 fuyao API Key</button>
     </div>
   ),
+  EastmoneyRateLimitConfigCard: ({ form, onChange, onSave, isDirty, onReset }: {
+    form: ConfigUpdate;
+    onChange: (patch: ConfigUpdate) => void;
+    onSave: () => void;
+    isDirty?: boolean;
+    onReset?: () => void;
+  }) => (
+    <div>
+      <input
+        aria-label="行情接口冷却时长（秒）"
+        value={form.eastmoney_cooldown_seconds ?? ""}
+        onChange={(event) => onChange({ eastmoney_cooldown_seconds: Number(event.target.value) })}
+      />
+      <button type="button" onClick={onSave}>保存东财限流配置</button>
+      {isDirty && onReset && (
+        <button type="button" onClick={onReset}>撤销更改</button>
+      )}
+    </div>
+  ),
+  EastmoneyProxyConfigCard: ({ form, onChange, onSave, isDirty, onReset }: {
+    form: ConfigUpdate;
+    onChange: (patch: ConfigUpdate) => void;
+    onSave: () => void;
+    isDirty?: boolean;
+    onReset?: () => void;
+  }) => (
+    <div>
+      <input
+        aria-label="出站代理地址"
+        value={form.outbound_proxy_url || ""}
+        onChange={(event) => onChange({ outbound_proxy_url: event.target.value })}
+      />
+      <button type="button" onClick={onSave}>保存出站代理配置</button>
+      {isDirty && onReset && (
+        <button type="button" onClick={onReset}>撤销更改</button>
+      )}
+    </div>
+  ),
   ResearchBudgetCard: () => null,
   FeishuConfigCard: () => null,
   FredConfigCard: ({ form, onChange, onSave, isDirty, onReset }: {
@@ -97,7 +150,7 @@ vi.mock("./SystemUpdateCard", () => ({ default: () => null }));
 vi.mock("../../components/AdminResetCard", () => ({ default: () => null }));
 vi.mock("../../components/ChangePasswordCard", () => ({ default: () => null }));
 
-const config: ConfigData = {
+let config: ConfigData = {
   llm_provider: "openai",
   llm_api_mode: "openai",
   llm_api_version: "",
@@ -150,6 +203,10 @@ const config: ConfigData = {
   eastmoney_jitter_max_seconds: 0,
   eastmoney_cooldown_seconds: 0,
   eastmoney_transient_failure_threshold: 1,
+  outbound_proxy_type: "none",
+  outbound_proxy_url: "",
+  outbound_proxy_timeout_seconds: 20,
+  outbound_proxy_retries: 2,
   market_daily_bar_refresh_enabled: true,
   market_daily_bar_refresh_poll_seconds: 60,
   market_daily_bar_refresh_retry_base_seconds: 60,
@@ -232,6 +289,85 @@ describe("SettingsPage Bot config", () => {
     expect(patch).not.toHaveProperty("bot_feishu_app_secret");
     expect(patch).not.toHaveProperty("feishu_verification_token");
     expect(patch).not.toHaveProperty("feishu_encrypt_key");
+    queryClient.clear();
+  });
+
+  it("submits the outbound proxy settings and keeps a masked address untouched", async () => {
+    const savedConfig = { ...config, outbound_proxy_type: "socks5" as const, outbound_proxy_url: "sock***2260" };
+    const originalConfig = config;
+    config = savedConfig;
+    try {
+      act(() => {
+        useAuthStore.setState({
+          user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+        });
+      });
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <SettingsPage />
+        </QueryClientProvider>,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "数据源管理" }));
+      const saveButton = await screen.findByRole("button", { name: "保存出站代理配置" });
+      await waitFor(() => expect(screen.getByLabelText("出站代理地址")).toHaveValue("sock***2260"));
+      fireEvent.click(saveButton);
+
+      expect(mocks.mutateConfig).toHaveBeenCalledWith(
+        {
+          outbound_proxy_type: "socks5",
+          outbound_proxy_url: "sock***2260",
+          outbound_proxy_timeout_seconds: 20,
+          outbound_proxy_retries: 2,
+        },
+        expect.anything(),
+      );
+      queryClient.clear();
+    } finally {
+      config = originalConfig;
+    }
+  });
+
+  it("submits every Eastmoney rate-limit field and reverts them independently", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "数据源管理" }));
+    const saveButton = await screen.findByRole("button", { name: "保存东财限流配置" });
+    // 初始值来自后端配置（测试夹具里为 0）
+    await waitFor(() => expect(screen.getByLabelText("行情接口冷却时长（秒）")).toHaveValue("0"));
+
+    fireEvent.change(screen.getByLabelText("行情接口冷却时长（秒）"), { target: { value: "600" } });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /撤销更改/ })).toBeInTheDocument(),
+    );
+    fireEvent.click(saveButton);
+
+    // 卡片保存会带上全部 7 个限流项，便于管理员一次性调整
+    expect(mocks.mutateConfig).toHaveBeenCalledWith(
+      {
+        eastmoney_min_interval_seconds: 0,
+        eastmoney_datacenter_min_interval_seconds: 0,
+        eastmoney_cooldown_seconds: 600,
+        eastmoney_datacenter_cooldown_seconds: 10,
+        eastmoney_jitter_min_seconds: 0,
+        eastmoney_jitter_max_seconds: 0,
+        eastmoney_transient_failure_threshold: 1,
+      },
+      expect.anything(),
+    );
     queryClient.clear();
   });
 

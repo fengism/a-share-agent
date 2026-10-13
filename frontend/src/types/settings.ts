@@ -1,5 +1,11 @@
 export type LlmApiMode = "auto" | "openai" | "litellm";
 
+/**
+ * 公共出站代理类型；none 表示已声明作用域内的接口仍强制直连。
+ * 各数据源在代码中自行声明生效范围，未声明的接口始终直连。
+ */
+export type OutboundProxyType = "none" | "http" | "socks5";
+
 export interface ProviderDefault {
   label: string;
   description: string;
@@ -52,6 +58,12 @@ export interface ConfigData {
   eastmoney_jitter_max_seconds: number;
   eastmoney_cooldown_seconds: number;
   eastmoney_transient_failure_threshold: number;
+  /** 公共出站代理类型；none 表示已声明作用域内的接口仍强制直连。 */
+  outbound_proxy_type: OutboundProxyType;
+  /** 公共出站代理地址，内含凭证，接口下发时按敏感字段脱敏。 */
+  outbound_proxy_url: string;
+  outbound_proxy_timeout_seconds: number;
+  outbound_proxy_retries: number;
   market_daily_bar_refresh_enabled: boolean;
   market_daily_bar_refresh_poll_seconds: number;
   market_daily_bar_refresh_retry_base_seconds: number;
@@ -95,6 +107,22 @@ export interface ConfigData {
 }
 
 export type ConfigUpdate = Partial<Omit<ConfigData, "provider_defaults" | "is_admin">>;
+
+/** 出站代理连通性探测请求（留空则使用默认探测目标）。 */
+export interface ProxyTestRequest {
+  target_url?: string;
+}
+
+/** 出站代理连通性探测结果。 */
+export interface ProxyTestResponse {
+  ok: boolean;
+  target_url: string;
+  proxy_enabled: boolean;
+  proxy_type: string;
+  exit_ip: string | null;
+  latency_ms: number;
+  message: string;
+}
 
 export type BotJobStatus = "pending" | "running" | "succeeded" | "failed";
 

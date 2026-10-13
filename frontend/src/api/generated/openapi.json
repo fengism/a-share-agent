@@ -3561,6 +3561,27 @@
             "title": "Notion Parent Page Id",
             "type": "string"
           },
+          "outbound_proxy_retries": {
+            "title": "Outbound Proxy Retries",
+            "type": "integer"
+          },
+          "outbound_proxy_timeout_seconds": {
+            "title": "Outbound Proxy Timeout Seconds",
+            "type": "number"
+          },
+          "outbound_proxy_type": {
+            "enum": [
+              "none",
+              "http",
+              "socks5"
+            ],
+            "title": "Outbound Proxy Type",
+            "type": "string"
+          },
+          "outbound_proxy_url": {
+            "title": "Outbound Proxy Url",
+            "type": "string"
+          },
           "provider_defaults": {
             "additionalProperties": true,
             "title": "Provider Defaults",
@@ -3622,6 +3643,10 @@
           "eastmoney_jitter_max_seconds",
           "eastmoney_cooldown_seconds",
           "eastmoney_transient_failure_threshold",
+          "outbound_proxy_type",
+          "outbound_proxy_url",
+          "outbound_proxy_timeout_seconds",
+          "outbound_proxy_retries",
           "market_daily_bar_refresh_enabled",
           "market_daily_bar_refresh_poll_seconds",
           "market_daily_bar_refresh_retry_base_seconds",
@@ -4608,6 +4633,60 @@
               }
             ],
             "title": "Notion Parent Page Id"
+          },
+          "outbound_proxy_retries": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outbound Proxy Retries"
+          },
+          "outbound_proxy_timeout_seconds": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 5.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outbound Proxy Timeout Seconds"
+          },
+          "outbound_proxy_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "http",
+                  "socks5"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outbound Proxy Type"
+          },
+          "outbound_proxy_url": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outbound Proxy Url"
           },
           "ths_cookie": {
             "anyOf": [
@@ -17839,6 +17918,68 @@
         "title": "ProviderCircuitStateResponse",
         "type": "object"
       },
+      "ProxyTestRequest": {
+        "description": "出站代理连通性探测请求（不落库，仅测试当前生效配置）。",
+        "properties": {
+          "target_url": {
+            "default": "http://push2his.eastmoney.com/api/qt/stock/kline/get",
+            "maxLength": 2048,
+            "title": "Target Url",
+            "type": "string"
+          }
+        },
+        "title": "ProxyTestRequest",
+        "type": "object"
+      },
+      "ProxyTestResponse": {
+        "properties": {
+          "exit_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Ip"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "proxy_enabled": {
+            "title": "Proxy Enabled",
+            "type": "boolean"
+          },
+          "proxy_type": {
+            "title": "Proxy Type",
+            "type": "string"
+          },
+          "target_url": {
+            "title": "Target Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "target_url",
+          "proxy_enabled",
+          "proxy_type",
+          "latency_ms",
+          "message"
+        ],
+        "title": "ProxyTestResponse",
+        "type": "object"
+      },
       "PushRequest": {
         "description": "Purpose: 推送接口的请求体，支持 Notion/飞书两种目标和四种内容类型。",
         "properties": {
@@ -21492,6 +21633,11 @@
             },
             "title": "History",
             "type": "array"
+          },
+          "is_delisted": {
+            "default": false,
+            "title": "Is Delisted",
+            "type": "boolean"
           },
           "is_stale": {
             "default": false,
@@ -29108,6 +29254,53 @@
           }
         ],
         "summary": "List Llm Models",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/config/proxy/test": {
+      "post": {
+        "description": "探测出站代理连通性：报告出口 IP、耗时与失败原因，不修改任何配置。",
+        "operationId": "test_outbound_proxy_api_config_proxy_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProxyTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Test Outbound Proxy",
         "tags": [
           "config"
         ]

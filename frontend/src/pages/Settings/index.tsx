@@ -2,14 +2,15 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react
 import { RobotOutlined, UndoOutlined } from "@ant-design/icons";
 import { Button, message, Popconfirm, Tag } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
-import { useConfig } from "../../api/queries";
+import { useConfig, useTestOutboundProxy } from "../../api/queries";
 import { queryKeys } from "../../api/queryKeys";
 import ChangePasswordCard from "../../components/ChangePasswordCard";
 import ResponsiveSectionNav from "../../components/ResponsiveSectionNav";
 import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
 import { useColors, useStyles, semanticTagStyle } from "../../styles/ui";
-import type { ConfigUpdate, ProviderDefault } from "../../types/settings";
+import type { ConfigUpdate, ProviderDefault, ProxyTestResponse } from "../../types/settings";
+import { EASTMONEY_RATE_LIMIT_KEYS } from "./ConfigCards";
 import SystemUpdateCard from "./SystemUpdateCard";
 import { useConfigSectionSave } from "./useConfigSectionSave";
 
@@ -35,6 +36,11 @@ export default function SettingsPage() {
   const colors = useColors();
   const { data: config, isLoading, error, refetch } = useConfig();
   const { save: saveConfig, isSaving } = useConfigSectionSave();
+  const {
+    mutate: testOutboundProxyMutate,
+    isPending: isTestingOutboundProxy,
+  } = useTestOutboundProxy();
+  const [outboundProxyTestResult, setOutboundProxyTestResult] = useState<ProxyTestResponse | null>(null);
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const isAdmin = Boolean(config?.is_admin);
@@ -84,6 +90,17 @@ export default function SettingsPage() {
       market_daily_backup_interval_days: cfg.market_daily_backup_interval_days,
       market_daily_backup_compression_level: cfg.market_daily_backup_compression_level,
       fuyao_api_key: cfg.fuyao_api_key,
+      outbound_proxy_type: cfg.outbound_proxy_type,
+      outbound_proxy_url: cfg.outbound_proxy_url,
+      outbound_proxy_timeout_seconds: cfg.outbound_proxy_timeout_seconds,
+      outbound_proxy_retries: cfg.outbound_proxy_retries,
+      eastmoney_min_interval_seconds: cfg.eastmoney_min_interval_seconds,
+      eastmoney_datacenter_min_interval_seconds: cfg.eastmoney_datacenter_min_interval_seconds,
+      eastmoney_datacenter_cooldown_seconds: cfg.eastmoney_datacenter_cooldown_seconds,
+      eastmoney_jitter_min_seconds: cfg.eastmoney_jitter_min_seconds,
+      eastmoney_jitter_max_seconds: cfg.eastmoney_jitter_max_seconds,
+      eastmoney_cooldown_seconds: cfg.eastmoney_cooldown_seconds,
+      eastmoney_transient_failure_threshold: cfg.eastmoney_transient_failure_threshold,
       anysearch_api_key: "",
       bot_enabled: cfg.bot_enabled,
       bot_command_prefix: cfg.bot_command_prefix,
@@ -167,6 +184,8 @@ export default function SettingsPage() {
         twitter: false,
         anySearch: false,
         fuyao: false,
+        outboundProxy: false,
+        eastmoneyRateLimit: false,
         dataSources: false,
         backup: false,
         marketDaily: false,
@@ -233,6 +252,24 @@ export default function SettingsPage() {
       form.fuyao_api_key && !form.fuyao_api_key.includes("***") && form.fuyao_api_key !== config.fuyao_api_key
     );
 
+    const outboundProxy = Boolean(
+      (form.outbound_proxy_type !== undefined &&
+        form.outbound_proxy_type !== config.outbound_proxy_type) ||
+      (form.outbound_proxy_url &&
+        !form.outbound_proxy_url.includes("***") &&
+        form.outbound_proxy_url !== config.outbound_proxy_url) ||
+      (form.outbound_proxy_timeout_seconds !== undefined &&
+        form.outbound_proxy_timeout_seconds !== config.outbound_proxy_timeout_seconds) ||
+      (form.outbound_proxy_retries !== undefined &&
+        form.outbound_proxy_retries !== config.outbound_proxy_retries)
+    );
+
+    const eastmoneyRateLimit = EASTMONEY_RATE_LIMIT_KEYS.some((key) => {
+      const nextValue = form[key];
+      const currentValue = config[key];
+      return nextValue !== undefined && nextValue !== currentValue;
+    });
+
     const backup = Boolean(
       (form.database_backup_retention_count !== undefined && form.database_backup_retention_count !== config.database_backup_retention_count) ||
       (form.database_backup_include_market_daily !== undefined && form.database_backup_include_market_daily !== config.database_backup_include_market_daily) ||
@@ -286,7 +323,7 @@ export default function SettingsPage() {
     );
 
     const integrations = feishu || notion;
-    const dataSources = iwencai || fred || twitter || anySearch || fuyao;
+    const dataSources = iwencai || fred || twitter || anySearch || fuyao || outboundProxy || eastmoneyRateLimit;
     const adminOps = backup || marketDaily || researchBudget;
     const admin = adminOps || bot;
     const hasUnsavedChanges = Boolean(ai || integrations || dataSources || admin);
@@ -301,6 +338,8 @@ export default function SettingsPage() {
       twitter,
       anySearch,
       fuyao,
+      outboundProxy,
+      eastmoneyRateLimit,
       dataSources,
       backup,
       marketDaily,
@@ -431,6 +470,48 @@ export default function SettingsPage() {
       updateForm({ fuyao_api_key: "" }),
     );
   }, [config?.fuyao_api_key, form.fuyao_api_key, saveConfig, updateForm]);
+
+  const handleSaveOutboundProxy = useCallback(() => {
+    const proxyType = form.outbound_proxy_type ?? "none";
+    const rawUrl = (form.outbound_proxy_url ?? "").trim();
+    // 代理地址按凭证下发，已保存的值会带 ***，此时不覆盖后端原值
+    const maskedUrl = rawUrl.includes("***");
+    const url = maskedUrl ? (config?.outbound_proxy_url ?? "") : rawUrl;
+
+    if (proxyType !== "none" && !maskedUrl && !url) {
+      message.error("启用代理后必须填写代理地址");
+      return;
+    }
+
+    saveConfig(
+      {
+        outbound_proxy_type: proxyType,
+        outbound_proxy_url: url,
+        outbound_proxy_timeout_seconds:
+          form.outbound_proxy_timeout_seconds ?? 20,
+        outbound_proxy_retries: form.outbound_proxy_retries ?? 2,
+      },
+      proxyType === "none" ? "出站代理已关闭" : "出站代理配置已保存",
+    );
+  }, [
+    config?.outbound_proxy_url,
+    form.outbound_proxy_retries,
+    form.outbound_proxy_timeout_seconds,
+    form.outbound_proxy_type,
+    form.outbound_proxy_url,
+    saveConfig,
+  ]);
+
+  const handleSaveEastmoneyRateLimit = useCallback(() => {
+    const patch: ConfigUpdate = {};
+    EASTMONEY_RATE_LIMIT_KEYS.forEach((key) => {
+      const value = form[key];
+      if (value !== undefined) {
+        patch[key] = value;
+      }
+    });
+    saveConfig(patch, "东财限流与风控配置已保存");
+  }, [form, saveConfig]);
 
   const handleSaveBackupRetention = useCallback(() => {
     saveConfig(
@@ -593,6 +674,41 @@ export default function SettingsPage() {
       fuyao_api_key: config.fuyao_api_key,
     });
     message.success("已撤销 fuyao 凭证修改");
+  }, [config, updateForm]);
+
+  const handleTestOutboundProxy = useCallback(() => {
+    testOutboundProxyMutate(undefined, {
+      onSuccess: (result) => {
+        setOutboundProxyTestResult(result);
+        if (result.ok) {
+          message.success(`代理可用（${result.latency_ms}ms）`);
+        } else {
+          message.warning(`代理不可用：${result.message}`);
+        }
+      },
+      onError: (error: Error) => message.error(`连通性测试失败: ${error.message}`),
+    });
+  }, [testOutboundProxyMutate]);
+
+  const handleResetOutboundProxy = useCallback(() => {
+    if (!config) return;
+    updateForm({
+      outbound_proxy_type: config.outbound_proxy_type,
+      outbound_proxy_url: config.outbound_proxy_url,
+      outbound_proxy_timeout_seconds: config.outbound_proxy_timeout_seconds,
+      outbound_proxy_retries: config.outbound_proxy_retries,
+    });
+    message.success("已撤销出站代理修改");
+  }, [config, updateForm]);
+
+  const handleResetEastmoneyRateLimit = useCallback(() => {
+    if (!config) return;
+    const patch: ConfigUpdate = {};
+    EASTMONEY_RATE_LIMIT_KEYS.forEach((key) => {
+      patch[key] = config[key] as number;
+    });
+    updateForm(patch);
+    message.success("已撤销东财限流配置修改");
   }, [config, updateForm]);
 
   const handleResetBackupRetention = useCallback(() => {
@@ -823,17 +939,26 @@ export default function SettingsPage() {
                   onSaveAnySearch={handleSaveAnySearch}
                   fuyaoConfigured={Boolean(config.fuyao_api_key)}
                   onSaveDataSourceCredentials={handleSaveDataSourceCredentials}
+                  onSaveOutboundProxy={handleSaveOutboundProxy}
+                  onSaveEastmoneyRateLimit={handleSaveEastmoneyRateLimit}
+                  onTestOutboundProxy={handleTestOutboundProxy}
+                  isTestingOutboundProxy={isTestingOutboundProxy}
+                  outboundProxyTestResult={outboundProxyTestResult}
                   onResetIwencai={handleResetIwencai}
                   onResetTwitter={handleResetTwitter}
                   onResetFred={handleResetFred}
                   onResetAnySearch={handleResetAnySearch}
                   onResetFuyao={handleResetFuyao}
+                  onResetOutboundProxy={handleResetOutboundProxy}
+                  onResetEastmoneyRateLimit={handleResetEastmoneyRateLimit}
                   dirtyCards={{
                     iwencai: dirtyFlags.iwencai,
                     fred: dirtyFlags.fred,
                     twitter: dirtyFlags.twitter,
                     anySearch: dirtyFlags.anySearch,
                     fuyao: dirtyFlags.fuyao,
+                    outboundProxy: dirtyFlags.outboundProxy,
+                    eastmoneyRateLimit: dirtyFlags.eastmoneyRateLimit,
                   }}
                 />
               </Suspense>

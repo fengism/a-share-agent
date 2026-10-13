@@ -107,7 +107,10 @@ from app.financial_data.market.quotes.schemas import (
 )
 from app.financial_data.market.quotes.sector import get_industry_rankings
 from app.financial_data.market.quotes.sector_stocks_history import get_sector_stocks_history
-from app.financial_data.market.quotes.sge_gold import get_sge_gold_history
+from app.financial_data.market.quotes.sge_gold import (
+    get_sge_gold_history,
+    warm_up_sge_gold_snapshots,
+)
 from app.financial_data.market.quotes.statistic import get_market_statistics
 from app.financial_data.market.quotes.volume import (
     get_market_volume,
@@ -178,6 +181,7 @@ __all__ = [
     "get_realtime_market_volume",
     "get_sector_stocks_history",
     "get_sge_gold_history",
+    "warm_up_sge_gold_snapshots",
     "get_ths_hot_concept",
     "get_ths_hot_industry",
     "get_twitter_feed",

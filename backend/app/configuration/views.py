@@ -46,6 +46,9 @@ class ProviderSettingsView:
     tdxhub_timeout_seconds: float
     eastmoney_min_interval_seconds: float
     eastmoney_datacenter_min_interval_seconds: float
+    outbound_proxy_type: str
+    outbound_proxy_timeout_seconds: float
+    outbound_proxy_retries: int
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ProviderSettingsView:
@@ -61,6 +64,10 @@ class ProviderSettingsView:
             eastmoney_datacenter_min_interval_seconds=(
                 settings.eastmoney_datacenter_min_interval_seconds
             ),
+            # 代理地址含凭证，不进入只读配置视图，仅暴露是否启用与传输参数
+            outbound_proxy_type=settings.outbound_proxy_type,
+            outbound_proxy_timeout_seconds=settings.outbound_proxy_timeout_seconds,
+            outbound_proxy_retries=settings.outbound_proxy_retries,
         )
 
 

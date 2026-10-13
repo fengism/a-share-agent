@@ -26,10 +26,20 @@ class UpstreamUnavailableError(ApplicationError):
     default_code = "upstream_unavailable"
 
 
+class UpstreamRateLimitedError(UpstreamUnavailableError):
+    """上游按请求频率拒绝服务，等待后重试通常可以恢复。
+
+    与永久失败区分开，才能让 ProviderGateway 按瞬时故障退避重试。
+    """
+
+    default_code = "upstream_rate_limited"
+
+
 __all__ = [
     "ApplicationError",
     "InvalidRequestError",
     "ResourceConflictError",
     "ResourceNotFoundError",
+    "UpstreamRateLimitedError",
     "UpstreamUnavailableError",
 ]

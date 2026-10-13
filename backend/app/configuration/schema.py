@@ -70,6 +70,10 @@ PERSISTED_GLOBAL_KEYS = frozenset(
         "eastmoney_jitter_max_seconds",
         "eastmoney_cooldown_seconds",
         "eastmoney_transient_failure_threshold",
+        "outbound_proxy_type",
+        "outbound_proxy_url",
+        "outbound_proxy_timeout_seconds",
+        "outbound_proxy_retries",
         "market_daily_bar_refresh_enabled",
         "market_daily_bar_refresh_poll_seconds",
         "market_daily_bar_refresh_retry_base_seconds",
@@ -128,6 +132,8 @@ SECRET_KEYS = frozenset(
         "baidu_acs_token",
         "ths_cookie",
         "legulegu_token",
+        # 代理地址内含用户名密码，按凭证处理避免在配置接口中明文下发
+        "outbound_proxy_url",
     }
 )
 
@@ -221,7 +227,7 @@ class Settings(BaseSettings):
     provider_retry_budget_seconds: float = 5.0
     provider_retry_jitter_seconds: float = 0.1
 
-    tdxhub_timeout_seconds: float = Field(default=10.0, gt=0)
+    tdxhub_timeout_seconds: float = Field(default=5.0, gt=0)
     sina_hq_page_workers: int = Field(default=4, ge=1, le=8)
     # 单次历史资金流备选查询的总 I/O 预算（包含连接、分页和逐日聚合）。
     tdxhub_fund_flow_timeout_seconds: float = Field(default=60.0, gt=0, le=90)
@@ -233,6 +239,12 @@ class Settings(BaseSettings):
     eastmoney_jitter_max_seconds: float = 0.5
     eastmoney_cooldown_seconds: float = 120.0
     eastmoney_transient_failure_threshold: int = 3
+    # 公共出站代理：供按出口 IP 风控的上游接口统一使用（当前为东财 K 线与资金流）。
+    # 各 provider 在代码里声明自己的 ProxyScope，未声明的接口一律保持直连。
+    outbound_proxy_type: Literal["none", "http", "socks5"] = "none"
+    outbound_proxy_url: str = ""
+    outbound_proxy_timeout_seconds: float = Field(default=20.0, ge=5, le=120)
+    outbound_proxy_retries: int = Field(default=2, ge=0, le=6)
 
     background_task_jitter_seconds: float = 15.0
     background_task_lease_seconds: float = 60.0

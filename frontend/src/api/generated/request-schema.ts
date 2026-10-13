@@ -772,6 +772,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config/proxy/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Outbound Proxy
+         * @description 探测出站代理连通性：报告出口 IP、耗时与失败原因，不修改任何配置。
+         */
+        post: operations["test_outbound_proxy_api_config_proxy_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/daily-review/generate": {
         parameters: {
             query?: never;
@@ -5723,6 +5743,17 @@ export interface components {
             notion_enabled: boolean;
             /** Notion Parent Page Id */
             notion_parent_page_id: string;
+            /** Outbound Proxy Retries */
+            outbound_proxy_retries: number;
+            /** Outbound Proxy Timeout Seconds */
+            outbound_proxy_timeout_seconds: number;
+            /**
+             * Outbound Proxy Type
+             * @enum {string}
+             */
+            outbound_proxy_type: "none" | "http" | "socks5";
+            /** Outbound Proxy Url */
+            outbound_proxy_url: string;
             /** Provider Defaults */
             provider_defaults: {
                 [key: string]: unknown;
@@ -5893,6 +5924,14 @@ export interface components {
             notion_enabled?: boolean | null;
             /** Notion Parent Page Id */
             notion_parent_page_id?: string | null;
+            /** Outbound Proxy Retries */
+            outbound_proxy_retries?: number | null;
+            /** Outbound Proxy Timeout Seconds */
+            outbound_proxy_timeout_seconds?: number | null;
+            /** Outbound Proxy Type */
+            outbound_proxy_type?: ("none" | "http" | "socks5") | null;
+            /** Outbound Proxy Url */
+            outbound_proxy_url?: string | null;
             /** Ths Cookie */
             ths_cookie?: string | null;
             /** Twitter Feeds */
@@ -11496,6 +11535,34 @@ export interface components {
             status: "closed" | "open" | "half_open_ready" | "half_open";
         };
         /**
+         * ProxyTestRequest
+         * @description 出站代理连通性探测请求（不落库，仅测试当前生效配置）。
+         */
+        ProxyTestRequest: {
+            /**
+             * Target Url
+             * @default http://push2his.eastmoney.com/api/qt/stock/kline/get
+             */
+            target_url?: string;
+        };
+        /** ProxyTestResponse */
+        ProxyTestResponse: {
+            /** Exit Ip */
+            exit_ip?: string | null;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Message */
+            message: string;
+            /** Ok */
+            ok: boolean;
+            /** Proxy Enabled */
+            proxy_enabled: boolean;
+            /** Proxy Type */
+            proxy_type: string;
+            /** Target Url */
+            target_url: string;
+        };
+        /**
          * PushRequest
          * @description Purpose: 推送接口的请求体，支持 Notion/飞书两种目标和四种内容类型。
          */
@@ -12802,6 +12869,11 @@ export interface components {
         SgeGoldResponse: {
             /** History */
             history?: components["schemas"]["SgeGoldHistoryPoint"][];
+            /**
+             * Is Delisted
+             * @default false
+             */
+            is_delisted?: boolean;
             /**
              * Is Stale
              * @default false
@@ -16269,6 +16341,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LlmModelsResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    test_outbound_proxy_api_config_proxy_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProxyTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyTestResponse"];
                 };
             };
             /** @description 统一错误响应 */

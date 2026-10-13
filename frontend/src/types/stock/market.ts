@@ -647,6 +647,8 @@ export interface SgeGoldResponse {
   history: SgeGoldHistoryPoint[];
   updated_at: string;
   is_stale: boolean;
+  /** 合约已停止交易，最新交易日长期未更新，仅供历史参考。 */
+  is_delisted: boolean;
 }
 
 export interface CustomsMonthSummary {

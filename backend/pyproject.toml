@@ -41,7 +41,9 @@ dependencies = [
     "pypdf>=6.16.2",
     "pdfplumber>=0.11.10",
     "pandas>=2.2.0",
-    "requests>=2.31.0",
+    "requests[socks]>=2.31.0",
+    # urllib3 2.x 的 SOCKS 支持走 socksio，requests[socks] 只覆盖 PySocks 分支
+    "socksio>=1.0.0",
     "lxml>=5.0.0",
     "exchange-calendars>=4.11",
 ]

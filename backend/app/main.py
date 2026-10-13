@@ -44,6 +44,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         potential_stock_daily=background_tasks.refresh_potential_stocks_daily,
         market_daily_bar_refresh=background_tasks.refresh_market_daily_bars_periodic,
         market_daily_backfill_worker=background_tasks.run_market_daily_backfill_worker,
+        sge_gold_snapshot_refresh=background_tasks.refresh_sge_gold_snapshots,
         bot_job_worker=job_workers.run_bot_job_worker,
         quant_strategy_reload=quant_strategy_reload,
         quant_job_worker=job_workers.run_quant_job_worker,

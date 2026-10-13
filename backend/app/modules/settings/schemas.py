@@ -53,6 +53,10 @@ class ConfigResponse(BaseModel):
     eastmoney_jitter_max_seconds: float
     eastmoney_cooldown_seconds: float
     eastmoney_transient_failure_threshold: int
+    outbound_proxy_type: Literal["none", "http", "socks5"]
+    outbound_proxy_url: str
+    outbound_proxy_timeout_seconds: float
+    outbound_proxy_retries: int
     market_daily_bar_refresh_enabled: bool
     market_daily_bar_refresh_poll_seconds: int
     market_daily_bar_refresh_retry_base_seconds: int
@@ -139,6 +143,10 @@ class ConfigUpdateRequest(BaseModel):
     eastmoney_jitter_max_seconds: float | None = Field(default=None, ge=0, le=60)
     eastmoney_cooldown_seconds: float | None = Field(default=None, ge=0, le=86400)
     eastmoney_transient_failure_threshold: int | None = Field(default=None, ge=1, le=100)
+    outbound_proxy_type: Literal["none", "http", "socks5"] | None = None
+    outbound_proxy_url: str | None = Field(default=None, max_length=512)
+    outbound_proxy_timeout_seconds: float | None = Field(default=None, ge=5, le=120)
+    outbound_proxy_retries: int | None = Field(default=None, ge=0, le=6)
     market_daily_bar_refresh_enabled: bool | None = None
     market_daily_bar_refresh_poll_seconds: int | None = Field(default=None, ge=15, le=3600)
     market_daily_bar_refresh_retry_base_seconds: int | None = Field(default=None, ge=1, le=1800)

@@ -6,6 +6,8 @@ import {
   AnySearchConfigCard,
   BotConfigCard,
   DataSourceCredentialsCard,
+  EastmoneyProxyConfigCard,
+  EastmoneyRateLimitConfigCard,
   FredConfigCard,
   IwencaiConfigCard,
   ResearchBudgetCard,
@@ -18,6 +20,7 @@ import MarketDailyBarManagerCard from "./MarketDailyBarManagerCard";
 import SecurityAuditCard from "./SecurityAuditCard";
 import UserManagerCard from "./UserManagerCard";
 import type { ConfigSectionProps } from "./sectionTypes";
+import type { ProxyTestResponse } from "../../types/settings";
 
 interface DataSourcesSettingsSectionProps extends ConfigSectionProps {
   onSaveIwencai: () => void;
@@ -27,11 +30,18 @@ interface DataSourcesSettingsSectionProps extends ConfigSectionProps {
   onSaveAnySearch: () => void;
   fuyaoConfigured: boolean;
   onSaveDataSourceCredentials: () => void;
+  onSaveOutboundProxy: () => void;
+  onSaveEastmoneyRateLimit: () => void;
+  onTestOutboundProxy?: () => void;
+  isTestingOutboundProxy?: boolean;
+  outboundProxyTestResult?: ProxyTestResponse | null;
   onResetIwencai?: () => void;
   onResetTwitter?: () => void;
   onResetFred?: () => void;
   onResetAnySearch?: () => void;
   onResetFuyao?: () => void;
+  onResetOutboundProxy?: () => void;
+  onResetEastmoneyRateLimit?: () => void;
   isAdmin?: boolean;
   dirtyCards?: {
     iwencai?: boolean;
@@ -39,6 +49,8 @@ interface DataSourcesSettingsSectionProps extends ConfigSectionProps {
     twitter?: boolean;
     anySearch?: boolean;
     fuyao?: boolean;
+    outboundProxy?: boolean;
+    eastmoneyRateLimit?: boolean;
   };
 }
 
@@ -54,11 +66,18 @@ export function DataSourcesSettingsSection({
   onSaveAnySearch,
   fuyaoConfigured,
   onSaveDataSourceCredentials,
+  onSaveOutboundProxy,
+  onSaveEastmoneyRateLimit,
+  onTestOutboundProxy,
+  isTestingOutboundProxy = false,
+  outboundProxyTestResult = null,
   onResetIwencai,
   onResetTwitter,
   onResetFred,
   onResetAnySearch,
   onResetFuyao,
+  onResetOutboundProxy,
+  onResetEastmoneyRateLimit,
   isAdmin = true,
   dirtyCards = {},
 }: DataSourcesSettingsSectionProps) {
@@ -119,6 +138,27 @@ export function DataSourcesSettingsSection({
               onSave={onSaveDataSourceCredentials}
               isDirty={dirtyCards.fuyao}
               onReset={onResetFuyao}
+            />
+          </Col>
+          <Col xs={24} lg={12} style={{ display: "flex" }}>
+            <EastmoneyProxyConfigCard
+              stretch
+              {...cardProps}
+              onSave={onSaveOutboundProxy}
+              isDirty={dirtyCards.outboundProxy}
+              onReset={onResetOutboundProxy}
+              onTest={onTestOutboundProxy}
+              isTesting={isTestingOutboundProxy}
+              testResult={outboundProxyTestResult}
+            />
+          </Col>
+          <Col xs={24} style={{ display: "flex" }}>
+            <EastmoneyRateLimitConfigCard
+              stretch
+              {...cardProps}
+              onSave={onSaveEastmoneyRateLimit}
+              isDirty={dirtyCards.eastmoneyRateLimit}
+              onReset={onResetEastmoneyRateLimit}
             />
           </Col>
         </Row>

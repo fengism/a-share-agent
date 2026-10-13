@@ -253,3 +253,6 @@ class SgeGoldResponse(BaseModel):
     history: list[SgeGoldHistoryPoint] = Field(default_factory=list)
     updated_at: str
     is_stale: bool = False
+    # 合约已停止交易：最新交易日滞后超过该天数时为 True。
+    # 由数据实际滞后推导，不依赖人工维护的品种清单。
+    is_delisted: bool = False

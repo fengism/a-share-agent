@@ -50,7 +50,10 @@ export default function SgeGoldTab() {
   const c = useColors();
   const [symbol, setSymbol] = useState("Au99.99");
   const [range, setRange] = useState<RangeValue>("1y");
-  const { data, isLoading, error, refetch } = useSgeGoldHistory(symbol);
+  const { data, isLoading, isFetching, error, refetch } = useSgeGoldHistory(symbol);
+  // 上金所有频率风控：请求进行中锁住品种切换，避免连续切换触发上游 403。
+  // 切换时配合 placeholderData 保留上一品种图表，避免整块空白闪烁。
+  const switching = isFetching;
 
   const filteredHistory = useMemo(() => {
     const history = data?.history ?? [];
@@ -141,6 +144,7 @@ export default function SgeGoldTab() {
           <select
             aria-label="黄金品种"
             value={symbol}
+            disabled={switching}
             onChange={(event) => setSymbol(event.target.value)}
           >
             {SGE_SYMBOLS.map(([value, label]) => (
@@ -167,6 +171,14 @@ export default function SgeGoldTab() {
                 type="warning"
                 showIcon
                 message="实时数据暂时不可用，当前展示最近一次历史快照"
+              />
+            ) : null}
+            {data.is_delisted ? (
+              <Alert
+                className="sge-gold__stale-alert"
+                type="info"
+                showIcon
+                message={`${data.name} 已停止交易，仅供历史参考，不再更新行情`}
               />
             ) : null}
 
@@ -197,7 +209,12 @@ export default function SgeGoldTab() {
                 </div>
                 <div className="sge-gold-summary__metric">
                   <span>数据日期</span>
-                  <strong>{latest.date}</strong>
+                  <strong>
+                    {latest.date}
+                    {data.is_delisted ? (
+                      <Tag color="default" style={{ marginLeft: 8 }}>已停更</Tag>
+                    ) : null}
+                  </strong>
                 </div>
                 <div className="sge-gold-summary__metric">
                   <span>数据来源</span>
@@ -231,6 +248,7 @@ export default function SgeGoldTab() {
               />
               <div className="sge-gold-chart__footer">
                 <span>共 {filteredHistory.length} 个交易日</span>
+                {switching ? <span>正在切换品种…</span> : null}
                 <span>更新于 {dayjs(data.updated_at).format("YYYY-MM-DD HH:mm")}</span>
               </div>
             </Card>

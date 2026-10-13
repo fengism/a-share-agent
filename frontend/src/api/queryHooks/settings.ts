@@ -32,6 +32,8 @@ import type {
   MarketDailyBarRefreshRequest,
   MarketAdjustmentFactorStatus,
   MarketDailyBarRefreshResult,
+  ProxyTestRequest,
+  ProxyTestResponse,
 } from "../../types/settings";
 
 export function useConfig() {
@@ -53,6 +55,16 @@ export function useUpdateConfig() {
 export function useFetchLlmModels() {
   return useMutation({
     mutationFn: (payload: LlmModelsRequest) => apiPost<LlmModelsResponse>("/config/llm/models", payload),
+  });
+}
+
+export function useTestOutboundProxy() {
+  return useMutation({
+    mutationFn: (payload?: ProxyTestRequest) =>
+      // 探测目标可能走不稳定代理，超时窗口要比普通配置请求更长
+      apiPost<ProxyTestResponse>("/config/proxy/test", payload ?? {}, {
+        timeoutMs: API_TIMEOUTS.EXTERNAL,
+      }),
   });
 }
 

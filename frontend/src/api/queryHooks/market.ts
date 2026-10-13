@@ -598,12 +598,14 @@ export function useCommoditySpotPrices(symbol = "") {
 export function useSgeGoldHistory(symbol = "Au99.99") {
   return useQuery({
     queryKey: queryKeys.market.macroSgeGold(symbol),
-    queryFn: () => openApiGet("/api/macro/sge-gold", {
+    queryFn: ({ signal }) => openApiGet("/api/macro/sge-gold", {
       query: { symbol },
-      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+      // 上金所按请求频率限流，切换品种时中止上一次请求，避免并发打满配额
+      options: { signal, timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<SgeGoldResponse>(),
     staleTime: QUERY_CACHE_POLICIES.macro.staleMs,
+    placeholderData: (previous) => previous,
   });
 }
 
