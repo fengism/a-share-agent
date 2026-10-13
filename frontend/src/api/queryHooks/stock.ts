@@ -205,6 +205,7 @@ export function useValuationDetail(code: string) {
     queryKey: queryKeys.stock.valuationDetail(code),
     queryFn: () => openApiGet("/api/stock/{code}/valuation-detail", {
       path: { code },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<StockValuationDetail>(),
     enabled: !!code,

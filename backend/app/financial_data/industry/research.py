@@ -91,11 +91,15 @@ async def call_industry_data(operation: str, *args: Any) -> Any:
     method_name = _PROVIDER_OPERATIONS.get(operation)
     if method_name is None:
         raise ValueError(f"不支持的产业链数据操作: {operation}")
-    provider_names = (
-        ("baidu", "eastmoney")
-        if operation in _INDEPENDENT_FIRST_OPERATIONS
-        else ("eastmoney",)
-    )
+    # 行业/概念资金流目前不调用百度风控接口，产业链相关数据继续保留 fallback
+    if operation in ("industry_fund_flow", "concept_fund_flow"):
+        provider_names = ("eastmoney",)
+    else:
+        provider_names = (
+            ("eastmoney", "baidu")
+            if operation in _INDEPENDENT_FIRST_OPERATIONS
+            else ("eastmoney",)
+        )
     last_error: Exception | None = None
     for index, provider_name in enumerate(provider_names):
         try:

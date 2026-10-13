@@ -17,10 +17,11 @@ import {
   usePublishQuantStrategyDraft,
   useScreenerScreen,
   useUpdateQuantStrategyDraft,
+  useValuationDetail,
   type QuantStrategyDraft,
   type QuantStrategyDefinitionInput,
 } from "./queries";
-import { apiDelete, apiGet, apiPost, apiPut } from "./client";
+import { API_TIMEOUTS, apiDelete, apiGet, apiPost, apiPut } from "./client";
 import { queryKeys } from "./queryKeys";
 import type { ScreenerFilter, ScreenerResult } from "../types/stock";
 
@@ -408,4 +409,23 @@ describe("query request lifecycle", () => {
     await waitFor(() => expect(result.current.data?.page).toBe(2));
     client.clear();
   });
+
+  it("requests valuation detail with external timeout budget", async () => {
+    vi.mocked(apiGet).mockResolvedValue({ code: "600519" });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useValuationDetail("600519"), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(apiGet).toHaveBeenCalledWith(
+      "/stock/600519/valuation-detail",
+      undefined,
+      { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    );
+    client.clear();
+  });
 });
+

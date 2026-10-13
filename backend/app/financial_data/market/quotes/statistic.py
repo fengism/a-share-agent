@@ -274,15 +274,6 @@ def _sector_attempts() -> list[_StatisticsAttempt]:
             cls_semaphore,
         ),
         _StatisticsAttempt(
-            "baidu",
-            "market_sector_rankings",
-            lambda: _get_provider("baidu").fetch_industry_rankings(50),
-            _parse_sector_statistics,
-            BAIDU_MARKET_SECTOR_SOURCE_ID,
-            BAIDU_MARKET_SECTOR_API,
-            baidu_semaphore,
-        ),
-        _StatisticsAttempt(
             "eastmoney",
             "market_sector_rankings",
             lambda: _get_eastmoney_provider().fetch_industry_rankings(50),
@@ -290,6 +281,15 @@ def _sector_attempts() -> list[_StatisticsAttempt]:
             EASTMONEY_MARKET_SECTOR_SOURCE_ID,
             EASTMONEY_MARKET_SECTOR_API,
             eastmoney_semaphore,
+        ),
+        _StatisticsAttempt(
+            "baidu",
+            "market_sector_rankings",
+            lambda: _get_provider("baidu").fetch_industry_rankings(50),
+            _parse_sector_statistics,
+            BAIDU_MARKET_SECTOR_SOURCE_ID,
+            BAIDU_MARKET_SECTOR_API,
+            baidu_semaphore,
         ),
         _StatisticsAttempt(
             "tencent",

@@ -131,13 +131,13 @@ async def _load_industry_rankings(target_date: date) -> dict:
 
     for provider_name, label, fetch_fn, semaphore in [
         ("cls", "财联社", lambda: _get_cls_provider().fetch_industry_rankings(50), cls_semaphore),
-        ("baidu", "百度", lambda: _get_baidu_provider().fetch_industry_rankings(50), baidu_semaphore),
         (
             "eastmoney",
             "东方财富",
             lambda: _get_eastmoney_provider().fetch_industry_rankings(50),
             eastmoney_semaphore,
         ),
+        ("baidu", "百度", lambda: _get_baidu_provider().fetch_industry_rankings(50), baidu_semaphore),
     ]:
         try:
             result = await provider_gateway.call(
