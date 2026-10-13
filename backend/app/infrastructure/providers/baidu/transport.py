@@ -18,6 +18,7 @@ class BaiduTransport:
         self,
         *,
         credentials_provider: Callable[[], tuple[str, str]],
+        on_risk_detected: Callable[[], None] | None = None,
         session: requests.Session | None = None,
     ) -> None:
         self.default_headers = {
@@ -30,6 +31,7 @@ class BaiduTransport:
         self._session = session or requests.Session()
         self._session.trust_env = False
         self._credentials_provider = credentials_provider
+        self._on_risk_detected = on_risk_detected
 
     def _request_headers(self) -> dict[str, str]:
         headers = dict(self.default_headers)
@@ -55,13 +57,16 @@ class BaiduTransport:
     ) -> dict:
         url = path if path.startswith("http") else f"{DEFAULT_BASE_URL}{path}"
         effective_headers = headers or self._request_headers()
-        logger.debug("Baidu request: %s, headers_keys=%s", url, list(effective_headers))
         response = self._session.get(
             url,
             params=params,
             headers=effective_headers,
             timeout=timeout or DEFAULT_TIMEOUT,
         )
+        if response.status_code == 403:
+            if self._on_risk_detected is not None:
+                self._on_risk_detected()
+            raise ConnectionError(f"百度风控拦截(403): {url}")
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, dict):
@@ -72,3 +77,6 @@ class BaiduTransport:
 def check_result_code(data: dict) -> None:
     if str(data.get("ResultCode", -1)) != "0":
         raise RuntimeError(f"百度PAE错误: {data}")
+    result = data.get("Result")
+    if isinstance(result, dict) and (result.get("code") in {403, "403"} or result.get("msg") == "hit risk"):
+        raise ConnectionError(f"百度风控拦截(403): {result.get('msg', 'hit risk')}")

@@ -11,6 +11,7 @@ import app.infrastructure.providers.baidu.stock as stock
 from app.configuration.runtime import get_settings
 from app.configuration.schema import Settings
 from app.core.news import parse_timestamp
+from app.infrastructure.providers.baidu.harvester import BaiduCredentialHarvester, baidu_harvester
 from app.infrastructure.providers.baidu.transport import BaiduTransport, check_result_code
 
 
@@ -21,17 +22,37 @@ class BaiduDataProvider:
         self,
         settings_provider: Callable[[], Settings],
         *,
+        harvester: BaiduCredentialHarvester | None = None,
         session: requests.Session | None = None,
     ) -> None:
         self._settings_provider = settings_provider
+        self._harvester = harvester or baidu_harvester
         self._transport = BaiduTransport(
             credentials_provider=self._credentials,
+            on_risk_detected=self.invalidate_credentials,
             session=session,
         )
 
     def _credentials(self) -> tuple[str, str]:
+        # 1. 优先使用无头浏览器动态采集的有效凭证
+        cookie, token = self._harvester.get_credentials()
+        if token:
+            return cookie, token
+        # 2. 检查静态配置
         settings = self._settings_provider()
-        return settings.baidu_cookie, settings.baidu_acs_token
+        if settings.baidu_acs_token:
+            return settings.baidu_cookie, settings.baidu_acs_token
+        # 3. 动态触发后台预热刷新
+        self._harvester.trigger_background_refresh()
+        return settings.baidu_cookie, ""
+
+    async def refresh_credentials(self, force: bool = False) -> tuple[str, str]:
+        """通过无头浏览器获取或刷新百度动态凭证。"""
+        return await self._harvester.ensure_credentials(force=force)
+
+    def invalidate_credentials(self) -> None:
+        """使缓存的动态凭证失效。"""
+        self._harvester.invalidate()
 
     @property
     def _session(self) -> requests.Session:
