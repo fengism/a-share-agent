@@ -131,6 +131,80 @@ class TencentDataProvider:
             },
         )
 
+    def fetch_index_kline(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """获取指数日 K 线。
+
+        Param:
+            symbol: 指数代码，支持 000300.SH, sh000300, 399006.SZ 等格式
+            start_date: 起始日期，格式 YYYY-MM-DD 或 YYYYMMDD
+            end_date: 结束日期，格式 YYYY-MM-DD 或 YYYYMMDD
+        Return:
+            中文列名的 K 线 DataFrame
+        """
+        raw_symbol = symbol.strip().lower()
+        if "." in raw_symbol:
+            code_part, ex_part = raw_symbol.split(".", 1)
+            qq_sym = f"{ex_part}{code_part}"
+        elif raw_symbol.startswith(("sh", "sz", "bj")):
+            qq_sym = raw_symbol
+        else:
+            market_prefix = "sh" if raw_symbol.startswith(("000", "688", "1")) else "sz"
+            qq_sym = f"{market_prefix}{raw_symbol}"
+
+        normalized_start = start_date.replace("-", "")
+        normalized_end = end_date.replace("-", "")
+        range_start = int(normalized_start[:4])
+        current_year = market_today().year
+        range_end = min(int(normalized_end[:4]) + 1, current_year + 1)
+        url = "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get"
+
+        big_df = pd.DataFrame()
+        for year in range(range_start, range_end):
+            params = {
+                "_var": f"kline_day_{year}",
+                "param": f"{qq_sym},day,{year}-01-01,{year + 1}-12-31,640,",
+                "r": "0.8205512681390605",
+            }
+            response = _get_session().get(url, params=params, timeout=10)
+            text = response.text
+            json_start = text.find("={")
+            if json_start < 0:
+                continue
+            payload = json.loads(text[json_start + 1 :])
+            data_json = payload.get("data", {}).get(qq_sym, {})
+            day_data = data_json.get("day", [])
+            if not day_data:
+                continue
+            temp_df = pd.DataFrame(day_data)
+            big_df = pd.concat([big_df, temp_df], ignore_index=True)
+
+        if big_df.empty:
+            return pd.DataFrame()
+
+        big_df = big_df.iloc[:, :6].copy()
+        big_df.columns = ["date", "open", "close", "high", "low", "volume"]
+        big_df["date"] = pd.to_datetime(big_df["date"], errors="coerce")
+        big_df["open"] = pd.to_numeric(big_df["open"], errors="coerce")
+        big_df["close"] = pd.to_numeric(big_df["close"], errors="coerce")
+        big_df["high"] = pd.to_numeric(big_df["high"], errors="coerce")
+        big_df["low"] = pd.to_numeric(big_df["low"], errors="coerce")
+        big_df["volume"] = pd.to_numeric(big_df["volume"], errors="coerce") * 100
+        big_df = big_df.dropna(subset=["date"]).drop_duplicates(ignore_index=True)
+        big_df = big_df.sort_values("date")
+        big_df = big_df[(big_df["date"] >= pd.to_datetime(normalized_start)) & (big_df["date"] <= pd.to_datetime(normalized_end))]
+        big_df["date"] = big_df["date"].dt.strftime("%Y-%m-%d")
+        return rename_columns(
+            big_df,
+            {
+                "date": "日期",
+                "open": "开盘",
+                "close": "收盘",
+                "high": "最高",
+                "low": "最低",
+                "volume": "成交量",
+            },
+        )
+
     def fetch_industry_rankings(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """获取市场板块涨跌排行榜（涨与跌各一份）。
 

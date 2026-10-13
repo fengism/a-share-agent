@@ -11,10 +11,13 @@ from pathlib import Path
 from typing import Literal, TypeVar, cast
 from zoneinfo import ZoneInfo
 
+import pandas as pd
+
 from app.core.cache import TTLCache, market_cache
-from app.core.concurrency.rate_limiter import call_blocking, eastmoney_semaphore, misc_semaphore
+from app.core.concurrency.rate_limiter import call_blocking, eastmoney_semaphore, misc_semaphore, tencent_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
+from app.core.market import safe_float
 from app.financial_data.market.quotes.index_kline import get_index_kline
 from app.financial_data.market.quotes.schemas import (
     NationalTeamEtfPoint,
@@ -46,11 +49,11 @@ _SZSE_MAX_WINDOW_DAYS = 7
 _SZSE_MAX_WINDOWS_PER_REFRESH = 8
 _SZSE_REQUEST_INTERVAL_SECONDS = 0.15
 _REFRESH_TIMEOUT_SECONDS = 15.0
-# TDX 日K在信号量排队与线程池争用下单次可达 20 秒以上，15 秒预算会让整批标的无谓超时
-_PRICE_TIMEOUT_SECONDS = 75.0
-_PRICE_ITEM_TIMEOUT_SECONDS = 30.0
+# 优先腾讯财经极速日K；若需回退TDX排队或重试，120s/45s 充足预算避免无谓超时截断
+_PRICE_TIMEOUT_SECONDS = 120.0
+_PRICE_ITEM_TIMEOUT_SECONDS = 45.0
 _SOURCE_TIMEOUT_SECONDS = 10.0
-_price_semaphore = asyncio.Semaphore(4)
+_price_semaphore = asyncio.Semaphore(8)
 _source_limits = {
     "sse": asyncio.Semaphore(4),
     "szse_history": asyncio.Semaphore(1),
@@ -693,6 +696,82 @@ def _read_provenance() -> tuple[dict[str, dict[str, dict]], list[NationalTeamSha
     return national_team_etf_store.load_share_metadata(ETF_POOL), observations
 
 
+async def _load_etf_close_history(
+    code: str,
+    start_date: str,
+    end_date: str,
+) -> dict[str, float]:
+    """优先从腾讯财经拉取 ETF 收盘价（轻量快速且无单线程互斥锁），失败时平滑回退 get_kline。"""
+    try:
+        provider = get_provider("tencent")
+        frame = await call_blocking(
+            provider.fetch_stock_kline,
+            code,
+            start_date,
+            end_date,
+            "",
+            semaphore=tencent_semaphore,
+        )
+        if isinstance(frame, pd.DataFrame) and not frame.empty and "日期" in frame.columns and "收盘" in frame.columns:
+            closes: dict[str, float] = {}
+            for _, row in frame.iterrows():
+                raw_date = row.get("日期")
+                close_val = safe_float(row.get("收盘"))
+                if raw_date is not None and close_val is not None:
+                    parsed = pd.to_datetime(raw_date, errors="coerce")
+                    if pd.notna(parsed):
+                        closes[parsed.strftime("%Y-%m-%d")] = close_val
+            if closes:
+                return closes
+    except Exception as error:
+        logger.debug("腾讯财经获取 ETF %s 行情失败，回退 get_kline: %r", code, error)
+
+    data = await get_kline(
+        code,
+        period="daily",
+        start_date=start_date,
+        end_date=end_date,
+        adjust="",
+        max_provider_sources=2,
+    )
+    return {item.date: item.close for item in data.items}
+
+
+async def _load_index_close_history(
+    key: str,
+    definition: IndexDefinition,
+    start_date: str,
+    end_date: str,
+) -> dict[str, float]:
+    """优先从腾讯财经拉取核心指数收盘价（极速且无单线程互斥锁），失败时平滑回退 get_index_kline。"""
+    try:
+        provider = get_provider("tencent")
+        frame = await call_blocking(
+            provider.fetch_index_kline,
+            definition.index_code,
+            start_date,
+            end_date,
+            semaphore=tencent_semaphore,
+        )
+        if isinstance(frame, pd.DataFrame) and not frame.empty and "日期" in frame.columns and "收盘" in frame.columns:
+            closes: dict[str, float] = {}
+            for _, row in frame.iterrows():
+                raw_date = row.get("日期")
+                close_val = safe_float(row.get("收盘"))
+                if raw_date is not None and close_val is not None:
+                    parsed = pd.to_datetime(raw_date, errors="coerce")
+                    if pd.notna(parsed):
+                        closes[parsed.strftime("%Y-%m-%d")] = close_val
+            if closes:
+                return closes
+    except Exception as error:
+        logger.debug("腾讯财经获取指数 %s 行情失败，回退 get_index_kline: %r", key, error)
+
+    symbol = definition.index_code.split(".")[0]
+    data = await get_index_kline(symbol, "daily", start_date, end_date)
+    return {item.date: item.close for item in data.items}
+
+
 async def _load_price_history(
     start_date: str,
     end_date: str,
@@ -704,16 +783,9 @@ async def _load_price_history(
         try:
             async with _price_semaphore:
                 async with asyncio.timeout(_PRICE_ITEM_TIMEOUT_SECONDS):
-                    data = await get_kline(
-                        code,
-                        period="daily",
-                        start_date=start_date,
-                        end_date=end_date,
-                        adjust="",
-                        max_provider_sources=2,
-                    )
-                    etf_history[code] = {item.date: item.close for item in data.items}
-                    return code, etf_history[code]
+                    closes = await _load_etf_close_history(code, start_date, end_date)
+                    etf_history[code] = closes
+                    return code, closes
         except Exception as error:
             logger.warning("国家队 ETF 行情获取失败 code=%s error=%r", code, error)
             return code, {}
@@ -722,10 +794,9 @@ async def _load_price_history(
         try:
             async with _price_semaphore:
                 async with asyncio.timeout(_PRICE_ITEM_TIMEOUT_SECONDS):
-                    symbol = definition.index_code.split(".")[0]
-                    data = await get_index_kline(symbol, "daily", start_date, end_date)
-                    index_history[key] = {item.date: item.close for item in data.items}
-                    return key, index_history[key]
+                    closes = await _load_index_close_history(key, definition, start_date, end_date)
+                    index_history[key] = closes
+                    return key, closes
         except Exception as error:
             logger.warning("国家队指数行情获取失败 index=%s error=%r", key, error)
             return key, {}
@@ -978,24 +1049,16 @@ async def prewarm_national_team_prices() -> None:
     end_text = end.strftime("%Y%m%d")
 
     async def load_index(key: str, definition: IndexDefinition) -> None:
-        symbol = definition.index_code.split(".")[0]
         try:
             async with _price_semaphore:
-                await get_index_kline(symbol, "daily", start_text, end_text)
+                await _load_index_close_history(key, definition, start_text, end_text)
         except Exception as error:
             logger.info("国家队指数行情预热失败 index=%s error=%r", key, error)
 
     async def load_etf(code: str) -> None:
         try:
             async with _price_semaphore:
-                await get_kline(
-                    code,
-                    period="daily",
-                    start_date=start_text,
-                    end_date=end_text,
-                    adjust="",
-                    max_provider_sources=2,
-                )
+                await _load_etf_close_history(code, start_text, end_text)
         except Exception as error:
             logger.info("国家队 ETF 行情预热失败 code=%s error=%r", code, error)
 
