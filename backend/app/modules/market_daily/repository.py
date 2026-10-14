@@ -432,6 +432,15 @@ def _normalize_persisted_ohlc(connection: sqlite3.Connection) -> None:
         columns = _table_columns(connection, table)
         if not {"open", "high", "low", "close"}.issubset(columns):
             continue
+        bad_rows = connection.execute(  # noqa: S608
+            f"""
+            SELECT rowid AS _rowid, * FROM {table}
+            WHERE open<=0 OR high IS NULL OR high<=0 OR low IS NULL OR low<=0
+               OR high<MAX(close, COALESCE(NULLIF(open, 0), close))
+               OR low>MIN(close, COALESCE(NULLIF(open, 0), close))
+            """
+        ).fetchall()
+        bad_rowids = [row["_rowid"] for row in bad_rows]
         connection.execute(f"UPDATE {table} SET open=NULL WHERE open<=0")  # noqa: S608
         connection.execute(  # noqa: S608
             f"""
@@ -443,7 +452,24 @@ def _normalize_persisted_ohlc(connection: sqlite3.Connection) -> None:
                OR low>MIN(close, COALESCE(NULLIF(open, 0), close))
             """
         )
-        rows = connection.execute(f"SELECT rowid AS _rowid, * FROM {table}").fetchall()  # noqa: S608
+
+        refresh_rows: list[sqlite3.Row] = []
+        if bad_rowids:
+            placeholders = ",".join("?" for _ in bad_rowids)
+            refresh_rows.extend(
+                connection.execute(
+                    f"SELECT rowid AS _rowid, * FROM {table} WHERE rowid IN ({placeholders})",  # noqa: S608
+                    tuple(bad_rowids),
+                ).fetchall()
+            )
+        null_hash_rows = connection.execute(
+            f"SELECT rowid AS _rowid, * FROM {table} WHERE data_hash IS NULL"  # noqa: S608
+        ).fetchall()
+        refresh_rowids = {row["_rowid"] for row in refresh_rows}
+        for row in null_hash_rows:
+            if row["_rowid"] not in refresh_rowids:
+                refresh_rows.append(row)
+
         if table == "market_daily_bars":
             connection.executemany(
                 """
@@ -455,7 +481,7 @@ def _normalize_persisted_ohlc(connection: sqlite3.Connection) -> None:
                         _record_hash(_record_from_storage_row(row)), row["market"],
                         row["instrument_type"], row["code"], row["trade_date"], row["adjustment"],
                     )
-                    for row in rows
+                    for row in refresh_rows
                 ],
             )
         else:
@@ -469,14 +495,16 @@ def _normalize_persisted_ohlc(connection: sqlite3.Connection) -> None:
                         _record_hash(_record_from_storage_row(row)), row["refresh_id"], row["market"],
                         row["instrument_type"], row["code"], row["trade_date"],
                     )
-                    for row in rows
+                    for row in refresh_rows
                 ],
             )
 
 
 def _backfill_split_hashes(connection: sqlite3.Connection) -> None:
     for table in ("market_daily_bars", "market_daily_bar_observations"):
-        rows = connection.execute(f"SELECT rowid AS _rowid, * FROM {table}").fetchall()  # noqa: S608
+        rows = connection.execute(  # noqa: S608
+            f"SELECT rowid AS _rowid, * FROM {table} WHERE content_hash IS NULL OR provenance_hash IS NULL"
+        ).fetchall()
         updates = [
             (
                 _content_hash(record := _record_from_storage_row(row)),
@@ -485,10 +513,11 @@ def _backfill_split_hashes(connection: sqlite3.Connection) -> None:
             )
             for row in rows
         ]
-        connection.executemany(
-            f"UPDATE {table} SET content_hash=?, provenance_hash=? WHERE rowid=?",  # noqa: S608
-            updates,
-        )
+        if updates:
+            connection.executemany(
+                f"UPDATE {table} SET content_hash=?, provenance_hash=? WHERE rowid=?",  # noqa: S608
+                updates,
+            )
 
 
 def _drop_index(connection: sqlite3.Connection, name: str) -> None:
@@ -1005,14 +1034,16 @@ class MarketDailyBarRepository:
                             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
                     if "turnover_pct" not in columns:
                         connection.execute(f"ALTER TABLE {table} ADD COLUMN turnover_pct REAL")
-                _migrate_legacy_bar_tables(connection)
-                _migrate_and_drop_legacy_closing_tables(connection)
-                _migrate_allow_hk_corporate_actions_and_factors(connection)
-                _normalize_persisted_ohlc(connection)
-                _backfill_split_hashes(connection)
-                _deduplicate_business_observations(connection)
-                _record_migration_ledger(connection, 2)
-                connection.execute("PRAGMA user_version=2")
+                needs_v2_repair = int(connection.execute("PRAGMA user_version").fetchone()[0]) < 2
+                if needs_v2_repair:
+                    _migrate_legacy_bar_tables(connection)
+                    _migrate_and_drop_legacy_closing_tables(connection)
+                    _migrate_allow_hk_corporate_actions_and_factors(connection)
+                    _normalize_persisted_ohlc(connection)
+                    _backfill_split_hashes(connection)
+                    _deduplicate_business_observations(connection)
+                    _record_migration_ledger(connection, 2)
+                    connection.execute("PRAGMA user_version=2")
             with _close_lock:
                 _initialized_paths.add(key)
 
