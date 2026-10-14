@@ -3,7 +3,7 @@
 import logging
 
 from app.configuration import get_settings
-from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
+from app.core.concurrency.rate_limiter import call_blocking, database_semaphore, tdxhub_semaphore
 from app.runtime import task_scheduler
 
 logger = logging.getLogger(__name__)
@@ -93,6 +93,81 @@ async def refresh_sge_gold_snapshots() -> None:
         name="sge_gold_snapshot_refresh",
         coro_factory=iteration,
         interval_seconds=60 * 60,
+        leader_election=True,
+    )
+
+
+async def refresh_stock_valuation_snapshots() -> None:
+    """定期预热用户自选股与持仓股票的每日估值快照。"""
+
+    async def iteration():
+        from app.financial_data.stock.public import warm_up_valuation_details
+
+        stats = await warm_up_valuation_details()
+        if stats.get("failed", 0) > 0:
+            logger.warning("自选/持仓估值快照预热存在失败标的: %s", stats)
+
+    await task_scheduler.run_periodic(
+        name="stock_valuation_snapshot_refresh",
+        coro_factory=iteration,
+        interval_seconds=60 * 60,
+        leader_election=True,
+    )
+
+
+async def refresh_tdxhub_best_ip() -> None:
+    """定期刷新 TDX 行情最优服务器，并顺带充当共享客户端的主动恢复探测器。
+
+    SDK 的建连会对 ``SERVER.HQ`` 做全量并发探测且无短路，一次故障会让客户端
+    重建反复付出数十秒代价。这里定期做一次协议级测速，把当前最优节点写回内存
+    配置的 ``BESTIP.HQ``，并丢弃可能已经失效的共享客户端，让下一次业务请求用
+    新探测结果重建。
+
+    只调用 ``tdxhub.server.server()`` 而不调用 ``tdxhub.server.bestip()``：后者
+    会用 SDK 内置默认整体覆盖 ``~/.tdxhub/config.json``，抹掉用户自定义的服务器
+    与缓存目录。``BESTIP.HQ`` 在 SDK 里仅作为候选列表的第一个元素被拼进去（探测
+    仍是全量并发），所以这里不裁剪候选列表，只提供顺序偏好。
+    """
+
+    async def iteration():
+        from tdxhub import config as tdxhub_config
+        from tdxhub.server import server
+
+        from app.infrastructure.providers.tdxhub import shared_tdxhub_quotes
+
+        def probe() -> list[tuple[str, int]]:
+            return server(index="HQ", limit=3, sync=False)
+
+        try:
+            endpoints = await call_blocking(probe, semaphore=tdxhub_semaphore)
+        except Exception as error:
+            logger.warning("TDX 行情服务器测速失败: error_type=%s", type(error).__name__)
+            return
+        if not endpoints:
+            logger.warning("TDX 行情服务器测速未发现可用节点")
+            return
+
+        # config.update 是递归 merge，只覆盖 BESTIP.HQ 并保留其余兄弟键；
+        # 纯内存生效，不落盘（落盘的 setup() 有 _loaded 守卫，运行中不会重载）。
+        tdxhub_config.update({"BESTIP": {"HQ": endpoints[0]}})
+
+        if shared_tdxhub_quotes.is_cooling_down():
+            # 冷却期内不硬闯，避免与业务请求的重建探测互相争抢带宽。
+            logger.info(
+                "TDX 客户端处于重建冷却期，本轮仅刷新最优服务器: best=%s remaining=%.1fs",
+                endpoints[0],
+                shared_tdxhub_quotes.cooldown_remaining_seconds(),
+            )
+            return
+
+        await call_blocking(shared_tdxhub_quotes.reset, semaphore=tdxhub_semaphore)
+        logger.info("TDX 最优服务器已刷新并重置共享客户端: best=%s 备选=%s", endpoints[0], endpoints[1:])
+
+    settings = get_settings()
+    await task_scheduler.run_periodic(
+        name="tdxhub_bestip_refresh",
+        coro_factory=iteration,
+        interval_seconds=settings.tdxhub_bestip_refresh_seconds,
         leader_election=True,
     )
 

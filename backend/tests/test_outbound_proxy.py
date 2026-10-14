@@ -7,10 +7,10 @@ import requests
 
 from app.configuration import get_settings
 from app.infrastructure.http.proxy import (
+    DIRECT_REQUEST,
     PROXY_TYPE_HTTP,
     PROXY_TYPE_NONE,
     PROXY_TYPE_SOCKS5,
-    DIRECT_REQUEST,
     ProxyConfigError,
     ProxyScope,
     normalize_proxy_url,

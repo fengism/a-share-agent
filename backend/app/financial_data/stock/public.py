@@ -69,7 +69,7 @@ from app.financial_data.stock.quotes.realtime import fetch_realtime_quote_set, f
 from app.financial_data.stock.quotes.schemas import IntradayData
 from app.financial_data.stock.quotes.spot_snapshot import get_spot_snapshot
 from app.financial_data.stock.quotes.technical_schemas import TechnicalIndicators
-from app.financial_data.stock.valuation.detail import get_valuation_detail
+from app.financial_data.stock.valuation.detail import get_valuation_detail, warm_up_valuation_details
 from app.financial_data.stock.valuation.orchestrator import get_valuation
 from app.financial_data.stock.valuation.percentiles import compute_percentiles
 from app.financial_data.stock.valuation.schemas import StockValuation, ValuationDetail
@@ -144,4 +144,5 @@ __all__ = [
     "update_industry_mapping_sw_files",
     "update_industry_mapping_sw_second_file",
     "ValuationDetail",
+    "warm_up_valuation_details",
 ]

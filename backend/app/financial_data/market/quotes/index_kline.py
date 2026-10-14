@@ -6,9 +6,15 @@ from datetime import date
 import pandas as pd
 
 from app.core.cache import cache_date, dated_cache_key_no_day, one_year_ago_date, series_cache
-from app.core.concurrency.rate_limiter import akshare_semaphore, call_blocking, eastmoney_semaphore, tdx_semaphore
+from app.core.concurrency.rate_limiter import (
+    akshare_semaphore,
+    call_blocking,
+    eastmoney_semaphore,
+    tdx_semaphore,
+    tencent_semaphore,
+)
 from app.core.concurrency.singleflight import AsyncSingleFlight
-from app.core.exceptions import UpstreamUnavailableError
+from app.core.exceptions import UpstreamEmptyResponseError, UpstreamUnavailableError
 from app.core.market import normalize_index_code, safe_float
 from app.domain.market import KlineData, KlineItem
 from app.financial_data.dates import clamp_kline_history_start_date as _clamp_start_date
@@ -46,6 +52,11 @@ def _get_tdxhub_provider():
     return get_provider("tdxhub")
 
 
+def _get_tencent_provider():
+    """Lazily resolve the Tencent provider singleton."""
+    return get_provider("tencent")
+
+
 _index_kline_singleflight = AsyncSingleFlight[KlineData]()
 
 
@@ -72,16 +83,23 @@ async def _require_index_kline_frame(
     start_date: str,
     end_date: str,
 ) -> pd.DataFrame:
-    """加载单个指数 K 线数据源，并将空结果视为失败。"""
+    """加载单个指数 K 线数据源，并将空结果视为失败。
+
+    指数必然有完整历史（不存在"次新指数"），因此开启覆盖度校验：上游只回最近
+    一两根时，其余校验都拦不住——陈旧度只看最新一根，而缓存键又含完整起止区间，
+    残缺结果会被当成整段历史写入 ``series_cache``。
+    """
     frame = await loader
     if frame.empty:
-        raise ValueError(f"{source} 未返回有效指数 K 线")
+        # 上游 200 但没有可用 K 线（限流/截断），与永久失败区分开才能让熔断器计数。
+        raise UpstreamEmptyResponseError(f"{source} 未返回有效指数 K 线")
     return validate_kline_frame(
         source,
         frame,
         start_date=start_date,
         end_date=end_date,
         period=period,
+        require_coverage=True,
     )
 
 
@@ -104,8 +122,25 @@ def _build_index_kline_source_attempts(
         Provider 尝试列表，按优先级排序
     """
     if period == "daily":
-        # ── 日线：直接请求各数据源 ──────────────────────────────────────
+        # ── 日线：直接请求各数据源（优先腾讯财经极速接口，无单线程互斥锁且按需切片）──────
         return [
+            ProviderAttempt(
+                label="腾讯财经指数K线",
+                loader=lambda: _require_index_kline_frame(
+                    "腾讯财经指数K线",
+                    call_blocking(
+                        _get_tencent_provider().fetch_index_kline,
+                        symbol,
+                        start_date,
+                        end_date,
+                        semaphore=tencent_semaphore,
+                    ),
+                    period=period,
+                    start_date=start_date,
+                    end_date=end_date,
+                ),
+                on_error=f"腾讯财经指数K线不可用，尝试 TDX 指数K线: symbol={symbol}",
+            ),
             ProviderAttempt(
                 label="TDX 指数K线",
                 loader=lambda: _require_index_kline_frame(
@@ -121,23 +156,7 @@ def _build_index_kline_source_attempts(
                     start_date=start_date,
                     end_date=end_date,
                 ),
-                on_error=f"TDX 指数K线不可用，尝试 Akshare 腾讯指数K线: symbol={symbol}",
-            ),
-            ProviderAttempt(
-                label="Akshare 腾讯指数K线",
-                loader=lambda: _require_index_kline_frame(
-                    "Akshare 腾讯指数K线",
-                    _load_and_filter(
-                        _get_akshare_provider().fetch_index_kline_tencent,
-                        symbol,
-                        start_date,
-                        end_date,
-                    ),
-                    period=period,
-                    start_date=start_date,
-                    end_date=end_date,
-                ),
-                on_error=f"Akshare 腾讯指数K线不可用，尝试 Akshare 新浪指数K线: symbol={symbol}",
+                on_error=f"TDX 指数K线不可用，尝试 Akshare 新浪指数K线: symbol={symbol}",
             ),
             ProviderAttempt(
                 label="Akshare 新浪指数K线",
@@ -213,9 +232,24 @@ def _build_index_kline_source_attempts(
             start_date=start_date,
             end_date=end_date,
             period=period,
+            require_coverage=True,
         )
 
     return [
+        ProviderAttempt(
+            label=f"腾讯财经日线聚合指数{period_label}K线",
+            loader=lambda: _load_daily_then_resample(
+                f"腾讯财经日线聚合指数{period_label}K线",
+                call_blocking(
+                    _get_tencent_provider().fetch_index_kline,
+                    symbol,
+                    start_date,
+                    end_date,
+                    semaphore=tencent_semaphore,
+                ),
+            ),
+            on_error=f"腾讯财经日线聚合指数{period_label}K线不可用，尝试 TDX: symbol={symbol}",
+        ),
         ProviderAttempt(
             label=f"TDX 日线聚合指数{period_label}K线",
             loader=lambda: _load_daily_then_resample(
@@ -228,20 +262,7 @@ def _build_index_kline_source_attempts(
                     semaphore=tdx_semaphore,
                 ),
             ),
-            on_error=f"TDX 日线聚合指数{period_label}K线不可用: symbol={symbol}",
-        ),
-        ProviderAttempt(
-            label=f"Akshare 腾讯日线聚合指数{period_label}K线",
-            loader=lambda: _load_daily_then_resample(
-                f"Akshare 腾讯日线聚合指数{period_label}K线",
-                _load_and_filter(
-                    _get_akshare_provider().fetch_index_kline_tencent,
-                    symbol,
-                    start_date,
-                    end_date,
-                ),
-            ),
-            on_error=f"Akshare 腾讯日线聚合指数{period_label}K线不可用: symbol={symbol}",
+            on_error=f"TDX 日线聚合指数{period_label}K线不可用，尝试 Akshare 新浪: symbol={symbol}",
         ),
         ProviderAttempt(
             label=f"Akshare 新浪日线聚合指数{period_label}K线",

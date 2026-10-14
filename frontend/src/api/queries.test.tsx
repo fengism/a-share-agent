@@ -218,7 +218,7 @@ describe("query request lifecycle", () => {
     expect(apiGet).toHaveBeenCalledWith(
       "/stock/600519/kline",
       expect.objectContaining({ period: "weekly", adjust: "hfq" }),
-      undefined,
+      { timeoutMs: API_TIMEOUTS.EXTERNAL },
     );
     client.clear();
   });

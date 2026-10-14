@@ -695,3 +695,5 @@ export type NationalTeamIndexPoint = components["schemas"]["NationalTeamIndexPoi
 export type NationalTeamIndexSeries = components["schemas"]["NationalTeamIndexSeries"];
 export type NationalTeamSummary = components["schemas"]["NationalTeamSummary"];
 export type NationalTeamResponse = components["schemas"]["NationalTeamResponse"];
+export type MarketVolumeSeriesItem = components["schemas"]["MarketVolumeSeriesItem"];
+export type MarketVolumeResponse = components["schemas"]["MarketVolumeResponse"];

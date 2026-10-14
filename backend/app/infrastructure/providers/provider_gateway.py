@@ -47,6 +47,12 @@ def _retry_after_seconds(error: Exception) -> float | None:
         return None
 
 
+def _error_status(error: Exception) -> int | None:
+    """Extract the upstream HTTP status so permanent-vs-transient failures stay diagnosable."""
+    status = getattr(getattr(error, "response", None), "status_code", None)
+    return status if isinstance(status, int) else None
+
+
 def _retry_policy(settings, max_attempts: int | None, retry_budget_seconds: float | None) -> RetryPolicy:
     return RetryPolicy(
         max_attempts=max(1, max_attempts or settings.provider_gateway_max_attempts),
@@ -106,12 +112,14 @@ class ProviderGateway:
                         error_type=type(exc).__name__,
                     )
                     logger.warning(
-                        "provider call failed provider=%s operation=%s attempt=%s category=%s error_type=%s",
+                        "provider call failed provider=%s operation=%s attempt=%s category=%s "
+                        "error_type=%s status=%s",
                         provider,
                         operation,
                         attempt_number,
                         category.value,
                         type(exc).__name__,
+                        _error_status(exc),
                     )
                     delay = retry_policy.delay_seconds(
                         attempt_number,
@@ -144,12 +152,14 @@ class ProviderGateway:
         self._record_failure(circuit_key, last_category, threshold, half_open)
         if last_error is not None:
             logger.warning(
-                "provider call exhausted retries provider=%s operation=%s attempts=%s category=%s error_type=%s",
+                "provider call exhausted retries provider=%s operation=%s attempts=%s category=%s "
+                "error_type=%s status=%s",
                 provider,
                 operation,
                 attempt_number,
                 last_category.value,
                 type(last_error).__name__,
+                _error_status(last_error),
             )
             raise last_error
         raise RuntimeError(f"provider call failed without an exception: {provider}.{operation}")
@@ -213,12 +223,14 @@ class ProviderGateway:
                     error_type=type(exc).__name__,
                 )
                 logger.debug(
-                    "provider call failed provider=%s operation=%s attempt=%s category=%s error_type=%s",
+                    "provider call failed provider=%s operation=%s attempt=%s category=%s "
+                    "error_type=%s status=%s",
                     provider,
                     operation,
                     attempt_number,
                     category.value,
                     type(exc).__name__,
+                    _error_status(exc),
                 )
                 delay = retry_policy.delay_seconds(
                     attempt_number,
@@ -246,12 +258,14 @@ class ProviderGateway:
         self._record_failure(circuit_key, last_category, threshold, half_open)
         if last_error is not None:
             logger.warning(
-                "provider call exhausted retries provider=%s operation=%s attempts=%s category=%s error_type=%s",
+                "provider call exhausted retries provider=%s operation=%s attempts=%s category=%s "
+                "error_type=%s status=%s",
                 provider,
                 operation,
                 attempt_number,
                 last_category.value,
                 type(last_error).__name__,
+                _error_status(last_error),
             )
             raise last_error
         raise RuntimeError(f"provider call failed without an exception: {provider}.{operation}")

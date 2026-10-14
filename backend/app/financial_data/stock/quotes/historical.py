@@ -283,15 +283,6 @@ def _historical_source_attempts(
     period_label = {"weekly": "周", "monthly": "月", "annual": "年"}.get(period, "")
     attempts = [
         attempt(
-            label=f"TDX {'复权' if period == 'daily' else '日线聚合复权' + period_label}K线",
-            source=tdx_source,
-            fetcher=get_provider("tdxhub").fetch_stock_kline,
-            fetch_args=(symbol, start_date, end_date, adjust, require_turnover),
-            semaphore=tdx_semaphore,
-            aggregate_period=aggregate_period,
-            error=f"TDX 历史K线不可用: code={symbol}",
-        ),
-        attempt(
             label=f"腾讯财经{'复权' if period == 'daily' else '日线聚合复权' + period_label}K线",
             source=tencent_source,
             fetcher=get_provider("tencent").fetch_stock_kline,
@@ -299,6 +290,15 @@ def _historical_source_attempts(
             semaphore=tencent_semaphore,
             aggregate_period=aggregate_period,
             error=f"腾讯财经历史K线不可用: code={symbol}",
+        ),
+        attempt(
+            label=f"TDX {'复权' if period == 'daily' else '日线聚合复权' + period_label}K线",
+            source=tdx_source,
+            fetcher=get_provider("tdxhub").fetch_stock_kline,
+            fetch_args=(symbol, start_date, end_date, adjust, require_turnover),
+            semaphore=tdx_semaphore,
+            aggregate_period=aggregate_period,
+            error=f"TDX 历史K线不可用: code={symbol}",
         ),
         attempt(
             label=f"AkShare 新浪{'复权' if period == 'daily' else '日线聚合复权' + period_label}K线",

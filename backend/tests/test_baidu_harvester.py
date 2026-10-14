@@ -4,8 +4,9 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from app.configuration.schema import Settings
-from app.infrastructure.providers.baidu.harvester import BaiduCredentialHarvester, harvest_baidu_credentials
+from app.infrastructure.providers.baidu.harvester import BaiduCredentialHarvester
 from app.infrastructure.providers.baidu.provider import BaiduDataProvider
 from app.infrastructure.providers.baidu.transport import BaiduTransport, check_result_code
 

@@ -42,6 +42,8 @@ _SINA_FACTOR_SOURCE = "sina.qfq_hfq"
 _ACTION_SOURCE = "tdxhub.xdxr"
 _CANONICAL_ANCHOR = date(1990, 1, 1)
 _OHLC = ("open", "high", "low", "close")
+# 会引起除权参考价变化的公司行为字段：任一非零即意味着该股确实有过除权除息。
+_PRICE_AFFECTING_ACTION_COLUMNS = ("fenhong", "songzhuangu", "peigu", "suogu")
 
 _repository = MarketDailyBarRepository(MARKET_DAILY_DATABASE_PATH)
 _code_locks: dict[str, asyncio.Lock] = {}
@@ -106,6 +108,23 @@ def _normalize_actions(code: str, raw: pd.DataFrame) -> tuple[pd.DataFrame, list
     return normalized, actions, hashlib.sha256(encoded.encode()).hexdigest()
 
 
+def _has_price_affecting_actions(actions: pd.DataFrame | None) -> bool:
+    """该股是否存在会引起除权参考价变化的公司行为。
+
+    区分"本来就没有公司行为"（因子恒为 1.0 是正确结果）与"上游返回了退化数据"
+    （有公司行为却算出恒定因子）是关键：两者在因子表里长得一模一样。
+    """
+    if actions is None or len(actions) == 0:
+        return False
+    for column in _PRICE_AFFECTING_ACTION_COLUMNS:
+        if column not in actions.columns:
+            continue
+        values = pd.to_numeric(actions[column], errors="coerce").fillna(0.0)
+        if bool(values.abs().gt(0).any()):
+            return True
+    return False
+
+
 def _build_factors(
     code: str,
     trading_dates: list[date],
@@ -123,6 +142,18 @@ def _build_factors(
         raise ValueError(f"{code} 复权因子包含空值")
     if not all(math.isfinite(float(value)) for value in frame[factor_columns].to_numpy().flat):
         raise ValueError(f"{code} 复权因子包含非有限值")
+    # TDX 抖动时会返回"非空但无意义"的 XDXR 帧（协议层 unpack 失败等），规范化后
+    # 仍是一张结构合法的表，算出来的因子恒为 1.0。上面两条校验都能通过，于是
+    # 静默把一份毫无信息量的因子表写进库——直到有人对比复权价时才发现整条曲线
+    # 没有任何跳变。这里用"有公司行为 ⇒ 因子必须变化"把它挡在写库之前。
+    if _has_price_affecting_actions(actions):
+        distinct = {
+            (round(float(row["qfq_mul"]), 8), round(float(row["qfq_add"]), 8),
+             round(float(row["hfq_mul"]), 8), round(float(row["hfq_add"]), 8))
+            for _, row in frame.iterrows()
+        }
+        if len(distinct) < 2:
+            raise ValueError(f"{code} 存在除权除息行为但复权因子恒定，拒绝写入退化因子表")
     return [
         MarketDailyAdjustmentFactor(
             code=code,

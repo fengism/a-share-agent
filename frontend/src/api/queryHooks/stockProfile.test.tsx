@@ -2,6 +2,7 @@ import type { PropsWithChildren } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { API_TIMEOUTS } from "../client";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { openApiGet } from "../openapiClient";
 import { queryKeys } from "../queryKeys";
@@ -79,6 +80,7 @@ describe("stock profile queries", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(openApiGet).toHaveBeenCalledWith("/api/stock/{code}/chip-distribution", {
       path: { code: "600519" },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     });
     const options = queryClient.getQueryCache().find({
       queryKey: queryKeys.stock.chipDistribution("600519"),

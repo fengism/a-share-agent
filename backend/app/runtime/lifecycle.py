@@ -101,6 +101,8 @@ def build_background_task_specs(
     market_daily_bar_refresh: AsyncTaskFactory,
     market_daily_backfill_worker: AsyncTaskFactory,
     sge_gold_snapshot_refresh: AsyncTaskFactory,
+    tdxhub_bestip_refresh: AsyncTaskFactory,
+    stock_valuation_snapshot_refresh: AsyncTaskFactory | None = None,
     bot_job_worker: AsyncTaskFactory,
     quant_strategy_reload: AsyncTaskFactory,
     quant_job_worker: AsyncTaskFactory,
@@ -220,6 +222,28 @@ def build_background_task_specs(
             start_message="上金所贵金属快照预热已启动",
         ),
         BackgroundTaskSpec(
+            name="tdxhub_bestip_refresh",
+            factory=tdxhub_bestip_refresh,
+            long_running=True,
+            critical=False,
+            restart_on_exit=True,
+            start_message="TDX 行情服务器测速与恢复任务已启动",
+        ),
+        *(
+            [
+                BackgroundTaskSpec(
+                    name="stock_valuation_snapshot_refresh",
+                    factory=stock_valuation_snapshot_refresh,
+                    long_running=True,
+                    critical=False,
+                    restart_on_exit=True,
+                    start_message="自选与持仓股票估值快照预热已启动",
+                )
+            ]
+            if stock_valuation_snapshot_refresh is not None
+            else []
+        ),
+        BackgroundTaskSpec(
             name="bot_job_worker",
             factory=bot_job_worker,
             long_running=True,
@@ -269,6 +293,8 @@ async def application_lifespan(
     market_daily_bar_refresh: AsyncTaskFactory,
     market_daily_backfill_worker: AsyncTaskFactory,
     sge_gold_snapshot_refresh: AsyncTaskFactory,
+    tdxhub_bestip_refresh: AsyncTaskFactory,
+    stock_valuation_snapshot_refresh: AsyncTaskFactory | None = None,
     bot_job_worker: AsyncTaskFactory,
     quant_strategy_reload: AsyncTaskFactory,
     quant_job_worker: AsyncTaskFactory,
@@ -371,6 +397,8 @@ async def application_lifespan(
         market_daily_bar_refresh=market_daily_bar_refresh,
         market_daily_backfill_worker=market_daily_backfill_worker,
         sge_gold_snapshot_refresh=sge_gold_snapshot_refresh,
+        tdxhub_bestip_refresh=tdxhub_bestip_refresh,
+        stock_valuation_snapshot_refresh=stock_valuation_snapshot_refresh,
         bot_job_worker=bot_job_worker,
         quant_strategy_reload=quant_strategy_reload,
         quant_job_worker=quant_job_worker,

@@ -6,7 +6,6 @@ import threading
 import time
 
 import pytest
-from curl_cffi import requests as curl_requests
 from curl_cffi.requests import exceptions as curl_errors
 
 from app.core.exceptions import UpstreamRateLimitedError

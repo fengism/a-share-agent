@@ -1,12 +1,16 @@
 import asyncio
+import json
 import logging
 import math
+from collections.abc import Sequence
 from datetime import date
+from pathlib import Path
 
+from app.configuration.paths import DATA_DIR
 from app.core.cache import analysis_cache as cache
-from app.core.cache import dated_cache_key
+from app.core.cache import cache_date, dated_cache_key
 from app.core.cache_policies import VALUATION_DETAIL
-from app.core.concurrency.rate_limiter import call_blocking, ths_semaphore
+from app.core.concurrency.rate_limiter import call_blocking, database_semaphore, misc_semaphore, ths_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import is_hk_code, market_today, normalize_code, safe_float
 from app.financial_data.stock.fundamentals.financials import get_financial, get_financial_metrics
@@ -64,6 +68,7 @@ from app.financial_data.stock.valuation.schemas import (
     ValuationPercentiles,
     ValuationProfile,
 )
+from app.infrastructure.persistence.json_storage import atomic_write_json
 from app.infrastructure.providers.provider_gateway import provider_gateway
 
 logger = logging.getLogger(__name__)
@@ -118,6 +123,7 @@ async def _fetch_valuation_detail_inputs(
     list[InstitutionForecast],
     list[dict],
     list[dict],
+    ValuationPercentiles,
 ]:
     """并发抓取详细估值需要的多份原始数据。
 
@@ -125,7 +131,7 @@ async def _fetch_valuation_detail_inputs(
         code: 原始股票代码
         raw_code: 归一化后的代码
     Return:
-        (基本信息, 估值数据, 财务指标, 机构预测) 元组
+        (基本信息, 估值数据, 财务指标, 机构预测, 利润表, 现金流量表, 估值百分位) 元组
     """
     return await asyncio.gather(
         get_basic_info(code),
@@ -134,6 +140,7 @@ async def _fetch_valuation_detail_inputs(
         _fetch_institution_forecasts(raw_code),
         get_financial(code, "profit"),
         get_financial(code, "cashflow"),
+        _fetch_valuation_percentiles(raw_code),
     )
 
 
@@ -680,8 +687,44 @@ def _build_weighted_outputs(
     )
 
 
+def _snapshot_path(code: str) -> Path:
+    return DATA_DIR / "valuation_snapshots" / f"{code}.json"
+
+
+def _read_disk_snapshot(code: str, *, ignore_date: bool = False) -> ValuationDetail | None:
+    path = _snapshot_path(code)
+    try:
+        if not path.is_file():
+            return None
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            return None
+        if not ignore_date and payload.get("snapshot_date") != cache_date():
+            return None
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            return None
+        return ValuationDetail.model_validate(data)
+    except Exception as error:
+        logger.debug("读取个股估值快照失败 %s: %s", code, error)
+        return None
+
+
+def _write_disk_snapshot(code: str, detail: ValuationDetail) -> None:
+    path = _snapshot_path(code)
+    try:
+        payload = {
+            "snapshot_date": cache_date(),
+            "code": code,
+            "data": detail.model_dump(),
+        }
+        atomic_write_json(path, payload, indent=2)
+    except Exception as error:
+        logger.warning("写入个股估值快照失败 %s: %s", code, error)
+
+
 async def _load_valuation_detail(code: str) -> ValuationDetail:
-    """汇总多估值方法的详细结果，带 1 天缓存。
+    """汇总多估值方法的详细结果，带 L1 内存 + L2 磁盘分级缓存。
 
     Param:
         code: 股票代码
@@ -694,15 +737,30 @@ async def _load_valuation_detail(code: str) -> ValuationDetail:
     if cached is not None:
         return cached
 
-    (
-        basic_info,
-        valuation_data,
-        financial_metrics,
-        institution_forecasts,
-        profit_rows,
-        cashflow_rows,
-    ) = await _fetch_valuation_detail_inputs(code, sym.raw)
-    percentiles = await _fetch_valuation_percentiles(sym.raw)
+    disk_cached = await call_blocking(_read_disk_snapshot, sym.raw, semaphore=misc_semaphore)
+    if disk_cached is not None:
+        cache.set(cache_key, disk_cached, ttl=VALUATION_DETAIL.ttl_seconds)
+        return disk_cached
+
+    try:
+        (
+            basic_info,
+            valuation_data,
+            financial_metrics,
+            institution_forecasts,
+            profit_rows,
+            cashflow_rows,
+            percentiles,
+        ) = await _fetch_valuation_detail_inputs(code, sym.raw)
+    except Exception as exc:
+        fallback = await call_blocking(
+            _read_disk_snapshot, sym.raw, ignore_date=True, semaphore=misc_semaphore
+        )
+        if fallback is not None:
+            logger.warning("估值上游数据获取失败，回退历史本地快照 code=%s: %s", sym.raw, exc)
+            return fallback
+        raise
+
     peer_summary = _build_peer_summary(valuation_data)
     fundamentals = _build_fundamentals(financial_metrics)
     current_price = _derive_current_price(basic_info)
@@ -769,6 +827,7 @@ async def _load_valuation_detail(code: str) -> ValuationDetail:
         institution_forecasts=institution_forecasts,
     )
     cache.set(cache_key, result, ttl=VALUATION_DETAIL.ttl_seconds)
+    await call_blocking(_write_disk_snapshot, sym.raw, result, semaphore=misc_semaphore)
     return result
 
 
@@ -779,6 +838,11 @@ async def _load_hk_valuation_detail(norm_code: str) -> ValuationDetail:
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
+
+    disk_cached = await call_blocking(_read_disk_snapshot, norm_code, semaphore=misc_semaphore)
+    if disk_cached is not None:
+        cache.set(cache_key, disk_cached, ttl=VALUATION_DETAIL.ttl_seconds)
+        return disk_cached
 
     hk_val = await hk_market_service.get_stock_valuation(norm_code)
     quotes = await hk_market_service.get_stock_quotes(codes=[norm_code])
@@ -842,6 +906,7 @@ async def _load_hk_valuation_detail(norm_code: str) -> ValuationDetail:
         notes=["港股暂未提供历史估值分位数与DCF模型"],
     )
     cache.set(cache_key, result, ttl=VALUATION_DETAIL.ttl_seconds)
+    await call_blocking(_write_disk_snapshot, norm_code, result, semaphore=misc_semaphore)
     return result
 
 
@@ -863,3 +928,60 @@ async def get_valuation_detail(code: str) -> ValuationDetail:
     if cached is not None:
         return ValuationDetail.model_validate(cached)
     return await _valuation_detail_singleflight.do(cache_key, lambda: _load_valuation_detail(code))
+
+
+async def warm_up_valuation_details(codes: Sequence[str] | None = None) -> dict[str, int]:
+    """预热自选与持仓股票的每日估值快照。
+
+    Param:
+        codes: 指定待预热的股票代码列表；若为 None 则自动预热用户自选与持仓标的
+    Return:
+        dict: {"succeeded": 成功数, "failed": 失败数}
+    """
+    if codes is None:
+        targets_set: set[str] = set()
+        try:
+            from app.infrastructure.persistence import portfolio as portfolio_store
+            from app.infrastructure.persistence import watchlist as watchlist_store
+
+            def get_all_codes() -> list[str]:
+                res = set()
+                try:
+                    w_conn = watchlist_store.get_connection()
+                    w_rows = w_conn.execute("SELECT DISTINCT stock_code FROM watchlist_items").fetchall()
+                    for r in w_rows:
+                        if r["stock_code"]:
+                            res.add(str(r["stock_code"]).strip())
+                except Exception as e:
+                    logger.debug("读取自选标的失败: %s", e)
+
+                try:
+                    p_conn = portfolio_store.get_connection()
+                    p_rows = p_conn.execute("SELECT DISTINCT stock_code FROM portfolio_transactions").fetchall()
+                    for r in p_rows:
+                        if r["stock_code"]:
+                            res.add(str(r["stock_code"]).strip())
+                except Exception as e:
+                    logger.debug("读取持仓标的失败: %s", e)
+
+                return list(res)
+
+            targets = await call_blocking(get_all_codes, semaphore=database_semaphore)
+            targets_set.update(targets)
+        except Exception as error:
+            logger.warning("获取待预热自选/持仓标的失败: %s", error)
+        targets = sorted(targets_set)
+    else:
+        targets = list(codes)
+
+    succeeded = 0
+    failed = 0
+    for code in targets:
+        try:
+            await get_valuation_detail(code)
+            succeeded += 1
+        except Exception as error:
+            failed += 1
+            logger.warning("个股估值快照预热失败 code=%s error_type=%s", code, type(error).__name__)
+    logger.info("个股估值快照预热完成: succeeded=%s failed=%s total=%s", succeeded, failed, len(targets))
+    return {"succeeded": succeeded, "failed": failed}

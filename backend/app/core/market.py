@@ -70,8 +70,10 @@ def normalize_code(raw: str) -> SymbolFormats:
 
 def normalize_index_symbol(symbol: str) -> str:
     """Add a Sina-compatible prefix to an index symbol."""
-    if symbol.startswith(("sh", "sz")):
+    if symbol.startswith(("sh", "sz", "bj")):
         return symbol
+    if symbol.startswith(("8", "4", "92")):
+        return f"bj{symbol}"
     if symbol.startswith("0"):
         return f"sh{symbol}"
     return f"sz{symbol}"
@@ -79,7 +81,7 @@ def normalize_index_symbol(symbol: str) -> str:
 
 def normalize_index_code(symbol: str) -> str:
     """Strip the market prefix from an index symbol."""
-    if symbol.startswith(("sh", "sz")):
+    if symbol.startswith(("sh", "sz", "bj")):
         return symbol[2:]
     return symbol
 

@@ -116,6 +116,19 @@ describe("SgeGoldTab", () => {
       }),
       expect.anything(),
     );
+
+    const lastCall = (mocks.chart.mock.calls.at(-1) as unknown as [{ option?: { tooltip?: { formatter?: (params: unknown) => string } } } | undefined])?.[0];
+    const tooltipFormatter = lastCall?.option?.tooltip?.formatter;
+    expect(tooltipFormatter).toBeTypeOf("function");
+    if (!tooltipFormatter) throw new Error("Expected tooltipFormatter to be defined");
+    // ECharts category axis candlestick passes [categoryIndex, open, close, low, high]
+    const tooltipText = tooltipFormatter([
+      { axisValue: "2026-09-02", data: [1, 810.5, 812.3, 808, 815] },
+    ]);
+    expect(tooltipText).toContain("开盘：810.50");
+    expect(tooltipText).toContain("收盘：812.30");
+    expect(tooltipText).toContain("最低：808.00");
+    expect(tooltipText).toContain("最高：815.00");
   });
 
   it("requests the newly selected SGE symbol", () => {

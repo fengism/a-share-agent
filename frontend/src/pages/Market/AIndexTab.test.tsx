@@ -38,7 +38,19 @@ vi.mock("../../api/queries", () => ({
       refetch: vi.fn(),
     };
   },
+  useMarketVolume: () => ({
+    data: { items: [] },
+    isLoading: false,
+    isFetching: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
+
+vi.mock("echarts-for-react/lib/core", () => ({
+  default: () => <div data-testid="echarts-mock" />,
+}));
+vi.mock("../../charts/echarts-setup", () => ({ default: {} }));
 
 vi.mock("../../charts/LazyKlineChart", () => ({
   default: ({
@@ -153,5 +165,15 @@ describe("AIndexTab", () => {
 
     fireEvent.click(screen.getByText("周K"));
     expect(screen.getByTestId("index-kline-history-range")).toHaveTextContent("近 1 年");
+  });
+
+  it("renders market volume trend card within AIndexTab", () => {
+    render(
+      <MemoryRouter initialEntries={["/market?tab=a-index"]}>
+        <AIndexTab />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("A股全市场成交额走势")).toBeInTheDocument();
+    expect(screen.getByText("沪深北全市场合计")).toBeInTheDocument();
   });
 });

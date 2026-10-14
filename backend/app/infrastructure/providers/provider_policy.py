@@ -4,7 +4,11 @@ import httpx
 import requests
 from curl_cffi.requests import exceptions as curl_errors
 
-from app.core.exceptions import UpstreamRateLimitedError, UpstreamUnavailableError
+from app.core.exceptions import (
+    UpstreamEmptyResponseError,
+    UpstreamRateLimitedError,
+    UpstreamUnavailableError,
+)
 
 
 class ProviderErrorCategory(StrEnum):
@@ -25,6 +29,10 @@ def classify_provider_error(exc: Exception) -> ProviderErrorCategory:
     if isinstance(exc, UpstreamRateLimitedError):
         # 上游明确按频率拒绝，等待退避后重试可恢复。
         return ProviderErrorCategory.RATE_LIMIT
+    if isinstance(exc, UpstreamEmptyResponseError):
+        # 成功响应但内容不可用：按 IP 限流时上游常返回 200 + 空体。归为瞬时故障，
+        # 熔断器才会计数并在持续空返回时打开，而不是每次都重跑整条降级链。
+        return ProviderErrorCategory.TRANSIENT
     if isinstance(exc, (requests.Timeout, httpx.TimeoutException, curl_errors.Timeout, TimeoutError)):
         return ProviderErrorCategory.TIMEOUT
     if isinstance(exc, (requests.HTTPError, httpx.HTTPStatusError, curl_errors.HTTPError)):

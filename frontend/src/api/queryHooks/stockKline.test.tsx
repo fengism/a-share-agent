@@ -2,7 +2,7 @@ import type { PropsWithChildren } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { apiGet } from "../client";
+import { apiGet, API_TIMEOUTS } from "../client";
 import { queryKeys } from "../queryKeys";
 import { useKlineData } from "./stock";
 
@@ -72,5 +72,14 @@ describe("useKlineData live refresh", () => {
       queryKey: queryKeys.stock.kline("600519", "daily", "qfq", "20260102", "20260105"),
     })?.options as { refetchInterval?: unknown } | undefined;
     expect(options?.refetchInterval).not.toBe(60_000);
+  });
+
+  it("requests kline data with external timeout budget", () => {
+    renderKline();
+    expect(apiGet).toHaveBeenCalledWith(
+      "/stock/600519/kline",
+      expect.objectContaining({ period: "daily", adjust: "qfq" }),
+      { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    );
   });
 });

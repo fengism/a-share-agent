@@ -35,6 +35,7 @@ import type {
   CommoditiesResponse,
   CustomsTradeDataResponse,
   MarketIndices,
+  MarketVolumeResponse,
   NewsAnalysis,
   SgeGoldResponse,
   ThsHotPlate,
@@ -59,6 +60,33 @@ export function useMarketIndices() {
   const isTradingSession = useAStockTradingSession();
   return useQuery(marketIndicesQueryOptions(
     isTradingSession ? QUERY_CACHE_POLICIES.marketIndices.pollMs : false,
+  ));
+}
+
+export function marketVolumeQueryOptions(
+  startDate = "",
+  endDate = "",
+  refetchInterval: number | false = false,
+) {
+  return queryOptions({
+    queryKey: queryKeys.market.volume(startDate, endDate),
+    queryFn: () => openApiGet("/api/market/volume", {
+      query: { start_date: startDate, end_date: endDate },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<MarketVolumeResponse>(),
+    staleTime: QUERY_CACHE_POLICIES.marketVolume.staleMs,
+    refetchInterval,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useMarketVolume(startDate = "", endDate = "") {
+  const isTradingSession = useAStockTradingSession();
+  return useQuery(marketVolumeQueryOptions(
+    startDate,
+    endDate,
+    isTradingSession ? QUERY_CACHE_POLICIES.marketVolume.pollMs : false,
   ));
 }
 

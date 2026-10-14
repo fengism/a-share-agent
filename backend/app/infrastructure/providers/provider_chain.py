@@ -8,6 +8,24 @@ from app.infrastructure.providers.provider_gateway import provider_gateway
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
+_MAX_LOGGED_ERROR_CHARS = 300
+
+
+def _error_detail(error: Exception) -> str:
+    """Render the real upstream failure so a chain log is actionable.
+
+    ``ProviderAttempt.on_error`` is a static human-facing hint ("腾讯实时行情不可用"):
+    useful context, but useless for telling a 403 apart from a 404 or a malformed
+    response. Log the actual exception as ``message`` and keep the hint as ``hint``.
+    Bound the length and collapse newlines so one failure stays one log line.
+    """
+    detail = " ".join(str(error).split())
+    if not detail:
+        return type(error).__name__
+    if len(detail) > _MAX_LOGGED_ERROR_CHARS:
+        return detail[:_MAX_LOGGED_ERROR_CHARS] + "..."
+    return detail
+
 
 @dataclass(frozen=True)
 class ProviderAttempt(Generic[T]):
@@ -96,11 +114,12 @@ class BaseProviderChain(Generic[T]):
                     )
                 )
                 logger.info(
-                    "provider attempt failed: label=%s, elapsed_ms=%.2f, error_type=%s, message=%s",
+                    "provider attempt failed: label=%s, elapsed_ms=%.2f, error_type=%s, hint=%s, message=%s",
                     attempt.label,
                     elapsed_ms,
                     type(exc).__name__,
                     attempt.on_error or "",
+                    _error_detail(exc),
                 )
                 continue
 

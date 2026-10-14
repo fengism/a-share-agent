@@ -10436,7 +10436,7 @@ export interface components {
                 [key: string]: string;
             };
             /** Unavailable Markets */
-            unavailable_markets?: ("shanghai" | "shenzhen")[];
+            unavailable_markets?: ("shanghai" | "shenzhen" | "beijing")[];
         };
         /** MarketVolumeSeriesItem */
         MarketVolumeSeriesItem: {

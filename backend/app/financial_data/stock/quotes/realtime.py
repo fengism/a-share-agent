@@ -16,7 +16,7 @@ from app.core.concurrency.rate_limiter import (
     tdx_semaphore,
     tencent_semaphore,
 )
-from app.core.exceptions import UpstreamUnavailableError
+from app.core.exceptions import UpstreamEmptyResponseError, UpstreamUnavailableError
 from app.core.market import normalize_code, safe_float
 from app.core.metrics import metrics
 from app.financial_data.stock.quotes.realtime_cache import (
@@ -67,7 +67,10 @@ async def _load_quote_source(source: str, fetcher, codes: list[str], *, semaphor
         if code in requested_codes and isinstance(quote, dict) and _has_usable_price(quote)
     }
     if not usable_quotes:
-        raise ValueError(f"{source} 未返回有效实时行情")
+        # 用 UpstreamEmptyResponseError 而非 ValueError：上游返回 200 但没有可用行情
+        # （腾讯被按 IP 限流时就是 v_sh600519="";），属于瞬时故障。若归为 permanent，
+        # ProviderCircuitBreaker 会重置计数，熔断器永远打不开。
+        raise UpstreamEmptyResponseError(f"{source} 未返回有效实时行情")
     return RealtimeQuoteSet(
         source=source,
         quotes=usable_quotes,

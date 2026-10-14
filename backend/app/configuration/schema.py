@@ -228,6 +228,12 @@ class Settings(BaseSettings):
     provider_retry_jitter_seconds: float = 0.1
 
     tdxhub_timeout_seconds: float = Field(default=5.0, gt=0)
+    # 客户端重建失败的冷却窗口。SDK 每次重建都会全量探测候选行情服务器，
+    # 冷却期内快速失败可避免故障期间反复付出探测代价；到期后自动重新探测，
+    # 恢复的服务器会自然重新参与，因此该值只影响恢复延迟、不影响可用性。
+    tdxhub_rebuild_cooldown_seconds: float = Field(default=30.0, ge=0, le=600)
+    # 后台 TDX 行情服务器测速任务的执行周期。
+    tdxhub_bestip_refresh_seconds: float = Field(default=1800.0, gt=0, le=86400)
     sina_hq_page_workers: int = Field(default=4, ge=1, le=8)
     # 单次历史资金流备选查询的总 I/O 预算（包含连接、分页和逐日聚合）。
     tdxhub_fund_flow_timeout_seconds: float = Field(default=60.0, gt=0, le=90)

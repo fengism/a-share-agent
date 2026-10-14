@@ -70,12 +70,14 @@ export default function SgeGoldTab() {
     tooltip: {
       trigger: "axis",
       axisPointer: { type: "cross" },
-      formatter: (params: Array<{ axisValue: string; data: number[] }>) => {
+      formatter: (params: Array<{ axisValue?: string; name?: string; data: number[] }>) => {
         const point = params[0];
         if (!point) return "";
-        const [open, close, low, high] = point.data;
+        const raw = Array.isArray(point.data) ? point.data : [];
+        const [open, close, low, high] = raw.length >= 5 ? raw.slice(1) : raw;
+        const title = point.axisValue || point.name || "";
         return [
-          point.axisValue,
+          title,
           `开盘：${formatPrice(open)}`,
           `收盘：${formatPrice(close)}`,
           `最低：${formatPrice(low)}`,
@@ -242,6 +244,7 @@ export default function SgeGoldTab() {
               <ReactECharts
                 echarts={echarts}
                 className="sge-gold-chart__canvas"
+                style={{ height: 430, width: "100%" }}
                 option={chartOption}
                 notMerge
                 lazyUpdate

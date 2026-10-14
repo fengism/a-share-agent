@@ -12,7 +12,7 @@ class MarketVolumeSeriesItem(BaseModel):
 class MarketVolumeResponse(BaseModel):
     items: list[MarketVolumeSeriesItem] = Field(default_factory=list)
     partial: bool = False
-    unavailable_markets: list[Literal["shanghai", "shenzhen"]] = Field(default_factory=list)
+    unavailable_markets: list[Literal["shanghai", "shenzhen", "beijing"]] = Field(default_factory=list)
     market_sources: dict[str, str] = Field(default_factory=dict)
     source_apis: dict[str, str] = Field(default_factory=dict)
 

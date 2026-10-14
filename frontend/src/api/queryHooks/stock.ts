@@ -55,6 +55,7 @@ export function useStockChipDistribution(code: string) {
     queryKey: queryKeys.stock.chipDistribution(code),
     queryFn: () => openApiGet("/api/stock/{code}/chip-distribution", {
       path: { code },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<ChipDistribution>(),
     enabled: !!code,
@@ -99,6 +100,7 @@ export function useKlineData(
     queryFn: () => openApiGet("/api/stock/{code}/kline", {
       path: { code },
       query: { period, adjust: adjustParam, start_date: startDate, end_date: endDate },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<KlineData>(),
     enabled: enabled && !!code,

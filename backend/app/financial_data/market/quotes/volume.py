@@ -17,9 +17,9 @@ from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
-# 上证指数 + 深证成指
-_INDEX_SYMBOLS = ("000001", "399001")
-_INDEX_MARKETS = {"000001": "shanghai", "399001": "shenzhen"}
+# 上证指数 + 深证成指 + 北证50（对齐同花顺全市场成交额口径）
+_INDEX_SYMBOLS = ("000001", "399001", "899050")
+_INDEX_MARKETS = {"000001": "shanghai", "399001": "shenzhen", "899050": "beijing"}
 _market_volume_singleflight: AsyncSingleFlight[MarketVolumeResponse] = AsyncSingleFlight()
 
 
@@ -72,10 +72,10 @@ async def _load_market_volume(
 
 
 async def get_market_volume(start_date: str = "", end_date: str = "") -> MarketVolumeResponse:
-    """获取沪深两市合计成交量，并显式标记缺失市场。
+    """获取沪深北全市场合计成交量，对齐同花顺全A成交额口径，并显式标记缺失市场。
 
-    通过 get_index_kline 分别获取上证指数和深证成指的日K数据，
-    按日期聚合两市的成交量和成交额总和。
+    通过 get_index_kline 分别获取上证指数、深证成指与北证50的日K数据，
+    按日期聚合全市场的成交量和成交额总和。
 
     Param:
         start_date: 起始日期，留空默认一年前
@@ -131,7 +131,7 @@ async def get_market_volume_stats(
 ) -> MarketVolume:
     """获取指定日期（或最新交易日）的市场成交额，并计算前一日、20日均值与60日均值。
 
-    结合历史指数日K聚合序列（上证+深证）计算严格的前一日成交额、20日成交额移动平均与60日成交额移动平均。
+    结合历史指数日K聚合序列（上证+深证+北交所）计算严格的前一日成交额、20日成交额移动平均与60日成交额移动平均。
     若启用实时模式且同花顺分时/日级快照可用，则优先采用实时快照的当日成交额并补充完整均线维度。
     """
     if target_date is None:

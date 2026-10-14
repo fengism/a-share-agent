@@ -63,18 +63,39 @@ class TdxhubUnavailableError(TdxhubError, ConnectionError):
     pass
 
 
+_RECONNECT_ERRORS = (TdxhubConnectionError, ConnectionError, OSError, TimeoutError)
+
+
 class SharedTdxhubQuotes:
     """进程内共享的 tdxhub 行情客户端。
 
     TDX 底层 TCP 客户端非线程安全，所有调用经统一锁串行化（上游
-    tdx_semaphore 已将并发限制为 2，串行化与原 tdx-api 池大小 1 相当）；
-    连接类异常时重建客户端并重试一次。
+    tdx_semaphore 已将并发限制为 2，串行化与原 tdx-api 池大小 1 相当）。
+
+    客户端重建是昂贵操作：SDK 构造函数会并发探测 ``SERVER.HQ`` 里的全部候选
+    行情服务器且没有短路（``tdxhub.quotes._probe_quote_endpoints``），上游不可用
+    时单次重建可达数十秒。若放任每个失败请求都各自重建，故障期间会形成"探测风暴"：
+    N 个并发失败各自付出一次全量探测。这里做两件事收敛它：
+
+    1. 重建走 single-flight（``_rebuild_lock``）：同一时刻只有一次探测在跑，
+       排队的调用等待后直接复用重建结果，而不是各自重探；
+    2. 重建失败进入冷却窗口：窗口内直接快速失败并让调用方降级到下一个 provider，
+       而不是继续排队等待下一次昂贵的探测。
+
+    注意仍需等待 single-flight 的调用方是等"一次"探测而非"自己的"探测，且这一次
+    探测不占用 ``_lock``；``reset()`` / ``is_cooling_down()`` 等运维入口不会被探测
+    阻塞。
+
+    冷却只缓存**时间窗**、不缓存失效 IP 黑名单：冷却到期后的下一次请求会重新
+    全量探测，届时恢复的服务器自然重新参与竞争，因此不存在"IP 被移除后挪不回来"。
     """
 
     def __init__(self, settings_provider: Callable[[], Any] = get_settings):
         self._settings_provider = settings_provider
         self._lock = threading.Lock()
+        self._rebuild_lock = threading.Lock()
         self._client = None
+        self._blocked_until = 0.0
 
     def _new_client(self):
         timeout = float(self._settings_provider().tdxhub_timeout_seconds)
@@ -86,28 +107,77 @@ class SharedTdxhubQuotes:
 
         return self._invoke_with_retry(invoke)
 
+    def is_cooling_down(self) -> bool:
+        """当前是否处于重建冷却期。"""
+        return time.monotonic() < self._blocked_until
+
+    def cooldown_remaining_seconds(self) -> float:
+        """距离冷却结束的剩余秒数。"""
+        return max(0.0, self._blocked_until - time.monotonic())
+
+    def _reject_if_cooling_down(self) -> None:
+        if self.is_cooling_down():
+            raise TdxhubUnavailableError(
+                f"TDX 行情服务器处于重建冷却期，剩余 {self.cooldown_remaining_seconds():.1f}s"
+            )
+
     def _invoke_with_retry(self, invoke: Callable[[Any], Any]) -> Any:
+        self._reject_if_cooling_down()
         with self._lock:
-            if self._client is None:
-                self._client = self._acquire_client()
+            client = self._client
+            if client is not None:
+                try:
+                    return invoke(client)
+                except _RECONNECT_ERRORS as exc:
+                    logger.warning("tdxhub 连接异常，重建客户端后重试: %s", exc)
+                    self._client = None
+        # 重建在串行锁之外：SDK 构造时的全量服务器探测可能耗时数十秒，持锁探测会
+        # 让 reset()/is_cooling_down() 等入口一并阻塞。并发调用在这里排队，
+        # 由 single-flight 保证只有一次探测，其余人复用重建结果。
+        return invoke(self._rebuild())
+
+    def _rebuild(self):
+        with self._rebuild_lock:
+            if self._client is not None:
+                # 并发失败时，其它线程已完成重建，直接复用。
+                return self._client
+            # 排队等待 single-flight 期间，前一个线程可能已探测失败并进入冷却。
+            # 此处复查才能保证"一轮故障只做一次全量探测"；只在调用入口检查会漏掉
+            # 这个窗口，导致后续线程逐个重复付出探测代价。
+            self._reject_if_cooling_down()
             try:
-                return invoke(self._client)
-            except (TdxhubConnectionError, ConnectionError, OSError, TimeoutError) as exc:
-                logger.warning("tdxhub 连接异常，重建客户端后重试: %s", exc)
-                self._client = None
-                self._client = self._acquire_client()
-                return invoke(self._client)
+                client = self._acquire_client()
+            except Exception:
+                self._enter_cooldown()
+                raise
+            with self._lock:
+                self._client = client
+            return client
+
+    def _cooldown_seconds(self) -> float:
+        settings = self._settings_provider()
+        return max(
+            0.0,
+            float(getattr(settings, "tdxhub_rebuild_cooldown_seconds", 30.0)),
+        )
+
+    def _enter_cooldown(self) -> None:
+        self._blocked_until = time.monotonic() + self._cooldown_seconds()
 
     def _acquire_client(self):
         try:
             return self._new_client()
-        except (TdxhubConnectionError, ConnectionError, OSError, TimeoutError) as exc:
+        except _RECONNECT_ERRORS as exc:
             raise TdxhubUnavailableError("TDX 行情服务器连接不可用") from exc
 
     def reset(self) -> None:
         """丢弃当前客户端，下次调用时重建，供异常恢复与测试隔离使用。"""
         with self._lock:
             self._client = None
+
+    def clear_cooldown(self) -> None:
+        """提前结束重建冷却，供后台测速任务主动尝试恢复链路。"""
+        self._blocked_until = 0.0
 
 
 shared_tdxhub_quotes = SharedTdxhubQuotes()
@@ -400,7 +470,13 @@ class TdxhubDataProvider:
             start=0,
             offset=offset,
         )
-        return self._format_index_kline_df(raw_df, start_date=start_date, end_date=end_date, volume_multiplier=100)
+        # 指数与个股的原始 vol 量纲不同：个股 bars_all 的 vol 是「手」，而指数
+        # bars 的 vol 是「万手」。都要统一到「股」，因此这里的系数是个股路径的
+        # 100 倍。系数用错会让指数成交量与成交额不自洽（amount/volume 偏离
+        # 成分股均价三个数量级），并与腾讯指数链相差 100 倍。
+        return self._format_index_kline_df(
+            raw_df, start_date=start_date, end_date=end_date, volume_multiplier=10_000,
+        )
 
     def fetch_stock_bars(self, code: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:
         """通过通达信底层原始 bars 接口获取个股 K 线（轻量直接查询）。

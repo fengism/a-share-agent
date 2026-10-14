@@ -10,6 +10,7 @@ import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useColors, useTokens } from "../../styles/ui";
 import type { ThemeColors } from "../../styles/ui";
 import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
+import MarketVolumeCard from "./MarketVolumeCard";
 
 const { Text } = Typography;
 const INDEX_CODES = ["000001", "399001", "399006", "000688", "000300", "000905"] as const;
@@ -255,6 +256,10 @@ export default function AIndexTab() {
           </Card>
         </Col>
       </Row>
+
+      <div style={{ marginTop: t.space[4] }}>
+        <MarketVolumeCard />
+      </div>
 
       <Modal
         title={

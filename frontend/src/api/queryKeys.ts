@@ -48,6 +48,8 @@ export const queryKeys = {
     hsgtFlow: ["hsgtFlow"] as const,
     northboundHistory: (pageSize: number) => ["northboundHistory", pageSize] as const,
     margin: ["marketMargin"] as const,
+    volume: (startDate?: string, endDate?: string) =>
+      ["marketVolume", startDate ?? "", endDate ?? ""] as const,
     nationalTeam: (days: number) => ["nationalTeam", days] as const,
     breadth: ["marketBreadth"] as const,
     priceAnomaly: (pageNo: number, pageSize: number) =>

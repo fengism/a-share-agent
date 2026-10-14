@@ -17,6 +17,17 @@ def _quote_number(value: str, multiplier: float = 1) -> float | None:
     return number * multiplier if number is not None else None
 
 
+def _volume_to_shares(code: str) -> int:
+    """腾讯日线成交量换算成「股」所需的系数。
+
+    实测各板块原始量纲并不一致（2026-10-13 同一根 bar，用 amount/volume 反推均价
+    即可判定）：沪 600519、深 000001、创业板 300750、北交所 920002 的原始值是「手」，
+    需要 ×100；而科创板 688981/688111/688036 与科创 CDR 689009 的原始值已经是「股」，
+    再乘 100 会偏大 100 倍。
+    """
+    return 1 if code.startswith(("688", "689")) else 100
+
+
 class TencentDataProvider:
     """Purpose: 对接腾讯财经代理接口的 K线、概念板块、行情快照、板块涨跌排行数据提供器。"""
 
@@ -107,9 +118,12 @@ class TencentDataProvider:
         big_df["close"] = pd.to_numeric(big_df["close"], errors="coerce")
         big_df["high"] = pd.to_numeric(big_df["high"], errors="coerce")
         big_df["low"] = pd.to_numeric(big_df["low"], errors="coerce")
-        # 腾讯日线 volume 单位为手、amount 单位为万元；统一为股和元。
-        big_df["volume"] = pd.to_numeric(big_df["volume"], errors="coerce") * 100
+        # 腾讯日线 amount 单位为万元；统一为元。
         big_df["amount"] = pd.to_numeric(big_df["amount"], errors="coerce") * 10000
+        # 腾讯按板块返回不同量纲的成交量：科创板（688 主板、689 CDR）的原始值已经是
+        # 「股」，沪/深主板、创业板、北交所则是「手」。一律乘 100 会让科创板成交量
+        # 偏大 100 倍——成交额不变，隐含均价会被压到 1 元量级。
+        big_df["volume"] = pd.to_numeric(big_df["volume"], errors="coerce") * _volume_to_shares(sym.raw)
         big_df["turnover_pct"] = pd.to_numeric(big_df["turnover_pct"], errors="coerce")
         big_df = big_df.dropna(subset=["date"]).drop_duplicates(ignore_index=True)
         big_df = big_df.sort_values("date")
@@ -148,7 +162,12 @@ class TencentDataProvider:
         elif raw_symbol.startswith(("sh", "sz", "bj")):
             qq_sym = raw_symbol
         else:
-            market_prefix = "sh" if raw_symbol.startswith(("000", "688", "1")) else "sz"
+            if raw_symbol.startswith(("8", "4", "92")):
+                market_prefix = "bj"
+            elif raw_symbol.startswith(("000", "688", "1")):
+                market_prefix = "sh"
+            else:
+                market_prefix = "sz"
             qq_sym = f"{market_prefix}{raw_symbol}"
 
         normalized_start = start_date.replace("-", "")
@@ -181,14 +200,27 @@ class TencentDataProvider:
         if big_df.empty:
             return pd.DataFrame()
 
-        big_df = big_df.iloc[:, :6].copy()
-        big_df.columns = ["date", "open", "close", "high", "low", "volume"]
+        # 指数行结构与个股一致：[date, open, close, high, low, volume, {}, ratio, amount, {}, {}]。
+        # 成交额在 index 8（单位万元），与个股同一个位置——早期只取前 6 列把成交额丢掉了，
+        # 导致走腾讯链时 KlineItem.amount 恒为 0。ratio 对个股是换手率、对指数含义不同，
+        # 统一丢弃避免误标。
+        big_df = big_df.iloc[:, :10].copy()
+        big_df.columns = [
+            "date", "open", "close", "high", "low", "volume", "field_1", "field_2",
+            "amount", "field_3",
+        ]
+        del big_df["field_1"]
+        del big_df["field_2"]
+        del big_df["field_3"]
         big_df["date"] = pd.to_datetime(big_df["date"], errors="coerce")
         big_df["open"] = pd.to_numeric(big_df["open"], errors="coerce")
         big_df["close"] = pd.to_numeric(big_df["close"], errors="coerce")
         big_df["high"] = pd.to_numeric(big_df["high"], errors="coerce")
         big_df["low"] = pd.to_numeric(big_df["low"], errors="coerce")
+        # 指数成交量各板块一致为「手」（与个股的 _volume_to_shares 分支不同）。
         big_df["volume"] = pd.to_numeric(big_df["volume"], errors="coerce") * 100
+        # 腾讯日线 amount 单位为万元；统一为元。
+        big_df["amount"] = pd.to_numeric(big_df["amount"], errors="coerce") * 10000
         big_df = big_df.dropna(subset=["date"]).drop_duplicates(ignore_index=True)
         big_df = big_df.sort_values("date")
         big_df = big_df[(big_df["date"] >= pd.to_datetime(normalized_start)) & (big_df["date"] <= pd.to_datetime(normalized_end))]
@@ -202,6 +234,7 @@ class TencentDataProvider:
                 "high": "最高",
                 "low": "最低",
                 "volume": "成交量",
+                "amount": "成交额",
             },
         )
 

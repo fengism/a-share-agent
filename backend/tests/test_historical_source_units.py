@@ -27,8 +27,8 @@ def test_unadjusted_daily_source_order(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     attempts = _historical_source_attempts("600519", "daily", "20260901", "20260930", "")
     assert [attempt.label for attempt in attempts] == [
-        "TDX 复权K线",
         "腾讯财经复权K线",
+        "TDX 复权K线",
         "AkShare 新浪复权K线",
         "东方财富不复权K线直连（fallback）",
         "新浪历史K线直连（fallback）",

@@ -14936,7 +14936,8 @@
             "items": {
               "enum": [
                 "shanghai",
-                "shenzhen"
+                "shenzhen",
+                "beijing"
               ],
               "type": "string"
             },

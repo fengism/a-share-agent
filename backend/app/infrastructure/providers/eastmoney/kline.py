@@ -73,7 +73,7 @@ class KlineMixin:
             start_date: 起始日期，格式 "YYYYMMDD"
             end_date: 结束日期，格式 "YYYYMMDD"
         Return:
-            pd.DataFrame: 包含列: 日期, 开盘, 收盘, 最高, 最低, 成交量(总手), 成交额(元), 振幅, 涨跌幅, 涨跌额, 换手率
+            pd.DataFrame: 包含列: 日期, 开盘, 收盘, 最高, 最低, 成交量(股), 成交额(元), 振幅, 涨跌幅, 涨跌额, 换手率
         """
         secid_map = {code: secid for code, _name, secid in INDEX_FALLBACKS}
         secid = secid_map.get(symbol)
@@ -115,5 +115,9 @@ class KlineMixin:
         rows = [item.split(",") for item in lines]
 
         df = pd.DataFrame(rows, columns=["date", "open", "close", "high", "low", "volume", "amount", "amplitude", "change_pct", "change", "turnover_pct"])
-        df["pre_close"] = df["close"].shift(1) 
+        # 与 fetch_kline 保持一致：东财指数 K 线成交量同样是「总手」，统一为股。
+        # 缺这一步会让腾讯指数链（已是股）与东财兜底链相差 100 倍，
+        # 同一接口因命中不同数据源而返回不同量纲的成交量。
+        df["volume"] = pd.to_numeric(df["volume"], errors="coerce") * 100
+        df["pre_close"] = df["close"].shift(1)
         return df

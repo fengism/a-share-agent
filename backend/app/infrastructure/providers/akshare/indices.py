@@ -20,12 +20,18 @@ def fetch_index_kline(
     start_date: str,
     end_date: str,
 ) -> pd.DataFrame:
-    return ak.index_zh_a_hist(
+    frame = ak.index_zh_a_hist(
         symbol=symbol,
         period=period,
         start_date=start_date,
         end_date=end_date,
     )
+    if not frame.empty and "成交量" in frame.columns:
+        # AkShare 东方财富指数日线成交量单位为手；统一为股。与 stock.fetch_stock_kline
+        # 对个股的处理保持一致——否则指数成交量会比腾讯/TDX/东财直连链小 100 倍。
+        frame = frame.copy()
+        frame["成交量"] = pd.to_numeric(frame["成交量"], errors="coerce") * 100
+    return frame
 
 
 def fetch_index_kline_sina(symbol: str) -> pd.DataFrame:
