@@ -110,7 +110,10 @@ def _normalize_actions(code: str, raw: pd.DataFrame) -> tuple[pd.DataFrame, list
     return normalized, actions, hashlib.sha256(encoded.encode()).hexdigest()
 
 
-def _has_price_affecting_actions(actions: pd.DataFrame | None) -> bool:
+def _has_price_affecting_actions(
+    actions: pd.DataFrame | None,
+    trading_dates: list[date] | None = None,
+) -> bool:
     """该股是否存在会引起除权参考价变化的公司行为。
 
     区分"本来就没有公司行为"（因子恒为 1.0 是正确结果）与"上游返回了退化数据"
@@ -118,10 +121,19 @@ def _has_price_affecting_actions(actions: pd.DataFrame | None) -> bool:
     """
     if actions is None or len(actions) == 0:
         return False
+    frame = actions
+    if trading_dates:
+        first_day = min(trading_dates)
+        try:
+            frame = actions[actions.index >= pd.Timestamp(first_day)]
+        except Exception:
+            frame = actions
+    if len(frame) == 0:
+        return False
     for column in _PRICE_AFFECTING_ACTION_COLUMNS:
-        if column not in actions.columns:
+        if column not in frame.columns:
             continue
-        values = pd.to_numeric(actions[column], errors="coerce").fillna(0.0)
+        values = pd.to_numeric(frame[column], errors="coerce").fillna(0.0)
         if bool(values.abs().gt(0).any()):
             return True
     return False
@@ -148,7 +160,7 @@ def _build_factors(
     # 仍是一张结构合法的表，算出来的因子恒为 1.0。上面两条校验都能通过，于是
     # 静默把一份毫无信息量的因子表写进库——直到有人对比复权价时才发现整条曲线
     # 没有任何跳变。这里用"有公司行为 ⇒ 因子必须变化"把它挡在写库之前。
-    if _has_price_affecting_actions(actions):
+    if _has_price_affecting_actions(actions, trading_dates):
         distinct = {
             (round(float(row["qfq_mul"]), 8), round(float(row["qfq_add"]), 8),
              round(float(row["hfq_mul"]), 8), round(float(row["hfq_add"]), 8))
