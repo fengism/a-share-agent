@@ -691,6 +691,9 @@ def _snapshot_path(code: str) -> Path:
     return DATA_DIR / "valuation_snapshots" / f"{code}.json"
 
 
+_VALUATION_SNAPSHOT_SCHEMA_VERSION = 4
+
+
 def _read_disk_snapshot(code: str, *, ignore_date: bool = False) -> ValuationDetail | None:
     path = _snapshot_path(code)
     try:
@@ -698,11 +701,24 @@ def _read_disk_snapshot(code: str, *, ignore_date: bool = False) -> ValuationDet
             return None
         payload = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
+            logger.debug("估值快照结构无效 %s: payload 非对象", code)
+            return None
+        if payload.get("schema_version") != _VALUATION_SNAPSHOT_SCHEMA_VERSION:
+            logger.debug(
+                "估值快照版本过期 %s: expected=%s actual=%s",
+                code,
+                _VALUATION_SNAPSHOT_SCHEMA_VERSION,
+                payload.get("schema_version"),
+            )
+            return None
+        if payload.get("code") not in (None, code):
+            logger.debug("估值快照代码不匹配 %s: %s", code, payload.get("code"))
             return None
         if not ignore_date and payload.get("snapshot_date") != cache_date():
             return None
         data = payload.get("data")
         if not isinstance(data, dict):
+            logger.debug("估值快照缺少 data %s", code)
             return None
         return ValuationDetail.model_validate(data)
     except Exception as error:
@@ -714,6 +730,7 @@ def _write_disk_snapshot(code: str, detail: ValuationDetail) -> None:
     path = _snapshot_path(code)
     try:
         payload = {
+            "schema_version": _VALUATION_SNAPSHOT_SCHEMA_VERSION,
             "snapshot_date": cache_date(),
             "code": code,
             "data": detail.model_dump(),

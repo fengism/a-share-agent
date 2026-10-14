@@ -266,6 +266,7 @@ CREATE TABLE IF NOT EXISTS market_adjustment_factor_state (
 
 _MIGRATION_MANIFEST = {
     1: "baseline_schema",
+    2: "persisted_ohlc_and_hash_backfill",
 }
 
 
@@ -999,14 +1000,19 @@ class MarketDailyBarRepository:
                         )
                 for table in ("market_daily_bars", "market_daily_bar_observations"):
                     columns = _table_columns(connection, table)
-                    for column in ("content_hash", "provenance_hash"):
+                    for column in ("data_hash", "content_hash", "provenance_hash"):
                         if column not in columns:
                             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
                     if "turnover_pct" not in columns:
                         connection.execute(f"ALTER TABLE {table} ADD COLUMN turnover_pct REAL")
+                _migrate_legacy_bar_tables(connection)
+                _migrate_and_drop_legacy_closing_tables(connection)
                 _migrate_allow_hk_corporate_actions_and_factors(connection)
-                _record_migration_ledger(connection, 1)
-                connection.execute("PRAGMA user_version=1")
+                _normalize_persisted_ohlc(connection)
+                _backfill_split_hashes(connection)
+                _deduplicate_business_observations(connection)
+                _record_migration_ledger(connection, 2)
+                connection.execute("PRAGMA user_version=2")
             with _close_lock:
                 _initialized_paths.add(key)
 

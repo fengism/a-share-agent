@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 ALGORITHM_VERSION = f"tdxhub-gbbq-affine-v1-sdk-{tdxhub_version}"
 SINA_ALGORITHM_VERSION = "sina-multiplicative-v1"
 LOCAL_ALGORITHM_VERSIONS = frozenset({ALGORITHM_VERSION, SINA_ALGORITHM_VERSION})
+HK_FACTOR_ALGORITHM_VERSIONS = frozenset({"hk-csv-qfq-affine-v1"})
+ALL_FACTOR_ALGORITHM_VERSIONS = LOCAL_ALGORITHM_VERSIONS | HK_FACTOR_ALGORITHM_VERSIONS
 FACTOR_REFRESH_TTL = timedelta(hours=24)
 FACTOR_FAILURE_RETRY_TTL = timedelta(minutes=5)
 # 读本地复权 K 线时，向 start_date 之前多取的自然日数，仅用于拿到"前一根"做
@@ -240,7 +242,14 @@ def _build_sina_factors(
     return factors, factor_hash
 
 
-def _state_is_fresh(state: dict[str, object] | None, expected_count: int, now: datetime) -> bool:
+def _state_is_fresh(
+    state: dict[str, object] | None,
+    expected_count: int,
+    now: datetime,
+    allowed_versions: frozenset[str] | None = None,
+) -> bool:
+    if allowed_versions is None:
+        allowed_versions = LOCAL_ALGORITHM_VERSIONS
     if state is None or bool(state.get("using_last_good")) or bool(state.get("last_error")):
         return False
     factor_count = state.get("factor_count")
@@ -248,7 +257,7 @@ def _state_is_fresh(state: dict[str, object] | None, expected_count: int, now: d
         normalized_count = int(str(factor_count))
     except (TypeError, ValueError):
         return False
-    if state.get("algorithm_version") not in LOCAL_ALGORITHM_VERSIONS or normalized_count != expected_count:
+    if state.get("algorithm_version") not in allowed_versions or normalized_count != expected_count:
         return False
     try:
         checked_at = datetime.fromisoformat(
@@ -483,13 +492,16 @@ async def get_adjustment_factor_status(code: str, market: str = "cn") -> MarketA
     factor_count = _safe_int(summary.get("factor_count"))
     coverage_complete = bar_count > 0 and factor_count == bar_count
     using_last_good = bool(state_dict.get("using_last_good"))
+    allowed_versions = HK_FACTOR_ALGORITHM_VERSIONS if market == "hk" else LOCAL_ALGORITHM_VERSIONS
     if bar_count == 0 or not state_dict:
         status = "missing"
     elif not coverage_complete:
         status = "incomplete"
     elif using_last_good or state_dict.get("last_error"):
         status = "degraded"
-    elif _state_is_fresh(state_dict, bar_count, datetime.now(UTC)):
+    elif state_dict.get("algorithm_version") not in allowed_versions:
+        status = "degraded"
+    elif _state_is_fresh(state_dict, bar_count, datetime.now(UTC), allowed_versions):
         status = "healthy"
     else:
         status = "stale"

@@ -3,10 +3,10 @@ import math
 import time
 from collections import OrderedDict
 from collections.abc import Iterable
-from datetime import datetime
 from threading import Lock
 from typing import Any
 
+from app.core.market import market_today
 from app.core.metrics import metrics
 
 logger = logging.getLogger(__name__)
@@ -158,7 +158,7 @@ series_cache = TTLCache(maxsize=512, name="series")
 
 def cache_date() -> str:
     """Return today's date in YYYYMMDD format."""
-    return datetime.now().strftime("%Y%m%d")
+    return market_today().strftime("%Y%m%d")
 
 
 def dated_cache_key(*parts: object) -> str:
@@ -173,7 +173,7 @@ def dated_cache_key_no_day(*parts: object) -> str:
 
 def one_year_ago_date() -> str:
     """Return the date one year before today in YYYYMMDD format."""
-    now = datetime.now()
+    now = market_today()
     try:
         previous_year = now.replace(year=now.year - 1)
     except ValueError:
