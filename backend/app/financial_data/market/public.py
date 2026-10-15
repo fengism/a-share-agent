@@ -1,5 +1,7 @@
 """Stable market-wide data capabilities for product modules and Agent tools."""
 
+from app.financial_data.market.macro.analysis import get_macro_analysis
+from app.financial_data.market.macro.feed import get_macro_feed
 from app.financial_data.market.macro.schemas import (
     CommoditiesResponse,
     CrudeOilData,
@@ -8,6 +10,8 @@ from app.financial_data.market.macro.schemas import (
     CustomsTradeDataResponse,
     GlobalMacroRatesResponse,
     MacroAllDataResponse,
+    MacroAnalysisResponse,
+    MacroFeedResponse,
     MacroUsDataResponse,
     SgeGoldHistoryPoint,
     SgeGoldResponse,
@@ -151,6 +155,8 @@ __all__ = [
     "get_industry_rankings",
     "get_macro_all_data",
     "get_macro_data",
+    "get_macro_feed",
+    "get_macro_analysis",
     "get_us_macro_data",
     "invalidate_us_macro_snapshot",
     "prewarm_us_macro_data",
@@ -194,6 +200,8 @@ __all__ = [
     "IndexIntradayItem",
     "MacroAllDataResponse",
     "MacroUsDataResponse",
+    "MacroFeedResponse",
+    "MacroAnalysisResponse",
     "SgeGoldHistoryPoint",
     "SgeGoldResponse",
     "CommoditiesResponse",

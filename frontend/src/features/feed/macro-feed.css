@@ -1,0 +1,360 @@
+/* 资讯页「宏观数据」板块 */
+
+.macro-feed {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.macro-card {
+  min-width: 0;
+  border-radius: var(--c-radius-md, 10px);
+}
+
+/* ── AI 解读 ── */
+.macro-analysis__summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-nested-bg);
+}
+
+.macro-analysis__summary p {
+  margin: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md);
+  line-height: var(--c-leading-relaxed);
+}
+
+.macro-analysis__warning {
+  margin-bottom: 10px;
+  font-size: var(--c-font-sm);
+}
+
+.macro-analysis__signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.macro-signal {
+  margin-inline-end: 0;
+}
+
+.macro-impact {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: var(--c-font-xs);
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.macro-impact.is-up {
+  color: var(--c-up);
+  background: color-mix(in srgb, var(--c-up) 14%, transparent);
+}
+
+.macro-impact.is-down {
+  color: var(--c-down);
+  background: color-mix(in srgb, var(--c-down) 14%, transparent);
+}
+
+.macro-impact.is-flat {
+  color: var(--c-text-secondary);
+  background: var(--c-nested-bg);
+}
+
+/* ── 事件时间轴 ── */
+.macro-timeline {
+  position: relative;
+  margin: 0;
+  padding: 4px 0 0 0;
+  list-style: none;
+}
+
+.macro-timeline__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 10px;
+  padding-bottom: 14px;
+}
+
+.macro-timeline__item::before {
+  position: absolute;
+  top: 6px;
+  bottom: -2px;
+  left: 51px;
+  width: 1px;
+  content: "";
+  background: var(--c-border);
+}
+
+.macro-timeline__item:last-child::before {
+  display: none;
+}
+
+.macro-timeline__date {
+  padding-top: 1px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  text-align: right;
+}
+
+.macro-timeline__body {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 12px;
+}
+
+.macro-timeline__body::before {
+  position: absolute;
+  top: 6px;
+  left: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  content: "";
+  background: var(--c-primary);
+}
+
+.macro-timeline__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.macro-timeline__tag {
+  margin-inline-end: 0;
+  font-size: var(--c-font-xs);
+}
+
+.macro-timeline__title {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md);
+  font-weight: 500;
+  line-height: var(--c-leading-normal);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+a.macro-timeline__title:hover {
+  color: var(--c-primary);
+}
+
+.macro-timeline__interpretation {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-sm);
+  line-height: var(--c-leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+/* ── 利率 ── */
+.macro-rates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 10px;
+}
+
+.macro-rate {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-nested-bg);
+}
+
+.macro-rate__label {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs);
+}
+
+.macro-rate__value {
+  color: var(--c-text-primary);
+  font-size: var(--c-font-xl, 22px);
+  line-height: 1.2;
+}
+
+.macro-rate__value small {
+  margin-left: 2px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+  font-weight: 400;
+}
+
+.macro-rate__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.macro-rate__change.is-up {
+  color: var(--c-up);
+}
+
+.macro-rate__change.is-down {
+  color: var(--c-down);
+}
+
+/* ── 列表 ── */
+.macro-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+
+.macro-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.macro-list__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--c-border);
+}
+
+.macro-list__item:last-child {
+  border-bottom: 0;
+}
+
+.macro-list__title {
+  min-width: 0;
+  color: var(--c-text-primary);
+  font-size: var(--c-font-md);
+  line-height: var(--c-leading-normal);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.macro-list__title:hover {
+  color: var(--c-primary);
+}
+
+.macro-list__icon {
+  margin-left: 6px;
+  font-size: 10px;
+  color: var(--c-text-muted);
+}
+
+.macro-list__date {
+  flex: 0 0 auto;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-xs);
+}
+
+.macro-empty {
+  padding: 16px 0;
+  color: var(--c-text-muted);
+  font-size: var(--c-font-sm);
+  text-align: center;
+}
+
+.macro-more {
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 0;
+  border: 1px dashed var(--c-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--c-primary);
+  font-size: var(--c-font-sm);
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+
+.macro-more:hover {
+  background: var(--c-nested-bg);
+}
+
+@media (max-width: 575px) {
+  .macro-feed {
+    gap: 12px;
+  }
+
+  .macro-card .ant-card-head {
+    min-height: 40px;
+    padding: 0 12px;
+  }
+
+  .macro-card .ant-card-head-title {
+    font-size: var(--c-font-md);
+  }
+
+  .macro-card .ant-card-body {
+    padding: 12px;
+  }
+
+  .macro-analysis__summary {
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+
+  .macro-analysis__summary p {
+    font-size: var(--c-font-sm);
+  }
+
+  .macro-analysis__signals {
+    margin-bottom: 10px;
+  }
+
+  .macro-rates {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+  }
+
+  .macro-rate {
+    padding: 8px 10px;
+  }
+
+  .macro-rate__value {
+    font-size: var(--c-font-lg, 18px);
+  }
+
+  .macro-list__item {
+    gap: 8px;
+    padding: 6px 0;
+  }
+
+  .macro-list__title {
+    font-size: var(--c-font-sm);
+  }
+
+  .macro-timeline__item {
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 8px;
+    padding-bottom: 12px;
+  }
+
+  .macro-timeline__item::before {
+    left: 42px;
+  }
+
+  .macro-timeline__title {
+    font-size: var(--c-font-sm);
+  }
+
+  .macro-timeline__interpretation {
+    font-size: var(--c-font-xs);
+  }
+}

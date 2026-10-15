@@ -9,6 +9,8 @@ from app.financial_data.market.public import (
     CustomsTradeDataResponse,
     GlobalMacroRatesResponse,
     MacroAllDataResponse,
+    MacroAnalysisResponse,
+    MacroFeedResponse,
     MacroUsDataResponse,
     SgeGoldResponse,
     TreasuryYieldsResponse,
@@ -23,6 +25,8 @@ from app.financial_data.market.public import (
     get_global_macro_rates as get_global_macro_rates_service,
 )
 from app.financial_data.market.public import get_macro_all_data as get_macro_all_data_service
+from app.financial_data.market.public import get_macro_analysis as get_macro_analysis_service
+from app.financial_data.market.public import get_macro_feed as get_macro_feed_service
 from app.financial_data.market.public import get_sge_gold_history as get_sge_gold_history_service
 from app.financial_data.market.public import (
     get_treasury_yield_curve as get_treasury_yield_curve_service,
@@ -40,6 +44,22 @@ async def get_macro_all(
     """获取全量宏观经济指标数据。"""
     logger.info("获取全量宏观数据 force_refresh=%s", force_refresh)
     return await get_macro_all_data_service(force_refresh=force_refresh)
+
+
+@router.get("/feed", response_model=MacroFeedResponse)
+async def get_macro_feed(
+    days: int = Query(31, ge=1, le=180, description="回溯自然日天数"),
+):
+    """获取资讯页宏观数据：统计局最新发布、央行新闻/政策解读与利率。"""
+    return await get_macro_feed_service(days=days)
+
+
+@router.get("/analysis", response_model=MacroAnalysisResponse)
+async def get_macro_analysis(
+    days: int = Query(31, ge=1, le=180, description="回溯自然日天数"),
+):
+    """获取宏观 AI 解读：综述与按时间梳理的事件系列（历史条目走缓存）。"""
+    return await get_macro_analysis_service(days=days)
 
 
 @router.get("/us", response_model=MacroUsDataResponse)

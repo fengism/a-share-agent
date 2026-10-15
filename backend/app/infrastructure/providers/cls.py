@@ -26,6 +26,13 @@ _CLS_INDUSTRY_RANKINGS_SIGN = "ef1ec7886be706a0b722d7e7bf3c0054"
 _CLS_MARKET_WIND_URL = "https://api3.cls.cn/v2/todayTuyere"
 _CLS_MARKET_WIND_STOCKS_URL = "https://x-quote.cls.cn/v2/quote/a/plate/tuyere/stocks"
 _CLS_MARKET_MAINLINE_URL = "https://api3.cls.cn/v2/dingPan/mainline"
+_CLS_ROLL_LIST_URL = "https://www.cls.cn/v1/roll/get_roll_list"
+_CLS_BASE = "https://www.cls.cn"
+_CLS_WEB_BASE_PARAMS = {
+    "app": "CailianpressWeb",
+    "os": "web",
+    "sv": "8.4.6",
+}
 _CLS_APP_BASE_PARAMS = {
     "app": "cailianpress",
     "sv": "8.7.4",
@@ -170,6 +177,14 @@ def _cls_app_params(**extra: str) -> dict[str, str]:
     serialized = "&".join(f"{key}={value}" for key, value in sorted(params.items()))
     sha1_digest = hashlib.sha1(serialized.encode()).hexdigest()
     params["sign"] = hashlib.md5(sha1_digest.encode()).hexdigest()
+    return params
+
+
+def _cls_web_params(**extra: object) -> dict[str, str]:
+    """生成财联社 web 端查询参数（含 md5(sha1(sorted k=v)) 签名）。"""
+    params = {**_CLS_WEB_BASE_PARAMS, **{key: str(value) for key, value in extra.items()}}
+    serialized = "&".join(f"{key}={value}" for key, value in sorted(params.items()))
+    params["sign"] = hashlib.md5(hashlib.sha1(serialized.encode()).hexdigest().encode()).hexdigest()
     return params
 
 
@@ -637,6 +652,75 @@ class ClsDataProvider:
             "chances": _normalize_mainline_chances(chances),
             "style": _normalize_mainline_style(data.get("styles")),
         }
+
+    def fetch_market_kuaixun(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
+        """获取财联社 7×24 电报快讯。
+
+        Param:
+            code: 可选，股票代码，用于过滤相关新闻
+            code_name: 可选，股票名称，用于过滤相关新闻
+        Return:
+            list[NewsSearchItem]: 快讯列表
+        """
+        response = provider_get(
+            _CLS_ROLL_LIST_URL,
+            params=_cls_web_params(category="", last_time="", rn=50),
+            headers=CLS_HEADERS,
+            timeout=15,
+        )
+        payload = parse_text_json(response)
+        if not isinstance(payload, dict) or payload.get("errno") != 0:
+            message = payload.get("msg") if isinstance(payload, dict) else "响应格式无效"
+            raise RuntimeError(f"财联社电报接口异常: {message or payload}")
+        data = payload.get("data") or {}
+        if not isinstance(data, dict):
+            raise RuntimeError("财联社电报接口返回了无效 data")
+        rows = data.get("roll_data") or []
+        if not isinstance(rows, list):
+            raise RuntimeError("财联社电报接口返回了无效 roll_data")
+        results: list[NewsSearchItem] = []
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            # 跳过广告与已下线/未入流的条目
+            if item.get("is_ad"):
+                continue
+            if item.get("in_roll") not in (None, 1) or item.get("status") not in (None, 1):
+                continue
+            brief = str(item.get("brief") or "").strip()
+            title = str(item.get("title") or "").strip() or brief
+            content = str(item.get("content") or "").strip() or brief
+            # 短电报 brief 与 content 相同，避免前端标题与正文重复展示。
+            if content == title:
+                content = ""
+            if not title and not content:
+                continue
+            if (code_name or code) and not contains_stock_reference(f"{title}\n{content}", code, code_name):
+                continue
+            raw_id = str(item.get("id") or "").strip()
+            url = str(item.get("shareurl") or "").strip() or (f"{_CLS_BASE}/detail/{raw_id}" if raw_id else "")
+            image_url = str(item.get("img") or "").strip()
+            if not image_url:
+                images = item.get("images")
+                if isinstance(images, list):
+                    image_url = next((str(url).strip() for url in images if str(url).strip()), "")
+            if image_url and not image_url.startswith(("http://", "https://")):
+                image_url = ""
+            publish_time = parse_timestamp(item.get("ctime"))
+            results.append(
+                NewsSearchItem(
+                    title=title,
+                    content=content[:500],
+                    source="财联社7×24快讯",
+                    publish_time=publish_time.isoformat(sep=" ") if publish_time else "",
+                    url=url,
+                    author=str(item.get("author") or "").strip(),
+                    read_count=_optional_int(item.get("reading_num")) or 0,
+                    comment_count=_optional_int(item.get("comment_num")) or 0,
+                    image_url=image_url,
+                )
+            )
+        return results
 
     def fetch_market_news(self, code: str = "", code_name: str = "") -> list[NewsSearchItem]:
         """财联社头条新闻。

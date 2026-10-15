@@ -13,6 +13,7 @@ const item = (source: string): FeedNewsItem => ({ source } as unknown as FeedNew
 describe("shared feed helpers", () => {
   it("getSourcePlatform groups by platform", () => {
     expect(getSourcePlatform("财联社快讯")).toBe("7×24 快讯");
+    expect(getSourcePlatform("财联社7×24快讯")).toBe("7×24 快讯");
     expect(getSourcePlatform("东方财富")).toBe("东方财富");
     expect(getSourcePlatform("某未知源")).toBe("其他");
   });

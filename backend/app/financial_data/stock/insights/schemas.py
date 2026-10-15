@@ -123,6 +123,7 @@ class StockBulletinPage(BaseModel):
     page: int = 1
     page_size: int = 10
     total_pages: int = 0
+    source: str = SINA_BULLETIN_SOURCE_ID
     items: list[StockBulletinItem] = Field(default_factory=list)
 
 

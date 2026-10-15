@@ -1193,17 +1193,24 @@ samp {
   align-items: start;
 }
 
-/* 今日主线机会卡片：宽栏下自适应多列，窄屏退回单列 */
+/* 今日主线机会卡片：宽栏下自适应多列，窄屏退回单列。
+   用 min(320px, 100%) 避免网格项 min-content 把列撑出屏幕。 */
 .dashboard-mainline-grid {
   display: grid;
   gap: var(--c-space-3);
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   align-items: stretch;
 }
 
 .dashboard-mainline-card {
+  min-width: 0;
   backdrop-filter: blur(12px);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 卡片内表格作为 grid 子项时，避免 scroll.x 的最小内容宽度把列撑宽 */
+.dashboard-mainline-card .ant-table-wrapper {
+  min-width: 0;
 }
 
 [data-theme="stellar-blue"] .dashboard-mainline-card {
@@ -1542,7 +1549,7 @@ samp {
 
 @media (max-width: 640px) {
   .dashboard-mainline-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .dashboard-section-heading {
     flex-wrap: wrap;

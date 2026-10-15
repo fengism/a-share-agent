@@ -155,6 +155,24 @@ def _finalize_twitter_analysis_snapshots(conn: sqlite3.Connection) -> None:
     )
 
 
+def _add_macro_analysis_cache(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS macro_analysis_cache (
+            cache_key    TEXT PRIMARY KEY,
+            result_json  TEXT NOT NULL,
+            generated_at REAL NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_macro_analysis_cache_generated_at
+        ON macro_analysis_cache(generated_at)
+        """
+    )
+
+
 def _add_user_config_key_index(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_user_config_key ON user_config(key)")
 
@@ -672,6 +690,7 @@ MARKET_MIGRATIONS = (
     Migration(10, "add national team etf tables", _add_national_team_etf_tables),
     Migration(11, "add sector constituent tables", _add_sector_constituent_tables),
     Migration(12, "add national team provenance", _add_national_team_provenance),
+    Migration(13, "add macro analysis cache", _add_macro_analysis_cache),
 )
 
 def _add_stock_concepts_tables(conn: sqlite3.Connection) -> None:

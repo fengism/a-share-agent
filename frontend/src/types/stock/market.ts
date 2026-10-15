@@ -474,6 +474,61 @@ export interface MacroAllData {
   trade: MacroCategory;
 }
 
+export interface MacroFeedItem {
+  id: string;
+  title: string;
+  url: string;
+  published_at: string;
+  source: string;
+}
+
+export interface MacroRateItem {
+  key: string;
+  label: string;
+  value: number | null;
+  unit: string;
+  period: string;
+  change_bp: number | null;
+}
+
+export interface MacroFeed {
+  period_start: string;
+  period_end: string;
+  releases: MacroFeedItem[];
+  policy_news: MacroFeedItem[];
+  policy_readings: MacroFeedItem[];
+  rates: MacroRateItem[];
+  updated_at: string;
+  status: "available" | "partial" | "unavailable";
+  failed_sources: string[];
+}
+
+export interface MacroAnalysisRef {
+  title: string;
+  url: string;
+}
+
+export interface MacroAnalysisEvent {
+  date: string;
+  category: string;
+  title: string;
+  interpretation: string;
+  impact: string;
+  refs: MacroAnalysisRef[];
+}
+
+export interface MacroAnalysis {
+  period: string;
+  summary: string;
+  sentiment: string;
+  events: MacroAnalysisEvent[];
+  policy_signals: string[];
+  degraded: boolean;
+  warning: string;
+  generated_at: string;
+  cached: boolean;
+}
+
 export interface TradingCalendar {
   start_date: string;
   end_date: string;

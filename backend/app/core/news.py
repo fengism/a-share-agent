@@ -223,7 +223,11 @@ def news_sort_key(item) -> datetime:
 
 
 def parse_timestamp(value) -> datetime | None:
-    """Parse Unix seconds or milliseconds into a datetime."""
+    """Parse Unix seconds or milliseconds into a Shanghai-naive datetime.
+
+    资讯管道（``filter_recent_news_items``/``news_sort_key``）统一按北京时间比较，
+    这里显式用上海时区，避免依赖服务器 TZ（容器外或未设置 TZ 时本地时间为 UTC，会偏 8 小时）。
+    """
     if value in (None, "", 0, "0"):
         return None
     try:
@@ -233,6 +237,6 @@ def parse_timestamp(value) -> datetime | None:
     if timestamp > 10**12:
         timestamp /= 1000
     try:
-        return datetime.fromtimestamp(timestamp)
+        return datetime.fromtimestamp(timestamp, tz=SHANGHAI_TIMEZONE).replace(tzinfo=None)
     except (OverflowError, OSError, ValueError):
         return None

@@ -15,6 +15,10 @@ vi.mock("../../features/feed/TwitterFeed", () => ({
   default: ({ searchQuery }: { searchQuery: string }) => <div>Twitter 资讯列表：{searchQuery || "全部"}</div>,
 }));
 
+vi.mock("../../features/feed/MacroFeed", () => ({
+  default: ({ searchQuery }: { searchQuery: string }) => <div>宏观数据列表：{searchQuery || "全部"}</div>,
+}));
+
 function LocationProbe() {
   const location = useLocation();
   return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
@@ -55,5 +59,17 @@ describe("Feed page", () => {
     expect(screen.getByRole("tab", { name: /Twitter 资讯$/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByDisplayValue("科技")).toHaveAttribute("placeholder", "搜索推文标题或内容");
     expect(screen.getByText("Twitter 资讯列表：科技")).toBeInTheDocument();
+  });
+
+  it("exposes a macro data column with its own search", () => {
+    render(
+      <MemoryRouter initialEntries={["/feed?tab=macro&q=CPI"]}>
+        <Feed />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("tab", { name: /宏观数据$/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByDisplayValue("CPI")).toHaveAttribute("placeholder", "搜索宏观数据或政策");
+    expect(screen.getByText("宏观数据列表：CPI")).toBeInTheDocument();
   });
 });

@@ -55,6 +55,7 @@ def _kuaixun_sources() -> list[NewsSource]:
     eastmoney = _get_eastmoney_provider()
     baidu = _get_baidu_provider()
     rss = _get_news_provider()
+    cls = _get_cls_provider()
     return [
         NewsSource(
             "东方财富7×24快讯",
@@ -67,6 +68,12 @@ def _kuaixun_sources() -> list[NewsSource]:
             baidu.fetch_market_kuaixun,
             limit=50,
             api="https://finance.pae.baidu.com/selfselect/expressnews",
+        ),
+        NewsSource(
+            "财联社7×24快讯",
+            cls.fetch_market_kuaixun,
+            limit=50,
+            api="https://www.cls.cn/v1/roll/get_roll_list",
         ),
         NewsSource(
             "华尔街见闻7×24快讯",

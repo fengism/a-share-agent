@@ -28,6 +28,7 @@ fuyao_semaphore = asyncio.Semaphore(2)
 kaipanhong_semaphore = asyncio.Semaphore(1)
 tdx_semaphore = asyncio.Semaphore(2)
 tdxhub_semaphore = tdx_semaphore
+cninfo_semaphore = asyncio.Semaphore(2)
 misc_semaphore = asyncio.Semaphore(4)
 database_semaphore = asyncio.Semaphore(8)
 # 搜索引擎单独限流：百度按 IP + 指纹判定，并发过高会直接返回安全验证空壳页，

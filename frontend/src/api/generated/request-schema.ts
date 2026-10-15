@@ -1625,6 +1625,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/macro/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Macro Analysis
+         * @description 获取宏观 AI 解读：综述与按时间梳理的事件系列（历史条目走缓存）。
+         */
+        get: operations["get_macro_analysis_api_macro_analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/macro/commodities": {
         parameters: {
             query?: never;
@@ -1657,6 +1677,26 @@ export interface paths {
          * @description 获取全国月度进出口总况及静态商品介绍，不含细分商品量价。
          */
         get: operations["get_customs_trade_api_macro_customs_trade_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/macro/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Macro Feed
+         * @description 获取资讯页宏观数据：统计局最新发布、央行新闻/政策解读与利率。
+         */
+        get: operations["get_macro_feed_api_macro_feed_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9079,6 +9119,159 @@ export interface components {
                 [key: string]: components["schemas"]["MacroIndicator"];
             };
         };
+        /**
+         * MacroAnalysisEvent
+         * @description 按时间梳理的宏观事件。
+         */
+        MacroAnalysisEvent: {
+            /**
+             * Category
+             * @default
+             */
+            category?: string;
+            /**
+             * Date
+             * @default
+             */
+            date?: string;
+            /**
+             * Impact
+             * @default
+             */
+            impact?: string;
+            /**
+             * Interpretation
+             * @default
+             */
+            interpretation?: string;
+            /** Refs */
+            refs?: components["schemas"]["MacroAnalysisRef"][];
+            /**
+             * Title
+             * @default
+             */
+            title?: string;
+        };
+        /** MacroAnalysisRef */
+        MacroAnalysisRef: {
+            /**
+             * Title
+             * @default
+             */
+            title?: string;
+            /**
+             * Url
+             * @default
+             */
+            url?: string;
+        };
+        /**
+         * MacroAnalysisResponse
+         * @description 宏观解读：综述 + 事件系列。
+         */
+        MacroAnalysisResponse: {
+            /**
+             * Cached
+             * @default false
+             */
+            cached?: boolean;
+            /**
+             * Degraded
+             * @default false
+             */
+            degraded?: boolean;
+            /** Events */
+            events?: components["schemas"]["MacroAnalysisEvent"][];
+            /**
+             * Generated At
+             * @default
+             */
+            generated_at?: string;
+            /**
+             * Period
+             * @default
+             */
+            period?: string;
+            /** Policy Signals */
+            policy_signals?: string[];
+            /**
+             * Sentiment
+             * @default 中性
+             */
+            sentiment?: string;
+            /**
+             * Summary
+             * @default
+             */
+            summary?: string;
+            /**
+             * Warning
+             * @default
+             */
+            warning?: string;
+        };
+        /**
+         * MacroFeedItem
+         * @description 宏观资讯条目（统计局发布 / 央行新闻 / 政策解读）。
+         */
+        MacroFeedItem: {
+            /** Id */
+            id: string;
+            /**
+             * Published At
+             * @default
+             */
+            published_at?: string;
+            /**
+             * Source
+             * @default
+             */
+            source?: string;
+            /** Title */
+            title: string;
+            /**
+             * Url
+             * @default
+             */
+            url?: string;
+        };
+        /**
+         * MacroFeedResponse
+         * @description 资讯页「宏观数据」板块的数据聚合结果。
+         */
+        MacroFeedResponse: {
+            /** Failed Sources */
+            failed_sources?: string[];
+            /**
+             * Period End
+             * @default
+             */
+            period_end?: string;
+            /**
+             * Period Start
+             * @default
+             */
+            period_start?: string;
+            /** Policy News */
+            policy_news?: components["schemas"]["MacroFeedItem"][];
+            /** Policy Readings */
+            policy_readings?: components["schemas"]["MacroFeedItem"][];
+            /** Rates */
+            rates?: components["schemas"]["MacroRateItem"][];
+            /** Releases */
+            releases?: components["schemas"]["MacroFeedItem"][];
+            /**
+             * Status
+             * @default available
+             * @enum {string}
+             */
+            status?: "available" | "partial" | "unavailable";
+            /**
+             * Updated At
+             * @default
+             */
+            updated_at?: string;
+        };
         /** MacroIndicator */
         MacroIndicator: {
             /** Field Periods */
@@ -9111,6 +9304,30 @@ export interface components {
             trend?: {
                 [key: string]: string | number | null;
             }[];
+        };
+        /**
+         * MacroRateItem
+         * @description 利率指标最新值。
+         */
+        MacroRateItem: {
+            /** Change Bp */
+            change_bp?: number | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Period
+             * @default
+             */
+            period?: string;
+            /**
+             * Unit
+             * @default %
+             */
+            unit?: string;
+            /** Value */
+            value?: number | null;
         };
         /** MacroUsDataResponse */
         MacroUsDataResponse: {
@@ -13250,6 +13467,11 @@ export interface components {
              * @default 10
              */
             page_size?: number;
+            /**
+             * Source
+             * @default sina_stock_bulletins
+             */
+            source?: string;
             /**
              * Total Pages
              * @default 0
@@ -17820,6 +18042,38 @@ export interface operations {
             };
         };
     };
+    get_macro_analysis_api_macro_analysis_get: {
+        parameters: {
+            query?: {
+                /** @description 回溯自然日天数 */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroAnalysisResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_commodities_api_macro_commodities_get: {
         parameters: {
             query?: {
@@ -17871,6 +18125,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomsTradeDataResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_macro_feed_api_macro_feed_get: {
+        parameters: {
+            query?: {
+                /** @description 回溯自然日天数 */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroFeedResponse"];
                 };
             };
             /** @description 统一错误响应 */

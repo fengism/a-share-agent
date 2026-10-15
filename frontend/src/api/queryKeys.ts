@@ -71,6 +71,8 @@ export const queryKeys = {
     twitterAnalysis: (username: string) => ["marketTwitterAnalysis", username] as const,
     newsAnalysis: ["newsAnalysis"] as const,
     macroAll: ["macroAllData"] as const,
+    macroFeed: ["macroFeed"] as const,
+    macroAnalysis: ["macroAnalysis"] as const,
     macroUs: ["macroUsData"] as const,
     macroGlobalRates: ["macroGlobalRates"] as const,
     macroTreasuryYields: (pageSize?: number) => ["macroTreasuryYields", pageSize || 300] as const,

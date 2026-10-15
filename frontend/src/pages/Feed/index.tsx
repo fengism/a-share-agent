@@ -1,13 +1,14 @@
-import { ReadOutlined, SearchOutlined, TwitterOutlined } from "@ant-design/icons";
+import { ReadOutlined, SearchOutlined, TwitterOutlined, FundOutlined } from "@ant-design/icons";
 import { Input, Tabs } from "antd";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useStyles } from "../../styles/ui";
+import MacroFeed from "../../features/feed/MacroFeed";
 import TwitterFeed from "../../features/feed/TwitterFeed";
 import FeedTabs from "./FeedTabs";
 import NewsAnalysisPanel from "./NewsAnalysisPanel";
 import "../../features/feed/feed.css";
 
-const FEED_SECTIONS = ["market", "twitter"] as const;
+const FEED_SECTIONS = ["market", "macro", "twitter"] as const;
 type FeedSection = (typeof FEED_SECTIONS)[number];
 
 const SECTION_SEARCH: Record<FeedSection, {
@@ -17,6 +18,10 @@ const SECTION_SEARCH: Record<FeedSection, {
   market: {
     placeholder: "搜索资讯标题或内容",
     label: "搜索市场资讯",
+  },
+  macro: {
+    placeholder: "搜索宏观数据或政策",
+    label: "搜索宏观数据",
   },
   twitter: {
     placeholder: "搜索推文标题或内容",
@@ -75,6 +80,11 @@ export default function Feed() {
               key: "market",
               label: <span><ReadOutlined /> 市场资讯</span>,
               children: <MarketFeed searchQuery={searchQuery} />,
+            },
+            {
+              key: "macro",
+              label: <span><FundOutlined /> 宏观数据</span>,
+              children: <MacroFeed searchQuery={searchQuery} />,
             },
             {
               key: "twitter",

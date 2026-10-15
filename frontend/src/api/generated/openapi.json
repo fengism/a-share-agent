@@ -11849,6 +11849,218 @@
         "title": "MacroAllDataResponse",
         "type": "object"
       },
+      "MacroAnalysisEvent": {
+        "description": "按时间梳理的宏观事件。",
+        "properties": {
+          "category": {
+            "default": "",
+            "title": "Category",
+            "type": "string"
+          },
+          "date": {
+            "default": "",
+            "title": "Date",
+            "type": "string"
+          },
+          "impact": {
+            "default": "",
+            "title": "Impact",
+            "type": "string"
+          },
+          "interpretation": {
+            "default": "",
+            "title": "Interpretation",
+            "type": "string"
+          },
+          "refs": {
+            "items": {
+              "$ref": "#/components/schemas/MacroAnalysisRef"
+            },
+            "title": "Refs",
+            "type": "array"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "title": "MacroAnalysisEvent",
+        "type": "object"
+      },
+      "MacroAnalysisRef": {
+        "properties": {
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "title": "MacroAnalysisRef",
+        "type": "object"
+      },
+      "MacroAnalysisResponse": {
+        "description": "宏观解读：综述 + 事件系列。",
+        "properties": {
+          "cached": {
+            "default": false,
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "degraded": {
+            "default": false,
+            "title": "Degraded",
+            "type": "boolean"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/MacroAnalysisEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "generated_at": {
+            "default": "",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "period": {
+            "default": "",
+            "title": "Period",
+            "type": "string"
+          },
+          "policy_signals": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Policy Signals",
+            "type": "array"
+          },
+          "sentiment": {
+            "default": "中性",
+            "title": "Sentiment",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "warning": {
+            "default": "",
+            "title": "Warning",
+            "type": "string"
+          }
+        },
+        "title": "MacroAnalysisResponse",
+        "type": "object"
+      },
+      "MacroFeedItem": {
+        "description": "宏观资讯条目（统计局发布 / 央行新闻 / 政策解读）。",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "published_at": {
+            "default": "",
+            "title": "Published At",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "MacroFeedItem",
+        "type": "object"
+      },
+      "MacroFeedResponse": {
+        "description": "资讯页「宏观数据」板块的数据聚合结果。",
+        "properties": {
+          "failed_sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed Sources",
+            "type": "array"
+          },
+          "period_end": {
+            "default": "",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "default": "",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "policy_news": {
+            "items": {
+              "$ref": "#/components/schemas/MacroFeedItem"
+            },
+            "title": "Policy News",
+            "type": "array"
+          },
+          "policy_readings": {
+            "items": {
+              "$ref": "#/components/schemas/MacroFeedItem"
+            },
+            "title": "Policy Readings",
+            "type": "array"
+          },
+          "rates": {
+            "items": {
+              "$ref": "#/components/schemas/MacroRateItem"
+            },
+            "title": "Rates",
+            "type": "array"
+          },
+          "releases": {
+            "items": {
+              "$ref": "#/components/schemas/MacroFeedItem"
+            },
+            "title": "Releases",
+            "type": "array"
+          },
+          "status": {
+            "default": "available",
+            "enum": [
+              "available",
+              "partial",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "title": "MacroFeedResponse",
+        "type": "object"
+      },
       "MacroIndicator": {
         "properties": {
           "field_periods": {
@@ -11960,6 +12172,57 @@
           }
         },
         "title": "MacroIndicator",
+        "type": "object"
+      },
+      "MacroRateItem": {
+        "description": "利率指标最新值。",
+        "properties": {
+          "change_bp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Bp"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "period": {
+            "default": "",
+            "title": "Period",
+            "type": "string"
+          },
+          "unit": {
+            "default": "%",
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "MacroRateItem",
         "type": "object"
       },
       "MacroUsDataResponse": {
@@ -22378,6 +22641,11 @@
             "title": "Page Size",
             "type": "integer"
           },
+          "source": {
+            "default": "sina_stock_bulletins",
+            "title": "Source",
+            "type": "string"
+          },
           "total_pages": {
             "default": 0,
             "title": "Total Pages",
@@ -31716,6 +31984,59 @@
         ]
       }
     },
+    "/api/macro/analysis": {
+      "get": {
+        "description": "获取宏观 AI 解读：综述与按时间梳理的事件系列（历史条目走缓存）。",
+        "operationId": "get_macro_analysis_api_macro_analysis_get",
+        "parameters": [
+          {
+            "description": "回溯自然日天数",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 31,
+              "description": "回溯自然日天数",
+              "maximum": 180,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MacroAnalysisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Macro Analysis",
+        "tags": [
+          "macro"
+        ]
+      }
+    },
     "/api/macro/commodities": {
       "get": {
         "description": "获取大宗商品期货最近报价与静态产业映射，不含现货/基差。",
@@ -31813,6 +32134,59 @@
           }
         ],
         "summary": "Get Customs Trade",
+        "tags": [
+          "macro"
+        ]
+      }
+    },
+    "/api/macro/feed": {
+      "get": {
+        "description": "获取资讯页宏观数据：统计局最新发布、央行新闻/政策解读与利率。",
+        "operationId": "get_macro_feed_api_macro_feed_get",
+        "parameters": [
+          {
+            "description": "回溯自然日天数",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 31,
+              "description": "回溯自然日天数",
+              "maximum": 180,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MacroFeedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Macro Feed",
         "tags": [
           "macro"
         ]

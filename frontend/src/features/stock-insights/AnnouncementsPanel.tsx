@@ -14,6 +14,15 @@ const { Text } = Typography;
 
 const BULLETIN_PAGE_SIZE = 10;
 
+const BULLETIN_SOURCE_LABELS: Record<string, string> = {
+  cninfo_stock_bulletins: "巨潮资讯",
+  sina_stock_bulletins: "新浪财经",
+};
+
+function bulletinSourceLabel(source: string | undefined): string {
+  return BULLETIN_SOURCE_LABELS[source ?? ""] ?? "公开披露";
+}
+
 function bulletinTypeColor(type: string): SemanticTagColor {
   if (type.includes("定期") || type.includes("财报")) return "primary";
   if (type.includes("临时")) return "warning";
@@ -62,6 +71,7 @@ export default function AnnouncementsPanel({ code }: Props) {
   const data = bulletinsQuery.data;
   const items = data?.items ?? [];
   const totalPages = data?.total_pages ?? 0;
+  const sourceLabel = bulletinSourceLabel(data?.source);
 
   return (
     <SectionDataState
@@ -76,13 +86,13 @@ export default function AnnouncementsPanel({ code }: Props) {
         <div style={sectionHeaderStyle}>
           <Text strong style={{ color: c.textPrimary, fontSize: t.font.md }}>公司公告</Text>
           <Text type="secondary" style={{ fontSize: t.font.sm }}>
-            新浪财经公告列表{data?.name ? ` · ${data.name}` : ""}
+            {sourceLabel}公告列表{data?.name ? ` · ${data.name}` : ""}
           </Text>
         </div>
         <Card
           size="small"
           title={`公告列表（第 ${data?.page ?? page} / ${totalPages || "-"} 页）`}
-          extra={<Text type="secondary">来源：新浪财经</Text>}
+          extra={<Text type="secondary">来源：{sourceLabel}</Text>}
           style={{ ...cardStyle }}
           styles={{ body: { padding: t.space[4] } }}
         >

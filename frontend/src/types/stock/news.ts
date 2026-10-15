@@ -37,6 +37,7 @@ export interface StockBulletinPage {
   page: number;
   page_size: number;
   total_pages: number;
+  source: string;
   items: StockBulletin[];
 }
 

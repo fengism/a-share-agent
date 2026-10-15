@@ -1,8 +1,14 @@
 .market-wind {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
   max-width: 100%;
+}
+
+/* 网格项默认 min-width:auto，会被内部横向卡片/表格的最小内容宽度撑开。 */
+.market-wind > * {
+  min-width: 0;
 }
 
 .wind-toolbar {

@@ -29,6 +29,8 @@ import type {
   MarketWind,
   MarketWindStocks,
   MacroAllData,
+  MacroAnalysis,
+  MacroFeed,
   MacroUsData,
   GlobalMacroRatesData,
   TreasuryYieldsResponse,
@@ -558,6 +560,30 @@ export function useMacroAllData() {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<MacroAllData>(),
+    staleTime: QUERY_CACHE_POLICIES.macro.staleMs,
+  });
+}
+
+export function useMacroFeed(days = 31) {
+  return useQuery({
+    queryKey: queryKeys.market.macroFeed,
+    queryFn: () => openApiGet("/api/macro/feed", {
+      query: { days },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<MacroFeed>(),
+    staleTime: QUERY_CACHE_POLICIES.macro.staleMs,
+  });
+}
+
+export function useMacroAnalysis(days = 31) {
+  return useQuery({
+    queryKey: queryKeys.market.macroAnalysis,
+    queryFn: () => openApiGet("/api/macro/analysis", {
+      query: { days },
+      options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
+    }),
+    select: asApiModel<MacroAnalysis>(),
     staleTime: QUERY_CACHE_POLICIES.macro.staleMs,
   });
 }

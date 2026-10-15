@@ -147,6 +147,23 @@ MARKET_TABLES.extend(
     ]
 )
 
+# 宏观解读缓存：按条目指纹/整包指纹持久化 LLM 输出，避免重复调用大模型
+MARKET_TABLES.append(
+    """
+    CREATE TABLE IF NOT EXISTS macro_analysis_cache (
+        cache_key    TEXT PRIMARY KEY,
+        result_json  TEXT NOT NULL,
+        generated_at REAL NOT NULL
+    )
+    """
+)
+MARKET_TABLES.append(
+    """
+    CREATE INDEX IF NOT EXISTS idx_macro_analysis_cache_generated_at
+    ON macro_analysis_cache(generated_at)
+    """
+)
+
 # ── 账号系统：用户 / 会话 / 邀请 / 每用户私密配置 ──
 USER_TABLES = []
 

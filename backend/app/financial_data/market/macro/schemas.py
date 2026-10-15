@@ -256,3 +256,69 @@ class SgeGoldResponse(BaseModel):
     # 合约已停止交易：最新交易日滞后超过该天数时为 True。
     # 由数据实际滞后推导，不依赖人工维护的品种清单。
     is_delisted: bool = False
+
+
+class MacroFeedItem(BaseModel):
+    """宏观资讯条目（统计局发布 / 央行新闻 / 政策解读）。"""
+
+    id: str
+    title: str
+    url: str = ""
+    published_at: str = ""
+    source: str = ""
+
+
+class MacroRateItem(BaseModel):
+    """利率指标最新值。"""
+
+    key: str
+    label: str
+    value: float | None = None
+    unit: str = "%"
+    period: str = ""
+    # 相对上一期的变化，单位：基点(bp)
+    change_bp: float | None = None
+
+
+class MacroFeedResponse(BaseModel):
+    """资讯页「宏观数据」板块的数据聚合结果。"""
+
+    period_start: str = ""
+    period_end: str = ""
+    releases: list[MacroFeedItem] = Field(default_factory=list)
+    policy_news: list[MacroFeedItem] = Field(default_factory=list)
+    policy_readings: list[MacroFeedItem] = Field(default_factory=list)
+    rates: list[MacroRateItem] = Field(default_factory=list)
+    updated_at: str = ""
+    status: Literal["available", "partial", "unavailable"] = "available"
+    failed_sources: list[str] = Field(default_factory=list)
+
+
+class MacroAnalysisRef(BaseModel):
+    title: str = ""
+    url: str = ""
+
+
+class MacroAnalysisEvent(BaseModel):
+    """按时间梳理的宏观事件。"""
+
+    date: str = ""
+    category: str = ""
+    title: str = ""
+    interpretation: str = ""
+    impact: str = ""
+    refs: list[MacroAnalysisRef] = Field(default_factory=list)
+
+
+class MacroAnalysisResponse(BaseModel):
+    """宏观解读：综述 + 事件系列。"""
+
+    period: str = ""
+    summary: str = ""
+    sentiment: str = "中性"
+    events: list[MacroAnalysisEvent] = Field(default_factory=list)
+    policy_signals: list[str] = Field(default_factory=list)
+    degraded: bool = False
+    warning: str = ""
+    generated_at: str = ""
+    cached: bool = False

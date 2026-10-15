@@ -58,6 +58,23 @@ _PBC_SOCIAL_FINANCING_COLUMNS = (
     "loans_written_off",
 )
 _SHIBOR_URL = "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-shibor/ShiborHis"
+# 国家统计局「最新发布」与央行新闻/政策解读列表页
+_NBS_RELEASE_URL = "https://www.stats.gov.cn/sj/zxfb/"
+_PBC_NEWS_URL = f"{_PBC_BASE_URL}/goutongjiaoliu/113456/113469/index.html"
+_PBC_POLICY_URL = f"{_PBC_BASE_URL}/rmyh/3963412/index.html"
+_NBS_RELEASE_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,*/*",
+    "Referer": _NBS_RELEASE_URL,
+    "User-Agent": _HEADERS["User-Agent"],
+}
+_NBS_RELEASE_ITEM = re.compile(r"<li[^>]*>(.*?)</li>", re.S | re.I)
+_NBS_ANCHOR = re.compile(r"<a[^>]*href=[\"']([^\"']+)[\"'][^>]*title=[\"']([^\"']*)[\"']", re.I)
+_NBS_SPAN_DATE = re.compile(r"<span[^>]*>\s*(\d{4}-\d{2}-\d{2})\s*</span>")
+_PBC_LIST_ANCHOR = re.compile(
+    r'<a[^>]*href="([^"]+)"[^>]*title="([^"]+)"[^>]*istitle="true"[^>]*>(.*?)</a>',
+    re.S | re.I,
+)
+_DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
 _SHIBOR_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Referer": "https://www.chinamoney.com.cn/",
@@ -287,6 +304,68 @@ def _pbc_get_text(url: str) -> str:
     if apparent_encoding:
         response.encoding = apparent_encoding
     return str(response.text)
+
+
+def _get_text(url: str, *, headers: dict[str, str], timeout: int = _TIMEOUT_SECONDS) -> str:
+    """获取 HTML 并按 apparent_encoding 纠正编码（列表页常缺 charset 响应头）。"""
+    response = provider_get(url, headers=headers, timeout=timeout)
+    apparent_encoding = getattr(response, "apparent_encoding", None)
+    if apparent_encoding:
+        response.encoding = apparent_encoding
+    return str(response.text)
+
+
+def _parse_nbs_releases(html: str) -> list[dict[str, Any]]:
+    """解析国家统计局「最新发布」列表（同一链接在响应式布局中重复三次，按 URL 去重）。"""
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for block_match in _NBS_RELEASE_ITEM.finditer(html):
+        block = block_match.group(1)
+        anchor = _NBS_ANCHOR.search(block)
+        date_match = _NBS_SPAN_DATE.search(block)
+        if anchor is None or date_match is None:
+            continue
+        title = anchor.group(2).strip()
+        if not title:
+            continue
+        url = urljoin(_NBS_RELEASE_URL, anchor.group(1))
+        if url in seen:
+            continue
+        seen.add(url)
+        items.append({
+            "id": url,
+            "title": title,
+            "url": url,
+            "published_at": date_match.group(1),
+            "source": "国家统计局",
+        })
+    return items
+
+
+def _parse_pbc_list(html: str, *, base_url: str, source: str) -> list[dict[str, Any]]:
+    """解析央行列表页：``istitle="true"`` 的正文链接 + 其后紧邻的日期。
+
+    侧栏「领导活动」等无日期链接会被自然排除。
+    """
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for match in _PBC_LIST_ANCHOR.finditer(html):
+        title = match.group(2).strip()
+        date_match = _DATE_PATTERN.search(html[match.end(): match.end() + 120])
+        if not title or date_match is None:
+            continue
+        url = urljoin(base_url, match.group(1))
+        if url in seen:
+            continue
+        seen.add(url)
+        items.append({
+            "id": url,
+            "title": title,
+            "url": url,
+            "published_at": date_match.group(0),
+            "source": source,
+        })
+    return items
 
 
 def _pbc_month_label(value: Any) -> str | None:
@@ -781,6 +860,23 @@ class NbsDataProvider:
             }
             for period in sorted(set(nominal) | set(index), reverse=True)
         ]
+
+    def fetch_latest_releases(self) -> list[dict[str, Any]]:
+        """获取国家统计局「最新发布」列表（标题 + 日期 + 原文链接）。"""
+        html = _get_text(_NBS_RELEASE_URL, headers=_NBS_RELEASE_HEADERS)
+        return _parse_nbs_releases(html)
+
+    def fetch_pbc_news(self) -> list[dict[str, Any]]:
+        """获取中国人民银行「新闻发布」列表。"""
+        headers = {**_PBC_HEADERS, "Referer": _PBC_NEWS_URL}
+        html = _get_text(_PBC_NEWS_URL, headers=headers)
+        return _parse_pbc_list(html, base_url=_PBC_BASE_URL, source="中国人民银行")
+
+    def fetch_pbc_policy(self) -> list[dict[str, Any]]:
+        """获取中国人民银行「政策解读」列表。"""
+        headers = {**_PBC_HEADERS, "Referer": _PBC_POLICY_URL}
+        html = _get_text(_PBC_POLICY_URL, headers=headers)
+        return _parse_pbc_list(html, base_url=_PBC_BASE_URL, source="中国人民银行")
 
 
 nbs_provider = NbsDataProvider()

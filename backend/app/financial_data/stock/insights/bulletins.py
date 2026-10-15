@@ -1,13 +1,21 @@
-"""个股公告服务（新浪 CB_AllService.getBulletinList）。"""
+"""个股公告服务：巨潮资讯（法定披露）为主，新浪财经兜底。"""
 
+import asyncio
 import logging
+from dataclasses import dataclass
 
 from app.core.cache import dated_cache_key
 from app.core.cache import market_cache as cache
-from app.core.concurrency.rate_limiter import sina_semaphore
+from app.core.concurrency.rate_limiter import cninfo_semaphore, sina_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import is_hk_code, normalize_code
 from app.financial_data.stock.insights.schemas import StockBulletinItem, StockBulletinPage
+from app.financial_data.stock.insights.sources import (
+    CNINFO_ANNOUNCEMENT_QUERY_API,
+    CNINFO_BULLETIN_SOURCE_ID,
+    SINA_BULLETIN_LIST_API,
+    SINA_BULLETIN_SOURCE_ID,
+)
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
@@ -19,9 +27,36 @@ BULLETIN_MAX_PAGE_SIZE = 30
 _bulletin_singleflight: AsyncSingleFlight[StockBulletinPage] = AsyncSingleFlight()
 
 
-def _get_sina_provider():
-    """延迟获取新浪 provider。"""
-    return get_provider("sina")
+@dataclass(frozen=True)
+class _BulletinSource:
+    provider: str
+    operation: str
+    method: str
+    source_id: str
+    source_api: str
+    semaphore: asyncio.Semaphore
+
+
+# 巨潮资讯是上市公司法定信息披露平台，权威且覆盖全，优先使用；
+# 请求失败或返回空列表时回退新浪财经。
+_BULLETIN_SOURCES = (
+    _BulletinSource(
+        provider="cninfo",
+        operation="stock_bulletins",
+        method="fetch_stock_bulletins",
+        source_id=CNINFO_BULLETIN_SOURCE_ID,
+        source_api=CNINFO_ANNOUNCEMENT_QUERY_API,
+        semaphore=cninfo_semaphore,
+    ),
+    _BulletinSource(
+        provider="sina",
+        operation="stock_bulletins",
+        method="fetch_stock_bulletins",
+        source_id=SINA_BULLETIN_SOURCE_ID,
+        source_api=SINA_BULLETIN_LIST_API,
+        semaphore=sina_semaphore,
+    ),
+)
 
 
 async def get_stock_bulletins(code: str, page: int = 1, page_size: int = 10) -> StockBulletinPage:
@@ -49,34 +84,65 @@ async def get_stock_bulletins(code: str, page: int = 1, page_size: int = 10) -> 
         return StockBulletinPage.model_validate(cached)
 
     async def load_and_cache() -> StockBulletinPage:
-        raw = await _fetch_bulletin_page(sym.raw, page, page_size)
-        result = _build_bulletin_page(sym.raw, raw, page=page, page_size=page_size)
+        raw, source = await _fetch_bulletin_page(sym.raw, page, page_size)
+        result = _build_bulletin_page(sym.raw, raw, page=page, page_size=page_size, source=source)
         cache.set(cache_key, result, ttl=BULLETIN_CACHE_TTL_SECONDS)
         return result
 
     return await _bulletin_singleflight.do(cache_key, load_and_cache)
 
 
-async def _fetch_bulletin_page(code: str, page: int, page_size: int) -> dict:
-    provider = _get_sina_provider()
-    return await provider_gateway.call_blocking(
-        "sina",
-        "stock_bulletins",
-        provider.fetch_stock_bulletins,
-        semaphore=sina_semaphore,
-        code=code,
-        page=page,
-        page_size=page_size,
-    )
+async def _fetch_bulletin_page(code: str, page: int, page_size: int) -> tuple[dict, _BulletinSource]:
+    last_error: Exception | None = None
+    for index, source in enumerate(_BULLETIN_SOURCES):
+        try:
+            provider = get_provider(source.provider)
+            raw = await provider_gateway.call_blocking(
+                source.provider,
+                source.operation,
+                getattr(provider, source.method),
+                code,
+                page=page,
+                page_size=page_size,
+                semaphore=source.semaphore,
+                is_fallback_attempt=index > 0,
+            )
+            if not raw.get("items"):
+                raise ValueError(f"{source.provider} 公告列表为空")
+            return raw, source
+        except Exception as error:
+            last_error = error
+            logger.info(
+                "公告数据源失败: provider=%s code=%s error=%s",
+                source.provider,
+                code,
+                error,
+            )
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("公告数据源为空")
 
 
-def _build_bulletin_page(code: str, raw: dict, *, page: int, page_size: int) -> StockBulletinPage:
-    items = [StockBulletinItem.model_validate(entry) for entry in raw.get("items", [])]
+def _build_bulletin_page(
+    code: str,
+    raw: dict,
+    *,
+    page: int,
+    page_size: int,
+    source: _BulletinSource,
+) -> StockBulletinPage:
+    items = [
+        StockBulletinItem.model_validate(entry).model_copy(
+            update={"source": source.source_id, "source_api": source.source_api}
+        )
+        for entry in raw.get("items", [])
+    ]
     return StockBulletinPage(
         code=code,
         name=str(raw.get("name") or ""),
         page=page,
         page_size=page_size,
         total_pages=int(raw.get("total_pages") or 0),
+        source=source.source_id,
         items=items,
     )

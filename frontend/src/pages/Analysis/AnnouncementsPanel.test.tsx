@@ -24,6 +24,7 @@ const bulletinPage: StockBulletinPage = {
   page: 1,
   page_size: 10,
   total_pages: 12,
+  source: "sina_stock_bulletins",
   items: [
     {
       id: "12551947",
@@ -77,5 +78,13 @@ describe("AnnouncementsPanel", () => {
 
     expect(screen.getByText("暂无公告数据")).toBeInTheDocument();
     expect(container.querySelector(".ant-pagination")).toBeNull();
+  });
+
+  it("labels the disclosure source from the response", () => {
+    mockQuery({ ...bulletinPage, source: "cninfo_stock_bulletins" });
+    render(<AnnouncementsPanel code="002273" />);
+
+    expect(screen.getByText("来源：巨潮资讯")).toBeInTheDocument();
+    expect(screen.getByText(/巨潮资讯公告列表/)).toBeInTheDocument();
   });
 });
