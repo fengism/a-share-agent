@@ -315,7 +315,7 @@ test("renders the desktop terminal command frame without a standalone context ra
   )).toBe(true);
 
   await page.getByRole("button", { name: "加入自选" }).click();
-  await expect.poll(() => watchlistWrites).toEqual([{ stock_code: "600519", note: "来自分析工作台" }]);
+  await expect.poll(() => watchlistWrites).toEqual([{ stock_code: "600519", note: "来自分析工作台", market: "cn" }]);
   await expect(page.getByText("已加入自选")).toBeVisible();
 
   await page.getByRole("button", { name: /失效条件/ }).click();
