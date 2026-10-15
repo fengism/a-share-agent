@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   createChart,
   createSeriesMarkers,
@@ -54,6 +54,8 @@ type Props = {
   chipDistribution?: ChipDistribution | null;
   /** 是否默认开启主图筹码峰线与侧边分布微图 */
   defaultShowChipPeak?: boolean;
+  /** 横屏（放大横屏）模式下叠加到 HUD 的工具条，例如周期切换控件 */
+  landscapeToolbar?: ReactNode;
 };
 type ChartItem = Omit<KlineItem, "date"> & { date: BusinessDay; rawDate: string };
 
@@ -135,6 +137,7 @@ export default function KlineChart({
   defaultCandleStyle = "solid",
   chipDistribution,
   defaultShowChipPeak = false,
+  landscapeToolbar,
 }: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
@@ -1591,6 +1594,22 @@ export default function KlineChart({
             </button>
           )}
         </div>
+
+        {isLandscape && landscapeToolbar ? (
+          <div
+            className="kline-chart__landscape-toolbar"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              flex: "1 1 100%",
+              flexWrap: "wrap",
+              rowGap: 4,
+            }}
+          >
+            {landscapeToolbar}
+          </div>
+        ) : null}
       </div>
 
       <div className="kline-chart__plot" style={{ position: "relative", flex: 1, width: "100%", minHeight: 0, backgroundColor: c.cardBg }}>

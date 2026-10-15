@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { Skeleton } from "antd";
 import type { KlineItem } from "../types/stock";
 import type { ChanlunResult } from "../utils/chanlun";
@@ -24,6 +24,8 @@ interface LazyKlineChartProps {
   defaultCandleStyle?: CandleStyleType;
   chipDistribution?: ChipDistribution | null;
   defaultShowChipPeak?: boolean;
+  /** 横屏（放大横屏）模式下叠加到 HUD 的工具条，例如周期切换控件 */
+  landscapeToolbar?: ReactNode;
 }
 
 export default function LazyKlineChart({
@@ -40,6 +42,7 @@ export default function LazyKlineChart({
   defaultCandleStyle,
   chipDistribution,
   defaultShowChipPeak,
+  landscapeToolbar,
 }: LazyKlineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(() => typeof IntersectionObserver === "undefined");
@@ -74,6 +77,7 @@ export default function LazyKlineChart({
             defaultCandleStyle={defaultCandleStyle}
             chipDistribution={chipDistribution}
             defaultShowChipPeak={defaultShowChipPeak}
+            landscapeToolbar={landscapeToolbar}
           />
         </Suspense>
       ) : (

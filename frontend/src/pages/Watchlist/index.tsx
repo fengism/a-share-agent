@@ -148,6 +148,7 @@ function formatPercent(value: number | null): string {
 function downloadWatchlistCsv(items: WatchlistItem[]) {
   const headers = [
     "代码",
+    "市场",
     "名称",
     "最新价",
     "涨跌幅(%)",
@@ -174,6 +175,7 @@ function downloadWatchlistCsv(items: WatchlistItem[]) {
 
   const rows = items.map((item) => [
     item.stock_code,
+    item.market === "hk" ? "港股" : "A股",
     item.stock_name,
     item.current_price != null ? item.current_price.toFixed(2) : "",
     item.change_pct != null ? item.change_pct.toFixed(2) : "",
@@ -378,6 +380,7 @@ export default function WatchlistPage() {
       <span className="watchlist-page__search-option">
         <span>{stock.name}</span>
         <Text type="secondary">{stock.code}</Text>
+        {stock.market === "hk" ? <Tag color="blue">港股</Tag> : null}
       </span>
     ),
   })), [stockSearch.currentResults]);
@@ -530,6 +533,7 @@ export default function WatchlistPage() {
         <PreloadLink className="watchlist-page__stock" to={buildWatchlistStockUrl(item.stock_code, item.market)}>
           <strong>{item.stock_name}</strong>
           <span>{item.stock_code}</span>
+          {item.market === "hk" ? <Tag color="blue">港股</Tag> : null}
         </PreloadLink>
       ),
     },

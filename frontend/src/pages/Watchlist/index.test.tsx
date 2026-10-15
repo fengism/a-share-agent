@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   addAlert: vi.fn(),
   deleteAlert: vi.fn(),
   refetch: vi.fn(),
+  items: [] as WatchlistItem[],
 }));
 
 const items: WatchlistItem[] = [
@@ -84,7 +85,7 @@ const items: WatchlistItem[] = [
 vi.mock("../../api/queries", () => ({
   useWatchlist: () => ({
     data: {
-      items,
+      items: mocks.items,
       source: "tencent",
       quoted_at: "2026-08-30T10:30:00",
     },
@@ -122,7 +123,19 @@ function renderPage() {
 }
 
 describe("WatchlistPage", () => {
+  const capturedBlobs: string[] = [];
+
   beforeEach(() => {
+    mocks.items = items;
+    capturedBlobs.length = 0;
+    class MockBlob {
+      constructor(parts: BlobPart[]) {
+        capturedBlobs.push(parts.map((part) => String(part)).join(""));
+      }
+    }
+    vi.stubGlobal("Blob", MockBlob as unknown as typeof Blob);
+    (URL as unknown as { createObjectURL: () => string }).createObjectURL = vi.fn(() => "blob:mock");
+    (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = vi.fn();
     mocks.add.mockReset().mockResolvedValue({});
     mocks.remove.mockReset().mockResolvedValue({});
     mocks.addAlert.mockReset().mockResolvedValue({});
@@ -258,6 +271,22 @@ describe("WatchlistPage", () => {
     expect(screen.getByRole("button", { name: /茅指数.*1 只/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /白酒概念.*2 只/ })).not.toBeInTheDocument();
     expect(screen.getByText("当前显示 1 只")).toBeInTheDocument();
+  });
+
+  it("exports watchlist to CSV with a market column distinguishing HK stocks", () => {
+    mocks.items = [
+      ...items,
+      { ...items[0], id: 4, stock_code: "00700", stock_name: "腾讯控股", market: "hk" },
+    ];
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /导出 CSV/ }));
+
+    const csv = capturedBlobs.join("");
+    const [header, ...rows] = csv.replace(/^\uFEFF/, "").split("\r\n");
+    expect(header).toBe("代码,市场,名称,最新价,涨跌幅(%),今开,最高,最低,成交额,换手率(%),市盈率(TTM),总市值,所属概念,备注,加入时间");
+    expect(rows.find((row) => row.startsWith("00700,"))).toContain("00700,港股,腾讯控股");
+    expect(rows.find((row) => row.startsWith("600519,"))).toContain("600519,A股,贵州茅台");
   });
 
   it("supports exporting watchlist to CSV and selecting stocks for batch backtest", () => {

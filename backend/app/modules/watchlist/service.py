@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime
 
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
@@ -16,6 +17,8 @@ from app.modules.watchlist.schemas import (
 )
 
 _HK_STORAGE_PREFIX = "HK:"
+
+logger = logging.getLogger(__name__)
 
 
 class UnknownWatchlistStockError(ValueError):
@@ -63,6 +66,33 @@ def _previous_close(quote: dict) -> float | None:
     return safe_float(value if value is not None else quote.get("pre_close"))
 
 
+def _market_cap_from_quote(quote: dict) -> float | None:
+    """统一取值：A 股行情用 ``mcap``，港股行情（HKStockQuote）用 ``market_cap``。"""
+    value = quote.get("mcap")
+    if value is None:
+        value = quote.get("market_cap")
+    return safe_float(value)
+
+
+async def _lookup_hk_stock_name(stock_code: str) -> str:
+    """行情源不可用或缺名称时，退回港股证券名录查询名称。
+
+    与 A 股使用 ``get_stock_name_map()`` 回退对齐，避免港股实时行情缺失时
+    无法把股票加入自选。
+    """
+    try:
+        from app.financial_data.hk.search_index import hk_stock_search_index
+
+        records = await hk_stock_search_index.search(stock_code, limit=1)
+    except Exception:
+        logger.warning("港股名录名称回退失败: code=%s", stock_code, exc_info=True)
+        return ""
+    for record in records:
+        if record.code == stock_code:
+            return str(record.name or "").strip()
+    return str(records[0].name or "").strip() if records else ""
+
+
 def _watchlist_item_from_quote(
     row: dict,
     *,
@@ -90,7 +120,7 @@ def _watchlist_item_from_quote(
         amount=safe_float(quote.get("amount")),
         turnover_pct=safe_float(quote.get("turnover_pct")),
         pe_ttm=safe_float(quote.get("pe_ttm")),
-        market_cap=safe_float(quote.get("mcap")),
+        market_cap=_market_cap_from_quote(quote),
         quote_source=quote_source,
         concepts=concepts,
         alerts=alerts or [],
@@ -201,6 +231,9 @@ async def add_watchlist_item(request: WatchlistItemCreate, user_id: int) -> Watc
         stock_quote = next((item for item in quote_page.items if item.code == request.stock_code), None)
         quote = stock_quote.model_dump() if stock_quote is not None else {}
         stock_name = str(quote.get("name") or "").strip()
+        if not stock_name:
+            # 行情源不可用或缺名称时退回港股名录，与 A 股名称回退行为一致。
+            stock_name = await _lookup_hk_stock_name(request.stock_code)
         quote_source = quote_page.source
         concepts = []
     else:

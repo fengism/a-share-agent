@@ -6,6 +6,7 @@ import IndicatorSubCharts from "../../charts/IndicatorSubCharts";
 import IntradayChart from "../../charts/IntradayChart";
 import LazyKlineChart from "../../charts/LazyKlineChart";
 import SectionDataState from "../../components/SectionDataState";
+import { useFullscreenChartHeight } from "../../hooks/useFullscreenChartHeight";
 import { useStyles } from "../../styles/ui";
 import { analyzeChanlun } from "../../utils/chanlun";
 import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
@@ -50,6 +51,35 @@ function KlinePanel({
   const chanlun = useMemo(
     () => chanlunEnabled && items && items.length >= 10 ? analyzeChanlun(items) : null,
     [chanlunEnabled, items],
+  );
+
+  // 放大横屏时页面工具栏被固定层遮住，这里把周期/复权/缠论控件带进图表 HUD
+  const landscapeToolbar = (
+    <>
+      <Segmented
+        size="small"
+        aria-label="K 线周期"
+        options={[
+          { label: "日K", value: "daily" },
+          { label: "周K", value: "weekly" },
+          { label: "月K", value: "monthly" },
+          { label: "年K", value: "annual" },
+        ]}
+        value={period}
+        onChange={(value) => setPeriod(String(value))}
+      />
+      <Segmented
+        size="small"
+        aria-label="复权方式"
+        options={[{ label: "前复权", value: "qfq" }, { label: "后复权", value: "hfq" }, { label: "不复权", value: "none" }]}
+        value={adjust}
+        onChange={(value) => setAdjust(String(value))}
+      />
+      <label className="stock-chart-chanlun-toggle">
+        缠论
+        <Switch aria-label="缠论" size="small" checked={chanlunEnabled} onChange={onChanlunChange} />
+      </label>
+    </>
   );
 
   // 筹码分布（港股无筹码分布，日K线周期时启用）
@@ -116,6 +146,7 @@ function KlinePanel({
           onReachLeftEdge={historyLimitReached ? undefined : onReachLeftEdge}
           historyLimitReached={historyLimitReached}
           chipDistribution={chipQuery?.data}
+          landscapeToolbar={landscapeToolbar}
         />
       </SectionDataState>
     </>
@@ -222,6 +253,7 @@ export default function StockCharts({ code }: { code: string }) {
   const [historyYears, setHistoryYears] = useState(1);
   const [expanded, setExpanded] = useState(false);
   const { cardStyle } = useStyles();
+  const fullscreenHeight = useFullscreenChartHeight();
 
   const startDate = useMemo(() => yearsAgoDate(historyYears), [historyYears]);
   const historyLimitReached = historyYears >= MAX_KLINE_HISTORY_YEARS;
@@ -338,7 +370,7 @@ export default function StockCharts({ code }: { code: string }) {
         onCancel={() => setExpanded(false)}
         footer={null}
         width="92vw"
-        styles={{ body: { height: "76vh", overflowY: "auto" } }}
+        styles={{ body: { height: fullscreenHeight, overflowY: "auto" } }}
         destroyOnHidden
       >
         {activeView === "kline" ? (
@@ -351,13 +383,13 @@ export default function StockCharts({ code }: { code: string }) {
             historyYears={historyYears}
             onReachLeftEdge={handleReachLeftEdge}
             historyLimitReached={historyLimitReached}
-            height={580}
+            height={fullscreenHeight}
             viewKeySuffix="-fullscreen"
           />
         ) : activeView === "intraday" ? (
-          <IntradayPanel code={code} height={580} viewKeySuffix="-fullscreen" />
+          <IntradayPanel code={code} height={fullscreenHeight} viewKeySuffix="-fullscreen" />
         ) : activeView === "macd" || activeView === "rsi" || activeView === "kdj" ? (
-          <div className="stock-macd-panel" style={{ minHeight: 600 }}>
+          <div className="stock-macd-panel" style={{ minHeight: fullscreenHeight }}>
             <IndicatorSubCharts
               code={code}
               types={["macd", "rsi", "kdj"]}
@@ -369,7 +401,7 @@ export default function StockCharts({ code }: { code: string }) {
               historyYears={historyYears}
               onReachLeftEdge={handleReachLeftEdge}
               historyLimitReached={historyLimitReached}
-              height={560}
+              height={Math.max(240, fullscreenHeight - 40)}
             />
           </div>
         ) : (

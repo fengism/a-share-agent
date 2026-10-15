@@ -34,6 +34,7 @@ import {
 } from "../../api/queryHooks/hk";
 import { useAddWatchlistItem } from "../../api/queryHooks/watchlist";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useFullscreenChartHeight } from "../../hooks/useFullscreenChartHeight";
 import { useNavigate } from "react-router-dom";
 import LazyKlineChart from "../../charts/LazyKlineChart";
 import ChangeValue from "../../components/ChangeValue";
@@ -129,6 +130,40 @@ export default function HKMarketTab({
   const [sortOption, setSortOption] = useState<SortOption>("default");
   const [indexChartExpanded, setIndexChartExpanded] = useState(false);
   const [stockChartExpanded, setStockChartExpanded] = useState(false);
+  const fullscreenHeight = useFullscreenChartHeight();
+  const indexPeriodControl = (
+    <Segmented
+      size="small"
+      aria-label="指数K线周期"
+      options={PERIOD_OPTIONS}
+      value={indexPeriod}
+      onChange={(value) => setIndexPeriod(String(value))}
+    />
+  );
+  const stockPeriodControl = (
+    <Segmented
+      size="small"
+      aria-label="个股K线周期"
+      options={PERIOD_OPTIONS}
+      value={stockPeriod}
+      onChange={(value) => setStockPeriod(String(value))}
+    />
+  );
+  const stockAdjustControl = (
+    <Segmented
+      size="small"
+      aria-label="复权方式"
+      options={ADJUST_OPTIONS}
+      value={adjust}
+      onChange={(value) => setAdjust(String(value))}
+    />
+  );
+  const stockLandscapeToolbar = (
+    <Space wrap size={4}>
+      {stockPeriodControl}
+      {stockAdjustControl}
+    </Space>
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const normalizedSearch = search.trim();
@@ -518,12 +553,7 @@ export default function HKMarketTab({
         }
         extra={
           <Space wrap>
-            <Segmented
-              aria-label="指数K线周期"
-              options={PERIOD_OPTIONS}
-              value={indexPeriod}
-              onChange={(value) => setIndexPeriod(String(value))}
-            />
+            {indexPeriodControl}
             <Button
               type="text"
               size="small"
@@ -546,6 +576,7 @@ export default function HKMarketTab({
             data={chartItems(indexHistoryQuery.data?.items)}
             height={360}
             viewKey={`hk-index-${activeIndex}-${indexPeriod}`}
+            landscapeToolbar={indexPeriodControl}
           />
         </SectionDataState>
       </Card>
@@ -577,18 +608,8 @@ export default function HKMarketTab({
           }
           extra={
             <Space wrap>
-              <Segmented
-                aria-label="个股K线周期"
-                options={PERIOD_OPTIONS}
-                value={stockPeriod}
-                onChange={(value) => setStockPeriod(String(value))}
-              />
-              <Segmented
-                aria-label="复权方式"
-                options={ADJUST_OPTIONS}
-                value={adjust}
-                onChange={(value) => setAdjust(String(value))}
-              />
+              {stockPeriodControl}
+              {stockAdjustControl}
               <Button
                 type="primary"
                 size="small"
@@ -658,6 +679,7 @@ export default function HKMarketTab({
               data={chartItems(stockHistoryQuery.data?.items)}
               height={380}
               viewKey={`hk-stock-${activeStock.code}-${stockPeriod}-${adjust}`}
+              landscapeToolbar={stockLandscapeToolbar}
             />
           </SectionDataState>
         </Card>
@@ -823,12 +845,13 @@ export default function HKMarketTab({
         footer={null}
         width="min(1200px, calc(100vw - 20px))"
         centered
-        styles={{ body: { height: "72vh" } }}
+        styles={{ body: { height: fullscreenHeight } }}
       >
         <LazyKlineChart
           data={chartItems(indexHistoryQuery.data?.items)}
-          height={560}
+          height={fullscreenHeight}
           viewKey={`hk-index-modal-${activeIndex}-${indexPeriod}`}
+          landscapeToolbar={indexPeriodControl}
         />
       </Modal>
 
@@ -841,12 +864,13 @@ export default function HKMarketTab({
           footer={null}
           width="min(1200px, calc(100vw - 20px))"
           centered
-          styles={{ body: { height: "72vh" } }}
+          styles={{ body: { height: fullscreenHeight } }}
         >
           <LazyKlineChart
             data={chartItems(stockHistoryQuery.data?.items)}
-            height={560}
+            height={fullscreenHeight}
             viewKey={`hk-stock-modal-${activeStock.code}-${stockPeriod}-${adjust}`}
+            landscapeToolbar={stockLandscapeToolbar}
           />
         </Modal>
       )}

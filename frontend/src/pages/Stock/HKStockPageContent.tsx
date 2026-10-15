@@ -33,6 +33,7 @@ import IntradayChart from "../../charts/IntradayChart";
 import LazyKlineChart from "../../charts/LazyKlineChart";
 import SectionDataState from "../../components/SectionDataState";
 import StockWorkspaceNav from "../../features/stock-navigation/StockWorkspaceNav";
+import { useFullscreenChartHeight } from "../../hooks/useFullscreenChartHeight";
 import { useColors, useStyles } from "../../styles/ui";
 import type { KlineItem } from "../../types/stock";
 import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
@@ -74,6 +75,35 @@ export default function HKStockPageContent({ code }: { code: string }) {
   const [adjust, setAdjust] = useState<string>("qfq");
   const [expanded, setExpanded] = useState<boolean>(false);
   const [historyYears, setHistoryYears] = useState(1);
+  const fullscreenHeight = useFullscreenChartHeight();
+  // 放大横屏时页面工具栏被固定层遮住，这里把周期/复权控件带进图表 HUD
+  const landscapeToolbar = (
+    <>
+      <Segmented
+        size="small"
+        aria-label="K线周期"
+        options={[
+          { label: "日K", value: "daily" },
+          { label: "周K", value: "weekly" },
+          { label: "月K", value: "monthly" },
+          { label: "年K", value: "annual" },
+        ]}
+        value={period}
+        onChange={(val) => setPeriod(String(val))}
+      />
+      <Segmented
+        size="small"
+        aria-label="复权方式"
+        options={[
+          { label: "前复权", value: "qfq" },
+          { label: "后复权", value: "hfq" },
+          { label: "不复权", value: "none" },
+        ]}
+        value={adjust}
+        onChange={(val) => setAdjust(String(val))}
+      />
+    </>
+  );
 
   const startDate = useMemo(() => yearsAgoDate(historyYears), [historyYears]);
   const historyLimitReached = historyYears >= MAX_KLINE_HISTORY_YEARS;
@@ -490,6 +520,7 @@ export default function HKStockPageContent({ code }: { code: string }) {
               viewKey={`hk-stock-page-${code}-${period}-${adjust}`}
               onReachLeftEdge={handleReachLeftEdge}
               historyLimitReached={historyLimitReached}
+              landscapeToolbar={landscapeToolbar}
             />
           </SectionDataState>
         ) : (
@@ -527,12 +558,12 @@ export default function HKStockPageContent({ code }: { code: string }) {
             : `${activeView.toUpperCase()} 技术副图全屏`
         }`}
       >
-        <div style={{ height: "80vh", minHeight: 480 }}>
+        <div style={{ height: fullscreenHeight, minHeight: 320 }}>
           {activeView === "intraday" ? (
             <IntradayChart
               data={intradayItems}
               prevClose={intradayQuery.data?.prev_close}
-              height={window.innerHeight * 0.76}
+              height={fullscreenHeight}
               viewKey={`hk-intraday-modal-${code}`}
               showAvgLine={showAvgLine}
               showPrevCloseLine={showPrevClose}
@@ -541,13 +572,14 @@ export default function HKStockPageContent({ code }: { code: string }) {
           ) : activeView === "kline" ? (
             <LazyKlineChart
               data={chartData}
-              height={window.innerHeight * 0.76}
+              height={fullscreenHeight}
               viewKey={`hk-stock-modal-${code}-${period}-${adjust}`}
               onReachLeftEdge={handleReachLeftEdge}
               historyLimitReached={historyLimitReached}
+              landscapeToolbar={landscapeToolbar}
             />
           ) : (
-            <div className="stock-macd-panel" style={{ minHeight: 600 }}>
+            <div className="stock-macd-panel" style={{ minHeight: fullscreenHeight }}>
               <IndicatorSubCharts
                 code={code}
                 types={["macd", "rsi", "kdj"]}
@@ -559,7 +591,7 @@ export default function HKStockPageContent({ code }: { code: string }) {
                 historyYears={historyYears}
                 onReachLeftEdge={handleReachLeftEdge}
                 historyLimitReached={historyLimitReached}
-                height={580}
+                height={Math.max(240, fullscreenHeight - 40)}
               />
             </div>
           )}

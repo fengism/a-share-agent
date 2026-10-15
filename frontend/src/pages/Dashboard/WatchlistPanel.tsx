@@ -195,6 +195,7 @@ export default function WatchlistPanel() {
                   <PreloadLink className="dashboard-watchlist__identity" to={buildWatchlistStockUrl(item.stock_code, item.market)}>
                     <strong>{item.stock_name}</strong>
                     <Text type="secondary" className="financial-num">{item.stock_code}</Text>
+                    {item.market === "hk" ? <Tag color="blue">港股</Tag> : null}
                   </PreloadLink>
                   <div className="dashboard-watchlist__quote-cluster">
                     <strong className="financial-num">{item.current_price?.toFixed(2) ?? "-"}</strong>

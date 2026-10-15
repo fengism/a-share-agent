@@ -6,6 +6,7 @@ import LazyKlineChart from "../../charts/LazyKlineChart";
 import ChangeValue from "../../components/ChangeValue";
 import IndexIntradayCard from "../../components/IndexIntradayCard";
 import SectionDataState from "../../components/SectionDataState";
+import { useFullscreenChartHeight } from "../../hooks/useFullscreenChartHeight";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useColors, useTokens } from "../../styles/ui";
 import type { ThemeColors } from "../../styles/ui";
@@ -34,12 +35,27 @@ export default function AIndexTab() {
   const c = useColors();
   const t = useTokens();
   const [klineExpanded, setKlineExpanded] = useState(false);
+  const fullscreenHeight = useFullscreenChartHeight();
   const [activeSymbol, setActiveSymbol] = useUrlSearchParam("index", "000001", {
     allowedValues: INDEX_CODES,
   });
   const [period, setPeriod] = useUrlSearchParam("period", "daily", {
     allowedValues: KLINE_PERIODS,
   });
+  const periodControl = (
+    <Segmented
+      size="small"
+      aria-label="K线周期"
+      options={[
+        { label: "日K", value: "daily" },
+        { label: "周K", value: "weekly" },
+        { label: "月K", value: "monthly" },
+        { label: "年K", value: "annual" },
+      ]}
+      value={period}
+      onChange={(value) => setPeriod(String(value))}
+    />
+  );
   // 默认展示近 1 年，向左滑动触底时每次再向前扩充 1 年，最多到 10 年
   const [historyYears, setHistoryYears] = useState(1);
   const startDate = useMemo(() => yearsAgoDate(historyYears), [historyYears]);
@@ -212,17 +228,7 @@ export default function AIndexTab() {
                     ? `已加载近 ${MAX_KLINE_HISTORY_YEARS} 年（上限）`
                     : `近 ${historyYears} 年 · 向左滑动加载更早数据（最多 ${MAX_KLINE_HISTORY_YEARS} 年）`}
                 </span>
-                <Segmented
-                  aria-label="K线周期"
-                  options={[
-                    { label: "日K", value: "daily" },
-                    { label: "周K", value: "weekly" },
-                    { label: "月K", value: "monthly" },
-                    { label: "年K", value: "annual" },
-                  ]}
-                  value={period}
-                  onChange={(value) => setPeriod(String(value))}
-                />
+                {periodControl}
                 <Button
                   type="text"
                   size="small"
@@ -251,6 +257,7 @@ export default function AIndexTab() {
                 viewKey={`${activeSymbol}-${period}`}
                 onReachLeftEdge={historyLimitReached ? undefined : handleReachLeftEdge}
                 historyLimitReached={historyLimitReached}
+                landscapeToolbar={periodControl}
               />
             </SectionDataState>
           </Card>
@@ -277,14 +284,15 @@ export default function AIndexTab() {
         footer={null}
         width="min(1200px, calc(100vw - 20px))"
         centered
-        styles={{ body: { height: "75vh" } }}
+        styles={{ body: { height: fullscreenHeight } }}
       >
         <LazyKlineChart
           data={klineItems}
-          height={580}
+          height={fullscreenHeight}
           viewKey={`${activeSymbol}-${period}-fullscreen`}
           onReachLeftEdge={historyLimitReached ? undefined : handleReachLeftEdge}
           historyLimitReached={historyLimitReached}
+          landscapeToolbar={periodControl}
         />
       </Modal>
     </div>

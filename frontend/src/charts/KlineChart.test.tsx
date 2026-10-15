@@ -650,6 +650,25 @@ describe("KlineChart", () => {
     expect(queryByText("90°旋转")).toBeNull();
   });
 
+  it("renders the landscape toolbar slot only while in landscape mode", () => {
+    const { getByText, queryByText } = render(
+      <KlineChart
+        data={[
+          { date: "2026-01-01", open: 10, close: 10.5, high: 11, low: 9.5, volume: 1000, amount: 10000 },
+        ] as unknown as KlineItem[]}
+        landscapeToolbar={<span>横屏周期工具条</span>}
+      />,
+    );
+
+    expect(queryByText("横屏周期工具条")).toBeNull();
+
+    fireEvent.click(getByText("放大横屏"));
+    expect(getByText("横屏周期工具条")).toBeInTheDocument();
+
+    fireEvent.click(getByText("退出横屏"));
+    expect(queryByText("横屏周期工具条")).toBeNull();
+  });
+
   it("supports chip peak line and CYQ distribution display toggle", () => {
     const mockChip = {
       peak_price: 18.5,
