@@ -533,6 +533,7 @@ export default function IntradayChart({
       {/* Real-time Interactive HUD status bar */}
       <div
         ref={hudRef}
+        className="intraday-chart__hud"
         style={{
           minHeight: 32,
           flexWrap: "wrap",
@@ -552,7 +553,7 @@ export default function IntradayChart({
         }}
       >
         {activePoint ? (
-          <div style={{
+          <div className="intraday-chart__hud-stats" style={{
             display: "flex",
             alignItems: "center",
             gap: "4px 8px",
@@ -593,7 +594,7 @@ export default function IntradayChart({
         ) : (
           <span>等待分时数据...</span>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "11px", flex: "0 0 auto" }}>
+        <div className="intraday-chart__hud-legend" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "11px", flex: "0 0 auto" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.primary }} />
             分时线
@@ -740,6 +741,7 @@ export default function IntradayChart({
 
         {/* 股价与成交量窗格中间区分栏 (带背景色、带说明、左右不穿透坐标轴) */}
         <div
+          className="intraday-chart__separator-bar"
           style={{
             position: "absolute",
             top: pane0Height - 11,
@@ -761,26 +763,28 @@ export default function IntradayChart({
           onMouseDown={handleSeparatorMouseDown}
           title="上下拖拽可调整分时图与成交量高度比例"
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{
+          <div className="intraday-chart__volume-info" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, overflow: "hidden", flexWrap: "nowrap" }}>
+            <span className="intraday-chart__volume-title" style={{
               fontSize: "11px",
               fontWeight: 700,
               color: c.textSecondary,
               letterSpacing: "0.02em",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}>
               成交量 VOL
             </span>
-            <span style={{ fontSize: "11px", color: c.textMuted }}>
+            <span className="intraday-chart__volume-stat" style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}>
               量: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatVolume(activePoint?.volume)}</strong>
             </span>
             {activePoint?.amount != null && (
-              <span style={{ fontSize: "11px", color: c.textMuted }}>
+              <span className="intraday-chart__volume-stat" style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}>
                 额: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatAmount(activePoint.amount)}</strong>
               </span>
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div className="intraday-chart__separator-drag" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <div style={{
               width: 22,
               height: 3,
@@ -788,7 +792,7 @@ export default function IntradayChart({
               backgroundColor: c.border,
               opacity: 0.8,
             }} />
-            <span style={{ fontSize: "10px", color: c.textMuted, opacity: 0.75 }}>
+            <span className="intraday-chart__separator-unit" style={{ fontSize: "10px", color: c.textMuted, opacity: 0.75 }}>
               单位: 股/元
             </span>
           </div>

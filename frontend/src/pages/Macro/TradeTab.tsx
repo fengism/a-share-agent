@@ -135,6 +135,7 @@ export default function TradeTab() {
             columns={commodityColumns}
             pagination={false}
             size="middle"
+            scroll={{ x: 800 }}
           />
         </Card>
       ) : null}

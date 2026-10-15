@@ -15,6 +15,7 @@ import PortfolioSettingsCard from "./PortfolioSettingsCard";
 import TransactionEntryCard, { type TransactionEntryCardHandle } from "./TransactionEntryCard";
 import type { PortfolioStockSummary } from "../../types/portfolio";
 import { errorMessage, formatTime } from "./portfolioFormatters";
+import "./portfolio.css";
 
 const { Paragraph, Title } = Typography;
 

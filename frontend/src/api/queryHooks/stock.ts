@@ -50,7 +50,7 @@ export function useStockBusinessIntro(code: string) {
   });
 }
 
-export function useStockChipDistribution(code: string) {
+export function useStockChipDistribution(code: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.stock.chipDistribution(code),
     queryFn: () => openApiGet("/api/stock/{code}/chip-distribution", {
@@ -58,7 +58,7 @@ export function useStockChipDistribution(code: string) {
       options: { timeoutMs: API_TIMEOUTS.EXTERNAL },
     }),
     select: asApiModel<ChipDistribution>(),
-    enabled: !!code,
+    enabled: (options?.enabled ?? true) && !!code,
     staleTime: QUERY_CACHE_POLICIES.marketTenMinutes.staleMs,
   });
 }

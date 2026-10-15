@@ -169,7 +169,7 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
     {
       title: "龙头股",
       key: "stock",
-      width: 160,
+      width: 150,
       render: (_value, row) => (
         <span style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[2] }}>
           <StockExternalLink code={row.code} name={row.name}><strong>{row.name}</strong></StockExternalLink>
@@ -177,12 +177,12 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
         </span>
       ),
     },
-    { title: "所属主线", dataIndex: "origin", key: "origin", width: 140, ellipsis: true },
+    { title: "所属主线", dataIndex: "origin", key: "origin", width: 130, ellipsis: true },
     {
       title: "涨跌幅",
       dataIndex: "change_pct",
       key: "change_pct",
-      width: 90,
+      width: 85,
       align: "right",
       render: (value: number | null) => <ChangeValue value={value} />,
     },
@@ -196,7 +196,7 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
     {
       title: "快速下钻",
       key: "actions",
-      width: 100,
+      width: 95,
       render: (_value, row) => (
         <span style={{ display: "inline-flex", gap: 4 }}>
           <PreloadLink to={`/analysis?code=${row.code}`}>
@@ -234,6 +234,7 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
         columns={columns}
         dataSource={rows}
         pagination={{ pageSize: 10, size: "small", showSizeChanger: false, hideOnSinglePage: true }}
+        scroll={{ x: 500 }}
       />
     </Card>
   );
@@ -264,7 +265,7 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
     {
       title: "个股",
       key: "stock",
-      width: 160,
+      width: 150,
       render: (_value, row) => (
         <span style={{ display: "inline-flex", alignItems: "baseline", gap: t.space[2] }}>
           <StockExternalLink code={row.code} name={row.name}><strong>{row.name}</strong></StockExternalLink>
@@ -272,19 +273,19 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
         </span>
       ),
     },
-    { title: "所属指数", dataIndex: "indexName", key: "indexName", width: 140, ellipsis: true },
+    { title: "所属指数", dataIndex: "indexName", key: "indexName", width: 130, ellipsis: true },
     {
       title: "近30日涨跌幅",
       dataIndex: "change_30d",
       key: "change_30d",
-      width: 120,
+      width: 100,
       align: "right",
       render: (value: number | null) => <ChangeValue value={value} />,
     },
     {
       title: "操作",
       key: "actions",
-      width: 70,
+      width: 65,
       render: (_value, row) => (
         <PreloadLink to={`/analysis?code=${row.code}`}>
           <Button size="small" type="link" style={{ padding: "0 2px", fontSize: 12 }}>
@@ -312,7 +313,7 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
         </div>
       ) : null}
       {style.indexes.length > 0 ? (
-        <div style={{ display: "grid", gap: t.space[2] }}>
+        <div style={{ display: "grid", gap: t.space[2], minWidth: 0 }}>
           <Text strong style={{ fontSize: t.font.sm }}>指数表现</Text>
           <Table<MarketMainlineStyleIndex>
             size="small"
@@ -320,11 +321,12 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
             columns={indexColumns}
             dataSource={style.indexes}
             pagination={false}
+            scroll={{ x: 280 }}
           />
         </div>
       ) : null}
       {stockRows.length > 0 ? (
-        <div style={{ display: "grid", gap: t.space[2] }}>
+        <div style={{ display: "grid", gap: t.space[2], minWidth: 0 }}>
           <Text strong style={{ fontSize: t.font.sm }}>代表个股</Text>
           <Table<MainlineStyleStockRow>
             size="small"
@@ -332,6 +334,7 @@ function MainlineStyleTableCard({ style }: { style: MarketMainlineStyle }) {
             columns={stockColumns}
             dataSource={stockRows}
             pagination={{ pageSize: 10, size: "small", showSizeChanger: false, hideOnSinglePage: true }}
+            scroll={{ x: 445 }}
           />
         </div>
       ) : null}
@@ -422,7 +425,7 @@ export default function Dashboard() {
           </div>
           <h1>市场总览</h1>
         </div>
-        <div className="dashboard-hero__shortcuts" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="dashboard-hero__shortcuts">
           <Button
             size="small"
             shape="round"

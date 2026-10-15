@@ -760,7 +760,7 @@ export default function HKMarketTab({
             columns={columns}
             dataSource={displayStocks}
             pagination={false}
-            scroll={{ x: 800 }}
+            scroll={{ x: "max-content" }}
             rowSelection={{
               selectedRowKeys: selectedCodes,
               preserveSelectedRowKeys: true,
@@ -821,7 +821,8 @@ export default function HKMarketTab({
         open={indexChartExpanded}
         onCancel={() => setIndexChartExpanded(false)}
         footer={null}
-        width="90vw"
+        width="min(1200px, calc(100vw - 20px))"
+        centered
         styles={{ body: { height: "72vh" } }}
       >
         <LazyKlineChart
@@ -838,7 +839,8 @@ export default function HKMarketTab({
           open={stockChartExpanded}
           onCancel={() => setStockChartExpanded(false)}
           footer={null}
-          width="90vw"
+          width="min(1200px, calc(100vw - 20px))"
+          centered
           styles={{ body: { height: "72vh" } }}
         >
           <LazyKlineChart

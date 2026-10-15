@@ -61,7 +61,7 @@ export default function MarketWindBoard({ embedded = false }: { embedded?: boole
     {
       title: "排名",
       key: "rank",
-      width: 72,
+      width: 56,
       align: "center",
       render: (_value: unknown, _stock: MarketWindStock, index: number) => (
         <span className={`wind-stock-rank ${index < 3 ? "wind-stock-rank--top" : ""}`}>{index + 1}</span>
@@ -70,7 +70,7 @@ export default function MarketWindBoard({ embedded = false }: { embedded?: boole
     {
       title: "龙头股",
       key: "stock",
-      width: 180,
+      width: 140,
       render: (_value: unknown, stock: MarketWindStock) => (
         <StockExternalLink code={stock.code} name={stock.name} className="wind-stock-link">
           <strong>{stock.name || "-"}</strong>
@@ -81,21 +81,21 @@ export default function MarketWindBoard({ embedded = false }: { embedded?: boole
     {
       title: "最新价",
       dataIndex: "price",
-      width: 120,
+      width: 95,
       align: "right",
       render: formatPrice,
     },
     {
       title: "涨跌幅",
       dataIndex: "change_pct",
-      width: 120,
+      width: 95,
       align: "right",
       render: (value: number | null) => <ChangeValue value={value} fontWeight={700} />,
     },
     {
       title: "连板高度",
       dataIndex: "limit_up_days",
-      width: 120,
+      width: 95,
       align: "center",
       render: (value: number) => value > 0
         ? <Tag style={semanticTagStyle(value > 1 ? "up" : "warning")}>{value > 1 ? `${value}连板` : "首板"}</Tag>
@@ -241,7 +241,7 @@ export default function MarketWindBoard({ embedded = false }: { embedded?: boole
               columns={columns}
               dataSource={stocks}
               pagination={false}
-              scroll={{ x: 612 }}
+              scroll={{ x: 480 }}
               size="middle"
               tableLayout="fixed"
             />

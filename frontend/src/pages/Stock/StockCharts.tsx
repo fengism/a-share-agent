@@ -52,6 +52,10 @@ function KlinePanel({
     [chanlunEnabled, items],
   );
 
+  // 筹码分布（港股无筹码分布，日K线周期时启用）
+  const isHK = code.startsWith("hk");
+  const chipQuery = useStockChipDistribution(code, { enabled: !isHK });
+
   // 上游已无更早数据时通知外层停止回溯（由 StockCharts 的 onHistoryExhausted 处理）
   const itemCount = items?.length ?? null;
   useEffect(() => {
@@ -111,6 +115,7 @@ function KlinePanel({
           viewKey={`${code}-${period}-${adjust}${viewKeySuffix}`}
           onReachLeftEdge={historyLimitReached ? undefined : onReachLeftEdge}
           historyLimitReached={historyLimitReached}
+          chipDistribution={chipQuery?.data}
         />
       </SectionDataState>
     </>

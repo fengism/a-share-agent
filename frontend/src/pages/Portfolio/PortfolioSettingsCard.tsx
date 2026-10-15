@@ -108,8 +108,8 @@ export default function PortfolioSettingsCard({ settings }: PortfolioSettingsCar
               <InputNumber min={0.01} max={100} precision={2} suffix="%" style={{ width: "100%" }} />
             </Form.Item>
           </Col>
-          <Col xs={12} sm={6} lg={3}>
-            <Form.Item label=" ">
+          <Col xs={24} sm={6} lg={3}>
+            <Form.Item label=" " className="portfolio-settings-submit-item">
               <Button
                 type="primary"
                 htmlType="submit"

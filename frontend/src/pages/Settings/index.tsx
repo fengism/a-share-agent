@@ -10,7 +10,7 @@ import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
 import { useColors, useStyles, semanticTagStyle } from "../../styles/ui";
 import type { ConfigUpdate, ProviderDefault, ProxyTestResponse } from "../../types/settings";
-import { EASTMONEY_RATE_LIMIT_KEYS } from "./ConfigCards";
+import { EASTMONEY_RATE_LIMIT_KEYS, normalizeProxyUrl, validateProxyUrl } from "./ConfigCards";
 import SystemUpdateCard from "./SystemUpdateCard";
 import { useConfigSectionSave } from "./useConfigSectionSave";
 
@@ -255,7 +255,7 @@ export default function SettingsPage() {
     const outboundProxy = Boolean(
       (form.outbound_proxy_type !== undefined &&
         form.outbound_proxy_type !== config.outbound_proxy_type) ||
-      (form.outbound_proxy_url &&
+      (form.outbound_proxy_url !== undefined &&
         !form.outbound_proxy_url.includes("***") &&
         form.outbound_proxy_url !== config.outbound_proxy_url) ||
       (form.outbound_proxy_timeout_seconds !== undefined &&
@@ -476,11 +476,27 @@ export default function SettingsPage() {
     const rawUrl = (form.outbound_proxy_url ?? "").trim();
     // 代理地址按凭证下发，已保存的值会带 ***，此时不覆盖后端原值
     const maskedUrl = rawUrl.includes("***");
-    const url = maskedUrl ? (config?.outbound_proxy_url ?? "") : rawUrl;
+    let url = maskedUrl ? (config?.outbound_proxy_url ?? "") : rawUrl;
 
-    if (proxyType !== "none" && !maskedUrl && !url) {
-      message.error("启用代理后必须填写代理地址");
-      return;
+    if (proxyType === "none") {
+      url = "";
+    } else {
+      if (!maskedUrl && !url) {
+        message.error("启用代理后必须填写代理地址");
+        return;
+      }
+      if (maskedUrl && config?.outbound_proxy_type !== proxyType) {
+        message.error("切换代理类型后请重新填写代理地址");
+        return;
+      }
+      if (!maskedUrl) {
+        const error = validateProxyUrl(url, proxyType);
+        if (error) {
+          message.error(error);
+          return;
+        }
+        url = normalizeProxyUrl(url, proxyType);
+      }
     }
 
     saveConfig(
@@ -492,14 +508,26 @@ export default function SettingsPage() {
         outbound_proxy_retries: form.outbound_proxy_retries ?? 2,
       },
       proxyType === "none" ? "出站代理已关闭" : "出站代理配置已保存",
+      (updatedConfig) => {
+        if (updatedConfig) {
+          updateForm({
+            outbound_proxy_type: updatedConfig.outbound_proxy_type,
+            outbound_proxy_url: updatedConfig.outbound_proxy_url ?? "",
+            outbound_proxy_timeout_seconds: updatedConfig.outbound_proxy_timeout_seconds,
+            outbound_proxy_retries: updatedConfig.outbound_proxy_retries,
+          });
+        }
+      },
     );
   }, [
+    config?.outbound_proxy_type,
     config?.outbound_proxy_url,
     form.outbound_proxy_retries,
     form.outbound_proxy_timeout_seconds,
     form.outbound_proxy_type,
     form.outbound_proxy_url,
     saveConfig,
+    updateForm,
   ]);
 
   const handleSaveEastmoneyRateLimit = useCallback(() => {

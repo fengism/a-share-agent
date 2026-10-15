@@ -1044,6 +1044,9 @@ class MarketDailyBarRepository:
                     _deduplicate_business_observations(connection)
                     _record_migration_ledger(connection, 2)
                     connection.execute("PRAGMA user_version=2")
+                    from app.core.cache import clear_all_caches
+
+                    clear_all_caches()
             with _close_lock:
                 _initialized_paths.add(key)
 

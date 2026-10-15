@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ConfigData, ConfigUpdate } from "../../types/settings";
+import type { ConfigData, ConfigUpdate, OutboundProxyType } from "../../types/settings";
 import { useAuthStore } from "../../store/authStore";
 import SettingsPage from ".";
 
@@ -25,9 +25,13 @@ vi.mock("./MarketDailyBarManagerCard", () => ({
   ),
 }));
 
-vi.mock("./ConfigCards", () => ({
-  // 页面用这个常量做脏检查、保存与撤销，这里提供与真实实现一致的键集合
-  EASTMONEY_RATE_LIMIT_KEYS: [
+vi.mock("./ConfigCards", async () => {
+  const { normalizeProxyUrl, validateProxyUrl } = await import("./config-cards/EastmoneyProxyConfigCard");
+  return {
+    normalizeProxyUrl,
+    validateProxyUrl,
+    // 页面用这个常量做脏检查、保存与撤销，这里提供与真实实现一致的键集合
+    EASTMONEY_RATE_LIMIT_KEYS: [
     "eastmoney_min_interval_seconds",
     "eastmoney_datacenter_min_interval_seconds",
     "eastmoney_cooldown_seconds",
@@ -104,6 +108,11 @@ vi.mock("./ConfigCards", () => ({
   }) => (
     <div>
       <input
+        aria-label="出站代理类型"
+        value={form.outbound_proxy_type || "none"}
+        onChange={(event) => onChange({ outbound_proxy_type: event.target.value as OutboundProxyType })}
+      />
+      <input
         aria-label="出站代理地址"
         value={form.outbound_proxy_url || ""}
         onChange={(event) => onChange({ outbound_proxy_url: event.target.value })}
@@ -140,7 +149,8 @@ vi.mock("./ConfigCards", () => ({
   NotionConfigCard: () => null,
   ProviderDefaultsCard: () => null,
   TwitterConfigCard: () => null,
-}));
+};
+});
 
 vi.mock("./BotJobManagerCard", () => ({ default: () => null }));
 vi.mock("./InviteManagerCard", () => ({ default: () => null }));
@@ -328,6 +338,39 @@ describe("SettingsPage Bot config", () => {
     } finally {
       config = originalConfig;
     }
+  });
+
+  it("normalizes and submits a new plaintext SOCKS5 proxy address", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "数据源管理" }));
+    const saveButton = await screen.findByRole("button", { name: "保存出站代理配置" });
+
+    fireEvent.change(screen.getByLabelText("出站代理类型"), { target: { value: "socks5" } });
+    fireEvent.change(screen.getByLabelText("出站代理地址"), { target: { value: "127.0.0.1:1080" } });
+    fireEvent.click(saveButton);
+
+    expect(mocks.mutateConfig).toHaveBeenCalledWith(
+      {
+        outbound_proxy_type: "socks5",
+        outbound_proxy_url: "socks5h://127.0.0.1:1080",
+        outbound_proxy_timeout_seconds: 20,
+        outbound_proxy_retries: 2,
+      },
+      expect.anything(),
+    );
+    queryClient.clear();
   });
 
   it("submits every Eastmoney rate-limit field and reverts them independently", async () => {

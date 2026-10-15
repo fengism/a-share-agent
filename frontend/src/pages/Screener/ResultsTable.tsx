@@ -529,7 +529,7 @@ export default function ResultsTable({
         columnWidth: 38,
       } : undefined}
       locale={{ emptyText: <Empty description="无匹配股票，请调整筛选条件" /> }}
-      scroll={isNarrow ? undefined : { x: "max-content" }}
+      scroll={isNarrow ? { x: 380 } : { x: "max-content" }}
     />
   );
 }

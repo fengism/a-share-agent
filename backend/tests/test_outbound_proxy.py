@@ -118,6 +118,12 @@ def test_https_http_proxy_scheme_is_accepted() -> None:
     assert normalize_proxy_url("https://proxy.local:8443", PROXY_TYPE_HTTP) == "https://proxy.local:8443"
 
 
+def test_socks_scheme_is_normalized_to_socks5h() -> None:
+    assert normalize_proxy_url("socks://user:pw@proxy.local:2260", PROXY_TYPE_SOCKS5) == (
+        "socks5h://user:pw@proxy.local:2260"
+    )
+
+
 @pytest.mark.parametrize(
     ("raw_url", "proxy_type", "expected_message"),
     [

@@ -5,6 +5,9 @@ import type { ChanlunResult } from "../utils/chanlun";
 import { loadKlineChart } from "./klineChartLoader";
 import type { KlineTradeMarker } from "./klineMarkers";
 
+import type { SubIndicatorType, CandleStyleType } from "./KlineChart";
+import type { ChipDistribution } from "../types/stock";
+
 const KlineChart = lazy(loadKlineChart);
 
 interface LazyKlineChartProps {
@@ -16,6 +19,11 @@ interface LazyKlineChartProps {
   forceRender?: boolean;
   onReachLeftEdge?: () => void;
   historyLimitReached?: boolean;
+  showHighLowMarkers?: boolean;
+  defaultSubIndicator?: SubIndicatorType;
+  defaultCandleStyle?: CandleStyleType;
+  chipDistribution?: ChipDistribution | null;
+  defaultShowChipPeak?: boolean;
 }
 
 export default function LazyKlineChart({
@@ -27,6 +35,11 @@ export default function LazyKlineChart({
   forceRender = false,
   onReachLeftEdge,
   historyLimitReached,
+  showHighLowMarkers,
+  defaultSubIndicator,
+  defaultCandleStyle,
+  chipDistribution,
+  defaultShowChipPeak,
 }: LazyKlineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = useState(() => typeof IntersectionObserver === "undefined");
@@ -56,6 +69,11 @@ export default function LazyKlineChart({
             chanlun={chanlun}
             onReachLeftEdge={onReachLeftEdge}
             historyLimitReached={historyLimitReached}
+            showHighLowMarkers={showHighLowMarkers}
+            defaultSubIndicator={defaultSubIndicator}
+            defaultCandleStyle={defaultCandleStyle}
+            chipDistribution={chipDistribution}
+            defaultShowChipPeak={defaultShowChipPeak}
           />
         </Suspense>
       ) : (

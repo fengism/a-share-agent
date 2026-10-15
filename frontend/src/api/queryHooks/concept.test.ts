@@ -84,7 +84,7 @@ describe("useConceptConstituents", () => {
     // 不传 codes = 只取本地身份列表，零上游行情调用
     expect(openApiGet).toHaveBeenCalledWith("/api/market/concept/{concept}/constituents", {
       path: { concept: "X" },
-      query: {},
+      query: { codes: "" },
     });
   });
 

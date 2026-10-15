@@ -832,17 +832,49 @@
   .industry-conclusion__header,
   .industry-conclusion__summary,
   .industry-conclusion__factor {
-    padding-inline: 16px;
+    padding-inline: 14px;
+  }
+
+  .industry-conclusion__header {
+    padding: 12px 14px 10px;
+    align-items: center;
+  }
+
+  .industry-conclusion__header h2 {
+    font-size: 17px !important;
+  }
+
+  .industry-conclusion__summary {
+    padding: 12px 14px;
+  }
+
+  .industry-conclusion__summary > p,
+  .industry-conclusion__summary-content .industry-markdown {
+    font-size: 13.5px;
+    line-height: 1.55;
   }
 
   .industry-report__title-row {
     flex-direction: column;
     align-items: flex-start;
+    gap: 8px;
+  }
+
+  .industry-report__title {
+    font-size: 17px !important;
   }
 
   .industry-report__actions {
     width: 100%;
-    justify-content: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .industry-report__actions .ant-btn {
+    height: 30px;
+    font-size: 12px;
+    padding: 0 8px;
   }
 
   .industry-report__chapter-nav {
@@ -850,17 +882,29 @@
     display: flex;
     width: 100%;
     overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+    scrollbar-width: none;
+    border-radius: var(--c-radius-sm);
+    padding: 2px 0;
+  }
+
+  .industry-report__chapter-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .industry-report__chapter-nav a {
-    min-width: 132px;
-    flex: 1 0 132px;
+    min-width: 108px;
+    flex: 0 0 auto;
+    padding: 7px 10px;
   }
 
-  .industry-conclusion__header {
-    align-items: center;
+  .industry-report__chapter-nav span {
+    font-size: 12px;
+  }
+
+  .industry-report__chapter-nav small {
+    font-size: 10px;
   }
 
   .industry-conclusion__metrics,
@@ -876,6 +920,7 @@
   .industry-conclusion__metrics > div,
   .industry-conclusion__factor {
     min-height: auto;
+    padding: 10px 14px;
     border-right: 0;
     border-bottom: 1px solid var(--c-border);
   }
@@ -885,14 +930,24 @@
     border-bottom: 0;
   }
 
+  .industry-conclusion__metrics strong {
+    font-size: 16px;
+    font-family: var(--c-font-mono);
+  }
+
   .industry-research-block {
-    margin-bottom: 14px;
-    padding-bottom: 16px;
+    margin-bottom: 12px;
+    padding-bottom: 14px;
+  }
+
+  .industry-research-block__title {
+    font-size: 14px;
+    margin-bottom: 10px;
   }
 
   .industry-research-grid {
-    margin-bottom: 14px;
-    padding-bottom: 14px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
   }
 
   .industry-chain-flow {
@@ -906,12 +961,52 @@
   }
 
   .industry-chain-tier {
-    padding: 12px;
+    padding: 10px 12px;
   }
 
   .industry-event-list__item {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;
+  }
+
+  .industry-decision-research {
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+
+  .industry-decision-research article {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--c-border);
+  }
+
+  .industry-decision-research article:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .industry-decision-research h4 {
+    font-size: 13.5px;
+    margin-bottom: 6px;
+  }
+
+  .industry-decision-research p {
+    font-size: 12.5px;
+    line-height: 1.55;
+    margin: 4px 0;
+  }
+
+  .industry-opportunity-map > header {
+    padding: 10px 12px;
+  }
+
+  .industry-opportunity-map > ol > li {
+    padding: 12px 14px;
+  }
+
+  .industry-opportunity-map__name {
+    font-size: 14px;
   }
 
   .industry-research-audit > summary {
@@ -933,7 +1028,29 @@
     flex-direction: column;
     gap: 3px;
   }
+}
 
+@media (max-width: 480px) {
+  .industry-report__title {
+    font-size: 16px !important;
+  }
+
+  .industry-conclusion__header h2 {
+    font-size: 15.5px !important;
+  }
+
+  .industry-conclusion__metrics strong {
+    font-size: 15px;
+  }
+
+  .industry-report__chapter-nav a {
+    min-width: 95px;
+    padding: 6px 8px;
+  }
+
+  .industry-chain-tier {
+    padding: 8px 10px;
+  }
 }
 
 .industry-markdown {
@@ -1407,3 +1524,27 @@
 .industry-decision-research > ul { padding-left: 20px; }
 .industry-decision-research > ul > li { margin-bottom: 16px; }
 .industry-decision-research p { line-height: 1.6; overflow-wrap: anywhere; }
+
+/* ── 移动端知识图谱响应式适配 ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .atlas-chain-card__heading {
+    gap: 6px;
+  }
+  .atlas-chain-card__name {
+    font-size: var(--c-font-base) !important;
+  }
+  .atlas-detail__name {
+    font-size: var(--c-font-lg) !important;
+  }
+  .atlas-detail__heading {
+    gap: 6px !important;
+  }
+  .atlas-layer__heading {
+    padding: 8px 12px !important;
+  }
+  .atlas-company-chip {
+    padding: 3px 7px !important;
+    font-size: var(--c-font-xs) !important;
+  }
+}
+

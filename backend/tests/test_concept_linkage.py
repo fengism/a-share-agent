@@ -312,3 +312,27 @@ def test_confirmed_local_closes_skips_rows_without_close(monkeypatch: pytest.Mon
     )
 
     assert module._confirmed_local_closes(["000002"]) == {}
+
+
+def test_get_concept_constituents_degrades_on_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """上游拉取行情超时应自动降级，避免阻塞整个接口。"""
+    _patch_connection(
+        monkeypatch,
+        mapping_rows=[
+            ("000002.SZ", "万科A", '["机器人概念"]'),
+        ],
+        concept_rows=[],
+    )
+
+    async def _slow_fetch(codes: list[str]):
+        await asyncio.sleep(10)
+
+    monkeypatch.setattr(module, "QUOTE_FETCH_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr(module, "fetch_realtime_quote_set", _slow_fetch)
+
+    result = asyncio.run(module.get_concept_constituents("机器人概念", quote_codes=["000002"]))
+
+    assert result["total"] == 1
+    assert result["items"][0]["code"] == "000002"
+    assert result["items"][0]["price"] is None
+

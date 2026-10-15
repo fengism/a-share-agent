@@ -554,13 +554,28 @@
     padding-inline: 16px;
   }
 
-  .market-daily-manager > .ant-card-head-wrapper,
+  .market-daily-manager .ant-card-head-wrapper,
   .market-daily-panel__header,
   .market-daily-job__topline,
   .market-daily-history__day-header,
   .market-daily-factor__summary {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .market-daily-manager .ant-card-head-wrapper {
+    gap: 8px;
+    padding: 12px 0;
+  }
+
+  .market-daily-manager .ant-card-extra {
+    margin-inline-start: 0;
+    width: 100%;
+  }
+
+  .market-daily-manager .ant-card-extra > .ant-space {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .market-daily-manager > .ant-card-body {

@@ -101,7 +101,7 @@ function MonthGrid({
             <Text type="secondary" style={{ fontSize: t.font.sm }}>全年 {yearTotalCount} 个</Text>
           ) : null}
         </div>
-        <div style={{ display: "inline-flex", gap: t.space[3], fontSize: t.font.xs, color: c.textSecondary, alignItems: "center" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: t.space[2], fontSize: t.font.xs, color: c.textSecondary, alignItems: "center" }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <i style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: hexToRgba(c.up, 0.45) }} />
             <i style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: hexToRgba(c.up, 0.12) }} />
@@ -150,8 +150,8 @@ function MonthGrid({
             background = hexToRgba(color, heatAlpha(heat.changePct));
             content = (
               <span style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: "var(--c-leading-tight)" }}>
-                <span style={{ fontSize: t.font.md, color: c.textPrimary }}>{dayjs(iso).date()}</span>
-                <span style={{ fontSize: t.font.xs, fontWeight: Number(t.weight.semibold), color: heat.changePct >= 0 ? c.up : c.down }}>
+                <span className="trading-calendar__cell-date" style={{ fontSize: t.font.md, color: c.textPrimary }}>{dayjs(iso).date()}</span>
+                <span className="trading-calendar__cell-pct financial-num" style={{ fontSize: t.font.xs, fontWeight: Number(t.weight.semibold), color: heat.changePct >= 0 ? c.up : c.down }}>
                   {formatPct(heat.changePct)}
                 </span>
               </span>
@@ -159,13 +159,14 @@ function MonthGrid({
           } else if (isTrading) {
             background = c.hoverBg;
             content = (
-              <span style={{ fontSize: t.font.md, color: c.textPrimary }}>{dayjs(iso).date()}</span>
+              <span className="trading-calendar__cell-date" style={{ fontSize: t.font.md, color: c.textPrimary }}>{dayjs(iso).date()}</span>
             );
           }
 
           return (
             <div
               key={iso}
+              className="trading-calendar__cell"
               style={{
                 display: "flex",
                 alignItems: "center",

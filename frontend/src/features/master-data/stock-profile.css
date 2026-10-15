@@ -46,6 +46,17 @@
   color: var(--c-text-muted);
 }
 
+.stock-profile-business-text--clickable {
+  cursor: pointer;
+  text-decoration: underline dotted var(--c-border);
+  transition: color 0.2s ease;
+}
+
+.stock-profile-business-text--clickable:hover,
+.stock-profile-business-text--clickable:active {
+  color: var(--c-primary);
+}
+
 .stock-profile-drawer__section {
   margin-bottom: 20px;
 }
@@ -69,4 +80,78 @@
 .stock-profile-detail-desc .ant-descriptions-item-label {
   width: 90px;
   color: var(--c-text-muted);
+}
+
+@media (max-width: 768px) {
+  .stock-profile-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .stock-profile-filters__left {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .stock-profile-filters__left > .ant-input-affix-wrapper {
+    grid-column: 1 / -1;
+    width: 100% !important;
+  }
+
+  .stock-profile-filters__left > .ant-btn {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .stock-profile-filters__left > .ant-select {
+    width: 100% !important;
+  }
+
+  .stock-profile-filters__right {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .stock-profile-filters__right > .ant-btn,
+  .stock-profile-filters__right > .ant-popconfirm {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .stock-profile-filters__right > .ant-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .stock-profile-stat-grid .ant-card-body {
+    padding: 10px 12px;
+  }
+
+  .stock-profile-stat-grid .ant-statistic-title {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .stock-profile-stat-grid .ant-statistic-content {
+    font-size: 18px;
+  }
+
+  .stock-profile-filters__left {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-profile-filters__right > .ant-btn,
+  .stock-profile-filters__right > .ant-popconfirm {
+    flex: 1 1 100%;
+  }
+
+  .stock-profile-detail-desc .ant-descriptions-item-label {
+    width: 75px;
+    font-size: 12px;
+  }
 }

@@ -24,24 +24,16 @@ export function ChatSessionSidebar({
     <div
       className="chat-session-sidebar"
       style={{
-        width: 220,
-        flexShrink: 0,
-        position: "sticky",
-        top: 0,
         background: colors.nestedBg,
         border: `1px solid ${colors.border}`,
         borderRadius: t.radius.lg,
         padding: t.space[3],
-        maxHeight: "calc(100vh - 120px)",
-        overflowY: "auto",
-        display: "flex",
-        flexDirection: "column",
         gap: t.space[2],
       }}
     >
       <Button
         type="primary"
-        block
+        className="chat-new-session-btn"
         icon={<PlusOutlined />}
         onClick={onNewSession}
         style={{ borderRadius: t.radius.md }}
@@ -49,11 +41,8 @@ export function ChatSessionSidebar({
         新对话
       </Button>
       <div
+        className="chat-session-list"
         style={{
-          flex: 1,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
           gap: t.space[1],
         }}
       >

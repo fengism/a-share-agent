@@ -208,6 +208,25 @@
 }
 
 @media (max-width: 479px) {
+  .industry-stat-grid .ant-card-body {
+    padding: 10px 12px;
+  }
+
+  .industry-stat-grid .ant-statistic-title {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .industry-stat-grid .ant-statistic-content {
+    font-size: 15px;
+  }
+
+  .industry-stat-suffix {
+    display: block;
+    margin-left: 0;
+    margin-top: 2px;
+  }
+
   .industry-filters {
     grid-template-columns: 1fr;
   }

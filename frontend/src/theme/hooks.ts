@@ -167,6 +167,8 @@ export function useStyles() {
         color: c.textPrimary,
         lineHeight: Number(t.leading.tight),
         letterSpacing: 0.1,
+        fontFamily: "var(--c-font-mono)",
+        fontVariantNumeric: "tabular-nums",
       },
 
       metricValueSecondaryStyle: {
@@ -174,6 +176,8 @@ export function useStyles() {
         fontWeight: Number(t.weight.semibold),
         color: c.textPrimary,
         lineHeight: Number(t.leading.tight),
+        fontFamily: "var(--c-font-mono)",
+        fontVariantNumeric: "tabular-nums",
       },
 
       gradientHeaderStyle: {

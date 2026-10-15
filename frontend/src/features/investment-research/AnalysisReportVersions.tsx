@@ -41,12 +41,23 @@ function ReportVersionDialog({ analysis, onClose }: { analysis: AnalysisResult; 
   return <Modal title={`${code} · ${date} 报告版本（只读）`} open onCancel={onClose} footer={null} width="90%" destroyOnHidden>
       {versions.isError ? <Alert type="error" title="版本列表加载失败" action={<Button onClick={() => void versions.refetch()}>重试</Button>} /> :
         versions.isLoading ? <Skeleton active /> : <>
-          <Select aria-label="报告版本" style={{ minWidth: 320 }} placeholder="选择要查看的版本" value={selected || undefined}
-            onChange={setSelected} options={(versions.data || []).map((item) => ({ value: item.report_id,
-              label: `${item.generated_at || "历史版本"} · ${item.report_id.slice(0, 8)} · ${item.overall_rating}/10`,
-            }))} />
-          <Button disabled={page === 0} onClick={() => { setPage(page - 1); setSelected(""); }}>上一页</Button>
-          <Button disabled={(versions.data?.length || 0) < 50} onClick={() => { setPage(page + 1); setSelected(""); }}>下一页</Button>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
+            <Select
+              aria-label="报告版本"
+              style={{ width: "100%", maxWidth: 360, minWidth: 0 }}
+              placeholder="选择要查看的版本"
+              value={selected || undefined}
+              onChange={setSelected}
+              options={(versions.data || []).map((item) => ({
+                value: item.report_id,
+                label: `${item.generated_at || "历史版本"} · ${item.report_id.slice(0, 8)} · ${item.overall_rating}/10`,
+              }))}
+            />
+            <div style={{ display: "inline-flex", gap: 8 }}>
+              <Button disabled={page === 0} onClick={() => { setPage(page - 1); setSelected(""); }}>上一页</Button>
+              <Button disabled={(versions.data?.length || 0) < 50} onClick={() => { setPage(page + 1); setSelected(""); }}>下一页</Button>
+            </div>
+          </div>
           {!versions.data?.length && <Typography.Paragraph>暂无独立版本。旧报告会在下次重新分析前保留为历史版本。</Typography.Paragraph>}
         </>}
       {snapshot.isError && <Alert type="error" title="报告版本加载失败" action={<Button onClick={() => void snapshot.refetch()}>重试</Button>} />}

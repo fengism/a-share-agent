@@ -362,7 +362,7 @@ test("keeps the mobile workspace ordered without horizontal overflow", async ({ 
   const historyBox = await page.getByRole("complementary", { name: "最近分析记录" }).boundingBox();
   expect(decisionBox).not.toBeNull();
   expect(historyBox).not.toBeNull();
-  expect(historyBox!.y).toBeLessThan(decisionBox!.y);
+  expect(decisionBox!.y).toBeLessThan(historyBox!.y);
   await expectAnalysisGeometry(page);
 });
 

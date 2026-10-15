@@ -47,7 +47,7 @@ function SectorStocksDrawer({
     const stockColumn = {
       title: "股票",
       key: "stock",
-      fixed: "left" as const,
+      fixed: isNarrow ? undefined : ("left" as const),
       width: 140,
       render: (_value: unknown, stock: MarketSectorStocksHistoryItem) => (
         <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
@@ -168,7 +168,7 @@ function SectorStocksDrawer({
     <Drawer
       open={Boolean(sector)}
       onClose={onClose}
-      size={isNarrow ? "100vw" : "min(860px, 100vw)"}
+      width={isNarrow ? "100%" : "min(860px, 100vw)"}
       title={`${sector?.name ?? ""} 成分股 · ${dateText}`}
       destroyOnHidden
     >
@@ -209,7 +209,7 @@ function SectorStocksDrawer({
             expandedRowRender: renderExpandedRow,
             columnWidth: 36,
           } : undefined}
-          scroll={{ x: historyDetailsAvailable ? 800 : 500 }}
+          scroll={{ x: isNarrow ? 340 : (historyDetailsAvailable ? 800 : 500) }}
           size="small"
         />
       </SectionDataState>
@@ -422,7 +422,7 @@ export default function IndustryRankTab() {
             expandedRowRender: renderExpandedRow,
             columnWidth: 36,
           } : undefined}
-          scroll={{ x: isNarrow ? undefined : 1180, y: 600 }}
+          scroll={{ x: isNarrow ? 360 : 1180, y: 600 }}
           size="small"
           style={{ background: "transparent" }}
         />

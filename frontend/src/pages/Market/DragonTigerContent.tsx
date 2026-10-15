@@ -123,7 +123,7 @@ function DetailModal({
   return (
     <Modal
       title={
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <SwapRightOutlined style={{ transform: "rotate(90deg)", color: c.primary }} />
           <span>
             龙虎榜席位明细 — <StockExternalLink code={code} name={name}>{name}</StockExternalLink> ({code})
@@ -134,7 +134,8 @@ function DetailModal({
       open={open}
       onCancel={onClose}
       footer={null}
-      width={780}
+      width="min(780px, calc(100vw - 24px))"
+      centered
     >
       <SectionDataState
         isLoading={isLoading && !hasData}

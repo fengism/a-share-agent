@@ -361,7 +361,7 @@ async def refresh_market_daily_bars_periodic() -> None:
     await task_scheduler.run_periodic(
         name="market_daily_bar_refresh",
         coro_factory=iteration,
-        interval_seconds=15,
+        interval_seconds=60,
         leader_election=True,
         retry_base_seconds=15,
     )

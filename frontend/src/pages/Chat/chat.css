@@ -495,8 +495,9 @@
 }
 
 /* Chat page two-column layout: sticky session sidebar + flexible main area.
-   Below the 767px mobile breakpoint the sidebar stacks on top of the main
-   area and stops being sticky so the conversation keeps the full width. */
+   Below the 768px mobile breakpoint the sidebar switches to a horizontal
+   touch-scrollable tab bar and stops being sticky so the conversation keeps
+   the full viewport without getting blocked during scrolling. */
 .chat-page-layout {
   display: flex;
   gap: var(--c-space-4);
@@ -506,16 +507,93 @@
   padding: 0 0 var(--c-space-6);
 }
 
-@media (max-width: 767px) {
+.chat-session-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.chat-new-session-btn {
+  width: 100%;
+}
+
+.chat-session-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chat-session {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
   .chat-page-layout {
     flex-direction: column;
     gap: var(--c-space-3);
     padding: 0 0 var(--c-space-5);
   }
 
+  .chat-session-sidebar,
   .chat-page-layout > .chat-session-sidebar {
-    position: static;
-    width: 100%;
-    max-height: 240px;
+    position: static !important;
+    top: auto !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .chat-new-session-btn {
+    width: auto !important;
+    flex-shrink: 0;
+  }
+
+  .chat-session-list {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 6px;
+    padding: 2px 0;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+  }
+
+  .chat-session-list::-webkit-scrollbar {
+    height: 3px;
+  }
+
+  .chat-session-list::-webkit-scrollbar-thumb {
+    background: var(--c-border);
+    border-radius: 3px;
+  }
+
+  .chat-session {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 160px;
+    min-width: 100px;
+  }
+
+  .chat-capability-presets {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 8px;
   }
 }
+

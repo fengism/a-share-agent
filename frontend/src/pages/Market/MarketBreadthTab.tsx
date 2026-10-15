@@ -118,7 +118,7 @@ export default function MarketBreadthTab() {
       <div className="market-breadth">
         <Row gutter={[16, 16]} className="market-breadth__metrics" style={{ marginBottom: t.space[4] }}>
           <Col xs={12} sm={6}>
-            <Card data-testid="breadth-latest-date" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+            <Card size="small" data-testid="breadth-latest-date" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>统计日期</span>}
                 value={lastSummary?.date || "-"}
@@ -127,7 +127,7 @@ export default function MarketBreadthTab() {
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card data-testid="breadth-strong-ratio" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+            <Card size="small" data-testid="breadth-strong-ratio" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>强势行业占比 (宽&gt;50%)</span>}
                 value={formatPct(lastSummary?.strong_ratio)}
@@ -136,7 +136,7 @@ export default function MarketBreadthTab() {
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card data-testid="breadth-strong-count" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+            <Card size="small" data-testid="breadth-strong-count" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>强势行业数</span>}
                 value={lastSummary
@@ -147,7 +147,7 @@ export default function MarketBreadthTab() {
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card data-testid="breadth-state" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+            <Card size="small" data-testid="breadth-state" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>市场状态</span>}
                 value={breadthState(lastSummary?.strong_ratio)}

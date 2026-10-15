@@ -275,7 +275,8 @@ export default function AIndexTab() {
         open={klineExpanded}
         onCancel={() => setKlineExpanded(false)}
         footer={null}
-        width="90vw"
+        width="min(1200px, calc(100vw - 20px))"
+        centered
         styles={{ body: { height: "75vh" } }}
       >
         <LazyKlineChart

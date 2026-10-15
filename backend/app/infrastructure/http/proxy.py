@@ -158,6 +158,8 @@ def normalize_proxy_url(raw_url: str, proxy_type: str) -> str:
 
     split = urlsplit(value)
     scheme = (split.scheme or "").lower()
+    if scheme == "socks":
+        scheme = "socks5h"
     if scheme not in _ALLOWED_SCHEMES[proxy_type]:
         allowed = "/".join(_ALLOWED_SCHEMES[proxy_type])
         raise ProxyConfigError(

@@ -34,7 +34,7 @@ export default function BackupRetentionCard({
       onReset={onReset}
     >
       <Row gutter={[16, 16]}>
-        <Col xs={12} md={6}>
+        <Col xs={24} sm={12} md={6}>
           <div style={fieldLabelStyle}>备份保留份数</div>
           <InputNumber
             aria-label="备份保留份数"
@@ -48,7 +48,7 @@ export default function BackupRetentionCard({
           />
         </Col>
 
-        <Col xs={12} md={6}>
+        <Col xs={24} sm={12} md={6}>
           <div style={fieldLabelStyle}>日线大库备份</div>
           <div style={{ paddingTop: 4 }}>
             <Switch
@@ -63,7 +63,7 @@ export default function BackupRetentionCard({
           </div>
         </Col>
 
-        <Col xs={12} md={6}>
+        <Col xs={24} sm={12} md={6}>
           <div style={fieldLabelStyle}>大库备份周期 (天)</div>
           <Space.Compact style={{ width: "100%" }}>
             <InputNumber
@@ -84,7 +84,7 @@ export default function BackupRetentionCard({
           </Space.Compact>
         </Col>
 
-        <Col xs={12} md={6}>
+        <Col xs={24} sm={12} md={6}>
           <div style={fieldLabelStyle}>大库压缩级别 (1-9)</div>
           <Space.Compact style={{ width: "100%" }}>
             <InputNumber

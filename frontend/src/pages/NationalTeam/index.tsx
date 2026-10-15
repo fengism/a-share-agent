@@ -38,6 +38,7 @@ import echarts from "../../charts/echarts-setup";
 import { useNationalTeamHoldings } from "../../api/queries";
 import PreloadLink from "../../components/PreloadLink";
 import SectionDataState from "../../components/SectionDataState";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors } from "../../styles/ui";
 import { APP_FONT_FAMILY } from "../../theme/typography";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
@@ -394,6 +395,7 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
 
 export default function NationalTeam() {
   const colors = useColors();
+  const isMobile = useMediaQuery("(max-width: 640px)");
   const [days, setDays] = useState<number>(120);
   const [rotationWindow, setRotationWindow] = useState<20 | 5 | 1>(20);
   const [selectedFilterIndex, setSelectedFilterIndex] = useState<string>("ALL");
@@ -460,8 +462,8 @@ export default function NationalTeam() {
       title: "宽基",
       dataIndex: "index_name",
       key: "index_name",
-      width: 95,
-      fixed: "left",
+      width: isMobile ? 76 : 95,
+      fixed: isMobile ? undefined : "left",
       render: (name: string) => (
         <Tag color={INDEX_TAG_COLORS[name] || "default"} className="national-team-index-tag">
           {name}
@@ -471,8 +473,8 @@ export default function NationalTeam() {
     {
       title: "ETF",
       key: "etf",
-      width: 210,
-      fixed: "left",
+      width: isMobile ? 130 : 210,
+      fixed: isMobile ? undefined : "left",
       render: (_, item) => (
         <div className="national-team-etf-name">
           <div className="national-team-etf-code-row">
@@ -494,33 +496,10 @@ export default function NationalTeam() {
       ),
     },
     {
-      title: "基金公司",
-      dataIndex: "fund_manager",
-      key: "fund_manager",
-      width: 110,
-      render: (val: string) => <Text className="national-team-subtle-text">{val || "-"}</Text>,
-    },
-    {
-      title: "最新日期",
-      dataIndex: "latest_date",
-      key: "latest_date",
-      width: 100,
-      render: (value, item) => {
-        const point = item.points?.find((entry) => entry.date === value);
-        const source = point?.source === "sse_history" ? "上交所历史份额"
-          : point?.source === "szse_history" ? "深交所历史份额" : point?.source || "未知";
-        return (
-          <Tooltip title={`来源：${source}；业务日期：${value || "未知"}；抓取时间：${point?.fetched_at || "未知"}；${point?.verification_status === "verified" ? "日期已确认" : "待确认"}`}>
-            <span className="national-team-date">{value || "-"}</span>
-          </Tooltip>
-        );
-      },
-    },
-    {
       title: "最新份额",
       dataIndex: "latest_shares_100m",
       key: "latest_shares_100m",
-      width: 125,
+      width: isMobile ? 95 : 125,
       align: "right",
       sorter: (a, b) => (a.latest_shares_100m ?? 0) - (b.latest_shares_100m ?? 0),
       render: (value) => (
@@ -532,7 +511,7 @@ export default function NationalTeam() {
       return {
         title: `${window} 日变化`,
         key,
-        width: 115,
+        width: isMobile ? 85 : 115,
         align: "right",
         sorter: (a, b) => (a[key] ?? 0) - (b[key] ?? 0),
         render: (_, item) => {
@@ -550,7 +529,7 @@ export default function NationalTeam() {
     {
       title: "1日估算净申购",
       key: "estimated_net_flow_1d",
-      width: 130,
+      width: isMobile ? 110 : 130,
       align: "right",
       sorter: (a, b) => {
         const flowA = a.points?.[a.points.length - 1]?.estimated_net_flow_100m ?? 0;
@@ -569,7 +548,30 @@ export default function NationalTeam() {
         );
       },
     },
-  ], [colors]);
+    {
+      title: "基金公司",
+      dataIndex: "fund_manager",
+      key: "fund_manager",
+      width: isMobile ? 95 : 110,
+      render: (val: string) => <Text className="national-team-subtle-text">{val || "-"}</Text>,
+    },
+    {
+      title: "最新日期",
+      dataIndex: "latest_date",
+      key: "latest_date",
+      width: isMobile ? 90 : 100,
+      render: (value, item) => {
+        const point = item.points?.find((entry) => entry.date === value);
+        const source = point?.source === "sse_history" ? "上交所历史份额"
+          : point?.source === "szse_history" ? "深交所历史份额" : point?.source || "未知";
+        return (
+          <Tooltip title={`来源：${source}；业务日期：${value || "未知"}；抓取时间：${point?.fetched_at || "未知"}；${point?.verification_status === "verified" ? "日期已确认" : "待确认"}`}>
+            <span className="national-team-date">{value || "-"}</span>
+          </Tooltip>
+        );
+      },
+    },
+  ], [colors, isMobile]);
 
   return (
     <section className="national-team-page" aria-labelledby="national-team-title">
@@ -957,7 +959,7 @@ export default function NationalTeam() {
               columns={columns}
               dataSource={filteredEtfs}
               pagination={false}
-              scroll={{ x: 960 }}
+              scroll={{ x: isMobile ? 830 : 960 }}
               size="small"
               className="national-team-table"
             />

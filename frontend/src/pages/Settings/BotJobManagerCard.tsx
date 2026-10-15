@@ -61,6 +61,7 @@ export default function BotJobManagerCard() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
+                flexWrap: "wrap",
                 gap: 12,
                 padding: "10px 12px",
                 borderRadius: 8,
@@ -68,13 +69,13 @@ export default function BotJobManagerCard() {
                 background: colors.hoverBg,
               }}
             >
-              <div style={{ minWidth: 0 }}>
-                <div style={{ color: colors.textPrimary }}>
+              <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+                <div style={{ color: colors.textPrimary, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
                   <code>{job.id.slice(0, 8)}</code>
-                  <span style={{ marginLeft: 8 }}>/ {job.command_name || "unknown"}</span>
-                  <Tag style={{ ...semanticTagStyle("up"), marginLeft: 8 }}>失败</Tag>
+                  <span>/ {job.command_name || "unknown"}</span>
+                  <Tag style={{ ...semanticTagStyle("up"), margin: 0 }}>失败</Tag>
                 </div>
-                <div style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", marginTop: 4 }}>
+                <div style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", marginTop: 4, wordBreak: "break-all" }}>
                   用户 {job.request_user_id || "未知"} · 尝试 {job.attempts}/{job.max_attempts}
                   {job.last_error ? ` · ${job.last_error}` : ""}
                   {` · ${new Date(job.updated_at * 1000).toLocaleString()}`}

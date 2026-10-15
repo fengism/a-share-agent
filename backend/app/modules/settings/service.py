@@ -94,6 +94,20 @@ def update_user_settings(
         overrides.update(values_to_store)
         candidate = overlay_private(config.get_settings(), overrides)
         resolve_llm_client_spec(candidate)
+
+    if {"outbound_proxy_type", "outbound_proxy_url"} & global_patch.keys():
+        candidate_type = global_patch.get(
+            "outbound_proxy_type", getattr(config.get_settings(), "outbound_proxy_type", "none")
+        )
+        candidate_url = global_values_to_store.get(
+            "outbound_proxy_url", getattr(config.get_settings(), "outbound_proxy_url", "")
+        )
+        if candidate_type and candidate_type != "none" and candidate_url:
+            from app.infrastructure.http.proxy import normalize_proxy_url
+            normalized = normalize_proxy_url(candidate_url, candidate_type)
+            if "outbound_proxy_url" in global_values_to_store:
+                global_values_to_store["outbound_proxy_url"] = normalized
+
     if values_to_store:
         user_config_store.set_user_config(user_id, values_to_store)
         invalidate_settings_cache()

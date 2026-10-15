@@ -25,13 +25,15 @@ export function useConceptList(limit = 1200) {
 
 export function useConceptConstituents(concept: string, quoteCodes?: string[]) {
   // 按需加载时把代码集并入 key：不同窗口是不同结果，避免缓存串味。
-  const codesKey = quoteCodes && quoteCodes.length ? [...quoteCodes].sort().join(",") : "";
+  // 未指定或空数组时传入 codes: ""，告诉后端只取本地成分股身份，避免拉取数千只全量行情超时。
+  const hasCodes = Boolean(quoteCodes && quoteCodes.length);
+  const codesKey = hasCodes ? [...quoteCodes!].sort().join(",") : "";
   return useQuery({
     queryKey: [...queryKeys.market.conceptConstituents(concept), codesKey],
     queryFn: () =>
       openApiGet("/api/market/concept/{concept}/constituents", {
         path: { concept },
-        query: quoteCodes && quoteCodes.length ? { codes: codesKey } : {},
+        query: { codes: codesKey },
       }),
     enabled: Boolean(concept),
     // 成分股身份是低频数据，但行情要新；沿用市场实时缓存档位

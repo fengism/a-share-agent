@@ -150,7 +150,7 @@ export default function IndustryConclusion({ result }: { result: IndustryChainRe
           {metrics.map((metric) => (
             <div key={`${metric.label}-${metric.period || "latest"}`}>
               <span className="industry-conclusion__metric-label">{metric.label}</span>
-              <strong className="industry-conclusion__metric-value">{metric.value}</strong>
+              <strong className="industry-conclusion__metric-value financial-num">{metric.value}</strong>
               <IndustryClaimStatus claim={metric} />
               <small className="industry-conclusion__metric-meta">{[metric.period, metric.growth].filter(Boolean).join(" · ")}</small>
             </div>

@@ -177,7 +177,7 @@ export default function CommoditiesTab() {
             placeholder="搜索品种名称、代码或产业链 (如: 碳酸锂、铜、储能)"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            style={{ width: 300 }}
+            style={{ width: "100%", maxWidth: 300 }}
             size="small"
             allowClear
           />
@@ -190,6 +190,7 @@ export default function CommoditiesTab() {
         columns={columns}
         pagination={{ pageSize: 12, showSizeChanger: true, showTotal: (t) => `共 ${t} 个品种` }}
         size="middle"
+        scroll={{ x: 1000 }}
       />
     </SectionDataState>
   );

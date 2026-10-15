@@ -158,7 +158,7 @@ function RecordEditor({
         source_version: record?.source_version || "manual",
       }))}
       destroyOnHidden
-      width={720}
+      width="min(720px, calc(100vw - 24px))"
     >
       <Alert
         type="info"
@@ -287,7 +287,7 @@ function ImportDrawer({
       closable={!busy}
       mask={{ closable: !busy }}
       keyboard={!busy}
-      width={640}
+      width="min(640px, 100vw)"
       destroyOnHidden
       extra={<Button disabled={busy} onClick={close}>关闭</Button>}
     >
@@ -474,7 +474,7 @@ export default function IndustryClassificationPage() {
       title: "股票",
       key: "stock",
       fixed: "left",
-      width: 180,
+      width: 140,
       render: (_, record) => (
         <Space direction="vertical" size={0}>
           <Text strong copyable>{record.stock_code}</Text>

@@ -153,6 +153,7 @@ samp {
 .financial-num {
   font-family: var(--c-font-mono);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .app-skip-link {
@@ -1177,6 +1178,13 @@ samp {
   background: var(--c-success);
 }
 
+.dashboard-hero__shortcuts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .dashboard-layout {
   display: grid;
   width: 100%;
@@ -1315,8 +1323,13 @@ samp {
 .dashboard-main,
 .dashboard-sidebar { min-width: 0; }
 
-/* Grid items default to min-width:auto. Keep the fixed-width hot-rank table
-   from widening the sidebar so its own horizontal scroller can overflow. */
+/* Grid items default to min-width:auto. Keep children from widening
+   the main column and sidebar so horizontal scroll and table responsive wrapping work. */
+.dashboard-main > section,
+.dashboard-main > section > .ant-card,
+.dashboard-main > section > .ant-card > .ant-card-body,
+.dashboard-main .ant-card,
+.dashboard-main .ant-card-body,
 .dashboard-sidebar > section,
 .dashboard-sidebar > section > .ant-card,
 .dashboard-sidebar > section > .ant-card > .ant-card-body {
@@ -1502,6 +1515,106 @@ samp {
 
 @container dashboard-page (max-width: 560px) {
   .dashboard-hero { align-items: flex-start; flex-direction: column; }
+}
+
+/* 媒体查询兜底：确保不支持 @container 的移动端环境（较旧 WebView、微信浏览器等）
+   以及子元素计算宽度时的正确单列回退 */
+@media (max-width: 900px) {
+  .dashboard-layout { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-sidebar {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+    overscroll-behavior: auto;
+    scrollbar-gutter: auto;
+  }
+  .dashboard-watchlist-card,
+  .dashboard-watchlist-card > .ant-card-body { max-height: none; }
+  .dashboard-watchlist__scroll { overflow: visible; }
+}
+
+@media (max-width: 767px) {
+  .dashboard-page {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-mainline-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-section-heading {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+  .dashboard-section-heading__actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 14px 16px;
+    gap: 12px;
+  }
+  .dashboard-hero h1 {
+    font-size: var(--c-font-xl);
+  }
+  .dashboard-hero__shortcuts {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 8px;
+    width: 100%;
+    padding: 2px 0 4px;
+  }
+  .dashboard-hero__shortcuts::-webkit-scrollbar {
+    display: none;
+  }
+  .dashboard-hero__shortcut-btn {
+    flex: 0 0 auto;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    white-space: nowrap;
+  }
+  .dashboard-section-heading__text small {
+    font-size: 11px;
+  }
+  .dashboard-mainline-card .ant-card-head {
+    padding: 0 10px;
+  }
+  .dashboard-mainline-card .ant-card-head-wrapper {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 0;
+  }
+  .dashboard-mainline-card .ant-card-extra {
+    margin-inline-start: 0;
+  }
+  .dashboard-mainline-card .ant-card-head-title {
+    white-space: normal;
+    overflow: visible;
+  }
+  .dashboard-mainline-card .ant-table-cell {
+    padding: 7px 8px !important;
+    font-size: 12px;
+  }
+  .dashboard-mainline-plate {
+    padding: 8px 10px;
+  }
+  .dashboard-watchlist__header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 
 @media (hover: none), (max-width: 900px) {
@@ -1711,6 +1824,8 @@ samp {
   font-size: var(--c-font-sm);
   font-weight: var(--c-weight-semibold);
   text-align: right;
+  font-family: var(--c-font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .chat-session:not(.active):hover {
@@ -1874,6 +1989,25 @@ samp {
   white-space: nowrap;
 }
 
+/* ── Global Statistic & Metric Typography ── */
+.ant-statistic-title {
+  color: var(--c-text-secondary);
+  font-size: var(--c-font-xs, 12px);
+  margin-bottom: 4px;
+}
+
+.ant-statistic-content {
+  font-family: var(--c-font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.ant-statistic-content-value {
+  font-family: var(--c-font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* Live pulse dot for real-time streaming & running indicators */
 .live-pulse-dot {
   display: inline-block;
@@ -1995,12 +2129,170 @@ samp {
   border: 1px solid color-mix(in srgb, var(--c-accent) 32%, transparent);
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .app-command-header__search { margin-left: 0; }
 
   .u-page-title--compact > h3.ant-typography {
     font-size: var(--c-font-2xl);
     line-height: var(--c-leading-tight);
+  }
+
+  /* 移动端全局 Tabs 手势横滑支持，隐藏下拉箭头操作 */
+  .ant-tabs-nav-wrap {
+    overflow-x: auto !important;
+    touch-action: pan-x pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .ant-tabs-nav-operations {
+    display: none !important;
+  }
+  .ant-tabs-tab {
+    flex-shrink: 0;
+  }
+
+  /* 移动端全局 Table 横向溢出兜底支持 */
+  .ant-table-content {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* 移动端全局弹窗安全边距与宽度限制 */
+  .ant-modal {
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
+  }
+
+  /* 移动端全局统计指标流式字号与紧凑排版 */
+  .ant-statistic-title {
+    font-size: 11px !important;
+    margin-bottom: 2px !important;
+  }
+  .ant-statistic-content-value {
+    font-size: clamp(16px, 4.2vw, 22px);
+  }
+  .ant-statistic-content-prefix,
+  .ant-statistic-content-suffix {
+    font-size: 12px;
+  }
+
+  /* 移动端全局表格字号与内边距紧凑化，提升屏效比 */
+  .ant-table {
+    font-size: 13px;
+  }
+  .ant-table-thead > tr > th {
+    font-size: 11.5px !important;
+    padding: 7px 8px !important;
+    white-space: nowrap;
+  }
+  .ant-table-tbody > tr > td {
+    font-size: 13px;
+    padding: 8px 8px !important;
+  }
+  .ant-table-pagination.ant-pagination {
+    margin: 12px 0 !important;
+  }
+
+  /* 移动端标签微型字阶 */
+  .ant-tag {
+    font-size: 11px;
+    line-height: 18px;
+    padding: 0 5px;
+  }
+
+  /* 移动端卡片头部在有标题和操作项时自适应折行 */
+  .ant-card-head-wrapper {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .ant-card-head-title {
+    min-width: 0;
+  }
+
+  /* 移动端卡片与分段器紧凑排版，提升纵向信息利用率 */
+  .ant-card:not(.ant-card-small) > .ant-card-body {
+    padding: 14px 12px;
+  }
+  .ant-card-small > .ant-card-body {
+    padding: 10px 10px;
+  }
+  .ant-card:not(.ant-card-small) > .ant-card-head {
+    padding: 0 12px;
+    min-height: 42px;
+    font-size: 14px;
+  }
+  .ant-card-small > .ant-card-head {
+    padding: 0 10px;
+    min-height: 38px;
+    font-size: 13px;
+  }
+
+  .ant-segmented {
+    font-size: 12px;
+  }
+  .ant-segmented .ant-segmented-item-label {
+    padding: 0 8px;
+    min-height: 28px;
+    line-height: 28px;
+  }
+
+  .ant-input,
+  .ant-input-number,
+  .ant-select-selector {
+    font-size: 13px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .u-page-title--compact > h3.ant-typography {
+    font-size: var(--c-font-xl, 18px) !important;
+  }
+  .ant-statistic-title {
+    font-size: 10.5px !important;
+  }
+  .ant-statistic-content-value {
+    font-size: clamp(15px, 4.4vw, 20px) !important;
+  }
+  .ant-table {
+    font-size: 12px;
+  }
+  .ant-table-thead > tr > th {
+    font-size: 11px !important;
+    padding: 6px 6px !important;
+  }
+  .ant-table-tbody > tr > td {
+    font-size: 12px;
+    padding: 7px 6px !important;
+  }
+
+  .ant-card:not(.ant-card-small) > .ant-card-body {
+    padding: 12px 10px;
+  }
+  .ant-card-small > .ant-card-body {
+    padding: 8px 8px;
+  }
+  .ant-card:not(.ant-card-small) > .ant-card-head {
+    padding: 0 10px;
+    min-height: 40px;
+  }
+  .ant-card-small > .ant-card-head {
+    padding: 0 8px;
+    min-height: 36px;
+  }
+
+  .ant-segmented .ant-segmented-item-label {
+    padding: 0 5px;
+    font-size: 11px;
+  }
+
+  /* 移动端交易日历单元格紧凑化 */
+  .trading-calendar__cell {
+    min-height: 42px !important;
+  }
+  .trading-calendar__cell-date {
+    font-size: 11.5px !important;
+  }
+  .trading-calendar__cell-pct {
+    font-size: 9.5px !important;
   }
 }
 
@@ -2031,4 +2323,143 @@ body,
 
 .chat-reasoning-block + .chat-reasoning-block {
   margin-top: 12px;
+}
+
+/* ── K线图与分时图移动端响应式与成交量说明优化 ── */
+@media (max-width: 768px) {
+  /* 分时图与K线图顶部 HUD 紧凑排版 */
+  .kline-chart__hud,
+  .intraday-chart__hud {
+    font-size: 10px !important;
+    padding: 3px 6px !important;
+    column-gap: 6px !important;
+    row-gap: 3px !important;
+  }
+
+  .kline-chart__hud-btn {
+    font-size: 10px !important;
+    padding: 1px 4px !important;
+  }
+
+  .intraday-chart__hud-legend {
+    font-size: 10px !important;
+    gap: 5px !important;
+  }
+
+  /* 股价与成交量/副图区分栏移动端紧凑化 */
+  .kline-chart__separator-bar,
+  .intraday-chart__separator-bar {
+    padding: 0 4px !important;
+  }
+
+  /* 分时图成交量说明 */
+  .intraday-chart__volume-info {
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .intraday-chart__volume-info::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .intraday-chart__volume-title {
+    font-size: 10px !important;
+    letter-spacing: normal !important;
+  }
+
+  .intraday-chart__volume-stat {
+    font-size: 10px !important;
+  }
+
+  /* K线图副图指标说明 (VOL / MACD / KDJ / RSI) */
+  .kline-chart__subindicator-info {
+    gap: 5px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .kline-chart__subindicator-info::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .kline-chart__subindicator-tab-btn {
+    font-size: 9px !important;
+    padding: 0 3px !important;
+    height: 15px !important;
+    line-height: 13px !important;
+  }
+
+  .kline-chart__subindicator-stats {
+    gap: 5px !important;
+  }
+
+  .kline-chart__vol-stat {
+    font-size: 10px !important;
+  }
+
+  .kline-chart__separator-unit,
+  .intraday-chart__separator-unit {
+    font-size: 9px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .kline-chart__hud,
+  .intraday-chart__hud {
+    font-size: 9.5px !important;
+    padding: 2px 4px !important;
+    column-gap: 4px !important;
+  }
+
+  .intraday-chart__hud-legend {
+    font-size: 9.5px !important;
+    gap: 4px !important;
+  }
+
+  .intraday-chart__volume-info {
+    gap: 4px !important;
+  }
+
+  .intraday-chart__volume-title {
+    font-size: 9.5px !important;
+  }
+
+  .intraday-chart__volume-stat {
+    font-size: 9.5px !important;
+  }
+
+  .kline-chart__subindicator-info {
+    gap: 4px !important;
+  }
+
+  .kline-chart__subindicator-tabs {
+    gap: 1px !important;
+  }
+
+  .kline-chart__subindicator-tab-btn {
+    font-size: 8.5px !important;
+    padding: 0 2px !important;
+  }
+
+  .kline-chart__subindicator-stats {
+    gap: 4px !important;
+  }
+
+  .kline-chart__vol-stat {
+    font-size: 9.5px !important;
+  }
+
+  /* 超窄屏下隐藏非核心的单位/参数文字与缩小拖拽条，腾出空间防止指标说明挤压 */
+  .kline-chart__separator-unit,
+  .intraday-chart__separator-unit {
+    display: none !important;
+  }
+
+  .kline-chart__separator-drag > div:first-child,
+  .intraday-chart__separator-drag > div:first-child {
+    width: 14px !important;
+  }
 }

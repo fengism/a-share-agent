@@ -78,6 +78,11 @@
   width: 100%;
   margin: 6px 0;
   font-size: var(--c-font-md);
+  font-variant-numeric: tabular-nums;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chat-markdown th,
@@ -92,3 +97,24 @@
   color: var(--c-text-secondary);
   font-weight: var(--c-weight-semibold);
 }
+
+@media (max-width: 768px) {
+  .chat-markdown {
+    font-size: 13.5px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .chat-markdown table {
+    font-size: 12px;
+  }
+  .chat-markdown th,
+  .chat-markdown td {
+    padding: 5px 8px;
+  }
+  .chat-markdown pre {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+}
+

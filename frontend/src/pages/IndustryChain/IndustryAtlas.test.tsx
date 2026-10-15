@@ -137,5 +137,23 @@ describe("IndustryAtlas long content wrapping", () => {
 
     fireEvent.click(screen.getByText(fixtures.longCompany));
     expect(screen.getByTestId("location")).toHaveTextContent("/stock/000001");
+
+    // 切换到拓扑流向
+    fireEvent.click(screen.getByText("拓扑流向"));
+    expect(screen.getByTestId("echarts-graph-mock")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("在当前拓扑图中高亮公司或细分环节…")).toBeInTheDocument();
+  });
+
+  it("supports switching between catalog, global graph, and reverse lookup views", () => {
+    renderAtlas();
+
+    // 切换到全景关系图谱
+    fireEvent.click(screen.getByText("全景关系图谱"));
+    expect(screen.getByText("全局拓扑图谱")).toBeInTheDocument();
+
+    // 切换到个股反查产业链
+    fireEvent.click(screen.getByText("个股反查产业链"));
+    expect(screen.getByText("🔍 从个股反查产业链分布")).toBeInTheDocument();
   });
 });
+

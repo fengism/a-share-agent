@@ -163,7 +163,7 @@ def cache_date() -> str:
 
 def dated_cache_key(*parts: object) -> str:
     """Build a cache key with today's date as the final segment."""
-    return ":".join(str(part) for part in (*parts, cache_date()))
+    return ":".join(str(part) for part in (*parts, cache_date(), cache_epoch()))
 
 
 def dated_cache_key_no_day(*parts: object) -> str:
@@ -179,3 +179,30 @@ def one_year_ago_date() -> str:
     except ValueError:
         previous_year = now.replace(year=now.year - 1, day=28)
     return previous_year.strftime("%Y%m%d")
+
+
+_CACHE_EPOCH = 0
+
+
+def cache_epoch() -> str:
+    """Return the current in-process cache epoch."""
+    return str(_CACHE_EPOCH)
+
+
+def invalidate_all_caches() -> None:
+    """Increase cache epoch and clear all process-local caches after repair/close."""
+    global _CACHE_EPOCH
+    _CACHE_EPOCH += 1
+    for cache_instance in (market_cache, reference_cache, analysis_cache, series_cache):
+        cache_instance.clear()
+    try:
+        from app.modules.market_daily.adjustment import _healthy_cache
+
+        _healthy_cache.clear()
+    except Exception:
+        pass
+
+
+def clear_all_caches() -> None:
+    """Backward-compatible alias for cache invalidation."""
+    invalidate_all_caches()

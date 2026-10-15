@@ -9,6 +9,7 @@ import {
   LineStyle,
   type IChartApi,
   type ISeriesApi,
+  type IPriceLine,
   type ISeriesMarkersPluginApi,
   type SeriesMarker,
   type Time,
@@ -16,7 +17,7 @@ import {
   type MouseEventParams,
   type CandlestickData,
 } from "lightweight-charts";
-import type { KlineItem } from "../types/stock";
+import type { KlineItem, ChipDistribution } from "../types/stock";
 import type { ChanlunResult, MmdType } from "../utils/chanlun";
 import { useColors } from "../styles/ui";
 import { APP_FONT_FAMILY, APP_FONT_SIZE } from "../theme/typography";
@@ -24,10 +25,15 @@ import { createDebouncedResizeHandler, shouldFitChartContent } from "./chartLife
 import { toBusinessDay, hexToRgba } from "./utils";
 import { buildKlineTradeMarkers, type KlineTradeMarker } from "./klineMarkers";
 import { calculateMA, calculateMAVOL, calculateBOLL, MA_CONFIGS, MAVOL_CONFIGS } from "./movingAverages";
+import { calculateMACD, calculateKDJ, calculateRSI } from "./technicalIndicators";
 import { VOLUME_PANE_INDEX, PRICE_PANE_RATIO, applyVolumePaneLayout, getChartPaneThemeConfig } from "./chartPaneLayout";
 
 /** 可视区左缘距离第一根 K 线多少根以内触发扩充历史。 */
 const LEFT_EDGE_TRIGGER_INDEX = 8;
+
+export type SubIndicatorType = "VOL" | "MACD" | "KDJ" | "RSI";
+export type CandleStyleType = "solid" | "hollow";
+export type { ChipDistribution } from "../types/stock";
 
 type Props = {
   data: KlineItem[];
@@ -42,6 +48,12 @@ type Props = {
   historyLimitReached?: boolean;
   /** 是否在可视区自动标注最高价与最低价，默认为 true */
   showHighLowMarkers?: boolean;
+  defaultSubIndicator?: SubIndicatorType;
+  defaultCandleStyle?: CandleStyleType;
+  /** 个股筹码分布数据（含筹码主峰、获利比例与成本区间） */
+  chipDistribution?: ChipDistribution | null;
+  /** 是否默认开启主图筹码峰线与侧边分布微图 */
+  defaultShowChipPeak?: boolean;
 };
 type ChartItem = Omit<KlineItem, "date"> & { date: BusinessDay; rawDate: string };
 
@@ -65,6 +77,15 @@ interface HoverCandleInfo {
   bollMid: number | null;
   bollUp: number | null;
   bollDn: number | null;
+  dif: number | null;
+  dea: number | null;
+  macd: number | null;
+  k: number | null;
+  d: number | null;
+  j: number | null;
+  rsi6: number | null;
+  rsi12: number | null;
+  rsi24: number | null;
 }
 
 const MMD_MARKER_TEXT: Record<MmdType, string> = {
@@ -110,6 +131,10 @@ export default function KlineChart({
   onReachLeftEdge,
   historyLimitReached = false,
   showHighLowMarkers = true,
+  defaultSubIndicator = "VOL",
+  defaultCandleStyle = "solid",
+  chipDistribution,
+  defaultShowChipPeak = false,
 }: Props) {
   const c = useColors();
   const colorsRef = useRef(c);
@@ -123,6 +148,9 @@ export default function KlineChart({
   const maSeriesMapRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const mavolSeriesMapRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const bollSeriesRef = useRef<{ mid?: ISeriesApi<"Line">; upper?: ISeriesApi<"Line">; lower?: ISeriesApi<"Line"> }>({});
+  const macdSeriesRef = useRef<{ bar?: ISeriesApi<"Histogram">; dif?: ISeriesApi<"Line">; dea?: ISeriesApi<"Line"> }>({});
+  const kdjSeriesRef = useRef<{ k?: ISeriesApi<"Line">; d?: ISeriesApi<"Line">; j?: ISeriesApi<"Line"> }>({});
+  const rsiSeriesRef = useRef<{ rsi6?: ISeriesApi<"Line">; rsi12?: ISeriesApi<"Line">; rsi24?: ISeriesApi<"Line"> }>({});
   const tradeMarkersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const chanlunSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const fittedViewKeyRef = useRef<string | null>(null);
@@ -135,7 +163,75 @@ export default function KlineChart({
   const rowCountRef = useRef(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [hoverInfo, setHoverInfo] = useState<HoverCandleInfo | null>(null);
-  const [mainOverlay, setMainOverlay] = useState<"MA" | "BOLL">("MA");
+  const [mainOverlay, setMainOverlay] = useState<"MA" | "BOLL" | "NONE">("MA");
+  const [subIndicator, setSubIndicator] = useState<SubIndicatorType>(defaultSubIndicator);
+  const [candleStyle, setCandleStyle] = useState<CandleStyleType>(defaultCandleStyle);
+  const [isLandscape, setIsLandscape] = useState(false);
+  const [isRotated, setIsRotated] = useState(false);
+  const [showChipPeak, setShowChipPeak] = useState(defaultShowChipPeak);
+  const chipPriceLineRef = useRef<IPriceLine | null>(null);
+
+  const toggleLandscape = useCallback(async () => {
+    if (!isLandscape) {
+      setIsLandscape(true);
+      try {
+        if (wrapperRef.current && !document.fullscreenElement && wrapperRef.current.requestFullscreen) {
+          await wrapperRef.current.requestFullscreen().catch(() => {});
+        }
+        const scrOrientation = typeof window !== "undefined" ? window.screen?.orientation : undefined;
+        if (scrOrientation && "lock" in scrOrientation && typeof (scrOrientation as unknown as { lock: (dir: string) => Promise<void> }).lock === "function") {
+          await (scrOrientation as unknown as { lock: (dir: string) => Promise<void> }).lock("landscape").catch(() => {});
+        }
+      } catch {
+        // 优雅降级使用 CSS 沉浸式横屏
+      }
+    } else {
+      setIsLandscape(false);
+      setIsRotated(false);
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          await document.exitFullscreen().catch(() => {});
+        }
+        const scrOrientation = typeof window !== "undefined" ? window.screen?.orientation : undefined;
+        if (scrOrientation && "unlock" in scrOrientation && typeof (scrOrientation as unknown as { unlock: () => void }).unlock === "function") {
+          (scrOrientation as unknown as { unlock: () => void }).unlock();
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [isLandscape]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && isLandscape) {
+        setIsLandscape(false);
+        setIsRotated(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+    };
+  }, [isLandscape]);
+
+  // 侧边迷你同花顺 CYQ 筹码分布降采样
+  const sortedHistogramSlice = useMemo(() => {
+    if (!chipDistribution?.histogram?.length) return [];
+    const sorted = [...chipDistribution.histogram].sort((a, b) => b.price - a.price);
+    const step = Math.max(1, Math.floor(sorted.length / 24));
+    const sampled = [];
+    for (let i = 0; i < sorted.length; i += step) {
+      sampled.push(sorted[i]);
+    }
+    return sampled;
+  }, [chipDistribution]);
+
+  const maxChipRatio = useMemo(() => {
+    if (!sortedHistogramSlice.length) return 1;
+    return Math.max(...sortedHistogramSlice.map((item) => item.ratio), 0.001);
+  }, [sortedHistogramSlice]);
+
   const hudRef = useRef<HTMLDivElement>(null);
   const [paneRatio, setPaneRatio] = useState<number>(PRICE_PANE_RATIO);
   const [pane0Height, setPane0Height] = useState<number>(() => Math.floor((height - 32) * PRICE_PANE_RATIO));
@@ -324,6 +420,57 @@ export default function KlineChart({
       bollDnMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
     }
 
+    const macd = calculateMACD(rows);
+    const difMap = new Map<string, number>();
+    const deaMap = new Map<string, number>();
+    const macdMap = new Map<string, number>();
+    for (const pt of macd.dif) {
+      const d = pt.time as BusinessDay;
+      difMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+    for (const pt of macd.dea) {
+      const d = pt.time as BusinessDay;
+      deaMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+    for (const pt of macd.macd) {
+      const d = pt.time as BusinessDay;
+      macdMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+
+    const kdj = calculateKDJ(rows);
+    const kMap = new Map<string, number>();
+    const dMap = new Map<string, number>();
+    const jMap = new Map<string, number>();
+    for (const pt of kdj.k) {
+      const d = pt.time as BusinessDay;
+      kMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+    for (const pt of kdj.d) {
+      const d = pt.time as BusinessDay;
+      dMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+    for (const pt of kdj.j) {
+      const d = pt.time as BusinessDay;
+      jMap.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+
+    const rsi = calculateRSI(rows);
+    const rsi6Map = new Map<string, number>();
+    const rsi12Map = new Map<string, number>();
+    const rsi24Map = new Map<string, number>();
+    for (const pt of rsi.rsi6) {
+      const d = pt.time as BusinessDay;
+      rsi6Map.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+    for (const pt of rsi.rsi12) {
+      const d = pt.time as BusinessDay;
+      rsi12Map.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+    for (const pt of rsi.rsi24) {
+      const d = pt.time as BusinessDay;
+      rsi24Map.set(`${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`, pt.value);
+    }
+
     const rowMap = new Map<string, { row: ChartItem; prevClose: number | null; changePct: number | null }>();
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -334,7 +481,13 @@ export default function KlineChart({
       rowMap.set(key, { row, prevClose, changePct });
     }
 
-    return { maMaps, mavolMaps, boll, bollMidMap, bollUpMap, bollDnMap, rowMap };
+    return {
+      maMaps, mavolMaps, boll, bollMidMap, bollUpMap, bollDnMap,
+      macd, difMap, deaMap, macdMap,
+      kdj, kMap, dMap, jMap,
+      rsi, rsi6Map, rsi12Map, rsi24Map,
+      rowMap,
+    };
   }, [rows]);
 
   // 建图只依赖 height；指标计算结果通过 ref 读取，避免数据变化时销毁重建整张图。
@@ -367,6 +520,15 @@ export default function KlineChart({
       bollMid: calculations.bollMidMap.get(dateKey) ?? null,
       bollUp: calculations.bollUpMap.get(dateKey) ?? null,
       bollDn: calculations.bollDnMap.get(dateKey) ?? null,
+      dif: calculations.difMap.get(dateKey) ?? null,
+      dea: calculations.deaMap.get(dateKey) ?? null,
+      macd: calculations.macdMap.get(dateKey) ?? null,
+      k: calculations.kMap.get(dateKey) ?? null,
+      d: calculations.dMap.get(dateKey) ?? null,
+      j: calculations.jMap.get(dateKey) ?? null,
+      rsi6: calculations.rsi6Map.get(dateKey) ?? null,
+      rsi12: calculations.rsi12Map.get(dateKey) ?? null,
+      rsi24: calculations.rsi24Map.get(dateKey) ?? null,
     };
   }, [rows, calculations]);
 
@@ -422,8 +584,22 @@ export default function KlineChart({
         bollMid: calculations.bollMidMap.get(dateKey) ?? null,
         bollUp: calculations.bollUpMap.get(dateKey) ?? null,
         bollDn: calculations.bollDnMap.get(dateKey) ?? null,
+        dif: calculations.difMap.get(dateKey) ?? null,
+        dea: calculations.deaMap.get(dateKey) ?? null,
+        macd: calculations.macdMap.get(dateKey) ?? null,
+        k: calculations.kMap.get(dateKey) ?? null,
+        d: calculations.dMap.get(dateKey) ?? null,
+        j: calculations.jMap.get(dateKey) ?? null,
+        rsi6: calculations.rsi6Map.get(dateKey) ?? null,
+        rsi12: calculations.rsi12Map.get(dateKey) ?? null,
+        rsi24: calculations.rsi24Map.get(dateKey) ?? null,
       });
     } else if (e.key === "Escape") {
+      if (isLandscape) {
+        e.preventDefault();
+        toggleLandscape();
+        return;
+      }
       selectedIndexRef.current = null;
       setHoverInfo(null);
     }
@@ -538,12 +714,52 @@ export default function KlineChart({
     });
     bollSeriesRef.current = { mid: bollMid, upper: bollUp, lower: bollDn };
 
+    // Initialize MACD Series (Pane 1)
+    const macdBar = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: "price", precision: 2, minMove: 0.01 },
+      priceScaleId: "right",
+    }, VOLUME_PANE_INDEX);
+    const macdDif = chart.addSeries(LineSeries, {
+      color: "#f0b90b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    }, VOLUME_PANE_INDEX);
+    const macdDea = chart.addSeries(LineSeries, {
+      color: "#e879f9", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    }, VOLUME_PANE_INDEX);
+    macdSeriesRef.current = { bar: macdBar, dif: macdDif, dea: macdDea };
+
+    // Initialize KDJ Series (Pane 1)
+    const kdjK = chart.addSeries(LineSeries, {
+      color: "#f0b90b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    }, VOLUME_PANE_INDEX);
+    const kdjD = chart.addSeries(LineSeries, {
+      color: "#38bdf8", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    }, VOLUME_PANE_INDEX);
+    const kdjJ = chart.addSeries(LineSeries, {
+      color: "#d946ef", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    }, VOLUME_PANE_INDEX);
+    kdjSeriesRef.current = { k: kdjK, d: kdjD, j: kdjJ };
+
+    // Initialize RSI Series (Pane 1)
+    const rsi6 = chart.addSeries(LineSeries, {
+      color: "#f0b90b", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    }, VOLUME_PANE_INDEX);
+    const rsi12 = chart.addSeries(LineSeries, {
+      color: "#38bdf8", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    }, VOLUME_PANE_INDEX);
+    const rsi24 = chart.addSeries(LineSeries, {
+      color: "#c084fc", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceScaleId: "right",
+    }, VOLUME_PANE_INDEX);
+    rsiSeriesRef.current = { rsi6, rsi12, rsi24 };
+
     const wrapper = wrapperRef.current;
     const brush = brushRef.current;
     const resizeObserver = new ResizeObserver(
       createDebouncedResizeHandler((entry) => {
         const hudHeight = hudRef.current?.clientHeight ?? 32;
-        chart.applyOptions({ width: Math.floor(entry.contentRect.width), height: Math.max(100, height - hudHeight) });
+        const entryHeight = Math.floor(entry.contentRect.height);
+        const plotHeight = entryHeight > 0 ? entryHeight : Math.max(100, height - hudHeight);
+        chart.applyOptions({ width: Math.floor(entry.contentRect.width), height: plotHeight });
+        applyVolumePaneLayout(chart, paneRatio);
         updateLayoutMetrics();
       })
     );
@@ -651,6 +867,15 @@ export default function KlineChart({
           bollMid: calculationsRef.current.bollMidMap.get(dateKey) ?? null,
           bollUp: calculationsRef.current.bollUpMap.get(dateKey) ?? null,
           bollDn: calculationsRef.current.bollDnMap.get(dateKey) ?? null,
+          dif: calculationsRef.current.difMap.get(dateKey) ?? null,
+          dea: calculationsRef.current.deaMap.get(dateKey) ?? null,
+          macd: calculationsRef.current.macdMap.get(dateKey) ?? null,
+          k: calculationsRef.current.kMap.get(dateKey) ?? null,
+          d: calculationsRef.current.dMap.get(dateKey) ?? null,
+          j: calculationsRef.current.jMap.get(dateKey) ?? null,
+          rsi6: calculationsRef.current.rsi6Map.get(dateKey) ?? null,
+          rsi12: calculationsRef.current.rsi12Map.get(dateKey) ?? null,
+          rsi24: calculationsRef.current.rsi24Map.get(dateKey) ?? null,
         });
       }
     };
@@ -706,8 +931,12 @@ export default function KlineChart({
       maSeriesMapRef.current.clear();
       mavolSeriesMapRef.current.clear();
       bollSeriesRef.current = {};
+      macdSeriesRef.current = {};
+      kdjSeriesRef.current = {};
+      rsiSeriesRef.current = {};
       tradeMarkersRef.current = null;
       chanlunSeriesRef.current = [];
+      chipPriceLineRef.current = null;
     };
     // 建图只依赖 height；viewKey 变化由下方数据 effect 负责重置视窗，不应重建图表。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -719,6 +948,15 @@ export default function KlineChart({
     const volume = volumeSeriesRef.current;
     if (!chart || !candle || !volume) return;
 
+    candle.applyOptions({
+      upColor: candleStyle === "hollow" ? c.cardBg : c.up,
+      downColor: c.down,
+      borderUpColor: c.up,
+      borderDownColor: c.down,
+      wickUpColor: c.up,
+      wickDownColor: c.down,
+    });
+
     candle.setData(rows.map((item) => ({
       time: item.date,
       open: item.open,
@@ -726,21 +964,91 @@ export default function KlineChart({
       low: item.low,
       close: item.close,
     })));
-    volume.setData(rows.map((item, index) => {
-      const prevClose = index > 0 ? rows[index - 1].close : null;
-      const isUp = item.close > item.open
-        ? true
-        : item.close < item.open
-          ? false
-          : prevClose != null
-            ? item.close >= prevClose
-            : true;
-      return {
-        time: item.date,
-        value: item.amount ?? item.volume,
-        color: isUp ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
-      };
-    }));
+
+    // 同花顺副图切换: VOL / MACD / KDJ / RSI
+    if (subIndicator === "VOL") {
+      chart.priceScale("right", VOLUME_PANE_INDEX).applyOptions({
+        scaleMargins: { top: 0.18, bottom: 0 },
+      });
+      volume.setData(rows.map((item, index) => {
+        const prevClose = index > 0 ? rows[index - 1].close : null;
+        const isUp = item.close > item.open
+          ? true
+          : item.close < item.open
+            ? false
+            : prevClose != null
+              ? item.close >= prevClose
+              : true;
+        return {
+          time: item.date,
+          value: item.amount ?? item.volume,
+          color: isUp ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
+        };
+      }));
+      for (const cfg of MAVOL_CONFIGS) {
+        const volLine = mavolSeriesMapRef.current.get(cfg.key);
+        if (volLine) {
+          const volPoints = calculateMAVOL(rows, cfg.period);
+          volLine.setData(volPoints.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        }
+      }
+      macdSeriesRef.current.bar?.setData([]);
+      macdSeriesRef.current.dif?.setData([]);
+      macdSeriesRef.current.dea?.setData([]);
+      kdjSeriesRef.current.k?.setData([]);
+      kdjSeriesRef.current.d?.setData([]);
+      kdjSeriesRef.current.j?.setData([]);
+      rsiSeriesRef.current.rsi6?.setData([]);
+      rsiSeriesRef.current.rsi12?.setData([]);
+      rsiSeriesRef.current.rsi24?.setData([]);
+    } else {
+      volume.setData([]);
+      for (const cfg of MAVOL_CONFIGS) {
+        mavolSeriesMapRef.current.get(cfg.key)?.setData([]);
+      }
+      chart.priceScale("right", VOLUME_PANE_INDEX).applyOptions({
+        scaleMargins: { top: 0.1, bottom: 0.1 },
+      });
+
+      if (subIndicator === "MACD") {
+        const { macd } = calculations;
+        macdSeriesRef.current.bar?.setData(macd.macd.map((pt) => ({
+          time: pt.time as BusinessDay,
+          value: pt.value,
+          color: pt.value >= 0 ? hexToRgba(c.up, 0.75) : hexToRgba(c.down, 0.75),
+        })));
+        macdSeriesRef.current.dif?.setData(macd.dif.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        macdSeriesRef.current.dea?.setData(macd.dea.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        kdjSeriesRef.current.k?.setData([]);
+        kdjSeriesRef.current.d?.setData([]);
+        kdjSeriesRef.current.j?.setData([]);
+        rsiSeriesRef.current.rsi6?.setData([]);
+        rsiSeriesRef.current.rsi12?.setData([]);
+        rsiSeriesRef.current.rsi24?.setData([]);
+      } else if (subIndicator === "KDJ") {
+        const { kdj } = calculations;
+        macdSeriesRef.current.bar?.setData([]);
+        macdSeriesRef.current.dif?.setData([]);
+        macdSeriesRef.current.dea?.setData([]);
+        kdjSeriesRef.current.k?.setData(kdj.k.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        kdjSeriesRef.current.d?.setData(kdj.d.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        kdjSeriesRef.current.j?.setData(kdj.j.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        rsiSeriesRef.current.rsi6?.setData([]);
+        rsiSeriesRef.current.rsi12?.setData([]);
+        rsiSeriesRef.current.rsi24?.setData([]);
+      } else if (subIndicator === "RSI") {
+        const { rsi } = calculations;
+        macdSeriesRef.current.bar?.setData([]);
+        macdSeriesRef.current.dif?.setData([]);
+        macdSeriesRef.current.dea?.setData([]);
+        kdjSeriesRef.current.k?.setData([]);
+        kdjSeriesRef.current.d?.setData([]);
+        kdjSeriesRef.current.j?.setData([]);
+        rsiSeriesRef.current.rsi6?.setData(rsi.rsi6.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        rsiSeriesRef.current.rsi12?.setData(rsi.rsi12.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+        rsiSeriesRef.current.rsi24?.setData(rsi.rsi24.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
+      }
+    }
 
     // Set MA Lines Data
     for (const cfg of MA_CONFIGS) {
@@ -752,15 +1060,6 @@ export default function KlineChart({
         } else {
           maLine.setData([]);
         }
-      }
-    }
-
-    // Set MAVOL Data
-    for (const cfg of MAVOL_CONFIGS) {
-      const volLine = mavolSeriesMapRef.current.get(cfg.key);
-      if (volLine) {
-        const volPoints = calculateMAVOL(rows, cfg.period);
-        volLine.setData(volPoints.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
       }
     }
 
@@ -814,7 +1113,7 @@ export default function KlineChart({
       fittedViewKeyRef.current = viewKey;
       setIsZoomed(false);
     }
-  }, [c.down, c.up, data, height, rows, tradeMarkers, viewKey, chanlun, mainOverlay, calculations, showHighLowMarkers, updateHighLowMarkers]);
+  }, [c.down, c.up, c.cardBg, candleStyle, subIndicator, data, height, rows, tradeMarkers, viewKey, chanlun, mainOverlay, calculations, showHighLowMarkers, updateHighLowMarkers]);
 
   // 缠论图层：笔折线 + 中枢上下沿虚线
   useEffect(() => {
@@ -867,6 +1166,40 @@ export default function KlineChart({
     }
   }, [chanlun, c.accent, c.info, height]);
 
+  // 筹码峰主图水平参考线 (PriceLine)
+  useEffect(() => {
+    const candle = candleSeriesRef.current;
+    if (!candle) return;
+    if (chipPriceLineRef.current) {
+      try {
+        candle.removePriceLine(chipPriceLineRef.current);
+      } catch {
+        // ignore
+      }
+      chipPriceLineRef.current = null;
+    }
+    if (showChipPeak && chipDistribution?.peak_price != null && Number.isFinite(chipDistribution.peak_price)) {
+      chipPriceLineRef.current = candle.createPriceLine({
+        price: chipDistribution.peak_price,
+        color: "#faad14",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: "筹码峰",
+      });
+    }
+    return () => {
+      if (chipPriceLineRef.current && candleSeriesRef.current) {
+        try {
+          candleSeriesRef.current.removePriceLine(chipPriceLineRef.current);
+        } catch {
+          // ignore
+        }
+        chipPriceLineRef.current = null;
+      }
+    };
+  }, [showChipPeak, chipDistribution, height]);
+
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -889,9 +1222,12 @@ export default function KlineChart({
     });
 
     candleSeriesRef.current?.applyOptions({
-      upColor: c.up, downColor: c.down,
-      borderUpColor: c.up, borderDownColor: c.down,
-      wickUpColor: c.up, wickDownColor: c.down,
+      upColor: candleStyle === "hollow" ? c.cardBg : c.up,
+      downColor: c.down,
+      borderUpColor: c.up,
+      borderDownColor: c.down,
+      wickUpColor: c.up,
+      wickDownColor: c.down,
     });
     volumeSeriesRef.current?.setData(rows.map((item, index) => {
       const prevClose = index > 0 ? rows[index - 1].close : null;
@@ -910,7 +1246,22 @@ export default function KlineChart({
     }));
     chart.priceScale("right", 0).applyOptions({ borderColor: c.border });
     chart.priceScale("right", VOLUME_PANE_INDEX).applyOptions({ borderColor: c.border });
-  }, [c.border, c.cardBg, c.down, c.primary, c.accent, c.isLight, c.textMuted, c.textSecondary, c.up, height, rows]);
+  }, [c.border, c.cardBg, c.down, c.primary, c.accent, c.isLight, c.textMuted, c.textSecondary, c.up, candleStyle, height, rows]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const el = chartElRef.current;
+    if (!chart || !el) return;
+    const timer = setTimeout(() => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        chart.applyOptions({ width: Math.floor(rect.width), height: Math.floor(rect.height) });
+        applyVolumePaneLayout(chart, paneRatio);
+        updateLayoutMetrics();
+      }
+    }, 40);
+    return () => clearTimeout(timer);
+  }, [isLandscape, isRotated, paneRatio]);
 
   return (
     <div
@@ -920,17 +1271,52 @@ export default function KlineChart({
       aria-label="K线图交互区"
       title="左键拖拽平移画布，按住 Shift 拖拽框选放大，双击重置全景"
       onKeyDown={handleKeyDown}
-      className="kline-chart"
-      style={{
-        position: "relative",
-        width: "100%",
-        height,
-        minHeight: height,
-        display: "flex",
-        flexDirection: "column",
-        backgroundColor: c.cardBg,
-        outline: "none",
-      }}
+      className={`kline-chart ${isLandscape ? "kline-chart--landscape" : ""}`}
+      style={
+        isLandscape
+          ? isRotated
+            ? {
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100vh",
+                height: "100vw",
+                transform: "rotate(90deg) translateY(-100%)",
+                transformOrigin: "top left",
+                zIndex: 2000,
+                display: "flex",
+                flexDirection: "column",
+                backgroundColor: c.cardBg,
+                outline: "none",
+                overflow: "hidden",
+                boxShadow: "0 0 20px rgba(0,0,0,0.5)",
+              }
+            : {
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: "100vw",
+                height: "100vh",
+                zIndex: 2000,
+                display: "flex",
+                flexDirection: "column",
+                backgroundColor: c.cardBg,
+                outline: "none",
+                overflow: "hidden",
+              }
+          : {
+              position: "relative",
+              width: "100%",
+              height,
+              minHeight: height,
+              display: "flex",
+              flexDirection: "column",
+              backgroundColor: c.cardBg,
+              outline: "none",
+            }
+      }
     >
       {/* Allow wrapped quotes to grow without overlapping the toolbar or plot. */}
       <div ref={hudRef} className="kline-chart__hud" style={{
@@ -994,11 +1380,23 @@ export default function KlineChart({
                 <span style={{ whiteSpace: "nowrap", color: "#13c2c2" }}>MA30: {activeCandle.ma30 != null ? activeCandle.ma30.toFixed(2) : "-"}</span>
                 <span style={{ whiteSpace: "nowrap", color: "#ff7a45" }}>MA60: {activeCandle.ma60 != null ? activeCandle.ma60.toFixed(2) : "-"}</span>
               </>
-            ) : (
+            ) : mainOverlay === "BOLL" ? (
               <>
                 <span style={{ whiteSpace: "nowrap", color: "#f0b90b" }}>MID: {activeCandle.bollMid != null ? activeCandle.bollMid.toFixed(2) : "-"}</span>
                 <span style={{ whiteSpace: "nowrap", color: "#ff7a45" }}>UP: {activeCandle.bollUp != null ? activeCandle.bollUp.toFixed(2) : "-"}</span>
                 <span style={{ whiteSpace: "nowrap", color: "#9254de" }}>DN: {activeCandle.bollDn != null ? activeCandle.bollDn.toFixed(2) : "-"}</span>
+              </>
+            ) : null}
+            {showChipPeak && chipDistribution?.peak_price != null && (
+              <>
+                <span style={{ whiteSpace: "nowrap", color: "#faad14" }}>
+                  筹码峰: {chipDistribution.peak_price.toFixed(2)}
+                </span>
+                {chipDistribution.profit_ratio != null && (
+                  <span style={{ whiteSpace: "nowrap", color: c.textMuted }}>
+                    获利盘: <strong style={{ color: chipDistribution.profit_ratio >= 0.5 ? c.up : c.down }}>{(chipDistribution.profit_ratio * 100).toFixed(1)}%</strong>
+                  </span>
+                )}
               </>
             )}
           </div>
@@ -1007,9 +1405,10 @@ export default function KlineChart({
         )}
 
         {/* Range & Overlay controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto", marginLeft: "auto", flexWrap: "wrap" }}>
+        <div className="kline-chart__hud-controls" style={{ display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto", marginLeft: "auto", flexWrap: "wrap" }}>
           <button
             type="button"
+            className="kline-chart__hud-btn"
             onClick={() => handleRangeSelect("1M")}
             title="查看近1月 (约22根K线)"
             style={{
@@ -1027,6 +1426,7 @@ export default function KlineChart({
           </button>
           <button
             type="button"
+            className="kline-chart__hud-btn"
             onClick={() => handleRangeSelect("3M")}
             title="查看近3月 (约66根K线)"
             style={{
@@ -1044,6 +1444,7 @@ export default function KlineChart({
           </button>
           <button
             type="button"
+            className="kline-chart__hud-btn"
             onClick={() => handleRangeSelect("1Y")}
             title="查看近1年 (约250根K线)"
             style={{
@@ -1061,6 +1462,7 @@ export default function KlineChart({
           </button>
           <button
             type="button"
+            className="kline-chart__hud-btn"
             onClick={() => handleRangeSelect("ALL")}
             title="查看全部K线"
             style={{
@@ -1076,9 +1478,13 @@ export default function KlineChart({
           >
             全部
           </button>
+
+          {/* 主图指标切换 */}
           <button
             type="button"
-            onClick={() => setMainOverlay(mainOverlay === "MA" ? "BOLL" : "MA")}
+            className="kline-chart__hud-btn"
+            onClick={() => setMainOverlay(mainOverlay === "MA" ? "BOLL" : mainOverlay === "BOLL" ? "NONE" : "MA")}
+            title="切换主图技术指标 (MA/BOLL/无)"
             style={{
               padding: "1px 7px",
               fontSize: "11px",
@@ -1091,8 +1497,99 @@ export default function KlineChart({
               whiteSpace: "nowrap",
             }}
           >
-            {mainOverlay === "MA" ? "切换BOLL" : "切换MA"}
+            {mainOverlay === "MA" ? "主:MA" : mainOverlay === "BOLL" ? "主:BOLL" : "主:无"}
           </button>
+
+          {/* 同花顺经典 红空绿实 / 实心蜡烛 切换 */}
+          <button
+            type="button"
+            className="kline-chart__hud-btn"
+            onClick={() => setCandleStyle(candleStyle === "solid" ? "hollow" : "solid")}
+            title={candleStyle === "solid" ? "切换为同花顺红空绿实（阳线镂空）" : "切换为常规实心K线"}
+            style={{
+              padding: "1px 7px",
+              fontSize: "11px",
+              borderRadius: 4,
+              border: `1px solid ${candleStyle === "hollow" ? c.primary : c.border}`,
+              background: candleStyle === "hollow" ? hexToRgba(c.primary, 0.12) : "transparent",
+              color: candleStyle === "hollow" ? c.primary : c.textSecondary,
+              cursor: "pointer",
+              fontWeight: candleStyle === "hollow" ? 600 : 400,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {candleStyle === "hollow" ? "红空绿实" : "实心K线"}
+          </button>
+
+          {/* 筹码峰与CYQ筹码分布开关 */}
+          {chipDistribution && (
+            <button
+              type="button"
+              className="kline-chart__hud-btn"
+              onClick={() => setShowChipPeak(!showChipPeak)}
+              title={showChipPeak ? "隐藏筹码峰与CYQ筹码分布" : "显示筹码峰与CYQ筹码分布"}
+              style={{
+                padding: "1px 7px",
+                fontSize: "11px",
+                borderRadius: 4,
+                border: `1px solid ${showChipPeak ? "#faad14" : c.border}`,
+                background: showChipPeak ? hexToRgba("#faad14", 0.15) : "transparent",
+                color: showChipPeak ? "#faad14" : c.textSecondary,
+                cursor: "pointer",
+                fontWeight: showChipPeak ? 600 : 400,
+                whiteSpace: "nowrap",
+              }}
+            >
+              筹码峰
+            </button>
+          )}
+
+          {/* 放大横屏模式切换 */}
+          <button
+            type="button"
+            className="kline-chart__hud-btn"
+            onClick={toggleLandscape}
+            title={isLandscape ? "退出横屏放大模式 (Esc)" : "放大横屏看盘 (沉浸式全屏横屏)"}
+            style={{
+              padding: "1px 7px",
+              fontSize: "11px",
+              borderRadius: 4,
+              border: `1px solid ${isLandscape ? c.primary : c.border}`,
+              background: isLandscape ? hexToRgba(c.primary, 0.15) : hexToRgba(c.primary, 0.05),
+              color: isLandscape ? c.primary : c.textPrimary,
+              cursor: "pointer",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+            }}
+          >
+            <span style={{ fontSize: "12px", lineHeight: 1 }}>{isLandscape ? "✕" : "⛶"}</span>
+            {isLandscape ? "退出横屏" : "放大横屏"}
+          </button>
+
+          {isLandscape && (
+            <button
+              type="button"
+              className="kline-chart__hud-btn"
+              onClick={() => setIsRotated(!isRotated)}
+              title="在竖屏与横屏方向之间旋转 90° (适配手机竖屏横拿看盘)"
+              style={{
+                padding: "1px 7px",
+                fontSize: "11px",
+                borderRadius: 4,
+                border: `1px solid ${c.border}`,
+                background: isRotated ? hexToRgba(c.primary, 0.15) : "transparent",
+                color: isRotated ? c.primary : c.textSecondary,
+                cursor: "pointer",
+                fontWeight: 500,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {isRotated ? "还原旋转" : "90°旋转"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -1103,8 +1600,9 @@ export default function KlineChart({
           background: hexToRgba(c.primary, 0.12), border: `1px solid ${hexToRgba(c.primary, 0.35)}`,
         }} />
 
-        {/* 股价与成交量窗格中间区分栏 (带背景色、带指标说明、左右不穿透坐标轴) */}
+        {/* 股价与副图窗格中间区分栏 (带背景色、带指标说明、左右不穿透坐标轴) */}
         <div
+          className="kline-chart__separator-bar"
           style={{
             position: "absolute",
             top: pane0Height - 11,
@@ -1124,42 +1622,106 @@ export default function KlineChart({
             userSelect: "none",
           }}
           onMouseDown={handleSeparatorMouseDown}
-          title="上下拖拽可调整K线图与成交量高度比例"
+          title="上下拖拽可调整K线图与副图高度比例"
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{
-              fontSize: "11px",
-              fontWeight: 700,
-              color: c.textSecondary,
-              letterSpacing: "0.02em",
-            }}>
-              成交量 VOL
-            </span>
+          <div className="kline-chart__subindicator-info" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "nowrap", overflow: "hidden", minWidth: 0 }}>
+            {/* 同花顺风格副图指标切换器 */}
+            <div className="kline-chart__subindicator-tabs" style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }} onMouseDown={(e) => e.stopPropagation()}>
+              {(["VOL", "MACD", "KDJ", "RSI"] as const).map((tab) => {
+                const isActive = subIndicator === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setSubIndicator(tab)}
+                    className="kline-chart__subindicator-tab-btn"
+                    style={{
+                      padding: "0 5px",
+                      height: 16,
+                      fontSize: "10px",
+                      fontWeight: isActive ? 700 : 500,
+                      borderRadius: 2,
+                      border: isActive ? `1px solid ${c.primary}` : "1px solid transparent",
+                      background: isActive ? hexToRgba(c.primary, 0.12) : "transparent",
+                      color: isActive ? c.primary : c.textSecondary,
+                      cursor: "pointer",
+                      lineHeight: "14px",
+                    }}
+                  >
+                    {tab}
+                  </button>
+                );
+              })}
+            </div>
+
             {activeCandle && (
-              <>
-                <span style={{ fontSize: "11px", color: c.textMuted }}>
-                  VOL: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.amount)}</strong>
-                </span>
-                {activeCandle.turnoverPct != null && (
-                  <span style={{ fontSize: "11px", color: c.textMuted }}>
-                    换手: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{activeCandle.turnoverPct.toFixed(2)}%</strong>
-                  </span>
+              <div className="kline-chart__subindicator-stats" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "nowrap" }}>
+                {subIndicator === "VOL" && (
+                  <>
+                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}>
+                      VOL: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.amount)}</strong>
+                    </span>
+                    {activeCandle.turnoverPct != null && (
+                      <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: c.textMuted, whiteSpace: "nowrap" }}>
+                        换手: <strong style={{ color: c.textPrimary, fontFamily: APP_FONT_FAMILY }}>{activeCandle.turnoverPct.toFixed(2)}%</strong>
+                      </span>
+                    )}
+                    {activeCandle.vol5 != null && (
+                      <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#f0b90b", whiteSpace: "nowrap" }}>
+                        MA5: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.vol5)}</strong>
+                      </span>
+                    )}
+                    {activeCandle.vol10 != null && (
+                      <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#00d4d4", whiteSpace: "nowrap" }}>
+                        MA10: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.vol10)}</strong>
+                      </span>
+                    )}
+                  </>
                 )}
-                {activeCandle.vol5 != null && (
-                  <span style={{ fontSize: "11px", color: "#f0b90b" }}>
-                    MA5: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.vol5)}</strong>
-                  </span>
+                {subIndicator === "MACD" && (
+                  <>
+                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#f0b90b", whiteSpace: "nowrap" }}>
+                      DIF: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.dif != null ? activeCandle.dif.toFixed(2) : "-"}</strong>
+                    </span>
+                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#e879f9", whiteSpace: "nowrap" }}>
+                      DEA: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.dea != null ? activeCandle.dea.toFixed(2) : "-"}</strong>
+                    </span>
+                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: (activeCandle.macd ?? 0) >= 0 ? c.up : c.down, whiteSpace: "nowrap" }}>
+                      MACD: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.macd != null ? activeCandle.macd.toFixed(2) : "-"}</strong>
+                    </span>
+                  </>
                 )}
-                {activeCandle.vol10 != null && (
-                  <span style={{ fontSize: "11px", color: "#00d4d4" }}>
-                    MA10: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{formatVolume(activeCandle.vol10)}</strong>
-                  </span>
+                {subIndicator === "KDJ" && (
+                  <>
+                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#f0b90b", whiteSpace: "nowrap" }}>
+                      K: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.k != null ? activeCandle.k.toFixed(2) : "-"}</strong>
+                    </span>
+                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#38bdf8", whiteSpace: "nowrap" }}>
+                      D: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.d != null ? activeCandle.d.toFixed(2) : "-"}</strong>
+                    </span>
+                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#d946ef", whiteSpace: "nowrap" }}>
+                      J: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.j != null ? activeCandle.j.toFixed(2) : "-"}</strong>
+                    </span>
+                  </>
                 )}
-              </>
+                {subIndicator === "RSI" && (
+                  <>
+                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#f0b90b", whiteSpace: "nowrap" }}>
+                      RSI6: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.rsi6 != null ? activeCandle.rsi6.toFixed(2) : "-"}</strong>
+                    </span>
+                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#38bdf8", whiteSpace: "nowrap" }}>
+                      RSI12: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.rsi12 != null ? activeCandle.rsi12.toFixed(2) : "-"}</strong>
+                    </span>
+                    <span className="kline-chart__vol-stat" style={{ fontSize: "11px", color: "#c084fc", whiteSpace: "nowrap" }}>
+                      RSI24: <strong style={{ fontFamily: APP_FONT_FAMILY }}>{activeCandle.rsi24 != null ? activeCandle.rsi24.toFixed(2) : "-"}</strong>
+                    </span>
+                  </>
+                )}
+              </div>
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div className="kline-chart__separator-drag" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <div style={{
               width: 22,
               height: 3,
@@ -1167,11 +1729,88 @@ export default function KlineChart({
               backgroundColor: c.border,
               opacity: 0.8,
             }} />
-            <span style={{ fontSize: "10px", color: c.textMuted, opacity: 0.75 }}>
-              单位: 股/元
+            <span className="kline-chart__separator-unit" style={{ fontSize: "10px", color: c.textMuted, opacity: 0.75 }}>
+              {subIndicator === "VOL" ? "单位: 股/元" : subIndicator === "MACD" ? "参数: 12,26,9" : subIndicator === "KDJ" ? "参数: 9,3,3" : "参数: 6,12,24"}
             </span>
           </div>
         </div>
+
+        {/* 同花顺风格 侧边 CYQ 筹码分布悬浮微图 */}
+        {showChipPeak && chipDistribution && sortedHistogramSlice.length > 0 && (
+          <div
+            className="pdf-hide"
+            style={{
+              position: "absolute",
+              right: 58,
+              top: 6,
+              width: 108,
+              maxHeight: Math.min(pane0Height - 16, 200),
+              backgroundColor: hexToRgba(c.cardBg, 0.88),
+              border: `1px solid ${hexToRgba(c.border, 0.8)}`,
+              borderRadius: 4,
+              padding: "4px 6px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              zIndex: 3,
+              pointerEvents: "none",
+              display: "flex",
+              flexDirection: "column",
+              backdropFilter: "blur(2px)",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+              <span style={{ fontSize: "9px", fontWeight: 700, color: c.textSecondary, letterSpacing: "0.02em" }}>
+                CYQ 筹码
+              </span>
+              <span style={{ fontSize: "9px", fontWeight: 700, color: "#faad14" }}>
+                峰:{chipDistribution.peak_price.toFixed(2)}
+              </span>
+            </div>
+
+            {/* 柱状分布图 */}
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 1, overflow: "hidden" }}>
+              {sortedHistogramSlice.map((item, idx) => {
+                const currentPrice = activeCandle?.close ?? chipDistribution.peak_price;
+                const isProfit = item.price <= currentPrice;
+                const isPeak = Math.abs(item.price - chipDistribution.peak_price) < 0.05;
+                const barColor = isPeak ? "#faad14" : isProfit ? hexToRgba(c.up, 0.75) : hexToRgba(c.down, 0.65);
+                const widthPct = Math.min(100, Math.max(4, Math.round((item.ratio / maxChipRatio) * 100)));
+
+                return (
+                  <div key={idx} style={{ display: "flex", alignItems: "center", height: 4, gap: 3 }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${widthPct}%`,
+                        backgroundColor: barColor,
+                        borderRadius: 1,
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 统计指标 */}
+            <div style={{ marginTop: 3, paddingTop: 2, borderTop: `1px dashed ${hexToRgba(c.border, 0.6)}`, display: "flex", flexDirection: "column", gap: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px" }}>
+                <span style={{ color: c.textMuted }}>获利比例</span>
+                <span style={{ color: (chipDistribution.profit_ratio ?? 0) >= 0.5 ? c.up : c.down, fontWeight: 600 }}>
+                  {chipDistribution.profit_ratio != null ? `${(chipDistribution.profit_ratio * 100).toFixed(1)}%` : "-"}
+                </span>
+              </div>
+              {chipDistribution.concentration_90 != null && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px" }}>
+                  <span style={{ color: c.textMuted }}>90%集中度</span>
+                  <span style={{ color: c.textSecondary, fontWeight: 500 }}>
+                    {(chipDistribution.concentration_90 * 100).toFixed(1)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {isZoomed && (
           <div className="pdf-hide" style={{ position: "absolute", right: 12, top: 10, zIndex: 5 }}>
             <button type="button" onClick={() => { chartRef.current?.timeScale().fitContent(); setIsZoomed(false); }}

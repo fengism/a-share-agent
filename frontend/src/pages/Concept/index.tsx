@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AutoComplete, Card, Col, Input, Row, Tag } from "antd";
+import { AutoComplete, Card, Col, Input, Row, Segmented, Tag } from "antd";
 import { ApartmentOutlined } from "@ant-design/icons";
 import {
   useConceptConstituents,
@@ -7,15 +7,19 @@ import {
   useConceptList,
   type ConceptSummary,
 } from "../../api/queryHooks/concept";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors } from "../../styles/ui";
 import ConceptConstituentPanel from "./ConceptConstituentPanel";
 import ConceptIndexPanel from "./ConceptIndexPanel";
 import { DEFAULT_INDEX_DAYS, useConceptParam, useConceptSearch } from "./conceptSelection";
+import "./concept-page.css";
 
 export default function Concept() {
   const c = useColors();
+  const isNarrow = useMediaQuery("(max-width: 768px)");
   const [conceptParam, setConceptParam] = useConceptParam();
   const [days, setDays] = useState(DEFAULT_INDEX_DAYS);
+  const [mobileView, setMobileView] = useState<"all" | "index" | "constituents">("all");
   // 搜索词与输入框显示值必须分开：受控AutoComplete 若直接把 value 绑到
   // 已选概念，用户输入时框内文字不会变化，下拉也就没法跟着过滤。
   const [keyword, setKeyword] = useState("");
@@ -68,20 +72,37 @@ export default function Concept() {
     [constituentsQuery.data],
   );
 
+  const mobileViewOptions = useMemo(
+    () => [
+      { label: "综合双屏", value: "all" },
+      { label: "指数走势", value: "index" },
+      {
+        label: `成分股${constituentsQuery.data?.total ? ` (${constituentsQuery.data.total})` : ""}`,
+        value: "constituents",
+      },
+    ],
+    [constituentsQuery.data?.total],
+  );
+
+  const showIndex = !isNarrow || mobileView === "all" || mobileView === "index";
+  const showConstituents = !isNarrow || mobileView === "all" || mobileView === "constituents";
+
   return (
-    <main style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
-      <header style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <ApartmentOutlined style={{ fontSize: 20, color: c.primary }} />
+    <main className="concept-page">
+      <header className="concept-header">
+        <ApartmentOutlined className="concept-header__icon" style={{ fontSize: isNarrow ? 18 : 20, color: c.primary }} />
         <div>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: c.textPrimary }}>概念板块联动</h1>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: c.textMuted }}>
+          <h1 className="concept-header__title" style={{ color: c.textPrimary }}>
+            概念板块联动
+          </h1>
+          <p className="concept-header__desc" style={{ color: c.textMuted }}>
             左侧是本地合成的等权概念指数，右侧是该概念的成分股与实时行情，两侧共享同一个概念选择。
           </p>
         </div>
       </header>
 
-      <Card size="small" styles={{ body: { padding: 12 } }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <Card size="small" styles={{ body: { padding: isNarrow ? 10 : 12 } }}>
+        <div className="concept-search-bar">
           <AutoComplete
             value={inputValue}
             // 我们自己按 concepts 过滤；option 的 label 是 JSX，默认过滤会匹配失败
@@ -100,58 +121,77 @@ export default function Concept() {
                 </span>
               ),
             }))}
-            style={{ width: 280 }}
+            className="concept-search-input"
+            style={{ width: "100%", maxWidth: isNarrow ? "100%" : 320 }}
             placeholder="搜索并选择概念，例如「固态电池」"
           >
             <Input.Search allowClear onSearch={handleSelectConcept} />
           </AutoComplete>
-          {concept ? (
-            <Tag style={{ marginInlineEnd: 0 }} color="blue">
-              {concept} ·{" "}
-              {constituentsQuery.data?.total ?? concepts.find((i) => i.name === concept)?.stock_count ?? 0} 只
-            </Tag>
-          ) : null}
-          <span style={{ fontSize: 12, color: c.textMuted }}>
-            共 {concepts.length} 个概念{keyword.trim() ? ` · 匹配 ${filtered.length}` : ""}
-          </span>
+          <div className="concept-search-meta">
+            {concept ? (
+              <Tag style={{ marginInlineEnd: 0 }} color="blue">
+                {concept} ·{" "}
+                {constituentsQuery.data?.total ?? concepts.find((i) => i.name === concept)?.stock_count ?? 0} 只
+              </Tag>
+            ) : null}
+            <span style={{ fontSize: 12, color: c.textMuted }}>
+              共 {concepts.length} 个概念{keyword.trim() ? ` · 匹配 ${filtered.length}` : ""}
+            </span>
+          </div>
         </div>
       </Card>
 
+      {isNarrow && (
+        <div className="concept-mobile-view-tabs">
+          <Segmented
+            block
+            size="middle"
+            value={mobileView}
+            options={mobileViewOptions}
+            onChange={(val) => setMobileView(val as "all" | "index" | "constituents")}
+          />
+        </div>
+      )}
+
       <Row gutter={[12, 12]} align="stretch">
-        <Col xs={24} xl={14}>
-          <Card size="small" style={{ height: "100%" }} styles={{ body: { padding: 12 } }}>
-            <ConceptIndexPanel
-              concept={concept}
-              points={indexQuery.data?.items}
-              days={days}
-              onDaysChange={setDays}
-              isLoading={indexQuery.isLoading}
-              error={indexQuery.error}
-              onRetry={() => void indexQuery.refetch()}
-              constituentTotal={indexQuery.data?.constituent_total ?? 0}
-              constituentUsed={indexQuery.data?.constituent_used ?? 0}
-              truncated={indexQuery.data?.truncated ?? false}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} xl={10}>
-          <Card size="small" style={{ height: "100%" }} styles={{ body: { padding: 12 } }}>
-            <ConceptConstituentPanel
-              concept={concept}
-              items={constituentsQuery.data?.items}
-              related={related}
-              total={constituentsQuery.data?.total ?? 0}
-              isLoading={constituentsQuery.isLoading}
-              error={constituentsQuery.error}
-              onRetry={() => void constituentsQuery.refetch()}
-              quoteSource={constituentsQuery.data?.quote_source ?? null}
-              quoteRequested={quoteCodes?.length ?? 0}
-              quotePending={constituentsQuery.isFetching}
-              onRequestQuotes={handleRequestQuotes}
-              onSelectConcept={handleSelectConcept}
-            />
-          </Card>
-        </Col>
+        {showIndex && (
+          <Col xs={24} xl={14}>
+            <Card size="small" style={{ height: "100%" }} styles={{ body: { padding: isNarrow ? 10 : 12 } }}>
+              <ConceptIndexPanel
+                concept={concept}
+                points={indexQuery.data?.items}
+                days={days}
+                onDaysChange={setDays}
+                isLoading={indexQuery.isLoading}
+                error={indexQuery.error}
+                onRetry={() => void indexQuery.refetch()}
+                constituentTotal={indexQuery.data?.constituent_total ?? 0}
+                constituentUsed={indexQuery.data?.constituent_used ?? 0}
+                truncated={indexQuery.data?.truncated ?? false}
+              />
+            </Card>
+          </Col>
+        )}
+        {showConstituents && (
+          <Col xs={24} xl={showIndex ? 10 : 24}>
+            <Card size="small" style={{ height: "100%" }} styles={{ body: { padding: isNarrow ? 10 : 12 } }}>
+              <ConceptConstituentPanel
+                concept={concept}
+                items={constituentsQuery.data?.items}
+                related={related}
+                total={constituentsQuery.data?.total ?? 0}
+                isLoading={constituentsQuery.isLoading}
+                error={constituentsQuery.error}
+                onRetry={() => void constituentsQuery.refetch()}
+                quoteSource={constituentsQuery.data?.quote_source ?? null}
+                quoteRequested={quoteCodes?.length ?? 0}
+                quotePending={constituentsQuery.isFetching}
+                onRequestQuotes={handleRequestQuotes}
+                onSelectConcept={handleSelectConcept}
+              />
+            </Card>
+          </Col>
+        )}
       </Row>
     </main>
   );

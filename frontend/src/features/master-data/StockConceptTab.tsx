@@ -99,6 +99,43 @@ function marketLabel(market: string): string {
   return "海外";
 }
 
+function ExpandableConceptTags({
+  concepts,
+  onSelectConcept,
+}: {
+  concepts: string[];
+  onSelectConcept: (c: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const maxInitial = 8;
+  const visible = expanded ? concepts : concepts.slice(0, maxInitial);
+  const hasMore = concepts.length > maxInitial;
+
+  return (
+    <div className="stock-concept-tags-wrap">
+      {visible.map((c) => (
+        <Tag
+          key={c}
+          color="blue"
+          style={{ cursor: "pointer" }}
+          onClick={() => onSelectConcept(c)}
+        >
+          {c}
+        </Tag>
+      ))}
+      {hasMore && (
+        <Tag
+          color={expanded ? "processing" : "default"}
+          style={{ cursor: "pointer", userSelect: "none", fontWeight: 500 }}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? "收起" : `+${concepts.length - maxInitial}更多`}
+        </Tag>
+      )}
+    </div>
+  );
+}
+
 function RecordEditorModal({
   open,
   record,
@@ -164,7 +201,7 @@ function RecordEditorModal({
         )
       }
       destroyOnHidden
-      width={720}
+      width="min(720px, calc(100vw - 24px))"
     >
       <Alert
         type="info"
@@ -311,7 +348,7 @@ function ImportDrawer({
       closable={!busy}
       mask={{ closable: !busy }}
       keyboard={!busy}
-      width={640}
+      width="min(640px, 100vw)"
       destroyOnHidden
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -508,7 +545,7 @@ export default function StockConceptPage() {
       title: "股票",
       key: "stock",
       fixed: "left",
-      width: 180,
+      width: 140,
       render: (_, record) => (
         <Space direction="vertical" size={0}>
           <Text strong copyable>
@@ -530,23 +567,10 @@ export default function StockConceptPage() {
       render: (concepts: string[]) => {
         if (!concepts || concepts.length === 0) return <Text type="secondary">—</Text>;
         return (
-          <div className="stock-concept-tags-wrap">
-            {concepts.slice(0, 10).map((c) => (
-              <Tag
-                key={c}
-                color="blue"
-                style={{ cursor: "pointer" }}
-                onClick={() => updateFilter({ concept: c })}
-              >
-                {c}
-              </Tag>
-            ))}
-            {concepts.length > 10 && (
-              <Tooltip title={concepts.slice(10).join("、")}>
-                <Tag color="default">+{concepts.length - 10}更多</Tag>
-              </Tooltip>
-            )}
-          </div>
+          <ExpandableConceptTags
+            concepts={concepts}
+            onSelectConcept={(c) => updateFilter({ concept: c })}
+          />
         );
       },
     },

@@ -530,6 +530,7 @@
 .stock-information-card .ant-tabs-nav { margin-bottom: var(--c-space-4); }
 .stock-information-card .ant-tabs-tab { padding-block: 13px; }
 .stock-information-card .ant-tabs-tab-active { font-weight: var(--c-weight-semibold); }
+.stock-information-card .ant-tabs-ink-bar { background: var(--c-primary) !important; height: 2px !important; border-radius: 2px; }
 .stock-information-tab { display: inline-flex; align-items: center; gap: 7px; }
 
 .stock-news-grid {
@@ -580,15 +581,106 @@
   .stock-chart-card .ant-card-extra .ant-segmented { width: 100%; }
   .stock-chart-card .ant-card-extra .ant-segmented-group { display: grid; grid-template-columns: repeat(3, 1fr); }
   .stock-chart-toolbar { justify-content: flex-start; }
+
+  /* ── 个股详情底部 Tab 栏移动端响应式与水平滑动优化 ── */
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav {
+    margin-bottom: var(--c-space-3);
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-wrap {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+    scrollbar-width: none;
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-list {
+    display: flex;
+    min-width: 100%;
+    transform: none !important;
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab {
+    flex: 1 0 auto;
+    justify-content: center;
+    padding: 10px 14px;
+    margin: 0 !important;
+    font-size: var(--c-font-sm);
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-nav-operations {
+    display: none !important;
+  }
+
+  /* ── 资讯与研究子 Tab 栏移动端水平滑动优化 ── */
+  .stock-information-card .ant-tabs-nav {
+    margin-bottom: var(--c-space-3);
+  }
+
+  .stock-information-card .ant-tabs-nav-wrap {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+    scrollbar-width: none;
+  }
+
+  .stock-information-card .ant-tabs-nav-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stock-information-card .ant-tabs-nav-list {
+    display: flex;
+    min-width: max-content;
+    transform: none !important;
+  }
+
+  .stock-information-card .ant-tabs-tab {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    margin: 0 4px 0 0 !important;
+    white-space: nowrap;
+  }
+
+  .stock-information-card .ant-tabs-nav-operations {
+    display: none !important;
+  }
+
+  .stock-information-tab {
+    gap: 5px;
+    font-size: var(--c-font-sm);
+  }
 }
 
 @media (max-width: 460px) {
   .stock-header-card__title-row h2 { font-size: 24px; }
+  .stock-header-card__quote strong { font-size: clamp(22px, 5.5vw, 26px); }
   .stock-header-card__icon { width: 40px; height: 40px; flex-basis: 40px; }
   .stock-header-card__actions { grid-template-columns: 1fr; }
   .stock-metrics-grid { grid-template-columns: 1fr; }
   .stock-section-title small { white-space: normal; }
   .stock-information-tab .anticon { display: none; }
+
+  .stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab {
+    padding: 8px 6px;
+    font-size: 13px;
+  }
+
+  .stock-information-card .ant-tabs-tab {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .stock-information-tab {
+    gap: 4px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -660,6 +752,33 @@
 .stock-detail-tabs {
   min-width: 0;
   container-type: inline-size;
+}
+
+.stock-detail-tabs > .ant-tabs > .ant-tabs-nav {
+  margin-bottom: var(--c-space-4);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab {
+  padding: 10px 20px;
+  font-size: var(--c-font-base);
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab:hover {
+  color: var(--c-primary);
+}
+
+.stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-tab-active {
+  font-weight: 600;
+  color: var(--c-primary) !important;
+}
+
+.stock-detail-tabs > .ant-tabs > .ant-tabs-nav .ant-tabs-ink-bar {
+  background: var(--c-primary) !important;
+  height: 2px !important;
+  border-radius: 2px;
 }
 
 .stock-financial-content {

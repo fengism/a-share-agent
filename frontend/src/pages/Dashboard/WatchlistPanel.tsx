@@ -259,6 +259,8 @@ export default function WatchlistPanel() {
         onOk={handleCreateAlert}
         okButtonProps={{ disabled: threshold == null, loading: addAlert.isPending }}
         okText="添加提醒"
+        width="min(440px, calc(100vw - 32px))"
+        centered
       >
         <Space orientation="vertical" style={{ width: "100%" }}>
           <Select

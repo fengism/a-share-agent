@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DatabaseOutlined, RobotOutlined, UserOutlined } from "@ant-design/icons";
 import { Col, Row, Segmented } from "antd";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import AdminResetCard from "../../components/AdminResetCard";
 import {
   AnySearchConfigCard,
@@ -200,6 +201,8 @@ export function AdminSettingsSection({
   dirtyCards = {},
 }: AdminSettingsSectionProps) {
   const [activeTab, setActiveTab] = useState<"ops" | "bot" | "user">("ops");
+  const isNarrow = useMediaQuery("(max-width: 640px)");
+  const isMobile = useMediaQuery("(max-width: 480px)");
 
   return (
     <section aria-labelledby="admin-settings-title">
@@ -212,13 +215,14 @@ export function AdminSettingsSection({
         <Segmented
           value={activeTab}
           onChange={(val) => setActiveTab(val as "ops" | "bot" | "user")}
-          size="large"
+          block={isNarrow}
+          size={isNarrow ? "middle" : "large"}
           options={[
             {
               value: "ops",
               label: (
-                <span style={{ padding: "0 8px", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <DatabaseOutlined /> 系统运维与数据维护
+                <span style={{ padding: isNarrow ? "0 2px" : "0 8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  <DatabaseOutlined /> {isNarrow ? (isMobile ? "运维" : "系统运维") : "系统运维与数据维护"}
                   {(dirtyCards.backup || dirtyCards.marketDaily || dirtyCards.researchBudget) && (
                     <span
                       style={{
@@ -237,8 +241,8 @@ export function AdminSettingsSection({
             {
               value: "bot",
               label: (
-                <span style={{ padding: "0 8px", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <RobotOutlined /> 自动化与推送机器人
+                <span style={{ padding: isNarrow ? "0 2px" : "0 8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  <RobotOutlined /> {isNarrow ? (isMobile ? "推送" : "自动化推送") : "自动化与推送机器人"}
                   {dirtyCards.bot && (
                     <span
                       style={{
@@ -257,8 +261,8 @@ export function AdminSettingsSection({
             {
               value: "user",
               label: (
-                <span style={{ padding: "0 8px", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <UserOutlined /> 用户与权限安全
+                <span style={{ padding: isNarrow ? "0 2px" : "0 8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  <UserOutlined /> {isNarrow ? (isMobile ? "用户" : "用户安全") : "用户与权限安全"}
                 </span>
               ),
             },

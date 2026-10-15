@@ -36,51 +36,55 @@ export default function PortfolioRiskPanel({ risk }: PortfolioRiskPanelProps) {
       <Row gutter={[16, 12]}>
         <Col xs={12} md={6}>
           <Statistic
+            className="portfolio-risk-stat"
             title="总仓位上限"
             value={risk.max_total_position_limit_pct}
             precision={2}
             suffix="%"
           />
-          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+          <Text className="portfolio-risk-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
             买入预演超过上限时提示
           </Text>
         </Col>
         <Col xs={12} md={6}>
           <Statistic
+            className="portfolio-risk-stat"
             title="最大单股权重"
             value={risk.max_single_stock_pct ?? "-"}
             precision={2}
             suffix={risk.max_single_stock_pct == null ? undefined : "%"}
           />
-          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", display: "block" }}>
+          <Text className="portfolio-risk-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", display: "block" }}>
             {largestPosition}
           </Text>
-          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+          <Text className="portfolio-risk-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
             上限 {risk.max_single_stock_limit_pct.toFixed(2)}%
           </Text>
         </Col>
         <Col xs={12} md={6}>
           <Statistic
+            className="portfolio-risk-stat"
             title="最大行业仓位"
             value={risk.largest_sector_pct ?? "-"}
             precision={2}
             suffix={risk.largest_sector_pct == null ? undefined : "%"}
           />
-          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", display: "block" }}>
+          <Text className="portfolio-risk-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", display: "block" }}>
             {largestSector}
           </Text>
-          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+          <Text className="portfolio-risk-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
             上限 {risk.max_sector_limit_pct.toFixed(2)}%
           </Text>
         </Col>
         <Col xs={12} md={6}>
           <Statistic
+            className="portfolio-risk-stat"
             title="前三大持仓占比"
             value={risk.top3_concentration_pct ?? "-"}
             precision={2}
             suffix={risk.top3_concentration_pct == null ? undefined : "%"}
           />
-          <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+          <Text className="portfolio-risk-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
             已定价 {risk.priced_stock_count} 只
             {risk.unpriced_stock_count > 0 ? ` · 未定价 ${risk.unpriced_stock_count} 只` : ""}
           </Text>

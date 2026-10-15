@@ -23,5 +23,5 @@ test("separates futures quotes and static trade references", async ({ page }) =>
   await page.goto("/macro?tab=trade");
   await expect(page.getByText("重点商品与关联公司参考（静态资料）")).toBeVisible();
   await expect(page.getByText(/不是当期海关统计/)).toBeVisible();
-  await expect(page.getByText("关联公司（静态，非受益判断）")).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "关联公司（静态，非受益判断）" })).toBeVisible();
 });

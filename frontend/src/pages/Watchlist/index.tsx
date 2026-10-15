@@ -46,6 +46,7 @@ import ChangeValue from "../../components/ChangeValue";
 import PreloadLink from "../../components/PreloadLink";
 import SectionDataState from "../../components/SectionDataState";
 import { useStockSearchController } from "../../hooks/useStockSearchController";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useStyles } from "../../styles/ui";
 import type {
   WatchlistAlertCondition,
@@ -341,6 +342,7 @@ function ConceptTags({
 
 export default function WatchlistPage() {
   const { cardStyle, pageContainerStyle, pageDescriptionStyle, pageTitleStyle } = useStyles();
+  const isMobile = useMediaQuery("(max-width: 640px)");
   const watchlist = useWatchlist();
   const addItem = useAddWatchlistItem();
   const deleteItem = useDeleteWatchlistItem();
@@ -523,7 +525,7 @@ export default function WatchlistPage() {
       title: "股票",
       key: "stock",
       fixed: "left",
-      width: 142,
+      width: isMobile ? 120 : 142,
       render: (_, item) => (
         <PreloadLink className="watchlist-page__stock" to={buildWatchlistStockUrl(item.stock_code, item.market)}>
           <strong>{item.stock_name}</strong>
@@ -534,8 +536,8 @@ export default function WatchlistPage() {
     {
       title: "最新价",
       dataIndex: "current_price",
-      width: 92,
-      fixed: "left",
+      width: isMobile ? 80 : 92,
+      fixed: isMobile ? undefined : "left",
       align: "right",
       render: (value: number | null, item) => (
         <strong className={`watchlist-page__price is-${marketDirection(item.change_pct)} financial-num`}>
@@ -546,64 +548,64 @@ export default function WatchlistPage() {
     {
       title: "涨跌幅",
       dataIndex: "change_pct",
-      width: 96,
-      fixed: "left",
+      width: isMobile ? 84 : 96,
+      fixed: isMobile ? undefined : "left",
       align: "right",
       render: (value: number | null) => <ChangeValue value={value} />,
     },
     {
       title: "今开",
       dataIndex: "open_price",
-      width: 88,
+      width: isMobile ? 76 : 88,
       align: "right",
       render: (val: number | null) => <span className="financial-num">{formatPrice(val)}</span>,
     },
     {
       title: "最高",
       dataIndex: "high_price",
-      width: 88,
+      width: isMobile ? 76 : 88,
       align: "right",
       render: (val: number | null) => <span className="financial-num">{formatPrice(val)}</span>,
     },
     {
       title: "最低",
       dataIndex: "low_price",
-      width: 88,
+      width: isMobile ? 76 : 88,
       align: "right",
       render: (val: number | null) => <span className="financial-num">{formatPrice(val)}</span>,
     },
     {
       title: "成交额",
       dataIndex: "amount",
-      width: 104,
+      width: isMobile ? 90 : 104,
       align: "right",
       render: (val: number | null) => <span className="financial-num">{formatCompactNumber(val)}</span>,
     },
     {
       title: "换手率",
       dataIndex: "turnover_pct",
-      width: 92,
+      width: isMobile ? 80 : 92,
       align: "right",
       render: (val: number | null) => <span className="financial-num">{formatPercent(val)}</span>,
     },
     {
       title: "市盈率",
       dataIndex: "pe_ttm",
-      width: 88,
+      width: isMobile ? 76 : 88,
       align: "right",
       render: (val: number | null) => <span className="financial-num">{formatPrice(val)}</span>,
     },
     {
       title: "总市值",
       dataIndex: "market_cap",
-      width: 104,
+      width: isMobile ? 90 : 104,
       align: "right",
       render: (val: number | null) => <span className="financial-num">{formatCompactNumber(val)}</span>,
     },
     {
       title: "所属概念",
       dataIndex: "concepts",
-      width: 230,
+      width: isMobile ? 180 : 230,
       render: (concepts: WatchlistConcept[]) => (
         <ConceptTags concepts={concepts} onSelect={focusConceptGroup} />
       ),
@@ -611,7 +613,7 @@ export default function WatchlistPage() {
     {
       title: "提醒",
       dataIndex: "alerts",
-      width: 210,
+      width: isMobile ? 170 : 210,
       render: (_, item) => (
         <div className="watchlist-page__alerts">
           {item.alerts.slice(0, 2).map((alert) => (
@@ -643,21 +645,21 @@ export default function WatchlistPage() {
     {
       title: "备注",
       dataIndex: "note",
-      width: 150,
+      width: isMobile ? 120 : 150,
       ellipsis: true,
       render: (value: string) => value || <span className="watchlist-page__empty-value">-</span>,
     },
     {
       title: "加入时间",
       dataIndex: "created_at",
-      width: 116,
+      width: isMobile ? 100 : 116,
       render: formatDate,
     },
     {
       title: "操作",
       key: "actions",
       fixed: "right",
-      width: 78,
+      width: isMobile ? 64 : 78,
       align: "center",
       render: (_, item) => (
         <Tooltip title="移除自选">
@@ -678,18 +680,7 @@ export default function WatchlistPage() {
   const renderTable = (items: WatchlistItem[], labelledBy?: string) => (
     <div className="watchlist-page__table-wrap" role="region" aria-labelledby={labelledBy}>
       {selectedStockCodes.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 12px",
-            marginBottom: 8,
-            backgroundColor: "var(--c-nested-bg)",
-            borderRadius: 6,
-            border: "1px solid var(--c-border)",
-          }}
-        >
+        <div className="watchlist-page__batch-bar">
           <Tag color="blue" style={{ margin: 0 }}>已选 {selectedStockCodes.length} 只</Tag>
           <Button
             size="small"
@@ -715,7 +706,7 @@ export default function WatchlistPage() {
         }}
         size="small"
         pagination={false}
-        scroll={{ x: 1690 }}
+        scroll={{ x: isMobile ? 1380 : 1690 }}
         rowClassName={(item) => `watchlist-page__row is-${marketDirection(item.change_pct)}`}
       />
     </div>
@@ -970,6 +961,7 @@ export default function WatchlistPage() {
         onOk={handleCreateAlert}
         okButtonProps={{ disabled: threshold == null, loading: addAlert.isPending }}
         okText="添加提醒"
+        width="min(440px, calc(100vw - 32px))"
       >
         <Space orientation="vertical" style={{ width: "100%" }}>
           <Select

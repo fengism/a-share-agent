@@ -58,16 +58,17 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
               overflow: "hidden",
               borderLeft: "3px solid var(--c-primary)",
             }}
-            className="u-card-interactive"
+            className="u-card-interactive portfolio-summary-card"
           >
             <Statistic
+              className="portfolio-summary-stat"
               title={<span><BankOutlined style={{ marginRight: 6 }} />总资产</span>}
               value={summary.total_asset_value ?? "-"}
               precision={2}
               prefix={summary.total_asset_value == null ? undefined : "¥"}
               styles={{ content: { fontFamily: "var(--c-font-mono)", fontWeight: 700 } }}
             />
-            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            <Text className="portfolio-summary-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
               证券估值 {formatMoney(summary.estimated_securities_value)}
             </Text>
           </Card>
@@ -81,9 +82,10 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
               overflow: "hidden",
               borderLeft: `3px solid ${changeColor(summary.cash_balance, colors)}`,
             }}
-            className="u-card-interactive"
+            className="u-card-interactive portfolio-summary-card"
           >
             <Statistic
+              className="portfolio-summary-stat"
               title={<span><WalletOutlined style={{ marginRight: 6 }} />现金余额</span>}
               value={summary.cash_balance ?? "-"}
               precision={2}
@@ -96,7 +98,7 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
                 },
               }}
             />
-            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            <Text className="portfolio-summary-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
               初始资金 {formatMoney(summary.initial_cash)}
             </Text>
           </Card>
@@ -110,16 +112,17 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
               overflow: "hidden",
               borderLeft: "3px solid #722ed1",
             }}
-            className="u-card-interactive"
+            className="u-card-interactive portfolio-summary-card"
           >
             <Statistic
+              className="portfolio-summary-stat"
               title={<span><PieChartOutlined style={{ marginRight: 6 }} />总仓位</span>}
               value={summary.total_position_pct ?? "-"}
               precision={2}
               suffix={summary.total_position_pct == null ? undefined : "%"}
               styles={{ content: { fontFamily: "var(--c-font-mono)", fontWeight: 700 } }}
             />
-            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            <Text className="portfolio-summary-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
               按总资产口径计算
             </Text>
           </Card>
@@ -133,16 +136,17 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
               overflow: "hidden",
               borderLeft: `3px solid var(--c-primary)`,
             }}
-            className="u-card-interactive"
+            className="u-card-interactive portfolio-summary-card"
           >
             <Statistic
+              className="portfolio-summary-stat"
               title={<span><StockOutlined style={{ marginRight: 6 }} />最新市值</span>}
               value={summary.total_market_value}
               precision={2}
               prefix="¥"
               styles={{ content: { fontFamily: "var(--c-font-mono)", fontWeight: 700 } }}
             />
-            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            <Text className="portfolio-summary-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
               已定价成本 {formatMoney(summary.priced_cost)}
             </Text>
           </Card>
@@ -156,9 +160,10 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
               overflow: "hidden",
               borderLeft: `3px solid ${changeColor(summary.combined_profit_amount, colors)}`,
             }}
-            className="u-card-interactive"
+            className="u-card-interactive portfolio-summary-card"
           >
             <Statistic
+              className="portfolio-summary-stat"
               title={<span><FundOutlined style={{ marginRight: 6 }} />综合盈亏</span>}
               value={summary.combined_profit_amount}
               precision={2}
@@ -171,7 +176,7 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
                 },
               }}
             />
-            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            <Text className="portfolio-summary-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
               共 {summary.transaction_count} 笔交易流水
             </Text>
           </Card>
@@ -185,9 +190,10 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
               overflow: "hidden",
               borderLeft: `3px solid ${changeColor(summary.unrealized_profit_amount, colors)}`,
             }}
-            className="u-card-interactive"
+            className="u-card-interactive portfolio-summary-card"
           >
             <Statistic
+              className="portfolio-summary-stat"
               title={<span><RiseOutlined style={{ marginRight: 6 }} />浮动盈亏</span>}
               value={summary.unrealized_profit_amount}
               precision={2}
@@ -200,7 +206,7 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
                 },
               }}
             />
-            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            <Text className="portfolio-summary-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
               盈利 {summary.profitable_count} · 亏损 {summary.losing_count}
             </Text>
           </Card>
@@ -214,9 +220,10 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
               overflow: "hidden",
               borderLeft: `3px solid ${changeColor(summary.total_profit_pct, colors)}`,
             }}
-            className="u-card-interactive"
+            className="u-card-interactive portfolio-summary-card"
           >
             <Statistic
+              className="portfolio-summary-stat"
               title={<span><LineChartOutlined style={{ marginRight: 6 }} />浮动收益率</span>}
               value={summary.total_profit_pct ?? "-"}
               precision={2}
@@ -229,7 +236,7 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
                 },
               }}
             />
-            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            <Text className="portfolio-summary-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
               基于已定价持仓计算
             </Text>
           </Card>
@@ -243,16 +250,17 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
               overflow: "hidden",
               borderLeft: `3px solid #1890ff`,
             }}
-            className="u-card-interactive"
+            className="u-card-interactive portfolio-summary-card"
           >
             <Statistic
+              className="portfolio-summary-stat"
               title={<span><StockOutlined style={{ marginRight: 6 }} />持仓总成本</span>}
               value={summary.total_cost}
               precision={2}
               prefix="¥"
               styles={{ content: { fontFamily: "var(--c-font-mono)", fontWeight: 700 } }}
             />
-            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+            <Text className="portfolio-summary-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
               {summary.stock_count} 只股票 · {summary.position_count} 个剩余批次
             </Text>
           </Card>
@@ -266,9 +274,10 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
               overflow: "hidden",
               borderLeft: `3px solid ${changeColor(summary.realized_profit_amount, colors)}`,
             }}
-            className="u-card-interactive"
+            className="u-card-interactive portfolio-summary-card"
           >
             <Statistic
+              className="portfolio-summary-stat"
               title={<span><CheckCircleOutlined style={{ marginRight: 6 }} />已实现盈亏</span>}
               value={summary.realized_profit_amount}
               precision={2}
@@ -281,7 +290,7 @@ export default function PortfolioSummaryCards({ summary }: PortfolioSummaryCards
                 },
               }}
             />
-            <Text style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>按 FIFO 成本核算卖出</Text>
+            <Text className="portfolio-summary-subtext" style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>按 FIFO 成本核算卖出</Text>
           </Card>
         </Col>
       </Row>

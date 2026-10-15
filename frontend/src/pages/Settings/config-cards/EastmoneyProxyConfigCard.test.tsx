@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import OutboundProxyConfigCard from "./EastmoneyProxyConfigCard";
+import OutboundProxyConfigCard, { normalizeProxyUrl, validateProxyUrl } from "./EastmoneyProxyConfigCard";
 
 function renderCard(overrides: Partial<Parameters<typeof OutboundProxyConfigCard>[0]> = {}) {
   const onChange = vi.fn();
@@ -133,5 +133,42 @@ describe("OutboundProxyConfigCard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /测试连通性/ }));
     expect(onTest).toHaveBeenCalledTimes(1);
+  });
+
+  it("validates and normalizes SOCKS5 proxy URLs correctly", () => {
+    expect(validateProxyUrl("socks5://user:pw@proxy.local:2260", "socks5")).toBeNull();
+    expect(validateProxyUrl("socks5h://user:pw@proxy.local:2260", "socks5")).toBeNull();
+    expect(validateProxyUrl("socks://user:pw@proxy.local:2260", "socks5")).toBeNull();
+    expect(validateProxyUrl("127.0.0.1:1080", "socks5")).toBeNull();
+    expect(validateProxyUrl("http://127.0.0.1:1080", "socks5")).toContain("必须是 socks5/socks5h");
+    expect(validateProxyUrl("socks5://127.0.0.1", "socks5")).toContain("必须指定端口");
+
+    expect(normalizeProxyUrl("127.0.0.1:1080", "socks5")).toBe("socks5h://127.0.0.1:1080");
+    expect(normalizeProxyUrl("socks://127.0.0.1:1080", "socks5")).toBe("socks5h://127.0.0.1:1080");
+    expect(normalizeProxyUrl("socks5://127.0.0.1:1080", "socks5")).toBe("socks5://127.0.0.1:1080");
+  });
+
+  it("clears masked proxy url when switching proxy type to avoid scheme mismatch", () => {
+    const { onChange } = renderCard({
+      form: { outbound_proxy_type: "http", outbound_proxy_url: "http***7890" },
+    });
+
+    fireEvent.click(screen.getByText("SOCKS5 代理"));
+    expect(onChange).toHaveBeenCalledWith({
+      outbound_proxy_type: "socks5",
+      outbound_proxy_url: "",
+    });
+  });
+
+  it("clears proxy url when switching to none", () => {
+    const { onChange } = renderCard({
+      form: { outbound_proxy_type: "socks5", outbound_proxy_url: "socks5h://127.0.0.1:1080" },
+    });
+
+    fireEvent.click(screen.getByText("直连（不使用代理）"));
+    expect(onChange).toHaveBeenCalledWith({
+      outbound_proxy_type: "none",
+      outbound_proxy_url: "",
+    });
   });
 });

@@ -170,7 +170,7 @@ export default function MarginTab() {
       <div className="market-margin">
         <Row gutter={[16, 16]} className="market-margin__metrics" style={{ marginBottom: t.space[4] }}>
           <Col xs={12} sm={6}>
-            <Card data-testid="margin-total-balance" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+            <Card size="small" data-testid="margin-total-balance" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>两融余额 (亿元)</span>}
                 value={formatValue(latest?.rzrqye)}
@@ -179,7 +179,7 @@ export default function MarginTab() {
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card data-testid="margin-fin-balance" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+            <Card size="small" data-testid="margin-fin-balance" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>融资余额 (亿元)</span>}
                 value={formatValue(latest?.rzye)}
@@ -188,7 +188,7 @@ export default function MarginTab() {
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card data-testid="margin-sec-balance" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+            <Card size="small" data-testid="margin-sec-balance" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>融券余额 (亿元)</span>}
                 value={formatValue(latest?.rqye)}
@@ -197,7 +197,7 @@ export default function MarginTab() {
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card data-testid="margin-balance-change" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
+            <Card size="small" data-testid="margin-balance-change" style={{ borderRadius: t.radius.md, boxShadow: t.shadow.xs }}>
               <Statistic
                 title={<span style={{ color: c.textSecondary, fontSize: t.font.sm }}>两融日变动 (亿元)</span>}
                 value={formatSigned(balanceChange)}

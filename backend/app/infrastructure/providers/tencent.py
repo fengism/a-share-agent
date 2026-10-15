@@ -331,18 +331,21 @@ class TencentDataProvider:
     def _fetch_quotes(self, symbols: list[str]) -> dict[str, dict]:
         if not symbols:
             return {}
-        url = TENCENT_STOCK_QUOTE_URL + ",".join(symbols)
+        quotes = {}
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
         }
-        response = _get_session().get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        quotes = {}
-        for line in response.text.split(";"):
-            quote = self._parse_stock_quote_line(line)
-            if quote.get("code"):
-                quotes[quote["code"]] = quote
+        # 腾讯接口 URL 长度有限，分批按 80 条一组拉取
+        for start in range(0, len(symbols), 80):
+            batch = symbols[start : start + 80]
+            url = TENCENT_STOCK_QUOTE_URL + ",".join(batch)
+            response = _get_session().get(url, headers=headers, timeout=6)
+            response.raise_for_status()
+            for line in response.text.split(";"):
+                quote = self._parse_stock_quote_line(line)
+                if quote.get("code"):
+                    quotes[quote["code"]] = quote
         return quotes
 
     def fetch_market_indices(self) -> pd.DataFrame:

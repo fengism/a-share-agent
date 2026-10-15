@@ -1,0 +1,295 @@
+/* 概念板块联动页面样式 */
+
+.concept-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  width: 100%;
+}
+
+.concept-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.concept-header__icon {
+  font-size: 20px;
+  color: var(--c-primary);
+  flex-shrink: 0;
+}
+
+.concept-header__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--c-text-primary);
+  line-height: var(--c-leading-tight);
+}
+
+.concept-header__desc {
+  margin: 2px 0 0;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+  line-height: var(--c-leading-normal);
+}
+
+.concept-search-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.concept-search-input {
+  width: 100%;
+  max-width: 320px;
+}
+
+.concept-search-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.concept-mobile-view-tabs {
+  display: none;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+/* 概念指数面板 */
+.concept-index-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+}
+
+.concept-index-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.concept-index-price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.concept-index-price__name {
+  font-size: var(--c-font-md);
+  color: var(--c-text-primary);
+}
+
+.concept-index-price__val {
+  font-family: var(--c-font-mono);
+  font-size: 18px;
+  color: var(--c-text-primary);
+  font-weight: var(--c-weight-semibold);
+}
+
+.concept-index-ranges {
+  flex-shrink: 0;
+}
+
+/* 指数统计栏（桌面端 flex 流，移动端微型卡片网格） */
+.concept-index-stats {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: var(--c-font-xs);
+  color: var(--c-text-muted);
+  align-items: center;
+}
+
+.concept-index-stats__tag {
+  margin-inline-end: 0 !important;
+}
+
+/* 成分股面板 */
+.concept-constituent-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+}
+
+.concept-constituent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.concept-constituent-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.concept-related-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* 移动端屏幕适配 (< 768px) */
+@media (max-width: 767px) {
+  .concept-page {
+    gap: 10px;
+  }
+
+  .concept-header {
+    gap: 8px;
+  }
+
+  .concept-header__title {
+    font-size: 18px;
+  }
+
+  .concept-search-input {
+    max-width: 100%;
+  }
+
+  .concept-search-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .concept-search-meta {
+    justify-content: space-between;
+    font-size: var(--c-font-xs);
+  }
+
+  .concept-mobile-view-tabs {
+    display: flex;
+  }
+
+  .concept-mobile-view-tabs .ant-segmented {
+    width: 100%;
+  }
+
+  .concept-mobile-view-tabs .ant-segmented-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .concept-mobile-view-tabs .ant-segmented-item {
+    flex: 1;
+    text-align: center;
+  }
+
+  .concept-index-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .concept-index-ranges {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .concept-index-ranges::-webkit-scrollbar {
+    display: none;
+  }
+
+  .concept-index-ranges .ant-segmented {
+    width: 100%;
+    display: flex;
+  }
+
+  .concept-index-ranges .ant-segmented-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .concept-index-ranges .ant-segmented-item {
+    flex: 1;
+    text-align: center;
+    padding-inline: 4px;
+    font-size: var(--c-font-xs);
+  }
+
+  /* 移动端紧凑统计微型网格 */
+  .concept-index-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: var(--c-radius-sm);
+    background: var(--c-bg-subtle);
+    border: 1px solid var(--c-border-subtle);
+  }
+
+  .concept-index-stats > span {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .concept-index-stats__tag {
+    grid-column: 1 / -1;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .concept-constituent-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .concept-constituent-sort {
+    width: 100%;
+  }
+
+  .concept-constituent-sort .ant-segmented {
+    width: 100%;
+  }
+
+  .concept-constituent-sort .ant-segmented-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .concept-constituent-sort .ant-segmented-item {
+    flex: 1;
+    text-align: center;
+  }
+
+  .concept-related-tags {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .concept-related-tags::-webkit-scrollbar {
+    display: none;
+  }
+
+  .concept-related-tags > * {
+    flex-shrink: 0;
+  }
+}

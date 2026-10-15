@@ -8,6 +8,7 @@ import {
 } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors, useTokens } from "../../styles/ui";
 import type {
   MarketPriceAnomalyCountItem,
@@ -75,6 +76,7 @@ function ExchangeTag({ market }: { market: MarketPriceAnomalyExchange }) {
 export default function PriceAnomalyTab() {
   const c = useColors();
   const t = useTokens();
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const [view, setView] = useState<AnomalyView>("detail");
   const [detailPage, setDetailPage] = useState(1);
   const [countPage, setCountPage] = useState(1);
@@ -89,7 +91,7 @@ export default function PriceAnomalyTab() {
     {
       title: "股票",
       key: "stock",
-      fixed: "left",
+      fixed: isMobile ? undefined : "left",
       width: 138,
       render: (_value, record) => <StockCell code={record.code} name={record.name} />,
     },
@@ -134,13 +136,13 @@ export default function PriceAnomalyTab() {
         ? <Tag color="error">{isCurrentDataDate ? "今日异动" : "数据日异动"}</Tag>
         : <Tag>窗口记录</Tag>,
     },
-  ], [isCurrentDataDate]);
+  ], [isCurrentDataDate, isMobile]);
 
   const countColumns: ColumnsType<MarketPriceAnomalyCountItem> = useMemo(() => [
     {
       title: "股票",
       key: "stock",
-      fixed: "left",
+      fixed: isMobile ? undefined : "left",
       width: 138,
       render: (_value, record) => <StockCell code={record.code} name={record.name} />,
     },
@@ -185,7 +187,7 @@ export default function PriceAnomalyTab() {
       align: "right",
       render: (value: number | null) => value == null ? "-" : `${value}日`,
     },
-  ], []);
+  ], [isMobile]);
 
   const query = isDetail ? detailQuery : countQuery;
   const items = isDetail ? detailQuery.data?.items ?? [] : countQuery.data?.items ?? [];

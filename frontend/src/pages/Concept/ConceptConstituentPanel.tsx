@@ -5,6 +5,7 @@ import { RiseOutlined } from "@ant-design/icons";
 import ChangeValue from "../../components/ChangeValue";
 import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors, semanticTagStyle } from "../../styles/ui";
 import type { ConceptConstituent, RelatedConcept } from "../../api/queryHooks/concept";
 import { closeSourceDate } from "./quoteSource";
@@ -58,6 +59,7 @@ export default function ConceptConstituentPanel({
   onSelectConcept,
 }: Props) {
   const c = useColors();
+  const isNarrow = useMediaQuery("(max-width: 768px)");
   const [sortKey, setSortKey] = useState<SortKey>("code");
   const [descending, setDescending] = useState(true);
 
@@ -136,93 +138,89 @@ export default function ConceptConstituentPanel({
     onRequestQuotes(allCodes);
   }, [allCodes, onRequestQuotes]);
 
-  const columns: ColumnsType<ConceptConstituent> = [
-    {
-      title: "代码",
-      dataIndex: "code",
-      width: 96,
-      fixed: "left",
-      render: (code: string, record) => (
-        <StockExternalLink
-          code={code}
-          name={record.name}
-          className="concept-stock-code"
-          style={{ fontFamily: "var(--c-font-mono)", color: c.primary, fontWeight: 500 }}
-        >
-          {code}
-        </StockExternalLink>
-      ),
-    },
-    {
-      title: "名称",
-      dataIndex: "name",
-      width: 108,
-      ellipsis: true,
-      render: (name: string, record) => (
-        <StockExternalLink code={record.code} name={name} style={{ color: c.textPrimary }}>
-          {name || "-"}
-        </StockExternalLink>
-      ),
-    },
-    {
-      title: "最新价",
-      dataIndex: "price",
-      width: 84,
-      align: "right",
-      render: (value: number | null, record: ConceptConstituent) => {
-        // 实时行情缺失时后端会用本地当日已确认收盘价兜底，此时必须显式区分，
-        // 否则用户会把收盘价误读成盘中实时价。
-        const closeDate = closeSourceDate(record.quote_source);
-        return (
-          <Tooltip
-            title={closeDate ? `收盘价（${closeDate}）` : undefined}
+  const columns: ColumnsType<ConceptConstituent> = useMemo(
+    () => [
+      {
+        title: "代码",
+        dataIndex: "code",
+        width: isNarrow ? 80 : 96,
+        fixed: "left",
+        render: (code: string, record) => (
+          <StockExternalLink
+            code={code}
+            name={record.name}
+            className="concept-stock-code financial-num"
+            style={{ fontFamily: "var(--c-font-mono)", color: c.primary, fontWeight: 500 }}
           >
-            <span
-              style={{
-                fontFamily: "var(--c-font-mono)",
-                color: closeDate ? c.textSecondary : c.textPrimary,
-              }}
-            >
-              {value == null ? "-" : value.toFixed(2)}
-            </span>
-          </Tooltip>
-        );
+            {code}
+          </StockExternalLink>
+        ),
       },
-    },
-    {
-      title: "涨跌幅",
-      dataIndex: "change_pct",
-      width: 92,
-      align: "right",
-      sorter: true,
-      render: (value: number | null) => <ChangeValue value={value} fontWeight={600} />,
-    },
-    {
-      title: "成交额",
-      dataIndex: "amount",
-      width: 92,
-      align: "right",
-      sorter: true,
-      render: (value: number | null) => (
-        <span className="financial-num" style={{ color: c.textSecondary }}>
-          {formatAmount(value)}
-        </span>
-      ),
-    },
-  ];
+      {
+        title: "名称",
+        dataIndex: "name",
+        width: isNarrow ? 90 : 108,
+        ellipsis: true,
+        render: (name: string, record) => (
+          <StockExternalLink code={record.code} name={name} style={{ color: c.textPrimary }}>
+            {name || "-"}
+          </StockExternalLink>
+        ),
+      },
+      {
+        title: "最新价",
+        dataIndex: "price",
+        width: isNarrow ? 76 : 84,
+        align: "right",
+        render: (value: number | null, record: ConceptConstituent) => {
+          // 实时行情缺失时后端会用本地当日已确认收盘价兜底，此时必须显式区分，
+          // 否则用户会把收盘价误读成盘中实时价。
+          const closeDate = closeSourceDate(record.quote_source);
+          return (
+            <Tooltip
+              title={closeDate ? `收盘价（${closeDate}）` : undefined}
+            >
+              <span
+                className="financial-num"
+                style={{
+                  fontFamily: "var(--c-font-mono)",
+                  color: closeDate ? c.textSecondary : c.textPrimary,
+                }}
+              >
+                {value == null ? "-" : value.toFixed(2)}
+              </span>
+            </Tooltip>
+          );
+        },
+      },
+      {
+        title: "涨跌幅",
+        dataIndex: "change_pct",
+        width: isNarrow ? 80 : 92,
+        align: "right",
+        sorter: true,
+        render: (value: number | null) => <ChangeValue value={value} fontWeight={600} />,
+      },
+      {
+        title: "成交额",
+        dataIndex: "amount",
+        width: isNarrow ? 80 : 92,
+        align: "right",
+        sorter: true,
+        render: (value: number | null) => (
+          <span className="financial-num" style={{ color: c.textSecondary }}>
+            {formatAmount(value)}
+          </span>
+        ),
+      },
+    ],
+    [c, isNarrow],
+  );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+    <div className="concept-constituent-panel" style={{ display: "flex", flexDirection: "column", gap: isNarrow ? 8 : 10, minWidth: 0 }}>
+      <div className="concept-constituent-header">
+        <div className="concept-constituent-info">
           <strong style={{ fontSize: 15, color: c.textPrimary }}>成分股</strong>
           <span style={{ fontSize: 12, color: c.textMuted }}>
             {total} 只
@@ -243,34 +241,36 @@ export default function ConceptConstituentPanel({
             ) : null}
           </span>
         </div>
-        <Segmented
-          size="small"
-          value={sortKey}
-          options={[
-            { label: "按涨幅", value: "change_pct" },
-            { label: "按成交额", value: "amount" },
-            { label: "按代码", value: "code" },
-          ]}
-          onChange={(value) => {
-            const next = value as SortKey;
-            setSortKey(next);
-            // 代码按字典序升序更自然，其余默认从高到低
-            setDescending(next !== "code");
-            // 涨幅/成交额排序与涨跌家数依赖全量行情，未补齐时结果会误导
-            if (next !== "code" && partial) requestFullQuotes();
-          }}
-        />
+        <div className="concept-constituent-sort">
+          <Segmented
+            size="small"
+            value={sortKey}
+            options={[
+              { label: "按涨幅", value: "change_pct" },
+              { label: "按成交额", value: "amount" },
+              { label: "按代码", value: "code" },
+            ]}
+            onChange={(value) => {
+              const next = value as SortKey;
+              setSortKey(next);
+              // 代码按字典序升序更自然，其余默认从高到低
+              setDescending(next !== "code");
+              // 涨幅/成交额排序与涨跌家数依赖全量行情，未补齐时结果会误导
+              if (next !== "code" && partial) requestFullQuotes();
+            }}
+          />
+        </div>
       </div>
 
       {related.length ? (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: c.textMuted }}>
+        <div className="concept-related-tags">
+          <span style={{ fontSize: 12, color: c.textMuted, flexShrink: 0 }}>
             <RiseOutlined /> 重叠概念
           </span>
           {related.map((item) => (
             <Tooltip key={item.name} title={`${item.overlap} 只成分股同时属于该概念`}>
               <Tag
-                style={{ ...semanticTagStyle("primary"), cursor: "pointer", marginInlineEnd: 0 }}
+                style={{ ...semanticTagStyle("primary"), cursor: "pointer", marginInlineEnd: 0, flexShrink: 0 }}
                 onClick={() => onSelectConcept(item.name)}
               >
                 {item.name} {item.overlap}
@@ -287,7 +287,7 @@ export default function ConceptConstituentPanel({
         isEmpty={!isLoading && !error && !items?.length}
         emptyText={`暂无「${concept}」的成分股数据`}
         errorTitle="成分股加载失败"
-        minHeight={360}
+        minHeight={isNarrow ? 300 : 360}
       >
         <Table
           size="small"
@@ -296,7 +296,7 @@ export default function ConceptConstituentPanel({
           dataSource={sorted}
           pagination={false}
           virtual
-          scroll={{ x: 472, y: 360 }}
+          scroll={{ x: isNarrow ? 406 : 472, y: isNarrow ? 320 : 360 }}
           onScroll={(event) => {
             // 触底前 120px 时预取下一段，避免滚到底出现空白
             const el = event.currentTarget as HTMLElement;

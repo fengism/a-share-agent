@@ -38,6 +38,10 @@ RELATED_CONCEPT_LIMIT = 12
 #: 题材关联（如 人形机器人↔机器人概念）挤到下面去。
 RELATED_MAX_SIZE_RATIO = 2.0
 
+#: 成分股实时行情拉取超时时间（秒），防止上游多批串行或异常时拖死整个接口。
+QUOTE_FETCH_TIMEOUT_SECONDS = 6.0
+
+
 #: 指数合成的最大回溯天数（约 10 年，与本地日线覆盖一致）。
 MAX_INDEX_DAYS = 3650
 
@@ -239,14 +243,14 @@ async def get_concept_constituents(concept: str, quote_codes: list[str] | None =
         logger.debug("概念成分股无需拉取行情: concept=%s", concept)
     else:
         try:
-            quote_set = await fetch_realtime_quote_set(codes)
+            quote_set = await asyncio.wait_for(fetch_realtime_quote_set(codes), timeout=QUOTE_FETCH_TIMEOUT_SECONDS)
             quoted_at = quote_set.quoted_at
             quote_source = quote_set.source
             for raw_code, quote in quote_set.quotes.items():
                 if isinstance(quote, dict):
                     quotes[raw_code] = quote
-        except Exception as error:  # 行情不可用不应让成分股列表整体失败
-            logger.warning("概念成分股行情不可用: concept=%s, error=%s", concept, error)
+        except Exception as error:  # 行情不可用或超时不应让成分股列表整体失败
+            logger.warning("概念成分股行情不可用或拉取超时: concept=%s, error=%s", concept, error)
 
     items: list[dict] = []
     # 实时行情没覆盖到的行，若本地已有**当日已确认**的收盘数据则用它兜底。

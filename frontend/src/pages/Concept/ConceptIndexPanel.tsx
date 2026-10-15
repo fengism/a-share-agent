@@ -4,6 +4,7 @@ import { InfoCircleOutlined } from "@ant-design/icons";
 import KlineChart from "../../charts/KlineChart";
 import ChangeValue from "../../components/ChangeValue";
 import SectionDataState from "../../components/SectionDataState";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors } from "../../styles/ui";
 import type { ConceptIndexPoint } from "../../api/queryHooks/concept";
 import type { KlineItem } from "../../types/stock";
@@ -59,6 +60,7 @@ export default function ConceptIndexPanel({
   truncated,
 }: Props) {
   const c = useColors();
+  const isNarrow = useMediaQuery("(max-width: 768px)");
   const items = useMemo(() => toKlineItems(points ?? []), [points]);
 
   const latest = points?.at(-1);
@@ -69,29 +71,26 @@ export default function ConceptIndexPanel({
   }, [first, latest]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0, flexWrap: "wrap" }}>
-          <strong style={{ fontSize: 15, color: c.textPrimary }}>{concept}</strong>
+    <div className="concept-index-panel" style={{ display: "flex", flexDirection: "column", gap: isNarrow ? 8 : 10, minWidth: 0 }}>
+      <div className="concept-index-header">
+        <div className="concept-index-price">
+          <strong className="concept-index-price__name">{concept}</strong>
           {latest ? (
             <>
               <span
                 aria-label="合成指数点位"
-                style={{ fontFamily: "var(--c-font-mono)", fontSize: 18, color: c.textPrimary }}
+                className="concept-index-price__val financial-num"
+                style={{
+                  fontSize: isNarrow ? 16 : 18,
+                  fontWeight: 600,
+                  color: c.textPrimary,
+                }}
               >
                 {latest.close.toFixed(2)}
               </span>
               <ChangeValue value={latest.change_pct} digits={2} />
               {periodChange != null ? (
-                <span style={{ fontSize: 12, color: c.textMuted }}>
+                <span style={{ fontSize: isNarrow ? 11.5 : 12, color: c.textMuted }}>
                   区间
                   <ChangeValue value={periodChange} digits={2} />
                 </span>
@@ -99,16 +98,18 @@ export default function ConceptIndexPanel({
             </>
           ) : null}
         </div>
-        <Segmented
-          size="small"
-          value={days}
-          options={CONCEPT_INDEX_RANGES.map((range) => ({ label: range.label, value: range.days }))}
-          onChange={(value) => onDaysChange(Number(value))}
-        />
+        <div className="concept-index-ranges">
+          <Segmented
+            size="small"
+            value={days}
+            options={CONCEPT_INDEX_RANGES.map((range) => ({ label: range.label, value: range.days }))}
+            onChange={(value) => onDaysChange(Number(value))}
+          />
+        </div>
       </div>
 
       {latest ? (
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, color: c.textMuted }}>
+        <div className="concept-index-stats">
           <span>
             上涨 <strong style={{ color: c.up }}>{latest.up_count}</strong>
           </span>
@@ -123,7 +124,7 @@ export default function ConceptIndexPanel({
           </span>
           <span>
             成交额{" "}
-            <strong style={{ color: c.textPrimary }}>
+            <strong className="financial-num" style={{ color: c.textPrimary }}>
               {latest.amount == null ? "—" : `${(latest.amount / 1e8).toFixed(0)}亿`}
             </strong>
           </span>
@@ -138,7 +139,7 @@ export default function ConceptIndexPanel({
               <InfoCircleOutlined /> 样本 {latest.sample_count}/{constituentUsed}
             </span>
           </Tooltip>
-          <Tag style={{ marginInlineEnd: 0 }} color="default">
+          <Tag className="concept-index-stats__tag" style={{ marginInlineEnd: 0, fontSize: isNarrow ? 11 : 12 }} color="default">
             本地合成等权指数
           </Tag>
         </div>
@@ -151,9 +152,13 @@ export default function ConceptIndexPanel({
         isEmpty={!isLoading && !error && !points?.length}
         emptyText={`暂无「${concept}」的合成指数数据`}
         errorTitle="概念指数加载失败"
-        minHeight={360}
+        minHeight={isNarrow ? 300 : 360}
       >
-        <KlineChart data={items} height={380} viewKey={`${concept}-concept-index-${days}`} />
+        <KlineChart
+          data={items}
+          height={isNarrow ? 320 : 380}
+          viewKey={`${concept}-concept-index-${days}`}
+        />
       </SectionDataState>
 
       <p style={{ margin: 0, fontSize: 11, lineHeight: 1.6, color: c.textMuted }}>

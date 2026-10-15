@@ -348,6 +348,7 @@ export default function StockProfileTab() {
       dataIndex: "stock_code",
       key: "stock_code",
       width: 110,
+      fixed: "left",
       render: (code: string) => {
         const raw = code.split(".")[0];
         return (
@@ -407,14 +408,21 @@ export default function StockProfileTab() {
       title: "主营业务",
       dataIndex: "main_business",
       key: "main_business",
+      width: 240,
       ellipsis: true,
-      render: (business: string) => {
+      render: (business: string, record) => {
         if (!business) {
           return <Tag color="default" style={{ color: "var(--c-text-muted)" }}>待补充</Tag>;
         }
         return (
           <Tooltip title={business} placement="topLeft">
-            <div className="stock-profile-business-text">{business}</div>
+            <div
+              className="stock-profile-business-text stock-profile-business-text--clickable"
+              onClick={() => handleOpenDetail(record)}
+              title="点击查看完整资料"
+            >
+              {business}
+            </div>
           </Tooltip>
         );
       },
@@ -438,6 +446,7 @@ export default function StockProfileTab() {
       key: "actions",
       width: 160,
       align: "right",
+      fixed: "right",
       render: (_, record) => (
         <Space size={2}>
           <Tooltip title="查看完整资料">
@@ -495,7 +504,7 @@ export default function StockProfileTab() {
         onRetry={refetchSummary} errorTitle="个股资料概览加载失败">
       <div className="stock-profile-stat-grid">
         <Row gutter={[12, 12]}>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6}>
             <Card size="small">
               <Statistic
                 title="全市场股票数"
@@ -509,7 +518,7 @@ export default function StockProfileTab() {
               </div>
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6}>
             <Card size="small">
               <Statistic
                 title="主营业务已录入"
@@ -521,7 +530,7 @@ export default function StockProfileTab() {
               <Progress percent={businessPercent} size="small" strokeColor="#52c41a" style={{ marginTop: 6 }} />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6}>
             <Card size="small">
               <Statistic
                 title="上市时间已建档"
@@ -533,7 +542,7 @@ export default function StockProfileTab() {
               <Progress percent={listingPercent} size="small" strokeColor="#1890ff" style={{ marginTop: 6 }} />
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6}>
             <Card size="small">
               <div style={{ fontSize: 13, color: "var(--c-text-muted)", marginBottom: 6 }}>主要板块分布</div>
               <Space wrap size={[4, 4]}>
@@ -635,6 +644,7 @@ export default function StockProfileTab() {
         dataSource={recordsData?.items || []}
         loading={isFetching && !isRecordsLoading}
         size="middle"
+        scroll={{ x: 1100 }}
         pagination={{
           current: filters.page,
           pageSize: filters.page_size,
@@ -675,7 +685,7 @@ export default function StockProfileTab() {
             "个股资料详情"
           )
         }
-        size="large"
+        width="min(720px, 100vw)"
         open={detailVisible}
         onClose={() => setDetailVisible(false)}
         extra={
@@ -700,7 +710,7 @@ export default function StockProfileTab() {
               <div className="stock-profile-drawer__title">
                 <BankOutlined /> 上市基础资料
               </div>
-              <Descriptions size="small" column={2} className="stock-profile-detail-desc" bordered>
+              <Descriptions size="small" column={{ xs: 1, sm: 2 }} className="stock-profile-detail-desc" bordered>
                 <Descriptions.Item label="股票代码">{activeRecord.stock_code}</Descriptions.Item>
                 <Descriptions.Item label="股票名称">{activeRecord.stock_name}</Descriptions.Item>
                 <Descriptions.Item label="上市板块">{activeRecord.board || "—"}</Descriptions.Item>
@@ -717,15 +727,15 @@ export default function StockProfileTab() {
               </div>
               <Descriptions size="small" column={1} className="stock-profile-detail-desc" bordered>
                 <Descriptions.Item label="主营业务">
-                  <Paragraph style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+                  <Paragraph style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
                     {activeRecord.main_business || "待补充"}
                   </Paragraph>
                 </Descriptions.Item>
                 <Descriptions.Item label="主要产品">
-                  <Paragraph style={{ margin: 0 }}>{activeRecord.products || "—"}</Paragraph>
+                  <Paragraph style={{ margin: 0, wordBreak: "break-all" }}>{activeRecord.products || "—"}</Paragraph>
                 </Descriptions.Item>
                 <Descriptions.Item label="经营范围">
-                  <Paragraph style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12 }}>
+                  <Paragraph style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12, wordBreak: "break-all" }}>
                     {activeRecord.business_scope || "—"}
                   </Paragraph>
                 </Descriptions.Item>
@@ -737,7 +747,7 @@ export default function StockProfileTab() {
               <div className="stock-profile-drawer__title">
                 <GlobalOutlined /> 公司工商概况
               </div>
-              <Descriptions size="small" column={2} className="stock-profile-detail-desc" bordered>
+              <Descriptions size="small" column={{ xs: 1, sm: 2 }} className="stock-profile-detail-desc" bordered>
                 <Descriptions.Item label="所属行业">
                   {activeRecord.sw_level1_name || activeRecord.industry || "—"}
                 </Descriptions.Item>
@@ -755,6 +765,7 @@ export default function StockProfileTab() {
                       href={activeRecord.website.startsWith("http") ? activeRecord.website : `https://${activeRecord.website}`}
                       target="_blank"
                       rel="noreferrer"
+                      style={{ wordBreak: "break-all" }}
                     >
                       {activeRecord.website}
                     </a>
@@ -770,7 +781,7 @@ export default function StockProfileTab() {
               <div className="stock-profile-drawer__section">
                 <div className="stock-profile-drawer__title">公司简介</div>
                 <Card size="small" style={{ background: "var(--c-nested-bg)" }}>
-                  <Paragraph style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>
+                  <Paragraph style={{ margin: 0, fontSize: 13, lineHeight: 1.6, wordBreak: "break-all" }}>
                     {activeRecord.company_intro}
                   </Paragraph>
                 </Card>
@@ -796,13 +807,13 @@ export default function StockProfileTab() {
         okText="保存"
         cancelText="取消"
         onCancel={() => setEditModalVisible(false)}
-        width={680}
+        width="min(680px, calc(100vw - 24px))"
         confirmLoading={createMutation.isPending || updateMutation.isPending}
         destroyOnHidden
       >
         <Form form={form} layout="vertical" initialValues={EMPTY_INPUT}>
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
                 name="stock_code"
                 label="股票代码"
@@ -811,7 +822,7 @@ export default function StockProfileTab() {
                 <Input placeholder="如 600519 或 600519.SH" disabled={Boolean(editingRecord)} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
                 name="stock_name"
                 label="股票名称"
@@ -820,7 +831,7 @@ export default function StockProfileTab() {
                 <Input placeholder="如 贵州茅台" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="board" label="上市板块">
                 <Input placeholder="主板 / 科创板 / 创业板 / 北交所" />
               </Form.Item>
@@ -828,17 +839,17 @@ export default function StockProfileTab() {
           </Row>
 
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="market_group" label="市场">
                 <Select options={MARKET_OPTIONS.filter((o) => o.value)} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="listing_date" label="上市时间">
                 <Input placeholder="YYYY-MM-DD" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="setup_date" label="成立时间">
                 <Input placeholder="YYYY-MM-DD" />
               </Form.Item>
@@ -858,17 +869,17 @@ export default function StockProfileTab() {
           </Form.Item>
 
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="sw_level1_name" label="申万一级行业">
                 <Input disabled placeholder="请在行业基础数据页维护" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="sw_level2_name" label="申万二级行业">
                 <Input disabled placeholder="请在行业基础数据页维护" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="legal_repr" label="法定代表人">
                 <Input placeholder="法人代表" />
               </Form.Item>
@@ -876,17 +887,17 @@ export default function StockProfileTab() {
           </Row>
 
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="registered_capital" label="注册资本">
                 <Input placeholder="如 12.50亿" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="province" label="省份/地区">
                 <Input placeholder="如 贵州" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="website" label="官方网址">
                 <Input placeholder="www.example.com" />
               </Form.Item>
@@ -903,6 +914,7 @@ export default function StockProfileTab() {
         title="批量导入个股资料"
         open={importOpen}
         onCancel={closeImport}
+        width="min(520px, calc(100vw - 24px))"
         closable={!importMutation.isPending}
         mask={{ closable: !importMutation.isPending }}
         keyboard={!importMutation.isPending}

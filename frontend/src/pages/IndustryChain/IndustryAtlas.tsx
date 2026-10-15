@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ApartmentOutlined,
   AppstoreOutlined,
@@ -54,6 +54,7 @@ import {
 } from "../../api/queryHooks/workflows";
 import { queryKeys } from "../../api/queryKeys";
 import { useAuthStore } from "../../store/authStore";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors, useStyles } from "../../styles/ui";
 import type {
   AtlasBatchMineResponse,
@@ -109,6 +110,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.is_admin ?? false);
+  const isMobile = useMediaQuery("(max-width: 576px)");
 
   const [activeView, setActiveView] = useState<"catalog" | "graph" | "reverse">("catalog");
   const [selectedSlug, setSelectedSlug] = useState("");
@@ -193,17 +195,20 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
   return (
     <div>
       {/* 头部控制栏：模式切换、自动挖掘状态与管理操作 */}
-      <div style={{ ...cardStyle, padding: "16px 20px", marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <Segmented
-            value={activeView}
-            onChange={(val) => setActiveView(val as "catalog" | "graph" | "reverse")}
-            options={[
-              { label: "知识库目录", value: "catalog", icon: <AppstoreOutlined /> },
-              { label: "全景关系图谱", value: "graph", icon: <ShareAltOutlined /> },
-              { label: "个股反查产业链", value: "reverse", icon: <NodeIndexOutlined /> },
-            ]}
-          />
+      <div style={{ ...cardStyle, padding: isMobile ? "12px 14px" : "16px 20px", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ width: isMobile ? "100%" : "auto" }}>
+            <Segmented
+              block={isMobile}
+              value={activeView}
+              onChange={(val) => setActiveView(val as "catalog" | "graph" | "reverse")}
+              options={[
+                { label: isMobile ? "目录" : "知识库目录", value: "catalog", icon: <AppstoreOutlined /> },
+                { label: isMobile ? "全景图谱" : "全景关系图谱", value: "graph", icon: <ShareAltOutlined /> },
+                { label: isMobile ? "个股反查" : "个股反查产业链", value: "reverse", icon: <NodeIndexOutlined /> },
+              ]}
+            />
+          </div>
 
           {activeView === "catalog" && (
             <Input
@@ -212,68 +217,71 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
               placeholder="搜索产业链、标签或别名…"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              style={{ maxWidth: 260 }}
+              style={{ width: isMobile ? "100%" : 260, maxWidth: "100%" }}
             />
           )}
 
-          <span style={{ color: colors.textMuted, fontSize: "var(--c-font-md)" }}>
-            {catalog
-              ? `${catalog.total_chains} 条产业链 · ${catalog.total_companies} 家核心公司`
-              : "加载中…"}
-          </span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+              {catalog
+                ? `${catalog.total_chains} 条产业链 · ${catalog.total_companies} 家核心公司`
+                : "加载中…"}
+            </span>
 
-          <Popover
-            title="产业链知识库与自动挖掘机制"
-            content={
-              <div style={{ maxWidth: 360, fontSize: "var(--c-font-sm)", lineHeight: 1.6 }}>
-                <p style={{ margin: "0 0 8px" }}>
-                  <b>AI 自动挖掘已启用</b>：每次执行产业链深度研究并生成分析报告后，后台将自动提取上中下游企业节点与所属环节。
-                </p>
-                <p style={{ margin: "0 0 8px" }}>
-                  <b>双向核验防幻觉</b>：公司名称与股票代码必须完全通过 A 股官方名录校验才允许入库，防止模型幻觉污染知识库。
-                </p>
-                <p style={{ margin: "0 0 8px" }}>
-                  <b>质量门禁与更新</b>：仅通过质量校验且具备完整环节与标的之报告才沉淀为知识库，同名链条稳定覆盖更新。
-                </p>
-                <p style={{ margin: 0, color: colors.textMuted }}>
-                  知识库条目后续在同主题分析时将作为先验证据输入模型，形成持续演进的正向反馈闭环。
-                </p>
-              </div>
-            }
-          >
-            <Tag
-              icon={<RobotOutlined />}
-              color="cyan"
-              style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+            <Popover
+              title="产业链知识库与自动挖掘机制"
+              content={
+                <div style={{ maxWidth: 360, fontSize: "var(--c-font-sm)", lineHeight: 1.6 }}>
+                  <p style={{ margin: "0 0 8px" }}>
+                    <b>AI 自动挖掘已启用</b>：每次执行产业链深度研究并生成分析报告后，后台将自动提取上中下游企业节点与所属环节。
+                  </p>
+                  <p style={{ margin: "0 0 8px" }}>
+                    <b>双向核验防幻觉</b>：公司名称与股票代码必须完全通过 A 股官方名录校验才允许入库，防止模型幻觉污染知识库。
+                  </p>
+                  <p style={{ margin: "0 0 8px" }}>
+                    <b>质量门禁与更新</b>：仅通过质量校验且具备完整环节与标的之报告才沉淀为知识库，同名链条稳定覆盖更新。
+                  </p>
+                  <p style={{ margin: 0, color: colors.textMuted }}>
+                    知识库条目后续在同主题分析时将作为先验证据输入模型，形成持续演进的正向反馈闭环。
+                  </p>
+                </div>
+              }
             >
-              自动挖掘已开启 <InfoCircleOutlined style={{ fontSize: 11 }} />
-            </Tag>
-          </Popover>
-
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-            {isAdmin && (
-              <>
-                <Button
-                  icon={<CloudDownloadOutlined />}
-                  onClick={() => setMineOpen(true)}
-                >
-                  从分析挖掘
-                </Button>
-                <Button
-                  icon={<RobotOutlined />}
-                  onClick={() => setBatchMineOpen(true)}
-                >
-                  批量挖掘历史研报
-                </Button>
-                <Button
-                  icon={<ImportOutlined />}
-                  onClick={() => setImportOpen(true)}
-                >
-                  导入产业链
-                </Button>
-              </>
-            )}
+              <Tag
+                icon={<RobotOutlined />}
+                color="cyan"
+                style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+              >
+                {isMobile ? "AI 挖掘已开" : "自动挖掘已开启"} <InfoCircleOutlined style={{ fontSize: 11 }} />
+              </Tag>
+            </Popover>
           </div>
+
+          {isAdmin && (
+            <div style={{ marginLeft: isMobile ? 0 : "auto", width: isMobile ? "100%" : "auto", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <Button
+                icon={<CloudDownloadOutlined />}
+                size={isMobile ? "small" : "middle"}
+                onClick={() => setMineOpen(true)}
+              >
+                从分析挖掘
+              </Button>
+              <Button
+                icon={<RobotOutlined />}
+                size={isMobile ? "small" : "middle"}
+                onClick={() => setBatchMineOpen(true)}
+              >
+                {isMobile ? "批量挖掘" : "批量挖掘历史研报"}
+              </Button>
+              <Button
+                icon={<ImportOutlined />}
+                size={isMobile ? "small" : "middle"}
+                onClick={() => setImportOpen(true)}
+              >
+                导入产业链
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* 目录视图：分类与来源标签 */}
@@ -358,8 +366,8 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))",
-                gap: 14,
+                gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))",
+                gap: isMobile ? 10 : 14,
               }}
             >
               {filteredChains.map((chain) => (
@@ -368,7 +376,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
                   className="atlas-chain-card"
                   style={{
                     ...cardStyle,
-                    padding: "16px 18px",
+                    padding: isMobile ? "12px 14px" : "16px 18px",
                     cursor: "pointer",
                     display: "flex",
                     flexDirection: "column",
@@ -567,11 +575,12 @@ function AtlasReverseLookup({
 }) {
   const colors = useColors();
   const { cardStyle } = useStyles();
+  const isMobile = useMediaQuery("(max-width: 576px)");
 
   return (
-    <Card style={cardStyle} bodyStyle={{ padding: 20 }}>
-      <div style={{ maxWidth: 600, marginBottom: 20 }}>
-        <h3 style={{ fontSize: "var(--c-font-lg)", marginBottom: 8, color: colors.textPrimary }}>
+    <Card style={cardStyle} bodyStyle={{ padding: isMobile ? "14px 16px" : 20 }}>
+      <div style={{ maxWidth: 600, marginBottom: 16 }}>
+        <h3 style={{ fontSize: isMobile ? "var(--c-font-base)" : "var(--c-font-lg)", marginBottom: 8, color: colors.textPrimary }}>
           🔍 从个股反查产业链分布
         </h3>
         <p style={{ color: colors.textSecondary, fontSize: "var(--c-font-sm)", marginBottom: 12 }}>
@@ -583,7 +592,7 @@ function AtlasReverseLookup({
           placeholder="输入股票代码或名称，如：中科创达、300496、宁德时代"
           value={keyword}
           onChange={(e) => onKeywordChange(e.target.value)}
-          size="large"
+          size={isMobile ? "middle" : "large"}
         />
       </div>
 
@@ -594,7 +603,7 @@ function AtlasReverseLookup({
       ) : matchedNodes.length === 0 ? (
         <Empty description="未在现有产业链知识库中检索到该股票" />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {matchedNodes.map((node) => (
             <div
               key={node.id}
@@ -602,13 +611,13 @@ function AtlasReverseLookup({
                 border: `1px solid ${colors.border}`,
                 borderRadius: 10,
                 background: colors.nestedBg,
-                padding: "16px 20px",
+                padding: isMobile ? "12px 14px" : "16px 20px",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
                 <span
                   style={{
-                    fontSize: "var(--c-font-xl)",
+                    fontSize: isMobile ? "var(--c-font-lg)" : "var(--c-font-xl)",
                     fontWeight: 600,
                     color: colors.textPrimary,
                     cursor: "pointer",
@@ -617,13 +626,13 @@ function AtlasReverseLookup({
                 >
                   {node.name}
                 </span>
-                <Tag color="blue" style={{ fontSize: 13, cursor: "pointer" }} onClick={() => onCompanyClick(node.id)}>
+                <Tag color="blue" style={{ fontSize: 12, cursor: "pointer" }} onClick={() => onCompanyClick(node.id)}>
                   {node.id}
                 </Tag>
                 <Tag color={node.layer === "upstream" ? "orange" : node.layer === "midstream" ? "blue" : "green"}>
                   主要层级: {LAYER_NAMES[node.layer] || node.layer}
                 </Tag>
-                <span style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginLeft: "auto" }}>
+                <span style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted, marginLeft: isMobile ? 0 : "auto", width: isMobile ? "100%" : "auto" }}>
                   覆盖 <b>{node.chain_count}</b> 条产业链 · {node.segments.length} 个环节
                 </span>
               </div>
@@ -673,6 +682,8 @@ function AtlasGlobalGraph({
   const colors = useColors();
   const { cardStyle } = useStyles();
   const chartRef = useRef<ReactEChartsCore | null>(null);
+  const isNarrow = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 576px)");
 
   const [graphTab, setGraphTab] = useState<"topology" | "hubs" | "synergy">("topology");
   const [selectedChains, setSelectedChains] = useState<string[]>([]);
@@ -725,7 +736,10 @@ function AtlasGlobalGraph({
       const isMatch =
         searchKeyword &&
         (node.name.toLowerCase().includes(searchKeyword) || node.id.includes(searchKeyword));
-      const baseSize = Math.max(20, Math.min(18 + node.chain_count * 8, 44));
+      const minSz = isNarrow ? 16 : 20;
+      const step = isNarrow ? 5 : 8;
+      const maxSz = isNarrow ? 36 : 44;
+      const baseSize = Math.max(minSz, Math.min(minSz - 2 + node.chain_count * step, maxSz));
       const symbolSize = isMatch ? baseSize * 1.35 : baseSize;
 
       return {
@@ -737,16 +751,16 @@ function AtlasGlobalGraph({
         itemStyle: {
           color,
           borderColor: isMatch ? colors.accent : colors.cardBg,
-          borderWidth: isMatch ? 3.5 : 1.5,
+          borderWidth: isMatch ? 3 : 1.5,
           shadowColor: isMatch ? `${colors.accent}90` : `${color}30`,
-          shadowBlur: isMatch ? 16 : 6,
+          shadowBlur: isMatch ? 14 : 5,
         },
         label: {
           show: true,
           position: "bottom",
           color: isMatch ? colors.primary : colors.textSecondary,
           fontWeight: isMatch ? "bold" : "normal",
-          fontSize: 11,
+          fontSize: isNarrow ? 10 : 11,
           formatter: "{b}",
         },
         rawNode: node,
@@ -806,8 +820,8 @@ function AtlasGlobalGraph({
         },
       },
       legend: {
-        top: 12,
-        left: 16,
+        top: isMobile ? 8 : 12,
+        left: isMobile ? 8 : 16,
         orient: "horizontal",
         data: [
           { name: "upstream", itemStyle: { color: LAYER_COLORS.upstream } },
@@ -815,15 +829,15 @@ function AtlasGlobalGraph({
           { name: "downstream", itemStyle: { color: LAYER_COLORS.downstream } },
         ],
         formatter: (name: string) => LAYER_NAMES[name] || name,
-        textStyle: { color: colors.textSecondary },
+        textStyle: { color: colors.textSecondary, fontSize: isNarrow ? 10 : 12 },
       },
       series: [
         {
           type: "graph",
           layout: "force",
           force: {
-            repulsion: 220,
-            edgeLength: [60, 160],
+            repulsion: isNarrow ? 160 : 220,
+            edgeLength: isNarrow ? [40, 110] : [60, 160],
             gravity: 0.08,
             friction: 0.65,
           },
@@ -848,7 +862,7 @@ function AtlasGlobalGraph({
         },
       ],
     };
-  }, [graphData, layerFilter, nodeSearch, onlyHubs, colors]);
+  }, [graphData, layerFilter, nodeSearch, onlyHubs, colors, isNarrow, isMobile]);
 
   const onChartClick = (params: { dataType?: string; data?: { id?: string } }) => {
     if (params.dataType === "node" && params.data?.id) {
@@ -857,24 +871,27 @@ function AtlasGlobalGraph({
   };
 
   return (
-    <Card style={cardStyle} bodyStyle={{ padding: 18 }}>
+    <Card style={cardStyle} bodyStyle={{ padding: isMobile ? 12 : 18 }}>
       {/* 子标签：力导向图谱 / 跨链枢纽龙头榜 / 产业协同矩阵 */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-        <Segmented
-          value={graphTab}
-          onChange={(v) => setGraphTab(v as "topology" | "hubs" | "synergy")}
-          options={[
-            { label: "全局拓扑图谱", value: "topology", icon: <ShareAltOutlined /> },
-            { label: "跨链枢纽龙头榜", value: "hubs", icon: <TrophyOutlined /> },
-            { label: "产业协同共振矩阵", value: "synergy", icon: <FireOutlined /> },
-          ]}
-        />
+        <div style={{ width: isMobile ? "100%" : "auto" }}>
+          <Segmented
+            block={isMobile}
+            value={graphTab}
+            onChange={(v) => setGraphTab(v as "topology" | "hubs" | "synergy")}
+            options={[
+              { label: isMobile ? "全景拓扑" : "全局拓扑图谱", value: "topology", icon: <ShareAltOutlined /> },
+              { label: isMobile ? "枢纽龙头" : "跨链枢纽龙头榜", value: "hubs", icon: <TrophyOutlined /> },
+              { label: isMobile ? "协同矩阵" : "产业协同共振矩阵", value: "synergy", icon: <FireOutlined /> },
+            ]}
+          />
+        </div>
 
         {graphData && (
-          <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+          <div style={{ fontSize: "var(--c-font-xs)", color: colors.textMuted }}>
             <span>已合并 <b>{graphData.summary.total_nodes}</b> 家公司</span>
             <span style={{ margin: "0 6px" }}>·</span>
-            <span><b>{graphData.summary.total_edges}</b> 条上下游传导关系</span>
+            <span><b>{graphData.summary.total_edges}</b> 条传导关系</span>
             <span style={{ margin: "0 6px" }}>·</span>
             <span>覆盖 <b>{graphData.summary.total_chains}</b> 条产业链</span>
           </div>
@@ -887,7 +904,7 @@ function AtlasGlobalGraph({
           <div
             style={{
               display: "flex",
-              gap: 12,
+              gap: 10,
               flexWrap: "wrap",
               alignItems: "center",
               marginBottom: 12,
@@ -897,7 +914,7 @@ function AtlasGlobalGraph({
               mode="multiple"
               allowClear
               placeholder="筛选特定产业链（默认展示全部）"
-              style={{ minWidth: 260, flex: 1, maxWidth: 440 }}
+              style={{ width: isNarrow ? "100%" : undefined, minWidth: isNarrow ? "100%" : 220, flex: 1, maxWidth: isNarrow ? "100%" : 440 }}
               value={selectedChains}
               onChange={setSelectedChains}
               options={chainOptions}
@@ -910,37 +927,40 @@ function AtlasGlobalGraph({
               onChange={(e) => setLayerFilter(e.target.value)}
             >
               <Radio.Button value="all">全层级</Radio.Button>
-              <Radio.Button value="upstream">仅上游</Radio.Button>
-              <Radio.Button value="midstream">仅中游</Radio.Button>
-              <Radio.Button value="downstream">仅下游</Radio.Button>
+              <Radio.Button value="upstream">{isNarrow ? "上游" : "仅上游"}</Radio.Button>
+              <Radio.Button value="midstream">{isNarrow ? "中游" : "仅中游"}</Radio.Button>
+              <Radio.Button value="downstream">{isNarrow ? "下游" : "仅下游"}</Radio.Button>
             </Radio.Group>
 
             <Input
               allowClear
               prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
               placeholder="高亮公司代码或名称…"
-              style={{ width: 190 }}
+              style={{ width: isNarrow ? "100%" : 190 }}
               value={nodeSearch}
               onChange={(e) => setNodeSearch(e.target.value)}
             />
 
-            <Switch
-              checkedChildren="仅跨链枢纽"
-              unCheckedChildren="全部标的"
-              checked={onlyHubs}
-              onChange={setOnlyHubs}
-            />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: isMobile ? "100%" : "auto", gap: 10 }}>
+              <Switch
+                checkedChildren="仅跨链枢纽"
+                unCheckedChildren="全部标的"
+                checked={onlyHubs}
+                onChange={setOnlyHubs}
+              />
 
-            <Button
-              icon={<CameraOutlined />}
-              onClick={handleExportImage}
-            >
-              导出全景图
-            </Button>
+              <Button
+                icon={<CameraOutlined />}
+                size="small"
+                onClick={handleExportImage}
+              >
+                导出全景图
+              </Button>
+            </div>
           </div>
 
           {graphQuery.isLoading && (
-            <div style={{ height: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ height: isNarrow ? 360 : 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Spin tip="正在构建全局产业链图谱…" />
             </div>
           )}
@@ -950,7 +970,7 @@ function AtlasGlobalGraph({
           )}
 
           {graphData && graphData.nodes.length === 0 && (
-            <div style={{ height: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ height: 320, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Empty description="所选产业链中未包含公司节点" />
             </div>
           )}
@@ -958,7 +978,7 @@ function AtlasGlobalGraph({
           {graphData && graphData.nodes.length > 0 && (
             <div
               style={{
-                height: 640,
+                height: isNarrow ? 420 : 640,
                 position: "relative",
                 border: `1px solid ${colors.border}`,
                 borderRadius: 8,
@@ -1038,13 +1058,13 @@ function HubCompaniesRanking({
                 border: `1px solid ${colors.border}`,
                 borderRadius: 10,
                 background: colors.nestedBg,
-                padding: "14px 16px",
+                padding: "12px 14px",
                 display: "flex",
                 flexDirection: "column",
                 gap: 8,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span
                   style={{
                     width: 22,
@@ -1130,15 +1150,15 @@ function ChainSynergyMatrix({
               border: `1px solid ${colors.border}`,
               borderRadius: 8,
               background: colors.nestedBg,
-              padding: "12px 16px",
+              padding: "12px 14px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               flexWrap: "wrap",
-              gap: 10,
+              gap: 8,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <Button type="link" style={{ padding: 0 }} onClick={() => onSelectChain(s.source_slug)}>
                 <b>{s.source_name}</b>
               </Button>
@@ -1148,11 +1168,11 @@ function ChainSynergyMatrix({
               </Button>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <Tag color="volcano" style={{ fontWeight: 600 }}>
                 共享 {s.shared_companies_count} 家龙头
               </Tag>
-              <span style={{ fontSize: "var(--c-font-sm)", color: colors.textSecondary }}>
+              <span style={{ fontSize: "var(--c-font-xs)", color: colors.textSecondary, overflowWrap: "anywhere", wordBreak: "break-word" }}>
                 共有关联企业：{s.shared_companies.join("、")}
               </span>
             </div>
@@ -1178,17 +1198,19 @@ function ChainAtlasDetail({
   const { cardStyle } = useStyles();
   const navigate = useNavigate();
   const [detailMode, setDetailMode] = useState<"cards" | "graph">("cards");
+  const isNarrow = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 576px)");
 
   return (
     <div>
-      <div style={{ ...cardStyle, padding: "18px 22px", marginBottom: 16 }}>
+      <div style={{ ...cardStyle, padding: isMobile ? "14px 16px" : "18px 22px", marginBottom: 16 }}>
         <div
           className="atlas-detail__heading"
           style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}
         >
           <strong
             className="atlas-detail__name"
-            style={{ fontSize: "var(--c-font-xl)", color: colors.textPrimary }}
+            style={{ fontSize: isMobile ? "var(--c-font-lg)" : "var(--c-font-xl)", color: colors.textPrimary }}
           >
             {chain.name}
           </strong>
@@ -1207,11 +1229,32 @@ function ChainAtlasDetail({
             </span>
           )}
 
-          <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
+          <div
+            style={{
+              marginLeft: isNarrow ? 0 : "auto",
+              width: isNarrow ? "100%" : "auto",
+              marginTop: isNarrow ? 6 : 0,
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            <div style={{ width: isNarrow ? "100%" : "auto" }}>
+              <Segmented
+                block={isNarrow}
+                value={detailMode}
+                onChange={(val) => setDetailMode(val as "cards" | "graph")}
+                options={[
+                  { label: "分层环节", value: "cards", icon: <BarsOutlined /> },
+                  { label: "拓扑流向", value: "graph", icon: <ApartmentOutlined /> },
+                ]}
+              />
+            </div>
             {chain.archive_id && (
               <Button
                 icon={<FileTextOutlined />}
-                size="small"
+                size={isMobile ? "small" : "middle"}
                 onClick={() =>
                   navigate(
                     `/industry-chain/${encodeURIComponent(chain.name)}?archive_id=${chain.archive_id}`
@@ -1221,16 +1264,9 @@ function ChainAtlasDetail({
                 查看源研报
               </Button>
             )}
-            <Segmented
-              value={detailMode}
-              onChange={(val) => setDetailMode(val as "cards" | "graph")}
-              options={[
-                { label: "分层环节", value: "cards", icon: <BarsOutlined /> },
-                { label: "拓扑流向", value: "graph", icon: <ApartmentOutlined /> },
-              ]}
-            />
             <Button
               icon={<CloudDownloadOutlined />}
+              size={isMobile ? "small" : "middle"}
               onClick={() => downloadIndustryChainAtlasYaml(chain.slug, chain.name)}
             >
               导出 YAML
@@ -1238,6 +1274,7 @@ function ChainAtlasDetail({
             <Button
               type="primary"
               icon={<ExperimentOutlined />}
+              size={isMobile ? "small" : "middle"}
               onClick={() => onAnalyze(chain.name)}
             >
               AI 深度分析
@@ -1333,7 +1370,22 @@ function SingleChainGraph({
   const colors = useColors();
   const { cardStyle } = useStyles();
   const chartRef = useRef<ReactEChartsCore | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+    updateWidth();
+    const ro = new ResizeObserver(updateWidth);
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   const handleExport = () => {
     const chart = chartRef.current?.getEchartsInstance?.();
@@ -1354,11 +1406,17 @@ function SingleChainGraph({
     const edges: Record<string, unknown>[] = [];
     const searchKeyword = search.trim().toLowerCase();
 
-    // 计算三层（上中下游）列坐标
+    // 动态计算三层（上中下游）列坐标以适配任何屏幕宽度（特别是移动端）
+    const effectiveWidth = containerWidth || (typeof window !== "undefined" ? window.innerWidth - 64 : 800);
+    const isSmall = effectiveWidth < 640;
+    const leftMargin = isSmall ? 28 : Math.max(60, Math.floor(effectiveWidth * 0.1));
+    const rightMargin = isSmall ? 80 : Math.max(140, Math.floor(effectiveWidth * 0.16));
+    const spanWidth = Math.max(180, effectiveWidth - leftMargin - rightMargin);
+
     const layerXMap: Record<string, number> = {
-      upstream: 120,
-      midstream: 480,
-      downstream: 840,
+      upstream: leftMargin,
+      midstream: leftMargin + Math.floor(spanWidth * 0.5),
+      downstream: leftMargin + spanWidth,
     };
 
     const layerCompanyMap: Record<string, string[]> = {
@@ -1379,15 +1437,15 @@ function SingleChainGraph({
 
     for (const layer of chain.layers) {
       const color = LAYER_COLORS[layer.key] || colors.primary;
-      const x = layerXMap[layer.key] || 480;
+      const x = layerXMap[layer.key] || (leftMargin + Math.floor(spanWidth * 0.5));
       const totalInLayer = layerCounts[layer.key] || 1;
-      const ySpacing = Math.max(48, Math.min(72, 600 / totalInLayer));
+      const ySpacing = Math.max(isSmall ? 40 : 48, Math.min(isSmall ? 60 : 72, 600 / totalInLayer));
 
       for (const segment of layer.segments) {
         for (const company of segment.companies) {
           if (!layerCompanyMap[layer.key].includes(company.code)) {
             layerCompanyMap[layer.key].push(company.code);
-            const y = 40 + layerCurY[layer.key] * ySpacing;
+            const y = (isSmall ? 32 : 40) + layerCurY[layer.key] * ySpacing;
             layerCurY[layer.key] += 1;
 
             const isMatch =
@@ -1397,18 +1455,21 @@ function SingleChainGraph({
                 segment.name.toLowerCase().includes(searchKeyword));
             const isDimmed = searchKeyword && !isMatch;
 
+            const baseSymbolSize = isSmall ? 18 : 26;
+            const matchSymbolSize = isSmall ? 24 : 34;
+
             nodes.push({
               id: company.code,
               name: company.name,
               x,
               y,
-              symbolSize: isMatch ? 34 : 26,
+              symbolSize: isMatch ? matchSymbolSize : baseSymbolSize,
               category: layer.key,
               itemStyle: {
                 color,
                 borderColor: isMatch ? colors.accent : colors.cardBg,
-                borderWidth: isMatch ? 3.5 : 2,
-                shadowBlur: isMatch ? 16 : 6,
+                borderWidth: isMatch ? (isSmall ? 2.5 : 3.5) : 2,
+                shadowBlur: isMatch ? (isSmall ? 10 : 16) : 6,
                 shadowColor: isMatch ? `${colors.accent}90` : `${color}40`,
                 opacity: isDimmed ? 0.35 : 1,
               },
@@ -1417,7 +1478,7 @@ function SingleChainGraph({
                 position: "right",
                 color: isMatch ? colors.primary : colors.textPrimary,
                 fontWeight: isMatch ? "bold" : "normal",
-                fontSize: 11,
+                fontSize: isSmall ? 10 : 11,
                 formatter: "{b}",
                 opacity: isDimmed ? 0.35 : 1,
               },
@@ -1474,8 +1535,8 @@ function SingleChainGraph({
     }
 
     const maxHeight = Math.max(
-      480,
-      Math.max(layerCounts.upstream, layerCounts.midstream, layerCounts.downstream) * 55 + 80
+      isSmall ? 400 : 480,
+      Math.max(layerCounts.upstream, layerCounts.midstream, layerCounts.downstream) * (isSmall ? 45 : 55) + 80
     );
 
     return {
@@ -1510,15 +1571,15 @@ function SingleChainGraph({
         },
       },
       legend: {
-        top: 10,
-        left: 20,
+        top: 8,
+        left: 12,
         data: [
           { name: "upstream", itemStyle: { color: LAYER_COLORS.upstream } },
           { name: "midstream", itemStyle: { color: LAYER_COLORS.midstream } },
           { name: "downstream", itemStyle: { color: LAYER_COLORS.downstream } },
         ],
         formatter: (name: string) => LAYER_NAMES[name] || name,
-        textStyle: { color: colors.textSecondary },
+        textStyle: { color: colors.textSecondary, fontSize: isSmall ? 10 : 12 },
       },
       series: [
         {
@@ -1548,7 +1609,7 @@ function SingleChainGraph({
       ],
       maxHeight,
     };
-  }, [chain, colors, search]);
+  }, [chain, colors, search, containerWidth]);
 
   const onChartClick = (params: { dataType?: string; data?: { id?: string } }) => {
     if (params.dataType === "node" && params.data?.id) {
@@ -1556,8 +1617,10 @@ function SingleChainGraph({
     }
   };
 
+  const isSmall = (containerWidth || (typeof window !== "undefined" ? window.innerWidth : 800)) < 640;
+
   return (
-    <Card style={cardStyle} bodyStyle={{ padding: 16 }}>
+    <Card style={cardStyle} bodyStyle={{ padding: isSmall ? 12 : 16 }}>
       {/* 搜索与导出工具栏 */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
         <Input
@@ -1566,11 +1629,13 @@ function SingleChainGraph({
           prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ width: 260 }}
+          style={{ width: isSmall ? "100%" : 260 }}
         />
         <Button
           icon={<CameraOutlined />}
+          size={isSmall ? "small" : "middle"}
           onClick={handleExport}
+          style={{ width: isSmall ? "100%" : "auto" }}
         >
           导出高清拓扑图
         </Button>
@@ -1581,22 +1646,36 @@ function SingleChainGraph({
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr 1fr",
-          gap: 12,
-          padding: "8px 16px",
+          gap: isSmall ? 4 : 12,
+          padding: isSmall ? "6px 8px" : "8px 16px",
           background: `${colors.primary}08`,
           borderRadius: 6,
           marginBottom: 12,
           textAlign: "center",
-          fontSize: "var(--c-font-sm)",
+          fontSize: isSmall ? "var(--c-font-xs)" : "var(--c-font-sm)",
           fontWeight: 600,
         }}
       >
-        <span style={{ color: LAYER_COLORS.upstream }}>上游 · 核心原材料 / 关键设备</span>
-        <span style={{ color: LAYER_COLORS.midstream }}>中游 · 制造封测 / 模组与系统集成</span>
-        <span style={{ color: LAYER_COLORS.downstream }}>下游 · 终端产品 / 行业应用场景</span>
+        <span style={{ color: LAYER_COLORS.upstream }}>
+          {isSmall ? "上游·材料/设备" : "上游 · 核心原材料 / 关键设备"}
+        </span>
+        <span style={{ color: LAYER_COLORS.midstream }}>
+          {isSmall ? "中游·制造/集成" : "中游 · 制造封测 / 模组与系统集成"}
+        </span>
+        <span style={{ color: LAYER_COLORS.downstream }}>
+          {isSmall ? "下游·终端/应用" : "下游 · 终端产品 / 行业应用场景"}
+        </span>
       </div>
 
-      <div style={{ height: Math.max(540, Math.min(chartOption.maxHeight || 540, 880)), position: "relative" }}>
+      <div
+        ref={containerRef}
+        style={{
+          height: isSmall
+            ? Math.max(400, Math.min(chartOption.maxHeight, 640))
+            : Math.max(540, Math.min(chartOption.maxHeight || 540, 880)),
+          position: "relative",
+        }}
+      >
         <ReactEChartsCore
           ref={chartRef}
           echarts={echarts}
@@ -1608,14 +1687,17 @@ function SingleChainGraph({
         <div
           style={{
             position: "absolute",
-            bottom: 8,
-            right: 16,
+            bottom: 6,
+            right: 12,
             fontSize: "var(--c-font-xs)",
             color: colors.textMuted,
             pointerEvents: "none",
+            background: `${colors.cardBg}cc`,
+            padding: "2px 6px",
+            borderRadius: 4,
           }}
         >
-          从左向右：上游原材料/设备 → 中游制造/方案 → 下游应用场景
+          {isSmall ? "支持双指捏合缩放 · 点击节点查看个股" : "从左向右：上游原材料/设备 → 中游制造/方案 → 下游应用场景"}
         </div>
       </div>
     </Card>
@@ -1632,6 +1714,7 @@ function AtlasLayerBand({
   const colors = useColors();
   const accentKey = LAYER_ACCENTS[layer.key] || "primary";
   const accent = colors[accentKey];
+  const isMobile = useMediaQuery("(max-width: 576px)");
 
   return (
     <div
@@ -1647,8 +1730,8 @@ function AtlasLayerBand({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          padding: "10px 16px",
+          gap: 8,
+          padding: isMobile ? "8px 12px" : "10px 16px",
           borderBottom: `1px solid ${colors.border}`,
           background: `linear-gradient(90deg, ${accent}14, transparent)`,
         }}
@@ -1665,13 +1748,13 @@ function AtlasLayerBand({
         />
         <strong
           className="atlas-layer__name"
-          style={{ color: colors.textPrimary, fontSize: "var(--c-font-base)" }}
+          style={{ color: colors.textPrimary, fontSize: isMobile ? "var(--c-font-sm)" : "var(--c-font-base)" }}
         >
           {layer.name}
         </strong>
         <span
           className="atlas-layer__count"
-          style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}
+          style={{ color: colors.textMuted, fontSize: "var(--c-font-xs)" }}
         >
           {layer.segments.length} 个环节
         </span>
@@ -1679,9 +1762,9 @@ function AtlasLayerBand({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-          gap: 12,
-          padding: 14,
+          gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 220px), 1fr))",
+          gap: isMobile ? 8 : 12,
+          padding: isMobile ? 10 : 14,
         }}
       >
         {layer.segments.map((segment) => (
@@ -1787,10 +1870,10 @@ function AtlasImportModal({
       okText="导入"
       okButtonProps={{ disabled: !content.trim() || importing }}
       confirmLoading={importing}
-      width={720}
+      width="min(720px, calc(100vw - 24px))"
       destroyOnClose
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
         <Upload
           accept=".yaml,.yml,.json,.txt"
           maxCount={1}
@@ -1826,7 +1909,7 @@ function AtlasImportModal({
         value={content}
         onChange={(event) => setContent(event.target.value)}
         placeholder={IMPORT_PLACEHOLDER}
-        rows={16}
+        rows={14}
         style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}
       />
     </Modal>
@@ -1874,6 +1957,7 @@ function AtlasMineModal({
       okText="执行挖掘"
       confirmLoading={mineMutation.isPending}
       okButtonProps={{ disabled: !industryName.trim() }}
+      width="min(520px, calc(100vw - 24px))"
       destroyOnClose
     >
       <div style={{ marginBottom: 12, color: colors.textSecondary, fontSize: "var(--c-font-sm)" }}>
@@ -1944,7 +2028,7 @@ function AtlasBatchMineModal({
           </Button>
         ),
       ]}
-      width={680}
+      width="min(680px, calc(100vw - 24px))"
       destroyOnClose
     >
       <div style={{ color: colors.textSecondary, marginBottom: 16, fontSize: "var(--c-font-sm)", lineHeight: "var(--c-leading-relaxed)" }}>
@@ -1965,7 +2049,7 @@ function AtlasBatchMineModal({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))",
               gap: 12,
               padding: 14,
               background: `${colors.primary}10`,
@@ -1998,6 +2082,7 @@ function AtlasBatchMineModal({
             <div style={{ maxHeight: 280, overflowY: "auto", border: `1px solid ${colors.border}`, borderRadius: 8 }}>
               <Table
                 size="small"
+                scroll={{ x: 380 }}
                 pagination={false}
                 dataSource={result.chains.map((c, i) => ({ ...c, key: i }))}
                 columns={[

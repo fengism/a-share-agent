@@ -2,8 +2,10 @@ import { lazy, Suspense } from "react";
 import { Tabs, Typography } from "antd";
 import { AppstoreOutlined, DatabaseOutlined, IdcardOutlined } from "@ant-design/icons";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useStyles } from "../../styles/ui";
 import RouteLoadingFallback from "../../components/RouteLoadingFallback";
+import "./master-data.css";
 
 const StockProfile = lazy(() => import("../../features/master-data/StockProfileTab"));
 const StockConcept = lazy(() => import("../../features/master-data/StockConceptTab"));
@@ -16,6 +18,8 @@ type MasterDataTab = (typeof TAB_KEYS)[number];
 
 export default function MasterDataPage() {
   const { pageContainerStyle, pageDescriptionStyle, pageTitleStyle } = useStyles();
+  const isNarrow = useMediaQuery("(max-width: 640px)");
+  const isMobile = useMediaQuery("(max-width: 480px)");
   const [activeTab, setActiveTab] = useUrlSearchParam<MasterDataTab>("tab", "profile", {
     allowedValues: TAB_KEYS,
   });
@@ -25,7 +29,7 @@ export default function MasterDataPage() {
       key: "profile",
       label: (
         <span>
-          <IdcardOutlined /> 个股基础资料
+          <IdcardOutlined /> {isNarrow ? (isMobile ? "个股" : "个股资料") : "个股基础资料"}
         </span>
       ),
       children: (
@@ -38,7 +42,7 @@ export default function MasterDataPage() {
       key: "concept",
       label: (
         <span>
-          <AppstoreOutlined /> 概念基础数据
+          <AppstoreOutlined /> {isNarrow ? (isMobile ? "概念" : "概念数据") : "概念基础数据"}
         </span>
       ),
       children: (
@@ -51,7 +55,7 @@ export default function MasterDataPage() {
       key: "industry",
       label: (
         <span>
-          <DatabaseOutlined /> 行业基础数据
+          <DatabaseOutlined /> {isNarrow ? (isMobile ? "行业" : "行业数据") : "行业基础数据"}
         </span>
       ),
       children: (

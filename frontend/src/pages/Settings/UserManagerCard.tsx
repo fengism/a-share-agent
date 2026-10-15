@@ -448,6 +448,7 @@ export default function UserManagerCard() {
 
       {/* Password Reset Modal */}
       <Modal
+        width="min(520px, calc(100vw - 24px))"
         title={
           <Space>
             <KeyOutlined style={{ color: colors.primary }} />

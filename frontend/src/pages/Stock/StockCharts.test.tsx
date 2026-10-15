@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({ kline: vi.fn(), analyze: vi.fn() }));
 vi.mock("../../api/queries", () => ({
   useKlineData: mocks.kline,
   useStockIntraday: () => ({ data: { items: [], prev_close: null }, isLoading: false, isFetching: false, error: null, refetch: vi.fn() }),
-  useStockChipDistribution: vi.fn(),
+  useStockChipDistribution: () => ({ data: null, isLoading: false, error: null }),
 }));
 vi.mock("../../utils/chanlun", () => ({ analyzeChanlun: mocks.analyze }));
 vi.mock("../../charts/LazyKlineChart", () => ({

@@ -383,7 +383,7 @@ test("keeps the stock research summary readable on mobile", async ({ page }) => 
   ))).resolves.toBe(1);
   await expect(page.locator(".analysis-conclusion__summary").evaluate((element) => (
     getComputedStyle(element).fontSize
-  ))).resolves.toBe("16px");
+  ))).resolves.toBe("13.5px");
   await expect(page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).resolves.toBe(true);
 });
 
@@ -547,10 +547,10 @@ test("shows mobile history access without horizontal overflow", async ({ page })
     titleSize: "24px",
     headerMarginBottom: "12px",
     headerPaddingBottom: "12px",
-    toolbarPaddingTop: "4px",
-    toolbarGap: "4px",
-    sectionPaddingTop: "20px",
-    sectionPaddingBottom: "20px",
+    toolbarPaddingTop: "6px",
+    toolbarGap: "6px",
+    sectionPaddingTop: "12px",
+    sectionPaddingBottom: "12px",
   });
   await expect(page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).resolves.toBe(true);
   await page.screenshot({ path: "/tmp/stock-research-typography-mobile.png", fullPage: true });

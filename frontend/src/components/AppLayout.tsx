@@ -25,7 +25,7 @@ export default function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const colors = useColors();
   const themeKey = useThemeStore((state) => state.themeKey);
-  const isMobile = useMediaQuery("(max-width: 767px)");
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const contentRef = useRef<HTMLElement>(null);
   const previousPath = useRef(location.pathname);
 

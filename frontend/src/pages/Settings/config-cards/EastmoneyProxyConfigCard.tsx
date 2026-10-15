@@ -17,24 +17,56 @@ const PLACEHOLDER: Record<OutboundProxyType, string> = {
   socks5: "socks5h://用户名:密码@代理地址:端口",
 };
 
+/** 规范化代理地址：未提供协议头时自动补齐，便于提交与后续处理。 */
+export function normalizeProxyUrl(rawUrl: string, proxyType: OutboundProxyType): string {
+  const value = rawUrl.trim();
+  if (!value) return "";
+  const schemeMatch = value.match(/^([a-zA-Z0-9+-]+):\/\/(.*)$/);
+  if (!schemeMatch) {
+    return `${proxyType === "socks5" ? "socks5h" : "http"}://${value}`;
+  }
+  const scheme = schemeMatch[1].toLowerCase();
+  const remainder = schemeMatch[2];
+  if (proxyType === "socks5" && scheme === "socks") {
+    return `socks5h://${remainder}`;
+  }
+  return value;
+}
+
 /** 提交前的前端校验，避免把明显非法的地址写进全局配置。 */
-function validateProxyUrl(url: string, proxyType: OutboundProxyType): string | null {
+export function validateProxyUrl(url: string, proxyType: OutboundProxyType): string | null {
   const value = url.trim();
   if (!value) return "启用代理后必须填写代理地址";
   if (/\s/.test(value)) return "代理地址不能包含空格";
-  const withScheme = /:\/\//.test(value) ? value : `${proxyType === "socks5" ? "socks5h" : "http"}://${value}`;
-  let parsed: URL;
+
+  const schemeMatch = value.match(/^([a-zA-Z0-9+-]+):\/\/(.*)$/);
+  const rawScheme = schemeMatch ? schemeMatch[1].toLowerCase() : null;
+  const remainder = schemeMatch ? schemeMatch[2] : value;
+
+  const isSocksScheme = Boolean(rawScheme && rawScheme.startsWith("socks"));
+  if (proxyType === "socks5" && rawScheme && !isSocksScheme) {
+    return "代理类型为 SOCKS5 时，地址协议必须是 socks5/socks5h";
+  }
+  if (proxyType === "http" && isSocksScheme) {
+    return "代理类型为 HTTP 时，地址协议必须是 http/https";
+  }
+  if (proxyType === "http" && rawScheme && rawScheme !== "http" && rawScheme !== "https") {
+    return "代理类型为 HTTP 时，地址协议必须是 http/https";
+  }
+
+  // 浏览器原生 new URL() 对非标准协议（如 socks5/socks5h）在部分环境下不会解析 authority
+  // （导致 hostname/port 为空）。这里借用 http:// 构造虚拟对象做稳健解析。
+  let dummy: URL;
   try {
-    parsed = new URL(withScheme);
+    dummy = new URL(`http://${remainder}`);
   } catch {
     return "代理地址格式无法解析";
   }
-  const scheme = parsed.protocol.replace(":", "").toLowerCase();
-  const isSocksScheme = scheme.startsWith("socks");
-  if (proxyType === "socks5" && !isSocksScheme) return "代理类型为 SOCKS5 时，地址协议必须是 socks5/socks5h";
-  if (proxyType === "http" && isSocksScheme) return "代理类型为 HTTP 时，地址协议必须是 http/https";
-  if (!parsed.hostname) return "代理地址缺少主机名";
-  if (proxyType === "socks5" && !parsed.port) return "SOCKS5 代理必须指定端口，例如 socks5h://user:pass@host:2260";
+
+  if (!dummy.hostname) return "代理地址缺少主机名";
+  if (proxyType === "socks5" && !dummy.port) {
+    return "SOCKS5 代理必须指定端口，例如 socks5h://user:pass@host:2260";
+  }
   return null;
 }
 
@@ -93,11 +125,18 @@ export default function OutboundProxyConfigCard({
             block
             value={proxyType}
             options={PROXY_TYPE_OPTIONS}
-            onChange={(value) =>
-              onChange({
-                outbound_proxy_type: value as OutboundProxyType,
-              })
-            }
+            onChange={(value) => {
+              const nextType = value as OutboundProxyType;
+              const patch: { outbound_proxy_type: OutboundProxyType; outbound_proxy_url?: string } = {
+                outbound_proxy_type: nextType,
+              };
+              if (nextType === "none") {
+                patch.outbound_proxy_url = "";
+              } else if (proxyUrl.includes("***")) {
+                patch.outbound_proxy_url = "";
+              }
+              onChange(patch);
+            }}
           />
         </Col>
         <Col span={24}>

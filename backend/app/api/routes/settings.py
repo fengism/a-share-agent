@@ -96,6 +96,12 @@ async def put_config(
             code="config.llm_credentials_missing",
             message=str(error),
         ) from error
+    except ProxyConfigError as error:
+        raise ApiError(
+            status_code=422,
+            code="config.proxy_invalid",
+            message=str(error),
+        ) from error
     except ConfigEncryptionError as error:
         raise _encryption_unavailable(error) from error
     return _to_response(result.settings, is_admin=bool(user["is_admin"]))

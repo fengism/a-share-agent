@@ -1,12 +1,14 @@
 import { act, fireEvent, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { KlineItem } from "../types/stock";
+import type { KlineItem, ChipDistribution } from "../types/stock";
 import KlineChart from "./KlineChart";
 
 const mocks = vi.hoisted(() => {
   const candleSeries = {
     setData: vi.fn(),
     applyOptions: vi.fn(),
+    createPriceLine: vi.fn(() => ({ applyOptions: vi.fn() })),
+    removePriceLine: vi.fn(),
   };
   const volumeSeries = {
     setData: vi.fn(),
@@ -518,4 +520,193 @@ describe("KlineChart", () => {
     expect(getAllByText("1.20%").length).toBeGreaterThanOrEqual(1);
     expect(getByText("(+0.00%)")).toBeInTheDocument();
   });
+
+  it("switches sub-indicators between VOL, MACD, KDJ, and RSI", () => {
+    const { getByText, queryByText } = render(
+      <KlineChart
+        data={[
+          { date: "2026-01-01", open: 10, close: 10.5, high: 11, low: 9.5, volume: 1000, amount: 10000 },
+          { date: "2026-01-02", open: 10.5, close: 11, high: 11.5, low: 10, volume: 2000, amount: 22000 },
+        ] as unknown as KlineItem[]}
+      />,
+    );
+
+    // Initial sub-indicator is VOL
+    expect(getByText(/VOL:/)).toBeInTheDocument();
+    expect(queryByText(/参数: 12,26,9/)).toBeNull();
+
+    // Switch to MACD
+    fireEvent.click(getByText("MACD"));
+    expect(getByText(/DIF:/)).toBeInTheDocument();
+    expect(getByText(/DEA:/)).toBeInTheDocument();
+    expect(getByText(/参数: 12,26,9/)).toBeInTheDocument();
+
+    // Switch to KDJ
+    fireEvent.click(getByText("KDJ"));
+    expect(getByText(/K:/)).toBeInTheDocument();
+    expect(getByText(/D:/)).toBeInTheDocument();
+    expect(getByText(/J:/)).toBeInTheDocument();
+    expect(getByText(/参数: 9,3,3/)).toBeInTheDocument();
+
+    // Switch to RSI
+    fireEvent.click(getByText("RSI"));
+    expect(getByText(/RSI6:/)).toBeInTheDocument();
+    expect(getByText(/RSI12:/)).toBeInTheDocument();
+    expect(getByText(/RSI24:/)).toBeInTheDocument();
+    expect(getByText(/参数: 6,12,24/)).toBeInTheDocument();
+
+    // Switch back to VOL
+    fireEvent.click(getByText("VOL"));
+    expect(getByText(/VOL:/)).toBeInTheDocument();
+  });
+
+  it("toggles candle style between solid and hollow (红空绿实)", () => {
+    const { getByText } = render(
+      <KlineChart
+        data={[
+          { date: "2026-01-01", open: 10, close: 10.5, high: 11, low: 9.5, volume: 1000, amount: 10000 },
+        ] as unknown as KlineItem[]}
+      />,
+    );
+
+    const toggleBtn = getByText("实心K线");
+    expect(toggleBtn).toBeInTheDocument();
+
+    // Toggle to hollow (红空绿实)
+    fireEvent.click(toggleBtn);
+    expect(getByText("红空绿实")).toBeInTheDocument();
+    expect(mocks.candleSeries.applyOptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        upColor: "#ffffff", // cardBg
+      }),
+    );
+
+    // Toggle back to solid
+    fireEvent.click(getByText("红空绿实"));
+    expect(getByText("实心K线")).toBeInTheDocument();
+    expect(mocks.candleSeries.applyOptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        upColor: "#f5222d", // c.up
+      }),
+    );
+  });
+
+  it("switches main overlay between MA, BOLL, and NONE", () => {
+    const { getByText } = render(
+      <KlineChart
+        data={[
+          { date: "2026-01-01", open: 10, close: 10.5, high: 11, low: 9.5, volume: 1000, amount: 10000 },
+        ] as unknown as KlineItem[]}
+      />,
+    );
+
+    // Initial is MA
+    expect(getByText("主:MA")).toBeInTheDocument();
+    expect(getByText(/MA5:/)).toBeInTheDocument();
+
+    // Click to switch to BOLL
+    fireEvent.click(getByText("主:MA"));
+    expect(getByText("主:BOLL")).toBeInTheDocument();
+    expect(getByText(/MID:/)).toBeInTheDocument();
+
+    // Click to switch to NONE
+    fireEvent.click(getByText("主:BOLL"));
+    expect(getByText("主:无")).toBeInTheDocument();
+    expect(queryByTextReg(getByText, /MA5:/)).toBeNull();
+    expect(queryByTextReg(getByText, /MID:/)).toBeNull();
+
+    // Click to switch back to MA
+    fireEvent.click(getByText("主:无"));
+    expect(getByText("主:MA")).toBeInTheDocument();
+    expect(getByText(/MA5:/)).toBeInTheDocument();
+  });
+
+  it("supports landscape fullscreen expansion, 90-degree rotation, and Escape exit", () => {
+    const { getByText, queryByText, getByRole } = render(
+      <KlineChart
+        data={[
+          { date: "2026-01-01", open: 10, close: 10.5, high: 11, low: 9.5, volume: 1000, amount: 10000 },
+        ] as unknown as KlineItem[]}
+      />,
+    );
+
+    const landscapeBtn = getByText("放大横屏");
+    expect(landscapeBtn).toBeInTheDocument();
+    expect(queryByText("90°旋转")).toBeNull();
+
+    // Click to enter landscape mode
+    fireEvent.click(landscapeBtn);
+    expect(getByText("退出横屏")).toBeInTheDocument();
+    expect(getByText("90°旋转")).toBeInTheDocument();
+
+    // Click 90-degree rotate
+    fireEvent.click(getByText("90°旋转"));
+    expect(getByText("还原旋转")).toBeInTheDocument();
+
+    // Press Escape on the container to exit landscape mode
+    const chartRegion = getByRole("region", { name: "K线图交互区" });
+    fireEvent.keyDown(chartRegion, { key: "Escape" });
+    expect(getByText("放大横屏")).toBeInTheDocument();
+    expect(queryByText("90°旋转")).toBeNull();
+  });
+
+  it("supports chip peak line and CYQ distribution display toggle", () => {
+    const mockChip = {
+      peak_price: 18.5,
+      profit_ratio: 0.65,
+      concentration_90: 0.12,
+      cost_90_low: 16.2,
+      cost_90_high: 19.8,
+      histogram: [
+        { price: 20.0, volume: 100, ratio: 0.1 },
+        { price: 18.5, volume: 500, ratio: 0.5 },
+        { price: 17.0, volume: 400, ratio: 0.4 },
+      ],
+    };
+
+    const { getByText, getAllByText, queryByText } = render(
+      <KlineChart
+        data={[
+          { date: "2026-01-01", open: 18.0, close: 18.6, high: 19.0, low: 17.8, volume: 1000, amount: 10000 },
+        ] as unknown as KlineItem[]}
+        chipDistribution={mockChip as unknown as ChipDistribution}
+        defaultShowChipPeak={true}
+      />,
+    );
+
+    // Verify toggle button rendered
+    const chipBtn = getByText("筹码峰");
+    expect(chipBtn).toBeInTheDocument();
+
+    // Verify HUD renders peak price and profit ratio
+    expect(getByText(/筹码峰: 18.50/)).toBeInTheDocument();
+    expect(getAllByText(/65\.0%/).length).toBeGreaterThanOrEqual(1);
+
+    // Verify CYQ micro-card rendered
+    expect(getByText("CYQ 筹码")).toBeInTheDocument();
+    expect(getByText(/峰:18.50/)).toBeInTheDocument();
+    expect(getByText(/90%集中度/)).toBeInTheDocument();
+
+    // Verify createPriceLine was called with peak_price
+    expect(mocks.candleSeries.createPriceLine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        price: 18.5,
+        title: "筹码峰",
+      }),
+    );
+
+    // Toggle off
+    fireEvent.click(chipBtn);
+    expect(queryByText(/筹码峰: 18.50/)).toBeNull();
+    expect(queryByText("CYQ 筹码")).toBeNull();
+    expect(mocks.candleSeries.removePriceLine).toHaveBeenCalled();
+  });
 });
+
+function queryByTextReg(getByText: (text: RegExp) => HTMLElement, reg: RegExp) {
+  try {
+    return getByText(reg);
+  } catch {
+    return null;
+  }
+}

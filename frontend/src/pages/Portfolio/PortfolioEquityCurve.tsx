@@ -50,17 +50,19 @@ export default function PortfolioEquityCurve() {
       {query.data && !points.length ? <Empty description="暂无交易流水，无法生成资产曲线" /> : null}
       {query.data && points.length ? (
         <>
-          <Space wrap size={24} style={{ marginBottom: 8 }}>
+          <Space wrap size={narrow ? [12, 8] : 24} style={{ marginBottom: 8 }}>
             {query.data.mode === "total_assets" ? (
               <>
-                <Statistic title="期末总资产" value={query.data.current_total_assets ?? 0} precision={2} prefix="¥" />
+                <Statistic className="portfolio-equity-stat" title="期末总资产" value={query.data.current_total_assets ?? 0} precision={2} prefix="¥" />
                 <Statistic
+                  className="portfolio-equity-stat"
                   title="累计收益率"
                   value={query.data.total_return_pct ?? "-"}
                   precision={2}
                   suffix={query.data.total_return_pct == null ? undefined : "%"}
                 />
                 <Statistic
+                  className="portfolio-equity-stat"
                   title="最大回撤"
                   value={query.data.max_drawdown_pct ?? "-"}
                   precision={2}
@@ -69,13 +71,14 @@ export default function PortfolioEquityCurve() {
               </>
             ) : (
               <Statistic
+                className="portfolio-equity-stat"
                 title="期末证券市值"
                 value={query.data.current_securities_value ?? 0}
                 precision={2}
                 prefix="¥"
               />
             )}
-            <Text type="secondary">
+            <Text type="secondary" style={{ fontSize: "12px", alignSelf: "center" }}>
               {query.data.start_date ?? "-"} 至 {query.data.end_date}
             </Text>
           </Space>

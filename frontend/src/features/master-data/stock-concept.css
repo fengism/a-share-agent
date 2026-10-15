@@ -74,3 +74,53 @@
   border: 1px solid var(--c-border);
   border-radius: 6px;
 }
+
+@media (max-width: 768px) {
+  .stock-concept-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .stock-concept-header > .ant-space {
+    width: 100%;
+  }
+
+  .stock-concept-header > .ant-space > .ant-space-item {
+    flex: 1;
+  }
+
+  .stock-concept-header > .ant-space .ant-btn {
+    width: 100%;
+  }
+
+  .stock-concept-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stock-concept-query,
+  .stock-concept-select {
+    width: 100% !important;
+  }
+
+  .stock-concept-filters > .ant-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .stock-concept-stat-grid .ant-card-body {
+    padding: 10px 12px;
+  }
+
+  .stock-concept-stat-grid .ant-statistic-title {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  .stock-concept-stat-grid .ant-statistic-content {
+    font-size: 18px;
+  }
+}

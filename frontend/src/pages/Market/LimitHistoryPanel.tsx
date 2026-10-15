@@ -6,6 +6,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useMarketLimitHistory } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import StockExternalLink from "../../components/StockExternalLink";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
 import type { MarketLimitHistoryCategory, MarketLimitHistoryItem } from "../../types/stock";
@@ -34,6 +35,7 @@ function formatRate(value: number | null) {
 export default function LimitHistoryPanel() {
   const colors = useColors();
   const t = useTokens();
+  const isMobile = useMediaQuery("(max-width: 768px)");
   const defaultDate = dayjs().subtract(1, "day").format("YYYY-MM-DD");
   const [category, setCategory] = useUrlSearchParam<MarketLimitHistoryCategory>(
     "historyCategory",
@@ -59,7 +61,7 @@ export default function LimitHistoryPanel() {
       {
         title: "股票",
         key: "stock",
-        fixed: "left",
+        fixed: isMobile ? undefined : "left",
         width: 144,
         render: (_value, stock) => (
           <StockExternalLink code={stock.code} name={stock.name} style={{ display: "inline-flex" }}>
@@ -179,7 +181,7 @@ export default function LimitHistoryPanel() {
       });
     }
     return result;
-  }, [category, colors.down, colors.up]);
+  }, [category, colors.down, colors.up, isMobile]);
 
   return (
     <div>
