@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 from app.configuration.schema import Settings
 from app.modules.push.domain.message import ChannelSendResult, NotificationMessage

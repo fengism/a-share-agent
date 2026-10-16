@@ -5,14 +5,11 @@ from __future__ import annotations
 import logging
 import time
 
-import httpx
-
 from app.configuration import get_effective_settings
 from app.configuration.schema import Settings
 from app.modules.push.channels.base import NotificationChannel
-from app.modules.push.domain.message import ChannelSendResult, NotificationMessage
-
 from app.modules.push.channels.http_client import resilient_post
+from app.modules.push.domain.message import ChannelSendResult, NotificationMessage
 
 logger = logging.getLogger(__name__)
 

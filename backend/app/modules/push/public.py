@@ -1,6 +1,7 @@
 """Push 模块对 HTTP 和其他业务适配器开放的稳定入口。"""
 
 from app.modules.push.application import execute_push_request
+from app.modules.push.channels import DingTalkChannel, NotificationChannel, channel_registry
 from app.modules.push.dispatcher import (
     compute_dingtalk_sign,
     compute_feishu_sign,
@@ -17,7 +18,6 @@ from app.modules.push.dispatcher import (
     send_wecom_webhook,
     send_wxpusher,
 )
-from app.modules.push.channels import DingTalkChannel, NotificationChannel, channel_registry
 from app.modules.push.domain import ChannelSendResult, NotificationMessage, NotificationSeverity
 from app.modules.push.formatters.system_alert import format_system_alert
 from app.modules.push.schemas import (

@@ -9,8 +9,6 @@ import logging
 import time
 from typing import Any
 
-import httpx
-
 from app.configuration import get_effective_settings
 from app.configuration.schema import Settings
 from app.modules.push.channels.base import NotificationChannel

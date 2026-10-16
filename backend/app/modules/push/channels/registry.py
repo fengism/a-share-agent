@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-from typing import Iterable
-
 from app.configuration.schema import Settings
 from app.modules.push.channels.base import NotificationChannel
 from app.modules.push.channels.dingtalk import DingTalkChannel
