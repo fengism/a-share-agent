@@ -307,6 +307,7 @@ class MacroAnalysisEvent(BaseModel):
     title: str = ""
     interpretation: str = ""
     impact: str = ""
+    pending: bool = False
     refs: list[MacroAnalysisRef] = Field(default_factory=list)
 
 
@@ -319,6 +320,7 @@ class MacroAnalysisResponse(BaseModel):
     events: list[MacroAnalysisEvent] = Field(default_factory=list)
     policy_signals: list[str] = Field(default_factory=list)
     degraded: bool = False
+    pending_count: int = 0
     warning: str = ""
     generated_at: str = ""
     cached: bool = False

@@ -1,6 +1,6 @@
 """Stable market-wide data capabilities for product modules and Agent tools."""
 
-from app.financial_data.market.macro.analysis import get_macro_analysis
+from app.financial_data.market.macro.analysis import get_macro_analysis, trigger_macro_prewarm
 from app.financial_data.market.macro.feed import get_macro_feed
 from app.financial_data.market.macro.schemas import (
     CommoditiesResponse,
@@ -46,6 +46,7 @@ from app.financial_data.market.quotes.hot_rank import get_hot_stocks, get_ths_ho
 from app.financial_data.market.quotes.index_intraday import get_index_intraday
 from app.financial_data.market.quotes.index_kline import get_index_kline
 from app.financial_data.market.quotes.indices import get_indices
+from app.financial_data.market.quotes.limit_break import get_limit_break_pool
 from app.financial_data.market.quotes.limit_history import get_limit_history
 from app.financial_data.market.quotes.limit_up_ladder import get_limit_up_ladder
 from app.financial_data.market.quotes.mainline import get_market_mainline
@@ -68,6 +69,8 @@ from app.financial_data.market.quotes.schemas import (
     MarketBreadthResponse,
     MarketEmotion,
     MarketEmotionDistribution,
+    MarketLimitBreakPoolItem,
+    MarketLimitBreakPoolResponse,
     MarketLimitHistoryCategory,
     MarketLimitHistoryItem,
     MarketLimitHistoryResponse,
@@ -157,6 +160,7 @@ __all__ = [
     "get_macro_data",
     "get_macro_feed",
     "get_macro_analysis",
+    "trigger_macro_prewarm",
     "get_us_macro_data",
     "invalidate_us_macro_snapshot",
     "prewarm_us_macro_data",
@@ -177,6 +181,7 @@ __all__ = [
     "get_market_price_anomaly_count",
     "get_market_breadth",
     "get_limit_up_ladder",
+    "get_limit_break_pool",
     "get_limit_history",
     "get_market_news",
     "get_market_statistics",
@@ -219,6 +224,8 @@ __all__ = [
     "MarketEmotion",
     "MarketEmotionDistribution",
     "MarketLimitUpBoardItem",
+    "MarketLimitBreakPoolItem",
+    "MarketLimitBreakPoolResponse",
     "MarketLimitHistoryCategory",
     "MarketLimitHistoryItem",
     "MarketLimitHistoryResponse",

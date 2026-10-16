@@ -2,12 +2,16 @@
 
 缓存策略（避免频繁调用大模型）：
 - 每条宏观条目按 ``id|title|date`` 指纹缓存解读，历史条目不重复调用；
-- 综述按"条目指纹集合"缓存，仅在内容变化时重新生成；
-- 两级：L1 进程内 ``analysis_cache``（快），L2 market 库 ``macro_analysis_cache``（跨重启/多 worker）。
+- 综述按"已解读条目指纹集合"缓存，仅在内容变化时重新生成；
+- 两级：L1 进程内 ``analysis_cache``（快），L2 market 库 ``macro_analysis_cache``（跨重启/多 worker）；
+- 缓存键与模型无关（全实例共享）：切换模型/子模型不会作废历史解读。
+
+未解读的新条目标记为 ``pending``，前端展示原文，由后台预热任务补齐解读。
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -16,7 +20,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from app.configuration.runtime import get_effective_settings
 from app.core.cache import analysis_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
@@ -43,6 +46,7 @@ _MAX_ITEMS = 40
 _BATCH_SIZE = 20
 
 _analysis_singleflight: AsyncSingleFlight[MacroAnalysisResponse] = AsyncSingleFlight()
+_prewarm_task: asyncio.Task[None] | None = None
 
 _ITEM_SYSTEM_PROMPT = """你是资深宏观分析师。对给定的每条宏观资讯逐条解读，判断其对 A 股市场的影响。
 
@@ -85,6 +89,7 @@ class _Interpretation:
     category: str
     interpretation: str
     impact: str
+    pending: bool = False
 
 
 @dataclass
@@ -94,12 +99,32 @@ class _ItemInterpretations:
 
 
 def _cache_prefix(scope: str) -> str:
-    settings = get_effective_settings()
-    return f"macro_{scope}:{MACRO_ANALYSIS_PROMPT_VERSION}:{settings.llm_provider}:{settings.llm_model}"
+    """缓存前缀：只区分作用域与提示词版本，解读结果与所用模型无关。"""
+    return f"macro_{scope}:{MACRO_ANALYSIS_PROMPT_VERSION}"
 
 
 def _item_hash(item: MacroFeedItem) -> str:
     return hashlib.md5(f"{item.id}|{item.title}|{item.published_at}".encode()).hexdigest()
+
+
+def _item_cache_keys(items: list[MacroFeedItem]) -> dict[int, str]:
+    prefix = _cache_prefix("item")
+    return {index: f"{prefix}:{_item_hash(item)}" for index, item in enumerate(items)}
+
+
+async def _unresolved_indices(items: list[MacroFeedItem]) -> list[int]:
+    """返回尚未命中 L1/L2 缓存的条目下标（即需要调用大模型的条目）。"""
+    keys = _item_cache_keys(items)
+    missing = [index for index in keys if cache.get(keys[index]) is None]
+    if not missing:
+        return []
+    stored = await call_blocking(
+        load_macro_analysis,
+        [keys[index] for index in missing],
+        max_age_seconds=_ITEM_CACHE_TTL_SECONDS,
+        semaphore=database_semaphore,
+    )
+    return [index for index in missing if keys[index] not in stored]
 
 
 def _normalize_impact(value: Any) -> str:
@@ -144,6 +169,7 @@ async def _llm_interpret(entries: list[tuple[int, MacroFeedItem]]) -> dict[int, 
         ],
         temperature=0.2,
         json_format=True,
+        task="macro_item",
     )
     payload = _parse_json(raw)
     rows = payload.get("items") if isinstance(payload, dict) else None
@@ -165,9 +191,8 @@ async def _llm_interpret(entries: list[tuple[int, MacroFeedItem]]) -> dict[int, 
     return result
 
 
-async def _interpret_items(items: list[MacroFeedItem]) -> _ItemInterpretations:
-    prefix = _cache_prefix("item")
-    keys = {index: f"{prefix}:{_item_hash(item)}" for index, item in enumerate(items)}
+async def _interpret_items(items: list[MacroFeedItem], *, allow_llm: bool) -> _ItemInterpretations:
+    keys = _item_cache_keys(items)
     resolved: dict[int, _Interpretation] = {}
     missing: list[int] = []
 
@@ -198,6 +223,8 @@ async def _interpret_items(items: list[MacroFeedItem]) -> _ItemInterpretations:
 
     degraded = False
     for start in range(0, len(missing), _BATCH_SIZE):
+        if not allow_llm:
+            break
         batch = missing[start : start + _BATCH_SIZE]
         try:
             fresh = await _llm_interpret([(index, items[index]) for index in batch])
@@ -228,10 +255,12 @@ async def _interpret_items(items: list[MacroFeedItem]) -> _ItemInterpretations:
 
     for index, item in enumerate(items):
         if index not in resolved:
+            # 尚未解读（缓存未命中）：请求路径展示原文并标记待解读，交由后台预热补齐
             resolved[index] = _Interpretation(
                 category="其他",
                 interpretation=item.title,
                 impact="中性",
+                pending=True,
             )
     return _ItemInterpretations(by_index=resolved, degraded=degraded)
 
@@ -249,6 +278,7 @@ def _build_events(
                 title=item.title,
                 interpretation=interpretation.interpretation if interpretation else "",
                 impact=interpretation.impact if interpretation else "中性",
+                pending=bool(interpretation.pending) if interpretation else False,
                 refs=[MacroAnalysisRef(title=item.title, url=item.url)] if item.url else [],
             )
         )
@@ -303,8 +333,10 @@ async def _llm_summarize(events: list[MacroAnalysisEvent]) -> dict[str, Any]:
     }
 
 
-async def _summarize(events: list[MacroAnalysisEvent], feed_hash: str) -> tuple[dict[str, Any], bool]:
-    key = f"{_cache_prefix('summary')}:{feed_hash}"
+async def _summarize(
+    events: list[MacroAnalysisEvent], digest: str, *, allow_llm: bool
+) -> tuple[dict[str, Any], bool]:
+    key = f"{_cache_prefix('summary')}:{digest}"
     cached = cache.get(key)
     if cached is not None:
         return cached, True
@@ -318,6 +350,9 @@ async def _summarize(events: list[MacroAnalysisEvent], feed_hash: str) -> tuple[
     if key in stored:
         cache.set(key, stored[key], ttl=_SUMMARY_CACHE_TTL_SECONDS)
         return stored[key], True
+
+    if not allow_llm:
+        return _pending_summary(events), False
 
     try:
         summary = await _llm_summarize(events)
@@ -336,6 +371,23 @@ async def _summarize(events: list[MacroAnalysisEvent], feed_hash: str) -> tuple[
     except Exception:
         logger.warning("宏观综述持久化失败", exc_info=True)
     return summary, False
+
+
+def _pending_summary(events: list[MacroAnalysisEvent]) -> dict[str, Any]:
+    """已解读事件不足以生成综述时的占位：不标记 degraded，由 pending_count 提示。"""
+    counts = Counter(event.impact for event in events)
+    if counts["偏多"] > counts["偏空"]:
+        sentiment = "偏多"
+    elif counts["偏空"] > counts["偏多"]:
+        sentiment = "偏空"
+    else:
+        sentiment = "中性"
+    return {
+        "summary": "",
+        "sentiment": sentiment,
+        "policy_signals": [],
+        "degraded": False,
+    }
 
 
 def _empty_response(feed: MacroFeedResponse) -> MacroAnalysisResponse:
@@ -360,10 +412,33 @@ async def get_macro_analysis(days: int = MACRO_FEED_DEFAULT_DAYS) -> MacroAnalys
     singleflight_key = f"{_cache_prefix('response')}:{feed_hash}"
 
     async def _load() -> MacroAnalysisResponse:
-        interpretations = await _interpret_items(items)
+        interpretations = await _interpret_items(items, allow_llm=False)
         events = _build_events(items, interpretations)
-        summary, summary_cached = await _summarize(events, feed_hash)
+        resolved_events = [event for event in events if not event.pending]
+        if resolved_events:
+            # 综述只依据已解读事件；待解读条目补齐后 digest 变化会自动重算
+            resolved_hash = hashlib.md5(
+                "|".join(
+                    _item_hash(items[index])
+                    for index, item in enumerate(items)
+                    if not interpretations.by_index[index].pending
+                ).encode()
+            ).hexdigest()
+            summary, summary_cached = await _summarize(
+                resolved_events, resolved_hash, allow_llm=False
+            )
+        else:
+            summary = _pending_summary([])
+            summary["summary"] = "近期宏观事件正在解读中，稍后刷新即可查看 AI 综述。"
+            summary_cached = False
         degraded = bool(summary.get("degraded")) or interpretations.degraded
+        pending_count = sum(1 for event in events if event.pending)
+        if degraded:
+            warning = "AI 解读暂不可用，当前展示原文与确定性汇总。"
+        elif pending_count:
+            warning = f"{pending_count} 条最新宏观事件仍在后台解读，请稍后刷新查看 AI 综述。"
+        else:
+            warning = ""
         return MacroAnalysisResponse(
             period=f"{feed.period_start} ~ {feed.period_end}",
             summary=str(summary.get("summary") or ""),
@@ -371,7 +446,8 @@ async def get_macro_analysis(days: int = MACRO_FEED_DEFAULT_DAYS) -> MacroAnalys
             events=events,
             policy_signals=list(summary.get("policy_signals") or []),
             degraded=degraded,
-            warning="AI 解读暂不可用，当前展示原文与确定性汇总。" if degraded else "",
+            pending_count=pending_count,
+            warning=warning,
             generated_at=datetime.now().isoformat(timespec="seconds"),
             cached=summary_cached,
         )
@@ -379,4 +455,69 @@ async def get_macro_analysis(days: int = MACRO_FEED_DEFAULT_DAYS) -> MacroAnalys
     return await _analysis_singleflight.do(singleflight_key, _load)
 
 
-__all__ = ["get_macro_analysis", "MACRO_ANALYSIS_PROMPT_VERSION"]
+async def prewarm_macro_analysis(days: int = MACRO_FEED_DEFAULT_DAYS) -> int:
+    """后台预热：为尚未解读的宏观条目补齐解读，并生成 AI 综述。
+
+    已命中缓存的条目不会重复调用大模型；返回本次新完成解读的条目数。
+    各类大模型异常在内部消化（降级为原文），不会抛出。
+    """
+    feed = await get_macro_feed(days)
+    items = _collect_items(feed)
+    if not items:
+        return 0
+    pending_before = await _unresolved_indices(items)
+    interpretations = await _interpret_items(items, allow_llm=True)
+    if pending_before:
+        events = _build_events(items, interpretations)
+        resolved_events = [event for event in events if not event.pending]
+        if resolved_events:
+            resolved_hash = hashlib.md5(
+                "|".join(
+                    _item_hash(items[index])
+                    for index, item in enumerate(items)
+                    if not interpretations.by_index[index].pending
+                ).encode()
+            ).hexdigest()
+            await _summarize(resolved_events, resolved_hash, allow_llm=True)
+    pending_after = await _unresolved_indices(items)
+    return max(0, len(pending_before) - len(pending_after))
+
+
+def trigger_macro_prewarm(days: int = MACRO_FEED_DEFAULT_DAYS) -> bool:
+    """命中待解读条目时在后台补齐解读，请求线程只调度不等待。
+
+    与 ``_start_us_macro_refresh`` 同一模式：同一时刻只保留一个预热任务，
+    已有任务在跑时直接返回 ``False``。``asyncio.create_task`` 会复制当前上下文，
+    因此该任务会沿用发起请求的用户模型/子模型配置。
+    """
+    global _prewarm_task
+    if _prewarm_task is not None and not _prewarm_task.done():
+        return False
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:  # 无事件循环（如脚本直调）时静默跳过
+        return False
+    task = loop.create_task(prewarm_macro_analysis(days), name="macro_analysis_prewarm")
+    _prewarm_task = task
+
+    def _finish(finished: asyncio.Task[None]) -> None:
+        global _prewarm_task
+        try:
+            finished.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception:  # noqa: BLE001 - 后台预热失败不影响请求
+            logger.warning("宏观解读后台预热失败", exc_info=True)
+        finally:
+            _prewarm_task = None
+
+    task.add_done_callback(_finish)
+    return True
+
+
+__all__ = [
+    "get_macro_analysis",
+    "prewarm_macro_analysis",
+    "trigger_macro_prewarm",
+    "MACRO_ANALYSIS_PROMPT_VERSION",
+]

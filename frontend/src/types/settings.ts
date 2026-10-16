@@ -23,6 +23,8 @@ export interface ConfigData {
   llm_api_key: string;
   llm_base_url: string;
   llm_model: string;
+  llm_sub_model: string;
+  llm_simple_tasks: string;
   llm_temperature: number;
   llm_context_length_tokens: number;
   feishu_enabled: boolean;

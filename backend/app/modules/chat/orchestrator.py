@@ -28,7 +28,9 @@ from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.runtime.evidence import build_evidence_gap_report, evidence_gap_reason
 from app.agentic.tools.packs.stock.context import resolve_stock_context
 from app.configuration import get_effective_settings
+from app.configuration.schema import Settings
 from app.core.metrics import metrics
+from app.infrastructure.llm import spec
 from app.infrastructure.llm.runtime import borrow_async_openai_chat_runtime
 from app.infrastructure.llm.tool_calling import AsyncLLMClient
 from app.modules.chat.general_agent import stream_general_agent
@@ -142,22 +144,30 @@ class Orchestrator:
         self,
         message: str,
         decision: RoutingDecision,
-        llm_client: AsyncLLMClient,
-        model: str,
+        settings: Settings,
     ) -> RoutingDecision:
         if not decision.needs_llm_classification:
             return decision
-        try:
-            refined = await self._llm_classify(message, llm_client, model)
-            logger.info("LLM classify: agents=%s", refined.agents)
-            return refined
-        except Exception as exc:
-            logger.warning("LLM classify failed, using all agents: %s", exc)
-            return RoutingDecision(
-                agents=list(self.sub_agents),
-                needs_llm_classification=False,
-                reasoning="模型路由失败，回退到全部专业 Agent",
-            )
+        # 意图分类是简单任务，优先走子模型；子模型调用失败时回退主模型再试一次
+        uses_sub_model = spec.task_uses_sub_model(settings, task="chat_routing")
+        attempts: tuple[str | None, ...] = ("chat_routing", None) if uses_sub_model else ("chat_routing",)
+        error: Exception | None = None
+        for task in attempts:
+            try:
+                async with borrow_async_openai_chat_runtime(settings, task=task) as runtime:
+                    refined = await self._llm_classify(message, runtime.client, runtime.model)
+                logger.info("LLM classify: agents=%s", refined.agents)
+                return refined
+            except Exception as exc:
+                error = exc
+                if task == "chat_routing" and uses_sub_model:
+                    logger.warning("子模型意图分类失败，回退主模型: %s", exc)
+        logger.warning("LLM classify failed, using all agents: %s", error)
+        return RoutingDecision(
+            agents=list(self.sub_agents),
+            needs_llm_classification=False,
+            reasoning="模型路由失败，回退到全部专业 Agent",
+        )
 
     async def _stream_orchestrated_response(
         self,
@@ -295,7 +305,7 @@ class Orchestrator:
             model = runtime.model
             # 路由精调（一次 LLM 调用）与股票上下文解析（网络请求）并行执行
             decision, stock_context = await asyncio.gather(
-                self._refine_decision(message, decision, llm_client, model),
+                self._refine_decision(message, decision, settings),
                 self._resolve_stocks(message),
             )
             async with aclosing(self._stream_orchestrated_response(

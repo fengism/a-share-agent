@@ -125,6 +125,8 @@ def test_lifecycle_registers_stock_valuation_snapshot_refresh() -> None:
         market_daily_backfill_worker=MagicMock(),
         sge_gold_snapshot_refresh=MagicMock(),
         tdxhub_bestip_refresh=MagicMock(),
+        macro_analysis_prewarm=MagicMock(),
+        daily_review_prewarm=MagicMock(),
         stock_valuation_snapshot_refresh=MagicMock(),
         bot_job_worker=MagicMock(),
         quant_strategy_reload=MagicMock(),

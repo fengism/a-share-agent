@@ -31,6 +31,8 @@ INDEX_INTRADAY = TtlPolicy(ttl_seconds=30)
 STOCK_INTRADAY = TtlPolicy(ttl_seconds=30)
 THS_HOT_RANK = TtlPolicy(ttl_seconds=5 * 60)
 MARKET_LIMIT_HISTORY = TtlPolicy(ttl_seconds=24 * 60 * 60)
+# 炸板池盘中会持续变化，而复盘只在收盘后取用，30 分钟缓存兼顾新鲜度与上游压力。
+MARKET_LIMIT_BREAK_POOL = TtlPolicy(ttl_seconds=30 * 60)
 MARKET_SECTOR_STOCKS_HISTORY = TtlPolicy(ttl_seconds=24 * 60 * 60)
 BASIC_INFO_FINAL = TtlPolicy(ttl_seconds=5 * 60)
 BASIC_INFO_STATIC = TtlPolicy(ttl_seconds=24 * 60 * 60)

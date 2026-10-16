@@ -5,6 +5,7 @@ from app.modules.daily_review.pdf_service import (
     generate_daily_review_pdf_html,
     render_daily_review_pdf_bytes,
 )
+from app.modules.daily_review.pipeline import prewarm_daily_review
 from app.modules.daily_review.schemas import DailyReviewHistoryItem, DailyReviewRequest
 from app.modules.daily_review.service import (
     generate_daily_review,
@@ -24,6 +25,7 @@ __all__ = [
     "get_daily_review_record",
     "list_daily_review_history",
     "load_daily_review",
+    "prewarm_daily_review",
     "remove_daily_review",
     "render_daily_review_pdf_bytes",
 ]

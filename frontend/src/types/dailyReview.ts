@@ -38,6 +38,7 @@ export interface DailyReviewDataSnapshot {
   bottom_sectors: Record<string, unknown>[];
   market_volume: Record<string, unknown>;
   macro_data: Record<string, unknown>;
+  macro_analysis?: Record<string, unknown>;
 }
 
 export interface DailyReviewEventImpact {
@@ -54,6 +55,86 @@ export interface DailyReviewEventImpact {
   invalidation_conditions: string[];
 }
 
+export interface DailyReviewSentimentCycle {
+  stage: "冰点" | "修复回暖" | "主升共振" | "高位分化" | "退潮杀跌";
+  ladder_health?: string;
+  evidence: string[];
+}
+
+export interface DailyReviewScenario {
+  name: "超预期" | "符合预期" | "低于预期";
+  trigger?: string;
+  playbook?: string;
+  watch_levels: string[];
+}
+
+export interface DailyReviewWatchItem {
+  name: string;
+  code?: string;
+  role: "总龙头" | "连板最高板" | "中军容量票" | "负反馈票";
+  reason?: string;
+  trigger?: string;
+}
+
+export interface DailyReviewWatchCheck {
+  name: string;
+  code?: string;
+  role?: string;
+  change_pct?: number | null;
+  hit: boolean;
+  limit_up: boolean;
+  missing: boolean;
+}
+
+export interface DailyReviewIndexCheck {
+  code?: string;
+  name: string;
+  previous_change_pct?: number | null;
+  change_pct?: number | null;
+}
+
+export interface DailyReviewPreviousCheck {
+  review_date: string;
+  verified_date: string;
+  indices?: DailyReviewIndexCheck[];
+  watchlist?: DailyReviewWatchCheck[];
+  hit_count: number;
+  checked_count: number;
+  hit_rate?: number | null;
+  previous_stage?: string;
+  limit_up_count?: number | null;
+  previous_limit_up_count?: number | null;
+  limit_up_delta?: number | null;
+  note?: string;
+}
+
+export interface CycleTrendPoint {
+  date: string;
+  stage?: string;
+  ladder_health?: string;
+  limit_up_count?: number | null;
+  limit_down_count?: number | null;
+  break_rate?: number | null;
+  up_down_ratio?: number | null;
+  index_change_pct?: number | null;
+  next_index_change_pct?: number | null;
+  stage_transition?: string;
+}
+
+export interface CycleStageStat {
+  stage: string;
+  occurrences: number;
+  next_day_up_ratio?: number | null;
+  avg_next_day_index_change_pct?: number | null;
+  avg_limit_up_delta?: number | null;
+}
+
+export interface CycleTrend {
+  points?: CycleTrendPoint[];
+  stage_stats?: CycleStageStat[];
+  note?: string;
+}
+
 export interface DailyReviewResult {
   schema_version?: number;
   date: string;
@@ -63,6 +144,7 @@ export interface DailyReviewResult {
   quality_status?: "complete" | "degraded";
   generation_status?: "llm" | "fallback";
   warnings?: string[];
+  notes?: string[];
   source_errors?: Record<string, string>;
   llm_error?: string;
   market_state?: "attack" | "balanced" | "defensive" | "unknown";
@@ -79,6 +161,12 @@ export interface DailyReviewResult {
   dragon_tiger_review: DailyReviewSection;
   news_policy_review?: DailyReviewSection;
   event_impacts?: DailyReviewEventImpact[];
+  sentiment_cycle?: DailyReviewSentimentCycle | null;
+  scenario_plans?: DailyReviewScenario[];
+  next_day_watchlist?: DailyReviewWatchItem[];
+  key_levels?: string[];
+  previous_review_check?: DailyReviewPreviousCheck | null;
+  cycle_trend?: CycleTrend | null;
   risk_alerts: string[];
   opportunities: string[];
   strategy_notes: string[];

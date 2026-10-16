@@ -1635,6 +1635,8 @@ export interface paths {
         /**
          * Get Macro Analysis
          * @description 获取宏观 AI 解读：综述与按时间梳理的事件系列（历史条目走缓存）。
+         *
+         *     命中未解读的新条目时顺带触发后台预热，新条目数秒内即可补齐 AI 解读。
          */
         get: operations["get_macro_analysis_api_macro_analysis_get"];
         put?: never;
@@ -5759,6 +5761,10 @@ export interface components {
             llm_model: string;
             /** Llm Provider */
             llm_provider: string;
+            /** Llm Simple Tasks */
+            llm_simple_tasks: string;
+            /** Llm Sub Model */
+            llm_sub_model: string;
             /** Llm Temperature */
             llm_temperature: number;
             /** Market Daily Attempt Retention Days */
@@ -5940,6 +5946,10 @@ export interface components {
             llm_model?: string | null;
             /** Llm Provider */
             llm_provider?: string | null;
+            /** Llm Simple Tasks */
+            llm_simple_tasks?: string | null;
+            /** Llm Sub Model */
+            llm_sub_model?: string | null;
             /** Llm Temperature */
             llm_temperature?: number | null;
             /** Market Daily Attempt Retention Days */
@@ -6174,6 +6184,72 @@ export interface components {
             source: string;
         };
         /**
+         * CycleStageStat
+         * @description 同一情绪阶段的次日表现统计（阶段胜率）。
+         */
+        CycleStageStat: {
+            /** Avg Limit Up Delta */
+            avg_limit_up_delta?: number | null;
+            /** Avg Next Day Index Change Pct */
+            avg_next_day_index_change_pct?: number | null;
+            /** Next Day Up Ratio */
+            next_day_up_ratio?: number | null;
+            /**
+             * Occurrences
+             * @default 0
+             */
+            occurrences: number;
+            /** Stage */
+            stage: string;
+        };
+        /** CycleTrend */
+        CycleTrend: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Points */
+            points?: components["schemas"]["CycleTrendPoint"][];
+            /** Stage Stats */
+            stage_stats?: components["schemas"]["CycleStageStat"][];
+        };
+        /**
+         * CycleTrendPoint
+         * @description 情绪周期趋势上的单个交易日。
+         */
+        CycleTrendPoint: {
+            /** Break Rate */
+            break_rate?: number | null;
+            /** Date */
+            date: string;
+            /** Index Change Pct */
+            index_change_pct?: number | null;
+            /**
+             * Ladder Health
+             * @default
+             */
+            ladder_health: string;
+            /** Limit Down Count */
+            limit_down_count?: number | null;
+            /** Limit Up Count */
+            limit_up_count?: number | null;
+            /** Next Index Change Pct */
+            next_index_change_pct?: number | null;
+            /**
+             * Stage
+             * @default
+             */
+            stage: string;
+            /**
+             * Stage Transition
+             * @default
+             */
+            stage_transition: string;
+            /** Up Down Ratio */
+            up_down_ratio?: number | null;
+        };
+        /**
          * DCFScenario
          * @description Purpose: DCF 单一情景的核心假设与估值结果。
          */
@@ -6282,8 +6358,16 @@ export interface components {
             hot_stocks?: components["schemas"]["HotRankSnapshotItem"][];
             /** Indices */
             indices?: components["schemas"]["IndexSnapshotItem"][];
+            /** Limit Break Pool */
+            limit_break_pool?: {
+                [key: string]: unknown;
+            };
             /** Limit Up Ladder */
             limit_up_ladder?: {
+                [key: string]: unknown;
+            };
+            /** Macro Analysis */
+            macro_analysis?: {
                 [key: string]: unknown;
             };
             /** Macro Data */
@@ -6379,6 +6463,65 @@ export interface components {
             title: string;
         };
         /**
+         * DailyReviewIndexCheck
+         * @description 指数次日验证：复盘日涨跌幅 vs 次日实际涨跌幅。
+         */
+        DailyReviewIndexCheck: {
+            /** Change Pct */
+            change_pct?: number | null;
+            /**
+             * Code
+             * @default
+             */
+            code: string;
+            /** Name */
+            name: string;
+            /** Previous Change Pct */
+            previous_change_pct?: number | null;
+        };
+        /**
+         * DailyReviewPreviousCheck
+         * @description 上一交易日复盘的次日验证结果（复盘闭环的输入）。
+         */
+        DailyReviewPreviousCheck: {
+            /**
+             * Checked Count
+             * @default 0
+             */
+            checked_count: number;
+            /**
+             * Hit Count
+             * @default 0
+             */
+            hit_count: number;
+            /** Hit Rate */
+            hit_rate?: number | null;
+            /** Indices */
+            indices?: components["schemas"]["DailyReviewIndexCheck"][];
+            /** Limit Up Count */
+            limit_up_count?: number | null;
+            /** Limit Up Delta */
+            limit_up_delta?: number | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Previous Limit Up Count */
+            previous_limit_up_count?: number | null;
+            /**
+             * Previous Stage
+             * @default
+             */
+            previous_stage: string;
+            /** Review Date */
+            review_date: string;
+            /** Verified Date */
+            verified_date: string;
+            /** Watchlist */
+            watchlist?: components["schemas"]["DailyReviewWatchCheck"][];
+        };
+        /**
          * DailyReviewRequest
          * @description Purpose: 每日复盘接口的请求参数。
          */
@@ -6393,6 +6536,7 @@ export interface components {
         };
         /** DailyReviewResult */
         DailyReviewResult: {
+            cycle_trend?: components["schemas"]["CycleTrend"] | null;
             /** Data Gaps */
             data_gaps?: string[];
             data_snapshot: components["schemas"]["DailyReviewDataSnapshot"];
@@ -6418,6 +6562,8 @@ export interface components {
             index_review: components["schemas"]["DailyReviewSection"];
             /** Invalid Conditions */
             invalid_conditions?: string[];
+            /** Key Levels */
+            key_levels?: string[];
             /**
              * Llm Error
              * @default
@@ -6437,6 +6583,10 @@ export interface components {
             /** Market Summary */
             market_summary: string;
             news_policy_review?: components["schemas"]["DailyReviewSection"];
+            /** Next Day Watchlist */
+            next_day_watchlist?: components["schemas"]["DailyReviewWatchItem"][];
+            /** Notes */
+            notes?: string[];
             /** Opportunities */
             opportunities?: string[];
             /**
@@ -6444,6 +6594,7 @@ export interface components {
              * @default
              */
             position_range: string;
+            previous_review_check?: components["schemas"]["DailyReviewPreviousCheck"] | null;
             prompt_trace?: components["schemas"]["PromptTrace"] | null;
             /**
              * Quality Status
@@ -6458,11 +6609,14 @@ export interface components {
             requested_date: string;
             /** Risk Alerts */
             risk_alerts?: string[];
+            /** Scenario Plans */
+            scenario_plans?: components["schemas"]["DailyReviewScenario"][];
             /**
              * Schema Version
-             * @default 5
+             * @default 8
              */
             schema_version: number;
+            sentiment_cycle?: components["schemas"]["DailyReviewSentimentCycle"] | null;
             /**
              * Session Status
              * @default completed
@@ -6480,6 +6634,29 @@ export interface components {
             /** Warnings */
             warnings?: string[];
         };
+        /**
+         * DailyReviewScenario
+         * @description 次日三情景（超预期 / 符合预期 / 低于预期）应对预案。
+         */
+        DailyReviewScenario: {
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "超预期" | "符合预期" | "低于预期";
+            /**
+             * Playbook
+             * @default
+             */
+            playbook: string;
+            /**
+             * Trigger
+             * @default
+             */
+            trigger: string;
+            /** Watch Levels */
+            watch_levels?: string[];
+        };
         /** DailyReviewSection */
         DailyReviewSection: {
             /** Bullets */
@@ -6488,6 +6665,24 @@ export interface components {
             summary: string;
             /** Title */
             title: string;
+        };
+        /**
+         * DailyReviewSentimentCycle
+         * @description 短线情绪周期定位（复盘深度的核心判断）。
+         */
+        DailyReviewSentimentCycle: {
+            /** Evidence */
+            evidence?: string[];
+            /**
+             * Ladder Health
+             * @default
+             */
+            ladder_health: string;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "冰点" | "修复回暖" | "主升共振" | "高位分化" | "退潮杀跌";
         };
         /** DailyReviewSourceStatus */
         DailyReviewSourceStatus: {
@@ -6522,6 +6717,70 @@ export interface components {
              * @enum {string}
              */
             status: "complete" | "partial" | "unavailable";
+        };
+        /**
+         * DailyReviewWatchCheck
+         * @description 单只观察标的的次日验证结果。
+         */
+        DailyReviewWatchCheck: {
+            /** Change Pct */
+            change_pct?: number | null;
+            /**
+             * Code
+             * @default
+             */
+            code: string;
+            /**
+             * Hit
+             * @default false
+             */
+            hit: boolean;
+            /**
+             * Limit Up
+             * @default false
+             */
+            limit_up: boolean;
+            /**
+             * Missing
+             * @default false
+             */
+            missing: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @default
+             */
+            role: string;
+        };
+        /**
+         * DailyReviewWatchItem
+         * @description 次日盯盘锚点个股。
+         */
+        DailyReviewWatchItem: {
+            /**
+             * Code
+             * @default
+             */
+            code: string;
+            /** Name */
+            name: string;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /**
+             * Role
+             * @default 总龙头
+             * @enum {string}
+             */
+            role: "总龙头" | "连板最高板" | "中军容量票" | "负反馈票";
+            /**
+             * Trigger
+             * @default
+             */
+            trigger: string;
         };
         /** DataGap */
         DataGap: {
@@ -9144,6 +9403,11 @@ export interface components {
              * @default
              */
             interpretation: string;
+            /**
+             * Pending
+             * @default false
+             */
+            pending: boolean;
             /** Refs */
             refs?: components["schemas"]["MacroAnalysisRef"][];
             /**
@@ -9187,6 +9451,11 @@ export interface components {
              * @default
              */
             generated_at: string;
+            /**
+             * Pending Count
+             * @default 0
+             */
+            pending_count: number;
             /**
              * Period
              * @default

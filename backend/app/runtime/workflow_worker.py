@@ -146,8 +146,11 @@ async def process_next_workflow_job(
             result = await screen_candidates_by_strategy(ScreenerStrategyRequest.model_validate(job.request), emit)
             await emit({"type": "complete", "result": result.model_dump(mode="json")})
         elif job.kind == "daily_review":
-            await emit({"type": "stage_started", "stage": "generate", "message": "正在生成每日复盘"})
-            result = await generate_daily_review(DailyReviewRequest.model_validate(job.request), job.user_id)
+            result = await generate_daily_review(
+                DailyReviewRequest.model_validate(job.request),
+                job.user_id,
+                progress_callback=emit,
+            )
             await emit({"type": "complete", "result": result.model_dump(mode="json")})
         else:
             raise ValueError(f"不支持的 Workflow 类型: {job.kind}")

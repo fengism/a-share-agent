@@ -94,6 +94,14 @@ function formatDate(value: dayjs.Dayjs | null) {
   return value?.format("YYYY-MM-DD") ?? "";
 }
 
+// 复盘自检/趋势里的涨跌幅：后端给的是百分数（如 3.2 表示 +3.20%）。
+function formatSignedPct(value?: number | null): string {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "—";
+  }
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
 function buildMoodSummary(review: NonNullable<ReturnType<typeof useDailyReview>["data"]>) {
   const rising = review.data_snapshot.indices.filter((item) => Number(item.change_pct ?? 0) > 0).length;
   const falling = review.data_snapshot.indices.filter((item) => Number(item.change_pct ?? 0) < 0).length;
@@ -205,6 +213,135 @@ function buildDailyReviewMarkdown(review: NonNullable<ReturnType<typeof useDaily
     if (review.strategy_notes?.length) {
       parts.push(`- **策略建议**：${review.strategy_notes.join("；")}`);
     }
+    parts.push("");
+  }
+
+  if (review.sentiment_cycle) {
+    parts.push(`## 情绪周期定位：${review.sentiment_cycle.stage}\n`);
+    if (review.sentiment_cycle.ladder_health) {
+      parts.push(`- 梯队健康度：${review.sentiment_cycle.ladder_health}`);
+    }
+    for (const item of review.sentiment_cycle.evidence ?? []) {
+      parts.push(`- 依据：${item}`);
+    }
+    parts.push("");
+  }
+
+  if (review.scenario_plans?.length) {
+    parts.push("## 明日三情景预案\n");
+    for (const scenario of review.scenario_plans) {
+      parts.push(`- **${scenario.name}**：触发 ${scenario.trigger || "待补充"}；应对 ${scenario.playbook || "待补充"}`);
+      if (scenario.watch_levels?.length) {
+        parts.push(`  - 观察信号：${scenario.watch_levels.join("；")}`);
+      }
+    }
+    parts.push("");
+  }
+
+  if (review.next_day_watchlist?.length) {
+    parts.push("## 次日观察锚点\n");
+    parts.push(
+      review.next_day_watchlist
+        .map((item) => `- **${item.name}**（${item.role}）：${item.reason || "待补充"}；触发 ${item.trigger || "待补充"}`)
+        .join("\n"),
+    );
+    parts.push("");
+  }
+
+  if (review.key_levels?.length) {
+    parts.push("## 关键点位与量能阈值\n");
+    parts.push(review.key_levels.map((item) => `- ${item}`).join("\n"));
+    parts.push("");
+  }
+
+  const check = review.previous_review_check;
+  if (check) {
+    parts.push(`## 上一交易日复盘自检（${check.review_date} → ${check.verified_date}）\n`);
+    if (check.previous_stage) {
+      parts.push(`- 上一交易日周期定位：${check.previous_stage}`);
+    }
+    if (check.previous_limit_up_count != null && check.limit_up_count != null) {
+      parts.push(`- 涨停家数：${check.previous_limit_up_count} → ${check.limit_up_count}`);
+    }
+    for (const index of check.indices ?? []) {
+      if (index.change_pct == null && index.previous_change_pct == null) {
+        continue;
+      }
+      parts.push(`- ${index.name}：${formatSignedPct(index.previous_change_pct)} → ${formatSignedPct(index.change_pct)}`);
+    }
+    for (const item of check.watchlist ?? []) {
+      if (item.missing) {
+        parts.push(`- ${item.name}：次日行情缺失`);
+        continue;
+      }
+      const limitUp = item.limit_up ? "，次日涨停" : "";
+      parts.push(`- ${item.name}：次日 ${formatSignedPct(item.change_pct)}${limitUp}（${item.hit ? "命中" : "落空"}）`);
+    }
+    if (check.checked_count) {
+      parts.push(`- 观察标的命中率：${check.hit_count}/${check.checked_count}`);
+    }
+    if (check.note) {
+      parts.push(`- 说明：${check.note}`);
+    }
+    parts.push("");
+  }
+
+  const trend = review.cycle_trend;
+  if (trend?.points?.length) {
+    parts.push("## 情绪周期历史趋势\n");
+    for (const point of trend.points.slice(-10)) {
+      const bits = [point.date, point.stage || "未定位"];
+      if (point.limit_up_count != null) {
+        bits.push(`涨停 ${point.limit_up_count} 家`);
+      }
+      if (point.break_rate != null) {
+        bits.push(`炸板率 ${(point.break_rate * 100).toFixed(1)}%`);
+      }
+      if (point.index_change_pct != null) {
+        bits.push(`指数 ${formatSignedPct(point.index_change_pct)}`);
+      }
+      if (point.next_index_change_pct != null) {
+        bits.push(`次日指数 ${formatSignedPct(point.next_index_change_pct)}`);
+      }
+      if (point.stage_transition) {
+        bits.push(point.stage_transition);
+      }
+      parts.push(`- ${bits.join("；")}`);
+    }
+    for (const stat of trend.stage_stats ?? []) {
+      parts.push(`- 阶段统计：${stat.stage} 出现 ${stat.occurrences} 次`);
+    }
+    if (trend.note) {
+      parts.push(`- 说明：${trend.note}`);
+    }
+    parts.push("");
+  }
+
+  const sourceStatus = review.data_snapshot?.source_status;
+  if (sourceStatus && Object.keys(sourceStatus).length) {
+    parts.push("## 复盘数据状态\n");
+    parts.push(
+      Object.entries(sourceStatus)
+        .map(([name, status]) => {
+          const label = status.status === "complete" ? "完整" : status.status === "partial" ? "部分" : "不可用";
+          const dataDate = status.data_date ? `（数据日期 ${status.data_date}）` : "";
+          const error = status.error ? ` — ${status.error}` : "";
+          return `- ${name}：${label}${dataDate}${error}`;
+        })
+        .join("\n"),
+    );
+    parts.push("");
+  }
+
+  if (review.warnings?.length) {
+    parts.push("## 数据核验警告\n");
+    parts.push(review.warnings.map((warning) => `- ⚠️ ${warning}`).join("\n"));
+    parts.push("");
+  }
+
+  if (review.notes?.length) {
+    parts.push("## 数据说明\n");
+    parts.push(review.notes.map((note) => `- ${note}`).join("\n"));
     parts.push("");
   }
 
@@ -573,6 +710,18 @@ export default function DailyReviewPage() {
                   )}
                 />
               )}
+              {review.notes?.length ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  title="部分辅助数据缺失（不影响复盘结论）"
+                  description={(
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {review.notes.map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  )}
+                />
+              ) : null}
               <Card style={{ ...cardStyle, borderLeft: `4px solid ${c.primary}`, background: `linear-gradient(135deg, color-mix(in srgb, ${c.primary} 6%, ${c.cardBg}), ${c.cardBg})` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
                   <Title level={4} style={{ marginTop: 0, marginBottom: 8 }}>{review.title}</Title>
@@ -655,6 +804,160 @@ export default function DailyReviewPage() {
                   </Space>
                 </Card>
               )}
+              {review.sentiment_cycle ? (
+                <Card title="情绪周期定位" style={cardStyle}>
+                  <Space wrap>
+                    <Tag color="processing" style={{ fontSize: "var(--c-font-base)" }}>{review.sentiment_cycle.stage}</Tag>
+                    {review.sentiment_cycle.ladder_health ? (
+                      <Text type="secondary">梯队健康度：{review.sentiment_cycle.ladder_health}</Text>
+                    ) : null}
+                  </Space>
+                  {review.sentiment_cycle.evidence?.length ? (
+                    <ul style={{ margin: "10px 0 0", paddingLeft: 18 }}>
+                      {review.sentiment_cycle.evidence.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </Card>
+              ) : null}
+
+              {review.scenario_plans?.length ? (
+                <Card title="明日三情景预案" style={cardStyle}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+                    {review.scenario_plans.map((scenario) => (
+                      <div key={scenario.name} style={{ padding: "10px 12px", borderRadius: "var(--c-radius-md)", background: c.nestedBg }}>
+                        <Text strong>{scenario.name}</Text>
+                        <Paragraph style={{ margin: "6px 0 0" }}><Text strong>触发：</Text>{scenario.trigger || "待补充"}</Paragraph>
+                        <Paragraph style={{ margin: "4px 0 0" }}><Text strong>应对：</Text>{scenario.playbook || "待补充"}</Paragraph>
+                        {scenario.watch_levels?.length ? (
+                          <Paragraph type="secondary" style={{ margin: "4px 0 0" }}>观察信号：{scenario.watch_levels.join("；")}</Paragraph>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ) : null}
+
+              {review.next_day_watchlist?.length ? (
+                <Card title="次日观察锚点" style={cardStyle}>
+                  <Space direction="vertical" style={{ width: "100%" }} size={8}>
+                    {review.next_day_watchlist.map((item) => (
+                      <div key={`${item.name}-${item.role}`} style={{ padding: "8px 12px", borderRadius: "var(--c-radius-md)", background: c.nestedBg }}>
+                        <Space wrap>
+                          <Text strong>{item.name}</Text>
+                          <Tag color="blue">{item.role}</Tag>
+                        </Space>
+                        <Paragraph style={{ margin: "6px 0 0" }}>{item.reason || "待补充"}</Paragraph>
+                        <Paragraph type="secondary" style={{ margin: "4px 0 0" }}>触发：{item.trigger || "待补充"}</Paragraph>
+                      </div>
+                    ))}
+                  </Space>
+                </Card>
+              ) : null}
+
+              {review.key_levels?.length ? (
+                <Card title="关键点位与量能阈值" style={cardStyle}>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {review.key_levels.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </Card>
+              ) : null}
+
+              {review.previous_review_check ? (
+                <Card title="上一交易日复盘自检" style={cardStyle}>
+                  <Space wrap style={{ marginBottom: 10 }}>
+                    <Text type="secondary">
+                      {review.previous_review_check.review_date} 复盘 → {review.previous_review_check.verified_date} 实际表现
+                    </Text>
+                    {review.previous_review_check.previous_stage ? (
+                      <Tag color="purple">昨日周期：{review.previous_review_check.previous_stage}</Tag>
+                    ) : null}
+                    {review.previous_review_check.checked_count ? (
+                      <Tag color="blue">
+                        命中 {review.previous_review_check.hit_count}/{review.previous_review_check.checked_count}
+                      </Tag>
+                    ) : (
+                      <Tag>暂无可核验行情</Tag>
+                    )}
+                    {review.previous_review_check.limit_up_delta != null ? (
+                      <Tag color={review.previous_review_check.limit_up_delta >= 0 ? "red" : "green"}>
+                        涨停家数 {review.previous_review_check.previous_limit_up_count} →{' '}
+                        {review.previous_review_check.limit_up_count}
+                      </Tag>
+                    ) : null}
+                  </Space>
+                  <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                    {(review.previous_review_check.watchlist ?? []).map((item) => (
+                      <div key={`${item.name}-${item.code ?? ""}`} style={{ padding: "8px 12px", borderRadius: "var(--c-radius-md)", background: c.nestedBg }}>
+                        <Space wrap>
+                          <Text strong>{item.name}</Text>
+                          {item.code ? <Text type="secondary">{item.code}</Text> : null}
+                          {item.missing ? (
+                            <Tag>次日行情缺失</Tag>
+                          ) : (
+                            <Tag color={item.hit ? "red" : "green"}>{formatSignedPct(item.change_pct)}</Tag>
+                          )}
+                          {item.limit_up ? <Tag color="volcano">涨停</Tag> : null}
+                        </Space>
+                      </div>
+                    ))}
+                    {(review.previous_review_check.indices ?? []).map((item) => (
+                      <Text key={`${item.name}-${item.code ?? ""}`} type="secondary">
+                        {item.name}：{formatSignedPct(item.previous_change_pct)} → {formatSignedPct(item.change_pct)}
+                      </Text>
+                    ))}
+                  </Space>
+                  {review.previous_review_check.note ? (
+                    <Paragraph type="secondary" style={{ margin: "10px 0 0" }}>{review.previous_review_check.note}</Paragraph>
+                  ) : null}
+                </Card>
+              ) : null}
+
+              {review.cycle_trend?.points?.length ? (
+                <Card title="情绪周期历史趋势" style={cardStyle}>
+                  {review.cycle_trend.note ? (
+                    <Paragraph type="secondary" style={{ marginTop: 0 }}>{review.cycle_trend.note}</Paragraph>
+                  ) : null}
+                  <Space wrap>
+                    {(review.cycle_trend.points ?? []).slice(-10).map((point) => (
+                      <div key={point.date} style={{ padding: "8px 12px", borderRadius: "var(--c-radius-md)", background: c.nestedBg }}>
+                        <Space size={4} wrap>
+                          <Text strong>{point.stage || "未定位"}</Text>
+                          <Text type="secondary">{point.date.slice(5)}</Text>
+                          {point.stage_transition ? (
+                            <Tag color={point.stage_transition === "升级" ? "red" : point.stage_transition === "降级" ? "green" : "default"}>
+                              {point.stage_transition}
+                            </Tag>
+                          ) : null}
+                        </Space>
+                        <div>
+                          <Text type="secondary">
+                            涨停 {point.limit_up_count ?? "-"} 家
+                            {point.break_rate != null ? ` ｜ 炸板率 ${(point.break_rate * 100).toFixed(1)}%` : ""}
+                            {point.index_change_pct != null ? ` ｜ 指数 ${formatSignedPct(point.index_change_pct)}` : ""}
+                            {point.next_index_change_pct != null ? ` ｜ 次日 ${formatSignedPct(point.next_index_change_pct)}` : ""}
+                          </Text>
+                        </div>
+                      </div>
+                    ))}
+                  </Space>
+                  {review.cycle_trend.stage_stats?.length ? (
+                    <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                      {review.cycle_trend.stage_stats.map((stat) => (
+                        <Text key={stat.stage} type="secondary">
+                          {stat.stage}：出现 {stat.occurrences} 次
+                          {stat.next_day_up_ratio != null ? `，次日指数上涨比例 ${(stat.next_day_up_ratio * 100).toFixed(0)}%` : ""}
+                          {stat.avg_next_day_index_change_pct != null ? `，平均次日 ${formatSignedPct(stat.avg_next_day_index_change_pct)}` : ""}
+                        </Text>
+                      ))}
+                    </div>
+                  ) : null}
+                </Card>
+              ) : null}
+
               {review.llm_review ? (
                 <Card title="复盘报告" style={{ ...cardStyle, background: c.nestedBg }}>
                   <div className="daily-review-markdown">

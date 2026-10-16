@@ -32,6 +32,7 @@ from app.financial_data.market.public import (
     get_treasury_yield_curve as get_treasury_yield_curve_service,
 )
 from app.financial_data.market.public import get_us_macro_data as get_us_macro_data_service
+from app.financial_data.market.public import trigger_macro_prewarm as trigger_macro_prewarm_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -58,8 +59,14 @@ async def get_macro_feed(
 async def get_macro_analysis(
     days: int = Query(31, ge=1, le=180, description="回溯自然日天数"),
 ):
-    """获取宏观 AI 解读：综述与按时间梳理的事件系列（历史条目走缓存）。"""
-    return await get_macro_analysis_service(days=days)
+    """获取宏观 AI 解读：综述与按时间梳理的事件系列（历史条目走缓存）。
+
+    命中未解读的新条目时顺带触发后台预热，新条目数秒内即可补齐 AI 解读。
+    """
+    response = await get_macro_analysis_service(days=days)
+    if response.pending_count:
+        trigger_macro_prewarm_service(days)
+    return response
 
 
 @router.get("/us", response_model=MacroUsDataResponse)

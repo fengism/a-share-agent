@@ -143,6 +143,7 @@ async def analyze_twitter_content(username: str, items: list[dict], settings: Se
         temperature=0.3,
         json_format=True,
         settings=settings,
+        task="twitter_analysis",
     )
     if not raw or not raw.strip():
         raise RuntimeError("大模型返回了空的 Twitter 分析结果")

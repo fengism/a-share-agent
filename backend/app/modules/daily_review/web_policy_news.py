@@ -10,10 +10,14 @@ from typing import Any, cast
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
+from app.core.cache import analysis_cache
 from app.core.news import dedupe_news_items, parse_news_datetime
 from app.domain.news import NewsSearchItem
 
 _MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
+# 同一复盘日的政策新闻搜索结果在进程内复用 6 小时：单次生成会打 3 次外部搜索，
+# 同日多用户/重复生成时不必重复打。空结果不写入缓存，避免把一次超时固化 6 小时。
+_POLICY_NEWS_CACHE_TTL_SECONDS = 6 * 60 * 60.0
 _SEARCH_QUERIES = (
     "A股 财经 政策 央行 证监会 国务院",
     "中国 宏观经济 产业政策 行业政策 资本市场",
@@ -134,6 +138,17 @@ def search_results_to_news(results: list[dict[str, Any]], target_date: date) -> 
 
 async def search_financial_policy_news(target_date: date) -> list[NewsSearchItem]:
     """搜索复盘日前后两天的财经政策新闻；失败时返回空列表交由质量状态展示。"""
+    cache_key = f"daily_review_policy_news:{target_date.isoformat()}"
+    cached = analysis_cache.get(cache_key)
+    if isinstance(cached, list):
+        return cast(list[NewsSearchItem], cached)
+    news = await _search_financial_policy_news_uncached(target_date)
+    if news:
+        analysis_cache.set(cache_key, news, _POLICY_NEWS_CACHE_TTL_SECONDS)
+    return news
+
+
+async def _search_financial_policy_news_uncached(target_date: date) -> list[NewsSearchItem]:
     from app.agentic.tools.packs.web.search import execute_web_search
 
     start = target_date.fromordinal(target_date.toordinal() - 2)

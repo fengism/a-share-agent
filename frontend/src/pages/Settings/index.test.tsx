@@ -145,7 +145,30 @@ vi.mock("./ConfigCards", async () => {
     </div>
   ),
   IwencaiConfigCard: () => null,
-  LlmConfigCard: () => null,
+  LlmConfigCard: ({ form, onChange, onSave, isDirty, onReset }: {
+    form: ConfigUpdate;
+    onChange: (patch: ConfigUpdate) => void;
+    onSave: () => void;
+    isDirty?: boolean;
+    onReset?: () => void;
+  }) => (
+    <div>
+      <input
+        aria-label="子模型"
+        value={form.llm_sub_model || ""}
+        onChange={(event) => onChange({ llm_sub_model: event.target.value })}
+      />
+      <input
+        aria-label="子模型任务清单"
+        value={form.llm_simple_tasks || ""}
+        onChange={(event) => onChange({ llm_simple_tasks: event.target.value })}
+      />
+      <button type="button" onClick={onSave}>保存大模型配置</button>
+      {isDirty && onReset && (
+        <button type="button" onClick={onReset}>撤销更改</button>
+      )}
+    </div>
+  ),
   NotionConfigCard: () => null,
   ProviderDefaultsCard: () => null,
   TwitterConfigCard: () => null,
@@ -167,6 +190,8 @@ let config: ConfigData = {
   llm_api_key: "",
   llm_base_url: "https://api.example.com",
   llm_model: "model",
+  llm_sub_model: "",
+  llm_simple_tasks: "",
   llm_temperature: 0.1,
   feishu_enabled: false,
   feishu_app_id: "",
@@ -546,6 +571,69 @@ describe("SettingsPage Bot config", () => {
     fireEvent.click(revertBtns[0]);
 
     // 应该恢复并隐藏撤销按钮
+    expect(screen.queryAllByRole("button", { name: "撤销更改" })).toHaveLength(0);
+    queryClient.clear();
+  });
+
+  it("saves the sub-model fields with the LLM config", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "AI 模型配置" }));
+    fireEvent.change(await screen.findByLabelText("子模型"), { target: { value: "fast-model" } });
+    fireEvent.change(screen.getByLabelText("子模型任务清单"), { target: { value: "macro_item,chat_routing" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存大模型配置" }));
+
+    expect(mocks.mutateConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        llm_model: "model",
+        llm_sub_model: "fast-model",
+        llm_simple_tasks: "macro_item,chat_routing",
+      }),
+      expect.anything(),
+    );
+    queryClient.clear();
+  });
+
+  it("reverts unsaved sub-model edits back to the saved values", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "AI 模型配置" }));
+    const input = await screen.findByLabelText("子模型");
+
+    // 初始状态没有未保存修改，撤销按钮不出现
+    expect(screen.queryAllByRole("button", { name: "撤销更改" })).toHaveLength(0);
+
+    fireEvent.change(input, { target: { value: "fast-model" } });
+    expect(screen.getByLabelText("子模型")).toHaveValue("fast-model");
+
+    fireEvent.click(screen.getByRole("button", { name: "撤销更改" }));
+
+    // 撤销后回到上次保存的值（空），撤销按钮随之消失
+    await waitFor(() => {
+      expect(screen.getByLabelText("子模型")).toHaveValue("");
+    });
     expect(screen.queryAllByRole("button", { name: "撤销更改" })).toHaveLength(0);
     queryClient.clear();
   });

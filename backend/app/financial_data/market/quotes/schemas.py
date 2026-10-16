@@ -382,6 +382,32 @@ class MarketLimitUpLadderResponse(BaseModel):
     sectors: list[MarketLimitUpLadderSector] = Field(default_factory=list)
 
 
+class MarketLimitBreakPoolItem(BaseModel):
+    """单只炸板（涨停被打开）股票。
+
+    ``open_times`` 为当日开板次数，是上游给出的炸板强度指标；同一只股票当日
+    可能多次炸板，因此该字段取值大于等于 1。
+    """
+
+    code: str = ""
+    name: str = ""
+    open_times: int = 0
+    price: float | None = None
+    change_pct: float | None = None
+    turnover_rate: float | None = None
+    turnover: float | None = None
+
+
+class MarketLimitBreakPoolResponse(BaseModel):
+    """炸板股票池，用于计算复盘中的炸板数与炸板率。"""
+
+    source: Literal["fuyao"] = "fuyao"
+    date: str
+    fetched_at: str
+    total: int = 0
+    items: list[MarketLimitBreakPoolItem] = Field(default_factory=list)
+
+
 MarketLimitHistoryCategory = Literal["limit_up", "limit_down", "wind_vane"]
 
 

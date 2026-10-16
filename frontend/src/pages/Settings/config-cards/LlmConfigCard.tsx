@@ -207,6 +207,36 @@ export default function LlmConfigCard({
             onChange={(value) => onChange({ llm_temperature: value })}
           />
         </Col>
+        <Col span={24}>
+          <div style={fieldLabelStyle}>子模型（简单任务，可选）</div>
+          <AutoComplete
+            aria-label="子模型"
+            style={{ width: "100%" }}
+            value={form.llm_sub_model || ""}
+            onChange={(value) => onChange({ llm_sub_model: value })}
+            options={(fetchedModels ?? recommendedModels).map((m) => ({ value: m }))}
+            filterOption={(input, option) =>
+              String(option?.value ?? "").toLowerCase().includes(input.toLowerCase())
+            }
+            placeholder="留空则复用主模型"
+            allowClear
+          />
+          <div style={{ marginTop: 4, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+            高频简单任务（如资讯逐条解读）改用更轻量的子模型，可显著降低超时概率；与主模型共用 Provider / Base URL / API Key。
+          </div>
+        </Col>
+        <Col span={24}>
+          <div style={fieldLabelStyle}>子模型启用任务（可选）</div>
+          <Input
+            aria-label="子模型任务清单"
+            value={form.llm_simple_tasks || ""}
+            onChange={(event) => onChange({ llm_simple_tasks: event.target.value })}
+            placeholder="留空=全部"
+          />
+          <div style={{ marginTop: 4, fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>
+            可选：chat_routing（对话意图分类）、macro_item（宏观逐条解读）、news_analysis（资讯归类）、twitter_analysis（推文分析）；逗号分隔。
+          </div>
+        </Col>
         <Col span={24} sm={12}>
           <div style={fieldLabelStyle}>模型上下文长度（tokens）</div>
           <InputNumber

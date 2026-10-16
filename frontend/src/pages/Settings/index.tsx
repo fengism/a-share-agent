@@ -59,6 +59,8 @@ export default function SettingsPage() {
       llm_api_key: cfg.llm_api_key,
       llm_base_url: cfg.llm_base_url,
       llm_model: cfg.llm_model,
+      llm_sub_model: cfg.llm_sub_model,
+      llm_simple_tasks: cfg.llm_simple_tasks,
       llm_temperature: cfg.llm_temperature,
       llm_context_length_tokens: cfg.llm_context_length_tokens,
       feishu_enabled: cfg.feishu_enabled,
@@ -203,6 +205,8 @@ export default function SettingsPage() {
       (form.llm_api_version !== undefined && form.llm_api_version !== config.llm_api_version) ||
       (form.llm_base_url !== undefined && form.llm_base_url !== config.llm_base_url) ||
       (form.llm_model !== undefined && form.llm_model !== config.llm_model) ||
+      (form.llm_sub_model !== undefined && form.llm_sub_model !== config.llm_sub_model) ||
+      (form.llm_simple_tasks !== undefined && form.llm_simple_tasks !== config.llm_simple_tasks) ||
       (form.llm_temperature !== undefined && form.llm_temperature !== config.llm_temperature) ||
       (form.llm_context_length_tokens !== undefined && form.llm_context_length_tokens !== config.llm_context_length_tokens) ||
       (form.llm_api_key && !form.llm_api_key.includes("***") && form.llm_api_key !== config.llm_api_key)
@@ -377,6 +381,8 @@ export default function SettingsPage() {
       llm_api_version: form.llm_api_version,
       llm_base_url: form.llm_base_url,
       llm_model: form.llm_model,
+      llm_sub_model: form.llm_sub_model,
+      llm_simple_tasks: form.llm_simple_tasks,
       llm_temperature: form.llm_temperature,
       llm_context_length_tokens: form.llm_context_length_tokens,
     };
@@ -628,6 +634,8 @@ export default function SettingsPage() {
       llm_api_key: config.llm_api_key,
       llm_base_url: config.llm_base_url,
       llm_model: config.llm_model,
+      llm_sub_model: config.llm_sub_model,
+      llm_simple_tasks: config.llm_simple_tasks,
       llm_temperature: config.llm_temperature,
       llm_context_length_tokens: config.llm_context_length_tokens,
     });

@@ -3513,6 +3513,14 @@
             "title": "Llm Provider",
             "type": "string"
           },
+          "llm_simple_tasks": {
+            "title": "Llm Simple Tasks",
+            "type": "string"
+          },
+          "llm_sub_model": {
+            "title": "Llm Sub Model",
+            "type": "string"
+          },
           "llm_temperature": {
             "title": "Llm Temperature",
             "type": "number"
@@ -3606,6 +3614,8 @@
           "llm_api_key",
           "llm_base_url",
           "llm_model",
+          "llm_sub_model",
+          "llm_simple_tasks",
           "llm_temperature",
           "llm_context_length_tokens",
           "feishu_enabled",
@@ -4490,6 +4500,28 @@
             ],
             "title": "Llm Provider"
           },
+          "llm_simple_tasks": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Simple Tasks"
+          },
+          "llm_sub_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Sub Model"
+          },
           "llm_temperature": {
             "anyOf": [
               {
@@ -5185,6 +5217,178 @@
         "title": "CustomsTradeDataResponse",
         "type": "object"
       },
+      "CycleStageStat": {
+        "description": "同一情绪阶段的次日表现统计（阶段胜率）。",
+        "properties": {
+          "avg_limit_up_delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Limit Up Delta"
+          },
+          "avg_next_day_index_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Next Day Index Change Pct"
+          },
+          "next_day_up_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Day Up Ratio"
+          },
+          "occurrences": {
+            "default": 0,
+            "title": "Occurrences",
+            "type": "integer"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage"
+        ],
+        "title": "CycleStageStat",
+        "type": "object"
+      },
+      "CycleTrend": {
+        "properties": {
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/CycleTrendPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "stage_stats": {
+            "items": {
+              "$ref": "#/components/schemas/CycleStageStat"
+            },
+            "title": "Stage Stats",
+            "type": "array"
+          }
+        },
+        "title": "CycleTrend",
+        "type": "object"
+      },
+      "CycleTrendPoint": {
+        "description": "情绪周期趋势上的单个交易日。",
+        "properties": {
+          "break_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Break Rate"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "index_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Change Pct"
+          },
+          "ladder_health": {
+            "default": "",
+            "title": "Ladder Health",
+            "type": "string"
+          },
+          "limit_down_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Down Count"
+          },
+          "limit_up_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Up Count"
+          },
+          "next_index_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Index Change Pct"
+          },
+          "stage": {
+            "default": "",
+            "title": "Stage",
+            "type": "string"
+          },
+          "stage_transition": {
+            "default": "",
+            "title": "Stage Transition",
+            "type": "string"
+          },
+          "up_down_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Up Down Ratio"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "title": "CycleTrendPoint",
+        "type": "object"
+      },
       "DCFScenario": {
         "description": "Purpose: DCF 单一情景的核心假设与估值结果。",
         "properties": {
@@ -5516,9 +5720,19 @@
             "title": "Indices",
             "type": "array"
           },
+          "limit_break_pool": {
+            "additionalProperties": true,
+            "title": "Limit Break Pool",
+            "type": "object"
+          },
           "limit_up_ladder": {
             "additionalProperties": true,
             "title": "Limit Up Ladder",
+            "type": "object"
+          },
+          "macro_analysis": {
+            "additionalProperties": true,
+            "title": "Macro Analysis",
             "type": "object"
           },
           "macro_data": {
@@ -5700,6 +5914,144 @@
         "title": "DailyReviewHistoryItem",
         "type": "object"
       },
+      "DailyReviewIndexCheck": {
+        "description": "指数次日验证：复盘日涨跌幅 vs 次日实际涨跌幅。",
+        "properties": {
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "code": {
+            "default": "",
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "previous_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Change Pct"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DailyReviewIndexCheck",
+        "type": "object"
+      },
+      "DailyReviewPreviousCheck": {
+        "description": "上一交易日复盘的次日验证结果（复盘闭环的输入）。",
+        "properties": {
+          "checked_count": {
+            "default": 0,
+            "title": "Checked Count",
+            "type": "integer"
+          },
+          "hit_count": {
+            "default": 0,
+            "title": "Hit Count",
+            "type": "integer"
+          },
+          "hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate"
+          },
+          "indices": {
+            "items": {
+              "$ref": "#/components/schemas/DailyReviewIndexCheck"
+            },
+            "title": "Indices",
+            "type": "array"
+          },
+          "limit_up_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Up Count"
+          },
+          "limit_up_delta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Up Delta"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "previous_limit_up_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Limit Up Count"
+          },
+          "previous_stage": {
+            "default": "",
+            "title": "Previous Stage",
+            "type": "string"
+          },
+          "review_date": {
+            "title": "Review Date",
+            "type": "string"
+          },
+          "verified_date": {
+            "title": "Verified Date",
+            "type": "string"
+          },
+          "watchlist": {
+            "items": {
+              "$ref": "#/components/schemas/DailyReviewWatchCheck"
+            },
+            "title": "Watchlist",
+            "type": "array"
+          }
+        },
+        "required": [
+          "review_date",
+          "verified_date"
+        ],
+        "title": "DailyReviewPreviousCheck",
+        "type": "object"
+      },
       "DailyReviewRequest": {
         "description": "Purpose: 每日复盘接口的请求参数。",
         "properties": {
@@ -5726,6 +6078,16 @@
       },
       "DailyReviewResult": {
         "properties": {
+          "cycle_trend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CycleTrend"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "data_gaps": {
             "items": {
               "type": "string"
@@ -5781,6 +6143,13 @@
             "title": "Invalid Conditions",
             "type": "array"
           },
+          "key_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Key Levels",
+            "type": "array"
+          },
           "llm_error": {
             "default": "",
             "title": "Llm Error",
@@ -5809,6 +6178,20 @@
           "news_policy_review": {
             "$ref": "#/components/schemas/DailyReviewSection"
           },
+          "next_day_watchlist": {
+            "items": {
+              "$ref": "#/components/schemas/DailyReviewWatchItem"
+            },
+            "title": "Next Day Watchlist",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
           "opportunities": {
             "items": {
               "type": "string"
@@ -5820,6 +6203,16 @@
             "default": "",
             "title": "Position Range",
             "type": "string"
+          },
+          "previous_review_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DailyReviewPreviousCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "prompt_trace": {
             "anyOf": [
@@ -5852,10 +6245,27 @@
             "title": "Risk Alerts",
             "type": "array"
           },
+          "scenario_plans": {
+            "items": {
+              "$ref": "#/components/schemas/DailyReviewScenario"
+            },
+            "title": "Scenario Plans",
+            "type": "array"
+          },
           "schema_version": {
-            "default": 5,
+            "default": 8,
             "title": "Schema Version",
             "type": "integer"
+          },
+          "sentiment_cycle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DailyReviewSentimentCycle"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "session_status": {
             "default": "completed",
@@ -5905,6 +6315,42 @@
         "title": "DailyReviewResult",
         "type": "object"
       },
+      "DailyReviewScenario": {
+        "description": "次日三情景（超预期 / 符合预期 / 低于预期）应对预案。",
+        "properties": {
+          "name": {
+            "enum": [
+              "超预期",
+              "符合预期",
+              "低于预期"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "playbook": {
+            "default": "",
+            "title": "Playbook",
+            "type": "string"
+          },
+          "trigger": {
+            "default": "",
+            "title": "Trigger",
+            "type": "string"
+          },
+          "watch_levels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Watch Levels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DailyReviewScenario",
+        "type": "object"
+      },
       "DailyReviewSection": {
         "properties": {
           "bullets": {
@@ -5928,6 +6374,39 @@
           "summary"
         ],
         "title": "DailyReviewSection",
+        "type": "object"
+      },
+      "DailyReviewSentimentCycle": {
+        "description": "短线情绪周期定位（复盘深度的核心判断）。",
+        "properties": {
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "ladder_health": {
+            "default": "",
+            "title": "Ladder Health",
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "冰点",
+              "修复回暖",
+              "主升共振",
+              "高位分化",
+              "退潮杀跌"
+            ],
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage"
+        ],
+        "title": "DailyReviewSentimentCycle",
         "type": "object"
       },
       "DailyReviewSourceStatus": {
@@ -5969,6 +6448,96 @@
           }
         },
         "title": "DailyReviewSourceStatus",
+        "type": "object"
+      },
+      "DailyReviewWatchCheck": {
+        "description": "单只观察标的的次日验证结果。",
+        "properties": {
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "code": {
+            "default": "",
+            "title": "Code",
+            "type": "string"
+          },
+          "hit": {
+            "default": false,
+            "title": "Hit",
+            "type": "boolean"
+          },
+          "limit_up": {
+            "default": false,
+            "title": "Limit Up",
+            "type": "boolean"
+          },
+          "missing": {
+            "default": false,
+            "title": "Missing",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "default": "",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DailyReviewWatchCheck",
+        "type": "object"
+      },
+      "DailyReviewWatchItem": {
+        "description": "次日盯盘锚点个股。",
+        "properties": {
+          "code": {
+            "default": "",
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "role": {
+            "default": "总龙头",
+            "enum": [
+              "总龙头",
+              "连板最高板",
+              "中军容量票",
+              "负反馈票"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "trigger": {
+            "default": "",
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DailyReviewWatchItem",
         "type": "object"
       },
       "DataGap": {
@@ -11872,6 +12441,11 @@
             "title": "Interpretation",
             "type": "string"
           },
+          "pending": {
+            "default": false,
+            "title": "Pending",
+            "type": "boolean"
+          },
           "refs": {
             "items": {
               "$ref": "#/components/schemas/MacroAnalysisRef"
@@ -11928,6 +12502,11 @@
             "default": "",
             "title": "Generated At",
             "type": "string"
+          },
+          "pending_count": {
+            "default": 0,
+            "title": "Pending Count",
+            "type": "integer"
           },
           "period": {
             "default": "",
@@ -31986,7 +32565,7 @@
     },
     "/api/macro/analysis": {
       "get": {
-        "description": "获取宏观 AI 解读：综述与按时间梳理的事件系列（历史条目走缓存）。",
+        "description": "获取宏观 AI 解读：综述与按时间梳理的事件系列（历史条目走缓存）。\n\n命中未解读的新条目时顺带触发后台预热，新条目数秒内即可补齐 AI 解读。",
         "operationId": "get_macro_analysis_api_macro_analysis_get",
         "parameters": [
           {

@@ -180,6 +180,7 @@ async def analyze_market_news(user_id: int) -> dict[str, Any]:
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.3,
+                task="news_analysis",
             )
             # strip markdown fences if present
             text = raw.strip()

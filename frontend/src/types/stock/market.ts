@@ -514,6 +514,7 @@ export interface MacroAnalysisEvent {
   title: string;
   interpretation: string;
   impact: string;
+  pending: boolean;
   refs: MacroAnalysisRef[];
 }
 
@@ -524,6 +525,7 @@ export interface MacroAnalysis {
   events: MacroAnalysisEvent[];
   policy_signals: string[];
   degraded: boolean;
+  pending_count: number;
   warning: string;
   generated_at: string;
   cached: boolean;

@@ -18,6 +18,8 @@ class LLMSettingsView:
     api_key: str
     base_url: str
     model: str
+    sub_model: str
+    simple_tasks: str
     temperature: float
     timeout_seconds: int
 
@@ -30,6 +32,8 @@ class LLMSettingsView:
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
             model=settings.llm_model,
+            sub_model=getattr(settings, "llm_sub_model", ""),
+            simple_tasks=getattr(settings, "llm_simple_tasks", ""),
             temperature=settings.llm_temperature,
             timeout_seconds=settings.llm_timeout_seconds,
         )

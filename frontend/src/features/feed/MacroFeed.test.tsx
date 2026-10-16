@@ -38,10 +38,11 @@ const analysisData: MacroAnalysis = {
   summary: "宏观综述内容",
   sentiment: "偏多",
   events: [
-    { date: "2026-10-14", category: "物价", title: "CPI上涨", interpretation: "利好消费板块", impact: "偏多", refs: [{ title: "CPI", url: "https://stats/r1" }] },
+    { date: "2026-10-14", category: "物价", title: "CPI上涨", interpretation: "利好消费板块", impact: "偏多", pending: false, refs: [{ title: "CPI", url: "https://stats/r1" }] },
   ],
   policy_signals: ["稳增长"],
   degraded: false,
+  pending_count: 0,
   warning: "",
   generated_at: "2026-10-15T10:00:00",
   cached: false,
@@ -109,6 +110,23 @@ describe("MacroFeed", () => {
     render(<MacroFeed />);
 
     expect(screen.getByText("AI 解读暂不可用，当前展示原文与确定性汇总。")).toBeInTheDocument();
+  });
+
+  it("marks newly collected events as pending interpretation", () => {
+    mockQueries(
+      {},
+      {
+        pending_count: 1,
+        warning: "1 条最新宏观事件仍在后台解读，请稍后刷新查看 AI 综述。",
+        events: [
+          { date: "2026-10-15", category: "其他", title: "新发布数据", interpretation: "新发布数据", impact: "中性", pending: true, refs: [] },
+        ],
+      },
+    );
+    render(<MacroFeed />);
+
+    expect(screen.getByText("解读中")).toBeInTheDocument();
+    expect(screen.getByText("1 条最新宏观事件仍在后台解读，请稍后刷新查看 AI 综述。")).toBeInTheDocument();
   });
 
   it("caps long lists and expands on demand", () => {

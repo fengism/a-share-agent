@@ -110,6 +110,7 @@ function EventTimeline({ events, preview = TIMELINE_PREVIEW }: { events: MacroAn
             <div className="macro-timeline__body">
               <div className="macro-timeline__head">
                 {event.category ? <Tag className="macro-timeline__tag">{event.category}</Tag> : null}
+                {event.pending ? <Tag color="processing">解读中</Tag> : null}
                 <span className={`macro-impact is-${impactClass(event.impact)}`}>{event.impact}</span>
               </div>
               {ref?.url ? (

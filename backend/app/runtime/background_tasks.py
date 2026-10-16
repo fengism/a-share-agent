@@ -8,6 +8,9 @@ from app.runtime import task_scheduler
 
 logger = logging.getLogger(__name__)
 
+MACRO_ANALYSIS_PREWARM_INTERVAL_SECONDS = 30 * 60
+DAILY_REVIEW_PREWARM_INTERVAL_SECONDS = 30 * 60
+
 
 async def refresh_industry_mapping_file_daily() -> None:
     """定期（默认每周）自动更新申万行业分类并联动同步官方股票名录。"""
@@ -388,3 +391,37 @@ async def run_market_daily_backfill_worker() -> None:
     from app.modules.market_daily.backfill import market_daily_backfill_service
 
     await market_daily_backfill_service.run_worker()
+
+
+async def refresh_macro_analysis_periodic() -> None:
+    """后台预热宏观解读：只为尚未解读的条目调用大模型（已缓存条目零调用）。"""
+    from app.financial_data.market.macro.analysis import prewarm_macro_analysis
+
+    async def iteration():
+        interpreted = await prewarm_macro_analysis()
+        if interpreted:
+            logger.info("宏观解读预热完成: interpreted=%s", interpreted)
+
+    await task_scheduler.run_periodic(
+        name="macro_analysis_prewarm",
+        coro_factory=iteration,
+        interval_seconds=MACRO_ANALYSIS_PREWARM_INTERVAL_SECONDS,
+        leader_election=True,
+    )
+
+
+async def refresh_daily_review_periodic() -> None:
+    """后台预热每日复盘：收盘后采集并生成一次 AI 复盘写入共享缓存（不落库）。"""
+    from app.modules.daily_review.public import prewarm_daily_review
+
+    async def iteration():
+        warmed = await prewarm_daily_review()
+        if warmed:
+            logger.info("每日复盘预热完成: warmed=%s", warmed)
+
+    await task_scheduler.run_periodic(
+        name="daily_review_prewarm",
+        coro_factory=iteration,
+        interval_seconds=DAILY_REVIEW_PREWARM_INTERVAL_SECONDS,
+        leader_election=True,
+    )

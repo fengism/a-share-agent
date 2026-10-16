@@ -15,15 +15,17 @@ const baseForm = {
   llm_base_url: "https://api.example.com/v1",
   llm_api_key: "sk-test",
   llm_model: "",
+  llm_sub_model: "",
+  llm_simple_tasks: "",
 };
 
-function renderCard() {
+function renderCard(onChange = vi.fn()) {
   const queryClient = new QueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
       <LlmConfigCard
         form={baseForm}
-        onChange={vi.fn()}
+        onChange={onChange}
         onSave={vi.fn()}
         isSaving={false}
         onProviderChange={vi.fn()}
@@ -63,5 +65,16 @@ describe("LlmConfigCard 模型列表获取", () => {
     fireEvent.click(screen.getByRole("button", { name: /获取模型/ }));
 
     expect(await screen.findByText(/获取模型列表失败：上游返回 401/)).toBeInTheDocument();
+  });
+
+  it("子模型输入会回传 llm_sub_model", () => {
+    const onChange = vi.fn();
+    renderCard(onChange);
+
+    fireEvent.change(screen.getByLabelText("子模型"), {
+      target: { value: "fast-model" },
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ llm_sub_model: "fast-model" });
   });
 });

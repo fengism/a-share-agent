@@ -94,10 +94,14 @@ class _PooledLLMClient(adapters.LLMClient):
             )
 
 
-def create_llm_client(settings: Settings | None = None) -> adapters.LLMClient:
+def create_llm_client(
+    settings: Settings | None = None, *, simple: bool = False, task: str | None = None,
+) -> adapters.LLMClient:
     if settings is None:
         settings = get_effective_settings()
-    return _PooledLLMClient(spec.resolve_llm_client_spec(settings))
+    return _PooledLLMClient(
+        spec.resolve_llm_client_spec(spec.apply_task_model(settings, simple=simple, task=task))
+    )
 
 
 async def llm_chat(
@@ -106,6 +110,8 @@ async def llm_chat(
     json_format: bool = False,
     settings: Settings | None = None,
     client: adapters.LLMClient | None = None,
+    simple: bool = False,
+    task: str | None = None,
 ) -> str:
     return (
         await llm_chat_result(
@@ -114,6 +120,8 @@ async def llm_chat(
             json_format=json_format,
             settings=settings,
             client=client,
+            simple=simple,
+            task=task,
         )
     ).text
 
@@ -124,11 +132,44 @@ async def llm_chat_result(
     json_format: bool = False,
     settings: Settings | None = None,
     client: adapters.LLMClient | None = None,
+    simple: bool = False,
+    task: str | None = None,
+) -> adapters.LLMCompletion:
+    """执行一次对话调用；切到子模型的简单任务在子模型失败时回退主模型重试一次。"""
+    base = settings or get_effective_settings()
+    effective = spec.apply_task_model(base, simple=simple, task=task)
+    if client is not None or effective is base:
+        # 显式注入 client 或未启用子模型：无回退可言，直接调用一次。
+        return await _llm_chat_once(
+            messages, temperature=temperature, json_format=json_format, settings=effective, client=client
+        )
+    try:
+        return await _llm_chat_once(
+            messages, temperature=temperature, json_format=json_format, settings=effective, client=None
+        )
+    except Exception:
+        logger.warning(
+            "子模型调用失败，回退主模型 sub_model=%s task=%s",
+            effective.llm_model,
+            task or ("simple" if simple else ""),
+            exc_info=True,
+        )
+        return await _llm_chat_once(
+            messages, temperature=temperature, json_format=json_format, settings=base, client=None
+        )
+
+
+async def _llm_chat_once(
+    messages: list[dict],
+    *,
+    temperature: float,
+    json_format: bool,
+    settings: Settings,
+    client: adapters.LLMClient | None,
 ) -> adapters.LLMCompletion:
     from app.infrastructure.llm.policy import generation_scope
     from app.infrastructure.llm.streaming import streaming_llm_client
 
-    settings = settings or get_effective_settings()
     async with generation_scope(settings, timeout_seconds=settings.llm_generation_timeout_seconds):
         if client is not None:
             # Legacy injection only: Python cannot forcibly stop a caller-owned thread.

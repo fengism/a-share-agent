@@ -4,11 +4,15 @@ from typing import Any
 
 from app.core.news import parse_news_datetime
 from app.modules.daily_review.models import (
+    CycleTrend,
     DailyReviewDataSnapshot,
     DailyReviewEventImpact,
+    DailyReviewPreviousCheck,
     DailyReviewResult,
     DailyReviewSection,
     DailyReviewSourceStatus,
+    DailyReviewWatchItem,
+    PolicyNewsSnapshotItem,
 )
 from app.modules.daily_review.news_policy import classify_policy_news
 
@@ -226,6 +230,77 @@ def _matches_event_title(candidate: str, source: str) -> bool:
     return normalized_candidate in normalized_source or normalized_source in normalized_candidate
 
 
+def _snapshot_stock_code_map(snapshot: DailyReviewDataSnapshot) -> dict[str, str]:
+    """快照中出现过的个股名称 → 代码，用于校验并补全次日观察锚点。"""
+    mapping: dict[str, str] = {}
+    candidates: list[dict[str, Any]] = []
+    for stock in (snapshot.limit_up_ladder or {}).get("stocks") or []:
+        candidates.append(stock)
+    for stock in (snapshot.market_statistics or {}).get("limit_up_stocks") or []:
+        if isinstance(stock, dict):
+            candidates.append(stock)
+    candidates.extend(stock for stock in (*snapshot.hot_stocks, *snapshot.dragon_tiger) if isinstance(stock, dict))
+    for stock in candidates:
+        name = str(stock.get("name") or "").strip()
+        code = str(stock.get("code") or "").strip()
+        if not name:
+            continue
+        if name not in mapping or (code and not mapping[name]):
+            mapping[name] = code
+    return mapping
+
+
+def _snapshot_stock_names(snapshot: DailyReviewDataSnapshot) -> set[str]:
+    """快照中出现过的个股名称集合，用于校验 LLM 是否虚构观察标的。"""
+    return set(_snapshot_stock_code_map(snapshot))
+
+
+def limit_break_rate(snapshot: DailyReviewDataSnapshot) -> float | None:
+    """炸板率 = 炸板家数 /（涨停家数 + 炸板家数）；数据缺失时返回 None。"""
+    ladder_stocks = (snapshot.limit_up_ladder or {}).get("stocks") or []
+    if not ladder_stocks or not snapshot.limit_break_pool:
+        return None
+    break_count = len((snapshot.limit_break_pool or {}).get("items") or [])
+    attempted = len(ladder_stocks) + break_count
+    return break_count / attempted if attempted else None
+
+
+def build_fallback_watchlist(snapshot: DailyReviewDataSnapshot) -> list[DailyReviewWatchItem]:
+    """用真实天梯数据给出次日观察锚点（主要在 LLM 未给出或名称不可核验时使用）。"""
+    stocks = (snapshot.limit_up_ladder or {}).get("stocks") or []
+    if not stocks:
+        return []
+    by_board = group_limit_up_by_board(stocks)
+    max_board = max(by_board)
+    space = by_board[max_board][0]
+    name = str(space.get("name") or "").strip()
+    if not name:
+        return []
+    return [
+        DailyReviewWatchItem(
+            name=name,
+            code=str(space.get("code") or "").strip(),
+            role="连板最高板",
+            reason=f"当日空间板（{max_board} 板），代表短线情绪高度与承接力度",
+            trigger="次日竞价及开盘半小时能否维持强势，断板或大幅低开视为情绪转弱信号",
+        )
+    ]
+
+
+def ground_watchlist(
+    snapshot: DailyReviewDataSnapshot,
+    items: list[DailyReviewWatchItem],
+) -> list[DailyReviewWatchItem]:
+    """只保留快照中真实出现过的个股，并用快照代码补全，避免复盘虚构观察标的。"""
+    mapping = _snapshot_stock_code_map(snapshot)
+    grounded = [
+        item.model_copy(update={"code": mapping[name] or item.code.strip()})
+        for item in items
+        if (name := item.name.strip()) in mapping
+    ]
+    return grounded[:3] or build_fallback_watchlist(snapshot)
+
+
 def ground_event_impacts(
     snapshot: DailyReviewDataSnapshot,
     impacts: list[DailyReviewEventImpact],
@@ -390,6 +465,157 @@ def _format_northbound(funds: dict[str, Any]) -> str:
         return "暂无北向资金净流入数据"
     sign = "+" if north > 0 else ""
     return f"北向资金净买入：{sign}{north:.2f} 亿元"
+
+
+def _quant_anchors(snapshot: DailyReviewDataSnapshot) -> str:
+    """用 Python 预先算好量化锚点，模型只做解读、不做算术。
+
+    复盘深度依赖「梯队结构、炸板率、量能倍数、涨跌比、资金背离」这类可计算指标；
+    让模型自己算会引入幻觉，因此统一在代码里算，并在数据缺失时显式声明不可得。
+    """
+    lines: list[str] = [
+        "以下锚点均由系统预计算，结论必须直接引用这些数字，禁止自行重算或估计。"
+    ]
+
+    # 1) 连板梯队结构
+    ladder = snapshot.limit_up_ladder or {}
+    ladder_stocks = ladder.get("stocks") or []
+    by_board = group_limit_up_by_board(ladder_stocks) if ladder_stocks else {}
+    max_board = max(by_board) if by_board else 0
+    if ladder_stocks:
+        multi_board = sum(len(items) for board, items in by_board.items() if board >= 2)
+        one_word = sum(1 for stock in ladder_stocks if stock.get("one_word"))
+        space_names = [str(s.get("name")) for s in by_board[max_board] if s.get("name")]
+        distribution = "、".join(
+            f"{board}板 {len(by_board[board])} 家" for board in sorted(by_board, reverse=True)
+        )
+        gaps = [board for board in range(2, max_board) if board not in by_board]
+        ladder_bits = [
+            f"涨停 {len(ladder_stocks)} 家（首板 {len(by_board.get(1, []))} 家、二板及以上 {multi_board} 家）",
+            f"空间板 {max_board} 板（{'、'.join(space_names[:3])}）",
+            f"一字板 {one_word} 家",
+            f"板位分布：{distribution}",
+        ]
+        if gaps:
+            ladder_bits.append(f"梯队断层：{'、'.join(f'{board}板' for board in gaps)} 无个股")
+        else:
+            ladder_bits.append("梯队无断层")
+        lines.append("- 连板梯队：" + "；".join(ladder_bits))
+    else:
+        lines.append("- 连板梯队：天梯数据缺失，禁止推断涨停梯队结构")
+
+    # 2) 涨停主线集中度
+    ladder_sectors = ladder.get("sectors") or []
+    if ladder_stocks and ladder_sectors:
+        ranked = sorted(ladder_sectors, key=lambda item: int(item.get("stock_count") or 0), reverse=True)[:3]
+        top3_count = sum(int(item.get("stock_count") or 0) for item in ranked)
+        detail = "、".join(
+            f"{item.get('sector_name')} {item.get('stock_count')} 家"
+            for item in ranked
+            if item.get("sector_name")
+        )
+        ratio = top3_count / len(ladder_stocks)
+        lines.append(f"- 涨停主线集中度：Top3 板块 {top3_count} 家，占全市场涨停 {ratio:.0%}（{detail}）")
+
+    # 3) 封板质量：炸板率
+    break_pool = snapshot.limit_break_pool or {}
+    break_items = break_pool.get("items") or []
+    if break_pool and ladder_stocks:
+        attempted = len(ladder_stocks) + len(break_items)
+        rate = limit_break_rate(snapshot) or 0.0
+        lines.append(
+            f"- 封板质量：炸板 {len(break_items)} 家，炸板率 {rate:.1%}"
+            f"（炸板 {len(break_items)} / 触及涨停 {attempted}）"
+        )
+    else:
+        lines.append("- 封板质量：炸板池数据缺失，炸板率不可得，严禁估算或引用其他日期的炸板率")
+
+    # 4) 两市量能
+    volume = snapshot.market_volume or {}
+    amount = volume.get("amount")
+    if isinstance(amount, (int, float)) and amount > 0:
+        volume_bits = [f"成交额 {amount / 100000000.0:.0f} 亿"]
+        previous = volume.get("amount_before_one_day")
+        if isinstance(previous, (int, float)) and previous > 0:
+            delta = amount - previous
+            volume_bits.append(f"较前一交易日 {'+' if delta >= 0 else '-'}{abs(delta) / previous:.1%}")
+        average_20 = volume.get("amount_average_20_day")
+        if isinstance(average_20, (int, float)) and average_20 > 0:
+            volume_bits.append(f"为 20 日均值 {amount / average_20:.2f} 倍")
+        average_60 = volume.get("amount_average_60_day")
+        if isinstance(average_60, (int, float)) and average_60 > 0:
+            volume_bits.append(f"为 60 日均值 {amount / average_60:.2f} 倍")
+        lines.append("- 两市量能：" + "；".join(volume_bits))
+    else:
+        lines.append("- 两市量能：成交额数据缺失，禁止推断放量或缩量")
+
+    # 5) 涨跌结构
+    statistics = snapshot.market_statistics or {}
+    up_count = statistics.get("up_count") or 0
+    down_count = statistics.get("down_count") or 0
+    if up_count or down_count:
+        breadth_bits = [f"涨跌家数 {up_count}:{down_count}"]
+        if down_count:
+            breadth_bits.append(f"涨跌比 {up_count / down_count:.2f}")
+        limit_up_count = statistics.get("limit_up_count") or 0
+        limit_down_count = statistics.get("limit_down_count") or 0
+        breadth_bits.append(f"涨停 {limit_up_count} 家 / 跌停 {limit_down_count} 家")
+        distribution = _format_distribution(statistics.get("stock_pct_distribution") or [])
+        if distribution:
+            breadth_bits.append(f"涨幅分布 {distribution}")
+        lines.append("- 涨跌结构：" + "；".join(breadth_bits))
+    else:
+        lines.append("- 涨跌结构：涨跌家数数据缺失")
+
+    # 6) 指数K线结构与量价位置
+    index_items = [item for item in snapshot.indices if isinstance(item.get("change_pct"), (int, float))]
+    if index_items:
+        index_bits = []
+        for item in index_items[:4]:
+            change_pct = float(item.get("change_pct") or 0)
+            high = item.get("high")
+            low = item.get("low")
+            price = item.get("price")
+            detail = f"{item.get('name')} {'+' if change_pct >= 0 else ''}{change_pct:.2f}%"
+            amplitude = item.get("amplitude")
+            if isinstance(amplitude, (int, float)):
+                detail += f"（振幅 {float(amplitude):.2f}%"
+                if isinstance(high, (int, float)) and isinstance(low, (int, float)) and isinstance(price, (int, float)) and high > low:
+                    detail += f"，收盘位于当日振幅 {(price - low) / (high - low):.0%}）"
+                else:
+                    detail += "）"
+            index_bits.append(detail)
+        lines.append("- 指数表现：" + "；".join(index_bits))
+        rising, weak = _index_move_counts(snapshot)
+        lines.append(f"- 指数方向：{rising} 涨 / {weak} 跌（核心指数）")
+
+    # 7) 资金与宽度背离
+    north = (snapshot.northbound_funds or {}).get("north_money")
+    index_move = None
+    if index_items:
+        index_move = sum(float(item.get("change_pct") or 0) for item in index_items) / len(index_items)
+    divergence_bits: list[str] = []
+    if isinstance(north, (int, float)) and index_move is not None:
+        north_direction = "净买入" if north > 0 else "净卖出"
+        index_direction = "上涨" if index_move > 0 else "下跌" if index_move < 0 else "持平"
+        north_sign = "+" if north > 0 else ""
+        conflict = (north > 0) != (index_move > 0) and index_move != 0
+        divergence_bits.append(
+            f"北向 {north_sign}{north:.2f} 亿（{north_direction}）vs 指数 {index_direction}（均值 {index_move:+.2f}%）"
+            + ("，方向背离" if conflict else "")
+        )
+    elif isinstance(north, (int, float)):
+        divergence_bits.append(f"北向 {'+' if north > 0 else ''}{north:.2f} 亿")
+    if (up_count or down_count) and index_move is not None and down_count:
+        conflict = index_move > 0 and up_count < down_count
+        if conflict:
+            divergence_bits.append(
+                f"指数上涨但下跌家数（{down_count}）多于上涨家数（{up_count}），存在宽度背离"
+            )
+    if divergence_bits:
+        lines.append("- 资金与宽度背离：" + "；".join(divergence_bits))
+
+    return "\n".join(lines)
 
 
 def _market_summary(snapshot: DailyReviewDataSnapshot, prefix: str) -> str:
@@ -567,6 +793,7 @@ def build_fallback_review(
             f"盘面定性：全市场涨停 {market_statistics.get('limit_up_count', 0)} 家、跌停 {market_statistics.get('limit_down_count', 0)} 家，关注高低位板块切换与连板高度突破。",
             "推演预案：若次日早盘放量高开，可聚焦领涨主线分歧转一致低吸；若缩量低开弱势震荡，则严控仓位防守观望。",
         ],
+        next_day_watchlist=build_fallback_watchlist(snapshot),
         data_snapshot=snapshot,
     )
 
@@ -621,13 +848,135 @@ def _macro_summary(snapshot: DailyReviewDataSnapshot) -> str:
             f"M1 {money_latest.get('CURRENCY', '-')}亿 (同比 {money_latest.get('CURRENCY_SAME', '-')}%), "
             f"M0 {money_latest.get('FREE_CASH', '-')}亿 (同比 {money_latest.get('FREE_CASH_SAME', '-')}%)"
         )
-    return "\n".join(bullets) if bullets else "暂无最新宏观数据"
+    data_text = "\n".join(bullets) if bullets else "暂无最新宏观数据"
+    events_text = _macro_event_summary(snapshot)
+    return f"{data_text}\n\n{events_text}" if events_text else data_text
+
+
+def _macro_event_summary(snapshot: DailyReviewDataSnapshot) -> str:
+    """AI 宏观事件解读：历史条目给出解读，待解读条目只给原文。"""
+    analysis = snapshot.macro_analysis or {}
+    events = analysis.get("events") or []
+    if not events:
+        return ""
+    lines: list[str] = []
+    summary = str(analysis.get("summary") or "").strip()
+    if summary:
+        sentiment = str(analysis.get("sentiment") or "中性")
+        lines.append(f"AI 宏观综述（{sentiment}）：{summary}")
+    pending_count = int(analysis.get("pending_count") or 0)
+    if pending_count:
+        lines.append(f"（{pending_count} 条最新事件仍在后台解读，已展示原文）")
+    for event in events[:12]:
+        if not isinstance(event, dict):
+            continue
+        event_date = str(event.get("date") or "")[:10]
+        title = str(event.get("title") or "").strip()
+        if not title:
+            continue
+        if event.get("pending"):
+            lines.append(f"- [{event_date}] {title}（待解读）")
+            continue
+        category = str(event.get("category") or "其他")
+        impact = str(event.get("impact") or "中性")
+        interpretation = str(event.get("interpretation") or "").strip()
+        detail = f" — {interpretation}" if interpretation and interpretation != title else ""
+        lines.append(f"- [{event_date}]（{category}/{impact}）{title}{detail}")
+    signals = analysis.get("policy_signals") or []
+    if signals:
+        lines.append(f"政策信号：{'、'.join(str(signal) for signal in signals[:8])}")
+    return "\n".join(lines)
+
+
+def _news_identity(url: str, title: str) -> str:
+    """新闻去重键：优先 URL，缺失时退化到标题。"""
+    normalized_url = (url or "").strip()
+    if normalized_url:
+        return normalized_url
+    return (title or "").strip()
+
+
+def _percent(value: float | None, *, digits: int = 2) -> str:
+    return f"{value:+.{digits}f}%" if isinstance(value, (int, float)) else "-"
+
+
+def _ratio(value: float | None) -> str:
+    return f"{value:.2f}" if isinstance(value, (int, float)) else "-"
+
+
+def _previous_review_check_block(check: DailyReviewPreviousCheck) -> str:
+    """把上一交易日的自检结果渲染成 Prompt 区块（复盘闭环的事实依据）。"""
+    lines = [f"# 上一交易日复盘自检（{check.review_date} → {check.verified_date}）"]
+    if check.checked_count:
+        rate = f"{check.hit_rate:.0%}" if check.hit_rate is not None else "-"
+        lines.append(f"- 观察标的命中：{check.hit_count}/{check.checked_count}（收涨比例 {rate}）")
+    else:
+        lines.append("- 观察标的命中：暂无可核验行情")
+    for item in check.watchlist[:6]:
+        if item.missing:
+            lines.append(f"  - {item.name}({item.code or '-'})：次日行情缺失")
+            continue
+        flag = "涨停" if item.limit_up else ("上涨" if item.hit else "下跌")
+        lines.append(f"  - {item.name}({item.code or '-'})：{_percent(item.change_pct)}（{flag}）")
+    index_parts = [
+        f"{item.name} {_percent(item.previous_change_pct)} → {_percent(item.change_pct)}"
+        for item in check.indices[:4]
+    ]
+    if index_parts:
+        lines.append(f"- 指数表现：{'；'.join(index_parts)}")
+    if check.limit_up_delta is not None:
+        lines.append(
+            f"- 涨停家数：{check.previous_limit_up_count} → {check.limit_up_count}"
+            f"（{check.limit_up_delta:+d}）"
+        )
+    if check.previous_stage:
+        lines.append(f"- 上一交易日情绪阶段：{check.previous_stage}")
+    if check.note:
+        lines.append(f"- 数据说明：{check.note}")
+    lines.append("- 要求：必须逐条说明昨日预判命中或落空的原因，并据此修正今日定位，不得回避。")
+    return "\n".join(lines)
+
+
+def _cycle_trend_block(trend: CycleTrend) -> str:
+    """渲染情绪周期历史趋势，让模型知道当前处在周期的哪个位置。"""
+    if not trend.points:
+        return f"# 情绪周期历史趋势\n- {trend.note or '暂无历史样本。'}"
+    lines = [f"# 情绪周期历史趋势（最近 {len(trend.points)} 个交易日，按时间升序）"]
+    for point in trend.points[-10:]:
+        parts = [point.date, point.stage or "未定位"]
+        if point.limit_up_count is not None:
+            parts.append(f"涨停{point.limit_up_count}")
+        if point.break_rate is not None:
+            parts.append(f"炸板{point.break_rate:.1%}")
+        if point.up_down_ratio is not None:
+            parts.append(f"涨跌比{_ratio(point.up_down_ratio)}")
+        parts.append(f"指数{_percent(point.index_change_pct)}")
+        parts.append(f"次日{_percent(point.next_index_change_pct)}")
+        if point.stage_transition:
+            parts.append(point.stage_transition)
+        lines.append("- " + "｜".join(parts))
+    for stat in trend.stage_stats[:4]:
+        up_ratio = f"{stat.next_day_up_ratio:.0%}" if stat.next_day_up_ratio is not None else "-"
+        summary = (
+            f"- 阶段统计：{stat.stage} 出现 {stat.occurrences} 次，次日指数上涨比例 {up_ratio}，"
+            f"平均次日指数 {_percent(stat.avg_next_day_index_change_pct)}"
+        )
+        if stat.avg_limit_up_delta is not None:
+            summary += f"，平均涨停变化 {stat.avg_limit_up_delta:+.1f}"
+        lines.append(summary)
+    if trend.note:
+        lines.append(f"- 数据说明：{trend.note}")
+    lines.append("- 要求：结合趋势判断当前阶段是延续还是切换，并给出与历史阶段特征一致的应对。")
+    return "\n".join(lines)
 
 
 def build_prompt(
     date: str,
     snapshot: DailyReviewDataSnapshot,
     prompt_template: str,
+    *,
+    previous_review_check: DailyReviewPreviousCheck | None = None,
+    cycle_trend: CycleTrend | None = None,
 ) -> str:
     indices_formatted = []
     for item in snapshot.indices[:6]:
@@ -698,9 +1047,18 @@ def build_prompt(
         for item in snapshot.hot_industries[:8]
         if item.get("name")
     ]
+    selected_policy_news = snapshot.policy_news[:16]
+    # 政策事件本身就是从市场新闻里挑出来的，同一篇必须在 Prompt 中只出现一次，
+    # 否则模型会把一条事件重复计入 event_impacts，并白白多花 token。
+    policy_keys = {_news_identity(item.url, item.title) for item in selected_policy_news}
+    remaining_news = [
+        item
+        for item in snapshot.market_news
+        if _news_identity(str(item.get("url") or ""), str(item.get("title") or "")) not in policy_keys
+    ][:20]
     news_bullets = [
         f"{item.get('publish_time', '-')}｜{item.get('source', '-')}｜{item.get('title', '')}：{str(item.get('content', '-'))[:320]}｜URL:{item.get('url', '-')}"
-        for item in snapshot.market_news[:20]
+        for item in remaining_news
         if item.get("title")
     ]
     policy_bullets = [
@@ -709,12 +1067,21 @@ def build_prompt(
             f"{item.publish_time or '-'}｜{item.source or '-'}｜{item.title}｜"
             f"关联方向:{'、'.join(item.related_sectors) or '待识别'}｜URL:{item.url or '-'}｜"
             f"交叉来源:{'、'.join(item.corroborating_sources) or '-'}"
+            # 政策事件已从「市场新闻」区块剔除，这里补上正文摘录，保证模型仍有事实依据。
+            + (f"｜内容:{item.content[:200]}" if item.content else "")
         )
-        for item in snapshot.policy_news[:16]
+        for item in selected_policy_news
     ]
     return prompt_template.format(
         date=date,
         indices_placeholder=indices_text,
+        quant_anchors_placeholder=_quant_anchors(snapshot),
+        previous_review_check_placeholder=(
+            _previous_review_check_block(previous_review_check)
+            if previous_review_check is not None
+            else "# 上一交易日复盘自检\n- 暂无上一交易日复盘可对照（首次生成或历史数据不足），本轮无需对照。"
+        ),
+        cycle_trend_placeholder=(_cycle_trend_block(cycle_trend) if cycle_trend is not None else "# 情绪周期历史趋势\n- 暂无历史样本。"),
         market_statistics_placeholder=_market_summary(snapshot, "当日整理"),
         limit_up_ladder_placeholder=_format_limit_up_ladder(snapshot.limit_up_ladder),
         northbound_funds_placeholder=_format_northbound(snapshot.northbound_funds),
@@ -722,7 +1089,13 @@ def build_prompt(
         hot_stocks_placeholder="\n".join(hot_stock_bullets) if hot_stock_bullets else json.dumps(snapshot.hot_stocks[:20], ensure_ascii=False),
         hot_concepts_placeholder="\n".join(hot_concept_bullets) if hot_concept_bullets else json.dumps(snapshot.hot_concepts[:8], ensure_ascii=False),
         hot_industries_placeholder="\n".join(hot_industry_bullets) if hot_industry_bullets else json.dumps(snapshot.hot_industries[:15], ensure_ascii=False),
-        news_placeholder="\n".join(news_bullets) if news_bullets else json.dumps(snapshot.market_news[:20], ensure_ascii=False),
+        news_placeholder=(
+            "\n".join(news_bullets)
+            if news_bullets
+            else json.dumps(remaining_news, ensure_ascii=False)
+            if remaining_news
+            else "暂无其他市场新闻（相关新闻已在上方政策/产业事件中单列）"
+        ),
         policy_news_placeholder="\n".join(policy_bullets) if policy_bullets else "暂无匹配复盘时点的重点政策事件",
         top_sectors_placeholder="\n".join(top_sector_bullets) if top_sector_bullets else json.dumps(snapshot.top_sectors[:10], ensure_ascii=False),
         bottom_sectors_placeholder="\n".join(bottom_sector_bullets) if bottom_sector_bullets else json.dumps(snapshot.bottom_sectors[:10], ensure_ascii=False),
@@ -746,8 +1119,11 @@ def build_snapshot(
     market_volume,
     macro_data,
     *,
+    macro_analysis=None,
     limit_up_ladder=None,
+    limit_break_pool=None,
     northbound_funds=None,
+    policy_news: list[PolicyNewsSnapshotItem] | None = None,
     requested_date: str = "",
     effective_date: str = "",
     source_status: dict[str, DailyReviewSourceStatus] | None = None,
@@ -770,7 +1146,10 @@ def build_snapshot(
         policy_target_date = date.fromisoformat(effective_date) if effective_date else None
     except ValueError:
         policy_target_date = None
-    policy_news = classify_policy_news(market_news_items, target_date=policy_target_date)
+    if policy_news is None:
+        # 采集阶段已算过一次（collector.DailyReviewCollection.policy_news）；
+        # 仅当调用方未提供时才在这里补算，避免对同一份新闻重复分类。
+        policy_news = classify_policy_news(market_news_items, target_date=policy_target_date)
     snapshot_data = {
         "requested_date": requested_date,
         "effective_date": effective_date,
@@ -792,8 +1171,16 @@ def build_snapshot(
         snapshot_data["market_volume"] = market_volume.model_dump()
     if not isinstance(macro_data, Exception) and macro_data is not None:
         snapshot_data["macro_data"] = macro_data
+    if macro_analysis is not None and not isinstance(macro_analysis, Exception):
+        snapshot_data["macro_analysis"] = (
+            macro_analysis.model_dump() if hasattr(macro_analysis, "model_dump") else macro_analysis
+        )
     if not isinstance(limit_up_ladder, Exception) and limit_up_ladder is not None:
         snapshot_data["limit_up_ladder"] = limit_up_ladder.model_dump() if hasattr(limit_up_ladder, "model_dump") else limit_up_ladder
+    if not isinstance(limit_break_pool, Exception) and limit_break_pool is not None:
+        snapshot_data["limit_break_pool"] = (
+            limit_break_pool.model_dump() if hasattr(limit_break_pool, "model_dump") else limit_break_pool
+        )
     if not isinstance(northbound_funds, Exception) and northbound_funds is not None:
         snapshot_data["northbound_funds"] = northbound_funds.model_dump() if hasattr(northbound_funds, "model_dump") else northbound_funds
     return DailyReviewDataSnapshot(**snapshot_data)

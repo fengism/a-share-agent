@@ -44,18 +44,21 @@ def save_daily_review(review: DailyReviewResult, user_id: int) -> None:
     atomic_write_text(path, review.model_dump_json(indent=2))
 
 
-def load_daily_review(date: str, user_id: int) -> DailyReviewResult | None:
+def load_daily_review(date: str, user_id: int, *, include_legacy: bool = False) -> DailyReviewResult | None:
     """从本地文件加载指定日期的复盘报告。
 
     Param:
         date: 复盘日期，格式 YYYY-MM-DD
         user_id: 当前用户 ID
+        include_legacy: 是否允许读取旧版全局复盘（仅管理员，避免跨用户串档）
     Return:
         复盘结果对象，文件不存在时返回 None
     """
     user_path = _user_review_path(date, user_id)
     if user_path.exists():
         return _load_review(user_path)
+    if not include_legacy:
+        return None
     legacy_path = _legacy_review_path(date)
     if legacy_path.exists():
         return _load_review(legacy_path)
@@ -91,6 +94,8 @@ def list_daily_reviews(
 ) -> list[DailyReviewHistoryItem]:
     """列出所有已保存的复盘报告摘要，按日期倒序排列。
 
+    始终列出当前用户的复盘；旧版全局复盘仅对管理员可见，避免跨用户串档。
+
     Param:
         user_id: 当前用户 ID
     Return:
@@ -100,8 +105,9 @@ def list_daily_reviews(
         return []
 
     paths_by_date: dict[str, Path] = {}
-    for path in _DATA_DIR.glob("*.json"):
-        paths_by_date[path.stem] = path
+    if can_delete_legacy:
+        for path in _DATA_DIR.glob("*.json"):
+            paths_by_date[path.stem] = path
     user_dir = _DATA_DIR / "users" / str(user_id)
     if user_dir.exists():
         for path in user_dir.glob("*.json"):

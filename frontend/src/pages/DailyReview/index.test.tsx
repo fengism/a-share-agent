@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { streamDailyReview } from "../../api/sse";
 import DailyReviewPage from "./index";
 
 const mockReview = {
@@ -46,8 +47,79 @@ const mockReview = {
     confirmation_signals: ["汽车板块次日放量"],
     invalidation_conditions: ["板块冲高回落"],
   }],
-  warnings: [],
+  warnings: [] as string[],
+  notes: [] as string[],
+  sentiment_cycle: undefined as
+    | undefined
+    | {
+        stage: "冰点" | "修复回暖" | "主升共振" | "高位分化" | "退潮杀跌";
+        ladder_health?: string;
+        evidence: string[];
+      },
+  scenario_plans: undefined as
+    | undefined
+    | Array<{
+        name: "超预期" | "符合预期" | "低于预期";
+        trigger?: string;
+        playbook?: string;
+        watch_levels: string[];
+      }>,
+  next_day_watchlist: undefined as
+    | undefined
+    | Array<{
+        name: string;
+        role: "总龙头" | "连板最高板" | "中军容量票" | "负反馈票";
+        reason?: string;
+        trigger?: string;
+      }>,
+  key_levels: undefined as undefined | string[],
+  previous_review_check: undefined as
+    | undefined
+    | {
+        review_date: string;
+        verified_date: string;
+        indices?: Array<{ code?: string; name: string; previous_change_pct?: number | null; change_pct?: number | null }>;
+        watchlist?: Array<{
+          name: string;
+          code?: string;
+          role?: string;
+          change_pct?: number | null;
+          hit: boolean;
+          limit_up: boolean;
+          missing: boolean;
+        }>;
+        hit_count: number;
+        checked_count: number;
+        previous_stage?: string;
+        limit_up_count?: number | null;
+        previous_limit_up_count?: number | null;
+        limit_up_delta?: number | null;
+        note?: string;
+      },
+  cycle_trend: undefined as
+    | undefined
+    | {
+        points?: Array<{
+          date: string;
+          stage?: string;
+          limit_up_count?: number | null;
+          break_rate?: number | null;
+          index_change_pct?: number | null;
+          next_index_change_pct?: number | null;
+          stage_transition?: string;
+        }>;
+        stage_stats?: Array<{
+          stage: string;
+          occurrences: number;
+          next_day_up_ratio?: number | null;
+          avg_next_day_index_change_pct?: number | null;
+        }>;
+        note?: string;
+      },
   data_snapshot: {
+    source_status: undefined as
+      | undefined
+      | Record<string, { status: "complete" | "partial" | "unavailable"; data_date?: string; error?: string }>,
     indices: [{ code: "000001", name: "上证指数", change_pct: 1.2 }],
     hot_stocks: [{ code: "600519", name: "贵州茅台", change_pct: 1.5 }],
     hot_concepts: [{ code: "BK0800", name: "机器人概念", change_pct: 4.2 }],
@@ -105,6 +177,11 @@ vi.mock("../../api/queries", () => ({
   }),
   downloadDailyReviewPdf: vi.fn(),
 }));
+
+vi.mock("../../api/sse", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../api/sse")>();
+  return { ...actual, streamDailyReview: vi.fn() };
+});
 
 vi.mock("../../hooks/useWorkflowPush", () => ({
   useWorkflowPush: () => ({
@@ -178,6 +255,143 @@ describe("DailyReviewPage", () => {
     expect(window.URL.createObjectURL).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
     clickSpy.mockRestore();
+  });
+
+  it("renders auxiliary data notes without marking the review degraded", () => {
+    mockReview.notes = ["macro_analysis：数据部分可用"];
+    renderPage();
+
+    expect(screen.getByText("部分辅助数据缺失（不影响复盘结论）")).toBeInTheDocument();
+    expect(screen.getByText("macro_analysis：数据部分可用")).toBeInTheDocument();
+    expect(screen.queryByText("复盘数据或生成过程不完整")).not.toBeInTheDocument();
+
+    mockReview.notes = [];
+  });
+
+  it("exports source status and warnings into the markdown", () => {
+    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText: writeTextSpy } });
+    mockReview.warnings = ["核心复盘数据缺失：market_volume"];
+    mockReview.data_snapshot.source_status = {
+      macro_analysis: { status: "partial", data_date: "2026-08-25", error: "2 条宏观事件待后台解读" },
+    };
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /复制/ }));
+
+    const exported = writeTextSpy.mock.calls[0][0] as string;
+    expect(exported).toContain("## 数据核验警告");
+    expect(exported).toContain("⚠️ 核心复盘数据缺失：market_volume");
+    expect(exported).toContain("## 复盘数据状态");
+    expect(exported).toContain("macro_analysis：部分（数据日期 2026-08-25） — 2 条宏观事件待后台解读");
+
+    mockReview.warnings = [];
+    mockReview.data_snapshot.source_status = undefined;
+  });
+
+  it("renders deep review cards and exports them to markdown", () => {
+    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText: writeTextSpy } });
+    mockReview.sentiment_cycle = {
+      stage: "修复回暖",
+      ladder_health: "二板及以上 12 家，梯队无断层",
+      evidence: ["空间板 6 板（甲）", "炸板率 16.7%"],
+    };
+    mockReview.scenario_plans = [
+      { name: "超预期", trigger: "放量高开", playbook: "加仓领涨主线", watch_levels: ["成交额 1.5 万亿"] },
+      { name: "符合预期", trigger: "平开震荡", playbook: "持股待涨", watch_levels: [] },
+      { name: "低于预期", trigger: "低开走弱", playbook: "降仓防守", watch_levels: [] },
+    ];
+    mockReview.next_day_watchlist = [
+      { name: "甲", role: "连板最高板", reason: "当日空间板（6 板）", trigger: "竞价能否维持强势" },
+    ];
+    mockReview.key_levels = ["上证 3250 支撑；压力 3350"];
+    renderPage();
+
+    expect(screen.getByText("情绪周期定位")).toBeInTheDocument();
+    expect(screen.getByText("修复回暖")).toBeInTheDocument();
+    expect(screen.getByText("明日三情景预案")).toBeInTheDocument();
+    expect(screen.getByText("次日观察锚点")).toBeInTheDocument();
+    expect(screen.getByText("关键点位与量能阈值")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /复制/ }));
+
+    const exported = writeTextSpy.mock.calls[0][0] as string;
+    expect(exported).toContain("## 情绪周期定位：修复回暖");
+    expect(exported).toContain("## 明日三情景预案");
+    expect(exported).toContain("**超预期**：触发 放量高开；应对 加仓领涨主线");
+    expect(exported).toContain("## 次日观察锚点");
+    expect(exported).toContain("**甲**（连板最高板）");
+    expect(exported).toContain("## 关键点位与量能阈值");
+
+    mockReview.sentiment_cycle = undefined;
+    mockReview.scenario_plans = undefined;
+    mockReview.next_day_watchlist = undefined;
+    mockReview.key_levels = undefined;
+  });
+
+  it("renders the previous review self-check and cycle trend", () => {
+    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText: writeTextSpy } });
+    mockReview.previous_review_check = {
+      review_date: "2026-08-24",
+      verified_date: "2026-08-25",
+      indices: [{ name: "上证指数", previous_change_pct: 0.8, change_pct: -0.42 }],
+      watchlist: [
+        { name: "甲", code: "600000", role: "连板最高板", change_pct: 10.0, hit: true, limit_up: true, missing: false },
+        { name: "乙", code: "600001", role: "中军容量票", change_pct: -3.2, hit: false, limit_up: false, missing: false },
+      ],
+      hit_count: 1,
+      checked_count: 2,
+      previous_stage: "修复回暖",
+      limit_up_count: 42,
+      previous_limit_up_count: 55,
+      limit_up_delta: -13,
+      note: "空间板未能延续，情绪高位分化。",
+    };
+    mockReview.cycle_trend = {
+      points: [
+        { date: "2026-08-22", stage: "冰点", limit_up_count: 21, break_rate: 0.42, index_change_pct: -1.2, stage_transition: "降级" },
+        { date: "2026-08-25", stage: "修复回暖", limit_up_count: 42, break_rate: 0.167, index_change_pct: 0.8, next_index_change_pct: -0.42 },
+      ],
+      stage_stats: [{ stage: "修复回暖", occurrences: 2, next_day_up_ratio: 0.5, avg_next_day_index_change_pct: -0.42 }],
+      note: "近 20 个交易日样本。",
+    };
+    renderPage();
+
+    expect(screen.getByText("上一交易日复盘自检")).toBeInTheDocument();
+    expect(screen.getByText("命中 1/2")).toBeInTheDocument();
+    expect(screen.getByText("情绪周期历史趋势")).toBeInTheDocument();
+    expect(screen.getByText("修复回暖：出现 2 次，次日指数上涨比例 50%，平均次日 -0.42%")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /复制/ }));
+
+    const exported = writeTextSpy.mock.calls[0][0] as string;
+    expect(exported).toContain("## 上一交易日复盘自检（2026-08-24 → 2026-08-25）");
+    expect(exported).toContain("- 观察标的命中率：1/2");
+    expect(exported).toContain("- 甲：次日 +10.00%，次日涨停（命中）");
+    expect(exported).toContain("## 情绪周期历史趋势");
+    expect(exported).toContain("- 阶段统计：修复回暖 出现 2 次");
+
+    mockReview.previous_review_check = undefined;
+    mockReview.cycle_trend = undefined;
+  });
+
+  it("shows backend stage progress while generating", async () => {
+    vi.mocked(streamDailyReview).mockImplementation((_request, onProgress) => {
+      onProgress({ type: "stage_started", stage: "collect", message: "正在采集行情、资金、新闻与宏观数据…" });
+      return {
+        promise: new Promise(() => {}),
+        started: Promise.resolve({ job_id: 1, dedupe_key: "2026-08-25", status: "running" }),
+        cancel: vi.fn().mockResolvedValue("cancelled"),
+        detach: vi.fn(),
+      } as never;
+    });
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "生成复盘" }));
+
+    expect(await screen.findByText("正在采集行情、资金、新闻与宏观数据…")).toBeInTheDocument();
   });
 
   it("supports searching and filtering history items", () => {

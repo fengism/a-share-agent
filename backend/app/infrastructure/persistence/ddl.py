@@ -164,6 +164,23 @@ MARKET_TABLES.append(
     """
 )
 
+# 每日复盘周期摘要：按交易日存放情绪阶段/涨停炸板/观察标的，跨用户共享
+MARKET_TABLES.append(
+    """
+    CREATE TABLE IF NOT EXISTS daily_review_cycle_records (
+        cycle_date   TEXT PRIMARY KEY,
+        result_json  TEXT NOT NULL,
+        generated_at REAL NOT NULL
+    )
+    """
+)
+MARKET_TABLES.append(
+    """
+    CREATE INDEX IF NOT EXISTS idx_daily_review_cycle_records_generated_at
+    ON daily_review_cycle_records(generated_at)
+    """
+)
+
 # ── 账号系统：用户 / 会话 / 邀请 / 每用户私密配置 ──
 USER_TABLES = []
 

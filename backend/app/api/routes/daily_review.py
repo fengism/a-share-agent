@@ -58,7 +58,7 @@ async def export_daily_review_pdf(
     user: AuthenticatedUser = Depends(require_active_user),
 ):
     """根据日期读取复盘记录，并生成包含矢量图表的 PDF。"""
-    review = await get_daily_review_record(date, user["id"])
+    review = await get_daily_review_record(date, user["id"], include_legacy=bool(user["is_admin"]))
     if review is None:
         raise NotFoundError("复盘记录不存在", code="daily_review.not_found")
 
@@ -94,7 +94,7 @@ async def get_daily_review(date: str, user: AuthenticatedUser = Depends(require_
     Return:
         DailyReviewResult: 该日的完整复盘结果；若不存在则返回 404。
     """
-    review = await get_daily_review_record(date, user["id"])
+    review = await get_daily_review_record(date, user["id"], include_legacy=bool(user["is_admin"]))
     if review is None:
         raise NotFoundError("复盘记录不存在", code="daily_review.not_found")
     return review

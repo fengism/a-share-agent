@@ -29,6 +29,8 @@ PRIVATE_USER_KEYS = frozenset(
         "llm_api_key",
         "llm_base_url",
         "llm_model",
+        "llm_sub_model",
+        "llm_simple_tasks",
         "llm_temperature",
         "llm_context_length_tokens",
         "notion_enabled",
@@ -155,6 +157,12 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-v4-flash"
+    # 简单/高频任务（如逐条资讯解读）使用的子模型；留空则复用主模型。
+    # 与主模型共用 provider/base_url/api_key，仅替换 model，避免子任务超时。
+    llm_sub_model: str = ""
+    # 允许使用子模型的任务清单（逗号分隔）；留空=全部已接入的任务。
+    # 可选值：chat_routing / macro_item / news_analysis / twitter_analysis
+    llm_simple_tasks: str = ""
     llm_temperature: float = 0.1
     # 模型上下文长度（tokens）；0 表示未设置，历史裁剪沿用默认 40k 字符预算。
     llm_context_length_tokens: int = Field(default=0, ge=0)

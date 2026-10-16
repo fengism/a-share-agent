@@ -12,7 +12,7 @@ from app.configuration.schema import Settings
 from app.infrastructure.llm.adapters import prepare_completion_kwargs
 from app.infrastructure.llm.capabilities import LLMCapabilities
 from app.infrastructure.llm.pool import AsyncResourcePool
-from app.infrastructure.llm.spec import LLMClientSpec, resolve_llm_client_spec
+from app.infrastructure.llm.spec import LLMClientSpec, apply_task_model, resolve_llm_client_spec
 
 _POOL_MAXSIZE = 16
 
@@ -258,8 +258,10 @@ def _create_async_openai_chat_runtime(
     )
 
 
-def create_openai_chat_runtime(settings: Settings | None = None) -> OpenAIChatRuntime:
-    settings = settings or get_effective_settings()
+def create_openai_chat_runtime(
+    settings: Settings | None = None, *, simple: bool = False, task: str | None = None,
+) -> OpenAIChatRuntime:
+    settings = apply_task_model(settings or get_effective_settings(), simple=simple, task=task)
     return _create_openai_chat_runtime(
         resolve_llm_client_spec(settings),
         openai_factory=OpenAI,
@@ -268,9 +270,9 @@ def create_openai_chat_runtime(settings: Settings | None = None) -> OpenAIChatRu
 
 
 def create_async_openai_chat_runtime(
-    settings: Settings | None = None, *, max_retries: int | None = 0,
+    settings: Settings | None = None, *, max_retries: int | None = 0, simple: bool = False, task: str | None = None,
 ) -> AsyncOpenAIChatRuntime:
-    settings = settings or get_effective_settings()
+    settings = apply_task_model(settings or get_effective_settings(), simple=simple, task=task)
     return _create_async_openai_chat_runtime(
         resolve_llm_client_spec(settings),
         async_openai_factory=AsyncOpenAI,
@@ -293,9 +295,9 @@ _async_runtime_pool: AsyncResourcePool[AsyncOpenAIChatRuntime] = AsyncResourcePo
 
 @asynccontextmanager
 async def borrow_async_openai_chat_runtime(
-    settings: Settings | None = None,
+    settings: Settings | None = None, *, simple: bool = False, task: str | None = None,
 ) -> AsyncIterator[AsyncOpenAIChatRuntime]:
-    settings = settings or get_effective_settings()
+    settings = apply_task_model(settings or get_effective_settings(), simple=simple, task=task)
     client_spec = resolve_llm_client_spec(settings)
     async with _async_runtime_pool.borrow(
         client_spec.key,

@@ -16,6 +16,8 @@ class ConfigResponse(BaseModel):
     llm_api_key: str
     llm_base_url: str
     llm_model: str
+    llm_sub_model: str
+    llm_simple_tasks: str
     llm_temperature: float
     llm_context_length_tokens: int
     feishu_enabled: bool
@@ -107,6 +109,8 @@ class ConfigUpdateRequest(BaseModel):
     llm_api_key: str | None = None
     llm_base_url: str | None = None
     llm_model: str | None = None
+    llm_sub_model: str | None = None
+    llm_simple_tasks: str | None = None
     llm_temperature: float | None = None
     llm_context_length_tokens: int | None = Field(default=None, ge=0)
     feishu_enabled: bool | None = None

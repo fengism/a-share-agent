@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import cast
 
 from app.configuration.llm_routing import resolve_llm_routing
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
@@ -37,6 +38,38 @@ class LLMClientSpec:
             self.timeout,
             self.effective_capabilities,
         )
+
+
+def simple_task_enabled(settings: Settings, task: str) -> bool:
+    """该任务是否应使用子模型：需配置 ``llm_sub_model``，且任务在启用清单内（清单为空=全部）。"""
+    if not str(getattr(settings, "llm_sub_model", "") or "").strip():
+        return False
+    configured = {
+        item.strip()
+        for item in str(getattr(settings, "llm_simple_tasks", "") or "").split(",")
+        if item.strip()
+    }
+    return not configured or task in configured
+
+
+def apply_task_model(settings: Settings, *, simple: bool = False, task: str | None = None) -> Settings:
+    """简单/高频任务改用子模型：仅在配置了 ``llm_sub_model`` 时替换 model。
+
+    仅替换 model（provider/base_url/api_key 不变），因此凭证隔离与连接池键
+    （键含 model）都能自然生效，无需改动路由/流式链路。
+    ``task`` 按 ``llm_simple_tasks`` 白名单判定；``simple`` 用于显式强制。
+    """
+    if not (simple or (task is not None and simple_task_enabled(settings, task))):
+        return settings
+    sub_model = str(getattr(settings, "llm_sub_model", "") or "").strip()
+    if not sub_model or sub_model == settings.llm_model:
+        return settings
+    return cast(Settings, settings.model_copy(update={"llm_model": sub_model}))
+
+
+def task_uses_sub_model(settings: Settings, *, simple: bool = False, task: str | None = None) -> bool:
+    """本次调用是否真的会切到子模型（用于失败后是否回退主模型）。"""
+    return apply_task_model(settings, simple=simple, task=task) is not settings
 
 
 def resolve_llm_client_spec(settings: Settings) -> LLMClientSpec:
