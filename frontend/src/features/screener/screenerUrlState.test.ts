@@ -44,4 +44,21 @@ describe("shared screener URL state", () => {
     });
     expect(params.toString()).toBe("");
   });
+
+  it("round-trips deep value and theme discovery filters", () => {
+    const state = parseScreenerUrlState(new URLSearchParams(
+      "amplitude_min=4&amplitude_max=15&broken_net=1&exclude_st=1&min_amount_yi=1.5&sort=amplitude&order=desc",
+    ));
+
+    expect(state.filters).toMatchObject({
+      amplitude_min: 4,
+      amplitude_max: 15,
+      is_broken_net: true,
+      exclude_st: true,
+      min_amount_yi: 1.5,
+      sort_by: "amplitude",
+      sort_order: "desc",
+    });
+    expect(parseScreenerUrlState(serializeScreenerUrlState(state))).toEqual(state);
+  });
 });

@@ -2985,6 +2985,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/push/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notification Channel Status
+         * @description 获取当前已配置的自动推送与通知通道状态。
+         */
+        get: operations["get_notification_channel_status_api_push_channels_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/push/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notification History
+         * @description 获取最近的通知推送历史审计日志。
+         */
+        get: operations["get_notification_history_api_push_history_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Clear Notification History Records
+         * @description 清空通知推送历史审计日志。
+         */
+        delete: operations["clear_notification_history_records_api_push_history_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/push/test-webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger Channel Test Webhook
+         * @description 测试指定通道（飞书、企业微信、微信）的通知连通性。
+         */
+        post: operations["trigger_channel_test_webhook_api_push_test_webhook_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quant/backtests": {
         parameters: {
             query?: never;
@@ -3295,6 +3359,26 @@ export interface paths {
          *         ValuationPercentileResult: 每只股票的估值百分位条目集合。
          */
         post: operations["compute_percentiles_api_screener_percentile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screener/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Screener Presets
+         * @description 获取经典题材挖掘与深度低估值选股预设模版。
+         */
+        get: operations["get_screener_presets_api_screener_presets_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11425,6 +11509,49 @@ export interface components {
             /** Updated At */
             updated_at: string;
         };
+        /**
+         * NotificationChannelStatus
+         * @description Purpose: 系统通知通道配置与启用状态。
+         */
+        NotificationChannelStatus: {
+            /** Auto Enabled */
+            auto_enabled: boolean;
+            /** Daily Review Auto */
+            daily_review_auto: boolean;
+            /**
+             * Dingtalk Configured
+             * @default false
+             */
+            dingtalk_configured: boolean;
+            /**
+             * Dingtalk Enabled
+             * @default true
+             */
+            dingtalk_enabled: boolean;
+            /** Feishu Configured */
+            feishu_configured: boolean;
+            /**
+             * Feishu Enabled
+             * @default true
+             */
+            feishu_enabled: boolean;
+            /** Potential Auto */
+            potential_auto: boolean;
+            /** Wecom Configured */
+            wecom_configured: boolean;
+            /**
+             * Wecom Enabled
+             * @default true
+             */
+            wecom_enabled: boolean;
+            /** Wxpusher Configured */
+            wxpusher_configured: boolean;
+            /**
+             * Wxpusher Enabled
+             * @default true
+             */
+            wxpusher_enabled: boolean;
+        };
         /** OkResponse */
         OkResponse: {
             /**
@@ -13036,6 +13163,10 @@ export interface components {
          * @description Purpose: 股票筛选接口的过滤条件参数。
          */
         ScreenerFilter: {
+            /** Amplitude Max */
+            amplitude_max?: number | null;
+            /** Amplitude Min */
+            amplitude_min?: number | null;
             /** Change Pct Max */
             change_pct_max?: number | null;
             /** Change Pct Min */
@@ -13049,6 +13180,11 @@ export interface components {
             exclude_st: boolean;
             /** Industries */
             industries?: string[] | null;
+            /**
+             * Is Broken Net
+             * @default false
+             */
+            is_broken_net: boolean;
             /** Market Cap Max */
             market_cap_max?: number | null;
             /** Market Cap Min */
@@ -13101,6 +13237,8 @@ export interface components {
          * @description Purpose: 股票筛选结果中的单只股票信息。
          */
         ScreenerItem: {
+            /** Amplitude */
+            amplitude?: number | null;
             /** Board */
             board?: string | null;
             /** Change Pct */
@@ -13114,6 +13252,11 @@ export interface components {
             /** Exchange Industry */
             exchange_industry?: string | null;
             first_industry?: components["schemas"]["StockConcept"] | null;
+            /**
+             * Is Broken Net
+             * @default false
+             */
+            is_broken_net: boolean;
             /** Listing Date */
             listing_date?: string | null;
             /** Market Cap */
@@ -13132,6 +13275,21 @@ export interface components {
             turnover_pct?: number | null;
             /** Volume */
             volume?: number | null;
+        };
+        /**
+         * ScreenerPreset
+         * @description Purpose: 题材挖掘与低估值等经典场景预设模版。
+         */
+        ScreenerPreset: {
+            /** Category */
+            category: string;
+            /** Description */
+            description: string;
+            filters: components["schemas"]["ScreenerFilter"];
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
         };
         /**
          * ScreenerResult
@@ -14625,6 +14783,44 @@ export interface components {
             ma10?: number | null;
             /** Ma5 */
             ma5?: number | null;
+        };
+        /**
+         * TestWebhookRequest
+         * @description Purpose: Webhook 通知通道连通性测试请求。
+         */
+        TestWebhookRequest: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "feishu" | "wecom" | "wxpusher" | "dingtalk";
+            /**
+             * Secret
+             * @default
+             */
+            secret: string;
+            /**
+             * Uids
+             * @default
+             */
+            uids: string;
+            /**
+             * Webhook Url
+             * @default
+             */
+            webhook_url: string;
+        };
+        /**
+         * TestWebhookResponse
+         * @description Purpose: Webhook 通知通道连通性测试响应。
+         */
+        TestWebhookResponse: {
+            /** Channel */
+            channel: string;
+            /** Message */
+            message: string;
+            /** Success */
+            success: boolean;
         };
         /** ThsHotPlate */
         ThsHotPlate: {
@@ -20627,6 +20823,132 @@ export interface operations {
             };
         };
     };
+    get_notification_channel_status_api_push_channels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelStatus"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_notification_history_api_push_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    clear_notification_history_records_api_push_history_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    trigger_channel_test_webhook_api_push_test_webhook_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestWebhookRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestWebhookResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_quant_backtests_api_quant_backtests_get: {
         parameters: {
             query?: {
@@ -21309,6 +21631,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ValuationPercentileResult"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_screener_presets_api_screener_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenerPreset"][];
                 };
             };
             /** @description 统一错误响应 */

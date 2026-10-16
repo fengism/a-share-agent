@@ -6,6 +6,7 @@ import { queryKeys } from "../queryKeys";
 import type {
   ScreenerFilter,
   ScreenerItem,
+  ScreenerPreset,
   ScreenerResult,
   ScreenerStrategyPreset,
   ScreenerStrategyRequest,
@@ -76,6 +77,14 @@ export function useComputePercentiles() {
   });
 }
 
+
+export function useScreenerPresets() {
+  return useQuery({
+    queryKey: ["screener", "presets"],
+    queryFn: () => apiGet<ScreenerPreset[]>("/screener/presets"),
+    staleTime: QUERY_CACHE_POLICIES.reference.staleMs,
+  });
+}
 
 export function useScreenerStrategies() {
   return useQuery({

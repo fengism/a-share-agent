@@ -251,4 +251,49 @@ describe("ResultsTable", () => {
       );
     });
   });
+
+  it("renders amplitude column, broken-net badge, and supports amplitude sorting", () => {
+    mocks.isNarrow = false;
+    const onSortChange = vi.fn();
+    render(
+      <MemoryRouter>
+        <ResultsTable
+          data={{
+            items: [{
+              code: "601398",
+              name: "工商银行",
+              price: 5.8,
+              change_pct: 0.5,
+              pe_ttm: 5.2,
+              pb: 0.58,
+              is_broken_net: true,
+              amplitude: 1.85,
+              market_cap: 20000,
+              turnover_pct: 0.12,
+              volume: 500000,
+              second_industry: null,
+            }],
+            total: 1,
+            page: 1,
+            page_size: 50,
+          }}
+          isLoading={false}
+          percentileMap={new Map()}
+          showPercentile={false}
+          onPageChange={vi.fn()}
+          filters={DEFAULT_SCREENER_FILTERS}
+          onSortChange={onSortChange}
+          selectedCodes={[]}
+          onSelectedCodesChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("破净")).toBeInTheDocument();
+    expect(screen.getByText("1.85%")).toBeInTheDocument();
+
+    const amplitudeHeader = screen.getByRole("columnheader", { name: /振幅/ });
+    fireEvent.click(amplitudeHeader);
+    expect(onSortChange).toHaveBeenCalledWith("amplitude", "asc");
+  });
 });

@@ -20,6 +20,11 @@ class ScreenerFilter(BaseModel):
     change_pct_max: float | None = None
     turnover_pct_min: float | None = None
     turnover_pct_max: float | None = None
+    # 题材/量价异动指标：日内振幅 (%)
+    amplitude_min: float | None = None
+    amplitude_max: float | None = None
+    # 深度价值指标：是否仅筛选破净股 (0 < 市净率 PB <= 1.0)
+    is_broken_net: bool = False
     industries: list[str] | None = None
     concepts: list[str] | None = None
     # 市场板块筛选：主板/科创板/创业板/北交所，None 表示全部市场
@@ -60,6 +65,8 @@ class ScreenerItem(BaseModel):
     market_cap: float | None = None  # 亿元
     turnover_pct: float | None = None
     volume: float | None = None
+    amplitude: float | None = None
+    is_broken_net: bool = False
     exchange: str | None = None
     board: str | None = None
     listing_date: str | None = None
@@ -68,6 +75,16 @@ class ScreenerItem(BaseModel):
     second_industry: StockConcept | None = None
     third_industry: StockConcept | None = None
     concepts: list[str] = Field(default_factory=list)
+
+
+class ScreenerPreset(BaseModel):
+    """Purpose: 题材挖掘与低估值等经典场景预设模版。"""
+
+    key: str
+    name: str
+    category: str  # "value" | "theme" | "growth"
+    description: str
+    filters: ScreenerFilter
 
 
 class ScreenerResult(BaseModel):

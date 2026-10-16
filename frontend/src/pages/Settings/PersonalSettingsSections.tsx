@@ -3,6 +3,7 @@ import type { ProviderDefault } from "../../types/settings";
 import {
   FeishuConfigCard,
   LlmConfigCard,
+  NotificationChannelsConfigCard,
   NotionConfigCard,
   ProviderDefaultsCard,
 } from "./ConfigCards";
@@ -51,11 +52,14 @@ export function AiSettingsSection({
 interface IntegrationsSettingsSectionProps extends ConfigSectionProps {
   onSaveFeishu: () => void;
   onSaveNotion: () => void;
+  onSaveNotificationChannels: () => void;
   onResetFeishu?: () => void;
   onResetNotion?: () => void;
+  onResetNotificationChannels?: () => void;
   dirtyCards?: {
     feishu?: boolean;
     notion?: boolean;
+    notificationChannels?: boolean;
   };
 }
 
@@ -66,18 +70,29 @@ export function IntegrationsSettingsSection({
   sectionTitleStyle,
   onSaveFeishu,
   onSaveNotion,
+  onSaveNotificationChannels,
   onResetFeishu,
   onResetNotion,
+  onResetNotificationChannels,
   dirtyCards = {},
 }: IntegrationsSettingsSectionProps) {
   const cardProps = { form, onChange, isSaving };
   return (
     <section aria-labelledby="integration-settings-title">
-      <h3 id="integration-settings-title" style={sectionTitleStyle}>协同与研报导出</h3>
+      <h3 id="integration-settings-title" style={sectionTitleStyle}>协同与自动推送</h3>
       <p style={{ color: "var(--c-text-muted)", marginTop: -4, marginBottom: 16 }}>
-        将系统生成的每日大盘复盘、个股深度研报和产业链图谱，自动同步推送到飞书文档或 Notion 企业知识库。
+        支持将每日收盘复盘与题材雷达自动推送到飞书群、企业微信群或个人微信，并可将研报同步归档至飞书文档与 Notion 知识库。
       </p>
       <Row gutter={[16, 16]}>
+        <Col span={24}>
+          <NotificationChannelsConfigCard
+            stretch
+            {...cardProps}
+            onSave={onSaveNotificationChannels}
+            isDirty={dirtyCards.notificationChannels}
+            onReset={onResetNotificationChannels}
+          />
+        </Col>
         <Col xs={24} xl={14} style={{ display: "flex" }}>
           <FeishuConfigCard
             stretch

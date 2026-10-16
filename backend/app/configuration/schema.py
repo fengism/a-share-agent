@@ -47,6 +47,14 @@ PRIVATE_USER_KEYS = frozenset(
         "feishu_daily_review_folder",
         "feishu_analysis_folder",
         "feishu_default_receiver",
+        "push_auto_enabled",
+        "feishu_webhook_url",
+        "feishu_webhook_secret",
+        "wecom_webhook_url",
+        "wxpusher_app_token",
+        "wxpusher_uids",
+        "push_daily_review_auto",
+        "push_potential_auto",
         "iwencai_enabled",
         "iwencai_base_url",
         "iwencai_api_key",
@@ -123,9 +131,12 @@ SECRET_KEYS = frozenset(
         "anysearch_api_key",
         "llm_api_key",
         "feishu_app_secret",
+        "feishu_webhook_secret",
+        "dingtalk_webhook_secret",
         "feishu_verification_token",
         "feishu_encrypt_key",
         "bot_feishu_app_secret",
+        "wxpusher_app_token",
         "iwencai_api_key",
         "notion_api_token",
         "eastmoney_cookie",
@@ -304,6 +315,22 @@ class Settings(BaseSettings):
     feishu_default_receiver: str = ""
     feishu_verification_token: str = ""
     feishu_encrypt_key: str = ""
+
+    # 自动推送与通知通道设置 (飞书/钉钉/企业微信/微信)
+    push_auto_enabled: bool = False
+    feishu_webhook_url: str = ""
+    feishu_webhook_secret: str = ""
+    dingtalk_webhook_url: str = ""
+    dingtalk_webhook_secret: str = ""
+    wecom_webhook_url: str = ""
+    wxpusher_app_token: str = ""
+    wxpusher_uids: str = ""
+    push_feishu_enabled: bool = True
+    push_dingtalk_enabled: bool = True
+    push_wecom_enabled: bool = True
+    push_wxpusher_enabled: bool = True
+    push_daily_review_auto: bool = True
+    push_potential_auto: bool = True
 
     bot_enabled: bool = False
     bot_command_prefix: str = "/"

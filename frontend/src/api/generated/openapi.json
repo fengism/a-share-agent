@@ -17076,6 +17076,70 @@
         "title": "NorthboundHistoryResponse",
         "type": "object"
       },
+      "NotificationChannelStatus": {
+        "description": "Purpose: 系统通知通道配置与启用状态。",
+        "properties": {
+          "auto_enabled": {
+            "title": "Auto Enabled",
+            "type": "boolean"
+          },
+          "daily_review_auto": {
+            "title": "Daily Review Auto",
+            "type": "boolean"
+          },
+          "dingtalk_configured": {
+            "default": false,
+            "title": "Dingtalk Configured",
+            "type": "boolean"
+          },
+          "dingtalk_enabled": {
+            "default": true,
+            "title": "Dingtalk Enabled",
+            "type": "boolean"
+          },
+          "feishu_configured": {
+            "title": "Feishu Configured",
+            "type": "boolean"
+          },
+          "feishu_enabled": {
+            "default": true,
+            "title": "Feishu Enabled",
+            "type": "boolean"
+          },
+          "potential_auto": {
+            "title": "Potential Auto",
+            "type": "boolean"
+          },
+          "wecom_configured": {
+            "title": "Wecom Configured",
+            "type": "boolean"
+          },
+          "wecom_enabled": {
+            "default": true,
+            "title": "Wecom Enabled",
+            "type": "boolean"
+          },
+          "wxpusher_configured": {
+            "title": "Wxpusher Configured",
+            "type": "boolean"
+          },
+          "wxpusher_enabled": {
+            "default": true,
+            "title": "Wxpusher Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "feishu_configured",
+          "wecom_configured",
+          "wxpusher_configured",
+          "auto_enabled",
+          "daily_review_auto",
+          "potential_auto"
+        ],
+        "title": "NotificationChannelStatus",
+        "type": "object"
+      },
       "OkResponse": {
         "properties": {
           "ok": {
@@ -21440,6 +21504,28 @@
       "ScreenerFilter": {
         "description": "Purpose: 股票筛选接口的过滤条件参数。",
         "properties": {
+          "amplitude_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amplitude Max"
+          },
+          "amplitude_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amplitude Min"
+          },
           "change_pct_max": {
             "anyOf": [
               {
@@ -21494,6 +21580,11 @@
               }
             ],
             "title": "Industries"
+          },
+          "is_broken_net": {
+            "default": false,
+            "title": "Is Broken Net",
+            "type": "boolean"
           },
           "market_cap_max": {
             "anyOf": [
@@ -21674,6 +21765,17 @@
       "ScreenerItem": {
         "description": "Purpose: 股票筛选结果中的单只股票信息。",
         "properties": {
+          "amplitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amplitude"
+          },
           "board": {
             "anyOf": [
               {
@@ -21738,6 +21840,11 @@
                 "type": "null"
               }
             ]
+          },
+          "is_broken_net": {
+            "default": false,
+            "title": "Is Broken Net",
+            "type": "boolean"
           },
           "listing_date": {
             "anyOf": [
@@ -21846,6 +21953,39 @@
           "name"
         ],
         "title": "ScreenerItem",
+        "type": "object"
+      },
+      "ScreenerPreset": {
+        "description": "Purpose: 题材挖掘与低估值等经典场景预设模版。",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/ScreenerFilter"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "category",
+          "description",
+          "filters"
+        ],
+        "title": "ScreenerPreset",
         "type": "object"
       },
       "ScreenerResult": {
@@ -25541,6 +25681,65 @@
           }
         },
         "title": "TechnicalVolumeAverages",
+        "type": "object"
+      },
+      "TestWebhookRequest": {
+        "description": "Purpose: Webhook 通知通道连通性测试请求。",
+        "properties": {
+          "channel": {
+            "enum": [
+              "feishu",
+              "wecom",
+              "wxpusher",
+              "dingtalk"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "secret": {
+            "default": "",
+            "title": "Secret",
+            "type": "string"
+          },
+          "uids": {
+            "default": "",
+            "title": "Uids",
+            "type": "string"
+          },
+          "webhook_url": {
+            "default": "",
+            "title": "Webhook Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel"
+        ],
+        "title": "TestWebhookRequest",
+        "type": "object"
+      },
+      "TestWebhookResponse": {
+        "description": "Purpose: Webhook 通知通道连通性测试响应。",
+        "properties": {
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "channel",
+          "message"
+        ],
+        "title": "TestWebhookResponse",
         "type": "object"
       },
       "ThsHotPlate": {
@@ -36400,6 +36599,183 @@
         ]
       }
     },
+    "/api/push/channels": {
+      "get": {
+        "description": "获取当前已配置的自动推送与通知通道状态。",
+        "operationId": "get_notification_channel_status_api_push_channels_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationChannelStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Notification Channel Status",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/api/push/history": {
+      "delete": {
+        "description": "清空通知推送历史审计日志。",
+        "operationId": "clear_notification_history_records_api_push_history_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Clear Notification History Records Api Push History Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Clear Notification History Records",
+        "tags": [
+          "push"
+        ]
+      },
+      "get": {
+        "description": "获取最近的通知推送历史审计日志。",
+        "operationId": "get_notification_history_api_push_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Notification History Api Push History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Notification History",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/api/push/test-webhook": {
+      "post": {
+        "description": "测试指定通道（飞书、企业微信、微信）的通知连通性。",
+        "operationId": "trigger_channel_test_webhook_api_push_test_webhook_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestWebhookRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestWebhookResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Trigger Channel Test Webhook",
+        "tags": [
+          "push"
+        ]
+      }
+    },
     "/api/quant/backtests": {
       "get": {
         "operationId": "get_quant_backtests_api_quant_backtests_get",
@@ -37448,6 +37824,47 @@
           }
         ],
         "summary": "Compute Percentiles",
+        "tags": [
+          "screener"
+        ]
+      }
+    },
+    "/api/screener/presets": {
+      "get": {
+        "description": "获取经典题材挖掘与深度低估值选股预设模版。",
+        "operationId": "get_screener_presets_api_screener_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScreenerPreset"
+                  },
+                  "title": "Response Get Screener Presets Api Screener Presets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Screener Presets",
         "tags": [
           "screener"
         ]

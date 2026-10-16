@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { Row, Col, InputNumber, Select, Button, Space, Switch, Slider, Typography } from "antd";
-import { SearchOutlined, ReloadOutlined } from "@ant-design/icons";
+import { SearchOutlined, ReloadOutlined, ThunderboltOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
 import type { ScreenerFilter } from "../../types/stock";
 import { useStyles } from "../../styles/ui";
+import { useScreenerPresets } from "../../api/queryHooks/screener";
 import ActiveFiltersBar from "./ActiveFiltersBar";
 
 const { Text } = Typography;
@@ -18,10 +19,10 @@ interface RangeFieldProps {
   step?: number;
 }
 
-function RangeField({ label, min, max, onMinChange, onMaxChange, minPlaceholder = "最小", maxPlaceholder = "最大", step = 0.01 }: RangeFieldProps) {
+function RangeField({ label, min, max, onMinChange, onMaxChange, minPlaceholder = "最小", maxPlaceholder = "最大", step = 0.01, md = 6 }: RangeFieldProps & { md?: number }) {
   const { fieldLabelStyle } = useStyles();
   return (
-    <Col xs={24} sm={12} md={8}>
+    <Col xs={24} sm={12} md={md}>
       <div style={fieldLabelStyle}>{label}</div>
       <Space.Compact style={{ width: "100%" }}>
         <InputNumber style={{ width: "50%" }} value={min} onChange={onMinChange} placeholder={minPlaceholder} step={step} size="small" />
@@ -52,6 +53,7 @@ export default function FilterPanel({
   pePercentileMax, pbPercentileMax, onPePercentileMaxChange, onPbPercentileMaxChange,
 }: Props) {
   const { fieldLabelStyle, mutedTextStyle } = useStyles();
+  const { data: presets } = useScreenerPresets();
 
   const industryOptions = useMemo(
     () => industries.map((n) => ({ label: n, value: n })),
@@ -66,8 +68,52 @@ export default function FilterPanel({
     onFiltersChange({ ...filters, ...patch });
   };
 
+  const isPresetActive = (preset: { filters: Partial<ScreenerFilter> }) => {
+    const keys = Object.keys(preset.filters) as (keyof ScreenerFilter)[];
+    return keys.length > 0 && keys.every((k) => {
+      const pv = preset.filters[k];
+      if (pv === null || pv === undefined) return true;
+      return filters[k] === pv;
+    });
+  };
+
   return (
     <div>
+      {/* 题材与低估值快捷场景模版 */}
+      {presets && presets.length > 0 && (
+        <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: "12px", color: mutedTextStyle.color, fontWeight: 600, flexShrink: 0 }}>
+            场景挖掘:
+          </span>
+          {presets.map((preset) => {
+            const active = isPresetActive(preset);
+            return (
+              <Button
+                key={preset.key}
+                size="small"
+                type={active ? "primary" : "default"}
+                icon={preset.category === "theme" ? <ThunderboltOutlined /> : <SafetyCertificateOutlined />}
+                onClick={() => {
+                  onFiltersChange({
+                    ...filters,
+                    ...preset.filters,
+                    page: 1,
+                  });
+                }}
+                title={preset.description}
+                style={{
+                  fontSize: "12px",
+                  borderColor: active ? undefined : preset.category === "theme" ? "#fa8c16" : preset.category === "value" ? "#1890ff" : undefined,
+                  color: active ? undefined : preset.category === "theme" ? "#fa8c16" : preset.category === "value" ? "#1890ff" : undefined,
+                }}
+              >
+                {preset.name}
+              </Button>
+            );
+          })}
+        </div>
+      )}
+
       <Row gutter={[16, 12]}>
         <RangeField label="PE(TTM)" min={filters.pe_min} max={filters.pe_max} onMinChange={(v) => set({ pe_min: v })} onMaxChange={(v) => set({ pe_max: v })} step={1} minPlaceholder="0" maxPlaceholder="100" />
         <RangeField label="PB" min={filters.pb_min} max={filters.pb_max} onMinChange={(v) => set({ pb_min: v })} onMaxChange={(v) => set({ pb_max: v })} step={0.1} minPlaceholder="0" maxPlaceholder="50" />
@@ -75,6 +121,7 @@ export default function FilterPanel({
         <RangeField label="市值(亿)" min={filters.market_cap_min} max={filters.market_cap_max} onMinChange={(v) => set({ market_cap_min: v })} onMaxChange={(v) => set({ market_cap_max: v })} step={10} minPlaceholder="0" maxPlaceholder="50000" />
         <RangeField label="涨跌幅(%)" min={filters.change_pct_min} max={filters.change_pct_max} onMinChange={(v) => set({ change_pct_min: v })} onMaxChange={(v) => set({ change_pct_max: v })} step={0.1} minPlaceholder="-10" maxPlaceholder="10" />
         <RangeField label="换手率(%)" min={filters.turnover_pct_min} max={filters.turnover_pct_max} onMinChange={(v) => set({ turnover_pct_min: v })} onMaxChange={(v) => set({ turnover_pct_max: v })} step={0.5} minPlaceholder="0" maxPlaceholder="50" />
+        <RangeField label="振幅(%)" min={filters.amplitude_min} max={filters.amplitude_max} onMinChange={(v) => set({ amplitude_min: v })} onMaxChange={(v) => set({ amplitude_max: v })} step={0.5} minPlaceholder="0" maxPlaceholder="30" />
       </Row>
 
       <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
@@ -124,7 +171,8 @@ export default function FilterPanel({
           <Space>
             <Select size="small" value={filters.sort_by} onChange={(v) => set({ sort_by: v })} style={{ width: 95 }} options={[
               { label: "市值", value: "market_cap" }, { label: "PE", value: "pe" }, { label: "PB", value: "pb" },
-              { label: "价格", value: "price" }, { label: "涨跌幅", value: "change_pct" }, { label: "换手率", value: "turnover_pct" }, { label: "成交量", value: "volume" },
+              { label: "价格", value: "price" }, { label: "涨跌幅", value: "change_pct" }, { label: "换手率", value: "turnover_pct" },
+              { label: "振幅", value: "amplitude" }, { label: "成交量", value: "volume" },
             ]} />
             <Select size="small" value={filters.sort_order} onChange={(v) => set({ sort_order: v as "asc" | "desc" })} style={{ width: 70 }} options={[
               { label: "降序", value: "desc" }, { label: "升序", value: "asc" },
@@ -141,10 +189,20 @@ export default function FilterPanel({
 
       <Row gutter={[16, 12]} style={{ marginTop: 12, borderTop: `1px solid ${mutedTextStyle.color}`, paddingTop: 12 }}>
         <Col span={24}>
-          <Space>
-            <Switch size="small" checked={showPercentile} onChange={onShowPercentileChange} />
-            <Text style={{ fontSize: "var(--c-font-md)", color: mutedTextStyle.color }}>估值百分位过滤</Text>
-            {showPercentile && <Text type="secondary" style={{ ...mutedTextStyle, fontSize: "var(--c-font-xs)" }}>（按需计算，可能需要较长时间）</Text>}
+          <Space size="large" wrap>
+            <Space>
+              <Switch size="small" checked={filters.is_broken_net || false} onChange={(v) => set({ is_broken_net: v, page: 1 })} />
+              <Text style={{ fontSize: "var(--c-font-md)", color: mutedTextStyle.color }}>仅破净股 (PB ≤ 1.0)</Text>
+            </Space>
+            <Space>
+              <Switch size="small" checked={filters.exclude_st || false} onChange={(v) => set({ exclude_st: v, page: 1 })} />
+              <Text style={{ fontSize: "var(--c-font-md)", color: mutedTextStyle.color }}>剔除ST风险股</Text>
+            </Space>
+            <Space>
+              <Switch size="small" checked={showPercentile} onChange={onShowPercentileChange} />
+              <Text style={{ fontSize: "var(--c-font-md)", color: mutedTextStyle.color }}>估值百分位过滤</Text>
+              {showPercentile && <Text type="secondary" style={{ ...mutedTextStyle, fontSize: "var(--c-font-xs)" }}>（按需计算，可能需要较长时间）</Text>}
+            </Space>
           </Space>
         </Col>
         {showPercentile && (

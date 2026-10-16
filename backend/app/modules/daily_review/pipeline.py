@@ -572,6 +572,11 @@ async def _generate_daily_review_locked(
         watchlist=review.next_day_watchlist,
         key_levels=review.key_levels,
     )
+    try:
+        from app.core.events import event_bus
+        await event_bus.publish(review, name="daily_review.completed")
+    except Exception:  # noqa: BLE001 - 事件发布异常绝不阻断复盘返回
+        logger.warning("发布每日复盘完成事件失败: date=%s", effective_text, exc_info=True)
     return review
 
 

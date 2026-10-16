@@ -390,6 +390,10 @@ async def application_lifespan(
     register_all_capabilities()
     logger.info("Chat skills 注册完成")
 
+    from app.modules.push.public import register_push_subscribers
+
+    register_push_subscribers()
+
     from app.modules.quant.public import configure_strategy_registry
 
     await blocking_runner(

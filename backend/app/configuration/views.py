@@ -133,6 +133,20 @@ class IntegrationSettingsView:
     feishu_enabled: bool
     feishu_app_id: str
     feishu_app_secret: str
+    push_auto_enabled: bool
+    feishu_webhook_url: str
+    feishu_webhook_secret: str
+    dingtalk_webhook_url: str
+    dingtalk_webhook_secret: str
+    wecom_webhook_url: str
+    wxpusher_app_token: str
+    wxpusher_uids: str
+    push_feishu_enabled: bool
+    push_dingtalk_enabled: bool
+    push_wecom_enabled: bool
+    push_wxpusher_enabled: bool
+    push_daily_review_auto: bool
+    push_potential_auto: bool
     iwencai_enabled: bool
     iwencai_base_url: str
     iwencai_api_key: str
@@ -146,6 +160,20 @@ class IntegrationSettingsView:
             feishu_enabled=settings.feishu_enabled,
             feishu_app_id=settings.feishu_app_id,
             feishu_app_secret=settings.feishu_app_secret,
+            push_auto_enabled=settings.push_auto_enabled,
+            feishu_webhook_url=settings.feishu_webhook_url,
+            feishu_webhook_secret=settings.feishu_webhook_secret,
+            dingtalk_webhook_url=settings.dingtalk_webhook_url,
+            dingtalk_webhook_secret=settings.dingtalk_webhook_secret,
+            wecom_webhook_url=settings.wecom_webhook_url,
+            wxpusher_app_token=settings.wxpusher_app_token,
+            wxpusher_uids=settings.wxpusher_uids,
+            push_feishu_enabled=settings.push_feishu_enabled,
+            push_dingtalk_enabled=settings.push_dingtalk_enabled,
+            push_wecom_enabled=settings.push_wecom_enabled,
+            push_wxpusher_enabled=settings.push_wxpusher_enabled,
+            push_daily_review_auto=settings.push_daily_review_auto,
+            push_potential_auto=settings.push_potential_auto,
             iwencai_enabled=settings.iwencai_enabled,
             iwencai_base_url=settings.iwencai_base_url,
             iwencai_api_key=settings.iwencai_api_key,

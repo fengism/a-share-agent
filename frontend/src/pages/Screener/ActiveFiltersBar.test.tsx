@@ -75,4 +75,42 @@ describe("ActiveFiltersBar", () => {
     );
     expect(container.firstChild).toBeNull();
   });
+
+  it("renders and clears deep value, theme amplitude, and risk tags", () => {
+    const onFiltersChange = vi.fn();
+    const onSearch = vi.fn();
+
+    render(
+      <ActiveFiltersBar
+        filters={{
+          ...DEFAULT_SCREENER_FILTERS,
+          amplitude_min: 5,
+          amplitude_max: 15,
+          is_broken_net: true,
+          exclude_st: true,
+          min_amount_yi: 1.0,
+        }}
+        onFiltersChange={onFiltersChange}
+        onSearch={onSearch}
+        onReset={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("生效条件 (4)：")).toBeInTheDocument();
+    expect(screen.getByText("振幅: 5 ~ 15%")).toBeInTheDocument();
+    expect(screen.getByText("仅破净股 (PB≤1.0)")).toBeInTheDocument();
+    expect(screen.getByText("剔除ST风险股")).toBeInTheDocument();
+    expect(screen.getByText("成交额 ≥ 1亿")).toBeInTheDocument();
+
+    const closeButtons = screen.getAllByLabelText("Close");
+    // Remove is_broken_net
+    fireEvent.click(closeButtons[1]);
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        is_broken_net: false,
+        page: 1,
+      }),
+    );
+    expect(onSearch).toHaveBeenCalled();
+  });
 });

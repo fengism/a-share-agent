@@ -31,6 +31,16 @@ async def _get_exchange_master_optional() -> ExchangeStockMaster | None:
         return None
 
 
+def _infer_board_by_code(code: str) -> str:
+    if code.startswith(("688", "689")):
+        return "科创板"
+    if code.startswith(("300", "301")):
+        return "创业板"
+    if code.startswith(("4", "8", "920")):
+        return "北交所"
+    return "主板"
+
+
 def _merge_exchange_master(df: pd.DataFrame, master: ExchangeStockMaster | None) -> pd.DataFrame:
     result = df.copy()
     result["代码"] = result["代码"].map(_normalize_candidate_code)
@@ -38,7 +48,7 @@ def _merge_exchange_master(df: pd.DataFrame, master: ExchangeStockMaster | None)
     if master is None or not master.records:
         result["exchange_industry"] = None
         result["exchange"] = None
-        result["board"] = None
+        result["board"] = result["代码"].map(_infer_board_by_code)
         result["listing_date"] = None
         return result
 
@@ -50,6 +60,7 @@ def _merge_exchange_master(df: pd.DataFrame, master: ExchangeStockMaster | None)
     result["exchange_industry"] = result["代码"].map({code: record.industry for code, record in by_code.items()})
     result["exchange"] = result["代码"].map({code: record.exchange for code, record in by_code.items()})
     result["board"] = result["代码"].map({code: record.board for code, record in by_code.items()})
+    result["board"] = result["board"].fillna(result["代码"].map(_infer_board_by_code))
     result["listing_date"] = result["代码"].map({code: record.listing_date for code, record in by_code.items()})
     return result
 
@@ -125,6 +136,17 @@ def _screen_dataframe(
 
     df["market_cap_yi"] = df["market_cap_raw_num"] / 1e8
 
+    # 计算日内振幅 (%)
+    if "最高" in df.columns and "最低" in df.columns:
+        high = pd.to_numeric(df["最高"], errors="coerce")
+        low = pd.to_numeric(df["最低"], errors="coerce")
+        prev_close = pd.to_numeric(df.get("昨收"), errors="coerce") if "昨收" in df.columns else pd.Series(dtype=float, index=df.index)
+        open_price = pd.to_numeric(df.get("今开"), errors="coerce") if "今开" in df.columns else pd.Series(dtype=float, index=df.index)
+        valid_prev = prev_close.where(prev_close > 0).fillna(open_price.where(open_price > 0))
+        df["amplitude_num"] = ((high - low) / valid_prev) * 100
+    else:
+        df["amplitude_num"] = None
+
     mask = pd.Series([True] * len(df), index=df.index)
     if filters.pe_min is not None:
         mask &= df["pe_num"] >= filters.pe_min
@@ -134,6 +156,9 @@ def _screen_dataframe(
         mask &= df["pb_num"] >= filters.pb_min
     if filters.pb_max is not None:
         mask &= df["pb_num"] <= filters.pb_max
+    # 破净股筛选: PB > 0 且 PB <= 1.0
+    if filters.is_broken_net:
+        mask &= df["pb_num"].notna() & (df["pb_num"] > 0) & (df["pb_num"] <= 1.0)
     if filters.price_min is not None:
         mask &= df["price_num"] >= filters.price_min
     if filters.price_max is not None:
@@ -150,6 +175,10 @@ def _screen_dataframe(
         mask &= df["turnover_pct_num"] >= filters.turnover_pct_min
     if filters.turnover_pct_max is not None:
         mask &= df["turnover_pct_num"] <= filters.turnover_pct_max
+    if filters.amplitude_min is not None:
+        mask &= df["amplitude_num"].notna() & (df["amplitude_num"] >= filters.amplitude_min)
+    if filters.amplitude_max is not None:
+        mask &= df["amplitude_num"].notna() & (df["amplitude_num"] <= filters.amplitude_max)
     if filters.industries:
         target_industries = set(filters.industries)
         industry_match = (
@@ -205,6 +234,7 @@ def _screen_dataframe(
         "change_pct": "change_pct_num",
         "turnover_pct": "turnover_pct_num",
         "volume": "volume_num",
+        "amplitude": "amplitude_num",
     }
     sort_col = sort_col_map.get(filters.sort_by, "market_cap_yi")
     ascending = filters.sort_order == "asc"
@@ -225,6 +255,11 @@ def _screen_dataframe(
         raw_concepts = row.get("concepts")
         stock_concepts = list(raw_concepts) if isinstance(raw_concepts, list) else []
 
+        pb_val = safe_float(row.get("市净率"))
+        is_broken = pb_val is not None and 0 < pb_val <= 1.0
+        amp_raw = safe_float(row.get("amplitude_num"))
+        amp_val = round(amp_raw, 2) if amp_raw is not None else None
+
         items.append(
             ScreenerItem(
                 code=str(row["代码"]),
@@ -232,10 +267,12 @@ def _screen_dataframe(
                 price=safe_float(row.get("最新价")),
                 change_pct=safe_float(row.get("涨跌幅")),
                 pe_ttm=safe_float(row.get("市盈率-动态")),
-                pb=safe_float(row.get("市净率")),
+                pb=pb_val,
                 market_cap=safe_float(row.get("market_cap_yi")),
                 turnover_pct=safe_float(row.get("换手率")),
                 volume=safe_float(row.get("成交量")),
+                amplitude=amp_val,
+                is_broken_net=is_broken,
                 exchange=safe_string(row.get("exchange")),
                 board=safe_string(row.get("board")),
                 listing_date=safe_string(row.get("listing_date")),

@@ -25,3 +25,35 @@ class PushResponse(BaseModel):
     url: str = ""
     title: str = ""
     message: str = ""
+
+
+class TestWebhookRequest(BaseModel):
+    """Purpose: Webhook 通知通道连通性测试请求。"""
+    __test__ = False
+    channel: Literal["feishu", "wecom", "wxpusher", "dingtalk"]
+    webhook_url: str = ""
+    secret: str = ""
+    uids: str = ""
+
+
+class TestWebhookResponse(BaseModel):
+    """Purpose: Webhook 通知通道连通性测试响应。"""
+    __test__ = False
+    success: bool
+    channel: str
+    message: str
+
+
+class NotificationChannelStatus(BaseModel):
+    """Purpose: 系统通知通道配置与启用状态。"""
+    feishu_configured: bool
+    dingtalk_configured: bool = False
+    wecom_configured: bool
+    wxpusher_configured: bool
+    feishu_enabled: bool = True
+    dingtalk_enabled: bool = True
+    wecom_enabled: bool = True
+    wxpusher_enabled: bool = True
+    auto_enabled: bool
+    daily_review_auto: bool
+    potential_auto: bool

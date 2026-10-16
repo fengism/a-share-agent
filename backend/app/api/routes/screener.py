@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from app.api.errors import BadRequestError
 from app.modules.screener.public import (
     ScreenerFilter,
+    ScreenerPreset,
     ScreenerResult,
     ScreenerStrategyPreset,
     ScreenerStrategyRequest,
@@ -14,6 +15,7 @@ from app.modules.screener.public import (
     ValuationPercentileRequest,
     ValuationPercentileResult,
     get_industry_list,
+    list_screener_presets,
     list_screener_strategies,
     screen_candidates_by_strategy,
 )
@@ -87,6 +89,12 @@ async def compute_percentiles(request: ValuationPercentileRequest):
         period=request.period,
     )
     return ValuationPercentileResult(items=items)
+
+
+@router.get("/presets", response_model=list[ScreenerPreset])
+async def get_screener_presets():
+    """获取经典题材挖掘与深度低估值选股预设模版。"""
+    return list_screener_presets()
 
 
 @router.get("/strategies", response_model=list[ScreenerStrategyPreset])

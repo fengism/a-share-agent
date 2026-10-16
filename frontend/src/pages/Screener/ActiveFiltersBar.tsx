@@ -119,6 +119,51 @@ export default function ActiveFiltersBar({
     });
   }
 
+  const amplitudeLabel = formatRangeLabel("振幅", filters.amplitude_min, filters.amplitude_max, "%");
+  if (amplitudeLabel) {
+    activeItems.push({
+      key: "amplitude",
+      label: amplitudeLabel,
+      onRemove: () => {
+        onFiltersChange({ ...filters, amplitude_min: null, amplitude_max: null, page: 1 });
+        onSearch();
+      },
+    });
+  }
+
+  if (filters.is_broken_net) {
+    activeItems.push({
+      key: "is_broken_net",
+      label: "仅破净股 (PB≤1.0)",
+      onRemove: () => {
+        onFiltersChange({ ...filters, is_broken_net: false, page: 1 });
+        onSearch();
+      },
+    });
+  }
+
+  if (filters.exclude_st) {
+    activeItems.push({
+      key: "exclude_st",
+      label: "剔除ST风险股",
+      onRemove: () => {
+        onFiltersChange({ ...filters, exclude_st: false, page: 1 });
+        onSearch();
+      },
+    });
+  }
+
+  if (filters.min_amount_yi != null && filters.min_amount_yi > 0) {
+    activeItems.push({
+      key: "min_amount_yi",
+      label: `成交额 ≥ ${filters.min_amount_yi}亿`,
+      onRemove: () => {
+        onFiltersChange({ ...filters, min_amount_yi: null, page: 1 });
+        onSearch();
+      },
+    });
+  }
+
   // Multi selects
   if (filters.markets && filters.markets.length > 0) {
     filters.markets.forEach((market) => {

@@ -317,6 +317,11 @@ async def run_daily_mining(
         "潜力股挖掘完成: date=%s universe=%s evaluated=%s hits=%s",
         result.date, result.universe_size, result.evaluated, len(result.items),
     )
+    try:
+        from app.core.events import event_bus
+        await event_bus.publish(result, name="potential_stocks.mined")
+    except Exception:  # noqa: BLE001 - 事件发布异常绝不阻断挖掘返回
+        logger.warning("发布潜力股挖掘完成事件失败: date=%s", result.date, exc_info=True)
     return result
 
 

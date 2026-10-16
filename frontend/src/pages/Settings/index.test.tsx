@@ -125,6 +125,7 @@ vi.mock("./ConfigCards", async () => {
   ),
   ResearchBudgetCard: () => null,
   FeishuConfigCard: () => null,
+  NotificationChannelsConfigCard: () => null,
   FredConfigCard: ({ form, onChange, onSave, isDirty, onReset }: {
     form: ConfigUpdate;
     onChange: (patch: ConfigUpdate) => void;

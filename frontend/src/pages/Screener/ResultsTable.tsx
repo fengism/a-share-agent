@@ -27,7 +27,7 @@ interface Props {
   strategyFallbackCodes?: ReadonlySet<string>;
 }
 
-type SortableKey = "price" | "change_pct" | "pe" | "pb" | "market_cap" | "turnover_pct" | "volume";
+type SortableKey = "price" | "change_pct" | "pe" | "pb" | "market_cap" | "turnover_pct" | "volume" | "amplitude";
 type LocalStrategySortKey = "strategy_signal_age" | "strategy_return_since_signal" | "strategy_average_amount_20d";
 
 const SORT_FIELD_MAP: Record<string, SortableKey> = {
@@ -38,6 +38,7 @@ const SORT_FIELD_MAP: Record<string, SortableKey> = {
   market_cap: "market_cap",
   turnover_pct: "turnover_pct",
   volume: "volume",
+  amplitude: "amplitude",
 };
 
 const LOCAL_STRATEGY_SORT_KEYS = new Set<LocalStrategySortKey>([
@@ -231,11 +232,40 @@ export default function ResultsTable({
     {
       title: "PB",
       dataIndex: "pb",
-      width: 70,
+      width: 78,
       align: "right",
       sorter: true,
       sortOrder: filters.sort_by === "pb" ? serverSortOrder : null,
-      render: (v: number | null) => <span className="financial-num">{v?.toFixed(2) ?? "-"}</span>,
+      render: (v: number | null, record: ScreenerItem) => (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 3, justifyContent: "flex-end", width: "100%" }}>
+          {record.is_broken_net && (
+            <span
+              style={{
+                fontSize: "10px",
+                lineHeight: "14px",
+                padding: "0 3px",
+                borderRadius: 2,
+                backgroundColor: "rgba(24, 144, 255, 0.12)",
+                color: "#1890ff",
+                fontWeight: 600,
+              }}
+              title="破净标的 (PB <= 1.0)"
+            >
+              破净
+            </span>
+          )}
+          <span className="financial-num">{v?.toFixed(2) ?? "-"}</span>
+        </span>
+      ),
+    },
+    {
+      title: "振幅",
+      dataIndex: "amplitude",
+      width: 75,
+      align: "right",
+      sorter: true,
+      sortOrder: filters.sort_by === "amplitude" ? serverSortOrder : null,
+      render: (v: number | null) => (v != null ? <span className="financial-num">{v.toFixed(2)}%</span> : "-"),
     },
     {
       title: "市值(亿)",
@@ -431,6 +461,8 @@ export default function ResultsTable({
         items={[
           { key: "pe", label: "PE(TTM)", value: record.pe_ttm?.toFixed(1) ?? "-" },
           { key: "pb", label: "PB", value: record.pb?.toFixed(2) ?? "-" },
+          { key: "amplitude", label: "日内振幅", value: record.amplitude != null ? `${record.amplitude.toFixed(2)}%` : "-" },
+          ...(record.is_broken_net ? [{ key: "broken-net", label: "破净状态", value: "破净标的 (PB ≤ 1.0)" }] : []),
           {
             key: "market-cap",
             label: "市值(亿)",

@@ -27,6 +27,10 @@ const NUMBER_FILTER_KEYS = [
   "change_pct_max",
   "turnover_pct_min",
   "turnover_pct_max",
+  "amplitude_min",
+  "amplitude_max",
+  "min_amount_yi",
+  "min_listing_days",
 ] as const;
 
 const SORT_FIELDS: ReadonlySet<string> = new Set([
@@ -36,6 +40,7 @@ const SORT_FIELDS: ReadonlySet<string> = new Set([
   "price",
   "change_pct",
   "turnover_pct",
+  "amplitude",
   "volume",
 ]);
 
@@ -86,6 +91,8 @@ export function parseScreenerUrlState(params: URLSearchParams): ScreenerUrlState
   filters.sort_order = params.get("order") === "asc" ? "asc" : "desc";
   filters.page = parsePositiveInteger(params.get("page"), DEFAULT_SCREENER_FILTERS.page);
   filters.page_size = parsePositiveInteger(params.get("size"), DEFAULT_SCREENER_FILTERS.page_size);
+  if (params.get("broken_net") === "1") filters.is_broken_net = true;
+  if (params.get("exclude_st") === "1") filters.exclude_st = true;
 
   return {
     filters,
@@ -111,6 +118,8 @@ export function serializeScreenerUrlState(state: ScreenerUrlState): URLSearchPar
   if (state.filters.markets?.length) {
     params.set("markets", Array.from(new Set(state.filters.markets)).join(","));
   }
+  if (state.filters.is_broken_net) params.set("broken_net", "1");
+  if (state.filters.exclude_st) params.set("exclude_st", "1");
   if (state.filters.sort_by !== DEFAULT_SCREENER_FILTERS.sort_by) params.set("sort", state.filters.sort_by);
   if (state.filters.sort_order !== DEFAULT_SCREENER_FILTERS.sort_order) params.set("order", state.filters.sort_order);
   if (state.filters.page !== DEFAULT_SCREENER_FILTERS.page) params.set("page", String(state.filters.page));

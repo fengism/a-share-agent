@@ -180,6 +180,7 @@ export default function SettingsPage() {
         ai: false,
         feishu: false,
         notion: false,
+        notificationChannels: false,
         integrations: false,
         iwencai: false,
         fred: false,
@@ -230,6 +231,17 @@ export default function SettingsPage() {
       (form.notion_parent_page_id !== undefined && form.notion_parent_page_id !== config.notion_parent_page_id) ||
       (form.notion_database_id !== undefined && form.notion_database_id !== config.notion_database_id) ||
       (form.notion_api_token && !form.notion_api_token.includes("***") && form.notion_api_token !== config.notion_api_token)
+    );
+
+    const notificationChannels = Boolean(
+      (form.push_auto_enabled !== undefined && form.push_auto_enabled !== config.push_auto_enabled) ||
+      (form.push_daily_review_auto !== undefined && form.push_daily_review_auto !== config.push_daily_review_auto) ||
+      (form.push_potential_auto !== undefined && form.push_potential_auto !== config.push_potential_auto) ||
+      (form.feishu_webhook_url !== undefined && form.feishu_webhook_url !== config.feishu_webhook_url) ||
+      (form.wecom_webhook_url !== undefined && form.wecom_webhook_url !== config.wecom_webhook_url) ||
+      (form.wxpusher_uids !== undefined && form.wxpusher_uids !== config.wxpusher_uids) ||
+      (form.feishu_webhook_secret && !form.feishu_webhook_secret.includes("***") && form.feishu_webhook_secret !== config.feishu_webhook_secret) ||
+      (form.wxpusher_app_token && !form.wxpusher_app_token.includes("***") && form.wxpusher_app_token !== config.wxpusher_app_token)
     );
 
     const iwencai = Boolean(
@@ -326,7 +338,7 @@ export default function SettingsPage() {
         JSON.stringify((config.bot_admin_users ?? []).map((u) => u.trim()).filter(Boolean)))
     );
 
-    const integrations = feishu || notion;
+    const integrations = feishu || notion || notificationChannels;
     const dataSources = iwencai || fred || twitter || anySearch || fuyao || outboundProxy || eastmoneyRateLimit;
     const adminOps = backup || marketDaily || researchBudget;
     const admin = adminOps || bot;
@@ -336,6 +348,7 @@ export default function SettingsPage() {
       ai,
       feishu,
       notion,
+      notificationChannels,
       integrations,
       iwencai,
       fred,
@@ -420,6 +433,24 @@ export default function SettingsPage() {
       patch.notion_api_token = form.notion_api_token;
     }
     saveConfig(patch, "Notion 配置已保存");
+  }, [form, saveConfig]);
+
+  const handleSaveNotificationChannels = useCallback(() => {
+    const patch: ConfigUpdate = {
+      push_auto_enabled: form.push_auto_enabled,
+      push_daily_review_auto: form.push_daily_review_auto,
+      push_potential_auto: form.push_potential_auto,
+      feishu_webhook_url: form.feishu_webhook_url,
+      wecom_webhook_url: form.wecom_webhook_url,
+      wxpusher_uids: form.wxpusher_uids,
+    };
+    if (form.feishu_webhook_secret && !form.feishu_webhook_secret.includes("***")) {
+      patch.feishu_webhook_secret = form.feishu_webhook_secret;
+    }
+    if (form.wxpusher_app_token && !form.wxpusher_app_token.includes("***")) {
+      patch.wxpusher_app_token = form.wxpusher_app_token;
+    }
+    saveConfig(patch, "通知推送通道配置已保存");
   }, [form, saveConfig]);
 
   const handleSaveIwencai = useCallback(() => {
@@ -669,6 +700,21 @@ export default function SettingsPage() {
       notion_database_id: config.notion_database_id,
     });
     message.success("已撤销 Notion 配置修改");
+  }, [config, updateForm]);
+
+  const handleResetNotificationChannels = useCallback(() => {
+    if (!config) return;
+    updateForm({
+      push_auto_enabled: config.push_auto_enabled,
+      push_daily_review_auto: config.push_daily_review_auto,
+      push_potential_auto: config.push_potential_auto,
+      feishu_webhook_url: config.feishu_webhook_url,
+      feishu_webhook_secret: config.feishu_webhook_secret,
+      wecom_webhook_url: config.wecom_webhook_url,
+      wxpusher_app_token: config.wxpusher_app_token,
+      wxpusher_uids: config.wxpusher_uids,
+    });
+    message.success("已撤销通知推送通道配置修改");
   }, [config, updateForm]);
 
   const handleResetIwencai = useCallback(() => {
@@ -1004,7 +1050,7 @@ export default function SettingsPage() {
             key: "integrations",
             label: (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                协同与研报导出
+                协同与自动推送
                 {dirtyFlags.integrations && (
                   <span
                     style={{
@@ -1029,11 +1075,14 @@ export default function SettingsPage() {
                   sectionTitleStyle={sectionTitleStyle}
                   onSaveFeishu={handleSaveFeishu}
                   onSaveNotion={handleSaveNotion}
+                  onSaveNotificationChannels={handleSaveNotificationChannels}
                   onResetFeishu={handleResetFeishu}
                   onResetNotion={handleResetNotion}
+                  onResetNotificationChannels={handleResetNotificationChannels}
                   dirtyCards={{
                     feishu: dirtyFlags.feishu,
                     notion: dirtyFlags.notion,
+                    notificationChannels: dirtyFlags.notificationChannels,
                   }}
                 />
               </Suspense>

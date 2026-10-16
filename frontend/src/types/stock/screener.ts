@@ -13,6 +13,12 @@ export interface ScreenerFilter {
   change_pct_max?: number | null;
   turnover_pct_min?: number | null;
   turnover_pct_max?: number | null;
+  amplitude_min?: number | null;
+  amplitude_max?: number | null;
+  is_broken_net?: boolean;
+  exclude_st?: boolean;
+  min_listing_days?: number | null;
+  min_amount_yi?: number | null;
   industries?: string[] | null;
   concepts?: string[] | null;
   markets?: string[] | null;
@@ -32,6 +38,8 @@ export interface ScreenerItem {
   market_cap: number | null;
   turnover_pct: number | null;
   volume: number | null;
+  amplitude?: number | null;
+  is_broken_net?: boolean;
   exchange?: string | null;
   board?: string | null;
   listing_date?: string | null;
@@ -40,6 +48,14 @@ export interface ScreenerItem {
   second_industry: StockConcept | null;
   third_industry?: StockConcept | null;
   concepts?: string[];
+}
+
+export interface ScreenerPreset {
+  key: string;
+  name: string;
+  category: "value" | "theme" | "growth" | string;
+  description: string;
+  filters: ScreenerFilter;
 }
 
 export interface ScreenerResult {
