@@ -85,6 +85,10 @@ export interface ConfigData {
   market_daily_bar_refresh_retry_base_seconds: number;
   market_daily_observation_retention_days: number;
   market_daily_attempt_retention_days: number;
+  macro_analysis_prewarm_enabled: boolean;
+  daily_review_prewarm_enabled: boolean;
+  potential_stock_daily_enabled: boolean;
+  stock_valuation_snapshot_refresh_enabled: boolean;
   database_backup_retention_count: number;
   database_backup_include_market_daily: boolean;
   market_daily_backup_interval_days: number;

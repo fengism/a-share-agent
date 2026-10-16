@@ -80,8 +80,7 @@ export default function LlmConfigCard({
       onReset={onReset}
     >
       <p style={{ color: "var(--c-text-muted)", marginTop: 0 }}>
-        全局 Key 仅可用于全局调用目标。自定义 Provider、Base URL、API 模式 / 版本或 LiteLLM 模型时，
-        请使用个人 API Key；免 Key 的本地服务可留空。掩码不是新 Key。
+        支持自定义 Provider、Base URL、API 模式与模型。管理员保存时将自动同步为系统全局配置，供后台常驻任务及所有未配置个人 Key 的用户使用；用户未填写个人 Key 时自动使用系统全局 Key。
       </p>
       <Row gutter={[24, 16]}>
         <Col span={24} sm={12}>
@@ -112,7 +111,7 @@ export default function LlmConfigCard({
             placeholder={
               selectedDefaults?.api_key_required === false
                 ? "本地服务可留空"
-                : "输入新的 API Key 以覆盖"
+                : "输入新的 API Key 以覆盖（未配置时默认使用全局 Key）"
             }
           />
         </Col>

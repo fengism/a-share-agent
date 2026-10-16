@@ -197,6 +197,7 @@ def build_background_task_specs(
             critical=False,
             restart_on_exit=True,
             start_message="每日潜力股挖掘任务已启动",
+            enabled=lambda: settings_provider().potential_stock_daily_enabled,
         ),
         BackgroundTaskSpec(
             name="market_daily_bar_refresh",
@@ -238,6 +239,7 @@ def build_background_task_specs(
             critical=False,
             restart_on_exit=True,
             start_message="宏观解读预热任务已启动",
+            enabled=lambda: settings_provider().macro_analysis_prewarm_enabled,
         ),
         BackgroundTaskSpec(
             name="daily_review_prewarm",
@@ -246,6 +248,7 @@ def build_background_task_specs(
             critical=False,
             restart_on_exit=True,
             start_message="每日复盘预热任务已启动",
+            enabled=lambda: settings_provider().daily_review_prewarm_enabled,
         ),
         *(
             [
@@ -256,6 +259,7 @@ def build_background_task_specs(
                     critical=False,
                     restart_on_exit=True,
                     start_message="自选与持仓股票估值快照预热已启动",
+                    enabled=lambda: settings_provider().stock_valuation_snapshot_refresh_enabled,
                 )
             ]
             if stock_valuation_snapshot_refresh is not None

@@ -87,6 +87,10 @@ export default function SettingsPage() {
       market_daily_bar_refresh_retry_base_seconds: cfg.market_daily_bar_refresh_retry_base_seconds,
       market_daily_observation_retention_days: cfg.market_daily_observation_retention_days,
       market_daily_attempt_retention_days: cfg.market_daily_attempt_retention_days,
+      macro_analysis_prewarm_enabled: cfg.macro_analysis_prewarm_enabled ?? false,
+      daily_review_prewarm_enabled: cfg.daily_review_prewarm_enabled ?? false,
+      potential_stock_daily_enabled: cfg.potential_stock_daily_enabled ?? false,
+      stock_valuation_snapshot_refresh_enabled: cfg.stock_valuation_snapshot_refresh_enabled ?? false,
       database_backup_retention_count: cfg.database_backup_retention_count,
       database_backup_include_market_daily: cfg.database_backup_include_market_daily,
       market_daily_backup_interval_days: cfg.market_daily_backup_interval_days,
@@ -193,6 +197,7 @@ export default function SettingsPage() {
         backup: false,
         marketDaily: false,
         researchBudget: false,
+        scheduledTasks: false,
         bot: false,
         adminOps: false,
         adminBot: false,
@@ -338,9 +343,16 @@ export default function SettingsPage() {
         JSON.stringify((config.bot_admin_users ?? []).map((u) => u.trim()).filter(Boolean)))
     );
 
+    const scheduledTasks = Boolean(
+      (form.macro_analysis_prewarm_enabled !== undefined && form.macro_analysis_prewarm_enabled !== config.macro_analysis_prewarm_enabled) ||
+      (form.daily_review_prewarm_enabled !== undefined && form.daily_review_prewarm_enabled !== config.daily_review_prewarm_enabled) ||
+      (form.potential_stock_daily_enabled !== undefined && form.potential_stock_daily_enabled !== config.potential_stock_daily_enabled) ||
+      (form.stock_valuation_snapshot_refresh_enabled !== undefined && form.stock_valuation_snapshot_refresh_enabled !== config.stock_valuation_snapshot_refresh_enabled)
+    );
+
     const integrations = feishu || notion || notificationChannels;
     const dataSources = iwencai || fred || twitter || anySearch || fuyao || outboundProxy || eastmoneyRateLimit;
-    const adminOps = backup || marketDaily || researchBudget;
+    const adminOps = backup || marketDaily || researchBudget || scheduledTasks;
     const admin = adminOps || bot;
     const hasUnsavedChanges = Boolean(ai || integrations || dataSources || admin);
 
@@ -361,6 +373,7 @@ export default function SettingsPage() {
       backup,
       marketDaily,
       researchBudget,
+      scheduledTasks,
       bot,
       adminOps,
       adminBot: bot,
@@ -596,6 +609,24 @@ export default function SettingsPage() {
     saveConfig,
   ]);
 
+  const handleSaveScheduledTasks = useCallback(() => {
+    saveConfig(
+      {
+        macro_analysis_prewarm_enabled: form.macro_analysis_prewarm_enabled,
+        daily_review_prewarm_enabled: form.daily_review_prewarm_enabled,
+        potential_stock_daily_enabled: form.potential_stock_daily_enabled,
+        stock_valuation_snapshot_refresh_enabled: form.stock_valuation_snapshot_refresh_enabled,
+      },
+      "后台常驻任务设置已保存",
+    );
+  }, [
+    form.daily_review_prewarm_enabled,
+    form.macro_analysis_prewarm_enabled,
+    form.potential_stock_daily_enabled,
+    form.stock_valuation_snapshot_refresh_enabled,
+    saveConfig,
+  ]);
+
   const handleSaveResearchBudget = useCallback(() => {
     const patch: ConfigUpdate = {
       analysis_llm_timeout_seconds: form.analysis_llm_timeout_seconds,
@@ -802,6 +833,17 @@ export default function SettingsPage() {
       market_daily_backup_compression_level: config.market_daily_backup_compression_level,
     });
     message.success("已撤销备份配置修改");
+  }, [config, updateForm]);
+
+  const handleResetScheduledTasks = useCallback(() => {
+    if (!config) return;
+    updateForm({
+      macro_analysis_prewarm_enabled: config.macro_analysis_prewarm_enabled,
+      daily_review_prewarm_enabled: config.daily_review_prewarm_enabled,
+      potential_stock_daily_enabled: config.potential_stock_daily_enabled,
+      stock_valuation_snapshot_refresh_enabled: config.stock_valuation_snapshot_refresh_enabled,
+    });
+    message.success("已撤销后台常驻任务设置修改");
   }, [config, updateForm]);
 
   const handleResetMarketDailyBars = useCallback(() => {
@@ -1120,14 +1162,17 @@ export default function SettingsPage() {
                     onSaveResearchBudget={handleSaveResearchBudget}
                     onSaveMarketDailyBars={handleSaveMarketDailyBars}
                     onSaveBackupRetention={handleSaveBackupRetention}
+                    onSaveScheduledTasks={handleSaveScheduledTasks}
                     onResetBot={handleResetBot}
                     onResetResearchBudget={handleResetResearchBudget}
                     onResetMarketDailyBars={handleResetMarketDailyBars}
                     onResetBackupRetention={handleResetBackupRetention}
+                    onResetScheduledTasks={handleResetScheduledTasks}
                     dirtyCards={{
                       backup: dirtyFlags.backup,
                       marketDaily: dirtyFlags.marketDaily,
                       researchBudget: dirtyFlags.researchBudget,
+                      scheduledTasks: dirtyFlags.scheduledTasks,
                       bot: dirtyFlags.bot,
                     }}
                   />

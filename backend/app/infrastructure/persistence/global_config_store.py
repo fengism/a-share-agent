@@ -1,7 +1,7 @@
 import json
 import logging
 
-from app.configuration import PERSISTED_GLOBAL_KEYS
+from app.configuration import GLOBAL_LLM_KEYS, PERSISTED_GLOBAL_KEYS
 from app.configuration import crypto as config_crypto
 from app.configuration.crypto_contracts import GLOBAL_CONFIG_SCOPE_ID
 from app.infrastructure.persistence.connection import get_connection, unit_of_work
@@ -37,7 +37,7 @@ def get_global_config() -> dict:
     for row in rows:
         key = row["key"]
         value = row["value"]
-        if key not in PERSISTED_GLOBAL_KEYS:
+        if key not in PERSISTED_GLOBAL_KEYS and key not in GLOBAL_LLM_KEYS:
             continue
         if key not in SECRET_KEYS or not value:
             result[key] = _deserialize_value(value)
@@ -90,7 +90,10 @@ def get_global_config() -> dict:
 def set_global_config(items: dict) -> None:
     from app.configuration import SECRET_KEYS
 
-    persisted_items = {key: value for key, value in items.items() if key in PERSISTED_GLOBAL_KEYS}
+    persisted_items = {
+        key: value for key, value in items.items()
+        if key in PERSISTED_GLOBAL_KEYS or key in GLOBAL_LLM_KEYS
+    }
     if not persisted_items:
         return
 

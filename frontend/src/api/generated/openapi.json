@@ -3322,6 +3322,10 @@
             "title": "Chat Max Tool Calls Total",
             "type": "integer"
           },
+          "daily_review_prewarm_enabled": {
+            "title": "Daily Review Prewarm Enabled",
+            "type": "boolean"
+          },
           "database_backup_include_market_daily": {
             "title": "Database Backup Include Market Daily",
             "type": "boolean"
@@ -3525,6 +3529,10 @@
             "title": "Llm Temperature",
             "type": "number"
           },
+          "macro_analysis_prewarm_enabled": {
+            "title": "Macro Analysis Prewarm Enabled",
+            "type": "boolean"
+          },
           "market_daily_attempt_retention_days": {
             "title": "Market Daily Attempt Retention Days",
             "type": "integer"
@@ -3590,10 +3598,18 @@
             "title": "Outbound Proxy Url",
             "type": "string"
           },
+          "potential_stock_daily_enabled": {
+            "title": "Potential Stock Daily Enabled",
+            "type": "boolean"
+          },
           "provider_defaults": {
             "additionalProperties": true,
             "title": "Provider Defaults",
             "type": "object"
+          },
+          "stock_valuation_snapshot_refresh_enabled": {
+            "title": "Stock Valuation Snapshot Refresh Enabled",
+            "type": "boolean"
           },
           "ths_cookie": {
             "title": "Ths Cookie",
@@ -3662,6 +3678,10 @@
           "market_daily_bar_refresh_retry_base_seconds",
           "market_daily_observation_retention_days",
           "market_daily_attempt_retention_days",
+          "macro_analysis_prewarm_enabled",
+          "daily_review_prewarm_enabled",
+          "potential_stock_daily_enabled",
+          "stock_valuation_snapshot_refresh_enabled",
           "bot_enabled",
           "bot_command_prefix",
           "bot_service_user_id",
@@ -3976,6 +3996,17 @@
               }
             ],
             "title": "Chat Max Tool Calls Total"
+          },
+          "daily_review_prewarm_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Review Prewarm Enabled"
           },
           "database_backup_include_market_daily": {
             "anyOf": [
@@ -4533,6 +4564,17 @@
             ],
             "title": "Llm Temperature"
           },
+          "macro_analysis_prewarm_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macro Analysis Prewarm Enabled"
+          },
           "market_daily_attempt_retention_days": {
             "anyOf": [
               {
@@ -4719,6 +4761,28 @@
               }
             ],
             "title": "Outbound Proxy Url"
+          },
+          "potential_stock_daily_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Potential Stock Daily Enabled"
+          },
+          "stock_valuation_snapshot_refresh_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Valuation Snapshot Refresh Enabled"
           },
           "ths_cookie": {
             "anyOf": [

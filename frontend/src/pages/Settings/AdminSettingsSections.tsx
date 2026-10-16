@@ -12,6 +12,7 @@ import {
   FredConfigCard,
   IwencaiConfigCard,
   ResearchBudgetCard,
+  ScheduledTasksConfigCard,
   TwitterConfigCard,
 } from "./ConfigCards";
 import BackupRetentionCard from "./BackupRetentionCard";
@@ -173,14 +174,17 @@ interface AdminSettingsSectionProps extends ConfigSectionProps {
   onSaveResearchBudget: () => void;
   onSaveMarketDailyBars: () => void;
   onSaveBackupRetention: () => void;
+  onSaveScheduledTasks: () => void;
   onResetBot?: () => void;
   onResetResearchBudget?: () => void;
   onResetMarketDailyBars?: () => void;
   onResetBackupRetention?: () => void;
+  onResetScheduledTasks?: () => void;
   dirtyCards?: {
     backup?: boolean;
     marketDaily?: boolean;
     researchBudget?: boolean;
+    scheduledTasks?: boolean;
     bot?: boolean;
   };
 }
@@ -194,10 +198,12 @@ export function AdminSettingsSection({
   onSaveResearchBudget,
   onSaveMarketDailyBars,
   onSaveBackupRetention,
+  onSaveScheduledTasks,
   onResetBot,
   onResetResearchBudget,
   onResetMarketDailyBars,
   onResetBackupRetention,
+  onResetScheduledTasks,
   dirtyCards = {},
 }: AdminSettingsSectionProps) {
   const [activeTab, setActiveTab] = useState<"ops" | "bot" | "user">("ops");
@@ -223,7 +229,7 @@ export function AdminSettingsSection({
               label: (
                 <span style={{ padding: isNarrow ? "0 2px" : "0 8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                   <DatabaseOutlined /> {isNarrow ? (isMobile ? "运维" : "系统运维") : "系统运维与数据维护"}
-                  {(dirtyCards.backup || dirtyCards.marketDaily || dirtyCards.researchBudget) && (
+                  {(dirtyCards.backup || dirtyCards.marketDaily || dirtyCards.researchBudget || dirtyCards.scheduledTasks) && (
                     <span
                       style={{
                         display: "inline-block",
@@ -274,8 +280,16 @@ export function AdminSettingsSection({
       {activeTab === "ops" && (
         <div style={{ marginBottom: 24 }}>
           <p style={{ color: "var(--c-text-muted)", marginTop: 0, marginBottom: 16 }}>
-            数据库在线备份策略（基础库与大库独立周期/极速压缩）、10 年日线数据维护与 AI 思考耗时预算。
+            常驻后台定时任务开关、数据库在线备份策略（基础库与大库独立周期/极速压缩）、10 年日线数据维护与 AI 思考耗时预算。
           </p>
+          <ScheduledTasksConfigCard
+            form={form}
+            onChange={onChange}
+            isSaving={isSaving}
+            onSave={onSaveScheduledTasks}
+            isDirty={dirtyCards.scheduledTasks}
+            onReset={onResetScheduledTasks}
+          />
           <BackupRetentionCard
             form={form}
             onChange={onChange}

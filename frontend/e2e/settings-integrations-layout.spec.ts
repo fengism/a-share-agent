@@ -16,12 +16,12 @@ for (const width of [1440, 1024, 768, 390]) {
     await page.goto("/settings");
     if (width < 768) {
       await page.getByRole("combobox", { name: "系统配置分类" }).click();
-      await page.getByText("协同与研报导出", { exact: true }).click();
+      await page.getByText("协同与自动推送", { exact: true }).click();
     } else {
-      await page.getByRole("button", { name: "协同与研报导出", exact: true }).click();
+      await page.getByRole("button", { name: "协同与自动推送", exact: true }).click();
     }
 
-    const section = page.getByRole("region", { name: "协同与研报导出", exact: true });
+    const section = page.getByRole("region", { name: "协同与自动推送", exact: true });
     const feishu = section.locator(".ant-card").filter({ hasText: "飞书推送配置" });
     const notion = section.locator(".ant-card").filter({ hasText: "Notion 转存配置" });
     await expect(feishu).toBeVisible();

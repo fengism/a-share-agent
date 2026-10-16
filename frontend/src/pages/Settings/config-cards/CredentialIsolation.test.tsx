@@ -25,9 +25,9 @@ describe("个人凭证隔离提示", () => {
         />,
       ),
     );
-    expect(screen.getByText(/全局 Key 仅可用于全局调用目标/)).toBeInTheDocument();
-    expect(screen.getByText(/LiteLLM 模型/)).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText("输入新的 API Key 以覆盖"), {
+    expect(screen.getByText(/管理员保存时将自动同步为系统全局配置/)).toBeInTheDocument();
+    expect(screen.getByText(/未填写个人 Key 时自动使用系统全局 Key/)).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText(/输入新的 API Key 以覆盖/), {
       target: { value: "personal-key" },
     });
     expect(onChange).toHaveBeenCalledWith({ llm_api_key: "personal-key" });

@@ -1083,7 +1083,9 @@ export default function KlineChart({
             : prevClose != null
               ? item.close >= prevClose
               : true;
-        const val = item.amount ?? item.volume;
+        const val = isAmo
+          ? (item.amount ?? item.volume ?? 0)
+          : (item.volume ?? item.amount ?? 0);
         return {
           time: item.date,
           value: val,
@@ -1093,7 +1095,7 @@ export default function KlineChart({
       for (const cfg of MAVOL_CONFIGS) {
         const volLine = mavolSeriesMapRef.current.get(cfg.key);
         if (volLine) {
-          const volPoints = calculateMAVOL(rows, cfg.period, "amount");
+          const volPoints = calculateMAVOL(rows, cfg.period, isAmo ? "amount" : "volume");
           volLine.setData(volPoints.map((pt) => ({ time: pt.time as BusinessDay, value: pt.value })));
         }
       }
@@ -1334,25 +1336,30 @@ export default function KlineChart({
       wickUpColor: c.up,
       wickDownColor: c.down,
     });
-    volumeSeriesRef.current?.setData(rows.map((item, index) => {
-      const prevClose = index > 0 ? rows[index - 1].close : null;
-      const isUp = item.close > item.open
-        ? true
-        : item.close < item.open
-          ? false
-          : prevClose != null
-            ? item.close >= prevClose
-            : true;
-      const val = item.amount ?? item.volume;
-      return {
-        time: item.date,
-        value: val,
-        color: isUp ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
-      };
-    }));
+    if (subIndicator === "VOL" || subIndicator === "AMO") {
+      const isAmo = subIndicator === "AMO";
+      volumeSeriesRef.current?.setData(rows.map((item, index) => {
+        const prevClose = index > 0 ? rows[index - 1].close : null;
+        const isUp = item.close > item.open
+          ? true
+          : item.close < item.open
+            ? false
+            : prevClose != null
+              ? item.close >= prevClose
+              : true;
+        const val = isAmo
+          ? (item.amount ?? item.volume ?? 0)
+          : (item.volume ?? item.amount ?? 0);
+        return {
+          time: item.date,
+          value: val,
+          color: isUp ? hexToRgba(c.up, 0.5) : hexToRgba(c.down, 0.5),
+        };
+      }));
+    }
     chart.priceScale("right", 0).applyOptions({ borderColor: c.border });
     chart.priceScale("right", VOLUME_PANE_INDEX).applyOptions({ borderColor: c.border });
-  }, [c.border, c.cardBg, c.down, c.primary, c.accent, c.isLight, c.textMuted, c.textSecondary, c.up, candleStyle, height, rows]);
+  }, [c.border, c.cardBg, c.down, c.primary, c.accent, c.isLight, c.textMuted, c.textSecondary, c.up, candleStyle, height, rows, subIndicator]);
 
   useEffect(() => {
     const chart = chartRef.current;

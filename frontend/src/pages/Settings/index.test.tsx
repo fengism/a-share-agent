@@ -173,6 +173,26 @@ vi.mock("./ConfigCards", async () => {
   NotionConfigCard: () => null,
   ProviderDefaultsCard: () => null,
   TwitterConfigCard: () => null,
+  ScheduledTasksConfigCard: ({ form, onChange, onSave, isDirty, onReset }: {
+    form: ConfigUpdate;
+    onChange: (patch: ConfigUpdate) => void;
+    onSave: () => void;
+    isDirty?: boolean;
+    onReset?: () => void;
+  }) => (
+    <div>
+      <input
+        type="checkbox"
+        aria-label="每日复盘自动预热开关"
+        checked={form.daily_review_prewarm_enabled ?? false}
+        onChange={(event) => onChange({ daily_review_prewarm_enabled: event.target.checked })}
+      />
+      <button type="button" onClick={onSave}>保存后台任务设置</button>
+      {isDirty && onReset && (
+        <button type="button" onClick={onReset}>撤销后台任务更改</button>
+      )}
+    </div>
+  ),
 };
 });
 
@@ -248,6 +268,10 @@ let config: ConfigData = {
   market_daily_bar_refresh_retry_base_seconds: 60,
   market_daily_observation_retention_days: 1095,
   market_daily_attempt_retention_days: 1095,
+  macro_analysis_prewarm_enabled: false,
+  daily_review_prewarm_enabled: false,
+  potential_stock_daily_enabled: false,
+  stock_valuation_snapshot_refresh_enabled: false,
   database_backup_retention_count: 2,
   database_backup_include_market_daily: true,
   market_daily_backup_interval_days: 7,
@@ -670,6 +694,42 @@ describe("SettingsPage Bot config", () => {
 
     // FRED 卡片的撤销按钮消失，AnySearch 的仍在
     expect(screen.getAllByRole("button", { name: "撤销更改" })).toHaveLength(1);
+    queryClient.clear();
+  });
+
+  it("submits the scheduled tasks settings and supports revert", async () => {
+    act(() => {
+      useAuthStore.setState({
+        user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+      });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "管理员工具" }));
+    const switchInput = await screen.findByLabelText("每日复盘自动预热开关");
+    expect(switchInput).not.toBeChecked();
+
+    fireEvent.click(switchInput);
+    expect(switchInput).toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: "保存后台任务设置" }));
+    expect(mocks.mutateConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        daily_review_prewarm_enabled: true,
+      }),
+      expect.anything(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "撤销后台任务更改" }));
+    await waitFor(() => {
+      expect(switchInput).not.toBeChecked();
+    });
     queryClient.clear();
   });
 });

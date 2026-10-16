@@ -104,6 +104,8 @@ async def refresh_stock_valuation_snapshots() -> None:
     """定期预热用户自选股与持仓股票的每日估值快照。"""
 
     async def iteration():
+        if not get_settings().stock_valuation_snapshot_refresh_enabled:
+            return
         from app.financial_data.stock.public import warm_up_valuation_details
 
         stats = await warm_up_valuation_details()
@@ -375,6 +377,8 @@ async def refresh_potential_stocks_daily() -> None:
     from app.modules.potential.public import run_scheduled_daily_mining
 
     async def iteration():
+        if not get_settings().potential_stock_daily_enabled:
+            return
         await run_scheduled_daily_mining()
 
     await task_scheduler.run_periodic(
@@ -398,6 +402,8 @@ async def refresh_macro_analysis_periodic() -> None:
     from app.financial_data.market.macro.analysis import prewarm_macro_analysis
 
     async def iteration():
+        if not get_settings().macro_analysis_prewarm_enabled:
+            return
         interpreted = await prewarm_macro_analysis()
         if interpreted:
             logger.info("宏观解读预热完成: interpreted=%s", interpreted)
@@ -415,6 +421,8 @@ async def refresh_daily_review_periodic() -> None:
     from app.modules.daily_review.public import prewarm_daily_review
 
     async def iteration():
+        if not get_settings().daily_review_prewarm_enabled:
+            return
         warmed = await prewarm_daily_review()
         if warmed:
             logger.info("每日复盘预热完成: warmed=%s", warmed)

@@ -188,7 +188,7 @@ describe("KlineChart", () => {
       expect.objectContaining({ priceScaleId: "right" }),
     );
     expect(mocks.volumeSeries.setData).toHaveBeenCalledWith([
-      expect.objectContaining({ value: 250_000_000 }),
+      expect.objectContaining({ value: 1_000 }),
     ]);
   });
 
@@ -535,12 +535,17 @@ describe("KlineChart", () => {
     expect(getByText(/VOL:/)).toBeInTheDocument();
     expect(getAllByText(/额:/).length).toBe(2);
     expect(queryByText(/参数: 12,26,9/)).toBeNull();
+    expect(mocks.volumeSeries.setData).toHaveBeenLastCalledWith([
+      expect.objectContaining({ value: 1000 }),
+      expect.objectContaining({ value: 2000 }),
+    ]);
 
     // Switch to MACD
     fireEvent.click(getByText("MACD"));
     expect(getByText(/DIF:/)).toBeInTheDocument();
     expect(getByText(/DEA:/)).toBeInTheDocument();
     expect(getByText(/参数: 12,26,9/)).toBeInTheDocument();
+    expect(mocks.volumeSeries.setData).toHaveBeenLastCalledWith([]);
 
     // Switch to KDJ
     fireEvent.click(getByText("KDJ"));
@@ -560,11 +565,19 @@ describe("KlineChart", () => {
     fireEvent.click(getByText("AMO"));
     expect(getByText(/AMO:/)).toBeInTheDocument();
     expect(getByText("单位: 元")).toBeInTheDocument();
+    expect(mocks.volumeSeries.setData).toHaveBeenLastCalledWith([
+      expect.objectContaining({ value: 10000 }),
+      expect.objectContaining({ value: 22000 }),
+    ]);
 
     // Switch back to VOL
     fireEvent.click(getByText("VOL"));
     expect(getByText(/VOL:/)).toBeInTheDocument();
     expect(getByText("单位: 股/元")).toBeInTheDocument();
+    expect(mocks.volumeSeries.setData).toHaveBeenLastCalledWith([
+      expect.objectContaining({ value: 1000 }),
+      expect.objectContaining({ value: 2000 }),
+    ]);
   });
 
   it("renders volume ratio badges when volume deviates from 5-day moving average", () => {

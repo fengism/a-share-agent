@@ -2,7 +2,6 @@ import json
 import logging
 from typing import get_origin
 
-from app.configuration.llm_routing import resolve_llm_routing
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
 from app.configuration.schema import PRIVATE_USER_KEYS, SECRET_KEYS, Settings
 
@@ -59,11 +58,10 @@ def overlay_private(base: Settings, overrides: dict) -> Settings:
         if "llm_api_version" not in patch:
             merged.llm_api_version = defaults.get("api_version", "")
 
-    # A global credential may only be inherited for its original destination.
-    # Enforce this on reads too, so previously stored unsafe overrides are protected.
-    if "llm_api_key" not in patch and (
-        resolve_llm_routing(merged).credential_scope != resolve_llm_routing(base).credential_scope
-    ):
+    # 用户未独立配置个人 API Key 时，自动回退复用系统全局 Key
+    if not (patch.get("llm_api_key") or "").strip() and base.llm_api_key:
+        merged.llm_api_key = base.llm_api_key
+    elif "llm_api_key" not in patch and not base.llm_api_key:
         merged.llm_api_key = ""
     if "iwencai_api_key" not in patch and merged.iwencai_base_url != base.iwencai_base_url:
         merged.iwencai_api_key = ""

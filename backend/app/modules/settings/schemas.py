@@ -64,6 +64,10 @@ class ConfigResponse(BaseModel):
     market_daily_bar_refresh_retry_base_seconds: int
     market_daily_observation_retention_days: int
     market_daily_attempt_retention_days: int
+    macro_analysis_prewarm_enabled: bool
+    daily_review_prewarm_enabled: bool
+    potential_stock_daily_enabled: bool
+    stock_valuation_snapshot_refresh_enabled: bool
     bot_enabled: bool
     bot_command_prefix: str
     bot_service_user_id: int
@@ -156,6 +160,10 @@ class ConfigUpdateRequest(BaseModel):
     market_daily_bar_refresh_retry_base_seconds: int | None = Field(default=None, ge=1, le=1800)
     market_daily_observation_retention_days: int | None = Field(default=None, ge=7, le=3650)
     market_daily_attempt_retention_days: int | None = Field(default=None, ge=30, le=3650)
+    macro_analysis_prewarm_enabled: bool | None = None
+    daily_review_prewarm_enabled: bool | None = None
+    potential_stock_daily_enabled: bool | None = None
+    stock_valuation_snapshot_refresh_enabled: bool | None = None
     database_backup_retention_count: int | None = Field(default=None, ge=1, le=90)
     database_backup_include_market_daily: bool | None = None
     market_daily_backup_interval_days: int | None = Field(default=None, ge=1, le=90)

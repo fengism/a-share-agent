@@ -6,9 +6,17 @@ from app.configuration.runtime import (
     get_settings,
     update_settings,
 )
-from app.configuration.schema import PERSISTED_GLOBAL_KEYS, PRIVATE_USER_KEYS, ROOT_DIR, SECRET_KEYS, Settings
+from app.configuration.schema import (
+    GLOBAL_LLM_KEYS,
+    PERSISTED_GLOBAL_KEYS,
+    PRIVATE_USER_KEYS,
+    ROOT_DIR,
+    SECRET_KEYS,
+    Settings,
+)
 
 __all__ = [
+    "GLOBAL_LLM_KEYS",
     "PRIVATE_USER_KEYS",
     "PERSISTED_GLOBAL_KEYS",
     "PROVIDER_DEFAULTS",

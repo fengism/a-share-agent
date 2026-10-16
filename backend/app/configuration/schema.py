@@ -122,6 +122,25 @@ PERSISTED_GLOBAL_KEYS = frozenset(
         "bot_feishu_app_secret",
         "feishu_verification_token",
         "feishu_encrypt_key",
+        "macro_analysis_prewarm_enabled",
+        "daily_review_prewarm_enabled",
+        "potential_stock_daily_enabled",
+        "stock_valuation_snapshot_refresh_enabled",
+    }
+)
+
+GLOBAL_LLM_KEYS = frozenset(
+    {
+        "llm_provider",
+        "llm_api_mode",
+        "llm_api_version",
+        "llm_api_key",
+        "llm_base_url",
+        "llm_model",
+        "llm_sub_model",
+        "llm_simple_tasks",
+        "llm_temperature",
+        "llm_context_length_tokens",
     }
 )
 
@@ -280,6 +299,11 @@ class Settings(BaseSettings):
     market_daily_bar_refresh_retry_base_seconds: int = Field(default=60, ge=1, le=1800)
     market_daily_observation_retention_days: int = Field(default=1095, ge=7, le=3650)
     market_daily_attempt_retention_days: int = Field(default=1095, ge=30, le=3650)
+    # 常驻后台任务开关，默认全部关闭，支持在前端按需开启
+    macro_analysis_prewarm_enabled: bool = False
+    daily_review_prewarm_enabled: bool = False
+    potential_stock_daily_enabled: bool = False
+    stock_valuation_snapshot_refresh_enabled: bool = False
     workflow_job_poll_seconds: float = Field(default=0.5, gt=0)
     workflow_job_lease_seconds: int = Field(default=900, ge=30)
     workflow_job_max_attempts: int = Field(default=2, ge=1, le=5)

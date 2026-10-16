@@ -18,4 +18,5 @@ export { default as LlmConfigCard } from "./config-cards/LlmConfigCard";
 export { default as NotificationChannelsConfigCard } from "./config-cards/NotificationChannelsConfigCard";
 export { default as NotionConfigCard } from "./config-cards/NotionConfigCard";
 export { default as TwitterConfigCard } from "./config-cards/TwitterConfigCard";
+export { default as ScheduledTasksConfigCard } from "./config-cards/ScheduledTasksConfigCard";
 export { ProviderDefaultsCard } from "./ProviderDefaultsCard";

@@ -5772,6 +5772,8 @@ export interface components {
             bot_webhook_max_skew_seconds: number;
             /** Chat Max Tool Calls Total */
             chat_max_tool_calls_total: number;
+            /** Daily Review Prewarm Enabled */
+            daily_review_prewarm_enabled: boolean;
             /** Database Backup Include Market Daily */
             database_backup_include_market_daily: boolean;
             /** Database Backup Retention Count */
@@ -5871,6 +5873,8 @@ export interface components {
             llm_sub_model: string;
             /** Llm Temperature */
             llm_temperature: number;
+            /** Macro Analysis Prewarm Enabled */
+            macro_analysis_prewarm_enabled: boolean;
             /** Market Daily Attempt Retention Days */
             market_daily_attempt_retention_days: number;
             /** Market Daily Backup Compression Level */
@@ -5904,10 +5908,14 @@ export interface components {
             outbound_proxy_type: "none" | "http" | "socks5";
             /** Outbound Proxy Url */
             outbound_proxy_url: string;
+            /** Potential Stock Daily Enabled */
+            potential_stock_daily_enabled: boolean;
             /** Provider Defaults */
             provider_defaults: {
                 [key: string]: unknown;
             };
+            /** Stock Valuation Snapshot Refresh Enabled */
+            stock_valuation_snapshot_refresh_enabled: boolean;
             /** Ths Cookie */
             ths_cookie: string;
             /** Twitter Feeds */
@@ -5962,6 +5970,8 @@ export interface components {
             bot_webhook_max_skew_seconds?: number | null;
             /** Chat Max Tool Calls Total */
             chat_max_tool_calls_total?: number | null;
+            /** Daily Review Prewarm Enabled */
+            daily_review_prewarm_enabled?: boolean | null;
             /** Database Backup Include Market Daily */
             database_backup_include_market_daily?: boolean | null;
             /** Database Backup Retention Count */
@@ -6056,6 +6066,8 @@ export interface components {
             llm_sub_model?: string | null;
             /** Llm Temperature */
             llm_temperature?: number | null;
+            /** Macro Analysis Prewarm Enabled */
+            macro_analysis_prewarm_enabled?: boolean | null;
             /** Market Daily Attempt Retention Days */
             market_daily_attempt_retention_days?: number | null;
             /** Market Daily Backup Compression Level */
@@ -6086,6 +6098,10 @@ export interface components {
             outbound_proxy_type?: ("none" | "http" | "socks5") | null;
             /** Outbound Proxy Url */
             outbound_proxy_url?: string | null;
+            /** Potential Stock Daily Enabled */
+            potential_stock_daily_enabled?: boolean | null;
+            /** Stock Valuation Snapshot Refresh Enabled */
+            stock_valuation_snapshot_refresh_enabled?: boolean | null;
             /** Ths Cookie */
             ths_cookie?: string | null;
             /** Twitter Feeds */

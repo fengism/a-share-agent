@@ -86,6 +86,16 @@ def update_user_settings(
 
     values_to_store = {key: value for key, value in private_patch.items() if not is_masked_secret(key, value)}
     global_values_to_store = {key: value for key, value in global_patch.items() if not is_masked_secret(key, value)}
+
+    # 管理员保存大模型配置时，自动同步至系统全局配置，供后台常驻任务及未独立配置 Key 的用户复用
+    if is_admin:
+        llm_global_values = {
+            key: value for key, value in values_to_store.items()
+            if key in config.GLOBAL_LLM_KEYS
+        }
+        if llm_global_values:
+            global_values_to_store.update(llm_global_values)
+
     if {
         "llm_provider", "llm_api_mode", "llm_api_version", "llm_api_key",
         "llm_base_url", "llm_model",
