@@ -87,11 +87,12 @@ def update_user_settings(
     values_to_store = {key: value for key, value in private_patch.items() if not is_masked_secret(key, value)}
     global_values_to_store = {key: value for key, value in global_patch.items() if not is_masked_secret(key, value)}
 
-    # 管理员保存大模型配置时，自动同步至系统全局配置，供后台常驻任务及未独立配置 Key 的用户复用
+    # 管理员保存大模型/推送通道配置时，自动同步至系统全局配置，
+    # 供后台常驻任务及未独立配置 Key 的用户复用
     if is_admin:
         llm_global_values = {
             key: value for key, value in values_to_store.items()
-            if key in config.GLOBAL_LLM_KEYS
+            if key in config.GLOBAL_SYNCED_KEYS
         }
         if llm_global_values:
             global_values_to_store.update(llm_global_values)
@@ -106,11 +107,10 @@ def update_user_settings(
         resolve_llm_client_spec(candidate)
 
     if {"outbound_proxy_type", "outbound_proxy_url"} & global_patch.keys():
-        candidate_type = global_patch.get(
-            "outbound_proxy_type", getattr(config.get_settings(), "outbound_proxy_type", "none")
-        )
+        current_network = config.get_settings().network
+        candidate_type = global_patch.get("outbound_proxy_type", current_network.outbound_proxy_type)
         candidate_url = global_values_to_store.get(
-            "outbound_proxy_url", getattr(config.get_settings(), "outbound_proxy_url", "")
+            "outbound_proxy_url", current_network.outbound_proxy_url
         )
         if candidate_type and candidate_type != "none" and candidate_url:
             from app.infrastructure.http.proxy import normalize_proxy_url

@@ -164,21 +164,24 @@ make backend-seed-hot-stocks  # 自动为热门股票补充经营主营资料（
 
 ## 常用服务配置
 
+> 配置项的存储位置、作用域与新增流程见 [配置系统开发指南](docs/configuration.md)。
+
 ### 大模型（LLM）配置
 
 系统支持任意兼容 OpenAI 接口规范的提供商：
 
 ```env
-LLM_PROVIDER=deepseek
+LLM_PROVIDER=zhipu
 LLM_API_KEY=your_api_key_here
-LLM_BASE_URL=https://api.deepseek.com
-LLM_MODEL=deepseek-chat
+LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+LLM_MODEL=GLM-4.7-Flash
 LLM_TEMPERATURE=0.1
 LLM_TIMEOUT_SECONDS=300
 ```
 
 > [!NOTE]
 > 管理员登录后可在前端「系统配置」页面动态修改全局或默认大模型配置；每个登录用户也可以在个人设置中配置自己独立的 API Key，实现额度与模型隔离。
+> 管理员保存的大模型与推送通道配置会自动同步为全局基线，供无用户上下文的常驻后台任务（如收盘自动推送）复用。
 
 ### AnySearch 聚合搜索配置
 
@@ -205,12 +208,13 @@ FEISHU_FOLDER_TOKEN=fldcnXXXX                    # 云文档目录 Token
 FEISHU_WIKI_SPACE_ID=                            # 知识库 Space ID（配置后优先推送到知识库）
 FEISHU_DEFAULT_RECEIVER=ou_xxxxx                 # 默认接收人 open_id / chat_id
 
-# 飞书 Bot 交互配置
+# 飞书 Bot 交互配置（复用上面的 FEISHU_APP_ID / FEISHU_APP_SECRET）
 BOT_ENABLED=true
-BOT_FEISHU_APP_ID=cli_xxxxx
-BOT_FEISHU_APP_SECRET=xxxxx
 FEISHU_VERIFICATION_TOKEN=xxxxx
 FEISHU_ENCRYPT_KEY=xxxxx
+# 仅当 Bot 使用与文档转存不同的飞书应用时才需单独指定（兼容旧部署）
+# BOT_FEISHU_APP_ID=cli_yyyyy
+# BOT_FEISHU_APP_SECRET=yyyyy
 ```
 
 - 支持命令：`/analyze <股票代码>`、`/market`、`/status`、`/task <任务ID>` 等。

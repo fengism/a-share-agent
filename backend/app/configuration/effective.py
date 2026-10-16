@@ -1,9 +1,10 @@
 import json
 import logging
-from typing import get_origin
+from typing import Literal, get_args, get_origin
 
+from app.configuration.api_models import PRIVATE_USER_KEYS, SECRET_KEYS
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
-from app.configuration.schema import PRIVATE_USER_KEYS, SECRET_KEYS, Settings
+from app.configuration.schema import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,14 @@ def coerce_setting_value(key: str, raw):
         if not isinstance(value, list):
             raise ValueError(f"{key} 必须是数组")
         return [str(item) for item in value]
+    if get_origin(annotation) is Literal:
+        # 枚举字段必须校验：model_copy(update=...) 不会触发 pydantic 校验，
+        # 非法存量值（如手工改库）会静默进入生效配置。
+        allowed = get_args(annotation)
+        text = raw if isinstance(raw, str) else str(raw)
+        if text not in allowed:
+            raise ValueError(f"{key} 取值必须是 {allowed} 之一")
+        return text
     return raw if isinstance(raw, str) else str(raw)
 
 
@@ -58,11 +67,10 @@ def overlay_private(base: Settings, overrides: dict) -> Settings:
         if "llm_api_version" not in patch:
             merged.llm_api_version = defaults.get("api_version", "")
 
-    # 用户未独立配置个人 API Key 时，自动回退复用系统全局 Key
+    # 用户未独立配置个人 API Key 时，自动回退复用系统全局 Key；
+    # 未提供 key 时 merged 已继承 base 的值，因此只需处理“回退复用”一种情况。
     if not (patch.get("llm_api_key") or "").strip() and base.llm_api_key:
         merged.llm_api_key = base.llm_api_key
-    elif "llm_api_key" not in patch and not base.llm_api_key:
-        merged.llm_api_key = ""
     if "iwencai_api_key" not in patch and merged.iwencai_base_url != base.iwencai_base_url:
         merged.iwencai_api_key = ""
     return merged

@@ -3334,6 +3334,14 @@
             "title": "Database Backup Retention Count",
             "type": "integer"
           },
+          "dingtalk_webhook_secret": {
+            "title": "Dingtalk Webhook Secret",
+            "type": "string"
+          },
+          "dingtalk_webhook_url": {
+            "title": "Dingtalk Webhook Url",
+            "type": "string"
+          },
           "disabled_chat_agents": {
             "items": {
               "type": "string"
@@ -3416,6 +3424,14 @@
             "title": "Feishu Verification Token",
             "type": "string"
           },
+          "feishu_webhook_secret": {
+            "title": "Feishu Webhook Secret",
+            "type": "string"
+          },
+          "feishu_webhook_url": {
+            "title": "Feishu Webhook Url",
+            "type": "string"
+          },
           "feishu_wiki_analysis_parent": {
             "title": "Feishu Wiki Analysis Parent",
             "type": "string"
@@ -3430,6 +3446,10 @@
           },
           "fred_api_key": {
             "title": "Fred Api Key",
+            "type": "string"
+          },
+          "fuyao_api_key": {
+            "title": "Fuyao Api Key",
             "type": "string"
           },
           "http_trust_env": {
@@ -3607,6 +3627,34 @@
             "title": "Provider Defaults",
             "type": "object"
           },
+          "push_auto_enabled": {
+            "title": "Push Auto Enabled",
+            "type": "boolean"
+          },
+          "push_daily_review_auto": {
+            "title": "Push Daily Review Auto",
+            "type": "boolean"
+          },
+          "push_dingtalk_enabled": {
+            "title": "Push Dingtalk Enabled",
+            "type": "boolean"
+          },
+          "push_feishu_enabled": {
+            "title": "Push Feishu Enabled",
+            "type": "boolean"
+          },
+          "push_potential_auto": {
+            "title": "Push Potential Auto",
+            "type": "boolean"
+          },
+          "push_wecom_enabled": {
+            "title": "Push Wecom Enabled",
+            "type": "boolean"
+          },
+          "push_wxpusher_enabled": {
+            "title": "Push Wxpusher Enabled",
+            "type": "boolean"
+          },
           "stock_valuation_snapshot_refresh_enabled": {
             "title": "Stock Valuation Snapshot Refresh Enabled",
             "type": "boolean"
@@ -3621,6 +3669,18 @@
             },
             "title": "Twitter Feeds",
             "type": "array"
+          },
+          "wecom_webhook_url": {
+            "title": "Wecom Webhook Url",
+            "type": "string"
+          },
+          "wxpusher_app_token": {
+            "title": "Wxpusher App Token",
+            "type": "string"
+          },
+          "wxpusher_uids": {
+            "title": "Wxpusher Uids",
+            "type": "string"
           }
         },
         "required": [
@@ -3644,6 +3704,20 @@
           "feishu_daily_review_folder",
           "feishu_analysis_folder",
           "feishu_default_receiver",
+          "push_auto_enabled",
+          "push_daily_review_auto",
+          "push_potential_auto",
+          "push_feishu_enabled",
+          "feishu_webhook_url",
+          "feishu_webhook_secret",
+          "push_dingtalk_enabled",
+          "dingtalk_webhook_url",
+          "dingtalk_webhook_secret",
+          "push_wecom_enabled",
+          "wecom_webhook_url",
+          "push_wxpusher_enabled",
+          "wxpusher_app_token",
+          "wxpusher_uids",
           "notion_enabled",
           "notion_api_token",
           "notion_parent_page_id",
@@ -3654,11 +3728,11 @@
           "disabled_chat_skills",
           "disabled_chat_agents",
           "http_trust_env",
-          "provider_defaults",
           "twitter_feeds",
           "eastmoney_cookie",
           "fred_api_key",
           "anysearch_api_key",
+          "fuyao_api_key",
           "baidu_cookie",
           "ths_cookie",
           "legulegu_token",
@@ -3682,6 +3756,10 @@
           "daily_review_prewarm_enabled",
           "potential_stock_daily_enabled",
           "stock_valuation_snapshot_refresh_enabled",
+          "database_backup_retention_count",
+          "database_backup_include_market_daily",
+          "market_daily_backup_interval_days",
+          "market_daily_backup_compression_level",
           "bot_enabled",
           "bot_command_prefix",
           "bot_service_user_id",
@@ -3711,17 +3789,15 @@
           "analysis_llm_timeout_seconds",
           "agent_research_timeout_seconds",
           "chat_max_tool_calls_total",
-          "database_backup_retention_count",
-          "database_backup_include_market_daily",
-          "market_daily_backup_interval_days",
-          "market_daily_backup_compression_level",
+          "provider_defaults",
           "is_admin"
         ],
         "title": "ConfigResponse",
         "type": "object"
       },
       "ConfigUpdateRequest": {
-        "description": "Partial configuration update request.",
+        "additionalProperties": false,
+        "description": "Partial configuration update request (per-user private + admin global).",
         "properties": {
           "agent_research_timeout_seconds": {
             "anyOf": [
@@ -4032,6 +4108,28 @@
             ],
             "title": "Database Backup Retention Count"
           },
+          "dingtalk_webhook_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dingtalk Webhook Secret"
+          },
+          "dingtalk_webhook_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dingtalk Webhook Url"
+          },
           "disabled_chat_agents": {
             "anyOf": [
               {
@@ -4261,6 +4359,28 @@
             ],
             "title": "Feishu Verification Token"
           },
+          "feishu_webhook_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feishu Webhook Secret"
+          },
+          "feishu_webhook_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feishu Webhook Url"
+          },
           "feishu_wiki_analysis_parent": {
             "anyOf": [
               {
@@ -4304,6 +4424,17 @@
               }
             ],
             "title": "Fred Api Key"
+          },
+          "fuyao_api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fuyao Api Key"
           },
           "http_trust_env": {
             "anyOf": [
@@ -4773,6 +4904,83 @@
             ],
             "title": "Potential Stock Daily Enabled"
           },
+          "push_auto_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Push Auto Enabled"
+          },
+          "push_daily_review_auto": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Push Daily Review Auto"
+          },
+          "push_dingtalk_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Push Dingtalk Enabled"
+          },
+          "push_feishu_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Push Feishu Enabled"
+          },
+          "push_potential_auto": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Push Potential Auto"
+          },
+          "push_wecom_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Push Wecom Enabled"
+          },
+          "push_wxpusher_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Push Wxpusher Enabled"
+          },
           "stock_valuation_snapshot_refresh_enabled": {
             "anyOf": [
               {
@@ -4808,6 +5016,39 @@
               }
             ],
             "title": "Twitter Feeds"
+          },
+          "wecom_webhook_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wecom Webhook Url"
+          },
+          "wxpusher_app_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wxpusher App Token"
+          },
+          "wxpusher_uids": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wxpusher Uids"
           }
         },
         "title": "ConfigUpdateRequest",

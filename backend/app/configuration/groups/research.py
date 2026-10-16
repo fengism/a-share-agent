@@ -1,0 +1,55 @@
+"""Agent 调研、LLM 生成预算、并发保护与渲染队列配置分组。"""
+
+from __future__ import annotations
+
+from pydantic import Field
+
+from app.configuration.groups.base import ConfigGroup
+
+
+class ResearchGroup(ConfigGroup):
+    """调研/分析/聊天预算、并发上限、PDF 渲染与 provider 熔断。"""
+
+    PREFIX = ""
+
+    agent_research_timeout_seconds: float = Field(default=1200.0, gt=0)
+    # 产业链调研预算独立于交互式 Chat/通用 Agent；有进展时允许更多轮次，无进展仍提前停止。
+    industry_chain_tool_calls_total: int = Field(default=96, ge=8, le=128)
+    industry_chain_repair_tool_calls_total: int = Field(default=48, ge=4, le=64)
+    industry_chain_max_rounds: int = Field(default=6, ge=2, le=10)
+    industry_chain_repair_max_rounds: int = Field(default=3, ge=1, le=6)
+    industry_chain_research_timeout_seconds: float = Field(default=1800.0, gt=0)
+    # 产业链定向补证分为独立的取证与报告重写时限；任一阶段超时都保留初稿并标记 degraded。
+    industry_chain_repair_research_timeout_seconds: float = Field(default=900.0, gt=0)
+    industry_chain_repair_synthesis_timeout_seconds: float = Field(default=600.0, gt=0)
+    # Long report generation: one deadline shared by streaming and schema repair.
+    analysis_llm_timeout_seconds: float = Field(default=1200.0, gt=0)
+    analysis_llm_max_completion_tokens: int = Field(default=32768, ge=1)
+
+    # Deployment-only; deliberately absent from private/persisted editable keys.
+    pdf_max_concurrency: int = Field(default=1, ge=1, le=4)
+    pdf_max_waiters: int = Field(default=4, ge=0, le=32)
+    pdf_render_timeout_seconds: float = Field(default=120.0, gt=0, le=240.0)
+    python_sandbox_url: str = ""
+    python_sandbox_token: str = Field(default="", repr=False)
+
+    max_concurrent_chat_per_user: int = 2
+    max_concurrent_chat_total: int = 8
+    max_concurrent_llm_requests: int = 6
+    blocking_thread_pool_workers: int = 20
+    chat_max_completion_tokens: int = 4096
+    chat_total_timeout_seconds: int = 300
+    chat_heartbeat_seconds: int = 15
+    chat_tool_timeout_seconds: int = 45
+    # Maximum new calls in an execution batch, not a hard cap on one model turn.
+    chat_max_tool_calls_per_round: int = Field(default=16, ge=1, le=32)
+    chat_max_tool_calls_total: int = Field(default=32, ge=1, le=128)
+    chat_max_tool_context_characters: int = Field(default=60_000, ge=4_096, le=500_000)
+    chat_max_synthesis_characters: int = Field(default=60_000, ge=4_096, le=500_000)
+
+    provider_gateway_max_attempts: int = 2
+    provider_failure_threshold: int = 3
+    provider_circuit_open_seconds: float = 30.0
+    provider_retry_base_seconds: float = 0.2
+    provider_retry_budget_seconds: float = 5.0
+    provider_retry_jitter_seconds: float = 0.1

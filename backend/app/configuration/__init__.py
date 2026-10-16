@@ -1,3 +1,14 @@
+from app.configuration.api_models import (
+    CONFIG_FIELD_GROUPS,
+    CONFIG_VALUE_FIELDS,
+    GLOBAL_LLM_KEYS,
+    GLOBAL_PUSH_KEYS,
+    GLOBAL_STORAGE_KEYS,
+    GLOBAL_SYNCED_KEYS,
+    PERSISTED_GLOBAL_KEYS,
+    PRIVATE_USER_KEYS,
+    SECRET_KEYS,
+)
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
 from app.configuration.runtime import (
     configure_user_settings_loader,
@@ -7,16 +18,17 @@ from app.configuration.runtime import (
     update_settings,
 )
 from app.configuration.schema import (
-    GLOBAL_LLM_KEYS,
-    PERSISTED_GLOBAL_KEYS,
-    PRIVATE_USER_KEYS,
     ROOT_DIR,
-    SECRET_KEYS,
     Settings,
 )
 
 __all__ = [
+    "CONFIG_FIELD_GROUPS",
+    "CONFIG_VALUE_FIELDS",
     "GLOBAL_LLM_KEYS",
+    "GLOBAL_PUSH_KEYS",
+    "GLOBAL_STORAGE_KEYS",
+    "GLOBAL_SYNCED_KEYS",
     "PRIVATE_USER_KEYS",
     "PERSISTED_GLOBAL_KEYS",
     "PROVIDER_DEFAULTS",

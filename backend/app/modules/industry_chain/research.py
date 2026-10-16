@@ -417,8 +417,8 @@ async def research_industry_chain(
     resolved_scope = resolve_industry_chain_scope(scope)
     scope_text = render_industry_chain_scope(resolved_scope)
     guidance = render_discovery_plan(name, resolved_scope) + "\n" + research_guidance(name)
-    max_rounds = int(getattr(settings, "industry_chain_max_rounds", 6))
-    research_timeout = float(getattr(settings, "industry_chain_research_timeout_seconds", 1800.0))
+    max_rounds = int(settings.industry_chain_max_rounds)
+    research_timeout = float(settings.industry_chain_research_timeout_seconds)
     settings = settings.model_copy(update={
         "agent_research_timeout_seconds": research_timeout,
     })

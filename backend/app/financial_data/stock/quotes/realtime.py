@@ -171,8 +171,8 @@ def clear_realtime_quote_cache() -> None:
 
 def _quote_cache_ttls() -> tuple[int, int]:
     settings = get_settings()
-    fresh = max(0, int(getattr(settings, "portfolio_quote_cache_ttl_seconds", REALTIME_STOCK_QUOTES.fresh_seconds)))
-    stale = max(fresh, int(getattr(settings, "portfolio_quote_stale_ttl_seconds", REALTIME_STOCK_QUOTES.stale_seconds)))
+    fresh = max(0, int(settings.portfolio_quote_cache_ttl_seconds))
+    stale = max(fresh, int(settings.portfolio_quote_stale_ttl_seconds))
     return fresh, stale
 
 def _cached_quote_set(codes: list[str], *, now: float) -> RealtimeQuoteSet:

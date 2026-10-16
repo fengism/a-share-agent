@@ -255,10 +255,10 @@ async def repair_report(name: str, result: IndustryChainResult, evidence: list[A
     try:
         # A separate, explicitly bounded allowance; never resets into another full research job.
         repair_settings, total_calls = research_budget_settings(settings, repair=True, overrides={
-            "chat_max_tool_calls_per_round": min(getattr(settings, "chat_max_tool_calls_per_round", 8), 6),
+            "chat_max_tool_calls_per_round": min(settings.chat_max_tool_calls_per_round, 6),
             "agent_research_timeout_seconds": research_timeout,
         })
-        repair_rounds = int(getattr(settings, "industry_chain_repair_max_rounds", 3))
+        repair_rounds = int(settings.industry_chain_repair_max_rounds)
         spec = replace(
             build_repair_spec(result, evidence, targets),
             max_rounds=repair_rounds,

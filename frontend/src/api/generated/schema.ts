@@ -5778,6 +5778,10 @@ export interface components {
             database_backup_include_market_daily: boolean;
             /** Database Backup Retention Count */
             database_backup_retention_count: number;
+            /** Dingtalk Webhook Secret */
+            dingtalk_webhook_secret: string;
+            /** Dingtalk Webhook Url */
+            dingtalk_webhook_url: string;
             /** Disabled Chat Agents */
             disabled_chat_agents: string[];
             /** Disabled Chat Skills */
@@ -5816,6 +5820,10 @@ export interface components {
             feishu_folder_token: string;
             /** Feishu Verification Token */
             feishu_verification_token: string;
+            /** Feishu Webhook Secret */
+            feishu_webhook_secret: string;
+            /** Feishu Webhook Url */
+            feishu_webhook_url: string;
             /** Feishu Wiki Analysis Parent */
             feishu_wiki_analysis_parent: string;
             /** Feishu Wiki Daily Review Parent */
@@ -5824,6 +5832,8 @@ export interface components {
             feishu_wiki_space_id: string;
             /** Fred Api Key */
             fred_api_key: string;
+            /** Fuyao Api Key */
+            fuyao_api_key: string;
             /** Http Trust Env */
             http_trust_env: boolean;
             /** Industry Chain Max Rounds */
@@ -5914,16 +5924,36 @@ export interface components {
             provider_defaults: {
                 [key: string]: unknown;
             };
+            /** Push Auto Enabled */
+            push_auto_enabled: boolean;
+            /** Push Daily Review Auto */
+            push_daily_review_auto: boolean;
+            /** Push Dingtalk Enabled */
+            push_dingtalk_enabled: boolean;
+            /** Push Feishu Enabled */
+            push_feishu_enabled: boolean;
+            /** Push Potential Auto */
+            push_potential_auto: boolean;
+            /** Push Wecom Enabled */
+            push_wecom_enabled: boolean;
+            /** Push Wxpusher Enabled */
+            push_wxpusher_enabled: boolean;
             /** Stock Valuation Snapshot Refresh Enabled */
             stock_valuation_snapshot_refresh_enabled: boolean;
             /** Ths Cookie */
             ths_cookie: string;
             /** Twitter Feeds */
             twitter_feeds: string[];
+            /** Wecom Webhook Url */
+            wecom_webhook_url: string;
+            /** Wxpusher App Token */
+            wxpusher_app_token: string;
+            /** Wxpusher Uids */
+            wxpusher_uids: string;
         };
         /**
          * ConfigUpdateRequest
-         * @description Partial configuration update request.
+         * @description Partial configuration update request (per-user private + admin global).
          */
         ConfigUpdateRequest: {
             /** Agent Research Timeout Seconds */
@@ -5976,6 +6006,10 @@ export interface components {
             database_backup_include_market_daily?: boolean | null;
             /** Database Backup Retention Count */
             database_backup_retention_count?: number | null;
+            /** Dingtalk Webhook Secret */
+            dingtalk_webhook_secret?: string | null;
+            /** Dingtalk Webhook Url */
+            dingtalk_webhook_url?: string | null;
             /** Disabled Chat Agents */
             disabled_chat_agents?: string[] | null;
             /** Disabled Chat Skills */
@@ -6014,6 +6048,10 @@ export interface components {
             feishu_folder_token?: string | null;
             /** Feishu Verification Token */
             feishu_verification_token?: string | null;
+            /** Feishu Webhook Secret */
+            feishu_webhook_secret?: string | null;
+            /** Feishu Webhook Url */
+            feishu_webhook_url?: string | null;
             /** Feishu Wiki Analysis Parent */
             feishu_wiki_analysis_parent?: string | null;
             /** Feishu Wiki Daily Review Parent */
@@ -6022,6 +6060,8 @@ export interface components {
             feishu_wiki_space_id?: string | null;
             /** Fred Api Key */
             fred_api_key?: string | null;
+            /** Fuyao Api Key */
+            fuyao_api_key?: string | null;
             /** Http Trust Env */
             http_trust_env?: boolean | null;
             /** Industry Chain Max Rounds */
@@ -6100,12 +6140,32 @@ export interface components {
             outbound_proxy_url?: string | null;
             /** Potential Stock Daily Enabled */
             potential_stock_daily_enabled?: boolean | null;
+            /** Push Auto Enabled */
+            push_auto_enabled?: boolean | null;
+            /** Push Daily Review Auto */
+            push_daily_review_auto?: boolean | null;
+            /** Push Dingtalk Enabled */
+            push_dingtalk_enabled?: boolean | null;
+            /** Push Feishu Enabled */
+            push_feishu_enabled?: boolean | null;
+            /** Push Potential Auto */
+            push_potential_auto?: boolean | null;
+            /** Push Wecom Enabled */
+            push_wecom_enabled?: boolean | null;
+            /** Push Wxpusher Enabled */
+            push_wxpusher_enabled?: boolean | null;
             /** Stock Valuation Snapshot Refresh Enabled */
             stock_valuation_snapshot_refresh_enabled?: boolean | null;
             /** Ths Cookie */
             ths_cookie?: string | null;
             /** Twitter Feeds */
             twitter_feeds?: string[] | null;
+            /** Wecom Webhook Url */
+            wecom_webhook_url?: string | null;
+            /** Wxpusher App Token */
+            wxpusher_app_token?: string | null;
+            /** Wxpusher Uids */
+            wxpusher_uids?: string | null;
         };
         /** CreateInviteRequest */
         CreateInviteRequest: {

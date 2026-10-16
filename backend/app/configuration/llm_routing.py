@@ -27,13 +27,13 @@ class LLMRouting:
 
 def resolve_llm_routing(settings: Settings) -> LLMRouting:
     """Share routing defaults between credential isolation and client construction."""
-    provider = str(getattr(settings, "llm_provider", "openai") or "openai").lower()
+    provider = (settings.llm_provider or "openai").lower()
     defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["openai"])
-    configured_mode = str(getattr(settings, "llm_api_mode", "auto") or "auto").lower()
+    configured_mode = (settings.llm_api_mode or "auto").lower()
     return LLMRouting(
         provider=provider,
         api_mode=str(defaults.get("api_mode", "openai")) if configured_mode == "auto" else configured_mode,
-        base_url=str(getattr(settings, "llm_base_url", "") or defaults["base_url"]),
-        model=str(getattr(settings, "llm_model", "") or defaults["model"]),
-        api_version=str(getattr(settings, "llm_api_version", "") or defaults.get("api_version", "")),
+        base_url=settings.llm_base_url or str(defaults["base_url"]),
+        model=settings.llm_model or str(defaults["model"]),
+        api_version=settings.llm_api_version or str(defaults.get("api_version", "")),
     )

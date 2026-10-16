@@ -248,7 +248,7 @@ async def periodic_database_backup() -> None:
             ))
 
         due_market_daily = False
-        if getattr(settings, "database_backup_include_market_daily", True):
+        if settings.database_backup_include_market_daily:
             market_daily_interval = max(3600, int(settings.market_daily_backup_interval_days * 86400))
             market_daily_due = set(await call_blocking(
                 backup_databases_due,

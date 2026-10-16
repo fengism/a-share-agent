@@ -42,11 +42,11 @@ class LLMClientSpec:
 
 def simple_task_enabled(settings: Settings, task: str) -> bool:
     """该任务是否应使用子模型：需配置 ``llm_sub_model``，且任务在启用清单内（清单为空=全部）。"""
-    if not str(getattr(settings, "llm_sub_model", "") or "").strip():
+    if not settings.llm_sub_model.strip():
         return False
     configured = {
         item.strip()
-        for item in str(getattr(settings, "llm_simple_tasks", "") or "").split(",")
+        for item in settings.llm_simple_tasks.split(",")
         if item.strip()
     }
     return not configured or task in configured
@@ -61,7 +61,7 @@ def apply_task_model(settings: Settings, *, simple: bool = False, task: str | No
     """
     if not (simple or (task is not None and simple_task_enabled(settings, task))):
         return settings
-    sub_model = str(getattr(settings, "llm_sub_model", "") or "").strip()
+    sub_model = settings.llm_sub_model.strip()
     if not sub_model or sub_model == settings.llm_model:
         return settings
     return cast(Settings, settings.model_copy(update={"llm_model": sub_model}))

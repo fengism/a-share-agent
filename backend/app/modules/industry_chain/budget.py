@@ -15,5 +15,5 @@ def search_policy_limits(total: int, *, repair: bool = False) -> dict:
 def research_budget_settings(settings=None, *, repair: bool = False, overrides: dict | None = None):
     settings = settings if settings is not None else get_effective_settings()
     key = "industry_chain_repair_tool_calls_total" if repair else "industry_chain_tool_calls_total"
-    total = int(getattr(settings, key, 48 if repair else 96))
+    total = int(getattr(settings, key))
     return settings.model_copy(update={**(overrides or {}), "chat_max_tool_calls_total": total}), total
