@@ -410,3 +410,32 @@ def test_build_prompt_without_history_inputs_stays_explicit():
 
     assert "暂无上一交易日复盘可对照" in prompt
     assert "暂无历史样本" in prompt
+
+
+# --- API 路由 -------------------------------------------------------------------
+
+
+async def test_get_cycle_trend_api_route():
+    from httpx import ASGITransport, AsyncClient
+
+    from app.api.auth.dependencies import require_active_user
+    from app.main import app
+
+    cycle_store.save_cycle_record(_record("2026-10-14", stage="冰点"))
+    cycle_store.save_cycle_record(_record("2026-10-15", stage="修复回暖"))
+
+    app.dependency_overrides[require_active_user] = lambda: {"id": 1, "username": "test", "is_admin": False}
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            resp = await client.get("/api/daily-review/cycle_trend?days=10")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert [p["date"] for p in data["points"]] == ["2026-10-14", "2026-10-15"]
+        assert data["points"][1]["stage_transition"] == "升级"
+    finally:
+        app.dependency_overrides.pop(require_active_user, None)
+

@@ -12,11 +12,13 @@ from app.api.schemas import DeleteResponse
 from app.core.exceptions import UpstreamUnavailableError
 from app.domain.identity import AuthenticatedUser
 from app.modules.daily_review.public import (
+    CycleTrend,
     DailyReviewHistoryItem,
     DailyReviewRequest,
     DailyReviewResult,
     generate_daily_review,
     generate_daily_review_pdf_html,
+    get_cycle_trend,
     get_daily_review_record,
     list_daily_review_history,
     remove_daily_review,
@@ -35,6 +37,15 @@ async def generate_review(request: DailyReviewRequest, user: AuthenticatedUser =
         return await generate_daily_review(request, user["id"])
     except ValueError as error:
         raise BadRequestError(str(error), code="daily_review.invalid_date") from error
+
+
+@router.get("/cycle_trend", response_model=CycleTrend)
+async def get_daily_review_cycle_trend(
+    days: Annotated[int, Query(ge=1, le=180)] = 20,
+    user: AuthenticatedUser = Depends(require_active_user),
+):
+    """获取全市场情绪周期历史趋势与阶段胜率。"""
+    return await get_cycle_trend(days=days)
 
 
 @router.get("/history", response_model=list[DailyReviewHistoryItem])

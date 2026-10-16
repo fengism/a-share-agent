@@ -522,7 +522,7 @@ describe("KlineChart", () => {
   });
 
   it("switches sub-indicators between VOL, MACD, KDJ, and RSI", () => {
-    const { getByText, queryByText } = render(
+    const { getByText, getAllByText, queryByText } = render(
       <KlineChart
         data={[
           { date: "2026-01-01", open: 10, close: 10.5, high: 11, low: 9.5, volume: 1000, amount: 10000 },
@@ -531,8 +531,9 @@ describe("KlineChart", () => {
       />,
     );
 
-    // Initial sub-indicator is VOL
+    // Initial sub-indicator is VOL, displays both volume and amount (both in top HUD and bottom bar)
     expect(getByText(/VOL:/)).toBeInTheDocument();
+    expect(getAllByText(/额:/).length).toBe(2);
     expect(queryByText(/参数: 12,26,9/)).toBeNull();
 
     // Switch to MACD
@@ -555,9 +556,29 @@ describe("KlineChart", () => {
     expect(getByText(/RSI24:/)).toBeInTheDocument();
     expect(getByText(/参数: 6,12,24/)).toBeInTheDocument();
 
+    // Switch to AMO (成交额)
+    fireEvent.click(getByText("AMO"));
+    expect(getByText(/AMO:/)).toBeInTheDocument();
+    expect(getByText("单位: 元")).toBeInTheDocument();
+
     // Switch back to VOL
     fireEvent.click(getByText("VOL"));
     expect(getByText(/VOL:/)).toBeInTheDocument();
+    expect(getByText("单位: 股/元")).toBeInTheDocument();
+  });
+
+  it("renders volume ratio badges when volume deviates from 5-day moving average", () => {
+    const data = [
+      { date: "2026-01-01", open: 10, close: 10.5, high: 11, low: 9.5, volume: 1000, amount: 10000 },
+      { date: "2026-01-02", open: 10.5, close: 11, high: 11.5, low: 10, volume: 1000, amount: 10000 },
+      { date: "2026-01-03", open: 11, close: 11.5, high: 12, low: 10.5, volume: 1000, amount: 10000 },
+      { date: "2026-01-04", open: 11.5, close: 12, high: 12.5, low: 11, volume: 1000, amount: 10000 },
+      { date: "2026-01-05", open: 12, close: 12.5, high: 13, low: 11.5, volume: 1000, amount: 10000 },
+      { date: "2026-01-06", open: 12.5, close: 13, high: 13.5, low: 12, volume: 2500, amount: 25000 },
+    ] as unknown as KlineItem[];
+
+    const { getByText } = render(<KlineChart data={data} />);
+    expect(getByText(/放量 1.9x/)).toBeInTheDocument();
   });
 
   it("toggles candle style between solid and hollow (红空绿实)", () => {

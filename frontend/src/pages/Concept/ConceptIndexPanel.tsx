@@ -158,6 +158,7 @@ export default function ConceptIndexPanel({
           data={items}
           height={isNarrow ? 320 : 380}
           viewKey={`${concept}-concept-index-${days}`}
+          defaultSubIndicator="AMO"
         />
       </SectionDataState>
 

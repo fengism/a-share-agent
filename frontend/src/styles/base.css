@@ -1412,7 +1412,13 @@ samp {
   outline-offset: 2px;
   border-radius: var(--c-radius-sm);
 }
-.hot-rank-horizontal-scroll__content { width: max-content; }
+.hot-rank-horizontal-scroll__content {
+  width: 100%;
+  min-width: 100%;
+}
+.hot-rank-horizontal-scroll .ant-table-cell {
+  padding: 7px 6px !important;
+}
 .hot-rank-horizontal-scroll a,
 .hot-rank-horizontal-scroll button {
   cursor: pointer;

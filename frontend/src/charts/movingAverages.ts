@@ -28,15 +28,21 @@ export function calculateMA<T extends { close: number; date?: unknown; time?: un
 export function calculateMAVOL<T extends { amount?: number | null; volume?: number | null; date?: unknown; time?: unknown }>(
   data: T[],
   period: number,
+  field: "volume" | "amount" = "volume",
 ): { time: T["date"] | T["time"]; value: number }[] {
   const result: { time: T["date"] | T["time"]; value: number }[] = [];
   let sum = 0;
   for (let i = 0; i < data.length; i++) {
-    const val = data[i].amount ?? data[i].volume ?? 0;
+    const raw = field === "volume"
+      ? (data[i].volume ?? data[i].amount ?? 0)
+      : (data[i].amount ?? data[i].volume ?? 0);
+    const val = raw || 0;
     sum += val;
     if (i >= period) {
-      const prevVal = data[i - period].amount ?? data[i - period].volume ?? 0;
-      sum -= prevVal;
+      const prevRaw = field === "volume"
+        ? (data[i - period].volume ?? data[i - period].amount ?? 0)
+        : (data[i - period].amount ?? data[i - period].volume ?? 0);
+      sum -= (prevRaw || 0);
     }
     if (i >= period - 1) {
       const time = data[i].date ?? data[i].time;

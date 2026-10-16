@@ -151,6 +151,17 @@ describe("HotRankContent", () => {
     // 横向滚动区宽度必须跟着切到 316px，否则仍会把表格撑出容器
     const scroller = screen.getByRole("region", { name: "热股榜左右滑动区域" });
     expect(scroller.firstElementChild).toHaveStyle({ minWidth: "316px" });
+
+    // 核心信息在紧凑布局下直接可见（概念标签与人气标签不被隐藏）
+    expect(screen.getByText("白酒")).toBeInTheDocument();
+    expect(screen.getByText("机构关注")).toBeInTheDocument();
+
+    // 概念榜紧凑模式也直接展示上榜标签与涨跌停
+    fireEvent.click(screen.getByText("概念榜"));
+    expect(screen.getByRole("columnheader", { name: "概念" })).toBeInTheDocument();
+    expect(screen.getByText("人工智能")).toBeInTheDocument();
+    expect(screen.getByText("持续活跃")).toBeInTheDocument();
+    expect(screen.getByText("3家涨停")).toBeInTheDocument();
   });
 
   it("renders clickable stock links in the compact layout", () => {
@@ -167,4 +178,5 @@ describe("HotRankContent", () => {
     expect(stockLink).toHaveAttribute("title", "查看贵州茅台（600519）个股详情");
   });
 });
+
 

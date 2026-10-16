@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Card, Col, Row, Segmented, Table, Tag } from "antd";
+import { Card, Segmented, Table, Tag } from "antd";
 import {
   AppstoreOutlined,
   FireOutlined,
@@ -153,35 +153,97 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
         {
           title: "股票",
           key: "stock",
-          width: 138,
-          render: (_: unknown, record: ThsHotStock) => (
-            <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
-              {rankBadge(record.rank, c, t)}
-              <StockExternalLink
-                code={record.code}
-                name={record.name}
-                className="hot-rank-stock-link"
-                style={{ minWidth: 0, color: c.primary }}
-              >
-                <span style={{ display: "block", color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
-                <span style={{ display: "block", color: c.textMuted, fontSize: t.font.xs, fontFamily: "var(--c-font-mono)" }}>{record.code}</span>
-              </StockExternalLink>
-            </div>
-          ),
+          render: (_: unknown, record: ThsHotStock) => {
+            const conceptTags = record.concept_tag ? record.concept_tag.split(";").filter(Boolean).slice(0, 2) : [];
+            return (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: t.space[2] }}>
+                <div style={{ marginTop: 2, flexShrink: 0 }}>{rankBadge(record.rank, c, t)}</div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <StockExternalLink
+                    code={record.code}
+                    name={record.name}
+                    className="hot-rank-stock-link"
+                    style={{ minWidth: 0, color: c.primary }}
+                  >
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                      <span
+                        style={{
+                          color: c.textPrimary,
+                          fontWeight: Number(t.weight.semibold),
+                          fontSize: t.font.sm,
+                          lineHeight: "1.3",
+                        }}
+                      >
+                        {record.name}
+                      </span>
+                      <span
+                        style={{
+                          color: c.textMuted,
+                          fontSize: t.font.xs,
+                          fontFamily: "var(--c-font-mono)",
+                        }}
+                      >
+                        {record.code}
+                      </span>
+                    </div>
+                  </StockExternalLink>
+                  {(conceptTags.length > 0 || record.pop_tag) ? (
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
+                      {conceptTags.map((tag) => (
+                        <span
+                          key={tag}
+                          style={{
+                            fontSize: 10,
+                            lineHeight: "14px",
+                            padding: "0 4px",
+                            borderRadius: 3,
+                            background: `${c.primary}18`,
+                            color: c.primary,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {record.pop_tag ? (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            lineHeight: "14px",
+                            padding: "0 4px",
+                            borderRadius: 3,
+                            background: `${c.warning}18`,
+                            color: c.warning,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {record.pop_tag}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          },
         },
         {
           title: "涨跌幅",
           dataIndex: "change_pct",
-          width: 76,
+          width: 82,
           align: "right",
           render: (value: number | null) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
         },
         {
           title: "热度",
           dataIndex: "hot_value",
-          width: 66,
+          width: 76,
           align: "right",
-          render: (value: number | null) => <span style={{ fontWeight: Number(t.weight.semibold), color: c.up }}>{formatHotValue(value)}</span>,
+          render: (value: number | null) => (
+            <span style={{ fontWeight: Number(t.weight.semibold), color: c.up, fontSize: t.font.sm, whiteSpace: "nowrap" }}>
+              {formatHotValue(value)}
+            </span>
+          ),
         },
       ];
     }
@@ -289,12 +351,13 @@ function StockTable({ enabled, scrollY }: { enabled: boolean; scrollY: number })
             rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
             size="small"
             pagination={false}
-            virtual
+            virtual={!isNarrow}
             expandable={isNarrow ? {
               expandedRowRender: renderExpandedRow,
-              columnWidth: 36,
+              columnWidth: 32,
             } : undefined}
-            scroll={{ x: isNarrow ? NARROW_TABLE_WIDTH : WIDE_STOCK_TABLE_WIDTH, y: scrollY }}
+            scroll={{ x: isNarrow ? undefined : WIDE_STOCK_TABLE_WIDTH, y: scrollY }}
+            style={{ width: "100%" }}
           />
         </HorizontalScrollArea>
       </SectionDataState>
@@ -325,27 +388,80 @@ function PlateTable({
         {
           title: type === "concept" ? "概念" : "行业",
           key: "plate",
-          width: 138,
           render: (_: unknown, record: ThsHotPlate) => (
-            <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
-              {rankBadge(record.rank, c, t)}
-              <span style={{ minWidth: 0, color: c.textPrimary, fontWeight: Number(t.weight.semibold) }}>{record.name}</span>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: t.space[2] }}>
+              <div style={{ marginTop: 2, flexShrink: 0 }}>{rankBadge(record.rank, c, t)}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <span
+                  style={{
+                    display: "block",
+                    color: c.textPrimary,
+                    fontWeight: Number(t.weight.semibold),
+                    fontSize: t.font.sm,
+                    lineHeight: "1.3",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={record.name}
+                >
+                  {record.name}
+                </span>
+                {(record.hot_tag || record.tag) ? (
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 3 }}>
+                    {record.hot_tag ? (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          lineHeight: "14px",
+                          padding: "0 4px",
+                          borderRadius: 3,
+                          background: `${c.primary}18`,
+                          color: c.primary,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {record.hot_tag}
+                      </span>
+                    ) : null}
+                    {record.tag ? (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          lineHeight: "14px",
+                          padding: "0 4px",
+                          borderRadius: 3,
+                          background: `${c.warning}18`,
+                          color: c.warning,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {record.tag}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </div>
           ),
         },
         {
           title: "涨跌幅",
           dataIndex: "change_pct",
-          width: 76,
+          width: 82,
           align: "right",
           render: (value: number) => <ChangeValue value={value} fontWeight={Number(t.weight.medium)} />,
         },
         {
           title: "热度",
           dataIndex: "hot_value",
-          width: 66,
+          width: 76,
           align: "right",
-          render: (value: number | null) => <span style={{ fontWeight: Number(t.weight.semibold), color: c.up }}>{formatHotValue(value)}</span>,
+          render: (value: number | null) => (
+            <span style={{ fontWeight: Number(t.weight.semibold), color: c.up, fontSize: t.font.sm, whiteSpace: "nowrap" }}>
+              {formatHotValue(value)}
+            </span>
+          ),
         },
       ];
     }
@@ -417,18 +533,24 @@ function PlateTable({
         errorTitle={`${type === "concept" ? "概念" : "行业"}热榜加载失败`}
         minHeight={320}
       >
-        <Table
-          columns={columns}
-          dataSource={data || []}
-          rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
-          size="small"
-          pagination={false}
-          scroll={{ x: isNarrow ? NARROW_TABLE_WIDTH : WIDE_PLATE_TABLE_WIDTH, y: scrollY }}
-          expandable={isNarrow ? {
-            expandedRowRender: renderExpandedRow,
-            columnWidth: 36,
-          } : undefined}
-        />
+        <HorizontalScrollArea
+          contentWidth={isNarrow ? NARROW_TABLE_WIDTH : WIDE_PLATE_TABLE_WIDTH}
+          label={type === "concept" ? "概念榜左右滑动区域" : "行业榜左右滑动区域"}
+        >
+          <Table
+            columns={columns}
+            dataSource={data || []}
+            rowKey={(record) => `${record.code}-${record.name}-${record.rank}`}
+            size="small"
+            pagination={false}
+            scroll={{ x: isNarrow ? undefined : WIDE_PLATE_TABLE_WIDTH, y: scrollY }}
+            expandable={isNarrow ? {
+              expandedRowRender: renderExpandedRow,
+              columnWidth: 32,
+            } : undefined}
+            style={{ width: "100%" }}
+          />
+        </HorizontalScrollArea>
       </SectionDataState>
     </div>
   );
@@ -454,22 +576,27 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
           border: "none",
           boxShadow: t.shadow.xs,
         }}
-        styles={{ body: { padding: embedded ? undefined : `${t.space[4]} ${t.space[6]}` } }}
+        styles={{ body: { padding: embedded ? `${t.space[2]} ${t.space[3]}` : `${t.space[3]} ${t.space[4]}` } }}
       >
-        <Row justify="space-between" align="middle">
-          <Col>
-            <Segmented
-              options={TAB_OPTIONS}
-              value={tab}
-              onChange={(value) => setTab(value as TabKey)}
-            />
-          </Col>
-          <Col>
-            <span style={{ color: c.textSecondary, fontSize: t.font.sm }}>
-              {embedded ? "每分钟自动更新" : "5分钟更新"}
-            </span>
-          </Col>
-        </Row>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "6px 12px",
+          }}
+        >
+          <Segmented
+            size={embedded ? "small" : "middle"}
+            options={TAB_OPTIONS}
+            value={tab}
+            onChange={(value) => setTab(value as TabKey)}
+          />
+          <span style={{ color: c.textSecondary, fontSize: t.font.xs, whiteSpace: "nowrap" }}>
+            {embedded ? "每分钟自动更新" : "5分钟更新"}
+          </span>
+        </div>
       </Card>
       <Card
         size="small"
@@ -481,7 +608,7 @@ export function HotRankContent({ embedded = false }: HotRankContentProps) {
         styles={{
           body: {
             padding: embedded
-              ? `${t.space[2]} ${t.space[2]}`
+              ? `${t.space[1]} ${t.space[1]}`
               : `${t.space[2]} ${t.space[4]}`,
           },
         }}

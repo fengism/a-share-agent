@@ -6,11 +6,18 @@ from datetime import date as dt_date
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 from app.financial_data.market.public import get_market_volume_stats
 from app.modules.daily_review import pipeline
-from app.modules.daily_review.models import DailyReviewResult
+from app.modules.daily_review.cycle_store import recent_cycle_records
+from app.modules.daily_review.cycle_trend import build_cycle_trend
+from app.modules.daily_review.models import CycleTrend, DailyReviewResult
 from app.modules.daily_review.persistence import repository
 from app.modules.daily_review.schemas import DailyReviewRequest
 
 logger = logging.getLogger(__name__)
+
+
+async def get_cycle_trend(*, days: int = 20) -> CycleTrend:
+    records = await call_blocking(recent_cycle_records, days, semaphore=misc_semaphore)
+    return build_cycle_trend(records, days=days)
 
 
 async def generate_daily_review(

@@ -30154,6 +30154,57 @@
         ]
       }
     },
+    "/api/daily-review/cycle_trend": {
+      "get": {
+        "description": "获取全市场情绪周期历史趋势与阶段胜率。",
+        "operationId": "get_daily_review_cycle_trend_api_daily_review_cycle_trend_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 180,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleTrend"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Daily Review Cycle Trend",
+        "tags": [
+          "daily-review"
+        ]
+      }
+    },
     "/api/daily-review/generate": {
       "post": {
         "description": "触发生成指定日期的每日市场复盘。",

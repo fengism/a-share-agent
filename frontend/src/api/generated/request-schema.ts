@@ -792,6 +792,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/daily-review/cycle_trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Daily Review Cycle Trend
+         * @description 获取全市场情绪周期历史趋势与阶段胜率。
+         */
+        get: operations["get_daily_review_cycle_trend_api_daily_review_cycle_trend_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/daily-review/generate": {
         parameters: {
             query?: never;
@@ -16865,6 +16885,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProxyTestResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_daily_review_cycle_trend_api_daily_review_cycle_trend_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleTrend"];
                 };
             };
             /** @description 统一错误响应 */
