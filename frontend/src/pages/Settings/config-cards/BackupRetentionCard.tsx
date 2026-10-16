@@ -1,7 +1,7 @@
 import { DatabaseOutlined } from "@ant-design/icons";
 import { Col, InputNumber, Row, Space, Switch } from "antd";
-import { useColors, useStyles } from "../../styles/ui";
-import { SettingsCard, type ConfigCardProps } from "./SettingsCard";
+import { useColors, useStyles } from "../../../styles/ui";
+import { SettingsCard, type ConfigCardProps } from "../SettingsCard";
 
 /** 与后端 Settings 默认值保持一致。 */
 const DEFAULT_RETENTION_COUNT = 3;

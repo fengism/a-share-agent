@@ -5,55 +5,35 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import AdminResetCard from "../../components/AdminResetCard";
 import {
   AnySearchConfigCard,
+  BackupRetentionCard,
   BotConfigCard,
+  DataSourceCookiesCard,
   DataSourceCredentialsCard,
   EastmoneyProxyConfigCard,
   EastmoneyRateLimitConfigCard,
   FredConfigCard,
   IwencaiConfigCard,
+  MarketDailyBarManagerCard,
   ResearchBudgetCard,
   ScheduledTasksConfigCard,
   TwitterConfigCard,
 } from "./ConfigCards";
-import BackupRetentionCard from "./BackupRetentionCard";
 import BotJobManagerCard from "./BotJobManagerCard";
 import InviteManagerCard from "./InviteManagerCard";
-import MarketDailyBarManagerCard from "./MarketDailyBarManagerCard";
 import SecurityAuditCard from "./SecurityAuditCard";
 import UserManagerCard from "./UserManagerCard";
 import type { ConfigSectionProps } from "./sectionTypes";
 import type { ProxyTestResponse } from "../../types/settings";
+import type { SettingsCards } from "./useSettingsForm";
 
 interface DataSourcesSettingsSectionProps extends ConfigSectionProps {
-  onSaveIwencai: () => void;
-  onSaveTwitter: () => void;
-  onSaveFred: () => void;
   anySearchConfigured: boolean;
-  onSaveAnySearch: () => void;
   fuyaoConfigured: boolean;
-  onSaveDataSourceCredentials: () => void;
-  onSaveOutboundProxy: () => void;
-  onSaveEastmoneyRateLimit: () => void;
   onTestOutboundProxy?: () => void;
   isTestingOutboundProxy?: boolean;
   outboundProxyTestResult?: ProxyTestResponse | null;
-  onResetIwencai?: () => void;
-  onResetTwitter?: () => void;
-  onResetFred?: () => void;
-  onResetAnySearch?: () => void;
-  onResetFuyao?: () => void;
-  onResetOutboundProxy?: () => void;
-  onResetEastmoneyRateLimit?: () => void;
   isAdmin?: boolean;
-  dirtyCards?: {
-    iwencai?: boolean;
-    fred?: boolean;
-    twitter?: boolean;
-    anySearch?: boolean;
-    fuyao?: boolean;
-    outboundProxy?: boolean;
-    eastmoneyRateLimit?: boolean;
-  };
+  cards: SettingsCards;
 }
 
 export function DataSourcesSettingsSection({
@@ -61,27 +41,13 @@ export function DataSourcesSettingsSection({
   onChange,
   isSaving,
   sectionTitleStyle,
-  onSaveIwencai,
-  onSaveTwitter,
-  onSaveFred,
   anySearchConfigured,
-  onSaveAnySearch,
   fuyaoConfigured,
-  onSaveDataSourceCredentials,
-  onSaveOutboundProxy,
-  onSaveEastmoneyRateLimit,
   onTestOutboundProxy,
   isTestingOutboundProxy = false,
   outboundProxyTestResult = null,
-  onResetIwencai,
-  onResetTwitter,
-  onResetFred,
-  onResetAnySearch,
-  onResetFuyao,
-  onResetOutboundProxy,
-  onResetEastmoneyRateLimit,
   isAdmin = true,
-  dirtyCards = {},
+  cards,
 }: DataSourcesSettingsSectionProps) {
   const cardProps = { form, onChange, isSaving };
   return (
@@ -95,9 +61,9 @@ export function DataSourcesSettingsSection({
       <div style={{ marginBottom: 20 }}>
         <IwencaiConfigCard
           {...cardProps}
-          onSave={onSaveIwencai}
-          isDirty={dirtyCards.iwencai}
-          onReset={onResetIwencai}
+          onSave={() => cards.save("iwencai")}
+          isDirty={cards.dirty.iwencai}
+          onReset={() => cards.reset("iwencai")}
         />
       </div>
 
@@ -108,18 +74,18 @@ export function DataSourcesSettingsSection({
             <FredConfigCard
               stretch
               {...cardProps}
-              onSave={onSaveFred}
-              isDirty={dirtyCards.fred}
-              onReset={onResetFred}
+              onSave={() => cards.save("fred")}
+              isDirty={cards.dirty.fred}
+              onReset={() => cards.reset("fred")}
             />
           </Col>
           <Col xs={24} lg={12} style={{ display: "flex" }}>
             <TwitterConfigCard
               stretch
               {...cardProps}
-              onSave={onSaveTwitter}
-              isDirty={dirtyCards.twitter}
-              onReset={onResetTwitter}
+              onSave={() => cards.save("twitter")}
+              isDirty={cards.dirty.twitter}
+              onReset={() => cards.reset("twitter")}
             />
           </Col>
           <Col xs={24} lg={12} style={{ display: "flex" }}>
@@ -127,9 +93,9 @@ export function DataSourcesSettingsSection({
               stretch
               {...cardProps}
               configured={anySearchConfigured}
-              onSave={onSaveAnySearch}
-              isDirty={dirtyCards.anySearch}
-              onReset={onResetAnySearch}
+              onSave={() => cards.save("anysearch")}
+              isDirty={cards.dirty.anysearch}
+              onReset={() => cards.reset("anysearch")}
             />
           </Col>
           <Col xs={24} lg={12} style={{ display: "flex" }}>
@@ -137,18 +103,27 @@ export function DataSourcesSettingsSection({
               stretch
               {...cardProps}
               fuyaoConfigured={fuyaoConfigured}
-              onSave={onSaveDataSourceCredentials}
-              isDirty={dirtyCards.fuyao}
-              onReset={onResetFuyao}
+              onSave={() => cards.save("fuyao")}
+              isDirty={cards.dirty.fuyao}
+              onReset={() => cards.reset("fuyao")}
+            />
+          </Col>
+          <Col xs={24} style={{ display: "flex" }}>
+            <DataSourceCookiesCard
+              stretch
+              {...cardProps}
+              onSave={() => cards.save("dataSourceCookies")}
+              isDirty={cards.dirty.dataSourceCookies}
+              onReset={() => cards.reset("dataSourceCookies")}
             />
           </Col>
           <Col xs={24} lg={12} style={{ display: "flex" }}>
             <EastmoneyProxyConfigCard
               stretch
               {...cardProps}
-              onSave={onSaveOutboundProxy}
-              isDirty={dirtyCards.outboundProxy}
-              onReset={onResetOutboundProxy}
+              onSave={() => cards.save("outboundProxy")}
+              isDirty={cards.dirty.outboundProxy}
+              onReset={() => cards.reset("outboundProxy")}
               onTest={onTestOutboundProxy}
               isTesting={isTestingOutboundProxy}
               testResult={outboundProxyTestResult}
@@ -158,9 +133,9 @@ export function DataSourcesSettingsSection({
             <EastmoneyRateLimitConfigCard
               stretch
               {...cardProps}
-              onSave={onSaveEastmoneyRateLimit}
-              isDirty={dirtyCards.eastmoneyRateLimit}
-              onReset={onResetEastmoneyRateLimit}
+              onSave={() => cards.save("eastmoneyRateLimit")}
+              isDirty={cards.dirty.eastmoneyRateLimit}
+              onReset={() => cards.reset("eastmoneyRateLimit")}
             />
           </Col>
         </Row>
@@ -170,23 +145,7 @@ export function DataSourcesSettingsSection({
 }
 
 interface AdminSettingsSectionProps extends ConfigSectionProps {
-  onSaveBot: () => void;
-  onSaveResearchBudget: () => void;
-  onSaveMarketDailyBars: () => void;
-  onSaveBackupRetention: () => void;
-  onSaveScheduledTasks: () => void;
-  onResetBot?: () => void;
-  onResetResearchBudget?: () => void;
-  onResetMarketDailyBars?: () => void;
-  onResetBackupRetention?: () => void;
-  onResetScheduledTasks?: () => void;
-  dirtyCards?: {
-    backup?: boolean;
-    marketDaily?: boolean;
-    researchBudget?: boolean;
-    scheduledTasks?: boolean;
-    bot?: boolean;
-  };
+  cards: SettingsCards;
 }
 
 export function AdminSettingsSection({
@@ -194,21 +153,16 @@ export function AdminSettingsSection({
   onChange,
   isSaving,
   sectionTitleStyle,
-  onSaveBot,
-  onSaveResearchBudget,
-  onSaveMarketDailyBars,
-  onSaveBackupRetention,
-  onSaveScheduledTasks,
-  onResetBot,
-  onResetResearchBudget,
-  onResetMarketDailyBars,
-  onResetBackupRetention,
-  onResetScheduledTasks,
-  dirtyCards = {},
+  cards,
 }: AdminSettingsSectionProps) {
   const [activeTab, setActiveTab] = useState<"ops" | "bot" | "user">("ops");
   const isNarrow = useMediaQuery("(max-width: 640px)");
   const isMobile = useMediaQuery("(max-width: 480px)");
+  const opsDirty =
+    cards.dirty.backup ||
+    cards.dirty.marketDaily ||
+    cards.dirty.researchBudget ||
+    cards.dirty.scheduledTasks;
 
   return (
     <section aria-labelledby="admin-settings-title">
@@ -229,7 +183,7 @@ export function AdminSettingsSection({
               label: (
                 <span style={{ padding: isNarrow ? "0 2px" : "0 8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                   <DatabaseOutlined /> {isNarrow ? (isMobile ? "运维" : "系统运维") : "系统运维与数据维护"}
-                  {(dirtyCards.backup || dirtyCards.marketDaily || dirtyCards.researchBudget || dirtyCards.scheduledTasks) && (
+                  {opsDirty && (
                     <span
                       style={{
                         display: "inline-block",
@@ -249,7 +203,7 @@ export function AdminSettingsSection({
               label: (
                 <span style={{ padding: isNarrow ? "0 2px" : "0 8px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                   <RobotOutlined /> {isNarrow ? (isMobile ? "推送" : "自动化推送") : "自动化与推送机器人"}
-                  {dirtyCards.bot && (
+                  {cards.dirty.bot && (
                     <span
                       style={{
                         display: "inline-block",
@@ -286,34 +240,34 @@ export function AdminSettingsSection({
             form={form}
             onChange={onChange}
             isSaving={isSaving}
-            onSave={onSaveScheduledTasks}
-            isDirty={dirtyCards.scheduledTasks}
-            onReset={onResetScheduledTasks}
+            onSave={() => cards.save("scheduledTasks")}
+            isDirty={cards.dirty.scheduledTasks}
+            onReset={() => cards.reset("scheduledTasks")}
           />
           <BackupRetentionCard
             form={form}
             onChange={onChange}
             isSaving={isSaving}
-            onSave={onSaveBackupRetention}
-            isDirty={dirtyCards.backup}
-            onReset={onResetBackupRetention}
+            onSave={() => cards.save("backup")}
+            isDirty={cards.dirty.backup}
+            onReset={() => cards.reset("backup")}
           />
           <MarketDailyBarManagerCard
             form={form}
             onChange={onChange}
             isSaving={isSaving}
             sectionTitleStyle={sectionTitleStyle}
-            onSave={onSaveMarketDailyBars}
-            isDirty={dirtyCards.marketDaily}
-            onReset={onResetMarketDailyBars}
+            onSave={() => cards.save("marketDaily")}
+            isDirty={cards.dirty.marketDaily}
+            onReset={() => cards.reset("marketDaily")}
           />
           <ResearchBudgetCard
             form={form}
             onChange={onChange}
             isSaving={isSaving}
-            onSave={onSaveResearchBudget}
-            isDirty={dirtyCards.researchBudget}
-            onReset={onResetResearchBudget}
+            onSave={() => cards.save("researchBudget")}
+            isDirty={cards.dirty.researchBudget}
+            onReset={() => cards.reset("researchBudget")}
           />
         </div>
       )}
@@ -328,9 +282,9 @@ export function AdminSettingsSection({
             form={form}
             onChange={onChange}
             isSaving={isSaving}
-            onSave={onSaveBot}
-            isDirty={dirtyCards.bot}
-            onReset={onResetBot}
+            onSave={() => cards.save("bot")}
+            isDirty={cards.dirty.bot}
+            onReset={() => cards.reset("bot")}
           />
           <BotJobManagerCard />
         </div>

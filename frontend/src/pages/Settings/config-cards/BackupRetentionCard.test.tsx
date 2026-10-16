@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import BackupRetentionCard from "./BackupRetentionCard";
-import type { ConfigUpdate } from "../../types/settings";
+import type { ConfigUpdate } from "../../../types/settings";
 
 const renderCard = (formPartial: Partial<ConfigUpdate> = {}, onChange = vi.fn(), onSave = vi.fn()) => {
   render(

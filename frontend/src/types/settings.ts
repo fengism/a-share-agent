@@ -1,10 +1,15 @@
-export type LlmApiMode = "auto" | "openai" | "litellm";
+import type { components } from "../api/generated/schema";
+
+type GeneratedConfigResponse = components["schemas"]["ConfigResponse"];
+
+/** 生效配置的字段类型直接来自 OpenAPI 生成产物，避免手写字段与后端漂移。 */
+export type LlmApiMode = GeneratedConfigResponse["llm_api_mode"];
 
 /**
  * 公共出站代理类型；none 表示已声明作用域内的接口仍强制直连。
  * 各数据源在代码中自行声明生效范围，未声明的接口始终直连。
  */
-export type OutboundProxyType = "none" | "http" | "socks5";
+export type OutboundProxyType = GeneratedConfigResponse["outbound_proxy_type"];
 
 export interface ProviderDefault {
   label: string;
@@ -16,115 +21,13 @@ export interface ProviderDefault {
   model: string;
 }
 
-export interface ConfigData {
-  llm_provider: string;
-  llm_api_mode: LlmApiMode;
-  llm_api_version: string;
-  llm_api_key: string;
-  llm_base_url: string;
-  llm_model: string;
-  llm_sub_model: string;
-  llm_simple_tasks: string;
-  llm_temperature: number;
-  llm_context_length_tokens: number;
-  feishu_enabled: boolean;
-  feishu_app_id: string;
-  feishu_app_secret: string;
-  feishu_folder_token: string;
-  feishu_wiki_space_id: string;
-  feishu_wiki_daily_review_parent: string;
-  feishu_wiki_analysis_parent: string;
-  feishu_daily_review_folder: string;
-  feishu_analysis_folder: string;
-  feishu_default_receiver: string;
-  push_auto_enabled?: boolean;
-  push_daily_review_auto?: boolean;
-  push_potential_auto?: boolean;
-  push_feishu_enabled?: boolean;
-  push_dingtalk_enabled?: boolean;
-  push_wecom_enabled?: boolean;
-  push_wxpusher_enabled?: boolean;
-  feishu_webhook_url?: string;
-  feishu_webhook_secret?: string;
-  dingtalk_webhook_url?: string;
-  dingtalk_webhook_secret?: string;
-  wecom_webhook_url?: string;
-  wxpusher_app_token?: string;
-  wxpusher_uids?: string;
-  notion_enabled: boolean;
-  notion_api_token: string;
-  notion_parent_page_id: string;
-  notion_database_id: string;
-  iwencai_enabled: boolean;
-  iwencai_base_url: string;
-  iwencai_api_key: string;
-  disabled_chat_skills: string[];
-  disabled_chat_agents: string[];
+/**
+ * 当前用户的生效配置：字段与后端 `ConfigResponse` 契约一一对应，
+ * 由 OpenAPI 生成类型派生，仅把 `provider_defaults` 收敛为强类型字典。
+ */
+export type ConfigData = Omit<GeneratedConfigResponse, "provider_defaults"> & {
   provider_defaults: Record<string, ProviderDefault>;
-  twitter_feeds: string[];
-  fred_api_key: string;
-  anysearch_api_key: string;
-  ths_cookie: string;
-  fuyao_api_key: string;
-  http_trust_env: boolean;
-  eastmoney_min_interval_seconds: number;
-  eastmoney_datacenter_min_interval_seconds: number;
-  eastmoney_datacenter_cooldown_seconds: number;
-  eastmoney_jitter_min_seconds: number;
-  eastmoney_jitter_max_seconds: number;
-  eastmoney_cooldown_seconds: number;
-  eastmoney_transient_failure_threshold: number;
-  /** 公共出站代理类型；none 表示已声明作用域内的接口仍强制直连。 */
-  outbound_proxy_type: OutboundProxyType;
-  /** 公共出站代理地址，内含凭证，接口下发时按敏感字段脱敏。 */
-  outbound_proxy_url: string;
-  outbound_proxy_timeout_seconds: number;
-  outbound_proxy_retries: number;
-  market_daily_bar_refresh_enabled: boolean;
-  market_daily_bar_refresh_poll_seconds: number;
-  market_daily_bar_refresh_retry_base_seconds: number;
-  market_daily_observation_retention_days: number;
-  market_daily_attempt_retention_days: number;
-  macro_analysis_prewarm_enabled: boolean;
-  daily_review_prewarm_enabled: boolean;
-  potential_stock_daily_enabled: boolean;
-  stock_valuation_snapshot_refresh_enabled: boolean;
-  database_backup_retention_count: number;
-  database_backup_include_market_daily: boolean;
-  market_daily_backup_interval_days: number;
-  market_daily_backup_compression_level: number;
-  bot_enabled: boolean;
-  bot_command_prefix: string;
-  bot_service_user_id: number;
-  bot_feishu_app_id: string;
-  bot_feishu_app_secret: string;
-  feishu_verification_token: string;
-  feishu_encrypt_key: string;
-  bot_rate_limit_requests: number;
-  bot_rate_limit_window: number;
-  bot_webhook_max_skew_seconds: number;
-  bot_event_dedup_ttl_seconds: number;
-  bot_job_poll_seconds: number;
-  bot_job_lease_seconds: number;
-  bot_job_max_attempts: number;
-  bot_job_retry_base_seconds: number;
-  bot_job_worker_concurrency: number;
-  bot_batch_concurrency: number;
-  bot_batch_max_stocks: number;
-  bot_admin_users: string[];
-  analysis_llm_timeout_seconds: number;
-  agent_research_timeout_seconds: number;
-  industry_chain_research_timeout_seconds: number;
-  industry_chain_repair_research_timeout_seconds: number;
-  industry_chain_repair_synthesis_timeout_seconds: number;
-  industry_chain_max_rounds: number;
-  industry_chain_repair_max_rounds: number;
-  industry_chain_tool_calls_total: number;
-  industry_chain_repair_tool_calls_total: number;
-  chat_max_tool_calls_total: number;
-  /** Whether the current user may edit instance-global fields. */
-  is_admin: boolean;
-}
+};
 
 export type ConfigUpdate = Partial<Omit<ConfigData, "provider_defaults" | "is_admin">>;
 

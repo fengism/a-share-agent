@@ -19,28 +19,12 @@ vi.mock("../../api/queries", () => ({
   }),
 }));
 
-vi.mock("./MarketDailyBarManagerCard", () => ({
-  default: ({ onSave }: { onSave: () => void }) => (
-    <button type="button" onClick={onSave}>保存刷新配置</button>
-  ),
-}));
-
 vi.mock("./ConfigCards", async () => {
   const { normalizeProxyUrl, validateProxyUrl } = await import("./config-cards/EastmoneyProxyConfigCard");
   return {
     normalizeProxyUrl,
     validateProxyUrl,
-    // 页面用这个常量做脏检查、保存与撤销，这里提供与真实实现一致的键集合
-    EASTMONEY_RATE_LIMIT_KEYS: [
-    "eastmoney_min_interval_seconds",
-    "eastmoney_datacenter_min_interval_seconds",
-    "eastmoney_cooldown_seconds",
-    "eastmoney_datacenter_cooldown_seconds",
-    "eastmoney_jitter_min_seconds",
-    "eastmoney_jitter_max_seconds",
-    "eastmoney_transient_failure_threshold",
-  ],
-  AnySearchConfigCard: ({ form, onChange, onSave, configured, isDirty, onReset }: {
+    AnySearchConfigCard: ({ form, onChange, onSave, configured, isDirty, onReset }: {
     form: ConfigUpdate;
     onChange: (patch: ConfigUpdate) => void;
     onSave: () => void;
@@ -80,6 +64,7 @@ vi.mock("./ConfigCards", async () => {
       <button type="button" onClick={onSave}>保存 fuyao API Key</button>
     </div>
   ),
+  DataSourceCookiesCard: () => null,
   EastmoneyRateLimitConfigCard: ({ form, onChange, onSave, isDirty, onReset }: {
     form: ConfigUpdate;
     onChange: (patch: ConfigUpdate) => void;
@@ -173,6 +158,8 @@ vi.mock("./ConfigCards", async () => {
   NotionConfigCard: () => null,
   ProviderDefaultsCard: () => null,
   TwitterConfigCard: () => null,
+  BackupRetentionCard: () => null,
+  MarketDailyBarManagerCard: () => null,
   ScheduledTasksConfigCard: ({ form, onChange, onSave, isDirty, onReset }: {
     form: ConfigUpdate;
     onChange: (patch: ConfigUpdate) => void;
@@ -224,6 +211,20 @@ let config: ConfigData = {
   feishu_daily_review_folder: "",
   feishu_analysis_folder: "",
   feishu_default_receiver: "",
+  push_auto_enabled: false,
+  push_daily_review_auto: true,
+  push_potential_auto: true,
+  push_feishu_enabled: true,
+  push_dingtalk_enabled: true,
+  push_wecom_enabled: true,
+  push_wxpusher_enabled: true,
+  feishu_webhook_url: "",
+  feishu_webhook_secret: "",
+  dingtalk_webhook_url: "",
+  dingtalk_webhook_secret: "",
+  wecom_webhook_url: "",
+  wxpusher_app_token: "",
+  wxpusher_uids: "",
   notion_enabled: false,
   notion_api_token: "",
   notion_parent_page_id: "",
@@ -239,6 +240,9 @@ let config: ConfigData = {
   fred_api_key: "fred-***-key",
   anysearch_api_key: "keys***alue",
   ths_cookie: "",
+  eastmoney_cookie: "",
+  baidu_cookie: "",
+  legulegu_token: "",
   fuyao_api_key: "fuyao-***-key",
   http_trust_env: false,
   analysis_llm_timeout_seconds: 1200,
@@ -332,7 +336,6 @@ describe("SettingsPage Bot config", () => {
       bot_enabled: true,
       bot_command_prefix: "/",
       bot_service_user_id: 7,
-      bot_feishu_app_id: "cli_bot",
       bot_rate_limit_requests: 20,
       bot_rate_limit_window: 120,
       bot_webhook_max_skew_seconds: 180,
@@ -346,6 +349,7 @@ describe("SettingsPage Bot config", () => {
       bot_batch_max_stocks: 12,
       bot_admin_users: ["ou_admin", "ou_ops"],
     });
+    expect(patch).not.toHaveProperty("bot_feishu_app_id");
     expect(patch).not.toHaveProperty("bot_feishu_app_secret");
     expect(patch).not.toHaveProperty("feishu_verification_token");
     expect(patch).not.toHaveProperty("feishu_encrypt_key");

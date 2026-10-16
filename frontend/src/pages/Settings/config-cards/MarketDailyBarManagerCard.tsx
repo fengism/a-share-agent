@@ -43,17 +43,17 @@ import {
   useRefreshMarketAdjustmentFactor,
   useRefreshMarketDailyBars,
   useRetryFailedMarketDailyBackfill,
-} from "../../api/queries";
-import { semanticTagStyle, useStyles } from "../../styles/ui";
+} from "../../../api/queries";
+import { semanticTagStyle, useStyles } from "../../../styles/ui";
 import type {
   ConfigUpdate,
   MarketAdjustmentFactorHealth,
   MarketDailyRefreshCheckpoint,
   MarketDailyRefreshStatus,
   MarketDailySegment,
-} from "../../types/settings";
-import { summarizeRefreshResult } from "./marketDailyRefreshSummary";
-import type { ConfigSectionProps } from "./sectionTypes";
+} from "../../../types/settings";
+import { summarizeRefreshResult } from "../marketDailyRefreshSummary";
+import type { ConfigSectionProps } from "../sectionTypes";
 import "./market-daily-bar-manager.css";
 
 const segmentOptions: Array<{ label: string; value: MarketDailySegment }> = [

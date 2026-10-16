@@ -48,21 +48,11 @@ export default function BotConfigCard({
             onChange={(event) => onChange({ bot_command_prefix: event.target.value })}
           />
         </Col>
-        <Col span={24} sm={12}>
-          <div style={fieldLabelStyle}>Bot 飞书 App ID</div>
-          <Input
-            value={form.bot_feishu_app_id || ""}
-            onChange={(event) => onChange({ bot_feishu_app_id: event.target.value })}
-            placeholder="cli_xxxxx"
-          />
-        </Col>
-        <Col span={24} sm={12}>
-          <div style={fieldLabelStyle}>Bot 飞书 App Secret</div>
-          <Input.Password
-            value={form.bot_feishu_app_secret || ""}
-            onChange={(event) => onChange({ bot_feishu_app_secret: event.target.value })}
-            placeholder="输入新的 Secret 以覆盖"
-          />
+        <Col span={24}>
+          <div style={{ color: "var(--c-text-muted)", fontSize: 13, lineHeight: 1.6 }}>
+            Bot 与文档转存共用「协同与自动推送 → 飞书应用凭证」中的 App ID / App Secret，
+            无需在此重复配置。旧版本单独配置的 <code>BOT_FEISHU_APP_ID</code> / <code>BOT_FEISHU_APP_SECRET</code> 仍会被读取。
+          </div>
         </Col>
         <Col span={24} sm={12}>
           <div style={fieldLabelStyle}>Verification Token</div>

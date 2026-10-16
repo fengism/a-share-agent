@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   factorRefetch: vi.fn(),
 }));
 
-vi.mock("../../api/queries", () => ({
+vi.mock("../../../api/queries", () => ({
   useMarketDailyBackfills: () => ({ data: { items: [], total: 0 }, isFetching: false }),
   useCreateMarketDailyBackfill: () => ({ mutate: mocks.backfillCreateMutate, isPending: false }),
   useCancelMarketDailyBackfill: () => ({ mutate: mocks.backfillCancelMutate, isPending: false }),

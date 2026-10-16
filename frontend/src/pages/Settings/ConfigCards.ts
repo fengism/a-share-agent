@@ -1,7 +1,9 @@
 export { default as AnySearchConfigCard } from "./config-cards/AnySearchConfigCard";
+export { default as BackupRetentionCard } from "./config-cards/BackupRetentionCard";
 export { default as BotConfigCard } from "./config-cards/BotConfigCard";
 export { default as ResearchBudgetCard } from "./config-cards/ResearchBudgetCard";
 export { default as DataSourceCredentialsCard } from "./config-cards/DataSourceCredentialsCard";
+export { default as DataSourceCookiesCard } from "./config-cards/DataSourceCookiesCard";
 export {
   default as EastmoneyRateLimitConfigCard,
   EASTMONEY_RATE_LIMIT_KEYS,
@@ -15,6 +17,7 @@ export { default as FeishuConfigCard } from "./config-cards/FeishuConfigCard";
 export { default as FredConfigCard } from "./config-cards/FredConfigCard";
 export { default as IwencaiConfigCard } from "./config-cards/IwencaiConfigCard";
 export { default as LlmConfigCard } from "./config-cards/LlmConfigCard";
+export { default as MarketDailyBarManagerCard } from "./config-cards/MarketDailyBarManagerCard";
 export { default as NotificationChannelsConfigCard } from "./config-cards/NotificationChannelsConfigCard";
 export { default as NotionConfigCard } from "./config-cards/NotionConfigCard";
 export { default as TwitterConfigCard } from "./config-cards/TwitterConfigCard";

@@ -8,13 +8,12 @@ import {
   ProviderDefaultsCard,
 } from "./ConfigCards";
 import type { ConfigSectionProps } from "./sectionTypes";
+import type { SettingsCards } from "./useSettingsForm";
 
 interface AiSettingsSectionProps extends ConfigSectionProps {
   providerDefaults: Record<string, ProviderDefault>;
-  onSave: () => void;
   onProviderChange: (provider: string) => void;
-  isDirty?: boolean;
-  onReset?: () => void;
+  cards: SettingsCards;
 }
 
 export function AiSettingsSection({
@@ -23,10 +22,8 @@ export function AiSettingsSection({
   isSaving,
   sectionTitleStyle,
   providerDefaults,
-  onSave,
   onProviderChange,
-  isDirty,
-  onReset,
+  cards,
 }: AiSettingsSectionProps) {
   return (
     <section aria-labelledby="ai-settings-title">
@@ -39,10 +36,10 @@ export function AiSettingsSection({
         onChange={onChange}
         isSaving={isSaving}
         providerDefaults={providerDefaults}
-        onSave={onSave}
+        onSave={() => cards.save("llm")}
         onProviderChange={onProviderChange}
-        isDirty={isDirty}
-        onReset={onReset}
+        isDirty={cards.dirty.llm}
+        onReset={() => cards.reset("llm")}
       />
       <ProviderDefaultsCard providerDefaults={providerDefaults} />
     </section>
@@ -50,17 +47,7 @@ export function AiSettingsSection({
 }
 
 interface IntegrationsSettingsSectionProps extends ConfigSectionProps {
-  onSaveFeishu: () => void;
-  onSaveNotion: () => void;
-  onSaveNotificationChannels: () => void;
-  onResetFeishu?: () => void;
-  onResetNotion?: () => void;
-  onResetNotificationChannels?: () => void;
-  dirtyCards?: {
-    feishu?: boolean;
-    notion?: boolean;
-    notificationChannels?: boolean;
-  };
+  cards: SettingsCards;
 }
 
 export function IntegrationsSettingsSection({
@@ -68,13 +55,7 @@ export function IntegrationsSettingsSection({
   onChange,
   isSaving,
   sectionTitleStyle,
-  onSaveFeishu,
-  onSaveNotion,
-  onSaveNotificationChannels,
-  onResetFeishu,
-  onResetNotion,
-  onResetNotificationChannels,
-  dirtyCards = {},
+  cards,
 }: IntegrationsSettingsSectionProps) {
   const cardProps = { form, onChange, isSaving };
   return (
@@ -88,27 +69,27 @@ export function IntegrationsSettingsSection({
           <NotificationChannelsConfigCard
             stretch
             {...cardProps}
-            onSave={onSaveNotificationChannels}
-            isDirty={dirtyCards.notificationChannels}
-            onReset={onResetNotificationChannels}
+            onSave={() => cards.save("notificationChannels")}
+            isDirty={cards.dirty.notificationChannels}
+            onReset={() => cards.reset("notificationChannels")}
           />
         </Col>
         <Col xs={24} xl={14} style={{ display: "flex" }}>
           <FeishuConfigCard
             stretch
             {...cardProps}
-            onSave={onSaveFeishu}
-            isDirty={dirtyCards.feishu}
-            onReset={onResetFeishu}
+            onSave={() => cards.save("feishu")}
+            isDirty={cards.dirty.feishu}
+            onReset={() => cards.reset("feishu")}
           />
         </Col>
         <Col xs={24} xl={10} style={{ display: "flex" }}>
           <NotionConfigCard
             stretch
             {...cardProps}
-            onSave={onSaveNotion}
-            isDirty={dirtyCards.notion}
-            onReset={onResetNotion}
+            onSave={() => cards.save("notion")}
+            isDirty={cards.dirty.notion}
+            onReset={() => cards.reset("notion")}
           />
         </Col>
       </Row>
