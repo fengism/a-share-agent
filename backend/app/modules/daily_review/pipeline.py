@@ -5,7 +5,6 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Literal, cast
-from zoneinfo import ZoneInfo
 
 from pydantic import ValidationError
 
@@ -14,6 +13,7 @@ from app.configuration.schema import Settings
 from app.core.cache import analysis_cache
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 from app.core.progress import ProgressCallback, ProgressEmitter
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.domain.llm import LLMConfigurationError
 from app.domain.prompting import PromptTrace
 from app.financial_data.market.public import (
@@ -52,7 +52,6 @@ from app.modules.daily_review.schemas import DailyReviewRequest
 from app.modules.daily_review.self_check import build_previous_review_check
 
 logger = logging.getLogger(__name__)
-_MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 # 生成过程向调用方（Workflow / 流式接口）回报的阶段事件。
 DailyReviewProgressCallback = ProgressCallback[dict[str, Any]]
 _QUEUE_MESSAGE = "已受理每日复盘任务，正在排队"
@@ -215,8 +214,8 @@ def _parse_generated_at(value: str) -> datetime | None:
         logger.warning("复盘生成时间无法解析，跳过缓存失效冷却判断: %r", value)
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=_MARKET_TIMEZONE)
-    return parsed.astimezone(_MARKET_TIMEZONE)
+        return parsed.replace(tzinfo=SHANGHAI_TIMEZONE)
+    return parsed.astimezone(SHANGHAI_TIMEZONE)
 
 
 def _older_than(value: str, delta: timedelta) -> bool:
@@ -286,7 +285,7 @@ class DailyReviewDateResolution:
 
 
 def _local_now() -> datetime:
-    return datetime.now(_MARKET_TIMEZONE)
+    return datetime.now(SHANGHAI_TIMEZONE)
 
 
 async def resolve_daily_review_date(
@@ -294,7 +293,7 @@ async def resolve_daily_review_date(
     *,
     now: datetime | None = None,
 ) -> DailyReviewDateResolution:
-    local_now = (now or _local_now()).astimezone(_MARKET_TIMEZONE)
+    local_now = (now or _local_now()).astimezone(SHANGHAI_TIMEZONE)
     requested = requested_date or local_now.date()
     if requested > local_now.date():
         raise ValueError("复盘日期不能晚于今天")

@@ -5,7 +5,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any, AsyncContextManager, Protocol
-from zoneinfo import ZoneInfo
 
 from app.agentic.contracts import (
     MAX_AGENT_SUMMARY_LENGTH,
@@ -28,10 +27,10 @@ from app.agentic.events import (
     auditable_agent_event,
 )
 from app.agentic.semantics import EvidenceState, ExecutionOutcome
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.infrastructure.llm.adapters import LLMInvalidResponseError
 
 AgentEventCallback = Callable[[AgentEvent], Awaitable[None]]
-_MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 _DEFAULT_RECENCY_DAYS = 183
 _FOLLOWUP_TOOL_CALL_RESERVE = 8
 
@@ -43,11 +42,11 @@ def build_research_system_prompt(
 ) -> str:
     """为 Research Agent 注入运行时日期和通用检索约束。"""
     if current_time is None:
-        resolved_time = datetime.now(_MARKET_TIMEZONE)
+        resolved_time = datetime.now(SHANGHAI_TIMEZONE)
     elif current_time.tzinfo is None:
-        resolved_time = current_time.replace(tzinfo=_MARKET_TIMEZONE)
+        resolved_time = current_time.replace(tzinfo=SHANGHAI_TIMEZONE)
     else:
-        resolved_time = current_time.astimezone(_MARKET_TIMEZONE)
+        resolved_time = current_time.astimezone(SHANGHAI_TIMEZONE)
     resolved_date = resolved_time.date()
     sections = [
         spec.system_prompt.rstrip(),

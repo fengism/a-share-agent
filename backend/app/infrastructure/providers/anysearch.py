@@ -10,15 +10,14 @@ from collections.abc import Callable
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import requests
 
 from app.configuration import get_settings
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.infrastructure.http.client import provider_post
 
 ANYSEARCH_SEARCH_URL = "https://api.anysearch.com/v1/search"
-_SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
 _TIME_RANGE_DAYS = {"day": 1, "week": 7, "month": 30, "half_year": 183}
 _DEFAULT_QUOTA_COOLDOWN_SECONDS = 300.0
 _DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS = 60.0
@@ -35,7 +34,7 @@ class AnySearchKeysUnavailableError(RuntimeError):
 
 
 def _shanghai_today() -> date:
-    return datetime.now(_SHANGHAI_TIMEZONE).date()
+    return datetime.now(SHANGHAI_TIMEZONE).date()
 
 
 def _query_with_time_range(query: str, time_range: str, today: date) -> str:

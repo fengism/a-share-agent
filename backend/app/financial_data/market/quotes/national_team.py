@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Literal, TypeVar, cast
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -18,6 +17,7 @@ from app.core.concurrency.rate_limiter import call_blocking, eastmoney_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
 from app.core.market import safe_float
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.financial_data.market.quotes.index_kline import get_index_kline
 from app.financial_data.market.quotes.schemas import (
     NationalTeamEtfPoint,
@@ -72,7 +72,7 @@ T = TypeVar("T")
 
 
 def _calendar_window(moment: datetime) -> tuple[date, bool]:
-    local = moment.astimezone(ZoneInfo("Asia/Shanghai"))
+    local = moment.astimezone(SHANGHAI_TIMEZONE)
     return local.date(), local.hour >= 16
 
 
@@ -838,7 +838,7 @@ async def _refresh_exchange(
             logger.warning("国家队历史份额刷新失败 exchange=%s error=%r，使用存量数据", exchange, error)
 
     async def current() -> None:
-        now = datetime.now(ZoneInfo("Asia/Shanghai"))
+        now = datetime.now(SHANGHAI_TIMEZONE)
         latest = trading_dates[-1] if trading_dates else None
         if exchange != "SZ" or latest != now.date().isoformat() or now.hour < 16:
             return
@@ -906,7 +906,7 @@ def _response_window(days: int, now: datetime) -> tuple[date, date]:
 async def _collect_response(days: int = 120) -> NationalTeamResponse:
     """返回核心宽基 ETF 份额与指数价格的国家队代理监测视图。"""
     days = max(30, min(days, 365))
-    now = datetime.now(ZoneInfo("Asia/Shanghai"))
+    now = datetime.now(SHANGHAI_TIMEZONE)
     cache_key = _response_cache_key(days, now)
     cached = market_cache.get(cache_key)
     if cached is not None:
@@ -1022,8 +1022,8 @@ async def get_national_team_etf_holdings(days: int = 120) -> NationalTeamRespons
             _start_refresh(days)
             # 不改 fetched_at，不把缓存时间伪装成数据更新时间。
             response = NationalTeamResponse.model_validate(stale)
-            now = datetime.now(ZoneInfo("Asia/Shanghai"))
-            fetched = datetime.fromisoformat(response.fetched_at).astimezone(ZoneInfo("Asia/Shanghai"))
+            now = datetime.now(SHANGHAI_TIMEZONE)
+            fetched = datetime.fromisoformat(response.fetched_at).astimezone(SHANGHAI_TIMEZONE)
             # 跨日或跨过当日发布宽限后，旧日历不能证明当前新鲜度。
             calendar_expired = _calendar_window(fetched) != _calendar_window(now)
             return response.model_copy(
@@ -1044,7 +1044,7 @@ async def prewarm_national_team_prices() -> None:
     使用与 `_collect_response` 默认窗口相同的日期与数据源链路；不带单标的超时，
     让慢速上游排队完成后正常写入缓存。预热失败仅记录日志，不影响启动。
     """
-    start, end = _response_window(120, datetime.now(ZoneInfo("Asia/Shanghai")))
+    start, end = _response_window(120, datetime.now(SHANGHAI_TIMEZONE))
     start_text = start.strftime("%Y%m%d")
     end_text = end.strftime("%Y%m%d")
 

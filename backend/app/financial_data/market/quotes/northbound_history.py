@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
-from zoneinfo import ZoneInfo
 
 from app.configuration.paths import DATA_DIR
 from app.core.concurrency.rate_limiter import call_blocking, exchange_semaphore, misc_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import UpstreamUnavailableError
+from app.core.parsing import coerce_finite_float
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.financial_data.market.quotes.schemas import NorthboundHistoryPoint, NorthboundHistoryResponse
 from app.infrastructure.persistence.file_lock import exclusive_file_lock
 from app.infrastructure.persistence.json_storage import atomic_write_json
@@ -23,7 +23,6 @@ from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
-_SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 # v2: 金额单位从错误的"亿元(按万元换算)"修正为百万元口径 ÷100，旧快照作废
 _SNAPSHOT_VERSION = 2
 _LEGULEGU_SOURCE = "乐咕乐股"
@@ -40,14 +39,6 @@ class EastMoneyNorthboundProvider(Protocol):
     def fetch_datacenter_report(self, **kwargs: Any) -> list[dict[str, Any]]: ...
 
     def fetch_index_kline(self, **kwargs: Any) -> Any: ...
-
-
-def _number(value: Any) -> float | None:
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return None
-    return parsed if math.isfinite(parsed) else None
 
 
 def _date_text(value: Any) -> str | None:
@@ -107,7 +98,7 @@ def _hs300_rows(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 def _mn_to_yi(value: Any) -> float | None:
     """上游金额单位为百万元（与东财 RPT_MUTUAL_DEAL_HISTORY 的 DEAL_AMT 同值
     交叉验证；2024-08-19 起该表公布成交总额），÷100 换算为亿元。"""
-    parsed = _number(value)
+    parsed = coerce_finite_float(value)
     return None if parsed is None else parsed / 100
 
 
@@ -135,12 +126,12 @@ def _parse_items(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
         item = by_date.setdefault(date, {"date": date})
         item.update(
             {
-                "hs300_open": _number(row.get("open")),
-                "hs300_close": _number(row.get("close")),
-                "hs300_high": _number(row.get("high")),
-                "hs300_low": _number(row.get("low")),
-                "hs300_change": _number(row.get("change")),
-                "hs300_change_pct": _number(row.get("pctChg")),
+                "hs300_open": coerce_finite_float(row.get("open")),
+                "hs300_close": coerce_finite_float(row.get("close")),
+                "hs300_high": coerce_finite_float(row.get("high")),
+                "hs300_low": coerce_finite_float(row.get("low")),
+                "hs300_change": coerce_finite_float(row.get("change")),
+                "hs300_change_pct": coerce_finite_float(row.get("pctChg")),
             }
         )
 
@@ -184,12 +175,12 @@ def _parse_eastmoney_items(
             continue
         by_date[date].update(
             {
-                "hs300_open": _number(row.get("open")),
-                "hs300_close": _number(row.get("close")),
-                "hs300_high": _number(row.get("high")),
-                "hs300_low": _number(row.get("low")),
-                "hs300_change": _number(row.get("change")),
-                "hs300_change_pct": _number(row.get("change_pct")),
+                "hs300_open": coerce_finite_float(row.get("open")),
+                "hs300_close": coerce_finite_float(row.get("close")),
+                "hs300_high": coerce_finite_float(row.get("high")),
+                "hs300_low": coerce_finite_float(row.get("low")),
+                "hs300_change": coerce_finite_float(row.get("change")),
+                "hs300_change_pct": coerce_finite_float(row.get("change_pct")),
             }
         )
     return [by_date[date] for date in sorted(by_date)]
@@ -214,14 +205,14 @@ class NorthboundHistoryService:
         )
         self._snapshot_path = data_dir / "legulegu" / "northbound_history.json"
         self._lock_path = data_dir / "legulegu" / ".locks" / "northbound_history.lock"
-        self._now = now or (lambda: datetime.now(_SHANGHAI_TZ))
+        self._now = now or (lambda: datetime.now(SHANGHAI_TIMEZONE))
         self._singleflight: AsyncSingleFlight[NorthboundHistoryResponse] = AsyncSingleFlight()
 
     def _now_shanghai(self) -> datetime:
         value = self._now()
         if value.tzinfo is None:
-            return value.replace(tzinfo=_SHANGHAI_TZ)
-        return value.astimezone(_SHANGHAI_TZ)
+            return value.replace(tzinfo=SHANGHAI_TIMEZONE)
+        return value.astimezone(SHANGHAI_TIMEZONE)
 
     def _is_fresh(self, fetched_at: str) -> bool:
         try:
@@ -229,8 +220,8 @@ class NorthboundHistoryService:
         except ValueError:
             return False
         if fetched.tzinfo is None:
-            fetched = fetched.replace(tzinfo=_SHANGHAI_TZ)
-        return fetched.astimezone(_SHANGHAI_TZ).date() == self._now_shanghai().date()
+            fetched = fetched.replace(tzinfo=SHANGHAI_TIMEZONE)
+        return fetched.astimezone(SHANGHAI_TIMEZONE).date() == self._now_shanghai().date()
 
     def _read_snapshot(self) -> tuple[str, str, list[NorthboundHistoryPoint]] | None:
         try:

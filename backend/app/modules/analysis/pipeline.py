@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import cast
 from uuid import uuid4
-from zoneinfo import ZoneInfo
 
 from app.agentic.events import AgentEvent, auditable_agent_event
 from app.agentic.public import AgentEvidenceInsufficientError
@@ -12,6 +11,7 @@ from app.configuration import get_effective_settings
 from app.core.cache import analysis_cache as cache
 from app.core.errors import log_internal_error
 from app.core.progress import ProgressCallback, ProgressEmitter, StageClock
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.infrastructure.llm.streaming import LLMGenerationTimeoutError
 from app.modules.analysis import result_service, stages
 from app.modules.analysis.events import ANALYSIS_STAGE_NAMES, AnalysisProgress, AnalysisStage
@@ -21,11 +21,10 @@ from app.modules.analysis.persistence import repository as analysis_storage
 from app.modules.analysis.provenance import build_provenance
 
 logger = logging.getLogger(__name__)
-_MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 
 def _analysis_date(now: datetime | None = None) -> str:
-    return (now or datetime.now(_MARKET_TIMEZONE)).astimezone(_MARKET_TIMEZONE).strftime("%Y%m%d")
+    return (now or datetime.now(SHANGHAI_TIMEZONE)).astimezone(SHANGHAI_TIMEZONE).strftime("%Y%m%d")
 
 
 async def _emit_stage_started(
@@ -89,7 +88,7 @@ async def run_analysis(
 
     settings = get_effective_settings()
     active_stage = 1
-    research_started_at = datetime.now(_MARKET_TIMEZONE)
+    research_started_at = datetime.now(SHANGHAI_TIMEZONE)
     try:
         clock = await _emit_stage_started(
             progress,
@@ -114,7 +113,7 @@ async def run_analysis(
             ),
             resolve_key_levels(code),
         )
-        research_completed_at = datetime.now(_MARKET_TIMEZONE)
+        research_completed_at = datetime.now(SHANGHAI_TIMEZONE)
         await _emit_stage_completed(progress, 1, clock)
 
         active_stage = 2
@@ -157,7 +156,7 @@ async def run_analysis(
             result.model_copy(update={
                 "agent_trace": list(research.execution_trace),
                 "report_id": uuid4().hex, "analysis_date": analysis_date,
-                "generated_at": datetime.now(_MARKET_TIMEZONE).isoformat(),
+                "generated_at": datetime.now(SHANGHAI_TIMEZONE).isoformat(),
                 "provenance": build_provenance(research, started_at=research_started_at, completed_at=research_completed_at, force=force),
             }),
         )

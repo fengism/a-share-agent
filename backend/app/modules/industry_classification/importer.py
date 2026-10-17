@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 from pydantic import ValidationError
 
+from app.core.dataframes import clean_cell_text
 from app.modules.code_normalization import normalize_imported_stock_code
 from app.modules.import_limits import MAX_IMPORT_BASE64_CHARS, MAX_IMPORT_FILE_BYTES
 from app.modules.industry_classification.models import IndustryRecordInput
@@ -55,14 +56,8 @@ def decode_file(content_base64: str) -> bytes:
     return content
 
 
-def _text(value: object) -> str:
-    if value is None or pd.isna(value):
-        return ""
-    return str(value).strip()
-
-
 def _normalize_code(value: object, exchange: str = "") -> tuple[str, str, str]:
-    return normalize_imported_stock_code(_text(value), exchange)
+    return normalize_imported_stock_code(clean_cell_text(value), exchange)
 
 
 def _read_dataframe(content: bytes, filename: str) -> pd.DataFrame:
@@ -145,7 +140,7 @@ def parse_data(content: bytes, filename: str = "upload.xlsx") -> ParsedIndustryF
     duplicate_codes: set[str] = set()
 
     for row_number, (_, row) in enumerate(frame.iterrows(), start=2):
-        exchange_val = _text(row[exchange_col]) if exchange_col else ""
+        exchange_val = clean_cell_text(row[exchange_col]) if exchange_col else ""
         stock_code, suffix, market = _normalize_code(row[code_col], exchange_val)
         if not stock_code or not suffix:
             invalid_rows += 1
@@ -156,12 +151,12 @@ def parse_data(content: bytes, filename: str = "upload.xlsx") -> ParsedIndustryF
             duplicate_codes.add(stock_code)
             continue
 
-        stock_name = _text(row[name_col]) if name_col else ""
-        industry_code = _text(row[industry_code_col]) if industry_code_col else ""
+        stock_name = clean_cell_text(row[name_col]) if name_col else ""
+        industry_code = clean_cell_text(row[industry_code_col]) if industry_code_col else ""
 
-        level1 = _text(row[l1_col])
-        level2 = _text(row[l2_col]) if l2_col else ""
-        level3 = _text(row[l3_col]) if l3_col else ""
+        level1 = clean_cell_text(row[l1_col])
+        level2 = clean_cell_text(row[l2_col]) if l2_col else ""
+        level3 = clean_cell_text(row[l3_col]) if l3_col else ""
 
         # 如果行业列是类似 "银行；股份制银行" 这种多级拼接格式（如同花顺行业）
         if "；" in level1 or ";" in level1:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import akshare_semaphore
@@ -15,7 +14,6 @@ from app.infrastructure.providers.registry import get_provider
 logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 3600
-_SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 
 
 def _parse_float(val: Any) -> float | None:

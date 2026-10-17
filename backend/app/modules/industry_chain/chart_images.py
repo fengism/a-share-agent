@@ -10,9 +10,8 @@ import json
 import logging
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
-
-from app.infrastructure.browser_runtime import full_chromium_launch_options
+from app.core.html import escape_html
+from app.infrastructure.report import render_elements_to_pngs
 from app.modules.industry_chain.models import IndustryChainResult
 
 logger = logging.getLogger(__name__)
@@ -59,8 +58,8 @@ def industry_chain_chart_cards(
 
 def _chart_page_html(title: str, description: str, option: dict, echarts_source: str) -> str:
     heading = (
-        f'<div class="chart-heading"><strong>{_esc(title)}</strong>'
-        + (f"<span>{_esc(description)}</span>" if description else "")
+        f'<div class="chart-heading"><strong>{escape_html(title)}</strong>'
+        + (f"<span>{escape_html(description)}</span>" if description else "")
         + "</div>"
     )
     return (
@@ -85,10 +84,6 @@ def _chart_page_html(title: str, description: str, option: dict, echarts_source:
     )
 
 
-def _esc(text: str) -> str:
-    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
 def render_industry_chain_chart_pngs(
     result: IndustryChainResult,
     *,
@@ -103,27 +98,15 @@ def render_industry_chain_chart_pngs(
     if not cards:
         return []
     echarts_source = _load_echarts_source()
-    images: list[tuple[str, bytes]] = []
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(
-            **full_chromium_launch_options(args=["--no-sandbox", "--disable-setuid-sandbox"]),
-        )
-        try:
-            page = browser.new_page(
-                viewport={"width": _CONTAINER_WIDTH_PX + 72, "height": _CONTAINER_HEIGHT_PX + 120},
-                device_scale_factor=2,
-            )
-            for title, description, option in cards:
-                page.set_content(
-                    _chart_page_html(title, description, option, echarts_source),
-                    wait_until="load",
-                )
-                page.wait_for_selector("#chart canvas", timeout=10_000)
-                element = page.query_selector(".chart-panel")
-                if element is None:
-                    logger.warning("产业链图表渲染结果为空，已跳过: title=%s", title)
-                    continue
-                images.append((title, element.screenshot()))
-        finally:
-            browser.close()
-    return images
+    return render_elements_to_pngs(
+        (
+            (title, _chart_page_html(title, description, option, echarts_source), ".chart-panel")
+            for title, description, option in cards
+        ),
+        viewport_width=_CONTAINER_WIDTH_PX + 72,
+        viewport_height=_CONTAINER_HEIGHT_PX + 120,
+        missing_element_message="产业链图表渲染结果为空",
+        wait_until="load",
+        # ECharts 需要等画布真的挂上去，否则截图可能拿到空白容器
+        ready_selector="#chart canvas",
+    )

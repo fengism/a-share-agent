@@ -9,6 +9,7 @@ import time
 from typing import Any
 
 from app.constants.http import BROWSER_USER_AGENT
+from app.core.timezones import SHANGHAI_TIMEZONE_NAME
 from app.infrastructure.browser_runtime import launch_full_chromium
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ async def harvest_baidu_credentials(
                     user_agent=BROWSER_USER_AGENT,
                     viewport={"width": 1280, "height": 800},
                     locale="zh-CN",
-                    timezone_id="Asia/Shanghai",
+                    timezone_id=SHANGHAI_TIMEZONE_NAME,
                 )
 
                 def _on_request(request: Any) -> None:

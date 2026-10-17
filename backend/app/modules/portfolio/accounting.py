@@ -6,9 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
-from zoneinfo import ZoneInfo
 
-_MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
+from app.core.timezones import SHANGHAI_TIMEZONE
 
 
 def _decimal(value: object) -> Decimal:
@@ -18,8 +17,8 @@ def _decimal(value: object) -> Decimal:
 def parse_trade_time(value: str) -> datetime:
     parsed_trade_time = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed_trade_time.tzinfo is None:
-        parsed_trade_time = parsed_trade_time.replace(tzinfo=_MARKET_TIMEZONE)
-    return parsed_trade_time.astimezone(_MARKET_TIMEZONE)
+        parsed_trade_time = parsed_trade_time.replace(tzinfo=SHANGHAI_TIMEZONE)
+    return parsed_trade_time.astimezone(SHANGHAI_TIMEZONE)
 
 
 def _trade_order_key(row: dict[str, Any]) -> tuple[datetime, int]:

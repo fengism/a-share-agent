@@ -1,24 +1,23 @@
 from __future__ import annotations
 
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from app.agentic.protocol import AgentMessage
+from app.core.timezones import SHANGHAI_TIMEZONE
 
 _MAX_HISTORY_CHARACTERS = 40_000
 _MAX_HISTORY_USER_CHARACTERS = 10_000
 _RUNTIME_DATE_SECTION = "## 运行时日期与时间"
-_SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 
 def _runtime_date_context(current_time: datetime | None = None) -> str:
     """生成供模型解释相对日期的上海时区运行时上下文。"""
     if current_time is None:
-        shanghai_time = datetime.now(_SHANGHAI_TIMEZONE)
+        shanghai_time = datetime.now(SHANGHAI_TIMEZONE)
     elif current_time.tzinfo is None:
-        shanghai_time = current_time.replace(tzinfo=_SHANGHAI_TIMEZONE)
+        shanghai_time = current_time.replace(tzinfo=SHANGHAI_TIMEZONE)
     else:
-        shanghai_time = current_time.astimezone(_SHANGHAI_TIMEZONE)
+        shanghai_time = current_time.astimezone(SHANGHAI_TIMEZONE)
 
     formatted_time = shanghai_time.strftime("%Y-%m-%d %H:%M:%S")
     return (

@@ -6,12 +6,10 @@ import asyncio
 import logging
 from datetime import date, datetime, timedelta
 
-from playwright.sync_api import sync_playwright
-
 from app.core.market import market_today
 from app.domain.market import KlineData
 from app.financial_data.stock.quotes.kline import get_kline
-from app.infrastructure.browser_runtime import full_chromium_launch_options
+from app.infrastructure.report import render_elements_to_pngs
 from app.modules.analysis.models import AnalysisResult
 from app.modules.analysis.pdf_service import (
     _render_price_chart,
@@ -111,23 +109,9 @@ def render_analysis_chart_pngs(
     cards = analysis_chart_cards(result, kline_data)
     if not cards:
         return []
-    images: list[tuple[str, bytes]] = []
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(
-            **full_chromium_launch_options(args=["--no-sandbox", "--disable-setuid-sandbox"]),
-        )
-        try:
-            page = browser.new_page(
-                viewport={"width": _CARD_WIDTH_PX + 40, "height": 600},
-                device_scale_factor=2,
-            )
-            for title, card_html in cards:
-                page.set_content(_card_page_html(card_html), wait_until="networkidle")
-                element = page.query_selector(".visual-card")
-                if element is None:
-                    logger.warning("个股图表卡片渲染结果为空，已跳过: title=%s", title)
-                    continue
-                images.append((title, element.screenshot()))
-        finally:
-            browser.close()
-    return images
+    return render_elements_to_pngs(
+        ((title, _card_page_html(card_html), ".visual-card") for title, card_html in cards),
+        viewport_width=_CARD_WIDTH_PX + 40,
+        viewport_height=600,
+        missing_element_message="个股图表卡片渲染结果为空",
+    )

@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 from collections.abc import Callable, Mapping, Sequence
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Protocol
-from zoneinfo import ZoneInfo
 
 from app.configuration.paths import DATA_DIR
 from app.core.concurrency.rate_limiter import call_blocking, exchange_semaphore, misc_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
+from app.core.parsing import coerce_finite_float
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.financial_data.market.macro.schemas import SgeGoldHistoryPoint, SgeGoldResponse
 from app.infrastructure.persistence.file_lock import exclusive_file_lock
 from app.infrastructure.persistence.json_storage import atomic_write_json
@@ -23,7 +23,6 @@ from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
-_SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 _SNAPSHOT_VERSION = 1
 _SOURCE = "上海黄金交易所"
 # 最新交易日滞后超过该天数即视为合约停止交易。
@@ -57,14 +56,6 @@ class SgeGoldProvider(Protocol):
     def fetch(self, symbol: str) -> Mapping[str, Any]: ...
 
 
-def _number(value: Any) -> float | None:
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return None
-    return parsed if math.isfinite(parsed) else None
-
-
 def _parse_date(value: Any) -> str | None:
     text = str(value).strip()
     if not text:
@@ -85,7 +76,7 @@ def _parse_history(payload: Mapping[str, Any]) -> list[dict[str, float | str]]:
         if not isinstance(row, Sequence) or isinstance(row, (str, bytes)) or len(row) < 5:
             continue
         date = _parse_date(row[0])
-        open_price, close, low, high = (_number(row[index]) for index in range(1, 5))
+        open_price, close, low, high = (coerce_finite_float(row[index]) for index in range(1, 5))
         if date is None or None in (open_price, close, low, high):
             continue
         by_date[date] = {
@@ -113,7 +104,7 @@ class SgeGoldService:
     ) -> None:
         self._provider = provider if provider is not None else get_provider("sge")
         self._snapshot_dir = data_dir / "sge_gold"
-        self._now = now or (lambda: datetime.now(_SHANGHAI_TZ))
+        self._now = now or (lambda: datetime.now(SHANGHAI_TIMEZONE))
         self._singleflight: AsyncSingleFlight[SgeGoldResponse] = AsyncSingleFlight()
 
     @staticmethod
@@ -132,8 +123,8 @@ class SgeGoldService:
     def _now_shanghai(self) -> datetime:
         value = self._now()
         if value.tzinfo is None:
-            return value.replace(tzinfo=_SHANGHAI_TZ)
-        return value.astimezone(_SHANGHAI_TZ)
+            return value.replace(tzinfo=SHANGHAI_TIMEZONE)
+        return value.astimezone(SHANGHAI_TIMEZONE)
 
     def _read_snapshot(self, symbol: str) -> tuple[str, list[dict[str, float | str]]] | None:
         path = self._snapshot_path(symbol)
@@ -167,8 +158,8 @@ class SgeGoldService:
         except ValueError:
             return False
         if fetched.tzinfo is None:
-            fetched = fetched.replace(tzinfo=_SHANGHAI_TZ)
-        return fetched.astimezone(_SHANGHAI_TZ).date() == self._now_shanghai().date()
+            fetched = fetched.replace(tzinfo=SHANGHAI_TIMEZONE)
+        return fetched.astimezone(SHANGHAI_TIMEZONE).date() == self._now_shanghai().date()
 
     def _to_response(
         self,

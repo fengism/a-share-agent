@@ -6,17 +6,16 @@ from collections.abc import Set
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import cast
-from zoneinfo import ZoneInfo
 
 from app.core.cache import TTLCache
 from app.core.concurrency.rate_limiter import akshare_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
 
-SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
 TRADING_WINDOW_START = time(9, 0)
 TRADING_WINDOW_END = time(15, 30)
 # 交易日历源不可用时的降级近似上限：约 32 年工作日，远超任何合理查询区间。

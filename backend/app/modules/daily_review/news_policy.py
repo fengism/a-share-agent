@@ -6,13 +6,11 @@ import re
 from datetime import date, datetime, time, timedelta
 from typing import Iterable, cast
 from urllib.parse import urlsplit
-from zoneinfo import ZoneInfo
 
 from app.core.news import parse_news_datetime
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.domain.news import NewsSearchItem
 from app.modules.daily_review.models import PolicyNewsSnapshotItem
-
-_MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 _POLICY_KEYWORDS = (
     "国务院", "中央", "政治局", "发改委", "央行", "证监会", "财政部", "商务部", "工信部",
@@ -103,9 +101,9 @@ def _parse_publish_time(value: object, target_date: date, *, use_realtime: bool)
     # 历史复盘用目标日收盘作为解析锚点：允许“09-30 14:20”这类缺年份但
     # 可确定归属的格式；禁止“刚刚/10分钟前/仅时分”，避免拿当前语义回填历史。
     reference = (
-        datetime.now(_MARKET_TIMEZONE)
+        datetime.now(SHANGHAI_TIMEZONE)
         if use_realtime
-        else datetime.combine(target_date, time(23, 59, 59), tzinfo=_MARKET_TIMEZONE)
+        else datetime.combine(target_date, time(23, 59, 59), tzinfo=SHANGHAI_TIMEZONE)
     )
     return cast(datetime | None, parse_news_datetime(
         value,

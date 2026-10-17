@@ -16,7 +16,14 @@ from app.modules.analysis import result_service
 from app.modules.analysis.key_levels import KeyLevels, apply_key_levels
 from app.modules.analysis.models import AnalysisResult, ValuationScenario, ValuationScenarios
 from app.modules.analysis.page_service import AnalysisPageLoaders, get_analysis_page_data
-from app.modules.analysis.prompts import apply_evidence_gap_degradation, parse_analysis_output
+from app.modules.analysis.prompts import (
+    EVIDENCE_CONFIDENCE_BASE_CAP,
+    EVIDENCE_CONFIDENCE_FLOOR,
+    EVIDENCE_CONFIDENCE_GAP_PENALTY,
+    EVIDENCE_GRADE_DEMOTION_GAP_THRESHOLD,
+    apply_evidence_gap_degradation,
+    parse_analysis_output,
+)
 
 
 def _framework() -> dict:
@@ -132,6 +139,78 @@ def test_evidence_gap_degradation_does_not_duplicate_existing_gap_topics() -> No
     output = parse_analysis_output(json.dumps(payload))
     degraded = apply_evidence_gap_degradation(output, ("护城河与反证公开资料",))
     assert [gap.topic for gap in degraded.research_framework.data_gaps] == ["护城河与反证公开资料"]
+
+
+def test_evidence_gap_degradation_demotes_grade_a_to_b_for_single_gap() -> None:
+    """1 个缺口未达到直接降 C 的阈值，但 A 级仍需降一档。"""
+    output = parse_analysis_output(json.dumps(_payload()))
+    assert output.research_framework.information_quality.grade == "A"
+
+    degraded = apply_evidence_gap_degradation(output, ("行业与价值链公开资料",))
+
+    quality = degraded.research_framework.information_quality
+    assert quality.grade == "B"
+    assert quality.evidence_confidence == pytest.approx(EVIDENCE_CONFIDENCE_BASE_CAP - EVIDENCE_CONFIDENCE_GAP_PENALTY)
+
+
+def test_evidence_gap_degradation_keeps_unknown_grade() -> None:
+    """`unknown` 不是真实评级，不应被降级改写。"""
+    payload = _payload()
+    payload["research_framework"]["information_quality"]["grade"] = "unknown"
+    output = parse_analysis_output(json.dumps(payload))
+
+    degraded = apply_evidence_gap_degradation(
+        output,
+        tuple(f"缺口{i}" for i in range(5)),
+    )
+
+    assert degraded.research_framework.information_quality.grade == "unknown"
+
+
+def test_evidence_gap_degradation_confidence_floors_at_constant() -> None:
+    """缺口很多时置信度不低于 EVIDENCE_CONFIDENCE_FLOOR，不会降到 0。"""
+    output = parse_analysis_output(json.dumps(_payload()))
+
+    degraded = apply_evidence_gap_degradation(
+        output,
+        tuple(f"缺口{i}" for i in range(20)),
+    )
+
+    assert degraded.research_framework.information_quality.evidence_confidence == pytest.approx(
+        EVIDENCE_CONFIDENCE_FLOOR
+    )
+
+
+def test_evidence_gap_degradation_caps_confidence_never_raises_it() -> None:
+    """模型自报的置信度低于上限时不允许被抬高。"""
+    payload = _payload()
+    payload["research_framework"]["information_quality"]["evidence_confidence"] = 0.2
+    payload["confidence"] = 0.2
+    output = parse_analysis_output(json.dumps(payload))
+
+    degraded = apply_evidence_gap_degradation(output, ("行业与价值链公开资料",))
+
+    assert degraded.research_framework.information_quality.evidence_confidence == pytest.approx(0.2)
+
+
+def test_evidence_gap_degradation_constants_are_intentional() -> None:
+    """锁定置信度口径的取值。
+
+    换数值本身不一定是错，但会改变全部个股研报的 confidence 与 grade；该用例存在的
+    目的是让它必须是一次**有意**改动（并提醒补上标定依据，仓库中当前未记录）。
+    """
+    assert EVIDENCE_CONFIDENCE_BASE_CAP == 0.65
+    assert EVIDENCE_CONFIDENCE_GAP_PENALTY == 0.1
+    assert EVIDENCE_CONFIDENCE_FLOOR == 0.35
+    assert EVIDENCE_GRADE_DEMOTION_GAP_THRESHOLD == 2
+
+    # 公式：max(floor, base - penalty * gaps)
+    for gaps, expected in ((1, 0.55), (2, 0.45), (3, 0.35), (4, 0.35)):
+        capped = max(
+            EVIDENCE_CONFIDENCE_FLOOR,
+            EVIDENCE_CONFIDENCE_BASE_CAP - EVIDENCE_CONFIDENCE_GAP_PENALTY * gaps,
+        )
+        assert capped == pytest.approx(expected)
 
 
 # ---------------------------------------------------------------- 关键点位覆盖

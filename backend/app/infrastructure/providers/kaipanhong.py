@@ -1,12 +1,12 @@
 from datetime import date, datetime
-from zoneinfo import ZoneInfo
 
 from app.core.market import market_today
+from app.core.parsing import parse_float
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.infrastructure.http.client import parse_text_json, provider_post
 
 _REALTIME_URL = "https://apphwshhq.kaipanhong.com/w1/api/index.php"
 _HISTORY_URL = "https://apphis.kaipanhong.com/w1/api/index.php"
-_SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
 _BASE_PARAMS = {
     "PhoneOSNew": "1",
     "DeviceID": "1a609dd6-b2b8-3bf9-ac40-a77581551454",
@@ -32,22 +32,11 @@ _HISTORY_CATEGORY_PIDS = {
 }
 
 
-
 def _safe_int(value: object) -> int:
     try:
         return int(float(str(value).replace(",", "")))
     except (TypeError, ValueError):
         return 0
-
-
-def _safe_float(value: object) -> float | None:
-    try:
-        text = str(value).replace(",", "").strip()
-        if not text:
-            return None
-        return float(text)
-    except (TypeError, ValueError):
-        return None
 
 
 def _row_value(row: list, index: int, default=None):
@@ -58,7 +47,7 @@ def _format_limit_up_time(value: object) -> str:
     timestamp = _safe_int(value)
     if timestamp <= 0:
         return ""
-    return datetime.fromtimestamp(timestamp, tz=_SHANGHAI_TIMEZONE).strftime("%H:%M:%S")
+    return datetime.fromtimestamp(timestamp, tz=SHANGHAI_TIMEZONE).strftime("%H:%M:%S")
 
 
 def _normalize_stock_rows(rows: list) -> list[dict]:
@@ -137,7 +126,7 @@ def _normalize_history_rows(rows: list, category: str) -> list[dict]:
                 "themes": str(_row_value(row, 11, "") or "").strip(),
                 "net_inflow": _safe_int(_row_value(row, 12)),
                 "turnover": _safe_int(_row_value(row, 13)),
-                "turnover_rate": _safe_float(_row_value(row, 14)),
+                "turnover_rate": parse_float(_row_value(row, 14)),
                 "market_cap": _safe_int(_row_value(row, 15)),
                 "reason": (
                     str(_row_value(row, 16, "") or "").strip() if include_limit_details else ""
@@ -166,24 +155,24 @@ def _normalize_sector_stock_rows(rows: list) -> list[dict]:
                 "code": code,
                 "name": name,
                 "tags": str(_row_value(row, 4, "") or "").strip(),
-                "price": _safe_float(_row_value(row, 5)),
-                "change_pct": _safe_float(_row_value(row, 6)),
+                "price": parse_float(_row_value(row, 5)),
+                "change_pct": parse_float(_row_value(row, 6)),
                 "amount": _safe_int(_row_value(row, 7)),
-                "turnover_rate": _safe_float(_row_value(row, 8)),
+                "turnover_rate": parse_float(_row_value(row, 8)),
                 "float_amount": _safe_int(_row_value(row, 10)),
                 "main_buy": _safe_int(_row_value(row, 11)),
                 "main_sell": _safe_int(_row_value(row, 12)),
                 "main_net": _safe_int(_row_value(row, 13)),
-                "buy_ratio": _safe_float(_row_value(row, 14)),
-                "sell_ratio": _safe_float(_row_value(row, 15)),
-                "net_ratio": _safe_float(_row_value(row, 16)),
+                "buy_ratio": parse_float(_row_value(row, 14)),
+                "sell_ratio": parse_float(_row_value(row, 15)),
+                "net_ratio": parse_float(_row_value(row, 16)),
                 "limit_tag": str(_row_value(row, 23, "") or "").strip(),
                 "rank_tag": str(_row_value(row, 24, "") or "").strip(),
-                "recent_chg": _safe_float(_row_value(row, 33)),
+                "recent_chg": parse_float(_row_value(row, 33)),
                 "limit_count": _safe_int(_row_value(row, 40)),
-                "chg_1d": _safe_float(_row_value(row, 62)),
-                "chg_5d": _safe_float(_row_value(row, 63)),
-                "chg_20d": _safe_float(_row_value(row, 64)),
+                "chg_1d": parse_float(_row_value(row, 62)),
+                "chg_5d": parse_float(_row_value(row, 63)),
+                "chg_20d": parse_float(_row_value(row, 64)),
             }
         )
     return stocks
@@ -203,14 +192,14 @@ def _normalize_industry_rows(rows: list, start_rank: int) -> list[dict]:
                 "rank": start_rank + len(sectors),
                 "code": code,
                 "name": name,
-                "change_pct": _safe_float(_row_value(row, 3)),
+                "change_pct": parse_float(_row_value(row, 3)),
                 "amount": _safe_int(_row_value(row, 5)),
                 "net_inflow": _safe_int(_row_value(row, 6)),
                 "buy_amount": _safe_int(_row_value(row, 7)),
                 "sell_amount": _safe_int(_row_value(row, 8)),
-                "turnover_rate": _safe_float(_row_value(row, 9)),
+                "turnover_rate": parse_float(_row_value(row, 9)),
                 "market_cap": _safe_int(_row_value(row, 10)),
-                "avg_change": _safe_float(_row_value(row, 11)),
+                "avg_change": parse_float(_row_value(row, 11)),
             }
         )
     return sectors

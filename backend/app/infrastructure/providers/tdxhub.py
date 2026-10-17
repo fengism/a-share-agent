@@ -11,7 +11,6 @@ import time
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any, TypedDict
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 from tdxhub.exceptions import TdxhubConnectionError, TdxhubIncompleteDataError
@@ -27,6 +26,7 @@ from app.core.market import (
     safe_float,
     safe_string,
 )
+from app.core.timezones import SHANGHAI_TIMEZONE
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +245,7 @@ class TdxhubDataProvider:
         settings = get_settings()
         budget = settings.tdxhub_fund_flow_timeout_seconds
         started_at = time.monotonic()
-        today = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
+        today = datetime.now(SHANGHAI_TIMEZONE).date().isoformat()
         if dates is not None:
             # Never let a cursor supply unvalidated, duplicate or future dates.
             if not dates or len(dates) > _FUND_FLOW_DAYS:

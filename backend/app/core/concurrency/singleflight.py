@@ -53,14 +53,14 @@ class AsyncSingleFlight(Generic[T]):
 
     def __init__(self) -> None:
         """Initialize the single-flight registry with empty inflight map and lock."""
-        self._inflight: dict[Hashable, asyncio.Task[T]] = {}
+        self._inflight: dict[Hashable, asyncio.Future[T]] = {}
         self._lock = asyncio.Lock()
 
-    def _remove_task(self, key: Hashable, task: asyncio.Task[T]) -> None:
+    def _remove_task(self, key: Hashable, task: asyncio.Future[T]) -> None:
         if self._inflight.get(key) is task:
             self._inflight.pop(key, None)
 
-    def _on_task_done(self, key: Hashable, task: asyncio.Task[T]) -> None:
+    def _on_task_done(self, key: Hashable, task: asyncio.Future[T]) -> None:
         if not task.cancelled():
             task.exception()
         self._remove_task(key, task)
@@ -80,7 +80,8 @@ class AsyncSingleFlight(Generic[T]):
                 self._remove_task(key, task)
                 task = None
             if task is None:
-                task = asyncio.create_task(loader())
+                # ensure_future 同时接受协程与其他 awaitable，比 create_task 更宽泛
+                task = asyncio.ensure_future(loader())
                 self._inflight[key] = task
                 task.add_done_callback(partial(self._on_task_done, key))
 

@@ -14,6 +14,7 @@ from typing import Any
 import pandas as pd
 from pydantic import ValidationError
 
+from app.core.dataframes import clean_cell_text
 from app.modules.code_normalization import normalize_imported_stock_code
 from app.modules.import_limits import MAX_IMPORT_BASE64_CHARS, MAX_IMPORT_FILE_BYTES
 from app.modules.stock_profile.models import StockBasicProfileInput
@@ -70,14 +71,8 @@ def decode_file(content_base64: str) -> bytes:
     return content
 
 
-def _text(value: object) -> str:
-    if value is None or pd.isna(value):
-        return ""
-    return str(value).strip()
-
-
 def _normalize_date(value: object) -> str | None:
-    text = _text(value)
+    text = clean_cell_text(value)
     if not text:
         return None
     candidate = text.replace("/", "-")[:10]
@@ -130,9 +125,9 @@ def parse_data(content: bytes, filename: str) -> ParsedProfileFile:
     duplicate_codes: set[str] = set()
 
     for row_number, (_, row) in enumerate(frame.iterrows(), start=2):
-        exchange_hint = _text(row[exchange_col]) if exchange_col else ""
+        exchange_hint = clean_cell_text(row[exchange_col]) if exchange_col else ""
         normalized_code, _suffix, market_group = normalize_imported_stock_code(
-            _text(row[code_col]), exchange_hint
+            clean_cell_text(row[code_col]), exchange_hint
         )
         if not normalized_code:
             invalid_rows += 1
@@ -147,8 +142,8 @@ def parse_data(content: bytes, filename: str) -> ParsedProfileFile:
             "stock_code": normalized_code,
             "market_group": market_group,
             "exchange": _suffix,
-            "stock_name": _text(row[field_cols["stock_name"]]) if field_cols["stock_name"] else "",
-            "board": _text(row[field_cols["board"]]) if field_cols["board"] else "",
+            "stock_name": clean_cell_text(row[field_cols["stock_name"]]) if field_cols["stock_name"] else "",
+            "board": clean_cell_text(row[field_cols["board"]]) if field_cols["board"] else "",
             "listing_date": _normalize_date(row[field_cols["listing_date"]]) if field_cols["listing_date"] else None,
             "setup_date": _normalize_date(row[field_cols["setup_date"]]) if field_cols["setup_date"] else None,
             "source_version": Path(filename).stem[:128],
@@ -169,7 +164,7 @@ def parse_data(content: bytes, filename: str) -> ParsedProfileFile:
             "company_intro",
         ):
             col = field_cols[key]
-            values[key] = _text(row[col]) if col else ""
+            values[key] = clean_cell_text(row[col]) if col else ""
         # 经输入模型归一：板块/交易所缺省时按代码推断，字段长度得到校验
         try:
             record = StockBasicProfileInput.model_validate(values).model_dump()

@@ -7,6 +7,23 @@ from app.infrastructure.llm.prompting import PromptSpec, prompt_registry
 from app.infrastructure.llm.prompting.parsing import parse_model_response
 from app.modules.analysis.models import DataGap, FactorAnalysis, InvestmentResearchFramework
 
+# ── 证据缺口降级口径 ────────────────────────────────────────────────────────
+# 正文证据缺口会把研报的置信度与评级压下来，避免出现「资料不足却给出高置信度结论」。
+#
+#     置信度上限 = EVIDENCE_CONFIDENCE_BASE_CAP
+#                  - EVIDENCE_CONFIDENCE_GAP_PENALTY × 缺口数
+#     且不低于 EVIDENCE_CONFIDENCE_FLOOR
+#
+# 注意：这三个数字是经验值，仓库里没有记录标定依据（对标样本、人工标注口径等）。
+# 改动会直接影响全部个股研报的 confidence 与 grade，调整时请一并补上依据说明。
+EVIDENCE_CONFIDENCE_BASE_CAP = 0.65
+EVIDENCE_CONFIDENCE_GAP_PENALTY = 0.1
+EVIDENCE_CONFIDENCE_FLOOR = 0.35
+
+# 缺口数达到该阈值时评级直接降为 C（不依赖模型给出的原评级）；
+# 未达阈值时，原评级为 A 的降一档到 B，其余保持。
+EVIDENCE_GRADE_DEMOTION_GAP_THRESHOLD = 2
+
 SYSTEM_PROMPT = """你是一位严谨的股票分析师。输入由研究 Agent 的摘要和工具原始证据组成，你必须基于可验证证据完成结构化分析。分析对象可能是 A 股或港股，以用户消息中的「交易市场」为准：港股以港元计价、无涨跌幅限制、可做空，且财报按 IFRS/港交所披露口径，与 A 股准则不可直接比较。
 
 ## 证据规则
@@ -166,7 +183,10 @@ def apply_evidence_gap_degradation(
     framework = output.research_framework
     quality = framework.information_quality
     gap_count = len(gaps)
-    confidence_cap = max(0.35, 0.65 - 0.1 * gap_count)
+    confidence_cap = max(
+        EVIDENCE_CONFIDENCE_FLOOR,
+        EVIDENCE_CONFIDENCE_BASE_CAP - EVIDENCE_CONFIDENCE_GAP_PENALTY * gap_count,
+    )
     current_confidence = (
         quality.evidence_confidence
         if quality.evidence_confidence is not None
@@ -175,7 +195,7 @@ def apply_evidence_gap_degradation(
     evidence_confidence = min(current_confidence, confidence_cap)
     grade = quality.grade
     if grade != "unknown":
-        if gap_count >= 2:
+        if gap_count >= EVIDENCE_GRADE_DEMOTION_GAP_THRESHOLD:
             grade = "C"
         elif grade == "A":
             grade = "B"

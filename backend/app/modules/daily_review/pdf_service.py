@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import html
 import logging
 import math
 import re
 from typing import Any, Iterable
 
+from app.core.html import escape_html
 from app.infrastructure.pdf_runtime import render_pdf
 from app.modules.daily_review.models import (
     DailyReviewDataSnapshot,
@@ -24,10 +24,6 @@ _NEUTRAL = "#94a3b8"
 _PRIMARY = "#2563eb"
 _GRID = "#e2e8f0"
 _TEXT = "#475569"
-
-
-def _esc(value: Any) -> str:
-    return html.escape(str(value if value is not None else ""))
 
 
 def _number(value: Any) -> float | None:
@@ -73,7 +69,7 @@ def _format_amount(value: float) -> str:
 def _chart_card(title: str, subtitle: str, svg: str) -> str:
     return f"""
     <section class="chart-card">
-      <div class="chart-heading"><strong>{_esc(title)}</strong><span>{_esc(subtitle)}</span></div>
+      <div class="chart-heading"><strong>{escape_html(title)}</strong><span>{escape_html(subtitle)}</span></div>
       {svg}
     </section>
     """
@@ -103,7 +99,7 @@ def _render_breadth_chart(snapshot: DailyReviewDataSnapshot) -> str:
         y = 18 + index * row_height
         width = max(value / maximum * 350, 3 if value > 0 else 0)
         rows.append(f"""
-          <text x="0" y="{y + 14}" fill="{_TEXT}" font-size="13">{_esc(label)}</text>
+          <text x="0" y="{y + 14}" fill="{_TEXT}" font-size="13">{escape_html(label)}</text>
           <rect x="58" y="{y}" width="350" height="20" rx="5" fill="#f1f5f9"/>
           <rect x="58" y="{y}" width="{width:.2f}" height="20" rx="5" fill="{color}" opacity="0.9"/>
           <text x="422" y="{y + 14}" fill="#0f172a" font-size="13" font-weight="700">{value:,.0f} 家</text>
@@ -128,9 +124,9 @@ def _render_index_chart(snapshot: DailyReviewDataSnapshot) -> str:
         x = center if value >= 0 else center - width
         color = _UP if value >= 0 else _DOWN
         rows.append(f"""
-          <text x="0" y="{y + 14}" fill="{_TEXT}" font-size="13">{_esc(_trim_label(name))}</text>
+          <text x="0" y="{y + 14}" fill="{_TEXT}" font-size="13">{escape_html(_trim_label(name))}</text>
           <rect x="{x:.2f}" y="{y}" width="{width:.2f}" height="20" rx="4" fill="{color}" opacity="0.9"/>
-          <text x="548" y="{y + 14}" text-anchor="end" fill="{color}" font-size="13" font-weight="700">{_esc(_format_percent(value))}</text>
+          <text x="548" y="{y + 14}" text-anchor="end" fill="{color}" font-size="13" font-weight="700">{escape_html(_format_percent(value))}</text>
         """)
     svg = f'<svg data-testid="daily-review-index-chart" viewBox="0 0 560 {height}" role="img" aria-label="核心指数涨跌幅图">{"".join(rows)}</svg>'
     return svg
@@ -155,9 +151,9 @@ def _render_sector_chart(snapshot: DailyReviewDataSnapshot) -> str:
         x = center if strong else center - width
         color = _UP if strong else _DOWN
         rows.append(f"""
-          <text x="0" y="{y + 13}" fill="{_TEXT}" font-size="12">{_esc(_trim_label(name))}</text>
+          <text x="0" y="{y + 13}" fill="{_TEXT}" font-size="12">{escape_html(_trim_label(name))}</text>
           <rect x="{x:.2f}" y="{y}" width="{width:.2f}" height="18" rx="4" fill="{color}" opacity="0.9"/>
-          <text x="548" y="{y + 13}" text-anchor="end" fill="{color}" font-size="12" font-weight="700">{_esc(_format_percent(value))}</text>
+          <text x="548" y="{y + 13}" text-anchor="end" fill="{color}" font-size="12" font-weight="700">{escape_html(_format_percent(value))}</text>
         """)
     svg = f'<svg data-testid="daily-review-sector-chart" viewBox="0 0 560 {height}" role="img" aria-label="板块强弱对比图">{"".join(rows)}</svg>'
     return svg
@@ -187,9 +183,9 @@ def _render_volume_chart(snapshot: DailyReviewDataSnapshot) -> str:
         x = index * slot + (slot - width) / 2.0
         bar_height = value / maximum * 82.0
         rows.append(f"""
-          <text x="{x + width / 2.0:.1f}" y="{116 - bar_height:.1f}" text-anchor="middle" fill="#0f172a" font-size="11" font-weight="700">{_esc(_format_amount(value))}</text>
+          <text x="{x + width / 2.0:.1f}" y="{116 - bar_height:.1f}" text-anchor="middle" fill="#0f172a" font-size="11" font-weight="700">{escape_html(_format_amount(value))}</text>
           <rect x="{x:.1f}" y="{122 - bar_height:.1f}" width="{width:.1f}" height="{bar_height:.1f}" rx="6" fill="{color}" opacity="0.9"/>
-          <text x="{x + width / 2.0:.1f}" y="146" text-anchor="middle" fill="{_TEXT}" font-size="12">{_esc(label)}</text>
+          <text x="{x + width / 2.0:.1f}" y="146" text-anchor="middle" fill="{_TEXT}" font-size="12">{escape_html(label)}</text>
         """)
     svg = f'<svg data-testid="daily-review-volume-chart" viewBox="0 0 560 158" role="img" aria-label="市场成交额对比图">{"".join(rows)}</svg>'
     return svg
@@ -217,15 +213,15 @@ def _render_charts(snapshot: DailyReviewDataSnapshot) -> str:
 
 
 def _render_list(values: Iterable[str], empty: str = "暂无可靠结论") -> str:
-    items = [f"<li>{_esc(value)}</li>" for value in values if str(value).strip()]
-    return f'<ul>{"".join(items)}</ul>' if items else f'<div class="empty-inline">{_esc(empty)}</div>'
+    items = [f"<li>{escape_html(value)}</li>" for value in values if str(value).strip()]
+    return f'<ul>{"".join(items)}</ul>' if items else f'<div class="empty-inline">{escape_html(empty)}</div>'
 
 
 def _render_section(section: DailyReviewSection) -> str:
     return f"""
       <div class="review-block">
-        <h3>{_esc(section.title)}</h3>
-        <p>{_esc(section.summary) or '暂无摘要'}</p>
+        <h3>{escape_html(section.title)}</h3>
+        <p>{escape_html(section.summary) or '暂无摘要'}</p>
         {_render_list(section.bullets, '暂无补充要点')}
       </div>
     """
@@ -259,15 +255,15 @@ _HORIZON_LABELS = {
 def _impact_row(label: str, value: str, *, class_name: str = "") -> str:
     classes = f"impact-row {class_name}".strip()
     return (
-        f'<div class="{classes}"><div class="impact-label">{_esc(label)}</div>'
-        f'<div class="impact-value">{_esc(value) or "-"}</div></div>'
+        f'<div class="{classes}"><div class="impact-label">{escape_html(label)}</div>'
+        f'<div class="impact-value">{escape_html(value) or "-"}</div></div>'
     )
 
 
 def _render_policy_summary(section: DailyReviewSection) -> str:
     return f"""
       <div class="policy-summary-copy">
-        <p>{_esc(section.summary) or '暂无摘要'}</p>
+        <p>{escape_html(section.summary) or '暂无摘要'}</p>
         {_render_list(section.bullets, '暂无补充要点')}
       </div>
     """
@@ -282,12 +278,12 @@ def _render_event_impact(impact: DailyReviewEventImpact, index: int) -> str:
       <article class="policy-impact-card{timing_class}">
         <div class="impact-header">
           <span class="impact-index">{index:02d}</span>
-          <div class="impact-title">{_esc(impact.event_title)}</div>
+          <div class="impact-title">{escape_html(impact.event_title)}</div>
           <div class="impact-tags">
-            <span>{_esc(_EVENT_TYPE_LABELS.get(impact.event_type, impact.event_type))}</span>
-            <span>{_esc(_DIRECTION_LABELS.get(impact.direction, impact.direction))}</span>
-            <span>{_esc(_HORIZON_LABELS.get(impact.horizon, impact.horizon))}</span>
-            <span>{_esc(_TIMING_LABELS.get(impact.timing, impact.timing))}</span>
+            <span>{escape_html(_EVENT_TYPE_LABELS.get(impact.event_type, impact.event_type))}</span>
+            <span>{escape_html(_DIRECTION_LABELS.get(impact.direction, impact.direction))}</span>
+            <span>{escape_html(_HORIZON_LABELS.get(impact.horizon, impact.horizon))}</span>
+            <span>{escape_html(_TIMING_LABELS.get(impact.timing, impact.timing))}</span>
           </div>
         </div>
         <div class="impact-rows">
@@ -313,12 +309,12 @@ def _render_safe_markdown(value: str) -> str:
 
     def flush_paragraph() -> None:
         if paragraph:
-            output.append(f'<p>{"<br>".join(_esc(line) for line in paragraph)}</p>')
+            output.append(f'<p>{"<br>".join(escape_html(line) for line in paragraph)}</p>')
             paragraph.clear()
 
     def flush_list() -> None:
         if list_items:
-            output.append(f'<ul>{"".join(f"<li>{_esc(item)}</li>" for item in list_items)}</ul>')
+            output.append(f'<ul>{"".join(f"<li>{escape_html(item)}</li>" for item in list_items)}</ul>')
             list_items.clear()
 
     for raw_line in text.splitlines():
@@ -333,7 +329,7 @@ def _render_safe_markdown(value: str) -> str:
             flush_paragraph()
             flush_list()
             level = min(len(heading.group(1)) + 2, 5)
-            output.append(f"<h{level}>{_esc(heading.group(2))}</h{level}>")
+            output.append(f"<h{level}>{escape_html(heading.group(2))}</h{level}>")
         elif bullet:
             flush_paragraph()
             list_items.append(bullet.group(1))
@@ -372,7 +368,7 @@ def generate_daily_review_pdf_html(result: DailyReviewResult) -> str:
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>{_esc(result.title)}</title>
+<title>{escape_html(result.title)}</title>
 <style>
   @page {{ size: A4; margin: 16mm 14mm 18mm; }}
   * {{ box-sizing: border-box; }}
@@ -434,12 +430,12 @@ def generate_daily_review_pdf_html(result: DailyReviewResult) -> str:
 </head>
 <body>
   <header class="hero">
-    <h1>{_esc(result.title)}</h1>
-    <div class="summary">{_esc(result.market_summary) or '核心数据不足，无法形成完整市场结论。'}</div>
+    <h1>{escape_html(result.title)}</h1>
+    <div class="summary">{escape_html(result.market_summary) or '核心数据不足，无法形成完整市场结论。'}</div>
     <div class="meta">
-      <span class="pill">交易日：{_esc(result.effective_date or result.date)}</span>
-      <span class="pill">市场状态：{_esc(state_labels.get(result.market_state, '数据不足'))}</span>
-      <span class="pill">建议仓位：{_esc(result.position_range or '待定')}</span>
+      <span class="pill">交易日：{escape_html(result.effective_date or result.date)}</span>
+      <span class="pill">市场状态：{escape_html(state_labels.get(result.market_state, '数据不足'))}</span>
+      <span class="pill">建议仓位：{escape_html(result.position_range or '待定')}</span>
       <span class="pill">质量：{quality_label}</span>
       <span class="pill">报告：{generation_label}</span>
     </div>
@@ -479,7 +475,7 @@ def generate_daily_review_pdf_html(result: DailyReviewResult) -> str:
     {_render_list([*result.data_gaps, *warnings], '核心数据维度未发现明确缺口')}
   </section>
 
-  <div class="footer-note">生成时间：{_esc(result.generated_at)} · 以上内容仅供研究参考，不构成投资建议。</div>
+  <div class="footer-note">生成时间：{escape_html(result.generated_at)} · 以上内容仅供研究参考，不构成投资建议。</div>
 </body>
 </html>"""
 

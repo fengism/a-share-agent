@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from urllib.parse import urlsplit
-
+from app.core.urls import safe_http_url
 from app.modules.industry_chain.models import (
     IndustryChainConflict,
     IndustryChainInsight,
@@ -17,20 +16,12 @@ def _escape_table(value: object) -> str:
     return str(value or "").replace("|", "\\|").replace("\n", " ").strip()
 
 
-def _safe_url(value: str) -> str:
-    try:
-        parsed = urlsplit(value.strip())
-    except ValueError:
-        return ""
-    return value.strip() if parsed.scheme in {"http", "https"} and parsed.netloc else ""
-
-
 def _evidence(ids: list[str]) -> str:
     return "、".join(dict.fromkeys(ids)) if ids else ""
 
 
 def _source(source: str, url: str) -> str:
-    safe_url = _safe_url(url)
+    safe_url = safe_http_url(url)
     if safe_url:
         return f"[{source or '原文'}]({safe_url})"
     return source
@@ -287,7 +278,7 @@ def render_industry_markdown(result: IndustryChainResult) -> str:
         lines.extend(["", "### 资料索引（引用线索不代表事实核实）"])
         for entry in result.evidence_catalog:
             links = "、".join(
-                _source(f"原文 {index + 1}", url) for index, url in enumerate(entry.source_urls) if _safe_url(url)
+                _source(f"原文 {index + 1}", url) for index, url in enumerate(entry.source_urls) if safe_http_url(url)
             )
             lines.append(f"- {entry.evidence_id}：{entry.title or '研究资料'}；{links or '原文链接未提供'}")
     if result.relationships:

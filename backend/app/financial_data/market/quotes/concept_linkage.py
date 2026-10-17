@@ -23,10 +23,11 @@ from app.core.cache import market_cache as cache
 from app.core.cache_policies import CONCEPT_LINKAGE
 from app.core.exceptions import InvalidRequestError, ResourceNotFoundError
 from app.core.market import normalize_code, safe_float
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.financial_data.stock.quotes.realtime import fetch_realtime_quote_set
 from app.infrastructure.persistence.connection import get_connection
 from app.modules.market_daily.concept_index import load_concept_index, sample_constituents
-from app.modules.market_daily.service import MARKET_TIMEZONE, market_daily_bar_service
+from app.modules.market_daily.service import market_daily_bar_service
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +164,7 @@ def _confirmed_local_closes(codes: list[str]) -> dict[str, dict]:
     当作今日价展示：非交易日、盘中未归档、或数据仍为 provisional 时都查不到行。
     涨跌幅由 close 与前一个交易日 close 计算（库内 change_pct 多为 NULL）。
     """
-    today = datetime.now(MARKET_TIMEZONE).date().isoformat()
+    today = datetime.now(SHANGHAI_TIMEZONE).date().isoformat()
     rows = market_daily_bar_service.repository.list_confirmed_closes(codes, today)
     result: dict[str, dict] = {}
     for code, payload in rows.items():

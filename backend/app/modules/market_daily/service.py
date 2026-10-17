@@ -9,11 +9,11 @@ from collections.abc import Awaitable, Callable
 from datetime import date, datetime, time, timedelta
 from functools import cache
 from uuid import uuid4
-from zoneinfo import ZoneInfo
 
 import exchange_calendars as xcals
 
 from app.core.exceptions import InvalidRequestError
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.financial_data.market.trading_session import get_trading_calendar_view
 from app.modules.market_daily.collectors import SnapshotDateExpiredError, collect_segment
 from app.modules.market_daily.models import (
@@ -37,7 +37,6 @@ from app.modules.market_daily.repository import (
 
 logger = logging.getLogger(__name__)
 
-MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 INITIAL_CONFIRMATION_TIME = time(16, 20)
 RECHECK_CONFIRMATION_TIME = time(17, 0)
 FAILED_RECOVERY_LOOKBACK_DAYS = 3
@@ -74,11 +73,11 @@ def _is_exchange_trading_day(name: str, target: date) -> bool:
 
 
 def _market_now() -> datetime:
-    return datetime.now(MARKET_TIMEZONE)
+    return datetime.now(SHANGHAI_TIMEZONE)
 
 
 def checkpoint_for(now: datetime) -> RefreshCheckpoint | None:
-    local = now.astimezone(MARKET_TIMEZONE) if now.tzinfo else now.replace(tzinfo=MARKET_TIMEZONE)
+    local = now.astimezone(SHANGHAI_TIMEZONE) if now.tzinfo else now.replace(tzinfo=SHANGHAI_TIMEZONE)
     if local.time() >= RECHECK_CONFIRMATION_TIME:
         return "recheck"
     if local.time() >= INITIAL_CONFIRMATION_TIME:
@@ -154,9 +153,9 @@ class MarketDailyBarService:
         await self.initialize()
         local_now = now or self._now_provider()
         if local_now.tzinfo is None:
-            local_now = local_now.replace(tzinfo=MARKET_TIMEZONE)
+            local_now = local_now.replace(tzinfo=SHANGHAI_TIMEZONE)
         else:
-            local_now = local_now.astimezone(MARKET_TIMEZONE)
+            local_now = local_now.astimezone(SHANGHAI_TIMEZONE)
         await self._retry_recent_failed(local_now)
         checkpoint = checkpoint_for(local_now)
         if checkpoint is None:
@@ -367,7 +366,7 @@ class MarketDailyBarService:
 
         request_started_at = monotonic_time.monotonic()
         self.retry_base_seconds = get_settings().market_daily_bar_refresh_retry_base_seconds
-        local_now = self._now_provider().astimezone(MARKET_TIMEZONE)
+        local_now = self._now_provider().astimezone(SHANGHAI_TIMEZONE)
         if request.trade_date != local_now.date():
             raise InvalidRequestError(
                 "全市场手动刷新仅支持今天；历史日期可查看或清理，但不能用当前快照重建"
@@ -400,7 +399,7 @@ class MarketDailyBarService:
             if any(segment.startswith("hk_") for segment in segments)
             else False
         )
-        now = datetime.now(MARKET_TIMEZONE)
+        now = datetime.now(SHANGHAI_TIMEZONE)
         for segment in segments:
             await self._run_segment(
                 request.trade_date,
@@ -449,7 +448,7 @@ class MarketDailyBarService:
         rebuild: bool = False,
         checkpoint: RefreshCheckpoint = "recheck",
     ) -> MarketDailyBarDeleteResult:
-        local_today = self._now_provider().astimezone(MARKET_TIMEZONE).date()
+        local_today = self._now_provider().astimezone(SHANGHAI_TIMEZONE).date()
         if rebuild and trade_date != local_today:
             raise InvalidRequestError(
                 "历史日期不能用当前全市场快照重建；请仅清理或使用历史 K 线数据源"
@@ -532,7 +531,7 @@ class MarketDailyBarService:
         now: datetime | None = None,
     ) -> dict[str, object]:
         await self.initialize()
-        local_now = (now or self._now_provider()).astimezone(MARKET_TIMEZONE)
+        local_now = (now or self._now_provider()).astimezone(SHANGHAI_TIMEZONE)
         deleted = await asyncio.to_thread(
             self.repository.prune_audit_history,
             observations_before=local_now.date() - timedelta(days=observation_retention_days),

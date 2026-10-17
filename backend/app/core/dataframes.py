@@ -1,6 +1,22 @@
 import pandas as pd
 
 
+def clean_cell_text(value: object) -> str:
+    """把表格单元格值规范化为去空白字符串。
+
+    ``None`` 与 pandas 缺失值（``NaN`` / ``NaT`` / ``NA``）统一映射为空串，
+    避免把 ``"nan"`` 这类字面量写进数据库。
+
+    Param:
+        value: 任意单元格值
+    Return:
+        去首尾空白后的字符串（缺失值为空串）
+    """
+    if value is None or pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
 def rename_columns(df: pd.DataFrame, rename_map: dict[str, str]) -> pd.DataFrame:
     """Rename DataFrame columns according to a mapping."""
     return df.rename(columns=rename_map)

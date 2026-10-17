@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 from pydantic import ValidationError
 
+from app.core.dataframes import clean_cell_text
 from app.modules.code_normalization import normalize_imported_stock_code
 from app.modules.import_limits import MAX_IMPORT_BASE64_CHARS, MAX_IMPORT_FILE_BYTES
 from app.modules.stock_concept.models import StockConceptRecordInput
@@ -45,18 +46,12 @@ def decode_file(content_base64: str) -> bytes:
     return content
 
 
-def _text(value: object) -> str:
-    if value is None or pd.isna(value):
-        return ""
-    return str(value).strip()
-
-
 def _normalize_stock_code(raw_val: object) -> tuple[str, str, str]:
-    return normalize_imported_stock_code(_text(raw_val))
+    return normalize_imported_stock_code(clean_cell_text(raw_val))
 
 
 def _extract_concepts(val: object) -> list[str]:
-    raw = _text(val)
+    raw = clean_cell_text(val)
     if not raw:
         return []
     parts = raw.replace("；", ";").replace(",", ";").replace("，", ";").split(";")
@@ -121,7 +116,7 @@ def parse_data(content: bytes, filename: str) -> ParsedConceptFile:
 
     for row_number, (_, row) in enumerate(frame.iterrows(), start=2):
         stock_code, suffix, market = normalize_imported_stock_code(
-            _text(row[code_col]), _text(row[exchange_col]) if exchange_col else ""
+            clean_cell_text(row[code_col]), clean_cell_text(row[exchange_col]) if exchange_col else ""
         )
         if not stock_code:
             invalid_rows += 1
@@ -132,7 +127,7 @@ def parse_data(content: bytes, filename: str) -> ParsedConceptFile:
             duplicate_codes.add(stock_code)
             continue
 
-        stock_name = _text(row[name_col]) if name_col else ""
+        stock_name = clean_cell_text(row[name_col]) if name_col else ""
         concepts = _extract_concepts(row[concept_col])
 
         values = {

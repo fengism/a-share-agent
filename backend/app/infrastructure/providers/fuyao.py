@@ -15,14 +15,14 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from app.configuration import get_settings
 from app.core.market import normalize_code
+from app.core.parsing import parse_float
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.infrastructure.http.client import provider_get
 
 _BASE_URL = "https://fuyao.aicubes.cn"
-_SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
 _TIMEOUT_SECONDS = 10
 _PAGE_SIZE = 200
 _MAX_PAGES = 20
@@ -53,7 +53,7 @@ def _date_ms(target: date) -> int:
     """交易日对应的 Asia/Shanghai 零点毫秒时间戳。"""
     from datetime import datetime
 
-    moment = datetime.combine(target, datetime.min.time(), _SHANGHAI_TIMEZONE)
+    moment = datetime.combine(target, datetime.min.time(), SHANGHAI_TIMEZONE)
     return int(moment.timestamp() * 1000)
 
 
@@ -62,16 +62,6 @@ def _safe_int(value: object) -> int:
         return int(float(str(value).replace(",", "")))
     except (TypeError, ValueError):
         return 0
-
-
-def _safe_float(value: object) -> float | None:
-    try:
-        text = str(value).replace(",", "").strip()
-        if not text:
-            return None
-        return float(text)
-    except (TypeError, ValueError):
-        return None
 
 
 def _normalize_time(value: object) -> str:
@@ -87,7 +77,7 @@ def _normalize_time(value: object) -> str:
 
 def _thousand_yuan_to_yuan(value: object) -> int:
     """封单额等金额统一取整为元。"""
-    amount = _safe_float(value)
+    amount = parse_float(value)
     return int(round(amount)) if amount is not None else 0
 
 
@@ -321,8 +311,8 @@ def _normalize_limit_up_item(item: dict[str, Any]) -> dict[str, Any]:
         "limit_count": _safe_int(item.get("continue_day_cnt")),
         "reason": str(item.get("limit_up_reason") or ""),
         "themes": "ST" if item.get("is_st") else ("新股" if item.get("is_new") else ""),
-        "price": _safe_float(item.get("last_price")),
-        "change_pct": _safe_float(item.get("price_change_ratio_pct")),
+        "price": parse_float(item.get("last_price")),
+        "change_pct": parse_float(item.get("price_change_ratio_pct")),
     }
 
 
@@ -332,9 +322,9 @@ def _normalize_limit_down_item(item: dict[str, Any]) -> dict[str, Any]:
         "name": str(item.get("name") or "").strip(),
         "limit_time": _normalize_time(item.get("last_limit_time")),
         "open_time": _normalize_time(item.get("first_limit_time")),
-        "price": _safe_float(item.get("last_price")),
-        "change_pct": _safe_float(item.get("price_change_ratio_pct")),
-        "turnover_rate": _safe_float(item.get("turnover_ratio_pct")),
+        "price": parse_float(item.get("last_price")),
+        "change_pct": parse_float(item.get("price_change_ratio_pct")),
+        "turnover_rate": parse_float(item.get("turnover_ratio_pct")),
     }
 
 
@@ -343,9 +333,9 @@ def _normalize_limit_break_item(item: dict[str, Any]) -> dict[str, Any]:
         "code": str(item.get("ticker") or "").strip(),
         "name": str(item.get("name") or "").strip(),
         "open_times": _safe_int(item.get("open_times")),
-        "price": _safe_float(item.get("last_price")),
-        "change_pct": _safe_float(item.get("price_change_ratio_pct")),
-        "turnover_rate": _safe_float(item.get("turnover_ratio_pct")),
+        "price": parse_float(item.get("last_price")),
+        "change_pct": parse_float(item.get("price_change_ratio_pct")),
+        "turnover_rate": parse_float(item.get("turnover_ratio_pct")),
         "turnover": _thousand_yuan_to_yuan(item.get("turnover")),
     }
 
@@ -356,11 +346,11 @@ def _normalize_quote_snapshot_item(item: dict[str, Any], snapshot_timestamp_ms: 
     涨跌幅/振幅优先用上游值，缺失时由现价与昨收推算。
     """
     code = str(item.get("ticker") or "").strip()
-    price = _safe_float(item.get("last_price"))
-    prev_close = _safe_float(item.get("prev_price"))
-    high = _safe_float(item.get("high_price"))
-    low = _safe_float(item.get("low_price"))
-    change_pct = _safe_float(item.get("price_change_ratio_pct"))
+    price = parse_float(item.get("last_price"))
+    prev_close = parse_float(item.get("prev_price"))
+    high = parse_float(item.get("high_price"))
+    low = parse_float(item.get("low_price"))
+    change_pct = parse_float(item.get("price_change_ratio_pct"))
     if change_pct is None and price is not None and prev_close not in (None, 0):
         change_pct = (price - prev_close) / prev_close * 100
     amplitude = (
@@ -372,14 +362,14 @@ def _normalize_quote_snapshot_item(item: dict[str, Any], snapshot_timestamp_ms: 
         "code": code,
         "price": price,
         "last_close": prev_close,
-        "open": _safe_float(item.get("open_price")),
+        "open": parse_float(item.get("open_price")),
         "high": high,
         "low": low,
-        "change_amt": _safe_float(item.get("price_change")),
+        "change_amt": parse_float(item.get("price_change")),
         "change_pct": change_pct,
         "amplitude_pct": amplitude,
-        "volume": _safe_float(item.get("volume")),
-        "amount": _safe_float(item.get("turnover")),
+        "volume": parse_float(item.get("volume")),
+        "amount": parse_float(item.get("turnover")),
         # 快照接口只给批次级时间戳，按上海时区格式化为不带时区的 ISO 字符串
         "quoted_at": _snapshot_quoted_at(snapshot_timestamp_ms),
         "name": "",
@@ -389,8 +379,8 @@ def _normalize_quote_snapshot_item(item: dict[str, Any], snapshot_timestamp_ms: 
 def _snapshot_quoted_at(timestamp_ms: int) -> str:
     """批次时间戳缺失时退回抓取时刻，保证 quoted_at 始终可用。"""
     if timestamp_ms <= 0:
-        return datetime.now(_SHANGHAI_TIMEZONE).isoformat(timespec="seconds")
-    return datetime.fromtimestamp(timestamp_ms / 1000, _SHANGHAI_TIMEZONE).isoformat(timespec="seconds")
+        return datetime.now(SHANGHAI_TIMEZONE).isoformat(timespec="seconds")
+    return datetime.fromtimestamp(timestamp_ms / 1000, SHANGHAI_TIMEZONE).isoformat(timespec="seconds")
 
 
 def _normalize_valuation_item(item: dict[str, Any]) -> dict[str, Any]:
@@ -399,11 +389,11 @@ def _normalize_valuation_item(item: dict[str, Any]) -> dict[str, Any]:
         "code": str(item.get("ticker") or "").strip(),
         "thscode": str(item.get("thscode") or "").strip(),
         "name": (str(item.get("name")).strip() if item.get("name") else ""),
-        "pe_ttm": _safe_float(item.get("pe_ttm")),
-        "pe_mrq": _safe_float(item.get("pe_mrq")),
-        "pb": _safe_float(item.get("pb_mrq")),
-        "ps_ttm": _safe_float(item.get("ps_ttm")),
-        "pcf_ttm": _safe_float(item.get("pcf_ttm")),
+        "pe_ttm": parse_float(item.get("pe_ttm")),
+        "pe_mrq": parse_float(item.get("pe_mrq")),
+        "pb": parse_float(item.get("pb_mrq")),
+        "ps_ttm": parse_float(item.get("ps_ttm")),
+        "pcf_ttm": parse_float(item.get("pcf_ttm")),
     }
 
 

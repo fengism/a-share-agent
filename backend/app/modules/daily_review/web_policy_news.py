@@ -8,13 +8,12 @@ from datetime import date, datetime, time, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any, cast
 from urllib.parse import urlsplit
-from zoneinfo import ZoneInfo
 
 from app.core.cache import analysis_cache
 from app.core.news import dedupe_news_items, parse_news_datetime
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.domain.news import NewsSearchItem
 
-_MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 # 同一复盘日的政策新闻搜索结果在进程内复用 6 小时：单次生成会打 3 次外部搜索，
 # 同日多用户/重复生成时不必重复打。空结果不写入缓存，避免把一次超时固化 6 小时。
 _POLICY_NEWS_CACHE_TTL_SECONDS = 6 * 60 * 60.0
@@ -34,7 +33,7 @@ _PUBLISHED_AT_KEYS = (
 
 
 def _parse_absolute_date(value: object, target_date: date) -> datetime | None:
-    reference = datetime.combine(target_date, time(23, 59, 59), tzinfo=_MARKET_TIMEZONE)
+    reference = datetime.combine(target_date, time(23, 59, 59), tzinfo=SHANGHAI_TIMEZONE)
     parsed = parse_news_datetime(
         value,
         now=reference,
@@ -51,11 +50,11 @@ def _parse_absolute_date(value: object, target_date: date) -> datetime | None:
             parsed_rfc = None
         if parsed_rfc is not None:
             if parsed_rfc.tzinfo is None:
-                parsed_rfc = parsed_rfc.replace(tzinfo=_MARKET_TIMEZONE)
-            return parsed_rfc.astimezone(_MARKET_TIMEZONE)
+                parsed_rfc = parsed_rfc.replace(tzinfo=SHANGHAI_TIMEZONE)
+            return parsed_rfc.astimezone(SHANGHAI_TIMEZONE)
         for pattern in ("%B %d, %Y", "%b %d, %Y", "%B %d %Y", "%b %d %Y"):
             try:
-                return datetime.strptime(value.strip(), pattern).replace(tzinfo=_MARKET_TIMEZONE)
+                return datetime.strptime(value.strip(), pattern).replace(tzinfo=SHANGHAI_TIMEZONE)
             except ValueError:
                 continue
     return None
@@ -118,9 +117,9 @@ def search_results_to_news(results: list[dict[str, Any]], target_date: date) -> 
         hostname = (urlsplit(url).hostname or "").removeprefix("www.")
         engine = str(result.get("engine") or "web")
         if published.tzinfo is None:
-            published = published.replace(tzinfo=_MARKET_TIMEZONE)
+            published = published.replace(tzinfo=SHANGHAI_TIMEZONE)
         else:
-            published = published.astimezone(_MARKET_TIMEZONE)
+            published = published.astimezone(SHANGHAI_TIMEZONE)
         items.append(NewsSearchItem(
             title=title,
             content=snippet[:1000],

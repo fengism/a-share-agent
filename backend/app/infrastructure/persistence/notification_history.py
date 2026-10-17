@@ -6,18 +6,17 @@ import json
 import logging
 from datetime import datetime
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 
 from app.configuration.paths import DATA_DIR
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.infrastructure.persistence.json_storage import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
 _HISTORY_FILE = DATA_DIR / "notification_history.json"
 _MAX_HISTORY_ENTRIES = 100
-_SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 
 
 class NotificationDeliveryRecord(BaseModel):
@@ -58,7 +57,7 @@ def record_notification_delivery(
     metadata: dict[str, Any] | None = None,
 ) -> NotificationDeliveryRecord:
     """追加单次通知投递记录，自动截断保留最近 100 条。"""
-    now = datetime.now(_SHANGHAI_TZ).isoformat(timespec="seconds")
+    now = datetime.now(SHANGHAI_TIMEZONE).isoformat(timespec="seconds")
     record_id = f"notif_{int(datetime.now().timestamp() * 1000)}"
 
     record = NotificationDeliveryRecord(

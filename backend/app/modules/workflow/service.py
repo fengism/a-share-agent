@@ -7,12 +7,12 @@ import time
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any, cast
-from zoneinfo import ZoneInfo
 
 from app.configuration import get_settings
 from app.core.concurrency.durable_stream import stream_durable_workflow_events
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
 from app.core.metrics import metrics
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.domain.industry_chain import IndustryChainResearchScope, resolve_industry_chain_scope
 from app.infrastructure.persistence.workflow_jobs import (
     WorkflowJob,
@@ -29,11 +29,9 @@ from app.modules.workflow.models import (
     WorkflowSubmissionSnapshot,
 )
 
-_MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
-
 
 def _industry_today():
-    return datetime.now(_MARKET_TIMEZONE).date()
+    return datetime.now(SHANGHAI_TIMEZONE).date()
 
 
 def _snapshot(job: WorkflowJob) -> WorkflowJobSnapshot:

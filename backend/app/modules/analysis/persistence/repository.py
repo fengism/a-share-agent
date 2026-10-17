@@ -6,11 +6,11 @@ import re
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
-from zoneinfo import ZoneInfo
 
 from app.configuration.paths import DATA_DIR
 from app.core.cache import analysis_cache as cache
 from app.core.market import is_hk_code
+from app.core.timezones import SHANGHAI_TIMEZONE
 from app.infrastructure.persistence.ddl import (
     ANALYSIS_HISTORY_INDEXES,
     ANALYSIS_HISTORY_TABLE,
@@ -22,7 +22,6 @@ from app.modules.analysis.persistence import history_index as history_store
 from app.modules.analysis.prompts import ANALYSIS_PROMPT_SPEC
 
 logger = logging.getLogger(__name__)
-_MARKET_TIMEZONE = ZoneInfo("Asia/Shanghai")
 _KEY_LEVELS_VERSION = "key-levels-v1"
 
 _DATA_DIR = DATA_DIR / "analyses"
@@ -132,7 +131,7 @@ def save_analysis(result: AnalysisResult, user_id: int) -> Path:
     if not result.report_id:
         result.report_id = uuid4().hex
     if not result.generated_at:
-        result.generated_at = datetime.now(_MARKET_TIMEZONE).isoformat()
+        result.generated_at = datetime.now(SHANGHAI_TIMEZONE).isoformat()
     version = _version_path(user_id, result.stock_code, result.analysis_date, result.report_id)
     version_existed = version.exists()
     filepath = _user_stock_dir(user_id, result.stock_code) / f"{result.analysis_date}.json"
@@ -265,7 +264,7 @@ def get_analysis_by_date(
 
 def get_latest_analysis(code: str, user_id: int, *, cache_ttl: int = 14400) -> AnalysisResult | None:
     """读取当前用户可见的指定股票最新分析结果。"""
-    today = datetime.now(_MARKET_TIMEZONE).strftime("%Y%m%d")
+    today = datetime.now(SHANGHAI_TIMEZONE).strftime("%Y%m%d")
     today_result = get_analysis_by_date(code, today, user_id, cache_ttl=cache_ttl)
     if today_result is not None:
         return today_result

@@ -231,7 +231,8 @@ def parse_timestamp(value) -> datetime | None:
     if value in (None, "", 0, "0"):
         return None
     try:
-        timestamp = int(float(value))
+        # 先取整秒，毫秒级时间戳在后面降为浮点秒
+        timestamp: float = int(float(value))
     except (TypeError, ValueError):
         return None
     if timestamp > 10**12:

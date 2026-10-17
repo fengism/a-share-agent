@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from playwright.sync_api import sync_playwright
-
-from app.infrastructure.browser_runtime import full_chromium_launch_options
+from app.infrastructure.report import render_elements_to_pngs
 from app.modules.daily_review.models import DailyReviewDataSnapshot
 from app.modules.daily_review.pdf_service import daily_review_chart_svgs
 
@@ -34,23 +32,9 @@ def render_daily_review_chart_pngs(snapshot: DailyReviewDataSnapshot) -> list[tu
     charts = daily_review_chart_svgs(snapshot)
     if not charts:
         return []
-    images: list[tuple[str, bytes]] = []
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(
-            **full_chromium_launch_options(args=["--no-sandbox", "--disable-setuid-sandbox"]),
-        )
-        try:
-            page = browser.new_page(
-                viewport={"width": _SVG_WIDTH_PX + 40, "height": 400},
-                device_scale_factor=2,
-            )
-            for title, _subtitle, svg in charts:
-                page.set_content(_chart_page_html(svg), wait_until="networkidle")
-                element = page.query_selector("svg")
-                if element is None:
-                    logger.warning("图表 SVG 渲染结果为空，已跳过: title=%s", title)
-                    continue
-                images.append((title, element.screenshot()))
-        finally:
-            browser.close()
-    return images
+    return render_elements_to_pngs(
+        ((title, _chart_page_html(svg), "svg") for title, _subtitle, svg in charts),
+        viewport_width=_SVG_WIDTH_PX + 40,
+        viewport_height=400,
+        missing_element_message="图表 SVG 渲染结果为空",
+    )

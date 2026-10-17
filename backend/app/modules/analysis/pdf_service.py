@@ -1,12 +1,12 @@
 """基于 Playwright Headless 浏览器的机构级纯矢量投研 PDF 生成服务（完整 8 大框架结论与全量数据）。"""
 
-import html
 import logging
 import math
 from datetime import date as calendar_date
 from datetime import datetime
 from typing import Any
 
+from app.core.html import escape_html
 from app.core.market import is_hk_code
 from app.domain.market import KlineData, KlineItem
 from app.financial_data.stock.quotes.chip_schemas import ChipDistribution
@@ -14,6 +14,10 @@ from app.infrastructure.pdf_runtime import render_pdf
 from app.modules.analysis.models import AnalysisResult
 
 logger = logging.getLogger(__name__)
+
+# 筹码获利占比的定性分档阈值（经验值，仅影响看板文案的方向标签，不参与任何计算）
+_CHIP_PROFIT_RATIO_BULLISH = 0.6
+_CHIP_PROFIT_RATIO_BEARISH = 0.3
 
 # 标签映射字典
 GRADE_LABELS = {
@@ -132,21 +136,13 @@ def _format_tool_name(tool_name: str) -> str:
     return f"{clean} (公开数据)"
 
 
-
-def _esc(text: Any) -> str:
-    """安全转义 HTML 字符串。"""
-    if text is None:
-        return ""
-    return html.escape(str(text))
-
-
 def _render_pill(text: str, bg: str = "#f1f5f9", fg: str = "#475569", border: str = "#cbd5e1") -> str:
     if not text:
         return ""
     return (
         f'<span style="display:inline-block; padding:2px 8px; border-radius:4px; '
         f'background:{bg}; color:{fg}; border:1px solid {border}; font-size:11px; font-weight:600; margin-right:4px;">'
-        f'{_esc(text)}</span>'
+        f'{escape_html(text)}</span>'
     )
 
 
@@ -156,7 +152,7 @@ def _render_list_items(items: list[str]) -> str:
     res = '<ul style="margin:0; padding-left:18px; list-style-type:disc;">'
     for it in items:
         if it and str(it).strip():
-            res += f'<li style="margin-bottom:3px; line-height:1.5; font-size:11px; color:#334155;">{_esc(str(it).strip())}</li>'
+            res += f'<li style="margin-bottom:3px; line-height:1.5; font-size:11px; color:#334155;">{escape_html(str(it).strip())}</li>'
     res += '</ul>'
     return res
 
@@ -166,8 +162,8 @@ def _render_named_box(title: str, content: str, bg: str = "#ffffff", border: str
         return ""
     return f"""
     <div style="background:{bg}; border:1px solid {border}; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
-        <div style="font-weight:700; color:#475569; font-size:11px; margin-bottom:3px;">{_esc(title)}</div>
-        <div style="font-size:11px; color:#1e293b; line-height:1.5;">{_esc(content)}</div>
+        <div style="font-weight:700; color:#475569; font-size:11px; margin-bottom:3px;">{escape_html(title)}</div>
+        <div style="font-size:11px; color:#1e293b; line-height:1.5;">{escape_html(content)}</div>
     </div>
     """
 
@@ -202,7 +198,7 @@ def _render_signals(signals: list[tuple[str, str]]) -> str:
     if not signals:
         return ""
     items = "".join(
-        f'<li><span class="signal-dot signal-{_esc(tone)}"></span>{_esc(text)}</li>'
+        f'<li><span class="signal-dot signal-{escape_html(tone)}"></span>{escape_html(text)}</li>'
         for text, tone in signals[:3]
         if text
     )
@@ -228,8 +224,8 @@ def _chart_card(
     return f"""
     <section class="visual-card">
         <div class="visual-heading">
-            <strong>{_esc(title)}</strong>
-            <span>{_esc(subtitle)}</span>
+            <strong>{escape_html(title)}</strong>
+            <span>{escape_html(subtitle)}</span>
         </div>
         {svg}
         {_render_signals(signals or [])}
@@ -349,7 +345,7 @@ def _render_price_chart(result: AnalysisResult, kline_data: KlineData | None, cu
             f'<line x1="{left}" x2="{width - right}" y1="{y:.2f}" y2="{y:.2f}" '
             f'stroke="{color}" stroke-width="1.2" stroke-dasharray="5 4"/>'
             f'<text x="{width - right - 3}" y="{y - 4:.2f}" text-anchor="end" fill="{color}" '
-            f'font-size="10" font-weight="700">{_esc(label)} {_esc(_format_price(value, currency))}</text>'
+            f'font-size="10" font-weight="700">{escape_html(label)} {escape_html(_format_price(value, currency))}</text>'
         )
 
     close_path = _line_path(closes, x_for=x_for, y_for=y_for)
@@ -383,7 +379,7 @@ def _render_price_chart(result: AnalysisResult, kline_data: KlineData | None, cu
             f'<line x1="{width - right + 3}" x2="{width - right + 10}" y1="{actual_y:.2f}" '
             f'y2="{label_y:.2f}" stroke="{color}" stroke-width="0.8"/>'
             f'<text x="{width - right + 13}" y="{label_y + 3.5:.2f}" fill="{color}" '
-            f'font-size="9.5" font-weight="700">{_esc(label)} {_esc(_format_price(value, currency))}</text>'
+            f'font-size="9.5" font-weight="700">{escape_html(label)} {escape_html(_format_price(value, currency))}</text>'
         )
 
     label_indices = sorted({round((len(bars) - 1) * ratio / 4) for ratio in range(5)})
@@ -391,7 +387,7 @@ def _render_price_chart(result: AnalysisResult, kline_data: KlineData | None, cu
         anchor = "start" if index == 0 else "end" if index == len(bars) - 1 else "middle"
         parts.append(
             f'<text x="{x_for(index):.2f}" y="{height - 12}" text-anchor="{anchor}" '
-            f'fill="#64748b" font-size="10">{_esc(_short_date(bars[index].date))}</text>'
+            f'fill="#64748b" font-size="10">{escape_html(_short_date(bars[index].date))}</text>'
         )
 
     legend = ['<circle cx="64" cy="13" r="4" fill="#0f766e"/><text x="73" y="17" fill="#475569" font-size="10">收盘价</text>']
@@ -469,7 +465,7 @@ def _render_volume_chart(kline_data: KlineData | None, *, end_date: Any = None) 
         parts.append(
             f'<line x1="{left}" x2="{width - right}" y1="{y:.2f}" y2="{y:.2f}" stroke="#e2e8f0"/>'
             f'<text x="{left - 8}" y="{y + 4:.2f}" text-anchor="end" fill="#64748b" font-size="10">'
-            f'{_esc(_format_volume(value))}</text>'
+            f'{escape_html(_format_volume(value))}</text>'
         )
     for index, (item, volume) in enumerate(zip(bars, volumes, strict=True)):
         bar_height = volume / maximum * plot_height
@@ -489,14 +485,14 @@ def _render_volume_chart(kline_data: KlineData | None, *, end_date: Any = None) 
         f'<line x1="{left}" x2="{width - right}" y1="{average_y:.2f}" y2="{average_y:.2f}" '
         f'stroke="#475569" stroke-width="1" stroke-dasharray="5 3"/>'
         f'<text x="{width - right - 3}" y="{average_y - 4:.2f}" text-anchor="end" fill="#475569" '
-        f'font-size="9.5">20日均量 {_esc(_format_volume(average_20))}</text>'
+        f'font-size="9.5">20日均量 {escape_html(_format_volume(average_20))}</text>'
     )
     for index in sorted({round((len(bars) - 1) * ratio / 4) for ratio in range(5)}):
         x = left + (index + 0.5) * step
         anchor = "start" if index == 0 else "end" if index == len(bars) - 1 else "middle"
         parts.append(
             f'<text x="{x:.2f}" y="{height - 10}" text-anchor="{anchor}" fill="#64748b" font-size="10">'
-            f"{_esc(_short_date(bars[index].date))}</text>"
+            f"{escape_html(_short_date(bars[index].date))}</text>"
         )
     svg = (
         f'<svg data-testid="analysis-volume-chart" viewBox="0 0 {width} {height}" role="img" '
@@ -599,13 +595,13 @@ def _render_valuation_chart(result: AnalysisResult, currency: str = "¥") -> str
         parts.append(
             f'<line x1="{x:.2f}" x2="{x:.2f}" y1="26" y2="{height - 22}" stroke="#e2e8f0"/>'
             f'<text x="{x:.2f}" y="18" text-anchor="{anchor}" fill="#64748b" font-size="9.5">'
-            f'{_esc(_format_price(value, currency))}</text>'
+            f'{escape_html(_format_price(value, currency))}</text>'
         )
     for index, (label, value_range, color) in enumerate(rows):
         y = top + index * row_height
         x1, x2 = x_for(value_range[0]), x_for(value_range[1])
         parts.append(
-            f'<text x="{left - 10}" y="{y + 16}" text-anchor="end" fill="#475569" font-size="11">{_esc(label)}</text>'
+            f'<text x="{left - 10}" y="{y + 16}" text-anchor="end" fill="#475569" font-size="11">{escape_html(label)}</text>'
             f'<line x1="{left}" x2="{width - right}" y1="{y + 12}" y2="{y + 12}" stroke="#f1f5f9" stroke-width="10" stroke-linecap="round"/>'
         )
         if abs(x2 - x1) < 2:
@@ -621,7 +617,7 @@ def _render_valuation_chart(result: AnalysisResult, currency: str = "¥") -> str
         )
         parts.append(
             f'<text x="{min(max(x2 + 6, left + 4), width - right):.2f}" y="{y + 31}" '
-            f'text-anchor="end" fill="{color}" font-size="9.5" font-weight="700">{_esc(range_text)}</text>'
+            f'text-anchor="end" fill="{color}" font-size="9.5" font-weight="700">{escape_html(range_text)}</text>'
         )
     if current is not None:
         current_x = x_for(current)
@@ -630,7 +626,7 @@ def _render_valuation_chart(result: AnalysisResult, currency: str = "¥") -> str
             f'stroke="#0f172a" stroke-width="1.5" stroke-dasharray="4 3"/>'
             f'<rect x="{current_x - 44:.2f}" y="1" width="88" height="20" rx="5" fill="#0f172a"/>'
             f'<text x="{current_x:.2f}" y="15" text-anchor="middle" fill="#ffffff" font-size="10" font-weight="700">'
-            f"当前 {_esc(_format_price(current, currency))}</text>"
+            f"当前 {escape_html(_format_price(current, currency))}</text>"
         )
     svg = (
         f'<svg data-testid="analysis-valuation-chart" viewBox="0 0 {width} {height}" role="img" '
@@ -742,7 +738,7 @@ def _render_chip_chart(chip_distribution: ChipDistribution | None, currency: str
         parts.append(
             f'<line x1="{left}" x2="{width - right}" y1="{y:.2f}" y2="{y:.2f}" stroke="{color}" stroke-width="1.3" stroke-dasharray="5 3"/>'
             f'<text x="{width - right}" y="{y - 4:.2f}" text-anchor="end" fill="{color}" font-size="10" font-weight="700">'
-            f"{_esc(label)} {_esc(_format_price(number, currency))}</text>"
+            f"{escape_html(label)} {escape_html(_format_price(number, currency))}</text>"
         )
     parts.append(
         f'<text x="{left}" y="{height - 9}" fill="#475569" font-size="10">获利筹码比例 '
@@ -771,7 +767,14 @@ def _render_chip_chart(chip_distribution: ChipDistribution | None, currency: str
         signals.append(
             (
                 f"模型估算获利筹码占比 {profit_ratio * 100:.1f}%",
-                "positive" if profit_ratio >= 0.6 else "negative" if profit_ratio <= 0.3 else "neutral",
+                # 盈亏盘占比的定性分档（经验值）：高于半数偏多、低于三成偏空，其余中性
+                (
+                    "positive"
+                    if profit_ratio >= _CHIP_PROFIT_RATIO_BULLISH
+                    else "negative"
+                    if profit_ratio <= _CHIP_PROFIT_RATIO_BEARISH
+                    else "neutral"
+                ),
             )
         )
     return _chart_card(
@@ -862,10 +865,10 @@ def _render_decision_dashboard(
         return ""
     cards = "".join(
         f"""
-        <div class="decision-metric metric-{_esc(tone)}">
-            <div class="decision-metric-label">{_esc(label)}</div>
-            <div class="decision-metric-value">{_esc(value)}</div>
-            <div class="decision-metric-detail">{_esc(detail)}</div>
+        <div class="decision-metric metric-{escape_html(tone)}">
+            <div class="decision-metric-label">{escape_html(label)}</div>
+            <div class="decision-metric-value">{escape_html(value)}</div>
+            <div class="decision-metric-detail">{escape_html(detail)}</div>
         </div>
         """
         for label, value, detail, tone in metrics
@@ -895,7 +898,7 @@ def _render_visual_analysis(
         return ""
     bars = _valid_bars(kline_data, end_date=getattr(result, "analysis_date", None))
     as_of_date = bars[-1].date if bars else getattr(chip_distribution, "as_of_date", None)
-    data_note = f"数据截至 {_esc(as_of_date)}" if as_of_date else f"分析基准日 {_esc(getattr(result, 'analysis_date', '最新'))}"
+    data_note = f"数据截至 {escape_html(as_of_date)}" if as_of_date else f"分析基准日 {escape_html(getattr(result, 'analysis_date', '最新'))}"
     return f"""
     <div class="visual-section">
         <div class="visual-section-header">
@@ -921,13 +924,13 @@ def _render_segment_quality(bm: Any) -> str:
             html += f"""
             <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                    <strong style="color:#0f172a; font-size:12px;">{_esc(seg.segment)}</strong>
-                    <span style="font-size:10px; color:#64748b; background:#f1f5f9; padding:1px 6px; border-radius:4px;">{_esc(seg.role or '主营业务')} ｜ {conf_str}</span>
+                    <strong style="color:#0f172a; font-size:12px;">{escape_html(seg.segment)}</strong>
+                    <span style="font-size:10px; color:#64748b; background:#f1f5f9; padding:1px 6px; border-radius:4px;">{escape_html(seg.role or '主营业务')} ｜ {conf_str}</span>
                 </div>
                 <div style="font-size:11px; color:#475569; line-height:1.45;">
-                    <div>• 增长质量: <strong>{_esc(seg.growth_quality or '--')}</strong></div>
-                    <div>• 盈利质量: <strong>{_esc(seg.profitability_quality or '--')}</strong></div>
-                    <div>• 收入持续性/现金重现: <strong>{_esc(seg.recurrence or '--')}</strong></div>
+                    <div>• 增长质量: <strong>{escape_html(seg.growth_quality or '--')}</strong></div>
+                    <div>• 盈利质量: <strong>{escape_html(seg.profitability_quality or '--')}</strong></div>
+                    <div>• 收入持续性/现金重现: <strong>{escape_html(seg.recurrence or '--')}</strong></div>
                 </div>
             </div>
             """
@@ -948,13 +951,13 @@ def _render_moats(moat: Any) -> str:
             html += f"""
             <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <strong style="color:#0f172a; font-size:13px;">{_esc(m_name)}</strong>
+                    <strong style="color:#0f172a; font-size:13px;">{escape_html(m_name)}</strong>
                     <div>
                         {_render_pill(f'强度: {m_strength}', '#f1f5f9', '#334155', '#cbd5e1')}
                         {_render_pill(f'趋势: {m_dir}', '#eff6ff', '#1d4ed8', '#bfdbfe')}
                     </div>
                 </div>
-                <div style="font-size:11px; color:#475569; margin-bottom:4px;"><strong>持续期限:</strong> {_esc(m.durability or '长期稳固')}</div>
+                <div style="font-size:11px; color:#475569; margin-bottom:4px;"><strong>持续期限:</strong> {escape_html(m.durability or '长期稳固')}</div>
                 <div style="font-size:11px; color:#334155; margin-top:4px;"><strong>支持证据:</strong></div>
                 {_render_list_items(m.evidence)}
                 {f'<div style="font-size:11px; color:#991b1b; margin-top:4px;"><strong>反证与潜在威胁:</strong></div>{_render_list_items(counter_threats)}' if counter_threats else ''}
@@ -976,15 +979,15 @@ def _render_risks(inv: Any, risk_warnings: list[str] | None) -> str:
             html += f"""
             <div style="background:#ffffff; border:1px solid #fecaca; border-left:4px solid #ef4444; border-radius:6px; padding:10px; margin-bottom:8px; break-inside:avoid;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                    <strong style="color:#991b1b; font-size:12px;">⚠️ {_esc(r.risk)}</strong>
+                    <strong style="color:#991b1b; font-size:12px;">⚠️ {escape_html(r.risk)}</strong>
                     <div>
                         {_render_pill(f'概率: {r_prob}', '#fef2f2', '#991b1b', '#fecaca')}
                         {_render_pill(f'影响: {r_impact}{horizon_str}', '#fef2f2', '#991b1b', '#fecaca')}
                     </div>
                 </div>
-                {f'<div style="font-size:11px; color:#475569; margin-bottom:3px;"><strong>失效路径:</strong> {_esc(r.failure_path)}</div>' if r.failure_path else ''}
-                {f'<div style="font-size:11px; color:#475569; margin-bottom:3px;"><strong>先行指标:</strong> {_esc(", ".join(r.leading_indicators))}</div>' if r.leading_indicators else ''}
-                {f'<div style="font-size:11px; color:#166534;"><strong>对冲缓解:</strong> {_esc(", ".join(r.mitigants))}</div>' if r.mitigants else ''}
+                {f'<div style="font-size:11px; color:#475569; margin-bottom:3px;"><strong>失效路径:</strong> {escape_html(r.failure_path)}</div>' if r.failure_path else ''}
+                {f'<div style="font-size:11px; color:#475569; margin-bottom:3px;"><strong>先行指标:</strong> {escape_html(", ".join(r.leading_indicators))}</div>' if r.leading_indicators else ''}
+                {f'<div style="font-size:11px; color:#166534;"><strong>对冲缓解:</strong> {escape_html(", ".join(r.mitigants))}</div>' if r.mitigants else ''}
             </div>
             """
         html += '</div>'
@@ -1005,9 +1008,9 @@ def _render_valuation_scenarios(sc: Any, curr: str) -> str:
         <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:8px;">
             <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:10px;">
                 <div style="font-weight:700; color:#166534; font-size:13px; margin-bottom:4px;">乐观情景 (Bull)</div>
-                <div style="font-size:16px; font-weight:800; color:#15803d; margin-bottom:4px;">{_esc(bull_range)}</div>
+                <div style="font-size:16px; font-weight:800; color:#15803d; margin-bottom:4px;">{escape_html(bull_range)}</div>
                 <div style="font-size:11px; color:#166534; line-height:1.45;">
-                    <div>{_esc(sc.bull.valuation_view or '增长超出市场预期')}</div>
+                    <div>{escape_html(sc.bull.valuation_view or '增长超出市场预期')}</div>
                     <div style="margin-top:6px; font-weight:700;">关键假设:</div>
                     {_render_list_items(sc.bull.assumptions)}
                     {f'<div style="margin-top:6px; font-weight:700; color:#991b1b;">失效条件:</div>{_render_list_items(sc.bull.invalidating_conditions)}' if sc.bull.invalidating_conditions else ''}
@@ -1015,9 +1018,9 @@ def _render_valuation_scenarios(sc: Any, curr: str) -> str:
             </div>
             <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:10px;">
                 <div style="font-weight:700; color:#1d4ed8; font-size:13px; margin-bottom:4px;">基准情景 (Base)</div>
-                <div style="font-size:16px; font-weight:800; color:#1e40af; margin-bottom:4px;">{_esc(base_range)}</div>
+                <div style="font-size:16px; font-weight:800; color:#1e40af; margin-bottom:4px;">{escape_html(base_range)}</div>
                 <div style="font-size:11px; color:#1d4ed8; line-height:1.45;">
-                    <div>{_esc(sc.base.valuation_view or '业务稳健推进')}</div>
+                    <div>{escape_html(sc.base.valuation_view or '业务稳健推进')}</div>
                     <div style="margin-top:6px; font-weight:700;">关键假设:</div>
                     {_render_list_items(sc.base.assumptions)}
                     {f'<div style="margin-top:6px; font-weight:700; color:#991b1b;">失效条件:</div>{_render_list_items(sc.base.invalidating_conditions)}' if sc.base.invalidating_conditions else ''}
@@ -1025,9 +1028,9 @@ def _render_valuation_scenarios(sc: Any, curr: str) -> str:
             </div>
             <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:10px;">
                 <div style="font-weight:700; color:#991b1b; font-size:13px; margin-bottom:4px;">悲观情景 (Bear)</div>
-                <div style="font-size:16px; font-weight:800; color:#b91c1c; margin-bottom:4px;">{_esc(bear_range)}</div>
+                <div style="font-size:16px; font-weight:800; color:#b91c1c; margin-bottom:4px;">{escape_html(bear_range)}</div>
                 <div style="font-size:11px; color:#991b1b; line-height:1.45;">
-                    <div>{_esc(sc.bear.valuation_view or '承压与估值收缩')}</div>
+                    <div>{escape_html(sc.bear.valuation_view or '承压与估值收缩')}</div>
                     <div style="margin-top:6px; font-weight:700;">关键假设:</div>
                     {_render_list_items(sc.bear.assumptions)}
                     {f'<div style="margin-top:6px; font-weight:700; color:#991b1b;">失效条件:</div>{_render_list_items(sc.bear.invalidating_conditions)}' if sc.bear.invalidating_conditions else ''}
@@ -1043,11 +1046,11 @@ def _render_data_gaps(data_gaps: list[Any]) -> str:
     data_gap_cards = "".join(
         f"""
         <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px;">
-            <strong style="color:#0f172a; font-size:12px;">{_esc(g.topic)}</strong>
-            <div style="font-size:11px; color:#475569; margin-top:2px;">{_esc(g.missing_data or '缺失数据说明未填写')}</div>
+            <strong style="color:#0f172a; font-size:12px;">{escape_html(g.topic)}</strong>
+            <div style="font-size:11px; color:#475569; margin-top:2px;">{escape_html(g.missing_data or '缺失数据说明未填写')}</div>
             <div style="font-size:10px; color:#64748b; margin-top:4px;">
-                <div>• 决策影响: {_esc(g.decision_impact or '待评估')}</div>
-                <div>• 下一步行动: {_esc(g.follow_up or '待跟进核验')}</div>
+                <div>• 决策影响: {escape_html(g.decision_impact or '待评估')}</div>
+                <div>• 下一步行动: {escape_html(g.follow_up or '待跟进核验')}</div>
             </div>
         </div>
         """
@@ -1141,8 +1144,8 @@ def generate_research_report_html(
     provenance = getattr(result, "provenance", None)
     freshness_note = provenance.freshness_note if provenance else "旧报告未记录数据时效与缓存来源；分析日期不代表数据截至日期。"
 
-    report_id_str = _esc(getattr(result, "report_id", None) or "未记录")
-    generated_at_str = _esc(getattr(result, "generated_at", None) or "未记录")
+    report_id_str = escape_html(getattr(result, "report_id", None) or "未记录")
+    generated_at_str = escape_html(getattr(result, "generated_at", None) or "未记录")
     short_report_id = report_id_str[:16] if len(report_id_str) > 16 else report_id_str
 
     freshness_html = f"""<div class="section-card" style="padding:7px 12px; margin-bottom:10px; background:#f8fafc; border:1px solid #e2e8f0; font-size:10.5px; color:#475569;">
@@ -1152,7 +1155,7 @@ def generate_research_report_html(
                 <strong>生成时间:</strong> {generated_at_str}
             </div>
             <div style="color:#64748b; font-size:10px;">
-                {_esc(freshness_note)}
+                {escape_html(freshness_note)}
             </div>
         </div>
     </div>"""
@@ -1189,11 +1192,11 @@ def generate_research_report_html(
             return "公开披露"
 
         appendix_rows = "".join(
-            f"<tr><td><strong>{_esc(_format_tool_name(k))}</strong></td>"
-            f"<td>{_esc('；'.join(sorted(v['data_dates'])[-3:]) or '跟随最新交易日')}</td>"
-            f"<td>{_esc('；'.join(sorted(v['report_periods'])[-2:]) or '最新已披露期')}</td>"
-            f"<td>{_esc(_format_status(v['cache_statuses']))}</td>"
-            f"<td>{_esc('；'.join(sorted(v['sources'])[:2]) or '公开信息渠道')}</td></tr>"
+            f"<tr><td><strong>{escape_html(_format_tool_name(k))}</strong></td>"
+            f"<td>{escape_html('；'.join(sorted(v['data_dates'])[-3:]) or '跟随最新交易日')}</td>"
+            f"<td>{escape_html('；'.join(sorted(v['report_periods'])[-2:]) or '最新已披露期')}</td>"
+            f"<td>{escape_html(_format_status(v['cache_statuses']))}</td>"
+            f"<td>{escape_html('；'.join(sorted(v['sources'])[:2]) or '公开信息渠道')}</td></tr>"
             for k, v in aggregated_evidence.items()
         )
         appendix_html = f"""
@@ -1229,7 +1232,7 @@ def generate_research_report_html(
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
-    <title>{_esc(name)} ({_esc(code)}) - 深度个股投资研究结论</title>
+    <title>{escape_html(name)} ({escape_html(code)}) - 深度个股投资研究结论</title>
     <style>
         @page {{
             size: A4 portrait;
@@ -1479,18 +1482,18 @@ def generate_research_report_html(
     <!-- 顶部报告抬头与评级 Hero -->
     <div class="hero-banner">
         <div>
-            <h1 class="hero-title">{_esc(name)} ({_esc(code)}) · 深度价值投资研报</h1>
+            <h1 class="hero-title">{escape_html(name)} ({escape_html(code)}) · 深度价值投资研报</h1>
             <div class="hero-meta">
-                所属行业：{_esc(industry_text or default_industry)} &nbsp;|&nbsp; 
-                研究基准日：{_esc(analysis_date)} &nbsp;|&nbsp; 
+                所属行业：{escape_html(industry_text or default_industry)} &nbsp;|&nbsp; 
+                研究基准日：{escape_html(analysis_date)} &nbsp;|&nbsp; 
                 最新参考价：{f'{curr}{current_price:.2f}' if current_price is not None else '--'} &nbsp;|&nbsp;
                 系统置信度：{confidence}%
             </div>
         </div>
         <div>
             <div class="hero-badge">
-                研判：{_esc(signal_label)}
-                <div style="font-size:11px; font-weight:normal; margin-top:2px;">目标区间: {_esc(target_range_str)}</div>
+                研判：{escape_html(signal_label)}
+                <div style="font-size:11px; font-weight:normal; margin-top:2px;">目标区间: {escape_html(target_range_str)}</div>
             </div>
         </div>
     </div>
@@ -1504,7 +1507,7 @@ def generate_research_report_html(
             <div style="font-weight:600; color:#0f766e; font-size:11px;">综合评分: {getattr(result, 'overall_rating', 8)}/10</div>
         </div>
         <p style="margin:0; font-size:12px; color:#134e4a; line-height:1.6;">
-            {_esc(overall_summary_text or '根据多维度深度投研分析，当前公司具备明确的竞争优势与估值支撑。')}
+            {escape_html(overall_summary_text or '根据多维度深度投研分析，当前公司具备明确的竞争优势与估值支撑。')}
         </p>
     </div>
 
@@ -1519,7 +1522,7 @@ def generate_research_report_html(
         <div class="two-column">
             <div>
                 <div style="font-size:11px; color:#475569; margin-bottom:4px;"><strong>覆盖度与评级依据:</strong></div>
-                <div style="font-size:11px; color:#334155; line-height:1.5;">{_esc(iq.coverage_summary if iq and iq.coverage_summary else (iq.grade_rationale if iq else '全量财报与研报数据覆盖完毕'))}</div>
+                <div style="font-size:11px; color:#334155; line-height:1.5;">{escape_html(iq.coverage_summary if iq and iq.coverage_summary else (iq.grade_rationale if iq else '全量财报与研报数据覆盖完毕'))}</div>
                 <div style="margin-top:6px; font-size:11px; color:#64748b;">
                     证据链置信度: <strong>{iq_conf}</strong> &nbsp;|&nbsp; 投资结论确定性: <strong>{iq_cert}</strong>
                 </div>
@@ -1537,11 +1540,11 @@ def generate_research_report_html(
             <div class="section-title">02 · 商业模式与盈利质量 (Business Model)</div>
         </div>
         <div style="font-size:11px; color:#334155; margin-bottom:6px;">
-            <strong>核心经济引擎 (Economic Engine):</strong> {_esc(bm.economic_engine if bm and bm.economic_engine else '主营业务具备稳定现金流与定价能力')}
+            <strong>核心经济引擎 (Economic Engine):</strong> {escape_html(bm.economic_engine if bm and bm.economic_engine else '主营业务具备稳定现金流与定价能力')}
         </div>
         <div style="display:flex; gap:16px; font-size:11px; color:#475569; margin-bottom:6px;">
-            <div><strong>盈利质量:</strong> {_esc(bm.earnings_quality if bm and bm.earnings_quality else '良好')}</div>
-            <div><strong>经营杠杆效应:</strong> {_esc(bm.operating_leverage if bm and bm.operating_leverage else '适中')}</div>
+            <div><strong>盈利质量:</strong> {escape_html(bm.earnings_quality if bm and bm.earnings_quality else '良好')}</div>
+            <div><strong>经营杠杆效应:</strong> {escape_html(bm.operating_leverage if bm and bm.operating_leverage else '适中')}</div>
         </div>
         {f'<div class="three-column" style="margin-top:8px;">'
            f'<div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px;"><div style="font-weight:700; color:#475569; font-size:11px; margin-bottom:4px;">核心收入驱动力</div>{_render_list_items(bm.revenue_drivers)}</div>'
@@ -1588,9 +1591,9 @@ def generate_research_report_html(
         <div class="two-column">
             <div>
                 <div style="font-size:11px; color:#475569; margin-bottom:4px;"><strong>行业长期趋势与格局:</strong></div>
-                <div style="font-size:11px; color:#334155; line-height:1.5;">{_esc(ind.secular_context if ind and ind.secular_context else '行业进入高质量发展与头部集中阶段')}</div>
-                <div style="margin-top:6px; font-size:11px; color:#475569;"><strong>竞争地位:</strong> {_esc(ind.competitive_position if ind and ind.competitive_position else '行业领军/头部竞争者')}</div>
-                <div style="margin-top:6px; font-size:11px; color:#475569;"><strong>价值链位置:</strong> {_esc(ind.value_chain_position if ind and ind.value_chain_position else '中枢关键环节')}</div>
+                <div style="font-size:11px; color:#334155; line-height:1.5;">{escape_html(ind.secular_context if ind and ind.secular_context else '行业进入高质量发展与头部集中阶段')}</div>
+                <div style="margin-top:6px; font-size:11px; color:#475569;"><strong>竞争地位:</strong> {escape_html(ind.competitive_position if ind and ind.competitive_position else '行业领军/头部竞争者')}</div>
+                <div style="margin-top:6px; font-size:11px; color:#475569;"><strong>价值链位置:</strong> {escape_html(ind.value_chain_position if ind and ind.value_chain_position else '中枢关键环节')}</div>
             </div>
             <div>
                 <div style="font-size:11px; color:#475569; margin-bottom:4px;"><strong>核心增长驱动力:</strong></div>
@@ -1606,7 +1609,7 @@ def generate_research_report_html(
             <div class="section-title" style="color:#b91c1c;">06 · 逆向推演与主要风险清单 (Inversion & Risks)</div>
             <div>{_render_pill('风险警示', '#fef2f2', '#b91c1c', '#fecaca')}</div>
         </div>
-        {f'<div style="font-size:11px; color:#7f1d1d; margin-bottom:6px; background:#fff1f2; padding:6px 10px; border-radius:4px;"><strong>最强看空逻辑推演 (Strongest Bear Case):</strong> {_esc(inv.bear_case)}</div>' if inv and inv.bear_case else ''}
+        {f'<div style="font-size:11px; color:#7f1d1d; margin-bottom:6px; background:#fff1f2; padding:6px 10px; border-radius:4px;"><strong>最强看空逻辑推演 (Strongest Bear Case):</strong> {escape_html(inv.bear_case)}</div>' if inv and inv.bear_case else ''}
         {risks_html if risks_html else '<div style="color:#64748b; font-size:11px;">暂无重大一票否决级风险。</div>'}
         {f'<div style="margin-top:8px; background:#ffffff; border:1px solid #fecaca; border-radius:6px; padding:8px 10px;"><div style="font-weight:700; color:#991b1b; font-size:11px; margin-bottom:4px;">认知偏差与假设自查 (Bias Checks):</div>{_render_list_items(inv.bias_checks)}</div>' if inv and inv.bias_checks else ''}
     </div>
@@ -1617,9 +1620,9 @@ def generate_research_report_html(
             <div class="section-title">07 · 估值假设与三情景推演 (Valuation Scenarios)</div>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:11px; color:#475569; margin-bottom:6px;">
-            <div><strong>当前估值:</strong> {_esc(val_framework.current_valuation if val_framework and val_framework.current_valuation else '评估中')}</div>
-            <div><strong>估值方法:</strong> {_esc(val_framework.method_summary if val_framework and val_framework.method_summary else 'DCF + 相对估值法')}</div>
-            <div><strong>安全边际:</strong> {_esc(val_framework.margin_of_safety if val_framework and val_framework.margin_of_safety else '具备合理安全边际')}</div>
+            <div><strong>当前估值:</strong> {escape_html(val_framework.current_valuation if val_framework and val_framework.current_valuation else '评估中')}</div>
+            <div><strong>估值方法:</strong> {escape_html(val_framework.method_summary if val_framework and val_framework.method_summary else 'DCF + 相对估值法')}</div>
+            <div><strong>安全边际:</strong> {escape_html(val_framework.margin_of_safety if val_framework and val_framework.margin_of_safety else '具备合理安全边际')}</div>
         </div>
         {sc_html if sc_html else '<div style="color:#64748b; font-size:11px;">三情景估值模型计算完成。</div>'}
         {f'<div class="two-column" style="margin-top:8px;">'
@@ -1640,11 +1643,11 @@ def generate_research_report_html(
                     {_render_pill(f'持仓管理: {holder_act}', '#f0fdf4', '#15803d', '#86efac')}
                 </div>
                 <div style="font-size:12px; font-weight:700; color:#1e40af;">
-                    建议买入/加仓区间: {_esc(buy_range_str)}
+                    建议买入/加仓区间: {escape_html(buy_range_str)}
                 </div>
             </div>
             <div style="font-size:11px; color:#334155; line-height:1.5;">
-                <strong>决策逻辑:</strong> {_esc(act.rationale if act and act.rationale else '估值合理且基本面扎实，建议按照安全边际分批配置。')}
+                <strong>决策逻辑:</strong> {escape_html(act.rationale if act and act.rationale else '估值合理且基本面扎实，建议按照安全边际分批配置。')}
             </div>
         </div>
 
@@ -1680,7 +1683,7 @@ def generate_research_report_html(
     <!-- 研报合规免责声明 -->
     <div class="disclaimer-box">
         <strong>【研究声明与免责提示】</strong><br>
-        1. 本报告由 {_esc(platform_name)}（AI Agentic Financial Platform）基于上市公司公开披露信息、市场公开行情及算法模型自动生成，旨在辅助投资者进行客观框架化研究，不构成任何形式的直接投资建议或保本承诺。<br>
+        1. 本报告由 {escape_html(platform_name)}（AI Agentic Financial Platform）基于上市公司公开披露信息、市场公开行情及算法模型自动生成，旨在辅助投资者进行客观框架化研究，不构成任何形式的直接投资建议或保本承诺。<br>
         2. 证券市场有风险，投资决策需建立在独立判断之上。过往数据与模型情景推演不代表未来真实收益。
     </div>
 

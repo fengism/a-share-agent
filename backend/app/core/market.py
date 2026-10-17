@@ -2,14 +2,12 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+from app.core.timezones import SHANGHAI_TIMEZONE
 
-SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
-"""A 股与港股业务日期基准时区。"""
+logger = logging.getLogger(__name__)
 
 
 def market_today() -> date:
@@ -132,11 +130,11 @@ def is_hk_code(code: str) -> bool:
 def contains_stock_reference(text: str, code: str, code_name: str) -> bool:
     """Check whether text references a stock by code or name alias."""
     code_base = normalize_stock_name(code_name)
-    code_name_aliases = {code_base}
+    alias_set = {code_base}
     for prefix in ("*ST", "ST", "N", "C", "XD", "DR", "XR"):
         if code_base.startswith(prefix) and len(code_base) > len(prefix):
-            code_name_aliases.add(code_base[len(prefix):])
-    code_name_aliases = sorted((alias for alias in code_name_aliases if alias), key=len, reverse=True)
+            alias_set.add(code_base[len(prefix):])
+    code_name_aliases = sorted((alias for alias in alias_set if alias), key=len, reverse=True)
     text = str(text or "")
     if not text:
         return False
