@@ -52,3 +52,57 @@ def test_generate_industry_chain_pdf_html_section_relationships():
     assert "海外新产能超预期投产" in html
 
 
+def test_generate_industry_chain_pdf_html_full_features():
+    from app.modules.industry_chain.models import IndustryChainNode, IndustryChainRelationship
+
+    result = IndustryChainResult(
+        name="智能电网特高压",
+        summary="电网投资与特高压出海双轮驱动。",
+        key_stocks=[
+            IndustryChainNode(
+                code="600406",
+                name="国电南瑞",
+                business_relevance="earnings",
+                role="二次设备龙头，调度系统市占率第一",
+                total_market_cap="1850.5亿",
+                pe="22.4",
+                pb="3.1",
+            )
+        ],
+        relationships=[
+            IndustryChainRelationship(
+                source_node="特高压交流变压器",
+                target_node="特高压换流站工程",
+                relation_type="supply",
+                impact_direction="positive",
+                title="主网设备交付带动工程节点确认",
+                time_lag="2-3个季度",
+                target_metric="特高压主网设备月度中标额",
+                tracking_metrics=["国网月度招标统计", "变压器出厂排产率"],
+            )
+        ],
+    )
+    html = generate_industry_chain_pdf_html(result)
+
+    # 目录导航与跨页分页样式
+    assert "📑 报告目录" in html
+    assert "page-break-inside: avoid" in html
+    assert "display: table-header-group" in html
+
+    # 标的估值与业务关联标签
+    assert "业绩兑现" in html
+    assert "国电南瑞" in html
+    assert "600406" in html
+    assert "总市值: 1850.5亿" in html
+    assert "PE: 22.4" in html
+
+    # 传导时滞与跟踪指标
+    assert "传导滞后期：" in html
+    assert "2-3个季度" in html
+    assert "观测指标：" in html
+    assert "特高压主网设备月度中标额" in html
+    assert "高频跟踪指标：" in html
+    assert "国网月度招标统计、变压器出厂排产率" in html
+
+
+

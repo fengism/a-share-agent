@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo } from "react";
-import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route, useParams, useSearchParams } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
@@ -16,6 +16,17 @@ import { useAuthStore } from "./store/authStore";
 import { queryClient } from "./api/queryClient";
 import { pageLoaders, preloadAppRoute } from "./routes/pageLoaders";
 import RoutePreloadProvider from "./routes/RoutePreloadProvider";
+import { buildStockAnalysisUrl } from "./utils/stockLinks";
+
+/** 旧路径 `/investment-research/:code` 重定向到 `/analysis/:code?view=report`（保留历史日期）。 */
+function LegacyResearchRedirect() {
+  const { code = "" } = useParams<{ code: string }>();
+  const [searchParams] = useSearchParams();
+  const params = new URLSearchParams({ view: "report" });
+  const date = searchParams.get("date");
+  if (date) params.set("date", date);
+  return <Navigate to={`${buildStockAnalysisUrl(code)}?${params.toString()}`} replace />;
+}
 
 // ── 路由级代码分割 ──
 const AppLayout = lazy(pageLoaders.appLayout);
@@ -30,7 +41,6 @@ const Analysis = lazy(pageLoaders.analysis);
 const Concept = lazy(pageLoaders.concept);
 const Stock = lazy(pageLoaders.stock);
 const AnalysisEntry = lazy(pageLoaders.analysisEntry);
-const InvestmentResearch = lazy(pageLoaders.investmentResearch);
 const DailyReviewPage = lazy(pageLoaders.dailyReview);
 const PotentialPage = lazy(pageLoaders.potential);
 const Chat = lazy(pageLoaders.chat);
@@ -202,7 +212,7 @@ export default function App() {
                   <Route path="/analysis" element={<ErrorBoundary><AnalysisEntry /></ErrorBoundary>} />
                   <Route path="/stock" element={<Navigate to="/analysis" replace />} />
                   <Route path="/investment-research" element={<Navigate to="/analysis" replace />} />
-                  <Route path="/investment-research/:code" element={<ErrorBoundary><InvestmentResearch /></ErrorBoundary>} />
+                  <Route path="/investment-research/:code" element={<LegacyResearchRedirect />} />
                   <Route path="/macro" element={<ErrorBoundary><Macro /></ErrorBoundary>} />
                   <Route path="/compare" element={<Navigate to="/screener" replace />} />
                   <Route path="/portfolio" element={<ErrorBoundary><Portfolio /></ErrorBoundary>} />

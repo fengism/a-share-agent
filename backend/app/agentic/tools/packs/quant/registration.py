@@ -81,7 +81,8 @@ def register_quant_tools(target_registry: CapabilityCatalog = registry) -> None:
                 "参数错误应修正输入，不得转用 Python 绕过。比率使用小数。"
             ),
             parameters=FINANCIAL_PARAMETERS,
-            policy=ToolPolicy(cost="low", cache_ttl_seconds=0, scope="user", freshness="static"),
+            # 固定公式纯函数：结果只取决于参数，与用户私有配置无关；TTL=0 不缓存。
+            policy=ToolPolicy(cost="low", cache_ttl_seconds=0, freshness="static"),
             executor=calculate_financial_metric,
         )
     )
@@ -235,7 +236,8 @@ def register_quant_tools(target_registry: CapabilityCatalog = registry) -> None:
                 },
                 "required": ["code"],
             },
-            policy=ToolPolicy(cost="low", cache_ttl_seconds=0, deduplicate_in_batch=False, scope="user", timeout_seconds=25, max_parallel_calls=2),
+            # 结果只取决于入参 code（沙盒用全局配置）；「仅管理员」是权限门，不参与结果。
+            policy=ToolPolicy(cost="low", cache_ttl_seconds=0, deduplicate_in_batch=False, timeout_seconds=25, max_parallel_calls=2),
             executor=_execute_python_code,
         )
     )

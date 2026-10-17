@@ -67,12 +67,45 @@ _URL_KEYS = ("url", "source_url", "final_url", "link", "pdf_url")
 # web_search 正是只靠 query / detail_hint 这些字段把文本长度凑过门槛的。
 _ECHO_KEYS = frozenset(
     {
-        "ok", "error", "meta", "metadata", "status", "arguments", "request",
-        "query", "engine", "language", "time_range", "count", "page", "page_size",
-        "detail_hint", "hint", "tips", "code", "name_hint", "cache_hit", "truncated",
-        "total", "total_items", "returned_items", "returned_characters", "content_length",
-        "fetched_at", "retrieved_at", "generated_at", "elapsed_ms", "fetch_mode",
-        "index", "id", "seq", "row_no", "type", "kind", "source", "provider",
+        "ok",
+        "error",
+        "meta",
+        "metadata",
+        "status",
+        "arguments",
+        "request",
+        "query",
+        "engine",
+        "language",
+        "time_range",
+        "count",
+        "page",
+        "page_size",
+        "detail_hint",
+        "hint",
+        "tips",
+        "code",
+        "name_hint",
+        "cache_hit",
+        "truncated",
+        "total",
+        "total_items",
+        "returned_items",
+        "returned_characters",
+        "content_length",
+        "fetched_at",
+        "retrieved_at",
+        "generated_at",
+        "elapsed_ms",
+        "fetch_mode",
+        "index",
+        "id",
+        "seq",
+        "row_no",
+        "type",
+        "kind",
+        "source",
+        "provider",
     }
 )
 # 回显字段被排除后，文本长度已经能代表「真有内容」，门槛只需挡住空壳。
@@ -100,11 +133,7 @@ def _content_units(value: Any, parent_url: str = "", depth: int = 0) -> list[Evi
     if depth > 8:
         return []
     if isinstance(value, list):
-        return [
-            unit
-            for item in value[:60]
-            for unit in _content_units(item, parent_url, depth + 1)
-        ]
+        return [unit for item in value[:60] for unit in _content_units(item, parent_url, depth + 1)]
     if not isinstance(value, dict):
         return []
     if value.get("ok") is False or value.get("error") or value.get("status") in ("error", "failed"):
@@ -128,15 +157,29 @@ def _content_units(value: Any, parent_url: str = "", depth: int = 0) -> list[Evi
 
 def _has_market_context(evidence) -> bool:
     dimensions = (
-        "市场", "产业", "行业", "上游", "中游", "下游",
-        "产品", "规模", "竞争", "需求", "出货", "芯片", "算力",
-        "空间", "增速", "渗透", "应用", "客户",
+        "市场",
+        "产业",
+        "行业",
+        "上游",
+        "中游",
+        "下游",
+        "产品",
+        "规模",
+        "竞争",
+        "需求",
+        "出货",
+        "芯片",
+        "算力",
+        "空间",
+        "增速",
+        "渗透",
+        "应用",
+        "客户",
     )
     # 不要求 URL：结构化数据（get_industry_list / iwencai_select_stock）没有链接，
     # 但「行业/规模/竞争」这类维度词确实是取回的内容。
     return any(
-        any(dimension in unit.text for dimension in dimensions)
-        for unit in _content_units(_decoded_content(evidence))
+        any(dimension in unit.text for dimension in dimensions) for unit in _content_units(_decoded_content(evidence))
     )
 
 
@@ -193,15 +236,22 @@ def _has_company_financials(evidence) -> bool:
     if evidence.tool_name != "analyze_financials" or not isinstance(value, dict):
         return False
     income = value.get("income") or {}
-    return bool(value.get("report_date")) and isinstance(income, dict) and any(
-        isinstance(income.get(key), (int, float)) and not isinstance(income[key], bool) and math.isfinite(income[key])
-        for key in ("revenue_billion", "net_profit_billion", "gross_margin")
+    return (
+        bool(value.get("report_date"))
+        and isinstance(income, dict)
+        and any(
+            isinstance(income.get(key), (int, float))
+            and not isinstance(income[key], bool)
+            and math.isfinite(income[key])
+            for key in ("revenue_billion", "net_profit_billion", "gross_margin")
+        )
     )
 
 
 def _has_company_disclosure(evidence) -> bool:
     return _has_web_body(evidence) and _has_dimension_context(
-        evidence, ("年度报告", "半年度报告", "年报", "公告", "公司", "收入", "毛利", "订单", "产能", "现金流"),
+        evidence,
+        ("年度报告", "半年度报告", "年报", "公告", "公司", "收入", "毛利", "订单", "产能", "现金流"),
         minimum_matches=3,
     )
 
@@ -357,7 +407,16 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
         EvidenceRequirement(
             "companies",
             "相关公司",
-            ("iwencai_select_stock", "iwencai_query", "iwencai_search", "get_stock_info", "analyze_financials", "web_search", "web_fetch", "fetch_urls"),
+            (
+                "iwencai_select_stock",
+                "iwencai_query",
+                "iwencai_search",
+                "get_stock_info",
+                "analyze_financials",
+                "web_search",
+                "web_fetch",
+                "fetch_urls",
+            ),
             validator=_has_company_records,
         ),
         EvidenceRequirement(
@@ -367,12 +426,18 @@ INDUSTRY_CHAIN_RESEARCH_SPEC = AgentResearchSpec(
             validator=_has_public_sources,
         ),
         EvidenceRequirement(
-            "company_financials", "重点公司财务数据（含报告期）",
-            ("analyze_financials",), validator=_has_company_financials, fatal=False,
+            "company_financials",
+            "重点公司财务数据（含报告期）",
+            ("analyze_financials",),
+            validator=_has_company_financials,
+            fatal=False,
         ),
         EvidenceRequirement(
-            "company_disclosure", "重点公司经营披露正文",
-            ("get_stock_documents", *BODY_TOOLS), validator=_has_company_disclosure, fatal=False,
+            "company_disclosure",
+            "重点公司经营披露正文",
+            ("get_stock_documents", *BODY_TOOLS),
+            validator=_has_company_disclosure,
+            fatal=False,
         ),
         EvidenceRequirement(
             "web_content",
@@ -419,22 +484,32 @@ async def research_industry_chain(
     guidance = render_discovery_plan(name, resolved_scope) + "\n" + research_guidance(name)
     max_rounds = int(settings.industry_chain_max_rounds)
     research_timeout = float(settings.industry_chain_research_timeout_seconds)
-    settings = settings.model_copy(update={
-        "agent_research_timeout_seconds": research_timeout,
-    })
+    settings = settings.model_copy(
+        update={
+            "agent_research_timeout_seconds": research_timeout,
+        }
+    )
     spec = replace(
         INDUSTRY_CHAIN_RESEARCH_SPEC,
         max_rounds=max_rounds,
         max_tool_turns=10,
         **search_policy_limits(total_calls),
-        reserved_tool_names=BODY_TOOLS, reserved_tool_calls=min(28, total_calls // 3), requirements=(
-        *INDUSTRY_CHAIN_RESEARCH_SPEC.requirements,
-        *(EvidenceRequirement(
-            f"{tier}_operations", f"{label}经营证据",
-            ("web_search", "iwencai_search", *BODY_TOOLS),
-            validator=lambda item, terms=tier_search_terms(name, tier): has_tier_operating_body(item, terms), fatal=False,
-        ) for tier, (label, _) in TIER_QUESTIONS.items()),
-    ))
+        reserved_tool_names=BODY_TOOLS,
+        reserved_tool_calls=min(28, total_calls // 3),
+        requirements=(
+            *INDUSTRY_CHAIN_RESEARCH_SPEC.requirements,
+            *(
+                EvidenceRequirement(
+                    f"{tier}_operations",
+                    f"{label}经营证据",
+                    ("web_search", "iwencai_search", *BODY_TOOLS),
+                    validator=lambda item, terms=tier_search_terms(name, tier): has_tier_operating_body(item, terms),
+                    fatal=False,
+                )
+                for tier, (label, _) in TIER_QUESTIONS.items()
+            ),
+        ),
+    )
     guidance += (
         f"\n自适应调研最多{max_rounds}轮、阶段总时限{int(research_timeout)}秒；"
         "只有证据缺口持续缩小时才进入下一轮，本轮无进展仍立即停止。"

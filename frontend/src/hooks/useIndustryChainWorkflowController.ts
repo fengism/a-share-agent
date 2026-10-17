@@ -61,7 +61,10 @@ export function useIndustryChainWorkflowController({
           stageMessage: event.message || "",
         });
       } else if (event.type === "stage_completed") {
-        current.patch(runId, { stageMessage: event.message || "完成" });
+        current.patch(runId, {
+          stageMessage: event.message || "完成",
+          ...(event.result ? { result: event.result } : {}),
+        });
       } else if (event.type === "stage_failed" && event.stage) {
         const failedStage = industryStageIndex(event.stage);
         current.patch(runId, {

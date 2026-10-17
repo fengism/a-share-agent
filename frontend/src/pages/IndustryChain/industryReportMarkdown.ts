@@ -39,7 +39,13 @@ export function buildIndustryReportMarkdown(
     lines.push("## 三、核心龙头标的");
     lines.push("");
     result.key_stocks.forEach((stock, i) => {
-      lines.push(`${i + 1}. **${stock.name}** (${stock.code}) - ${stock.role || "产业链核心企业"}`);
+      const codeStr = stock.code ? ` (${stock.code})` : "";
+      const valParts: string[] = [];
+      if (stock.total_market_cap) valParts.push(`市值: ${stock.total_market_cap}`);
+      if (stock.pe) valParts.push(`PE: ${stock.pe}`);
+      if (stock.pb) valParts.push(`PB: ${stock.pb}`);
+      const valStr = valParts.length > 0 ? ` [${valParts.join(" | ")}]` : "";
+      lines.push(`${i + 1}. **${stock.name || stock.company || stock.code}**${codeStr} - ${stock.role || "产业链核心企业"}${valStr}`);
     });
     lines.push("");
   }

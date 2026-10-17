@@ -143,69 +143,73 @@ def _append_tier(
         + "<br/>"
         + _tooltip_line("展示环节", str(len(visible_nodes)))
     )
-    graph_nodes.append(_graph_node(
-        node_id=tier_id,
-        name=tier_name,
-        x=center_x,
-        y=130,
-        category=category,
-        color=color,
-        border_color=color,
-        symbol_size=[176, 52],
-        label_color="#ffffff",
-        tooltip=tier_tooltip,
-        font_size=14,
-        font_weight=700,
-    ))
+    graph_nodes.append(
+        _graph_node(
+            node_id=tier_id,
+            name=tier_name,
+            x=center_x,
+            y=130,
+            category=category,
+            color=color,
+            border_color=color,
+            symbol_size=[176, 52],
+            label_color="#ffffff",
+            tooltip=tier_tooltip,
+            font_size=14,
+            font_weight=700,
+        )
+    )
     graph_links.append(_graph_link("industry-root", tier_id, color, curveness=0.08))
 
     for index, node in enumerate(visible_nodes):
         stage_id = f"{tier_key}-stage-{index}"
         stage_y = _TIER_START_Y + index * _TIER_ROW_GAP
         stage_name = _node_name(node)
-        graph_nodes.append(_graph_node(
-            node_id=stage_id,
-            name=_short_label(stage_name, 10),
-            x=center_x,
-            y=stage_y,
-            category=category,
-            color=soft_color,
-            border_color=color,
-            symbol_size=[142, 40],
-            label_color="#172033",
-            tooltip=_stage_tooltip(node),
-        ))
+        graph_nodes.append(
+            _graph_node(
+                node_id=stage_id,
+                name=_short_label(stage_name, 10),
+                x=center_x,
+                y=stage_y,
+                category=category,
+                color=soft_color,
+                border_color=color,
+                symbol_size=[142, 40],
+                label_color="#172033",
+                tooltip=_stage_tooltip(node),
+            )
+        )
         curve_direction = -1 if index % 2 else 1
         curve_size = 0.025 + min(index, 6) * 0.006
-        graph_links.append(_graph_link(
-            tier_id,
-            stage_id,
-            color,
-            curveness=curve_direction * curve_size,
-        ))
+        graph_links.append(
+            _graph_link(
+                tier_id,
+                stage_id,
+                color,
+                curveness=curve_direction * curve_size,
+            )
+        )
 
         companies = [company.strip() for company in node.companies if company.strip()][:_MAX_COMPANY_NODES]
         offsets = [118] if len(companies) == 1 else [-118, 118]
         for company_index, company in enumerate(companies):
             company_id = f"{tier_key}-stage-{index}-company-{company_index}"
-            graph_nodes.append(_graph_node(
-                node_id=company_id,
-                name=_short_label(company, 7),
-                x=center_x + offsets[company_index],
-                y=stage_y,
-                category=category,
-                color="#ffffff",
-                border_color=color,
-                symbol_size=[96, 30],
-                label_color="#334155",
-                tooltip=(
-                    _tooltip_line("代表公司", company)
-                    + "<br/>"
-                    + _tooltip_line("所属环节", stage_name)
-                ),
-                font_size=12,
-                font_weight=500,
-            ))
+            graph_nodes.append(
+                _graph_node(
+                    node_id=company_id,
+                    name=_short_label(company, 7),
+                    x=center_x + offsets[company_index],
+                    y=stage_y,
+                    category=category,
+                    color="#ffffff",
+                    border_color=color,
+                    symbol_size=[96, 30],
+                    label_color="#334155",
+                    tooltip=(_tooltip_line("代表公司", company) + "<br/>" + _tooltip_line("所属环节", stage_name)),
+                    font_size=12,
+                    font_weight=500,
+                )
+            )
             graph_links.append(_graph_link(stage_id, company_id, color))
 
 
@@ -219,20 +223,22 @@ def build_industry_charts(result: IndustryChainResult) -> list[IndustryChainChar
         return []
 
     root_name = result.name.strip() or "产业链"
-    graph_nodes = [_graph_node(
-        node_id="industry-root",
-        name=_short_label(root_name, 14),
-        x=_GRAPH_WIDTH // 2,
-        y=28,
-        category=0,
-        color="#0f4cbd",
-        border_color="#0f4cbd",
-        symbol_size=[206, 56],
-        label_color="#ffffff",
-        tooltip=_tooltip_line("产业链", root_name),
-        font_size=16,
-        font_weight=700,
-    )]
+    graph_nodes = [
+        _graph_node(
+            node_id="industry-root",
+            name=_short_label(root_name, 14),
+            x=_GRAPH_WIDTH // 2,
+            y=28,
+            category=0,
+            color="#0f4cbd",
+            border_color="#0f4cbd",
+            symbol_size=[206, 56],
+            label_color="#ffffff",
+            tooltip=_tooltip_line("产业链", root_name),
+            font_size=16,
+            font_weight=700,
+        )
+    ]
     graph_links: list[dict] = []
 
     for category, (tier_key, nodes) in enumerate(tier_groups, start=1):
@@ -264,38 +270,42 @@ def build_industry_charts(result: IndustryChainResult) -> list[IndustryChainChar
             "textStyle": {"color": "#172033", "fontSize": 13, "lineHeight": 20},
             "extraCssText": "max-width:360px;white-space:normal;overflow-wrap:anywhere;word-break:break-word;box-shadow:0 8px 28px rgba(15,23,42,.16);border-radius:8px;padding:10px 14px;",
         },
-        "series": [{
-            "type": "graph",
-            "layout": "none",
-            "data": graph_nodes,
-            "links": graph_links,
-            "categories": categories,
-            "left": "3%",
-            "right": "3%",
-            "top": "5%",
-            "bottom": "5%",
-            "roam": True,
-            "scaleLimit": {"min": 0.65, "max": 2.5},
-            "edgeSymbol": ["none", "none"],
-            "lineStyle": {
-                "color": "source",
-                "width": 1.4,
-                "opacity": 0.48,
-            },
-            "emphasis": {
-                "focus": "adjacency",
-                "scale": 1.08,
-                "lineStyle": {"width": 2.4, "opacity": 0.9},
-            },
-            "selectedMode": False,
-        }],
+        "series": [
+            {
+                "type": "graph",
+                "layout": "none",
+                "data": graph_nodes,
+                "links": graph_links,
+                "categories": categories,
+                "left": "3%",
+                "right": "3%",
+                "top": "5%",
+                "bottom": "5%",
+                "roam": True,
+                "scaleLimit": {"min": 0.65, "max": 2.5},
+                "edgeSymbol": ["none", "none"],
+                "lineStyle": {
+                    "color": "source",
+                    "width": 1.4,
+                    "opacity": 0.48,
+                },
+                "emphasis": {
+                    "focus": "adjacency",
+                    "scale": 1.08,
+                    "lineStyle": {"width": 2.4, "opacity": 0.9},
+                },
+                "selectedMode": False,
+            }
+        ],
     }
-    return [IndustryChainChart(
-        title=f"{root_name}产业链全景图谱",
-        description="基于上中下游核心环节与代表公司构建的分层关系图（支持缩放、拖拽与关联高亮）",
-        type="graph",
-        option=option,
-    )]
+    return [
+        IndustryChainChart(
+            title=f"{root_name}产业链全景图谱",
+            description="基于上中下游核心环节与代表公司构建的分层关系图（支持缩放、拖拽与关联高亮）",
+            type="graph",
+            option=option,
+        )
+    ]
 
 
 def build_relationship_chart(result: IndustryChainResult) -> IndustryChainChart | None:
@@ -309,17 +319,31 @@ def build_relationship_chart(result: IndustryChainResult) -> IndustryChainChart 
         type="graph",
         option={
             "tooltip": {"trigger": "item", "confine": True},
-            "series": [{
-                "type": "graph", "layout": "circular", "roam": True,
-                "label": {"show": True}, "edgeSymbol": ["none", "arrow"],
-                "data": [{"id": name, "name": name, "symbolSize": 45,
-                          "tooltip": {"formatter": escape(name)}} for name in names],
-                "links": [{
-                    "source": edge.source_node, "target": edge.target_node,
-                    "label": {"show": True, "formatter": labels[edge.relation_type]},
-                    "lineStyle": {"type": "dashed" if edge.claim_type != "fact" else "solid", "curveness": 0.15},
-                    "tooltip": {"formatter": escape(edge.detail or edge.title)},
-                } for edge in result.relationships],
-            }],
+            "series": [
+                {
+                    "type": "graph",
+                    "layout": "circular",
+                    "roam": True,
+                    "label": {"show": True},
+                    "edgeSymbol": ["none", "arrow"],
+                    "data": [
+                        {"id": name, "name": name, "symbolSize": 45, "tooltip": {"formatter": escape(name)}}
+                        for name in names
+                    ],
+                    "links": [
+                        {
+                            "source": edge.source_node,
+                            "target": edge.target_node,
+                            "label": {"show": True, "formatter": labels[edge.relation_type]},
+                            "lineStyle": {
+                                "type": "dashed" if edge.claim_type != "fact" else "solid",
+                                "curveness": 0.15,
+                            },
+                            "tooltip": {"formatter": escape(edge.detail or edge.title)},
+                        }
+                        for edge in result.relationships
+                    ],
+                }
+            ],
         },
     )

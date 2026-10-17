@@ -1,4 +1,5 @@
 """Document-oriented discovery plans, not an N-metrics × N-tools query expansion."""
+
 from __future__ import annotations
 
 import json
@@ -20,12 +21,42 @@ DOCUMENT_SEARCH_RULES = """## 文献级检索规划
 """
 
 _FOCUS = {
-    "robot": ("产业技术白皮书", "商业化应用报告", ("单机成本与部件价值量", "技术路线与关键部件", "竞争与量产阶段"), ("付费任务", "交付与复购", "任务经济性")),
-    "ai_computing": ("基础设施产业报告", "数据中心建设运营报告", ("规模与需求", "计算网络散热配置", "供应瓶颈与竞争"), ("资本开支", "机柜交付", "计费利用率")),
-    "baijiu": ("行业运行报告", "消费渠道调研报告", ("市场规模", "价格带与竞争", "渠道结构"), ("终端动销", "渠道库存与批价", "经销商回款")),
-    "solar": ("产业发展路线图", "装机运行报告", ("环节价格成本", "产能与技术路线", "行业竞争"), ("装机需求", "消纳与项目收益", "组件采购")),
-    "semiconductor": ("产业技术白皮书", "终端市场报告", ("产业结构与竞争", "制程与封装", "产能与库存周期"), ("终端销量", "客户库存", "采购与资本开支")),
-    "pharma": ("行业运行报告", "药品准入市场报告", ("管线与竞争", "审批与商业化", "研发产业链"), ("准入与处方", "销售回款", "临床及商业化约束")),
+    "robot": (
+        "产业技术白皮书",
+        "商业化应用报告",
+        ("单机成本与部件价值量", "技术路线与关键部件", "竞争与量产阶段"),
+        ("付费任务", "交付与复购", "任务经济性"),
+    ),
+    "ai_computing": (
+        "基础设施产业报告",
+        "数据中心建设运营报告",
+        ("规模与需求", "计算网络散热配置", "供应瓶颈与竞争"),
+        ("资本开支", "机柜交付", "计费利用率"),
+    ),
+    "baijiu": (
+        "行业运行报告",
+        "消费渠道调研报告",
+        ("市场规模", "价格带与竞争", "渠道结构"),
+        ("终端动销", "渠道库存与批价", "经销商回款"),
+    ),
+    "solar": (
+        "产业发展路线图",
+        "装机运行报告",
+        ("环节价格成本", "产能与技术路线", "行业竞争"),
+        ("装机需求", "消纳与项目收益", "组件采购"),
+    ),
+    "semiconductor": (
+        "产业技术白皮书",
+        "终端市场报告",
+        ("产业结构与竞争", "制程与封装", "产能与库存周期"),
+        ("终端销量", "客户库存", "采购与资本开支"),
+    ),
+    "pharma": (
+        "行业运行报告",
+        "药品准入市场报告",
+        ("管线与竞争", "审批与商业化", "研发产业链"),
+        ("准入与处方", "销售回款", "临床及商业化约束"),
+    ),
 }
 
 
@@ -40,14 +71,30 @@ class SourcePackage:
 def source_packages(name: str, scope: IndustryChainResearchScope) -> tuple[SourcePackage, ...]:
     scope = resolve_industry_chain_scope(scope)
     template = select_research_template(name)
-    landscape, demand, coverage, demand_coverage = _FOCUS[template.key] if template.key in _FOCUS else (
-        "产业研究报告", "需求应用报告", ("产业边界", "市场与竞争", "技术及上下游结构"), ("真实需求", "客户采购", "经营约束"))
+    landscape, demand, coverage, demand_coverage = (
+        _FOCUS[template.key]
+        if template.key in _FOCUS
+        else (
+            "产业研究报告",
+            "需求应用报告",
+            ("产业边界", "市场与竞争", "技术及上下游结构"),
+            ("真实需求", "客户采购", "经营约束"),
+        )
+    )
     year = scope.end_date.year
     return (
-        SourcePackage("landscape", f"{name} {landscape} {year}", coverage, "先用一个发现工具定位综合原文，再按多个相关问题阅读"),
-        SourcePackage("demand", f"{name} {demand} {year}", demand_coverage, "优先客户/行业机构原始披露；已被首份文献覆盖则不另搜"),
-        SourcePackage("company", "", ("相关业务收入", "订单与产能", "毛利与现金流"),
-                      "根据已读材料选2-3家代表公司；A股用get_stock_documents(kind=periodic_report)；其他公司定位官方定期报告，每家同份报告集中阅读，不逐指标搜索"),
+        SourcePackage(
+            "landscape", f"{name} {landscape} {year}", coverage, "先用一个发现工具定位综合原文，再按多个相关问题阅读"
+        ),
+        SourcePackage(
+            "demand", f"{name} {demand} {year}", demand_coverage, "优先客户/行业机构原始披露；已被首份文献覆盖则不另搜"
+        ),
+        SourcePackage(
+            "company",
+            "",
+            ("相关业务收入", "订单与产能", "毛利与现金流"),
+            "根据已读材料选2-3家代表公司；A股用get_stock_documents(kind=periodic_report)；其他公司定位官方定期报告，每家同份报告集中阅读，不逐指标搜索",
+        ),
     )
 
 
@@ -79,4 +126,6 @@ def render_repair_reading_plan(targets) -> str:
             action = "上下游与传导问题合并为一份链条阅读任务；先查已有全景/需求文献的相关章节，缺核心前提才拆窄查询"
         entry = packages.setdefault(key, {"key": key, "action": action, "read_for": []})
         entry["read_for"].append(target.question)
-    return "补证阅读任务（不是逐项query，全部原核验目标仍需检查）：\n" + json.dumps(list(packages.values()), ensure_ascii=False)
+    return "补证阅读任务（不是逐项query，全部原核验目标仍需检查）：\n" + json.dumps(
+        list(packages.values()), ensure_ascii=False
+    )

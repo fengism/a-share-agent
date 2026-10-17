@@ -339,13 +339,18 @@ async def test_review_prompt_cache_reuses_identical_prompt(monkeypatch: pytest.M
     assert forced.value.market_summary == "摘要2"
 
 
-def test_review_llm_cache_key_separates_models() -> None:
-    assert pipeline._review_llm_cache_key("PROMPT", Settings()) == pipeline._review_llm_cache_key("PROMPT", Settings())
-    assert pipeline._review_llm_cache_key("PROMPT", Settings()) != pipeline._review_llm_cache_key(
-        "PROMPT", Settings(llm_model="other-model")
-    )
-    assert pipeline._review_llm_cache_key("PROMPT", Settings()) != pipeline._review_llm_cache_key("其他 PROMPT", Settings())
+def test_review_llm_cache_key_is_model_independent() -> None:
+    """AI 分析结果缓存与模型无关：仅 Prompt 内容与版本决定 key。
 
+    与个股分析、产业链、宏观解读保持一致——换模型不另起一份缓存，
+    需要强制重新生成时由 ``force`` 跳过缓存。
+    """
+    key = pipeline._review_llm_cache_key("PROMPT")
+    assert key.startswith("daily_review_llm:")
+    # key 只有固定前缀 + 内容哈希两段，不含 provider/model 段
+    assert key.count(":") == 1
+    assert key == pipeline._review_llm_cache_key("PROMPT")
+    assert key != pipeline._review_llm_cache_key("其他 PROMPT")
 
 async def test_generate_daily_review_serializes_duplicate_calls(monkeypatch: pytest.MonkeyPatch) -> None:
     analysis_cache.clear()

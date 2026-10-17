@@ -78,8 +78,13 @@ class IndustryChainNode(IndustryChainClaim):
     evidence_ids: list[str] = Field(default_factory=list)
     claim_type: Literal["fact", "inference", "opinion"] = "fact"
     confidence: Literal["high", "medium", "low"] = "medium"
+    pe: str = ""
+    pb: str = ""
+    total_market_cap: str = ""
 
-    @field_validator("companies", "realization_conditions", "invalidation_conditions", "tracking_metrics", mode="before")
+    @field_validator(
+        "companies", "realization_conditions", "invalidation_conditions", "tracking_metrics", mode="before"
+    )
     @classmethod
     def _coerce_node_str_lists(cls, value: Any) -> Any:
         return _coerce_str_list(value)
@@ -335,6 +340,4 @@ class IndustryChainResult(BaseModel):
     opportunities: list[IndustryChainOpportunity] = Field(default_factory=list)
     relationships: list[IndustryChainRelationship] = Field(default_factory=list)
     topic_resolution: IndustryChainTopicResolution = Field(default_factory=IndustryChainTopicResolution)
-    analysis_metadata: IndustryChainAnalysisMetadata = Field(
-        default_factory=IndustryChainAnalysisMetadata
-    )
+    analysis_metadata: IndustryChainAnalysisMetadata = Field(default_factory=IndustryChainAnalysisMetadata)

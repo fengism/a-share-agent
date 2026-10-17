@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -18,6 +19,8 @@ from app.financial_data.industry.public import call_industry_data
 from app.financial_data.market.public import get_market_news
 from app.financial_data.stock.public import search_stocks
 from app.modules.industry_chain.query_plan import source_packages
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -149,9 +152,7 @@ def _filter_news_by_scope(
         return values
     filtered = []
     for item in values:
-        published_at = parse_news_time(
-            str(item.get("publish_time") or item.get("time") or "")
-        )
+        published_at = parse_news_time(str(item.get("publish_time") or item.get("time") or ""))
         if published_at.year <= 1:
             continue
         if scope.start_date <= published_at.date() <= scope.end_date:
@@ -199,16 +200,18 @@ def _scope_search_options(scope: IndustryChainResearchScope) -> tuple[str, str, 
     return region, date_range, time_range, language
 
 
-PUBLIC_DIMENSIONS = frozenset({
-    "stocks",
-    "market",
-    "competition",
-    "technology",
-    "chain",
-    "drivers_risks",
-    "reports",
-    "events",
-})
+PUBLIC_DIMENSIONS = frozenset(
+    {
+        "stocks",
+        "market",
+        "competition",
+        "technology",
+        "chain",
+        "drivers_risks",
+        "reports",
+        "events",
+    }
+)
 _DIMENSION_TTL_SECONDS = {
     "stocks": 6 * 60 * 60,
     "market": 15 * 60,
@@ -254,16 +257,19 @@ async def collect_public_industry_data(
 
     async def source_search(family: str):
         if family not in searches:
-            query = (f"{name} 政策公告 {resolved_scope.end_date.year}" if family == "events" else packages[family].query)
-            searches[family] = asyncio.create_task(public_data.web_search(
-                query, max_results=8,
-                time_range=time_range if family == "events" else "any", language=language,
-            ))
+            query = f"{name} 政策公告 {resolved_scope.end_date.year}" if family == "events" else packages[family].query
+            searches[family] = asyncio.create_task(
+                public_data.web_search(
+                    query,
+                    max_results=8,
+                    time_range=time_range if family == "events" else "any",
+                    language=language,
+                )
+            )
         return await searches[family]
 
     def candidates(value, family):
-        return [{**row, "discovery_group": family, "content_status": "not_fetched"}
-                for row in _web_results(value)]
+        return [{**row, "discovery_group": family, "content_status": "not_fetched"} for row in _web_results(value)]
 
     async def collect_market() -> dict:
         industry_rankings, concept_rankings, industry_flow, concept_flow, market_web = await asyncio.gather(
@@ -327,11 +333,13 @@ async def collect_public_industry_data(
                     sector_stocks.append(record)
                     component_stocks.append(record)
             if sector_stocks:
-                competition_data.append({
-                    "market": sector.get("name", ""),
-                    "summary": "东方财富板块成分股",
-                    "companies": sector_stocks,
-                })
+                competition_data.append(
+                    {
+                        "market": sector.get("name", ""),
+                        "summary": "东方财富板块成分股",
+                        "companies": sector_stocks,
+                    }
+                )
         return {
             "competition_data": [*competition_data, *candidates(competition_search, "landscape")],
             "_component_stocks": component_stocks,
@@ -342,10 +350,14 @@ async def collect_public_industry_data(
 
     async def collect_chain() -> dict:
         # Broad document discovery cannot establish tier-specific facts or companies.
-        return {"chain_data": {
-            "upstream": [], "midstream": [], "downstream": [],
-            "source_candidates": candidates(await source_search("landscape"), "landscape"),
-        }}
+        return {
+            "chain_data": {
+                "upstream": [],
+                "midstream": [],
+                "downstream": [],
+                "source_candidates": candidates(await source_search("landscape"), "landscape"),
+            }
+        }
 
     async def collect_drivers_risks() -> dict:
         return {"driver_risk_data": candidates(await source_search("demand"), "demand")}
@@ -377,7 +389,17 @@ async def collect_public_industry_data(
             cache_hits.append(dimension)
             return cached
         cache_misses.append(dimension)
-        payload = await collector()
+        try:
+            payload = await asyncio.wait_for(collector(), timeout=25.0)
+        except asyncio.TimeoutError:
+            logger.warning("公共数据维度采集超时: name=%s, dimension=%s", name, dimension)
+            failed_dimensions.append(dimension)
+            return {"error": f"维度 {dimension} 采集超时"}
+        except Exception as exc:
+            logger.warning("公共数据维度采集异常: name=%s, dimension=%s, error=%s", name, dimension, exc)
+            failed_dimensions.append(dimension)
+            return {"error": str(exc)}
+
         # Empty/error-only payloads must not poison a dimension cache.
         def has_content(value):
             if isinstance(value, dict):
@@ -385,6 +407,7 @@ async def collect_public_industry_data(
             if isinstance(value, list):
                 return any(has_content(v) for v in value)
             return bool(value)
+
         if has_content(payload):
             reference_cache.set(key, payload, ttl=_DIMENSION_TTL_SECONDS[dimension])
         else:

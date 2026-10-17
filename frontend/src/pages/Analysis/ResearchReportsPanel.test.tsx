@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { StockReportPage } from "../../types/stock";
-import ResearchReportsPanel from "./ResearchReportsPanel";
+import ResearchReportsPanel from "../../features/stock-insights/ResearchReportsPanel";
 
 const useStockReportsMock = vi.fn();
 

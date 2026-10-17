@@ -48,6 +48,9 @@ export interface IndustryChainNode extends IndustryChainClaim {
   evidence_ids?: string[];
   claim_type?: "fact" | "inference" | "opinion";
   confidence?: "high" | "medium" | "low";
+  pe?: string;
+  pb?: string;
+  total_market_cap?: string;
   [key: string]: unknown;
 }
 

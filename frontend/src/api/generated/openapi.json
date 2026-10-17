@@ -10356,6 +10356,16 @@
             ],
             "title": "Name"
           },
+          "pb": {
+            "default": "",
+            "title": "Pb",
+            "type": "string"
+          },
+          "pe": {
+            "default": "",
+            "title": "Pe",
+            "type": "string"
+          },
           "realization_conditions": {
             "items": {
               "type": "string"
@@ -10386,6 +10396,11 @@
           "source_url": {
             "default": "",
             "title": "Source Url",
+            "type": "string"
+          },
+          "total_market_cap": {
+            "default": "",
+            "title": "Total Market Cap",
             "type": "string"
           },
           "tracking_metrics": {
@@ -28681,7 +28696,7 @@
     },
     "/api/analysis/{code}": {
       "post": {
-        "description": "触发指定股票的同步 AI 分析。\n\nParam:\n    code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。\nReturn:\n    AnalysisResult: 完整的结构化分析结果，包含评级、信号与目标价等字段。",
+        "description": "触发指定股票的同步 AI 分析。\n\n同步便利接口：会一直等到任务结束再返回完整结果。耗时可能达数十分钟，\n长流程客户端建议改用 ``POST /workflows/analysis/{code}`` + SSE 进度流。\n\nParam:\n    code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。\nReturn:\n    AnalysisResult: 完整的结构化分析结果，包含评级、信号与目标价等字段。",
         "operationId": "trigger_analysis_api_analysis__code__post",
         "parameters": [
           {
@@ -35513,7 +35528,7 @@
     },
     "/api/market/news-analysis": {
       "get": {
-        "description": "获取由 LLM 生成的市场资讯综合分析。",
+        "description": "获取由 LLM 生成的市场资讯综合分析（公共资讯流，结果与用户无关）。",
         "operationId": "get_news_analysis_api_market_news_analysis_get",
         "responses": {
           "200": {

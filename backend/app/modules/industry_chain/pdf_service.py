@@ -54,13 +54,17 @@ def _render_evidence_tags(evidence_ids: list[str]) -> str:
 
 
 def _render_claim_pill(claim_type: str, confidence: str) -> str:
-    claim_map = {"fact": ("事实", "#dcfce7", "#166534"), "inference": ("推断", "#fef3c7", "#92400e"), "opinion": ("观点", "#e0e7ff", "#3730a3")}
+    claim_map = {
+        "fact": ("事实", "#dcfce7", "#166534"),
+        "inference": ("推断", "#fef3c7", "#92400e"),
+        "opinion": ("观点", "#e0e7ff", "#3730a3"),
+    }
     conf_map = {"high": "高置信度", "medium": "中置信度", "low": "低置信度"}
     cl_label, cl_bg, cl_fg = claim_map.get(claim_type, ("研判", "#f1f5f9", "#475569"))
     conf_label = conf_map.get(confidence, "中置信度")
     return (
         f'<span style="display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; background:{cl_bg}; color:{cl_fg};">'
-        f'{cl_label} · {conf_label}</span>'
+        f"{cl_label} · {conf_label}</span>"
     )
 
 
@@ -107,7 +111,8 @@ def _render_panorama_graph(result: IndustryChainResult) -> str:
     svg_height = node_y + graph_rows * row_gap + (24 if has_omitted else 0)
 
     root_label = _esc(_truncate_graph_label(result.name or "产业链", 16))
-    parts = [f'''<svg viewBox="0 0 {width} {svg_height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="{root_label}产业链全景图谱">
+    parts = [
+        f'''<svg viewBox="0 0 {width} {svg_height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="{root_label}产业链全景图谱">
         <defs>
             <filter id="panorama-shadow" x="-15%" y="-20%" width="130%" height="150%">
                 <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.12"/>
@@ -117,7 +122,8 @@ def _render_panorama_graph(result: IndustryChainResult) -> str:
             </marker>
         </defs>
         <rect x="{root_x}" y="{root_y}" width="{root_width}" height="{root_height}" rx="14" fill="#0f4cbd" filter="url(#panorama-shadow)"/>
-        <text x="480" y="52" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="700">{root_label}</text>''']
+        <text x="480" y="52" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="700">{root_label}</text>'''
+    ]
 
     for center, (title, subtitle, nodes, color, soft_color) in zip(centers, tiers, strict=True):
         parts.append(
@@ -161,12 +167,12 @@ def _render_panorama_graph(result: IndustryChainResult) -> str:
             omitted_y = node_y + len(visible_nodes) * row_gap - 5
             parts.append(
                 f'<text x="{center}" y="{omitted_y}" text-anchor="middle" fill="#64748b" font-size="10.5">'
-                f'另有 {omitted} 个环节，详见下表</text>'
+                f"另有 {omitted} 个环节，详见下表</text>"
             )
 
     parts.append("</svg>")
     svg = "".join(parts)
-    return f'''
+    return f"""
         <div class="panorama-block" data-testid="industry-chain-panorama">
             <div class="panorama-heading">
                 <div>
@@ -177,7 +183,7 @@ def _render_panorama_graph(result: IndustryChainResult) -> str:
             </div>
             {svg}
         </div>
-    '''
+    """
 
 
 def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
@@ -196,7 +202,11 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
     region_map = {"china": "中国市场", "global": "全球市场", "china_and_global": "中国与全球市场"}
     scope_region = region_map.get(scope.get("region", ""), scope.get("region", "全市场"))
     scope_company = "A 股上市公司" if scope.get("company_scope") == "a_share" else "全公开企业"
-    date_range = f"{scope.get('start_date', '')} 至 {scope.get('end_date', '')}" if scope.get("start_date") and scope.get("end_date") else "近一年最新动态"
+    date_range = (
+        f"{scope.get('start_date', '')} 至 {scope.get('end_date', '')}"
+        if scope.get("start_date") and scope.get("end_date")
+        else "近一年最新动态"
+    )
 
     # 证据覆盖统计
     stats = result.evidence_stats
@@ -212,7 +222,11 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
         cards = []
         for m in result.market_metrics:
             source_badge = _render_source_badge(m.source, m.source_url)
-            growth_badge = f'<span style="color:#16a34a; font-weight:700; margin-left:6px;">↑ {m.growth}</span>' if m.growth else ""
+            growth_badge = (
+                f'<span style="color:#16a34a; font-weight:700; margin-left:6px;">↑ {m.growth}</span>'
+                if m.growth
+                else ""
+            )
             period_str = f'<span style="color:#64748b; font-size:10px;">({m.period})</span>' if m.period else ""
             cards.append(f"""
             <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px;">
@@ -238,19 +252,27 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             continue
         for idx, node in enumerate(nodes):
             companies_str = "、".join(node.companies) if node.companies else (node.company or "--")
-            share_badge = f'<span style="display:inline-block; font-size:10px; color:#475569; background:#f1f5f9; padding:1px 5px; border-radius:3px; margin-left:4px;">份额: {_esc(node.market_share)}</span>' if node.market_share else ""
+            share_badge = (
+                f'<span style="display:inline-block; font-size:10px; color:#475569; background:#f1f5f9; padding:1px 5px; border-radius:3px; margin-left:4px;">份额: {_esc(node.market_share)}</span>'
+                if node.market_share
+                else ""
+            )
             source_badge = _render_source_badge(node.source, node.source_url)
             evidence_tags = _render_evidence_tags(node.evidence_ids)
-            
-            stage_cell = f'<td rowspan="{len(nodes)}" style="background:{stage_bg}; color:{stage_color}; font-weight:700; font-size:11px; text-align:center; vertical-align:middle; width:100px; border-right:1px solid #e2e8f0;">{stage_label}</td>' if idx == 0 else ""
+
+            stage_cell = (
+                f'<td rowspan="{len(nodes)}" style="background:{stage_bg}; color:{stage_color}; font-weight:700; font-size:11px; text-align:center; vertical-align:middle; width:100px; border-right:1px solid #e2e8f0;">{stage_label}</td>'
+                if idx == 0
+                else ""
+            )
             chain_rows_html += f"""
             <tr style="border-bottom:1px solid #f1f5f9;">
                 {stage_cell}
                 <td style="padding:8px 10px; font-weight:600; color:#0f172a; font-size:11px; width:130px;">
-                    {_esc(node.name or node.company or '核心环节')}
+                    {_esc(node.name or node.company or "核心环节")}
                 </td>
                 <td style="padding:8px 10px; font-size:11px; color:#475569; line-height:1.45;">
-                    {_esc(node.role or node.description or '--')}
+                    {_esc(node.role or node.description or "--")}
                 </td>
                 <td style="padding:8px 10px; font-size:11px; color:#0f172a; font-weight:500; width:180px;">
                     {_esc(companies_str)} {share_badge}
@@ -276,7 +298,7 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
                     <strong style="font-size:12px; color:#0f172a;">{_esc(t.title)}</strong>
                     {claim_pill}
                 </div>
-                <div style="font-size:11px; color:#334155; line-height:1.5; margin-bottom:6px;">{_esc(t.detail or t.evidence or '--')}</div>
+                <div style="font-size:11px; color:#334155; line-height:1.5; margin-bottom:6px;">{_esc(t.detail or t.evidence or "--")}</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#64748b;">
                     <div>{source_badge}</div>
                     <div>{evidence_tags}</div>
@@ -313,7 +335,7 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             d_items.append(f"""
             <div style="margin-bottom:6px; font-size:11px; color:#334155; line-height:1.5;">
                 <strong style="color:#0f172a;">• {_esc(d.title)}</strong>
-                {f'<div style="color:#64748b; margin-left:12px; margin-top:2px;">{_esc(d.detail)}</div>' if d.detail else ''}
+                {f'<div style="color:#64748b; margin-left:12px; margin-top:2px;">{_esc(d.detail)}</div>' if d.detail else ""}
             </div>
             """)
         drivers_html = "".join(d_items)
@@ -325,7 +347,7 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             t_items.append(f"""
             <div style="margin-bottom:6px; font-size:11px; color:#334155; line-height:1.5;">
                 <strong style="color:#0f172a;">• {_esc(tr.title)}</strong>
-                {f'<div style="color:#64748b; margin-left:12px; margin-top:2px;">{_esc(tr.detail)}</div>' if tr.detail else ''}
+                {f'<div style="color:#64748b; margin-left:12px; margin-top:2px;">{_esc(tr.detail)}</div>' if tr.detail else ""}
             </div>
             """)
         trends_html = "".join(t_items)
@@ -339,7 +361,7 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             r_items.append(f"""
             <div style="margin-bottom:6px; font-size:11px; color:#991b1b; line-height:1.5; background:#fef2f2; border:1px solid #fee2e2; border-radius:4px; padding:6px 10px;">
                 <strong>⚠️ {_esc(r.title)}</strong>
-                {f'<div style="color:#7f1d1d; margin-top:2px;">{_esc(r.detail)}</div>' if r.detail else ''}
+                {f'<div style="color:#7f1d1d; margin-top:2px;">{_esc(r.detail)}</div>' if r.detail else ""}
             </div>
             """)
         risks_html = "".join(r_items)
@@ -347,16 +369,56 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
     # 6.5 产业链传导与利润弹性机制
     relationships_rows_html = ""
     if result.relationships:
-        direction_map = {"positive": ("正向传导", "#16a34a", "#f0fdf4"), "negative": ("负向传导", "#dc2626", "#fef2f2"), "mixed": ("双向波动", "#d97706", "#fffbeb"), "unknown": ("定性关联", "#475569", "#f8fafc")}
-        rel_map = {"supply": "供货配套", "purchase": "大客户采购", "substitute": "技术替代", "compete": "同业竞争", "transmission": "利润传导"}
+        direction_map = {
+            "positive": ("正向传导", "#16a34a", "#f0fdf4"),
+            "negative": ("负向传导", "#dc2626", "#fef2f2"),
+            "mixed": ("双向波动", "#d97706", "#fffbeb"),
+            "unknown": ("定性关联", "#475569", "#f8fafc"),
+        }
+        rel_map = {
+            "supply": "供货配套",
+            "purchase": "大客户采购",
+            "substitute": "技术替代",
+            "compete": "同业竞争",
+            "transmission": "利润传导",
+        }
         for r in result.relationships:
-            dir_label, dir_fg, dir_bg = direction_map.get(r.impact_direction or "unknown", ("定性关联", "#475569", "#f8fafc"))
+            dir_label, dir_fg, dir_bg = direction_map.get(
+                r.impact_direction or "unknown", ("定性关联", "#475569", "#f8fafc")
+            )
             rel_label = rel_map.get(r.relation_type, r.relation_type or "定性关联")
             dir_badge = f'<span style="display:inline-block; font-size:10px; color:{dir_fg}; background:{dir_bg}; border:1px solid {dir_fg}33; padding:1px 6px; border-radius:3px;">{dir_label}</span>'
             rel_badge = f'<span style="display:inline-block; font-size:10px; color:#0284c7; background:#e0f2fe; padding:1px 6px; border-radius:3px; margin-left:4px;">{rel_label}</span>'
-            driver_info = f'<div style="font-size:10px; color:#64748b; margin-top:2px;"><b>驱动冲击：</b>{_esc(r.driver)}</div>' if r.driver else ""
-            conditions_info = f'<div style="font-size:10px; color:#475569; margin-top:2px;"><b>兑现条件：</b>{_esc("；".join(r.conditions))}</div>' if r.conditions else ""
-            invalidation_info = f'<div style="font-size:10px; color:#b91c1c; margin-top:2px;"><b>失效风险：</b>{_esc(r.invalidation)}</div>' if r.invalidation else ""
+            driver_info = (
+                f'<div style="font-size:10px; color:#64748b; margin-top:2px;"><b>驱动冲击：</b>{_esc(r.driver)}</div>'
+                if r.driver
+                else ""
+            )
+            time_lag_info = (
+                f'<div style="font-size:10px; color:#0284c7; margin-top:2px;"><b>传导滞后期：</b>{_esc(r.time_lag)}</div>'
+                if r.time_lag
+                else ""
+            )
+            metric_info = (
+                f'<div style="font-size:10px; color:#0f766e; margin-top:2px;"><b>观测指标：</b>{_esc(r.target_metric)}</div>'
+                if r.target_metric
+                else ""
+            )
+            tracking_info = (
+                f'<div style="font-size:10px; color:#475569; margin-top:2px;"><b>高频跟踪指标：</b>{_esc("、".join(r.tracking_metrics))}</div>'
+                if r.tracking_metrics
+                else ""
+            )
+            conditions_info = (
+                f'<div style="font-size:10px; color:#475569; margin-top:2px;"><b>兑现条件：</b>{_esc("；".join(r.conditions))}</div>'
+                if r.conditions
+                else ""
+            )
+            invalidation_info = (
+                f'<div style="font-size:10px; color:#b91c1c; margin-top:2px;"><b>失效风险：</b>{_esc(r.invalidation)}</div>'
+                if r.invalidation
+                else ""
+            )
             evidence_tags = _render_evidence_tags(r.evidence_ids)
 
             relationships_rows_html += f"""
@@ -368,6 +430,9 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
                 <td style="padding:7px 10px; font-size:11px; color:#334155; line-height:1.45;">
                     <div>{_esc(r.detail or r.title)}</div>
                     {driver_info}
+                    {time_lag_info}
+                    {metric_info}
+                    {tracking_info}
                     {conditions_info}
                     {invalidation_info}
                 </td>
@@ -378,6 +443,12 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             """
 
     # 7. 重点股票标的
+    relevance_map = {
+        "earnings": ("业绩兑现", "#16a34a", "#f0fdf4"),
+        "business": ("实质业务", "#0284c7", "#e0f2fe"),
+        "concept": ("概念布局", "#d97706", "#fffbeb"),
+        "unverified": ("待验证", "#64748b", "#f1f5f9"),
+    }
     stocks_rows_html = ""
     if result.key_stocks:
         for s in result.key_stocks:
@@ -386,12 +457,41 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             role_desc = _esc(s.role or s.description or "--")
             source_badge = _render_source_badge(s.source, s.source_url)
             evidence_tags = _render_evidence_tags(s.evidence_ids)
+
+            rel_text, rel_fg, rel_bg = relevance_map.get(s.business_relevance, ("待验证", "#64748b", "#f1f5f9"))
+            rel_badge = f'<span style="display:inline-block; font-size:9.5px; color:{rel_fg}; background:{rel_bg}; border:1px solid {rel_fg}33; padding:1px 5px; border-radius:3px; margin-top:2px;">{rel_text}</span>'
+
+            val_parts = []
+            if s.total_market_cap:
+                val_parts.append(f"总市值: {_esc(s.total_market_cap)}")
+            if s.pe:
+                val_parts.append(f"PE: {_esc(s.pe)}")
+            if s.pb:
+                val_parts.append(f"PB: {_esc(s.pb)}")
+            val_html = (
+                f'<div style="font-size:10px; color:#475569; line-height:1.35;">{"<br>".join(val_parts)}</div>'
+                if val_parts
+                else '<span style="color:#94a3b8; font-size:10px;">--</span>'
+            )
+
+            rev_info = (
+                f'<span style="display:inline-block; font-size:9.5px; color:#0284c7; background:#e0f2fe; padding:1px 5px; border-radius:3px; margin-left:4px;">业务占比: {_esc(s.revenue_share)}</span>'
+                if s.revenue_share
+                else ""
+            )
+
             stocks_rows_html += f"""
             <tr style="border-bottom:1px solid #f1f5f9;">
-                <td style="padding:6px 10px; font-weight:700; color:#0284c7; font-size:11px; width:90px;">{stock_code}</td>
-                <td style="padding:6px 10px; font-weight:700; color:#0f172a; font-size:11px; width:120px;">{stock_name}</td>
-                <td style="padding:6px 10px; font-size:11px; color:#334155;">{role_desc}</td>
-                <td style="padding:6px 10px; width:120px; text-align:right;">
+                <td style="padding:6px 10px; font-weight:700; color:#0284c7; font-size:11px; width:75px;">{stock_code}</td>
+                <td style="padding:6px 10px; font-weight:700; color:#0f172a; font-size:11px; width:115px;">
+                    <div>{stock_name}</div>
+                    <div>{rel_badge}</div>
+                </td>
+                <td style="padding:6px 10px; font-size:10px; width:100px;">{val_html}</td>
+                <td style="padding:6px 10px; font-size:11px; color:#334155;">
+                    <div>{role_desc} {rev_info}</div>
+                </td>
+                <td style="padding:6px 10px; width:110px; text-align:right;">
                     <div>{source_badge}</div>
                     <div>{evidence_tags}</div>
                 </td>
@@ -411,7 +511,7 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
                     <div>{date_badge}<strong style="font-size:11px; color:#0f172a;">{_esc(ev.title)}</strong></div>
                     {source_badge}
                 </div>
-                {f'<div style="font-size:11px; color:#475569; line-height:1.45;">• 影响研判: {_esc(ev.impact)}</div>' if ev.impact else ''}
+                {f'<div style="font-size:11px; color:#475569; line-height:1.45;">• 影响研判: {_esc(ev.impact)}</div>' if ev.impact else ""}
             </div>
             """)
         events_html = "".join(e_cards)
@@ -422,9 +522,17 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
         s_items = []
         for src in result.sources:
             safe_u = _safe_url(src.url)
-            title_node = f'<a href="{safe_u}" target="_blank" style="color:#0284c7; text-decoration:none; font-weight:600;">{_esc(src.title)} ↗</a>' if safe_u else f'<strong style="color:#334155;">{_esc(src.title)}</strong>'
-            meta_str = f"({_esc(src.publisher or '权威机构')} · {_esc(src.date or '')})" if src.publisher or src.date else ""
-            s_items.append(f'<div style="margin-bottom:4px; font-size:10px; color:#64748b;">• {title_node} <span style="color:#94a3b8;">{meta_str}</span></div>')
+            title_node = (
+                f'<a href="{safe_u}" target="_blank" style="color:#0284c7; text-decoration:none; font-weight:600;">{_esc(src.title)} ↗</a>'
+                if safe_u
+                else f'<strong style="color:#334155;">{_esc(src.title)}</strong>'
+            )
+            meta_str = (
+                f"({_esc(src.publisher or '权威机构')} · {_esc(src.date or '')})" if src.publisher or src.date else ""
+            )
+            s_items.append(
+                f'<div style="margin-bottom:4px; font-size:10px; color:#64748b;">• {title_node} <span style="color:#94a3b8;">{meta_str}</span></div>'
+            )
         sources_html = "".join(s_items)
 
     missing_html = ""
@@ -434,7 +542,10 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
 
     conflicts_html = ""
     if result.conflicts:
-        c_items = "".join(f'<div style="margin-bottom:4px;"><strong>{_esc(c.topic)}</strong>: {_esc(" vs ".join(c.values))} ({_esc(c.reason)})</div>' for c in result.conflicts)
+        c_items = "".join(
+            f'<div style="margin-bottom:4px;"><strong>{_esc(c.topic)}</strong>: {_esc(" vs ".join(c.values))} ({_esc(c.reason)})</div>'
+            for c in result.conflicts
+        )
         conflicts_html = f'<div style="background:#fef2f2; border:1px solid #fee2e2; border-radius:6px; padding:8px 10px; margin-top:8px;"><strong style="font-size:11px; color:#991b1b;">⚡ 冲突口径比对：</strong><div style="margin-top:4px; font-size:10px; color:#7f1d1d;">{c_items}</div></div>'
 
     return f"""<!DOCTYPE html>
@@ -547,6 +658,14 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             border: 1px solid #e2e8f0;
             border-radius: 6px;
             overflow: hidden;
+            page-break-inside: auto;
+        }}
+        tr {{
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }}
+        thead {{
+            display: table-header-group;
         }}
         th {{
             background: #f1f5f9;
@@ -556,6 +675,29 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             padding: 6px 10px;
             text-align: left;
             border-bottom: 1px solid #e2e8f0;
+        }}
+        .toc-bar {{
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 7px 12px;
+            margin-bottom: 14px;
+            font-size: 10.5px;
+            color: #64748b;
+            page-break-inside: avoid;
+        }}
+        .toc-title {{
+            font-weight: 700;
+            color: #0f172a;
+            margin-right: 2px;
+        }}
+        .toc-item {{
+            color: #2563eb;
+            font-weight: 500;
         }}
         .disclaimer-box {{
             background: #f8fafc;
@@ -586,8 +728,28 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
         <div style="display:flex; gap:16px; font-size:11px; color:#cbd5e1; border-top:1px solid #334155; padding-top:8px;">
             <div>📌 证据引用: <strong style="color:#ffffff;">{stats.selected_count}</strong> 条权威事实</div>
             <div>📊 核心维度覆盖率: <strong style="color:#ffffff;">{coverage_percent}%</strong></div>
-            <div>⚡ 知识库状态: <strong style="color:#ffffff;">{result.archive_id or '最新实时生成'}</strong></div>
+            <div>⚡ 知识库状态: <strong style="color:#ffffff;">{result.archive_id or "最新实时生成"}</strong></div>
         </div>
+    </div>
+
+    <!-- 报告目录导航 TOC -->
+    <div class="toc-bar">
+        <span class="toc-title">📑 报告目录</span>
+        <span class="toc-item">01 战略定位与概述</span>
+        <span>•</span>
+        <span class="toc-item">02 产业链图谱与环节</span>
+        <span>•</span>
+        <span class="toc-item">03 技术路线与竞争</span>
+        <span>•</span>
+        <span class="toc-item">04 增长驱动与风险</span>
+        <span>•</span>
+        <span class="toc-item">05 传导机制与弹性</span>
+        <span>•</span>
+        <span class="toc-item">06 核心关注标的</span>
+        <span>•</span>
+        <span class="toc-item">07 重大产业事件</span>
+        <span>•</span>
+        <span class="toc-item">08 证据审计与信息源</span>
     </div>
 
     <!-- 01 战略定位与产业全景概述 -->
@@ -684,13 +846,14 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             <thead>
                 <tr>
                     <th>证券代码</th>
-                    <th>标的名称</th>
+                    <th>标的名称 / 业务关联</th>
+                    <th>当前估值 / 市值</th>
                     <th>产业链环节角色、核心壁垒与弹性看点</th>
                     <th style="text-align:right;">来源/证据</th>
                 </tr>
             </thead>
             <tbody>
-                {stocks_rows_html or '<tr><td colspan="4" style="text-align:center; padding:12px; color:#94a3b8; font-size:11px;">暂无核心关注标的明细</td></tr>'}
+                {stocks_rows_html or '<tr><td colspan="5" style="text-align:center; padding:12px; color:#94a3b8; font-size:11px;">暂无核心关注标的明细</td></tr>'}
             </tbody>
         </table>
     </div>

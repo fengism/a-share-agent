@@ -134,7 +134,8 @@ def _load_directory(
 
 
 def _load_definitions(
-    builtin_dir: Path, import_dir: Path,
+    builtin_dir: Path,
+    import_dir: Path,
 ) -> tuple[dict[str, AtlasChain], frozenset[str]]:
     errors: list[str] = []
     builtin = _load_directory(builtin_dir, errors, strict=True)
@@ -193,7 +194,8 @@ class _AtlasRegistry:
                 )
                 logger.info(
                     "产业链知识库重载完成: chains=%s (imported=%s)",
-                    len(chains), len(imported),
+                    len(chains),
+                    len(imported),
                 )
             return self.state
 

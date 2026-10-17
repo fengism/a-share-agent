@@ -12,7 +12,6 @@ export const pageLoaders = {
   analysis: () => import("../pages/Analysis"),
   stock: () => import("../pages/Stock"),
   analysisEntry: () => import("../pages/Analysis/Entry"),
-  investmentResearch: () => import("../pages/InvestmentResearch"),
   dailyReview: () => import("../pages/DailyReview"),
   potential: () => import("../pages/Potential"),
   chat: () => import("../pages/Chat"),
@@ -83,13 +82,11 @@ export function preloadAppRoute(pathnameWithSearch: string): Promise<void> | und
           : pathname;
   const loader = routeKey === "/stock/:code"
     ? pageLoaders.stock
-    : routeKey === "/analysis/:code"
+    : routeKey === "/analysis/:code" || routeKey === "/investment-research/:code"
       ? pageLoaders.analysis
-      : routeKey === "/investment-research/:code"
-        ? pageLoaders.investmentResearch
-        : routeKey === "/industry-chain/:name"
-          ? pageLoaders.industryChain
-          : routeIntentLoaders[routeKey] ?? routeLoaders[routeKey];
+      : routeKey === "/industry-chain/:name"
+        ? pageLoaders.industryChain
+        : routeIntentLoaders[routeKey] ?? routeLoaders[routeKey];
   if (!loader) return undefined;
   const cached = preloadCache.get(routeKey);
   if (cached) return cached;

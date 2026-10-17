@@ -127,17 +127,19 @@ async def _collect_shared(resolution: "DailyReviewDateResolution") -> DailyRevie
     return collection
 
 
-def _review_llm_cache_key(user_content: str, settings: Settings) -> str:
+def _review_llm_cache_key(user_content: str) -> str:
+    """复盘 LLM 输出缓存 key：只取决于提示词内容与 Prompt 版本。
+
+    与个股分析、产业链、宏观解读保持一致：**AI 分析结果缓存与所用模型无关**。
+    换模型不会另起一份缓存；需要强制重新生成时由 ``force`` 跳过缓存。
+    """
     material = json.dumps(
         {"ref": DAILY_REVIEW_PROMPT_SPEC.ref, "prompt": user_content},
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
     )
-    return (
-        f"daily_review_llm:{settings.llm_provider}:{settings.llm_model}:"
-        f"{hashlib.sha256(material.encode()).hexdigest()}"
-    )
+    return f"daily_review_llm:{hashlib.sha256(material.encode()).hexdigest()}"
 
 
 def _cached_prompt_run(cached: object) -> PromptRun[DailyReviewPromptOutput] | None:
@@ -163,8 +165,8 @@ async def _run_review_prompt(
     *,
     allow_cache: bool,
 ) -> PromptRun[DailyReviewPromptOutput]:
-    """执行结构化复盘 Prompt；相同 Prompt 与模型的输出跨用户复用。"""
-    key = _review_llm_cache_key(user_content, settings)
+    """执行结构化复盘 Prompt；相同 Prompt 的输出跨用户复用（与模型无关）。"""
+    key = _review_llm_cache_key(user_content)
     if allow_cache:
         cached_run = _cached_prompt_run(analysis_cache.get(key))
         if cached_run is not None:
@@ -618,7 +620,7 @@ async def prewarm_daily_review(date_text: str | None = None) -> bool:
         previous_review_check=previous_check,
         cycle_trend=cycle_trend,
     )
-    if analysis_cache.get(_review_llm_cache_key(user_content, settings)) is not None:
+    if analysis_cache.get(_review_llm_cache_key(user_content)) is not None:
         return False
     try:
         prompt_run = await _run_review_prompt(user_content, settings, allow_cache=True)

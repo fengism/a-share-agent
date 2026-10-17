@@ -36,7 +36,13 @@ def apply_quality_gate(
         result.quality_status = "degraded"
         add_missing_evidence(result, "未形成有事实前提、传导机制与反证条件的核心研究判断")
     for thesis in result.research_theses:
-        if not thesis.mechanism or not thesis.conditions or not thesis.counter_evidence or not thesis.invalidation or not thesis.tracking_metrics:
+        if (
+            not thesis.mechanism
+            or not thesis.conditions
+            or not thesis.counter_evidence
+            or not thesis.invalidation
+            or not thesis.tracking_metrics
+        ):
             result.quality_status = "degraded"
             add_missing_evidence(result, f"核心判断「{thesis.title}」缺少机制、反向证据说明、成立/失效条件或跟踪指标")
     if not result.summary.strip():
@@ -83,8 +89,7 @@ def apply_quality_gate(
             if len(expected) < 2:
                 continue
             actual_text = " ".join(
-                " ".join(filter(None, (node.name, node.role, node.description)))
-                for node in getattr(result, tier)
+                " ".join(filter(None, (node.name, node.role, node.description))) for node in getattr(result, tier)
             )
             covered = [segment for segment in expected if segment_is_covered(segment, actual_text)]
             if len(covered) * 2 < len(expected):

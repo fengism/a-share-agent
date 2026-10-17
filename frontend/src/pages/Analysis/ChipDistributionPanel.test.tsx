@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ChipDistribution } from "../../types/stock";
-import ChipDistributionPanel from "./ChipDistributionPanel";
+import ChipDistributionPanel from "../../features/stock-insights/ChipDistributionPanel";
 
 const chartOptions: unknown[] = [];
 

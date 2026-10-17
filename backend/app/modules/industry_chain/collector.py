@@ -95,9 +95,7 @@ async def collect_industry_chain_data(
         "rankings": "market",
     }
     missing_dimensions = {
-        dimension
-        for key, dimension in key_dimensions.items()
-        if not _has_content(collected.get(key))
+        dimension for key, dimension in key_dimensions.items() if not _has_content(collected.get(key))
     }
     if missing_dimensions:
         try:
@@ -114,7 +112,5 @@ async def collect_industry_chain_data(
                 collected[key] = fallback[key]
 
     if not any(_has_content(collected[key]) for key in _DATA_KEYS):
-        raise IndustryChainDataUnavailableError(
-            f"未获取到“{name}”的产业链数据，请稍后重试或在设置中启用问财数据源"
-        )
+        raise IndustryChainDataUnavailableError(f"未获取到“{name}”的产业链数据，请稍后重试或在设置中启用问财数据源")
     return collected

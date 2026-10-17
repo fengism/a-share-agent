@@ -13,14 +13,14 @@ describe("preloadAppRoute", () => {
     prefetchMarketOverview.mockClear();
   });
 
-  it("loads the investment research page for a dynamic stock route", async () => {
-    const loadInvestmentResearch = vi.spyOn(pageLoaders, "investmentResearch").mockResolvedValue({
+  it("loads the analysis page for the legacy investment-research deep link", async () => {
+    const loadAnalysis = vi.spyOn(pageLoaders, "analysis").mockResolvedValue({
       default: () => { throw new Error("preloaded page must not render in this test"); },
     });
 
     await preloadAppRoute("/investment-research/600519");
 
-    expect(loadInvestmentResearch).toHaveBeenCalledTimes(1);
+    expect(loadAnalysis).toHaveBeenCalledTimes(1);
   });
 
   it("loads the stock facts page for a dynamic stock route", async () => {

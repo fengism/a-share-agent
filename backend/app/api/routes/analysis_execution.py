@@ -27,9 +27,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _sync_wait_timeout_seconds() -> float:
+    """同步端点要一直等到任务结束，预算必须覆盖调研 + 报告生成的完整时限。
+
+    此前用 ``chat_total_timeout_seconds``（默认 300s）等待，而流水线预算可达
+    ``agent_research_timeout_seconds`` + ``analysis_llm_timeout_seconds``（默认共 2400s），
+    导致超过 5 分钟的分析被误报为失败（后台任务其实仍在跑）。
+    """
+    settings = get_settings()
+    return settings.agent_research_timeout_seconds + settings.analysis_llm_timeout_seconds + 60.0
+
+
 @router.post("/{code}", response_model=AnalysisResult)
 async def trigger_analysis(code: str, user: AuthenticatedUser = Depends(require_active_user)):
     """触发指定股票的同步 AI 分析。
+
+    同步便利接口：会一直等到任务结束再返回完整结果。耗时可能达数十分钟，
+    长流程客户端建议改用 ``POST /workflows/analysis/{code}`` + SSE 进度流。
 
     Param:
         code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。
@@ -50,7 +64,7 @@ async def trigger_analysis(code: str, user: AuthenticatedUser = Depends(require_
         payload = await wait_for_workflow_result(
             submission.job.id,
             user["id"],
-            timeout_seconds=get_settings().chat_total_timeout_seconds,
+            timeout_seconds=_sync_wait_timeout_seconds(),
         )
     except WorkflowExecutionError as error:
         if error.cancelled:

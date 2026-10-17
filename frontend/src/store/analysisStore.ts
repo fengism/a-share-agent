@@ -16,12 +16,9 @@ export interface AnalysisRunIdentity {
   code: string;
 }
 
-export type AnalysisEntryRoute = "analysis" | "investment-research";
-
 interface AnalysisState {
   currentCode: string;
   jobId: string;
-  preferredRoute: AnalysisEntryRoute;
   activeRun: AnalysisRunIdentity | null;
   analysisResult: AnalysisResult | null;
   isAnalyzing: boolean;
@@ -31,7 +28,7 @@ interface AnalysisState {
   agentProcess: AgentProcessState;
   analysisError: string | null;
   activeStream: WorkflowStream<AnalysisResult> | null;
-  claimContext: (code: string, preferredRoute?: AnalysisEntryRoute) => void;
+  claimContext: (code: string) => void;
   beginRun: (identity: AnalysisRunIdentity) => void;
   setRunStream: (identity: AnalysisRunIdentity, stream: WorkflowStream<AnalysisResult>) => void;
   setRunJobId: (identity: AnalysisRunIdentity, jobId: string) => void;
@@ -55,7 +52,6 @@ function initialAnalysisState() {
   return {
     currentCode: "",
     jobId: "",
-    preferredRoute: "analysis" as AnalysisEntryRoute,
     activeRun: null,
     analysisResult: null,
     isAnalyzing: false,
@@ -76,16 +72,10 @@ function ownsRun(active: AnalysisRunIdentity | null, identity: AnalysisRunIdenti
 
 export const useAnalysisStore = create<AnalysisState>((set, get) => ({
   ...initialAnalysisState(),
-  claimContext: (code, preferredRoute) => set((state) => {
-    if (state.activeRun) {
-      return preferredRoute ? { preferredRoute } : state;
-    }
-    if (state.currentCode === code) return preferredRoute ? { preferredRoute } : state;
-    return {
-      ...initialAnalysisState(),
-      currentCode: code,
-      preferredRoute: preferredRoute ?? state.preferredRoute,
-    };
+  claimContext: (code) => set((state) => {
+    // 两个分析视图已合并到 /analysis/:code，不再需要记录首选路由。
+    if (state.activeRun || state.currentCode === code) return state;
+    return { ...initialAnalysisState(), currentCode: code };
   }),
   beginRun: (identity) => set({
     currentCode: identity.code,

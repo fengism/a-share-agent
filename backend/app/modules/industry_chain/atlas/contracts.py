@@ -96,11 +96,7 @@ class AtlasChain(BaseModel):
 
     @property
     def company_count(self) -> int:
-        return sum(
-            len(segment.companies)
-            for layer in self.layers
-            for segment in layer.segments
-        )
+        return sum(len(segment.companies) for layer in self.layers for segment in layer.segments)
 
 
 class AtlasChainSummary(BaseModel):

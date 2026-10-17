@@ -106,6 +106,13 @@ class AnalysisPromptOutput(BaseModel):
     risk_warnings: list[str] = Field(default_factory=list, description="最关键的三个风险因素")
     research_framework: InvestmentResearchFramework = Field(description="长期投资研究框架与条件化决策")
 
+    @field_validator("current_price", mode="before")
+    @classmethod
+    def normalize_current_price(cls, value):
+        # prompt 要求「无法确认当前价时使用 0」，但模型仍可能返回 null；
+        # 与 estimated_price_range/fair_value_range 一致做兜底，避免整次分析因校验失败而重试。
+        return 0.0 if value is None else value
+
     @field_validator("estimated_price_range", mode="before")
     @classmethod
     def normalize_estimated_price_range(cls, value):

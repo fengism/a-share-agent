@@ -112,7 +112,7 @@ describe("analysisStore ownership", () => {
     expect(state.activeStream).toBeNull();
     expect(state.isAnalyzing).toBe(false);
 
-    useAnalysisStore.getState().claimContext("000001", "analysis");
+    useAnalysisStore.getState().claimContext("000001");
     state = useAnalysisStore.getState();
     expect(state.currentCode).toBe("000001");
   });

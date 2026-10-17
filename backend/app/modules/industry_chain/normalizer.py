@@ -1,8 +1,19 @@
 import re
 
 from app.modules.industry_chain.charts import build_industry_charts
-from app.modules.industry_chain.models import IndustryChainNode, IndustryChainResult
+from app.modules.industry_chain.enrichment import (
+    enrich_result_stock_codes,
+    enrich_stock_market_snapshots,
+)
+from app.modules.industry_chain.models import IndustryChainResult
 from app.modules.industry_chain.report_renderer import render_industry_markdown
+
+__all__ = [
+    "enrich_result_stock_codes",
+    "enrich_stock_market_snapshots",
+    "result_from_payload",
+]
+
 
 _A_SHARE_CODE_PATTERN = re.compile(
     r"^(?:(?:SH|SZ|BJ)[.:]?)?"
@@ -57,7 +68,15 @@ def _node_list(value) -> list[dict]:
             continue
         node = dict(item)
         for field in (
-            "name", "company", "code", "role", "description", "market_share", "metric", "source", "source_url",
+            "name",
+            "company",
+            "code",
+            "role",
+            "description",
+            "market_share",
+            "metric",
+            "source",
+            "source_url",
         ):
             node[field] = _string_value(node.get(field))
         node["code"] = _stock_code(node.get("code"))
@@ -151,55 +170,4 @@ def result_from_payload(name: str, parsed: dict) -> IndustryChainResult:
     )
     result.charts = build_industry_charts(result)
     result.llm_review = render_industry_markdown(result)
-    return result
-
-
-def _find_stock_code_from_text(text: str, reverse_map: dict[str, str]) -> str:
-    if not text:
-        return ""
-    clean_text = text.strip()
-    if clean_text in reverse_map:
-        return reverse_map[clean_text]
-    for name, code in reverse_map.items():
-        if len(name) >= 3 and (name in clean_text or clean_text in name):
-            return code
-    return ""
-
-
-def enrich_result_stock_codes(
-    result: IndustryChainResult,
-    name_map: dict[str, str],
-) -> IndustryChainResult:
-    """基于全市场 5000+ 股票名称代码映射表，自动补齐并修正产业链各环节公司代码与名称。"""
-    if not name_map:
-        return result
-    reverse_map = {name.strip(): code.strip() for code, name in name_map.items() if name}
-
-    def enrich_node(node) -> IndustryChainNode:
-        code = (node.code or "").strip()
-        name = (node.name or "").strip()
-        company = (node.company or "").strip()
-
-        if code and code in name_map:
-            if not name or name == code:
-                node.name = name_map[code]
-
-        if not code:
-            candidates = [name, company, *node.companies]
-            for cand in candidates:
-                found_code = _find_stock_code_from_text(cand, reverse_map)
-                if found_code:
-                    node.code = found_code
-                    if not node.name:
-                        node.name = name_map.get(found_code, cand)
-                    break
-        return node
-
-    result.key_stocks = [enrich_node(node) for node in result.key_stocks]
-    result.upstream = [enrich_node(node) for node in result.upstream]
-    result.midstream = [enrich_node(node) for node in result.midstream]
-    result.downstream = [enrich_node(node) for node in result.downstream]
-    for group in result.competition:
-        group.companies = [enrich_node(node) for node in group.companies]
-
     return result

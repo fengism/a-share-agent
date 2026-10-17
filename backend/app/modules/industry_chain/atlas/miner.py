@@ -46,7 +46,9 @@ def _build_name_to_code(code_to_name: dict[str, str]) -> dict[str, str]:
 
 
 def _resolve_companies(
-    result_node, name_to_code: dict[str, str], code_to_name: dict[str, str],
+    result_node,
+    name_to_code: dict[str, str],
+    code_to_name: dict[str, str],
 ) -> list[dict]:
     """解析节点代表公司；代码与公司名必须能对上名称表，防止幻觉配对污染知识库。"""
     companies: dict[str, dict] = {}
@@ -98,23 +100,29 @@ async def build_mined_chain(result: IndustryChainResult) -> AtlasChain | None:
             if not companies:
                 continue
             segment_name = (node.name or node.role or node.company or "").strip()
-            segments.append({
-                "name": segment_name or "未命名环节",
-                "companies": companies,
-            })
+            segments.append(
+                {
+                    "name": segment_name or "未命名环节",
+                    "companies": companies,
+                }
+            )
             total_companies += len(companies)
         if segments:
-            layers.append({
-                "key": key,
-                "name": f"{label} · AI 挖掘",
-                "segments": segments,
-            })
+            layers.append(
+                {
+                    "key": key,
+                    "name": f"{label} · AI 挖掘",
+                    "segments": segments,
+                }
+            )
 
     total_segments = sum(len(layer["segments"]) for layer in layers)
     if total_segments < _MIN_SEGMENTS or total_companies < _MIN_COMPANIES:
         logger.info(
             "产业链挖掘跳过（内容不足）: name=%s, segments=%s, companies=%s",
-            name, total_segments, total_companies,
+            name,
+            total_segments,
+            total_companies,
         )
         return None
 
@@ -123,19 +131,21 @@ async def build_mined_chain(result: IndustryChainResult) -> AtlasChain | None:
         raw_summary = f"由 AI 产业链分析自动挖掘的{name}产业链结构。"
     summary = raw_summary[: _SUMMARY_LIMIT - 1] + "…" if len(raw_summary) > _SUMMARY_LIMIT else raw_summary
 
-    return AtlasChain.model_validate({
-        "slug": mining_slug(name),
-        "name": name,
-        "category": "AI 挖掘",
-        "summary": summary,
-        "aliases": (result.aliases or [])[:5],
-        "tags": ["AI挖掘"],
-        "drivers": (result.drivers or [])[:3],
-        "layers": layers,
-        "mined": True,
-        "mined_at": datetime.now().isoformat(timespec="seconds"),
-        "archive_id": result.archive_id or "",
-    })
+    return AtlasChain.model_validate(
+        {
+            "slug": mining_slug(name),
+            "name": name,
+            "category": "AI 挖掘",
+            "summary": summary,
+            "aliases": (result.aliases or [])[:5],
+            "tags": ["AI挖掘"],
+            "drivers": (result.drivers or [])[:3],
+            "layers": layers,
+            "mined": True,
+            "mined_at": datetime.now().isoformat(timespec="seconds"),
+            "archive_id": result.archive_id or "",
+        }
+    )
 
 
 def save_mined_chain(chain: AtlasChain) -> None:
@@ -166,7 +176,9 @@ async def auto_mine_from_result(result: IndustryChainResult) -> None:
         await mine_and_save_atlas_chain(result)
     except Exception:
         logger.warning(
-            "产业链知识库自动挖掘失败: name=%s", result.name, exc_info=True,
+            "产业链知识库自动挖掘失败: name=%s",
+            result.name,
+            exc_info=True,
         )
 
 

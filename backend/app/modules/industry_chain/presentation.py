@@ -1,4 +1,5 @@
 """Presentation-only replacement of internal references; never mutate audit data."""
+
 from __future__ import annotations
 
 import re
@@ -11,8 +12,11 @@ _URL_FIELDS = {"url", "source_url", "source_urls", "pdf_url", "href"}
 
 
 def reference_labels(catalog: list[dict]) -> dict[str, str]:
-    return {str(item.get("evidence_id", "")).lower(): f"资料 {index + 1}"
-            for index, item in enumerate(catalog) if item.get("evidence_id")}
+    return {
+        str(item.get("evidence_id", "")).lower(): f"资料 {index + 1}"
+        for index, item in enumerate(catalog)
+        if item.get("evidence_id")
+    }
 
 
 def readable_references(text: str, labels: dict[str, str] | None = None) -> str:
@@ -21,7 +25,7 @@ def readable_references(text: str, labels: dict[str, str] | None = None) -> str:
     parts = []
     offset = 0
     for match in _URL.finditer(text):
-        parts.append(_REF.sub(lambda ref: labels.get(ref[1].lower(), "相关资料"), text[offset:match.start()]))
+        parts.append(_REF.sub(lambda ref: labels.get(ref[1].lower(), "相关资料"), text[offset : match.start()]))
         parts.append(match[0])
         offset = match.end()
     parts.append(_REF.sub(lambda ref: labels.get(ref[1].lower(), "相关资料"), text[offset:]))

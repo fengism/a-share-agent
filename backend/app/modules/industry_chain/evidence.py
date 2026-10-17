@@ -133,11 +133,7 @@ def _provider(tool_name: str) -> str:
 
 def _evidence_dimensions(item: AgentEvidence) -> set[str]:
     text = f"{item.arguments}\n{item.content}".lower()
-    return {
-        dimension
-        for dimension, terms in _EVIDENCE_DIMENSION_TERMS.items()
-        if any(term in text for term in terms)
-    }
+    return {dimension for dimension, terms in _EVIDENCE_DIMENSION_TERMS.items() if any(term in text for term in terms)}
 
 
 def _selection_priority(index: int, item: AgentEvidence) -> tuple[int, int]:
@@ -153,21 +149,23 @@ def build_evidence_catalog(evidence: list[AgentEvidence] | tuple[AgentEvidence, 
             continue
         seen.add(evidence_id)
         value = _decode(item.content)
-        catalog.append(IndustryChainEvidence(
-            evidence_id=evidence_id,
-            tool_name=item.tool_name,
-            provider=_provider(item.tool_name),
-            material_type=_material_type(item.tool_name),
-            arguments=item.arguments[:2000],
-            title=_first_field(value, ("title", "name")),
-            source_urls=_source_urls(value),
-            published_at=_first_field(value, _DATE_KEYS),
-            fetched_at=_first_field(value, ("fetched_at",)),
-            truncated=_is_truncated(item.content),
-            content_preview=_content_preview(value),
-            status="error" if item.is_error else "success",
-            error_message=_error_message(item.content) if item.is_error else "",
-        ))
+        catalog.append(
+            IndustryChainEvidence(
+                evidence_id=evidence_id,
+                tool_name=item.tool_name,
+                provider=_provider(item.tool_name),
+                material_type=_material_type(item.tool_name),
+                arguments=item.arguments[:2000],
+                title=_first_field(value, ("title", "name")),
+                source_urls=_source_urls(value),
+                published_at=_first_field(value, _DATE_KEYS),
+                fetched_at=_first_field(value, ("fetched_at",)),
+                truncated=_is_truncated(item.content),
+                content_preview=_content_preview(value),
+                status="error" if item.is_error else "success",
+                error_message=_error_message(item.content) if item.is_error else "",
+            )
+        )
     return catalog
 
 
@@ -191,7 +189,9 @@ def compact_industry_evidence(
             failed_count += 1
             continue
         unique.append((index, item))
-    unique.sort(key=lambda pair: (agent_evidence_id(pair[1]) not in (priority_ids or set()), _selection_priority(*pair)))
+    unique.sort(
+        key=lambda pair: (agent_evidence_id(pair[1]) not in (priority_ids or set()), _selection_priority(*pair))
+    )
 
     dimension_cache: dict[str, set[str]] = {}
 
@@ -203,17 +203,18 @@ def compact_industry_evidence(
         # Topic mentions in search arguments do not reserve BODY slots.
         found = {dimension for dimension in found if not dimension.endswith("_operations")}
         if item.tool_name in {"web_fetch", "fetch_urls", "read_pdf"}:
-            body_text = "\n".join(part.text for part in extract_evidence_content(_decode(item.content)) if part.source_url).lower()
-            found.update(dimension for dimension, terms in _EVIDENCE_DIMENSION_TERMS.items()
-                         if dimension.endswith("_operations") and any(term in body_text for term in terms))
+            body_text = "\n".join(
+                part.text for part in extract_evidence_content(_decode(item.content)) if part.source_url
+            ).lower()
+            found.update(
+                dimension
+                for dimension, terms in _EVIDENCE_DIMENSION_TERMS.items()
+                if dimension.endswith("_operations") and any(term in body_text for term in terms)
+            )
         dimension_cache[eid] = found
         return found
 
-    available_dimensions = {
-        dimension
-        for _, item in unique
-        for dimension in dimensions(item)
-    }
+    available_dimensions = {dimension for _, item in unique for dimension in dimensions(item)}
     coverage_candidates: list[tuple[int, AgentEvidence]] = []
     for dimension in _EVIDENCE_DIMENSION_TERMS:
         if dimension not in available_dimensions:
@@ -250,11 +251,26 @@ def compact_industry_evidence(
     used = 0
     for _, item in ordered:
         section = render_industry_evidence_section(
-            item, index=len(sections) + 1, item_budget=effective_item_length, focus_terms=focus_terms,
+            item,
+            index=len(sections) + 1,
+            item_budget=effective_item_length,
+            focus_terms=focus_terms,
         )
         cost = len(section) + (1 if sections else 0)
         if used + cost > max_context_length:
-            continue
+            remaining = max_context_length - used - (1 if sections else 0)
+            if remaining >= 256:
+                section = render_industry_evidence_section(
+                    item,
+                    index=len(sections) + 1,
+                    item_budget=remaining,
+                    focus_terms=focus_terms,
+                )
+                cost = len(section) + (1 if sections else 0)
+                if used + cost > max_context_length:
+                    continue
+            else:
+                continue
         selected.append(item)
         sections.append(section)
         used += cost
@@ -293,8 +309,7 @@ def compact_public_industry_data(value: dict[str, Any]) -> dict[str, Any]:
             return [bound(child, depth=depth + 1) for child in item[:limit]]
         if isinstance(item, dict):
             return {
-                str(child_key): bound(child, key=str(child_key), depth=depth + 1)
-                for child_key, child in item.items()
+                str(child_key): bound(child, key=str(child_key), depth=depth + 1) for child_key, child in item.items()
             }
         return item
 
@@ -375,11 +390,7 @@ def validate_result_source_urls(
         evidence_ids = getattr(item, "evidence_ids", [])
         if not source_url or not evidence_ids:
             continue
-        allowed_urls = {
-            url
-            for evidence_id in evidence_ids
-            for url in urls_by_evidence.get(evidence_id, set())
-        }
+        allowed_urls = {url for evidence_id in evidence_ids for url in urls_by_evidence.get(evidence_id, set())}
         if _canonical_url(source_url) not in allowed_urls:
             mismatched.add(source_url)
             setattr(item, field_name, "")
@@ -391,7 +402,15 @@ def _material_type(tool_name: str) -> Literal["discovery", "body", "structured",
         return "discovery"
     if tool_name in {"web_fetch", "fetch_urls", "read_pdf"}:
         return "body"
-    if tool_name in {"iwencai_query", "iwencai_select_stock", "analyze_financials", "get_stock_info", "get_stock_valuation_detail", "get_commodity_spot_prices", "get_customs_trade_data"}:
+    if tool_name in {
+        "iwencai_query",
+        "iwencai_select_stock",
+        "analyze_financials",
+        "get_stock_info",
+        "get_stock_valuation_detail",
+        "get_commodity_spot_prices",
+        "get_customs_trade_data",
+    }:
         return "structured"
     return "unknown"
 
@@ -410,17 +429,42 @@ def validate_claim_support(result: IndustryChainResult, evidence: list[AgentEvid
             # The static profiles must never be treated as measured trade evidence.
             value = {"data": value.get("recent_12m_macro_trend") or []}
         if item.tool_name == "get_commodity_spot_prices" and isinstance(value, dict):
-            allowed = {"symbol", "contract", "quote_kind", "source", "source_url", "unit", "latest_price", "date", "change", "change_pct", "high", "low", "open", "prev_settle", "volume", "open_interest"}
-            value = {"data": [{key: val for key, val in row.items() if key in allowed}
-                              for row in value.get("items", []) if isinstance(row, dict) and row.get("status") == "available"]}
+            allowed = {
+                "symbol",
+                "contract",
+                "quote_kind",
+                "source",
+                "source_url",
+                "unit",
+                "latest_price",
+                "date",
+                "change",
+                "change_pct",
+                "high",
+                "low",
+                "open",
+                "prev_settle",
+                "volume",
+                "open_interest",
+            }
+            value = {
+                "data": [
+                    {key: val for key, val in row.items() if key in allowed}
+                    for row in value.get("items", [])
+                    if isinstance(row, dict) and row.get("status") == "available"
+                ]
+            }
         return extract_evidence_content(value, structured=_material_type(item.tool_name) == "structured")
 
     by_id = {
         agent_evidence_id(item): content(item)
-        for item in evidence if not item.is_error and _material_type(item.tool_name) in {"body", "structured"}
+        for item in evidence
+        if not item.is_error and _material_type(item.tool_name) in {"body", "structured"}
     }
+
     def normalize(text: str) -> str:
         return re.sub(r"\s+", "", text)
+
     missing = 0
     for claim in _claim_items(result):
         if not hasattr(claim, "citations"):
@@ -434,8 +478,11 @@ def validate_claim_support(result: IndustryChainResult, evidence: list[AgentEvid
         accepted = []
         for citation in claim.citations:
             quote = normalize(citation.quote)
-            matches = [part for part in by_id.get(citation.evidence_id, [])
-                       if len(quote) >= 12 and quote in normalize(part.text)]
+            matches = [
+                part
+                for part in by_id.get(citation.evidence_id, [])
+                if len(quote) >= 12 and quote in normalize(part.text)
+            ]
             if citation.evidence_id in claim.evidence_ids and matches:
                 urls = {part.source_url for part in matches}
                 # A batch-level source URL cannot select a different document's quotation.
@@ -452,11 +499,17 @@ def validate_claim_support(result: IndustryChainResult, evidence: list[AgentEvid
         else:
             missing += 1
             claim.confidence = "low"
-            linked = [item for item in result.evidence_catalog if item.evidence_id in claim.evidence_ids and item.status == "success"]
+            linked = [
+                item
+                for item in result.evidence_catalog
+                if item.evidence_id in claim.evidence_ids and item.status == "success"
+            ]
             if linked and all(item.material_type == "discovery" for item in linked):
                 claim.verification_notes.append("仅有检索线索或目录；下一步读取原始公告/报告正文。")
             elif any(item.material_type in {"body", "structured"} for item in linked):
-                claim.verification_notes.append("已有正文/数据但引用未匹配；下一步定位同一文档中的逐字片段，不能改写或拼接。")
+                claim.verification_notes.append(
+                    "已有正文/数据但引用未匹配；下一步定位同一文档中的逐字片段，不能改写或拼接。"
+                )
             else:
                 claim.verification_notes.append("尚无可用来源；下一步取得权威披露与对应统计期。")
             claim.verification_notes.append("缺少可匹配原文，结论待验证。")
@@ -474,7 +527,11 @@ def validate_claim_support(result: IndustryChainResult, evidence: list[AgentEvid
             )
             numeric = scalar_in_display_unit(claim.numeric_value, claim.unit)
             if claim.numeric_value and (
-                numeric is None or len(numbers) != 1 or numeric != numbers[0][0] or not matches_value or is_bounded_quantity(claim.value)
+                numeric is None
+                or len(numbers) != 1
+                or numeric != numbers[0][0]
+                or not matches_value
+                or is_bounded_quantity(claim.value)
             ):
                 claim.numeric_value = ""
                 claim.confidence = "low"

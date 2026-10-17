@@ -60,6 +60,9 @@ export interface paths {
          * Trigger Analysis
          * @description 触发指定股票的同步 AI 分析。
          *
+         *     同步便利接口：会一直等到任务结束再返回完整结果。耗时可能达数十分钟，
+         *     长流程客户端建议改用 ``POST /workflows/analysis/{code}`` + SSE 进度流。
+         *
          *     Param:
          *         code: 股票代码（路径参数），A 股 6 位数字或港股 1-5 位数字。
          *     Return:
@@ -2511,7 +2514,7 @@ export interface paths {
         };
         /**
          * Get News Analysis
-         * @description 获取由 LLM 生成的市场资讯综合分析。
+         * @description 获取由 LLM 生成的市场资讯综合分析（公共资讯流，结果与用户无关）。
          */
         get: operations["get_news_analysis_api_market_news_analysis_get"];
         put?: never;
@@ -8452,6 +8455,16 @@ export interface components {
             metric: string;
             /** Name */
             name?: string | null;
+            /**
+             * Pb
+             * @default
+             */
+            pb: string;
+            /**
+             * Pe
+             * @default
+             */
+            pe: string;
             /** Realization Conditions */
             realization_conditions?: string[];
             /**
@@ -8479,6 +8492,11 @@ export interface components {
              * @default
              */
             source_url: string;
+            /**
+             * Total Market Cap
+             * @default
+             */
+            total_market_cap: string;
             /** Tracking Metrics */
             tracking_metrics?: string[];
             /** Verification Notes */

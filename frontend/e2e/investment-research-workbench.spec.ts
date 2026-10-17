@@ -419,7 +419,7 @@ test("includes financial appendices in the focused research PDF", async ({ page 
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await mockResearchApi(page);
-  await page.goto("/investment-research/600519");
+  await page.goto("/analysis/600519?view=report");
   await expect(page.getByRole("heading", { name: /投资研究报告/ })).toBeVisible();
   const typography = await page.locator(".investment-research-report").evaluate((report) => {
     const framework = report.querySelector<HTMLElement>(".research-framework");
@@ -506,21 +506,21 @@ test("includes financial appendices in the focused research PDF", async ({ page 
   await download.saveAs("/tmp/stock-investment-research-report.pdf");
 });
 
-test("keeps historical legacy reports in the standalone namespace", async ({ page }) => {
+test("keeps historical legacy reports readable through the report view", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await mockResearchApi(page);
-  await page.goto("/investment-research/600519?date=20260820");
+  await page.goto("/analysis/600519?view=report&date=20260820");
 
   await expect(page.getByText("历史快照 · 2026-08-20")).toBeVisible();
   await expect(page.getByText("该研究快照由旧版框架生成，暂无结构化研究结论")).toBeVisible();
   await page.getByRole("link", { name: /贵州茅台/ }).first().click();
-  await expect(page).toHaveURL(/\/investment-research\/600519\?date=20260826$/);
+  await expect(page).toHaveURL(/\/analysis\/600519\?view=report&date=20260826$/);
 });
 
 test("shows mobile history access without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockResearchApi(page);
-  await page.goto("/investment-research/600519");
+  await page.goto("/analysis/600519?view=report");
 
   await expect(page.getByRole("button", { name: "研究历史" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "生意与盈利引擎" })).toBeVisible();

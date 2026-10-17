@@ -32,14 +32,22 @@ def extract_evidence_content(value: Any, *, structured: bool = False) -> list[Ev
             return []
         if item.get("ok") is False or item.get("error") or item.get("status") in ("error", "failed"):
             return []
-        url = next((valid for key in ("url", "source_url", "final_url") if (valid := http_url(item.get(key)))), parent_url)
+        url = next(
+            (valid for key in ("url", "source_url", "final_url") if (valid := http_url(item.get(key)))), parent_url
+        )
         if structured and not any(isinstance(item.get(key), (dict, list)) for key in ("data", "results", "items")):
             return [EvidenceContent(json.dumps(item, ensure_ascii=False, default=str), url)]
-        parts = [EvidenceContent(item[key], url) for key in ("content", "text", "body", "markdown")
-                 if isinstance(item.get(key), str)]
-        parts.extend(part for key, child in item.items()
-                     if key not in {"arguments", "request", "error", "metadata"} and isinstance(child, (dict, list))
-                     for part in walk(child, url))
+        parts = [
+            EvidenceContent(item[key], url)
+            for key in ("content", "text", "body", "markdown")
+            if isinstance(item.get(key), str)
+        ]
+        parts.extend(
+            part
+            for key, child in item.items()
+            if key not in {"arguments", "request", "error", "metadata"} and isinstance(child, (dict, list))
+            for part in walk(child, url)
+        )
         return parts
 
     if isinstance(value, str):

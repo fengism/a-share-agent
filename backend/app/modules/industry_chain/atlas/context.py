@@ -22,10 +22,16 @@ def matching_atlas_chain(name: str) -> AtlasChain | None:
     if matched is None and not exact:
         matched = get_atlas_chain(mining_slug(normalized))
     if matched is None and not exact and len(normalized) >= 2:
-        partial = [chain for chain in chains if (
-            normalized in chain.name or chain.name in normalized
-            or any(alias and (normalized in alias or alias in normalized) for alias in (chain.aliases or []))
-        ) and not chain.slug.startswith("auto-")]
+        partial = [
+            chain
+            for chain in chains
+            if (
+                normalized in chain.name
+                or chain.name in normalized
+                or any(alias and (normalized in alias or alias in normalized) for alias in (chain.aliases or []))
+            )
+            and not chain.slug.startswith("auto-")
+        ]
         matched = partial[0] if len(partial) == 1 else None
     return matched
 
@@ -48,7 +54,4 @@ def render_atlas_prior(matched: AtlasChain | None) -> str:
 def atlas_expected_segments(matched: AtlasChain | None) -> dict[str, list[str]]:
     if matched is None:
         return {}
-    return {
-        layer.key: [segment.name for segment in layer.segments if segment.name.strip()]
-        for layer in matched.layers
-    }
+    return {layer.key: [segment.name for segment in layer.segments if segment.name.strip()] for layer in matched.layers}

@@ -33,6 +33,7 @@ __all__ = [
 
 class IndustryChainHistoryItem(BaseModel):
     """Purpose: 产业链分析历史列表的单条摘要。"""
+
     name: str
     archive_id: str
     saved_at: str = ""

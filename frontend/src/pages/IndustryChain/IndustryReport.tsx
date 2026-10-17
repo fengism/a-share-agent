@@ -11,6 +11,7 @@ import {
   FileTextOutlined,
   FullscreenOutlined,
   SendOutlined,
+  TableOutlined,
 } from "@ant-design/icons";
 import { Alert, Button, Collapse, Dropdown, Input, message, Modal, Popover, Skeleton, Tag, Typography } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
@@ -125,6 +126,60 @@ export default function IndustryReport({
       URL.revokeObjectURL?.(url);
     }
     message.success("Markdown 研报已导出");
+  };
+
+  const handleExportStocksCsv = () => {
+    const stocks = rawResult.key_stocks || [];
+    if (!stocks.length) {
+      message.warning("当前报告暂无重点公司数据可导出");
+      return;
+    }
+    const headers = [
+      "证券代码",
+      "公司名称",
+      "环节角色",
+      "业务相关度",
+      "相关收入占比",
+      "最新市值",
+      "动态PE",
+      "PB",
+      "受益路径",
+      "兑现条件",
+      "失效条件",
+    ];
+    const relevanceMap: Record<string, string> = {
+      earnings: "收入相关（待复核）",
+      business: "业务相关（待复核）",
+      concept: "概念布局",
+      unverified: "待验证",
+    };
+    const rows = stocks.map((s) => [
+      s.code || "",
+      s.name || s.company || "",
+      s.role || s.description || "",
+      relevanceMap[s.business_relevance || "unverified"] || s.business_relevance || "待验证",
+      s.revenue_share ? `${s.revenue_share}${s.revenue_period ? ` (${s.revenue_period})` : ""}` : "",
+      s.total_market_cap || "",
+      s.pe || "",
+      s.pb || "",
+      s.benefit_path || "",
+      (s.realization_conditions || []).join("；"),
+      (s.invalidation_conditions || []).join("；"),
+    ]);
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\r\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    if (typeof URL.createObjectURL === "function") {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const downloadName = (rawResult.name || activeName || "产业链").replace(/[/\\?%*:|"<>]/g, "_");
+      a.download = `重点公司清单_${downloadName}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL?.(url);
+    }
+    message.success(`已导出 ${stocks.length} 家重点公司清单`);
   };
 
   const handleCopyMarkdown = async () => {
@@ -274,12 +329,20 @@ export default function IndustryReport({
                     label: "导出为 Markdown (.md)",
                     icon: <FileMarkdownOutlined />,
                   },
+                  {
+                    key: "csv",
+                    label: "导出重点公司 (.csv)",
+                    icon: <TableOutlined />,
+                    disabled: !rawResult.key_stocks?.length,
+                  },
                 ],
                 onClick: ({ key }) => {
                   if (key === "pdf") {
                     void handleExportPdf();
                   } else if (key === "md") {
                     handleExportMarkdown();
+                  } else if (key === "csv") {
+                    handleExportStocksCsv();
                   }
                 },
               }}

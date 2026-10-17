@@ -104,11 +104,18 @@ def save_industry_chain(
     try:
         with _HISTORY_INDEX.mutation() as mutation:
             path, payload = archive_store.save_archive(
-                _DATA_DIR, name, result, user_id, resolved_archive_id, _safe_name,
+                _DATA_DIR,
+                name,
+                result,
+                user_id,
+                resolved_archive_id,
+                _safe_name,
             )
             try:
                 _upsert_history_item(
-                    user_id, _safe_name(name), path,
+                    user_id,
+                    _safe_name(name),
+                    path,
                     _history_item_from_payload(payload, path.parent, resolved_archive_id),
                 )
             except Exception:

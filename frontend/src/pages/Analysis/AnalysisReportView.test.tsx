@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisResult } from "../../types/stock";
-import InvestmentResearch from ".";
+import Analysis from ".";
 import { stopAgentProcess, type AgentProcessState } from "../../features/agent-process/agentProcess";
 
 const {
@@ -83,13 +83,19 @@ function LocationProbe() {
   return <span data-testid="location">{location.pathname}{location.search}{location.hash}</span>;
 }
 
+/** 只在 ?view=report 时挂载分析页；跳回工作台后仅保留位置探针，避免连带渲染工作台。 */
+function AnalysisReportRoute() {
+  const [searchParams] = useSearchParams();
+  if (searchParams.get("view") !== "report") return <LocationProbe />;
+  return <><Analysis /><LocationProbe /></>;
+}
+
 function renderPage(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/stock/:code" element={<LocationProbe />} />
-        <Route path="/investment-research/:code" element={<><InvestmentResearch /><LocationProbe /></>} />
-        <Route path="/analysis/:code" element={<LocationProbe />} />
+        <Route path="/analysis/:code" element={<AnalysisReportRoute />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -109,7 +115,7 @@ function setupController(displayResult: AnalysisResult | null = null) {
   });
 }
 
-describe("InvestmentResearch", () => {
+describe("AnalysisReportView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     usePdfExport.mockReturnValue({ exportPdf, isExporting: false });
@@ -128,7 +134,7 @@ describe("InvestmentResearch", () => {
       refetch: vi.fn(),
     });
 
-    renderPage("/investment-research/600519");
+    renderPage("/analysis/600519?view=report");
 
     expect(screen.getByRole("heading", { name: /投资研究报告/ })).toBeInTheDocument();
     expect(screen.getByText("结构化研究报告")).toBeInTheDocument();
@@ -144,7 +150,7 @@ describe("InvestmentResearch", () => {
       refetch: vi.fn(),
     });
 
-    renderPage("/investment-research/600519?date=20260826");
+    renderPage("/analysis/600519?view=report&date=20260826");
 
     expect(screen.getByText("结构化研究报告")).toBeInTheDocument();
     expect(screen.getByText("历史快照 · 2026-08-26")).toBeInTheDocument();
@@ -164,7 +170,7 @@ describe("InvestmentResearch", () => {
       refetch: vi.fn(),
     });
 
-    renderPage("/investment-research/600519");
+    renderPage("/analysis/600519?view=report");
 
     expect(screen.getByText("营收与毛利构成")).toBeInTheDocument();
     expect(screen.getByText("关键财务指标")).toBeInTheDocument();
@@ -181,7 +187,7 @@ describe("InvestmentResearch", () => {
 
   it("does not load the current aggregate while viewing a history snapshot", () => {
     setupController(analysis);
-    renderPage("/investment-research/600519?date=20260826");
+    renderPage("/analysis/600519?view=report&date=20260826");
 
     expect(useAnalysisPageData).toHaveBeenCalledWith("600519", { enabled: false });
   });
@@ -206,7 +212,7 @@ describe("InvestmentResearch", () => {
       refetch: vi.fn(),
     });
 
-    renderPage("/investment-research/600519");
+    renderPage("/analysis/600519?view=report");
     fireEvent.click(screen.getByRole("button", { name: /返回个股研究/ }));
 
     expect(screen.getByTestId("location")).toHaveTextContent("/analysis/600519?panel=research");
@@ -214,10 +220,10 @@ describe("InvestmentResearch", () => {
   });
 
   it("canonicalizes invalid history dates", async () => {
-    renderPage("/investment-research/600519?date=20260230");
+    renderPage("/analysis/600519?view=report&date=20260230");
 
     await waitFor(() => {
-      expect(screen.getByTestId("location")).toHaveTextContent("/investment-research/600519");
+      expect(screen.getByTestId("location")).toHaveTextContent("/analysis/600519?view=report");
       expect(screen.getByTestId("location")).not.toHaveTextContent("date=");
     });
   });
@@ -235,7 +241,7 @@ describe("InvestmentResearch", () => {
       cancelAnalysis: vi.fn(),
     });
 
-    renderPage("/investment-research/600519");
+    renderPage("/analysis/600519?view=report");
     expect(screen.getAllByRole("button", { name: /返回个股研究/ })).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: /返回个股研究/ }));
 
@@ -257,7 +263,7 @@ describe("InvestmentResearch", () => {
       stages: [{ stage: 1, name: "数据采集与证据校验", status: "started" }, null, null],
       currentStageIndex: 0, agentProcess: stopAgentProcess(process, termination, "研究已停止"),
     });
-    const { container } = renderPage("/investment-research/600519");
+    const { container } = renderPage("/analysis/600519?view=report");
     const toggle = screen.getByRole("button", { name: /Agent 思考与执行/ });
     expect(within(toggle).getByText(termination === "cancelled" ? "已停止" : "已停止等待")).toBeInTheDocument();
     fireEvent.click(toggle);

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.agentic.events import AgentEvent
 from app.domain.prompting import PromptTrace
@@ -201,3 +201,16 @@ class AnalysisResult(BaseModel):
     research_framework: InvestmentResearchFramework | None = None
     prompt_trace: PromptTrace | None = None
     agent_trace: list[AgentEvent] = Field(default_factory=list)
+
+    @field_validator("current_price", mode="before")
+    @classmethod
+    def _normalize_current_price(cls, value):
+        # 历史归档或模型输出可能缺失当前价；prompt 约定用 0 表示“无法确认”。
+        return 0.0 if value is None else value
+
+    @field_validator("estimated_price_range", mode="before")
+    @classmethod
+    def _normalize_estimated_price_range(cls, value):
+        if isinstance(value, (list, tuple)) and len(value) == 2 and any(item is None for item in value):
+            return (0.0, 0.0)
+        return value

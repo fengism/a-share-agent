@@ -32,17 +32,26 @@ def number_tokens(value: str) -> list[tuple[Decimal, str]]:
             tokens.append((number, (match[2] or "").strip()))
     return tokens
 
+
 # Product/precision specifications are not measured quantities (FP16, 1.6T, 800G).
 _SPEC = re.compile(r"(?i)\b(?:FP|BF|INT)\d+\b|(?<![\w.])\d+(?:\.\d+)?\s*(?:T|G)(?![A-Za-z])")
 _QUANTITY = re.compile(rf"(?<![\w.])({_NUMBER})\s*(万亿|亿|万|千)?\s*([%‰])?(?![\d.])", re.ASCII)
-_SCALES = {"": Decimal(1), "千": Decimal(1000), "万": Decimal(10000), "亿": Decimal(100000000), "万亿": Decimal(1000000000000)}
+_SCALES = {
+    "": Decimal(1),
+    "千": Decimal(1000),
+    "万": Decimal(10000),
+    "亿": Decimal(100000000),
+    "万亿": Decimal(1000000000000),
+}
 
 
 def quantity_tokens(value: str) -> list[tuple[Decimal, str]]:
     text = _SPEC.sub("", normalize_number_text(value))
-    return [(number * _SCALES[match[2] or ""], match[3] or "")
-            for match in _QUANTITY.finditer(text)
-            if (number := parse_number(match[1])) is not None]
+    return [
+        (number * _SCALES[match[2] or ""], match[3] or "")
+        for match in _QUANTITY.finditer(text)
+        if (number := parse_number(match[1])) is not None
+    ]
 
 
 def scalar_in_display_unit(value: str, unit: str) -> Decimal | None:
@@ -54,7 +63,9 @@ def scalar_in_display_unit(value: str, unit: str) -> Decimal | None:
 
 
 def is_bounded_quantity(value: str) -> bool:
-    return bool(re.search(r"超过|超出|超(?=\d)|不足|以上|以下|至少|至多|不低于|不超过|约?\s*[<>≤≥]|[~～–—]|至|到", value))
+    return bool(
+        re.search(r"超过|超出|超(?=\d)|不足|以上|以下|至少|至多|不低于|不超过|约?\s*[<>≤≥]|[~～–—]|至|到", value)
+    )
 
 
 def specification_tokens(value: str) -> set[str]:

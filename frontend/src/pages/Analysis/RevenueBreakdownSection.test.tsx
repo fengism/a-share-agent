@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import RevenueBreakdownSection from "./RevenueBreakdownSection";
+import RevenueBreakdownSection from "../../features/investment-research/RevenueBreakdownSection";
 
 const mocks = vi.hoisted(() => ({
   useRevenueBreakdown: vi.fn(),

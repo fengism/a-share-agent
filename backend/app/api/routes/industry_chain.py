@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Annotated
 from urllib.parse import quote
@@ -44,6 +45,7 @@ from app.modules.industry_chain.public import (
     render_industry_chain_pdf_bytes,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # 批量挖掘单次扫描的历史存档上限，避免管理员误触把全部存档读入内存
@@ -83,9 +85,7 @@ async def export_industry_chain_pdf(
     if archive_id:
         result = await load_industry_chain_archive(name, archive_id, user["id"])
     else:
-        latest = await get_latest_industry_chain_archive(
-            name, user["id"], can_delete_legacy=bool(user["is_admin"])
-        )
+        latest = await get_latest_industry_chain_archive(name, user["id"], can_delete_legacy=bool(user["is_admin"]))
         if latest is None or not latest.archive_id:
             result = None
         else:
@@ -167,7 +167,9 @@ async def mine_industry_chain_atlas(
     archive_id = request.archive_id
     if not archive_id:
         latest = await get_latest_industry_chain_archive(
-            request.name, admin["id"], can_delete_legacy=True,
+            request.name,
+            admin["id"],
+            can_delete_legacy=True,
         )
         archive_id = (latest.archive_id or "") if latest is not None else ""
     if not archive_id:
@@ -192,7 +194,11 @@ async def batch_mine_industry_chain_atlas(
     逐条加载存档并挖掘，未通过质量门或内容不足的存档计入 skipped 而非中断整批。
     """
     items = await list_industry_chain_history(
-        admin["id"], name=None, limit=_BATCH_MINE_SCAN_LIMIT, offset=0, can_delete_legacy=True,
+        admin["id"],
+        name=None,
+        limit=_BATCH_MINE_SCAN_LIMIT,
+        offset=0,
+        can_delete_legacy=True,
     )
     targets: list[tuple[str, IndustryChainResult]] = []
     skipped = 0
@@ -295,6 +301,12 @@ async def get_industry_chain_archive(
     result = await load_industry_chain_archive(name, archive_id, user["id"])
     if result is None:
         raise NotFoundError("产业链存档不存在", code="industry_chain.archive_not_found")
+    try:
+        from app.modules.industry_chain.enrichment import enrich_stock_market_snapshots
+
+        result = enrich_stock_market_snapshots(result, refresh_existing=True)
+    except Exception as enrich_exc:
+        logger.debug("历史存档刷新最新行情快照跳过: %s", enrich_exc)
     return result
 
 

@@ -29,7 +29,6 @@ interface AnalysisWorkflowControllerOptions {
   onSuccess?: (result: AnalysisResult) => void;
   onError?: (error: Error) => void;
   onCancelled?: (result: WorkflowCancelResult) => void;
-  preferredRoute?: "analysis" | "investment-research";
 }
 
 interface RunRequest {
@@ -86,7 +85,6 @@ export function useAnalysisWorkflowController({
   onSuccess,
   onError,
   onCancelled,
-  preferredRoute = "analysis",
 }: AnalysisWorkflowControllerOptions) {
   const queryClient = useQueryClient();
   const currentCode = useAnalysisStore((state) => state.currentCode);
@@ -117,13 +115,13 @@ export function useAnalysisWorkflowController({
     if (active?.code === code && state.activeStream) {
       identityRef.current = active;
       streamRef.current = state.activeStream;
-      state.claimContext(code, preferredRoute);
+      state.claimContext(code);
       return;
     }
     identityRef.current = null;
     streamRef.current = null;
-    state.claimContext(code, preferredRoute);
-  }, [code, historyDate, preferredRoute]);
+    state.claimContext(code);
+  }, [code, historyDate]);
 
   useEffect(() => () => {
     streamRef.current = null;

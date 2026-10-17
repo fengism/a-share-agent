@@ -228,16 +228,20 @@ def list_history(
         )"""
     )
     params.extend((user_id, user_id, limit, offset))
-    rows = get_connection().execute(
-        f"""
+    rows = (
+        get_connection()
+        .execute(
+            f"""
         SELECT h.scope_user_id, h.name, h.archive_id, h.saved_at, h.title, h.summary
         FROM industry_chain_history_index h
-        WHERE {' AND '.join(filters)}
+        WHERE {" AND ".join(filters)}
         ORDER BY h.archive_id DESC, h.safe_name DESC
         LIMIT ? OFFSET ?
         """,
-        params,
-    ).fetchall()
+            params,
+        )
+        .fetchall()
+    )
     items = []
     for row in rows:
         item = dict(row)

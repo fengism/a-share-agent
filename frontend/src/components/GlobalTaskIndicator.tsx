@@ -47,7 +47,7 @@ export default function GlobalTaskIndicator({ compact = false }: { compact?: boo
     ...(localAnalysisRun && localAnalysisRunning ? [{
       key: `local-analysis:${localAnalysisRun.runId}`,
       label: `个股研究 · ${localAnalysisRun.code}`,
-      target: `/${useAnalysisStore.getState().preferredRoute}/${encodeURIComponent(localAnalysisRun.code)}`,
+      target: `/analysis/${encodeURIComponent(localAnalysisRun.code)}`,
       cancelling: localAnalysisCancelling,
       stop: () => cancelLocalAnalysis(),
     }] : []),

@@ -103,13 +103,8 @@ async def get_all_analysis_history(
     )
 
 
-@router.post("/export-pdf")
-async def export_custom_analysis_pdf(
-    result: AnalysisResult,
-    user: AuthenticatedUser = Depends(require_active_user),
-):
-    """基于前端传入的实时分析结果对象直接生成纯矢量投研 PDF。"""
-    code = getattr(result, "stock_code", None) or getattr(result, "code", "stock")
+async def _analysis_pdf_response(result: AnalysisResult, code: str) -> Response:
+    """把分析结果渲染为矢量 PDF 下载响应（两个导出端点共用）。"""
     stock_info_dict = None
     try:
         basic_info = await get_basic_info(code)
@@ -118,58 +113,6 @@ async def export_custom_analysis_pdf(
     except Exception as error:
         # 基础信息只是 PDF 里的可选抬头，缺失不该阻断导出；但必须留痕，
         # 否则上游挂掉时 PDF 照常返回 200，运营侧完全看不出少了这段内容。
-        logger.warning("生成 PDF 时获取股票基础信息失败: code=%s error_type=%s", code, type(error).__name__)
-
-    kline_data, chip_distribution = await _load_pdf_visual_data(
-        code,
-        getattr(result, "analysis_date", ""),
-    )
-    html_content = generate_research_report_html(
-        result,
-        stock_info=stock_info_dict,
-        kline_data=kline_data,
-        chip_distribution=chip_distribution,
-    )
-    pdf_bytes = await render_pdf_bytes_from_html(html_content, is_hk=is_hk_code(code))
-
-    stock_name = getattr(result, "stock_name", None) or getattr(result, "name", "") or code
-    report_date = getattr(result, "analysis_date", "") or "最新"
-    filename = f"{code}_{stock_name}_深度投研报告_{report_date}.pdf"
-
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
-            "Access-Control-Expose-Headers": "Content-Disposition",
-        },
-    )
-
-
-@router.get("/{code}/export-pdf")
-async def export_analysis_pdf(
-    code: str,
-    date: Annotated[str | None, Query()] = None,
-    user: AuthenticatedUser = Depends(require_active_user),
-):
-    """根据股票代码与日期，通过无头浏览器直接生成纯矢量投研 PDF 并下载。"""
-    if date:
-        result = await load_analysis_history(code, date, user["id"])
-    else:
-        result = await load_latest_analysis(code, user["id"])
-
-    if result is None:
-        raise NotFoundError(
-            f"未找到 {code} 的分析记录，请先执行研究后再导出",
-            code="analysis.not_found",
-        )
-
-    stock_info_dict = None
-    try:
-        basic_info = await get_basic_info(code)
-        if basic_info:
-            stock_info_dict = basic_info.model_dump()
-    except Exception as error:
         logger.warning("导出分析报告时获取股票基础信息失败: code=%s error_type=%s", code, type(error).__name__)
 
     kline_data, chip_distribution = await _load_pdf_visual_data(
@@ -196,6 +139,36 @@ async def export_analysis_pdf(
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
+
+
+@router.post("/export-pdf")
+async def export_custom_analysis_pdf(
+    result: AnalysisResult,
+    user: AuthenticatedUser = Depends(require_active_user),
+):
+    """基于前端传入的实时分析结果对象直接生成纯矢量投研 PDF。"""
+    code = getattr(result, "stock_code", None) or getattr(result, "code", "stock")
+    return await _analysis_pdf_response(result, code)
+
+
+@router.get("/{code}/export-pdf")
+async def export_analysis_pdf(
+    code: str,
+    date: Annotated[str | None, Query()] = None,
+    user: AuthenticatedUser = Depends(require_active_user),
+):
+    """根据股票代码与日期，通过无头浏览器直接生成纯矢量投研 PDF 并下载。"""
+    if date:
+        result = await load_analysis_history(code, date, user["id"])
+    else:
+        result = await load_latest_analysis(code, user["id"])
+
+    if result is None:
+        raise NotFoundError(
+            f"未找到 {code} 的分析记录，请先执行研究后再导出",
+            code="analysis.not_found",
+        )
+    return await _analysis_pdf_response(result, code)
 
 
 @router.get("/{code}/history", response_model=list[AnalysisHistoryItem])

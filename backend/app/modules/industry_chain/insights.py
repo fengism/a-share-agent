@@ -41,7 +41,8 @@ def build_topic_resolution(
     for chain in list_atlas_chains():
         candidates = [chain.name, *(chain.aliases or [])]
         if any(
-            topic and (
+            topic
+            and (
                 topic == _normalize_topic(candidate)
                 or topic in _normalize_topic(candidate)
                 or _normalize_topic(candidate) in topic
@@ -88,17 +89,19 @@ def build_opportunities(result: IndustryChainResult) -> list[IndustryChainOpport
         completeness = sum(bool(value) for value in (node.role, node.description, node.metric, linked)) * 25
         rationale_parts = [part for part in (node.role, node.description, node.metric) if part]
         rationale = "；".join(rationale_parts[:2]) or "基于产业链角色与现有公开证据纳入研究跟踪。"
-        opportunities.append(IndustryChainOpportunity(
-            name=name or code,
-            code=code,
-            role=node.role,
-            scoring_version=2,
-            completeness_score=completeness,
-            evidence_score=evidence,
-            total_score=completeness,
-            rationale=rationale,
-            evidence_ids=list(node.evidence_ids),
-        ))
+        opportunities.append(
+            IndustryChainOpportunity(
+                name=name or code,
+                code=code,
+                role=node.role,
+                scoring_version=2,
+                completeness_score=completeness,
+                evidence_score=evidence,
+                total_score=completeness,
+                rationale=rationale,
+                evidence_ids=list(node.evidence_ids),
+            )
+        )
 
     opportunities.sort(key=lambda item: (-item.total_score, item.code, item.name))
     return opportunities

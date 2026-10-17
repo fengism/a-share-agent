@@ -911,6 +911,165 @@ def _render_visual_analysis(
     """
 
 
+def _render_segment_quality(bm: Any) -> str:
+    """02 商业模式：主营分部质量明细卡片。"""
+    html = ""
+    if bm and bm.segment_quality:
+        html = '<div style="margin-top:8px;"><div style="font-weight:700; font-size:11px; color:#475569; margin-bottom:6px;">📊 主营分部质量明细评估：</div><div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px;">'
+        for seg in bm.segment_quality:
+            conf_str = f"{int(seg.evidence_confidence * 100)}% 证据" if seg.evidence_confidence is not None else "证据待核验"
+            html += f"""
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <strong style="color:#0f172a; font-size:12px;">{_esc(seg.segment)}</strong>
+                    <span style="font-size:10px; color:#64748b; background:#f1f5f9; padding:1px 6px; border-radius:4px;">{_esc(seg.role or '主营业务')} ｜ {conf_str}</span>
+                </div>
+                <div style="font-size:11px; color:#475569; line-height:1.45;">
+                    <div>• 增长质量: <strong>{_esc(seg.growth_quality or '--')}</strong></div>
+                    <div>• 盈利质量: <strong>{_esc(seg.profitability_quality or '--')}</strong></div>
+                    <div>• 收入持续性/现金重现: <strong>{_esc(seg.recurrence or '--')}</strong></div>
+                </div>
+            </div>
+            """
+        html += '</div></div>'
+    return html
+
+
+def _render_moats(moat: Any) -> str:
+    """03 护城河：逐项支持证据/反证与强弱趋势。"""
+    html = ""
+    if moat and moat.moats:
+        html = '<div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; margin-top:8px;">'
+        for m in moat.moats:
+            m_name = MOAT_LABELS.get(m.moat_type, m.moat_type)
+            m_strength = LEVEL_LABELS.get(m.strength, m.strength)
+            m_dir = DIRECTION_LABELS.get(m.direction, m.direction)
+            counter_threats = [*getattr(m, "counterevidence", []), *getattr(m, "threats", [])]
+            html += f"""
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <strong style="color:#0f172a; font-size:13px;">{_esc(m_name)}</strong>
+                    <div>
+                        {_render_pill(f'强度: {m_strength}', '#f1f5f9', '#334155', '#cbd5e1')}
+                        {_render_pill(f'趋势: {m_dir}', '#eff6ff', '#1d4ed8', '#bfdbfe')}
+                    </div>
+                </div>
+                <div style="font-size:11px; color:#475569; margin-bottom:4px;"><strong>持续期限:</strong> {_esc(m.durability or '长期稳固')}</div>
+                <div style="font-size:11px; color:#334155; margin-top:4px;"><strong>支持证据:</strong></div>
+                {_render_list_items(m.evidence)}
+                {f'<div style="font-size:11px; color:#991b1b; margin-top:4px;"><strong>反证与潜在威胁:</strong></div>{_render_list_items(counter_threats)}' if counter_threats else ''}
+            </div>
+            """
+        html += '</div>'
+    return html
+
+
+def _render_risks(inv: Any, risk_warnings: list[str] | None) -> str:
+    """05 逆向推演：失败路径与缓释因素；无结构化风险时回落到风险提示列表。"""
+    html = ""
+    if inv and inv.risks:
+        html = '<div style="margin-top:8px;">'
+        for r in inv.risks:
+            r_prob = RISK_LABELS.get(r.probability, r.probability)
+            r_impact = RISK_LABELS.get(r.impact, r.impact)
+            horizon_str = f" ｜ 观察窗口: {r.time_horizon}" if getattr(r, "time_horizon", None) else ""
+            html += f"""
+            <div style="background:#ffffff; border:1px solid #fecaca; border-left:4px solid #ef4444; border-radius:6px; padding:10px; margin-bottom:8px; break-inside:avoid;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <strong style="color:#991b1b; font-size:12px;">⚠️ {_esc(r.risk)}</strong>
+                    <div>
+                        {_render_pill(f'概率: {r_prob}', '#fef2f2', '#991b1b', '#fecaca')}
+                        {_render_pill(f'影响: {r_impact}{horizon_str}', '#fef2f2', '#991b1b', '#fecaca')}
+                    </div>
+                </div>
+                {f'<div style="font-size:11px; color:#475569; margin-bottom:3px;"><strong>失效路径:</strong> {_esc(r.failure_path)}</div>' if r.failure_path else ''}
+                {f'<div style="font-size:11px; color:#475569; margin-bottom:3px;"><strong>先行指标:</strong> {_esc(", ".join(r.leading_indicators))}</div>' if r.leading_indicators else ''}
+                {f'<div style="font-size:11px; color:#166534;"><strong>对冲缓解:</strong> {_esc(", ".join(r.mitigants))}</div>' if r.mitigants else ''}
+            </div>
+            """
+        html += '</div>'
+    elif risk_warnings:
+        html = _render_list_items(risk_warnings)
+    return html
+
+
+def _render_valuation_scenarios(sc: Any, curr: str) -> str:
+    """06 估值：bull/base/bear 三情景区间与失效条件。"""
+    html = ""
+    if sc and getattr(sc, "bull", None) and getattr(sc, "base", None) and getattr(sc, "bear", None):
+        bull_range = f"{curr}{sc.bull.fair_value_range[0]:.2f} - {curr}{sc.bull.fair_value_range[1]:.2f}" if getattr(sc.bull, "fair_value_range", None) else "--"
+        base_range = f"{curr}{sc.base.fair_value_range[0]:.2f} - {curr}{sc.base.fair_value_range[1]:.2f}" if getattr(sc.base, "fair_value_range", None) else "--"
+        bear_range = f"{curr}{sc.bear.fair_value_range[0]:.2f} - {curr}{sc.bear.fair_value_range[1]:.2f}" if getattr(sc.bear, "fair_value_range", None) else "--"
+
+        html = f"""
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:8px;">
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:10px;">
+                <div style="font-weight:700; color:#166534; font-size:13px; margin-bottom:4px;">乐观情景 (Bull)</div>
+                <div style="font-size:16px; font-weight:800; color:#15803d; margin-bottom:4px;">{_esc(bull_range)}</div>
+                <div style="font-size:11px; color:#166534; line-height:1.45;">
+                    <div>{_esc(sc.bull.valuation_view or '增长超出市场预期')}</div>
+                    <div style="margin-top:6px; font-weight:700;">关键假设:</div>
+                    {_render_list_items(sc.bull.assumptions)}
+                    {f'<div style="margin-top:6px; font-weight:700; color:#991b1b;">失效条件:</div>{_render_list_items(sc.bull.invalidating_conditions)}' if sc.bull.invalidating_conditions else ''}
+                </div>
+            </div>
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:10px;">
+                <div style="font-weight:700; color:#1d4ed8; font-size:13px; margin-bottom:4px;">基准情景 (Base)</div>
+                <div style="font-size:16px; font-weight:800; color:#1e40af; margin-bottom:4px;">{_esc(base_range)}</div>
+                <div style="font-size:11px; color:#1d4ed8; line-height:1.45;">
+                    <div>{_esc(sc.base.valuation_view or '业务稳健推进')}</div>
+                    <div style="margin-top:6px; font-weight:700;">关键假设:</div>
+                    {_render_list_items(sc.base.assumptions)}
+                    {f'<div style="margin-top:6px; font-weight:700; color:#991b1b;">失效条件:</div>{_render_list_items(sc.base.invalidating_conditions)}' if sc.base.invalidating_conditions else ''}
+                </div>
+            </div>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:10px;">
+                <div style="font-weight:700; color:#991b1b; font-size:13px; margin-bottom:4px;">悲观情景 (Bear)</div>
+                <div style="font-size:16px; font-weight:800; color:#b91c1c; margin-bottom:4px;">{_esc(bear_range)}</div>
+                <div style="font-size:11px; color:#991b1b; line-height:1.45;">
+                    <div>{_esc(sc.bear.valuation_view or '承压与估值收缩')}</div>
+                    <div style="margin-top:6px; font-weight:700;">关键假设:</div>
+                    {_render_list_items(sc.bear.assumptions)}
+                    {f'<div style="margin-top:6px; font-weight:700; color:#991b1b;">失效条件:</div>{_render_list_items(sc.bear.invalidating_conditions)}' if sc.bear.invalidating_conditions else ''}
+                </div>
+            </div>
+        </div>
+        """
+    return html
+
+
+def _render_data_gaps(data_gaps: list[Any]) -> str:
+    """09 数据缺口与待核验清单。"""
+    data_gap_cards = "".join(
+        f"""
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px;">
+            <strong style="color:#0f172a; font-size:12px;">{_esc(g.topic)}</strong>
+            <div style="font-size:11px; color:#475569; margin-top:2px;">{_esc(g.missing_data or '缺失数据说明未填写')}</div>
+            <div style="font-size:10px; color:#64748b; margin-top:4px;">
+                <div>• 决策影响: {_esc(g.decision_impact or '待评估')}</div>
+                <div>• 下一步行动: {_esc(g.follow_up or '待跟进核验')}</div>
+            </div>
+        </div>
+        """
+        for g in data_gaps
+    )
+    html = (
+        f"""
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">09 · 数据缺口与待核验清单 (Data Gaps)</div>
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px;">
+                {data_gap_cards}
+            </div>
+        </div>
+        """
+        if data_gaps
+        else ""
+    )
+    return html
+
+
 def generate_research_report_html(
     result: AnalysisResult,
     stock_info: dict[str, Any] | None = None,
@@ -955,128 +1114,21 @@ def generate_research_report_html(
 
     # ---------------- 02 商业模式 ----------------
     bm = getattr(rf, "business_model", None) if rf else None
-    segments_html = ""
-    if bm and bm.segment_quality:
-        segments_html = '<div style="margin-top:8px;"><div style="font-weight:700; font-size:11px; color:#475569; margin-bottom:6px;">📊 主营分部质量明细评估：</div><div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px;">'
-        for seg in bm.segment_quality:
-            conf_str = f"{int(seg.evidence_confidence * 100)}% 证据" if seg.evidence_confidence is not None else "证据待核验"
-            segments_html += f"""
-            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                    <strong style="color:#0f172a; font-size:12px;">{_esc(seg.segment)}</strong>
-                    <span style="font-size:10px; color:#64748b; background:#f1f5f9; padding:1px 6px; border-radius:4px;">{_esc(seg.role or '主营业务')} ｜ {conf_str}</span>
-                </div>
-                <div style="font-size:11px; color:#475569; line-height:1.45;">
-                    <div>• 增长质量: <strong>{_esc(seg.growth_quality or '--')}</strong></div>
-                    <div>• 盈利质量: <strong>{_esc(seg.profitability_quality or '--')}</strong></div>
-                    <div>• 收入持续性/现金重现: <strong>{_esc(seg.recurrence or '--')}</strong></div>
-                </div>
-            </div>
-            """
-        segments_html += '</div></div>'
-
+    segments_html = _render_segment_quality(bm)
     # ---------------- 03 护城河 ----------------
     moat = getattr(rf, "moat", None) if rf else None
-    moats_html = ""
-    if moat and moat.moats:
-        moats_html = '<div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; margin-top:8px;">'
-        for m in moat.moats:
-            m_name = MOAT_LABELS.get(m.moat_type, m.moat_type)
-            m_strength = LEVEL_LABELS.get(m.strength, m.strength)
-            m_dir = DIRECTION_LABELS.get(m.direction, m.direction)
-            counter_threats = [*getattr(m, "counterevidence", []), *getattr(m, "threats", [])]
-            moats_html += f"""
-            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <strong style="color:#0f172a; font-size:13px;">{_esc(m_name)}</strong>
-                    <div>
-                        {_render_pill(f'强度: {m_strength}', '#f1f5f9', '#334155', '#cbd5e1')}
-                        {_render_pill(f'趋势: {m_dir}', '#eff6ff', '#1d4ed8', '#bfdbfe')}
-                    </div>
-                </div>
-                <div style="font-size:11px; color:#475569; margin-bottom:4px;"><strong>持续期限:</strong> {_esc(m.durability or '长期稳固')}</div>
-                <div style="font-size:11px; color:#334155; margin-top:4px;"><strong>支持证据:</strong></div>
-                {_render_list_items(m.evidence)}
-                {f'<div style="font-size:11px; color:#991b1b; margin-top:4px;"><strong>反证与潜在威胁:</strong></div>{_render_list_items(counter_threats)}' if counter_threats else ''}
-            </div>
-            """
-        moats_html += '</div>'
-
+    moats_html = _render_moats(moat)
     # ---------------- 04 管理层与行业 ----------------
     mgmt = getattr(rf, "management", None) if rf else None
     ind = getattr(rf, "industry_position", None) if rf else None
 
     # ---------------- 05 逆向推演与风险 ----------------
     inv = getattr(rf, "inversion", None) if rf else None
-    risks_html = ""
-    if inv and inv.risks:
-        risks_html = '<div style="margin-top:8px;">'
-        for r in inv.risks:
-            r_prob = RISK_LABELS.get(r.probability, r.probability)
-            r_impact = RISK_LABELS.get(r.impact, r.impact)
-            horizon_str = f" ｜ 观察窗口: {r.time_horizon}" if getattr(r, "time_horizon", None) else ""
-            risks_html += f"""
-            <div style="background:#ffffff; border:1px solid #fecaca; border-left:4px solid #ef4444; border-radius:6px; padding:10px; margin-bottom:8px; break-inside:avoid;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                    <strong style="color:#991b1b; font-size:12px;">⚠️ {_esc(r.risk)}</strong>
-                    <div>
-                        {_render_pill(f'概率: {r_prob}', '#fef2f2', '#991b1b', '#fecaca')}
-                        {_render_pill(f'影响: {r_impact}{horizon_str}', '#fef2f2', '#991b1b', '#fecaca')}
-                    </div>
-                </div>
-                {f'<div style="font-size:11px; color:#475569; margin-bottom:3px;"><strong>失效路径:</strong> {_esc(r.failure_path)}</div>' if r.failure_path else ''}
-                {f'<div style="font-size:11px; color:#475569; margin-bottom:3px;"><strong>先行指标:</strong> {_esc(", ".join(r.leading_indicators))}</div>' if r.leading_indicators else ''}
-                {f'<div style="font-size:11px; color:#166534;"><strong>对冲缓解:</strong> {_esc(", ".join(r.mitigants))}</div>' if r.mitigants else ''}
-            </div>
-            """
-        risks_html += '</div>'
-    elif getattr(result, "risk_warnings", None):
-        risks_html = _render_list_items(result.risk_warnings)
-
+    risks_html = _render_risks(inv, getattr(result, "risk_warnings", None))
     # ---------------- 06 估值三情景 ----------------
     val_framework = getattr(rf, "valuation", None) if rf else None
     sc = getattr(val_framework, "scenarios", None) if val_framework else getattr(result, "scenarios", None)
-    sc_html = ""
-    if sc and getattr(sc, "bull", None) and getattr(sc, "base", None) and getattr(sc, "bear", None):
-        bull_range = f"{curr}{sc.bull.fair_value_range[0]:.2f} - {curr}{sc.bull.fair_value_range[1]:.2f}" if getattr(sc.bull, "fair_value_range", None) else "--"
-        base_range = f"{curr}{sc.base.fair_value_range[0]:.2f} - {curr}{sc.base.fair_value_range[1]:.2f}" if getattr(sc.base, "fair_value_range", None) else "--"
-        bear_range = f"{curr}{sc.bear.fair_value_range[0]:.2f} - {curr}{sc.bear.fair_value_range[1]:.2f}" if getattr(sc.bear, "fair_value_range", None) else "--"
-
-        sc_html = f"""
-        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:8px;">
-            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:10px;">
-                <div style="font-weight:700; color:#166534; font-size:13px; margin-bottom:4px;">乐观情景 (Bull)</div>
-                <div style="font-size:16px; font-weight:800; color:#15803d; margin-bottom:4px;">{_esc(bull_range)}</div>
-                <div style="font-size:11px; color:#166534; line-height:1.45;">
-                    <div>{_esc(sc.bull.valuation_view or '增长超出市场预期')}</div>
-                    <div style="margin-top:6px; font-weight:700;">关键假设:</div>
-                    {_render_list_items(sc.bull.assumptions)}
-                    {f'<div style="margin-top:6px; font-weight:700; color:#991b1b;">失效条件:</div>{_render_list_items(sc.bull.invalidating_conditions)}' if sc.bull.invalidating_conditions else ''}
-                </div>
-            </div>
-            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:10px;">
-                <div style="font-weight:700; color:#1d4ed8; font-size:13px; margin-bottom:4px;">基准情景 (Base)</div>
-                <div style="font-size:16px; font-weight:800; color:#1e40af; margin-bottom:4px;">{_esc(base_range)}</div>
-                <div style="font-size:11px; color:#1d4ed8; line-height:1.45;">
-                    <div>{_esc(sc.base.valuation_view or '业务稳健推进')}</div>
-                    <div style="margin-top:6px; font-weight:700;">关键假设:</div>
-                    {_render_list_items(sc.base.assumptions)}
-                    {f'<div style="margin-top:6px; font-weight:700; color:#991b1b;">失效条件:</div>{_render_list_items(sc.base.invalidating_conditions)}' if sc.base.invalidating_conditions else ''}
-                </div>
-            </div>
-            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:10px;">
-                <div style="font-weight:700; color:#991b1b; font-size:13px; margin-bottom:4px;">悲观情景 (Bear)</div>
-                <div style="font-size:16px; font-weight:800; color:#b91c1c; margin-bottom:4px;">{_esc(bear_range)}</div>
-                <div style="font-size:11px; color:#991b1b; line-height:1.45;">
-                    <div>{_esc(sc.bear.valuation_view or '承压与估值收缩')}</div>
-                    <div style="margin-top:6px; font-weight:700;">关键假设:</div>
-                    {_render_list_items(sc.bear.assumptions)}
-                    {f'<div style="margin-top:6px; font-weight:700; color:#991b1b;">失效条件:</div>{_render_list_items(sc.bear.invalidating_conditions)}' if sc.bear.invalidating_conditions else ''}
-                </div>
-            </div>
-        </div>
-        """
-
+    sc_html = _render_valuation_scenarios(sc, curr)
     # ---------------- 07 行动建议与持续跟踪 ----------------
     act = getattr(rf, "actions", None) if rf else None
     new_inv_act = ACTION_LABELS.get(act.new_investor_action, act.new_investor_action) if act else "重点关注"
@@ -1085,34 +1137,7 @@ def generate_research_report_html(
 
     # ---------------- 08 数据缺口 ----------------
     data_gaps = getattr(rf, "data_gaps", []) if rf else []
-    data_gap_cards = "".join(
-        f"""
-        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px;">
-            <strong style="color:#0f172a; font-size:12px;">{_esc(g.topic)}</strong>
-            <div style="font-size:11px; color:#475569; margin-top:2px;">{_esc(g.missing_data or '缺失数据说明未填写')}</div>
-            <div style="font-size:10px; color:#64748b; margin-top:4px;">
-                <div>• 决策影响: {_esc(g.decision_impact or '待评估')}</div>
-                <div>• 下一步行动: {_esc(g.follow_up or '待跟进核验')}</div>
-            </div>
-        </div>
-        """
-        for g in data_gaps
-    )
-    data_gaps_html = (
-        f"""
-        <div class="section-card">
-            <div class="section-header">
-                <div class="section-title">09 · 数据缺口与待核验清单 (Data Gaps)</div>
-            </div>
-            <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px;">
-                {data_gap_cards}
-            </div>
-        </div>
-        """
-        if data_gaps
-        else ""
-    )
-
+    data_gaps_html = _render_data_gaps(data_gaps)
     provenance = getattr(result, "provenance", None)
     freshness_note = provenance.freshness_note if provenance else "旧报告未记录数据时效与缓存来源；分析日期不代表数据截至日期。"
 

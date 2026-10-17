@@ -86,12 +86,7 @@ def _chart_page_html(title: str, description: str, option: dict, echarts_source:
 
 
 def _esc(text: str) -> str:
-    return (
-        str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def render_industry_chain_chart_pngs(

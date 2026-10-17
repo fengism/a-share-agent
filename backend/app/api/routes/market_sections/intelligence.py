@@ -54,9 +54,9 @@ async def refresh_twitter_feed():
 
 
 @router.get("/news-analysis", response_model=NewsAnalysisResponse)
-async def get_news_analysis(user: AuthenticatedUser = Depends(require_active_user)):
-    """获取由 LLM 生成的市场资讯综合分析。"""
-    return await analyze_market_news_service(user["id"])
+async def get_news_analysis(_user: AuthenticatedUser = Depends(require_active_user)):
+    """获取由 LLM 生成的市场资讯综合分析（公共资讯流，结果与用户无关）。"""
+    return await analyze_market_news_service()
 
 
 @router.get("/twitter-analyze", response_model=TwitterAnalysisResult)

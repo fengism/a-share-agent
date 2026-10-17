@@ -1,4 +1,5 @@
 """Select literal source-bound windows; never summarize or re-key evidence."""
+
 from __future__ import annotations
 
 import json
@@ -10,9 +11,33 @@ from app.modules.industry_chain.evidence_content import extract_evidence_content
 
 # Include counter-evidence explicitly; relevance must not mean optimism only.
 _DEFAULT_TERMS = (
-    "订单", "交付", "验收", "成本", "毛利", "库存", "现金流", "回款", "产能", "良率",
-    "客户", "需求", "采购", "价格", "利用率", "动销", "临床", "获批",
-    "取消", "延期", "下滑", "亏损", "未形成", "未披露", "减值", "风险", "不及预期",
+    "订单",
+    "交付",
+    "验收",
+    "成本",
+    "毛利",
+    "库存",
+    "现金流",
+    "回款",
+    "产能",
+    "良率",
+    "客户",
+    "需求",
+    "采购",
+    "价格",
+    "利用率",
+    "动销",
+    "临床",
+    "获批",
+    "取消",
+    "延期",
+    "下滑",
+    "亏损",
+    "未形成",
+    "未披露",
+    "减值",
+    "风险",
+    "不及预期",
 )
 _NEGATIVE_TERMS = ("取消", "延期", "下滑", "亏损", "未形成", "未披露", "减值", "风险", "不及预期")
 _WINDOW = 560
@@ -33,9 +58,9 @@ def _windows(text: str, focus_terms: tuple[str, ...]):
         end = min(len(text), start + _WINDOW)
         # Keep the surrounding sentence where practical, so "未/但" is not dropped
         # simply because it was one character outside the fixed window boundary.
-        left = list(re.finditer(r"[。！？!?\n]", text[max(0, start - 160):start]))
+        left = list(re.finditer(r"[。！？!?\n]", text[max(0, start - 160) : start]))
         start = max(0, start - 160) + left[-1].end() if left else max(0, start - 160)
-        right = re.search(r"[。！？!?\n]", text[end:min(len(text), end + 160)])
+        right = re.search(r"[。！？!?\n]", text[end : min(len(text), end + 160)])
         end = end + right.end() if right else min(len(text), end + 160)
         quote = text[start:end]
         lowered = quote.lower()
@@ -62,23 +87,44 @@ def _windows(text: str, focus_terms: tuple[str, ...]):
 
 def _body_payload(item: AgentEvidence, budget: int, focus_terms: tuple[str, ...]) -> str | None:
     parts = extract_evidence_content(_decode(item.content))
-    unique = list({(part.source_url, part.text): part for part in parts if part.source_url and part.text.strip()}.values())
+    unique = list(
+        {(part.source_url, part.text): part for part in parts if part.source_url and part.text.strip()}.values()
+    )
     if not unique:
         return None
     records = []
     pools = []
     for part in unique[:12]:
         pools.append((part, list(_windows(part.text, focus_terms))))
-    payload = {"selection": "literal_windows", "offset_basis": "各次工具返回的单篇正文字符位置，非PDF页码；片段之间不连续", "documents": records, "source_document_count": len(unique)}
+    payload = {
+        "selection": "literal_windows",
+        "offset_basis": "各次工具返回的单篇正文字符位置，非PDF页码；片段之间不连续",
+        "documents": records,
+        "source_document_count": len(unique),
+    }
     for rank in range(8):
         for part, windows in pools:
             if rank >= len(windows):
                 continue
-            record = next((entry for entry in records if entry["url"] == part.source_url and entry["body_length"] == len(part.text)
-                           and entry["body_index"] == unique.index(part)), None)
+            record = next(
+                (
+                    entry
+                    for entry in records
+                    if entry["url"] == part.source_url
+                    and entry["body_length"] == len(part.text)
+                    and entry["body_index"] == unique.index(part)
+                ),
+                None,
+            )
             new_record = record is None
             if new_record:
-                record = {"url": part.source_url, "body_index": unique.index(part), "body_length": len(part.text), "excerpts": [], "truncated": True}
+                record = {
+                    "url": part.source_url,
+                    "body_index": unique.index(part),
+                    "body_length": len(part.text),
+                    "excerpts": [],
+                    "truncated": True,
+                }
                 records.append(record)
             record["excerpts"].append(windows[rank])
             encoded = json.dumps(payload, ensure_ascii=False)
@@ -90,12 +136,15 @@ def _body_payload(item: AgentEvidence, budget: int, focus_terms: tuple[str, ...]
         return None
     for record in records:
         record["excerpts"].sort(key=lambda value: value["start"])
-        record["truncated"] = sum(window["end"] - window["start"] for window in record["excerpts"]) < record["body_length"]
+        record["truncated"] = (
+            sum(window["end"] - window["start"] for window in record["excerpts"]) < record["body_length"]
+        )
     return json.dumps(payload, ensure_ascii=False)
 
 
-def render_industry_evidence_section(item: AgentEvidence, *, index: int, item_budget: int,
-                                     focus_terms: tuple[str, ...] = ()) -> str:
+def render_industry_evidence_section(
+    item: AgentEvidence, *, index: int, item_budget: int, focus_terms: tuple[str, ...] = ()
+) -> str:
     terms = tuple(dict.fromkeys(term.strip() for term in focus_terms if 2 <= len(term.strip()) <= 80))[:48]
     content = None
     if item.tool_name in {"web_fetch", "fetch_urls", "read_pdf"}:
@@ -103,8 +152,10 @@ def render_industry_evidence_section(item: AgentEvidence, *, index: int, item_bu
     if content is None:
         content = serialize_context_result(item.content, item_budget)
     eid = agent_evidence_id(item)
-    payload = json.dumps({"evidence_id": eid, "tool_name": item.tool_name,
-                          "arguments": item.arguments[:1000], "content": content}, ensure_ascii=False)
+    payload = json.dumps(
+        {"evidence_id": eid, "tool_name": item.tool_name, "arguments": item.arguments[:1000], "content": content},
+        ensure_ascii=False,
+    )
     # Evidence may contain literal XML-like delimiters: keep it inside the JSON string.
     payload = payload.replace("<", "\\u003c").replace(">", "\\u003e")
     return f'<tool_evidence id="{eid}" index="{index}" name="{item.tool_name}">{payload}</tool_evidence>'

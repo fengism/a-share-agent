@@ -145,13 +145,14 @@ def _resolve_refs(result: dict[str, Any], items: list) -> dict[str, Any]:
     return result
 
 
-async def analyze_market_news(user_id: int) -> dict[str, Any]:
+async def analyze_market_news() -> dict[str, Any]:
     """调用 LLM 对市场资讯流进行结构化分析，失败时降级返回兜底分析。
 
     使用 SingleFlight 防止并发重复调用 LLM。
 
-    Param:
-        user_id: 当前用户 ID
+    分析对象是公共资讯流，结果与用户无关：缓存键只含日期与内容哈希，
+    所有用户共享同一份分析（N 个用户只调用一次 LLM）。
+
     Return:
         包含 market_sentiment/summary/sections 字段的结构化分析字典
     """
@@ -165,7 +166,7 @@ async def analyze_market_news(user_id: int) -> dict[str, Any]:
     content_hash = hashlib.md5(
         "\n".join(_get(item, "title") for item in items[:80]).encode()
     ).hexdigest()
-    cache_key = dated_cache_key("news_analysis", f"user:{user_id}", content_hash)
+    cache_key = dated_cache_key("news_analysis", content_hash)
 
     async def _load() -> dict[str, Any]:
         cached = cache.get(cache_key)

@@ -49,10 +49,14 @@ def validate_relationships(result: IndustryChainResult) -> None:
         share = number_tokens(node.revenue_share)
         period = re.compile(rf"(?<![0-9]){re.escape(node.revenue_period.strip())}(?![0-9])")
         matched_share = (
-            len(share) == 1 and share[0][1] == "%" and 0 <= share[0][0] <= 100
+            len(share) == 1
+            and share[0][1] == "%"
+            and 0 <= share[0][0] <= 100
             and bool(node.revenue_period.strip())
-            and any(share[0] in number_tokens(citation.quote)
-                    and period.search(normalize_number_text(citation.quote)) for citation in node.citations)
+            and any(
+                share[0] in number_tokens(citation.quote) and period.search(normalize_number_text(citation.quote))
+                for citation in node.citations
+            )
         )
         if node.revenue_share and not matched_share:
             node.revenue_share = ""
@@ -61,3 +65,45 @@ def validate_relationships(result: IndustryChainResult) -> None:
         if node.business_relevance == "earnings" and not node.revenue_share:
             node.business_relevance = "unverified"
             node.verification_notes.append("未验证相关收入占比，不能标记为业绩相关。")
+
+
+def build_node_adjacency_map(result: IndustryChainResult) -> dict[str, dict[str, list[str]]]:
+    """构建产业链节点关系图谱邻接索引，方便拓扑上下游与竞品关系双向快速检索。"""
+    adjacency: dict[str, dict[str, list[str]]] = {}
+
+    def _ensure_node(node_name: str) -> None:
+        if node_name not in adjacency:
+            adjacency[node_name] = {
+                "upstream": [],
+                "downstream": [],
+                "compete": [],
+                "substitute": [],
+                "transmission": [],
+            }
+
+    for edge in result.relationships:
+        src = (edge.source_node or "").strip()
+        tgt = (edge.target_node or "").strip()
+        rel = edge.relation_type
+        if not src or not tgt:
+            continue
+        _ensure_node(src)
+        _ensure_node(tgt)
+
+        if rel == "supply":
+            if src not in adjacency[tgt]["upstream"]:
+                adjacency[tgt]["upstream"].append(src)
+            if tgt not in adjacency[src]["downstream"]:
+                adjacency[src]["downstream"].append(tgt)
+        elif rel == "purchase":
+            if tgt not in adjacency[src]["upstream"]:
+                adjacency[src]["upstream"].append(tgt)
+            if src not in adjacency[tgt]["downstream"]:
+                adjacency[tgt]["downstream"].append(src)
+        elif rel in ("compete", "substitute", "transmission"):
+            if tgt not in adjacency[src][rel]:
+                adjacency[src][rel].append(tgt)
+            if rel in ("compete", "substitute") and src not in adjacency[tgt][rel]:
+                adjacency[tgt][rel].append(src)
+
+    return adjacency

@@ -49,10 +49,7 @@ def collection_item_count(value: Any) -> int:
 
 
 def evidence_inventory(public_data: dict[str, Any], *, agent_evidence_count: int) -> str:
-    public_counts = "；".join(
-        f"{key} {collection_item_count(public_data.get(key))} 条"
-        for key in PUBLIC_DATA_KEYS
-    )
+    public_counts = "；".join(f"{key} {collection_item_count(public_data.get(key))} 条" for key in PUBLIC_DATA_KEYS)
     return f"Agent 工具证据 {agent_evidence_count} 条；{public_counts}"
 
 
@@ -63,37 +60,31 @@ def public_evidence_items(name: str, public_data: dict[str, Any]) -> list[AgentE
         value = public_data.get(key)
         if not has_meaningful_value(value):
             continue
-        items.append(AgentEvidence(
-            tool_call_id=f"public-industry-data:{key}",
-            tool_name="public_industry_data",
-            arguments=json.dumps({"name": name, "dimension": key}, ensure_ascii=False, separators=(",", ":")),
-            content=serialize_result({key: value}, MAX_PUBLIC_CONTEXT_LENGTH // 2),
-        ))
+        items.append(
+            AgentEvidence(
+                tool_call_id=f"public-industry-data:{key}",
+                tool_name="public_industry_data",
+                arguments=json.dumps({"name": name, "dimension": key}, ensure_ascii=False, separators=(",", ":")),
+                content=serialize_result({key: value}, MAX_PUBLIC_CONTEXT_LENGTH // 2),
+            )
+        )
     return items
 
 
 def public_evidence_reference(items: list[AgentEvidence]) -> str:
-    return "；".join(
-        f"{json.loads(item.arguments)['dimension']}={agent_evidence_id(item)}"
-        for item in items
-    )
+    return "；".join(f"{json.loads(item.arguments)['dimension']}={agent_evidence_id(item)}" for item in items)
 
 
 def independent_source_count(evidence_catalog) -> int:
-    urls = {
-        url.rstrip("/")
-        for item in evidence_catalog
-        if item.status == "success"
-        for url in item.source_urls
-        if url
-    }
+    urls = {url.rstrip("/") for item in evidence_catalog if item.status == "success" for url in item.source_urls if url}
     return len(urls)
 
 
 def usable_agent_evidence_count(evidence: list[AgentEvidence]) -> int:
-    return len({
-        agent_evidence_id(item)
-        for item in evidence
-        if item.tool_name != "public_industry_data"
-        and item.evidence_state.usable_acquisition
-    })
+    return len(
+        {
+            agent_evidence_id(item)
+            for item in evidence
+            if item.tool_name != "public_industry_data" and item.evidence_state.usable_acquisition
+        }
+    )

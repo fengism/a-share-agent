@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { AnalysisResult, InvestmentResearchFramework } from "../../types/stock";
-import ResearchFrameworkPanel from "./ResearchFrameworkPanel";
+import ResearchFrameworkPanel from "../../features/investment-research/ResearchFrameworkPanel";
 
 function LocationProbe() {
   const location = useLocation();

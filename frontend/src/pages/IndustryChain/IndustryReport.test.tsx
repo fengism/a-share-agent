@@ -29,6 +29,7 @@ vi.mock("@ant-design/icons", () => ({
   HistoryOutlined: () => <span />,
   RiseOutlined: () => <span />,
   SendOutlined: () => <span />,
+  TableOutlined: () => <span />,
   TrophyOutlined: () => <span />,
   WarningOutlined: () => <span />,
 }));
@@ -581,6 +582,38 @@ describe("IndustryReport", () => {
     fireEvent.click(exportBtn);
     const exportMdItem = screen.getByText("导出为 Markdown (.md)");
     fireEvent.click(exportMdItem);
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    clickSpy.mockRestore();
+  });
+
+  it("supports exporting key stocks list via dropdown as CSV", () => {
+    window.URL.createObjectURL = vi.fn(() => "blob:mock-csv-url");
+    window.URL.revokeObjectURL = vi.fn();
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    const resultWithStocks: IndustryChainResult = {
+      ...result,
+      key_stocks: [
+        { name: "中际旭创", code: "300308", role: "光模块龙头", total_market_cap: "1200亿", pe: "35.5x", pb: "8.2" },
+      ],
+    };
+
+    renderReport(
+      <IndustryReport
+        result={resultWithStocks}
+        activeName="CPO"
+        archiveId="archive-cpo"
+        isPushing={false}
+        pushResult={null}
+        onPush={vi.fn()}
+      />,
+    );
+
+    const exportBtn = screen.getByRole("button", { name: "导出" });
+    fireEvent.click(exportBtn);
+    const exportCsvItem = screen.getByText("导出重点公司 (.csv)");
+    fireEvent.click(exportCsvItem);
     expect(window.URL.createObjectURL).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
     clickSpy.mockRestore();

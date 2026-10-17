@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import FundFlowPanel from "./FundFlowPanel";
+import FundFlowPanel from "../../features/stock-insights/FundFlowPanel";
 
 const baseFundFlow = Array.from({ length: 75 }, (_, index) => ({
   date: new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10),

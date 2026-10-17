@@ -5,7 +5,7 @@ import type {
   StockValuationDetail,
   ValuationMethodResult,
 } from "../../types/stock";
-import ValuationPanel from "./ValuationPanel";
+import ValuationPanel from "../../features/investment-research/ValuationPanel";
 
 function method(
   name: string,
