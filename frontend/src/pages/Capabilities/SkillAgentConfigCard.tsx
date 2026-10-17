@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BranchesOutlined, RobotOutlined, SaveOutlined } from "@ant-design/icons";
 import { Button, Card, Divider, Segmented, Space, Switch, Tag, Typography } from "antd";
 import SectionDataState from "../../components/SectionDataState";
@@ -10,6 +10,7 @@ import type {
   ChatCapabilityAvailabilityResponse,
 } from "../../types/capabilities";
 import type { ConfigUpdate } from "../../types/settings";
+import { reportPresetCatalogDrift } from "../../utils/capabilityPresets";
 import {
   applyCapabilityPreset,
   CAPABILITY_PRESETS,
@@ -77,6 +78,18 @@ export default function SkillAgentConfigCard({
   const agentNames = capabilities?.agents.map((agent) => agent.name) ?? [];
   const disabledSkills = new Set(disabledSkillNames);
   const disabledAgents = new Set(disabledAgentNames);
+
+  // 预设里的能力名是前端硬编码的（见 utils/capabilityPresets.ts）。这里是少数能拿到
+  // **完整**能力目录的地方，因此在此校验一次：后端改名/下线能力时前端会静默残缺，
+  // 必须至少能在控制台看到告警，否则只有用户发现「快速分析少了东西」才能暴露。
+  // 依赖 capabilities 而非其上派生的数组，避免每次 render 都触发。
+  useEffect(() => {
+    if (!capabilities) return;
+    reportPresetCatalogDrift(
+      capabilities.skills.map((skill) => skill.name),
+      capabilities.agents.map((agent) => agent.name),
+    );
+  }, [capabilities]);
 
   return (
     <Card

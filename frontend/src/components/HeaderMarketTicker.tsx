@@ -2,6 +2,7 @@ import { Component, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMarketIndices } from "../api/queries";
 import { useColors } from "../styles/ui";
+import { HEADER_TICKER_INDEX_COUNT, isHeaderTickerIndex } from "../utils/keyMarketIndices";
 import "./header-market-ticker.css";
 
 interface ErrorBoundaryProps {
@@ -47,14 +48,10 @@ function TickerContent() {
   const allIndices = data?.indices ?? [];
   if (allIndices.length === 0) return null;
 
-  // Prioritize Shangzheng (000001), Shencheng (399001), and Chuangyeban (399006)
-  const targetCodes = ["000001", "399001", "399006", "sh000001", "sz399001", "sz399006"];
-  const selected = allIndices.filter((idx) =>
-    targetCodes.some((code) => idx.code.includes(code)) ||
-    ["上证指数", "深证成指", "创业板指"].some((n) => idx.name.includes(n)),
-  ).slice(0, 3);
+  // 前端只负责「挑出要展示的指数」；具体顺序由后端按 INDEX_FALLBACKS 归一。
+  const selected = allIndices.filter(isHeaderTickerIndex).slice(0, HEADER_TICKER_INDEX_COUNT);
 
-  const displayList = selected.length > 0 ? selected : allIndices.slice(0, 3);
+  const displayList = selected.length > 0 ? selected : allIndices.slice(0, HEADER_TICKER_INDEX_COUNT);
 
   return (
     <div

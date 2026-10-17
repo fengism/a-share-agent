@@ -46,6 +46,20 @@ export function formatNumber(value: number | null | undefined, digits = 2) {
   return value.toFixed(digits);
 }
 
+/**
+ * 带千分位的数字格式化（zh-CN，如 1,234.56）。
+ *
+ * 与 {@link formatNumber} 的区别仅在于是否插入千分位分隔符；
+ * 非有限数（NaN / Infinity）统一降级为 "-"。
+ */
+export function formatNumberWithSeparators(value: number | null | undefined, digits = 2) {
+  if (value == null || !Number.isFinite(value)) return "-";
+  return value.toLocaleString("zh-CN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
 export function changeColor(value: number | null | undefined, c?: ThemeColors) {
   const colors = c ?? getColors();
   if (value == null) return colors.textSecondary;

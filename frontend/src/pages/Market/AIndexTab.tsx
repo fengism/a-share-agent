@@ -9,35 +9,22 @@ import SectionDataState from "../../components/SectionDataState";
 import { useFullscreenChartHeight } from "../../hooks/useFullscreenChartHeight";
 import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import { useColors, useTokens } from "../../styles/ui";
-import type { ThemeColors } from "../../styles/ui";
 import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
+import { changeColor, formatAmount } from "../../utils/format";
+import { KEY_MARKET_INDEX_CODES } from "../../utils/keyMarketIndices";
 import MarketVolumeCard from "./MarketVolumeCard";
 
 const { Text } = Typography;
-const INDEX_CODES = ["000001", "399001", "399006", "000688", "000300", "000905"] as const;
+const DEFAULT_INDEX_CODE = "000001";
 const KLINE_PERIODS = ["daily", "weekly", "monthly"] as const;
-
-function getChangeColor(changePct: number | null, c: ThemeColors) {
-  if (changePct == null) return c.textSecondary;
-  if (changePct > 0) return c.up;
-  if (changePct < 0) return c.down;
-  return c.textSecondary;
-}
-
-function formatAmount(value: number | null | undefined) {
-  if (value == null) return "-";
-  if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(1)}亿`;
-  if (Math.abs(value) >= 1e4) return `${(value / 1e4).toFixed(1)}万`;
-  return value.toFixed(0);
-}
 
 export default function AIndexTab() {
   const c = useColors();
   const t = useTokens();
   const [klineExpanded, setKlineExpanded] = useState(false);
   const fullscreenHeight = useFullscreenChartHeight();
-  const [activeSymbol, setActiveSymbol] = useUrlSearchParam("index", "000001", {
-    allowedValues: INDEX_CODES,
+  const [activeSymbol, setActiveSymbol] = useUrlSearchParam("index", DEFAULT_INDEX_CODE, {
+    allowedValues: KEY_MARKET_INDEX_CODES,
   });
   const [period, setPeriod] = useUrlSearchParam("period", "daily", {
     allowedValues: KLINE_PERIODS,
@@ -83,7 +70,7 @@ export default function AIndexTab() {
   }, []);
 
   const mainIndices = useMemo(
-    () => INDEX_CODES.map((code) => (marketData?.indices || []).find((item) => item.code === code)).filter((item) => item != null),
+    () => KEY_MARKET_INDEX_CODES.map((code) => (marketData?.indices || []).find((item) => item.code === code)).filter((item) => item != null),
     [marketData],
   );
   const desktopSpan = mainIndices.length > 0 ? Math.max(4, Math.floor(24 / mainIndices.length)) : 4;
@@ -167,7 +154,7 @@ export default function AIndexTab() {
                         precision={2}
                         styles={{
                           content: {
-                            color: getChangeColor(idx.change_pct, c),
+                            color: changeColor(idx.change_pct, c),
                             fontSize: "clamp(16px, 4.2vw, 26px)",
                             lineHeight: 1.2,
                             fontWeight: Number(t.weight.bold),

@@ -6,16 +6,13 @@ import { Link } from "react-router-dom";
 import { useHKIndustryComparison, type HKIndustryPeerItem } from "../../api/queryHooks/hk";
 import SectionDataState from "../../components/SectionDataState";
 import { useColors, useStyles } from "../../styles/ui";
+import { formatNumberWithSeparators } from "../../utils/format";
 import StockSectionTitle from "./StockSectionTitle";
 
 const { Text } = Typography;
 
 function formatVal(value: number | null | undefined, digits = 2) {
-  if (value == null) return "-";
-  return value.toLocaleString("zh-CN", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
+  return formatNumberWithSeparators(value, digits);
 }
 
 function calculateMedian(values: number[]): number | null {

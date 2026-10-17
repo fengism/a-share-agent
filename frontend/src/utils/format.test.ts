@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   formatSignedPercent, formatRatioPercent, formatHotValue, formatWanAmount,
-  formatNumber, formatMarketCap, formatAmount, formatAmountWanYi, changeColor,
+  formatNumber, formatNumberWithSeparators, formatMarketCap, formatAmount, formatAmountWanYi, changeColor,
   formatChangeAriaLabel, getChangeDirection,
 } from "./format";
 import { themes } from "../theme/themes";
@@ -39,6 +39,16 @@ describe("format utils", () => {
     expect(formatNumber(3.14159)).toBe("3.14");
     expect(formatNumber(3.14159, 3)).toBe("3.142");
     expect(formatNumber(null)).toBe("-");
+  });
+
+  it("formatNumberWithSeparators", () => {
+    expect(formatNumberWithSeparators(1234.5)).toBe("1,234.50");
+    expect(formatNumberWithSeparators(1234.5, 0)).toBe("1,235");
+    expect(formatNumberWithSeparators(-1234567.891, 2)).toBe("-1,234,567.89");
+    expect(formatNumberWithSeparators(null)).toBe("-");
+    expect(formatNumberWithSeparators(undefined)).toBe("-");
+    expect(formatNumberWithSeparators(Number.NaN)).toBe("-");
+    expect(formatNumberWithSeparators(Number.POSITIVE_INFINITY)).toBe("-");
   });
 
   it("formatMarketCap", () => {

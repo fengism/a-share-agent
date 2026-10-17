@@ -37,6 +37,7 @@ import { useFullscreenChartHeight } from "../../hooks/useFullscreenChartHeight";
 import { useColors, useStyles } from "../../styles/ui";
 import type { KlineItem } from "../../types/stock";
 import { MAX_KLINE_HISTORY_YEARS, yearsAgoDate } from "../../utils/date";
+import { formatNumberWithSeparators } from "../../utils/format";
 import StockBusinessIntro from "./StockBusinessIntro";
 import KeyFinancialMetricsSection from "../../features/investment-research/KeyFinancialMetricsSection";
 import RevenueBreakdownSection from "../../features/investment-research/RevenueBreakdownSection";
@@ -45,20 +46,11 @@ import StockSectionTitle from "./StockSectionTitle";
 
 const { Title, Text } = Typography;
 
-function formatNumber(value: number | null | undefined, digits = 2) {
-  return value == null
-    ? "-"
-    : value.toLocaleString("zh-CN", {
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits,
-      });
-}
-
 function formatAmount(value: number | null | undefined) {
   if (value == null) return "-";
   if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(2)}亿`;
   if (Math.abs(value) >= 1e4) return `${(value / 1e4).toFixed(1)}万`;
-  return formatNumber(value, 0);
+  return formatNumberWithSeparators(value, 0);
 }
 
 type HKChartView = "intraday" | "kline" | "macd" | "rsi" | "kdj";
@@ -232,15 +224,15 @@ export default function HKStockPageContent({ code }: { code: string }) {
                         : colors.down,
                   }}
                 >
-                  {quote.price == null ? "-" : `HK$${formatNumber(quote.price)}`}
+                  {quote.price == null ? "-" : `HK$${formatNumberWithSeparators(quote.price)}`}
                 </strong>
                 <small>
                   {quote.change != null && quote.change_pct != null ? (
                     <span style={{ color: changePct && changePct > 0 ? colors.up : colors.down }}>
                       {changePct && changePct > 0 ? "+" : ""}
-                      {formatNumber(quote.change)} (
+                      {formatNumberWithSeparators(quote.change)} (
                       {changePct && changePct > 0 ? "+" : ""}
-                      {formatNumber(quote.change_pct)}%)
+                      {formatNumberWithSeparators(quote.change_pct)}%)
                     </span>
                   ) : (
                     "新浪实时行情"
@@ -275,19 +267,19 @@ export default function HKStockPageContent({ code }: { code: string }) {
           <dl className="stock-metrics-grid">
             <div className="stock-metric stock-metric--featured">
               <dt>今开盘</dt>
-              <dd>{formatNumber(quote?.open)}</dd>
+              <dd>{formatNumberWithSeparators(quote?.open)}</dd>
             </div>
             <div className="stock-metric stock-metric--featured">
               <dt>昨收盘</dt>
-              <dd>{formatNumber(quote?.pre_close)}</dd>
+              <dd>{formatNumberWithSeparators(quote?.pre_close)}</dd>
             </div>
             <div className="stock-metric">
               <dt>最高价</dt>
-              <dd style={{ color: colors.up }}>{formatNumber(quote?.high)}</dd>
+              <dd style={{ color: colors.up }}>{formatNumberWithSeparators(quote?.high)}</dd>
             </div>
             <div className="stock-metric">
               <dt>最低价</dt>
-              <dd style={{ color: colors.down }}>{formatNumber(quote?.low)}</dd>
+              <dd style={{ color: colors.down }}>{formatNumberWithSeparators(quote?.low)}</dd>
             </div>
             <div className="stock-metric">
               <dt>振幅</dt>
@@ -319,7 +311,7 @@ export default function HKStockPageContent({ code }: { code: string }) {
             </div>
             <div className="stock-metric">
               <dt>买一价 / 卖一价</dt>
-              <dd>{formatNumber(quote?.bid)} / {formatNumber(quote?.ask)}</dd>
+              <dd>{formatNumberWithSeparators(quote?.bid)} / {formatNumberWithSeparators(quote?.ask)}</dd>
             </div>
             <div className="stock-metric">
               <dt>数据更新时间</dt>

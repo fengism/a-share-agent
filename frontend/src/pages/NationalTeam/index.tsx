@@ -41,6 +41,7 @@ import SectionDataState from "../../components/SectionDataState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useColors } from "../../styles/ui";
 import { APP_FONT_FAMILY } from "../../theme/typography";
+import { formatNumberWithSeparators } from "../../utils/format";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
 import type { NationalTeamEtfSeries, NationalTeamIndexSeries } from "../../types/stock";
 import "./national-team.css";
@@ -112,21 +113,13 @@ const INDEX_TAG_COLORS: Record<string, string> = {
   "创业板": "geekblue",
 };
 
-function formatNumber(value: number | null | undefined, digits = 2) {
-  if (value == null || !Number.isFinite(value)) return "-";
-  return value.toLocaleString("zh-CN", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
-
 function formatShares(value: number | null | undefined) {
-  return value == null ? "-" : `${formatNumber(value)} 亿份`;
+  return value == null ? "-" : `${formatNumberWithSeparators(value)} 亿份`;
 }
 
 function formatSigned(value: number | null | undefined, unit = "亿份") {
   if (value == null || !Number.isFinite(value)) return "-";
-  return `${value > 0 ? "+" : ""}${formatNumber(value)} ${unit}`;
+  return `${value > 0 ? "+" : ""}${formatNumberWithSeparators(value)} ${unit}`;
 }
 
 function valueColor(value: number | null | undefined, up: string, down: string, neutral: string) {
@@ -165,7 +158,7 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
         const rows = params.map((entry) => {
           const isShare = entry.seriesName === "ETF 合计份额";
           const unit = isShare ? "亿份" : "点";
-          const formattedVal = formatNumber(entry.value, 2);
+          const formattedVal = formatNumberWithSeparators(entry.value, 2);
           return `<div style="display:flex;justify-content:space-between;align-items:center;gap:20px;margin-top:4px">
             <span style="display:flex;align-items:center;gap:6px;font-size:12px">${entry.marker}${entry.seriesName}</span>
             <b style="font-family:var(--c-font-mono);font-size:12px">${formattedVal} ${unit}</b>
@@ -208,7 +201,7 @@ function IndexDualAxisChart({ item }: { item: NationalTeamIndexSeries }) {
         name: "份额（亿份）",
         scale: true,
         nameTextStyle: { color: shareColor, fontSize: 10, fontWeight: 600, padding: [0, 0, 2, 0] },
-        axisLabel: { color: colors.textSecondary, fontSize: 10, formatter: (val: number) => formatNumber(val, 1) },
+        axisLabel: { color: colors.textSecondary, fontSize: 10, formatter: (val: number) => formatNumberWithSeparators(val, 1) },
         splitLine: { lineStyle: { color: colors.border, type: "dashed", opacity: 0.35 } },
       },
       {
