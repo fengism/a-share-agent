@@ -5,7 +5,7 @@ from app.modules.bot.commands.base import BotCommand
 from app.modules.bot.models import BotExecutionContext, BotMessage, BotResponse
 from app.modules.daily_review.models import DailyReviewDataSnapshot, DailyReviewResult
 from app.modules.daily_review.public import DailyReviewRequest, generate_daily_review
-from app.modules.push.content import _STATE_LABELS, _build_daily_review_data_blocks
+from app.modules.push.public import build_daily_review_data_blocks, market_state_label
 
 _DATA_SECTION_HEADINGS = ("主要指数表现", "量能与市场宽度", "短线连板天梯", "行业板块涨跌榜")
 _SUMMARY_CHAR_LIMIT = 600
@@ -31,7 +31,7 @@ def _data_section_text(snapshot: DailyReviewDataSnapshot, char_budget: int) -> s
     selected: list[ContentBlock] = []
     keeping = False
     used = 0
-    for block in _build_daily_review_data_blocks(snapshot):
+    for block in build_daily_review_data_blocks(snapshot):
         if block.type == "heading":
             keeping = any(name in block.text for name in _DATA_SECTION_HEADINGS)
             if keeping:
@@ -52,7 +52,7 @@ def _trimmed(text: str, limit: int) -> str:
 
 
 def _format_market_reply(result: DailyReviewResult) -> str:
-    state_label = _STATE_LABELS.get(result.market_state, "数据不足")
+    state_label = market_state_label(result.market_state, default="数据不足")
     header = (
         f"📅 {result.effective_date or result.date} 市场复盘"
         f"（{state_label} ｜ 建议仓位 {result.position_range or '灵活配置'}）"

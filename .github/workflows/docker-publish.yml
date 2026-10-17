@@ -66,9 +66,13 @@ jobs:
       - name: Lint backend and sandbox
         working-directory: backend
         run: |
-          uv run --frozen ruff check app ../sandbox
+          uv run --frozen ruff check app scripts ../sandbox
           uv run --frozen mypy
           uv run --frozen mypy ../sandbox
+
+      - name: Check backend module boundaries
+        working-directory: backend
+        run: uv run --frozen python -m scripts.check_import_boundaries
 
       - name: Install native Chromium for rendering tests
         working-directory: backend
@@ -81,7 +85,9 @@ jobs:
             echo "::notice::backend/tests 不存在（测试已随模块重构移除），跳过后端单元测试"
             exit 0
           fi
-          uv run --frozen pytest -q
+          uv run --frozen coverage run -m pytest -q
+          # 覆盖率棘轮：下限与 backend/pyproject.toml 的 [tool.coverage.report] fail_under 保持一致
+          uv run --frozen coverage report --fail-under=44
 
       - uses: actions/setup-node@v4
         with:

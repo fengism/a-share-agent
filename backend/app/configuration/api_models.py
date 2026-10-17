@@ -22,6 +22,8 @@ from typing import Annotated, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
+from app.configuration.provider_catalog import LLMApiMode
+
 __all__ = [
     "API_SECRET_KEYS",
     "CONFIG_FIELD_GROUPS",
@@ -60,7 +62,7 @@ class ConfigUpdateRequest(BaseModel):
     # ---------------------------------------------------------------- 大模型
     llm_provider: Annotated[str | None, ConfigMeta("private", "llm", synced_global=True)] = None
     llm_api_mode: Annotated[
-        Literal["auto", "openai", "litellm"] | None,
+        LLMApiMode | None,
         ConfigMeta("private", "llm", synced_global=True),
     ] = None
     llm_api_version: Annotated[str | None, ConfigMeta("private", "llm", synced_global=True)] = None

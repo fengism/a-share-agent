@@ -125,6 +125,15 @@ _STATE_LABELS = {
 }
 
 
+def market_state_label(state: str, default: str = "未知") -> str:
+    """把市场状态枚举转换为推送/回复用中文标签。
+
+    消费方对未知状态的降级文案不一致（推送卡片用「未知」，Bot 回复用
+    「数据不足」），因此默认值由调用方显式传入。
+    """
+    return _STATE_LABELS.get(state, default)
+
+
 def _format_pct(val: float | None) -> str:
     if val is None:
         return "-"
@@ -142,7 +151,7 @@ def _format_amt(val: float | None) -> str:
     return f"{val:.0f} 元"
 
 
-def _build_daily_review_data_blocks(snapshot: DailyReviewDataSnapshot) -> list[ContentBlock]:
+def build_daily_review_data_blocks(snapshot: DailyReviewDataSnapshot) -> list[ContentBlock]:
     blocks: list[ContentBlock] = [
         ContentBlock(type="heading", level=2, text="📊 核心市场数据看板"),
     ]
@@ -258,7 +267,7 @@ def _build_daily_review_data_blocks(snapshot: DailyReviewDataSnapshot) -> list[C
 def _build_daily_review(review: DailyReviewResult) -> list[ContentBlock]:
     """将每日复盘结果组装为 ContentBlock 列表。"""
     date_str = review.effective_date or review.date
-    state_label = _STATE_LABELS.get(review.market_state, "未知")
+    state_label = market_state_label(review.market_state)
 
     blocks: list[ContentBlock] = [
         ContentBlock(type="heading", level=1, text=f"📅 {date_str} A 股每日市场复盘"),
@@ -269,7 +278,7 @@ def _build_daily_review(review: DailyReviewResult) -> list[ContentBlock]:
 
     # 插入核心市场数据看板（指数、市场宽度、行业排行、龙虎榜等）
     if review.data_snapshot:
-        data_blocks = _build_daily_review_data_blocks(review.data_snapshot)
+        data_blocks = build_daily_review_data_blocks(review.data_snapshot)
         if len(data_blocks) > 1:
             blocks.extend(data_blocks)
             blocks.append(ContentBlock(type="divider"))

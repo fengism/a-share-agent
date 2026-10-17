@@ -224,7 +224,8 @@ async def import_industry_chain_atlas(
 ) -> list[AtlasChain]:
     """导入外部产业链定义（管理员），校验通过后写入导入目录并立即生效。"""
     try:
-        return import_atlas_chains(request.content, overwrite=request.overwrite)
+        chains: list[AtlasChain] = import_atlas_chains(request.content, overwrite=request.overwrite)
+        return chains
     except AtlasImportError as exc:
         message = str(exc)
         if "已存在" in message:

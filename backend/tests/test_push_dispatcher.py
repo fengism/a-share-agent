@@ -311,7 +311,7 @@ async def test_api_routes(mock_user: AuthenticatedUser, monkeypatch):
 
 
 def test_channel_registry():
-    from app.modules.push.channels.registry import ChannelRegistry, create_default_registry
+    from app.modules.push.channels.registry import create_default_registry
 
     reg = create_default_registry()
     channels = reg.list_all()
@@ -329,6 +329,7 @@ def test_channel_registry():
 @pytest.mark.asyncio
 async def test_event_bus_and_subscribers(sample_daily_review: DailyReviewResult, monkeypatch):
     import asyncio
+
     from app.core.events import event_bus
     from app.modules.push.subscribers import register_push_subscribers
 
@@ -377,6 +378,7 @@ async def test_dispatch_debounce_and_history(sample_daily_review: DailyReviewRes
 
 def test_compute_dingtalk_sign():
     import urllib.parse
+
     from app.modules.push.channels.dingtalk import compute_dingtalk_sign
 
     secret = "SEC123456"
@@ -419,7 +421,6 @@ async def test_send_dingtalk_webhook():
 
 @pytest.mark.asyncio
 async def test_resilient_post_retry():
-    import httpx
     from app.modules.push.channels.http_client import resilient_post
 
     # 第一次 502，第二次 200
@@ -474,8 +475,8 @@ async def test_clear_notification_history_api(mock_user: AuthenticatedUser):
 
 
 def test_format_system_alert():
-    from app.modules.push.formatters.system_alert import format_system_alert
     from app.modules.push.domain.message import NotificationSeverity
+    from app.modules.push.formatters.system_alert import format_system_alert
 
     msg = format_system_alert(
         title="大盘突发跳水预警",

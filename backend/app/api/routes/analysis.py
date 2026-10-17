@@ -147,7 +147,8 @@ async def export_custom_analysis_pdf(
     user: AuthenticatedUser = Depends(require_active_user),
 ):
     """基于前端传入的实时分析结果对象直接生成纯矢量投研 PDF。"""
-    code = getattr(result, "stock_code", None) or getattr(result, "code", "stock")
+    # str() 仅为收敛 getattr 的 Any 返回值，不改变原有取值优先级与空串语义
+    code = str(getattr(result, "stock_code", None) or getattr(result, "code", "stock"))
     return await _analysis_pdf_response(result, code)
 
 

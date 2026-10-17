@@ -1,6 +1,7 @@
 """在 JSON 解析前限制导入请求；同时覆盖 Content-Length 与分块上传。"""
 
 from collections import deque
+from typing import Any
 
 from starlette.responses import JSONResponse
 
@@ -29,7 +30,7 @@ class ImportBodyLimitMiddleware:
                         return await reject()
                 except ValueError:
                     pass
-        chunks = deque()
+        chunks: deque[Any] = deque()
         total = 0
         while True:
             message = await receive()

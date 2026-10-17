@@ -1,4 +1,25 @@
-PROVIDER_DEFAULTS = {
+from typing import Literal, TypedDict
+
+#: ``Settings.llm_api_mode`` 允许的取值；与 catalog 中的 ``api_mode`` 必须一致。
+LLMApiMode = Literal["auto", "openai", "litellm"]
+
+
+class ProviderDefaults(TypedDict, total=False):
+    """LLM provider 目录中单个条目的字段。
+
+    ``total=False``：并非每个 provider 都声明全部字段（目前仅 ``api_version`` 可选）。
+    """
+
+    label: str
+    description: str
+    api_mode: LLMApiMode
+    api_key_required: bool
+    base_url: str
+    model: str
+    api_version: str
+
+
+PROVIDER_DEFAULTS: dict[str, ProviderDefaults] = {
     "deepseek": {
         "label": "DeepSeek",
         "description": "DeepSeek 官方 OpenAI 兼容接口",

@@ -1045,7 +1045,10 @@ class MarketDailyBarRepository:
                     _record_migration_ledger(connection, 2)
                     connection.execute("PRAGMA user_version=2")
                     from app.core.cache import clear_all_caches
+                    from app.modules.market_daily.adjustment import clear_adjustment_health_cache
 
+                    # 迁移重写了复权因子，先丢弃本模块的因子健康缓存再失效全局缓存。
+                    clear_adjustment_health_cache()
                     clear_all_caches()
             with _close_lock:
                 _initialized_paths.add(key)

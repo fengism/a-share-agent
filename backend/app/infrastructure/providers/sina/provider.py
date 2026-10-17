@@ -320,7 +320,7 @@ class SinaDataProvider:
             if not isinstance(row, Mapping):
                 continue
             code = str(row.get("code") or "").strip()
-            name = normalize_stock_name(row.get("name"))
+            name = normalize_stock_name(str(row.get("name") or ""))
             if (
                 len(code) != 6
                 or not code.isdigit()

@@ -25,7 +25,7 @@ def build_updated_settings(current: Settings, patch: dict) -> Settings:
     """Build a copy-on-write global settings snapshot."""
     old_provider = current.llm_provider.lower()
     old_defaults = PROVIDER_DEFAULTS.get(old_provider, {})
-    updated = current.model_copy(deep=True)
+    updated: Settings = current.model_copy(deep=True)
 
     for key, value in patch.items():
         if value is None or not hasattr(current, key) or is_masked_secret(key, value):

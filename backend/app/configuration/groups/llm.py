@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from pydantic import Field
 
 from app.configuration.groups.base import ConfigGroup
 from app.configuration.llm_compatibility import LLMCompatibilityOverride
+from app.configuration.provider_catalog import LLMApiMode
 
 
 class LLMGroup(ConfigGroup):
@@ -16,7 +15,7 @@ class LLMGroup(ConfigGroup):
     PREFIX = "llm_"
 
     llm_provider: str = "zhipu"
-    llm_api_mode: Literal["auto", "openai", "litellm"] = "auto"
+    llm_api_mode: LLMApiMode = "auto"
     llm_api_version: str = ""
     llm_api_key: str = ""
     llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4"

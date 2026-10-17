@@ -55,7 +55,7 @@ def overlay_private(base: Settings, overrides: dict) -> Settings:
     if not patch:
         return base
 
-    merged = base.model_copy(update=patch)
+    merged: Settings = base.model_copy(update=patch)
     if "llm_provider" in patch and merged.llm_provider.lower() != base.llm_provider.lower():
         defaults = PROVIDER_DEFAULTS.get(str(merged.llm_provider).lower(), {})
         if "llm_base_url" not in patch and defaults.get("base_url"):

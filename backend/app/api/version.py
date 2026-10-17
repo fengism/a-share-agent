@@ -212,7 +212,10 @@ async def update_status() -> UpdateStatusResponse:
     if not status_file.exists():
         return UpdateStatusResponse(status="idle")
     try:
-        return UpdateStatusResponse.model_validate_json(status_file.read_text(encoding="utf-8"))
+        status: UpdateStatusResponse = UpdateStatusResponse.model_validate_json(
+            status_file.read_text(encoding="utf-8")
+        )
+        return status
     except (OSError, ValueError):
         logger.warning("读取更新状态失败", exc_info=True)
         return UpdateStatusResponse(status="failed", message="更新状态文件损坏")

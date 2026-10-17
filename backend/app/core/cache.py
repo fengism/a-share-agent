@@ -195,12 +195,6 @@ def invalidate_all_caches() -> None:
     _CACHE_EPOCH += 1
     for cache_instance in (market_cache, reference_cache, analysis_cache, series_cache):
         cache_instance.clear()
-    try:
-        from app.modules.market_daily.adjustment import _healthy_cache
-
-        _healthy_cache.clear()
-    except Exception:
-        pass
 
 
 def clear_all_caches() -> None:

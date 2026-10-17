@@ -73,6 +73,20 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 addopts = "-ra"
 
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+# 覆盖率棘轮：实测约 44.5%，先钉在 44%；后续提升覆盖面后同步上调此值，只升不降。
+fail_under = 44
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+
 [tool.ruff]
 line-length = 120
 target-version = "py311"
@@ -90,6 +104,13 @@ ignore = ["E501"]
 [tool.mypy]
 python_version = "3.11"
 files = [
+    "app/api",
+    "app/configuration",
+    "app/infrastructure/persistence/retention.py",
+    "app/infrastructure/report",
+    "app/constants",
+    "app/core",
+    "app/runtime",
     "app/agentic/adapters/research.py",
     "app/agentic/agents/contracts.py",
     "app/agentic/agents/executor.py",
@@ -129,18 +150,6 @@ files = [
     "app/agentic/tools/packs/web/fetcher.py",
     "app/agentic/tools/packs/web/transport.py",
     "app/agentic/tools/packs/web/url_security.py",
-    "app/core/exceptions.py",
-    "app/core/metrics.py",
-    "app/core/concurrency/durable_stream.py",
-    "app/core/concurrency/rate_limiter.py",
-    "app/core/prometheus.py",
-    "app/core/progress.py",
-    "app/core/retry.py",
-    "app/core/operational.py",
-    "app/configuration/schema.py",
-    "app/configuration/api_models.py",
-    "app/configuration/groups",
-    "app/configuration/locations.py",
     "app/financial_data/market/quotes/statistic.py",
     "app/financial_data/market/quotes/index_kline.py",
     "app/financial_data/market/quotes/indices.py",
@@ -153,7 +162,6 @@ files = [
     "app/infrastructure/providers/sina/industry.py",
     "app/infrastructure/providers/sina/provider.py",
     "app/infrastructure/persistence/leased_jobs.py",
-    "app/configuration/llm_compatibility.py",
     "app/infrastructure/llm/capabilities.py",
     "app/infrastructure/llm/spec.py",
     "app/infrastructure/llm/tool_calling.py",
@@ -184,11 +192,6 @@ files = [
     "app/modules/stock_comparison/service.py",
     "app/modules/workflow/models.py",
     "app/modules/workflow/service.py",
-    "app/api/system.py",
-    "app/api/schemas.py",
-    "app/api/auth/cookies.py",
-    "app/api/auth/dependencies.py",
-    "app/api/auth/http.py",
     "app/domain/identity.py",
     "app/infrastructure/browser_runtime.py",
     "app/infrastructure/pdf_runtime.py",
@@ -205,16 +208,6 @@ files = [
     "app/infrastructure/providers/provider_gateway.py",
     "app/infrastructure/providers/provider_chain.py",
     "app/modules/*/public.py",
-    "app/runtime/agentic_tools.py",
-    "app/runtime/app_version.py",
-    "app/runtime/health.py",
-    "app/runtime/job_workers.py",
-    "app/runtime/logging_setup.py",
-    "app/runtime/task_health.py",
-    "app/runtime/task_scheduler.py",
-    "app/runtime/task_supervisor.py",
-    "app/runtime/middleware.py",
-    "app/runtime/workflow_worker.py",
 ]
 check_untyped_defs = true
 follow_imports = "skip"

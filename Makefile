@@ -6,11 +6,12 @@ BACKEND_PORT ?= 8000
 FRONTEND_HOST ?= 127.0.0.1
 FRONTEND_PORT ?= 5173
 STARTUP_TIMEOUT ?= 90
+COVERAGE_MIN ?= 44
 
 RUN_ENV = BACKEND_HOST="$(BACKEND_HOST)" BACKEND_PORT="$(BACKEND_PORT)" FRONTEND_HOST="$(FRONTEND_HOST)" FRONTEND_PORT="$(FRONTEND_PORT)" STARTUP_TIMEOUT="$(STARTUP_TIMEOUT)"
 
 .PHONY: help setup start stop restart status logs dev prod pack check test version-check version-bump \
-	backend-sync backend-browser-install backend-dev backend-lint backend-type backend-test backend-db-init backend-reset-admin backend-reset-accounts \
+	backend-sync backend-browser-install backend-dev backend-lint backend-boundaries backend-type backend-test backend-coverage backend-db-init backend-reset-admin backend-reset-accounts \
 	frontend-install frontend-dev frontend-api-check frontend-test frontend-e2e frontend-build frontend-lint \
 	export-industry-mapping docker-up docker-sandbox-up docker-down docker-restart docker-build docker-logs docker-status
 
@@ -45,7 +46,7 @@ logs: ## 持续查看前后端日志
 
 test: backend-test frontend-test ## 运行前后端测试
 
-check: version-check backend-lint backend-type backend-test frontend-api-check frontend-test frontend-lint frontend-build ## 运行完整质量检查
+check: version-check backend-lint backend-boundaries backend-type backend-coverage frontend-api-check frontend-test frontend-lint frontend-build ## 运行完整质量检查
 
 version-check: ## 校验前后端清单与 OpenAPI 产物的版本号是否一致
 	@python3 scripts/bump_version.py --check
@@ -98,7 +99,10 @@ backend-dev: ## 单独启动后端
 	cd backend && uv run --frozen uvicorn app.main:app --reload --host "$(BACKEND_HOST)" --port "$(BACKEND_PORT)"
 
 backend-lint: ## 检查后端代码规范
-	cd backend && uv run --frozen ruff check --config pyproject.toml app $(if $(wildcard backend/tests),tests,)
+	cd backend && uv run --frozen ruff check --config pyproject.toml app scripts $(if $(wildcard backend/tests),tests,)
+
+backend-boundaries: ## 检查后端模块边界（分层 / 私有名 / 上层反向依赖）
+	cd backend && uv run --frozen python -m scripts.check_import_boundaries
 
 backend-type: ## 检查后端静态类型
 	cd backend && uv run --frozen mypy
@@ -108,6 +112,14 @@ backend-test: ## 运行后端测试（backend/tests 存在时才执行）
 		cd backend && uv run --frozen pytest -q; \
 	else \
 		echo "backend/tests 不存在，跳过后端测试"; \
+	fi
+
+backend-coverage: ## 运行后端测试并校验覆盖率下限（可用 COVERAGE_MIN 覆盖，默认 44）
+	@if [ -d backend/tests ]; then \
+		cd backend && uv run --frozen coverage run -m pytest -q \
+			&& uv run --frozen coverage report --fail-under=$(COVERAGE_MIN); \
+	else \
+		echo "backend/tests 不存在，跳过后端覆盖率"; \
 	fi
 
 backend-db-init: ## 初始化双数据库并应用结构迁移（空行业库自动播种）

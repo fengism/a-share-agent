@@ -529,7 +529,7 @@ class ClsDataProvider:
         if not isinstance(plate_data, list):
             raise RuntimeError("财联社行业板块接口返回了无效 plate_data")
 
-        rows = []
+        rows: list[dict[str, Any]] = []
         for item in plate_data:
             if not isinstance(item, dict):
                 continue

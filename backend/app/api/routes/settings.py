@@ -138,7 +138,7 @@ async def _probe_exit_ip(proxy: dict[str, str] | None, timeout: float) -> str | 
         )
         if response.status_code != 200:
             return None
-        candidate = response.text.strip()
+        candidate: str = response.text.strip()
     except requests.RequestException:
         return None
     # 只接受合法 IP，避免把代理返回的错误页当成出口地址

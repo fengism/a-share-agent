@@ -1,6 +1,8 @@
 """具体后台任务定义。"""
 
 import logging
+from pathlib import Path
+from typing import cast
 
 from app.configuration import get_settings
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore, tdxhub_semaphore
@@ -141,7 +143,8 @@ async def refresh_tdxhub_best_ip() -> None:
         from app.infrastructure.providers.tdxhub import shared_tdxhub_quotes
 
         def probe() -> list[tuple[str, int]]:
-            return server(index="HQ", limit=3, sync=False)
+            # tdxhub 未提供类型桩，返回值形状由该库约定（endpoint 二元组列表）
+            return cast(list[tuple[str, int]], server(index="HQ", limit=3, sync=False))
 
         try:
             endpoints = await call_blocking(probe, semaphore=tdxhub_semaphore)
@@ -271,7 +274,7 @@ async def periodic_database_backup() -> None:
             logger.debug("SQLite 在线备份未到期，跳过本轮")
             return
 
-        created = []
+        created: list[Path] = []
         if due_critical:
             created_critical = await call_blocking(
                 create_online_backups,
