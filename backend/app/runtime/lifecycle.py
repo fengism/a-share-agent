@@ -441,6 +441,12 @@ async def application_lifespan(
     finally:
         await task_supervisor.stop()
 
+        # 事件订阅者（如自动推送）在后台任务中运行，必须在关闭数据库前排空，
+        # 否则「事件已发布、订阅者尚未落库」的窗口会在退出时丢失。
+        from app.core.events import event_bus
+
+        await event_bus.drain()
+
         await settings_effects_shutdown()
 
         from app.financial_data.market.quotes.national_team import shutdown_national_team_refresh

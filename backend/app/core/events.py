@@ -21,6 +21,21 @@ logger = logging.getLogger(__name__)
 EventT = TypeVar("EventT")
 EventHandler = Callable[[EventT], Coroutine[Any, Any, None] | None]
 
+# ``publish`` 只做调度，订阅者任务在后台运行；进程退出或测试隔离时需要等待它们的上限。
+DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 5.0
+
+
+def _matches(event: Any, expected: type) -> bool:
+    """安全判断事件是否属于订阅类型。
+
+    ``list[int]`` 这类泛型别名不能用于 ``isinstance``（会抛 ``TypeError``），
+    而 ``publish`` 的契约是绝不向发布者抛错，因此这里降级为不匹配。
+    """
+    try:
+        return isinstance(event, expected)
+    except TypeError:
+        return False
+
 
 @dataclass(frozen=True)
 class DomainEvent:
@@ -34,6 +49,9 @@ class AsyncEventBus:
     def __init__(self) -> None:
         self._handlers: dict[type, list[EventHandler[Any]]] = defaultdict(list)
         self._named_handlers: dict[str, list[EventHandler[Any]]] = defaultdict(list)
+        # 必须持有 task 强引用：asyncio 只保留弱引用，未持有引用的任务可能在
+        # 执行前被垃圾回收（官方文档明确警告）。
+        self._pending_tasks: set[asyncio.Task[None]] = set()
 
     def subscribe(self, event_type_or_name: type | str, handler: EventHandler[Any]) -> None:
         """订阅指定事件类型或事件名称。"""
@@ -57,10 +75,10 @@ class AsyncEventBus:
         """发布领域事件，非阻塞异步调度所有已注册的订阅者。"""
         handlers: list[EventHandler[Any]] = []
 
-        # 1. 按具体事件类型查找处理器（包含子类）
+        # 1. 按具体事件类型查找处理器（isinstance 已覆盖子类）
         event_cls = type(event)
         for registered_type, registered_handlers in self._handlers.items():
-            if isinstance(event, registered_type) or issubclass(event_cls, registered_type):
+            if _matches(event, registered_type):
                 handlers.extend(registered_handlers)
 
         # 2. 按命名查找处理器
@@ -93,13 +111,48 @@ class AsyncEventBus:
 
         # 启动后台任务并发执行，不阻断发布者
         for handler in unique_handlers:
-            asyncio.create_task(_safe_execute(handler))
+            self._track(asyncio.create_task(_safe_execute(handler), name=f"event:{event_name}"))
+
+    def _track(self, task: asyncio.Task[None]) -> None:
+        self._pending_tasks.add(task)
+        task.add_done_callback(self._on_task_done)
+
+    def _on_task_done(self, task: asyncio.Task[None]) -> None:
+        self._pending_tasks.discard(task)
+        if task.cancelled():
+            return
+        # ``_safe_execute`` 已吞掉订阅者异常，这里是最后的兜底观测点。
+        if (error := task.exception()) is not None:
+            logger.warning("事件订阅者任务异常退出 error=%s", error, exc_info=error)
+
+    @property
+    def pending_task_count(self) -> int:
+        """当前尚未完成的订阅者任务数（供健康检查与测试观测）。"""
+        return len(self._pending_tasks)
+
+    async def drain(self, timeout: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS) -> int:
+        """等待未完成的订阅者任务；超时后取消并返回被取消的数量。
+
+        进程退出前调用，避免「事件已发布但订阅者尚未落库/推送」的丢失。
+        """
+        pending = [task for task in self._pending_tasks if not task.done()]
+        if not pending:
+            return 0
+        _, still_pending = await asyncio.wait(pending, timeout=timeout)
+        for task in still_pending:
+            task.cancel()
+        if still_pending:
+            await asyncio.gather(*still_pending, return_exceptions=True)
+            logger.warning("事件订阅者任务未在 %.1fs 内完成，已取消 %d 个", timeout, len(still_pending))
+        return len(still_pending)
 
     def clear(self) -> None:
-        """清除所有订阅者（主要供测试隔离）。"""
-        self._handlers.clearexhaustive = False
+        """清除所有订阅者并取消未完成的调度任务（主要供测试隔离）。"""
         self._handlers.clear()
         self._named_handlers.clear()
+        for task in list(self._pending_tasks):
+            task.cancel()
+        self._pending_tasks.clear()
 
 
 # 全局共享事件总线单例
