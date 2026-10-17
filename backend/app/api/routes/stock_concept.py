@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import io
-import sqlite3
 import urllib.parse
 
 from fastapi import APIRouter, Depends, Query, status
@@ -16,12 +15,11 @@ from app.api.errors import (
 )
 from app.domain.identity import AuthenticatedUser
 from app.modules.master_data_revision import MasterDataConflictError
-from app.modules.stock_concept.importer import ConceptImportError
-from app.modules.stock_concept.models import StockConceptUpdateRequest
 from app.modules.stock_concept.public import (
     ConceptImportCommitRequest,
     ConceptImportCommitResponse,
     ConceptImportConflictError,
+    ConceptImportError,
     ConceptImportFileRequest,
     ConceptImportPreviewResponse,
     ConceptImportTokenNotFoundError,
@@ -30,7 +28,9 @@ from app.modules.stock_concept.public import (
     ConceptStatusResponse,
     StockConceptListResponse,
     StockConceptRecord,
+    StockConceptRecordConflictError,
     StockConceptRecordInput,
+    StockConceptUpdateRequest,
     commit_import,
     create_manual,
     delete_record,
@@ -108,11 +108,8 @@ def create_record(
 ):
     try:
         record_id = create_manual(request)
-    except sqlite3.IntegrityError as exc:
-        raise ConflictError(
-            f"股票代码 {request.stock_code} 已存在",
-            code="stock_concept.record_exists",
-        ) from exc
+    except StockConceptRecordConflictError as exc:
+        raise ConflictError(str(exc), code="stock_concept.record_exists") from exc
     return ConceptMutationResponse(success=True, id=record_id)
 
 
@@ -132,11 +129,8 @@ def update_record(
         success = update_manual(record_id, request, expected_revision=request.expected_revision)
     except MasterDataConflictError as exc:
         raise ConflictError(str(exc), code="master_data.edit_conflict") from exc
-    except sqlite3.IntegrityError as exc:
-        raise ConflictError(
-            f"股票代码 {request.stock_code} 已存在",
-            code="stock_concept.record_exists",
-        ) from exc
+    except StockConceptRecordConflictError as exc:
+        raise ConflictError(str(exc), code="stock_concept.record_exists") from exc
     return ConceptMutationResponse(success=success, id=record_id)
 
 

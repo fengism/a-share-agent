@@ -1,5 +1,6 @@
 """申万行业基础数据模块的稳定公开入口。"""
 
+from app.modules.industry_classification.importer import IndustryImportError
 from app.modules.industry_classification.models import (
     ImportCommitRequest,
     ImportCommitResponse,
@@ -10,11 +11,13 @@ from app.modules.industry_classification.models import (
     IndustryRecord,
     IndustryRecordInput,
     IndustryStatusResponse,
+    IndustryUpdateRequest,
     MutationResponse,
     RefreshPolicyRequest,
     RefreshResponse,
 )
 from app.modules.industry_classification.repository import (
+    IndustryRecordConflictError,
     a_share_all_levels_mapping,
     create_manual,
     delete_record,
@@ -46,12 +49,15 @@ __all__ = [
     "ImportPreviewResponse",
     "IndustryHierarchyResponse",
     "IndustryImportConflictError",
+    "IndustryImportError",
     "IndustryImportTokenNotFoundError",
     "IndustryListResponse",
     "IndustryRecord",
+    "IndustryRecordConflictError",
     "IndustryRecordInput",
     "IndustryRefreshError",
     "IndustryStatusResponse",
+    "IndustryUpdateRequest",
     "MutationResponse",
     "RefreshPolicyRequest",
     "RefreshResponse",

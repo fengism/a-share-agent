@@ -37,6 +37,14 @@ class ImportBatchStateChangedError(RuntimeError):
     pass
 
 
+class IndustryRecordConflictError(RuntimeError):
+    """手工写入违反唯一约束（如股票代码重复）。
+
+    存储层的 ``sqlite3.IntegrityError`` 在数据访问层就翻译成领域错误，
+    以免 API 层依赖具体数据库实现。
+    """
+
+
 def _connection() -> sqlite3.Connection:
     return get_connection("industry")
 
@@ -172,37 +180,43 @@ def _manual_values(record: IndustryRecordInput) -> tuple[object, ...]:
 
 
 def create_manual(record: IndustryRecordInput) -> int:
-    with unit_of_work(connection=_connection(), immediate=True) as work:
-        cursor = work.connection.execute(
-            """
-            INSERT INTO sw_industry_classifications(
-                market_group, exchange_suffix, stock_code, stock_name,
-                sw_level1_name, sw_level2_name, sw_level3_name, sw_industry_code,
-                source, source_version, effective_date, is_manual_override
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, 1)
-            """,
-            _manual_values(record),
-        )
-        return int(cursor.lastrowid)
+    try:
+        with unit_of_work(connection=_connection(), immediate=True) as work:
+            cursor = work.connection.execute(
+                """
+                INSERT INTO sw_industry_classifications(
+                    market_group, exchange_suffix, stock_code, stock_name,
+                    sw_level1_name, sw_level2_name, sw_level3_name, sw_industry_code,
+                    source, source_version, effective_date, is_manual_override
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, 1)
+                """,
+                _manual_values(record),
+            )
+            return int(cursor.lastrowid)
+    except sqlite3.IntegrityError as exc:
+        raise IndustryRecordConflictError("股票代码已存在") from exc
 
 
 def update_manual(record_id: int, record: IndustryRecordInput, *, expected_revision: str | None = None) -> bool:
-    with unit_of_work(connection=_connection(), immediate=True) as work:
-        if expected_revision is not None:
-            current = work.connection.execute("SELECT * FROM sw_industry_classifications WHERE id=?", (record_id,)).fetchone()
-            check_revision(current, expected_revision)
-        cursor = work.connection.execute(
-            """
-            UPDATE sw_industry_classifications SET
-                market_group=?, exchange_suffix=?, stock_code=?, stock_name=?,
-                sw_level1_name=?, sw_level2_name=?, sw_level3_name=?, sw_industry_code=?,
-                source='manual', source_version=?, effective_date=?, is_manual_override=1,
-                updated_at=datetime('now','localtime')
-            WHERE id=?
-            """,
-            (*_manual_values(record), record_id),
-        )
-        return cursor.rowcount > 0
+    try:
+        with unit_of_work(connection=_connection(), immediate=True) as work:
+            if expected_revision is not None:
+                current = work.connection.execute("SELECT * FROM sw_industry_classifications WHERE id=?", (record_id,)).fetchone()
+                check_revision(current, expected_revision)
+            cursor = work.connection.execute(
+                """
+                UPDATE sw_industry_classifications SET
+                    market_group=?, exchange_suffix=?, stock_code=?, stock_name=?,
+                    sw_level1_name=?, sw_level2_name=?, sw_level3_name=?, sw_industry_code=?,
+                    source='manual', source_version=?, effective_date=?, is_manual_override=1,
+                    updated_at=datetime('now','localtime')
+                WHERE id=?
+                """,
+                (*_manual_values(record), record_id),
+            )
+            return cursor.rowcount > 0
+    except sqlite3.IntegrityError as exc:
+        raise IndustryRecordConflictError("股票代码已存在") from exc
 
 
 def delete_record(record_id: int) -> bool:

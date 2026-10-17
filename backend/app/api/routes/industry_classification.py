@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import io
-import sqlite3
 import urllib.parse
 
 from fastapi import APIRouter, Depends, Query, status
@@ -16,8 +15,6 @@ from app.api.errors import (
     ServiceUnavailableError,
 )
 from app.domain.identity import AuthenticatedUser
-from app.modules.industry_classification.importer import IndustryImportError
-from app.modules.industry_classification.models import IndustryUpdateRequest
 from app.modules.industry_classification.public import (
     ImportCommitRequest,
     ImportCommitResponse,
@@ -25,12 +22,15 @@ from app.modules.industry_classification.public import (
     ImportPreviewResponse,
     IndustryHierarchyResponse,
     IndustryImportConflictError,
+    IndustryImportError,
     IndustryImportTokenNotFoundError,
     IndustryListResponse,
     IndustryRecord,
+    IndustryRecordConflictError,
     IndustryRecordInput,
     IndustryRefreshError,
     IndustryStatusResponse,
+    IndustryUpdateRequest,
     MutationResponse,
     RefreshPolicyRequest,
     RefreshResponse,
@@ -108,8 +108,8 @@ def create_record(
 ):
     try:
         return MutationResponse(id=create_manual(request))
-    except sqlite3.IntegrityError as exc:
-        raise ConflictError("股票代码已存在", code="industry.stock_code_exists") from exc
+    except IndustryRecordConflictError as exc:
+        raise ConflictError(str(exc), code="industry.stock_code_exists") from exc
 
 
 @router.put("/records/{record_id}", response_model=MutationResponse)
@@ -124,8 +124,8 @@ def update_record(
         update_manual(record_id, request, expected_revision=request.expected_revision)
     except MasterDataConflictError as exc:
         raise ConflictError(str(exc), code="master_data.edit_conflict") from exc
-    except sqlite3.IntegrityError as exc:
-        raise ConflictError("股票代码已存在", code="industry.stock_code_exists") from exc
+    except IndustryRecordConflictError as exc:
+        raise ConflictError(str(exc), code="industry.stock_code_exists") from exc
     return MutationResponse(id=record_id)
 
 

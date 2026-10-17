@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.modules.stock_concept.importer import ConceptImportError
 from app.modules.stock_concept.models import (
     ConceptImportCommitRequest,
     ConceptImportCommitResponse,
@@ -13,8 +14,10 @@ from app.modules.stock_concept.models import (
     StockConceptListResponse,
     StockConceptRecord,
     StockConceptRecordInput,
+    StockConceptUpdateRequest,
 )
 from app.modules.stock_concept.repository import (
+    StockConceptRecordConflictError,
     a_share_all_concepts_mapping,
     create_manual,
     delete_record,
@@ -38,6 +41,7 @@ __all__ = [
     "ConceptImportCommitRequest",
     "ConceptImportCommitResponse",
     "ConceptImportConflictError",
+    "ConceptImportError",
     "ConceptImportFileRequest",
     "ConceptImportPreviewResponse",
     "ConceptImportTokenNotFoundError",
@@ -48,7 +52,9 @@ __all__ = [
     "ConceptStatusResponse",
     "StockConceptListResponse",
     "StockConceptRecord",
+    "StockConceptRecordConflictError",
     "StockConceptRecordInput",
+    "StockConceptUpdateRequest",
     "a_share_all_concepts_mapping",
     "auto_enrich_pending_concepts",
     "commit_import",
