@@ -23,8 +23,7 @@ from app.modules.potential.schemas import (
     PotentialStockItem,
 )
 from app.modules.quant.engine import build_target_positions
-from app.modules.quant.public import get_strategy_registry
-from app.modules.screener.strategy_screening import SCREENER_STRATEGY_KEYS
+from app.modules.quant.public import CURATED_STRATEGY_KEYS, get_strategy_registry, mining_weight
 
 logger = logging.getLogger(__name__)
 
@@ -39,18 +38,17 @@ _HISTORY_DAYS = 420
 _TRADING_CALENDAR_LOOKBACK_DAYS = 370
 _DAILY_MINING_CUTOFF = time(15, 10)
 
-# 策略权重：形态/底部类罕见信号权重更高
-_STRATEGY_WEIGHTS: dict[str, float] = {
-    "bull_trend": 1.0,
-    "ma_golden_cross": 1.2,
-    "volume_breakout": 1.2,
-    "shrink_pullback": 1.0,
-    "bottom_volume": 1.5,
-    "one_yang_three_yin": 1.5,
-    "box_oscillation": 1.0,
-}
-# 信号新鲜度加成：3 个交易日内触发的信号额外 +50% 权重
+# 分层候选池：头部龙头与中盘活跃各取前 N 名后合并去重
+_HEAD_CANDIDATE_LIMIT = 150
+_MID_CANDIDATE_LIMIT = 150
+# 中盘活跃成长口径：成交额上限（亿，下限沿用全局的 _MIN_AMOUNT_YI）与换手率区间（%）
+_MID_MAX_AMOUNT_YI = 15.0
+_MID_MIN_TURNOVER_PCT = 2.0
+_MID_MAX_TURNOVER_PCT = 18.0
+
+# 信号新鲜度加成：_FRESH_SIGNAL_DAYS 个交易日内触发的信号额外乘以 _FRESH_SIGNAL_BONUS
 _FRESH_SIGNAL_DAYS = 3
+_FRESH_SIGNAL_BONUS = 1.5
 
 
 def _normalize_code(value: object) -> str:
@@ -60,7 +58,7 @@ def _normalize_code(value: object) -> str:
     return text.zfill(6) if text.isdigit() else text
 
 
-def _select_candidates(
+def select_candidates(
     df: pd.DataFrame | None,
     master_records: list,
 ) -> list[dict]:
@@ -85,15 +83,16 @@ def _select_candidates(
     frame = frame[mask]
 
     # 分层挑选候选池：
-    # 1. 头部高流动性龙头（成交额前 150 名）
-    # 2. 中盘活跃成长股票（成交额 0.8~15 亿且换手率 2%~18% 之间前 150 名）
-    head_candidates = frame.sort_values(by="amount_yi", ascending=False).head(150)
+    # 1. 头部高流动性龙头：成交额前 _HEAD_CANDIDATE_LIMIT 名
+    # 2. 中盘活跃成长股：成交额 ≤ _MID_MAX_AMOUNT_YI 亿且换手率
+    #    在 _MID_MIN_TURNOVER_PCT ~ _MID_MAX_TURNOVER_PCT% 之间，按换手率取前 _MID_CANDIDATE_LIMIT 名
+    head_candidates = frame.sort_values(by="amount_yi", ascending=False).head(_HEAD_CANDIDATE_LIMIT)
     mid_pool = frame[
-        (frame["amount_yi"] <= 15.0)
-        & (frame["turnover_pct"] >= 2.0)
-        & (frame["turnover_pct"] <= 18.0)
+        (frame["amount_yi"] <= _MID_MAX_AMOUNT_YI)
+        & (frame["turnover_pct"] >= _MID_MIN_TURNOVER_PCT)
+        & (frame["turnover_pct"] <= _MID_MAX_TURNOVER_PCT)
     ]
-    mid_candidates = mid_pool.sort_values(by="turnover_pct", ascending=False).head(150)
+    mid_candidates = mid_pool.sort_values(by="turnover_pct", ascending=False).head(_MID_CANDIDATE_LIMIT)
     merged_frame = pd.concat([head_candidates, mid_candidates]).drop_duplicates(subset=["代码"], keep="first")
     selected = merged_frame.head(_MAX_CANDIDATES)
 
@@ -149,9 +148,9 @@ def _evaluate_strategies(
         # 信号时效性风控：只保留最近 _MAX_SIGNAL_AGE_DAYS (5个交易日) 内触发 entry 的新鲜信号
         if age > _MAX_SIGNAL_AGE_DAYS:
             continue
-        weight = _STRATEGY_WEIGHTS.get(key, 1.0)
+        weight = mining_weight(key)
         if age <= _FRESH_SIGNAL_DAYS:
-            weight *= 1.5
+            weight *= _FRESH_SIGNAL_BONUS
         score += weight
         hits.append(snapshot.definition.name)
         if signal_age is None or age < signal_age:
@@ -210,14 +209,14 @@ async def mine_potential_stocks(market_date: date) -> PotentialDailyResult:
         get_exchange_stock_master(),
     )
     candidates = await call_blocking(
-        _select_candidates,
+        select_candidates,
         df,
         master.records if master is not None else [],
         semaphore=misc_semaphore,
     )
     registry = get_strategy_registry()
     strategy_snapshots = {
-        key: registry.resolve(key, None, {}) for key in sorted(SCREENER_STRATEGY_KEYS)
+        key: registry.resolve(key, None, {}) for key in sorted(CURATED_STRATEGY_KEYS)
     }
 
     semaphore = asyncio.Semaphore(_MAX_CONCURRENCY)

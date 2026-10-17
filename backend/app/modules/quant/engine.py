@@ -28,9 +28,26 @@ from app.modules.quant.strategies.evaluator import evaluate_target_positions
 from app.modules.quant.strategies.registry import get_strategy_registry
 
 ENGINE_VERSION = "2026-09-19-v10"
+#: 年化收益/波动率换算用的每年交易日数（沪深 A 股惯例）。
+TRADING_DAYS_PER_YEAR = 252
 HOLDOUT_TRAINING_RATIO = 0.7
 MIN_TRAINING_OBSERVATIONS = 40
 MIN_HOLDOUT_OBSERVATIONS = 20
+
+#: ``fee_schedule="a_share_historical"`` 支持的最早起始日。
+A_SHARE_HISTORICAL_FEE_START = "2015-08-01"
+
+#: 沪深 A 股过户费档期（双向计征）：（生效起始日, 费率），按生效日倒序排列。
+_TRANSFER_FEE_SCHEDULE: tuple[tuple[str, float], ...] = (
+    ("2022-04-29", 0.00001),  # 过户费总体下调 50%
+    (A_SHARE_HISTORICAL_FEE_START, 0.00002),
+)
+
+#: 证券交易印花税档期（仅卖出方计征）：（生效起始日, 税率），按生效日倒序排列。
+_STAMP_DUTY_SCHEDULE: tuple[tuple[str, float], ...] = (
+    ("2023-08-28", 0.0005),  # 印花税减半征收
+    (A_SHARE_HISTORICAL_FEE_START, 0.001),
+)
 
 
 class BacktestCancelled(RuntimeError):
@@ -122,16 +139,28 @@ def _commission(amount: float, execution: QuantExecutionConfig) -> float:
     return float(max(amount * execution.commission_rate, execution.minimum_commission))
 
 
+def _scheduled_rate(
+    schedule: tuple[tuple[str, float], ...],
+    current_date: str,
+) -> float:
+    """按 ``(生效起始日, 费率)`` 档期表取出 ``current_date`` 当日适用的费率。
+
+    档期按生效日倒序排列；日期早于最早一档时说明该时段不在支持范围内。
+    """
+    for effective_from, rate in schedule:
+        if current_date >= effective_from:
+            return rate
+    raise ValueError(f"历史费率仅支持 {A_SHARE_HISTORICAL_FEE_START} 之后的沪深 A 股")
+
+
 def _trade_fee(
     amount: float, side: str, execution: QuantExecutionConfig, current_date: str | None = None,
 ) -> float:
     transfer_rate = execution.transfer_fee_rate
     stamp_rate = execution.stamp_duty_rate
     if execution.fee_schedule == "a_share_historical" and current_date is not None:
-        if current_date < "2015-08-01":
-            raise ValueError("历史费率仅支持 2015-08-01 之后的沪深 A 股")
-        transfer_rate = .00002 if current_date < "2022-04-29" else .00001
-        stamp_rate = .001 if current_date < "2023-08-28" else .0005
+        transfer_rate = _scheduled_rate(_TRANSFER_FEE_SCHEDULE, current_date)
+        stamp_rate = _scheduled_rate(_STAMP_DUTY_SCHEDULE, current_date)
     return float(_commission(amount, execution) + amount * (transfer_rate + (stamp_rate if side == "sell" else 0)))
 
 
@@ -223,7 +252,7 @@ def _aligned_returns(points: list[QuantEquityPoint], initial_cash: float) -> tup
 def _annualized_return(total_return: float, observations: int) -> float:
     if observations <= 0 or total_return <= -1:
         return total_return
-    return float((1 + total_return) ** (252 / observations) - 1)
+    return float((1 + total_return) ** (TRADING_DAYS_PER_YEAR / observations) - 1)
 
 
 def _percent(value: float) -> float:
@@ -269,17 +298,17 @@ def _build_metrics(
     total_return = equities[-1] / initial_cash - 1 if equities else 0
     returns = _daily_returns([initial_cash, *equities])
     daily_volatility = statistics.pstdev(returns) if len(returns) > 1 else 0
-    volatility = daily_volatility * math.sqrt(252)
-    excess_daily = (statistics.fmean(returns) - risk_free_rate / 252) if returns else 0
-    sharpe = excess_daily / daily_volatility * math.sqrt(252) if daily_volatility > 0 else None
-    downside_returns = [min(value - risk_free_rate / 252, 0) for value in returns]
+    volatility = daily_volatility * math.sqrt(TRADING_DAYS_PER_YEAR)
+    excess_daily = (statistics.fmean(returns) - risk_free_rate / TRADING_DAYS_PER_YEAR) if returns else 0
+    sharpe = excess_daily / daily_volatility * math.sqrt(TRADING_DAYS_PER_YEAR) if daily_volatility > 0 else None
+    downside_returns = [min(value - risk_free_rate / TRADING_DAYS_PER_YEAR, 0) for value in returns]
     downside_daily = (
         math.sqrt(statistics.fmean(value * value for value in downside_returns))
         if len(downside_returns) > 1
         else 0
     )
-    downside_volatility = downside_daily * math.sqrt(252) if downside_daily > 0 else None
-    sortino = excess_daily / downside_daily * math.sqrt(252) if downside_daily > 0 else None
+    downside_volatility = downside_daily * math.sqrt(TRADING_DAYS_PER_YEAR) if downside_daily > 0 else None
+    sortino = excess_daily / downside_daily * math.sqrt(TRADING_DAYS_PER_YEAR) if downside_daily > 0 else None
     annualized_return = _annualized_return(total_return, len(equities))
     max_drawdown = min((point.drawdown for point in points), default=0)
     calmar = annualized_return / abs(max_drawdown) if max_drawdown < 0 else None
@@ -290,12 +319,12 @@ def _build_metrics(
     ]
     active_daily_volatility = statistics.pstdev(active_returns) if len(active_returns) > 1 else None
     tracking_error = (
-        active_daily_volatility * math.sqrt(252)
+        active_daily_volatility * math.sqrt(TRADING_DAYS_PER_YEAR)
         if active_daily_volatility is not None
         else None
     )
     information_ratio = (
-        statistics.fmean(active_returns) / active_daily_volatility * math.sqrt(252)
+        statistics.fmean(active_returns) / active_daily_volatility * math.sqrt(TRADING_DAYS_PER_YEAR)
         if active_daily_volatility is not None and active_daily_volatility > 0
         else None
     )
@@ -722,7 +751,7 @@ def _volatility_scale(
             return 0.0
         daily_by_code.append(_daily_returns(values))
     portfolio_returns = [statistics.fmean(day) for day in zip(*daily_by_code)]
-    volatility = statistics.pstdev(portfolio_returns) * math.sqrt(252)
+    volatility = statistics.pstdev(portfolio_returns) * math.sqrt(TRADING_DAYS_PER_YEAR)
     return min(1.0, target_volatility / volatility) if volatility > 0 else 1.0
 
 

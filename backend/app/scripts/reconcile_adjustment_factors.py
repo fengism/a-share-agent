@@ -68,7 +68,7 @@ def _tdx_factor_series(code: str, start: str, end: str) -> FactorSeries:
     from tdxhub.gbbq import adjustment_factors, normalize_gbbq
 
     from app.infrastructure.providers.registry import get_provider
-    from app.modules.market_daily.adjustment import _CANONICAL_ANCHOR
+    from app.modules.market_daily.adjustment import canonical_adjustment_anchor
 
     series = FactorSeries("tdx_xdxr")
     try:
@@ -81,7 +81,7 @@ def _tdx_factor_series(code: str, start: str, end: str) -> FactorSeries:
         series.error = "TDX XDXR 返回空"
         return series
 
-    dates = pd.bdate_range(_CANONICAL_ANCHOR, end).strftime("%Y-%m-%d").tolist()
+    dates = pd.bdate_range(canonical_adjustment_anchor(), end).strftime("%Y-%m-%d").tolist()
     frame = adjustment_factors(dates, actions).iloc[1:]
     for day, (_, row) in zip(dates[1:], frame.iterrows(), strict=False):
         if start <= day <= end:

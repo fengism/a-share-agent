@@ -17,7 +17,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 
-from app.modules.potential.service import _select_candidates
+from app.modules.potential.public import select_candidates
 
 
 async def collect_hot_codes(top: int, extra_codes: list[str] | None = None) -> list[str]:
@@ -28,7 +28,7 @@ async def collect_hot_codes(top: int, extra_codes: list[str] | None = None) -> l
         get_spot_snapshot(),
         get_exchange_stock_master(),
     )
-    candidates = _select_candidates(
+    candidates = select_candidates(
         snapshot_df,
         master.records if master is not None else [],
     )

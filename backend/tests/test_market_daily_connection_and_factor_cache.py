@@ -159,3 +159,24 @@ async def test_invalidate_clears_healthy_cache(monkeypatch: pytest.MonkeyPatch) 
 
     await adjustment.invalidate_adjustment_factors("600519")
     assert "600519" not in adjustment._healthy_cache
+
+
+def test_clear_adjustment_health_cache_empties_module_cache() -> None:
+    """库结构修复路径（日行情库 v2 迁移）依赖这个入口丢弃旧的「已确认健康」结论。
+
+    此前由 app.core.cache 反向 import 本模块的私有字典来清空；改为对外暴露入口后，
+    core 不再依赖业务模块，本用例锁定该入口确实会清空缓存。
+    """
+    adjustment._healthy_cache.clear()
+    adjustment._healthy_cache_set("600519", 0.0)
+    adjustment._healthy_cache_set("000001", 0.0)
+    assert len(adjustment._healthy_cache) == 2
+
+    adjustment.clear_adjustment_health_cache()
+
+    assert adjustment._healthy_cache == {}
+
+
+def test_canonical_adjustment_anchor_matches_internal_constant() -> None:
+    """对账脚本改用公开访问器后，取值必须与内部常量一致。"""
+    assert adjustment.canonical_adjustment_anchor() == adjustment._CANONICAL_ANCHOR

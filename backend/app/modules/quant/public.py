@@ -44,6 +44,13 @@ from app.modules.quant.service import (
     strategy_registry_status,
 )
 from app.modules.quant.strategies.contracts import StrategySnapshot
+from app.modules.quant.strategies.curation import (
+    CURATED_STRATEGIES,
+    CURATED_STRATEGY_KEYS,
+    DEFAULT_MINING_WEIGHT,
+    MINING_WEIGHTS,
+    mining_weight,
+)
 from app.modules.quant.strategies.registry import configure_strategy_registry, get_strategy_registry
 from app.modules.quant.strategies.watcher import StrategyDirectoryWatcher
 
@@ -52,6 +59,10 @@ async def run_strategy_reload_watcher(interval_seconds: float) -> None:
     await StrategyDirectoryWatcher(get_strategy_registry(), interval_seconds).run()
 
 __all__ = [
+    "CURATED_STRATEGIES",
+    "CURATED_STRATEGY_KEYS",
+    "DEFAULT_MINING_WEIGHT",
+    "MINING_WEIGHTS",
     "QuantBacktestCreate",
     "QuantBacktestList",
     "QuantBacktestRun",
@@ -84,6 +95,7 @@ __all__ = [
     "list_backtests",
     "list_strategy_drafts",
     "list_user_strategies",
+    "mining_weight",
     "process_next_quant_job",
     "publish_strategy_draft",
     "retry_backtest",

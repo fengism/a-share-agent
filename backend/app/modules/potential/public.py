@@ -11,6 +11,7 @@ from app.modules.potential.service import (
     mine_potential_stocks,
     run_daily_mining,
     run_scheduled_daily_mining,
+    select_candidates,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "mine_potential_stocks",
     "run_daily_mining",
     "run_scheduled_daily_mining",
+    "select_candidates",
 ]

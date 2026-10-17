@@ -308,6 +308,21 @@ def _healthy_cache_clear(code: str) -> None:
     _healthy_cache.pop(code, None)
 
 
+def clear_adjustment_health_cache() -> None:
+    """清空因子健康缓存。
+
+    库结构修复（如日行情库 v2 迁移）会重写复权因子，此时必须丢弃「已确认健康」的
+    判定，否则后续读取会跳过点查而直接吃旧结论。原先由 ``app.core.cache`` 反向
+    import 本模块的私有字典实现，现改为由本模块对外暴露清理入口。
+    """
+    _healthy_cache.clear()
+
+
+def canonical_adjustment_anchor() -> date:
+    """返回复权因子的基准锚点日期（早于上市日与所有公司行为）。"""
+    return _CANONICAL_ANCHOR
+
+
 def _last_good_failure_is_cooling_down(
     state: dict[str, object] | None,
     now: datetime,

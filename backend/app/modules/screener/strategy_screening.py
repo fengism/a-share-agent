@@ -12,7 +12,13 @@ from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import market_today, normalize_code
 from app.financial_data.stock.public import get_historical_bars
 from app.modules.quant.engine import strategy_warmup_bars
-from app.modules.quant.public import StrategySnapshot, build_target_positions, get_strategy_registry, strategy_presets
+from app.modules.quant.public import (
+    CURATED_STRATEGY_KEYS,
+    StrategySnapshot,
+    build_target_positions,
+    get_strategy_registry,
+    strategy_presets,
+)
 from app.modules.screener.schemas import (
     ScreenerStrategyMatch,
     ScreenerStrategyPreset,
@@ -20,17 +26,9 @@ from app.modules.screener.schemas import (
     ScreenerStrategyResult,
 )
 
-SCREENER_STRATEGY_KEYS = frozenset(
-    {
-        "bull_trend",
-        "ma_golden_cross",
-        "volume_breakout",
-        "shrink_pullback",
-        "bottom_volume",
-        "one_yang_three_yin",
-        "box_oscillation",
-    }
-)
+#: 选股页可选的策略范围。单一事实来源在 quant.strategies.curation，
+#: 不在此重复维护名单（旧实现就是在此处另写了一份 7 个 key 的 frozenset）。
+SCREENER_STRATEGY_KEYS = CURATED_STRATEGY_KEYS
 _MAX_CONCURRENCY = 5
 MAX_STRATEGY_CANDIDATES = 200
 _STRATEGY_CACHE_TTL_SECONDS = 300
