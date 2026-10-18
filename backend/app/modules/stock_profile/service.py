@@ -353,8 +353,8 @@ def _merge_exchange_master(master: ExchangeStockMaster, hk_records: tuple[Any, .
                 items = data.get("items") or {}
                 if items:
                     local_intro_map[file.stem] = items
-            except Exception:
-                pass
+            except Exception as error:
+                logger.debug("主营资料快照读取失败 file=%s: %s", file.name, error)
 
     # 3. 合并经过官方服务校验且带时效信息的名录，不直接读取未校验的快照。
     for item in master.records:

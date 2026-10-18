@@ -80,6 +80,9 @@ def sample_potential_result() -> PotentialDailyResult:
         universe_size=5200,
         evaluated=5180,
         failed_count=20,
+        market_regime="bear",
+        market_note="沪深300跌破MA20",
+        market_emotion="strong",
         items=[
             PotentialStockItem(
                 code="000001",
@@ -88,10 +91,15 @@ def sample_potential_result() -> PotentialDailyResult:
                 change_pct=3.2,
                 turnover_pct=2.1,
                 amount=500000000,
+                industry="银行",
                 score=88.5,
                 strategies=["成交量突增", "均线多头"],
                 signal_date="2026-10-15",
                 signal_age_days=0,
+                fundamental_score=0.5,
+                theme_score=0.5,
+                themes=["低空经济"],
+                risk_flags=["RSI超买"],
             ),
             PotentialStockItem(
                 code="600519",
@@ -221,6 +229,12 @@ def test_format_potential_stocks_feishu_card(sample_potential_result: PotentialD
     content_text = card["elements"][0]["text"]["content"]
     assert "平安银行" in content_text
     assert "成交量突增" in content_text
+    assert "银行" in content_text
+    assert "RSI超买" in content_text
+    assert "基本面" in content_text
+    assert "低空经济" in content_text
+    assert "市场环境" in content_text
+    assert "情绪" in content_text
 
 
 def test_format_potential_stocks_wecom_markdown(sample_potential_result: PotentialDailyResult):
@@ -228,6 +242,11 @@ def test_format_potential_stocks_wecom_markdown(sample_potential_result: Potenti
     assert "### ⚡ 题材挖掘与潜力个股雷达 · 2026-10-15" in md
     assert "平安银行" in md
     assert "88.5" in md
+    assert "银行" in md
+    assert "基本面" in md
+    assert "低空经济" in md
+    assert "市场环境" in md
+    assert "情绪" in md
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,7 @@
 """多股票指标对比服务。"""
 
 import asyncio
+import logging
 from collections.abc import Sequence
 from typing import Any, cast
 
@@ -86,8 +87,8 @@ async def compare_stocks(codes: Sequence[str] | str) -> list[StockCompareItem]:
                         result["pb"] = quote.pb
                     if result.get("market_cap") is None:
                         result["market_cap"] = quote.market_cap
-            except Exception:
-                pass
+            except Exception as error:
+                logging.getLogger(__name__).debug("港股行情补全失败 code=%s: %s", code, error)
             if not result.get("industry"):
                 result["industry"] = "港股上市公司"
 

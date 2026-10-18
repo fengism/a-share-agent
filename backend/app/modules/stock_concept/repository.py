@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from collections import Counter
 from collections.abc import Iterable
@@ -476,8 +477,8 @@ def a_share_all_concepts_mapping() -> dict[str, list[str]]:
                 parsed = json.loads(raw_concepts)
                 if isinstance(parsed, list):
                     concepts = [str(c).strip() for c in parsed if str(c).strip()]
-            except Exception:
-                pass
+            except Exception as error:
+                logging.getLogger(__name__).debug("概念 JSON 解析失败 code=%s: %s", bare_code, error)
         elif isinstance(raw_concepts, list):
             concepts = [str(c).strip() for c in raw_concepts if str(c).strip()]
         result[bare_code] = concepts

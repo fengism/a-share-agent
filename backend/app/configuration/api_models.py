@@ -88,7 +88,9 @@ class ConfigUpdateRequest(BaseModel):
     feishu_app_secret: Annotated[
         str | None, ConfigMeta("private", "feishu", secret=True, synced_global=True)
     ] = None
-    feishu_folder_token: Annotated[str | None, ConfigMeta("private", "feishu")] = None
+    feishu_folder_token: Annotated[
+        str | None, ConfigMeta("private", "feishu", secret=True)
+    ] = None
     feishu_wiki_space_id: Annotated[str | None, ConfigMeta("private", "feishu")] = None
     feishu_wiki_daily_review_parent: Annotated[str | None, ConfigMeta("private", "feishu")] = None
     feishu_wiki_analysis_parent: Annotated[str | None, ConfigMeta("private", "feishu")] = None
@@ -110,7 +112,7 @@ class ConfigUpdateRequest(BaseModel):
         bool | None, ConfigMeta("private", "push", synced_global=True)
     ] = None
     feishu_webhook_url: Annotated[
-        str | None, ConfigMeta("private", "push", synced_global=True)
+        str | None, ConfigMeta("private", "push", secret=True, synced_global=True)
     ] = None
     feishu_webhook_secret: Annotated[
         str | None, ConfigMeta("private", "push", secret=True, synced_global=True)
@@ -119,7 +121,7 @@ class ConfigUpdateRequest(BaseModel):
         bool | None, ConfigMeta("private", "push", synced_global=True)
     ] = None
     dingtalk_webhook_url: Annotated[
-        str | None, ConfigMeta("private", "push", synced_global=True)
+        str | None, ConfigMeta("private", "push", secret=True, synced_global=True)
     ] = None
     dingtalk_webhook_secret: Annotated[
         str | None, ConfigMeta("private", "push", secret=True, synced_global=True)
@@ -128,7 +130,7 @@ class ConfigUpdateRequest(BaseModel):
         bool | None, ConfigMeta("private", "push", synced_global=True)
     ] = None
     wecom_webhook_url: Annotated[
-        str | None, ConfigMeta("private", "push", synced_global=True)
+        str | None, ConfigMeta("private", "push", secret=True, synced_global=True)
     ] = None
     push_wxpusher_enabled: Annotated[
         bool | None, ConfigMeta("private", "push", synced_global=True)

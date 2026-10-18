@@ -14,6 +14,7 @@ class _MultipleMethodContext:
     basis: str | None = None
     confidence: float = 0.0
     applicability: str = ""
+    current_multiple: float | None = None
 
 
 @dataclass
@@ -27,6 +28,11 @@ class _ValuationBases:
     net_borrowing_ttm: float | None = None
     net_profit_ttm: float | None = None
     revenue_ttm: float | None = None
+    normalized_net_profit: float | None = None
+    normalized_revenue: float | None = None
+    normalized_roe: float | None = None
+    normalized_net_margin: float | None = None
+    normalized_basis: str | None = None
     normalized_growth_rate: float | None = None
     normalized_growth_basis: str | None = None
     normalized_growth_quality: float = 0.2
@@ -55,5 +61,6 @@ class _WeightedValuationOutputs:
     method_weights: dict[str, float] = field(default_factory=dict)
     blended_fair_value: float | None = None
     fair_value_range: list[float] | None = None
+    method_dispersion: float | None = None
     valuation_view: str | None = None
     valuation_summary: str | None = None

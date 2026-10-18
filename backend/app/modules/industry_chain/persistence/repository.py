@@ -1,4 +1,6 @@
 import logging
+import shutil
+import time
 from pathlib import Path
 
 from app.configuration.paths import DATA_DIR
@@ -225,3 +227,39 @@ __all__ = [
     "industry_chain_history_index_snapshot",
     "rebuild_industry_chain_history_index",
 ]
+
+
+def purge_expired_industry_chain_archives(keep_days: int, now: float | None = None) -> int:
+    """删除整体过期的产业链主题归档目录，并重建历史索引。
+
+    以「主题目录」为删除单位，避免索引与文件不一致；删除后全量重建索引。
+    """
+    if keep_days <= 0 or not _DATA_DIR.exists():
+        return 0
+    current = time.time() if now is None else now
+    cutoff = current - keep_days * 24 * 60 * 60
+    targets: list[Path] = list(history_store.history_roots(_DATA_DIR, None, _safe_name))
+    users_root = _DATA_DIR / "users"
+    if users_root.exists():
+        for user_dir in users_root.iterdir():
+            if user_dir.is_dir():
+                targets.extend(history_store.history_roots(user_dir, None, _safe_name))
+    removed = 0
+    for name_dir in targets:
+        try:
+            files = [path for path in name_dir.glob("*.json") if path.is_file()]
+        except OSError:
+            continue
+        if not files:
+            continue
+        try:
+            if any(path.stat().st_mtime >= cutoff for path in files):
+                continue
+        except OSError:
+            continue
+        shutil.rmtree(name_dir, ignore_errors=True)
+        removed += 1
+    if removed:
+        rebuild_industry_chain_history_index()
+        logger.info("清理过期产业链归档: dirs=%s keep_days=%s", removed, keep_days)
+    return removed

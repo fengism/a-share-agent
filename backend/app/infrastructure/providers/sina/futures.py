@@ -21,7 +21,7 @@ async def _get_text(url: str, client: httpx.AsyncClient | None = None, *, timeou
         # 兼容不接受 timeout 关键字的自定义 client / 测试替身
         response = await client.get(url, headers=_HEADERS)
     response.raise_for_status()
-    return response.content.decode("gbk", errors="ignore")
+    return str(response.content.decode("gbk", errors="ignore"))
 
 
 def parse_domestic_quote(line: str) -> tuple[str, dict[str, Any]] | None:

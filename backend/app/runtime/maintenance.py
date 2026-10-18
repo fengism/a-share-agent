@@ -120,3 +120,49 @@ def purge_expired_runtime_data(
             ),
         ),
     }
+
+
+def purge_expired_file_data(
+    *,
+    potential_retention_days: int,
+    valuation_snapshot_retention_days: int,
+    analysis_archive_retention_days: int,
+    industry_chain_retention_days: int,
+    now: float | None = None,
+) -> dict[str, int]:
+    """清理按日累积的 JSON 快照与带历史索引的嵌套归档，避免 data 目录无限增长。
+
+    扁平快照按文件 mtime 删除；``analyses`` / ``industry_chains`` 以「目录」为
+    删除单位并在删除后重建历史索引，避免索引与文件不一致。
+    """
+    from app.configuration.paths import DATA_DIR
+    from app.infrastructure.persistence.file_retention import purge_old_files
+    from app.modules.analysis.persistence import repository as analysis_repository
+    from app.modules.industry_chain.persistence import repository as industry_chain_repository
+
+    current = time.time() if now is None else now
+    return {
+        "potential_stocks": purge_old_files(
+            DATA_DIR / "potential_stocks",
+            keep_days=potential_retention_days,
+            now=current,
+        ),
+        "potential_performance": purge_old_files(
+            DATA_DIR / "potential_performance",
+            keep_days=potential_retention_days,
+            now=current,
+        ),
+        "valuation_snapshots": purge_old_files(
+            DATA_DIR / "valuation_snapshots",
+            keep_days=valuation_snapshot_retention_days,
+            now=current,
+        ),
+        "analysis_archives": analysis_repository.purge_expired_analysis_archives(
+            analysis_archive_retention_days,
+            now=current,
+        ),
+        "industry_chain_archives": industry_chain_repository.purge_expired_industry_chain_archives(
+            industry_chain_retention_days,
+            now=current,
+        ),
+    }

@@ -59,7 +59,7 @@ def _combined_rows(
                 latest[field] = values[period]
                 latest_periods[field] = period
             values_for_period[field] = latest.get(field) if carry_forward else values.get(period)
-        row = {"TIME": period, **values_for_period}
+        row: dict[str, Any] = {"TIME": period, **values_for_period}
         if carry_forward:
             row["_FIELD_PERIODS"] = dict(latest_periods)
         rows.append(row)

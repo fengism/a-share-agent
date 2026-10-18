@@ -5,7 +5,12 @@ from pathlib import Path
 from typing import cast
 
 from app.configuration import get_settings
-from app.core.concurrency.rate_limiter import call_blocking, database_semaphore, tdxhub_semaphore
+from app.core.concurrency.rate_limiter import (
+    call_blocking,
+    database_semaphore,
+    misc_semaphore,
+    tdxhub_semaphore,
+)
 from app.runtime import task_scheduler
 
 logger = logging.getLogger(__name__)
@@ -182,7 +187,11 @@ async def refresh_tdxhub_best_ip() -> None:
 
 async def periodic_wal_checkpoint() -> None:
     from app.infrastructure.persistence.connection import checkpoint_wal, optimize_databases
-    from app.runtime.maintenance import purge_expired_auth_data, purge_expired_runtime_data
+    from app.runtime.maintenance import (
+        purge_expired_auth_data,
+        purge_expired_file_data,
+        purge_expired_runtime_data,
+    )
 
     async def iteration():
         settings = get_settings()
@@ -195,6 +204,12 @@ async def periodic_wal_checkpoint() -> None:
             semaphore=database_semaphore,
         )
         auth_purged = await call_blocking(purge_expired_auth_data, semaphore=database_semaphore)
+        file_purged = await call_blocking(
+            purge_expired_file_data,
+            potential_retention_days=settings.potential_retention_days,
+            valuation_snapshot_retention_days=settings.valuation_snapshot_retention_days,
+            semaphore=misc_semaphore,
+        )
         from app.modules.market_daily.service import market_daily_bar_service
 
         market_daily_maintained = await market_daily_bar_service.maintain_storage(
@@ -204,9 +219,10 @@ async def periodic_wal_checkpoint() -> None:
         optimized = await call_blocking(optimize_databases, semaphore=database_semaphore)
         checkpointed = await call_blocking(checkpoint_wal, semaphore=database_semaphore)
         logger.info(
-            "SQLite 周期维护完成: auth=%s runtime=%s market_daily=%s optimize=%s checkpoint=%s",
+            "SQLite 周期维护完成: auth=%s runtime=%s files=%s market_daily=%s optimize=%s checkpoint=%s",
             auth_purged,
             runtime_purged,
+            file_purged,
             market_daily_maintained,
             optimized,
             checkpointed,
@@ -352,7 +368,8 @@ async def twitter_health_check() -> bool:
             semaphore=database_semaphore,
         )
         return True
-    except Exception:
+    except Exception as error:
+        logger.debug("Twitter 数据库健康检查失败: %s", error)
         return False
 
 

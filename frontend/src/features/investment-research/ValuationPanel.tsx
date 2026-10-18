@@ -49,7 +49,8 @@ function percentileTag(value: number | null | undefined, tagStyle: React.CSSProp
 
 function valuationViewTag(value: string | null | undefined, tagStyle: React.CSSProperties) {
   if (!value) return <Text type="secondary">-</Text>;
-  const tone: SemanticTagColor = value === "低估" ? "down" : value === "高估" ? "up" : "info";
+  const tone: SemanticTagColor =
+    value === "低估" ? "down" : value === "高估" ? "up" : value === "分歧较大" || value === "参考性有限" ? "warning" : "info";
   return <Tag style={{ ...tagStyle, ...semanticTagStyle(tone) }}>{value}</Tag>;
 }
 
@@ -92,6 +93,7 @@ function qualityGradeTone(value: string | null | undefined): SemanticTagColor {
 function sourceLabel(value: string | null | undefined) {
   const labels: Record<string, string> = {
     reported_ttm: "财报 TTM",
+    reported_ttm_yoy_bridge: "同比桥接 TTM",
     reported_annual: "完整年报",
     annualized_fallback: "年化回退",
     market_implied: "市场反推",

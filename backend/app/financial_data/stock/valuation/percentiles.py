@@ -56,7 +56,7 @@ async def compute_percentile(code: str, indicator: str = "市盈率(TTM)", perio
     cache_key = dated_cache_key("percentile", code, indicator, period)
     cached = cache.get(cache_key)
     if cached is not None:
-        return cached
+        return float(cached)
 
     sym = normalize_code(code)
     try:
@@ -126,10 +126,11 @@ async def _compute_percentile_singleflight(
     """
     key = _percentile_key(code, indicator, period)
 
-    return await _percentile_singleflight.do(
+    result: float | None = await _percentile_singleflight.do(
         key,
         lambda: _compute_percentile_limited(key[0], indicator, period),
     )
+    return result
 
 
 async def compute_percentiles(codes: list[str], indicator: str = "市盈率(TTM)", period: str = "近三年") -> list[dict]:

@@ -3,6 +3,9 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import shutil
+import time
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -329,3 +332,51 @@ def list_all_analyses(
 ) -> list[dict]:
     """列出当前用户全部历史，并只读兼容旧全局历史。"""
     return _query_history(user_id, None, limit, offset, can_delete_legacy, query)
+
+
+def _iter_stock_dirs() -> Iterator[Path]:
+    """遍历个股归档目录（含 legacy 与 users/<id>/<code> 两种布局）。"""
+    if _DATA_DIR.exists():
+        for child in _DATA_DIR.iterdir():
+            if child.is_dir() and child.name != _USERS_DIR_NAME:
+                yield child
+    users_root = _DATA_DIR / _USERS_DIR_NAME
+    if not users_root.exists():
+        return
+    for user_dir in users_root.iterdir():
+        if not user_dir.is_dir():
+            continue
+        for stock_dir in user_dir.iterdir():
+            if stock_dir.is_dir():
+                yield stock_dir
+
+
+def purge_expired_analysis_archives(keep_days: int, now: float | None = None) -> int:
+    """删除整体过期的个股分析归档目录，并重建历史索引。
+
+    以「个股目录」为删除单位：只要目录内还有未过期文件就整目录保留，避免出现
+    「索引里有、文件已删」或同一天只剩版本快照的中间态。删除后全量重建索引。
+    """
+    if keep_days <= 0 or not _DATA_DIR.exists():
+        return 0
+    current = time.time() if now is None else now
+    cutoff = current - keep_days * 24 * 60 * 60
+    removed = 0
+    for stock_dir in _iter_stock_dirs():
+        try:
+            files = [path for path in stock_dir.rglob("*.json") if path.is_file()]
+        except OSError:
+            continue
+        if not files:
+            continue
+        try:
+            if any(path.stat().st_mtime >= cutoff for path in files):
+                continue
+        except OSError:
+            continue
+        shutil.rmtree(stock_dir, ignore_errors=True)
+        removed += 1
+    if removed:
+        rebuild_analysis_history_index()
+        logger.info("清理过期个股分析归档: dirs=%s keep_days=%s", removed, keep_days)
+    return removed

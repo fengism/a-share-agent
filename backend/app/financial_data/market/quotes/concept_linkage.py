@@ -17,12 +17,12 @@ import logging
 import sqlite3
 from collections import Counter
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from app.core.cache import market_cache as cache
 from app.core.cache_policies import CONCEPT_LINKAGE
 from app.core.exceptions import InvalidRequestError, ResourceNotFoundError
-from app.core.market import normalize_code, safe_float
+from app.core.market import market_today, normalize_code, safe_float
 from app.core.timezones import SHANGHAI_TIMEZONE
 from app.financial_data.stock.quotes.realtime import fetch_realtime_quote_set
 from app.infrastructure.persistence.connection import get_connection
@@ -323,7 +323,7 @@ async def get_concept_index(concept: str, *, days: int) -> dict:
 
     codes = [item.code for item in constituents]
     used_codes = sample_constituents(codes)
-    start_date = (date.today() - timedelta(days=days)).isoformat()
+    start_date = (market_today() - timedelta(days=days)).isoformat()
     points = await asyncio.to_thread(load_concept_index, used_codes, start_date)
     payload = {
         "concept": concept,

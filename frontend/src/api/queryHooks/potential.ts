@@ -1,8 +1,13 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiGet, apiPost } from "../client";
+import { API_TIMEOUTS, apiGet, apiPost } from "../client";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { queryKeys } from "../queryKeys";
-import type { PotentialDailyResult, PotentialDateItem } from "../../types/stock";
+import type {
+  PotentialDailyResult,
+  PotentialDateItem,
+  PotentialPerformanceSummary,
+  PotentialRunStatus,
+} from "../../types/stock";
 
 export function usePotentialDaily(date: string | null) {
   return useQuery({
@@ -23,11 +28,33 @@ export function usePotentialDates() {
   });
 }
 
+export function usePotentialPerformance(date: string | null, days: number) {
+  return useQuery({
+    queryKey: date ? queryKeys.potential.performance(date, days) : ["potentialPerformance", "none", days],
+    queryFn: () => date
+      ? apiGet<PotentialPerformanceSummary | null>("/potential/performance", { date, days })
+      : Promise.resolve(null),
+    enabled: Boolean(date),
+    staleTime: 60_000,
+  });
+}
+
 export function usePotentialRun() {
   return useMutation({
-    mutationFn: (force: boolean) => apiPost<PotentialDailyResult | null>(
+    mutationFn: (force: boolean) => apiPost<PotentialRunStatus>(
       force ? "/potential/run?force=true" : "/potential/run",
       {},
+      { timeoutMs: API_TIMEOUTS.DEFAULT },
     ),
+  });
+}
+
+export function usePotentialRunStatus(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.potential.runStatus,
+    queryFn: () => apiGet<PotentialRunStatus>("/potential/run/status"),
+    enabled,
+    staleTime: 0,
+    refetchInterval: (query) => (query.state.data?.running ? 5_000 : false),
   });
 }

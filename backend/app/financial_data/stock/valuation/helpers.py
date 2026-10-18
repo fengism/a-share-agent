@@ -3,10 +3,15 @@
 import logging
 import math
 import re
+from collections.abc import Sequence
 from datetime import date
 
 from app.core.market import safe_float
-from app.financial_data.stock.valuation.schemas import InstitutionForecast, PeerMetricStats
+from app.financial_data.stock.valuation.schemas import (
+    InstitutionForecast,
+    PeerMetricStats,
+    ValuationPeer,
+)
 from app.infrastructure.providers.registry import get_provider
 
 logger = logging.getLogger(__name__)
@@ -22,7 +27,7 @@ def _get_ths_provider():
     return get_provider("ths")
 
 
-def _median_positive(values: list[float | None]) -> float | None:
+def _median_positive(values: Sequence[float | None]) -> float | None:
     """计算列表中正值的中位数。
 
     Param:
@@ -39,6 +44,172 @@ def _median_positive(values: list[float | None]) -> float | None:
     return round((series[mid - 1] + series[mid]) / 2, 4)
 
 
+def _peer_implied_ratios(
+    peers: list[ValuationPeer],
+    numerator_attr: str,
+    denominator_attr: str,
+) -> list[float]:
+    """由同行估值倍数反推财务比率。
+
+    PB/PE 近似 ROE，PS/PE 近似净利率。同行样本与目标公司使用同一张
+    估值比较表，口径一致，无需额外抓取同行财报。
+
+    Param:
+        peers: 同行列表
+        numerator_attr: 分子字段名（如 pb）
+        denominator_attr: 分母字段名（如 pe_ttm）
+    Return:
+        正且有限的比率列表
+    """
+    ratios: list[float] = []
+    for peer in peers:
+        numerator = getattr(peer, numerator_attr, None)
+        denominator = getattr(peer, denominator_attr, None)
+        if (
+            numerator is None
+            or denominator is None
+            or not math.isfinite(numerator)
+            or not math.isfinite(denominator)
+            or numerator <= 0
+            or denominator <= 0
+        ):
+            continue
+        ratio = numerator / denominator
+        if math.isfinite(ratio) and ratio > 0:
+            ratios.append(ratio)
+    return ratios
+
+
+def _percentile_positive(values: list[float], quantile: float) -> float | None:
+    """计算正值列表的分位数（线性插值）。"""
+    series = sorted(value for value in values if math.isfinite(value) and value > 0)
+    if not series:
+        return None
+    position = max(0.0, min(quantile, 1.0)) * (len(series) - 1)
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return round(series[lower], 6)
+    weight = position - lower
+    return round(series[lower] * (1 - weight) + series[upper] * weight, 6)
+
+
+def _peer_quality_benchmark(
+    peers: list[ValuationPeer],
+    numerator_attr: str,
+    denominator_attr: str,
+    target_metric: float | None,
+) -> tuple[float | None, str | None]:
+    """为高盈利质量公司选择更保守的同行质量基准。
+
+    直接拿同行中位数做质量基准，会把行业龙头的估值推到现价的数倍；
+    目标公司质量高于同行中位数时，改用同行上四分位作为对标基准，
+    只给“优于上四分位”的部分溢价；低于中位数时仍对标中位数。
+
+    Param:
+        peers: 同行列表
+        numerator_attr: 分子字段名（如 pb）
+        denominator_attr: 分母字段名（如 pe_ttm）
+        target_metric: 目标公司财务比率
+    Return:
+        (质量基准, 基准说明) 元组
+    """
+    ratios = _peer_implied_ratios(peers, numerator_attr, denominator_attr)
+    if len(ratios) < 2:
+        return None, None
+    median = _percentile_positive(ratios, 0.5)
+    if median is None:
+        return None, None
+    if target_metric is not None and math.isfinite(target_metric) and target_metric > median:
+        return _percentile_positive(ratios, 0.75), "同行上四分位"
+    return median, "同行中位数"
+
+
+def _cap_target_multiple(
+    target_multiple: float | None,
+    current_multiple: float | None,
+    *,
+    label: str,
+    max_ratio: float = 1.5,
+) -> tuple[float | None, str | None]:
+    """用当前倍数给同行目标倍数设置上限，避免同行盈利失真时估值失控。
+
+    Param:
+        target_multiple: 同行目标倍数
+        current_multiple: 目标公司当前倍数
+        label: 倍数名称（PE/PB/PS）
+        max_ratio: 目标倍数相对当前倍数的上限
+    Return:
+        (受约束的目标倍数, 约束说明) 元组
+    """
+    if (
+        target_multiple is None
+        or current_multiple is None
+        or not math.isfinite(target_multiple)
+        or not math.isfinite(current_multiple)
+        or target_multiple <= 0
+        or current_multiple <= 0
+    ):
+        return target_multiple, None
+    cap = current_multiple * max_ratio
+    if target_multiple <= cap:
+        return target_multiple, None
+    return round(cap, 4), f"目标 {label} 按当前 {label} {max_ratio:.1f} 倍约束"
+
+
+def _quality_adjusted_multiple(
+    base_multiple: float | None,
+    stock_metric: float | None,
+    peer_metric: float | None,
+    *,
+    label: str,
+    lower: float = 0.4,
+    upper: float = 2.5,
+    min_peer_metric: float = 0.03,
+) -> tuple[float | None, str | None]:
+    """按财务质量差异调整同行倍数。
+
+    直接把同行中位数套到高 ROE/高净利率公司上，会系统性低估其价值；
+    反之低质量公司会被高估。这里按目标公司与同行的财务比率差异缩放
+    目标倍数，并做上下限截断，避免极端值放大。同行比率本身过低
+    （例如周期底部全行业微利）时不做调整，否则会把失真倍数放大。
+
+    Param:
+        base_multiple: 同行倍数中位数
+        stock_metric: 目标公司财务比率（ROE 或净利率）
+        peer_metric: 同行财务比率基准
+        label: 财务比率名称
+        lower: 调整系数下限
+        upper: 调整系数上限
+        min_peer_metric: 同行比率低于该值时不做质量调整
+    Return:
+        (调整后倍数, 调整说明) 元组
+    """
+    if base_multiple is None or not math.isfinite(base_multiple) or base_multiple <= 0:
+        return base_multiple, None
+    if (
+        stock_metric is None
+        or peer_metric is None
+        or not math.isfinite(stock_metric)
+        or not math.isfinite(peer_metric)
+        or peer_metric <= 0
+    ):
+        return base_multiple, None
+    if peer_metric < min_peer_metric:
+        return base_multiple, f"同行 {label} 过低（{peer_metric * 100:.1f}%），不做质量调整"
+    if stock_metric > 0:
+        raw_factor = stock_metric / peer_metric
+    else:
+        raw_factor = 1 + stock_metric / peer_metric
+    if not math.isfinite(raw_factor):
+        return base_multiple, None
+    factor = lower if raw_factor <= 0 else max(lower, min(raw_factor, upper))
+    note = f"按 {label} 质量调整 ×{factor:.2f}"
+    if abs(factor - raw_factor) > 1e-9:
+        note += f"（原始 {raw_factor:.2f}，已截断）"
+    return round(base_multiple * factor, 4), note
+
+
 def _parse_report_date(value: object) -> date | None:
     text = str(value or "").strip()[:10]
     try:
@@ -49,7 +220,7 @@ def _parse_report_date(value: object) -> date | None:
 
 def _row_metric(row: dict, aliases: tuple[str, ...]) -> float | None:
     for alias in aliases:
-        value = safe_float(row.get(alias))
+        value: float | None = safe_float(row.get(alias))
         if value is not None and math.isfinite(value):
             return value
     return None
@@ -59,8 +230,13 @@ def _derive_ttm_report_metric(
     rows: list[dict],
     aliases: tuple[str, ...],
     report_date: str | None,
+    yoy: float | None = None,
 ) -> tuple[float | None, str]:
-    """按“本期累计 + 上年全年 - 上年同期”推导 TTM。"""
+    """按“本期累计 + 上年全年 - 上年同期”推导 TTM。
+
+    上年同期报告缺失但本期同比可用时，用同比反推上年同期，避免直接
+    把半年报/季报简单年化造成季节性失真。
+    """
     current_date = _parse_report_date(report_date)
     if current_date is None:
         return None, "unavailable"
@@ -82,6 +258,14 @@ def _derive_ttm_report_metric(
     if prior_annual is not None and prior_comparable is not None:
         ttm_value = current_value + prior_annual - prior_comparable
         return (ttm_value, "reported_ttm") if math.isfinite(ttm_value) else (None, "unavailable")
+    if prior_annual is not None and yoy is not None and math.isfinite(yoy) and yoy > -99.0:
+        growth_denominator = 1 + yoy / 100
+        if growth_denominator > 0:
+            estimated_prior_comparable = current_value / growth_denominator
+            if math.isfinite(estimated_prior_comparable):
+                ttm_value = current_value + prior_annual - estimated_prior_comparable
+                if math.isfinite(ttm_value):
+                    return ttm_value, "reported_ttm_yoy_bridge"
     annualized_value = _annualize_report_metric(current_value, current_date.isoformat())
     return (annualized_value, "annualized_fallback") if annualized_value is not None else (None, "unavailable")
 
@@ -117,6 +301,82 @@ def _annual_metric_cagr(
             growth_rate = ratio ** (1 / years) - 1
             if math.isfinite(growth_rate):
                 return growth_rate, years
+    return None, None
+
+
+def _annual_metric_average(
+    rows: list[dict],
+    aliases: tuple[str, ...],
+    years: int = 3,
+) -> float | None:
+    """计算最近若干年年报指标的平均值，用于周期股的正常化盈利。"""
+    values_by_year = {
+        parsed.year: value
+        for row in rows
+        if (parsed := _parse_report_date(row.get("REPORT_DATE") or row.get("REPORT_DATE_NAME"))) is not None
+        and parsed.month == 12
+        and parsed.day == 31
+        if (value := _row_metric(row, aliases)) is not None
+    }
+    if not values_by_year:
+        return None
+    latest_year = max(values_by_year)
+    values = [
+        values_by_year[year]
+        for year in range(latest_year - years + 1, latest_year + 1)
+        if year in values_by_year
+    ]
+    if len(values) < 2:
+        return None
+    average = sum(values) / len(values)
+    return average if math.isfinite(average) else None
+
+
+def _latest_annual_metric(rows: list[dict], aliases: tuple[str, ...]) -> float | None:
+    """取最近一期年报指标。"""
+    values_by_year = {
+        parsed.year: value
+        for row in rows
+        if (parsed := _parse_report_date(row.get("REPORT_DATE") or row.get("REPORT_DATE_NAME"))) is not None
+        and parsed.month == 12
+        and parsed.day == 31
+        if (value := _row_metric(row, aliases)) is not None
+    }
+    if not values_by_year:
+        return None
+    value = values_by_year[max(values_by_year)]
+    return value if math.isfinite(value) else None
+
+
+def _normalized_metric_basis(
+    rows: list[dict],
+    aliases: tuple[str, ...],
+    ttm_value: float | None,
+) -> tuple[float | None, str | None]:
+    """构造周期股正常化盈利基准。
+
+    优先使用近三年年报平均；历史期数不足时，用最近一期年报与 TTM
+    的平均值做两点平滑，仍比直接使用峰值/低谷 TTM 稳定。
+
+    Param:
+        rows: 利润表行
+        aliases: 指标别名
+        ttm_value: 当前 TTM 指标
+    Return:
+        (正常化指标, 口径说明) 元组
+    """
+    average = _annual_metric_average(rows, aliases, 3)
+    if average is not None:
+        return average, "近三年平均"
+    latest_annual = _latest_annual_metric(rows, aliases)
+    if (
+        latest_annual is not None
+        and ttm_value is not None
+        and math.isfinite(latest_annual)
+        and math.isfinite(ttm_value)
+    ):
+        smoothed = (latest_annual + ttm_value) / 2
+        return (smoothed, "近一年与 TTM 平均") if math.isfinite(smoothed) else (None, None)
     return None, None
 
 
@@ -227,7 +487,7 @@ def _normalize_peg_growth_rate(
     if value is None or not math.isfinite(value):
         return None
     rate = value / 100 if percentage_points else value
-    if not math.isfinite(rate) or rate <= 0.03:
+    if not math.isfinite(rate) or rate <= 0.08:
         return None
     return min(rate, 0.50)
 
@@ -291,7 +551,8 @@ def _forecast_confidence_adjustment(forecast: InstitutionForecast) -> float:
     elif institution_count < 5:
         adjustment -= 0.08
     forecast_range = (forecast.min_value, forecast.mean_value, forecast.max_value)
-    if all(value is not None and math.isfinite(value) for value in forecast_range) and forecast.mean_value != 0:
+    if all(value is not None and math.isfinite(value) for value in forecast_range) and forecast.mean_value not in (None, 0):
+        assert forecast.min_value is not None and forecast.max_value is not None and forecast.mean_value is not None
         if (forecast.max_value - forecast.min_value) / abs(forecast.mean_value) > 0.6:
             adjustment -= 0.12
     return adjustment

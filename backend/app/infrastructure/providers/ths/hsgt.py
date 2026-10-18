@@ -26,7 +26,7 @@ def get_trade_date(transport: ThsTransport) -> str:
         },
     )
     time_info = data.get("data", {}).get("time_info") or []
-    return (time_info[0] if time_info else {}).get("trade_date", "")
+    return str((time_info[0] if time_info else {}).get("trade_date", ""))
 
 
 def fetch_hsgt_realtime(

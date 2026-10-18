@@ -47,9 +47,9 @@ async def _close_resources(
         # unsafe until start() has settled, even if the request was cancelled.
         try:
             driver = await startup
-        except Exception:
+        except Exception as error:
             # The request keeps the startup error; still clean a failed manager.
-            pass
+            logger.debug("Playwright 启动任务失败但继续清理: %s", error)
     if browser is not None:
         await _cleanup(browser, "close")
     if driver is not None:

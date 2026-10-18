@@ -62,8 +62,8 @@ def export_seed_tables(connection: sqlite3.Connection, output_dir: Path) -> list
     """把种子表全量导出为 gzip CSV（不含自增主键），返回写出的文件列表。"""
     try:
         connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    except Exception:  # noqa: BLE001 - WAL 不可用时直接读，读路径仍可见 WAL 数据
-        pass
+    except Exception as error:  # noqa: BLE001 - WAL 不可用时直接读，读路径仍可见 WAL 数据
+        logger.debug("WAL checkpoint 不可用，继续读取: %s", error)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []

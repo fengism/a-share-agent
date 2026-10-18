@@ -262,6 +262,7 @@ async def _read_pdf_from_local(
             "content_type": "pdf",
         }
     except Exception as err:
+        logger.debug("读取本地 PDF 失败 url=%s: %s", url, err)
         return {"url": url, "title": "", "content": "", "error": f"读取本地 PDF 失败: {err}"}
 
 

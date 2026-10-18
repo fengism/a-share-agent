@@ -18908,6 +18908,17 @@
       "PotentialDailyResult": {
         "description": "一个交易日的潜力股挖掘结果。",
         "properties": {
+          "advance_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Advance Ratio"
+          },
           "date": {
             "title": "Date",
             "type": "string"
@@ -18926,12 +18937,71 @@
             "title": "Generated At",
             "type": "string"
           },
+          "hot_themes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hot Themes",
+            "type": "array"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/PotentialStockItem"
             },
             "title": "Items",
             "type": "array"
+          },
+          "limit_down_count": {
+            "default": 0,
+            "title": "Limit Down Count",
+            "type": "integer"
+          },
+          "limit_up_count": {
+            "default": 0,
+            "title": "Limit Up Count",
+            "type": "integer"
+          },
+          "market_emotion": {
+            "default": "neutral",
+            "enum": [
+              "strong",
+              "neutral",
+              "weak"
+            ],
+            "title": "Market Emotion",
+            "type": "string"
+          },
+          "market_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Note"
+          },
+          "market_regime": {
+            "default": "neutral",
+            "enum": [
+              "bull",
+              "bear",
+              "neutral"
+            ],
+            "title": "Market Regime",
+            "type": "string"
+          },
+          "median_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Change Pct"
           },
           "universe_size": {
             "default": 0,
@@ -18944,6 +19014,281 @@
           "generated_at"
         ],
         "title": "PotentialDailyResult",
+        "type": "object"
+      },
+      "PotentialPerformanceItem": {
+        "description": "潜力股单只标的的前瞻表现。",
+        "properties": {
+          "benchmark_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Return Pct"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "entry_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Price"
+          },
+          "excess_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excess Return Pct"
+          },
+          "exit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Price"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "max_drawdown_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Pct"
+          },
+          "max_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Return Pct"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Pct"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "title": "PotentialPerformanceItem",
+        "type": "object"
+      },
+      "PotentialPerformanceSummary": {
+        "description": "某个挖掘日期在指定持有期内的整体表现。",
+        "properties": {
+          "average_excess_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Excess Pct"
+          },
+          "average_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Return Pct"
+          },
+          "benchmark_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Return Pct"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "evaluated_count": {
+            "default": 0,
+            "title": "Evaluated Count",
+            "type": "integer"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "item_count": {
+            "default": 0,
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PotentialPerformanceItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "median_return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Return Pct"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "win_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate"
+          }
+        },
+        "required": [
+          "date",
+          "days",
+          "generated_at"
+        ],
+        "title": "PotentialPerformanceSummary",
+        "type": "object"
+      },
+      "PotentialRunStatus": {
+        "description": "手动触发的潜力股挖掘任务状态（后台异步执行）。",
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "running": {
+            "default": false,
+            "title": "Running",
+            "type": "boolean"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "default": "idle",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "PotentialRunStatus",
         "type": "object"
       },
       "PotentialStockItem": {
@@ -18975,6 +19320,22 @@
             "title": "Code",
             "type": "string"
           },
+          "fundamental_score": {
+            "default": 0.0,
+            "title": "Fundamental Score",
+            "type": "number"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
           "market_cap": {
             "anyOf": [
               {
@@ -19001,10 +19362,38 @@
             ],
             "title": "Price"
           },
+          "quality_score": {
+            "default": 0.0,
+            "title": "Quality Score",
+            "type": "number"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "risk_flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Risk Flags",
+            "type": "array"
+          },
           "score": {
             "default": 0.0,
             "title": "Score",
             "type": "number"
+          },
+          "sector_strength": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector Strength"
           },
           "signal_age_days": {
             "anyOf": [
@@ -19022,11 +19411,35 @@
             "title": "Signal Date",
             "type": "string"
           },
+          "signal_score": {
+            "default": 0.0,
+            "title": "Signal Score",
+            "type": "number"
+          },
+          "signal_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Signal Types",
+            "type": "array"
+          },
           "strategies": {
             "items": {
               "type": "string"
             },
             "title": "Strategies",
+            "type": "array"
+          },
+          "theme_score": {
+            "default": 0.0,
+            "title": "Theme Score",
+            "type": "number"
+          },
+          "themes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Themes",
             "type": "array"
           },
           "turnover_pct": {
@@ -36813,9 +37226,82 @@
         ]
       }
     },
+    "/api/potential/performance": {
+      "get": {
+        "description": "计算某个挖掘日期在指定持有期内的前瞻表现。",
+        "operationId": "get_potential_performance_api_potential_performance_get",
+        "parameters": [
+          {
+            "description": "挖掘日期 YYYY-MM-DD",
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "description": "挖掘日期 YYYY-MM-DD",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "title": "Date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "持有交易日数",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "description": "持有交易日数",
+              "maximum": 30,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PotentialPerformanceSummary"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Potential Performance Api Potential Performance Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Potential Performance",
+        "tags": [
+          "potential"
+        ]
+      }
+    },
     "/api/potential/run": {
       "post": {
-        "description": "手动触发一次潜力股挖掘（后台每日任务之外的即时入口）。",
+        "description": "后台触发一次潜力股挖掘并立即返回任务状态，避免 HTTP 长阻塞。",
         "operationId": "trigger_potential_mining_api_potential_run_post",
         "parameters": [
           {
@@ -36836,15 +37322,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/PotentialDailyResult"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "title": "Response Trigger Potential Mining Api Potential Run Post"
+                  "$ref": "#/components/schemas/PotentialRunStatus"
                 }
               }
             },
@@ -36867,6 +37345,43 @@
           }
         ],
         "summary": "Trigger Potential Mining",
+        "tags": [
+          "potential"
+        ]
+      }
+    },
+    "/api/potential/run/status": {
+      "get": {
+        "description": "查询手动挖掘任务状态，供前端轮询。",
+        "operationId": "get_potential_run_status_api_potential_run_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PotentialRunStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Potential Run Status",
         "tags": [
           "potential"
         ]

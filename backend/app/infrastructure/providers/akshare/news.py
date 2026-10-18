@@ -7,7 +7,7 @@ from app.infrastructure.providers.akshare.loader import ak
 
 
 def fetch_stock_news(code: str) -> list[NewsSearchItem]:
-    results = []
+    results: list[NewsSearchItem] = []
     frame = ak.stock_news_em(symbol=code)
     if frame is None or frame.empty:
         return results

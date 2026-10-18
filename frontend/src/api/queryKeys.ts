@@ -107,6 +107,8 @@ export const queryKeys = {
     latest: ["potentialLatest"] as const,
     byDate: (date: string) => ["potentialDaily", date] as const,
     dates: ["potentialDates"] as const,
+    performance: (date: string, days: number) => ["potentialPerformance", date, days] as const,
+    runStatus: ["potentialRunStatus"] as const,
   },
   screener: {
     screen: (filters: unknown) => ["screener", filters] as const,

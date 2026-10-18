@@ -32,8 +32,13 @@ def _build_multiple_valuation(
     confidence_score: float,
     applicability: str,
     data_quality_score: float = 1.0,
+    current_multiple: float | None = None,
 ) -> ValuationMethodResult:
     """构造单一倍数法估值结果。
+
+    当当前价与当前倍数都可用时，优先按“目标倍数 / 当前倍数”做相对重估，
+    避免目标倍数与财务指标来自不同口径（如 TTM/年报/股本摊薄）时
+    产生虚假的上下空间；当前倍数缺失时才回退到目标倍数乘财务指标。
 
     Param:
         method: 估值方法名（PE/PB/PS 等）
@@ -44,6 +49,8 @@ def _build_multiple_valuation(
         basis: 估值依据说明
         confidence_score: 置信度数值
         applicability: 适用性说明
+        data_quality_score: 数据质量分
+        current_multiple: 当前倍数（PE/PB/PS）
     Return:
         ValuationMethodResult 模型对象
     """
@@ -72,7 +79,27 @@ def _build_multiple_valuation(
             data_quality_score=data_quality_score,
             applicability=applicability,
         )
-    if total_shares is None or not math.isfinite(total_shares) or total_shares <= 0:
+
+    has_valid_current_price = current_price is not None and math.isfinite(current_price) and current_price > 0
+    has_valid_current_multiple = (
+        current_multiple is not None and math.isfinite(current_multiple) and current_multiple > 0
+    )
+    has_valid_shares = total_shares is not None and math.isfinite(total_shares) and total_shares > 0
+    use_relative_rerating = has_valid_current_price and has_valid_current_multiple
+    if use_relative_rerating:
+        assert current_price is not None and current_multiple is not None
+        per_share_value = round(current_price * target_multiple / current_multiple, 2)
+        equity_value = (
+            round(per_share_value * total_shares, 2)
+            if total_shares is not None and math.isfinite(total_shares) and total_shares > 0
+            else None
+        )
+        basis = f"{basis}；按当前倍数相对重估" if basis else "按当前倍数相对重估"
+    elif has_valid_shares:
+        assert total_shares is not None
+        equity_value = round(target_multiple * basis_metric, 2)
+        per_share_value = round(equity_value / total_shares, 2)
+    else:
         return ValuationMethodResult(
             method=method,
             available=False,
@@ -84,13 +111,10 @@ def _build_multiple_valuation(
             applicability=applicability,
         )
 
-    equity_value = round(target_multiple * basis_metric, 2)
-    per_share_value = round(equity_value / total_shares, 2)
     if (
-        not math.isfinite(equity_value)
-        or equity_value <= 0
-        or not math.isfinite(per_share_value)
+        not math.isfinite(per_share_value)
         or per_share_value <= 0
+        or (equity_value is not None and (not math.isfinite(equity_value) or equity_value <= 0))
     ):
         return ValuationMethodResult(
             method=method,
@@ -102,8 +126,11 @@ def _build_multiple_valuation(
             data_quality_score=data_quality_score,
             applicability=applicability,
         )
-    has_valid_current_price = current_price is not None and math.isfinite(current_price) and current_price > 0
-    upside_pct = (per_share_value - current_price) / current_price * 100 if has_valid_current_price else None
+    upside_pct = (
+        (per_share_value - current_price) / current_price * 100
+        if current_price is not None and math.isfinite(current_price) and current_price > 0
+        else None
+    )
     upside_pct = round(upside_pct, 2) if upside_pct is not None and math.isfinite(upside_pct) else None
     return ValuationMethodResult(
         method=method,
@@ -162,6 +189,28 @@ def _build_peg_valuation(
             data_quality_score=data_quality_score,
             applicability=applicability,
         )
+    if profile.category == "financial":
+        return ValuationMethodResult(
+            method="PEG",
+            available=False,
+            reason="金融企业盈利增长与 PE 的匹配关系较弱，PEG 不适用",
+            basis="；".join(basis_parts),
+            confidence="low",
+            confidence_score=0.2,
+            data_quality_score=data_quality_score,
+            applicability="金融企业以 PB、PE 为主，PEG 不参与估值",
+        )
+    if profile.category == "cyclical":
+        return ValuationMethodResult(
+            method="PEG",
+            available=False,
+            reason="周期行业盈利增速均值回复特征强，PEG 不适用",
+            basis="；".join(basis_parts),
+            confidence="low",
+            confidence_score=0.2,
+            data_quality_score=data_quality_score,
+            applicability="周期行业以 PB、PE 为主，PEG 不参与估值",
+        )
     if growth_rate is None:
         return ValuationMethodResult(
             method="PEG",
@@ -201,6 +250,7 @@ def _build_peg_valuation(
         confidence_score,
         applicability,
         data_quality_score,
+        current_multiple=current_pe,
     )
 
 
@@ -325,6 +375,7 @@ def _build_dcf_valuation(
     normalized_growth_rate: float | None = None,
     growth_basis: str | None = None,
     data_quality_score: float = 0.5,
+    disabled_reason: str | None = None,
 ) -> DCFValuationResult:
     """构造保守 DCF 估值结果（FCFE 近似模型）。
 
@@ -335,15 +386,25 @@ def _build_dcf_valuation(
         net_profit_yoy: 净利润同比增长率
         current_price: 当前股价
         total_shares: 总股本
+        disabled_reason: 画像不适用时的禁用原因
     Return:
         DCFValuationResult 模型对象
     """
+    applicability = "DCF 对现金流假设敏感，仅作为区间参考"
+    data_quality_score = max(0.0, min(data_quality_score, 1.0)) if math.isfinite(data_quality_score) else 0.0
+    if disabled_reason:
+        return DCFValuationResult(
+            available=False,
+            reason=disabled_reason,
+            confidence="low",
+            confidence_score=0.2,
+            data_quality_score=data_quality_score,
+            applicability="该画像下现金流口径不适用，建议以相对估值为主",
+        )
     base_cashflow: float | None = None
     basis: str | None = None
     fcfe_source: str | None = None
     confidence_score = 0.45
-    data_quality_score = max(0.0, min(data_quality_score, 1.0)) if math.isfinite(data_quality_score) else 0.0
-    applicability = "DCF 对现金流假设敏感，仅作为区间参考"
     if operating_cashflow is not None and math.isfinite(operating_cashflow) and operating_cashflow > 0:
         if capital_expenditure is not None and math.isfinite(capital_expenditure) and capital_expenditure >= 0:
             base_cashflow = operating_cashflow - abs(capital_expenditure)
@@ -410,7 +471,6 @@ def _build_dcf_valuation(
         ("bull", "乐观", min(0.20, growth_rate + 0.03), max(0.07, discount_rate - 0.01), 0.035),
     )
     scenarios = []
-    has_valid_current_price = current_price is not None and math.isfinite(current_price) and current_price > 0
     try:
         for name, label, scenario_growth, scenario_discount, scenario_terminal in scenario_inputs:
             equity_value = _project_dcf(
@@ -423,7 +483,11 @@ def _build_dcf_valuation(
             per_share_value = equity_value / total_shares
             if not math.isfinite(per_share_value) or per_share_value <= 0:
                 raise ValueError("DCF per-share value is invalid")
-            upside_pct = (per_share_value - current_price) / current_price * 100 if has_valid_current_price else None
+            upside_pct = (
+        (per_share_value - current_price) / current_price * 100
+        if current_price is not None and math.isfinite(current_price) and current_price > 0
+        else None
+    )
             scenarios.append(
                 DCFScenario(
                     name=name,

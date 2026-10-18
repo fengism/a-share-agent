@@ -25,15 +25,20 @@ from app.financial_data.stock.valuation.blending import (
     _build_blended_value,
     _build_valuation_summary,
     _build_valuation_view,
+    _method_dispersion,
 )
 from app.financial_data.stock.valuation.helpers import (
     _annualize_report_metric,
+    _cap_target_multiple,
     _current_peg,
     _derive_normalized_dcf_growth,
     _derive_ttm_basis,
     _derive_ttm_report_metric,
     _fallback_target_multiple,
     _get_ths_provider,
+    _normalized_metric_basis,
+    _peer_quality_benchmark,
+    _quality_adjusted_multiple,
     _robust_peer_metric,
 )
 from app.financial_data.stock.valuation.methods import (
@@ -50,6 +55,7 @@ from app.financial_data.stock.valuation.models import (
 from app.financial_data.stock.valuation.orchestrator import get_valuation
 from app.financial_data.stock.valuation.percentiles import compute_percentile
 from app.financial_data.stock.valuation.profile import (
+    _calc_net_margin,
     _calc_roe,
     _classify_stock_profile,
     _derive_peg_growth_rate,
@@ -133,7 +139,15 @@ async def _fetch_valuation_detail_inputs(
     Return:
         (基本信息, 估值数据, 财务指标, 机构预测, 利润表, 现金流量表, 估值百分位) 元组
     """
-    return await asyncio.gather(
+    (
+        basic_info,
+        valuation_data,
+        financial_metrics,
+        institution_forecasts,
+        profit_rows,
+        cashflow_rows,
+        percentiles,
+    ) = await asyncio.gather(
         get_basic_info(code),
         get_valuation(code),
         get_financial_metrics(code),
@@ -141,6 +155,15 @@ async def _fetch_valuation_detail_inputs(
         get_financial(code, "profit"),
         get_financial(code, "cashflow"),
         _fetch_valuation_percentiles(raw_code),
+    )
+    return (
+        basic_info,
+        valuation_data,
+        financial_metrics,
+        institution_forecasts,
+        profit_rows,
+        cashflow_rows,
+        percentiles,
     )
 
 
@@ -159,9 +182,9 @@ async def _fetch_valuation_percentiles(raw_code: str) -> ValuationPercentiles:
         return_exceptions=True,
     )
     return ValuationPercentiles(
-        pe_3y=None if isinstance(pe_percentile, Exception) else pe_percentile,
-        pb_3y=None if isinstance(pb_percentile, Exception) else pb_percentile,
-        ps_3y=None if isinstance(ps_percentile, Exception) else ps_percentile,
+        pe_3y=None if isinstance(pe_percentile, BaseException) else pe_percentile,
+        pb_3y=None if isinstance(pb_percentile, BaseException) else pb_percentile,
+        ps_3y=None if isinstance(ps_percentile, BaseException) else ps_percentile,
     )
 
 
@@ -209,27 +232,37 @@ def _build_fundamentals(financial_metrics) -> ValuationFundamentals:
     )
 
 
-def _derive_current_price(basic_info: StockBasicInfo) -> float | None:
-    """通过市值和总股本反推当前股价。
+def _resolve_price_and_shares(basic_info: StockBasicInfo) -> tuple[float | None, float | None]:
+    """解析当前股价与总股本，保证两者口径一致。
+
+    市值与股本同时可用时用二者反推现价，保证市值、现价、股本口径
+    一致；任一字段缺失时再用行情现价与市值互推，避免仅因一个字段
+    缺失就让全部倍数法估值不可用。
 
     Param:
         basic_info: 股票基本信息
     Return:
-        当前股价，数据缺失时返回 None
+        (当前股价, 总股本) 元组
     """
     market_cap = basic_info.market_cap
     total_shares = basic_info.total_shares
-    if (
-        market_cap is None
-        or not math.isfinite(market_cap)
-        or market_cap <= 0
-        or total_shares is None
-        or not math.isfinite(total_shares)
-        or total_shares <= 0
-    ):
-        return None
-    current_price = market_cap / total_shares
-    return round(current_price, 2) if math.isfinite(current_price) else None
+    if total_shares is not None and (not math.isfinite(total_shares) or total_shares <= 0):
+        total_shares = None
+    if market_cap is not None and (not math.isfinite(market_cap) or market_cap <= 0):
+        market_cap = None
+    price = None
+    if market_cap is not None and total_shares is not None:
+        # 市值与股本同源时优先用二者反推，保证市值、现价、股本口径一致。
+        price = market_cap / total_shares
+    if price is None:
+        price = basic_info.current_price
+        if price is not None and (not math.isfinite(price) or price <= 0):
+            price = None
+    if total_shares is None and market_cap is not None and price is not None:
+        total_shares = market_cap / price
+    resolved_price = round(price, 2) if price is not None and math.isfinite(price) else None
+    resolved_shares = total_shares if total_shares is not None and math.isfinite(total_shares) else None
+    return resolved_price, resolved_shares
 
 
 def _build_detail_notes(profile: ValuationProfile) -> list[str]:
@@ -243,8 +276,12 @@ def _build_detail_notes(profile: ValuationProfile) -> list[str]:
     return [
         *profile.rationale,
         "综合估值仅使用可用方法，并按股票画像和置信度动态加权。",
+        "PB/PS 目标倍数按目标公司与同行的 ROE、净利率差异做质量调整，避免高盈利质量公司被同行低倍数系统性低估。",
+        "金融类不使用 PS/PEG/DCF，周期类不使用 PEG/DCF，避免现金流与增速口径不匹配。",
+        "上年同期缺失时用本期同比桥接 TTM；周期股用近三年或近一年与 TTM 平均盈利正常化。",
         "PEG 依赖盈利增长假设，增长率异常或预测缺失时会自动降级或剔除。",
         "DCF 采用保守 FCFE 代理模型，结果更适合作为区间参考。",
+        "方法分歧过大时标注“分歧较大”，不强行给出单一中枢。",
     ]
 
 
@@ -253,16 +290,31 @@ def _build_multiple_method_contexts(
     percentiles: ValuationPercentiles,
     peer_summary: ValuationPeerSummary,
     profile: ValuationProfile,
-    roe: float | None,
+    stock_roe: float | None,
+    stock_net_margin: float | None,
+    normalized_roe: float | None = None,
+    normalized_net_margin: float | None = None,
+    normalized_basis: str | None = None,
 ) -> dict[str, _MultipleMethodContext]:
-    """组装 PE/PB/PS 倍数法上下文，按画像与 ROE 调整置信度。
+    """组装 PE/PB/PS 倍数法上下文，并按财务质量调整目标倍数。
+
+    直接把同行 PB/PS 中位数套到高 ROE 或高净利率公司上，会得到远低于
+    现价的“合理价值”；反之低质量公司会被高估。这里用同行 PB/PE 近似
+    同行 ROE、PS/PE 近似同行净利率，对 PB/PS 目标倍数做质量调整。
+    周期股使用正常化盈利（近三年平均，历史不足时用近一年与 TTM 平均）
+    计算的 ROE/净利率，避免峰值或低谷盈利把 PB/PS 推到极端；同行 TTM
+    盈利失真时，PE 改用前瞻 PE 口径。
 
     Param:
         valuation_data: 估值数据模型
         percentiles: 估值百分位
         peer_summary: 同行汇总
         profile: 估值画像
-        roe: ROE 值
+        stock_roe: 目标公司 TTM ROE
+        stock_net_margin: 目标公司 TTM 净利率
+        normalized_roe: 正常化 ROE（周期股使用）
+        normalized_net_margin: 正常化净利率（周期股使用）
+        normalized_basis: 正常化口径说明
     Return:
         方法名到 _MultipleMethodContext 的字典
     """
@@ -282,6 +334,49 @@ def _build_multiple_method_contexts(
         else _fallback_target_multiple(valuation_data.ps_ttm, percentiles.ps_3y)
     )
 
+    use_normalized = profile.category == "cyclical"
+    quality_roe = normalized_roe if use_normalized and normalized_roe is not None else stock_roe
+    quality_margin = (
+        normalized_net_margin if use_normalized and normalized_net_margin is not None else stock_net_margin
+    )
+    quality_note = (
+        f"按{normalized_basis}盈利正常化"
+        if use_normalized
+        and normalized_basis
+        and (normalized_roe is not None or normalized_net_margin is not None)
+        else None
+    )
+    peer_roe, peer_roe_basis = _peer_quality_benchmark(peer_summary.peers, "pb", "pe_ttm", quality_roe)
+    peer_net_margin, peer_margin_basis = _peer_quality_benchmark(
+        peer_summary.peers, "ps_ttm", "pe_ttm", quality_margin
+    )
+
+    pe_current_multiple = None
+    peer_forward_pe, _ = _robust_peer_metric([peer._pe_forward for peer in peer_summary.peers])
+    target_forward_pe = getattr(valuation_data, "_pe_forward", None)
+    forward_pe_distorted = (
+        peer_forward_pe is not None
+        and target_forward_pe is not None
+        and math.isfinite(target_forward_pe)
+        and target_forward_pe > 0
+        and peer_summary.pe_median is not None
+        and peer_summary.pe_median > 0
+        and (
+            peer_forward_pe < peer_summary.pe_median * 0.7
+            or peer_forward_pe > peer_summary.pe_median * 1.3
+        )
+    )
+    if forward_pe_distorted:
+        assert (
+            peer_forward_pe is not None
+            and target_forward_pe is not None
+            and peer_summary.pe_median is not None
+        )
+        # 同行 TTM 盈利处于低谷或峰值时，TTM PE 会被动失真，改用前瞻 PE 口径。
+        pe_target = peer_forward_pe
+        pe_basis = "同行前瞻 PE 中位数（TTM 盈利失真，改用前瞻口径）"
+        pe_current_multiple = target_forward_pe
+
     pe_confidence = 0.65
     pe_applicability = "盈利为正时 PE 可反映利润定价"
     if profile.category == "loss_making":
@@ -293,29 +388,67 @@ def _build_multiple_method_contexts(
         pe_applicability = "周期行业利润波动较大，PE 仅作低权重参考"
     elif profile.category in {"stable", "growth"}:
         pe_confidence = 0.7
+    if pe_target is not None:
+        pe_target, pe_cap_note = _cap_target_multiple(
+            pe_target, pe_current_multiple or valuation_data.pe_ttm, label="PE"
+        )
+        if pe_cap_note:
+            pe_basis = f"{pe_basis}；{pe_cap_note}" if pe_basis else pe_cap_note
 
     pb_confidence = 0.65
     pb_applicability = "PB 可辅助衡量资产定价"
     if profile.category in {"financial", "cyclical"}:
         pb_confidence = 0.8
         pb_applicability = "金融/周期资产属性较强，PB 权重较高"
-    if roe is not None and roe < 0.06:
+    if pb_target is not None:
+        pb_target, pb_quality_note = _quality_adjusted_multiple(pb_target, quality_roe, peer_roe, label="ROE")
+        if pb_quality_note:
+            if peer_roe_basis and "质量调整 ×" in pb_quality_note:
+                pb_quality_note = f"{pb_quality_note}，对标{peer_roe_basis}"
+            if quality_note and "质量调整 ×" in pb_quality_note:
+                pb_quality_note = f"{pb_quality_note}，{quality_note}"
+            pb_basis = f"{pb_basis}；{pb_quality_note}" if pb_basis else pb_quality_note
+        pb_target, pb_cap_note = _cap_target_multiple(pb_target, valuation_data.pb, label="PB")
+        if pb_cap_note:
+            pb_basis = f"{pb_basis}；{pb_cap_note}" if pb_basis else pb_cap_note
+    if quality_roe is not None and quality_roe < 0.06:
         pb_confidence = min(pb_confidence, 0.5)
         pb_applicability = "ROE 偏低，PB 估值需要折价看待"
-        if pb_target is not None:
-            pb_target = pb_target * 0.85
+    elif quality_roe is not None and quality_roe > 0.2 and peer_roe is not None and quality_roe > peer_roe * 1.5:
+        pb_applicability = "ROE 显著高于同行，PB 已按盈利质量上调"
 
     ps_confidence = 0.55
     ps_applicability = "PS 适合辅助观察收入规模定价"
-    if profile.category in {"growth", "loss_making"}:
-        ps_confidence = 0.72
-        ps_applicability = "成长或利润承压阶段，PS 比 PE 更有参考价值"
-    elif profile.category in {"financial", "stable"}:
-        ps_confidence = 0.4
-        ps_applicability = "该类型公司收入倍数解释力有限，PS 低权重参考"
+    if profile.category == "financial":
+        ps_target = None
+        ps_basis = "金融企业收入口径与一般企业不可比，PS 不参与估值"
+        ps_confidence = 0.2
+        ps_applicability = "金融企业以 PE/PB 为主，PS 不适用"
+    else:
+        if ps_target is not None:
+            ps_target, ps_quality_note = _quality_adjusted_multiple(
+                ps_target, quality_margin, peer_net_margin, label="净利率"
+            )
+            if ps_quality_note:
+                if peer_margin_basis and "质量调整 ×" in ps_quality_note:
+                    ps_quality_note = f"{ps_quality_note}，对标{peer_margin_basis}"
+                if quality_note and "质量调整 ×" in ps_quality_note:
+                    ps_quality_note = f"{ps_quality_note}，{quality_note}"
+                ps_basis = f"{ps_basis}；{ps_quality_note}" if ps_basis else ps_quality_note
+            ps_target, ps_cap_note = _cap_target_multiple(ps_target, valuation_data.ps_ttm, label="PS")
+            if ps_cap_note:
+                ps_basis = f"{ps_basis}；{ps_cap_note}" if ps_basis else ps_cap_note
+        if profile.category in {"growth", "loss_making"}:
+            ps_confidence = 0.72
+            ps_applicability = "成长或利润承压阶段，PS 比 PE 更有参考价值"
+        elif profile.category == "stable":
+            ps_confidence = 0.4
+            ps_applicability = "该类型公司收入倍数解释力有限，PS 低权重参考"
 
     return {
-        "pe": _MultipleMethodContext(pe_target, pe_basis, pe_confidence, pe_applicability),
+        "pe": _MultipleMethodContext(
+            pe_target, pe_basis, pe_confidence, pe_applicability, pe_current_multiple
+        ),
         "pb": _MultipleMethodContext(pb_target, pb_basis, pb_confidence, pb_applicability),
         "ps": _MultipleMethodContext(ps_target, ps_basis, ps_confidence, ps_applicability),
     }
@@ -343,11 +476,13 @@ def _derive_valuation_bases(
         profit_rows,
         ("PARENT_NETPROFIT", "NET_PROFIT"),
         report_date,
+        fundamentals.net_profit_yoy,
     )
     revenue_ttm, revenue_source = _derive_ttm_report_metric(
         profit_rows,
         ("TOTAL_OPERATE_INCOME", "OPERATE_INCOME", "TOTAL_REVENUE"),
         report_date,
+        fundamentals.revenue_yoy,
     )
     operating_cashflow_ttm, operating_cashflow_source = _derive_ttm_report_metric(
         cashflow_rows,
@@ -423,6 +558,21 @@ def _derive_valuation_bases(
             if market_cap not in (None, 0) and valuation_data.ps_ttm not in (None, 0)
             else "annualized_fallback"
         )
+    normalized_net_profit, normalized_net_profit_basis = _normalized_metric_basis(
+        profit_rows,
+        ("PARENT_NETPROFIT", "NET_PROFIT"),
+        net_profit_ttm,
+    )
+    normalized_revenue, normalized_revenue_basis = _normalized_metric_basis(
+        profit_rows,
+        ("TOTAL_OPERATE_INCOME", "OPERATE_INCOME", "TOTAL_REVENUE"),
+        revenue_ttm,
+    )
+    normalized_basis = normalized_net_profit_basis or normalized_revenue_basis
+    normalized_roe = (
+        _calc_roe(fundamentals, normalized_net_profit) if normalized_net_profit is not None else None
+    )
+    normalized_net_margin = _calc_net_margin(normalized_net_profit, normalized_revenue)
     return _ValuationBases(
         net_profit_annualized=net_profit_annualized,
         revenue_annualized=revenue_annualized,
@@ -433,6 +583,11 @@ def _derive_valuation_bases(
         net_borrowing_ttm=net_borrowing_ttm,
         net_profit_ttm=net_profit_ttm,
         revenue_ttm=revenue_ttm,
+        normalized_net_profit=normalized_net_profit,
+        normalized_revenue=normalized_revenue,
+        normalized_roe=normalized_roe,
+        normalized_net_margin=normalized_net_margin,
+        normalized_basis=normalized_basis,
         normalized_growth_rate=normalized_growth_rate,
         normalized_growth_basis=normalized_growth_basis,
         normalized_growth_quality=normalized_growth_quality,
@@ -451,6 +606,7 @@ def _source_quality(source: str) -> float:
     return {
         "reported_ttm": 1.0,
         "reported_annual": 0.95,
+        "reported_ttm_yoy_bridge": 0.85,
         "annualized_fallback": 0.55,
         "market_implied": 0.45,
     }.get(source, 0.2)
@@ -459,39 +615,41 @@ def _source_quality(source: str) -> float:
 def _build_data_quality(
     bases: _ValuationBases,
     peer_summary: ValuationPeerSummary,
+    profile: ValuationProfile,
 ) -> ValuationDataQuality:
-    peer_confidence = (
-        sum(
-            (
-                peer_summary.pe_stats.confidence_score,
-                peer_summary.pb_stats.confidence_score,
-                peer_summary.ps_stats.confidence_score,
-            )
-        )
-        / 3
+    is_financial = profile.category == "financial"
+    peer_scores = [peer_summary.pe_stats.confidence_score, peer_summary.pb_stats.confidence_score]
+    if not is_financial:
+        peer_scores.append(peer_summary.ps_stats.confidence_score)
+    peer_confidence = sum(peer_scores) / len(peer_scores)
+    ttm_quality = (
+        _source_quality(bases.net_profit_source)
+        if is_financial
+        else (_source_quality(bases.net_profit_source) + _source_quality(bases.revenue_source)) / 2
     )
-    ttm_quality = (_source_quality(bases.net_profit_source) + _source_quality(bases.revenue_source)) / 2
     cashflow_quality = (
         _source_quality(bases.operating_cashflow_source) + _source_quality(bases.capital_expenditure_source)
     ) / 2
-    score = round(0.45 * ttm_quality + 0.30 * cashflow_quality + 0.25 * peer_confidence, 4)
+    if is_financial:
+        # 金融企业不使用 PS/DCF，数据质量只由盈利口径与 PE/PB 同行样本决定。
+        score = round(0.60 * ttm_quality + 0.40 * peer_confidence, 4)
+    else:
+        score = round(0.45 * ttm_quality + 0.30 * cashflow_quality + 0.25 * peer_confidence, 4)
     limitations = []
     disclosed_sources = {"reported_ttm", "reported_annual"}
     if bases.net_profit_source not in disclosed_sources:
         limitations.append("净利润未使用完整披露 TTM，估值基础可靠性下降。")
-    if bases.revenue_source not in disclosed_sources:
+    if not is_financial and bases.revenue_source not in disclosed_sources:
         limitations.append("营业收入未使用完整披露 TTM，PS 估值仅供参考。")
-    if bases.capital_expenditure_ttm is None:
+    if not is_financial and bases.capital_expenditure_ttm is None:
         limitations.append("资本开支缺失，DCF 使用保守现金流代理。")
-    if (
-        min(
-            peer_summary.pe_stats.sample_size,
-            peer_summary.pb_stats.sample_size,
-            peer_summary.ps_stats.sample_size,
-        )
-        < 3
-    ):
+    peer_sample_sizes = [peer_summary.pe_stats.sample_size, peer_summary.pb_stats.sample_size]
+    if not is_financial:
+        peer_sample_sizes.append(peer_summary.ps_stats.sample_size)
+    if min(peer_sample_sizes) < 3:
         limitations.append("有效同行样本偏少，相对估值置信度有限。")
+    if profile.category == "loss_making":
+        limitations.append("亏损公司未计入研发管线与扭亏预期，PB/PS 估值参考性有限。")
     return ValuationDataQuality(
         score=score,
         grade="high" if score >= 0.8 else "medium" if score >= 0.6 else "low",
@@ -608,6 +766,7 @@ def _build_fair_values(
             pe_context.confidence,
             pe_context.applicability,
             method_data_quality["pe"],
+            current_multiple=pe_context.current_multiple or valuation_data.pe_ttm,
         ),
         "pb": _build_multiple_valuation(
             "PB",
@@ -619,6 +778,7 @@ def _build_fair_values(
             pb_context.confidence,
             pb_context.applicability,
             method_data_quality["pb"],
+            current_multiple=valuation_data.pb,
         ),
         "ps": _build_multiple_valuation(
             "PS",
@@ -630,6 +790,7 @@ def _build_fair_values(
             ps_context.confidence,
             ps_context.applicability,
             method_data_quality["ps"],
+            current_multiple=valuation_data.ps_ttm,
         ),
         "peg": _build_peg_valuation(
             bases.net_profit_ttm,
@@ -655,6 +816,13 @@ def _build_fair_values(
             normalized_growth_rate=bases.normalized_growth_rate,
             growth_basis=bases.normalized_growth_basis,
             data_quality_score=method_data_quality["dcf"],
+            disabled_reason=(
+                "金融企业现金流口径与 FCFE 不匹配，DCF 不参与估值"
+                if profile.category == "financial"
+                else "周期行业当期现金流受商品价格影响大，DCF 不参与估值"
+                if profile.category == "cyclical"
+                else None
+            ),
         ),
     }
 
@@ -677,21 +845,26 @@ def _build_weighted_outputs(
     _apply_weights(fair_values, method_weights)
     blended_fair_value = _build_blended_value(fair_values, method_weights)
     fair_value_range = _build_blended_range(fair_values, method_weights)
-    valuation_view = _build_valuation_view(fair_value_range, blended_fair_value, current_price)
+    dispersion = _method_dispersion(fair_values, method_weights)
+    valuation_view = _build_valuation_view(fair_value_range, blended_fair_value, current_price, dispersion)
+    if profile.category == "loss_making" and valuation_view in {"低估", "高估"}:
+        # 亏损公司缺少盈利锚，PB/PS 方向性结论容易被研发管线/扭亏预期推翻。
+        valuation_view = "参考性有限"
     return _WeightedValuationOutputs(
         method_weights=method_weights,
         blended_fair_value=blended_fair_value,
         fair_value_range=fair_value_range,
+        method_dispersion=dispersion,
         valuation_view=valuation_view,
-        valuation_summary=_build_valuation_summary(profile, fair_value_range, valuation_view),
+        valuation_summary=_build_valuation_summary(profile, fair_value_range, valuation_view, dispersion),
     )
 
 
 def _snapshot_path(code: str) -> Path:
-    return DATA_DIR / "valuation_snapshots" / f"{code}.json"
+    return Path(DATA_DIR) / "valuation_snapshots" / f"{code}.json"
 
 
-_VALUATION_SNAPSHOT_SCHEMA_VERSION = 4
+_VALUATION_SNAPSHOT_SCHEMA_VERSION = 9
 
 
 def _read_disk_snapshot(code: str, *, ignore_date: bool = False) -> ValuationDetail | None:
@@ -720,7 +893,8 @@ def _read_disk_snapshot(code: str, *, ignore_date: bool = False) -> ValuationDet
         if not isinstance(data, dict):
             logger.debug("估值快照缺少 data %s", code)
             return None
-        return ValuationDetail.model_validate(data)
+        snapshot: ValuationDetail = ValuationDetail.model_validate(data)
+        return snapshot
     except Exception as error:
         logger.debug("读取个股估值快照失败 %s: %s", code, error)
         return None
@@ -749,12 +923,13 @@ async def _load_valuation_detail(code: str) -> ValuationDetail:
         ValuationDetail 模型对象，含画像、各方法结果与综合估值
     """
     sym = normalize_code(code)
-    cache_key = dated_cache_key("valuation_detail_v4", sym.raw)
+    cache_key = dated_cache_key("valuation_detail_v9", sym.raw)
     cached = cache.get(cache_key)
     if cached is not None:
-        return cached
+        cached_detail: ValuationDetail = ValuationDetail.model_validate(cached)
+        return cached_detail
 
-    disk_cached = await call_blocking(_read_disk_snapshot, sym.raw, semaphore=misc_semaphore)
+    disk_cached: ValuationDetail | None = await call_blocking(_read_disk_snapshot, sym.raw, semaphore=misc_semaphore)
     if disk_cached is not None:
         cache.set(cache_key, disk_cached, ttl=VALUATION_DETAIL.ttl_seconds)
         return disk_cached
@@ -770,7 +945,7 @@ async def _load_valuation_detail(code: str) -> ValuationDetail:
             percentiles,
         ) = await _fetch_valuation_detail_inputs(code, sym.raw)
     except Exception as exc:
-        fallback = await call_blocking(
+        fallback: ValuationDetail | None = await call_blocking(
             _read_disk_snapshot, sym.raw, ignore_date=True, semaphore=misc_semaphore
         )
         if fallback is not None:
@@ -780,11 +955,7 @@ async def _load_valuation_detail(code: str) -> ValuationDetail:
 
     peer_summary = _build_peer_summary(valuation_data)
     fundamentals = _build_fundamentals(financial_metrics)
-    current_price = _derive_current_price(basic_info)
-    profile = _classify_stock_profile(basic_info, fundamentals)
-    contexts = _build_multiple_method_contexts(
-        valuation_data, percentiles, peer_summary, profile, _calc_roe(fundamentals)
-    )
+    current_price, total_shares = _resolve_price_and_shares(basic_info)
     bases = _derive_valuation_bases(
         fundamentals,
         financial_metrics.latest_report_date,
@@ -794,11 +965,25 @@ async def _load_valuation_detail(code: str) -> ValuationDetail:
         cashflow_rows,
     )
     fundamentals.capital_expenditure = bases.capital_expenditure_ttm
-    data_quality = _build_data_quality(bases, peer_summary)
+    profile = _classify_stock_profile(basic_info, fundamentals, bases.net_profit_ttm)
+    stock_roe = _calc_roe(fundamentals, bases.net_profit_ttm)
+    stock_net_margin = _calc_net_margin(bases.net_profit_ttm, bases.revenue_ttm)
+    contexts = _build_multiple_method_contexts(
+        valuation_data,
+        percentiles,
+        peer_summary,
+        profile,
+        stock_roe,
+        stock_net_margin,
+        bases.normalized_roe,
+        bases.normalized_net_margin,
+        bases.normalized_basis,
+    )
+    data_quality = _build_data_quality(bases, peer_summary, profile)
     peg_context = _derive_peg_context(
         institution_forecasts,
         bases.net_profit_ttm,
-        basic_info.total_shares,
+        total_shares,
         fundamentals.net_profit_yoy,
         valuation_data.pe_ttm,
     )
@@ -811,17 +996,21 @@ async def _load_valuation_detail(code: str) -> ValuationDetail:
         bases,
         peg_context,
         current_price,
-        basic_info.total_shares,
+        total_shares,
         data_quality,
     )
     weighted_outputs = _build_weighted_outputs(fair_values, profile, current_price)
+    if weighted_outputs.method_dispersion is not None and weighted_outputs.method_dispersion > 2.2:
+        data_quality.limitations.append(
+            f"各估值方法结果分歧较大（最高/最低约 {weighted_outputs.method_dispersion:.1f} 倍），综合中枢参考性下降。"
+        )
 
     result = ValuationDetail(
         code=sym.raw,
         report_date=financial_metrics.latest_report_date,
         current_price=current_price,
         market_cap=basic_info.market_cap,
-        total_shares=basic_info.total_shares,
+        total_shares=total_shares,
         industry=basic_info.first_industry.name if basic_info.first_industry else None,
         multiples=ValuationMultiples(
             pe_ttm=valuation_data.pe_ttm,
@@ -851,12 +1040,13 @@ async def _load_valuation_detail(code: str) -> ValuationDetail:
 async def _load_hk_valuation_detail(norm_code: str) -> ValuationDetail:
     from app.financial_data.hk.service import hk_market_service
 
-    cache_key = dated_cache_key("valuation_detail_v4", norm_code)
+    cache_key = dated_cache_key("valuation_detail_v9", norm_code)
     cached = cache.get(cache_key)
     if cached is not None:
-        return cached
+        cached_hk_detail: ValuationDetail = ValuationDetail.model_validate(cached)
+        return cached_hk_detail
 
-    disk_cached = await call_blocking(_read_disk_snapshot, norm_code, semaphore=misc_semaphore)
+    disk_cached: ValuationDetail | None = await call_blocking(_read_disk_snapshot, norm_code, semaphore=misc_semaphore)
     if disk_cached is not None:
         cache.set(cache_key, disk_cached, ttl=VALUATION_DETAIL.ttl_seconds)
         return disk_cached
@@ -933,18 +1123,26 @@ async def get_valuation_detail(code: str) -> ValuationDetail:
         from app.financial_data.hk.service import normalize_hk_code
 
         norm_code = normalize_hk_code(code)
-        cache_key = dated_cache_key("valuation_detail_v4", norm_code)
+        cache_key = dated_cache_key("valuation_detail_v9", norm_code)
         cached = cache.get(cache_key)
         if cached is not None:
-            return ValuationDetail.model_validate(cached)
-        return await _valuation_detail_singleflight.do(cache_key, lambda: _load_hk_valuation_detail(norm_code))
+            cached_hk_get: ValuationDetail = ValuationDetail.model_validate(cached)
+            return cached_hk_get
+        loaded_hk: ValuationDetail = await _valuation_detail_singleflight.do(
+            cache_key, lambda: _load_hk_valuation_detail(norm_code)
+        )
+        return loaded_hk
 
     sym = normalize_code(code)
-    cache_key = dated_cache_key("valuation_detail_v4", sym.raw)
+    cache_key = dated_cache_key("valuation_detail_v9", sym.raw)
     cached = cache.get(cache_key)
     if cached is not None:
-        return ValuationDetail.model_validate(cached)
-    return await _valuation_detail_singleflight.do(cache_key, lambda: _load_valuation_detail(code))
+        cached_detail: ValuationDetail = ValuationDetail.model_validate(cached)
+        return cached_detail
+    loaded_detail: ValuationDetail = await _valuation_detail_singleflight.do(
+        cache_key, lambda: _load_valuation_detail(code)
+    )
+    return loaded_detail
 
 
 async def warm_up_valuation_details(codes: Sequence[str] | None = None) -> dict[str, int]:

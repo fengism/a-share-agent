@@ -6,6 +6,7 @@ from app.core.cache import cache_date, dated_cache_key_no_day, one_year_ago_date
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, ths_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
+from app.core.market import market_today
 from app.domain.market import MarketVolume
 from app.financial_data.dates import parse_market_date
 from app.financial_data.market.quotes.index_kline import get_index_kline
@@ -135,7 +136,7 @@ async def get_market_volume_stats(
     若启用实时模式且同花顺分时/日级快照可用，则优先采用实时快照的当日成交额并补充完整均线维度。
     """
     if target_date is None:
-        target_date = date.today()
+        target_date = market_today()
 
     target_text = target_date.isoformat()
     start_date = (target_date - timedelta(days=160)).isoformat()

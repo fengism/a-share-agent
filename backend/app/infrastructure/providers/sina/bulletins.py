@@ -1,7 +1,7 @@
 """Sina Finance 个股公告列表（CB_AllService.getBulletinList）。"""
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -18,7 +18,7 @@ def _parse_payload(response: requests.Response) -> dict:
     """解析公告接口返回，兼容 JSON 与 JSONP 两种封装。"""
     payload = response.text.strip()
     if payload.startswith("{"):
-        return response.json()
+        return cast(dict, response.json())
     return parse_jsonp(payload)
 
 

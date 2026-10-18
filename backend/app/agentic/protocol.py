@@ -4,18 +4,19 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-MAX_AGENT_CONTENT_LENGTH = 100_000
+from app.domain.agent_protocol import (
+    MAX_AGENT_CONTENT_LENGTH,
+    ToolCallFunction,
+    ToolCallInfo,
+)
 
-
-class ToolCallFunction(BaseModel):
-    name: str = Field(min_length=1, max_length=128)
-    arguments: str = Field(max_length=MAX_AGENT_CONTENT_LENGTH)
-
-
-class ToolCallInfo(BaseModel):
-    id: str = Field(min_length=1, max_length=256)
-    type: Literal["function"] = "function"
-    function: ToolCallFunction
+__all__ = [
+    "MAX_AGENT_CONTENT_LENGTH",
+    "AgentMessage",
+    "ToolCallFunction",
+    "ToolCallInfo",
+    "ToolResultInfo",
+]
 
 
 class ToolResultInfo(BaseModel):

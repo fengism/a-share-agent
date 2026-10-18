@@ -75,7 +75,7 @@ def _format_period(value: object) -> str:
 
 
 def _finite_float(value: object) -> float | None:
-    number = safe_float(value)
+    number: float | None = safe_float(value)
     if number is not None and not math.isfinite(number):
         raise RuntimeError("新浪财报接口返回非有限数值")
     return number
@@ -196,15 +196,14 @@ def _fetch_report_data(session, paper_code: str, source: str, num: int) -> Mappi
     response.raise_for_status()
     payload = response.json()
     result = payload.get("result") if isinstance(payload, Mapping) else None
-    status = result.get("status") if isinstance(result, Mapping) else None
-    data = result.get("data") if isinstance(result, Mapping) else None
-    report_list = data.get("report_list") if isinstance(data, Mapping) else None
-    if (
-        not isinstance(status, Mapping)
-        or status.get("code") != 0
-        or not isinstance(report_list, Mapping)
-        or not report_list
-    ):
+    if not isinstance(result, Mapping):
+        raise RuntimeError("新浪财报接口未返回有效结果")
+    status = result.get("status")
+    data = result.get("data")
+    if not isinstance(status, Mapping) or status.get("code") != 0 or not isinstance(data, Mapping):
+        raise RuntimeError("新浪财报接口未返回有效报表")
+    report_list = data.get("report_list")
+    if not isinstance(report_list, Mapping) or not report_list:
         raise RuntimeError("新浪财报接口未返回有效报表")
     return data
 

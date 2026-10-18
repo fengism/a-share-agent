@@ -23,6 +23,10 @@ class MaintenanceGroup(ConfigGroup):
     market_daily_bar_refresh_retry_base_seconds: int = Field(default=60, ge=1, le=1800)
     market_daily_observation_retention_days: int = Field(default=1095, ge=7, le=3650)
     market_daily_attempt_retention_days: int = Field(default=1095, ge=30, le=3650)
+    potential_retention_days: int = Field(default=180, ge=7, le=3650)
+    valuation_snapshot_retention_days: int = Field(default=30, ge=7, le=3650)
+    analysis_archive_retention_days: int = Field(default=90, ge=7, le=3650)
+    industry_chain_retention_days: int = Field(default=180, ge=7, le=3650)
     # 常驻后台任务开关，默认全部关闭，支持在前端按需开启
     macro_analysis_prewarm_enabled: bool = False
     daily_review_prewarm_enabled: bool = False

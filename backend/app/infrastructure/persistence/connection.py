@@ -303,8 +303,8 @@ def close_connection():
         try:
             if conn.in_transaction:
                 conn.rollback()
-        except Exception:
-            pass
+        except Exception as error:
+            logger.debug("关闭连接前回滚失败: %s", error)
     checkpointed_paths: set[str] = set()
     for conn in conns:
         try:
@@ -318,8 +318,8 @@ def close_connection():
                 if is_busy_error(checkpoint_err):
                     try:
                         conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
-                    except Exception:
-                        pass
+                    except Exception as error:
+                        logger.debug("WAL PASSIVE checkpoint 降级失败: %s", error)
                 else:
                     raise
             checkpointed_paths.add(database_file)

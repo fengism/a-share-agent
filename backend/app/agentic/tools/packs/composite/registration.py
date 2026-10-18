@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from app.agentic.catalog import registry
@@ -53,6 +54,7 @@ async def _gather_labeled(
         except asyncio.CancelledError:
             raise
         except Exception as error:
+            logging.getLogger(__name__).debug("组合工具执行失败: %s", error)
             return {
                 "status": "failed",
                 "error": str(error) or type(error).__name__,

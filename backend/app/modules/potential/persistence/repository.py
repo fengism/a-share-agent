@@ -8,7 +8,7 @@ from app.configuration.paths import DATA_DIR
 from app.infrastructure.persistence.json_storage import atomic_write_text
 from app.modules.potential.schemas import PotentialDailyResult
 
-_DATA_DIR = DATA_DIR / "potential_stocks"
+_DATA_DIR = Path(DATA_DIR) / "potential_stocks"
 
 
 def _result_path(date: str) -> Path:
@@ -25,7 +25,8 @@ def load_potential_result(date: str) -> PotentialDailyResult | None:
     path = _result_path(date)
     if not path.exists():
         return None
-    return PotentialDailyResult.model_validate_json(path.read_text(encoding="utf-8"))
+    loaded: PotentialDailyResult = PotentialDailyResult.model_validate_json(path.read_text(encoding="utf-8"))
+    return loaded
 
 
 def list_potential_dates(limit: int = 30) -> list[str]:
@@ -41,10 +42,11 @@ def list_potential_dates(limit: int = 30) -> list[str]:
 
 def list_potential_summaries(limit: int = 30) -> list[tuple[str, int]]:
     """按日期倒序列出 (日期, 命中数量)。"""
-    return [
-        (date, len(load_potential_result(date).items) if load_potential_result(date) else 0)
-        for date in list_potential_dates(limit)
-    ]
+    summaries: list[tuple[str, int]] = []
+    for date in list_potential_dates(limit):
+        result = load_potential_result(date)
+        summaries.append((date, len(result.items) if result is not None else 0))
+    return summaries
 
 
 def has_potential_result(date: str) -> bool:

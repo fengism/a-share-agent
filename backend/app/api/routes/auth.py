@@ -7,6 +7,7 @@ from app.api.auth.cookies import (
     clear_auth_cookies,
     enforce_cookie_csrf,
     request_auth_token,
+    resolve_secure_cookie,
     set_auth_cookies,
 )
 from app.api.auth.dependencies import get_current_user, require_admin, security_scheme
@@ -60,7 +61,11 @@ def register(req: RegisterRequest, request: Request, response: Response) -> Auth
         )
     except auth_service.AuthServiceError as error:
         raise _http_error(error) from error
-    set_auth_cookies(response, session.token, secure=get_settings().auth_cookie_secure)
+    set_auth_cookies(
+        response,
+        session.token,
+        secure=resolve_secure_cookie(request, get_settings().auth_cookie_secure),
+    )
     return AuthResponse(token=session.token, user=_user_out(session.user))
 
 
@@ -84,7 +89,11 @@ def login(req: LoginRequest, request: Request, response: Response) -> AuthRespon
         )
     except auth_service.AuthServiceError as error:
         raise _http_error(error) from error
-    set_auth_cookies(response, session.token, secure=get_settings().auth_cookie_secure)
+    set_auth_cookies(
+        response,
+        session.token,
+        secure=resolve_secure_cookie(request, get_settings().auth_cookie_secure),
+    )
     return AuthResponse(token=session.token, user=_user_out(session.user))
 
 
@@ -97,7 +106,7 @@ def logout(
     token, uses_cookie = request_auth_token(request, credentials)
     enforce_cookie_csrf(request, uses_cookie)
     auth_service.logout(token)
-    clear_auth_cookies(response, secure=get_settings().auth_cookie_secure)
+    clear_auth_cookies(response, secure=resolve_secure_cookie(request, get_settings().auth_cookie_secure))
     return OkResponse()
 
 

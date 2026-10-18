@@ -190,7 +190,8 @@ def _extract_auth_context(
         if key.lower() == b"authorization":
             try:
                 text = value.decode("latin-1")
-            except Exception:
+            except Exception as error:
+                logger.debug("Authorization 头解码失败: %s", error)
                 return None, False, None
             if text[:7].lower() == "bearer ":
                 return text[7:].strip() or None, False, None
@@ -201,7 +202,8 @@ def _extract_auth_context(
             continue
         try:
             cookies.load(value.decode("latin-1"))
-        except Exception:
+        except Exception as error:
+            logger.debug("Cookie 头解析失败: %s", error)
             return None, False, None
     session_morsel = cookies.get(SESSION_COOKIE_NAME)
     csrf_morsel = cookies.get(CSRF_COOKIE_NAME)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import sqlite3
 import threading
 from collections.abc import Iterable, Sequence
@@ -931,8 +932,8 @@ def close_all_connections() -> None:
             if connection.in_transaction:
                 connection.rollback()
             connection.close()
-        except Exception:  # noqa: BLE001 - 关闭清理不应抛出
-            pass
+        except Exception as error:  # noqa: BLE001 - 关闭清理不应抛出
+            logging.getLogger(__name__).debug("关闭日线库连接失败: %s", error)
     _local.connections = {}
 
 

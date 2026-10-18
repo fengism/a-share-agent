@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import logging
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -65,7 +66,8 @@ def _read_dataframe(content: bytes, filename: str) -> pd.DataFrame:
     if lower_fn.endswith(".csv"):
         try:
             return pd.read_csv(BytesIO(content), dtype=str, encoding="utf-8-sig")
-        except Exception:
+        except Exception as error:
+            logging.getLogger(__name__).debug("UTF-8 解析失败，回退 GBK: %s", error)
             return pd.read_csv(BytesIO(content), dtype=str, encoding="gbk")
     else:
         try:

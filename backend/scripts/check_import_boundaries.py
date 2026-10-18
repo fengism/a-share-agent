@@ -39,7 +39,8 @@ REPO_BACKEND_DIR = APP_DIR.parent
 LAYER_FORBIDDEN: dict[str, frozenset[str]] = {
     "core": frozenset({"infrastructure", "modules"}),
     "domain": frozenset({"infrastructure", "modules"}),
-    "infrastructure": frozenset({"modules"}),
+    "infrastructure": frozenset({"modules", "agentic"}),
+    "financial_data": frozenset({"modules"}),
 }
 
 #: R3：这些 app 子包属于「上层」，内层与业务模块不得反向依赖。
@@ -48,7 +49,7 @@ UPWARD_FORBIDDEN: frozenset[str] = frozenset({"api", "runtime", "main"})
 #: R3 的合法来源（组合根与工具脚本）。
 UPWARD_EXEMPT_SOURCES: frozenset[str] = frozenset({"main", "scripts"})
 
-#: ``app/modules`` 下的顶层共享内核：被多处复用的单文件模块，没有模块门面可言。
+#: ``app/modules`` 下的顶层共享内核：与 financial_data 互相依赖，按共享层处理。
 SHARED_KERNEL_MODULES: frozenset[str] = frozenset(
     {
         "code_normalization",
@@ -69,6 +70,20 @@ KNOWN_EXCEPTIONS: dict[tuple[str, str], str] = {
     # 版本解析与 cookie 写入目前住在 runtime / api，两侧互为依赖，宜下沉到共享层。
     ("api/version.py", "runtime"): "版本解析逻辑当前位于 runtime.app_version",
     ("runtime/middleware.py", "api"): "认证 cookie 名与写入器当前位于 api.auth.cookies",
+    # ── 数据层读取本地落库数据的历史债务（基线，冻结存量、只减不增）──
+    # financial_data 需要读取 market_daily / stock_profile / stock_concept /
+    # industry_classification 落库的本地快照。产品当前不做端口化/仓储下沉，
+    # 只冻结存量、禁止新增依赖；确实要动数据源架构时再单独评估。
+    ("financial_data/hk/service.py", "modules.market_daily"): "港股日线读取本地 market_daily 仓储",
+    ("financial_data/market/quotes/breadth.py", "modules.industry_classification"): "市场宽度读取本地行业映射",
+    ("financial_data/market/quotes/concept_linkage.py", "modules.market_daily"): "概念指数读取本地日线仓储",
+    ("financial_data/market/quotes/index_kline.py", "modules.market_daily"): "指数日线读取本地日线仓储",
+    ("financial_data/stock/classification/service.py", "modules.industry_classification"): "个股分类读取本地行业映射",
+    ("financial_data/stock/profile/basic_info.py", "modules.stock_concept"): "基础信息读取本地概念快照",
+    ("financial_data/stock/profile/basic_info.py", "modules.industry_classification"): "基础信息读取本地行业映射",
+    ("financial_data/stock/profile/basic_info.py", "modules.stock_profile"): "基础信息读取本地个股资料快照",
+    ("financial_data/stock/profile/business_intro.py", "modules.stock_profile"): "主营介绍读取本地个股资料快照",
+    ("financial_data/stock/quotes/kline.py", "modules.market_daily"): "个股日线读取本地日线仓储",
 }
 
 
@@ -133,6 +148,8 @@ def _check_layer(ctx: _ScanContext, path: Path, module: str, line: int) -> None:
     source = _layer_of(path, ctx.app_dir)
     forbidden = LAYER_FORBIDDEN.get(source)
     if not forbidden or parts[1] not in forbidden:
+        return
+    if parts[1] == "modules" and len(parts) > 2 and parts[2] in SHARED_KERNEL_MODULES:
         return
     if _exempt(path, _layer_target(parts), ctx.app_dir):
         return

@@ -1,14 +1,15 @@
-"""每日潜力股挖掘：多策略信号融合 + 风控过滤，按日持久化。"""
+"""每日潜力股挖掘编排：候选池 → 信号/质量/题材/基本面 → 风控与行业分散。"""
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
+from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.financial_data.market.public import get_trading_calendar_view
 from app.financial_data.market.trading_session import SHANGHAI_TIMEZONE
 from app.financial_data.stock.public import (
@@ -16,148 +17,50 @@ from app.financial_data.stock.public import (
     get_historical_bars,
     get_spot_snapshot,
 )
+from app.modules.potential import constants
+from app.modules.potential.fundamentals import _apply_fundamental_overlay
 from app.modules.potential.persistence import repository
+from app.modules.potential.regime import _combine_regime, _market_emotion, _resolve_market_regime
 from app.modules.potential.schemas import (
     PotentialDailyResult,
     PotentialDateItem,
+    PotentialRunStatus,
     PotentialStockItem,
 )
-from app.modules.quant.engine import build_target_positions
-from app.modules.quant.public import CURATED_STRATEGY_KEYS, get_strategy_registry, mining_weight
+from app.modules.potential.screening import _industry_stats, select_candidates
+from app.modules.potential.signals import _evaluate_candidate
+from app.modules.potential.themes import _load_theme_map
+from app.modules.quant.public import CURATED_STRATEGY_KEYS, get_strategy_registry
 
 logger = logging.getLogger(__name__)
 
-# 候选池：兼顾高流动性龙头与中盘活跃成长股
-_MAX_CANDIDATES = 300
-_MIN_AMOUNT_YI = 0.8
-_MIN_LISTING_DAYS = 365
-_MAX_SIGNAL_AGE_DAYS = 5
-_MAX_OUTPUT = 50
-_MAX_CONCURRENCY = 6
-_HISTORY_DAYS = 420
-_TRADING_CALENDAR_LOOKBACK_DAYS = 370
-_DAILY_MINING_CUTOFF = time(15, 10)
+_MAX_OUTPUT = constants._MAX_OUTPUT
+_MAX_CONCURRENCY = constants._MAX_CONCURRENCY
+_MAX_PER_INDUSTRY = constants._MAX_PER_INDUSTRY
+_MAX_PER_UNCLASSIFIED = constants._MAX_PER_UNCLASSIFIED
+_HISTORY_DAYS = constants._HISTORY_DAYS
+_BAR_FETCH_TIMEOUT_SECONDS = constants._BAR_FETCH_TIMEOUT_SECONDS
+_FUNDAMENTAL_CANDIDATE_LIMIT = constants._FUNDAMENTAL_CANDIDATE_LIMIT
+_TRADING_CALENDAR_LOOKBACK_DAYS = constants._TRADING_CALENDAR_LOOKBACK_DAYS
+_DAILY_MINING_CUTOFF = constants._DAILY_MINING_CUTOFF
+_THEME_CONCEPT_LIMIT = constants._THEME_CONCEPT_LIMIT
 
-# 分层候选池：头部龙头与中盘活跃各取前 N 名后合并去重
-_HEAD_CANDIDATE_LIMIT = 150
-_MID_CANDIDATE_LIMIT = 150
-# 中盘活跃成长口径：成交额上限（亿，下限沿用全局的 _MIN_AMOUNT_YI）与换手率区间（%）
-_MID_MAX_AMOUNT_YI = 15.0
-_MID_MIN_TURNOVER_PCT = 2.0
-_MID_MAX_TURNOVER_PCT = 18.0
+_mining_singleflight: AsyncSingleFlight[PotentialDailyResult] = AsyncSingleFlight()
 
-# 信号新鲜度加成：_FRESH_SIGNAL_DAYS 个交易日内触发的信号额外乘以 _FRESH_SIGNAL_BONUS
-_FRESH_SIGNAL_DAYS = 3
-_FRESH_SIGNAL_BONUS = 1.5
-
-
-def _normalize_code(value: object) -> str:
-    text = str(value or "").strip()
-    if text[:2].upper() in {"SH", "SZ", "BJ"}:
-        text = text[2:]
-    return text.zfill(6) if text.isdigit() else text
-
-
-def select_candidates(
-    df: pd.DataFrame | None,
-    master_records: list,
-) -> list[dict]:
-    """从全市场快照筛出风控合格的候选池（分层覆盖核心高成交龙头与中盘活跃成长股）。"""
-    if df is None or df.empty:
-        return []
-    frame = df.copy()
-    frame["代码"] = frame["代码"].map(_normalize_code)
-    frame = frame.drop_duplicates(subset=["代码"], keep="first")
-
-    by_code = {record.code: record for record in master_records}
-    frame["board"] = frame["代码"].map({code: record.board for code, record in by_code.items()})
-    frame["listing_date"] = frame["代码"].map({code: record.listing_date for code, record in by_code.items()})
-    frame["amount_yi"] = pd.to_numeric(frame.get("成交额"), errors="coerce") / 1e8
-    frame["turnover_pct"] = pd.to_numeric(frame.get("换手率"), errors="coerce")
-
-    name_text = frame["名称"].astype(str)
-    mask = ~(name_text.str.upper().str.contains("ST", na=False) | name_text.str.contains("退", na=False))
-    mask &= frame["amount_yi"].notna() & (frame["amount_yi"] >= _MIN_AMOUNT_YI)
-    listing_days = (pd.Timestamp.now() - pd.to_datetime(frame["listing_date"], errors="coerce")).dt.days
-    mask &= listing_days.isna() | (listing_days >= _MIN_LISTING_DAYS)
-    frame = frame[mask]
-
-    # 分层挑选候选池：
-    # 1. 头部高流动性龙头：成交额前 _HEAD_CANDIDATE_LIMIT 名
-    # 2. 中盘活跃成长股：成交额 ≤ _MID_MAX_AMOUNT_YI 亿且换手率
-    #    在 _MID_MIN_TURNOVER_PCT ~ _MID_MAX_TURNOVER_PCT% 之间，按换手率取前 _MID_CANDIDATE_LIMIT 名
-    head_candidates = frame.sort_values(by="amount_yi", ascending=False).head(_HEAD_CANDIDATE_LIMIT)
-    mid_pool = frame[
-        (frame["amount_yi"] <= _MID_MAX_AMOUNT_YI)
-        & (frame["turnover_pct"] >= _MID_MIN_TURNOVER_PCT)
-        & (frame["turnover_pct"] <= _MID_MAX_TURNOVER_PCT)
-    ]
-    mid_candidates = mid_pool.sort_values(by="turnover_pct", ascending=False).head(_MID_CANDIDATE_LIMIT)
-    merged_frame = pd.concat([head_candidates, mid_candidates]).drop_duplicates(subset=["代码"], keep="first")
-    selected = merged_frame.head(_MAX_CANDIDATES)
-
-    return [
-        {
-            "code": str(row["代码"]),
-            "name": str(row["名称"]),
-            "price": pd.to_numeric(row.get("最新价"), errors="coerce"),
-            "change_pct": pd.to_numeric(row.get("涨跌幅"), errors="coerce"),
-            "market_cap": pd.to_numeric(row.get("总市值"), errors="coerce") / 1e8,
-            "turnover_pct": pd.to_numeric(row.get("换手率"), errors="coerce"),
-            "amount": row["amount_yi"],
-        }
-        for _, row in selected.iterrows()
-    ]
-
-
-def _float_or_none(value):
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    return number if pd.notna(number) else None
-
-
-def _latest_entry_index(positions: list[int]) -> int | None:
-    for index in range(len(positions) - 1, -1, -1):
-        if positions[index] == 1 and (index == 0 or positions[index - 1] != 1):
-            return index
-    return None
-
-
-def _evaluate_strategies(
-    bars_items: list,
-    strategy_snapshots: dict,
-) -> tuple[list[str], str, int | None, float]:
-    """对单只股票的全部策略求信号（同步，在线程池中执行）。"""
-    hits: list[str] = []
-    latest_signal_date = ""
-    signal_age: int | None = None
-    score = 0.0
-    for key, snapshot in strategy_snapshots.items():
-        try:
-            positions = build_target_positions(bars_items, snapshot)
-        except Exception:
+def _diversify_items(items: list[dict], max_output: int, max_per_industry: int) -> list[dict]:
+    """按行业分散输出，避免榜单被单一热门行业占满。"""
+    selected: list[dict] = []
+    counts: dict[str, int] = {}
+    for item in items:
+        industry = item.get("industry") or "未分类"
+        cap = _MAX_PER_UNCLASSIFIED if industry == "未分类" else max_per_industry
+        if counts.get(industry, 0) >= cap:
             continue
-        if not positions or positions[-1] != 1:
-            continue
-        entry_index = _latest_entry_index(positions)
-        if entry_index is None:
-            continue
-        age = len(positions) - 1 - entry_index
-        # 信号时效性风控：只保留最近 _MAX_SIGNAL_AGE_DAYS (5个交易日) 内触发 entry 的新鲜信号
-        if age > _MAX_SIGNAL_AGE_DAYS:
-            continue
-        weight = mining_weight(key)
-        if age <= _FRESH_SIGNAL_DAYS:
-            weight *= _FRESH_SIGNAL_BONUS
-        score += weight
-        hits.append(snapshot.definition.name)
-        if signal_age is None or age < signal_age:
-            signal_age = age
-            latest_signal_date = bars_items[entry_index].date
-    return hits, latest_signal_date, signal_age, score
-
+        counts[industry] = counts.get(industry, 0) + 1
+        selected.append(item)
+        if len(selected) >= max_output:
+            break
+    return selected
 
 def _normalize_shanghai_now(now: datetime | None) -> datetime:
     if now is None:
@@ -165,7 +68,6 @@ def _normalize_shanghai_now(now: datetime | None) -> datetime:
     if now.tzinfo is None:
         return now.replace(tzinfo=SHANGHAI_TIMEZONE)
     return now.astimezone(SHANGHAI_TIMEZONE)
-
 
 async def resolve_potential_market_date(now: datetime | None = None) -> date | None:
     """解析最近一个已经收盘的真实 A 股交易日。"""
@@ -201,37 +103,76 @@ async def resolve_potential_market_date(now: datetime | None = None) -> date | N
         return None
     return max(trade_dates)
 
+async def mine_potential_stocks(
+    market_date: date,
+    spot_df: pd.DataFrame | None = None,
+    master=None,
+) -> PotentialDailyResult:
+    """按指定交易日执行一轮挖掘：候选筛选 → 多策略信号 → 质量叠加 → 行业分散。"""
+    if spot_df is None or master is None:
+        fetched_spot, fetched_master = await asyncio.gather(
+            get_spot_snapshot(),
+            get_exchange_stock_master(),
+        )
+        spot_df = spot_df if spot_df is not None else fetched_spot
+        master = master if master is not None else fetched_master
+    master_records = master.records if master is not None else []
 
-async def mine_potential_stocks(market_date: date) -> PotentialDailyResult:
-    """按指定交易日执行一轮挖掘：候选筛选 → 多策略信号 → 融合评分。"""
-    df, master = await asyncio.gather(
-        get_spot_snapshot(),
-        get_exchange_stock_master(),
+    candidates, industry_stats, emotion = await asyncio.gather(
+        call_blocking(select_candidates, spot_df, master_records, semaphore=misc_semaphore),
+        call_blocking(_industry_stats, spot_df, master_records, semaphore=misc_semaphore),
+        call_blocking(_market_emotion, spot_df, master_records, semaphore=misc_semaphore),
     )
-    candidates = await call_blocking(
-        select_candidates,
-        df,
-        master.records if master is not None else [],
-        semaphore=misc_semaphore,
+    for candidate in candidates:
+        industry = candidate.get("industry")
+        stats = industry_stats.get(industry) if isinstance(industry, str) else None
+        candidate["sector_strength"] = stats["median_change_pct"] if stats else None
+        candidate["theme_strength"] = 0.0
+        candidate["themes"] = []
+
+    (theme_map, hot_themes), (index_regime, regime_note) = await asyncio.gather(
+        _load_theme_map({candidate["code"] for candidate in candidates}),
+        _resolve_market_regime(market_date),
     )
+    regime = _combine_regime(index_regime, emotion["label"])
+    breadth_text = (
+        f"上涨占比 {emotion['advance_ratio'] * 100:.0f}%"
+        if emotion["advance_ratio"] is not None
+        else "上涨占比未知"
+    )
+    regime_note = (
+        f"{regime_note}；情绪 {emotion['label']}，{breadth_text}，"
+        f"涨停 {emotion['limit_up_count']} 家 / 跌停 {emotion['limit_down_count']} 家"
+    )
+    for candidate in candidates:
+        theme = theme_map.get(candidate["code"])
+        if theme:
+            candidate["theme_strength"] = theme["strength"]
+            candidate["themes"] = theme["themes"]
+
     registry = get_strategy_registry()
-    strategy_snapshots = {
-        key: registry.resolve(key, None, {}) for key in sorted(CURATED_STRATEGY_KEYS)
-    }
+    strategy_snapshots: dict = {}
+    for key in sorted(CURATED_STRATEGY_KEYS):
+        try:
+            strategy_snapshots[key] = registry.resolve(key, None, {})
+        except Exception as error:
+            logger.warning("潜力股策略解析失败 key=%s: %s", key, error)
 
     semaphore = asyncio.Semaphore(_MAX_CONCURRENCY)
     start_date = market_date - timedelta(days=_HISTORY_DAYS)
     end_date = market_date
-    items: list[PotentialStockItem] = []
+    items: list[dict] = []
     failed = 0
+    market_date_text = market_date.isoformat()
 
     async def evaluate(candidate: dict) -> None:
         nonlocal failed
         code = candidate["code"]
         async with semaphore:
             try:
-                bars = await get_historical_bars(
-                    code, start_date, end_date, period="daily", adjust="qfq",
+                bars = await asyncio.wait_for(
+                    get_historical_bars(code, start_date, end_date, period="daily", adjust="qfq"),
+                    timeout=_BAR_FETCH_TIMEOUT_SECONDS,
                 )
             except Exception as error:
                 failed += 1
@@ -240,77 +181,59 @@ async def mine_potential_stocks(market_date: date) -> PotentialDailyResult:
             if not bars.items:
                 failed += 1
                 return
+            last_bar_date = str(bars.items[-1].date)[:10]
+            if last_bar_date != market_date_text:
+                failed += 1
+                logger.debug("潜力股跳过非目标交易日行情 %s: last_bar=%s", code, last_bar_date)
+                return
 
-        final_bar = bars.items[-1]
-        prev_bar = bars.items[-2] if len(bars.items) >= 2 else None
-
-        prev_close = prev_bar.close if prev_bar else final_bar.close
-        calc_change_pct = (
-            round((final_bar.close - prev_close) / prev_close * 100, 2)
-            if prev_close and prev_close > 0
-            else _float_or_none(candidate.get("change_pct"))
-        )
-
-        # 当日跌幅与形态风控：排除当日收盘跌幅超 3% 或大阴线杀跌股票（实体跌幅超 3.5%）
-        if calc_change_pct is not None and calc_change_pct < -3.0:
-            return
-        if final_bar.open > 0 and (final_bar.close - final_bar.open) / final_bar.open < -0.035:
-            return
-
-        hits, latest_signal_date, signal_age, score = await call_blocking(
-            _evaluate_strategies,
+        item = await call_blocking(
+            _evaluate_candidate,
             bars.items,
             strategy_snapshots,
+            candidate,
+            regime,
             semaphore=misc_semaphore,
         )
-        if not hits:
-            return
-
-        # 以交易日官方日K线收盘价格与精确涨跌幅为准，确保与行情详情及K线完全对齐
-        exact_price = round(final_bar.close, 2) if final_bar.close else _float_or_none(candidate.get("price"))
-
-        items.append(
-            PotentialStockItem(
-                code=code,
-                name=candidate["name"],
-                price=exact_price,
-                change_pct=calc_change_pct,
-                market_cap=_float_or_none(candidate.get("market_cap")),
-                turnover_pct=_float_or_none(candidate.get("turnover_pct")),
-                amount=_float_or_none(candidate.get("amount")),
-                strategies=hits,
-                signal_date=latest_signal_date,
-                signal_age_days=signal_age,
-                score=round(score, 2),
-            )
-        )
+        if item is not None:
+            items.append(item)
 
     await asyncio.gather(*(evaluate(candidate) for candidate in candidates))
-    items.sort(key=lambda item: (-item.score, -(item.amount or 0)))
+    fundamental_succeeded, fundamental_failed = await _apply_fundamental_overlay(items, market_date)
+    logger.info(
+        "潜力股基本面叠加完成: date=%s candidates=%s succeeded=%s failed=%s",
+        market_date_text,
+        min(len(items), _FUNDAMENTAL_CANDIDATE_LIMIT),
+        fundamental_succeeded,
+        fundamental_failed,
+    )
+    items.sort(key=lambda item: (-item["score"], -(item.get("amount") or 0)))
+    selected = _diversify_items(items, _MAX_OUTPUT, _MAX_PER_INDUSTRY)
 
     return PotentialDailyResult(
-        date=end_date.isoformat(),
+        date=market_date_text,
         generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
         universe_size=len(candidates),
         evaluated=len(candidates) - failed,
         failed_count=failed,
-        items=items[:_MAX_OUTPUT],
+        market_regime=regime,
+        market_note=regime_note,
+        market_emotion=emotion["label"],
+        advance_ratio=emotion["advance_ratio"],
+        limit_up_count=emotion["limit_up_count"],
+        limit_down_count=emotion["limit_down_count"],
+        median_change_pct=emotion["median_change_pct"],
+        hot_themes=hot_themes,
+        items=[PotentialStockItem(**item) for item in selected],
     )
 
-
-async def run_daily_mining(
-    force: bool = False,
-    now: datetime | None = None,
-) -> PotentialDailyResult | None:
-    """挖掘最近已收盘交易日；已有结果时跳过（force 可强制重跑）。"""
-    market_date = await resolve_potential_market_date(now)
-    if market_date is None:
-        return None
-
-    market_date_text = market_date.isoformat()
-    if not force and repository.has_potential_result(market_date_text):
-        return repository.load_potential_result(market_date_text)
-    result = await mine_potential_stocks(market_date)
+async def _mine_and_save(market_date: date) -> PotentialDailyResult:
+    """执行一轮完整挖掘并落盘；同一交易日的并发请求由 singleflight 合并。"""
+    spot_df, master = await asyncio.gather(
+        get_spot_snapshot(),
+        get_exchange_stock_master(),
+    )
+    result = await mine_potential_stocks(market_date, spot_df=spot_df, master=master)
     await call_blocking(repository.save_potential_result, result, semaphore=misc_semaphore)
     logger.info(
         "潜力股挖掘完成: date=%s universe=%s evaluated=%s hits=%s",
@@ -323,6 +246,42 @@ async def run_daily_mining(
         logger.warning("发布潜力股挖掘完成事件失败: date=%s", result.date, exc_info=True)
     return result
 
+async def _load_saved_result(date_text: str) -> PotentialDailyResult | None:
+    """读取已落盘的当日结果，统一收窄 call_blocking 的 Any 返回。"""
+    loaded: PotentialDailyResult | None = await call_blocking(
+        repository.load_potential_result, date_text, semaphore=misc_semaphore
+    )
+    return loaded
+
+async def run_daily_mining(
+    force: bool = False,
+    now: datetime | None = None,
+) -> PotentialDailyResult | None:
+    """挖掘最近已收盘交易日；已有结果时跳过（force 可强制重跑）。
+
+    同一交易日的并发触发通过 singleflight 合并，避免重复扫全市场、重复拉行情与财报。
+    """
+    local_now = _normalize_shanghai_now(now)
+    market_date = await resolve_potential_market_date(local_now)
+    if market_date is None:
+        return None
+
+    market_date_text = market_date.isoformat()
+    if not force and repository.has_potential_result(market_date_text):
+        return await _load_saved_result(market_date_text)
+    if (
+        local_now.weekday() < 5
+        and local_now.time().replace(tzinfo=None) < _DAILY_MINING_CUTOFF
+        and market_date != local_now.date()
+    ):
+        # 收盘前手动触发时，全市场快照仍是当日盘中数据，不能拿来挖上一交易日。
+        logger.warning("收盘前跳过潜力股挖掘，避免使用盘中快照回挖上一交易日: date=%s", market_date_text)
+        return await _load_saved_result(market_date_text)
+
+    mined: PotentialDailyResult = await _mining_singleflight.do(
+        market_date_text, lambda: _mine_and_save(market_date)
+    )
+    return mined
 
 async def run_scheduled_daily_mining(
     now: datetime | None = None,
@@ -337,18 +296,80 @@ async def run_scheduled_daily_mining(
         return None
     return await run_daily_mining(force=False, now=local_now)
 
-
 async def get_potential_result(date: str | None = None) -> PotentialDailyResult | None:
     """获取指定日期结果；未指定时返回最近一份。"""
     if date is not None:
-        return await call_blocking(repository.load_potential_result, date, semaphore=misc_semaphore)
+        return await _load_saved_result(date)
     dates = await call_blocking(repository.list_potential_dates, 1, semaphore=misc_semaphore)
     if not dates:
         return None
-    return await call_blocking(repository.load_potential_result, dates[0], semaphore=misc_semaphore)
-
+    return await _load_saved_result(dates[0])
 
 async def list_potential_date_items(limit: int = 30) -> list[PotentialDateItem]:
     """列出可用结果日期与各自命中数量。"""
     summaries = await call_blocking(repository.list_potential_summaries, limit, semaphore=misc_semaphore)
     return [PotentialDateItem(date=date, count=count) for date, count in summaries]
+
+
+_manual_run_task: asyncio.Task[None] | None = None
+_manual_run_lock = asyncio.Lock()
+_manual_run_state: dict[str, str | None] = {
+    "status": "idle",
+    "date": None,
+    "started_at": None,
+    "finished_at": None,
+    "error": None,
+}
+
+
+def _utc_now_text() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def mining_run_status() -> PotentialRunStatus:
+    """返回手动挖掘任务状态；running 以任务是否结束为准，避免状态残留。"""
+    task = _manual_run_task
+    running = task is not None and not task.done()
+    return PotentialRunStatus(
+        running=running,
+        status="running" if running else str(_manual_run_state.get("status") or "idle"),
+        date=_manual_run_state.get("date"),
+        started_at=_manual_run_state.get("started_at"),
+        finished_at=_manual_run_state.get("finished_at"),
+        error=_manual_run_state.get("error"),
+    )
+
+
+async def start_daily_mining_background(force: bool = False) -> PotentialRunStatus:
+    """后台启动一轮挖掘并立即返回；已有任务在跑时直接复用同一任务。"""
+    global _manual_run_task
+    async with _manual_run_lock:
+        if _manual_run_task is not None and not _manual_run_task.done():
+            return mining_run_status()
+        _manual_run_state.update(
+            status="running",
+            date=None,
+            started_at=_utc_now_text(),
+            finished_at=None,
+            error=None,
+        )
+        _manual_run_task = asyncio.create_task(_run_manual_mining(force))
+        return mining_run_status()
+
+
+async def _run_manual_mining(force: bool) -> None:
+    try:
+        result = await run_daily_mining(force=force)
+    except asyncio.CancelledError:
+        _manual_run_state.update(status="idle", finished_at=_utc_now_text(), error="cancelled")
+        raise
+    except Exception as error:  # noqa: BLE001 - 后台任务需记录失败并保留状态
+        logger.warning("后台潜力股挖掘失败: %s", error, exc_info=True)
+        _manual_run_state.update(status="failed", finished_at=_utc_now_text(), error=type(error).__name__)
+        return
+    _manual_run_state.update(
+        status="completed",
+        date=result.date if result is not None else None,
+        finished_at=_utc_now_text(),
+        error=None,
+    )

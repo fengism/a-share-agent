@@ -8,12 +8,38 @@ from hmac import compare_digest
 from fastapi import Request, Response
 
 from app.api.errors import ApiError
+from app.configuration import get_settings
 from app.core.security import SESSION_TTL_DAYS
 
 SESSION_COOKIE_NAME = "a_share_session"
 CSRF_COOKIE_NAME = "a_share_csrf"
 CSRF_HEADER_NAME = "X-CSRF-Token"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def _is_secure_request(*, scheme: str, forwarded_proto: str | None, trust_proxy_headers: bool) -> bool:
+    """判断当前请求是否为 HTTPS。
+
+    仅当显式信任代理头时才采信 X-Forwarded-Proto，避免直连实例被伪造头欺骗。
+    """
+    if trust_proxy_headers and forwarded_proto:
+        return forwarded_proto.split(",")[0].strip().lower() == "https"
+    return scheme == "https"
+
+
+def resolve_secure_cookie(request: Request, configured: bool) -> bool:
+    """综合显式配置与请求协议决定是否给会话 Cookie 加 Secure。
+
+    运维忘记设置 auth_cookie_secure 时，HTTPS 请求仍应拿到 Secure Cookie；
+    本地 HTTP 开发则保持不加 Secure，否则浏览器不会回传 Cookie。
+    """
+    if configured:
+        return True
+    return _is_secure_request(
+        scheme=request.url.scheme,
+        forwarded_proto=request.headers.get("x-forwarded-proto"),
+        trust_proxy_headers=get_settings().trust_proxy_headers,
+    )
 
 
 def request_auth_token(request: Request, credentials) -> tuple[str | None, bool]:

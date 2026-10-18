@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal
@@ -184,6 +185,7 @@ async def load_equity_curve(
                     "",
                 )
             except Exception as error:
+                logging.getLogger(__name__).debug("历史行情加载失败 code=%s: %s", code, error)
                 return code, {}, None, f"{code} 历史行情加载失败：{type(error).__name__}"
             prices = {
                 date.fromisoformat(item.date): item.close

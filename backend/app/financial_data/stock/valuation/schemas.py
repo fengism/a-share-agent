@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 class ValuationPeer(BaseModel):
@@ -9,6 +9,7 @@ class ValuationPeer(BaseModel):
     pe_ttm: float | None = None
     pb: float | None = None
     ps_ttm: float | None = None
+    _pe_forward: float | None = PrivateAttr(default=None)
 
 
 class StockValuation(BaseModel):
@@ -19,6 +20,7 @@ class StockValuation(BaseModel):
     pb: float | None = None
     ps_ttm: float | None = None
     peers: list[ValuationPeer] = Field(default_factory=list)
+    _pe_forward: float | None = PrivateAttr(default=None)
 
 
 class ValuationMultiples(BaseModel):

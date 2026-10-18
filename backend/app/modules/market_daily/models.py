@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.core.market import market_today
+
 Market = Literal["cn", "hk"]
 InstrumentType = Literal["stock", "index"]
 RefreshCheckpoint = Literal["initial", "recheck"]
@@ -218,7 +220,7 @@ class MarketDailyBackfillRequest(BaseModel):
             raise ValueError("start_date 不能晚于 end_date")
         if (self.end_date - self.start_date).days > 3653:
             raise ValueError("单个回填任务最多支持约 10 年")
-        if self.end_date >= date.today():
+        if self.end_date >= market_today():
             raise ValueError("历史回填的 end_date 必须早于今天；当天数据请使用盘后归档")
         return self
 

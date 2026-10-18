@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from typing import Any
 
@@ -270,7 +271,8 @@ class FuyaoDataProvider:
         """连板天梯接口：只用于补 2 板及以上股票，返回空表示不覆盖涨停池结果。"""
         try:
             data = self._get_data(_LIMIT_UP_LADDER_PATH)
-        except Exception:
+        except Exception as error:
+            logging.getLogger(__name__).debug("fuyao 接口解析失败: %s", error)
             return []
         wanted = requested_date.replace("-", "")
         stocks: list[dict[str, Any]] = []

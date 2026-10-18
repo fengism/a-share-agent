@@ -297,3 +297,16 @@ def test_source_inconsistency_is_not_retryable(tmp_path: Path) -> None:
     assert failed.failure_details[0]["kind"] == "source_inconsistent"
     with pytest.raises(Exception, match="没有失败股票需要重试"):
         service._retry_failed(job.job_id)
+
+
+def test_backfill_date_validation_uses_market_timezone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """回填校验必须使用市场时区日期，避免 CST 凌晨把「昨天」误判为今天。"""
+    from app.modules.market_daily import models
+
+    monkeypatch.setattr(models, "market_today", lambda: date(2026, 10, 17))
+
+    with pytest.raises(Exception):
+        MarketDailyBackfillRequest(start_date=date(2026, 10, 1), end_date=date(2026, 10, 17))
+
+    request = MarketDailyBackfillRequest(start_date=date(2026, 10, 1), end_date=date(2026, 10, 16))
+    assert request.end_date == date(2026, 10, 16)

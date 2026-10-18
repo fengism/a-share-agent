@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from datetime import date, datetime, time, timedelta
 from email.utils import parsedate_to_datetime
@@ -167,7 +168,8 @@ async def _search_financial_policy_news_uncached(target_date: date) -> list[News
                 time_range="any",
                 language="zh",
             )
-        except Exception:
+        except Exception as error:
+            logging.getLogger(__name__).debug("政策新闻 Web Search 失败: %s", error)
             return []
         return search_results_to_news(cast(list[dict[str, Any]], payload.get("results") or []), target_date)
 

@@ -13,6 +13,79 @@ from app.infrastructure.providers.provider_gateway import provider_gateway
 
 logger = logging.getLogger(__name__)
 _valuation_singleflight = AsyncSingleFlight[StockValuation]()
+_VALUATION_CACHE_PREFIX = "valuation_v2"
+_AGGREGATE_LABELS = ("行业平均", "行业中值", "行业均值")
+
+
+def _row_code(value: object) -> str:
+    """将表格中的代码列归一化为六位股票代码。"""
+    text = str(value).strip()
+    if text.endswith(".0") and text[:-2].isdigit():
+        text = text[:-2]
+    return text
+
+
+def _row_name(value: object) -> str:
+    return str(value).strip()
+
+
+def _is_aggregate_row(code: str, name: str) -> bool:
+    """判断是否为行业平均/中值等汇总行，而不是可比的个股。"""
+    if len(code) != 6 or not code.isdigit():
+        return True
+    return any(label in name for label in _AGGREGATE_LABELS)
+
+
+def _parse_valuation_comparison(
+    df, raw_code: str
+) -> tuple[float | None, float | None, float | None, float | None, list[ValuationPeer]]:
+    """从东财同行比较表中解析目标公司倍数与有效同行。
+
+    东财接口会把排名末位的公司挪到首行，首行并不保证是目标公司；
+    必须按代码定位目标行，否则会把同行的 PE/PB/PS 当成目标公司自身
+    倍数，进而把 PB/PS 估值算到离现价数倍的位置。行业平均/中值行
+    也必须从同行样本中剔除。
+
+    Param:
+        df: 同行比较表
+        raw_code: 目标公司六位代码
+    Return:
+        (PE, PB, PS, 前瞻 PE, 同行列表) 元组
+    """
+    if df is None or len(df) == 0:
+        return None, None, None, None, []
+
+    target_row = None
+    for _, row in df.iterrows():
+        if _row_code(row.get("代码")) == raw_code:
+            target_row = row
+            break
+    if target_row is None:
+        logger.warning("估值比较表缺少目标代码 %s，改用基础信息回退", raw_code)
+
+    pe_ttm = safe_float(target_row.get("市盈率-TTM")) if target_row is not None else None
+    pb = safe_float(target_row.get("市净率-MRQ")) if target_row is not None else None
+    ps_ttm = safe_float(target_row.get("市销率-TTM")) if target_row is not None else None
+    pe_forward = safe_float(target_row.get("市盈率-25E")) if target_row is not None else None
+
+    peers: list[ValuationPeer] = []
+    seen: set[str] = set()
+    for _, row in df.head(12).iterrows():
+        peer_code = _row_code(row.get("代码"))
+        peer_name = _row_name(row.get("简称"))
+        if _is_aggregate_row(peer_code, peer_name) or peer_code == raw_code or peer_code in seen:
+            continue
+        seen.add(peer_code)
+        peer = ValuationPeer(
+            name=peer_name or peer_code,
+            code=peer_code,
+            pe_ttm=safe_float(row.get("市盈率-TTM")),
+            pb=safe_float(row.get("市净率-MRQ")),
+            ps_ttm=safe_float(row.get("市销率-TTM")),
+        )
+        peer._pe_forward = safe_float(row.get("市盈率-25E"))
+        peers.append(peer)
+    return pe_ttm, pb, ps_ttm, pe_forward, peers
 
 
 async def _load_valuation(code: str) -> StockValuation:
@@ -27,12 +100,13 @@ async def _load_valuation(code: str) -> StockValuation:
         from app.financial_data.hk.service import hk_market_service, normalize_hk_code
 
         norm_code = normalize_hk_code(code)
-        cache_key = dated_cache_key("valuation", norm_code)
+        cache_key = dated_cache_key(_VALUATION_CACHE_PREFIX, norm_code)
         cached = cache.get(cache_key)
         if cached is not None:
-            return StockValuation.model_validate(cached)
+            cached_hk: StockValuation = StockValuation.model_validate(cached)
+            return cached_hk
         hk_val = await hk_market_service.get_stock_valuation(norm_code)
-        peers: list[ValuationPeer] = []
+        hk_peers: list[ValuationPeer] = []
         try:
             from app.financial_data.hk.industry_comparison import get_hk_stock_industry_comparison
 
@@ -40,7 +114,7 @@ async def _load_valuation(code: str) -> StockValuation:
             for p in comp.peers:
                 if p.code == norm_code:
                     continue
-                peers.append(
+                hk_peers.append(
                     ValuationPeer(
                         name=p.name,
                         code=p.code,
@@ -57,20 +131,22 @@ async def _load_valuation(code: str) -> StockValuation:
             pe_ttm=hk_val.pe_ttm,
             pb=hk_val.pb,
             ps_ttm=hk_val.ps_ttm,
-            peers=peers,
+            peers=hk_peers,
         )
         cache.set(cache_key, result, ttl=VALUATION.ttl_seconds)
         return result
 
     sym = normalize_code(code)
-    cache_key = dated_cache_key("valuation", sym.raw)
+    cache_key = dated_cache_key(_VALUATION_CACHE_PREFIX, sym.raw)
     cached = cache.get(cache_key)
     if cached is not None:
-        return StockValuation.model_validate(cached)
+        cached_a: StockValuation = StockValuation.model_validate(cached)
+        return cached_a
 
     pe_ttm: float | None = None
     pb: float | None = None
     ps_ttm: float | None = None
+    pe_forward: float | None = None
     peers: list[ValuationPeer] = []
 
     try:
@@ -84,24 +160,7 @@ async def _load_valuation(code: str) -> StockValuation:
             ),
         )
         if len(df) > 0:
-            row = df.iloc[0]
-            pe_ttm = safe_float(row.get("市盈率-TTM"))
-            pb = safe_float(row.get("市净率-MRQ"))
-            ps_ttm = safe_float(row.get("市销率-TTM"))
-        for _, row in df.head(10).iterrows():
-            peer_name = str(row.get("简称", "")).strip()
-            peer_code = str(row.get("代码", "")).strip()
-            if not peer_code or peer_code in {"行业中值", "行业平均"} or peer_name in {"行业中值", "行业平均"}:
-                continue
-            peers.append(
-                ValuationPeer(
-                    name=peer_name,
-                    code=peer_code,
-                    pe_ttm=safe_float(row.get("市盈率-TTM")),
-                    pb=safe_float(row.get("市净率-MRQ")),
-                    ps_ttm=safe_float(row.get("市销率-TTM")),
-                )
-            )
+            pe_ttm, pb, ps_ttm, pe_forward, peers = _parse_valuation_comparison(df, sym.raw)
     except Exception:
         logger.info(f"估值数据获取失败，回退到基础信息: {sym.raw}")
 
@@ -122,6 +181,7 @@ async def _load_valuation(code: str) -> StockValuation:
         ps_ttm=ps_ttm,
         peers=peers,
     )
+    result._pe_forward = pe_forward
     cache.set(cache_key, result, ttl=VALUATION.ttl_seconds)
     return result
 
@@ -132,15 +192,19 @@ async def get_valuation(code: str) -> StockValuation:
         from app.financial_data.hk.service import normalize_hk_code
 
         norm_code = normalize_hk_code(code)
-        cache_key = dated_cache_key("valuation", norm_code)
+        cache_key = dated_cache_key(_VALUATION_CACHE_PREFIX, norm_code)
         cached = cache.get(cache_key)
         if cached is not None:
-            return StockValuation.model_validate(cached)
-        return await _valuation_singleflight.do(cache_key, lambda: _load_valuation(norm_code))
+            cached_hk_get: StockValuation = StockValuation.model_validate(cached)
+            return cached_hk_get
+        loaded_hk: StockValuation = await _valuation_singleflight.do(cache_key, lambda: _load_valuation(norm_code))
+        return loaded_hk
 
     sym = normalize_code(code)
-    cache_key = dated_cache_key("valuation", sym.raw)
+    cache_key = dated_cache_key(_VALUATION_CACHE_PREFIX, sym.raw)
     cached = cache.get(cache_key)
     if cached is not None:
-        return StockValuation.model_validate(cached)
-    return await _valuation_singleflight.do(cache_key, lambda: _load_valuation(code))
+        cached_a_get: StockValuation = StockValuation.model_validate(cached)
+        return cached_a_get
+    loaded_a: StockValuation = await _valuation_singleflight.do(cache_key, lambda: _load_valuation(code))
+    return loaded_a

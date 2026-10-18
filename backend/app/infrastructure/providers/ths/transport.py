@@ -1,6 +1,7 @@
 """同花顺 HTTP 传输与动态配置。"""
 
 from collections.abc import Callable
+from typing import cast
 
 import requests
 
@@ -57,4 +58,4 @@ class ThsTransport:
         return response
 
     def request_json(self, method: str, url: str, **kwargs) -> dict:
-        return self.request(method, url, **kwargs).json()
+        return cast(dict, self.request(method, url, **kwargs).json())

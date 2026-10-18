@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
-from app.agentic.protocol import ToolCallFunction, ToolCallInfo
+from app.domain.agent_protocol import ToolCallFunction, ToolCallInfo
 from app.infrastructure.llm.adapters import extract_message_text
 from app.infrastructure.llm.capabilities import (
     DEFAULT_LLM_CAPABILITIES as DEFAULT_LLM_CAPABILITIES,

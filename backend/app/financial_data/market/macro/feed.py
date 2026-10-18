@@ -12,6 +12,7 @@ from app.core.cache import dated_cache_key
 from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import nbs_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
+from app.core.market import market_today
 from app.financial_data.market.macro.schemas import (
     MacroFeedItem,
     MacroFeedResponse,
@@ -62,7 +63,7 @@ def _parse_date(value: Any) -> date | None:
 
 
 def _filter_recent(items: list[dict], *, days: int) -> list[dict]:
-    cutoff = date.today() - timedelta(days=days)
+    cutoff = market_today() - timedelta(days=days)
     result = [
         item
         for item in items
@@ -187,7 +188,7 @@ async def _load_macro_feed(days: int) -> MacroFeedResponse:
     else:
         status = "available"
 
-    today = date.today()
+    today = market_today()
     return MacroFeedResponse(
         period_start=(today - timedelta(days=days)).isoformat(),
         period_end=today.isoformat(),

@@ -2943,6 +2943,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/potential/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Potential Performance
+         * @description 计算某个挖掘日期在指定持有期内的前瞻表现。
+         */
+        get: operations["get_potential_performance_api_potential_performance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/potential/run": {
         parameters: {
             query?: never;
@@ -2954,9 +2974,29 @@ export interface paths {
         put?: never;
         /**
          * Trigger Potential Mining
-         * @description 手动触发一次潜力股挖掘（后台每日任务之外的即时入口）。
+         * @description 后台触发一次潜力股挖掘并立即返回任务状态，避免 HTTP 长阻塞。
          */
         post: operations["trigger_potential_mining_api_potential_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/potential/run/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Potential Run Status
+         * @description 查询手动挖掘任务状态，供前端轮询。
+         */
+        get: operations["get_potential_run_status_api_potential_run_status_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -12160,6 +12200,8 @@ export interface components {
          * @description 一个交易日的潜力股挖掘结果。
          */
         PotentialDailyResult: {
+            /** Advance Ratio */
+            advance_ratio?: number | null;
             /** Date */
             date: string;
             /**
@@ -12174,13 +12216,127 @@ export interface components {
             failed_count: number;
             /** Generated At */
             generated_at: string;
+            /** Hot Themes */
+            hot_themes?: string[];
             /** Items */
             items?: components["schemas"]["PotentialStockItem"][];
+            /**
+             * Limit Down Count
+             * @default 0
+             */
+            limit_down_count: number;
+            /**
+             * Limit Up Count
+             * @default 0
+             */
+            limit_up_count: number;
+            /**
+             * Market Emotion
+             * @default neutral
+             * @enum {string}
+             */
+            market_emotion: "strong" | "neutral" | "weak";
+            /** Market Note */
+            market_note?: string | null;
+            /**
+             * Market Regime
+             * @default neutral
+             * @enum {string}
+             */
+            market_regime: "bull" | "bear" | "neutral";
+            /** Median Change Pct */
+            median_change_pct?: number | null;
             /**
              * Universe Size
              * @default 0
              */
             universe_size: number;
+        };
+        /**
+         * PotentialPerformanceItem
+         * @description 潜力股单只标的的前瞻表现。
+         */
+        PotentialPerformanceItem: {
+            /** Benchmark Return Pct */
+            benchmark_return_pct?: number | null;
+            /** Code */
+            code: string;
+            /** Entry Price */
+            entry_price?: number | null;
+            /** Excess Return Pct */
+            excess_return_pct?: number | null;
+            /** Exit Price */
+            exit_price?: number | null;
+            /** Industry */
+            industry?: string | null;
+            /** Max Drawdown Pct */
+            max_drawdown_pct?: number | null;
+            /** Max Return Pct */
+            max_return_pct?: number | null;
+            /** Name */
+            name: string;
+            /** Return Pct */
+            return_pct?: number | null;
+        };
+        /**
+         * PotentialPerformanceSummary
+         * @description 某个挖掘日期在指定持有期内的整体表现。
+         */
+        PotentialPerformanceSummary: {
+            /** Average Excess Pct */
+            average_excess_pct?: number | null;
+            /** Average Return Pct */
+            average_return_pct?: number | null;
+            /** Benchmark Return Pct */
+            benchmark_return_pct?: number | null;
+            /** Date */
+            date: string;
+            /** Days */
+            days: number;
+            /**
+             * Evaluated Count
+             * @default 0
+             */
+            evaluated_count: number;
+            /** Generated At */
+            generated_at: string;
+            /**
+             * Item Count
+             * @default 0
+             */
+            item_count: number;
+            /** Items */
+            items?: components["schemas"]["PotentialPerformanceItem"][];
+            /** Median Return Pct */
+            median_return_pct?: number | null;
+            /** Message */
+            message?: string | null;
+            /** Win Rate */
+            win_rate?: number | null;
+        };
+        /**
+         * PotentialRunStatus
+         * @description 手动触发的潜力股挖掘任务状态（后台异步执行）。
+         */
+        PotentialRunStatus: {
+            /** Date */
+            date?: string | null;
+            /** Error */
+            error?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
+            /**
+             * Running
+             * @default false
+             */
+            running: boolean;
+            /** Started At */
+            started_at?: string | null;
+            /**
+             * Status
+             * @default idle
+             */
+            status: string;
         };
         /**
          * PotentialStockItem
@@ -12193,6 +12349,13 @@ export interface components {
             change_pct?: number | null;
             /** Code */
             code: string;
+            /**
+             * Fundamental Score
+             * @default 0
+             */
+            fundamental_score: number;
+            /** Industry */
+            industry?: string | null;
             /** Market Cap */
             market_cap?: number | null;
             /** Name */
@@ -12200,10 +12363,24 @@ export interface components {
             /** Price */
             price?: number | null;
             /**
+             * Quality Score
+             * @default 0
+             */
+            quality_score: number;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Risk Flags */
+            risk_flags?: string[];
+            /**
              * Score
              * @default 0
              */
             score: number;
+            /** Sector Strength */
+            sector_strength?: number | null;
             /** Signal Age Days */
             signal_age_days?: number | null;
             /**
@@ -12211,8 +12388,22 @@ export interface components {
              * @default
              */
             signal_date: string;
+            /**
+             * Signal Score
+             * @default 0
+             */
+            signal_score: number;
+            /** Signal Types */
+            signal_types?: string[];
             /** Strategies */
             strategies?: string[];
+            /**
+             * Theme Score
+             * @default 0
+             */
+            theme_score: number;
+            /** Themes */
+            themes?: string[];
             /** Turnover Pct */
             turnover_pct?: number | null;
         };
@@ -20852,6 +21043,40 @@ export interface operations {
             };
         };
     };
+    get_potential_performance_api_potential_performance_get: {
+        parameters: {
+            query: {
+                /** @description 挖掘日期 YYYY-MM-DD */
+                date: string;
+                /** @description 持有交易日数 */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PotentialPerformanceSummary"] | null;
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     trigger_potential_mining_api_potential_run_post: {
         parameters: {
             query?: {
@@ -20870,7 +21095,36 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PotentialDailyResult"] | null;
+                    "application/json": components["schemas"]["PotentialRunStatus"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_potential_run_status_api_potential_run_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PotentialRunStatus"];
                 };
             };
             /** @description 统一错误响应 */

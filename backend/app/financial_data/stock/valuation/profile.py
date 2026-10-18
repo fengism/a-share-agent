@@ -53,39 +53,66 @@ def _contains_any(text: str, keywords: tuple[str, ...]) -> bool:
     return any(keyword in text for keyword in keywords)
 
 
-def _calc_roe(fundamentals: ValuationFundamentals) -> float | None:
+def _calc_roe(fundamentals: ValuationFundamentals, net_profit: float | None = None) -> float | None:
     """根据净利润和股东权益计算 ROE。
 
     Param:
         fundamentals: 估值基本面数据
+        net_profit: 可选的 TTM 净利润，优先于报告期净利润
     Return:
         ROE 小数值，数据不足时返回 None
     """
-    net_profit = fundamentals.net_profit
+    profit = net_profit if net_profit is not None and math.isfinite(net_profit) else fundamentals.net_profit
     shareholders_equity = fundamentals.shareholders_equity
     if (
-        net_profit is None
-        or not math.isfinite(net_profit)
+        profit is None
+        or not math.isfinite(profit)
         or shareholders_equity is None
         or not math.isfinite(shareholders_equity)
         or shareholders_equity <= 0
     ):
         return None
-    roe = net_profit / shareholders_equity
+    roe = profit / shareholders_equity
     return roe if math.isfinite(roe) else None
 
 
-def _is_loss_making(fundamentals: ValuationFundamentals) -> bool:
+def _calc_net_margin(net_profit: float | None, revenue: float | None) -> float | None:
+    """计算净利率，用于 PS 倍数的盈利质量调整。
+
+    Param:
+        net_profit: TTM 净利润
+        revenue: TTM 营业收入
+    Return:
+        净利率小数值，数据不足时返回 None
+    """
+    if (
+        net_profit is None
+        or not math.isfinite(net_profit)
+        or revenue is None
+        or not math.isfinite(revenue)
+        or revenue <= 0
+    ):
+        return None
+    margin = net_profit / revenue
+    return margin if math.isfinite(margin) else None
+
+
+def _is_loss_making(
+    fundamentals: ValuationFundamentals,
+    net_profit_ttm: float | None = None,
+) -> bool:
     """判断公司是否处于亏损状态。
 
     Param:
         fundamentals: 估值基本面数据
+        net_profit_ttm: 可选 TTM 净利润，优先于报告期净利润
     Return:
         净利润或扣非净利润为负时返回 True
     """
+    profit = net_profit_ttm if net_profit_ttm is not None and math.isfinite(net_profit_ttm) else fundamentals.net_profit
     return any(
         value is not None and math.isfinite(value) and value < 0
-        for value in [fundamentals.net_profit, fundamentals.non_net_profit]
+        for value in [profit, fundamentals.non_net_profit]
     )
 
 
@@ -104,23 +131,29 @@ def _has_stable_operating_metrics(fundamentals: ValuationFundamentals) -> bool:
         return False
     if operating_cashflow / net_profit < 0.8:
         return False
-    if any(value is None or not math.isfinite(value) for value in growth_values):
-        return False
-    return all(-0.05 <= value / 100 < 0.12 for value in growth_values)
+    for value in growth_values:
+        if value is None or not math.isfinite(value) or not (-0.05 <= value / 100 < 0.12):
+            return False
+    return True
 
 
-def _classify_stock_profile(basic_info: StockBasicInfo, fundamentals: ValuationFundamentals) -> ValuationProfile:
+def _classify_stock_profile(
+    basic_info: StockBasicInfo,
+    fundamentals: ValuationFundamentals,
+    net_profit_ttm: float | None = None,
+) -> ValuationProfile:
     """根据行业和财务指标对股票进行画像分类。
 
     Param:
         basic_info: 股票基本信息
         fundamentals: 估值基本面数据
+        net_profit_ttm: 可选 TTM 净利润，优先用于亏损判断
     Return:
         ValuationProfile 对象，含分类和理由
     """
     industry_text = _normalize_industry_text(basic_info)
     rationale: list[str] = []
-    if _is_loss_making(fundamentals):
+    if _is_loss_making(fundamentals, net_profit_ttm):
         rationale.append("净利润或扣非净利润为负，盈利法估值可靠性较低")
         return ValuationProfile(category="loss_making", label="亏损/利润承压类", rationale=rationale)
     if _contains_any(industry_text, FINANCIAL_KEYWORDS):
