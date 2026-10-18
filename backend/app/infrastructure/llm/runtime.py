@@ -9,77 +9,18 @@ from openai import AsyncOpenAI, OpenAI
 
 from app.configuration.runtime import get_effective_settings
 from app.configuration.schema import Settings
+from app.domain.llm import (
+    describe_llm_account_error as describe_llm_account_error,
+)
+from app.domain.llm import (
+    is_llm_connection_error as is_llm_connection_error,
+)
 from app.infrastructure.llm.adapters import prepare_completion_kwargs
 from app.infrastructure.llm.capabilities import LLMCapabilities
 from app.infrastructure.llm.pool import AsyncResourcePool
 from app.infrastructure.llm.spec import LLMClientSpec, apply_task_model, resolve_llm_client_spec
 
 _POOL_MAXSIZE = 16
-
-
-_LLM_CONNECTION_ERROR_NAMES = frozenset({
-    "APIConnectionError",
-    "APITimeoutError",
-    "APIConnectionTimeoutError",
-})
-
-
-def is_llm_connection_error(error: BaseException) -> bool:
-    """LLM 网关连不上（网络/代理故障）——可重试的上游错误，而非业务失败。
-
-    openai 与 litellm 的连接类异常类名一致（APIConnectionError/APITimeoutError），
-    按异常类名匹配以避免硬依赖具体 SDK；同时沿 __cause__ 链穿透包装层。
-    """
-    current: BaseException | None = error
-    depth = 0
-    while current is not None and depth < 8:
-        if type(current).__name__ in _LLM_CONNECTION_ERROR_NAMES:
-            return True
-        current = current.__cause__
-        depth += 1
-    return False
-
-
-_LLM_ACCOUNT_ERROR_MESSAGES: dict[int, str] = {
-    401: "模型 API Key 无效或已过期，请在设置中检查模型配置",
-    402: "模型服务余额不足，请充值或更换模型配置",
-    403: "模型 API Key 无权限访问该模型，请在设置中检查模型配置",
-    404: "模型不存在或接口地址错误，请在设置中检查模型配置",
-}
-
-_CONTEXT_LENGTH_MARKERS = (
-    "context_length",
-    "maximum context",
-    "context window",
-    "input length exceeds",
-    "prompt is too long",
-)
-
-
-def describe_llm_account_error(error: BaseException) -> str | None:
-    """将用户可自行解决的模型配置类错误映射为可操作的提示文案。
-
-    每个用户在设置页配置自己的模型账号，Key 无效、余额不足等错误由用户
-    自行处理，重试无意义，应透出真实原因而非脱敏成错误编号。未命中映射
-    （瞬时故障、服务端错误等）返回 None，由调用方走既有脱敏兜底。
-    openai 与 litellm 的状态码异常均带 ``status_code`` 属性，沿 __cause__
-    链穿透包装层。
-    """
-    current: BaseException | None = error
-    depth = 0
-    while current is not None and depth < 8:
-        status_code = getattr(current, "status_code", None)
-        if isinstance(status_code, int):
-            message = _LLM_ACCOUNT_ERROR_MESSAGES.get(status_code)
-            if message is not None:
-                return message
-            if status_code == 400:
-                text = str(current).lower()
-                if any(marker in text for marker in _CONTEXT_LENGTH_MARKERS):
-                    return "对话内容超出模型上下文长度，请精简问题后重试"
-        current = current.__cause__
-        depth += 1
-    return None
 
 
 @dataclass(frozen=True)

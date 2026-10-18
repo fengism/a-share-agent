@@ -89,25 +89,43 @@ def has_meaningful_tool_content(content: str) -> bool:
     return _has_meaningful_value(payload)
 
 
+def _cache_key(name: str, arguments: str, user_id: int | str | None) -> str:
+    if user_id is None:
+        return f"{name}:{arguments}"
+    return f"{name}:user:{user_id}:{arguments}"
+
+
+def tool_call_cache_key_from_arguments(
+    name: str,
+    arguments: Any,
+    *,
+    user_id: int | str | None = None,
+) -> str:
+    """Create a cache key from already-parsed arguments (avoids a second decode)."""
+    try:
+        canonical = json.dumps(
+            arguments,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError):
+        canonical = str(arguments).strip()
+    return _cache_key(name, canonical, user_id)
+
+
 def tool_call_cache_key(call: ToolCallInfo, *, user_id: int | str | None = None) -> str:
     """Create a stable cache key independent of JSON whitespace and key order.
 
     ``user_id`` 用于 scope="user" 的工具：这类工具的结果依赖当前用户的私有配置
     （LLM api_key / model 等），不按用户分区就可能把一个用户的结果复用给另一个用户。
     """
-    arguments = call.function.arguments
+    raw = call.function.arguments
     try:
-        arguments = json.dumps(
-            json.loads(arguments),
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
+        parsed = json.loads(raw)
     except (TypeError, ValueError, json.JSONDecodeError):
-        arguments = arguments.strip()
-    if user_id is None:
-        return f"{call.function.name}:{arguments}"
-    return f"{call.function.name}:user:{user_id}:{arguments}"
+        return _cache_key(call.function.name, raw.strip(), user_id)
+    return tool_call_cache_key_from_arguments(call.function.name, parsed, user_id=user_id)
 
 
 def serialize_truncated_preview(

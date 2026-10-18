@@ -1,0 +1,237 @@
+"""Core AgentExecutor loop: tool round, dedupe, reasoning budget, failure labels."""
+
+from dataclasses import replace
+from typing import Any
+
+from app.agentic.agents.contracts import AgentProfile
+from app.agentic.agents.executor import _MAX_REPLAY_REASONING_CHARACTERS, AgentExecutor
+from app.agentic.catalog import registry
+from app.agentic.protocol import ToolResultInfo
+from app.agentic.runtime.context import AgentExecutionContext
+from app.agentic.tools.contracts import ToolPolicy
+from app.agentic.tools.serialization import serialize_error
+from app.configuration import get_settings
+from app.infrastructure.llm.capabilities import DEFAULT_LLM_CAPABILITIES
+
+_FAKE_TOOL = "fake_tool"
+_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": _FAKE_TOOL,
+        "description": "test tool",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+}
+
+
+class _FakeClient:
+    def __init__(self, capabilities: Any = None) -> None:
+        if capabilities is not None:
+            self.capabilities = capabilities
+
+
+class _FakeCompletions:
+    def __init__(self, responses: list[dict]) -> None:
+        self._responses = list(responses)
+        self.requests: list[dict] = []
+
+    async def __call__(self, client, **kwargs):
+        self.requests.append(kwargs)
+        if not self._responses:
+            raise AssertionError("unexpected completion request")
+        return self._responses.pop(0)
+
+
+def _tool_call_response(
+    *,
+    call_id: str = "call_1",
+    reasoning_content: str = "",
+) -> dict:
+    return {
+        "choices": [{
+            "message": {
+                "content": "",
+                "reasoning_content": reasoning_content,
+                "tool_calls": [{
+                    "id": call_id,
+                    "type": "function",
+                    "function": {"name": _FAKE_TOOL, "arguments": "{}"},
+                }],
+            },
+            "finish_reason": "tool_calls",
+        }],
+    }
+
+
+def _two_tool_call_response() -> dict:
+    response = _tool_call_response(call_id="call_1")
+    second = _tool_call_response(call_id="call_2")["choices"][0]["message"]["tool_calls"][0]
+    response["choices"][0]["message"]["tool_calls"].append(second)
+    return response
+
+
+def _final_response(content: str = "最终结论") -> dict:
+    return {
+        "choices": [{
+            "message": {"content": content, "tool_calls": []},
+            "finish_reason": "stop",
+        }],
+    }
+
+
+def _profile() -> AgentProfile:
+    return AgentProfile(
+        name="test-agent",
+        display_name="测试 Agent",
+        description="executor test",
+        system_prompt="system",
+        tool_names=(_FAKE_TOOL,),
+        max_rounds=2,
+    )
+
+
+def _context(**updates) -> AgentExecutionContext:
+    settings = get_settings().model_copy(update=updates)
+    return AgentExecutionContext(settings=settings)
+
+
+def _install_registry(
+    monkeypatch,
+    results: list[tuple[str, bool]],
+) -> list:
+    executed: list = []
+
+    async def fake_execute(call, allowed_names=None, execution_context=None, arguments=None):
+        executed.append(call)
+        content, is_error = results[min(len(executed) - 1, len(results) - 1)]
+        return ToolResultInfo(
+            tool_call_id=call.id,
+            name=call.function.name,
+            content=content,
+            is_error=is_error,
+        )
+
+    monkeypatch.setattr(
+        registry,
+        "get_tool_definitions_for",
+        lambda names: [_TOOL_DEFINITION] if _FAKE_TOOL in names else [],
+    )
+    monkeypatch.setattr(registry, "get_tool_policy", lambda name: ToolPolicy(cache_ttl_seconds=0))
+    monkeypatch.setattr(registry, "get_tool", lambda name: None)
+    monkeypatch.setattr(registry, "execute_tool", fake_execute)
+    return executed
+
+
+async def test_executor_runs_tool_then_final_answer(monkeypatch):
+    completions = _FakeCompletions([_tool_call_response(), _final_response("最终结论")])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+    executed = _install_registry(monkeypatch, [('{"ok":true,"data":{"value":1}}', False)])
+
+    result = await AgentExecutor().run(
+        _profile(),
+        "问题",
+        None,
+        _FakeClient(),
+        "fake-model",
+        execution_context=_context(),
+        require_tool_first_round=True,
+    )
+
+    assert result.status == "completed"
+    assert result.analysis == "最终结论"
+    assert result.tools_called == [_FAKE_TOOL]
+    assert len(executed) == 1
+    assert result.tool_results[0].has_evidence is True
+    assert len(completions.requests) == 2
+
+
+async def test_executor_deduplicates_identical_tool_calls(monkeypatch):
+    completions = _FakeCompletions([_two_tool_call_response(), _final_response()])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+    executed = _install_registry(monkeypatch, [('{"ok":true,"data":{"value":1}}', False)])
+
+    result = await AgentExecutor().run(
+        _profile(),
+        "问题",
+        None,
+        _FakeClient(),
+        "fake-model",
+        execution_context=_context(),
+        require_tool_first_round=True,
+    )
+
+    assert len(executed) == 1
+    assert [item.skipped for item in result.tool_results] == [False, True]
+
+
+async def test_executor_bounds_replayed_reasoning(monkeypatch):
+    capabilities = replace(DEFAULT_LLM_CAPABILITIES, replay_tool_reasoning=True)
+    completions = _FakeCompletions([
+        _tool_call_response(reasoning_content="R" * 10_000),
+        _final_response(),
+    ])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+    _install_registry(monkeypatch, [('{"ok":true,"data":{"value":1}}', False)])
+
+    result = await AgentExecutor().run(
+        _profile(),
+        "问题",
+        None,
+        _FakeClient(capabilities),
+        "fake-model",
+        execution_context=_context(chat_max_tool_context_characters=60_000),
+        require_tool_first_round=True,
+    )
+
+    assistant_messages = [
+        message
+        for message in completions.requests[1]["messages"]
+        if message.get("role") == "assistant" and message.get("tool_calls")
+    ]
+    assert len(assistant_messages) == 1
+    assert len(assistant_messages[0]["reasoning_content"]) == _MAX_REPLAY_REASONING_CHARACTERS
+    assert any("推理内容已按上下文预算截断" in warning for warning in result.warnings)
+
+
+async def test_executor_does_not_store_raw_tool_error_in_errors(monkeypatch):
+    completions = _FakeCompletions([_tool_call_response(), _final_response()])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+    _install_registry(monkeypatch, [(
+        serialize_error("upstream_unavailable", "secret provider detail", retryable=True),
+        True,
+    )])
+
+    result = await AgentExecutor().run(
+        _profile(),
+        "问题",
+        None,
+        _FakeClient(),
+        "fake-model",
+        execution_context=_context(),
+        require_tool_first_round=True,
+    )
+
+    assert result.status == "partial"
+    assert any("fake_tool: 数据源暂不可用" in error for error in result.errors)
+    assert all("secret" not in error for error in result.errors)
+
+
+async def test_executor_skips_tools_when_budget_exhausted(monkeypatch):
+    completions = _FakeCompletions([_final_response("预算不足下的结论")])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+    executed = _install_registry(monkeypatch, [('{"ok":true,"data":{"value":1}}', False)])
+
+    result = await AgentExecutor().run(
+        _profile(),
+        "问题",
+        None,
+        _FakeClient(),
+        "fake-model",
+        execution_context=_context(chat_max_tool_calls_total=0),
+        require_tool_first_round=True,
+    )
+
+    assert executed == []
+    assert result.status == "partial"
+    assert any("额度" in warning for warning in result.warnings)
+    assert "tools" not in completions.requests[0]

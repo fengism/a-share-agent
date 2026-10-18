@@ -4,11 +4,11 @@ from collections.abc import AsyncGenerator, Collection
 from contextlib import aclosing
 
 from app.agentic.agents.contracts import AgentProfile
-from app.agentic.agents.service import stream_agent
 from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent
 from app.agentic.protocol import AgentMessage
 from app.agentic.runtime.context import AgentExecutionContext
+from app.agentic_integration.agents.service import stream_agent
 from app.modules.chat.prompts import SYSTEM_PROMPT
 
 _MAX_ROUNDS = 5

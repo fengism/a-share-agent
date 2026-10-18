@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from app.agentic.agents.catalog import list_agent_profiles
-from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
+from app.agentic_integration.agents.catalog import list_agent_profiles
+from app.agentic_integration.bootstrap import register_all_capabilities
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
 from app.configuration.schema import Settings
 from app.modules.chat.schemas import (

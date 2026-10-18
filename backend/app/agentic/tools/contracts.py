@@ -8,15 +8,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from app.agentic.protocol import ToolCallInfo, ToolResultInfo
+from app.agentic.runtime.settings import get_default_settings
 from app.agentic.tools.serialization import (
     result_error_message,
     serialize_error,
     serialize_result,
 )
 from app.agentic.tools.validation import ToolArgumentsError, coerce_arguments
-from app.configuration import get_settings
-from app.core.errors import is_transient_error, log_internal_error
-from app.core.exceptions import ApplicationError, UpstreamUnavailableError
+from app.domain.errors import ApplicationError, UpstreamUnavailableError, is_transient_error, log_internal_error
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +107,8 @@ class Tool:
         self,
         call: ToolCallInfo,
         execution_context: AgentExecutionContext | None = None,
+        *,
+        arguments: Any | None = None,
     ) -> ToolResultInfo:
         if self.executor is None:
             return ToolResultInfo(
@@ -129,8 +130,9 @@ class Tool:
                 is_error=True,
             )
         try:
-            arguments = coerce_arguments(json.loads(call.function.arguments), self.parameters)
-            settings = execution_context.settings if execution_context is not None else get_settings()
+            if arguments is None:
+                arguments = coerce_arguments(json.loads(call.function.arguments), self.parameters)
+            settings = execution_context.settings if execution_context is not None else get_default_settings()
             requested_timeout = self.policy.timeout_seconds or settings.chat_tool_timeout_seconds
             timeout_seconds = max(1.0, float(requested_timeout))
             if execution_context is not None:

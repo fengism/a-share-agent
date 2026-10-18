@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from app.agentic.public import execute_web_search
+from app.agentic_integration.public import execute_web_search
 from app.core.cache import reference_cache
 from app.core.news import parse_news_time
 from app.domain.industry_chain import (

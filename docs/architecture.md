@@ -11,6 +11,8 @@
 | 基础设施 | `app/infrastructure` | `core`、`domain`、`constants`、`configuration` | provider、持久化、HTTP、LLM 适配 |
 | 数据层 | `app/financial_data` | 内层 + 基础设施 | 行情、财报、估值、宏观等对外数据能力 |
 | 业务模块 | `app/modules/*` | 内层 + 基础设施 + `financial_data` + 共享内核 | 分析、量化、选股、潜力股、推送等 |
+| Agent 核心 | `app/agentic` | 内层 + `app.domain` | 可独立抽取的 Agent 执行、编排、预算与证据契约 |
+| Agent 集成 | `app/agentic_integration` | 任意（宿主适配） | 工具包、业务 Agent、默认 Research Runtime |
 | 上层 | `app/api`、`app/runtime`、`app/main.py` | 任意 | HTTP 适配、后台任务、组合根 |
 
 共享内核：`app/modules/code_normalization.py`、`import_limits.py`、
@@ -79,6 +81,29 @@ performance 5/10/20 日前瞻复盘
 （`potential_stocks` / `potential_performance` / `valuation_snapshots`）按 mtime 删除；
 `analyses` / `industry_chains` 以「目录」为删除单位，删除后重建各自历史索引，
 保证索引与文件一致。
+
+
+## Agentic 边界（`app/agentic`）
+
+目标：核心执行链路可在不改业务代码的前提下抽取为独立包。详细清单见
+`backend/app/agentic/README.md`。
+
+- **Core**：`agents/executor.py`、`orchestration/*`、`runtime/*`、工具/技能契约、
+  `contracts.py` / `events.py` / `protocol.py` 等。只允许依赖标准库、`pydantic`、
+  `app.agentic.*`、`app.domain.*`。
+- **Integration**：`app/agentic_integration`（`tools/packs/**`、`skills/packs/**`、
+  `agents/profiles/**`、`agents/service.py`、`adapters/**`、`bootstrap.py`、注册入口）。
+  可以依赖宿主业务、数据源、浏览器和配置。
+- **Ports**：宿主在组合根注入 LLM 传输、默认 Settings、指标、请求上下文和工具实现：
+  `app.agentic.runtime.llm.configure_llm_transport()`、
+  `app.agentic.runtime.settings.configure_default_settings()`、
+  `app.agentic.runtime.metrics.configure_metrics()`、
+  `app.agentic.runtime.context.configure_request_context_provider()`、
+  `app.agentic.tools.application.configure_application_tool_handlers()`。
+
+门禁：`pytest tests/test_agentic_core_boundary.py` 会检查 Core 文件没有导入
+`app.configuration` / `app.core` / `app.infrastructure` / `app.modules` /
+`app.api` / `app.runtime` / `app.agentic_integration`。新增 Core 文件时不要绕过该测试。
 
 ## 质量门禁
 

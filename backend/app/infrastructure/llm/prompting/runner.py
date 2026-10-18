@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from app.configuration import Settings, get_effective_settings
 from app.core.metrics import metrics
+from app.domain.llm import LLMFailureMarker
 from app.domain.prompting import PromptTrace
 from app.infrastructure.llm.adapters import LLMClient
 from app.infrastructure.llm.policy import generation_scope
@@ -27,7 +28,7 @@ class PromptRun(Generic[OutputT]):
     trace: PromptTrace
 
 
-class PromptExecutionError(ValueError):
+class PromptExecutionError(ValueError, LLMFailureMarker):
     def __init__(self, message: str, *, raw_response: str, trace: PromptTrace):
         super().__init__(message)
         self.raw_response = raw_response

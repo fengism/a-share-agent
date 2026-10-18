@@ -36,9 +36,9 @@ def _normalize_chat_capability_preferences(patch: dict) -> dict:
     if not {"disabled_chat_skills", "disabled_chat_agents"} & patch.keys():
         return patch
 
-    from app.agentic.agents.catalog import list_agent_profiles
-    from app.agentic.bootstrap import register_all_capabilities
     from app.agentic.catalog import registry
+    from app.agentic_integration.agents.catalog import list_agent_profiles
+    from app.agentic_integration.bootstrap import register_all_capabilities
 
     register_all_capabilities()
     known_names = {

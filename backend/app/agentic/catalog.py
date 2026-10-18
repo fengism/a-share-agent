@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Collection
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import app.agentic.tools.contracts as tool_contracts
 import app.agentic.tools.serialization as tool_serialization
@@ -46,11 +46,19 @@ class CapabilityCatalog:
     def list_tools(self) -> list[tool_contracts.Tool]:
         return list(self._tools.values())
 
+    def tool_names(self) -> set[str]:
+        return set(self._tools)
+
+    def unregister_tools(self, names: Collection[str]) -> None:
+        for name in names:
+            self._tools.pop(name, None)
+
     def get_tool_definitions_for(self, tool_names: list[str]) -> list[dict]:
+        selected = set(tool_names)
         return [
             tool.to_tool_definition()
             for name, tool in self._tools.items()
-            if name in tool_names
+            if name in selected
         ]
 
     async def execute_tool(
@@ -58,6 +66,8 @@ class CapabilityCatalog:
         call: ToolCallInfo,
         allowed_names: Collection[str] | None = None,
         execution_context: AgentExecutionContext | None = None,
+        *,
+        arguments: Any | None = None,
     ) -> ToolResultInfo:
         if allowed_names is not None and call.function.name not in allowed_names:
             return ToolResultInfo(
@@ -85,7 +95,7 @@ class CapabilityCatalog:
                 ),
                 is_error=True,
             )
-        return await tool.execute(call, execution_context=execution_context)
+        return await tool.execute(call, execution_context=execution_context, arguments=arguments)
 
     def register_skill(self, skill: Skill) -> Skill:
         if any(existing.name == skill.name for existing in self._skills):
@@ -98,6 +108,15 @@ class CapabilityCatalog:
 
     def list_skills(self) -> list[Skill]:
         return sorted(self._skills, key=lambda skill: (skill.priority, skill.name))
+
+    def skill_names(self) -> set[str]:
+        return {skill.name for skill in self._skills}
+
+    def unregister_skills(self, names: Collection[str]) -> None:
+        if not names:
+            return
+        removed = set(names)
+        self._skills = [skill for skill in self._skills if skill.name not in removed]
 
     def validate_skill_coverage(self) -> list[str]:
         covered_tools = {

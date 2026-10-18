@@ -6,11 +6,18 @@ import asyncio
 from datetime import date
 from typing import Any
 
+from app.agentic.runtime.context import configure_request_context_provider
+from app.agentic.runtime.llm import configure_llm_transport
+from app.agentic.runtime.metrics import configure_metrics
+from app.agentic.runtime.settings import configure_default_settings
 from app.agentic.tools.application import (
     ApplicationToolHandlers,
     configure_application_tool_handlers,
 )
-from app.core.request_context import get_current_user, get_current_user_id
+from app.configuration import get_settings
+from app.core.metrics import metrics
+from app.core.request_context import get_current_request_id, get_current_user, get_current_user_id
+from app.infrastructure.llm.completion import create_chat_completion, stream_chat_completion
 from app.modules.daily_review.public import DailyReviewRequest, generate_daily_review
 from app.modules.industry_chain.public import research_industry_chain
 from app.modules.market_intelligence.public import analyze_twitter_user
@@ -25,6 +32,14 @@ from app.modules.quant.public import (
 from app.modules.quant.schemas import QuantUniverse
 from app.modules.screener.public import ScreenerFilter, get_industry_list, screen_stocks
 from app.modules.stock_comparison.public import compare_stocks
+
+# Composition root: install host adapters for the agentic ports.
+configure_llm_transport(create_chat_completion, stream_chat_completion)
+configure_default_settings(get_settings)
+configure_metrics(metrics)
+configure_request_context_provider(
+    lambda: (get_current_user_id(), get_current_request_id())
+)
 
 
 async def _compare_stocks(codes: list[str] | str) -> Any:

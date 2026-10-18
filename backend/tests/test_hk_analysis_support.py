@@ -116,8 +116,8 @@ async def test_research_stock_dispatches_without_zero_padding():
 def test_hk_tools_accept_hk_codes_and_reject_a_share_codes():
     """工具参数 schema 必须放行 1-5 位港股代码，否则 Agent 会在校验阶段就被打回。"""
     from app.agentic.catalog import registry
-    from app.agentic.tools.registration import register_all_tools
     from app.agentic.tools.validation import ToolArgumentsError, coerce_arguments
+    from app.agentic_integration.tools.registration import register_all_tools
 
     register_all_tools()
     profile_schema = registry._tools["get_hk_stock_profile"].parameters

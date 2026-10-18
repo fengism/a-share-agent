@@ -26,8 +26,14 @@ from app.agentic.protocol import (
 from app.agentic.runtime.answer import AnswerTextStream, clean_answer
 from app.agentic.runtime.completion import completion_warning
 from app.agentic.runtime.context import AgentExecutionContext, ToolCallReservation
-from app.agentic.runtime.evidence import build_evidence_gap_report, safe_tool_failure_code
+from app.agentic.runtime.evidence import (
+    build_evidence_gap_report,
+    safe_tool_failure_code,
+    tool_failure_label,
+)
 from app.agentic.runtime.llm import create_chat_completion, stream_chat_completion
+from app.agentic.runtime.metrics import metrics
+from app.agentic.runtime.settings import get_default_settings
 from app.agentic.runtime.tool_budget import budget_rejection_message
 from app.agentic.semantics import EvidenceState, model_stop_code, result_status, stop_reason
 from app.agentic.tools.cache import SharedToolCache
@@ -35,23 +41,14 @@ from app.agentic.tools.calls import (
     build_assistant_tool_message,
     extract_pseudo_tool_calls,
     has_tool_call_markup,
-    normalize_wrapped_tool_call,
+    prepare_tool_call,
     strip_tool_call_markup,
 )
 from app.agentic.tools.serialization import (
     serialize_context_results,
     serialize_error,
-    tool_call_cache_key,
 )
-from app.configuration import get_settings
-from app.core.errors import build_internal_error, log_internal_error
-from app.core.exceptions import UpstreamUnavailableError
-from app.core.metrics import metrics
-from app.infrastructure.cleanup import wait_for_cleanup
-from app.infrastructure.llm.adapters import LLMInvalidResponseError, LLMRetryableError
-from app.infrastructure.llm.policy import LLMGenerationTimeoutError
-from app.infrastructure.llm.runtime import describe_llm_account_error, is_llm_connection_error
-from app.infrastructure.llm.tool_calling import (
+from app.domain.agent_llm import (
     AsyncLLMClient,
     ChatCompletionStreamNormalizer,
     LLMCapabilities,
@@ -61,6 +58,15 @@ from app.infrastructure.llm.tool_calling import (
     normalize_chat_completion,
     resolve_tool_request,
 )
+from app.domain.async_utils import wait_for_cleanup
+from app.domain.errors import UpstreamUnavailableError, build_internal_error, log_internal_error
+from app.domain.llm import (
+    LLMGenerationTimeoutError,
+    LLMInvalidResponseError,
+    LLMRetryableError,
+    describe_llm_account_error,
+    is_llm_connection_error,
+)
 
 logger = logging.getLogger(__name__)
 _EMPTY_OUTPUT_ERROR = "模型未生成有效回答，请稍后重试"
@@ -68,12 +74,30 @@ _TOOL_CONTEXT_WARNING = "工具上下文预算不足，部分证据已截断或�
 _TOOL_BUDGET_WARNING = "部分工具请求受额度限制未执行，具体原因见对应工具结果"
 _TOOL_MARKUP_WARNING = "模型以正文形式输出了工具调用标记，已从回答中移除；结论仅基于已取得的证据"
 _TOOL_OUTPUT_ERROR = "模型仍在请求工具而未生成有效结论，请检查模型工具调用兼容性后重试"
+_REASONING_TRUNCATED_WARNING = "推理内容已按上下文预算截断，不影响工具证据与最终结论"
+# Some thinking gateways require reasoning on tool turns, but it is not tool
+# evidence. Cap each replayed turn and count it against the same context budget.
+_MAX_REPLAY_REASONING_CHARACTERS = 8_000
 _FINAL_ANSWER_INSTRUCTION = (
     "本次工具取证阶段已结束。现在只输出最终分析正文，不要再调用工具、输出工具调用标记，"
     "也不要停留在‘让我获取更多数据’等后续行动计划。仅依据对话中已取得的有效证据作答，"
     "明确区分已知事实、推断和未核实信息；缺少新闻或资金流向数据时明确说明，"
     "不得假装已查询、编造数据或据此给出确定性结论。"
 )
+
+
+def _bounded_replay_reasoning(
+    reasoning_content: str,
+    max_tool_context_characters: int,
+) -> tuple[str, bool]:
+    """Bound one replayed reasoning turn; returns ``(text, truncated)``."""
+    cap = min(
+        _MAX_REPLAY_REASONING_CHARACTERS,
+        max(0, max_tool_context_characters // 4),
+    )
+    if len(reasoning_content) <= cap:
+        return reasoning_content, False
+    return reasoning_content[:cap], True
 
 
 def _llm_request_timeout(
@@ -197,7 +221,7 @@ class AgentExecutor:
             max_tool_context_characters=(
                 execution_context.settings.chat_max_tool_context_characters
                 if execution_context is not None
-                else get_settings().chat_max_tool_context_characters
+                else get_default_settings().chat_max_tool_context_characters
             ),
         )
 
@@ -274,18 +298,36 @@ class AgentExecutor:
         # 必须在拼历史消息、发 tool_call 事件之前拆掉模型多包的参数外壳：
         # 证据、工具缓存键、search policy 统计都直接读 function.arguments，
         # 晚一步解包就会让证据里的 code 变成空串，产业链修复循环据此反复建任务。
-        tool_calls = [normalize_wrapped_tool_call(tool_call) for tool_call in tool_calls]
+        prepared_calls = [prepare_tool_call(tool_call) for tool_call in tool_calls]
+        tool_calls = [prepared.call for prepared in prepared_calls]
+        prepared_arguments = [prepared.arguments for prepared in prepared_calls]
+        # One scoped key per call: grouping, cache lookup, and duplicate backfill
+        # all use the same identity instead of re-serializing arguments each time.
+        cache_keys = [
+            state.tool_cache.cache_key_for_arguments(
+                tool_call.function.name, arguments, execution_context
+            )
+            if arguments is not None
+            else state.tool_cache.cache_key_for(tool_call, execution_context)
+            for tool_call, arguments in zip(tool_calls, prepared_arguments)
+        ]
         assistant_message = build_assistant_tool_message(tool_calls, assistant_content)
         if capabilities.replay_tool_reasoning:
             # Some thinking gateways require the original reasoning on tool turns.
             # This stays in the invocation context; do not log/persist it here.
-            assistant_message["reasoning_content"] = reasoning_content
+            replay_reasoning, truncated = _bounded_replay_reasoning(
+                reasoning_content, state.max_tool_context_characters
+            )
+            assistant_message["reasoning_content"] = replay_reasoning
+            state.tool_context_characters += len(replay_reasoning)
+            if truncated and _REASONING_TRUNCATED_WARNING not in state.warnings:
+                state.warnings.append(_REASONING_TRUNCATED_WARNING)
         state.messages.append(assistant_message)
         for tool_call in tool_calls:
             state.tools_called.append(tool_call.function.name)
             await emit(AgentEvent(type="tool_call", tool_call=tool_call))
 
-        settings = execution_context.settings if execution_context is not None else get_settings()
+        settings = execution_context.settings if execution_context is not None else get_default_settings()
         batch_size = settings.chat_max_tool_calls_per_round
         # Keep duplicates with their first occurrence, even across batch boundaries.
         # Side-effecting tools opt out: each request remains a separate execution.
@@ -293,7 +335,7 @@ class AgentExecutor:
         group_by_key: dict[str, list[int]] = {}
         for index, call in enumerate(tool_calls):
             policy = registry.get_tool_policy(call.function.name)
-            key = tool_call_cache_key(call)
+            key = cache_keys[index]
             if (policy is None or policy.deduplicate_in_batch) and key in group_by_key:
                 group_by_key[key].append(index)
             else:
@@ -314,7 +356,9 @@ class AgentExecutor:
                     f"每批最多 {batch_size} 个新调用；仍受总额度、上下文和时限约束。"
                 )))
             await self._execute_tool_batch(
-                profile, state, [tool_calls[index] for index in indices], emit,
+                profile, state, [tool_calls[index] for index in indices],
+                [cache_keys[index] for index in indices],
+                [prepared_arguments[index] for index in indices], emit,
                 execution_context, tool_call_reserve, capabilities,
             )
             completed_indices.extend(indices)
@@ -329,6 +373,8 @@ class AgentExecutor:
         profile: AgentProfile,
         state: _ExecutionState,
         tool_calls: list[ToolCallInfo],
+        cache_keys: list[str],
+        prepared_arguments: list[Any | None],
         emit: Callable[[AgentEvent], Awaitable[None]],
         execution_context: AgentExecutionContext | None,
         tool_call_reserve: int,
@@ -337,19 +383,27 @@ class AgentExecutor:
         tool_results, accepted_calls, rejected_calls = await self._classify_tool_calls(
             state,
             tool_calls,
+            cache_keys,
             execution_context=execution_context,
             tool_call_reserve=tool_call_reserve,
         )
 
         started_reservations: set[int] = set()
 
-        async def execute_accepted(call: ToolCallInfo, reservation: ToolCallReservation | None) -> tuple[ToolResultInfo, bool]:
+        async def execute_accepted(
+            call: ToolCallInfo,
+            reservation: ToolCallReservation | None,
+            cache_key: str,
+            arguments: Any | None,
+        ) -> tuple[ToolResultInfo, bool]:
             shared = False
             if reservation is not None:
                 started_reservations.add(reservation.reservation_id)
             try:
                 result, shared = await state.tool_cache.execute_shared(
-                    call, allowed_names=state.effective_tool_names, execution_context=execution_context,
+                    call, allowed_names=state.effective_tool_names,
+                    execution_context=execution_context, cache_key=cache_key,
+                    arguments=arguments,
                 )
                 return result, shared
             finally:
@@ -363,12 +417,21 @@ class AgentExecutor:
         tasks: list[asyncio.Task[tuple[ToolResultInfo, bool]]] = []
         try:
             if capabilities.parallel_tool_calls:
-                tasks = [asyncio.create_task(execute_accepted(call, reservation)) for _, call, reservation in accepted_calls]
+                tasks = [
+                    asyncio.create_task(
+                        execute_accepted(
+                            call, reservation, cache_keys[index], prepared_arguments[index]
+                        )
+                    )
+                    for index, call, reservation in accepted_calls
+                ]
                 accepted_pairs = await asyncio.gather(*tasks)
             else:
                 accepted_pairs = []
-                for _, call, reservation in accepted_calls:
-                    accepted_pairs.append(await execute_accepted(call, reservation))
+                for index, call, reservation in accepted_calls:
+                    accepted_pairs.append(await execute_accepted(
+                        call, reservation, cache_keys[index], prepared_arguments[index]
+                    ))
         finally:
             async def settle_unstarted() -> None:
                 for task in tasks:
@@ -423,7 +486,7 @@ class AgentExecutor:
         # 同轮重复调用共享首次调用的真实结果（包括失败和预算拒绝），但保留各自 ID。
         first_indices: dict[str, int] = {}
         for index, tool_call in enumerate(tool_calls):
-            key = tool_call_cache_key(tool_call)
+            key = cache_keys[index]
             first_index = first_indices.setdefault(key, index)
             if tool_results[index] is None and first_index != index:
                 skipped_indices.add(index)
@@ -476,7 +539,9 @@ class AgentExecutor:
                 "content": context_content,
             })
             if result.is_error:
-                state.errors.append(f"{tool_call.function.name}: {result.content}")
+                # 只保留受控短标签：完整 payload 可能很大，且含上游/模型生成的原文，
+                # 不适合作为面向用户的 errors 兜底文案。
+                state.errors.append(f"{tool_call.function.name}: {tool_failure_label(result.content)}")
             logger.info(
                 "Agent %s tool: %s, error=%s",
                 profile.name,
@@ -692,6 +757,7 @@ class AgentExecutor:
         self,
         state: _ExecutionState,
         tool_calls: list[ToolCallInfo],
+        cache_keys: list[str],
         *,
         execution_context: AgentExecutionContext | None,
         tool_call_reserve: int,
@@ -701,7 +767,7 @@ class AgentExecutor:
         unique_calls: list[tuple[int, ToolCallInfo]] = []
         batch_keys: set[str] = set()
         for index, tool_call in enumerate(tool_calls):
-            cache_key = tool_call_cache_key(tool_call)
+            cache_key = cache_keys[index]
             policy = registry.get_tool_policy(tool_call.function.name)
             deduplicate = policy is None or policy.deduplicate_in_batch
             if deduplicate and cache_key in batch_keys:
@@ -712,6 +778,7 @@ class AgentExecutor:
                 tool_call,
                 allowed_names=state.effective_tool_names,
                 execution_context=execution_context,
+                cache_key=cache_key,
             )
             if previous is not None:
                 tool_results[index] = previous
@@ -786,7 +853,7 @@ class AgentExecutor:
             AgentExecutionResult，包含最终分析文本、调用过的工具和耗时
         """
         execution_context = execution_context or AgentExecutionContext.from_current(
-            get_settings()
+            get_default_settings()
         )
         capabilities = capabilities_from_client(llm_client)
         state = self._build_execution_state(

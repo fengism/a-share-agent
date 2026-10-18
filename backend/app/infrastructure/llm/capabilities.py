@@ -2,46 +2,28 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Literal
+from dataclasses import replace
+from typing import TYPE_CHECKING
 
 from app.configuration.llm_compatibility import LLMCompatibilityOverride, normalize_llm_endpoint
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
+from app.domain.llm import (
+    DEFAULT_LLM_CAPABILITIES as DEFAULT_LLM_CAPABILITIES,
+)
+from app.domain.llm import (
+    LLMCapabilities as LLMCapabilities,
+)
+from app.domain.llm import (
+    is_reasoning_model as is_reasoning_model,
+)
+from app.domain.llm import (
+    model_parameter_defaults as model_parameter_defaults,
+)
 
 if TYPE_CHECKING:
     from app.configuration.schema import Settings
 
-
-@dataclass(frozen=True, slots=True)
-class LLMCapabilities:
-    native_tool_calling: bool = True
-    streaming_tool_calls: bool = True
-    parallel_tool_calls: bool = True
-    supports_tool_choice_none: bool = True
-    supports_tool_choice_required: bool = True
-    supports_named_tool_choice: bool = True
-    replay_tool_reasoning: bool = False
-    supports_strict_json_schema: bool = False
-    json_mode: bool = True
-    stream_include_usage: bool = True
-    supports_temperature: bool = True
-    token_parameter: Literal["max_tokens", "max_completion_tokens"] = "max_tokens"
-    max_completion_tokens: int | None = None
-
-
-DEFAULT_LLM_CAPABILITIES = LLMCapabilities()
 _FULL_TOOL_PROVIDERS = frozenset({"openai", "azure", "claude", "gemini", "deepseek", "qwen", "zhipu", "moonshot"})
-
-
-def is_reasoning_model(model: str) -> bool:
-    # Legacy alias hint only; arbitrary deployment names require an explicit rule.
-    return model.rsplit("/", 1)[-1].lower().startswith(("o1", "o3", "o4", "gpt-5"))
-
-
-def model_parameter_defaults(model: str) -> LLMCapabilities:
-    if is_reasoning_model(model):
-        return replace(DEFAULT_LLM_CAPABILITIES, supports_temperature=False, token_parameter="max_completion_tokens")
-    return DEFAULT_LLM_CAPABILITIES
 
 
 def _endpoint_key(base_url: str) -> str:

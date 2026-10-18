@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
+from app.agentic_integration.bootstrap import register_all_capabilities
 from app.core.cache import analysis_cache, market_cache, reference_cache, series_cache
 from app.financial_data.hk.industry_comparison import (
     HKIndustryComparison,

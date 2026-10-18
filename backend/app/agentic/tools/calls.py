@@ -3,11 +3,17 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Collection
+from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 
 from app.agentic.catalog import CapabilityCatalog, registry
 from app.agentic.protocol import ToolCallFunction, ToolCallInfo
 from app.agentic.tools.validation import ToolArgumentsError, coerce_arguments
+
+# Model echoes the wire-format argument name into the payload body. Only unwrap
+# when the key is not a real schema property.
+_WIRE_ENVELOPE_KEYS = ("arguments", "parameters", "input", "args")
 
 
 def build_assistant_tool_message(
@@ -47,6 +53,18 @@ def tool_call_infos_from_stream(
     ]
 
 
+def _looks_like_argument_envelope(parsed: Any, schema: dict[str, Any]) -> bool:
+    """Cheap shape check before paying for full schema validation."""
+    if not isinstance(parsed, dict) or len(parsed) != 1:
+        return False
+    key, inner = next(iter(parsed.items()))
+    return (
+        key in _WIRE_ENVELOPE_KEYS
+        and isinstance(inner, dict)
+        and key not in (schema.get("properties") or {})
+    )
+
+
 def normalize_wrapped_tool_call(tool_call: ToolCallInfo) -> ToolCallInfo:
     """拆掉模型多包的一层参数外壳，返回等价的 ToolCallInfo。
 
@@ -58,10 +76,24 @@ def normalize_wrapped_tool_call(tool_call: ToolCallInfo) -> ToolCallInfo:
     tool = registry.get_tool(tool_call.function.name)
     if tool is None:
         return tool_call
+    arguments = tool_call.function.arguments
+    # Cheap shape check before JSON decoding: a normal argument object has no
+    # wire-envelope key, so it can never need unwrapping.
+    if not arguments.lstrip().startswith("{"):
+        return tool_call
+    if not any(f'"{key}"' in arguments for key in _WIRE_ENVELOPE_KEYS):
+        return tool_call
     try:
-        parsed = json.loads(tool_call.function.arguments)
+        parsed = json.loads(arguments)
+    except json.JSONDecodeError:
+        return tool_call
+    # The common case is a normal argument object. Full schema validation is
+    # already done once by Tool.execute; avoid paying for it twice per call.
+    if not _looks_like_argument_envelope(parsed, tool.parameters):
+        return tool_call
+    try:
         coerced = coerce_arguments(parsed, tool.parameters)
-    except (json.JSONDecodeError, ToolArgumentsError):
+    except ToolArgumentsError:
         return tool_call
     if coerced is parsed:
         return tool_call
@@ -71,6 +103,40 @@ def normalize_wrapped_tool_call(tool_call: ToolCallInfo) -> ToolCallInfo:
             arguments=json.dumps(coerced, ensure_ascii=False, separators=(",", ":")),
         )
     })
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedToolCall:
+    """A normalized call plus parsed/coerced arguments for one execution."""
+
+    call: ToolCallInfo
+    arguments: Any | None
+
+
+def prepare_tool_call(tool_call: ToolCallInfo) -> PreparedToolCall:
+    """Parse and validate arguments once; ``None`` defers error reporting to Tool.execute."""
+    tool = registry.get_tool(tool_call.function.name)
+    if tool is None:
+        return PreparedToolCall(tool_call, None)
+    try:
+        parsed = json.loads(tool_call.function.arguments)
+    except json.JSONDecodeError:
+        return PreparedToolCall(tool_call, None)
+    try:
+        coerced = coerce_arguments(parsed, tool.parameters)
+    except ToolArgumentsError:
+        return PreparedToolCall(tool_call, None)
+    if coerced is parsed:
+        return PreparedToolCall(tool_call, parsed)
+    return PreparedToolCall(
+        tool_call.model_copy(update={
+            "function": ToolCallFunction(
+                name=tool_call.function.name,
+                arguments=json.dumps(coerced, ensure_ascii=False, separators=(",", ":")),
+            )
+        }),
+        coerced,
+    )
 
 
 def _find_matching_parenthesis(text: str, start: int) -> int:
@@ -128,6 +194,12 @@ def _parse_arguments(arguments: str, parameter_order: list[str]) -> dict | None:
     return {parameter_order[0]: stripped} if parameter_order else None
 
 
+@lru_cache(maxsize=64)
+def _cached_tool_name_pattern(names: tuple[str, ...]) -> re.Pattern[str]:
+    """Compile the pseudo-call matcher once per stable tool-name tuple."""
+    return re.compile(r"\b(" + "|".join(re.escape(name) for name in names) + r")\s*\(")
+
+
 def extract_pseudo_tool_calls(
     text: str,
     catalog: CapabilityCatalog,
@@ -141,11 +213,11 @@ def extract_pseudo_tool_calls(
         for tool in catalog.list_tools()
         if allowed_names is None or tool.name in allowed_names
     ]
-    names = [re.escape(tool.name) for tool in tools]
+    names = tuple(tool.name for tool in tools)
     if not names:
         return []
 
-    pattern = re.compile(r"\b(" + "|".join(names) + r")\s*\(")
+    pattern = _cached_tool_name_pattern(names)
     calls: list[ToolCallInfo] = []
     for match in pattern.finditer(text):
         name = match.group(1)
@@ -301,9 +373,6 @@ def _json_tool_entries(body: str) -> list[dict[str, Any]]:
             return []
     candidates = parsed if isinstance(parsed, list) else [parsed]
     return [entry for entry in (_json_entry_arguments(item) for item in candidates) if entry]
-
-
-_WIRE_ENVELOPE_KEYS = ("arguments", "parameters", "input", "args")
 
 
 def _unwrap_wire_envelope(

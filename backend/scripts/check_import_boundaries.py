@@ -37,10 +37,10 @@ REPO_BACKEND_DIR = APP_DIR.parent
 #: ``domain.identity.UserRecord``，``domain.industry_chain`` 需要 ``core.market``）。
 #: 真正值得守住的是内层不得伸手到 ``infrastructure`` / ``modules``。
 LAYER_FORBIDDEN: dict[str, frozenset[str]] = {
-    "core": frozenset({"infrastructure", "modules"}),
-    "domain": frozenset({"infrastructure", "modules"}),
-    "infrastructure": frozenset({"modules", "agentic"}),
-    "financial_data": frozenset({"modules"}),
+    "core": frozenset({"infrastructure", "modules", "agentic", "agentic_integration"}),
+    "domain": frozenset({"infrastructure", "modules", "agentic", "agentic_integration"}),
+    "infrastructure": frozenset({"modules", "agentic", "agentic_integration"}),
+    "financial_data": frozenset({"modules", "agentic", "agentic_integration"}),
 }
 
 #: R3：这些 app 子包属于「上层」，内层与业务模块不得反向依赖。

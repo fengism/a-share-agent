@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import json
-import math
 from typing import Any
 
-from app.agentic.public import (
+from app.agentic.runtime.evidence import decode_tool_payload, flatten_text, has_finite_number
+from app.agentic_integration.public import (
     AgentEventCallback,
     AgenticResearchResult,
     AgentResearchSpec,
@@ -12,26 +11,6 @@ from app.agentic.public import (
     run_agentic_research,
 )
 from app.core.market import is_hk_code
-
-
-def _decoded_content(evidence) -> Any:
-    try:
-        value = json.loads(evidence.content)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return evidence.content
-    if isinstance(value, dict) and value.get("ok") is True and "data" in value:
-        return value["data"]
-    return value
-
-
-def _flatten_text(value: Any) -> str:
-    if isinstance(value, str):
-        return value
-    if isinstance(value, dict):
-        return "\n".join(_flatten_text(item) for item in value.values())
-    if isinstance(value, (list, tuple)):
-        return "\n".join(_flatten_text(item) for item in value)
-    return str(value) if value is not None else ""
 
 
 def _body_records(value: Any) -> list[tuple[str, str]]:
@@ -48,24 +27,12 @@ def _body_records(value: Any) -> list[tuple[str, str]]:
     return records
 
 
-def _has_finite_number(value: Any) -> bool:
-    if isinstance(value, bool):
-        return False
-    if isinstance(value, (int, float)):
-        return math.isfinite(value)
-    if isinstance(value, dict):
-        return any(_has_finite_number(item) for item in value.values())
-    if isinstance(value, (list, tuple)):
-        return any(_has_finite_number(item) for item in value)
-    return False
-
-
 def _has_financial_evidence(evidence) -> bool:
-    payload = _decoded_content(evidence)
+    payload = decode_tool_payload(evidence.content)
     if not isinstance(payload, dict):
         return False
     return any(
-        _has_finite_number(payload.get(key))
+        has_finite_number(payload.get(key))
         for key in ("income", "balance", "cashflow", "key_indicators", "income_raw")
     )
 
@@ -73,18 +40,18 @@ def _has_financial_evidence(evidence) -> bool:
 def _has_web_body(evidence) -> bool:
     return any(
         url.startswith(("http://", "https://")) and len(content.strip()) >= 300
-        for url, content in _body_records(_decoded_content(evidence))
+        for url, content in _body_records(decode_tool_payload(evidence.content))
     )
 
 
 def _has_structured_research_evidence(evidence) -> bool:
-    payload = _decoded_content(evidence)
+    payload = decode_tool_payload(evidence.content)
     records = payload if isinstance(payload, list) else payload.get("items", []) if isinstance(payload, dict) else []
-    return isinstance(records, list) and bool(records) and len(_flatten_text(records).strip()) >= 120
+    return isinstance(records, list) and bool(records) and len(flatten_text(records).strip()) >= 120
 
 
 def _research_evidence_contains(evidence, keywords: tuple[str, ...]) -> bool:
-    text = _flatten_text(_decoded_content(evidence)).strip()
+    text = flatten_text(decode_tool_payload(evidence.content)).strip()
     return len(text) >= 120 and any(keyword in text for keyword in keywords)
 
 

@@ -9,7 +9,8 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from app.agentic.contracts import AgentEvidence, agent_evidence_id
-from app.agentic.public import EvidenceRequirement, run_agentic_research
+from app.agentic.runtime.evidence import decode_tool_payload
+from app.agentic_integration.public import EvidenceRequirement, run_agentic_research
 from app.core.market import is_a_share_code
 from app.infrastructure.llm.prompting import run_structured_prompt
 from app.modules.industry_chain.budget import BODY_TOOLS, research_budget_settings, search_policy_limits
@@ -38,7 +39,6 @@ from app.modules.industry_chain.query_plan import render_repair_reading_plan
 from app.modules.industry_chain.relationships import validate_relationships
 from app.modules.industry_chain.research import (
     INDUSTRY_CHAIN_RESEARCH_SPEC,
-    _decoded_content,
     _has_company_disclosure,
     _has_company_financials,
     _has_web_body,
@@ -88,6 +88,11 @@ def _code(item: AgentEvidence) -> str:
         return ""
 
 
+def _mentions_company(item: AgentEvidence, code: str | None, name: str) -> bool:
+    text = str(decode_tool_payload(item.content))
+    return bool((code and code in text) or name in text)
+
+
 def _attempt_status(items: list[AgentEvidence], accepts) -> str:
     if not items:
         return "未执行"
@@ -116,7 +121,7 @@ def build_repair_targets(result: IndustryChainResult, evidence: list[AgentEviden
             item
             for item in evidence
             if agent_evidence_id(item) in company.evidence_ids
-            and (company.code and company.code in str(_decoded_content(item)) or name in str(_decoded_content(item)))
+            and _mentions_company(item, company.code, name)
         ]
         disclosure_status = _attempt_status(disclosures, _has_company_disclosure)
         if financial_status != "已有资料" or disclosure_status != "已有资料":
@@ -171,7 +176,7 @@ def _company_body(item: AgentEvidence, *, code: str, name: str) -> bool:
         and ((bool(code) and code in part.text) or (len(name) >= 2 and name in part.text))
         and any(term in part.text for term in ("年度报告", "半年度报告", "年报", "公告"))
         and operating_context(part.text, tuple(value for value in (code, name) if value))
-        for part in extract_evidence_content(_decoded_content(item))
+        for part in extract_evidence_content(decode_tool_payload(item.content))
     )
 
 

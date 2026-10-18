@@ -12,16 +12,17 @@ from openai import APITimeoutError
 
 from app.configuration.runtime import get_effective_settings
 from app.configuration.schema import Settings
+from app.domain.llm import (
+    LLMGenerationTimeoutError as LLMGenerationTimeoutError,
+)
+from app.domain.llm import (
+    LLMRequestTimeoutError as LLMRequestTimeoutError,
+)
+from app.domain.llm import (
+    is_llm_failure as is_llm_failure,
+)
 
 _current_settings: ContextVar[Settings | None] = ContextVar("llm_call_settings", default=None)
-
-
-class LLMGenerationTimeoutError(TimeoutError):
-    """LLM timeout (deadline or transport); do not blindly restart a workflow."""
-
-
-class LLMRequestTimeoutError(LLMGenerationTimeoutError):
-    """The transport timed out before the enclosing generation deadline expired."""
 
 
 def request_timeout_error(
@@ -92,30 +93,3 @@ def completion_token_limit(requested: int, settings: Settings) -> int:
     """Optional endpoint/model cap; never guess capacities from a model alias."""
     cap = settings.llm_model_max_completion_tokens
     return max(1, min(requested, cap) if cap is not None else requested)
-
-
-def is_llm_failure(error: BaseException) -> bool:
-    """Walk wrappers without string matching or exposing provider response bodies."""
-    from app.domain.llm import LLMConfigurationError
-    from app.infrastructure.llm.adapters import LLMInvalidResponseError, LLMRetryableError
-    from app.infrastructure.llm.prompting.runner import PromptExecutionError
-
-    current: BaseException | None = error
-    for _ in range(8):
-        if current is None:
-            return False
-        if isinstance(
-            current,
-            (
-                LLMGenerationTimeoutError,
-                LLMConfigurationError,
-                LLMInvalidResponseError,
-                LLMRetryableError,
-                PromptExecutionError,
-            ),
-        ):
-            return True
-        if type(current).__module__.split(".", 1)[0] in {"openai", "litellm"}:
-            return True
-        current = current.__cause__ or current.__context__
-    return False

@@ -3,7 +3,7 @@
 报表渲染会把外部数据源给出的链接直接嵌进 HTML ``href`` / Markdown 链接，
 必须过滤 ``javascript:``、``data:`` 等协议与畸形 URL，避免注入可执行链接。
 本函数只做协议与主机白名单判断，不做 DNS 解析或 SSRF 校验（后者见
-``app.agentic.tools.packs.web.url_security``）。
+``app.agentic_integration.tools.packs.web.url_security``）。
 """
 
 from __future__ import annotations

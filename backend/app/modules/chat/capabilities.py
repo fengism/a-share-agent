@@ -1,8 +1,8 @@
 """Chat Skill、Agent 与 Tool 能力目录应用服务。"""
 
-from app.agentic.agents.catalog import list_agent_profiles
-from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
+from app.agentic_integration.agents.catalog import list_agent_profiles
+from app.agentic_integration.bootstrap import register_all_capabilities
 from app.configuration import get_effective_settings
 from app.modules.chat.availability import build_capability_availability
 from app.modules.chat.schemas import (

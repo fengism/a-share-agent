@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import math
 import re
 from collections.abc import Awaitable, Callable
@@ -8,7 +7,8 @@ from dataclasses import replace
 from typing import Any
 
 from app.agentic.events import AgentEvent
-from app.agentic.public import (
+from app.agentic.runtime.evidence import decode_tool_payload, flatten_text
+from app.agentic_integration.public import (
     AgenticResearchResult,
     AgentResearchSpec,
     EvidenceRequirement,
@@ -38,28 +38,8 @@ _HTTP_URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
 _A_SHARE_CODE_PATTERN = re.compile(r"(?<!\d)(?:(?:00|30|60|68|43|83|87)\d{4}|920\d{3})(?!\d)")
 
 
-def _decoded_content(evidence) -> Any:
-    try:
-        value = json.loads(evidence.content)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return evidence.content
-    if isinstance(value, dict) and value.get("ok") is True and "data" in value:
-        return value["data"]
-    return value
-
-
-def _flatten_text(value: Any) -> str:
-    if isinstance(value, str):
-        return value
-    if isinstance(value, dict):
-        return "\n".join(_flatten_text(item) for item in value.values())
-    if isinstance(value, (list, tuple)):
-        return "\n".join(_flatten_text(item) for item in value)
-    return str(value) if value is not None else ""
-
-
 def _count_urls(value: Any) -> int:
-    return len(set(_HTTP_URL_PATTERN.findall(_flatten_text(value))))
+    return len(set(_HTTP_URL_PATTERN.findall(flatten_text(value))))
 
 
 _URL_KEYS = ("url", "source_url", "final_url", "link", "pdf_url")
@@ -127,7 +107,7 @@ def _record_text(value: dict[str, Any]) -> str:
 def _content_units(value: Any, parent_url: str = "", depth: int = 0) -> list[EvidenceContent]:
     """列出证据里「按记录聚合」的内容单元，并标记它绑定到哪个可追溯 URL。
 
-    与 ``_flatten_text`` 的关键差别：排除 ``_ECHO_KEYS`` 里的回显字段，并且按记录
+    与 ``flatten_text`` 的关键差别：排除 ``_ECHO_KEYS`` 里的回显字段，并且按记录
     （而不是按字段）聚合文本——一条搜索结果的标题+摘要应当算一份内容。
     """
     if depth > 8:
@@ -179,12 +159,13 @@ def _has_market_context(evidence) -> bool:
     # 不要求 URL：结构化数据（get_industry_list / iwencai_select_stock）没有链接，
     # 但「行业/规模/竞争」这类维度词确实是取回的内容。
     return any(
-        any(dimension in unit.text for dimension in dimensions) for unit in _content_units(_decoded_content(evidence))
+        any(dimension in unit.text for dimension in dimensions)
+        for unit in _content_units(decode_tool_payload(evidence.content))
     )
 
 
 def _has_company_records(evidence) -> bool:
-    text = _flatten_text(_decoded_content(evidence))
+    text = flatten_text(decode_tool_payload(evidence.content))
     codes = set(_A_SHARE_CODE_PATTERN.findall(text))
     if len(codes) >= 1:
         return True
@@ -192,7 +173,7 @@ def _has_company_records(evidence) -> bool:
 
 
 def _has_public_company_records(evidence) -> bool:
-    value = _decoded_content(evidence)
+    value = decode_tool_payload(evidence.content)
     records = value if isinstance(value, list) else value.get("items", []) if isinstance(value, dict) else []
     if not isinstance(records, list):
         return False
@@ -214,7 +195,7 @@ def _has_public_sources(evidence) -> bool:
     它的 ``detail_hint``（约 60 字）加 query 回显就够了。取证门一旦能被空结果满足，
     报告就会带着「已完成取证」的假象进入合成，下游质量门也拿不到真材料。
     """
-    units = _content_units(_decoded_content(evidence))
+    units = _content_units(decode_tool_payload(evidence.content))
     if any(unit.source_url and unit.text.strip() for unit in units):
         return True
     return _count_urls("\n".join(unit.text for unit in units)) >= 1
@@ -227,12 +208,12 @@ def _has_web_body(evidence) -> bool:
     # Search snippets, metadata, error pages and document directories are not bodies.
     return evidence.tool_name in BODY_TOOLS and any(
         part.source_url and len(re.sub(r"\s+", "", part.text)) >= 80
-        for part in extract_evidence_content(_decoded_content(evidence))
+        for part in extract_evidence_content(decode_tool_payload(evidence.content))
     )
 
 
 def _has_company_financials(evidence) -> bool:
-    value = _decoded_content(evidence)
+    value = decode_tool_payload(evidence.content)
     if evidence.tool_name != "analyze_financials" or not isinstance(value, dict):
         return False
     income = value.get("income") or {}
@@ -264,7 +245,7 @@ def _has_dimension_context(
 ) -> bool:
     if not _has_web_body(evidence):
         return False
-    text = "\n".join(part.text for part in extract_evidence_content(_decoded_content(evidence))).lower()
+    text = "\n".join(part.text for part in extract_evidence_content(decode_tool_payload(evidence.content))).lower()
     return len(text) >= 20 and sum(term.lower() in text for term in terms) >= minimum_matches
 
 

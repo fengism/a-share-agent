@@ -11,11 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.agentic.agents.profiles.fundamental import PROFILE as FUNDAMENTAL_ANALYST_PROFILE
-from app.agentic.agents.profiles.technical import PROFILE as TECHNICAL_ANALYST_PROFILE
-from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
-from app.agentic.tools.packs.stock.context import _resolve_stock
+from app.agentic_integration.agents.profiles.fundamental import PROFILE as FUNDAMENTAL_ANALYST_PROFILE
+from app.agentic_integration.agents.profiles.technical import PROFILE as TECHNICAL_ANALYST_PROFILE
+from app.agentic_integration.bootstrap import register_all_capabilities
+from app.agentic_integration.tools.packs.stock.context import _resolve_stock
 from app.core.cache import analysis_cache, market_cache, reference_cache, series_cache
 from app.core.exceptions import InvalidRequestError, UpstreamUnavailableError
 from app.financial_data.hk.schemas import HKStockQuote, HKStockQuotePage, HKStockValuation
@@ -84,7 +84,7 @@ def test_agentic_skills_coverage_and_profiles():
 async def test_agent_context_resolve_hk_stock():
     """验证 Agent 对话上下文解析港股时调用港股 profile 接口且不会触发 A 股异常。"""
     with patch(
-        "app.agentic.tools.packs.stock.helpers.get_hk_stock_profile",
+        "app.agentic_integration.tools.packs.stock.helpers.get_hk_stock_profile",
         new=AsyncMock(
             return_value={
                 "quote": {

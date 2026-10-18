@@ -387,7 +387,7 @@ async def application_lifespan(
     except Exception:
         logger.warning("启动清理过期认证数据失败", exc_info=True)
 
-    from app.agentic.bootstrap import register_all_capabilities
+    from app.agentic_integration.bootstrap import register_all_capabilities
     from app.runtime.agentic_tools import configure_application_tools
 
     configure_application_tools()

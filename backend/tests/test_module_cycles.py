@@ -24,7 +24,7 @@ BASELINE: frozenset[tuple[str, ...]] = frozenset(
         ("api", "runtime"),
         ("core", "domain"),
         (
-            "agentic",
+            "agentic_integration",
             "financial_data",
             "infrastructure",
             "modules.analysis",

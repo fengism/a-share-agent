@@ -1,14 +1,16 @@
-"""Deterministic user-facing evidence gaps; never used as model evidence.
+"""Shared evidence payload decoding and deterministic user-facing gap reports.
 
-No raw errors, tool payloads or model prose are interpolated here. They may
-contain credentials, prompt-injection text or unsupported financial claims.
+No raw errors, tool payloads or model prose are interpolated into gap reports.
+They may contain credentials, prompt-injection text or unsupported claims.
 """
 
 from __future__ import annotations
 
 import json
+import math
 from collections import Counter
 from collections.abc import Iterable
+from typing import Any
 
 from app.agentic.agents.contracts import AgentExecutionResult
 
@@ -30,6 +32,42 @@ _FAILURES = {
 }
 
 
+def decode_tool_payload(content: str) -> Any:
+    """Decode serialized tool content, unwrapping the ``{ok, data}`` envelope.
+
+    Non-JSON content is returned as-is so text heuristics can still inspect it.
+    """
+    try:
+        value = json.loads(content)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return content
+    if isinstance(value, dict) and value.get("ok") is True and "data" in value:
+        return value["data"]
+    return value
+
+
+def flatten_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return "\n".join(flatten_text(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return "\n".join(flatten_text(item) for item in value)
+    return str(value) if value is not None else ""
+
+
+def has_finite_number(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return math.isfinite(value)
+    if isinstance(value, dict):
+        return any(has_finite_number(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(has_finite_number(item) for item in value)
+    return False
+
+
 def safe_tool_failure_code(content: str) -> str:
     if len(content) > 100_000:
         return ""
@@ -40,6 +78,11 @@ def safe_tool_failure_code(content: str) -> str:
         return code if isinstance(code, str) and code in _FAILURES else ""
     except (ValueError, TypeError):
         return ""
+
+
+def tool_failure_label(content: str) -> str:
+    """Short user-safe label for one failed tool result; never raw payload text."""
+    return _FAILURES.get(safe_tool_failure_code(content), "工具调用失败")
 
 
 def evidence_gap_reason(result: AgentExecutionResult) -> str:

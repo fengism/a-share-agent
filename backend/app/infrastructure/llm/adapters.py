@@ -8,7 +8,22 @@ from typing import Any
 import httpx
 from openai import APIConnectionError, APITimeoutError, OpenAI
 
-from app.domain.llm import LLMConfigurationError
+from app.domain.agent_llm import extract_message_text as extract_message_text
+from app.domain.llm import (
+    LLMConfigurationError,
+)
+from app.domain.llm import (
+    LLMEmptyResponseError as LLMEmptyResponseError,
+)
+from app.domain.llm import (
+    LLMInvalidResponseError as LLMInvalidResponseError,
+)
+from app.domain.llm import (
+    LLMRetryableError as LLMRetryableError,
+)
+from app.domain.llm import (
+    LLMUpstreamResponseError as LLMUpstreamResponseError,
+)
 from app.infrastructure.llm.capabilities import (
     LLMCapabilities,
     model_parameter_defaults,
@@ -18,27 +33,6 @@ from app.infrastructure.llm.capabilities import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class LLMRetryableError(RuntimeError):
-    """A transient provider failure that can be retried safely."""
-
-
-class LLMUpstreamResponseError(LLMRetryableError):
-    """The provider returned an empty or non-JSON HTTP response."""
-
-    def __init__(self, message: str, *, status_code: int | None = None) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-
-
-class LLMInvalidResponseError(RuntimeError):
-    """The provider returned a non-retryable, incompatible completion response."""
-
-
-class LLMEmptyResponseError(LLMRetryableError):
-    """The provider returned a syntactically valid completion with no text."""
-
 
 _TRANSIENT_LLM_ERROR_MARKERS = (
     "upstream returned failure",
@@ -203,27 +197,6 @@ def prepare_completion_kwargs(
         prepared.pop("tool_choice", None)
         prepared.pop("parallel_tool_calls", None)
     return prepared
-
-
-def extract_message_text(content: Any) -> str:
-    """Normalize text and provider-specific content block responses."""
-    if content is None:
-        return ""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-            elif isinstance(item, dict) and isinstance(item.get("text"), str):
-                parts.append(item["text"])
-            else:
-                text = getattr(item, "text", None)
-                if isinstance(text, str):
-                    parts.append(text)
-        return "".join(parts)
-    return str(content)
 
 
 class LLMClient(ABC):

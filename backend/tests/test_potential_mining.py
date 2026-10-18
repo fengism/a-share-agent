@@ -377,10 +377,13 @@ async def test_run_daily_mining_dedupes_concurrent_runs(monkeypatch: pytest.Monk
 
     monkeypatch.setattr(service, "_mine_and_save", fake_mine)
 
+    # Fix the clock after the 15:10 Shanghai cutoff so the test is independent of
+    # the machine's local time/UTC offset.
+    fixed_now = datetime(2026, 10, 16, 16, 0)
     results = await asyncio.gather(
-        service.run_daily_mining(),
-        service.run_daily_mining(),
-        service.run_daily_mining(),
+        service.run_daily_mining(now=fixed_now),
+        service.run_daily_mining(now=fixed_now),
+        service.run_daily_mining(now=fixed_now),
     )
 
     assert calls["count"] == 1

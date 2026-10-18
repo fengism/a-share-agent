@@ -4,10 +4,9 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator, Collection
 from contextlib import aclosing
+from typing import cast
 
-from app.agentic.agents.catalog import select_agent_profiles
 from app.agentic.agents.contracts import AgentExecutionResult
-from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent
 from app.agentic.orchestration.contracts import ExecutionPlan
@@ -26,7 +25,9 @@ from app.agentic.orchestration.synthesis import stream_synthesis
 from app.agentic.protocol import AgentMessage
 from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.runtime.evidence import build_evidence_gap_report, evidence_gap_reason
-from app.agentic.tools.packs.stock.context import resolve_stock_context
+from app.agentic_integration.agents.catalog import select_agent_profiles
+from app.agentic_integration.bootstrap import register_all_capabilities
+from app.agentic_integration.tools.packs.stock.context import resolve_stock_context
 from app.configuration import get_effective_settings
 from app.configuration.schema import Settings
 from app.core.metrics import metrics
@@ -296,7 +297,7 @@ class Orchestrator:
             return
 
         settings = (
-            self.execution_context.settings
+            cast(Settings, self.execution_context.settings)
             if self.execution_context is not None
             else get_effective_settings()
         )
@@ -447,12 +448,12 @@ class Orchestrator:
             prompt_ref=DECISION_SYNTHESIS_PROMPT_REF,
             temperature=temperature,
             max_completion_tokens=(
-                self.execution_context.settings.chat_max_completion_tokens
+                cast(Settings, self.execution_context.settings).chat_max_completion_tokens
                 if self.execution_context is not None
                 else None
             ),
             max_input_characters=(
-                self.execution_context.settings.chat_max_synthesis_characters
+                cast(Settings, self.execution_context.settings).chat_max_synthesis_characters
                 if self.execution_context is not None
                 else 60_000
             ),

@@ -3,14 +3,15 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from contextlib import aclosing
 
-from app.agentic.agents.catalog import list_agent_profiles
-from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent
 from app.agentic.protocol import AgentMessage
 from app.agentic.runtime.context import AgentExecutionContext
+from app.agentic_integration.agents.catalog import list_agent_profiles
+from app.agentic_integration.bootstrap import register_all_capabilities
 from app.configuration import get_effective_settings
 from app.core.metrics import metrics
+from app.core.request_context import get_current_request_id, get_current_user_id
 from app.modules.chat.capability_plan import build_chat_capability_plan
 from app.modules.chat.general_agent import stream_general_agent
 from app.modules.chat.orchestrator import Orchestrator
@@ -57,6 +58,8 @@ async def run_chat_agent(
     execution_context = AgentExecutionContext.from_current(
         settings,
         total_timeout_seconds=settings.chat_total_timeout_seconds,
+        user_id=get_current_user_id(),
+        request_id=get_current_request_id(),
     )
     if settings.multi_agent_enabled and plan.candidate_agent_names:
         orchestrator = Orchestrator(

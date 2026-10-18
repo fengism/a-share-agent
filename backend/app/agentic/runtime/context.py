@@ -2,12 +2,28 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from app.agentic.runtime.research_policy import ResearchSearchPolicy
+from app.agentic.runtime.settings import AgentSettings
 from app.agentic.tools.cache import SharedToolCache
-from app.configuration.schema import Settings
-from app.core.request_context import get_current_request_id, get_current_user_id
+
+_request_context_provider: Callable[[], tuple[int | None, str | None]] | None = None
+
+
+def configure_request_context_provider(
+    provider: Callable[[], tuple[int | None, str | None]],
+) -> None:
+    """Install the host's request-scoped user/request-id lookup."""
+    global _request_context_provider
+    _request_context_provider = provider
+
+
+def _current_request_ids() -> tuple[int | None, str | None]:
+    if _request_context_provider is None:
+        return None, None
+    return _request_context_provider()
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -23,7 +39,7 @@ class ToolCallReservation:
 
 @dataclass(slots=True)
 class AgentExecutionContext:
-    settings: Settings
+    settings: AgentSettings
     user_id: int | None = None
     request_id: str | None = None
     deadline: float | None = None
@@ -44,17 +60,21 @@ class AgentExecutionContext:
     @classmethod
     def from_current(
         cls,
-        settings: Settings,
+        settings: AgentSettings,
         *,
         total_timeout_seconds: float | None = None,
+        user_id: int | None = None,
+        request_id: str | None = None,
     ) -> AgentExecutionContext:
         deadline = None
         if total_timeout_seconds is not None:
             deadline = time.monotonic() + max(1.0, float(total_timeout_seconds))
+        if user_id is None and request_id is None:
+            user_id, request_id = _current_request_ids()
         return cls(
             settings=settings,
-            user_id=get_current_user_id(),
-            request_id=get_current_request_id(),
+            user_id=user_id,
+            request_id=request_id,
             deadline=deadline,
         )
 

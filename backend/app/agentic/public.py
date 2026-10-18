@@ -1,9 +1,9 @@
-"""Agentic 子系统对业务模块开放的稳定入口。"""
+"""Agentic core public contracts (host-independent).
 
-from collections.abc import Awaitable, Callable
-from typing import Any, cast
+Host-facing helpers such as the default research runtime and web-search
+compatibility wrapper live in :mod:`app.agentic_integration.public`.
+"""
 
-from app.agentic.adapters.research import AgentExecutorResearchRuntime
 from app.agentic.contracts import (
     AgentEvidence,
     AgentEvidenceInsufficientError,
@@ -19,30 +19,13 @@ from app.agentic.research import (
     AgentResearchRuntime,
     AgentResearchSession,
 )
-from app.agentic.research import run_agentic_research as _run_agentic_research
-from app.agentic.semantics import EvidenceState, ExecutionOutcome, ExecutionStatus, StopReason, stop_reason
-from app.agentic.tools.packs.web.search import execute_web_search
-
-_DEFAULT_RUNTIME = AgentExecutorResearchRuntime()
-
-
-async def run_agentic_research(
-    spec: AgentResearchSpec,
-    message: str,
-    settings: Any = None,
-    runtime: AgentResearchRuntime | None = None,
-    event_callback: Callable[[AgentEvent], Awaitable[None]] | None = None,
-    evidence_callback: Callable[[AgentEvidence], None] | None = None,
-) -> AgenticResearchResult:
-    return cast(AgenticResearchResult, await _run_agentic_research(
-        spec,
-        message,
-        runtime=runtime or _DEFAULT_RUNTIME,
-        settings=settings,
-        event_callback=event_callback,
-        evidence_callback=evidence_callback,
-    ))
-
+from app.agentic.semantics import (
+    EvidenceState,
+    ExecutionOutcome,
+    ExecutionStatus,
+    StopReason,
+    stop_reason,
+)
 
 __all__ = [
     "EvidenceState",
@@ -52,6 +35,7 @@ __all__ = [
     "stop_reason",
     "AgentEvidence",
     "AgentEvidenceInsufficientError",
+    "AgentEvent",
     "AgentEventCallback",
     "AgenticResearchResult",
     "AgentResearchRuntime",
@@ -59,7 +43,5 @@ __all__ = [
     "AgentResearchSpec",
     "AgentRoundResult",
     "EvidenceRequirement",
-    "execute_web_search",
-    "run_agentic_research",
     "agent_evidence_id",
 ]

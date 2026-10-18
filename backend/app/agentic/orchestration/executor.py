@@ -14,12 +14,17 @@ from app.agentic.orchestration.reviewer import is_usable_task_result
 from app.agentic.protocol import AgentMessage
 from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.tools.cache import SharedToolCache
-from app.core.errors import log_internal_error
-from app.core.exceptions import UpstreamUnavailableError
-from app.infrastructure.llm.policy import is_llm_failure
-from app.infrastructure.llm.tool_calling import AsyncLLMClient
+from app.domain.agent_llm import AsyncLLMClient
+from app.domain.errors import UpstreamUnavailableError, log_internal_error
+from app.domain.llm import is_llm_failure
 
 logger = logging.getLogger(__name__)
+
+# Dependency analyses are prepended to the task message, which is not covered by
+# build_messages()' history compaction. Keep a bounded, fairly shared budget so
+# two long upstream reports cannot crowd out the current task and tool evidence.
+_MAX_DEPENDENCY_CONTEXT_CHARACTERS = 24_000
+_DEPENDENCY_TRUNCATION_MARKER = "\n…（前置分析已按上下文预算截断）"
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,10 +33,33 @@ class _TaskCompleted:
     result: AgentExecutionResult
 
 
+def _render_dependency_context(
+    dependency_results: list[AgentExecutionResult],
+    max_characters: int,
+) -> str:
+    if not dependency_results:
+        return ""
+    headers = [f"### {result.display_name}\n" for result in dependency_results]
+    separator_length = 2 * max(0, len(dependency_results) - 1)
+    available = max(0, max_characters - sum(map(len, headers)) - separator_length)
+    base_allowance, extra = divmod(available, len(dependency_results))
+    parts: list[str] = []
+    for index, (header, result) in enumerate(zip(headers, dependency_results)):
+        allowance = base_allowance + int(index < extra)
+        text = result.analysis
+        if len(text) > allowance:
+            keep = max(0, allowance - len(_DEPENDENCY_TRUNCATION_MARKER))
+            text = (text[:keep] + _DEPENDENCY_TRUNCATION_MARKER)[:allowance]
+        parts.append(header + text)
+    return "\n\n".join(parts)
+
+
 def _build_task_message(
     task: AgentTask,
     message: str,
     task_results: Mapping[str, AgentExecutionResult],
+    *,
+    max_dependency_characters: int = _MAX_DEPENDENCY_CONTEXT_CHARACTERS,
 ) -> str:
     parts = [message]
     dependency_results = [
@@ -40,10 +68,7 @@ def _build_task_message(
         if dependency in task_results
     ]
     if dependency_results:
-        context = "\n\n".join(
-            f"### {result.display_name}\n{result.analysis}"
-            for result in dependency_results
-        )
+        context = _render_dependency_context(dependency_results, max_dependency_characters)
         parts.append(f"## 已完成的前置分析\n{context}")
 
     is_retry_or_special = (
@@ -76,6 +101,12 @@ async def stream_execution_plan(
         if execution_context is not None
         else SharedToolCache()
     )
+    max_dependency_characters = _MAX_DEPENDENCY_CONTEXT_CHARACTERS
+    if execution_context is not None:
+        max_dependency_characters = min(
+            max_dependency_characters,
+            execution_context.settings.chat_max_tool_context_characters,
+        )
     tasks_by_id = {task.task_id: task for task in plan.tasks}
     reuse_ids = set(plan.reuse_task_ids)
     pending = {task.task_id: task for task in plan.tasks if task.task_id not in reuse_ids}
@@ -101,7 +132,10 @@ async def stream_execution_plan(
             profile = agents[task.agent_name]
             result = await agent_executor.run(
                 profile,
-                _build_task_message(task, message, task_results),
+                _build_task_message(
+                    task, message, task_results,
+                    max_dependency_characters=max_dependency_characters,
+                ),
                 history,
                 llm_client,
                 model,

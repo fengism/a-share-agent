@@ -4,6 +4,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
+
+
+@lru_cache(maxsize=512)
+def _ascii_keyword_pattern(keyword: str) -> re.Pattern[str]:
+    """Compile ASCII word-boundary matchers once per keyword."""
+    return re.compile(rf"(?<![a-z0-9]){re.escape(keyword)}(?![a-z0-9])")
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,14 +56,16 @@ class Skill:
                 raise ValueError(f"Skill '{self.name}' 的 {field_name} 包含空值")
 
     def matches(self, message: str) -> bool:
-        normalized = message.lower()
+        return self.matches_normalized(message.lower())
+
+    def matches_normalized(self, normalized_message: str) -> bool:
+        """Match against an already-lowercased message (callers can reuse it)."""
         for keyword in self.activation_keywords:
             normalized_keyword = keyword.lower()
             if normalized_keyword.isascii() and normalized_keyword.isalnum():
-                pattern = rf"(?<![a-z0-9]){re.escape(normalized_keyword)}(?![a-z0-9])"
-                if re.search(pattern, normalized):
+                if _ascii_keyword_pattern(normalized_keyword).search(normalized_message):
                     return True
-            elif normalized_keyword in normalized:
+            elif normalized_keyword in normalized_message:
                 return True
         return False
 

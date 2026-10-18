@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.agentic.protocol import AgentMessage
-from app.core.timezones import SHANGHAI_TIMEZONE
+from app.agentic.runtime.timezones import SHANGHAI_TIMEZONE
 
 _MAX_HISTORY_CHARACTERS = 40_000
 _MAX_HISTORY_USER_CHARACTERS = 10_000

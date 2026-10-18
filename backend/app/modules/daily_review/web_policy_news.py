@@ -149,7 +149,7 @@ async def search_financial_policy_news(target_date: date) -> list[NewsSearchItem
 
 
 async def _search_financial_policy_news_uncached(target_date: date) -> list[NewsSearchItem]:
-    from app.agentic.tools.packs.web.search import execute_web_search
+    from app.agentic_integration.tools.packs.web.search import execute_web_search
 
     start = target_date.fromordinal(target_date.toordinal() - 2)
     end = target_date.fromordinal(target_date.toordinal() + 2)

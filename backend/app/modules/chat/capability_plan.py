@@ -4,9 +4,9 @@ import re
 from collections.abc import Collection
 from dataclasses import dataclass
 
-from app.agentic.agents.catalog import list_agent_profiles
-from app.agentic.bootstrap import register_all_capabilities
 from app.agentic.catalog import registry
+from app.agentic_integration.agents.catalog import list_agent_profiles
+from app.agentic_integration.bootstrap import register_all_capabilities
 from app.financial_data.stock.profile.name_map import contains_known_stock_name
 from app.modules.chat.routing import (
     build_keyword_matcher,
@@ -35,12 +35,13 @@ class ChatCapabilityPlan:
 
 def _detect_skill_names(message: str) -> set[str]:
     message_without_urls = _URL_PATTERN.sub(" ", message)
+    normalized_message = message_without_urls.lower()
     skills = {skill.name: skill for skill in registry.list_skills()}
     detected = {
         skill.name
         for skill in skills.values()
         if skill.name not in {"url_content", "twitter_account"}
-        and skill.matches(message_without_urls)
+        and skill.matches_normalized(normalized_message)
     }
     if extract_stock_codes(message_without_urls) or contains_known_stock_name(message_without_urls):
         detected.add("stock_analysis")
@@ -54,7 +55,7 @@ def _detect_skill_names(message: str) -> set[str]:
         detected.discard("stock_analysis")
 
     twitter_skill = skills.get("twitter_account")
-    if twitter_skill is not None and twitter_skill.matches(message_without_urls):
+    if twitter_skill is not None and twitter_skill.matches_normalized(normalized_message):
         detected.add("twitter_account")
     elif is_url_message(message):
         detected.add("url_content")

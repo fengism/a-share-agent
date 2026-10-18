@@ -4,6 +4,7 @@ import hashlib
 import json
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
+from functools import cached_property
 from typing import Any
 
 from app.agentic.events import AgentEvent
@@ -91,9 +92,14 @@ class AgentEvidence:
     content: str
     is_error: bool = False
 
-    @property
+    @cached_property
     def evidence_state(self) -> EvidenceState:
         return EvidenceState.from_content(self.content, is_error=self.is_error)
+
+    @cached_property
+    def evidence_id(self) -> str:
+        """Stable content identity, cached because evidence is immutable."""
+        return _agent_evidence_id(self)
 
 
 @dataclass(frozen=True)
@@ -204,7 +210,7 @@ def _content_fingerprint(content: str) -> str:
     return json.dumps(_strip_volatile(payload), ensure_ascii=False, sort_keys=True, default=str)
 
 
-def agent_evidence_id(evidence: AgentEvidence) -> str:
+def _agent_evidence_id(evidence: AgentEvidence) -> str:
     try:
         arguments = json.dumps(
             json.loads(evidence.arguments),
@@ -221,6 +227,11 @@ def agent_evidence_id(evidence: AgentEvidence) -> str:
         ).encode("utf-8")
     ).hexdigest()[:16]
     return f"ev_{digest}"
+
+
+def agent_evidence_id(evidence: AgentEvidence) -> str:
+    """Return the cached evidence identity without re-hashing large payloads."""
+    return evidence.evidence_id
 
 
 @dataclass(frozen=True)
