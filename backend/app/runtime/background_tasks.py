@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import cast
 
 from app.configuration import get_settings
+from app.configuration.schema import Settings
 from app.core.concurrency.rate_limiter import (
     call_blocking,
     database_semaphore,
@@ -185,6 +186,16 @@ async def refresh_tdxhub_best_ip() -> None:
     )
 
 
+def _file_retention_kwargs(settings: Settings) -> dict[str, int]:
+    """Keep the maintenance call aligned with purge_expired_file_data's required args."""
+    return {
+        "potential_retention_days": settings.potential_retention_days,
+        "valuation_snapshot_retention_days": settings.valuation_snapshot_retention_days,
+        "analysis_archive_retention_days": settings.analysis_archive_retention_days,
+        "industry_chain_retention_days": settings.industry_chain_retention_days,
+    }
+
+
 async def periodic_wal_checkpoint() -> None:
     from app.infrastructure.persistence.connection import checkpoint_wal, optimize_databases
     from app.runtime.maintenance import (
@@ -206,9 +217,8 @@ async def periodic_wal_checkpoint() -> None:
         auth_purged = await call_blocking(purge_expired_auth_data, semaphore=database_semaphore)
         file_purged = await call_blocking(
             purge_expired_file_data,
-            potential_retention_days=settings.potential_retention_days,
-            valuation_snapshot_retention_days=settings.valuation_snapshot_retention_days,
             semaphore=misc_semaphore,
+            **_file_retention_kwargs(settings),
         )
         from app.modules.market_daily.service import market_daily_bar_service
 

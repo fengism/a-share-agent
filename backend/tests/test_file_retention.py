@@ -80,3 +80,84 @@ def test_purge_expired_file_data_covers_snapshots_and_archives(tmp_path: Path, m
     assert (tmp_path / "industry_chains" / "new-theme").exists()
     assert not (tmp_path / "analyses" / "users" / "1" / "600519").exists()
     assert not (tmp_path / "industry_chains" / "old-theme").exists()
+
+
+def test_wal_checkpoint_retention_kwargs_match_purge_signature() -> None:
+    """后台维护调用必须覆盖 purge_expired_file_data 的全部必填参数。"""
+    from inspect import Parameter, signature
+    from types import SimpleNamespace
+
+    from app.runtime.background_tasks import _file_retention_kwargs
+    from app.runtime.maintenance import purge_expired_file_data
+
+    required = {
+        name
+        for name, parameter in signature(purge_expired_file_data).parameters.items()
+        if parameter.kind is Parameter.KEYWORD_ONLY
+        and parameter.default is Parameter.empty
+    }
+    settings = SimpleNamespace(
+        potential_retention_days=180,
+        valuation_snapshot_retention_days=30,
+        analysis_archive_retention_days=90,
+        industry_chain_retention_days=180,
+    )
+
+    kwargs = _file_retention_kwargs(settings)
+
+    assert set(kwargs) == required
+    assert kwargs["analysis_archive_retention_days"] == 90
+    assert kwargs["industry_chain_retention_days"] == 180
+
+
+async def test_wal_checkpoint_iteration_passes_all_retention_settings(monkeypatch) -> None:
+    """实际执行后台迭代，任何必填参数漏传都会在这里直接失败。"""
+    from types import SimpleNamespace
+
+    from app.modules.market_daily.service import market_daily_bar_service
+    from app.runtime import background_tasks
+
+    settings = SimpleNamespace(
+        bot_event_dedup_ttl_seconds=60,
+        bot_rate_limit_window=60,
+        twitter_post_retention_days=30,
+        workflow_job_retention_seconds=3600,
+        potential_retention_days=180,
+        valuation_snapshot_retention_days=30,
+        analysis_archive_retention_days=90,
+        industry_chain_retention_days=180,
+        market_daily_observation_retention_days=1095,
+        market_daily_attempt_retention_days=1095,
+    )
+    captured: dict[str, object] = {}
+
+    async def fake_call_blocking(func, *args, **kwargs):
+        captured[func.__name__] = kwargs
+        return {}
+
+    async def fake_maintain_storage(**kwargs):
+        captured["maintain_storage"] = kwargs
+        return {}
+
+    async def fake_run_periodic(*, name, coro_factory, interval_seconds, leader_election):
+        captured["coro_factory"] = coro_factory
+
+    monkeypatch.setattr(background_tasks, "get_settings", lambda: settings)
+    monkeypatch.setattr(background_tasks, "call_blocking", fake_call_blocking)
+    monkeypatch.setattr(background_tasks.task_scheduler, "run_periodic", fake_run_periodic)
+    monkeypatch.setattr(market_daily_bar_service, "maintain_storage", fake_maintain_storage)
+
+    await background_tasks.periodic_wal_checkpoint()
+    factory = captured["coro_factory"]
+    assert callable(factory)
+    await factory()
+
+    file_kwargs = captured["purge_expired_file_data"]
+    assert file_kwargs["potential_retention_days"] == 180
+    assert file_kwargs["valuation_snapshot_retention_days"] == 30
+    assert file_kwargs["analysis_archive_retention_days"] == 90
+    assert file_kwargs["industry_chain_retention_days"] == 180
+    assert captured["maintain_storage"] == {
+        "observation_retention_days": 1095,
+        "attempt_retention_days": 1095,
+    }
