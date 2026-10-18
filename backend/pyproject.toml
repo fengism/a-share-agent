@@ -138,6 +138,7 @@ files = [
     "app/agentic/runtime/timezones.py",
     "app/agentic/runtime/tool_budget.py",
     "app/agentic/skills/contracts.py",
+    "app/agentic_integration/skills/loader.py",
     "app/agentic_integration/skills/packs/industry.py",
     "app/agentic_integration/skills/packs/market.py",
     "app/agentic_integration/skills/packs/stock.py",

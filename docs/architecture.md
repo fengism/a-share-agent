@@ -91,9 +91,10 @@ performance 5/10/20 日前瞻复盘
 - **Core**：`agents/executor.py`、`orchestration/*`、`runtime/*`、工具/技能契约、
   `contracts.py` / `events.py` / `protocol.py` 等。只允许依赖标准库、`pydantic`、
   `app.agentic.*`、`app.domain.*`。
-- **Integration**：`app/agentic_integration`（`tools/packs/**`、`skills/packs/**`、
+- **Integration**：`app/agentic_integration`（`tools/packs/**`、`skills/definitions/**`、
   `agents/profiles/**`、`agents/service.py`、`adapters/**`、`bootstrap.py`、注册入口）。
-  可以依赖宿主业务、数据源、浏览器和配置。
+  可以依赖宿主业务、数据源、浏览器和配置。Skill 已支持 `SKILL.md` 文件化定义，
+  Python packs 在 Phase 1 保留为 parity/rollback 来源。
 - **Ports**：宿主在组合根注入 LLM 传输、默认 Settings、指标、请求上下文和工具实现：
   `app.agentic.runtime.llm.configure_llm_transport()`、
   `app.agentic.runtime.settings.configure_default_settings()`、
