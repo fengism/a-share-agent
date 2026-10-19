@@ -1,6 +1,7 @@
 """Core AgentExecutor loop: tool round, dedupe, reasoning budget, failure labels."""
 
 from dataclasses import replace
+from types import SimpleNamespace
 from typing import Any
 
 from app.agentic.agents.contracts import AgentProfile
@@ -235,3 +236,354 @@ async def test_executor_skips_tools_when_budget_exhausted(monkeypatch):
     assert result.status == "partial"
     assert any("额度" in warning for warning in result.warnings)
     assert "tools" not in completions.requests[0]
+
+
+async def test_executor_load_skill_is_not_data_evidence(monkeypatch):
+    definition = {
+        "type": "function",
+        "function": {
+            "name": "load_skill",
+            "description": "load a skill",
+            "parameters": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+                "additionalProperties": False,
+            },
+        },
+    }
+    tool_call = {
+        "choices": [{
+            "message": {
+                "content": "",
+                "tool_calls": [{
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "load_skill", "arguments": '{"name":"skill_a"}'},
+                }],
+            },
+            "finish_reason": "tool_calls",
+        }],
+    }
+    completions = _FakeCompletions([tool_call, _final_response("最终结论")])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+
+    async def fake_execute(call, allowed_names=None, execution_context=None, arguments=None):
+        return ToolResultInfo(
+            tool_call_id=call.id,
+            name=call.function.name,
+            content='{"ok":true,"data":{"kind":"skill_instructions","instructions":"rule-a"}}',
+        )
+
+    monkeypatch.setattr(
+        registry,
+        "get_tool_definitions_for",
+        lambda names: [definition] if "load_skill" in names else [],
+    )
+    monkeypatch.setattr(
+        registry,
+        "get_tool_policy",
+        lambda name: ToolPolicy(cache_ttl_seconds=0, evidence=False),
+    )
+    monkeypatch.setattr(registry, "get_tool", lambda name: None)
+    monkeypatch.setattr(registry, "execute_tool", fake_execute)
+    profile = AgentProfile(
+        name="test-agent",
+        display_name="测试 Agent",
+        description="executor test",
+        system_prompt="system",
+        tool_names=("load_skill",),
+        max_rounds=2,
+    )
+
+    result = await AgentExecutor().run(
+        profile,
+        "问题",
+        None,
+        _FakeClient(),
+        "fake-model",
+        execution_context=_context(),
+        require_tool_first_round=True,
+    )
+
+    assert result.status == "completed"
+    assert result.tool_results[0].instruction is True
+    assert result.tool_results[0].has_evidence is False
+    assert result.has_context_evidence is False
+
+
+async def test_executor_expands_tools_after_load_skill(monkeypatch):
+    load_definition = {
+        "type": "function",
+        "function": {
+            "name": "load_skill",
+            "description": "load a skill",
+            "parameters": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+                "additionalProperties": False,
+            },
+        },
+    }
+    data_definition = {
+        "type": "function",
+        "function": {
+            "name": "new_tool",
+            "description": "new data tool",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
+    }
+    definitions = {
+        "load_skill": load_definition,
+        "new_tool": data_definition,
+    }
+    parameters = {
+        "load_skill": load_definition["function"]["parameters"],
+        "new_tool": data_definition["function"]["parameters"],
+    }
+    responses = [
+        {"choices": [{"message": {"content": "", "tool_calls": [{
+            "id": "call_1", "type": "function",
+            "function": {"name": "load_skill", "arguments": '{"name":"skill_a"}'},
+        }]}, "finish_reason": "tool_calls"}]},
+        {"choices": [{"message": {"content": "", "tool_calls": [{
+            "id": "call_2", "type": "function",
+            "function": {"name": "new_tool", "arguments": "{}"},
+        }]}, "finish_reason": "tool_calls"}]},
+        _final_response("最终结论"),
+    ]
+    completions = _FakeCompletions(responses)
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+
+    async def fake_execute(call, allowed_names=None, execution_context=None, arguments=None):
+        if call.function.name == "load_skill":
+            content = '{"ok":true,"data":{"kind":"skill_instructions","tools":["new_tool"]}}'
+        else:
+            content = '{"ok":true,"data":{"value":1}}'
+        return ToolResultInfo(tool_call_id=call.id, name=call.function.name, content=content)
+
+    monkeypatch.setattr(
+        registry,
+        "get_tool_definitions_for",
+        lambda names: [definitions[name] for name in names if name in definitions],
+    )
+    monkeypatch.setattr(
+        registry,
+        "get_tool_policy",
+        lambda name: ToolPolicy(cache_ttl_seconds=0, evidence=name != "load_skill"),
+    )
+    monkeypatch.setattr(
+        registry,
+        "get_tool",
+        lambda name: SimpleNamespace(parameters=parameters[name]) if name in parameters else None,
+    )
+    monkeypatch.setattr(registry, "execute_tool", fake_execute)
+    from app.agentic.agents import executor as executor_module
+    from app.core.metrics import MetricsRegistry
+
+    fresh = MetricsRegistry()
+    monkeypatch.setattr(executor_module, "metrics", fresh)
+    profile = AgentProfile(
+        name="test-agent",
+        display_name="测试 Agent",
+        description="executor test",
+        system_prompt="system",
+        tool_names=("load_skill",),
+        max_rounds=3,
+    )
+    context = AgentExecutionContext(
+        settings=get_settings(),
+        allowed_skill_names=("skill_a",),
+        enabled_tool_names=("new_tool",),
+    )
+
+    result = await AgentExecutor().run(
+        profile,
+        "问题",
+        None,
+        _FakeClient(),
+        "fake-model",
+        execution_context=context,
+        require_tool_first_round=True,
+    )
+
+    assert result.status == "completed"
+    assert result.tools_called == ["load_skill", "new_tool"]
+    assert [item.instruction for item in result.tool_results] == [True, False]
+    assert result.tool_results[1].has_evidence is True
+    assert result.has_context_evidence is True
+    assert fresh.snapshot()["agentic"]["events"]["skill_tools_expanded"] == 1
+
+
+def test_expand_skill_tools_adds_enabled_tool(monkeypatch):
+    from app.agentic.agents import executor as executor_module
+    from app.core.metrics import MetricsRegistry
+
+    fresh = MetricsRegistry()
+    monkeypatch.setattr(executor_module, "metrics", fresh)
+    monkeypatch.setattr(
+        executor_module.registry,
+        "get_tool",
+        lambda name: SimpleNamespace(parameters={}),
+    )
+    monkeypatch.setattr(
+        executor_module.registry,
+        "get_tool_definitions_for",
+        lambda names: [{"type": "function", "function": {"name": name}} for name in names],
+    )
+    state = SimpleNamespace(effective_tool_names=[], tool_definitions=[])
+    context = AgentExecutionContext(
+        settings=get_settings(),
+        enabled_tool_names=("new_tool",),
+    )
+
+    AgentExecutor()._expand_skill_tools(
+        state,
+        context,
+        '{"ok":true,"data":{"kind":"skill_instructions","tools":["new_tool"]}}',
+    )
+
+    assert state.effective_tool_names == ["new_tool"]
+    assert state.tool_definitions == [{"type": "function", "function": {"name": "new_tool"}}]
+    assert fresh.snapshot()["agentic"]["events"]["skill_tools_expanded"] == 1
+
+
+def test_expand_skill_tools_rejects_unenabled_tool(monkeypatch):
+    from app.agentic.agents import executor as executor_module
+    from app.core.metrics import MetricsRegistry
+
+    fresh = MetricsRegistry()
+    monkeypatch.setattr(executor_module, "metrics", fresh)
+    monkeypatch.setattr(
+        executor_module.registry,
+        "get_tool",
+        lambda name: SimpleNamespace(parameters={}),
+    )
+    monkeypatch.setattr(
+        executor_module.registry,
+        "get_tool_definitions_for",
+        lambda names: [{"type": "function", "function": {"name": name}} for name in names],
+    )
+    state = SimpleNamespace(effective_tool_names=[], tool_definitions=[])
+    context = AgentExecutionContext(
+        settings=get_settings(),
+        enabled_tool_names=("other_tool",),
+    )
+
+    AgentExecutor()._expand_skill_tools(
+        state,
+        context,
+        '{"ok":true,"data":{"kind":"skill_instructions","tools":["new_tool"]}}',
+    )
+
+    assert state.effective_tool_names == []
+    events = fresh.snapshot()["agentic"]["events"]
+    assert events["skill_tool_rejected"] == 1
+    assert "skill_tools_expanded" not in events
+
+
+async def test_executor_loads_skill_and_uses_new_tool_in_same_turn(monkeypatch):
+    load_definition = {
+        "type": "function",
+        "function": {
+            "name": "load_skill",
+            "description": "load a skill",
+            "parameters": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+                "additionalProperties": False,
+            },
+        },
+    }
+    data_definition = {
+        "type": "function",
+        "function": {
+            "name": "new_tool",
+            "description": "new data tool",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
+    }
+    definitions = {"load_skill": load_definition, "new_tool": data_definition}
+    parameters = {
+        "load_skill": load_definition["function"]["parameters"],
+        "new_tool": data_definition["function"]["parameters"],
+    }
+    same_turn = {"choices": [{"message": {"content": "", "tool_calls": [
+        {
+            "id": "call_1", "type": "function",
+            "function": {"name": "load_skill", "arguments": '{"name":"skill_a"}'},
+        },
+        {
+            "id": "call_2", "type": "function",
+            "function": {"name": "new_tool", "arguments": "{}"},
+        },
+    ]}, "finish_reason": "tool_calls"}]}
+    completions = _FakeCompletions([same_turn, _final_response("最终结论")])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+
+    async def fake_execute(call, allowed_names=None, execution_context=None, arguments=None):
+        if call.function.name == "load_skill":
+            content = '{"ok":true,"data":{"kind":"skill_instructions","tools":["new_tool"]}}'
+        else:
+            content = '{"ok":true,"data":{"value":1}}'
+        return ToolResultInfo(tool_call_id=call.id, name=call.function.name, content=content)
+
+    monkeypatch.setattr(
+        registry,
+        "get_tool_definitions_for",
+        lambda names: [definitions[name] for name in names if name in definitions],
+    )
+    monkeypatch.setattr(
+        registry,
+        "get_tool_policy",
+        lambda name: ToolPolicy(
+            cache_ttl_seconds=0,
+            evidence=name != "load_skill",
+            budget="skill" if name == "load_skill" else "tool",
+        ),
+    )
+    monkeypatch.setattr(
+        registry,
+        "get_tool",
+        lambda name: SimpleNamespace(parameters=parameters[name]) if name in parameters else None,
+    )
+    monkeypatch.setattr(registry, "execute_tool", fake_execute)
+    profile = AgentProfile(
+        name="test-agent",
+        display_name="测试 Agent",
+        description="executor test",
+        system_prompt="system",
+        tool_names=("load_skill",),
+        max_rounds=2,
+    )
+    context = AgentExecutionContext(
+        settings=get_settings(),
+        allowed_skill_names=("skill_a",),
+        enabled_tool_names=("new_tool",),
+    )
+
+    result = await AgentExecutor().run(
+        profile,
+        "问题",
+        None,
+        _FakeClient(),
+        "fake-model",
+        execution_context=context,
+        require_tool_first_round=True,
+    )
+
+    assert result.status == "completed"
+    assert result.tools_called == ["load_skill", "new_tool"]
+    assert [item.instruction for item in result.tool_results] == [True, False]
+    assert result.tool_results[1].has_evidence is True
+    assert len(completions.requests) == 2

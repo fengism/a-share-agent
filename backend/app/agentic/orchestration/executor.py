@@ -7,12 +7,15 @@ from dataclasses import dataclass, replace
 
 from app.agentic.agents.contracts import AgentExecutionResult, AgentProfile
 from app.agentic.agents.executor import agent_executor
+from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent
 from app.agentic.orchestration.contracts import AgentTask, ExecutionPlan
 from app.agentic.orchestration.progress import build_task_progress_event
 from app.agentic.orchestration.reviewer import is_usable_task_result
 from app.agentic.protocol import AgentMessage
 from app.agentic.runtime.context import AgentExecutionContext
+from app.agentic.runtime.metrics import metrics
+from app.agentic.runtime.settings import get_default_settings
 from app.agentic.tools.cache import SharedToolCache
 from app.domain.agent_llm import AsyncLLMClient
 from app.domain.errors import UpstreamUnavailableError, log_internal_error
@@ -52,6 +55,32 @@ def _render_dependency_context(
             text = (text[:keep] + _DEPENDENCY_TRUNCATION_MARKER)[:allowance]
         parts.append(header + text)
     return "\n\n".join(parts)
+
+
+def _build_professional_skill_prompt(
+    profile: AgentProfile,
+    execution_context: AgentExecutionContext | None,
+) -> str:
+    """Inject the Skill rules declared by a professional agent's profile.
+
+    Professional sub-agents already receive the tools from their ``skill_names``;
+    adding the same rules keeps their tool policy consistent with the general
+    agent without going through the dynamic ``load_skill`` path.
+    """
+    skill_names = tuple(getattr(profile, "skill_names", ()) or ())
+    if not skill_names:
+        return ""
+    settings = (
+        execution_context.settings
+        if execution_context is not None
+        else get_default_settings()
+    )
+    if not getattr(settings, "chat_agent_skill_instructions_enabled", True):
+        return ""
+    prompt = registry.get_skill_instructions(skill_names, limit=len(skill_names))
+    if prompt:
+        metrics.record_agentic_event("agent_skill_instructions_injected")
+    return prompt
 
 
 def _build_task_message(
@@ -145,6 +174,9 @@ async def stream_execution_plan(
                 tool_cache=tool_cache,
                 allowed_tool_names=task.allowed_tools,
                 temperature=temperature,
+                tool_selection_prompt=_build_professional_skill_prompt(
+                    profile, execution_context
+                ),
                 require_tool_evidence=bool(task.allowed_tools),
                 execution_context=execution_context,
             )

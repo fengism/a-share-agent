@@ -4,6 +4,7 @@ import asyncio
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Literal
 
 from app.agentic.runtime.research_policy import ResearchSearchPolicy
 from app.agentic.runtime.settings import AgentSettings
@@ -35,6 +36,7 @@ class ToolCallReservation:
     search: bool
     reserved: bool
     search_epoch: int = 0
+    budget_kind: Literal["tool", "skill"] = "tool"
 
 
 @dataclass(slots=True)
@@ -46,9 +48,15 @@ class AgentExecutionContext:
     tool_cache: SharedToolCache = field(default_factory=SharedToolCache)
     reserved_tool_names: tuple[str, ...] = ()
     reserved_tool_calls: int = 0
+    # None means standalone/unrestricted; an empty tuple means no Skill is enabled.
+    allowed_skill_names: tuple[str, ...] | None = None
+    # Tools a loaded Skill may add dynamically; None means unrestricted.
+    enabled_tool_names: tuple[str, ...] | None = None
+    active_skill_names: tuple[str, ...] = ()
     search_policy: ResearchSearchPolicy | None = None
     _reserved_calls_used: int = field(default=0, init=False, repr=False)
     _tool_calls_used: int = field(default=0, init=False, repr=False)
+    _skill_loads_used: int = field(default=0, init=False, repr=False)
     _reservation_sequence: int = field(default=0, init=False, repr=False)
     _active_tool_reservations: dict[int, ToolCallReservation] = field(default_factory=dict, init=False, repr=False)
     _tool_budget_lock: asyncio.Lock = field(
@@ -121,6 +129,37 @@ class AgentExecutionContext:
         self._active_tool_reservations[token.reservation_id] = token
         return token
 
+    def _reserve_skill_load(self, tool_name: str | None) -> ToolCallReservation | None:
+        if self.skill_loads_remaining <= 0:
+            return None
+        self._skill_loads_used += 1
+        self._reservation_sequence += 1
+        token = ToolCallReservation(
+            self._reservation_sequence,
+            tool_name,
+            False,
+            False,
+            0,
+            "skill",
+        )
+        self._active_tool_reservations[token.reservation_id] = token
+        return token
+
+    async def reserve_skill_load_with_diagnostics(
+        self, tool_name: str | None = None,
+    ) -> tuple[ToolCallReservation | None, dict[str, str | int] | None]:
+        """Reserve from the separate Skill-load budget, not the data-tool budget."""
+        async with self._tool_budget_lock:
+            if self.deadline_exceeded():
+                return None, {"reason": "deadline"}
+            if self.skill_loads_remaining <= 0:
+                return None, {
+                    "reason": "skill_total",
+                    "used": self._skill_loads_used,
+                    "limit": self.skill_loads_limit,
+                }
+            return self._reserve_skill_load(tool_name), None
+
     def _budget_rejection(self, *, preserve: int, tool_name: str | None) -> dict[str, str | int] | None:
         if self.deadline_exceeded():
             return {"reason": "deadline"}
@@ -168,6 +207,10 @@ class AgentExecutionContext:
         if self._active_tool_reservations.get(token.reservation_id) is not token:
             return False
         self._active_tool_reservations.pop(token.reservation_id)
+        if token.budget_kind == "skill":
+            if refund:
+                self._skill_loads_used = max(0, self._skill_loads_used - 1)
+            return True
         if refund:
             self._tool_calls_used -= 1
             if token.search and self.search_policy is not None:
@@ -197,6 +240,18 @@ class AgentExecutionContext:
                 :count
             ]
             return sum(self._settle_reservation(token, refund=True) for token in tokens)
+
+    @property
+    def skill_loads_limit(self) -> int:
+        return max(0, int(getattr(self.settings, "chat_max_skill_loads_total", 3)))
+
+    @property
+    def skill_loads_used(self) -> int:
+        return self._skill_loads_used
+
+    @property
+    def skill_loads_remaining(self) -> int:
+        return max(0, self.skill_loads_limit - self._skill_loads_used)
 
     @property
     def tool_calls_used(self) -> int:

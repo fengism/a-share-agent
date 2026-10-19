@@ -24,6 +24,13 @@ from app.financial_data.stock.profile.name_sources import (
     LEGACY_STOCK_NAMES_SOURCE_ID,
     SSE_STOCK_NAMES_SOURCE_ID,
 )
+from app.financial_data.stock.profile.short_names import (
+    build_pinyin_index,
+    build_short_name_index,
+    extract_pinyin_tokens,
+    has_stock_context,
+    normalize_name,
+)
 from app.financial_data.stock.profile.sources import (
     BAIDU_STOCK_NAMES,
     CNINFO_STOCK_NAMES,
@@ -96,28 +103,82 @@ class StockNameSourceAttempt:
 
 
 def _build_stock_name_detection_index(snapshot: StockNameMapSnapshot) -> tuple[str, ...]:
-    names = {
-        str(name).replace(" ", "").strip()
-        for name in snapshot.mapping.values()
-        if len(str(name).replace(" ", "").strip()) >= 3
-    }
+    names: set[str] = set()
+    for raw in snapshot.mapping.values():
+        name = normalize_name(raw)
+        if len(name) < 2:
+            continue
+        names.add(name)
+        if len(name) > 2 and name.endswith(("A", "B")):
+            names.add(name[:-1])
     return tuple(sorted(names, key=lambda name: (-len(name), name)))
 
 
-def contains_known_stock_name(message: str) -> bool:
-    """Return whether text contains a known full A-share stock name."""
-    global _stock_name_detection_index
-    normalized = message.replace(" ", "").strip()
-    if len(normalized) < 3:
+def _ensure_stock_name_index() -> None:
+    global _stock_name_detection_index, _stock_reference_names, _stock_short_name_index, _stock_pinyin_index
+    if _stock_name_detection_index is not None:
+        return
+    snapshot = _coerce_cached_snapshot(_STOCK_NAME_MAP_SERVICE.get_cached())
+    if snapshot is None:
+        snapshot = _load_local_stock_name_map()
+    if snapshot is None:
+        _stock_name_detection_index = ()
+        _stock_reference_names = ()
+        return
+    _stock_reference_names = tuple(str(name) for name in snapshot.mapping.values())
+    _stock_name_detection_index = _build_stock_name_detection_index(snapshot)
+
+
+def _ensure_short_name_index() -> frozenset[str]:
+    global _stock_short_name_index
+    if _stock_short_name_index is None:
+        _ensure_stock_name_index()
+        _stock_short_name_index = build_short_name_index(_stock_reference_names or ())
+    return _stock_short_name_index
+
+
+def _ensure_pinyin_index() -> frozenset[str]:
+    global _stock_pinyin_index
+    if _stock_pinyin_index is None:
+        _ensure_stock_name_index()
+        _stock_pinyin_index = build_pinyin_index(_stock_reference_names or ())
+    return _stock_pinyin_index
+
+
+def _contains_pinyin_reference(message: str) -> bool:
+    tokens = extract_pinyin_tokens(message)
+    if not tokens:
         return False
-    if _stock_name_detection_index is None:
-        snapshot = _coerce_cached_snapshot(_STOCK_NAME_MAP_SERVICE.get_cached())
-        if snapshot is None:
-            snapshot = _load_local_stock_name_map()
-        if snapshot is None:
-            return False
-        _stock_name_detection_index = _build_stock_name_detection_index(snapshot)
-    return any(name in normalized for name in _stock_name_detection_index)
+    index = _ensure_pinyin_index()
+    return any(token in index for token in tokens)
+
+
+def contains_known_stock_name(message: str) -> bool:
+    """是否包含完整股票名、A/B 归一形式或拼音首字母。"""
+    _ensure_stock_name_index()
+    normalized = normalize_name(message)
+    if len(normalized) >= 2 and _stock_name_detection_index:
+        if any(name in normalized for name in _stock_name_detection_index):
+            return True
+    return _contains_pinyin_reference(message)
+
+
+def contains_short_stock_name(message: str) -> bool:
+    """是否包含自动派生的股票简称（不含语境门控）。"""
+    normalized = normalize_name(message)
+    if len(normalized) < 2:
+        return False
+    index = _ensure_short_name_index()
+    return any(alias in normalized for alias in index)
+
+
+def mentions_stock_target(message: str) -> bool:
+    """是否应当视为股票标的：高置信引用，或“简称 + 股票语境词”。"""
+    if contains_known_stock_name(message):
+        return True
+    if not has_stock_context(message):
+        return False
+    return contains_short_stock_name(message)
 
 
 def _normalize_source_id(source_id: object) -> str:
@@ -133,6 +194,9 @@ _STOCK_NAME_MAP_SERVICE = BaseFileSnapshotService[StockNameMapSnapshot](
 _STOCK_NAME_FILE_MAX_AGE_SECONDS = 24 * 60 * 60
 _stock_name_map_singleflight: AsyncSingleFlight[StockNameMapSnapshot] = AsyncSingleFlight()
 _stock_name_detection_index: tuple[str, ...] | None = None
+_stock_reference_names: tuple[str, ...] | None = None
+_stock_short_name_index: frozenset[str] | None = None
+_stock_pinyin_index: frozenset[str] | None = None
 
 
 def _get_cninfo_provider():
@@ -248,10 +312,16 @@ def _save_stock_name_file(snapshot: StockNameMapSnapshot) -> None:
 
 
 def _load_local_stock_name_map() -> StockNameMapSnapshot | None:
-    """Load and merge the standalone name file and local market snapshot."""
+    """Load the standalone name file, falling back to the local market snapshot.
+
+    A complete name file is authoritative and avoids reading the full market
+    snapshot on every cold start; the snapshot is only a fallback (and may be
+    stale/rejected as realtime data).
+    """
     file_snapshot = _load_stock_name_file()
-    spot_snapshot = _load_stock_name_map_from_spot_snapshot()
-    return StockNameMapSnapshot.merge(file_snapshot, spot_snapshot)
+    if file_snapshot is not None:
+        return file_snapshot
+    return _load_stock_name_map_from_spot_snapshot()
 
 
 def _mapping_from_stocks(stocks: list[dict], source: str) -> dict[str, str]:
@@ -378,9 +448,12 @@ async def _fetch_stock_name_map_remote() -> StockNameMapSnapshot | None:
 
 
 async def _cache_and_persist_stock_name_map(snapshot: StockNameMapSnapshot) -> StockNameMapSnapshot:
-    global _stock_name_detection_index
+    global _stock_name_detection_index, _stock_reference_names, _stock_short_name_index, _stock_pinyin_index
     _STOCK_NAME_MAP_SERVICE.set_cached(snapshot)
+    _stock_reference_names = tuple(str(name) for name in snapshot.mapping.values())
     _stock_name_detection_index = _build_stock_name_detection_index(snapshot)
+    _stock_short_name_index = None
+    _stock_pinyin_index = None
     await call_blocking(
         _save_stock_name_file,
         snapshot,

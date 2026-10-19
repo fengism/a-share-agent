@@ -15,6 +15,7 @@ class AgentSettings(Protocol):
     chat_max_tool_calls_per_round: int
     chat_max_tool_calls_total: int
     chat_max_tool_context_characters: int
+    chat_max_skill_loads_total: int
     chat_tool_timeout_seconds: float
     llm_context_length_tokens: int
     llm_generation_timeout_seconds: float

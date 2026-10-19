@@ -46,6 +46,18 @@ class ResearchGroup(ConfigGroup):
     chat_max_tool_calls_total: int = Field(default=32, ge=1, le=128)
     chat_max_tool_context_characters: int = Field(default=60_000, ge=4_096, le=500_000)
     chat_max_synthesis_characters: int = Field(default=60_000, ge=4_096, le=500_000)
+    # 通用 Agent 的 Skill 渐进披露：-1=完整 rules（回滚），0=仅目录+load_skill，N=目录+前 N 个详细规则。
+    chat_skill_instruction_top_n: int = Field(default=0, ge=-1, le=10)
+    # 允许 load_skill 激活未命中关键词的 Skill，并动态加入其工具。
+    chat_skill_dynamic_activation_enabled: bool = True
+    # load_skill 使用独立预算，不占用数据工具额度。
+    chat_max_skill_loads_total: int = Field(default=3, ge=0, le=20)
+    # 初始工具集只加载得分最高的 N 个 active Skill；-1=全部，0=只给 load_skill。
+    chat_max_initial_active_skills: int = Field(default=3, ge=-1, le=10)
+    # 专业 Agent 是否注入其 profile.skill_names 对应的 Skill 规则。
+    chat_agent_skill_instructions_enabled: bool = True
+    # 初始工具集是否只暴露 Skill 的 core_tools；false 回退为全部 tools。
+    chat_skill_core_tools_enabled: bool = True
 
     provider_gateway_max_attempts: int = 2
     provider_failure_threshold: int = 3

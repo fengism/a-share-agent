@@ -16,6 +16,9 @@ tools:
 - web_fetch
 - fetch_urls
 - read_pdf
+core_tools:
+- web_fetch
+- fetch_urls
 priority: 10
 exclusions:
 - 不要自动联动股票工具，除非用户明确要求结合行情分析

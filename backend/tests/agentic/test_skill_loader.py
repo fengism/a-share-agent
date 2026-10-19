@@ -1,4 +1,4 @@
-"""SKILL.md loader: schema validation and Phase 1 parity with Python packs."""
+"""SKILL.md loader: schema validation and built-in definition coverage."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from app.agentic_integration.skills.catalog import list_python_skills
 from app.agentic_integration.skills.loader import SkillDefinitionError, load_builtin_skills
 
 
@@ -159,15 +158,58 @@ def test_extra_heading_fails(tmp_path: Path):
 def test_default_definitions_load():
     skills = load_builtin_skills()
 
-    assert len(skills) == 10
+    expected = {
+        "financial_calculations",
+        "industry_research",
+        "information_query",
+        "market_data",
+        "python_code_interpreter",
+        "quant_strategy_authoring",
+        "stock_analysis",
+        "stock_screening",
+        "twitter_account",
+        "url_content",
+    }
+    assert {skill.name for skill in skills} == expected
     assert len({skill.name for skill in skills}) == len(skills)
     assert skills == sorted(skills, key=lambda skill: (skill.priority, skill.name))
+    for skill in skills:
+        assert skill.tool_names
+        assert skill.rules
+        assert skill.render_catalog(1)
+        assert skill.render_instructions(1)
 
 
-def test_markdown_definitions_match_python_packs():
-    python_skills = list_python_skills()
-    markdown_skills = load_builtin_skills()
+def test_core_tools_default_to_all_tools(tmp_path: Path):
+    _write_skill(tmp_path, "no_core", tools=["tool_a", "tool_b"])
 
-    assert markdown_skills == python_skills
-    for markdown, python in zip(markdown_skills, python_skills):
-        assert markdown.render_prompt(1) == python.render_prompt(1)
+    skill = load_builtin_skills(tmp_path)[0]
+
+    assert skill.core_tool_names == ()
+    assert skill.initial_tool_names == ("tool_a", "tool_b")
+
+
+def test_loads_core_tools(tmp_path: Path):
+    _write_skill(
+        tmp_path,
+        "with_core",
+        tools=["tool_a", "tool_b"],
+        core_tools=["tool_a"],
+    )
+
+    skill = load_builtin_skills(tmp_path)[0]
+
+    assert skill.core_tool_names == ("tool_a",)
+    assert skill.initial_tool_names == ("tool_a",)
+
+
+def test_rejects_core_tool_outside_tools(tmp_path: Path):
+    _write_skill(
+        tmp_path,
+        "bad_core",
+        tools=["tool_a"],
+        core_tools=["tool_b"],
+    )
+
+    with pytest.raises(SkillDefinitionError):
+        load_builtin_skills(tmp_path)

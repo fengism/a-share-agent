@@ -7,13 +7,13 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 
 from app.agentic.runtime.llm import create_chat_completion
-from app.financial_data.stock.profile.name_map import contains_known_stock_name
 from app.infrastructure.llm.prompting.parsing import extract_json_object
 from app.infrastructure.llm.tool_calling import AsyncLLMClient
 from app.modules.chat.prompts import (
     ORCHESTRATOR_CLASSIFY_PROMPT,
     ORCHESTRATOR_CLASSIFY_PROMPT_REF,
 )
+from app.modules.chat.stock_reference import mentions_stock_target
 
 DEFAULT_AGENT_NAMES = ("technical", "fundamental", "news", "risk", "macro")
 
@@ -131,8 +131,8 @@ def classify_message(
     matched_agents = [agent_name for agent_name in matched_domains if agent_name in available]
     agent_names = [name for name in DEFAULT_AGENT_NAMES if name in available]
     has_stock_code = bool(extract_stock_codes(message))
-    has_stock_name = contains_known_stock_name(message)
-    is_stock_target = has_stock_code or has_stock_name
+    has_stock_reference = mentions_stock_target(message)
+    is_stock_target = has_stock_code or has_stock_reference
 
     if not matched_domains and not is_stock_target:
         if any(keyword in message for keyword in _FULL_ANALYSIS_KEYWORDS):

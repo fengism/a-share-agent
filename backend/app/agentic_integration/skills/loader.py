@@ -23,6 +23,7 @@ _ALLOWED_KEYS = frozenset({
     "triggers",
     "activation_keywords",
     "tools",
+    "core_tools",
     "priority",
     "exclusions",
     "examples",
@@ -163,6 +164,7 @@ def _load_skill(path: Path) -> Skill:
                 data, "activation_keywords", path=path, required=True
             ),
             tool_names=_string_list(data, "tools", path=path, required=True),
+            core_tool_names=_string_list(data, "core_tools", path=path, required=False),
             rules=_extract_rules(match.group("body"), path),
             priority=_priority(data, path),
             exclusions=_string_list(data, "exclusions", path=path, required=False),

@@ -13,6 +13,9 @@ tools:
 - iwencai_select_stock
 - screen_stocks
 - get_industries
+core_tools:
+- iwencai_select_stock
+- screen_stocks
 priority: 40
 exclusions:
 - 不要用 iwencai_query 代替选股

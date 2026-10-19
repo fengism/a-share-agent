@@ -124,25 +124,67 @@ class CapabilityCatalog:
             for skill in self._skills
             for tool_name in skill.tool_names
         }
-        missing_tools = sorted(set(self._tools) - covered_tools)
+        data_tools = {
+            name
+            for name, tool in self._tools.items()
+            if tool.policy.evidence
+        }
+        missing_tools = sorted(data_tools - covered_tools)
         if missing_tools:
-            logger.warning("以下工具尚未归属任何 Skill：%s", missing_tools)
+            logger.warning("以下数据工具尚未归属任何 Skill：%s", missing_tools)
         return missing_tools
 
-    def get_skill_prompt(self, skill_names: Collection[str] | None = None) -> str:
+    def _selected_skills(self, skill_names: Collection[str] | None = None) -> list[Skill]:
         selected = None if skill_names is None else set(skill_names)
-        skills = [
+        return [
             skill
             for skill in self.list_skills()
             if selected is None or skill.name in selected
         ]
+
+    def get_skill_prompt(self, skill_names: Collection[str] | None = None) -> str:
+        """Full prompt for backward compatibility; prefer catalog + instructions."""
+        skills = self._selected_skills(skill_names)
+        if not skills:
+            return ""
+        return "\n\n".join(
+            skill.render_prompt(index)
+            for index, skill in enumerate(skills, start=1)
+        )
+
+    def get_skill_catalog_prompt(
+        self,
+        skill_names: Collection[str] | None = None,
+        *,
+        active_skill_names: Collection[str] | None = None,
+    ) -> str:
+        """Compact catalog: descriptions and triggers, no rules/examples."""
+        skills = self._selected_skills(skill_names)
+        if not skills:
+            return ""
+        active = set(active_skill_names or ())
+        return "\n\n".join(
+            skill.render_catalog(index, recommended=skill.name in active)
+            for index, skill in enumerate(skills, start=1)
+        )
+
+    def get_skill_instructions(
+        self,
+        skill_names: Collection[str] | None = None,
+        *,
+        limit: int | None = 1,
+    ) -> str:
+        """Detailed instructions for the top-N skills (priority order)."""
+        skills = self._selected_skills(skill_names)
+        if limit is not None:
+            skills = skills[:max(0, int(limit))]
         if not skills:
             return ""
         parts = [
-            skill.render_prompt(index)
+            f"### {skill.description}\n{skill.render_instructions(index)}"
             for index, skill in enumerate(skills, start=1)
         ]
-        return "\n\n".join(parts)
+        return "## Skill 详细规则\n\n" + "\n\n".join(parts)
 
     def get_tool_names_for_skills(
         self,
@@ -155,6 +197,24 @@ class CapabilityCatalog:
             if selected is not None and skill.name not in selected:
                 continue
             for tool_name in skill.tool_names:
+                if tool_name in seen:
+                    continue
+                seen.add(tool_name)
+                names.append(tool_name)
+        return names
+
+    def get_initial_tool_names_for_skills(
+        self,
+        skill_names: Collection[str] | None = None,
+    ) -> list[str]:
+        """First-turn tools: ``core_tools`` when declared, else every tool."""
+        selected = None if skill_names is None else set(skill_names)
+        names: list[str] = []
+        seen: set[str] = set()
+        for skill in self.list_skills():
+            if selected is not None and skill.name not in selected:
+                continue
+            for tool_name in skill.initial_tool_names:
                 if tool_name in seen:
                     continue
                 seen.add(tool_name)

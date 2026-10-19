@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -26,6 +27,15 @@ _MAX_QUEUE_WAIT_SECONDS = 5.0
 if TYPE_CHECKING:
     from app.agentic.runtime.context import AgentExecutionContext
 
+_current_tool_context: ContextVar["AgentExecutionContext | None"] = ContextVar(
+    "agentic_tool_context", default=None
+)
+
+
+def get_current_tool_context() -> "AgentExecutionContext | None":
+    """Return the execution context for the currently running tool call."""
+    return _current_tool_context.get()
+
 
 @dataclass(frozen=True)
 class ToolPolicy:
@@ -40,6 +50,10 @@ class ToolPolicy:
     max_result_characters: int = 12_000
     # Independent of TTL: pure tools may coalesce within a batch even with TTL=0.
     deduplicate_in_batch: bool = True
+    # Instruction tools (e.g. load_skill) must not satisfy data-evidence gates.
+    evidence: bool = True
+    # "skill" uses a separate per-run budget instead of the data-tool budget.
+    budget: Literal["tool", "skill"] = "tool"
 
     def __post_init__(self) -> None:
         if self.cache_ttl_seconds < 0:
@@ -117,6 +131,7 @@ class Tool:
                 content=serialize_error("tool_unavailable", f"工具 '{self.name}' 暂不可用"),
                 is_error=True,
             )
+        executor = self.executor
         # 整体 deadline 已耗尽时直接短路。不短路的话 bounded_timeout 会返回 ~1ms，
         # 每次调用都立刻失败，而 LLM 看到的是「可重试的工具错误」会继续调用，
         # 白白烧掉每轮/总工具配额和一次 LLM 往返。
@@ -137,9 +152,17 @@ class Tool:
             timeout_seconds = max(1.0, float(requested_timeout))
             if execution_context is not None:
                 timeout_seconds = execution_context.bounded_timeout(timeout_seconds)
+
+            async def invoke():
+                token = _current_tool_context.set(execution_context)
+                try:
+                    return await executor(**arguments)
+                finally:
+                    _current_tool_context.reset(token)
+
             if self._semaphore is None:
                 async with asyncio.timeout(timeout_seconds):
-                    result = await self.executor(**arguments)
+                    result = await invoke()
             else:
                 # 排队时间不计入工具超时。max_parallel_calls 是进程级共享的（工具注册
                 # 在 lifespan 里做一次），一个慢请求就能让后来者把整份预算耗在等待上：
@@ -170,7 +193,7 @@ class Tool:
                     )
                 try:
                     async with asyncio.timeout(timeout_seconds):
-                        result = await self.executor(**arguments)
+                        result = await invoke()
                 finally:
                     self._semaphore.release()
             return ToolResultInfo(

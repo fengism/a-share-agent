@@ -29,10 +29,6 @@ activation_keywords:
 - kdj
 - 技术面
 - 基本面
-- 新闻
-- 公告
-- 舆情
-- 情绪
 - 风险
 - 止损
 - 仓位
@@ -65,6 +61,18 @@ tools:
 - get_hk_stock_kline
 - get_hk_stock_technical_indicators
 - get_hk_stock_industry_comparison
+core_tools:
+- search_stocks
+- get_stock_info
+- get_stock_kline
+- get_stock_news
+- get_stock_financial
+- get_stock_valuation_detail
+- get_stock_technical_indicators
+- get_stock_risk_data
+- get_hk_stock_profile
+- get_hk_stock_kline
+- get_hk_stock_technical_indicators
 priority: 30
 exclusions:
 - 调用组合工具后不要重复调用其组成工具

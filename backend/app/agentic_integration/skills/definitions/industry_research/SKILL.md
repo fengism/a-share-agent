@@ -26,6 +26,9 @@ tools:
 - iwencai_search
 - get_commodity_spot_prices
 - get_customs_trade_data
+core_tools:
+- sector_analysis
+- get_hot_rank
 priority: 50
 exclusions:
 - 单一问题不要同时调用综合分析和其组成工具

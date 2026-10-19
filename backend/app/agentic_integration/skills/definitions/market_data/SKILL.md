@@ -57,6 +57,11 @@ tools:
 - get_commodity_spot_prices
 - get_customs_trade_data
 - get_hk_market_overview
+core_tools:
+- get_market_overview
+- get_daily_review
+- get_macro_data
+- get_hk_market_overview
 priority: 60
 exclusions:
 - 同一宏观问题不要同时调用两个宏观工具

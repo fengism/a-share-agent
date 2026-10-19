@@ -45,6 +45,7 @@ class ToolExecutionSummary:
     # Reviewer 的 any(not is_error) / all(is_error) 两个判定都看不到它，一次零有效
     # 证据的任务会被当成 usable 注入下游。
     skipped: bool = False
+    instruction: bool = False  # Control/instruction result, not data evidence.
     failure_code: str = ""  # Allowlisted category only; no raw provider details.
 
     @property

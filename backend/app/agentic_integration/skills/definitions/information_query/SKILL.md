@@ -9,6 +9,9 @@ activation_keywords:
 - 搜索
 - 查找
 - 检索
+- 新闻
+- 资讯
+- 公告
 - 网页
 - 白皮书
 - 公开来源
@@ -21,6 +24,10 @@ tools:
 - read_pdf
 - iwencai_search
 - iwencai_query
+core_tools:
+- web_search
+- web_fetch
+- iwencai_search
 priority: 70
 exclusions:
 - 选股问题使用 iwencai_select_stock 或 screen_stocks

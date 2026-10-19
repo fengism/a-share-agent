@@ -129,12 +129,18 @@ class Orchestrator:
         message: str,
         history: list[AgentMessage] | None,
         tool_names: Collection[str],
+        *,
+        skill_names: Collection[str] | None = None,
+        enabled_skill_names: Collection[str] | None = None,
+        enabled_tool_names: Collection[str] | None = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         async with aclosing(stream_general_agent(
             message,
             history,
             tool_names=tool_names,
-            skill_names=self.skill_names,
+            skill_names=skill_names if skill_names is not None else self.skill_names,
+            enabled_skill_names=enabled_skill_names,
+            enabled_tool_names=enabled_tool_names,
             require_tool_evidence=self.require_tool_evidence and bool(tool_names),
             execution_context=self.execution_context,
         )) as stream:
@@ -191,6 +197,9 @@ class Orchestrator:
                 message,
                 history,
                 self.allowed_tool_names,
+                skill_names=(),
+                enabled_skill_names=self.skill_names,
+                enabled_tool_names=self.allowed_tool_names,
             )) as stream:
                 async for delta in stream:
                     yield delta
@@ -278,7 +287,9 @@ class Orchestrator:
         """多 Agent 编排主流程：路由 → 并发执行子 Agent → 综合分析。"""
         early_tool_names = self._early_general_tool_names(message)
         if early_tool_names is not None:
-            async with aclosing(self._stream_general_response(message, history, early_tool_names)) as stream:
+            async with aclosing(self._stream_general_response(
+                message, history, early_tool_names, skill_names=()
+            )) as stream:
                 async for delta in stream:
                     yield delta
             return
@@ -291,6 +302,9 @@ class Orchestrator:
                 message,
                 history,
                 self.allowed_tool_names,
+                skill_names=(),
+                enabled_skill_names=self.skill_names,
+                enabled_tool_names=self.allowed_tool_names,
             )) as stream:
                 async for delta in stream:
                     yield delta

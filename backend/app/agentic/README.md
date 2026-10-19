@@ -22,7 +22,7 @@ LLM 传输、配置、指标、工具实现和业务 Agent/Tool Pack。
 
 ## Integration（宿主相关，`app/agentic_integration`）
 
-- `tools/packs/**`、`skills/packs/**`
+- `tools/packs/**`、`skills/definitions/**`
 - `agents/profiles/**`、`agents/prompts.py`、`agents/catalog.py`、`agents/service.py`
 - `tools/registration.py`、`skills/catalog.py`、`bootstrap.py`
 - `adapters/**`
@@ -34,7 +34,7 @@ LLM 传输、配置、指标、工具实现和业务 Agent/Tool Pack。
 ## 文件化 Skill（Phase 1）
 
 内置 Skill 现在由 `app/agentic_integration/skills/definitions/<name>/SKILL.md`
-加载，运行时仍构造同一个 `Skill` dataclass，行为与 Python packs 保持一致。
+加载，运行时仍构造同一个 `Skill` dataclass。
 
 ```text
 app/agentic_integration/skills/
@@ -78,8 +78,42 @@ examples:
 - 正文必须且只能有一个 `## Rules`，每条规则用 `- ` 列表项
 - 目录名必须与 `name` 一致
 - 非法定义在启动期直接失败，并带文件路径
-- Phase 1 保留 Python packs 作为 parity/rollback；`list_python_skills()` 与
-  `load_builtin_skills()` 的字段必须完全一致
+- `SKILL.md` 是唯一事实来源；Phase 1 的 Python packs 已移除
+
+### 按需加载（Phase 2b）
+
+- 通用 Agent 默认只注入 Skill 目录（description + triggers）
+- 需要详细规则时调用 `load_skill(name)` 工具
+- `load_skill` 的 `ToolPolicy.evidence=False`，返回的是指令，不计入数据证据
+- `chat_skill_instruction_top_n` 控制自动注入：
+  - `-1`：完整 rules（旧行为，回滚用）
+  - `0`：仅目录 + `load_skill`（默认）
+  - `N`：目录 + 前 N 个 Skill 的详细规则
+
+### 动态激活（P2）
+
+- 默认允许 `load_skill` 加载当前请求所有 enabled Skill，而不仅是关键词命中的 Skill
+- 加载成功后，该 Skill 的工具从**下一轮**起加入 `state.tool_definitions`
+- 同一轮中如果同时调用 `load_skill` 和数据工具，会先执行 `load_skill` 并扩展工具，
+  再执行剩余数据工具；最终结果仍按原始调用顺序返回
+- 动态加入的工具必须存在于 registry，且属于 `enabled_tool_names`
+- 初始工具集仍只包含 active Skill 的工具 + `load_skill`
+- `chat_skill_dynamic_activation_enabled=false` 可回退到 Phase 2b 的 active-only 行为
+- `load_skill` 返回 `tools_available_next_turn=true`，并提示指令不是数据证据
+- 目录对关键词命中的 active Skill 标记 `[推荐]`
+- `load_skill` 使用独立预算 `chat_max_skill_loads_total`（默认 3），不占数据工具额度
+- `chat_max_initial_active_skills` 控制初始工具集（默认 3）：
+  - `-1`：所有 active Skill 的工具
+  - `0`：不预加载数据工具，只给 `load_skill`
+  - `N`：前 N 个 active Skill 的工具
+- active Skill 按 `match_score` 排序；股票代码/名称、URL、Twitter 会获得高优先级
+- `enabled_tool_names` 仍覆盖全部 enabled Skill，供 `load_skill` 动态扩展
+- `SKILL.md` 的 `core_tools` 声明首轮工具；未声明的工具在 `load_skill` 后从下一轮起可用
+  （`chat_skill_core_tools_enabled=false` 回退为全部 `tools`）
+- core 漏工具观测：运行时记录 `skill_core_tool_missed:<tool>`、`skill_load_after_initial:<skill>`；
+  用 `python -m scripts.analyze_skill_core_misses <metrics.json>` 按真实调用排序并给出提升建议
+- 专业 Agent（technical/fundamental/news/risk/macro）按 `profile.skill_names` 注入 Skill 规则；
+  `chat_agent_skill_instructions_enabled=false` 可关闭
 
 未来打成 wheel 时需要把 `definitions/**/SKILL.md` 加入 package-data；当前
 Docker/源码运行会直接复制整个 `app` 目录。

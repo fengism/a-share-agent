@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection
@@ -72,6 +73,7 @@ logger = logging.getLogger(__name__)
 _EMPTY_OUTPUT_ERROR = "模型未生成有效回答，请稍后重试"
 _TOOL_CONTEXT_WARNING = "工具上下文预算不足，部分证据已截断或未提供给模型，结论可能受限"
 _TOOL_BUDGET_WARNING = "部分工具请求受额度限制未执行，具体原因见对应工具结果"
+_SKILL_BUDGET_WARNING = "部分 Skill 加载请求受额度限制未执行"
 _TOOL_MARKUP_WARNING = "模型以正文形式输出了工具调用标记，已从回答中移除；结论仅基于已取得的证据"
 _TOOL_OUTPUT_ERROR = "模型仍在请求工具而未生成有效结论，请检查模型工具调用兼容性后重试"
 _REASONING_TRUNCATED_WARNING = "推理内容已按上下文预算截断，不影响工具证据与最终结论"
@@ -283,6 +285,55 @@ class AgentExecutor:
                 metrics.record_agentic_event("llm_stream_interrupted")
             state.warnings.append(warning)
 
+    def _expand_skill_tools(
+        self,
+        state: _ExecutionState,
+        execution_context: AgentExecutionContext | None,
+        content: str,
+    ) -> None:
+        """Add tools from a successfully loaded skill to the next round."""
+        if execution_context is None:
+            return
+        try:
+            payload = json.loads(content)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(data, dict) or data.get("kind") != "skill_instructions":
+            return
+        raw_tools = data.get("tools")
+        if not isinstance(raw_tools, list):
+            return
+        skill_name = data.get("name")
+        allowed = execution_context.enabled_tool_names
+        new_tools: list[str] = []
+        for name in raw_tools:
+            if not isinstance(name, str) or not name:
+                continue
+            if name in state.effective_tool_names:
+                continue
+            if registry.get_tool(name) is None:
+                metrics.record_agentic_event("skill_tool_rejected")
+                continue
+            if allowed is not None and name not in allowed:
+                metrics.record_agentic_event("skill_tool_rejected")
+                continue
+            new_tools.append(name)
+        if not new_tools:
+            return
+        state.effective_tool_names.extend(new_tools)
+        state.tool_definitions.extend(registry.get_tool_definitions_for(new_tools))
+        metrics.record_agentic_event("skill_tools_expanded")
+        metrics.record_agentic_event("skill_initial_tools_expanded")
+        for name in new_tools:
+            # Per-tool signal used to decide which non-core tools to promote.
+            metrics.record_agentic_event(f"skill_core_tool_missed:{name}")
+        logger.info(
+            "Skill core tools missed: skill=%s tools=%s",
+            skill_name if isinstance(skill_name, str) else "unknown",
+            new_tools,
+        )
+
     async def _execute_tool_calls(
         self,
         profile: AgentProfile,
@@ -345,6 +396,18 @@ class AgentExecutor:
                     group_by_key[key] = group
         if execution_context is not None and execution_context.reserved_tool_names:
             groups.sort(key=lambda group: tool_calls[group[0]].function.name not in execution_context.reserved_tool_names)
+
+        def is_skill_call(index: int) -> bool:
+            policy = registry.get_tool_policy(tool_calls[index].function.name)
+            return policy is not None and policy.budget == "skill"
+
+        # Skill/instruction tools are pure and may unlock tools for the rest of
+        # this same assistant turn. Run them first, then execute data tools with
+        # the expanded tool set; final result order is restored below.
+        groups = [
+            *[group for group in groups if is_skill_call(group[0])],
+            *[group for group in groups if not is_skill_call(group[0])],
+        ]
         batches = [sorted(index for group in groups[offset:offset + batch_size] for index in group)
                    for offset in range(0, len(groups), batch_size)]
         messages_start, results_start = len(state.messages), len(state.tool_results)
@@ -454,7 +517,11 @@ class AgentExecutor:
             completed.sort(key=lambda pair: pair[0].function.name not in policy.tool_names)
             for call, result in completed:
                 policy.observe(call.function.name, call.function.arguments, result.content, is_error=result.is_error)
-            policy.finish_batch()
+            if any(
+                call.function.name in policy.tool_names or call.function.name in policy.read_tool_names
+                for call, _ in completed
+            ):
+                policy.finish_batch()
         context_exhausted = state.tool_context_characters >= state.max_tool_context_characters
         # 没真实执行过的调用要能被下游看见：预算拒绝与批内去重都不是「工具成功了」。
         skipped_indices = {index for index, _ in rejected_calls}
@@ -473,9 +540,15 @@ class AgentExecutor:
                     is_error=False,
                 )
                 continue
-            metrics.record_agentic_event("tool_budget_rejected")
-            if _TOOL_BUDGET_WARNING not in state.warnings:
-                state.warnings.append(_TOOL_BUDGET_WARNING)
+            policy = registry.get_tool_policy(tool_call.function.name)
+            if policy is not None and policy.budget == "skill":
+                metrics.record_agentic_event("skill_budget_rejected")
+                warning = _SKILL_BUDGET_WARNING
+            else:
+                metrics.record_agentic_event("tool_budget_rejected")
+                warning = _TOOL_BUDGET_WARNING
+            if warning not in state.warnings:
+                state.warnings.append(warning)
             # Admission captures the exact limiting bucket before concurrent
             # completions/refunds can change the ledger. Keep that snapshot.
             if tool_results[index] is None:
@@ -518,13 +591,16 @@ class AgentExecutor:
             evidence_state = EvidenceState.from_content(
                 result.content, is_error=result.is_error, context=context_content, skipped=index in skipped_indices,
             )
+            policy = registry.get_tool_policy(tool_call.function.name)
+            is_evidence = policy is None or policy.evidence
             state.tool_results.append(
                 ToolExecutionSummary(
                     name=tool_call.function.name,
                     is_error=result.is_error,
-                    has_evidence=evidence_state.usable_acquisition,
-                    context_has_evidence=evidence_state.usable_context,
+                    has_evidence=evidence_state.usable_acquisition and is_evidence,
+                    context_has_evidence=evidence_state.usable_context and is_evidence,
                     skipped=index in skipped_indices,
+                    instruction=not is_evidence,
                     failure_code=safe_tool_failure_code(result.content),
                 )
             )
@@ -538,6 +614,8 @@ class AgentExecutor:
                 "tool_call_id": result.tool_call_id,
                 "content": context_content,
             })
+            if tool_call.function.name == "load_skill" and not result.is_error:
+                self._expand_skill_tools(state, execution_context, result.content)
             if result.is_error:
                 # 只保留受控短标签：完整 payload 可能很大，且含上游/模型生成的原文，
                 # 不适合作为面向用户的 errors 兜底文案。
@@ -801,15 +879,27 @@ class AgentExecutor:
         for index, tool_call in unique_calls:
             allowed = not context_exhausted
             reservation = None
+            policy = registry.get_tool_policy(tool_call.function.name)
+            budget_kind = policy.budget if policy is not None else "tool"
             if allowed and execution_context is not None:
-                reservation, rejection = await execution_context.reserve_tool_call_with_diagnostics(
-                    preserve=tool_call_reserve, tool_name=tool_call.function.name,
-                )
+                if budget_kind == "skill":
+                    reservation, rejection = await execution_context.reserve_skill_load_with_diagnostics(
+                        tool_call.function.name,
+                    )
+                else:
+                    reservation, rejection = await execution_context.reserve_tool_call_with_diagnostics(
+                        preserve=tool_call_reserve, tool_name=tool_call.function.name,
+                    )
                 allowed = reservation is not None
                 if rejection is not None:
+                    error_code = (
+                        "skill_budget_exceeded"
+                        if budget_kind == "skill"
+                        else "tool_budget_exceeded"
+                    )
                     tool_results[index] = ToolResultInfo(
                         tool_call_id=tool_call.id, name=tool_call.function.name,
-                        content=serialize_error("tool_budget_exceeded", budget_rejection_message(rejection),
+                        content=serialize_error(error_code, budget_rejection_message(rejection),
                                                 data={"budget": rejection}),
                         is_error=False,
                     )
