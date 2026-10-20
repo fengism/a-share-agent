@@ -9,7 +9,9 @@ from app.modules.daily_review.models import (
     DailyReviewEventImpact,
     DailyReviewPreviousCheck,
     DailyReviewResult,
+    DailyReviewScenario,
     DailyReviewSection,
+    DailyReviewSentimentCycle,
     DailyReviewSourceStatus,
     DailyReviewWatchItem,
     PolicyNewsSnapshotItem,
@@ -467,6 +469,240 @@ def _format_northbound(funds: dict[str, Any]) -> str:
     return f"北向资金净买入：{sign}{north:.2f} 亿元"
 
 
+# ---------------------------------------------------------------------------
+# 深度输出的确定性校验
+#
+# prompt 已经要求「情绪周期必须收敛到一个明确结论」「关键点位必须带具体数值」，
+# 但此前只有 watchlist / event_impacts / news_policy 做了 grounding，最需要严谨的
+# 深度字段反而完全靠模型自述。这里用与 `_quant_anchors()` 同源的快照数据做校验：
+# 锚点信号强时按锚点修正，信号弱时保留模型判断但记 warning（不静默篡改）。
+# ---------------------------------------------------------------------------
+
+#: 情绪周期判定的阈值。改这里等于改产品判断，必须同时改测试。
+_SENTIMENT_LIMIT_DOWN_PANIC = 20  # 跌停家数 ≥ 此值视为杀跌
+_SENTIMENT_LIMIT_UP_COLD = 30  # 冰点：涨停家数上限
+_SENTIMENT_LIMIT_UP_HOT = 60  # 主升：涨停家数下限
+_SENTIMENT_MAX_BOARD_COLD = 2  # 冰点：空间板高度上限
+_SENTIMENT_MAX_BOARD_STRONG = 5  # 主升/高位分化：空间板高度下限
+_SENTIMENT_BREAK_RATE_HEALTHY = 0.25  # 主升：炸板率上限
+_SENTIMENT_BREAK_RATE_DIVERGED = 0.30  # 高位分化：炸板率下限
+_SENTIMENT_BREAK_RATE_PANIC = 0.45  # 退潮：炸板率下限（配合空间板回落）
+
+_MIN_SENTIMENT_EVIDENCE = 2
+
+
+def _emotion_summary(snapshot: DailyReviewDataSnapshot) -> str:
+    """财联社情绪分布的可核验摘要：涨跌家数、大面股、赚钱效应、情绪温度。"""
+    emotion = snapshot.market_emotion or {}
+    if not emotion:
+        return ""
+    distribution = emotion.get("up_down_dis") or {}
+    bits: list[str] = []
+    up_num = distribution.get("up_num")
+    down_num = distribution.get("down_num")
+    if isinstance(up_num, int) and isinstance(down_num, int):
+        bits.append(f"涨跌家数 {up_num}:{down_num}")
+    big_loss = sum(
+        value for key in ("down_6", "down_8", "down_10")
+        if isinstance(value := distribution.get(key), int)
+    )
+    if big_loss:
+        bits.append(f"跌幅超 6% 的个股 {big_loss} 家")
+    limit_down = distribution.get("down_10")
+    if isinstance(limit_down, int) and limit_down:
+        bits.append(f"跌幅超 10% 的个股 {limit_down} 家")
+    for key, label in (
+        ("profit_ratio", "赚钱效应"),
+        ("up_ratio", "上涨占比"),
+        ("up_open_ratio", "上涨开盘率"),
+    ):
+        value = emotion.get(key)
+        if isinstance(value, str) and value.strip():
+            bits.append(f"{label} {value.strip()}")
+    degree = emotion.get("market_degree")
+    if isinstance(degree, int):
+        bits.append(f"情绪温度 {degree}")
+    return "；".join(bits)
+
+
+def sentiment_anchors(snapshot: DailyReviewDataSnapshot) -> dict[str, float | int | None]:
+    """抽出情绪周期判定所需的量化锚点（与 `_quant_anchors()` 同源）。"""
+    ladder = snapshot.limit_up_ladder or {}
+    stocks = ladder.get("stocks") or []
+    by_board = group_limit_up_by_board(stocks) if stocks else {}
+    statistics = snapshot.market_statistics or {}
+    limit_up = statistics.get("limit_up_count")
+    limit_down = statistics.get("limit_down_count")
+    return {
+        "max_board": max(by_board) if by_board else (0 if stocks else None),
+        "break_rate": limit_break_rate(snapshot),
+        "limit_up_count": limit_up if isinstance(limit_up, int) else None,
+        "limit_down_count": limit_down if isinstance(limit_down, int) else None,
+    }
+
+
+def derive_sentiment_stage(snapshot: DailyReviewDataSnapshot) -> tuple[str | None, str]:
+    """用量化锚点推导情绪周期，返回 ``(stage, confidence)``。
+
+    ``confidence`` 为 ``strong`` 时说明判据来自硬信号（跌停潮、空间板高度+炸板率），
+    足以纠正模型；``weak`` 只用于提示不一致，不覆盖模型判断。
+    """
+    anchors = sentiment_anchors(snapshot)
+    max_board = anchors["max_board"]
+    break_rate = anchors["break_rate"]
+    limit_up = anchors["limit_up_count"]
+    limit_down = anchors["limit_down_count"]
+
+    # 退潮杀跌：跌停潮是最硬的信号，不需要空间板配合。
+    if isinstance(limit_down, int) and limit_down >= _SENTIMENT_LIMIT_DOWN_PANIC:
+        return "退潮杀跌", "strong"
+    if (
+        isinstance(break_rate, float)
+        and isinstance(max_board, int)
+        and break_rate >= _SENTIMENT_BREAK_RATE_PANIC
+        and max_board <= _SENTIMENT_MAX_BOARD_COLD + 1
+    ):
+        return "退潮杀跌", "strong"
+    # 主升共振：高度、家数、封板质量三者同时满足。
+    if (
+        isinstance(max_board, int)
+        and isinstance(limit_up, int)
+        and isinstance(break_rate, float)
+        and max_board >= _SENTIMENT_MAX_BOARD_STRONG
+        and limit_up >= _SENTIMENT_LIMIT_UP_HOT
+        and break_rate <= _SENTIMENT_BREAK_RATE_HEALTHY
+    ):
+        return "主升共振", "strong"
+    # 高位分化：有高度但封板质量明显下降。
+    if (
+        isinstance(max_board, int)
+        and isinstance(break_rate, float)
+        and max_board >= _SENTIMENT_MAX_BOARD_STRONG
+        and break_rate >= _SENTIMENT_BREAK_RATE_DIVERGED
+    ):
+        return "高位分化", "strong"
+    # 冰点：高度与家数同时萎缩。
+    if (
+        isinstance(max_board, int)
+        and isinstance(limit_up, int)
+        and max_board <= _SENTIMENT_MAX_BOARD_COLD
+        and limit_up <= _SENTIMENT_LIMIT_UP_COLD
+    ):
+        return "冰点", "strong"
+    # 修复回暖：中间地带的弱信号，不覆盖模型判断。
+    if isinstance(max_board, int) and 2 < max_board < _SENTIMENT_MAX_BOARD_STRONG:
+        return "修复回暖", "weak"
+    return None, "none"
+
+
+def sentiment_anchor_evidence(snapshot: DailyReviewDataSnapshot) -> list[str]:
+    """用快照数字补出可核验的情绪周期证据（不编造模型没给出的判断）。"""
+    anchors = sentiment_anchors(snapshot)
+    evidence: list[str] = []
+    if isinstance(anchors["max_board"], int) and anchors["max_board"]:
+        evidence.append(f"空间板高度 {anchors['max_board']} 板")
+    limit_up = anchors["limit_up_count"]
+    limit_down = anchors["limit_down_count"]
+    # 跌停家数本身就能独立支撑「退潮杀跌」，不能因为缺涨停家数就不写证据。
+    if isinstance(limit_up, int) and isinstance(limit_down, int):
+        evidence.append(f"涨停 {limit_up} 家 / 跌停 {limit_down} 家")
+    elif isinstance(limit_up, int):
+        evidence.append(f"涨停 {limit_up} 家")
+    elif isinstance(limit_down, int):
+        evidence.append(f"跌停 {limit_down} 家")
+    if isinstance(anchors["break_rate"], float):
+        evidence.append(f"炸板率 {anchors['break_rate']:.1%}")
+    emotion = _emotion_summary(snapshot)
+    if emotion:
+        evidence.append(emotion)
+    return evidence
+
+
+def ground_sentiment_cycle(
+    snapshot: DailyReviewDataSnapshot,
+    cycle: DailyReviewSentimentCycle | None,
+) -> tuple[DailyReviewSentimentCycle | None, list[str]]:
+    """校验情绪周期定位与量化锚点是否自洽，返回 ``(cycle, warnings)``。"""
+    derived, confidence = derive_sentiment_stage(snapshot)
+    warnings: list[str] = []
+    if cycle is None:
+        if derived is None:
+            return None, warnings
+        cycle = DailyReviewSentimentCycle(stage=derived, evidence=sentiment_anchor_evidence(snapshot))
+        warnings.append(f"模型未给出情绪周期定位，已按量化锚点判定为「{derived}」")
+        return cycle, warnings
+    if derived is not None and derived != cycle.stage:
+        if confidence == "strong":
+            warnings.append(
+                f"情绪周期定位与量化锚点不一致（模型「{cycle.stage}」→ 锚点「{derived}」），已按锚点修正"
+            )
+            cycle = cycle.model_copy(update={"stage": derived})
+        else:
+            warnings.append(
+                f"情绪周期定位与量化锚点不一致（模型「{cycle.stage}」vs 锚点「{derived}」，"
+                "锚点信号较弱，保留模型判断）"
+            )
+    quantified = [item for item in cycle.evidence if any(char.isdigit() for char in item)]
+    if len(quantified) < _MIN_SENTIMENT_EVIDENCE:
+        supplemented = [
+            item for item in sentiment_anchor_evidence(snapshot) if item not in quantified
+        ]
+        if supplemented:
+            warnings.append("情绪周期的量化证据不足，已用快照锚点补齐")
+            cycle = cycle.model_copy(update={"evidence": [*quantified, *supplemented]})
+    return cycle, warnings
+
+
+def ground_key_levels(
+    snapshot: DailyReviewDataSnapshot,
+    levels: list[str],
+) -> tuple[list[str], list[str]]:
+    """只保留带具体数值的关键点位：「关注关键点位」这类无法验证的表述直接丢弃。"""
+    kept: list[str] = []
+    dropped = 0
+    for level in levels:
+        text = str(level).strip()
+        if not text:
+            continue
+        if not any(char.isdigit() for char in text):
+            dropped += 1
+            continue
+        if text in kept:
+            continue
+        kept.append(text)
+    warnings = [f"已丢弃 {dropped} 条不含具体数值的关键点位"] if dropped else []
+    return kept[:8], warnings
+
+
+def ground_scenario_plans(
+    snapshot: DailyReviewDataSnapshot,
+    plans: list[DailyReviewScenario],
+) -> tuple[list[DailyReviewScenario], list[str]]:
+    """情景预案的触发条件必须可执行；缺情形只提示，不替模型编造预案。
+
+    刻意**不**因为「触发条件没写数字」就删掉整条预案：playbook 本身仍有价值，
+    删掉等于让用户少了一个预案。缺数字只记一条 warning 暴露质量问题。
+    """
+    kept: list[DailyReviewScenario] = []
+    vague = 0
+    for plan in plans:
+        if not plan.trigger.strip():
+            continue
+        if not any(char.isdigit() for char in plan.trigger):
+            vague += 1
+        kept.append(plan)
+    warnings: list[str] = []
+    if vague:
+        warnings.append(f"{vague} 条情景预案的触发条件缺少具体数值，可执行性受限")
+    missing = [
+        name for name in ("超预期", "符合预期", "低于预期")
+        if not any(plan.name == name for plan in kept)
+    ]
+    if missing:
+        warnings.append(f"情景预案缺少{'、'.join(missing)}，次日推演不完整")
+    return kept, warnings
+
+
 def _quant_anchors(snapshot: DailyReviewDataSnapshot) -> str:
     """用 Python 预先算好量化锚点，模型只做解读、不做算术。
 
@@ -614,6 +850,13 @@ def _quant_anchors(snapshot: DailyReviewDataSnapshot) -> str:
             )
     if divergence_bits:
         lines.append("- 资金与宽度背离：" + "；".join(divergence_bits))
+
+    # 8) 市场情绪分布（财联社）：情绪周期定位的独立信号
+    emotion = _emotion_summary(snapshot)
+    if emotion:
+        lines.append("- 市场情绪分布：" + emotion)
+    else:
+        lines.append("- 市场情绪分布：情绪分布数据缺失，禁止据此推断情绪温度")
 
     return "\n".join(lines)
 
@@ -1123,6 +1366,7 @@ def build_snapshot(
     limit_up_ladder=None,
     limit_break_pool=None,
     northbound_funds=None,
+    market_emotion=None,
     policy_news: list[PolicyNewsSnapshotItem] | None = None,
     requested_date: str = "",
     effective_date: str = "",
@@ -1183,4 +1427,8 @@ def build_snapshot(
         )
     if not isinstance(northbound_funds, Exception) and northbound_funds is not None:
         snapshot_data["northbound_funds"] = northbound_funds.model_dump() if hasattr(northbound_funds, "model_dump") else northbound_funds
+    if not isinstance(market_emotion, Exception) and market_emotion is not None:
+        snapshot_data["market_emotion"] = (
+            market_emotion.model_dump() if hasattr(market_emotion, "model_dump") else market_emotion
+        )
     return DailyReviewDataSnapshot(**snapshot_data)

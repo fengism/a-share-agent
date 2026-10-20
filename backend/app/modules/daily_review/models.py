@@ -164,11 +164,13 @@ class DailyReviewDataSnapshot(BaseModel):
     limit_up_ladder: dict[str, Any] = Field(default_factory=dict)
     limit_break_pool: dict[str, Any] = Field(default_factory=dict)
     northbound_funds: dict[str, Any] = Field(default_factory=dict)
+    # 财联社市场情绪分布（涨跌家数、大面数、连板高度）：情绪周期定位的直接输入。
+    market_emotion: dict[str, Any] = Field(default_factory=dict)
 
 
 # 复盘快照/结果的结构版本：任何会影响已缓存复盘内容的结构变更都要 +1，
 # pipeline 会据此自动作废旧缓存（旧记录保留自己的历史值）。
-DAILY_REVIEW_SCHEMA_VERSION = 8
+DAILY_REVIEW_SCHEMA_VERSION = 9
 
 
 class DailyReviewSentimentCycle(BaseModel):

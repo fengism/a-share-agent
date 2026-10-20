@@ -471,6 +471,7 @@ def _build_snapshot(
         limit_up_ladder=values.get("limit_up_ladder"),
         limit_break_pool=values.get("limit_break_pool"),
         northbound_funds=values.get("northbound_funds"),
+        market_emotion=values.get("market_emotion"),
         requested_date=requested_date,
         effective_date=effective_date,
         source_status=source_status,
@@ -575,6 +576,7 @@ async def _generate_daily_review_locked(
 
     await _stage_started(progress, "analyze", _ANALYZE_MESSAGE)
     settings = get_effective_settings()
+    grounding_enabled = bool(getattr(settings, "daily_review_grounding_enabled", True))
     user_content = _build_prompt(
         effective_text,
         snapshot,
@@ -611,11 +613,29 @@ async def _generate_daily_review_locked(
         review.risk_alerts = output.risk_alerts
         review.opportunities = output.opportunities
         review.strategy_notes = output.strategy_notes
-        review.sentiment_cycle = output.sentiment_cycle
-        review.scenario_plans = output.scenario_plans
+        # 深度输出同样要做确定性校验：此前只有 watchlist / event_impacts / 新闻政策
+        # 做了 grounding，最需要严谨的情绪周期与情景预案完全靠模型自述。
+        if grounding_enabled:
+            review.sentiment_cycle, sentiment_warnings = review_builder.ground_sentiment_cycle(
+                snapshot, output.sentiment_cycle,
+            )
+            review.scenario_plans, scenario_warnings = review_builder.ground_scenario_plans(
+                snapshot, output.scenario_plans,
+            )
+            warnings.extend(sentiment_warnings)
+            warnings.extend(scenario_warnings)
+        else:
+            review.sentiment_cycle = output.sentiment_cycle
+            review.scenario_plans = output.scenario_plans
         # 次日观察标的必须是快照里真实存在的个股，否则视为虚构。
         review.next_day_watchlist = review_builder.ground_watchlist(snapshot, output.next_day_watchlist)
-        review.key_levels = output.key_levels
+        if grounding_enabled:
+            review.key_levels, level_warnings = review_builder.ground_key_levels(
+                snapshot, output.key_levels,
+            )
+            warnings.extend(level_warnings)
+        else:
+            review.key_levels = output.key_levels
         await progress.emit({
             "type": "stage_progress", "stage": "analyze",
             "message": "模型输出已就绪，正在做确定性校验与兜底",

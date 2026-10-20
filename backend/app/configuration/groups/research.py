@@ -25,6 +25,9 @@ class ResearchGroup(ConfigGroup):
     # Long report generation: one deadline shared by streaming and schema repair.
     analysis_llm_timeout_seconds: float = Field(default=1200.0, gt=0)
     analysis_llm_max_completion_tokens: int = Field(default=32768, ge=1)
+    # 每日复盘的确定性校验：情绪周期与量化锚点冲突时按锚点修正、关键点位/情景预案
+    # 必须含可验证数字。关闭后完全按模型输出（回退到旧行为）。
+    daily_review_grounding_enabled: bool = True
 
     # Deployment-only; deliberately absent from private/persisted editable keys.
     pdf_max_concurrency: int = Field(default=1, ge=1, le=4)

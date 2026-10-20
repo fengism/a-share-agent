@@ -21,6 +21,8 @@ export interface DailyReviewDataSnapshot {
   hot_industries: Record<string, unknown>[];
   dragon_tiger: Record<string, unknown>[];
   market_statistics: Record<string, unknown>;
+  /** 财联社市场情绪分布：涨跌家数、大面数、赚钱效应、情绪温度。 */
+  market_emotion?: Record<string, unknown>;
   market_news: Record<string, unknown>[];
   policy_news?: Array<{
     title: string;
