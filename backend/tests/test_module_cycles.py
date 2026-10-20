@@ -4,8 +4,10 @@
 压成节点后检测强连通分量（SCC）。本仓库历史包袱允许存在以下三个环：
 
 1. ``{api, runtime}`` —— 版本解析与认证 cookie 分居两侧；
-2. 数据层/基础设施/若干业务模块组成的大环（详见 BASELINE 注释）；
-3. ``{core, domain}`` —— 内层互相引用（request_context ↔ domain.identity 等）。
+2. 数据层/基础设施/若干业务模块组成的大环（详见 BASELINE 注释）。
+
+``{core, domain}`` 这个内层环已消除：``market_today()`` 与上海时区常量下沉到
+``app.domain.timezones``，domain 不再反向依赖 core。
 
 新增环意味着新的双向耦合，必须显式修改本基线并说明理由，否则测试失败。
 """
@@ -22,7 +24,6 @@ APP_DIR = Path(__file__).resolve().parents[1] / "app"
 BASELINE: frozenset[tuple[str, ...]] = frozenset(
     {
         ("api", "runtime"),
-        ("core", "domain"),
         (
             "agentic_integration",
             "financial_data",
