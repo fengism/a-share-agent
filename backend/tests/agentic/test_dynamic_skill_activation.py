@@ -84,6 +84,35 @@ async def test_dynamic_activation_disabled_falls_back_to_active_only(monkeypatch
     assert context.active_skill_names == ()
 
 
+async def test_evidence_gate_is_dropped_when_no_tool_can_be_sent(monkeypatch):
+    """一个工具都发不出去时，证据门必须自动失效，否则每次回答都必然失败。
+
+    触发条件：首轮工具上限=0（只给 load_skill）且关闭了动态激活。
+    """
+    register_all_capabilities()
+    captured = await _capture_general_agent(monkeypatch)
+    settings = get_settings().model_copy(update={
+        "chat_skill_dynamic_activation_enabled": False,
+        "chat_skill_instruction_top_n": 0,
+    })
+    context = AgentExecutionContext(settings=settings)
+
+    async for _ in general_agent.stream_general_agent(
+        "你好",
+        tool_names=(),
+        skill_names=("stock_analysis",),
+        enabled_skill_names=("stock_analysis",),
+        enabled_tool_names=(),
+        require_tool_evidence=True,
+        execution_context=context,
+    ):
+        pass
+
+    assert captured["profile"].tool_names == ("load_skill",)
+    # load_skill 能加载，但一个数据工具都展不开：证据门无解，必须自动失效。
+    assert captured["kwargs"]["require_tool_evidence"] is False
+
+
 def test_agentic_event_names_are_bounded():
     """动态事件前缀不能被无限撑大（工具名来自模型输出）。"""
     from app.core.metrics import _MAX_AGENTIC_EVENT_SERIES, MetricsRegistry

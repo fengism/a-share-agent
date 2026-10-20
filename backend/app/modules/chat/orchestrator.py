@@ -99,6 +99,7 @@ class Orchestrator:
         require_tool_evidence: bool = False,
         execution_context: AgentExecutionContext | None = None,
         needs_stock_resolution: bool = False,
+        initial_tool_names: Collection[str] | None = None,
     ):
         register_all_capabilities()
         selected_skills = None if skill_names is None else set(skill_names)
@@ -112,6 +113,9 @@ class Orchestrator:
             if allowed_tool_names is None
             else list(dict.fromkeys(allowed_tool_names))
         )
+        # 通用 Agent 首轮只给核心工具（与单体路径一致）；专业子 Agent 各自从
+        # profile 取工具，不受影响。未传入时回退到完整 active 工具集（旧行为）。
+        self.initial_tool_names = list(dict.fromkeys(initial_tool_names or self.allowed_tool_names))
         self.sub_agents = select_agent_profiles(agent_names)
         self.require_tool_evidence = require_tool_evidence
         self.execution_context = execution_context
@@ -147,7 +151,8 @@ class Orchestrator:
             skill_names=skill_names if skill_names is not None else self.skill_names,
             enabled_skill_names=enabled_skill_names,
             enabled_tool_names=enabled_tool_names,
-            require_tool_evidence=self.require_tool_evidence and bool(tool_names),
+            require_tool_evidence=self.require_tool_evidence
+            and bool(tool_names or enabled_tool_names),
             execution_context=self.execution_context,
         )) as stream:
             async for delta in stream:
@@ -202,7 +207,7 @@ class Orchestrator:
             async with aclosing(self._stream_general_response(
                 message,
                 history,
-                self.allowed_tool_names,
+                self.initial_tool_names,
                 skill_names=(),
                 enabled_skill_names=self.skill_names,
                 enabled_tool_names=self.allowed_tool_names,
@@ -307,7 +312,7 @@ class Orchestrator:
             async with aclosing(self._stream_general_response(
                 message,
                 history,
-                self.allowed_tool_names,
+                self.initial_tool_names,
                 skill_names=(),
                 enabled_skill_names=self.skill_names,
                 enabled_tool_names=self.allowed_tool_names,

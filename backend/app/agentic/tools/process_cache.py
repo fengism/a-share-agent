@@ -15,6 +15,12 @@ Eligibility is deliberately narrow:
 - errors are never stored (one upstream blip must not become a traffic-wide
   outage), and oversized payloads are skipped so the cache cannot be used as an
   unbounded memory amplifier.
+- instruction/control tools (``evidence=False``, e.g. ``load_skill``) are never
+  admitted: their payload carries request-scoped fields (which tools this
+  session may use) and their executor performs the per-session authorization
+  check. A cache hit skips that executor, so caching them would both leak a
+  disabled Skill's instructions and hand one caller another caller's tool
+  availability.
 """
 
 from __future__ import annotations
@@ -62,6 +68,9 @@ class ProcessToolCache:
             # 这是对未来把 ttl>0 建到变更类工具上的防守：宁可少命中，不能把
             # 一次“下单/写配置”的回答从上一个请求里抬回来。
             and policy.deduplicate_in_batch
+            # 指令类工具（load_skill 等）的载荷依赖调用方上下文，且授权检查在
+            # executor 里；缓存命中会跳过 executor，等于跨请求绕过授权。
+            and policy.evidence
         )
 
     def get(self, key: str, tool_call_id: str) -> ToolResultInfo | None:

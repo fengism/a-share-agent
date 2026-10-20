@@ -177,12 +177,14 @@ def build_chat_capability_plan(
     available_agents = tuple(profile.name for profile in available_profiles)
     profiles_by_name = {profile.name: profile for profile in available_profiles}
     decision = classify_message(message, available_agents)
-    active_skill_set = set(active_skills)
+    # 候选 Agent 的筛选依据是「关键词已激活的 Skill」，必须用合并前的快照；
+    # 而下面判断消歧时要用合并后的最终 active_skills，不要复用这份快照。
+    detected_skill_set = set(active_skills)
     candidate_agents = tuple(
         agent_name
         for agent_name in decision.agents
         if agent_name in profiles_by_name
-        and set(profiles_by_name[agent_name].skill_names).intersection(active_skill_set)
+        and set(profiles_by_name[agent_name].skill_names).intersection(detected_skill_set)
     )
     if candidate_agents:
         candidate_skills = {
@@ -211,12 +213,15 @@ def build_chat_capability_plan(
             )
             active_tool_names = tuple(registry.get_tool_names_for_skills(active_skills))
 
-    requires_evidence = bool(active_skills and tool_names)
+    # 证据门看的是「这次是否真的启用了数据 Skill」，而不是首轮工具集：
+    # ``chat_max_initial_active_skills=0`` 只下发 load_skill 时 tool_names 为空，
+    # 若拿它当依据，证据门会被配置静默关掉。
+    requires_evidence = bool(active_skills and active_tool_names)
     # 与 _detect_skill_scores 用同一份去 URL 文本：URL 里的数字不能被当成股票代码，
     # 否则会出现“分数已按未识别提振、却没有下发消歧指令”的不一致。
     message_without_urls = _URL_PATTERN.sub(" ", message)
     unresolved_stock = (
-        "stock_analysis" in active_skill_set
+        "stock_analysis" in set(active_skills)
         and not extract_stock_codes(message_without_urls)
         and needs_stock_resolution(message_without_urls)
     )

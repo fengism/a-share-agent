@@ -19,6 +19,7 @@ from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.tools.cache import SharedToolCache
 from app.agentic.tools.contracts import ToolPolicy
 from app.agentic.tools.process_cache import ProcessToolCache, process_tool_cache
+from app.agentic_integration.bootstrap import register_all_capabilities
 from app.configuration import get_settings
 
 _DAILY_POLICY = ToolPolicy(cost="medium", cache_ttl_seconds=900, freshness="daily")
@@ -58,6 +59,24 @@ def test_eligibility_is_narrow():
     # be answered from a previous request, even if a TTL were configured.
     assert cache.eligible(
         ToolPolicy(cache_ttl_seconds=900, freshness="daily", deduplicate_in_batch=False)
+    ) is False
+
+
+def test_instruction_tools_are_never_shared_across_requests():
+    """指令类工具（load_skill）的载荷与授权都是请求内的，不得跨请求复用。
+
+    缓存命中会跳过 executor，而 ``allowed_skill_names`` 的授权检查就在 executor 里：
+    一旦跨请求缓存，被本会话禁用的 Skill 会通过别的请求的缓存把完整指令交出去，
+    载荷里的 ``unavailable_tools`` 也是首个请求方的工具可用性。
+    """
+    register_all_capabilities()
+    load_skill = registry.get_tool_policy("load_skill")
+    assert load_skill is not None
+    assert load_skill.evidence is False
+    assert ProcessToolCache.eligible(load_skill) is False
+    # 同一契约对任何 instruction 工具生效，不只是当前那一个。
+    assert ProcessToolCache.eligible(
+        ToolPolicy(cache_ttl_seconds=900, freshness="static", evidence=False)
     ) is False
 
 

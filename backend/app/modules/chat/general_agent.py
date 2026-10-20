@@ -64,6 +64,18 @@ def _build_skill_prompt(
     return "\n\n".join(part for part in (catalog, instructions) if part)
 
 
+def _has_reachable_data_tool(
+    initial_tool_names: Collection[str],
+    expansion_tool_names: Collection[str],
+) -> bool:
+    """本会话是否可能拿到至少一个数据工具（首轮直给或经 load_skill 展开）。"""
+    for name in dict.fromkeys((*initial_tool_names, *expansion_tool_names)):
+        tool = registry.get_tool(name)
+        if tool is not None and tool.policy.evidence:
+            return True
+    return False
+
+
 async def stream_general_agent(
     message: str,
     history: list[AgentMessage] | None = None,
@@ -102,6 +114,14 @@ async def stream_general_agent(
     )
     if loadable_skills and registry.get_tool(_LOAD_SKILL_TOOL) is not None:
         effective_tool_names = tuple(dict.fromkeys((*effective_tool_names, _LOAD_SKILL_TOOL)))
+    if require_tool_evidence and not _has_reachable_data_tool(
+        effective_tool_names, expansion_tool_names
+    ):
+        # 证据门要求「本会话能拿到至少一个数据工具」：首轮工具上限=0 且动态激活
+        # 关闭时既没有首轮工具、load_skill 也展不开任何工具，此时保留证据门只会让
+        # 每一次回答都以「未获取有效工具证据」失败。
+        metrics.record_agentic_event("require_evidence_without_tools")
+        require_tool_evidence = False
     if execution_context is not None:
         execution_context.allowed_skill_names = loadable_skills
         execution_context.enabled_tool_names = expansion_tool_names

@@ -75,3 +75,24 @@ def test_disabled_stock_analysis_skill_does_not_request_resolution():
     )
 
     assert plan.needs_stock_resolution is False
+
+
+def test_resolution_request_always_implies_the_active_skill():
+    """消歧请求不能与最终激活的 Skill 脱节。
+
+    判定必须看**合并候选 Agent 之后**的 active_skills：旧实现用的是合并前的快照，
+    于是 stock_analysis 经候选 Agent 补入时会出现「不下发指令」或「指令指向未激活
+    Skill」的不一致。
+    """
+    messages = (
+        "这只票还能拿吗",
+        "这家做光伏的公司股票能买入吗",
+        "字节跳动能买入吗",
+        "茅台股票能买吗",
+        "分析一下光伏行业估值",
+        "今天大盘怎么样",
+    )
+    for message in messages:
+        plan = build_chat_capability_plan(message, max_initial_active_skills=3)
+        if plan.needs_stock_resolution:
+            assert "stock_analysis" in plan.active_skill_names, message

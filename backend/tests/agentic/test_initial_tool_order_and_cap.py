@@ -110,6 +110,73 @@ def test_cap_never_touches_load_skill():
     assert registry.get_tool("load_skill") is not None  # 但它确实存在
 
 
+# --- 证据门 -----------------------------------------------------------------
+
+
+def test_evidence_gate_tracks_active_tools_not_the_first_turn_set():
+    """``chat_max_initial_active_skills=0`` 只下发 load_skill 时，证据门不能被关掉。
+
+    旧实现用首轮 ``tool_names`` 判断，于是把首轮工具压到 0 就等于静默取消
+    ``requires_tool_evidence``——配置只该控制「首轮 schema 体积」，不该改证据要求。
+    """
+    plan = _plan("分析茅台估值", max_skills=0)
+
+    assert plan.tool_names == ()
+    assert plan.active_tool_names
+    assert plan.requires_tool_evidence is True
+
+
+def test_evidence_gate_stays_off_when_no_skill_is_active():
+    plan = _plan("你好")
+
+    assert plan.active_skill_names == ()
+    assert plan.requires_tool_evidence is False
+
+
+# --- 多 Agent 路径 ----------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_general_fallback_uses_the_capped_initial_tools(monkeypatch):
+    """多 Agent 路径的通用 Agent 回退也要吃首轮工具上限。
+
+    专业子 Agent 的工具来自各自 profile，不受影响；但回退到通用 Agent 时旧实现把
+    完整 active 工具集一次性塞进首轮 schema，``chat_max_initial_tools`` 于是只对
+    单体路径生效。
+    """
+    from app.agentic.events import AgentEvent
+    from app.modules.chat import orchestrator as orchestrator_module
+    from app.modules.chat.routing import RoutingDecision
+
+    register_all_capabilities()
+    captured: dict = {}
+
+    async def fake_stream_general_agent(message, history, *, tool_names=None, **kwargs):
+        captured["tool_names"] = list(tool_names or ())
+        captured["enabled_tool_names"] = list(kwargs.get("enabled_tool_names") or ())
+        captured["require_tool_evidence"] = kwargs.get("require_tool_evidence")
+        yield AgentEvent(type="done", status="completed")
+
+    monkeypatch.setattr(orchestrator_module, "stream_general_agent", fake_stream_general_agent)
+    active = registry.get_tool_names_for_skills(["stock_analysis"])
+    orchestrator = orchestrator_module.Orchestrator(
+        agent_names=[],
+        skill_names=["stock_analysis"],
+        allowed_tool_names=active,
+        initial_tool_names=["search_stocks"],
+        require_tool_evidence=True,
+    )
+    decision = RoutingDecision(agents=[], needs_llm_classification=False, reasoning="t")
+
+    async for _ in orchestrator.run("今天天气怎么样", initial_decision=decision):
+        pass
+
+    assert captured["tool_names"] == ["search_stocks"]
+    # 动态扩展仍以完整 active 工具为界，否则 load_skill 拿不到被截掉的工具。
+    assert set(captured["enabled_tool_names"]) == set(active)
+    assert captured["require_tool_evidence"] is True
+
+
 # --- stream() 参数对齐 ------------------------------------------------------
 
 

@@ -54,7 +54,9 @@ class ResearchGroup(ConfigGroup):
     chat_max_initial_tools: int = Field(default=0, ge=0, le=64)
     # 历史回灌预算；大上下文模型可调高，0 不合法（必须保留最起码的连续性）。
     chat_max_history_characters: int = Field(default=40_000, ge=4_000, le=200_000)
-    # 整轮 prompt（system + 历史 + 工具结果）总字符上限。0=不启用，保持旧行为。
+    # 整轮 prompt 的字符总预算，用于反推「工具结果」与「子任务前置分析」还能占多少。
+    # 注意：它不是硬上限——system prompt、Skill 规则与历史各自受自己的配置约束；
+    # 这里只把工具结果上下文与依赖上下文压到剩余额度内。0=不启用，保持旧行为。
     chat_max_prompt_characters: int = Field(default=0, ge=0, le=1_000_000)
     # 跨请求复用 public + daily/static 工具结果（按 ToolPolicy.cache_ttl_seconds）。
     chat_tool_process_cache_enabled: bool = True
