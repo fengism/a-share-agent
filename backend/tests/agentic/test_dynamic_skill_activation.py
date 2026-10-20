@@ -82,3 +82,17 @@ async def test_dynamic_activation_disabled_falls_back_to_active_only(monkeypatch
     assert context.allowed_skill_names == ()
     assert context.enabled_tool_names == ()
     assert context.active_skill_names == ()
+
+
+def test_agentic_event_names_are_bounded():
+    """动态事件前缀不能被无限撑大（工具名来自模型输出）。"""
+    from app.core.metrics import _MAX_AGENTIC_EVENT_SERIES, MetricsRegistry
+
+    fresh = MetricsRegistry()
+    for index in range(_MAX_AGENTIC_EVENT_SERIES + 50):
+        fresh.record_agentic_event(f"bogus_prefix_{index}")
+
+    events = fresh.snapshot()["agentic"]["events"]
+    # The overflow bucket itself is one extra series on top of the capped set.
+    assert len(events) == _MAX_AGENTIC_EVENT_SERIES + 1
+    assert events["agentic_event_series_overflow"] == 50

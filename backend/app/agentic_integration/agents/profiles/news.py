@@ -7,6 +7,7 @@ PROFILE = AgentProfile(
     description="分析近期新闻、公告和市场情绪",
     system_prompt=NEWS_AGENT_PROMPT,
     tool_names=(
+        "search_stocks",
         "get_stock_news",
         "get_stock_sentiment",
         "get_interactive_qa",

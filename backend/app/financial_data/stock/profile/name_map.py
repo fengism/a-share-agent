@@ -28,6 +28,7 @@ from app.financial_data.stock.profile.short_names import (
     build_pinyin_index,
     build_short_name_index,
     extract_pinyin_tokens,
+    has_specific_stock_context,
     has_stock_context,
     normalize_name,
 )
@@ -176,7 +177,9 @@ def mentions_stock_target(message: str) -> bool:
     """是否应当视为股票标的：高置信引用，或“简称 + 股票语境词”。"""
     if contains_known_stock_name(message):
         return True
-    if not has_stock_context(message):
+    # “这只/该股/买入”这类指向具体标的的措辞同样构成语境；
+    # 只看泛化词会把“这只茅台还能拿吗”漏成未识别标的。
+    if not (has_stock_context(message) or has_specific_stock_context(message)):
         return False
     return contains_short_stock_name(message)
 

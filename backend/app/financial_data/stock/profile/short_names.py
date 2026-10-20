@@ -54,6 +54,10 @@ _COMMON_WORDS: tuple[str, ...] = tuple("""
 华南 西部 南方 北方 长江 黄河 泰山 黄山 峨眉山 新能源 大数据 人工智能 互联网 物联网 区块链
 元宇宙 碳中和 光伏 储能 锂电池 白酒 军工 券商 基建 消费 成长 价值 周期 龙头 概念 中字头
 半导 标准 远程 助手 变速 清新 朝阳 梅花 飞天 财富 神州 麒麟
+公司 企业 工厂 门店 商家 品牌 产品 项目 客户 用户 股东 高管 员工 总部 基地 园区 政府 部门
+协会 机构 单位 行业 产业 领域 业务 技术 研发 生产 销售 渠道 供应 需求 价格 成本 利润 收入
+支出 资金 资产 负债 股权 债权 上市 退市 停牌 复牌 涨停 跌停 换手 成交 买卖 持有 质押 解禁
+送转 配股 定增 可转债 期权 债券 利率 增长 下滑 同比 环比 季度 年度 中期 报告 公告 研报
 """.split())
 
 _GENERIC_WORDS: frozenset[str] = (
@@ -81,6 +85,14 @@ _STOCK_CONTEXT_KEYWORDS: tuple[str, ...] = tuple("""
 股票 个股 股价 估值 市值 市盈率 市净率 财报 财务 roe 营收 净利润 主营 技术面 基本面 k线
 macd rsi kdj 走势 新闻 公告 舆情 情绪 风险 止损 仓位 目标价 支撑位 压力位 怎么样 如何
 分析 看看 对比 港股 恒指 恒生 h股 分红 回购 增持 减持 龙虎榜 涨跌 涨幅 跌幅 收盘 开盘
+""".split())
+
+# Layer C 门控：只有“指向某一具体证券”的措辞才算未识别标的。
+# `_STOCK_CONTEXT_KEYWORDS` 含有“分析/怎么样”等泛化动词，用它做门控会把
+# “分析一下光伏行业估值”也当成个股问题，因此这里另用高精度词表。
+_SPECIFIC_STOCK_CONTEXT_KEYWORDS: tuple[str, ...] = tuple("""
+这只 这支 该股 该股票 标的 持仓 建仓 加仓 减仓 买入 卖出 止损 止盈 仓位 成本价
+目标价 支撑位 压力位 龙虎榜 增持 减持 回购 解禁
 """.split())
 
 _ASCII_TOKEN_RE = re.compile(r"[A-Za-z]{3,}")
@@ -158,10 +170,17 @@ def has_stock_context(message: str) -> bool:
     return any(keyword in folded for keyword in _STOCK_CONTEXT_KEYWORDS)
 
 
+def has_specific_stock_context(message: str) -> bool:
+    """消息是否在谈论某一只具体证券（高精度，不含泛化动词）。"""
+    folded = message.casefold()
+    return any(keyword in folded for keyword in _SPECIFIC_STOCK_CONTEXT_KEYWORDS)
+
+
 __all__ = [
     "build_pinyin_index",
     "build_short_name_index",
     "extract_pinyin_tokens",
+    "has_specific_stock_context",
     "has_stock_context",
     "is_generic_word",
     "normalize_name",

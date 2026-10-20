@@ -9,7 +9,7 @@ from typing import cast
 from app.agentic.agents.contracts import AgentExecutionResult
 from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent
-from app.agentic.orchestration.contracts import ExecutionPlan
+from app.agentic.orchestration.contracts import AgentTask, ExecutionPlan
 from app.agentic.orchestration.executor import stream_execution_plan
 from app.agentic.orchestration.planner import build_execution_plan
 from app.agentic.orchestration.progress import (
@@ -34,7 +34,10 @@ from app.core.metrics import metrics
 from app.infrastructure.llm import spec
 from app.infrastructure.llm.runtime import borrow_async_openai_chat_runtime
 from app.infrastructure.llm.tool_calling import AsyncLLMClient
-from app.modules.chat.general_agent import stream_general_agent
+from app.modules.chat.general_agent import (
+    STOCK_RESOLUTION_INSTRUCTION,
+    stream_general_agent,
+)
 from app.modules.chat.prompts import (
     DECISION_SYNTHESIS_PROMPT,
     DECISION_SYNTHESIS_PROMPT_REF,
@@ -47,6 +50,7 @@ from app.modules.chat.routing import (
     is_greeting_message,
     is_url_only_message,
 )
+from app.modules.chat.stock_reference import RESOLVER_TOOL_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +98,7 @@ class Orchestrator:
         allowed_tool_names: Collection[str] | None = None,
         require_tool_evidence: bool = False,
         execution_context: AgentExecutionContext | None = None,
+        needs_stock_resolution: bool = False,
     ):
         register_all_capabilities()
         selected_skills = None if skill_names is None else set(skill_names)
@@ -110,6 +115,7 @@ class Orchestrator:
         self.sub_agents = select_agent_profiles(agent_names)
         self.require_tool_evidence = require_tool_evidence
         self.execution_context = execution_context
+        self.needs_stock_resolution = needs_stock_resolution
 
     def _early_general_tool_names(self, message: str) -> list[str] | None:
         # 仅当消息本身就是链接时才走通用 Agent 快速路径；链接+问题的混合消息
@@ -349,6 +355,18 @@ class Orchestrator:
     async def _llm_classify(self, message: str, llm_client: AsyncLLMClient, model: str) -> RoutingDecision:
         return await classify_with_llm(message, llm_client, model, self.sub_agents)
 
+    def _task_instruction(self, task: AgentTask) -> str:
+        """Layer C: tell only the sub-agents that can resolve a target to do it.
+
+        ``search_stocks`` 是唯一的消歧工具；没有它的子 Agent（如宏观）拿到这条指令
+        只会产生无法执行的空要求，所以按 ``allowed_tools`` 精确投递。
+        """
+        if not self.needs_stock_resolution:
+            return ""
+        if RESOLVER_TOOL_NAME not in task.allowed_tools:
+            return ""
+        return STOCK_RESOLUTION_INSTRUCTION
+
     async def _run_sub_agents_streaming(
         self, plan: ExecutionPlan, message: str,
         history: list[AgentMessage] | None,
@@ -369,6 +387,7 @@ class Orchestrator:
             temperature,
             attempt=attempt,
             execution_context=self.execution_context,
+            task_instruction=self._task_instruction,
         )) as stream:
             async for delta in stream:
                 yield delta
@@ -419,7 +438,7 @@ class Orchestrator:
                 detail=retry_issues.get(task_id, "任务需要重试"),
             )
         yield AgentEvent(type="status", content="部分分析未完成，正在进行一次重试…")
-        retry_plan = build_retry_plan(plan, review)
+        retry_plan = build_retry_plan(plan, review, results)
         async with aclosing(self._run_sub_agents_streaming(
             retry_plan,
             message,

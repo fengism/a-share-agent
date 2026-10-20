@@ -55,6 +55,7 @@ async def run_chat_agent(
         enabled_agent_names=enabled_agent_names,
         max_initial_active_skills=settings.chat_max_initial_active_skills,
         core_tools_enabled=settings.chat_skill_core_tools_enabled,
+        max_initial_tools=settings.chat_max_initial_tools,
     )
     metrics.record_agentic_event("capability_plan")
     execution_context = AgentExecutionContext.from_current(
@@ -70,6 +71,7 @@ async def run_chat_agent(
             allowed_tool_names=plan.active_tool_names,
             require_tool_evidence=plan.requires_tool_evidence,
             execution_context=execution_context,
+            needs_stock_resolution=plan.needs_stock_resolution,
         )
         decision = RoutingDecision(
             agents=list(plan.candidate_agent_names),
@@ -89,6 +91,7 @@ async def run_chat_agent(
         enabled_skill_names=plan.enabled_skill_names,
         enabled_tool_names=plan.enabled_tool_names,
         require_tool_evidence=plan.requires_tool_evidence,
+        needs_stock_resolution=plan.needs_stock_resolution,
         execution_context=execution_context,
     )) as stream:
         async for delta in stream:

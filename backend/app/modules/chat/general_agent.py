@@ -16,6 +16,14 @@ from app.modules.chat.prompts import SYSTEM_PROMPT
 _MAX_ROUNDS = 5
 _MAX_HISTORY_MESSAGES = 20
 _LOAD_SKILL_TOOL = "load_skill"
+# Layer C：能看出在问某只股票，但看不出是哪只。
+# 编排路径（专业 Agent）复用同一段文案，避免两条路径口径不一致。
+STOCK_RESOLUTION_INSTRUCTION = (
+    "用户描述了某只具体股票但没有给出任何可识别的名称或代码："
+    "必须先调用 search_stocks 用用户提到的名称确认代码，再基于返回的代码分析；"
+    "search_stocks 没有结果时，可以再用 web_search 等工具确认公司名称与是否上市；"
+    "仍然确认不了就直接说明未找到该标的，不得猜代码、编造数据或假设分析对象。"
+)
 
 
 def _build_skill_prompt(
@@ -65,6 +73,7 @@ async def stream_general_agent(
     enabled_skill_names: Collection[str] | None = None,
     enabled_tool_names: Collection[str] | None = None,
     require_tool_evidence: bool = False,
+    needs_stock_resolution: bool = False,
     execution_context: AgentExecutionContext | None = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     settings = (
@@ -105,14 +114,20 @@ async def stream_general_agent(
         tool_names=effective_tool_names,
         max_rounds=_MAX_ROUNDS,
     )
+    tool_selection_prompt = _build_skill_prompt(
+        loadable_skills, execution_context, active_skill_names=active_skills
+    )
+    if needs_stock_resolution:
+        metrics.record_agentic_event("stock_resolution_instructed")
+        tool_selection_prompt = "\n\n".join(
+            part for part in (STOCK_RESOLUTION_INSTRUCTION, tool_selection_prompt) if part
+        )
     async with aclosing(stream_agent(
         profile,
         message,
         history,
         allowed_tool_names=effective_tool_names,
-        tool_selection_prompt=_build_skill_prompt(
-            loadable_skills, execution_context, active_skill_names=active_skills
-        ),
+        tool_selection_prompt=tool_selection_prompt,
         max_history_messages=_MAX_HISTORY_MESSAGES,
         require_tool_first_round=require_tool_evidence,
         require_tool_evidence=require_tool_evidence,

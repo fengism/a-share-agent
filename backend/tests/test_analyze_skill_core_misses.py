@@ -1,6 +1,7 @@
 """core_tools miss analysis script."""
 
 from scripts.analyze_skill_core_misses import (
+    build_core_usage,
     build_report,
     collect_prefixed,
     extract_events,
@@ -19,6 +20,7 @@ def _payload() -> dict:
                     "skill_core_tool_missed:get_stock_documents": 3,
                     "skill_core_tool_missed:get_stock_sentiment": 1,
                     "skill_load_after_initial:stock_analysis": 4,
+                    "tool_called:get_stock_info": 9,
                 }
             }
         }
@@ -56,3 +58,39 @@ def test_render_text_mentions_misses_and_after_initial():
 
     assert "get_stock_documents" in text
     assert "stock_analysis" in text
+
+
+def test_build_report_flags_unused_core_tools():
+    events = extract_events(_payload())
+    report = build_report(events)
+
+    assert report["tool_calls"] == {"get_stock_info": 9}
+    usage = {row["tool"]: row for row in report["core_tool_usage"]}
+    assert usage["get_stock_info"]["calls"] == 9
+    assert usage["get_stock_info"]["unused"] is False
+    assert any(row["unused"] for row in usage.values())
+
+
+def test_core_usage_requires_a_skill_with_declared_core_tools():
+    assert build_core_usage({"get_stock_info": 1}, {"no_core": frozenset()}) == []
+    rows = build_core_usage({"a": 3}, {"s": frozenset({"a", "b"})})
+    assert rows == [
+        {"tool": "a", "skill": "s", "calls": 3, "unused": False},
+        {"tool": "b", "skill": "s", "calls": 0, "unused": True},
+    ]
+
+
+def test_demotion_candidates_need_a_minimum_sample():
+    """样本很小时「从未调用」几乎必然成立，不能据此建议降级。"""
+    from scripts.analyze_skill_core_misses import render_text as render
+
+    events = extract_events(_payload())  # 只有 9 次工具调用
+    small = build_report(events, min_samples=200)
+    assert small["tool_call_samples"] == 9
+    assert small["demotion_sample_ready"] is False
+    assert not any(row["unused"] for row in small["core_tool_usage"])
+    assert "only 9 tool calls observed" in render(small)
+
+    enough = build_report(events, min_samples=5)
+    assert enough["demotion_sample_ready"] is True
+    assert any(row["unused"] for row in enough["core_tool_usage"])

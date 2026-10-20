@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Collection
 from dataclasses import dataclass
@@ -14,9 +15,14 @@ from app.modules.chat.routing import (
     extract_stock_codes,
     is_url_message,
 )
-from app.modules.chat.stock_reference import mentions_stock_target
+from app.modules.chat.stock_reference import mentions_stock_target, needs_stock_resolution
+
+logger = logging.getLogger(__name__)
 
 _URL_PATTERN = re.compile(r"https?://[^\s<>()]+", re.I)
+# Layer C：只识别出股票语境、没识别出标的时给的中间分。
+# 高于关键词得分（让它进入首轮工具集，拿到 search_stocks），低于已确认标的的 100。
+_UNRESOLVED_STOCK_SCORE = 50
 _SCREENING_COMPATIBLE_STOCK_KEYWORDS = (
     "个股", "股价", "财报", "财务", "roe", "营收", "净利润", "k线", "macd",
     "rsi", "kdj", "技术面", "基本面", "新闻", "公告", "舆情", "情绪", "风险",
@@ -36,6 +42,8 @@ class ChatCapabilityPlan:
     candidate_agent_names: tuple[str, ...]
     needs_llm_classification: bool
     requires_tool_evidence: bool
+    # Layer C：消息指向具体证券但未识别出标的，需要先 search_stocks 消歧。
+    needs_stock_resolution: bool
     reasoning: str
 
 
@@ -55,6 +63,13 @@ def _detect_skill_scores(message: str) -> dict[str, int]:
     has_stock_reference = mentions_stock_target(message_without_urls)
     if has_stock_code or has_stock_reference:
         scores["stock_analysis"] = max(scores.get("stock_analysis", 0), 100)
+    elif "stock_analysis" in skills and needs_stock_resolution(message_without_urls):
+        # 有标的语境但认不出是哪只：给中间分，让它进首轮工具集拿到 search_stocks。
+        # 是否真的请求消歧由 build_chat_capability_plan 决定并打点（那里才知道
+        # 后续筛选是否把 stock_analysis 又拿掉了）。
+        scores["stock_analysis"] = max(
+            scores.get("stock_analysis", 0), _UNRESOLVED_STOCK_SCORE
+        )
     has_explicit_stock_analysis = _SCREENING_KEYWORD_MATCHER(message_without_urls)
     if (
         "stock_screening" in scores
@@ -91,10 +106,28 @@ def _initial_tool_names(
     skill_names: tuple[str, ...],
     *,
     core_tools_enabled: bool,
+    max_tools: int = 0,
 ) -> tuple[str, ...]:
+    """首轮工具清单：按 Skill 相关度顺序取，``max_tools>0`` 时截断。
+
+    截断依赖顺序正确（`CapabilityCatalog._selected_skills` 保留调用方顺序）；否则
+    查新闻时会把 ``web_search`` 排在后面而被先截掉。被截掉的工具不是消失——模型仍可
+    通过 ``load_skill`` 拿到，所以这是一个纯粹的「首轮 schema 体积」开关。
+    """
     if core_tools_enabled:
-        return tuple(registry.get_initial_tool_names_for_skills(skill_names))
-    return tuple(registry.get_tool_names_for_skills(skill_names))
+        names = registry.get_initial_tool_names_for_skills(skill_names)
+    else:
+        names = registry.get_tool_names_for_skills(skill_names)
+    if max_tools > 0 and len(names) > max_tools:
+        metrics.record_agentic_event("skill_initial_tools_capped")
+        logger.info(
+            "首轮工具数被 chat_max_initial_tools 截断: %s -> %s（skills=%s）",
+            len(names),
+            max_tools,
+            ",".join(skill_names),
+        )
+        names = names[:max_tools]
+    return tuple(names)
 
 
 def build_chat_capability_plan(
@@ -104,6 +137,7 @@ def build_chat_capability_plan(
     enabled_agent_names: Collection[str] | None = None,
     max_initial_active_skills: int = 3,
     core_tools_enabled: bool = True,
+    max_initial_tools: int = 0,
 ) -> ChatCapabilityPlan:
     register_all_capabilities()
     requested_skills = None if enabled_skill_names is None else set(enabled_skill_names)
@@ -128,7 +162,9 @@ def build_chat_capability_plan(
         active_skills,
         max_initial=max_initial_active_skills,
     )
-    tool_names = _initial_tool_names(initial_skills, core_tools_enabled=core_tools_enabled)
+    tool_names = _initial_tool_names(
+        initial_skills, core_tools_enabled=core_tools_enabled, max_tools=max_initial_tools
+    )
     active_tool_names = tuple(registry.get_tool_names_for_skills(active_skills))
     enabled_tool_names = tuple(registry.get_tool_names_for_skills(enabled_skills))
 
@@ -169,11 +205,23 @@ def build_chat_capability_plan(
                 max_initial=max_initial_active_skills,
             )
             tool_names = _initial_tool_names(
-                initial_skills, core_tools_enabled=core_tools_enabled
+                initial_skills,
+                core_tools_enabled=core_tools_enabled,
+                max_tools=max_initial_tools,
             )
             active_tool_names = tuple(registry.get_tool_names_for_skills(active_skills))
 
     requires_evidence = bool(active_skills and tool_names)
+    # 与 _detect_skill_scores 用同一份去 URL 文本：URL 里的数字不能被当成股票代码，
+    # 否则会出现“分数已按未识别提振、却没有下发消歧指令”的不一致。
+    message_without_urls = _URL_PATTERN.sub(" ", message)
+    unresolved_stock = (
+        "stock_analysis" in active_skill_set
+        and not extract_stock_codes(message_without_urls)
+        and needs_stock_resolution(message_without_urls)
+    )
+    if unresolved_stock:
+        metrics.record_agentic_event("stock_resolution_requested")
     if len(initial_skills) < len(active_skills):
         metrics.record_agentic_event("skill_initial_converged")
     if not initial_skills and active_skills:
@@ -191,5 +239,6 @@ def build_chat_capability_plan(
         candidate_agent_names=candidate_agents,
         needs_llm_classification=decision.needs_llm_classification and bool(candidate_agents),
         requires_tool_evidence=requires_evidence,
+        needs_stock_resolution=unresolved_stock,
         reasoning=reasoning,
     )

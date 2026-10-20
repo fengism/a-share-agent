@@ -135,12 +135,29 @@ class CapabilityCatalog:
         return missing_tools
 
     def _selected_skills(self, skill_names: Collection[str] | None = None) -> list[Skill]:
-        selected = None if skill_names is None else set(skill_names)
-        return [
-            skill
-            for skill in self.list_skills()
-            if selected is None or skill.name in selected
-        ]
+        """Resolve names to skills, preserving the caller's order.
+
+        调用方传来的顺序是**相关度顺序**（capability_plan 按 match_score 排序）。此前这里
+        一律按 ``list_skills()`` 的注册顺序重排，导致工具清单与相关度脱节：查新闻时
+        ``web_search`` 排在 ``web_fetch``/``fetch_urls`` 之后（那两个来自最低分的 Skill）。
+        集合输入没有顺序可言，退回注册顺序以保证确定性（prompt 前缀缓存依赖它）。
+        """
+        skills = {skill.name: skill for skill in self.list_skills()}
+        if skill_names is None:
+            return list(skills.values())
+        if isinstance(skill_names, (list, tuple)):
+            order = list(skill_names)
+        else:
+            order = [name for name in skills if name in set(skill_names)]
+        selected: list[Skill] = []
+        seen: set[str] = set()
+        for name in order:
+            skill = skills.get(name)
+            if skill is None or name in seen:
+                continue
+            seen.add(name)
+            selected.append(skill)
+        return selected
 
     def get_skill_prompt(self, skill_names: Collection[str] | None = None) -> str:
         """Full prompt for backward compatibility; prefer catalog + instructions."""
@@ -190,12 +207,9 @@ class CapabilityCatalog:
         self,
         skill_names: Collection[str] | None = None,
     ) -> list[str]:
-        selected = None if skill_names is None else set(skill_names)
         names: list[str] = []
         seen: set[str] = set()
-        for skill in self.list_skills():
-            if selected is not None and skill.name not in selected:
-                continue
+        for skill in self._selected_skills(skill_names):
             for tool_name in skill.tool_names:
                 if tool_name in seen:
                     continue
@@ -208,12 +222,9 @@ class CapabilityCatalog:
         skill_names: Collection[str] | None = None,
     ) -> list[str]:
         """First-turn tools: ``core_tools`` when declared, else every tool."""
-        selected = None if skill_names is None else set(skill_names)
         names: list[str] = []
         seen: set[str] = set()
-        for skill in self.list_skills():
-            if selected is not None and skill.name not in selected:
-                continue
+        for skill in self._selected_skills(skill_names):
             for tool_name in skill.initial_tool_names:
                 if tool_name in seen:
                     continue

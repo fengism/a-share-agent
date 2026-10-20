@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Callable, Mapping
 from dataclasses import dataclass, replace
 
 from app.agentic.agents.contracts import AgentExecutionResult, AgentProfile
@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 # two long upstream reports cannot crowd out the current task and tool evidence.
 _MAX_DEPENDENCY_CONTEXT_CHARACTERS = 24_000
 _DEPENDENCY_TRUNCATION_MARKER = "\n…（前置分析已按上下文预算截断）"
+# 子任务消息里给 system prompt、Skill 规则、任务目标与工具结果预留的空间。
+_PROMPT_RESERVED_CHARACTERS = 24_000
+_MIN_DEPENDENCY_CONTEXT_CHARACTERS = 2_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +58,39 @@ def _render_dependency_context(
             text = (text[:keep] + _DEPENDENCY_TRUNCATION_MARKER)[:allowance]
         parts.append(header + text)
     return "\n\n".join(parts)
+
+
+def _prompt_budget_for_dependencies(
+    execution_context: AgentExecutionContext,
+) -> int:
+    """把整轮 prompt 上限换算成依赖上下文还能占多少字符。
+
+    子任务消息 = system prompt（含 Skill 规则）+ 前置分析 + 任务目标。只靠
+    ``_MAX_DEPENDENCY_CONTEXT_CHARACTERS`` 与 ``chat_max_tool_context_characters``
+    两个上限时，``chat_max_prompt_characters`` 对这块完全不生效。
+    """
+    total_cap = int(
+        getattr(execution_context.settings, "chat_max_prompt_characters", 0) or 0
+    )
+    if total_cap <= 0:
+        return _MAX_DEPENDENCY_CONTEXT_CHARACTERS
+    # 与执行器保留下限一致：依赖上下文被压到 0 等于让下游在无证据的情况下作答。
+    remaining = total_cap - _PROMPT_RESERVED_CHARACTERS
+    if remaining >= _MAX_DEPENDENCY_CONTEXT_CHARACTERS:
+        return _MAX_DEPENDENCY_CONTEXT_CHARACTERS
+    metrics.record_agentic_event("dependency_context_budget_reduced")
+    return max(_MIN_DEPENDENCY_CONTEXT_CHARACTERS, remaining)
+
+
+def _prepend_instruction(prompt: str, instruction: str) -> str:
+    """Put a host-supplied directive in front of the Skill rules.
+
+    The directive must come first: the Skill rules are long and the model reads
+    the tool-selection prompt top-down.
+    """
+    if not instruction:
+        return prompt
+    return "\n\n".join(part for part in (instruction, prompt) if part)
 
 
 def _build_professional_skill_prompt(
@@ -100,12 +136,20 @@ def _build_task_message(
         context = _render_dependency_context(dependency_results, max_dependency_characters)
         parts.append(f"## 已完成的前置分析\n{context}")
 
+    if task.repair_context:
+        parts.append(
+            "## 上一轮分析（本轮需要修复）\n"
+            "以下是你上一轮已经给出的分析。其中仍然成立的结论必须保留，不要整段重新推导；"
+            "只需补齐缺失的数据证据并修正不成立的结论。\n\n"
+            f"{task.repair_context}"
+        )
+
     is_retry_or_special = (
         "修复" in task.objective
         or "上一轮" in task.objective
         or "重试" in task.objective
     )
-    if dependency_results or is_retry_or_special:
+    if dependency_results or task.repair_context or is_retry_or_special:
         parts.append(f"## 当前任务指示与要求\n{task.objective}")
 
     return "\n\n".join(parts)
@@ -123,7 +167,15 @@ async def stream_execution_plan(
     *,
     attempt: int = 1,
     execution_context: AgentExecutionContext | None = None,
+    task_instruction: Callable[[AgentTask], str] | None = None,
 ) -> AsyncGenerator[AgentEvent, None]:
+    """Run every pending task of ``plan``.
+
+    ``task_instruction`` lets the host prepend a per-task directive to the tool
+    selection prompt (e.g. "resolve this ambiguous target first"). It stays a
+    callable so the core never hardcodes host-side tool or product names: the
+    host decides which tasks qualify.
+    """
     queue: asyncio.Queue[AgentEvent | _TaskCompleted] = asyncio.Queue()
     tool_cache = (
         execution_context.tool_cache
@@ -135,6 +187,7 @@ async def stream_execution_plan(
         max_dependency_characters = min(
             max_dependency_characters,
             execution_context.settings.chat_max_tool_context_characters,
+            _prompt_budget_for_dependencies(execution_context),
         )
     tasks_by_id = {task.task_id: task for task in plan.tasks}
     reuse_ids = set(plan.reuse_task_ids)
@@ -174,8 +227,9 @@ async def stream_execution_plan(
                 tool_cache=tool_cache,
                 allowed_tool_names=task.allowed_tools,
                 temperature=temperature,
-                tool_selection_prompt=_build_professional_skill_prompt(
-                    profile, execution_context
+                tool_selection_prompt=_prepend_instruction(
+                    _build_professional_skill_prompt(profile, execution_context),
+                    task_instruction(task) if task_instruction is not None else "",
                 ),
                 require_tool_evidence=bool(task.allowed_tools),
                 execution_context=execution_context,
