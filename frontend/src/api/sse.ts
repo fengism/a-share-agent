@@ -425,7 +425,6 @@ export interface DailyReviewProgress {
   type:
     | "stage_started"
     | "stage_completed"
-    | "stage_failed"
     | "stage_progress"
     | "source_done"
     | "cache_hit"

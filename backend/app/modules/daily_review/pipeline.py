@@ -121,10 +121,6 @@ async def _stage_completed(
     await progress.emit({"type": "stage_completed", "stage": stage, "message": message, **extra})
 
 
-async def _stage_failed(progress: ProgressEmitter[dict[str, Any]], stage: str, message: str) -> None:
-    await progress.emit({"type": "stage_failed", "stage": stage, "message": message})
-
-
 @asynccontextmanager
 async def _stage_heartbeat(
     progress: ProgressEmitter[dict[str, Any]],

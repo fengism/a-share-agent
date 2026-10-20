@@ -9,12 +9,18 @@ export const DAILY_REVIEW_STAGES = [
 
 export type DailyReviewStageKey = (typeof DAILY_REVIEW_STAGES)[number]["key"];
 
+/** 分析阶段走了确定性兜底时的提示（后端 generation_status="fallback"）。 */
+export const DAILY_REVIEW_FALLBACK_DESCRIPTION = "AI 复盘生成失败，已使用确定性兜底";
+export const DAILY_REVIEW_CACHED_DESCRIPTION = "复用已有复盘";
+
 export interface DailyReviewProgressState {
   done: DailyReviewStageKey[];
   current: DailyReviewStageKey | "";
   collect: { done: number; total: number; failed: number } | null;
   elapsedMs: number;
   cached: boolean;
+  /** 非空表示本次复盘的 AI 输出不可用，已降级为确定性兜底。 */
+  degraded: string;
 }
 
 export const EMPTY_DAILY_REVIEW_PROGRESS: DailyReviewProgressState = {
@@ -23,6 +29,7 @@ export const EMPTY_DAILY_REVIEW_PROGRESS: DailyReviewProgressState = {
   collect: null,
   elapsedMs: 0,
   cached: false,
+  degraded: "",
 };
 
 export function reduceDailyReviewProgress(
@@ -39,7 +46,10 @@ export function reduceDailyReviewProgress(
       const collect = stage === "collect"
         ? { done: event.sources ?? state.collect?.done ?? 0, total: event.sources ?? 0, failed: event.failed ?? 0 }
         : state.collect;
-      return { ...state, done, current: "", collect };
+      const degraded = stage === "analyze" && event.generation_status === "fallback"
+        ? DAILY_REVIEW_FALLBACK_DESCRIPTION
+        : state.degraded;
+      return { ...state, done, current: "", collect, degraded };
     }
     case "source_done": {
       const failed = (state.collect?.failed ?? 0) + (event.status === "unavailable" ? 1 : 0);
@@ -65,9 +75,13 @@ export function buildDailyReviewStepItems(state: DailyReviewProgressState) {
   return DAILY_REVIEW_STAGES.map((stage, index) => {
     const finished = state.done.includes(stage.key);
     let description: string | undefined;
-    if (stage.key === "collect" && state.collect) {
+    if (stage.key === "queue" && state.cached) {
+      description = DAILY_REVIEW_CACHED_DESCRIPTION;
+    } else if (stage.key === "collect" && state.collect) {
       const { done, total, failed } = state.collect;
       description = failed > 0 ? `已完成 ${done}/${total}，${failed} 个源不可用` : `已完成 ${done}/${total}`;
+    } else if (stage.key === "analyze" && state.degraded) {
+      description = state.degraded;
     } else if (stage.key === "analyze" && state.elapsedMs > 0 && !finished) {
       description = `已用 ${Math.round(state.elapsedMs / 1000)}s`;
     } else if (finished) {

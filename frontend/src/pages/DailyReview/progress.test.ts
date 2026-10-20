@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  DAILY_REVIEW_CACHED_DESCRIPTION,
+  DAILY_REVIEW_FALLBACK_DESCRIPTION,
   EMPTY_DAILY_REVIEW_PROGRESS,
   buildDailyReviewStepItems,
   reduceDailyReviewProgress,
@@ -64,6 +66,21 @@ describe("每日复盘进度归约", () => {
     expect(apply([{ type: "cache_hit" }]).cached).toBe(true);
   });
 
+  it("兜底输出被记为降级", () => {
+    const state = apply([
+      { type: "stage_completed", stage: "analyze", generation_status: "fallback" },
+    ]);
+    expect(state.degraded).not.toBe("");
+    expect(state.done).toEqual(["analyze"]);
+  });
+
+  it("正常模型输出不会标记降级", () => {
+    const state = apply([
+      { type: "stage_completed", stage: "analyze", generation_status: "llm" },
+    ]);
+    expect(state.degraded).toBe("");
+  });
+
   it("未知事件不改变状态", () => {
     const initial = apply([{ type: "stage_started", stage: "collect" }]);
     expect(apply([{ type: "complete" }], initial)).toEqual(initial);
@@ -103,5 +120,20 @@ describe("每日复盘步骤渲染", () => {
       { type: "stage_progress", elapsed_ms: 32000 },
     ]);
     expect(buildDailyReviewStepItems(state)[2].description).toBe("已用 32s");
+  });
+
+  it("缓存命中时排队步骤显示复用而不是等待", () => {
+    const items = buildDailyReviewStepItems(apply([{ type: "cache_hit" }]));
+    expect(items[0].description).toBe(DAILY_REVIEW_CACHED_DESCRIPTION);
+  });
+
+  it("兜底输出在 AI 复盘步骤上可见", () => {
+    const state = apply([
+      { type: "stage_started", stage: "analyze" },
+      { type: "stage_completed", stage: "analyze", generation_status: "fallback" },
+    ]);
+    const analyze = buildDailyReviewStepItems(state)[2];
+    expect(analyze.description).toBe(DAILY_REVIEW_FALLBACK_DESCRIPTION);
+    expect(analyze.status).toBe("finish");
   });
 });
