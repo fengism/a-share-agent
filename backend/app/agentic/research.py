@@ -16,7 +16,6 @@ from app.agentic.contracts import (
     EvidenceBatchStats,
     EvidenceRequirement,
     classify_evidence_batch,
-    render_agent_evidence,
 )
 from app.agentic.events import (
     AgentEvent,
@@ -26,13 +25,19 @@ from app.agentic.events import (
     AgentResearchRound,
     auditable_agent_event,
 )
+from app.agentic.research_policy import (
+    build_gap_message,
+    followup_reserve,
+    missing_requirements,
+    normalize_round_result,
+    select_gap_tools,
+    should_continue,
+)
 from app.agentic.runtime.timezones import SHANGHAI_TIMEZONE
 from app.agentic.semantics import EvidenceState, ExecutionOutcome
-from app.domain.llm import LLMInvalidResponseError
 
 AgentEventCallback = Callable[[AgentEvent], Awaitable[None]]
 _DEFAULT_RECENCY_DAYS = 183
-_FOLLOWUP_TOOL_CALL_RESERVE = 8
 
 
 def build_research_system_prompt(
@@ -48,15 +53,16 @@ def build_research_system_prompt(
     else:
         resolved_time = current_time.astimezone(SHANGHAI_TIMEZONE)
     resolved_date = resolved_time.date()
-    sections = [
-        spec.system_prompt.rstrip(),
-        (
-            "## 运行时日期与时间\n"
-            f"- 当前时间（Asia/Shanghai）：{resolved_time.isoformat(sep=' ', timespec='seconds')}。"
-            "所有‘当前’‘最新’‘今年’等相对时间都以此日期为准；用户明确指定的分析日期优先。\n"
-            "- 不得沿用模型训练数据中的旧年份作为当前年份；历史年份只能用于趋势对比，并明确标注为历史数据。"
-        ),
-    ]
+    # Prompt-prefix caching: the runtime clock changes every second, so it must be
+    # the last section. Placed mid-prompt it would invalidate every static rule
+    # that follows it on each request.
+    clock_section = (
+        "## 运行时日期与时间\n"
+        f"- 当前时间（Asia/Shanghai）：{resolved_time.isoformat(sep=' ', timespec='seconds')}。"
+        "所有‘当前’‘最新’‘今年’等相对时间都以此日期为准；用户明确指定的分析日期优先。\n"
+        "- 不得沿用模型训练数据中的旧年份作为当前年份；历史年份只能用于趋势对比，并明确标注为历史数据。"
+    )
+    sections = [spec.system_prompt.rstrip()]
     if "web_search" in spec.tool_names:
         recency_start = resolved_date - timedelta(days=_DEFAULT_RECENCY_DAYS)
         if spec.document_search_guidance:
@@ -85,6 +91,7 @@ def build_research_system_prompt(
         "- 若搜索结果（web_search / iwencai_search）或网页抓取（web_fetch）中的二手财务数据与财报接口返回的财务指标（营收、归母净利、扣非净利、毛利率、资产负债率、EPS、分部数据等）存在差异或冲突，必须无条件以财报接口数据为准，严禁采用搜索引擎摘要或第三方非标网页数据覆盖财报接口数据。\n"
         "- 网页搜索与外部资料仅用于获取行业趋势、商业护城河背景、产业链地位和舆情定性资料，不用于替代定量财务数据。"
     )
+    sections.append(clock_section)
     return "\n\n".join(sections)
 
 
@@ -106,54 +113,10 @@ class AgentResearchRuntime(Protocol):
     ) -> AsyncContextManager[AgentResearchSession]: ...
 
 
-def _missing_requirements(
-    requirements: tuple[EvidenceRequirement, ...],
-    evidence: list[AgentEvidence],
-) -> list[EvidenceRequirement]:
-    return [
-        requirement
-        for requirement in requirements
-        if not any(requirement.accepts(item) for item in evidence)
-    ]
-
-
-def _gap_tool_names(
-    spec: AgentResearchSpec,
-    missing: list[EvidenceRequirement],
-) -> tuple[str, ...]:
-    required_tools = {
-        tool_name
-        for requirement in missing
-        for tool_name in requirement.tool_names
-    }
-    discovery_tools = {"web_search", "iwencai_search"}
-    if required_tools.intersection({"web_fetch", "fetch_urls"}):
-        required_tools.update(discovery_tools.intersection(spec.tool_names))
-    return tuple(tool_name for tool_name in spec.tool_names if tool_name in required_tools)
-
-
-def _build_gap_message(
-    original_message: str,
-    previous_result: AgentRoundResult,
-    evidence: list[AgentEvidence],
-    missing: list[EvidenceRequirement],
-    round_index: int = 2,
-    document_search_guidance: str = "",
-) -> str:
-    labels = "、".join(item.label for item in missing)
-    round_desc = f"第 {round_index} 轮" if round_index > 1 else "本轮"
-    return "\n".join([
-        f"原始调研任务：{original_message}",
-        f"前序调研摘要：{previous_result.summary or '暂无结论'}",
-        f"缺失证据维度（{round_desc}）：{labels}",
-        "请仅围绕缺失维度继续调用允许的工具补齐证据。必须实际调用工具，不得使用常识补写。",
-        ("缺口是待阅读/核对清单，不是一项一个query。先复用已取得的文献与目录，按同一文献/公司合并检查；"
-         "仅在阅读后仍缺核心前提时增加窄查询，说明已有材料为何不足。\n" + document_search_guidance)
-        if document_search_guidance else
-        "先检查已有工具参数，不得原样重复失败或低质量的查询；应根据缺失维度缩小范围并改进检索词。",
-        "已有工具证据：",
-        render_agent_evidence(evidence),
-    ])
+# 纯决策逻辑见 app/agentic/research_policy.py（可单独测试，无副作用）。
+_missing_requirements = missing_requirements
+_gap_tool_names = select_gap_tools
+_build_gap_message = build_gap_message
 
 
 async def _emit(callback: AgentEventCallback | None, event: AgentEvent) -> None:
@@ -173,14 +136,7 @@ async def _run_round(
         result = await session.run(message, allowed_tool_names, tool_call_reserve=tool_call_reserve)
     else:
         result = await session.run(message, allowed_tool_names, event_callback=event_callback, tool_call_reserve=tool_call_reserve)
-    # The pluggable Runtime interface must enforce the same boundary as the
-    # default adapter: status flags cannot override a fatal or unknown reason.
-    outcome = result.outcome
-    if outcome.reason.fatal:
-        raise LLMInvalidResponseError(f"Agent 调研停止：{outcome.reason.description}（reason={outcome.reason.code}）")
-    if result.execution_status == "failed" or outcome.status == "failed" or result.stop_reason:
-        result = replace(result, summary="")
-    return result
+    return normalize_round_result(result)
 
 
 @dataclass(slots=True)
@@ -496,7 +452,7 @@ async def run_agentic_research(
             message,
             spec.tool_names,
             round_callback,
-            tool_call_reserve=_FOLLOWUP_TOOL_CALL_RESERVE if max_rounds > 1 else 0,
+            tool_call_reserve=followup_reserve(max_rounds),
         )
         round_outcomes.append(last_result.outcome)
         evidence_stats = await _collect_round_result(last_result, evidence, summaries, progress)
@@ -552,8 +508,13 @@ async def run_agentic_research(
             stop_reason = gap_result.stop_reason
             missing = _missing_requirements(spec.requirements, evidence)
             made_progress = len(missing) < missing_count_before
-            can_continue = bool(
-                missing and made_progress and current_round < max_rounds and not stop_reason and gap_result.tool_calls_remaining != 0
+            can_continue = should_continue(
+                missing=missing,
+                current_round=current_round,
+                max_rounds=max_rounds,
+                stop_reason=stop_reason,
+                tool_calls_remaining=gap_result.tool_calls_remaining,
+                made_progress=made_progress,
             )
             await _emit_round_completed(
                 progress,
