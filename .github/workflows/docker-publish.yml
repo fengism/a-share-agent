@@ -141,6 +141,8 @@ jobs:
         run: npm run test:e2e
 
       - name: Upload Playwright failure artifacts
+        # 上传失败（如 blob 存储 ECONNRESET）不应掩盖真正的 E2E 失败信息
+        continue-on-error: true
         if: failure()
         uses: actions/upload-artifact@v4
         with:
