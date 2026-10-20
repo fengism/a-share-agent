@@ -45,6 +45,16 @@ class ResearchGroup(ConfigGroup):
     chat_max_tool_calls_per_round: int = Field(default=16, ge=1, le=32)
     chat_max_tool_calls_total: int = Field(default=32, ge=1, le=128)
     chat_max_tool_context_characters: int = Field(default=60_000, ge=4_096, le=500_000)
+    # 首轮工具数上限。首轮工具 schema 是 prompt 的最大单项（14 个工具约 8.8k 字符），
+    # 而 chat_max_initial_active_skills 限的是 Skill 数不是工具数：3 个 Skill 的
+    # core_tools 相加可能是 14 个。0 表示不限制；被截掉的工具仍可通过 load_skill 获得。
+    chat_max_initial_tools: int = Field(default=0, ge=0, le=64)
+    # 历史回灌预算；大上下文模型可调高，0 不合法（必须保留最起码的连续性）。
+    chat_max_history_characters: int = Field(default=40_000, ge=4_000, le=200_000)
+    # 整轮 prompt（system + 历史 + 工具结果）总字符上限。0=不启用，保持旧行为。
+    chat_max_prompt_characters: int = Field(default=0, ge=0, le=1_000_000)
+    # 跨请求复用 public + daily/static 工具结果（按 ToolPolicy.cache_ttl_seconds）。
+    chat_tool_process_cache_enabled: bool = True
     chat_max_synthesis_characters: int = Field(default=60_000, ge=4_096, le=500_000)
     # 通用 Agent 的 Skill 渐进披露：-1=完整 rules（回滚），0=仅目录+load_skill，N=目录+前 N 个详细规则。
     chat_skill_instruction_top_n: int = Field(default=0, ge=-1, le=10)

@@ -50,3 +50,31 @@ def test_tool_failure_label_never_exposes_raw_provider_text():
 def test_tool_failure_label_falls_back_to_generic_text():
     assert tool_failure_label("not-json") == "工具调用失败"
     assert tool_failure_label(json.dumps({"ok": False, "error": {"code": "unknown_code"}})) == "工具调用失败"
+
+
+def test_failure_code_fast_path_skips_decoding_success_payloads():
+    from app.agentic.runtime.evidence import failure_label, safe_tool_failure_code
+
+    # No "error" key -> no decode at all, and no false negative either.
+    assert safe_tool_failure_code('{"ok":true,"data":{"items":[1,2,3]}}') == ""
+    assert safe_tool_failure_code("plain text") == ""
+    # The fast path must not miss envelopes whose data merely mentions the word.
+    assert safe_tool_failure_code(
+        '{"ok":false,"error":{"code":"timeout","message":"has \\"error\\" inside"}}'
+    ) == "timeout"
+    assert failure_label("timeout") == "数据获取超时"
+    assert failure_label("") == "工具调用失败"
+
+
+def test_evidence_state_reuses_the_acquisition_result_for_identical_context():
+    from app.agentic.semantics import EvidenceState
+
+    content = '{"ok":true,"data":{"code":"600519"}}'
+    same = EvidenceState.from_content(content, context=content)
+    truncated = EvidenceState.from_content(content, context='{"ok":true,"data":{}}')
+
+    assert same.usable_acquisition is True
+    assert same.usable_context is True
+    # A truncated context that lost the payload is no longer evidence.
+    assert truncated.usable_acquisition is True
+    assert truncated.usable_context is False

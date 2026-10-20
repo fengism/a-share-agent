@@ -70,6 +70,10 @@ def has_finite_number(value: Any) -> bool:
 
 
 def safe_tool_failure_code(content: str) -> str:
+    # 错误封装永远是含 "error" 键的 JSON 对象（serialize_error 生成）。
+    # 成功结果占绝大多数，先用子串判断避开整包解码：9k 字符约 115µs -> 0.3µs。
+    if '"error"' not in content:
+        return ""
     if len(content) > 100_000:
         return ""
     try:
@@ -81,9 +85,14 @@ def safe_tool_failure_code(content: str) -> str:
         return ""
 
 
+def failure_label(code: str) -> str:
+    """Map an already-extracted failure code to its user-safe label."""
+    return _FAILURES.get(code, "工具调用失败")
+
+
 def tool_failure_label(content: str) -> str:
     """Short user-safe label for one failed tool result; never raw payload text."""
-    return _FAILURES.get(safe_tool_failure_code(content), "工具调用失败")
+    return failure_label(safe_tool_failure_code(content))
 
 
 def evidence_gap_reason(result: AgentExecutionResult) -> str:

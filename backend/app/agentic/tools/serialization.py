@@ -24,6 +24,9 @@ _RESERVED_ERROR_CODES = frozenset(
 # 预算耗尽到连 {"ok": false}（12 字符）都放不下时的最小标记。
 _DROPPED_RESULT = "null"
 _MIN_DROPPED_RESULT_LEN = len(_DROPPED_RESULT)
+# 工具消息的最小合法占位：role=tool 的 content 不能是空串（部分网关直接 400），
+# 而 "{}" 只有 2 个字符、也不是有效证据（``_has_meaningful_value({})`` 为 False）。
+EMPTY_TOOL_RESULT = "{}"
 
 
 # Collection envelopes must be judged by their actual records, not request
@@ -128,37 +131,57 @@ def tool_call_cache_key(call: ToolCallInfo, *, user_id: int | str | None = None)
     return tool_call_cache_key_from_arguments(call.function.name, parsed, user_id=user_id)
 
 
+# ensure_ascii=False 下 JSON 只需要转义这三类字符；不含它们时序列化长度可以精确预算，
+# 不用为了量长度把整包重新 encode 十几遍。
+_JSON_ESCAPE_NEEDED = re.compile(r'["\\\x00-\x1f]')
+
+
 def serialize_truncated_preview(
     content: str,
     note: str,
     max_result_len: int = MAX_RESULT_LEN,
 ) -> str:
-    low = 0
-    high = min(len(content), max_result_len)
-    best = json.dumps(
-        {
-            "ok": True,
-            "data": {"preview": ""},
-            "meta": {"truncated": True, "reason": note},
-        },
-        ensure_ascii=False,
-    )
-    while low <= high:
-        middle = (low + high) // 2
-        candidate = json.dumps(
-            {
-                "ok": True,
-                "data": {"preview": content[:middle]},
-                "meta": {"truncated": True, "reason": note},
-            },
-            ensure_ascii=False,
-        )
-        if len(candidate) <= max_result_len:
-            best = candidate
-            low = middle + 1
-        else:
-            high = middle - 1
-    return best
+    """Fit a prefix of ``content`` into a ``{ok, data.preview, meta}`` envelope.
+
+    旧实现用二分查找并每步 ``json.dumps`` 整包：一次 15k 字符的结果要 encode
+    ~19 次，在真实请求里占到 agent 侧 CPU 的 65%。现在先按「不转义时长 1:1」
+    精确算出可放长度，命中就只序列化一次；只有真的含引号/反斜杠/控制字符时才
+    用溢出回退收缩（至少 1:1 增长，1~2 次收敛）。
+    """
+    limit = max(0, int(max_result_len))
+    envelope: dict[str, Any] = {
+        "ok": True,
+        "data": {"preview": ""},
+        "meta": {"truncated": True, "reason": note},
+    }
+    base = json.dumps(envelope, ensure_ascii=False)
+    # 空 preview 的 JSON 字面量 "" 占 2 个字符；剩余额度就是转义后 preview 的预算。
+    budget = limit - (len(base) - 2)
+    if budget < 2:
+        # 信封本身都装不下。调用方会把超预算的返回值换成 "{}"，但这里直接给出
+        # 合法的 "{}"：旧实现经调用方后也是 "{}“，改写成空串会变成
+        # role=tool 的 content 为空（部分网关 400），是一个真实的协议回归。
+        if len(base) <= limit:
+            return base
+        return "{}" if limit >= 2 else ""
+    take = min(len(content), budget - 2)
+    if not _JSON_ESCAPE_NEEDED.search(content, 0, take):
+        envelope["data"]["preview"] = content[:take]
+        return json.dumps(envelope, ensure_ascii=False)
+    while take > 0:
+        envelope["data"]["preview"] = content[:take]
+        candidate = json.dumps(envelope, ensure_ascii=False)
+        overflow = len(candidate) - limit
+        if overflow <= 0:
+            return candidate
+        # 尾部被删掉的那段自己也可能含转义字符（JSON 载荷到处是引号）。
+        # 按「字符 + 转义增量」估算要删多少，避免抽多后只剩一个小预览。
+        tail_start = max(0, take - overflow)
+        escaped = len(_JSON_ESCAPE_NEEDED.findall(content, tail_start, take))
+        take -= max(1, overflow - escaped)
+    envelope["data"]["preview"] = ""
+    candidate = json.dumps(envelope, ensure_ascii=False)
+    return candidate if len(candidate) <= limit else ""
 
 
 def _truncated_error_envelope(
@@ -244,43 +267,80 @@ def serialize_truncated_error(
     # （_has_meaningful_value(None) 为 False）。
     if limit >= _MIN_DROPPED_RESULT_LEN:
         return _DROPPED_RESULT
-    return ""
+    # 放不下 null 时也不能给空串：{} 同样是「没有可用内容」，但不是非法协议载荷。
+    return EMPTY_TOOL_RESULT
 
 
 def serialize_context_result(content: str, max_result_len: int) -> str:
+    bounded, _ = _serialize_context_result_detailed(content, max_result_len)
+    return bounded
+
+
+def _serialize_context_result_detailed(
+    content: str,
+    max_result_len: int,
+) -> tuple[str, bool | None]:
+    """Bound one payload, reusing the decode needed for truncation.
+
+    Returns ``(bounded, source_has_evidence)``. ``source_has_evidence`` is ``None``
+    when this path never decoded the payload (it fit the budget), so the caller must
+    decide itself.
+
+    上下文截断必然要 ``json.loads`` 整包，而调用方紧接着还要再解析一次同一份内容来
+    判定「是否拿到有效证据」。一个 46k 的结果约 1.3ms，一次请求里每条结果就是 2.6ms
+    的重复解码；这里把同一次 decode 的结果复用出去。
+    """
     limit = max(0, int(max_result_len))
     if len(content) <= limit:
-        return content
-    if limit < 2:
-        return ""
+        # 工具自己返回空内容时同样补一个合法占位。
+        return content or EMPTY_TOOL_RESULT, None
+    if limit < len(EMPTY_TOOL_RESULT):
+        # 预算连 {} 都放不下：仍然给出合法 JSON。最多超出 2 个字符，比一次
+        # 因 role=tool 空内容而失败的请求便宜得多。
+        return EMPTY_TOOL_RESULT, None
     try:
         envelope = json.loads(content)
     except (ValueError, TypeError):
+        # 非 JSON 文本：与原 ``has_meaningful_tool_content`` 一致，按「有内容」处理。
+        source_has_evidence: bool | None = True
         envelope = None
+    else:
+        source_has_evidence = _has_meaningful_value(envelope)
     if isinstance(envelope, dict) and envelope.get("ok") is False:
         note = "Agent 工具上下文预算不足，结果已截断"
-        return serialize_truncated_error(envelope.get("error"), content, note, limit)
+        return serialize_truncated_error(envelope.get("error"), content, note, limit), source_has_evidence
     if isinstance(envelope, dict) and envelope.get("ok") is True:
         document = bounded_document(envelope.get("data"), limit, envelope.get("meta") or {})
         if document is not None:
-            return document
+            return document, source_has_evidence
     preview = serialize_truncated_preview(
         content,
         "Agent 工具上下文预算不足，结果已截断",
         limit,
     )
-    return preview if len(preview) <= limit else "{}"
+    return (preview if len(preview) <= limit else "{}"), source_has_evidence
 
 
 def serialize_context_results(contents: list[str], max_result_len: int) -> list[str]:
     """Share a batch budget fairly; small results retain their full payload first."""
+    return [bounded for bounded, _ in serialize_context_results_detailed(contents, max_result_len)]
+
+
+def serialize_context_results_detailed(
+    contents: list[str],
+    max_result_len: int,
+) -> list[tuple[str, bool | None]]:
+    """``serialize_context_results`` plus each source payload's evidence flag.
+
+    See ``_serialize_context_result_detailed`` for why the flag is free here.
+    """
     remaining = max(0, int(max_result_len))
-    bounded = [""] * len(contents)
+    bounded: list[tuple[str, bool | None]] = [("", None)] * len(contents)
     ordered = sorted(range(len(contents)), key=lambda index: len(contents[index]))
     for offset, index in enumerate(ordered):
         allowance = remaining // (len(ordered) - offset)
-        bounded[index] = serialize_context_result(contents[index], allowance)
-        remaining -= len(bounded[index])
+        bounded[index] = _serialize_context_result_detailed(contents[index], allowance)
+        remaining -= len(bounded[index][0])
     return bounded
 
 

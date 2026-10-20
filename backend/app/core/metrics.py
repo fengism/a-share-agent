@@ -7,6 +7,11 @@ from dataclasses import dataclass
 from threading import Lock
 
 _MAX_PROVIDER_OPERATION_SERIES = 64
+# agentic 事件名同时是低基数标签。当前实际取值上界约 45 个固定名
+# + tool_called:/skill_core_tool_missed:<tool> 各至多「工具数」个 + skill 级事件，
+# 取 512 留出工具增长空间；再涨就该怀疑有动态前缀失控。
+_MAX_AGENTIC_EVENT_SERIES = 512
+_AGENTIC_EVENT_OVERFLOW = "agentic_event_series_overflow"
 
 
 @dataclass(slots=True)
@@ -45,7 +50,11 @@ class _BrowserFetchMetrics(_DurationMetrics):
 class _LlmMetrics(_DurationMetrics):
     cancellations: int = 0
     prompt_tokens: int = 0
+    # 单次最大值：只看总量无法判断是否真有请求撞到上下文上限，
+    # 调 chat_max_prompt_characters / completion 预算需要这个分布上界。
+    prompt_tokens_max: int = 0
     completion_tokens: int = 0
+    completion_tokens_max: int = 0
     queue_wait_ms_total: float = 0.0
     queue_wait_ms_max: float = 0.0
     ttft_ms_total: float = 0.0
@@ -105,7 +114,9 @@ def _llm_metrics_snapshot(entry: _LlmMetrics) -> dict:
         **_duration_metrics_snapshot(entry),
         "cancellations": entry.cancellations,
         "prompt_tokens": entry.prompt_tokens,
+        "prompt_tokens_max": entry.prompt_tokens_max,
         "completion_tokens": entry.completion_tokens,
+        "completion_tokens_max": entry.completion_tokens_max,
         "queue_wait_ms_max": round(entry.queue_wait_ms_max, 2),
         "ttft_ms_max": round(entry.ttft_ms_max, 2),
         "queue_wait_ms_avg": round(entry.queue_wait_ms_total / entry.attempts, 2),
@@ -276,8 +287,14 @@ class MetricsRegistry:
                 duration_ms=duration_ms,
                 error_type=error_type,
             )
-            entry.prompt_tokens += max(0, prompt_tokens or 0)
-            entry.completion_tokens += max(0, completion_tokens or 0)
+            if prompt_tokens:
+                entry.prompt_tokens += max(0, prompt_tokens)
+                entry.prompt_tokens_max = max(entry.prompt_tokens_max, prompt_tokens)
+            if completion_tokens:
+                entry.completion_tokens += max(0, completion_tokens)
+                entry.completion_tokens_max = max(
+                    entry.completion_tokens_max, completion_tokens
+                )
             entry.queue_wait_ms_total += max(0.0, queue_wait_ms)
             entry.queue_wait_ms_max = max(entry.queue_wait_ms_max, queue_wait_ms)
             if ttft_ms is not None:
@@ -288,6 +305,14 @@ class MetricsRegistry:
 
     def record_agentic_event(self, event: str) -> None:
         with self._lock:
+            # 事件名是低基数标签：一部分带工具/Skill 名（已由 registry 限定），
+            # 但任何新接入的动态前缀都不应该能无限撑大内存与 /metrics 体积。
+            if (
+                event not in self._agentic_events
+                and len(self._agentic_events) >= _MAX_AGENTIC_EVENT_SERIES
+            ):
+                self._agentic_events[_AGENTIC_EVENT_OVERFLOW] += 1
+                return
             self._agentic_events[event] += 1
 
     def record_browser_fetch(

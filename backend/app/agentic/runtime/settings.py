@@ -11,10 +11,20 @@ from typing import Protocol
 
 
 class AgentSettings(Protocol):
+    """Host-provided settings surface used by the core executor.
+
+    Fields below are read through ``getattr`` where a standalone or extracted
+    caller may legitimately omit them; declaring them here documents the real
+    host contract without making them a hard import-time requirement.
+    """
     chat_max_completion_tokens: int
     chat_max_tool_calls_per_round: int
     chat_max_tool_calls_total: int
     chat_max_tool_context_characters: int
+    chat_max_history_characters: int
+    chat_max_initial_tools: int
+    chat_max_prompt_characters: int
+    chat_tool_process_cache_enabled: bool
     chat_max_skill_loads_total: int
     chat_tool_timeout_seconds: float
     llm_context_length_tokens: int

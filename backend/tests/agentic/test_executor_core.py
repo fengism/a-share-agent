@@ -165,6 +165,31 @@ async def test_executor_deduplicates_identical_tool_calls(monkeypatch):
     assert [item.skipped for item in result.tool_results] == [False, True]
 
 
+async def test_executor_counts_only_really_used_tools(monkeypatch):
+    """``tool_called:<name>`` must not inflate on deduplicated duplicates."""
+    from app.agentic.agents import executor as executor_module
+    from app.core.metrics import MetricsRegistry
+
+    fresh = MetricsRegistry()
+    monkeypatch.setattr(executor_module, "metrics", fresh)
+    completions = _FakeCompletions([_two_tool_call_response(), _final_response()])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+    _install_registry(monkeypatch, [('{"ok":true,"data":{"value":1}}', False)])
+
+    await AgentExecutor().run(
+        _profile(),
+        "问题",
+        None,
+        _FakeClient(),
+        "fake-model",
+        execution_context=_context(),
+        require_tool_first_round=True,
+    )
+
+    events = fresh.snapshot()["agentic"]["events"]
+    assert events[f"tool_called:{_FAKE_TOOL}"] == 1
+
+
 async def test_executor_bounds_replayed_reasoning(monkeypatch):
     capabilities = replace(DEFAULT_LLM_CAPABILITIES, replay_tool_reasoning=True)
     completions = _FakeCompletions([
