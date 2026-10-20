@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import atexit
 import logging
+import sys
 import threading
 from typing import Any
 
@@ -14,6 +16,7 @@ _DESTRUCTOR_GUARD_MARKER = "__a_share_agent_safe_destructor__"
 
 _initialization_lock = threading.Lock()
 _initialized = False
+_fallback_registered = False
 
 
 def _load_mini_racer() -> tuple[type[Any], bool]:
@@ -51,13 +54,35 @@ def _install_legacy_destructor_guard(mini_racer_class: type[Any]) -> None:
 
 
 def install_legacy_mini_racer_shutdown_guard() -> None:
-    """Best-effort fallback for processes that do not run the app lifespan."""
+    """Best-effort fallback for processes that do not run the app lifespan.
+
+    Returns immediately when ``py_mini_racer`` was never imported: no instance can
+    exist, so there is nothing to patch. This matters because the callback runs at
+    interpreter exit, where importing the V8 binary costs ~43 ms — a pure shutdown
+    cost for CLI scripts and one-shot workers that never touch AkShare.
+    """
+    if "py_mini_racer" not in sys.modules:
+        return
     try:
         mini_racer_class, is_legacy = _load_mini_racer()
     except RuntimeError:
         return
     if is_legacy:
         _install_legacy_destructor_guard(mini_racer_class)
+
+
+def register_shutdown_guard_fallback() -> None:
+    """Idempotently register the atexit fallback from the MiniRacer call sites.
+
+    Deliberately **not** in ``app/__init__.py``: that made every ``import app.*``
+    (including the agentic core) drag in ``app.infrastructure``, which is what kept
+    the core from being extractable as a standalone package.
+    """
+    global _fallback_registered
+    if _fallback_registered:
+        return
+    _fallback_registered = True
+    atexit.register(install_legacy_mini_racer_shutdown_guard)
 
 
 def initialize_javascript_runtime() -> None:
