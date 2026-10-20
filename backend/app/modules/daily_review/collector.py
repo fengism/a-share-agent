@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, cast
@@ -21,6 +23,7 @@ from app.financial_data.market.public import (
     get_limit_up_ladder,
     get_macro_analysis,
     get_macro_data,
+    get_market_emotion,
     get_market_news,
     get_market_statistics,
     get_market_volume_stats,
@@ -31,6 +34,8 @@ from app.financial_data.market.public import (
 from app.modules.daily_review.models import DailyReviewSourceStatus, PolicyNewsSnapshotItem
 from app.modules.daily_review.news_policy import classify_policy_news, filter_news_for_review
 from app.modules.daily_review.web_policy_news import search_financial_policy_news
+
+logger = logging.getLogger(__name__)
 
 _CORE_INDICES = (
     ("000001", "上证指数"),
@@ -202,7 +207,60 @@ def _status(name: str, value: Any, target_date: str, is_realtime: bool) -> Daily
     )
 
 
-async def collect_daily_review_data(target_date: date, *, use_realtime: bool) -> DailyReviewCollection:
+#: 采集进度回调：每完成一个数据源调用一次（含失败），供 SSE 展示 x/N。
+CollectProgressCallback = Callable[[dict[str, Any]], Awaitable[None]]
+
+
+async def _run_sources(
+    coroutines: dict[str, Awaitable[Any]],
+    progress_callback: CollectProgressCallback | None,
+) -> dict[str, Any]:
+    """并发采集，并在每个源完成时上报进度。
+
+    13 个源并发跑一次 `asyncio.gather` 时，最慢的那一个决定整体等待时间，期间用户
+    看不到任何进展。改成 `as_completed` 后每个源落地即可上报，失败也照样上报——
+    失败率本身就是复盘质量信息。异常仍以值的形式留在 `values` 里，与
+    `gather(return_exceptions=True)` 的行为一致（CancelledError 照旧向上传播）。
+    """
+    total = len(coroutines)
+
+    async def _one(name: str, awaitable: Awaitable[Any]) -> tuple[str, Any]:
+        try:
+            return name, await awaitable
+        except Exception as error:  # noqa: BLE001 - 与 return_exceptions=True 等价
+            # 异常以值的形式交回调用方（由其写入 source_status 与 warnings），
+            # 这里记一条便于定位是哪个源挂了。
+            logger.warning("复盘数据源采集失败: source=%s error=%s", name, type(error).__name__)
+            return name, error
+
+    tasks = [asyncio.ensure_future(_one(name, coro)) for name, coro in coroutines.items()]
+    values: dict[str, Any] = {}
+    try:
+        for done, completed in enumerate(asyncio.as_completed(tasks), start=1):
+            name, value = await completed
+            values[name] = value
+            if progress_callback is not None:
+                await progress_callback({
+                    "type": "source_done",
+                    "stage": "collect",
+                    "source": name,
+                    "status": "unavailable" if isinstance(value, BaseException) or value is None else "complete",
+                    "done": done,
+                    "total": total,
+                })
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+    return values
+
+
+async def collect_daily_review_data(
+    target_date: date,
+    *,
+    use_realtime: bool,
+    progress_callback: CollectProgressCallback | None = None,
+) -> DailyReviewCollection:
     coroutines = {
         "indices": get_indices() if use_realtime else _historical_indices(target_date),
         "hot_stocks": get_hot_stocks(),
@@ -211,6 +269,8 @@ async def collect_daily_review_data(target_date: date, *, use_realtime: bool) ->
         "dragon_tiger": get_dragon_tiger_list(target_date.isoformat()),
         "market_statistics": get_market_statistics(target_date.isoformat()),
         "market_news": get_market_news(),
+        # 情绪分布（涨跌家数 / 大面数 / 连板高度）直接支撑情绪周期定位。
+        "market_emotion": get_market_emotion(),
         "market_volume": get_market_volume_stats(target_date, use_realtime=use_realtime),
         "macro_data": get_macro_data(),
         "macro_analysis": get_macro_analysis(),
@@ -219,9 +279,7 @@ async def collect_daily_review_data(target_date: date, *, use_realtime: bool) ->
         "limit_break_pool": get_limit_break_pool(target_date),
         "northbound_funds": _target_northbound(target_date),
     }
-    names = list(coroutines)
-    resolved = await asyncio.gather(*coroutines.values(), return_exceptions=True)
-    values = dict(zip(names, resolved, strict=True))
+    values = await _run_sources(coroutines, progress_callback)
     northbound = values.get("northbound_funds")
     northbound_fallback_note = ""
     if isinstance(northbound, tuple):

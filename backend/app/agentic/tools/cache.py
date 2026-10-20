@@ -11,6 +11,7 @@ from app.agentic.catalog import registry
 from app.agentic.protocol import ToolCallInfo, ToolResultInfo
 from app.agentic.runtime.metrics import metrics
 from app.agentic.tools.contracts import ToolPolicy
+from app.agentic.tools.process_cache import process_tool_cache
 from app.agentic.tools.serialization import tool_call_cache_key, tool_call_cache_key_from_arguments
 
 if TYPE_CHECKING:
@@ -139,20 +140,25 @@ class SharedToolCache:
         if allowed_names is not None and call.function.name not in allowed_names:
             return None
         entry = self._get_entry(call, execution_context, cache_key)
-        if entry is None or not entry.future.done():
-            return None
-        if entry.future.cancelled() or entry.future.exception() is not None:
-            # 任务可能刚好在「已结束但还没摘掉条目」的窗口里被看到。异常必须先判断
-            # 再取：直接 future.result() 会把异常抛穿 agent，而这里不在任何 try 内。
-            return None
-        result = entry.future.result()
-        if result.is_error:
-            return None
-        metrics.record_agentic_event("tool_cache_hit")
-        return ToolResultInfo(
-            tool_call_id=call.id, name=result.name,
-            content=result.content, is_error=result.is_error,
-        )
+        if entry is not None:
+            if not entry.future.done() or entry.future.cancelled() or entry.future.exception() is not None:
+                # 任务可能刚好在「已结束但还没摘掉条目」的窗口里被看到。异常必须先判断
+                # 再取：直接 future.result() 会把异常抛穿 agent，而这里不在任何 try 内。
+                # 未完成的条目交给 execute_shared 去 await，不去读可能更旧的进程缓存。
+                return None
+            result = entry.future.result()
+            if result.is_error:
+                return None
+            metrics.record_agentic_event("tool_cache_hit")
+            return ToolResultInfo(
+                tool_call_id=call.id, name=result.name,
+                content=result.content, is_error=result.is_error,
+            )
+        policy = registry.get_tool_policy(call.function.name) or ToolPolicy()
+        if self._process_cache_enabled(policy, execution_context):
+            key = cache_key or self._cache_key(call, execution_context)
+            return process_tool_cache.get(key, call.id)
+        return None
 
     async def execute(
         self,
@@ -226,13 +232,23 @@ class SharedToolCache:
                 True,
             )
 
+        # 跨请求缓存：policy 已经声明了可复用时长（cache_ttl_seconds/freshness），
+        # 但此前只在单个执行上下文内生效。
+        process_cache_store = self._process_cache_enabled(policy, execution_context)
+        if process_cache_store:
+            cross_request = process_tool_cache.get(key, call.id)
+            if cross_request is not None:
+                return cross_request, True
+
         negative = self._negative_result(key, call)
         if negative is not None:
             return negative, True
 
         metrics.record_agentic_event("tool_cache_miss")
         task: asyncio.Task[ToolResultInfo] = asyncio.create_task(
-            self._run_shared(key, policy, call, allowed_names, execution_context, arguments),
+            self._run_shared(
+                key, policy, call, allowed_names, execution_context, arguments, process_cache_store,
+            ),
             name=f"tool:{call.function.name}",
         )
         entry = _SharedToolCacheEntry(future=task)
@@ -244,6 +260,23 @@ class SharedToolCache:
         task.add_done_callback(_retrieve_task_exception)
         return await asyncio.shield(task), False
 
+    @staticmethod
+    def _process_cache_enabled(
+        policy: ToolPolicy,
+        execution_context: "AgentExecutionContext | None",
+    ) -> bool:
+        """Whether this call may read/write the process-wide cache.
+
+        The toggle lives on the request settings so no extra settings lookup is
+        needed per tool call. Standalone runs (no execution context) only use the
+        per-request cache, which keeps unit tests and extracted usage isolated.
+        """
+        if execution_context is None:
+            return False
+        if not bool(getattr(execution_context.settings, "chat_tool_process_cache_enabled", True)):
+            return False
+        return process_tool_cache.eligible(policy)
+
     async def _run_shared(
         self,
         key: str,
@@ -252,6 +285,7 @@ class SharedToolCache:
         allowed_names: Collection[str] | None,
         execution_context: "AgentExecutionContext | None",
         arguments: Any | None = None,
+        process_cache_store: bool = False,
     ) -> ToolResultInfo:
         """执行共享工作并维护缓存条目；所有等待者拿到同一份结果。"""
         try:
@@ -278,6 +312,8 @@ class SharedToolCache:
         entry = self._cache.get(key)
         if entry is not None:
             entry.expires_at = time.monotonic() + policy.cache_ttl_seconds
+        if process_cache_store:
+            process_tool_cache.put(key, result, policy.cache_ttl_seconds)
         metrics.record_agentic_event("tool_success")
         return result
 

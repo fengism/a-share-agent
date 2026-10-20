@@ -1,23 +1,17 @@
 import logging
 import re
 from dataclasses import dataclass
-from datetime import date, datetime
 
 import pandas as pd
 
-from app.core.timezones import SHANGHAI_TIMEZONE
+# 历史再导出：多个模块从 ``app.core.market`` 拿这两个名字，不是“未使用导入”。
+from app.core.timezones import SHANGHAI_TIMEZONE as SHANGHAI_TIMEZONE
+from app.domain.timezones import market_today as market_today
 
 logger = logging.getLogger(__name__)
 
-
-def market_today() -> date:
-    """返回市场时区（Asia/Shanghai）的当天日期。
-
-    容器通常以 UTC 运行，而用户在浏览器里看到的是 Asia/Shanghai 日期。
-    每天 00:00–08:00 CST 两者相差一天，若用 ``date.today()`` 校验「不能晚于今天」，
-    用户提交的当日日期会被误判为未来日期而报错，因此业务日期一律走本函数。
-    """
-    return datetime.now(SHANGHAI_TIMEZONE).date()
+# market_today() 由 domain 层定义并在此转发：domain 不能反向依赖 core，
+# 但历史上 domain.industry_chain 需要的正是这个函数。
 
 
 @dataclass(frozen=True)

@@ -24,6 +24,16 @@ from app.financial_data.stock.profile.name_sources import (
     LEGACY_STOCK_NAMES_SOURCE_ID,
     SSE_STOCK_NAMES_SOURCE_ID,
 )
+from app.financial_data.stock.profile.short_names import (
+    FirstCharIndex,
+    build_first_char_index,
+    build_pinyin_index,
+    build_short_name_index,
+    extract_pinyin_tokens,
+    has_specific_stock_context,
+    has_stock_context,
+    normalize_name,
+)
 from app.financial_data.stock.profile.sources import (
     BAIDU_STOCK_NAMES,
     CNINFO_STOCK_NAMES,
@@ -95,29 +105,112 @@ class StockNameSourceAttempt:
     semaphore: asyncio.Semaphore
 
 
-def _build_stock_name_detection_index(snapshot: StockNameMapSnapshot) -> tuple[str, ...]:
-    names = {
-        str(name).replace(" ", "").strip()
-        for name in snapshot.mapping.values()
-        if len(str(name).replace(" ", "").strip()) >= 3
-    }
-    return tuple(sorted(names, key=lambda name: (-len(name), name)))
+def _build_stock_name_detection_index(snapshot: StockNameMapSnapshot) -> FirstCharIndex:
+    names: set[str] = set()
+    for raw in snapshot.mapping.values():
+        name = normalize_name(raw)
+        if len(name) < 2:
+            continue
+        names.add(name)
+        if len(name) > 2 and name.endswith(("A", "B")):
+            names.add(name[:-1])
+    return build_first_char_index(names)
+
+
+def _stock_name_file_signature() -> tuple[int, int] | None:
+    """名称文件的 (mtime_ns, size)；文件不存在时为 None。"""
+    try:
+        stat = _STOCK_NAME_FILE.stat()
+    except OSError:
+        return None
+    return (stat.st_mtime_ns, stat.st_size)
+
+
+def _ensure_stock_name_index() -> None:
+    """按文件签名重建名称/简称/拼音索引。
+
+    此前是「一旦建好就永不重新检查」，于是长跑进程里新上市股票的名称永远认不出来：
+    每小时的名录同步即使更新了 ``stock_names.json``，内存索引也不会重建。港股侧
+    (``hk/name_reference.py``) 一直是按文件签名失效的，这里与之对齐。
+    """
+    global _stock_name_detection_index, _stock_reference_names, _stock_short_name_index
+    global _stock_pinyin_index, _stock_source_key
+    key = _stock_name_file_signature()
+    if _stock_name_detection_index is not None and key == _stock_source_key:
+        return
+    _stock_source_key = key
+    # 文件存在时它是权威来源：绕过可能仍在 TTL 内的旧服务缓存。
+    snapshot = _load_local_stock_name_map() if key is not None else None
+    if snapshot is None:
+        snapshot = _coerce_cached_snapshot(_STOCK_NAME_MAP_SERVICE.get_cached())
+    if snapshot is None:
+        snapshot = _load_local_stock_name_map()
+    if snapshot is None:
+        _stock_name_detection_index = build_first_char_index(())
+        _stock_reference_names = ()
+        _stock_short_name_index = None
+        _stock_pinyin_index = None
+        return
+    _stock_reference_names = tuple(str(name) for name in snapshot.mapping.values())
+    _stock_name_detection_index = _build_stock_name_detection_index(snapshot)
+    # 派生索引必须一起失效，否则简称/拼音仍用旧快照。
+    _stock_short_name_index = None
+    _stock_pinyin_index = None
+
+
+def _ensure_short_name_index() -> FirstCharIndex:
+    global _stock_short_name_index
+    if _stock_short_name_index is None:
+        _ensure_stock_name_index()
+        _stock_short_name_index = build_first_char_index(
+            build_short_name_index(_stock_reference_names or ())
+        )
+    return _stock_short_name_index
+
+
+def _ensure_pinyin_index() -> frozenset[str]:
+    global _stock_pinyin_index
+    if _stock_pinyin_index is None:
+        _ensure_stock_name_index()
+        _stock_pinyin_index = build_pinyin_index(_stock_reference_names or ())
+    return _stock_pinyin_index
+
+
+def _contains_pinyin_reference(message: str) -> bool:
+    tokens = extract_pinyin_tokens(message)
+    if not tokens:
+        return False
+    index = _ensure_pinyin_index()
+    return any(token in index for token in tokens)
 
 
 def contains_known_stock_name(message: str) -> bool:
-    """Return whether text contains a known full A-share stock name."""
-    global _stock_name_detection_index
-    normalized = message.replace(" ", "").strip()
-    if len(normalized) < 3:
+    """是否包含完整股票名、A/B 归一形式或拼音首字母。"""
+    _ensure_stock_name_index()
+    normalized = normalize_name(message)
+    if len(normalized) >= 2 and _stock_name_detection_index:
+        if _stock_name_detection_index.matches(normalized):
+            return True
+    return _contains_pinyin_reference(message)
+
+
+def contains_short_stock_name(message: str) -> bool:
+    """是否包含自动派生的股票简称（不含语境门控）。"""
+    normalized = normalize_name(message)
+    if len(normalized) < 2:
         return False
-    if _stock_name_detection_index is None:
-        snapshot = _coerce_cached_snapshot(_STOCK_NAME_MAP_SERVICE.get_cached())
-        if snapshot is None:
-            snapshot = _load_local_stock_name_map()
-        if snapshot is None:
-            return False
-        _stock_name_detection_index = _build_stock_name_detection_index(snapshot)
-    return any(name in normalized for name in _stock_name_detection_index)
+    return _ensure_short_name_index().matches(normalized)
+
+
+def mentions_stock_target(message: str) -> bool:
+    """是否应当视为股票标的：高置信引用，或“简称 + 股票语境词”。"""
+    if contains_known_stock_name(message):
+        return True
+    # “这只/该股/买入”这类指向具体标的的措辞同样构成语境；
+    # 只看泛化词会把“这只茅台还能拿吗”漏成未识别标的。
+    if not (has_stock_context(message) or has_specific_stock_context(message)):
+        return False
+    return contains_short_stock_name(message)
 
 
 def _normalize_source_id(source_id: object) -> str:
@@ -132,7 +225,13 @@ _STOCK_NAME_MAP_SERVICE = BaseFileSnapshotService[StockNameMapSnapshot](
 )
 _STOCK_NAME_FILE_MAX_AGE_SECONDS = 24 * 60 * 60
 _stock_name_map_singleflight: AsyncSingleFlight[StockNameMapSnapshot] = AsyncSingleFlight()
-_stock_name_detection_index: tuple[str, ...] | None = None
+#: 名称文件签名（mtime_ns, size）。文件变化时重建全部派生索引，
+#: 否则新上市股票的名称在长跑进程里永远认不出来。
+_stock_source_key: tuple[int, int] | None = None
+_stock_name_detection_index: FirstCharIndex | None = None
+_stock_reference_names: tuple[str, ...] | None = None
+_stock_short_name_index: FirstCharIndex | None = None
+_stock_pinyin_index: frozenset[str] | None = None
 
 
 def _get_cninfo_provider():
@@ -248,10 +347,16 @@ def _save_stock_name_file(snapshot: StockNameMapSnapshot) -> None:
 
 
 def _load_local_stock_name_map() -> StockNameMapSnapshot | None:
-    """Load and merge the standalone name file and local market snapshot."""
+    """Load the standalone name file, falling back to the local market snapshot.
+
+    A complete name file is authoritative and avoids reading the full market
+    snapshot on every cold start; the snapshot is only a fallback (and may be
+    stale/rejected as realtime data).
+    """
     file_snapshot = _load_stock_name_file()
-    spot_snapshot = _load_stock_name_map_from_spot_snapshot()
-    return StockNameMapSnapshot.merge(file_snapshot, spot_snapshot)
+    if file_snapshot is not None:
+        return file_snapshot
+    return _load_stock_name_map_from_spot_snapshot()
 
 
 def _mapping_from_stocks(stocks: list[dict], source: str) -> dict[str, str]:
@@ -378,14 +483,19 @@ async def _fetch_stock_name_map_remote() -> StockNameMapSnapshot | None:
 
 
 async def _cache_and_persist_stock_name_map(snapshot: StockNameMapSnapshot) -> StockNameMapSnapshot:
-    global _stock_name_detection_index
+    global _stock_name_detection_index, _stock_reference_names, _stock_short_name_index
+    global _stock_pinyin_index, _stock_source_key
     _STOCK_NAME_MAP_SERVICE.set_cached(snapshot)
+    _stock_reference_names = tuple(str(name) for name in snapshot.mapping.values())
     _stock_name_detection_index = _build_stock_name_detection_index(snapshot)
+    _stock_short_name_index = None
+    _stock_pinyin_index = None
     await call_blocking(
         _save_stock_name_file,
         snapshot,
         semaphore=misc_semaphore,
     )
+    _stock_source_key = _stock_name_file_signature()
     return snapshot
 
 
@@ -465,8 +575,14 @@ async def build_stock_name_map() -> None:
     master = await get_exchange_stock_master()
     official_snapshot = _snapshot_from_exchange_master(master)
     if official_snapshot is not None:
-        await _cache_and_persist_stock_name_map(official_snapshot)
-        mapping = official_snapshot.mapping
+        cached = _coerce_cached_snapshot(_STOCK_NAME_MAP_SERVICE.get_cached())
+        if cached is not None and cached.mapping == official_snapshot.mapping:
+            # 名录没有变化：不重写文件。每小时任务都会走到这里，避免无谓的
+            # 285KB 原子写入以及随之而来的索引重建。
+            mapping = official_snapshot.mapping
+        else:
+            await _cache_and_persist_stock_name_map(official_snapshot)
+            mapping = official_snapshot.mapping
     else:
         mapping = await get_stock_name_map()
     if not mapping:

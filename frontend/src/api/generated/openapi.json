@@ -6045,6 +6045,11 @@
             "title": "Macro Data",
             "type": "object"
           },
+          "market_emotion": {
+            "additionalProperties": true,
+            "title": "Market Emotion",
+            "type": "object"
+          },
           "market_news": {
             "items": {
               "$ref": "#/components/schemas/MarketNewsSnapshotItem"
@@ -6558,7 +6563,7 @@
             "type": "array"
           },
           "schema_version": {
-            "default": 8,
+            "default": 9,
             "title": "Schema Version",
             "type": "integer"
           },

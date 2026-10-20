@@ -5,7 +5,7 @@ from typing import Literal, cast
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.core.market import market_today
+from app.domain.timezones import market_today
 
 
 class IndustryChainResearchScope(BaseModel):

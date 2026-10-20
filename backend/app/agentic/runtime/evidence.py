@@ -29,6 +29,7 @@ _FAILURES = {
     "invalid_arguments": "工具参数未通过校验",
     "tool_context_budget_exhausted": "证据上下文预算已用尽",
     "tool_budget_exceeded": "工具调用预算已用尽",
+    "skill_budget_exceeded": "Skill 加载额度已用尽",
 }
 
 
@@ -69,6 +70,10 @@ def has_finite_number(value: Any) -> bool:
 
 
 def safe_tool_failure_code(content: str) -> str:
+    # 错误封装永远是含 "error" 键的 JSON 对象（serialize_error 生成）。
+    # 成功结果占绝大多数，先用子串判断避开整包解码：9k 字符约 115µs -> 0.3µs。
+    if '"error"' not in content:
+        return ""
     if len(content) > 100_000:
         return ""
     try:
@@ -80,9 +85,14 @@ def safe_tool_failure_code(content: str) -> str:
         return ""
 
 
+def failure_label(code: str) -> str:
+    """Map an already-extracted failure code to its user-safe label."""
+    return _FAILURES.get(code, "工具调用失败")
+
+
 def tool_failure_label(content: str) -> str:
     """Short user-safe label for one failed tool result; never raw payload text."""
-    return _FAILURES.get(safe_tool_failure_code(content), "工具调用失败")
+    return failure_label(safe_tool_failure_code(content))
 
 
 def evidence_gap_reason(result: AgentExecutionResult) -> str:
@@ -94,16 +104,17 @@ def evidence_gap_reason(result: AgentExecutionResult) -> str:
         failure = _FAILURES.get(item.failure_code)
         if failure and failure not in reasons:
             reasons.append(failure)
-    if not result.tool_results:
-        reasons.append("未取得工具结果，不能声称已完成查询")
+    evidence_items = [item for item in result.tool_results if not item.instruction]
+    if not evidence_items:
+        reasons.append("未取得数据工具结果，不能声称已完成查询")
     else:
-        if any(item.skipped for item in result.tool_results):
+        if any(item.skipped for item in evidence_items):
             reasons.append("部分工具请求未执行或被合并复用")
-        if any(item.is_error for item in result.tool_results):
+        if any(item.is_error for item in evidence_items):
             reasons.append("部分工具调用失败")
-        if any(not item.is_error and not item.skipped and not item.evidence_state.usable_acquisition for item in result.tool_results):
+        if any(not item.is_error and not item.skipped and not item.evidence_state.usable_acquisition for item in evidence_items):
             reasons.append("部分工具未返回有效数据")
-        if any(item.evidence_state.usable_acquisition and not item.evidence_state.usable_context for item in result.tool_results):
+        if any(item.evidence_state.usable_acquisition and not item.evidence_state.usable_context for item in evidence_items):
             reasons.append("部分已获取数据未进入模型上下文")
     if not reasons:
         reasons.append("该维度未完整完成；已有上下文证据不代表其余问题已核实")
@@ -122,7 +133,9 @@ def build_evidence_gap_report(results: Iterable[AgentExecutionResult]) -> str:
         counts: Counter[str] = Counter()
         for tool in result.tool_results:
             category = (
-                "上下文有效"
+                "Skill 指令"
+                if tool.instruction
+                else "上下文有效"
                 if tool.evidence_state.usable_context
                 else "已跳过或复用"
                 if tool.skipped

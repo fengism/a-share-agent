@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection
@@ -16,7 +17,7 @@ from app.agentic.agents.contracts import (
 )
 from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent, AgentReasoningSource
-from app.agentic.messages import build_messages
+from app.agentic.messages import DEFAULT_HISTORY_CHARACTERS, build_messages
 from app.agentic.orchestration.opinions import parse_opinion_block
 from app.agentic.protocol import (
     AgentMessage,
@@ -28,8 +29,8 @@ from app.agentic.runtime.completion import completion_warning
 from app.agentic.runtime.context import AgentExecutionContext, ToolCallReservation
 from app.agentic.runtime.evidence import (
     build_evidence_gap_report,
+    failure_label,
     safe_tool_failure_code,
-    tool_failure_label,
 )
 from app.agentic.runtime.llm import create_chat_completion, stream_chat_completion
 from app.agentic.runtime.metrics import metrics
@@ -45,7 +46,8 @@ from app.agentic.tools.calls import (
     strip_tool_call_markup,
 )
 from app.agentic.tools.serialization import (
-    serialize_context_results,
+    EMPTY_TOOL_RESULT,
+    serialize_context_results_detailed,
     serialize_error,
 )
 from app.domain.agent_llm import (
@@ -72,12 +74,15 @@ logger = logging.getLogger(__name__)
 _EMPTY_OUTPUT_ERROR = "模型未生成有效回答，请稍后重试"
 _TOOL_CONTEXT_WARNING = "工具上下文预算不足，部分证据已截断或未提供给模型，结论可能受限"
 _TOOL_BUDGET_WARNING = "部分工具请求受额度限制未执行，具体原因见对应工具结果"
+_SKILL_BUDGET_WARNING = "部分 Skill 加载请求受额度限制未执行"
 _TOOL_MARKUP_WARNING = "模型以正文形式输出了工具调用标记，已从回答中移除；结论仅基于已取得的证据"
 _TOOL_OUTPUT_ERROR = "模型仍在请求工具而未生成有效结论，请检查模型工具调用兼容性后重试"
 _REASONING_TRUNCATED_WARNING = "推理内容已按上下文预算截断，不影响工具证据与最终结论"
 # Some thinking gateways require reasoning on tool turns, but it is not tool
 # evidence. Cap each replayed turn and count it against the same context budget.
 _MAX_REPLAY_REASONING_CHARACTERS = 8_000
+# 工具结果预算再怎么收缩，也要留出「本次工具确实能返回点东西」的下限。
+_MIN_TOOL_CONTEXT_CHARACTERS = 4_096
 _FINAL_ANSWER_INSTRUCTION = (
     "本次工具取证阶段已结束。现在只输出最终分析正文，不要再调用工具、输出工具调用标记，"
     "也不要停留在‘让我获取更多数据’等后续行动计划。仅依据对话中已取得的有效证据作答，"
@@ -98,6 +103,47 @@ def _bounded_replay_reasoning(
     if len(reasoning_content) <= cap:
         return reasoning_content, False
     return reasoning_content[:cap], True
+
+
+def _tool_context_exhausted(remaining_characters: int, pending_calls: int) -> bool:
+    """Decide whether executing the pending calls can still show the model anything.
+
+    ``remaining >= 0`` only means "the budget is not used up yet". With 8 pending
+    calls and 5 characters left, every result degrades to the ``{}`` placeholder, so
+    the upstream calls and the tool budget are spent for nothing. Requiring one
+    placeholder per pending call keeps small payloads deliverable (they fit inside a
+    tiny allowance) while skipping the provably useless批次.
+    """
+    if pending_calls <= 0:
+        return False
+    return remaining_characters < len(EMPTY_TOOL_RESULT) * pending_calls
+
+
+def _bound_tool_context_for_prompt_budget(
+    messages: list[dict],
+    max_tool_context_characters: int,
+    execution_context: AgentExecutionContext | None,
+) -> int:
+    """按整轮 prompt 总量上限反推工具结果还能用多少字符。
+
+    ``chat_max_tool_context_characters`` 只管工具结果自己，system prompt、历史与
+    当前消息都是另一笔账；三笔加起来没有上限时，长会话会悄悄把 prompt 撑到远超
+    任何单个配置的位置。``chat_max_prompt_characters<=0`` 表示不启用（旧行为）。
+    """
+    if execution_context is None:
+        return max_tool_context_characters
+    total_cap = int(getattr(execution_context.settings, "chat_max_prompt_characters", 0) or 0)
+    if total_cap <= 0:
+        return max_tool_context_characters
+    prompt_characters = sum(len(str(item.get("content") or "")) for item in messages)
+    remaining = total_cap - prompt_characters
+    if remaining >= max_tool_context_characters:
+        return max_tool_context_characters
+    metrics.record_agentic_event("agent_prompt_budget_reduced")
+    if remaining < _MIN_TOOL_CONTEXT_CHARACTERS:
+        metrics.record_agentic_event("agent_prompt_budget_exceeded")
+    # 收缩到剩余量，但保留下限：返回 0 会让模型看不到任何工具结果。
+    return max(_MIN_TOOL_CONTEXT_CHARACTERS, remaining)
 
 
 def _llm_request_timeout(
@@ -199,29 +245,30 @@ class AgentExecutor:
         unexpected_tools = sorted(set(effective_tool_names) - set(profile.tool_names))
         if unexpected_tools:
             raise ValueError(f"Agent {profile.name} 不允许执行工具：{unexpected_tools}")
+        settings = execution_context.settings if execution_context is not None else get_default_settings()
+        messages = build_messages(
+            message,
+            history,
+            max_history_messages,
+            system_prompt=profile.system_prompt,
+            tool_selection_prompt=tool_selection_prompt,
+            context_length_tokens=getattr(settings, "llm_context_length_tokens", 0),
+            max_history_characters=getattr(
+                settings, "chat_max_history_characters", DEFAULT_HISTORY_CHARACTERS
+            ),
+        )
         return _ExecutionState(
             started_at=time.monotonic(),
-            messages=build_messages(
-                message,
-                history,
-                max_history_messages,
-                system_prompt=profile.system_prompt,
-                tool_selection_prompt=tool_selection_prompt,
-                context_length_tokens=(
-                    getattr(execution_context.settings, "llm_context_length_tokens", 0)
-                    if execution_context is not None
-                    else 0
-                ),
-            ),
+            messages=messages,
             effective_tool_names=effective_tool_names,
             tool_definitions=registry.get_tool_definitions_for(effective_tool_names),
             tool_cache=tool_cache or (
                 execution_context.tool_cache if execution_context is not None else SharedToolCache()
             ),
-            max_tool_context_characters=(
-                execution_context.settings.chat_max_tool_context_characters
-                if execution_context is not None
-                else get_default_settings().chat_max_tool_context_characters
+            max_tool_context_characters=_bound_tool_context_for_prompt_budget(
+                messages,
+                settings.chat_max_tool_context_characters,
+                execution_context,
             ),
         )
 
@@ -282,6 +329,55 @@ class AgentExecutor:
             elif turn.finish_reason == "stream_error":
                 metrics.record_agentic_event("llm_stream_interrupted")
             state.warnings.append(warning)
+
+    def _expand_skill_tools(
+        self,
+        state: _ExecutionState,
+        execution_context: AgentExecutionContext | None,
+        content: str,
+    ) -> None:
+        """Add tools from a successfully loaded skill to the next round."""
+        if execution_context is None:
+            return
+        try:
+            payload = json.loads(content)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(data, dict) or data.get("kind") != "skill_instructions":
+            return
+        raw_tools = data.get("tools")
+        if not isinstance(raw_tools, list):
+            return
+        skill_name = data.get("name")
+        allowed = execution_context.enabled_tool_names
+        new_tools: list[str] = []
+        for name in raw_tools:
+            if not isinstance(name, str) or not name:
+                continue
+            if name in state.effective_tool_names:
+                continue
+            if registry.get_tool(name) is None:
+                metrics.record_agentic_event("skill_tool_rejected")
+                continue
+            if allowed is not None and name not in allowed:
+                metrics.record_agentic_event("skill_tool_rejected")
+                continue
+            new_tools.append(name)
+        if not new_tools:
+            return
+        state.effective_tool_names.extend(new_tools)
+        state.tool_definitions.extend(registry.get_tool_definitions_for(new_tools))
+        metrics.record_agentic_event("skill_tools_expanded")
+        metrics.record_agentic_event("skill_initial_tools_expanded")
+        for name in new_tools:
+            # Per-tool signal used to decide which non-core tools to promote.
+            metrics.record_agentic_event(f"skill_core_tool_missed:{name}")
+        logger.info(
+            "Skill core tools missed: skill=%s tools=%s",
+            skill_name if isinstance(skill_name, str) else "unknown",
+            new_tools,
+        )
 
     async def _execute_tool_calls(
         self,
@@ -345,6 +441,18 @@ class AgentExecutor:
                     group_by_key[key] = group
         if execution_context is not None and execution_context.reserved_tool_names:
             groups.sort(key=lambda group: tool_calls[group[0]].function.name not in execution_context.reserved_tool_names)
+
+        def is_skill_call(index: int) -> bool:
+            policy = registry.get_tool_policy(tool_calls[index].function.name)
+            return policy is not None and policy.budget == "skill"
+
+        # Skill/instruction tools are pure and may unlock tools for the rest of
+        # this same assistant turn. Run them first, then execute data tools with
+        # the expanded tool set; final result order is restored below.
+        groups = [
+            *[group for group in groups if is_skill_call(group[0])],
+            *[group for group in groups if not is_skill_call(group[0])],
+        ]
         batches = [sorted(index for group in groups[offset:offset + batch_size] for index in group)
                    for offset in range(0, len(groups), batch_size)]
         messages_start, results_start = len(state.messages), len(state.tool_results)
@@ -454,7 +562,11 @@ class AgentExecutor:
             completed.sort(key=lambda pair: pair[0].function.name not in policy.tool_names)
             for call, result in completed:
                 policy.observe(call.function.name, call.function.arguments, result.content, is_error=result.is_error)
-            policy.finish_batch()
+            if any(
+                call.function.name in policy.tool_names or call.function.name in policy.read_tool_names
+                for call, _ in completed
+            ):
+                policy.finish_batch()
         context_exhausted = state.tool_context_characters >= state.max_tool_context_characters
         # 没真实执行过的调用要能被下游看见：预算拒绝与批内去重都不是「工具成功了」。
         skipped_indices = {index for index, _ in rejected_calls}
@@ -473,9 +585,15 @@ class AgentExecutor:
                     is_error=False,
                 )
                 continue
-            metrics.record_agentic_event("tool_budget_rejected")
-            if _TOOL_BUDGET_WARNING not in state.warnings:
-                state.warnings.append(_TOOL_BUDGET_WARNING)
+            policy = registry.get_tool_policy(tool_call.function.name)
+            if policy is not None and policy.budget == "skill":
+                metrics.record_agentic_event("skill_budget_rejected")
+                warning = _SKILL_BUDGET_WARNING
+            else:
+                metrics.record_agentic_event("tool_budget_rejected")
+                warning = _TOOL_BUDGET_WARNING
+            if warning not in state.warnings:
+                state.warnings.append(warning)
             # Admission captures the exact limiting bucket before concurrent
             # completions/refunds can change the ledger. Keep that snapshot.
             if tool_results[index] is None:
@@ -502,11 +620,11 @@ class AgentExecutor:
         resolved_results = [result for result in tool_results if result is not None]
         if len(resolved_results) != len(tool_calls):
             raise RuntimeError("工具调用结果数量与请求不一致")
-        context_contents = serialize_context_results(
+        context_contents = serialize_context_results_detailed(
             [result.content for result in resolved_results],
             state.max_tool_context_characters - state.tool_context_characters,
         )
-        for index, (tool_call, result, context_content) in enumerate(
+        for index, (tool_call, result, (context_content, source_evidence)) in enumerate(
             zip(tool_calls, resolved_results, context_contents)
         ):
             await emit(AgentEvent(type="tool_result", tool_result=result))
@@ -516,16 +634,29 @@ class AgentExecutor:
                 # 原样再调一次注定被拒的调用。
                 context_content = result.content
             evidence_state = EvidenceState.from_content(
-                result.content, is_error=result.is_error, context=context_content, skipped=index in skipped_indices,
+                result.content,
+                is_error=result.is_error,
+                context=context_content,
+                skipped=index in skipped_indices,
+                acquired=source_evidence,
             )
+            policy = registry.get_tool_policy(tool_call.function.name)
+            if index not in skipped_indices and policy is not None:
+                # 只有已注册的工具才打标签：工具名是模型生成的，幻觉出来的名字
+                # 会无限撑大指标 key。policy 为 None 即未注册。
+                metrics.record_agentic_event(f"tool_called:{tool_call.function.name}")
+            is_evidence = policy is None or policy.evidence
+            # 只解码一次：摘要里的 failure_code 与面向用户的错误文案共用它。
+            failure_code = safe_tool_failure_code(result.content)
             state.tool_results.append(
                 ToolExecutionSummary(
                     name=tool_call.function.name,
                     is_error=result.is_error,
-                    has_evidence=evidence_state.usable_acquisition,
-                    context_has_evidence=evidence_state.usable_context,
+                    has_evidence=evidence_state.usable_acquisition and is_evidence,
+                    context_has_evidence=evidence_state.usable_context and is_evidence,
                     skipped=index in skipped_indices,
-                    failure_code=safe_tool_failure_code(result.content),
+                    instruction=not is_evidence,
+                    failure_code=failure_code,
                 )
             )
             if context_content != result.content:
@@ -538,10 +669,12 @@ class AgentExecutor:
                 "tool_call_id": result.tool_call_id,
                 "content": context_content,
             })
+            if tool_call.function.name == "load_skill" and not result.is_error:
+                self._expand_skill_tools(state, execution_context, result.content)
             if result.is_error:
                 # 只保留受控短标签：完整 payload 可能很大，且含上游/模型生成的原文，
                 # 不适合作为面向用户的 errors 兜底文案。
-                state.errors.append(f"{tool_call.function.name}: {tool_failure_label(result.content)}")
+                state.errors.append(f"{tool_call.function.name}: {failure_label(failure_code)}")
             logger.info(
                 "Agent %s tool: %s, error=%s",
                 profile.name,
@@ -792,8 +925,12 @@ class AgentExecutor:
             unique_calls.sort(key=lambda pair: pair[1].function.name not in execution_context.reserved_tool_names)
         # 上下文预算耗尽后不再执行工具：跑了也只会因为 tool_context_characters 已经
         # 用满而被整条挤掉（serialize_context_results 的 allowance 变 0），模型看不到
-        # 任何结果，工具配额和 LLM 往返却照常消耗。
-        context_exhausted = state.tool_context_characters >= state.max_tool_context_characters
+        # 任何结果，工具配额和 LLM 往返却照常消耗。判据用「剩余额度连每条一个合法占位
+        # 都放不下」而不只是「>= 上限」：剩个位数字符时同样一条有效内容都送不出去。
+        context_exhausted = _tool_context_exhausted(
+            state.max_tool_context_characters - state.tool_context_characters,
+            len(unique_calls),
+        )
         if context_exhausted and unique_calls:
             metrics.record_agentic_event("tool_context_budget_exhausted")
             if _TOOL_CONTEXT_WARNING not in state.warnings:
@@ -801,15 +938,27 @@ class AgentExecutor:
         for index, tool_call in unique_calls:
             allowed = not context_exhausted
             reservation = None
+            policy = registry.get_tool_policy(tool_call.function.name)
+            budget_kind = policy.budget if policy is not None else "tool"
             if allowed and execution_context is not None:
-                reservation, rejection = await execution_context.reserve_tool_call_with_diagnostics(
-                    preserve=tool_call_reserve, tool_name=tool_call.function.name,
-                )
+                if budget_kind == "skill":
+                    reservation, rejection = await execution_context.reserve_skill_load_with_diagnostics(
+                        tool_call.function.name,
+                    )
+                else:
+                    reservation, rejection = await execution_context.reserve_tool_call_with_diagnostics(
+                        preserve=tool_call_reserve, tool_name=tool_call.function.name,
+                    )
                 allowed = reservation is not None
                 if rejection is not None:
+                    error_code = (
+                        "skill_budget_exceeded"
+                        if budget_kind == "skill"
+                        else "tool_budget_exceeded"
+                    )
                     tool_results[index] = ToolResultInfo(
                         tool_call_id=tool_call.id, name=tool_call.function.name,
-                        content=serialize_error("tool_budget_exceeded", budget_rejection_message(rejection),
+                        content=serialize_error(error_code, budget_rejection_message(rejection),
                                                 data={"budget": rejection}),
                         is_error=False,
                     )
@@ -891,19 +1040,20 @@ class AgentExecutor:
             await emit(event)
 
         forced_tool_round = False
-        search_guidance_message = None
+        search_guidance = ""
         for round_num in range(profile.max_rounds):
             turn_number = round_num + 1
             metrics.record_agentic_event("agent_round")
             tool_definitions = state.tool_definitions
             if execution_context.search_policy is not None:
                 guidance = execution_context.search_policy.instruction()
-                # One replaceable message per inner run, not an ever-growing instruction history.
-                if search_guidance_message is None:
-                    search_guidance_message = {"role": "user", "content": guidance}
-                    state.messages.append(search_guidance_message)
-                else:
-                    search_guidance_message["content"] = guidance
+                # Append-only. Rewriting one early message in place invalidated the
+                # provider's prompt-prefix cache for everything after it (all prior
+                # tool results included) on every round. Rounds are bounded by
+                # profile.max_rounds, so repeated guidance stays bounded too.
+                if guidance != search_guidance:
+                    state.messages.append({"role": "user", "content": guidance})
+                    search_guidance = guidance
             if execution_context.reserved_tool_names:
                 tool_definitions = [definition for definition in tool_definitions if execution_context.tool_calls_available(
                     preserve=tool_call_reserve, tool_name=definition["function"]["name"],
@@ -1079,7 +1229,18 @@ class AgentExecutor:
         require_tool_first_round: bool = False,
         require_tool_evidence: bool = False,
         execution_context: AgentExecutionContext | None = None,
+        tool_cache: "SharedToolCache | None" = None,
+        tool_call_reserve: int = 0,
+        task_id: str | None = None,
+        attempt: int = 1,
     ) -> AsyncGenerator[AgentEvent, None]:
+        """Streaming wrapper over :meth:`run`.
+
+        Keeps the same knobs as ``run``: a streaming caller that cannot pass
+        ``tool_call_reserve`` silently loses the "reserve N calls for follow-up
+        research" guarantee, and one that cannot pass ``task_id``/``attempt``
+        produces events that cannot be attributed to a plan step.
+        """
         queue: asyncio.Queue[AgentEvent | _ExecutionCompleted | _ExecutionFailed]
         queue = asyncio.Queue()
 
@@ -1100,6 +1261,10 @@ class AgentExecutor:
                     require_tool_evidence=require_tool_evidence,
                     execution_context=execution_context,
                     stream_response=True,
+                    tool_cache=tool_cache,
+                    tool_call_reserve=tool_call_reserve,
+                    task_id=task_id,
+                    attempt=attempt,
                 )
                 await queue.put(_ExecutionCompleted(result))
             except BaseException as exc:

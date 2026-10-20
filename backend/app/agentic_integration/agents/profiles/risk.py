@@ -8,6 +8,7 @@ PROFILE = AgentProfile(
     system_prompt=RISK_AGENT_PROMPT,
     tool_names=(
         "financial_calculator",
+        "search_stocks",
         "get_stock_risk_data",
         "get_restricted_shares_lift",
         "get_stock_technical_indicators",

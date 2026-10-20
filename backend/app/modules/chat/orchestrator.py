@@ -9,7 +9,7 @@ from typing import cast
 from app.agentic.agents.contracts import AgentExecutionResult
 from app.agentic.catalog import registry
 from app.agentic.events import AgentEvent
-from app.agentic.orchestration.contracts import ExecutionPlan
+from app.agentic.orchestration.contracts import AgentTask, ExecutionPlan
 from app.agentic.orchestration.executor import stream_execution_plan
 from app.agentic.orchestration.planner import build_execution_plan
 from app.agentic.orchestration.progress import (
@@ -34,7 +34,10 @@ from app.core.metrics import metrics
 from app.infrastructure.llm import spec
 from app.infrastructure.llm.runtime import borrow_async_openai_chat_runtime
 from app.infrastructure.llm.tool_calling import AsyncLLMClient
-from app.modules.chat.general_agent import stream_general_agent
+from app.modules.chat.general_agent import (
+    STOCK_RESOLUTION_INSTRUCTION,
+    stream_general_agent,
+)
 from app.modules.chat.prompts import (
     DECISION_SYNTHESIS_PROMPT,
     DECISION_SYNTHESIS_PROMPT_REF,
@@ -47,6 +50,7 @@ from app.modules.chat.routing import (
     is_greeting_message,
     is_url_only_message,
 )
+from app.modules.chat.stock_reference import RESOLVER_TOOL_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +98,8 @@ class Orchestrator:
         allowed_tool_names: Collection[str] | None = None,
         require_tool_evidence: bool = False,
         execution_context: AgentExecutionContext | None = None,
+        needs_stock_resolution: bool = False,
+        initial_tool_names: Collection[str] | None = None,
     ):
         register_all_capabilities()
         selected_skills = None if skill_names is None else set(skill_names)
@@ -107,9 +113,13 @@ class Orchestrator:
             if allowed_tool_names is None
             else list(dict.fromkeys(allowed_tool_names))
         )
+        # 通用 Agent 首轮只给核心工具（与单体路径一致）；专业子 Agent 各自从
+        # profile 取工具，不受影响。未传入时回退到完整 active 工具集（旧行为）。
+        self.initial_tool_names = list(dict.fromkeys(initial_tool_names or self.allowed_tool_names))
         self.sub_agents = select_agent_profiles(agent_names)
         self.require_tool_evidence = require_tool_evidence
         self.execution_context = execution_context
+        self.needs_stock_resolution = needs_stock_resolution
 
     def _early_general_tool_names(self, message: str) -> list[str] | None:
         # 仅当消息本身就是链接时才走通用 Agent 快速路径；链接+问题的混合消息
@@ -129,13 +139,20 @@ class Orchestrator:
         message: str,
         history: list[AgentMessage] | None,
         tool_names: Collection[str],
+        *,
+        skill_names: Collection[str] | None = None,
+        enabled_skill_names: Collection[str] | None = None,
+        enabled_tool_names: Collection[str] | None = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         async with aclosing(stream_general_agent(
             message,
             history,
             tool_names=tool_names,
-            skill_names=self.skill_names,
-            require_tool_evidence=self.require_tool_evidence and bool(tool_names),
+            skill_names=skill_names if skill_names is not None else self.skill_names,
+            enabled_skill_names=enabled_skill_names,
+            enabled_tool_names=enabled_tool_names,
+            require_tool_evidence=self.require_tool_evidence
+            and bool(tool_names or enabled_tool_names),
             execution_context=self.execution_context,
         )) as stream:
             async for delta in stream:
@@ -190,7 +207,10 @@ class Orchestrator:
             async with aclosing(self._stream_general_response(
                 message,
                 history,
-                self.allowed_tool_names,
+                self.initial_tool_names,
+                skill_names=(),
+                enabled_skill_names=self.skill_names,
+                enabled_tool_names=self.allowed_tool_names,
             )) as stream:
                 async for delta in stream:
                     yield delta
@@ -278,7 +298,9 @@ class Orchestrator:
         """多 Agent 编排主流程：路由 → 并发执行子 Agent → 综合分析。"""
         early_tool_names = self._early_general_tool_names(message)
         if early_tool_names is not None:
-            async with aclosing(self._stream_general_response(message, history, early_tool_names)) as stream:
+            async with aclosing(self._stream_general_response(
+                message, history, early_tool_names, skill_names=()
+            )) as stream:
                 async for delta in stream:
                     yield delta
             return
@@ -290,7 +312,10 @@ class Orchestrator:
             async with aclosing(self._stream_general_response(
                 message,
                 history,
-                self.allowed_tool_names,
+                self.initial_tool_names,
+                skill_names=(),
+                enabled_skill_names=self.skill_names,
+                enabled_tool_names=self.allowed_tool_names,
             )) as stream:
                 async for delta in stream:
                     yield delta
@@ -335,6 +360,18 @@ class Orchestrator:
     async def _llm_classify(self, message: str, llm_client: AsyncLLMClient, model: str) -> RoutingDecision:
         return await classify_with_llm(message, llm_client, model, self.sub_agents)
 
+    def _task_instruction(self, task: AgentTask) -> str:
+        """Layer C: tell only the sub-agents that can resolve a target to do it.
+
+        ``search_stocks`` 是唯一的消歧工具；没有它的子 Agent（如宏观）拿到这条指令
+        只会产生无法执行的空要求，所以按 ``allowed_tools`` 精确投递。
+        """
+        if not self.needs_stock_resolution:
+            return ""
+        if RESOLVER_TOOL_NAME not in task.allowed_tools:
+            return ""
+        return STOCK_RESOLUTION_INSTRUCTION
+
     async def _run_sub_agents_streaming(
         self, plan: ExecutionPlan, message: str,
         history: list[AgentMessage] | None,
@@ -355,6 +392,7 @@ class Orchestrator:
             temperature,
             attempt=attempt,
             execution_context=self.execution_context,
+            task_instruction=self._task_instruction,
         )) as stream:
             async for delta in stream:
                 yield delta
@@ -405,7 +443,7 @@ class Orchestrator:
                 detail=retry_issues.get(task_id, "任务需要重试"),
             )
         yield AgentEvent(type="status", content="部分分析未完成，正在进行一次重试…")
-        retry_plan = build_retry_plan(plan, review)
+        retry_plan = build_retry_plan(plan, review, results)
         async with aclosing(self._run_sub_agents_streaming(
             retry_plan,
             message,

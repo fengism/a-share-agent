@@ -3,6 +3,7 @@
 import threading
 
 from app.agentic.catalog import registry
+from app.agentic_integration.skills.registration import register_skill_tools
 from app.agentic_integration.tools.packs.composite.registration import register_composite_tools
 from app.agentic_integration.tools.packs.market.registration import register_market_tools
 from app.agentic_integration.tools.packs.quant.registration import register_quant_tools
@@ -37,6 +38,7 @@ def register_all_tools() -> None:
             register_composite_tools()
             register_web_tools()
             register_twitter_tools()
+            register_skill_tools()
         except Exception:
             registry.unregister_tools(registry.tool_names() - before)
             raise

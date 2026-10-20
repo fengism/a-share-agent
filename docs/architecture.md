@@ -91,9 +91,21 @@ performance 5/10/20 日前瞻复盘
 - **Core**：`agents/executor.py`、`orchestration/*`、`runtime/*`、工具/技能契约、
   `contracts.py` / `events.py` / `protocol.py` 等。只允许依赖标准库、`pydantic`、
   `app.agentic.*`、`app.domain.*`。
-- **Integration**：`app/agentic_integration`（`tools/packs/**`、`skills/packs/**`、
+- **Integration**：`app/agentic_integration`（`tools/packs/**`、`skills/definitions/**`、
   `agents/profiles/**`、`agents/service.py`、`adapters/**`、`bootstrap.py`、注册入口）。
-  可以依赖宿主业务、数据源、浏览器和配置。
+  可以依赖宿主业务、数据源、浏览器和配置。Skill 已支持 `SKILL.md` 文件化定义，
+  `SKILL.md` 是 Skill 的唯一事实来源；通用 Agent 默认只注入 Skill 目录，
+  通过 `load_skill(name)` 按需加载详细规则（指令不计入数据证据）。
+  专业 Agent 按其 `profile.skill_names` 直接注入详细规则（可用
+  `chat_agent_skill_instructions_enabled=false` 关闭）。
+  默认允许动态激活 enabled Skill，并从下一轮起把其工具加入执行工具集，
+  受 `enabled_tool_names` 白名单限制；同一轮内的 `load_skill` 会先执行并扩展工具，
+  再执行剩余数据工具。`load_skill` 使用独立预算，不占数据工具额度。初始工具集只加载
+  得分最高的 N 个 active Skill（`chat_max_initial_active_skills`，默认 3），且每个 Skill
+  只暴露 `SKILL.md` 声明的 `core_tools`；其余工具在 `load_skill` 后从下一轮起可用
+  （`chat_skill_core_tools_enabled=false` 可回退为全部 `tools`）。
+  core 漏工具通过 `skill_core_tool_missed:<tool>` 与 `skill_load_after_initial:<skill>`
+  指标观测，可用 `scripts/analyze_skill_core_misses.py` 分析 metrics 快照。
 - **Ports**：宿主在组合根注入 LLM 传输、默认 Settings、指标、请求上下文和工具实现：
   `app.agentic.runtime.llm.configure_llm_transport()`、
   `app.agentic.runtime.settings.configure_default_settings()`、
@@ -104,6 +116,22 @@ performance 5/10/20 日前瞻复盘
 门禁：`pytest tests/test_agentic_core_boundary.py` 会检查 Core 文件没有导入
 `app.configuration` / `app.core` / `app.infrastructure` / `app.modules` /
 `app.api` / `app.runtime` / `app.agentic_integration`。新增 Core 文件时不要绕过该测试。
+
+## 股票标的识别（Chat 路由）
+
+`app/financial_data/stock/profile/short_names.py` 从完整股票名映射自动派生简称与拼音
+首字母索引，新增股票/改名会自动跟随；词缀候选按“2 字前后缀 + 3-4 字高频前缀”自动
+统计，不再维护股票简称表。`name_map.mentions_stock_target()` 分三级判断：
+
+- 完整名 / A-B 归一 / 拼音首字母：高置信，直接视为股票标的
+- 自动派生简称（如 茅台、海康、工行）：仅当消息同时包含股票语境词
+  （股价 / 估值 / 新闻 / 公告 / 怎么样…）才判定，避免“友好往来”误命中
+- 地名 / 行业 / 常见词不会进入简称索引
+
+该结果同时用于 Skill 激活（`stock_analysis`）和专业 Agent 路由（`classify_message`）。
+港股名称走同一机制：`app/financial_data/hk/name_reference.py` 从
+`data/hk_stock_search_index.json` 派生完整名与简称，`app/modules/chat/stock_reference.py`
+合并 A 股与港股判断。
 
 ## 质量门禁
 

@@ -42,6 +42,9 @@ async def stream_agent(
     require_tool_evidence: bool = False,
     execution_context: AgentExecutionContext | None = None,
     settings: Any = None,
+    tool_call_reserve: int = 0,
+    task_id: str | None = None,
+    attempt: int = 1,
 ) -> AsyncGenerator[AgentEvent, None]:
     effective_settings = settings or get_effective_settings()
     effective_context = execution_context or AgentExecutionContext.from_current(
@@ -63,6 +66,9 @@ async def stream_agent(
             require_tool_first_round=require_tool_first_round,
             require_tool_evidence=require_tool_evidence,
             execution_context=effective_context,
+            tool_call_reserve=tool_call_reserve,
+            task_id=task_id,
+            attempt=attempt,
         )) as stream:
             async for event in stream:
                 yield event

@@ -106,8 +106,3 @@ def resolve_url_target(url: str, *, resolver: Resolver = socket.getaddrinfo) -> 
         port=port,
         addresses=tuple(addresses),
     )
-
-
-def assert_url_safe(url: str) -> None:
-    """Validate that a URL resolves exclusively to public HTTP(S) addresses."""
-    resolve_url_target(url)

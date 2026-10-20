@@ -40,9 +40,27 @@ class EvidenceState:
         is_error: bool = False,
         context: str | None = None,
         skipped: bool = False,
+        acquired: bool | None = None,
     ) -> EvidenceState:
-        acquired = not is_error and has_meaningful_tool_content(content)
-        visible = None if context is None else acquired and has_meaningful_tool_content(context)
+        """Derive the evidence state.
+
+        ``acquired`` lets a caller that already decoded the payload (context
+        truncation does) pass the verdict in, avoiding a second full ``json.loads``
+        of the same content. ``None`` means "not determined" and is decoded here.
+        """
+        if acquired is None:
+            acquired = not is_error and has_meaningful_tool_content(content)
+        else:
+            acquired = bool(acquired) and not is_error
+        # 上下文未被截断时（绝大多数结果），可见性与采集结果必然相同。
+        # 此前无条件再解析一次同一份 JSON：一个 9k 字符的结果约 115µs，
+        # 一次请求几十条工具结果就是数毫秒的纯重复解码。
+        if context is None:
+            visible = None
+        elif context == content:
+            visible = acquired
+        else:
+            visible = acquired and has_meaningful_tool_content(context)
         return cls(acquired, visible, is_error, skipped)
 
 

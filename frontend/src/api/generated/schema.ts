@@ -6597,6 +6597,10 @@ export interface components {
             macro_data?: {
                 [key: string]: unknown;
             };
+            /** Market Emotion */
+            market_emotion?: {
+                [key: string]: unknown;
+            };
             /** Market News */
             market_news?: components["schemas"]["MarketNewsSnapshotItem"][];
             market_statistics?: components["schemas"]["MarketBreadthSnapshot"];
@@ -6836,7 +6840,7 @@ export interface components {
             scenario_plans?: components["schemas"]["DailyReviewScenario"][];
             /**
              * Schema Version
-             * @default 8
+             * @default 9
              */
             schema_version: number;
             sentiment_cycle?: components["schemas"]["DailyReviewSentimentCycle"] | null;

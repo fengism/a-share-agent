@@ -8,6 +8,7 @@ PROFILE = AgentProfile(
     system_prompt=TECHNICAL_AGENT_PROMPT,
     tool_names=(
         "financial_calculator",
+        "search_stocks",
         "get_stock_kline",
         "get_stock_technical_indicators",
         "get_hk_stock_kline",

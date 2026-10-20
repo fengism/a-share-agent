@@ -14,8 +14,12 @@ from akshare.index import index_stock_hk
 from akshare.stock import stock_hk_sina
 
 from app.core.exceptions import UpstreamUnavailableError
+from app.infrastructure.javascript_runtime import register_shutdown_guard_fallback
 
 logger = logging.getLogger(__name__)
+
+# 本模块直接 import akshare（也就直接用到 MiniRacer），兜底 guard 必须在这里生效。
+register_shutdown_guard_fallback()
 
 try:
     from py_mini_racer._mini_racer import MiniRacer as _ModernMiniRacer

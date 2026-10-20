@@ -26,6 +26,9 @@ class Skill:
     priority: int = 100
     exclusions: tuple[str, ...] = ()
     examples: tuple[str, ...] = ()
+    # Tools exposed on the first turn; the rest need an explicit ``load_skill``.
+    # Empty means every ``tool_names`` entry is initial (legacy behavior).
+    core_tool_names: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if re.fullmatch(r"[a-z][a-z0-9_]{1,63}", self.name) is None:
@@ -44,10 +47,18 @@ class Skill:
             raise ValueError(f"Skill '{self.name}' priority 不能小于 0")
         if len(self.tool_names) != len(set(self.tool_names)):
             raise ValueError(f"Skill '{self.name}' 包含重复工具")
+        if len(self.core_tool_names) != len(set(self.core_tool_names)):
+            raise ValueError(f"Skill '{self.name}' 的 core_tools 包含重复工具")
+        invalid_core = sorted(set(self.core_tool_names) - set(self.tool_names))
+        if invalid_core:
+            raise ValueError(
+                f"Skill '{self.name}' 的 core_tools 未包含在 tools 中：{invalid_core}"
+            )
         for field_name, values in (
             ("triggers", self.triggers),
             ("activation_keywords", self.activation_keywords),
             ("tool_names", self.tool_names),
+            ("core_tool_names", self.core_tool_names),
             ("rules", self.rules),
             ("exclusions", self.exclusions),
             ("examples", self.examples),
@@ -58,25 +69,53 @@ class Skill:
     def matches(self, message: str) -> bool:
         return self.matches_normalized(message.lower())
 
-    def matches_normalized(self, normalized_message: str) -> bool:
-        """Match against an already-lowercased message (callers can reuse it)."""
+    @property
+    def initial_tool_names(self) -> tuple[str, ...]:
+        """Tools exposed on the first turn (``core_tools`` or all tools)."""
+        return self.core_tool_names or self.tool_names
+
+    def match_score(self, normalized_message: str) -> int:
+        """Rank how strongly this skill matches an already-lowercased message."""
+        score = 0
         for keyword in self.activation_keywords:
             normalized_keyword = keyword.lower()
             if normalized_keyword.isascii() and normalized_keyword.isalnum():
-                if _ascii_keyword_pattern(normalized_keyword).search(normalized_message):
-                    return True
+                if not _ascii_keyword_pattern(normalized_keyword).search(normalized_message):
+                    continue
+                score += 2  # ASCII acronyms/terms are more specific than broad Chinese words.
             elif normalized_keyword in normalized_message:
-                return True
-        return False
+                score += 1
+            else:
+                continue
+            if len(normalized_keyword) >= 4:
+                score += 1
+        return score
 
-    def render_prompt(self, index: int) -> str:
-        lines = [
-            f"{index}. **{self.description}**",
+    def matches_normalized(self, normalized_message: str) -> bool:
+        """Match against an already-lowercased message (callers can reuse it)."""
+        return self.match_score(normalized_message) > 0
+
+    def render_catalog(self, index: int, *, recommended: bool = False) -> str:
+        """Compact routing entry: skill name, description and triggers."""
+        marker = "[推荐] " if recommended else ""
+        return "\n".join([
+            f"{index}. **{marker}{self.name}** — {self.description}",
             f"- 触发：{'；'.join(self.triggers)}",
-        ]
-        lines.extend(f"- {rule}" for rule in self.rules)
+        ])
+
+    def render_instructions(self, index: int) -> str:
+        """Detailed rules/examples, loaded only when the skill is selected."""
+        lines = [f"- {rule}" for rule in self.rules]
         if self.exclusions:
             lines.append(f"- 避免：{'；'.join(self.exclusions)}")
         if self.examples:
             lines.append(f"- 示范：{' | '.join(self.examples)}")
         return "\n".join(lines)
+
+    def render_prompt(self, index: int) -> str:
+        """Backward-compatible full prompt (catalog + instructions)."""
+        return "\n".join(
+            part
+            for part in (self.render_catalog(index), self.render_instructions(index))
+            if part
+        )

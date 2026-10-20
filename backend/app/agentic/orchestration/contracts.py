@@ -26,6 +26,8 @@ class AgentTask:
     objective: str
     allowed_tools: tuple[str, ...]
     dependencies: tuple[str, ...] = ()
+    # 重试任务携带的上一轮结论（已按预算截断）；空串表示首次执行。
+    repair_context: str = ""
 
     def __post_init__(self) -> None:
         if not self.task_id.strip():

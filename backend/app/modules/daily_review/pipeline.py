@@ -1,7 +1,11 @@
 import asyncio
+import contextlib
 import hashlib
 import json
 import logging
+import time
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Literal, cast
@@ -101,7 +105,67 @@ def _collection_cache_key(resolution: "DailyReviewDateResolution") -> str:
     return f"daily_review_collection:{resolution.effective_date.isoformat()}"
 
 
-async def _collect_shared(resolution: "DailyReviewDateResolution") -> DailyReviewCollection:
+_HEARTBEAT_INTERVAL_SECONDS = 5.0
+
+
+async def _stage_started(progress: ProgressEmitter[dict[str, Any]], stage: str, message: str) -> None:
+    await progress.emit({"type": "stage_started", "stage": stage, "message": message})
+
+
+async def _stage_completed(
+    progress: ProgressEmitter[dict[str, Any]],
+    stage: str,
+    message: str = "",
+    **extra: Any,
+) -> None:
+    await progress.emit({"type": "stage_completed", "stage": stage, "message": message, **extra})
+
+
+@asynccontextmanager
+async def _stage_heartbeat(
+    progress: ProgressEmitter[dict[str, Any]],
+    stage: str,
+    label: str,
+    *,
+    interval: float = _HEARTBEAT_INTERVAL_SECONDS,
+) -> AsyncGenerator[None, None]:
+    """长耗时阶段的心跳：让前端能看到「已用 Ns」，而不是一行不动的文字。
+
+    复盘的分析阶段是一次非流式结构化调用（可长达分钟级），期间没有任何中间事件。
+    """
+    if progress.callback is None:
+        yield
+        return
+    started_at = time.monotonic()
+    stop = asyncio.Event()
+
+    async def beat() -> None:
+        while True:
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=interval)
+                return
+            except TimeoutError:
+                await progress.emit({
+                    "type": "stage_progress",
+                    "stage": stage,
+                    "message": f"{label}…（已用 {int(time.monotonic() - started_at)}s）",
+                    "elapsed_ms": int((time.monotonic() - started_at) * 1000),
+                })
+
+    task = asyncio.create_task(beat())
+    try:
+        yield
+    finally:
+        stop.set()
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
+async def _collect_shared(
+    resolution: "DailyReviewDateResolution",
+    progress: ProgressEmitter[dict[str, Any]] | None = None,
+) -> DailyReviewCollection:
     """采集复盘数据；同一有效交易日的快照跨用户共享。
 
     历史口径复用 15 分钟，期间新增的新闻 / 宏观事件会在下一次采集时体现；
@@ -116,6 +180,7 @@ async def _collect_shared(resolution: "DailyReviewDateResolution") -> DailyRevie
     collection = await collect_daily_review_data(
         resolution.effective_date,
         use_realtime=resolution.use_realtime,
+        progress_callback=progress.emit if progress is not None else None,
     )
     ttl = (
         _SETTLED_COLLECTION_CACHE_TTL_SECONDS
@@ -402,6 +467,7 @@ def _build_snapshot(
         limit_up_ladder=values.get("limit_up_ladder"),
         limit_break_pool=values.get("limit_break_pool"),
         northbound_funds=values.get("northbound_funds"),
+        market_emotion=values.get("market_emotion"),
         requested_date=requested_date,
         effective_date=effective_date,
         source_status=source_status,
@@ -457,6 +523,7 @@ async def generate_daily_review(
     await progress.emit({"type": "stage_started", "stage": "queue", "message": _QUEUE_MESSAGE})
     lock = await _generation_lock((resolution.effective_date.isoformat(), user_id))
     async with lock:
+        await _stage_completed(progress, "queue", "已获得生成锁，开始采集数据")
         return await _generate_daily_review_locked(request, user_id, resolution, progress)
 
 
@@ -478,11 +545,21 @@ async def _generate_daily_review_locked(
         if cached is not None:
             cached_review = cached if isinstance(cached, DailyReviewResult) else DailyReviewResult.model_validate(cached)
             if not await _cached_review_staleness(cached_review):
+                await progress.emit({
+                    "type": "cache_hit",
+                    "stage": "queue",
+                    "message": f"复用 {effective_text} 已有复盘，未重新生成",
+                })
                 return cast(DailyReviewResult, cached_review.model_copy(update={"requested_date": requested_text}))
             logger.info("缓存复盘已过期，自动重新采集: date=%s", effective_text)
 
-    await progress.emit({"type": "stage_started", "stage": "collect", "message": _COLLECT_MESSAGE})
-    collection = await _collect_shared(resolution)
+    await _stage_started(progress, "collect", _COLLECT_MESSAGE)
+    collection = await _collect_shared(resolution, progress)
+    await _stage_completed(
+        progress, "collect", "数据采集完成",
+        sources=len(collection.source_status),
+        failed=sum(1 for status in collection.source_status.values() if status.status == "unavailable"),
+    )
     snapshot = _build_snapshot(
         collection.values,
         requested_date=requested_text,
@@ -493,8 +570,9 @@ async def _generate_daily_review_locked(
     previous_check, cycle_trend = await _review_history_inputs(effective_text, resolution, snapshot)
     quality_status, warnings, notes, source_errors = _quality(snapshot)
 
-    await progress.emit({"type": "stage_started", "stage": "analyze", "message": _ANALYZE_MESSAGE})
+    await _stage_started(progress, "analyze", _ANALYZE_MESSAGE)
     settings = get_effective_settings()
+    grounding_enabled = bool(getattr(settings, "daily_review_grounding_enabled", True))
     user_content = _build_prompt(
         effective_text,
         snapshot,
@@ -510,7 +588,12 @@ async def _generate_daily_review_locked(
     llm_error = ""
     try:
         # 强制刷新时跳过共享输出缓存，保证「重新生成」确实重新调用模型。
-        prompt_run = await _run_review_prompt(user_content, settings, allow_cache=not request.force)
+        await progress.emit({
+            "type": "stage_progress", "stage": "analyze",
+            "message": f"提示词已构建（{len(user_content)} 字符），正在调用模型",
+        })
+        async with _stage_heartbeat(progress, "analyze", "正在生成 AI 复盘报告"):
+            prompt_run = await _run_review_prompt(user_content, settings, allow_cache=not request.force)
         output = prompt_run.value
         generation_status = "llm"
         review.market_state = output.market_state
@@ -526,11 +609,33 @@ async def _generate_daily_review_locked(
         review.risk_alerts = output.risk_alerts
         review.opportunities = output.opportunities
         review.strategy_notes = output.strategy_notes
-        review.sentiment_cycle = output.sentiment_cycle
-        review.scenario_plans = output.scenario_plans
+        # 深度输出同样要做确定性校验：此前只有 watchlist / event_impacts / 新闻政策
+        # 做了 grounding，最需要严谨的情绪周期与情景预案完全靠模型自述。
+        if grounding_enabled:
+            review.sentiment_cycle, sentiment_warnings = review_builder.ground_sentiment_cycle(
+                snapshot, output.sentiment_cycle,
+            )
+            review.scenario_plans, scenario_warnings = review_builder.ground_scenario_plans(
+                snapshot, output.scenario_plans,
+            )
+            warnings.extend(sentiment_warnings)
+            warnings.extend(scenario_warnings)
+        else:
+            review.sentiment_cycle = output.sentiment_cycle
+            review.scenario_plans = output.scenario_plans
         # 次日观察标的必须是快照里真实存在的个股，否则视为虚构。
         review.next_day_watchlist = review_builder.ground_watchlist(snapshot, output.next_day_watchlist)
-        review.key_levels = output.key_levels
+        if grounding_enabled:
+            review.key_levels, level_warnings = review_builder.ground_key_levels(
+                snapshot, output.key_levels,
+            )
+            warnings.extend(level_warnings)
+        else:
+            review.key_levels = output.key_levels
+        await progress.emit({
+            "type": "stage_progress", "stage": "analyze",
+            "message": "模型输出已就绪，正在做确定性校验与兜底",
+        })
         review.position_range = output.position_range
         review.invalid_conditions = output.invalid_conditions
         review.data_gaps = output.data_gaps
@@ -558,7 +663,8 @@ async def _generate_daily_review_locked(
     review.previous_review_check = previous_check
     review.cycle_trend = cycle_trend
     review.llm_review = render_daily_review_markdown(review)
-    await progress.emit({"type": "stage_started", "stage": "persist", "message": _PERSIST_MESSAGE})
+    await _stage_completed(progress, "analyze", "AI 复盘生成完成", generation_status=generation_status)
+    await _stage_started(progress, "persist", _PERSIST_MESSAGE)
     await call_blocking(
         save_daily_review,
         review,
@@ -573,6 +679,7 @@ async def _generate_daily_review_locked(
         watchlist=review.next_day_watchlist,
         key_levels=review.key_levels,
     )
+    await _stage_completed(progress, "persist", "复盘已保存")
     try:
         from app.core.events import event_bus
         await event_bus.publish(review, name="daily_review.completed")

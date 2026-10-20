@@ -25,6 +25,9 @@ class ResearchGroup(ConfigGroup):
     # Long report generation: one deadline shared by streaming and schema repair.
     analysis_llm_timeout_seconds: float = Field(default=1200.0, gt=0)
     analysis_llm_max_completion_tokens: int = Field(default=32768, ge=1)
+    # 每日复盘的确定性校验：情绪周期与量化锚点冲突时按锚点修正、关键点位/情景预案
+    # 必须含可验证数字。关闭后完全按模型输出（回退到旧行为）。
+    daily_review_grounding_enabled: bool = True
 
     # Deployment-only; deliberately absent from private/persisted editable keys.
     pdf_max_concurrency: int = Field(default=1, ge=1, le=4)
@@ -45,7 +48,31 @@ class ResearchGroup(ConfigGroup):
     chat_max_tool_calls_per_round: int = Field(default=16, ge=1, le=32)
     chat_max_tool_calls_total: int = Field(default=32, ge=1, le=128)
     chat_max_tool_context_characters: int = Field(default=60_000, ge=4_096, le=500_000)
+    # 首轮工具数上限。首轮工具 schema 是 prompt 的最大单项（14 个工具约 8.8k 字符），
+    # 而 chat_max_initial_active_skills 限的是 Skill 数不是工具数：3 个 Skill 的
+    # core_tools 相加可能是 14 个。0 表示不限制；被截掉的工具仍可通过 load_skill 获得。
+    chat_max_initial_tools: int = Field(default=0, ge=0, le=64)
+    # 历史回灌预算；大上下文模型可调高，0 不合法（必须保留最起码的连续性）。
+    chat_max_history_characters: int = Field(default=40_000, ge=4_000, le=200_000)
+    # 整轮 prompt 的字符总预算，用于反推「工具结果」与「子任务前置分析」还能占多少。
+    # 注意：它不是硬上限——system prompt、Skill 规则与历史各自受自己的配置约束；
+    # 这里只把工具结果上下文与依赖上下文压到剩余额度内。0=不启用，保持旧行为。
+    chat_max_prompt_characters: int = Field(default=0, ge=0, le=1_000_000)
+    # 跨请求复用 public + daily/static 工具结果（按 ToolPolicy.cache_ttl_seconds）。
+    chat_tool_process_cache_enabled: bool = True
     chat_max_synthesis_characters: int = Field(default=60_000, ge=4_096, le=500_000)
+    # 通用 Agent 的 Skill 渐进披露：-1=完整 rules（回滚），0=仅目录+load_skill，N=目录+前 N 个详细规则。
+    chat_skill_instruction_top_n: int = Field(default=0, ge=-1, le=10)
+    # 允许 load_skill 激活未命中关键词的 Skill，并动态加入其工具。
+    chat_skill_dynamic_activation_enabled: bool = True
+    # load_skill 使用独立预算，不占用数据工具额度。
+    chat_max_skill_loads_total: int = Field(default=3, ge=0, le=20)
+    # 初始工具集只加载得分最高的 N 个 active Skill；-1=全部，0=只给 load_skill。
+    chat_max_initial_active_skills: int = Field(default=3, ge=-1, le=10)
+    # 专业 Agent 是否注入其 profile.skill_names 对应的 Skill 规则。
+    chat_agent_skill_instructions_enabled: bool = True
+    # 初始工具集是否只暴露 Skill 的 core_tools；false 回退为全部 tools。
+    chat_skill_core_tools_enabled: bool = True
 
     provider_gateway_max_attempts: int = 2
     provider_failure_threshold: int = 3

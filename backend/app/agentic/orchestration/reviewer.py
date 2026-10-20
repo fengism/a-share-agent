@@ -11,6 +11,20 @@ from app.agentic.orchestration.contracts import (
     PlanReview,
 )
 
+# 重试只带上一轮的结论尾部：结论与结构化观点块在末尾，前文（数据罗列）可以重新取。
+_MAX_REPAIR_CONTEXT_CHARACTERS = 4_000
+_REPAIR_TRUNCATION_MARKER = "…（上一轮分析前文已按上下文预算截断）\n"
+
+
+def _bounded_repair_context(analysis: str) -> str:
+    text = (analysis or "").strip()
+    if not text:
+        return ""
+    if len(text) <= _MAX_REPAIR_CONTEXT_CHARACTERS:
+        return text
+    keep = max(0, _MAX_REPAIR_CONTEXT_CHARACTERS - len(_REPAIR_TRUNCATION_MARKER))
+    return _REPAIR_TRUNCATION_MARKER + text[-keep:]
+
 
 def is_usable_task_result(task: AgentTask, result: AgentExecutionResult | None) -> bool:
     """只有具有正文和计划要求证据的结果才可作为依赖上下文。"""
@@ -72,7 +86,11 @@ def review_execution_plan(
     )
 
 
-def build_retry_plan(plan: ExecutionPlan, review: PlanReview) -> ExecutionPlan:
+def build_retry_plan(
+    plan: ExecutionPlan,
+    review: PlanReview,
+    results: Mapping[str, AgentExecutionResult] | None = None,
+) -> ExecutionPlan:
     retry_ids = set(review.retry_task_ids)
     # 任一上游重算都会使全部传递下游失效，不得留下基于旧上下文的成功结果。
     while True:
@@ -87,6 +105,14 @@ def build_retry_plan(plan: ExecutionPlan, review: PlanReview) -> ExecutionPlan:
         for issue in review.issues
         if issue.task_id in retry_ids and issue.reason
     }
+
+    def repair_context(task: AgentTask) -> str:
+        """上一轮已有的分析，供重试时保留成立的部分，避免整段重新推导。"""
+        if results is None:
+            return ""
+        previous = results.get(task.agent_name)
+        return _bounded_repair_context(previous.analysis) if previous is not None else ""
+
     tasks = tuple(
         replace(
             task,
@@ -96,6 +122,7 @@ def build_retry_plan(plan: ExecutionPlan, review: PlanReview) -> ExecutionPlan:
                 if task.task_id in issue_reasons
                 else f"{task.objective}；修复上一次执行失败并重新给出完整结论"
             ),
+            repair_context=repair_context(task),
         ) if task.task_id in retry_ids else task
         for task in plan.tasks
     )
