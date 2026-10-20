@@ -51,7 +51,20 @@ async def refresh_industry_mapping_file_daily() -> None:
             except Exception as e:
                 logger.warning("交易所股票名录联动更新失败，保留当前资料: %s", e)
 
-        # 3. 后台平滑跑批：每次为缺失主营资料的股票补充 50 只（使用同花顺/东财公开源，免 Token）
+        # 3. 名称映射每小时对齐一次名录。
+        # 此前唯一会写 stock_names.json 的是启动预热（supervised_once，只跑一次），
+        # 而内存里的名称/简称/拼音索引只在文件签名变化时重建，于是长跑进程里
+        # 新上市股票的名称永远认不出来，只能靠股票代码。
+        # 不增加上游请求：get_exchange_stock_master() 自带 24h 缓存，名录没过期时
+        # 这里只是比对一次映射、发现无变化就直接返回。
+        try:
+            from app.financial_data.stock.public import build_stock_name_map
+
+            await build_stock_name_map()
+        except Exception as e:
+            logger.warning("股票名称映射刷新失败，保留当前数据: %s", e)
+
+        # 4. 后台平滑跑批：每次为缺失主营资料的股票补充 50 只（使用同花顺/东财公开源，免 Token）
         try:
             enrich_stats = await auto_enrich_pending_profiles(batch_size=50, delay_seconds=0.5)
             if enrich_stats["enriched"] > 0:
@@ -64,7 +77,7 @@ async def refresh_industry_mapping_file_daily() -> None:
         except Exception as e:
             logger.debug("后台自动补充主营资料跳过: %s", e)
 
-        # 4. 后台平滑跑批：每次为缺失概念的股票补充同花顺概念（免 Token 公开源）
+        # 5. 后台平滑跑批：每次为缺失概念的股票补充同花顺概念（免 Token 公开源）
         try:
             from app.modules.stock_concept.public import auto_enrich_pending_concepts
             concept_stats = await auto_enrich_pending_concepts(batch_size=20, delay_seconds=0.5)

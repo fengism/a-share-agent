@@ -50,6 +50,9 @@ def test_full_name_index_normalizes_full_width_suffix():
 
 
 def test_contains_known_stock_name_matches_full_name_and_pinyin(monkeypatch):
+    # 索引与文件签名要一起锁定：否则真实 data/stock_names.json 会让索引被重建。
+    monkeypatch.setattr(name_map, "_stock_name_file_signature", lambda: None)
+    monkeypatch.setattr(name_map, "_stock_source_key", None)
     monkeypatch.setattr(name_map, "_stock_name_detection_index", ("贵州茅台",))
     monkeypatch.setattr(name_map, "_stock_short_name_index", frozenset())
     monkeypatch.setattr(name_map, "_stock_pinyin_index", frozenset({"gzmt"}))
@@ -60,6 +63,8 @@ def test_contains_known_stock_name_matches_full_name_and_pinyin(monkeypatch):
 
 
 def test_stock_reference_requires_context_for_derived_alias(monkeypatch):
+    monkeypatch.setattr(name_map, "_stock_name_file_signature", lambda: None)
+    monkeypatch.setattr(name_map, "_stock_source_key", None)
     monkeypatch.setattr(name_map, "_stock_name_detection_index", ())
     monkeypatch.setattr(name_map, "_stock_short_name_index", frozenset({"茅台"}))
     monkeypatch.setattr(name_map, "_stock_pinyin_index", frozenset())
@@ -96,6 +101,8 @@ def test_local_name_map_falls_back_to_spot(monkeypatch):
 
 
 def test_classify_message_routes_alias_with_context(monkeypatch):
+    monkeypatch.setattr(name_map, "_stock_name_file_signature", lambda: None)
+    monkeypatch.setattr(name_map, "_stock_source_key", None)
     monkeypatch.setattr(name_map, "_stock_name_detection_index", ())
     monkeypatch.setattr(name_map, "_stock_short_name_index", frozenset({"茅台"}))
     monkeypatch.setattr(name_map, "_stock_pinyin_index", frozenset())
@@ -123,3 +130,98 @@ def test_build_short_name_index_drops_rare_long_prefixes():
 
     assert "贵州茅" not in index
     assert "茅台" in index
+
+
+# --- 名称文件更新后自动重建索引（新股上市）----------------------------------
+
+
+def _write_name_file(path, mapping: dict[str, str]) -> None:
+    import json
+
+    path.write_text(
+        json.dumps(
+            {"source_id": "test", "source_overrides": {}, "mapping": mapping},
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _use_temp_name_file(monkeypatch, tmp_path, mapping: dict[str, str]):
+    from app.financial_data.stock.profile import name_map as module
+
+    name_file = tmp_path / "stock_names.json"
+    _write_name_file(name_file, mapping)
+    monkeypatch.setattr(module, "_STOCK_NAME_FILE", name_file)
+    monkeypatch.setattr(module, "_stock_source_key", None)
+    monkeypatch.setattr(module, "_stock_name_detection_index", None)
+    monkeypatch.setattr(module, "_stock_reference_names", ())
+    monkeypatch.setattr(module, "_stock_short_name_index", None)
+    monkeypatch.setattr(module, "_stock_pinyin_index", None)
+    monkeypatch.setattr(module, "_load_stock_name_map_from_spot_snapshot", lambda: None)
+    return name_file
+
+
+def test_new_stock_name_is_recognized_after_the_file_changes(monkeypatch, tmp_path):
+    """长跑进程里新上市股票的名称必须能被认出来，不能等重启。"""
+    base = {f"{600000 + index:06d}": f"测试股{index}号" for index in range(4200)}
+    base["600519"] = "贵州茅台"
+    name_file = _use_temp_name_file(monkeypatch, tmp_path, base)
+
+    assert name_map.contains_known_stock_name("分析贵州茅台")
+    assert not name_map.contains_known_stock_name("分析乙新股科技")
+
+    # 上游新增一只股票后文件被重写
+    _write_name_file(name_file, {**base, "301999": "乙新股科技"})
+
+    assert name_map.contains_known_stock_name("分析乙新股科技")
+    # 派生简称索引也要跟着更新
+    assert name_map.contains_short_stock_name("乙新股")
+
+
+def test_unchanged_file_does_not_rebuild_the_index(monkeypatch, tmp_path):
+    base = {f"{600000 + index:06d}": f"测试股{index}号" for index in range(4200)}
+    _use_temp_name_file(monkeypatch, tmp_path, base)
+
+    builds: list[int] = []
+    original = name_map._build_stock_name_detection_index
+
+    def _counting(snapshot):
+        builds.append(len(snapshot.mapping))
+        return original(snapshot)
+
+    monkeypatch.setattr(name_map, "_build_stock_name_detection_index", _counting)
+
+    name_map._ensure_stock_name_index()
+    name_map._ensure_stock_name_index()
+    name_map.contains_known_stock_name("测试股1号")
+
+    assert len(builds) == 1, "文件没变时不该重复构建索引"
+
+
+def test_derived_indexes_are_invalidated_with_the_file(monkeypatch, tmp_path):
+    base = {f"{600000 + index:06d}": f"测试股{index}号" for index in range(4200)}
+    name_file = _use_temp_name_file(monkeypatch, tmp_path, base)
+
+    name_map._ensure_short_name_index()
+    assert name_map._stock_short_name_index is not None
+
+    _write_name_file(name_file, {**base, "301999": "乙新股科技"})
+    name_map._ensure_stock_name_index()
+
+    assert name_map._stock_short_name_index is None, "文件变化后简称索引必须失效"
+    assert name_map._stock_pinyin_index is None, "文件变化后拼音索引必须失效"
+
+
+def test_missing_name_file_degrades_without_crashing(monkeypatch, tmp_path):
+    from app.financial_data.stock.profile import name_map as module
+
+    monkeypatch.setattr(module, "_STOCK_NAME_FILE", tmp_path / "absent.json")
+    monkeypatch.setattr(module, "_stock_source_key", None)
+    monkeypatch.setattr(module, "_stock_name_detection_index", None)
+    monkeypatch.setattr(module, "_STOCK_NAME_MAP_SERVICE", type(
+        "S", (), {"get_cached": staticmethod(lambda: None)},
+    )())
+
+    assert module.contains_known_stock_name("分析贵州茅台") is False
+    assert module._stock_name_detection_index == ()
