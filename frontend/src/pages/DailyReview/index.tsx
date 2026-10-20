@@ -46,6 +46,13 @@ import {
   useInfiniteDailyReviewHistory,
 } from "../../api/queries";
 import { streamDailyReview, type DailyReviewProgress } from "../../api/sse";
+import {
+  DAILY_REVIEW_STAGES,
+  EMPTY_DAILY_REVIEW_PROGRESS,
+  buildDailyReviewStepItems,
+  reduceDailyReviewProgress,
+  type DailyReviewProgressState,
+} from "./progress";
 import { ApiError } from "../../api/client";
 import PushModal from "../../components/PushModal";
 import QueryErrorState from "../../components/QueryErrorState";
@@ -379,6 +386,9 @@ export default function DailyReviewPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [generationMessage, setGenerationMessage] = useState("");
+  const [generationProgress, setGenerationProgress] = useState<DailyReviewProgressState>(
+    EMPTY_DAILY_REVIEW_PROGRESS,
+  );
   const [historyFilter, setHistoryFilter] = useState("");
   const cancelGenerationRef = useRef<(() => Promise<unknown>) | null>(null);
   const detachGenerationRef = useRef<(() => void) | null>(null);
@@ -451,9 +461,11 @@ export default function DailyReviewPage() {
     cancellationRequestedRef.current = false;
     setIsGenerating(true);
     setGenerationMessage("正在提交每日复盘任务");
+    setGenerationProgress(EMPTY_DAILY_REVIEW_PROGRESS);
     try {
       const stream = streamDailyReview({ date, force }, (event: DailyReviewProgress) => {
         if (event.message) setGenerationMessage(event.message);
+        setGenerationProgress((previous) => reduceDailyReviewProgress(previous, event));
       });
       cancelGenerationRef.current = stream.cancel;
       detachGenerationRef.current = stream.detach;
@@ -595,10 +607,10 @@ export default function DailyReviewPage() {
 
       {isGenerating ? (
         <WorkflowProgressPanel
-          current={0}
+          current={Math.min(generationProgress.done.length, DAILY_REVIEW_STAGES.length - 1)}
           status="running"
           message={generationMessage || "正在汇总市场数据并生成复盘报告"}
-          items={[{ title: "生成每日复盘", status: "process" }]}
+          items={buildDailyReviewStepItems(generationProgress)}
         />
       ) : null}
 

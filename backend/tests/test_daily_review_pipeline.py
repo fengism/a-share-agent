@@ -294,7 +294,9 @@ async def test_collection_snapshot_is_shared_for_both_session_kinds(monkeypatch:
     analysis_cache.clear()
     calls: list[str] = []
 
-    async def _fake_collect(target_date: date, *, use_realtime: bool) -> DailyReviewCollection:
+    async def _fake_collect(
+        target_date: date, *, use_realtime: bool, progress_callback=None,
+    ) -> DailyReviewCollection:
         calls.append(f"{target_date.isoformat()}:{use_realtime}")
         return _collection()
 
@@ -363,7 +365,9 @@ async def test_generate_daily_review_serializes_duplicate_calls(monkeypatch: pyt
         kwargs.pop("semaphore", None)
         return fn(*args, **kwargs)
 
-    async def _fake_collect(target_date: date, *, use_realtime: bool) -> DailyReviewCollection:
+    async def _fake_collect(
+        target_date: date, *, use_realtime: bool, progress_callback=None,
+    ) -> DailyReviewCollection:
         return _collection()
 
     async def _fake_run(spec: object, context: dict, **kwargs: object) -> PromptRun[DailyReviewPromptOutput]:
@@ -409,7 +413,9 @@ async def test_concurrent_users_share_one_llm_call(monkeypatch: pytest.MonkeyPat
         kwargs.pop("semaphore", None)
         return fn(*args, **kwargs)
 
-    async def _fake_collect(target_date: date, *, use_realtime: bool) -> DailyReviewCollection:
+    async def _fake_collect(
+        target_date: date, *, use_realtime: bool, progress_callback=None,
+    ) -> DailyReviewCollection:
         return _collection()
 
     async def _fake_run(spec: object, context: dict, **kwargs: object) -> PromptRun[DailyReviewPromptOutput]:
@@ -631,7 +637,9 @@ async def _patch_generation(
         kwargs.pop("semaphore", None)
         return fn(*args, **kwargs)  # type: ignore[operator]
 
-    async def _fake_collect(target_date: date, *, use_realtime: bool) -> DailyReviewCollection:
+    async def _fake_collect(
+        target_date: date, *, use_realtime: bool, progress_callback=None,
+    ) -> DailyReviewCollection:
         return _collection()
 
     async def _fake_run(spec: object, context: dict, **kwargs: object) -> PromptRun[DailyReviewPromptOutput]:
@@ -667,17 +675,25 @@ async def test_generate_daily_review_reports_progress_stages(monkeypatch: pytest
         DailyReviewRequest(date=date(2026, 10, 14)), 7, progress_callback=_record
     )
 
-    assert [event["stage"] for event in events] == ["queue", "collect", "analyze", "persist"]
-    assert all(event["type"] == "stage_started" for event in events)
+    # 每个阶段都要有 started + completed：只有 started 时进度条永远停在第一步。
+    stages = [event["stage"] for event in events]
+    assert stages[:2] == ["queue", "queue"]
+    for stage in ("queue", "collect", "analyze", "persist"):
+        types = [event["type"] for event in events if event["stage"] == stage]
+        assert types[0] == "stage_started", stage
+        assert "stage_completed" in types, stage
+    assert stages[-1] == "persist"
     assert all(event["message"] for event in events)
 
-    # 命中缓存时不再采集/生成，只回报排队阶段（前端仍由 complete 事件收尾）。
+    # 命中缓存时不再采集/生成，但必须显式告知，否则前端只能干等到超时。
     events.clear()
     await pipeline.generate_daily_review(
         DailyReviewRequest(date=date(2026, 10, 14)), 7, progress_callback=_record
     )
 
-    assert [event["stage"] for event in events] == ["queue"]
+    assert [event["type"] for event in events] == [
+        "stage_started", "stage_completed", "cache_hit",
+    ]
 
 
 async def test_generate_daily_review_without_callback_still_works(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -706,7 +722,9 @@ async def test_prewarm_daily_review_warms_shared_caches(monkeypatch: pytest.Monk
     prompts: list[str] = []
     resolutions: list[date | None] = []
 
-    async def _fake_collect(target_date: date, *, use_realtime: bool) -> DailyReviewCollection:
+    async def _fake_collect(
+        target_date: date, *, use_realtime: bool, progress_callback=None,
+    ) -> DailyReviewCollection:
         assert use_realtime is True
         return _collection()
 
@@ -741,7 +759,9 @@ async def test_prewarm_daily_review_skips_when_session_not_completed(monkeypatch
     analysis_cache.clear()
     collected: list[str] = []
 
-    async def _fake_collect(target_date: date, *, use_realtime: bool) -> DailyReviewCollection:
+    async def _fake_collect(
+        target_date: date, *, use_realtime: bool, progress_callback=None,
+    ) -> DailyReviewCollection:
         collected.append(target_date.isoformat())
         return _collection()
 
@@ -758,7 +778,9 @@ async def test_prewarm_daily_review_skips_when_session_not_completed(monkeypatch
 async def test_prewarm_daily_review_swallows_llm_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     analysis_cache.clear()
 
-    async def _fake_collect(target_date: date, *, use_realtime: bool) -> DailyReviewCollection:
+    async def _fake_collect(
+        target_date: date, *, use_realtime: bool, progress_callback=None,
+    ) -> DailyReviewCollection:
         return _collection()
 
     async def _fake_run(spec: object, context: dict, **kwargs: object) -> PromptRun[DailyReviewPromptOutput]:
@@ -799,7 +821,9 @@ async def test_settled_realtime_snapshot_uses_long_ttl(monkeypatch: pytest.Monke
         recorded.append(ttl)
         original_set(key, value, ttl)
 
-    async def _fake_collect(target_date: date, *, use_realtime: bool) -> DailyReviewCollection:
+    async def _fake_collect(
+        target_date: date, *, use_realtime: bool, progress_callback=None,
+    ) -> DailyReviewCollection:
         return _collection()
 
     monkeypatch.setattr(analysis_cache, "set", _spy)

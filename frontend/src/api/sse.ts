@@ -422,9 +422,29 @@ export interface IndustryChainProgress {
 export type IndustryChainProgressHandler = (event: IndustryChainProgress) => void;
 
 export interface DailyReviewProgress {
-  type: "stage_started" | "stage_completed" | "complete" | "error";
+  type:
+    | "stage_started"
+    | "stage_completed"
+    | "stage_failed"
+    | "stage_progress"
+    | "source_done"
+    | "cache_hit"
+    | "complete"
+    | "error";
   stage?: string;
   message?: string;
+  /** 采集阶段：当前完成的数据源名。 */
+  source?: string;
+  status?: "complete" | "unavailable";
+  /** 采集阶段完成计数。 */
+  done?: number;
+  total?: number;
+  /** 采集阶段汇总：源总数与失败数。 */
+  sources?: number;
+  failed?: number;
+  /** 长耗时阶段心跳的已用毫秒。 */
+  elapsed_ms?: number;
+  generation_status?: "llm" | "fallback";
   result?: DailyReviewResult;
 }
 
