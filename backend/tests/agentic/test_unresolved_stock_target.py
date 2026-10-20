@@ -2,13 +2,56 @@
 
 精度优先：`_STOCK_CONTEXT_KEYWORDS` 里的“分析/怎么样”等泛化动词不能作为触发
 条件，否则“分析一下光伏行业估值”会被强制调 search_stocks。
+
+名称索引必须打补丁：``data/`` 在 .gitignore 里，CI 上没有 ``stock_names.json``，
+依赖真实快照的断言会在 CI 静默变成“任何名称都认不出”。
 """
 
 from __future__ import annotations
 
-from app.financial_data.stock.profile.short_names import has_specific_stock_context
+import pytest
+
+from app.financial_data.hk import name_reference as hk
+from app.financial_data.stock.profile import name_map
+from app.financial_data.stock.profile.short_names import (
+    build_first_char_index,
+    build_short_name_index,
+    has_specific_stock_context,
+)
 from app.modules.chat.capability_plan import build_chat_capability_plan
 from app.modules.chat.stock_reference import needs_stock_resolution
+
+_REFERENCE_NAMES: tuple[str, ...] = ("贵州茅台", "海康威视")
+
+
+@pytest.fixture(autouse=True)
+def _fixed_reference_indexes(monkeypatch):
+    """锁定名称索引，不读 data/ 下的真实快照（CI 没有这个文件）。"""
+    monkeypatch.setattr(name_map, "_stock_name_file_signature", lambda: None)
+    monkeypatch.setattr(name_map, "_stock_source_key", None)
+    monkeypatch.setattr(
+        name_map,
+        "_stock_name_detection_index",
+        name_map._build_stock_name_detection_index(
+            name_map.StockNameMapSnapshot(
+                mapping={str(i): n for i, n in enumerate(_REFERENCE_NAMES)},
+                default_source_id="cache.legacy_stock_names",
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        name_map,
+        "_stock_short_name_index",
+        build_first_char_index(build_short_name_index(_REFERENCE_NAMES)),
+    )
+    monkeypatch.setattr(name_map, "_stock_pinyin_index", frozenset())
+    monkeypatch.setattr(name_map, "_stock_reference_names", _REFERENCE_NAMES)
+    # 港股索引同样不读 data/hk_stock_search_index.json。
+    monkeypatch.setattr(hk, "_ensure_hk_reference_indexes", lambda: None)
+    monkeypatch.setattr(hk, "_hk_name_index", build_first_char_index(frozenset()))
+    monkeypatch.setattr(hk, "_hk_short_name_index", build_first_char_index(frozenset()))
+    monkeypatch.setattr(hk, "_hk_pinyin_index", frozenset())
+    monkeypatch.setattr(hk, "_hk_names", ())
 
 
 def test_specific_stock_context_ignores_generic_analysis_verbs():
