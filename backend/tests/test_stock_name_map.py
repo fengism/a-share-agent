@@ -1,6 +1,7 @@
 """Short-name derivation, pinyin initials, and stock-reference detection."""
 
 from app.financial_data.stock.profile import name_map, short_names
+from app.financial_data.stock.profile.short_names import build_first_char_index
 
 
 def _snapshot(mapping: dict[str, str]) -> name_map.StockNameMapSnapshot:
@@ -53,8 +54,8 @@ def test_contains_known_stock_name_matches_full_name_and_pinyin(monkeypatch):
     # 索引与文件签名要一起锁定：否则真实 data/stock_names.json 会让索引被重建。
     monkeypatch.setattr(name_map, "_stock_name_file_signature", lambda: None)
     monkeypatch.setattr(name_map, "_stock_source_key", None)
-    monkeypatch.setattr(name_map, "_stock_name_detection_index", ("贵州茅台",))
-    monkeypatch.setattr(name_map, "_stock_short_name_index", frozenset())
+    monkeypatch.setattr(name_map, "_stock_name_detection_index", build_first_char_index(("贵州茅台",)))
+    monkeypatch.setattr(name_map, "_stock_short_name_index", build_first_char_index(frozenset()))
     monkeypatch.setattr(name_map, "_stock_pinyin_index", frozenset({"gzmt"}))
 
     assert name_map.contains_known_stock_name("贵州茅台发布公告")
@@ -65,8 +66,8 @@ def test_contains_known_stock_name_matches_full_name_and_pinyin(monkeypatch):
 def test_stock_reference_requires_context_for_derived_alias(monkeypatch):
     monkeypatch.setattr(name_map, "_stock_name_file_signature", lambda: None)
     monkeypatch.setattr(name_map, "_stock_source_key", None)
-    monkeypatch.setattr(name_map, "_stock_name_detection_index", ())
-    monkeypatch.setattr(name_map, "_stock_short_name_index", frozenset({"茅台"}))
+    monkeypatch.setattr(name_map, "_stock_name_detection_index", build_first_char_index(()))
+    monkeypatch.setattr(name_map, "_stock_short_name_index", build_first_char_index(frozenset({"茅台"})))
     monkeypatch.setattr(name_map, "_stock_pinyin_index", frozenset())
 
     assert not name_map.mentions_stock_target("茅台")
@@ -103,8 +104,8 @@ def test_local_name_map_falls_back_to_spot(monkeypatch):
 def test_classify_message_routes_alias_with_context(monkeypatch):
     monkeypatch.setattr(name_map, "_stock_name_file_signature", lambda: None)
     monkeypatch.setattr(name_map, "_stock_source_key", None)
-    monkeypatch.setattr(name_map, "_stock_name_detection_index", ())
-    monkeypatch.setattr(name_map, "_stock_short_name_index", frozenset({"茅台"}))
+    monkeypatch.setattr(name_map, "_stock_name_detection_index", build_first_char_index(()))
+    monkeypatch.setattr(name_map, "_stock_short_name_index", build_first_char_index(frozenset({"茅台"})))
     monkeypatch.setattr(name_map, "_stock_pinyin_index", frozenset())
 
     from app.modules.chat.routing import classify_message
@@ -224,4 +225,60 @@ def test_missing_name_file_degrades_without_crashing(monkeypatch, tmp_path):
     )())
 
     assert module.contains_known_stock_name("分析贵州茅台") is False
-    assert module._stock_name_detection_index == ()
+    assert len(module._stock_name_detection_index or ()) == 0
+
+
+# --- 首字符预筛索引（性能优化，语义必须与全量扫描一致）---------------------
+
+
+def test_first_char_index_matches_full_scan_oracle():
+    """预筛只跳过「首字符都不在文本里」的名称，结论必须与全量扫描逐条一致。"""
+    names = [
+        "贵州茅台", "宁德时代", "中芯国际", "万科A", "光伏科技", "中国平安",
+        "平安银行", "比亚迪", "东方财富", "药明康德",
+    ]
+    index = short_names.build_first_char_index(names)
+    messages = [
+        "分析贵州茅台",
+        "宁德时代和中芯国际哪个好",
+        "今天大盘怎么样",
+        "光伏行业新闻",
+        "万科A 走势",
+        "完全没有提到任何股票",
+        "",
+        "茅",           # 单字不足以构成名称
+        "台茅台",       # 名称不是前缀也能命中
+    ]
+    for message in messages:
+        expected = any(name in message for name in names)
+        assert index.matches(message) is expected, message
+
+
+def test_first_char_index_is_sound_for_every_name():
+    """每个名称用自己的名字作为文本时必须命中（首字符分桶不能漏）。"""
+    names = ["贵州茅台", "宁德时代", "万科A", "中芯国际"]
+    index = short_names.build_first_char_index(names)
+    for name in names:
+        assert index.matches(f"请分析{name}的估值"), name
+        assert name in index
+
+
+def test_first_char_index_handles_empty_inputs():
+    empty = short_names.build_first_char_index(())
+    assert len(empty) == 0
+    assert not empty.matches("任意文本")
+    assert not empty
+
+    index = short_names.build_first_char_index(["贵州茅台"])
+    assert not index.matches("")
+
+
+def test_detection_index_uses_first_char_buckets():
+    """生产路径必须走预筛索引，而不是退回全量扫描。"""
+    index = name_map._build_stock_name_detection_index(
+        _snapshot({"600519": "贵州茅台", "300750": "宁德时代"})
+    )
+
+    assert isinstance(index, short_names.FirstCharIndex)
+    assert index.matches("分析贵州茅台")
+    assert not index.matches("分析光伏行业")

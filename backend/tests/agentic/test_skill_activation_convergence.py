@@ -1,6 +1,7 @@
 """P4c: score-based active Skill ordering and initial tool convergence."""
 
 from app.agentic.skills.contracts import Skill
+from app.financial_data.stock.profile.short_names import build_first_char_index
 from app.modules.chat.capability_plan import build_chat_capability_plan
 
 
@@ -79,8 +80,8 @@ def test_url_only_forces_url_content_into_initial_tools():
 def test_full_stock_name_still_activates_stock_analysis(monkeypatch):
     from app.financial_data.stock.profile import name_map
 
-    monkeypatch.setattr(name_map, "_stock_name_detection_index", ("贵州茅台",))
-    monkeypatch.setattr(name_map, "_stock_short_name_index", frozenset())
+    monkeypatch.setattr(name_map, "_stock_name_detection_index", build_first_char_index(("贵州茅台",)))
+    monkeypatch.setattr(name_map, "_stock_short_name_index", build_first_char_index(frozenset()))
     monkeypatch.setattr(name_map, "_stock_pinyin_index", frozenset())
     plan = build_chat_capability_plan("贵州茅台新闻")
 
@@ -90,8 +91,8 @@ def test_full_stock_name_still_activates_stock_analysis(monkeypatch):
 def test_short_alias_with_context_activates_stock_analysis(monkeypatch):
     from app.financial_data.stock.profile import name_map
 
-    monkeypatch.setattr(name_map, "_stock_name_detection_index", ())
-    monkeypatch.setattr(name_map, "_stock_short_name_index", frozenset({"茅台"}))
+    monkeypatch.setattr(name_map, "_stock_name_detection_index", build_first_char_index(()))
+    monkeypatch.setattr(name_map, "_stock_short_name_index", build_first_char_index(frozenset({"茅台"})))
     monkeypatch.setattr(name_map, "_stock_pinyin_index", frozenset())
 
     plan = build_chat_capability_plan("茅台新闻", max_initial_active_skills=2)
@@ -102,8 +103,8 @@ def test_short_alias_with_context_activates_stock_analysis(monkeypatch):
 def test_short_alias_without_context_does_not_force_stock_analysis(monkeypatch):
     from app.financial_data.stock.profile import name_map
 
-    monkeypatch.setattr(name_map, "_stock_name_detection_index", ())
-    monkeypatch.setattr(name_map, "_stock_short_name_index", frozenset({"茅台"}))
+    monkeypatch.setattr(name_map, "_stock_name_detection_index", build_first_char_index(()))
+    monkeypatch.setattr(name_map, "_stock_short_name_index", build_first_char_index(frozenset({"茅台"})))
     monkeypatch.setattr(name_map, "_stock_pinyin_index", frozenset())
 
     plan = build_chat_capability_plan("茅台", max_initial_active_skills=2)

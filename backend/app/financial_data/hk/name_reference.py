@@ -11,6 +11,8 @@ import logging
 
 from app.configuration.paths import DATA_DIR
 from app.financial_data.stock.profile.short_names import (
+    FirstCharIndex,
+    build_first_char_index,
     build_pinyin_index,
     build_short_name_index,
     extract_pinyin_tokens,
@@ -30,22 +32,22 @@ _AMBIGUOUS_HK_NAMES: frozenset[str] = frozenset({
 
 _hk_source_key: tuple[int, int] | None = None
 _hk_loaded = False
-_hk_name_index: frozenset[str] = frozenset()
-_hk_short_name_index: frozenset[str] = frozenset()
+_hk_name_index: FirstCharIndex = build_first_char_index(())
+_hk_short_name_index: FirstCharIndex = build_first_char_index(())
 _hk_pinyin_index: frozenset[str] | None = None
 _hk_names: tuple[str, ...] = ()
 
 
-def build_hk_name_index(names: tuple[str, ...] | list[str]) -> frozenset[str]:
+def build_hk_name_index(names: tuple[str, ...] | list[str]) -> FirstCharIndex:
     """港股完整名高置信索引（长度 >= 3，排除歧义词）。"""
-    return frozenset(
+    return build_first_char_index([
         name
         for raw in names
         if len(name := normalize_name(raw)) >= 3 and name not in _AMBIGUOUS_HK_NAMES
-    )
+    ])
 
 
-def build_hk_short_name_index(names: tuple[str, ...] | list[str]) -> frozenset[str]:
+def build_hk_short_name_index(names: tuple[str, ...] | list[str]) -> FirstCharIndex:
     """港股派生简称：自动词缀 + 2 字品牌名，排除歧义词与通用词。"""
     normalized = [normalize_name(raw) for raw in names]
     aliases = set(build_short_name_index(normalized, include_exceptions=False))
@@ -56,7 +58,7 @@ def build_hk_short_name_index(names: tuple[str, ...] | list[str]) -> frozenset[s
             and not is_generic_word(name)
         ):
             aliases.add(name)
-    return frozenset(aliases - _AMBIGUOUS_HK_NAMES)
+    return build_first_char_index(aliases - _AMBIGUOUS_HK_NAMES)
 
 
 def _read_hk_names() -> tuple[str, ...]:
@@ -105,7 +107,7 @@ def contains_hk_stock_name(message: str) -> bool:
     _ensure_hk_reference_indexes()
     normalized = normalize_name(message)
     if len(normalized) >= 3 and _hk_name_index:
-        if any(name in normalized for name in _hk_name_index):
+        if _hk_name_index.matches(normalized):
             return True
     tokens = extract_pinyin_tokens(message)
     if not tokens:
@@ -120,7 +122,7 @@ def contains_hk_short_stock_name(message: str) -> bool:
     if len(normalized) < 2:
         return False
     _ensure_hk_reference_indexes()
-    return any(alias in normalized for alias in _hk_short_name_index)
+    return _hk_short_name_index.matches(normalized)
 
 
 def mentions_hk_stock_target(message: str) -> bool:

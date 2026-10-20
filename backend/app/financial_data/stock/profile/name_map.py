@@ -25,6 +25,8 @@ from app.financial_data.stock.profile.name_sources import (
     SSE_STOCK_NAMES_SOURCE_ID,
 )
 from app.financial_data.stock.profile.short_names import (
+    FirstCharIndex,
+    build_first_char_index,
     build_pinyin_index,
     build_short_name_index,
     extract_pinyin_tokens,
@@ -103,7 +105,7 @@ class StockNameSourceAttempt:
     semaphore: asyncio.Semaphore
 
 
-def _build_stock_name_detection_index(snapshot: StockNameMapSnapshot) -> tuple[str, ...]:
+def _build_stock_name_detection_index(snapshot: StockNameMapSnapshot) -> FirstCharIndex:
     names: set[str] = set()
     for raw in snapshot.mapping.values():
         name = normalize_name(raw)
@@ -112,7 +114,7 @@ def _build_stock_name_detection_index(snapshot: StockNameMapSnapshot) -> tuple[s
         names.add(name)
         if len(name) > 2 and name.endswith(("A", "B")):
             names.add(name[:-1])
-    return tuple(sorted(names, key=lambda name: (-len(name), name)))
+    return build_first_char_index(names)
 
 
 def _stock_name_file_signature() -> tuple[int, int] | None:
@@ -144,7 +146,7 @@ def _ensure_stock_name_index() -> None:
     if snapshot is None:
         snapshot = _load_local_stock_name_map()
     if snapshot is None:
-        _stock_name_detection_index = ()
+        _stock_name_detection_index = build_first_char_index(())
         _stock_reference_names = ()
         _stock_short_name_index = None
         _stock_pinyin_index = None
@@ -156,11 +158,13 @@ def _ensure_stock_name_index() -> None:
     _stock_pinyin_index = None
 
 
-def _ensure_short_name_index() -> frozenset[str]:
+def _ensure_short_name_index() -> FirstCharIndex:
     global _stock_short_name_index
     if _stock_short_name_index is None:
         _ensure_stock_name_index()
-        _stock_short_name_index = build_short_name_index(_stock_reference_names or ())
+        _stock_short_name_index = build_first_char_index(
+            build_short_name_index(_stock_reference_names or ())
+        )
     return _stock_short_name_index
 
 
@@ -185,7 +189,7 @@ def contains_known_stock_name(message: str) -> bool:
     _ensure_stock_name_index()
     normalized = normalize_name(message)
     if len(normalized) >= 2 and _stock_name_detection_index:
-        if any(name in normalized for name in _stock_name_detection_index):
+        if _stock_name_detection_index.matches(normalized):
             return True
     return _contains_pinyin_reference(message)
 
@@ -195,8 +199,7 @@ def contains_short_stock_name(message: str) -> bool:
     normalized = normalize_name(message)
     if len(normalized) < 2:
         return False
-    index = _ensure_short_name_index()
-    return any(alias in normalized for alias in index)
+    return _ensure_short_name_index().matches(normalized)
 
 
 def mentions_stock_target(message: str) -> bool:
@@ -225,9 +228,9 @@ _stock_name_map_singleflight: AsyncSingleFlight[StockNameMapSnapshot] = AsyncSin
 #: 名称文件签名（mtime_ns, size）。文件变化时重建全部派生索引，
 #: 否则新上市股票的名称在长跑进程里永远认不出来。
 _stock_source_key: tuple[int, int] | None = None
-_stock_name_detection_index: tuple[str, ...] | None = None
+_stock_name_detection_index: FirstCharIndex | None = None
 _stock_reference_names: tuple[str, ...] | None = None
-_stock_short_name_index: frozenset[str] | None = None
+_stock_short_name_index: FirstCharIndex | None = None
 _stock_pinyin_index: frozenset[str] | None = None
 
 
