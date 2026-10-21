@@ -276,3 +276,98 @@ def test_dropped_result_placeholder_is_used_before_empty_string():
     oversized = '{"ok":false,"error":{"code":"x","message":"%s"}}' % ("长" * 400)
     assert serialize_context_result(oversized, 4) == "null"
     assert serialize_context_result(oversized, 3) == EMPTY_TOOL_RESULT
+
+
+def test_compact_tool_payload_strips_none_recursively():
+    from app.agentic.tools.serialization import compact_tool_payload
+
+    data = {
+        "a": 1,
+        "b": None,
+        "c": [
+            {"k1": "v1", "k2": None},
+            {"k3": 0, "k4": False, "k5": ""},
+        ],
+        "d": {"nested_none": None, "nested_val": "ok"},
+    }
+    compacted = compact_tool_payload(data)
+    assert compacted == {
+        "a": 1,
+        "c": [
+            {"k1": "v1"},
+            {"k3": 0, "k4": False, "k5": ""},
+        ],
+        "d": {"nested_val": "ok"},
+    }
+
+
+def test_serialize_result_compacts_payload_and_uses_compact_separators():
+    from app.agentic.tools.serialization import serialize_result
+
+    # pe 作为核心估值指标被保留以避免语义歧义；sparse_note 作为无意义空字段被剥离
+    data = {"name": "平安银行", "pe": None, "sparse_note": None, "volume": 1000}
+    serialized = serialize_result(data)
+    # Check that whitespace after separators is eliminated
+    assert ": " not in serialized
+    assert ", " not in serialized
+    parsed = json.loads(serialized)
+    assert parsed["ok"] is True
+    assert parsed["data"] == {"name": "平安银行", "pe": None, "volume": 1000}
+
+
+def test_serialize_error_compacts_data():
+    from app.agentic.tools.serialization import serialize_error
+
+    err_serialized = serialize_error(
+        "timeout",
+        "fetch failed",
+        retryable=True,
+        data={"requested_id": "123", "extra": None},
+    )
+    assert ": " not in err_serialized
+    assert ", " not in err_serialized
+    parsed = json.loads(err_serialized)
+    assert parsed["ok"] is False
+    assert parsed["data"] == {"requested_id": "123"}
+
+
+def test_serialize_result_bisects_collection_inside_dict():
+    from app.agentic.tools.serialization import serialize_result
+
+    # Dict containing large list of items, e.g. KlineData or NewsList
+    large_dict = {
+        "code": "600519",
+        "items": [
+            {"date": f"2024-{i // 25 + 1:02d}-{i % 25 + 1:02d}", "close": 1500.0 + i, "volume": 10000 + i}
+            for i in range(100)
+        ],
+    }
+    # Set limit to 2000 chars: not enough for 100 items, but enough for truncated items
+    serialized = serialize_result(large_dict, max_result_len=2000)
+    assert len(serialized) <= 2000
+    parsed = json.loads(serialized)
+    assert parsed["ok"] is True
+    # The dictionary structure is preserved instead of turning into string preview
+    assert isinstance(parsed["data"], dict)
+    assert parsed["data"]["code"] == "600519"
+    assert isinstance(parsed["data"]["items"], list)
+    assert 0 < len(parsed["data"]["items"]) < 100
+    assert parsed["meta"]["truncated"] is True
+    # Ascending dates: latest bars must be preserved at tail
+    assert parsed["data"]["items"][-1]["date"] == "2024-04-25"
+    assert "已保留最新" in parsed["meta"]["reason"]
+
+
+def test_serialize_result_preserves_head_for_generic_lists():
+    from app.agentic.tools.serialization import serialize_result
+
+    generic_dict = {
+        "ranking": "hot_stocks",
+        "rows": [{"rank": i, "code": f"00000{i}"} for i in range(100)],
+    }
+    serialized = serialize_result(generic_dict, max_result_len=1500)
+    assert len(serialized) <= 1500
+    parsed = json.loads(serialized)
+    assert parsed["ok"] is True
+    assert parsed["data"]["rows"][0]["rank"] == 0
+    assert "已保留前" in parsed["meta"]["reason"]

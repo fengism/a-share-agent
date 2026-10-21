@@ -80,7 +80,7 @@ _TOOL_OUTPUT_ERROR = "模型仍在请求工具而未生成有效结论，请检�
 _REASONING_TRUNCATED_WARNING = "推理内容已按上下文预算截断，不影响工具证据与最终结论"
 # Some thinking gateways require reasoning on tool turns, but it is not tool
 # evidence. Cap each replayed turn and count it against the same context budget.
-_MAX_REPLAY_REASONING_CHARACTERS = 8_000
+_MAX_REPLAY_REASONING_CHARACTERS = 4_000
 # 工具结果预算再怎么收缩，也要留出「本次工具确实能返回点东西」的下限。
 _MIN_TOOL_CONTEXT_CHARACTERS = 4_096
 _FINAL_ANSWER_INSTRUCTION = (
@@ -165,6 +165,8 @@ def _llm_request_timeout(
 def _termination_error_reason(exc: Exception) -> str:
     if isinstance(exc, LLMInvalidResponseError):
         return "invalid_response"
+    if isinstance(exc, LLMRetryableError):
+        return "stream_error"
     code = getattr(exc, "status_code", None)
     if isinstance(code, int):
         return {400: "bad_request", 401: "authentication_error", 403: "permission_error", 429: "rate_limited"}.get(code, "generation_error")
@@ -407,7 +409,10 @@ class AgentExecutor:
             else state.tool_cache.cache_key_for(tool_call, execution_context)
             for tool_call, arguments in zip(tool_calls, prepared_arguments)
         ]
-        assistant_message = build_assistant_tool_message(tool_calls, assistant_content)
+        cleaned_content = strip_tool_call_markup(assistant_content) if assistant_content else ""
+        if cleaned_content != (assistant_content or "") and _TOOL_MARKUP_WARNING not in state.warnings:
+            state.warnings.append(_TOOL_MARKUP_WARNING)
+        assistant_message = build_assistant_tool_message(tool_calls, cleaned_content or None)
         if capabilities.replay_tool_reasoning:
             # Some thinking gateways require the original reasoning on tool turns.
             # This stays in the invocation context; do not log/persist it here.
@@ -799,7 +804,6 @@ class AgentExecutor:
         max_completion_tokens: int | None = None,
         request_timeout: float | None = None,
     ) -> LLMTurn:
-        reasoning_source = AgentReasoningSource(block_id=uuid4().hex)
         capabilities = capabilities_from_client(llm_client)
         tool_request = resolve_tool_request(
             tool_definitions,
@@ -828,63 +832,81 @@ class AgentExecutor:
             )
             turn = normalize_chat_completion(response)
             if turn.reasoning_content:
+                reasoning_source = AgentReasoningSource(block_id=uuid4().hex, attempt=1)
                 await emit(AgentEvent(type="reasoning", content=turn.reasoning_content, reasoning_source=reasoning_source))
             return turn
 
-        normalizer = ChatCompletionStreamNormalizer()
         stream_text_immediately = tool_choice == "none"
-        # 正文按句过滤后推送：工具标记和获取数据的过程描述不能进入不可撤回的流。
-        markup_filter = AnswerTextStream() if stream_text_immediately else None
+        max_turn_attempts = 2
+        for turn_attempt in range(1, max_turn_attempts + 1):
+            reasoning_source = AgentReasoningSource(block_id=uuid4().hex, attempt=turn_attempt)
+            normalizer = ChatCompletionStreamNormalizer()
+            # 正文按句过滤后推送：工具标记和获取数据的过程描述不能进入不可撤回的流。
+            markup_filter = AnswerTextStream() if stream_text_immediately else None
 
-        async def flush_markup() -> None:
-            if markup_filter is None:
-                return
-            tail = markup_filter.flush()
-            if tail:
-                await emit(AgentEvent(type="text", content=tail))
+            async def flush_markup() -> None:
+                if markup_filter is None:
+                    return
+                tail = markup_filter.flush()
+                if tail:
+                    await emit(AgentEvent(type="text", content=tail))
 
-        stream = stream_chat_completion(
-            llm_client,
-            metric_stage=("agent.final@v1" if tool_choice == "none" else "agent.round@v1"),
-            max_completion_tokens=max_completion_tokens,
-            request_timeout=request_timeout,
-            **kwargs,
-        )
-        try:
-            async with aclosing(stream):
-                async for chunk in stream:
-                    delta = normalizer.add(chunk)
-                    if delta.content:
-                        if stream_text_immediately:
-                            text = markup_filter.feed(delta.content) if markup_filter else delta.content
-                            if text:
-                                await emit(AgentEvent(type="text", content=text))
-                    if delta.reasoning_content:
-                        await emit(
-                            AgentEvent(type="reasoning", content=delta.reasoning_content, reasoning_source=reasoning_source)
-                        )
-        except asyncio.CancelledError:
-            await flush_markup()
-            raise
-        except (LLMRetryableError, LLMGenerationTimeoutError, TimeoutError):
+            stream = stream_chat_completion(
+                llm_client,
+                metric_stage=("agent.final@v1" if tool_choice == "none" else "agent.round@v1"),
+                max_completion_tokens=max_completion_tokens,
+                request_timeout=request_timeout,
+                **kwargs,
+            )
+            try:
+                async with aclosing(stream):
+                    async for chunk in stream:
+                        delta = normalizer.add(chunk)
+                        if delta.content:
+                            if stream_text_immediately:
+                                text = markup_filter.feed(delta.content) if markup_filter else delta.content
+                                if text:
+                                    await emit(AgentEvent(type="text", content=text))
+                        if delta.reasoning_content:
+                            await emit(
+                                AgentEvent(type="reasoning", content=delta.reasoning_content, reasoning_source=reasoning_source)
+                            )
+            except asyncio.CancelledError:
+                await flush_markup()
+                raise
+            except (LLMRetryableError, LLMGenerationTimeoutError, TimeoutError) as exc:
+                await flush_markup()
+                turn = normalizer.finish()
+                if clean_answer(turn.content):
+                    return LLMTurn(
+                        content=turn.content,
+                        reasoning_content=turn.reasoning_content,
+                        tool_calls=(),
+                        finish_reason="stream_error",
+                    )
+                if (
+                    isinstance(exc, LLMRetryableError)
+                    and not isinstance(exc, LLMGenerationTimeoutError)
+                    and turn_attempt < max_turn_attempts
+                ):
+                    logger.warning(
+                        "LLM流式响应中断，准备重试该轮调用: attempt=%d/%d error=%s",
+                        turn_attempt,
+                        max_turn_attempts,
+                        exc,
+                    )
+                    await emit(AgentEvent(type="status", content="模型响应中断，正在重试本轮生成…"))
+                    await asyncio.sleep(1.0)
+                    continue
+                raise
+
             await flush_markup()
             turn = normalizer.finish()
-            if not clean_answer(turn.content):
-                raise
-            return LLMTurn(
-                content=turn.content,
-                reasoning_content=turn.reasoning_content,
-                tool_calls=(),
-                finish_reason="stream_error",
-            )
-
-        await flush_markup()
-        turn = normalizer.finish()
-        if turn.finish_reason is None:
-            # Clean transport EOF is not a model completion. Never execute tool
-            # arguments from a stream whose terminal frame was not received.
-            return LLMTurn(turn.content, turn.reasoning_content, (), finish_reason="stream_error")
-        return turn
+            if turn.finish_reason is None:
+                # Clean transport EOF is not a model completion. Never execute tool
+                # arguments from a stream whose terminal frame was not received.
+                return LLMTurn(turn.content, turn.reasoning_content, (), finish_reason="stream_error")
+            return turn
 
     async def _classify_tool_calls(
         self,
@@ -1021,10 +1043,12 @@ class AgentExecutor:
         async def emit(delta: AgentEvent) -> None:
             if event_queue is not None:
                 if delta.type == "reasoning" and delta.reasoning_source is not None:
+                    inner_attempt = delta.reasoning_source.attempt
                     delta = delta.model_copy(update={
                         "reasoning_source": delta.reasoning_source.model_copy(update={
                             "source": profile.display_name, "turn": turn_number,
-                            "task_id": task_id, "attempt": attempt,
+                            "task_id": task_id,
+                            "attempt": inner_attempt if inner_attempt > 1 else attempt,
                         }),
                     })
                 await event_queue.put(delta)
@@ -1137,8 +1161,8 @@ class AgentExecutor:
                     )
                 if stream_response:
                     await emit(AgentEvent(type="error", error=detail))
-                    return self._build_result(profile, state, "", "failed", retryable=False)
-                return self._build_result(profile, state, detail, "failed", retryable=False)
+                    return self._build_result(profile, state, "", "failed", retryable=isinstance(exc, LLMRetryableError))
+                return self._build_result(profile, state, detail, "failed", retryable=isinstance(exc, LLMRetryableError))
 
             self._record_turn_completion(state, turn)
 

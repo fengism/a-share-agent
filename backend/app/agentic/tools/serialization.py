@@ -395,6 +395,68 @@ def reported_error_code(result: Any) -> str:
     return "tool_reported_error"
 
 
+_SEMANTIC_NULL_KEYS = frozenset(
+    {
+        # 核心估值指标（如亏损公司市盈率为 null，明确表明无有效估值倍数而非“未曾查询”）
+        "pe", "pe_ttm", "pe_static", "pe_forward", "pb", "pb_mrq", "pb_3y", "ps", "ps_ttm", "ps_3y", "peg", "pcf", "pcf_ttm",
+        # 核心盈利与回报率（如未分红公司股息率为 null）
+        "eps", "basic_eps", "diluted_eps", "roe", "roa", "roic", "gross_margin", "net_margin", "dividend_yield", "dv_ratio", "dv_ttm",
+        # 核心成长与财务杠杆
+        "revenue_yoy", "net_profit_yoy", "operate_income_yoy", "parent_netprofit_yoy", "debt_asset_ratio", "asset_liability_ratio",
+        "non_net_profit", "non_net_profit_yoy", "deduct_parent_netprofit", "deduct_parent_netprofit_yoy", "current_ratio", "quick_ratio",
+        # 评级、目标价与市场概览
+        "rating", "target_price", "upside_pct", "turnover_pct", "current_price", "market_cap", "float_market_cap",
+        # 估值模型置信度与结果
+        "confidence", "confidence_score", "target_multiple", "equity_value", "per_share_value",
+    }
+)
+
+
+def _is_semantic_null_key(key: str) -> bool:
+    lowered = key.lower()
+    return lowered in _SEMANTIC_NULL_KEYS or lowered.startswith("is_")
+
+
+def compact_tool_payload(value: Any) -> Any:
+    """Recursively strip None values from dicts, preserving distinct domain nulls."""
+    if isinstance(value, dict):
+        return {
+            k: compact_tool_payload(v)
+            for k, v in value.items()
+            if v is not None or _is_semantic_null_key(str(k))
+        }
+    if isinstance(value, (list, tuple)):
+        return [compact_tool_payload(item) for item in value]
+    return value
+
+
+def _find_item_timestamp(item: Any) -> str:
+    if not isinstance(item, dict):
+        return ""
+    for key in ("date", "time", "datetime", "trade_date", "report_date", "日期", "交易日期", "报告期"):
+        val = item.get(key) or item.get(key.upper())
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    return ""
+
+
+def _slice_collection_items(items: list[Any], kept: int) -> tuple[list[Any], str]:
+    """Slice collection to fit budget, preserving latest records if ordered chronologically."""
+    if not items or kept >= len(items):
+        return items, ""
+    total = len(items)
+    first_date = _find_item_timestamp(items[0])
+    last_date = _find_item_timestamp(items[-1])
+    if first_date and last_date:
+        if first_date < last_date:
+            # 升序时序数据（如 K 线）：保留最新（尾部）数据
+            return items[-kept:], f"共 {total} 条，已保留最新 {kept} 条"
+        else:
+            # 降序时序数据（如新闻列表）：保留最新（头部）数据
+            return items[:kept], f"共 {total} 条，已保留最新 {kept} 条"
+    return items[:kept], f"共 {total} 条，已保留前 {kept} 条"
+
+
 def serialize_result(result: Any, max_result_len: int = MAX_RESULT_LEN) -> str:
     """Serialize a result using the stable JSON tool contract."""
     if error_message := result_error_message(result):
@@ -419,37 +481,69 @@ def serialize_result(result: Any, max_result_len: int = MAX_RESULT_LEN) -> str:
             data={key: value for key, value in result.items() if key != "ok"} or None,
         )
 
-    payload = {"ok": True, "data": result}
-    content = json.dumps(payload, ensure_ascii=False, default=str)
+    compacted = compact_tool_payload(result)
+    payload = {"ok": True, "data": compacted}
+    content = json.dumps(payload, ensure_ascii=False, default=str, separators=(",", ":"))
     if len(content) <= max_result_len:
         return content
 
-    document = bounded_document(result, max_result_len)
+    document = bounded_document(compacted, max_result_len)
     if document is not None:
         return document
 
-    if isinstance(result, list) and result:
-        total = len(result)
+    if isinstance(compacted, list) and compacted:
+        total = len(compacted)
         kept = total
         while kept > 1:
             kept //= 2
+            sliced, reason = _slice_collection_items(compacted, kept)
             payload = {
                 "ok": True,
-                "data": result[:kept],
+                "data": sliced,
                 "meta": {
                     "truncated": True,
-                    "reason": f"共 {total} 条，已保留前 {kept} 条",
+                    "reason": reason,
                     "total_items": total,
                     "returned_items": kept,
                 },
             }
-            content = json.dumps(payload, ensure_ascii=False, default=str)
+            content = json.dumps(payload, ensure_ascii=False, default=str, separators=(",", ":"))
             if len(content) <= max_result_len:
                 return content
-        single = json.dumps(result[0], ensure_ascii=False, default=str)
+        first_or_last = (
+            compacted[-1]
+            if (isinstance(compacted[0], dict) and _find_item_timestamp(compacted[0]))
+            else compacted[0]
+        )
+        single = json.dumps(first_or_last, ensure_ascii=False, default=str, separators=(",", ":"))
         return serialize_truncated_preview(single, "单条结果过长，已截断", max_result_len)
 
-    raw_result = json.dumps(result, ensure_ascii=False, default=str)
+    if isinstance(compacted, dict):
+        for coll_key in ("items", "results", "rows", "records", "data", "list", "news"):
+            coll = compacted.get(coll_key)
+            if isinstance(coll, list) and len(coll) > 1:
+                total = len(coll)
+                kept = total
+                while kept > 1:
+                    kept //= 2
+                    sliced, reason = _slice_collection_items(coll, kept)
+                    truncated_dict = {**compacted, coll_key: sliced}
+                    payload = {
+                        "ok": True,
+                        "data": truncated_dict,
+                        "meta": {
+                            "truncated": True,
+                            "reason": reason,
+                            "total_items": total,
+                            "returned_items": kept,
+                        },
+                    }
+                    content = json.dumps(payload, ensure_ascii=False, default=str, separators=(",", ":"))
+                    if len(content) <= max_result_len:
+                        return content
+                break
+
+    raw_result = json.dumps(compacted, ensure_ascii=False, default=str, separators=(",", ":"))
     return serialize_truncated_preview(raw_result, "结果过长，已截断", max_result_len)
 
 
@@ -469,8 +563,8 @@ def serialize_error(
         },
     }
     if data is not None:
-        payload["data"] = data
-    content = json.dumps(payload, ensure_ascii=False, default=str)
+        payload["data"] = compact_tool_payload(data)
+    content = json.dumps(payload, ensure_ascii=False, default=str, separators=(",", ":"))
     if len(content) <= MAX_RESULT_LEN:
         return content
 
@@ -479,4 +573,4 @@ def serialize_error(
         "truncated": True,
         "reason": "错误上下文过长，已省略",
     }
-    return json.dumps(payload, ensure_ascii=False, default=str)
+    return json.dumps(payload, ensure_ascii=False, default=str, separators=(",", ":"))

@@ -612,3 +612,44 @@ async def test_executor_loads_skill_and_uses_new_tool_in_same_turn(monkeypatch):
     assert [item.instruction for item in result.tool_results] == [True, False]
     assert result.tool_results[1].has_evidence is True
     assert len(completions.requests) == 2
+
+
+async def test_assistant_message_cleans_pseudo_tool_markup(monkeypatch):
+    """验证助手消息中混杂的伪工具调用标记在回放时被净化，避免历史污染。"""
+    markup_content = "<tool_call>\n{\"name\": \"fake_tool\", \"arguments\": {}}\n</tool_call>"
+    response_with_markup = {
+        "choices": [{
+            "message": {
+                "content": markup_content,
+                "tool_calls": [{
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": _FAKE_TOOL, "arguments": "{}"},
+                }],
+            },
+            "finish_reason": "tool_calls",
+        }],
+    }
+    completions = _FakeCompletions([response_with_markup, _final_response()])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+    _install_registry(monkeypatch, [('{"ok":true,"data":{"value":1}}', False)])
+
+    result = await AgentExecutor().run(
+        _profile(),
+        "问题",
+        None,
+        _FakeClient(),
+        "fake-model",
+        execution_context=_context(),
+        require_tool_first_round=True,
+    )
+
+    assistant_messages = [
+        message
+        for message in completions.requests[1]["messages"]
+        if message.get("role") == "assistant" and message.get("tool_calls")
+    ]
+    assert len(assistant_messages) == 1
+    # 伪标记被剥离，避免污染后续轮次 prompt
+    assert assistant_messages[0].get("content") is None
+    assert any("模型以正文形式输出了工具调用标记" in warning for warning in result.warnings)

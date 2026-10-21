@@ -40,6 +40,15 @@ _TRANSIENT_LLM_ERROR_MARKERS = (
     "temporarily unavailable",
     "connection reset",
     "connection aborted",
+    "connection closed",
+    "closed connection",
+    "stream ended",
+    "sse stream ended",
+    "stream closed",
+    "remote end closed",
+    "peer closed",
+    "incomplete chunked read",
+    "broken pipe",
 )
 
 

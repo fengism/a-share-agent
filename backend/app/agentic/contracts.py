@@ -284,6 +284,7 @@ def render_agent_evidence(
                 "content": serialize_context_result(item.content, max_item_length),
             },
             ensure_ascii=False,
+            separators=(",", ":"),
         )
         section = (
             f'<tool_evidence id="{evidence_id}" index="{index}" '
