@@ -1,7 +1,9 @@
 import { BarChartOutlined } from "@ant-design/icons";
 import { Card, Skeleton } from "antd";
+import type { HKStockQuote } from "../../api/queryHooks/hk";
 import type { StockBasicInfo } from "../../types/stock";
-import { useStyles } from "../../styles/ui";
+import { useColors, useStyles } from "../../styles/ui";
+import { formatNumberWithSeparators } from "../../utils/format";
 import StockSectionTitle from "./StockSectionTitle";
 
 interface StockMetricsProps {
@@ -14,10 +16,12 @@ interface StockMetricsProps {
    * 又让几何尺寸与加载后完全一致，不产生二次位移。
    */
   info?: StockBasicInfo;
+  market?: "cn" | "hk";
+  hkQuote?: HKStockQuote | null;
 }
 
-/** 指标定义。标签是静态的，先于数据渲染出来，用户能立刻看到卡片结构。 */
-const METRICS: Array<{
+/** A 股指标定义。标签是静态的，先于数据渲染出来，用户能立刻看到卡片结构。 */
+const CN_METRICS: Array<{
   label: string;
   featured?: boolean;
   format: (info: StockBasicInfo) => string;
@@ -33,6 +37,13 @@ const METRICS: Array<{
   { label: "上市日期", format: (i) => i.listing_date || "-" },
 ];
 
+function formatAmount(value: number | null | undefined) {
+  if (value == null) return "-";
+  if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(2)}亿`;
+  if (Math.abs(value) >= 1e4) return `${(value / 1e4).toFixed(1)}万`;
+  return formatNumberWithSeparators(value, 0);
+}
+
 function formatLargeNumber(value: number | null, unit: "currency" | "shares") {
   if (value == null || !Number.isFinite(value)) return "-";
   if (Math.abs(value) >= 1e12) return `${(value / 1e12).toFixed(2)}万亿`;
@@ -45,8 +56,81 @@ function formatRatio(value: number | null, suffix = "") {
   return value == null || !Number.isFinite(value) ? "-" : `${value.toFixed(2)}${suffix}`;
 }
 
-export default function StockMetrics({ info }: StockMetricsProps) {
+export default function StockMetrics({ info, market = "cn", hkQuote }: StockMetricsProps) {
+  const colors = useColors();
   const { cardStyle } = useStyles();
+  const isHK = market === "hk";
+
+  if (isHK) {
+    const amplitude =
+      hkQuote?.high != null && hkQuote?.low != null && hkQuote?.pre_close != null && hkQuote.pre_close > 0
+        ? ((hkQuote.high - hkQuote.low) / hkQuote.pre_close) * 100
+        : null;
+
+    return (
+      <Card
+        className="stock-section-card stock-metrics-card"
+        title={<StockSectionTitle icon={<BarChartOutlined />} title="关键行情指标" description="港股主板盘口与成交明细" />}
+        style={cardStyle}
+        styles={{ body: { padding: 0 } }}
+      >
+        <dl className="stock-metrics-grid" aria-busy={hkQuote ? undefined : true}>
+          <div className="stock-metric stock-metric--featured">
+            <dt>今开盘</dt>
+            <dd>{hkQuote ? formatNumberWithSeparators(hkQuote.open) : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric stock-metric--featured">
+            <dt>昨收盘</dt>
+            <dd>{hkQuote ? formatNumberWithSeparators(hkQuote.pre_close) : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>最高价</dt>
+            <dd style={{ color: colors.up }}>{hkQuote ? formatNumberWithSeparators(hkQuote.high) : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>最低价</dt>
+            <dd style={{ color: colors.down }}>{hkQuote ? formatNumberWithSeparators(hkQuote.low) : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>振幅</dt>
+            <dd>{hkQuote ? (amplitude != null ? `${amplitude.toFixed(2)}%` : "-") : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>市盈率 (TTM)</dt>
+            <dd>{hkQuote ? (hkQuote.pe_ttm != null ? hkQuote.pe_ttm.toFixed(2) : "-") : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>市净率</dt>
+            <dd>{hkQuote ? (hkQuote.pb != null ? hkQuote.pb.toFixed(2) : "-") : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>总市值</dt>
+            <dd>{hkQuote ? (hkQuote.market_cap != null ? `${formatAmount(hkQuote.market_cap)} 港元` : "-") : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>流通市值</dt>
+            <dd>{hkQuote ? (hkQuote.float_market_cap != null ? `${formatAmount(hkQuote.float_market_cap)} 港元` : "-") : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>成交额</dt>
+            <dd>{hkQuote ? `${formatAmount(hkQuote.amount)} 港元` : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>成交量</dt>
+            <dd>{hkQuote ? `${formatAmount(hkQuote.volume)} 股` : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>买一价 / 卖一价</dt>
+            <dd>{hkQuote ? `${formatNumberWithSeparators(hkQuote.bid)} / ${formatNumberWithSeparators(hkQuote.ask)}` : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+          <div className="stock-metric">
+            <dt>数据更新时间</dt>
+            <dd style={{ fontSize: 12 }}>{hkQuote ? (hkQuote.updated_at || "实时交易中") : <Skeleton.Button active block size="small" />}</dd>
+          </div>
+        </dl>
+      </Card>
+    );
+  }
 
   return (
     <Card
@@ -56,7 +140,7 @@ export default function StockMetrics({ info }: StockMetricsProps) {
       styles={{ body: { padding: 0 } }}
     >
       <dl className="stock-metrics-grid" aria-busy={info ? undefined : true}>
-        {METRICS.map((metric) => (
+        {CN_METRICS.map((metric) => (
           <div className={`stock-metric${metric.featured ? " stock-metric--featured" : ""}`} key={metric.label}>
             <dt>{metric.label}</dt>
             {info ? (
