@@ -51,8 +51,9 @@ class BaiduDataProvider:
         return await self._harvester.ensure_credentials(force=force)
 
     def invalidate_credentials(self) -> None:
-        """使缓存的动态凭证失效。"""
+        """使缓存的动态凭证失效并触发后台刷新。"""
         self._harvester.invalidate()
+        self._harvester.trigger_background_refresh()
 
     @property
     def _session(self) -> requests.Session:

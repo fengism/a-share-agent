@@ -56,7 +56,9 @@ class BaiduTransport:
         timeout: int | None = None,
     ) -> dict:
         url = path if path.startswith("http") else f"{DEFAULT_BASE_URL}{path}"
-        effective_headers = headers or self._request_headers()
+        effective_headers = dict(self._request_headers())
+        if headers:
+            effective_headers.update(headers)
         response = self._session.get(
             url,
             params=params,

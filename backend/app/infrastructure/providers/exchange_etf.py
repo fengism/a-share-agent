@@ -26,13 +26,23 @@ def _format_szse_date_param(value: str) -> str:
     return f"{value[:4]}-{value[4:6]}-{value[6:]}"
 
 
+def _build_async_client(timeout: float | httpx.Timeout) -> httpx.AsyncClient:
+    """创建绑定 IPv4 本地地址并直连的异步 HTTP 客户端，规避 IPv6 路由黑洞导致的握手超时。"""
+    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+    return httpx.AsyncClient(
+        transport=transport,
+        timeout=timeout,
+        trust_env=False,
+    )
+
+
 async def fetch_sse_etf_shares(point_date: str) -> dict[str, float]:
-    async with httpx.AsyncClient(timeout=8) as client:
+    async with _build_async_client(timeout=httpx.Timeout(20.0, connect=10.0)) as client:
         response = await client.get(
             _SSE_URL,
             params={
                 "isPagination": "true",
-                "pageHelp.pageSize": "10000",
+                "pageHelp.pageSize": "1000",
                 "pageHelp.pageNo": "1",
                 "pageHelp.beginPage": "1",
                 "pageHelp.cacheSize": "1",
@@ -75,7 +85,11 @@ def _parse_szse_current_frame(
         if not (len(code) == 6 and code.isdigit()):
             continue
         try:
-            shares = float(row[share_column])
+            raw_val = row[share_column]
+            if isinstance(raw_val, (int, float)):
+                shares = float(raw_val)
+            else:
+                shares = float(str(raw_val).replace(",", "").strip())
             if math.isfinite(shares) and shares >= 0:
                 result[code] = shares
         except (KeyError, TypeError, ValueError):
@@ -131,7 +145,7 @@ async def fetch_szse_etf_share_history(
         "jjlb": "ETF",
         "random": str(random.random()),
     }
-    async with httpx.AsyncClient(timeout=4.0, trust_env=False) as client:
+    async with _build_async_client(timeout=10.0) as client:
         response = await client.get(_SZSE_HISTORY_URL, params=params, headers=headers)
         response.raise_for_status()
     return cast(
@@ -167,7 +181,7 @@ async def fetch_szse_etf_current_shares() -> dict[str, float]:
         "TABKEY": "tab1",
         "random": str(random.random()),
     }
-    async with httpx.AsyncClient(timeout=3.0, trust_env=False) as client:
+    async with _build_async_client(timeout=8.0) as client:
         response = await client.get(_SZSE_CURRENT_URL, params=params, headers=headers)
         response.raise_for_status()
     return cast(

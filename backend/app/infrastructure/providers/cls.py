@@ -26,7 +26,9 @@ _CLS_INDUSTRY_RANKINGS_SIGN = "ef1ec7886be706a0b722d7e7bf3c0054"
 _CLS_MARKET_WIND_URL = "https://api3.cls.cn/v2/todayTuyere"
 _CLS_MARKET_WIND_STOCKS_URL = "https://x-quote.cls.cn/v2/quote/a/plate/tuyere/stocks"
 _CLS_MARKET_MAINLINE_URL = "https://api3.cls.cn/v2/dingPan/mainline"
+_CLS_MARKET_MAINLINE_FALLBACK_URL = "https://www.cls.cn/v2/dingPan/mainline"
 _CLS_ROLL_LIST_URL = "https://www.cls.cn/v1/roll/get_roll_list"
+_CLS_ROLL_LIST_FALLBACK_URL = "https://api3.cls.cn/v1/roll/get_roll_list"
 _CLS_BASE = "https://www.cls.cn"
 _CLS_WEB_BASE_PARAMS = {
     "app": "CailianpressWeb",
@@ -632,12 +634,28 @@ class ClsDataProvider:
 
     def fetch_market_mainline(self) -> dict:
         """获取财联社今日主线机会。"""
-        response = provider_get(
-            _CLS_MARKET_MAINLINE_URL,
-            params=_cls_app_params(),
-            headers={**_CLS_APP_HEADERS, "Host": "api3.cls.cn"},
-            timeout=10,
+        endpoints = (
+            (_CLS_MARKET_MAINLINE_URL, "api3.cls.cn"),
+            (_CLS_MARKET_MAINLINE_FALLBACK_URL, "www.cls.cn"),
         )
+        response = None
+        last_exc: Exception | None = None
+        for endpoint, host in endpoints:
+            try:
+                response = provider_get(
+                    endpoint,
+                    params=_cls_app_params(),
+                    headers={**_CLS_APP_HEADERS, "Host": host},
+                    timeout=5,
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                logger.info("财联社主线端点 %s 请求失败: %s，尝试备用端点", endpoint, exc)
+        if response is None:
+            if last_exc is not None:
+                raise last_exc
+            raise RuntimeError("财联社主线接口无响应")
         payload = parse_text_json(response)
         if not isinstance(payload, dict) or payload.get("errno") != 0:
             message = payload.get("msg") if isinstance(payload, dict) else "响应格式无效"
@@ -662,12 +680,24 @@ class ClsDataProvider:
         Return:
             list[NewsSearchItem]: 快讯列表
         """
-        response = provider_get(
-            _CLS_ROLL_LIST_URL,
-            params=_cls_web_params(category="", last_time="", rn=50),
-            headers=CLS_HEADERS,
-            timeout=15,
-        )
+        response = None
+        last_exc: Exception | None = None
+        for endpoint in (_CLS_ROLL_LIST_URL, _CLS_ROLL_LIST_FALLBACK_URL):
+            try:
+                response = provider_get(
+                    endpoint,
+                    params=_cls_web_params(category="", last_time="", rn=50),
+                    headers=CLS_HEADERS,
+                    timeout=5,
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                logger.info("财联社快讯端点 %s 请求失败: %s，尝试备用端点", endpoint, exc)
+        if response is None:
+            if last_exc is not None:
+                raise last_exc
+            raise RuntimeError("财联社电报接口无响应")
         payload = parse_text_json(response)
         if not isinstance(payload, dict) or payload.get("errno") != 0:
             message = payload.get("msg") if isinstance(payload, dict) else "响应格式无效"

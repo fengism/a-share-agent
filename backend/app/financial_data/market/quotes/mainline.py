@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 
 from app.core.cache import dated_cache_key_no_day
@@ -9,18 +10,23 @@ from app.financial_data.market.quotes.schemas import MarketMainlineResponse
 from app.infrastructure.providers.provider_gateway import provider_gateway
 from app.infrastructure.providers.registry import get_provider
 
+logger = logging.getLogger(__name__)
+
 _MARKET_MAINLINE_CACHE_KEY = dated_cache_key_no_day("market_mainline", "v2")
-_MARKET_MAINLINE_CACHE_TTL_SECONDS = 60
+_MARKET_MAINLINE_CACHE_TTL_SECONDS = 600
 _market_mainline_singleflight: AsyncSingleFlight[MarketMainlineResponse] = AsyncSingleFlight()
+_last_market_mainline: MarketMainlineResponse | None = None
 
 
 async def get_market_mainline() -> MarketMainlineResponse:
     """获取财联社今日主线机会，使用独立短缓存保持内容及时更新。"""
+    global _last_market_mainline
     cached = cache.get(_MARKET_MAINLINE_CACHE_KEY)
     if cached is not None:
         return MarketMainlineResponse.model_validate(cached)
 
     async def load_and_cache() -> MarketMainlineResponse:
+        global _last_market_mainline
         cached_inside_flight = cache.get(_MARKET_MAINLINE_CACHE_KEY)
         if cached_inside_flight is not None:
             return MarketMainlineResponse.model_validate(cached_inside_flight)
@@ -36,7 +42,12 @@ async def get_market_mainline() -> MarketMainlineResponse:
                 style=data.get("style"),
                 items=data.get("chances") or [],
             )
+            _last_market_mainline = result
         except Exception as error:
+            if _last_market_mainline is not None:
+                logger.warning("市场主线上游获取失败，使用上次有效数据降级兜底: %s", error)
+                cache.set(_MARKET_MAINLINE_CACHE_KEY, _last_market_mainline, ttl=60)
+                return _last_market_mainline
             raise UpstreamUnavailableError("市场主线上游暂时不可用") from error
         cache.set(
             _MARKET_MAINLINE_CACHE_KEY,

@@ -47,17 +47,19 @@ _DISCLAIMER = (
 _YI = 100_000_000
 _SZSE_MAX_WINDOW_DAYS = 7
 _SZSE_MAX_WINDOWS_PER_REFRESH = 8
+_SSE_MAX_DATES_PER_REFRESH = 4
 _SZSE_REQUEST_INTERVAL_SECONDS = 0.15
-_REFRESH_TIMEOUT_SECONDS = 15.0
+_REFRESH_TIMEOUT_SECONDS = 35.0
 # 优先腾讯财经极速日K；若需回退TDX排队或重试，120s/45s 充足预算避免无谓超时截断
 _PRICE_TIMEOUT_SECONDS = 120.0
 _PRICE_ITEM_TIMEOUT_SECONDS = 45.0
-_SOURCE_TIMEOUT_SECONDS = 10.0
+_SOURCE_TIMEOUT_SECONDS = 20.0
 _price_semaphore = asyncio.Semaphore(8)
 _source_limits = {
-    "sse": asyncio.Semaphore(4),
+    "sse": asyncio.Semaphore(2),
     "szse_history": asyncio.Semaphore(1),
     "szse_current": asyncio.Semaphore(1),
+    "sse_current": asyncio.Semaphore(1),
 }
 _source_cache = TTLCache(maxsize=1024, name="national_team_sources")
 _source_cooldowns = TTLCache(maxsize=8, name="national_team_cooldowns")
@@ -106,7 +108,7 @@ async def _source_request(scope: str, key: str, loader: Callable[[], Awaitable[T
             except Exception:
                 # 本地拥塞不是上游故障；冷却拒绝也不能续期，避免持续请求阻止恢复。
                 if upstream_started:
-                    _source_cooldowns.set(scope, True, ttl=60)
+                    _source_cooldowns.set(scope, True, ttl=10)
                 raise
             _source_cache.set(cache_key, result, ttl=60)
             return result
@@ -124,9 +126,10 @@ def initialize_national_team_refresh() -> None:
     _source_flight = AsyncSingleFlight()
     _response_flight = AsyncSingleFlight()
     _source_limits = {
-        "sse": asyncio.Semaphore(4),
+        "sse": asyncio.Semaphore(2),
         "szse_history": asyncio.Semaphore(1),
         "szse_current": asyncio.Semaphore(1),
+        "sse_current": asyncio.Semaphore(1),
     }
     _price_semaphore = asyncio.Semaphore(4)
     _active_tasks.clear()
@@ -467,7 +470,7 @@ async def _fetch_sse_date(point_date: str) -> tuple[str, dict[str, float]]:
         "exchange",
         "fetch_sse_etf_shares",
         lambda: get_provider("exchange").fetch_sse_etf_shares(point_date),
-        max_attempts=1,
+        retry_budget_seconds=_SOURCE_TIMEOUT_SECONDS,
     )
     return point_date, {
         code: shares for code, shares in values.items() if code in ETF_POOL and ETF_POOL[code].exchange == "SH"
@@ -487,7 +490,7 @@ async def _backfill_sse_history(
     ]
     if not missing_dates:
         return False
-    semaphore = asyncio.Semaphore(4)
+    semaphore = asyncio.Semaphore(2)
     changed = False
 
     def merge(point_date: str, values: dict[str, float]) -> None:
@@ -514,7 +517,8 @@ async def _backfill_sse_history(
                 return
         merge(point_date, values)
 
-    tasks = [asyncio.create_task(fetch(day)) for day in reversed(missing_dates)]
+    target_dates = list(reversed(missing_dates))[:_SSE_MAX_DATES_PER_REFRESH]
+    tasks = [asyncio.create_task(fetch(day)) for day in target_dates]
     try:
         await asyncio.gather(*tasks)
     finally:
@@ -522,7 +526,7 @@ async def _backfill_sse_history(
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         # 共享请求已完成但结果尚未交付等待方时，取消也不能丢失进度。
-        for day in missing_dates:
+        for day in target_dates:
             cached = _source_cache.get(f"sse:{day}")
             if cached is not None:
                 merge(day, cached[1])
@@ -658,7 +662,7 @@ async def _fetch_szse_current() -> dict[str, NationalTeamShareObservation]:
                 )
 
     try:
-        async with asyncio.timeout(3.0):
+        async with asyncio.timeout(5.0):
             merge(await _fetch_szse_current_direct(), "szse_current")
     except Exception as error:
         logger.warning("深交所 ETF 当前份额直连失败 error=%r", error)
@@ -666,12 +670,48 @@ async def _fetch_szse_current() -> dict[str, NationalTeamShareObservation]:
     missing_codes = target_codes.difference(result)
     if missing_codes:
         try:
-            async with asyncio.timeout(2.0):
+            async with asyncio.timeout(5.0):
                 merge(await _fetch_szse_current_eastmoney(missing_codes), "eastmoney_current")
         except Exception as error:
             logger.warning("深交所 ETF 当前份额东财备选数据源失败 error=%r", error)
     if not result:
         raise UpstreamUnavailableError("深交所 ETF 当前份额所有数据源均不可用")
+    return result
+
+
+async def _fetch_sse_current_eastmoney(missing_codes: set[str]) -> dict[str, float]:
+    if not missing_codes:
+        return {}
+    return await provider_gateway.call_blocking(
+        "eastmoney",
+        "fetch_etf_current_shares",
+        get_provider("eastmoney").fetch_etf_current_shares,
+        missing_codes,
+        semaphore=eastmoney_semaphore,
+        is_fallback_attempt=True,
+        max_attempts=1,
+    )
+
+
+async def _fetch_sse_current() -> dict[str, NationalTeamShareObservation]:
+    target_codes = {code for code, item in ETF_POOL.items() if item.exchange == "SH"}
+    result: dict[str, NationalTeamShareObservation] = {}
+    try:
+        async with asyncio.timeout(6.0):
+            values = await _fetch_sse_current_eastmoney(target_codes)
+            fetched_at = datetime.now(UTC).isoformat(timespec="seconds")
+            for code, shares in values.items():
+                if code in target_codes:
+                    result[code] = NationalTeamShareObservation(
+                        code=code,
+                        source="eastmoney_current",
+                        shares_100m=shares / _YI,
+                        fetched_at=fetched_at,
+                    )
+    except Exception as error:
+        logger.warning("上交所 ETF 当前份额东财备选数据源失败 error=%r", error)
+    if not result:
+        raise UpstreamUnavailableError("上交所 ETF 当前份额备选数据源不可用")
     return result
 
 
@@ -840,18 +880,21 @@ async def _refresh_exchange(
     async def current() -> None:
         now = datetime.now(SHANGHAI_TIMEZONE)
         latest = trading_dates[-1] if trading_dates else None
-        if exchange != "SZ" or latest != now.date().isoformat() or now.hour < 16:
+        if latest != now.date().isoformat() or now.hour < 16:
             return
         missing = {code for code in codes if latest not in share_history.get(code, {})}
         if not missing:
             return
         try:
-            async with asyncio.timeout(6.0):
-                values = await _source_request("szse_current", latest, _fetch_szse_current)
+            async with asyncio.timeout(12.0):
+                if exchange == "SZ":
+                    values = await _source_request("szse_current", latest, _fetch_szse_current)
+                else:
+                    values = await _source_request("sse_current", latest, _fetch_sse_current)
             # 没有业务日期的当前快照只能作为独立观察，不进入历史或回填完成标记。
             await call_blocking(_write_observations, values, semaphore=misc_semaphore)
         except Exception as error:
-            logger.warning("国家队当前份额刷新失败 error=%r", error)
+            logger.warning("国家队当前份额刷新失败 exchange=%s error=%r", exchange, error)
 
     try:
         async with asyncio.TaskGroup() as group:

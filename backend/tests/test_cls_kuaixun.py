@@ -119,3 +119,23 @@ def test_fetch_market_kuaixun_raises_on_api_error(monkeypatch: pytest.MonkeyPatc
 
     with pytest.raises(RuntimeError, match="财联社电报接口异常"):
         cls_module.ClsDataProvider().fetch_market_kuaixun()
+
+
+def test_fetch_market_kuaixun_fallback_on_primary_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    urls_called: list[str] = []
+
+    def mock_get(url, *, params=None, headers=None, timeout=None):  # noqa: ANN001
+        urls_called.append(url)
+        if "www.cls.cn" in url:
+            raise ConnectionError("Primary timed out")
+        return _FakeResponse(_ROLL_PAYLOAD)
+
+    monkeypatch.setattr(cls_module, "provider_get", mock_get)
+
+    items = cls_module.ClsDataProvider().fetch_market_kuaixun()
+
+    assert len(urls_called) == 2
+    assert urls_called[0] == "https://www.cls.cn/v1/roll/get_roll_list"
+    assert urls_called[1] == "https://api3.cls.cn/v1/roll/get_roll_list"
+    assert len(items) == 2
+

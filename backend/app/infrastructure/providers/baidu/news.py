@@ -3,7 +3,6 @@
 from collections.abc import Callable
 from typing import Any
 
-from app.constants.http import BD_HEADERS
 from app.core.market import contains_stock_reference
 from app.domain.news import NewsSearchItem
 from app.infrastructure.providers.baidu.transport import BaiduTransport, check_result_code
@@ -21,7 +20,7 @@ def fetch_market_kuaixun(
     code_name: str = "",
 ) -> list[NewsSearchItem]:
     data = transport.get_json(
-        "https://finance.pae.baidu.com/selfselect/expressnews",
+        "/selfselect/expressnews",
         params={
             "rn": "20",
             "pn": "0",
@@ -29,7 +28,6 @@ def fetch_market_kuaixun(
             "filterByUserStocks": "0",
             "finClientType": "pc",
         },
-        headers=BD_HEADERS,
     )
     check_result_code(data)
     results: list[NewsSearchItem] = []

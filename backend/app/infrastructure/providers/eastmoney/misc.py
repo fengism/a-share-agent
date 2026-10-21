@@ -11,10 +11,15 @@ class MiscMixin:
     def fetch_etf_current_shares(self, codes: set[str]) -> dict[str, float]:
         if not codes:
             return {}
+        secids = [
+            f"1.{code}" if code.startswith(("5", "6")) else f"0.{code}"
+            for code in sorted(codes)
+        ]
         response = self.em_get_response(
-            "https://push2.eastmoney.com/api/qt/ulist.np/get",
-            params={"secids": ",".join(f"0.{code}" for code in sorted(codes)), "fields": "f12,f38"},
-            timeout=2,
+            "https://push2delay.eastmoney.com/api/qt/ulist.np/get",
+            params={"secids": ",".join(secids), "fields": "f12,f38", "invt": "2"},
+            headers={"Referer": "https://quote.eastmoney.com/"},
+            timeout=5,
         )
         response.raise_for_status()
         rows = (response.json().get("data") or {}).get("diff", [])

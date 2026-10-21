@@ -162,7 +162,7 @@ async def get_market_kuaixun() -> list[NewsSearchItem]:
         result = dedupe_news_items(result)
         result.sort(key=news_sort_key, reverse=True)
         result = result[:200]
-        cache.set(cache_key, result, ttl=60)
+        cache.set(cache_key, result, ttl=60 if result else 5)
         return result
 
     return await _news_singleflight.do(cache_key, _load)
@@ -188,7 +188,7 @@ async def get_market_other_news() -> list[NewsSearchItem]:
         result = dedupe_news_items(result)
         result.sort(key=news_sort_key, reverse=True)
         result = result[:100]
-        cache.set(cache_key, result, ttl=300)
+        cache.set(cache_key, result, ttl=300 if result else 10)
         return result
 
     return await _news_singleflight.do(cache_key, _load)
