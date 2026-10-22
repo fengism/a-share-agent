@@ -10,7 +10,7 @@ COVERAGE_MIN ?= 44
 
 RUN_ENV = BACKEND_HOST="$(BACKEND_HOST)" BACKEND_PORT="$(BACKEND_PORT)" FRONTEND_HOST="$(FRONTEND_HOST)" FRONTEND_PORT="$(FRONTEND_PORT)" STARTUP_TIMEOUT="$(STARTUP_TIMEOUT)"
 
-.PHONY: help setup start stop restart status logs dev prod pack check test version-check version-bump \
+.PHONY: help setup start stop restart status logs dev prod pack check test release \
 	backend-sync backend-browser-install backend-dev backend-lint backend-boundaries backend-type backend-test backend-coverage backend-db-init backend-reset-admin backend-reset-accounts \
 	frontend-install frontend-dev frontend-api-check frontend-test frontend-e2e frontend-build frontend-lint \
 	export-industry-mapping docker-up docker-sandbox-up docker-down docker-restart docker-build docker-logs docker-status
@@ -46,14 +46,14 @@ logs: ## 持续查看前后端日志
 
 test: backend-test frontend-test ## 运行前后端测试
 
-check: version-check backend-lint backend-boundaries backend-type backend-coverage frontend-api-check frontend-test frontend-lint frontend-build ## 运行完整质量检查
+check: backend-lint backend-boundaries backend-type backend-coverage frontend-api-check frontend-test frontend-lint frontend-build ## 运行完整质量检查
 
-version-check: ## 校验前后端清单与 OpenAPI 产物的版本号是否一致
-	@python3 scripts/bump_version.py --check
-
-version-bump: ## 一键升版本并重新生成 OpenAPI 产物 (用法: make version-bump V=0.6.0 或 V=minor|patch|major，可加 ARGS=--dry-run)
-	@test -n "$(V)" || { echo "请指定版本，例如: make version-bump V=minor" >&2; exit 2; }
-	@python3 scripts/bump_version.py "$(V)" $(ARGS)
+release: ## 创建并推送版本标签以触发发布流水线 (用法: make release V=v0.8.0)
+	@test -n "$(V)" || { echo "请指定版本标签，例如: make release V=v0.8.0" >&2; exit 2; }
+	@echo "$(V)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+' || { echo "版本标签格式应为 vMAJOR.MINOR.PATCH，例如: v0.8.0" >&2; exit 2; }
+	@git tag -a "$(V)" -m "Release $(V)"
+	@git push origin "$(V)"
+	@echo "已成功创建并推送标签 $(V)，GitHub Actions 将自动构建并发布 Release 镜像。"
 
 pack: ## 打包源码（排除密钥、依赖、运行时数据库和日志，使用仓库种子初始化行业库）
 	tar czf stock-agent.tar.gz \

@@ -69,12 +69,18 @@ def current_version() -> str:
 
 
 def _parse_semantic_version(value: str) -> Version | None:
-    candidate = value.strip()
-    if re.fullmatch(rf"v?{_SEMVER}", candidate, re.IGNORECASE) is None:
+    candidate = value.strip().lstrip("vV")
+    if not candidate:
         return None
     try:
-        return Version(candidate.removeprefix("v").removeprefix("V"))
+        return Version(candidate)
     except InvalidVersion:
+        match = re.match(r"^((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))", candidate)
+        if match:
+            try:
+                return Version(match.group(1))
+            except InvalidVersion:
+                pass
         return None
 
 

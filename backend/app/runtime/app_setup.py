@@ -3,7 +3,6 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.runtime.app_version import resolve_app_version
 from app.runtime.import_body_limit import ImportBodyLimitMiddleware
 from app.runtime.middleware import RequestObservabilityMiddleware, UserContextMiddleware
 
@@ -21,7 +20,7 @@ def create_application(
 ) -> FastAPI:
     application = FastAPI(
         title="A股智能分析系统",
-        version=resolve_app_version().lstrip("v"),
+        version="1.0.0",  # API 契约版本固定，解耦应用发版与 OpenAPI 产物重新生成
         lifespan=lifespan,
         docs_url="/docs" if _EXPOSE_DOCS else None,
         redoc_url="/redoc" if _EXPOSE_DOCS else None,

@@ -908,6 +908,8 @@ class AgentExecutor:
                 return LLMTurn(turn.content, turn.reasoning_content, (), finish_reason="stream_error")
             return turn
 
+        raise RuntimeError("LLM turn completion exhausted all attempts without returning or raising")
+
     async def _classify_tool_calls(
         self,
         state: _ExecutionState,

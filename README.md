@@ -301,12 +301,11 @@ position: { mode: binary }
 
 ## 项目开发与维护
 
-### 质量检查命令
+### 质量检查与版本发布
 
 ```bash
-make check          # 统一代码质量门禁（版本一致性 + 后端 Ruff/Mypy + 前端构建）
-make version-check  # 校验全项目清单与 OpenAPI 规范版本号是否一致
-make version-bump V=patch # 一键升级版本号并同步刷新 OpenAPI 产物
+make check          # 统一代码质量门禁（后端 Ruff/Mypy + 前端构建与测试）
+make release V=v0.8.0 # 创建并推送 Git Tag，由 GitHub Actions 自动触发镜像构建与发版
 ```
 
 ### 源码打包归档
