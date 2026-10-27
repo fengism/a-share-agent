@@ -1,6 +1,6 @@
 import AnalysisFreshness from "./AnalysisFreshness";
 import { buildStockValuationUrl } from "./analysisHistoryUrl";
-import { renderWithCitations } from "./CitationText";
+import { renderWithCitations } from "./citationRendering";
 import { ArrowRightOutlined, AuditOutlined, WarningOutlined } from "@ant-design/icons";
 import { Alert, Button, Empty, Progress, Segmented, Tag, Typography } from "antd";
 import { useState } from "react";

@@ -180,3 +180,59 @@ def test_clear_adjustment_health_cache_empties_module_cache() -> None:
 def test_canonical_adjustment_anchor_matches_internal_constant() -> None:
     """对账脚本改用公开访问器后，取值必须与内部常量一致。"""
     assert adjustment.canonical_adjustment_anchor() == adjustment._CANONICAL_ANCHOR
+
+
+def test_close_all_connections_during_active_query_is_thread_safe(tmp_path: Path) -> None:
+    """测试并发安全：当一个线程在执行数据库事务时，另一线程调用 close_all_connections 不应引发崩溃或段错误。"""
+    import threading
+    import time
+
+    repo = MarketDailyBarRepository(path=tmp_path / "concurrent_close.sqlite3")
+    repo.initialize()
+
+    started = threading.Event()
+    release = threading.Event()
+    worker_finished = threading.Event()
+    worker_error: list[Exception] = []
+
+    def worker():
+        try:
+            with repo._connect() as conn:
+                conn.execute("CREATE TABLE IF NOT EXISTS test_sync (id INTEGER)")
+                started.set()
+                release.wait(timeout=5)
+                conn.execute("INSERT INTO test_sync VALUES (1)")
+        except Exception as err:
+            worker_error.append(err)
+        finally:
+            worker_finished.set()
+
+    t = threading.Thread(target=worker)
+    t.start()
+    assert started.wait(timeout=5)
+
+    close_thread_started = threading.Event()
+    close_thread_finished = threading.Event()
+
+    def closer():
+        close_thread_started.set()
+        close_all_connections()
+        close_thread_finished.set()
+
+    ct = threading.Thread(target=closer)
+    ct.start()
+    assert close_thread_started.wait(timeout=5)
+    time.sleep(0.1)
+    assert not close_thread_finished.is_set()
+
+    release.set()
+    worker_finished.wait(timeout=5)
+    t.join(timeout=5)
+    ct.join(timeout=5)
+
+    assert not worker_error, f"Worker 执行失败: {worker_error}"
+    assert close_thread_finished.is_set(), "close_all_connections 未成功等待并关闭连接"
+
+    with repo._connect() as conn:
+        count = conn.execute("SELECT COUNT(*) FROM test_sync").fetchone()[0]
+        assert count == 1

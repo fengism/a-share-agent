@@ -402,6 +402,7 @@ def test_compute_industry_chain_changes_with_value_dist_and_divergence():
 
 async def test_enrich_stocks_financial_breakdown(monkeypatch):
     from unittest.mock import AsyncMock
+
     from app.financial_data.stock.fundamentals.schemas import RevenueBreakdown, RevenueBreakdownItem
     from app.modules.industry_chain.enrichment import enrich_stocks_financial_breakdown
     from app.modules.industry_chain.models import IndustryChainNode, IndustryChainResult
@@ -465,6 +466,7 @@ async def test_enrich_stocks_financial_breakdown(monkeypatch):
 @pytest.mark.asyncio
 async def test_enrich_macro_commodity_and_customs(monkeypatch):
     from unittest.mock import AsyncMock
+
     from app.modules.industry_chain.enrichment import enrich_macro_commodity_and_customs
     from app.modules.industry_chain.models import IndustryChainResult
 
@@ -547,6 +549,7 @@ def test_build_repair_targets_triggers_bear_and_depth_audit():
 
 async def test_enrich_stocks_valuation_percentile_and_consensus_forecast(monkeypatch):
     from unittest.mock import AsyncMock
+
     from app.financial_data.stock.valuation.schemas import InstitutionForecast
     from app.modules.industry_chain.enrichment import (
         enrich_stocks_consensus_forecast,
@@ -609,11 +612,12 @@ async def test_enrich_stocks_valuation_percentile_and_consensus_forecast(monkeyp
 @pytest.mark.asyncio
 async def test_enrich_stocks_financial_metrics_and_restricted_risk(monkeypatch):
     from unittest.mock import AsyncMock
+
+    from app.financial_data.stock.fundamentals.schemas import FinancialMetrics
     from app.modules.industry_chain.enrichment import (
         enrich_stocks_financial_metrics,
         enrich_stocks_restricted_risk,
     )
-    from app.financial_data.stock.fundamentals.schemas import FinancialMetrics
 
     mock_metrics = FinancialMetrics(
         code="002371",

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertOutlined, CheckOutlined, CopyOutlined, MessageOutlined, RiseOutlined } from "@ant-design/icons";
 import { Button, message } from "antd";
 import { useNavigate } from "react-router-dom";
-import { renderWithCitations } from "../../features/investment-research/CitationText";
+import { renderWithCitations } from "../../features/investment-research/citationRendering";
 import type { AnalysisResult } from "../../types/stock";
 import { getAnalysisFollowUps, getConditionalAction } from "./analysisDecision";
 

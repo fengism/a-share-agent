@@ -129,8 +129,8 @@ def test_config_response_reports_inheritance_for_regular_user() -> None:
 
     app.dependency_overrides[get_current_user] = lambda: user
     try:
-        with TestClient(app) as client:
-            body = client.get("/api/config").json()
+        client = TestClient(app)
+        body = client.get("/api/config").json()
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -140,8 +140,8 @@ def test_config_response_reports_inheritance_for_regular_user() -> None:
 
     app.dependency_overrides[get_current_user] = lambda: admin
     try:
-        with TestClient(app) as client:
-            admin_body = client.get("/api/config").json()
+        client = TestClient(app)
+        admin_body = client.get("/api/config").json()
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -255,8 +255,8 @@ def test_config_api_accepts_clearing_personal_llm_key(global_llm_config) -> None
 
     app.dependency_overrides[get_current_user] = lambda: user
     try:
-        with TestClient(app) as client:
-            response = client.put("/api/config", json={"llm_api_key": ""})
+        client = TestClient(app)
+        response = client.put("/api/config", json={"llm_api_key": ""})
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 

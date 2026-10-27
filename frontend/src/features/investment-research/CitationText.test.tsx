@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import CitationText, { renderWithCitations } from "./CitationText";
+import CitationText from "./CitationText";
+import { renderWithCitations } from "./citationRendering";
 
 describe("CitationText", () => {
   it("renders plain text without citations as string", () => {

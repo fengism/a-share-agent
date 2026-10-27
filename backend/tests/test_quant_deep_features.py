@@ -11,7 +11,6 @@ from app.modules.quant.engine import (
     _omega_ratio,
     _probabilistic_sharpe_ratio,
     run_backtest,
-    strategy_warmup_bars,
 )
 from app.modules.quant.schemas import (
     QuantEquityPoint,
@@ -758,6 +757,7 @@ def test_cross_sectional_top_n_selection() -> None:
 @pytest.mark.asyncio
 async def test_parameter_sensitivity_scan_flow() -> None:
     import uuid
+
     from app.infrastructure.persistence import account_store
     from app.modules.quant.persistence import runs as run_store
     from app.modules.quant.schemas import QuantParameterScanRequest
@@ -815,10 +815,12 @@ async def test_parameter_sensitivity_scan_flow() -> None:
 @pytest.mark.asyncio
 async def test_parameter_sensitivity_endpoint() -> None:
     import uuid
-    from app.main import app
+
     from httpx import ASGITransport, AsyncClient
+
     from app.api.auth.dependencies import require_active_user
     from app.infrastructure.persistence import account_store
+    from app.main import app
     from app.modules.quant.persistence import runs as run_store
 
     user = account_store.create_user(f"api_{uuid.uuid4().hex[:8]}", "Password123!")

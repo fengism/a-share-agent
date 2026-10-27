@@ -66,7 +66,9 @@ jobs:
       - name: Lint backend and sandbox
         working-directory: backend
         run: |
-          uv run --frozen ruff check app scripts ../sandbox
+          # 范围必须与 Makefile 的 backend-lint 一致：漏掉 tests 会让 `make check`
+          # 在本地因测试文件规范问题失败，而 CI 永远发现不了。
+          uv run --frozen ruff check app scripts tests ../sandbox
           uv run --frozen mypy
           uv run --frozen mypy ../sandbox
 
@@ -154,6 +156,104 @@ jobs:
             frontend/test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # PR 阶段只构建 + 冒烟、不推送镜像：Dockerfile / nginx.conf / 沙箱运行时的回归
+  # 必须在合并前暴露，否则只能在 main 上的串行发布流水线里才被发现。
+  # 只验 amd64（与 GitHub 托管 runner 原生架构一致）；arm64 仍由 main 上的原生 runner 覆盖。
+  # needs: verify —— 单测/类型/lint 都过了再跑重构建，失败时直接跳过，避免白烧 runner 时间
+  # 与两个重任务并行的资源峰值。
+  docker-build-check:
+    name: Docker build check (pull request, no push)
+    needs: [verify]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          load: true
+          tags: ci-check/a-share-backend:pr
+          # 只读复用 main 的构建缓存：PR 分支自己写缓存（gha scope 按 ref 隔离）
+          # 只能加快同一 PR 的后续推送，却要每次上传 backend 那个 ~650MB 的
+          # chromium/venv 巨层，还会按 LRU 挤掉 main 自己的缓存，得不偿失。
+          cache-from: type=gha,scope=backend-amd64
+          build-args: |
+            APP_UID=1000
+            APP_GID=1000
+            APP_VERSION=pr-${{ github.sha }}
+            APP_REVISION=${{ github.sha }}
+
+      - name: Smoke-test backend image
+        env:
+          IMAGE: ci-check/a-share-backend:pr
+        run: |
+          test "$(docker image inspect --format '{{.Architecture}}' "$IMAGE")" = amd64
+          docker run --rm --network none --read-only --memory=2g --init \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --tmpfs /tmp:rw,size=512m,mode=1777 \
+            --tmpfs /app/data:rw,size=128m,uid=1000,gid=1000,mode=0700 \
+            --tmpfs /app/logs:rw,size=32m,uid=1000,gid=1000,mode=0700 \
+            -e PYTHONPATH=/app -e EXPECTED_ARCH=amd64 -e VERIFY_NO_HEADLESS_SHELL=1 \
+            --entrypoint python "$IMAGE" scripts/verify_browser_runtime.py
+          docker run --rm --network none --read-only --memory=2g --init \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --tmpfs /tmp:rw,size=512m,mode=1777 \
+            --tmpfs /app/data:rw,size=128m,uid=1000,gid=1000,mode=0700 \
+            --tmpfs /app/logs:rw,size=32m,uid=1000,gid=1000,mode=0700 \
+            -e APP_DATA_DIR=/app/data -e PYTHONPATH=/app -e HTTP_TRUST_ENV=false \
+            --entrypoint python "$IMAGE" scripts/verify_application_runtime.py
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          load: true
+          tags: ci-check/a-share-frontend:pr
+          cache-from: type=gha,scope=frontend-amd64
+
+      - name: Smoke-test frontend image
+        run: |
+          test "$(docker image inspect --format '{{.Architecture}}' ci-check/a-share-frontend:pr)" = amd64
+          docker run --rm --network none --read-only --tmpfs /tmp:rw,mode=1777 \
+            --add-host backend:127.0.0.1 --entrypoint nginx ci-check/a-share-frontend:pr -t
+
+      - name: Build python-runner image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./sandbox
+          target: runner
+          load: true
+          tags: ci-check/a-share-python-runner:pr
+          cache-from: type=gha,scope=python-runner-amd64
+
+      - name: Build python-sandbox worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./sandbox
+          target: worker
+          load: true
+          tags: ci-check/a-share-python-sandbox:pr
+          cache-from: type=gha,scope=python-sandbox-amd64
+
+      - name: Execute real sandbox jobs on native daemon
+        run: |
+          docker run --rm --network none --entrypoint python ci-check/a-share-python-runner:pr \
+            -c 'import runner, subprocess; subprocess.run(["docker", "--version"], check=True)'
+          docker run --rm --network none --read-only --tmpfs /tmp:rw,mode=1777 \
+            --entrypoint python ci-check/a-share-python-sandbox:pr \
+            -c 'import numpy, pandas; assert numpy.array([1, 2]).sum() == 3'
+          docker run --rm --read-only --init --memory=256m --pids-limit=64 \
+            --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp:size=16m,mode=1777 \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -e PYTHON_SANDBOX_TOKEN=ci-only-not-a-production-secret-0000 \
+            -e PYTHON_SANDBOX_IMAGE=ci-check/a-share-python-sandbox:pr \
+            --entrypoint python ci-check/a-share-python-runner:pr /opt/verify_runtime.py
 
   backend:
     needs: [verify, frontend-e2e]

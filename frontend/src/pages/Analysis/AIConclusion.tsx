@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { Card, Progress, Typography } from "antd";
 import RatingBadge from "../../components/RatingBadge";
 import SignalBadge from "../../components/SignalBadge";
-import { renderWithCitations } from "../../features/investment-research/CitationText";
+import { renderWithCitations } from "../../features/investment-research/citationRendering";
 import type { AnalysisResult } from "../../types/stock";
 import { useColors, useStyles, useTokens } from "../../theme/hooks";
 import "./analysis-conclusion.css";

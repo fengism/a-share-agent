@@ -896,19 +896,26 @@ class _ConnectionScope:
     其结束时 ``in_transaction`` 为假，这里的 commit/rollback 都是无害的空操作。
     """
 
-    __slots__ = ("_connection",)
+    __slots__ = ("_connection", "_lock")
 
-    def __init__(self, connection: sqlite3.Connection) -> None:
+    def __init__(self, connection: sqlite3.Connection, lock: threading.RLock | None = None) -> None:
         self._connection = connection
+        self._lock = lock
 
     def __enter__(self) -> sqlite3.Connection:
+        if self._lock is not None:
+            self._lock.acquire()
         return self._connection
 
     def __exit__(self, exc_type, exc, traceback) -> bool:
-        if exc_type is not None:
-            self._connection.rollback()
-        elif self._connection.in_transaction:
-            self._connection.commit()
+        try:
+            if exc_type is not None:
+                self._connection.rollback()
+            elif self._connection.in_transaction:
+                self._connection.commit()
+        finally:
+            if self._lock is not None:
+                self._lock.release()
         return False
 
 
@@ -918,6 +925,7 @@ _local = threading.local()
 _close_lock = threading.Lock()
 _init_lock = threading.Lock()
 _open_connections: list[sqlite3.Connection] = []
+_connection_locks: dict[int, threading.RLock] = {}
 _initialized_paths: set[str] = set()
 
 
@@ -927,13 +935,24 @@ def close_all_connections() -> None:
         connections = list(_open_connections)
         _open_connections.clear()
         _initialized_paths.clear()
+        locks = {id(conn): _connection_locks.pop(id(conn), None) for conn in connections}
     for connection in connections:
-        try:
-            if connection.in_transaction:
-                connection.rollback()
-            connection.close()
-        except Exception as error:  # noqa: BLE001 - 关闭清理不应抛出
-            logging.getLogger(__name__).debug("关闭日线库连接失败: %s", error)
+        lock = locks.get(id(connection))
+        if lock is not None:
+            with lock:
+                try:
+                    if connection.in_transaction:
+                        connection.rollback()
+                    connection.close()
+                except Exception as error:  # noqa: BLE001 - 关闭清理不应抛出
+                    logging.getLogger(__name__).debug("关闭日线库连接失败: %s", error)
+        else:
+            try:
+                if connection.in_transaction:
+                    connection.rollback()
+                connection.close()
+            except Exception as error:  # noqa: BLE001 - 关闭清理不应抛出
+                logging.getLogger(__name__).debug("关闭日线库连接失败: %s", error)
     _local.connections = {}
 
 
@@ -950,6 +969,12 @@ class MarketDailyBarRepository:
             connections = {}
             _local.connections = connections
         connection = connections.get(key)
+        if connection is not None:
+            try:
+                connection.in_transaction
+            except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+                connection = None
+                connections.pop(key, None)
         if connection is None:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             try:
@@ -969,10 +994,14 @@ class MarketDailyBarRepository:
             connections[key] = connection
             with _close_lock:
                 _open_connections.append(connection)
+                _connection_locks[id(connection)] = threading.RLock()
         return connection
 
     def _connect(self) -> _ConnectionScope:
-        return _ConnectionScope(self._connection())
+        connection = self._connection()
+        with _close_lock:
+            lock = _connection_locks.get(id(connection))
+        return _ConnectionScope(connection, lock)
 
     def initialize(self) -> None:
         key = str(self.path)

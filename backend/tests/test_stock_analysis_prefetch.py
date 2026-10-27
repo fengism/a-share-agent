@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -9,7 +8,7 @@ from app.agentic.contracts import AgentEvidence, AgentResearchSpec, AgentRoundRe
 from app.agentic.protocol import ToolResultInfo
 from app.agentic.research import run_agentic_research
 from app.modules.analysis.prefetch import _build_prefetch_plan, prefetch_stock_baseline
-from app.modules.analysis.research import ANALYSIS_RESEARCH_SPEC, HK_ANALYSIS_RESEARCH_SPEC
+from app.modules.analysis.research import ANALYSIS_RESEARCH_SPEC
 
 
 def test_prefetch_plan_separation():

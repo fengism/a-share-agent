@@ -350,36 +350,36 @@ def test_api_private_atlas_permissions_and_mine(tmp_path, monkeypatch):
     save_industry_chain("测试专用链", result, user_id=1001, archive_id="arch-001")
 
     try:
-        with TestClient(app) as client:
-            # 1. 普通用户请求 scope="global" 报错 403
-            resp = client.post("/api/industry-chain/atlas/mine", json={"name": "测试专用链", "scope": "global"})
-            assert resp.status_code == 403
-            assert "仅管理员可沉淀为全局公共知识库" in resp.json()["message"]
+        client = TestClient(app)
+        # 1. 普通用户请求 scope="global" 报错 403
+        resp = client.post("/api/industry-chain/atlas/mine", json={"name": "测试专用链", "scope": "global"})
+        assert resp.status_code == 403
+        assert "仅管理员可沉淀为全局公共知识库" in resp.json()["message"]
 
-            # 2. 普通用户挖掘（默认 scope="user"）成功，返回 source="user"
-            resp = client.post("/api/industry-chain/atlas/mine", json={"name": "测试专用链"})
-            assert resp.status_code == 200
-            data = resp.json()
-            assert data["source"] == "user"
-            assert data["name"] == "测试专用链"
-            slug = data["slug"]
+        # 2. 普通用户挖掘（默认 scope="user"）成功，返回 source="user"
+        resp = client.post("/api/industry-chain/atlas/mine", json={"name": "测试专用链"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["source"] == "user"
+        assert data["name"] == "测试专用链"
+        slug = data["slug"]
 
-            # 3. 普通用户查看目录能看到自己的专属图谱
-            catalog_resp = client.get("/api/industry-chain/atlas/chains")
-            assert catalog_resp.status_code == 200
-            chains = catalog_resp.json()["chains"]
-            assert any(c["slug"] == slug and c["source"] == "user" for c in chains)
+        # 3. 普通用户查看目录能看到自己的专属图谱
+        catalog_resp = client.get("/api/industry-chain/atlas/chains")
+        assert catalog_resp.status_code == 200
+        chains = catalog_resp.json()["chains"]
+        assert any(c["slug"] == slug and c["source"] == "user" for c in chains)
 
-            # 4. 普通用户可以删除自己的私有图谱
-            del_resp = client.delete(f"/api/industry-chain/atlas/chains/{slug}")
-            assert del_resp.status_code == 200
+        # 4. 普通用户可以删除自己的私有图谱
+        del_resp = client.delete(f"/api/industry-chain/atlas/chains/{slug}")
+        assert del_resp.status_code == 200
 
-            # 5. 普通用户尝试删除全局内置链（semiconductor），报错 403
-            del_global = client.delete("/api/industry-chain/atlas/chains/semiconductor")
-            assert del_global.status_code == 403
+        # 5. 普通用户尝试删除全局内置链（semiconductor），报错 403
+        del_global = client.delete("/api/industry-chain/atlas/chains/semiconductor")
+        assert del_global.status_code == 403
 
-            # 6. 普通用户导入 YAML 测试（支持私有知识库导入，阻断 global 导入）
-            sample_yaml = """
+        # 6. 普通用户导入 YAML 测试（支持私有知识库导入，阻断 global 导入）
+        sample_yaml = """
 slug: user-custom-yaml
 name: 自定义光子计算
 category: 个人专属
@@ -393,23 +393,24 @@ layers:
           - name: 中际旭创
             code: "300308"
 """
-            # 传 scope="global" 报错 403
-            imp_global = client.post("/api/industry-chain/atlas/import", json={"content": sample_yaml, "scope": "global"})
-            assert imp_global.status_code == 403
+        # 传 scope="global" 报错 403
+        imp_global = client.post("/api/industry-chain/atlas/import", json={"content": sample_yaml, "scope": "global"})
+        assert imp_global.status_code == 403
 
-            # 正常导入，作为个人专属
-            imp_user = client.post("/api/industry-chain/atlas/import", json={"content": sample_yaml})
-            assert imp_user.status_code == 200
-            imported_chains = imp_user.json()
-            assert len(imported_chains) == 1
-            assert imported_chains[0]["source"] == "user"
-            assert imported_chains[0]["slug"] == "user-custom-yaml"
+        # 正常导入，作为个人专属
+        imp_user = client.post("/api/industry-chain/atlas/import", json={"content": sample_yaml})
+        assert imp_user.status_code == 200
+        imported_chains = imp_user.json()
+        assert len(imported_chains) == 1
+        assert imported_chains[0]["source"] == "user"
+        assert imported_chains[0]["slug"] == "user-custom-yaml"
     finally:
         app.dependency_overrides.pop(require_active_user, None)
 
 
 async def test_build_mined_chain_enriches_segment_description_and_notes(monkeypatch):
     from unittest.mock import AsyncMock
+
     from app.modules.industry_chain.atlas.miner import build_mined_chain
     from app.modules.industry_chain.models import IndustryChainNode, IndustryChainResult
 
@@ -458,7 +459,7 @@ async def test_build_mined_chain_enriches_segment_description_and_notes(monkeypa
     assert chain.slug.startswith("user-")
 
     # 验证 segment description 沉淀
-    upstream_layer = next(l for l in chain.layers if l.key == "upstream")
+    upstream_layer = next(layer for layer in chain.layers if layer.key == "upstream")
     segment = upstream_layer.segments[0]
     assert segment.name == "刻蚀设备"
     assert "先进制程干法刻蚀" in segment.description

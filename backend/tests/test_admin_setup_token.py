@@ -97,6 +97,6 @@ def test_needs_setup_endpoint_exposes_requirement(monkeypatch: pytest.MonkeyPatc
 
     app = FastAPI()
     app.include_router(auth_routes.router, prefix="/api/auth")
-    with TestClient(app) as client:
-        payload = client.get("/api/auth/needs-setup").json()
+    client = TestClient(app)
+    payload = client.get("/api/auth/needs-setup").json()
     assert payload == {"needs_setup": True, "requires_setup_token": True}

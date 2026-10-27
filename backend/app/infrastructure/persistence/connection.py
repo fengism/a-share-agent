@@ -35,6 +35,7 @@ _storage_migration_done = False
 _local = threading.local()
 _all_connections: list[sqlite3.Connection] = []
 _connection_names: dict[int, str] = {}
+_connection_locks: dict[int, threading.RLock] = {}
 _registry_lock = threading.Lock()
 _connection_generation = 0
 
@@ -141,6 +142,7 @@ def get_connection(database: DatabaseName = "market") -> sqlite3.Connection:
         with _registry_lock:
             _all_connections.append(conn)
             _connection_names[id(conn)] = database
+            _connection_locks[id(conn)] = threading.RLock()
         logger.debug(
             "SQLite 线程连接已建立: database=%s path=%s thread=%s",
             database,
@@ -206,6 +208,7 @@ class SQLiteUnitOfWork:
         self._started_at = 0.0
         with _registry_lock:
             self._database = _connection_names.get(id(connection), "external")
+            self._lock = _connection_locks.get(id(connection))
 
     def _record(self, error: BaseException | None) -> None:
         metrics.record_persistence_operation(
@@ -218,7 +221,11 @@ class SQLiteUnitOfWork:
         )
 
     def __enter__(self) -> SQLiteUnitOfWork:
+        if self._lock is not None:
+            self._lock.acquire()
         if self._active:
+            if self._lock is not None:
+                self._lock.release()
             raise RuntimeError("Unit of Work 不可重复进入")
         self._active = True
         self._started_at = perf_counter()
@@ -243,6 +250,8 @@ class SQLiteUnitOfWork:
         except Exception as error:
             self._active = False
             self._record(error)
+            if self._lock is not None:
+                self._lock.release()
             raise
         return self
 
@@ -275,6 +284,8 @@ class SQLiteUnitOfWork:
         finally:
             _local.uow_depth = max(0, getattr(_local, "uow_depth", 1) - 1)
             self._active = False
+            if self._lock is not None:
+                self._lock.release()
         return False
 
 
@@ -298,38 +309,78 @@ def close_connection():
         _all_connections.clear()
         for conn in conns:
             _connection_names.pop(id(conn), None)
+        locks = {id(conn): _connection_locks.pop(id(conn), None) for conn in conns}
         _connection_generation += 1
     for conn in conns:
-        try:
-            if conn.in_transaction:
-                conn.rollback()
-        except Exception as error:
-            logger.debug("关闭连接前回滚失败: %s", error)
+        lock = locks.get(id(conn))
+        if lock is not None:
+            with lock:
+                try:
+                    if conn.in_transaction:
+                        conn.rollback()
+                except Exception as error:
+                    logger.debug("关闭连接前回滚失败: %s", error)
+        else:
+            try:
+                if conn.in_transaction:
+                    conn.rollback()
+            except Exception as error:
+                logger.debug("关闭连接前回滚失败: %s", error)
     checkpointed_paths: set[str] = set()
     for conn in conns:
-        try:
-            main_row = next(row for row in conn.execute("PRAGMA database_list") if row[1] == "main")
-            database_file = str(main_row[2])
-            if database_file in checkpointed_paths:
-                continue
-            try:
-                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            except sqlite3.OperationalError as checkpoint_err:
-                if is_busy_error(checkpoint_err):
+        lock = locks.get(id(conn))
+        if lock is not None:
+            with lock:
+                try:
+                    main_row = next(row for row in conn.execute("PRAGMA database_list") if row[1] == "main")
+                    database_file = str(main_row[2])
+                    if database_file in checkpointed_paths:
+                        continue
                     try:
-                        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
-                    except Exception as error:
-                        logger.debug("WAL PASSIVE checkpoint 降级失败: %s", error)
-                else:
-                    raise
-            checkpointed_paths.add(database_file)
-        except Exception as exc:
-            logger.warning("关闭前 WAL checkpoint 失败: %s", exc)
+                        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    except sqlite3.OperationalError as checkpoint_err:
+                        if is_busy_error(checkpoint_err):
+                            try:
+                                conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                            except Exception as error:
+                                logger.debug("WAL PASSIVE checkpoint 降级失败: %s", error)
+                        else:
+                            raise
+                    checkpointed_paths.add(database_file)
+                except Exception as exc:
+                    logger.warning("关闭前 WAL checkpoint 失败: %s", exc)
+        else:
+            try:
+                main_row = next(row for row in conn.execute("PRAGMA database_list") if row[1] == "main")
+                database_file = str(main_row[2])
+                if database_file in checkpointed_paths:
+                    continue
+                try:
+                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                except sqlite3.OperationalError as checkpoint_err:
+                    if is_busy_error(checkpoint_err):
+                        try:
+                            conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                        except Exception as error:
+                            logger.debug("WAL PASSIVE checkpoint 降级失败: %s", error)
+                    else:
+                        raise
+                checkpointed_paths.add(database_file)
+            except Exception as exc:
+                logger.warning("关闭前 WAL checkpoint 失败: %s", exc)
     for conn in conns:
-        try:
-            conn.close()
-        except Exception as exc:
-            logger.warning('关闭 SQLite 连接失败: %s', exc)
+        lock = locks.get(id(conn))
+        if lock is not None:
+            with lock:
+                try:
+                    conn.close()
+                except Exception as exc:
+                    logger.warning('关闭 SQLite 连接失败: %s', exc)
+        else:
+            try:
+                conn.close()
+            except Exception as exc:
+                logger.warning('关闭 SQLite 连接失败: %s', exc)
     _local.connections = {}
     _local.generation = _connection_generation
     _local.savepoint_counter = 0
