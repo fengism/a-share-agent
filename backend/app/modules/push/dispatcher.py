@@ -72,6 +72,21 @@ async def send_wxpusher(
 
 _recent_dispatches: dict[str, float] = {}
 _DEBOUNCE_WINDOW_SECONDS = 180  # 3 分钟内同一事件同一日期防抖
+# 防抖表只增不减：每发生一次「新事件×新日期」就留一条永久记录。写入时顺带清理
+# 过期项（而不是靠进程重启），否则长跑进程会一直攒着历史上所有的键。
+_DEBOUNCE_PURGE_INTERVAL_SECONDS = 600.0
+_last_debounce_purge = 0.0
+
+
+def _prune_recent_dispatches(now: float) -> None:
+    """删除已过防抖窗口的键（调用方负责保证串行）。"""
+    global _last_debounce_purge
+    if now - _last_debounce_purge < _DEBOUNCE_PURGE_INTERVAL_SECONDS:
+        return
+    _last_debounce_purge = now
+    deadline = now - _DEBOUNCE_WINDOW_SECONDS
+    for key in [k for k, seen_at in _recent_dispatches.items() if seen_at <= deadline]:
+        del _recent_dispatches[key]
 
 
 async def dispatch_notification(message: NotificationMessage, *, force: bool = False) -> dict[str, str]:
@@ -140,6 +155,7 @@ async def dispatch_notification(message: NotificationMessage, *, force: bool = F
         )
 
     if debounce_key:
+        _prune_recent_dispatches(now)
         _recent_dispatches[debounce_key] = now
 
     # 异步落库审计历史

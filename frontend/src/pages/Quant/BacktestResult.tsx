@@ -1,14 +1,24 @@
-import { CopyOutlined, InfoCircleOutlined } from "@ant-design/icons";
-import { Button, message } from "antd";
+import { CopyOutlined, DownloadOutlined, FileTextOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { Button, Space, message } from "antd";
 import type { QuantBacktestResult, QuantStrategyConfig } from "../../api/queries";
 import BacktestCharts from "./results/BacktestCharts";
 import BacktestMetrics from "./results/BacktestMetrics";
+import BacktestParameterSensitivity from "./results/BacktestParameterSensitivity";
 import BacktestTables from "./results/BacktestTables";
 import BacktestTradeKline from "./results/BacktestTradeKline";
+import { exportBacktestTearsheetMarkdown, exportEquityCurveCsv } from "./results/exportTearsheet";
 import { quantStrategyIdentity, quantStrategyParameterSummary } from "./quantRun";
 import "./quant-results.css";
 
-export default function BacktestResult({ result, strategy }: { result: QuantBacktestResult; strategy?: QuantStrategyConfig }) {
+export default function BacktestResult({
+  result,
+  strategy,
+  runId,
+}: {
+  result: QuantBacktestResult;
+  strategy?: QuantStrategyConfig;
+  runId?: string;
+}) {
   const handleCopySummary = async () => {
     const lines = [
       "### 量化策略回测报告摘要",
@@ -29,23 +39,52 @@ export default function BacktestResult({ result, strategy }: { result: QuantBack
     }
   };
 
+  const handleExportTearsheet = () => {
+    exportBacktestTearsheetMarkdown(result, strategy);
+    message.success("量化策略专业研报 (Markdown) 已导出");
+  };
+
+  const handleExportNav = () => {
+    exportEquityCurveCsv(result.equity_curve);
+    message.success("每日净值序列 (CSV) 已导出");
+  };
+
   return (
     <section aria-label="回测结果">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+      <div className="quant-result-toolbar">
         <nav className="quant-result-nav" aria-label="回测结果导航">
           <a href="#quant-result-metrics">核心指标</a>
           <a href="#quant-result-charts">净值与回撤</a>
           <a href="#quant-result-trades-chart">交易点位</a>
           <a href="#quant-result-details">收益与成交</a>
+          <a href="#quant-result-sensitivity">参数敏感性</a>
         </nav>
-        <Button
-          size="small"
-          icon={<CopyOutlined />}
-          onClick={handleCopySummary}
-          aria-label="复制回测摘要"
-        >
-          复制摘要
-        </Button>
+        <Space size={8} wrap>
+          <Button
+            size="small"
+            icon={<CopyOutlined />}
+            onClick={handleCopySummary}
+            aria-label="复制回测摘要"
+          >
+            复制摘要
+          </Button>
+          <Button
+            size="small"
+            icon={<FileTextOutlined />}
+            onClick={handleExportTearsheet}
+            aria-label="导出研报 Markdown"
+          >
+            导出研报 (MD)
+          </Button>
+          <Button
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={handleExportNav}
+            aria-label="导出净值 CSV"
+          >
+            导出净值 (CSV)
+          </Button>
+        </Space>
       </div>
       {strategy ? (
         <div className="quant-result-strategy" aria-label="本次执行策略">
@@ -78,8 +117,12 @@ export default function BacktestResult({ result, strategy }: { result: QuantBack
         <BacktestTradeKline codes={result.codes} equityCurve={result.equity_curve} trades={result.trades} marketSnapshots={result.market_snapshots} />
       </div>
       <div id="quant-result-details" className="quant-result-anchor">
-        <BacktestTables monthlyReturns={result.monthly_returns} trades={result.trades} />
+        <BacktestTables monthlyReturns={result.monthly_returns} trades={result.trades} metrics={result.metrics} />
+      </div>
+      <div id="quant-result-sensitivity" className="quant-result-anchor">
+        <BacktestParameterSensitivity runId={runId} strategy={strategy} />
       </div>
     </section>
   );
 }
+

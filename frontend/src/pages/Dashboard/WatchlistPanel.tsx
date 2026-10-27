@@ -24,6 +24,7 @@ import type { WatchlistAlertCondition, WatchlistItem } from "../../types/watchli
 import ChangeValue from "../../components/ChangeValue";
 import PreloadLink from "../../components/PreloadLink";
 import { buildWatchlistStockUrl } from "../../utils/stockLinks";
+import { formatMarketClock } from "../../utils/marketTime";
 
 const { Text } = Typography;
 const CONDITION_LABELS: Record<WatchlistAlertCondition, string> = {
@@ -48,10 +49,7 @@ function sourceLabel(value: string | undefined): string {
 }
 
 function formatQuotedTime(value: string | undefined): string {
-  if (!value) return "尚未更新";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "尚未更新";
-  return parsed.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return formatMarketClock(value, "尚未更新");
 }
 
 export default function WatchlistPanel() {

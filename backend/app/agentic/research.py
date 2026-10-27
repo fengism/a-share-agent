@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Any, AsyncContextManager, Protocol
@@ -428,6 +428,7 @@ async def run_agentic_research(
     settings: Any = None,
     event_callback: AgentEventCallback | None = None,
     evidence_callback: Callable[[AgentEvidence], None] | None = None,
+    initial_evidence: Sequence[AgentEvidence] | None = None,
 ) -> AgenticResearchResult:
     evidence: list[AgentEvidence] = []
     summaries: list[str] = []
@@ -436,8 +437,17 @@ async def run_agentic_research(
     await progress.start()
     round_callback = progress.forward_event
 
+    if initial_evidence:
+        initial_stats = classify_evidence_batch(tuple(initial_evidence), seen_ids=progress.seen_evidence_ids)
+        evidence.extend(initial_stats.added)
+        if evidence_callback is not None:
+            for item in initial_stats.added:
+                evidence_callback(item)
+        await progress.sync_completed_steps(evidence)
+
     max_rounds = max(1, spec.max_rounds)
     initial_requirements = list(spec.requirements)
+    current_missing = _missing_requirements(spec.requirements, evidence)
 
     async with runtime.open_session(spec, settings=settings) as session:
         first_round = await _emit_round_started(
@@ -447,9 +457,21 @@ async def run_agentic_research(
             requirements=initial_requirements,
             tool_names=spec.tool_names,
         )
+        round_1_message = message
+        if initial_evidence and evidence:
+            completed_labels = [req.label for req in spec.requirements if not any(m.key == req.key for m in current_missing)]
+            pending_labels = [req.label for req in current_missing]
+            if completed_labels and pending_labels:
+                round_1_message = (
+                    f"{message}\n\n"
+                    f"【系统已自动预取并纳入证据库的维度】：{'、'.join(completed_labels)}。\n"
+                    f"【当前重点调研缺口维度】：{'、'.join(pending_labels)}。\n"
+                    "请注意：已预取维度的工具已执行完毕，请勿重复调用对应基础行情/财报/估值工具，"
+                    "请重点调用研报检索、网页正文阅读与新闻等工具，补充调研上述缺口维度。"
+                )
         last_result = await _run_round(
             session,
-            message,
+            round_1_message,
             spec.tool_names,
             round_callback,
             tool_call_reserve=followup_reserve(max_rounds),

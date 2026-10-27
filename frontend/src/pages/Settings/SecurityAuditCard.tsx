@@ -8,16 +8,22 @@ import {
   SearchOutlined,
   StopOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Input, Select, Space, Table, Tag, Tooltip } from "antd";
+import { Button, Card, Input, Select, Space, Table, Tabs, Tag, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useLoginAuditLogs } from "../../api/queries";
+import { useAdminAuditActions, useLoginAuditLogs } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { semanticTagStyle, useColors, useStyles } from "../../styles/ui";
-import type { LoginAuditLogItem } from "../../types/auth";
+import {
+  ACTION_FILTERS,
+  ACTION_LABELS,
+  LOGIN_STATUS_FILTERS,
+  loginStatusMeta,
+  summarizeDetails,
+} from "./auditMeta";
+import type { AdminAuditActionItem, LoginAuditLogItem } from "../../types/auth";
 
-export default function SecurityAuditCard() {
-  const { cardStyle, sectionCardBodyStyle } = useStyles();
+function LoginAuditSection() {
   const colors = useColors();
   const isNarrow = useMediaQuery("(max-width: 640px)");
 
@@ -38,35 +44,29 @@ export default function SecurityAuditCard() {
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
 
-  const statusTag = (status: string) => {
+  const statusIcon = (status: string) => {
     switch (status) {
       case "success":
-        return (
-          <Tag icon={<CheckCircleOutlined />} style={semanticTagStyle("down")}>
-            登录成功
-          </Tag>
-        );
+        return <CheckCircleOutlined />;
       case "failed_credentials":
-        return (
-          <Tag icon={<CloseCircleOutlined />} style={semanticTagStyle("warning")}>
-            密码错误
-          </Tag>
-        );
+        return <CloseCircleOutlined />;
       case "failed_disabled":
-        return (
-          <Tag icon={<StopOutlined />} style={semanticTagStyle("up")}>
-            账号已停用
-          </Tag>
-        );
+        return <StopOutlined />;
       case "failed_rate_limited":
-        return (
-          <Tag icon={<ExclamationCircleOutlined />} color="default">
-            限流阻断
-          </Tag>
-        );
+        return <ExclamationCircleOutlined />;
       default:
-        return <Tag>{status}</Tag>;
+        return undefined;
     }
+  };
+
+  // 文案与语义色统一取自 auditMeta，避免与「我的登录记录」两处漂移
+  const statusTag = (status: string) => {
+    const meta = loginStatusMeta(status);
+    return (
+      <Tag icon={statusIcon(status)} style={semanticTagStyle(meta.tone)}>
+        {meta.label}
+      </Tag>
+    );
   };
 
   const columns: ColumnsType<LoginAuditLogItem> = [
@@ -138,16 +138,11 @@ export default function SecurityAuditCard() {
   ];
 
   return (
-    <Card
-      title={<span><SafetyCertificateOutlined style={{ marginRight: 8 }} />安全与登录审计日志</span>}
-      style={{ ...cardStyle, marginBottom: 16 }}
-      styles={{ body: sectionCardBodyStyle }}
-    >
+    <>
       <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginBottom: 12 }}>
         实时记录系统所有用户的登录尝试、认证失败、禁用拦截与限流防御事件，便于追踪异常访问与安全合规审计。
       </div>
 
-      {/* Toolbar */}
       <div
         style={{
           display: "flex",
@@ -181,12 +176,7 @@ export default function SecurityAuditCard() {
             placeholder="所有认证结果"
             allowClear
             style={{ width: 140 }}
-            options={[
-              { value: "success", label: "登录成功" },
-              { value: "failed_credentials", label: "密码错误" },
-              { value: "failed_disabled", label: "账号已停用" },
-              { value: "failed_rate_limited", label: "限流阻断" },
-            ]}
+            options={LOGIN_STATUS_FILTERS}
           />
         </Space>
 
@@ -229,6 +219,213 @@ export default function SecurityAuditCard() {
           scroll={{ x: 750 }}
         />
       </SectionDataState>
+    </>
+  );
+}
+
+function AdminActionSection() {
+  const colors = useColors();
+  const isNarrow = useMediaQuery("(max-width: 640px)");
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [searchActor, setSearchActor] = useState("");
+  const [selectedAction, setSelectedAction] = useState<string | undefined>();
+
+  const { data, isLoading, error, refetch } = useAdminAuditActions({
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+    actor_username: searchActor.trim() || undefined,
+    action: selectedAction || undefined,
+  });
+
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+
+  const columns: ColumnsType<AdminAuditActionItem> = [
+    {
+      title: "时间",
+      dataIndex: "created_at",
+      key: "created_at",
+      width: 165,
+      render: (val: string) => val || "—",
+    },
+    {
+      title: "操作者",
+      dataIndex: "actor_username",
+      key: "actor_username",
+      width: 150,
+      render: (val: string, record) => (
+        <Space size={4}>
+          <span style={{ fontWeight: 600, color: colors.textPrimary }}>{val || "系统"}</span>
+          {record.actor_id ? (
+            <Tag style={{ fontSize: "10px", lineHeight: "16px", padding: "0 4px" }}>
+              #{record.actor_id}
+            </Tag>
+          ) : null}
+        </Space>
+      ),
+    },
+    {
+      title: "操作",
+      dataIndex: "action",
+      key: "action",
+      width: 150,
+      render: (action: string) => (
+        <Tag color="blue">{ACTION_LABELS[action] ?? action}</Tag>
+      ),
+    },
+    {
+      title: "对象",
+      key: "target",
+      width: 170,
+      render: (_, record) =>
+        record.target_label ? (
+          <span>
+            {record.target_label}
+            {record.target_type ? (
+              <span style={{ color: colors.textMuted, fontSize: "11px" }}>（{record.target_type}）</span>
+            ) : null}
+          </span>
+        ) : (
+          <span style={{ color: colors.textMuted }}>{record.target_id || "—"}</span>
+        ),
+    },
+    {
+      title: "变更内容",
+      dataIndex: "details",
+      key: "details",
+      ellipsis: true,
+      render: (details: string) => {
+        const summary = summarizeDetails(details);
+        return summary === "—" ? (
+          <span style={{ color: colors.textMuted }}>—</span>
+        ) : (
+          <Tooltip title={details}>
+            <span style={{ fontSize: "12px" }}>{summary}</span>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: "来源 IP",
+      dataIndex: "actor_ip",
+      key: "actor_ip",
+      width: 130,
+      render: (ip: string) => (
+        <code style={{ fontFamily: "var(--c-font-mono)", fontSize: "var(--c-font-sm)" }}>
+          {ip || "未知"}
+        </code>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <div style={{ fontSize: "var(--c-font-sm)", color: colors.textMuted, marginBottom: 12 }}>
+        记录管理员对账号、邀请码与全局配置的每一次变更。<strong>只记录改动了哪些字段</strong>，
+        不会保存密钥类取值（API Key、密码等）。
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 10,
+          marginBottom: 12,
+        }}
+      >
+        <Space wrap>
+          <Input
+            placeholder="搜索操作者..."
+            prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
+            value={searchActor}
+            onChange={(e) => {
+              setSearchActor(e.target.value);
+              setPage(1);
+            }}
+            allowClear
+            size="small"
+            style={{ width: isNarrow ? "100%" : 160 }}
+          />
+          <Select
+            size="small"
+            value={selectedAction}
+            onChange={(val) => {
+              setSelectedAction(val);
+              setPage(1);
+            }}
+            placeholder="所有操作类型"
+            allowClear
+            style={{ width: 160 }}
+            options={ACTION_FILTERS}
+          />
+        </Space>
+
+        <Button
+          size="small"
+          icon={<ReloadOutlined />}
+          onClick={() => refetch()}
+          loading={isLoading}
+        >
+          刷新
+        </Button>
+      </div>
+
+      <SectionDataState
+        isLoading={isLoading && items.length === 0}
+        error={items.length > 0 ? undefined : error}
+        onRetry={() => refetch()}
+        isEmpty={!isLoading && !error && items.length === 0}
+        emptyText="暂无管理员操作记录"
+        errorTitle="管理员操作记录加载失败"
+        minHeight={140}
+      >
+        <Table<AdminAuditActionItem>
+          rowKey="id"
+          columns={columns}
+          dataSource={items}
+          pagination={{
+            current: page,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            pageSizeOptions: ["10", "20", "50", "100"],
+            size: "small",
+            onChange: (p, ps) => {
+              setPage(p);
+              setPageSize(ps);
+            },
+          }}
+          size="small"
+          scroll={{ x: 820 }}
+        />
+      </SectionDataState>
+    </>
+  );
+}
+
+export default function SecurityAuditCard() {
+  const { cardStyle, sectionCardBodyStyle } = useStyles();
+  const [activeTab, setActiveTab] = useState("login");
+
+  return (
+    <Card
+      title={<span><SafetyCertificateOutlined style={{ marginRight: 8 }} />安全与登录审计日志</span>}
+      style={{ ...cardStyle, marginBottom: 16 }}
+      styles={{ body: sectionCardBodyStyle }}
+    >
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        size="small"
+        items={[
+          { key: "login", label: "登录审计", children: <LoginAuditSection /> },
+          { key: "admin", label: "管理员操作", children: <AdminActionSection /> },
+        ]}
+      />
     </Card>
   );
 }

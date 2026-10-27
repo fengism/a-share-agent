@@ -36,6 +36,12 @@ const run: QuantBacktestRun = {
       lot_size: 100,
       risk_free_rate: 0.015,
       rebalance_window_days: 3,
+      allocation_method: "equal",
+      market_impact_coefficient: 0,
+      ranking_lookback: 20,
+      ranking_metric: "momentum",
+      rebalance_frequency: "daily",
+      slippage_model: "fixed",
     },
   },
 };

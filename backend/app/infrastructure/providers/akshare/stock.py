@@ -84,7 +84,7 @@ def fetch_stock_intraday_minute_sina(
             date=resolved_date.replace("-", ""),
         )
     except Exception as exc:
-        logger.info("akshare新浪分时数据不可用: code=%s, error=%s", code, exc)
+        logger.debug("akshare新浪分时数据不可用: code=%s, error=%s", code, exc)
         return pd.DataFrame()
     frame = frame.copy()
     frame["time"] = frame["ticktime"].map(
@@ -105,7 +105,7 @@ def fetch_stock_intraday_transactions(
     try:
         frame = ak.stock_intraday_em(symbol=code)
     except Exception as exc:
-        logger.info("akshare东方财富逐笔数据不可用: code=%s, error=%s", code, exc)
+        logger.debug("akshare东方财富逐笔数据不可用: code=%s, error=%s", code, exc)
         return pd.DataFrame()
     return normalize_intraday_df(frame)
 
@@ -117,7 +117,7 @@ def fetch_stock_intraday_minute(
     try:
         frame = ak.stock_zh_a_hist_min_em(symbol=code, period="1", adjust="")
     except Exception as exc:
-        logger.info("akshare东方财富分钟K线不可用: code=%s, error=%s", code, exc)
+        logger.debug("akshare东方财富分钟K线不可用: code=%s, error=%s", code, exc)
         return pd.DataFrame()
     return normalize_intraday_df(frame)
 

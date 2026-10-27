@@ -229,10 +229,10 @@ function ChainNodeCard({ node, framed = false }: { node: IndustryChainNode; fram
           ))}
         </div>
       )}
-      {(node.market_share || node.metric) && (
+      {(node.market_share || node.metric || node.gross_margin) && (
         <div className="industry-chain-node__tag-list" style={{ marginTop: 6 }}>
           <Tag className="industry-chain-node__tag industry-chain-node__metric" color="gold" style={{ fontSize: "var(--c-font-xs)" }}>
-            {[node.market_share, node.metric].filter(Boolean).join(" · ")}
+            {[node.market_share, node.metric, node.gross_margin ? `毛利: ${node.gross_margin}` : ""].filter(Boolean).join(" · ")}
           </Tag>
         </div>
       )}
@@ -533,12 +533,17 @@ export default function IndustryResearchSections({ result }: { result: IndustryC
     {
       title: "市场指标 / 毛利率",
       key: "metric",
-      width: 160,
-      render: (_: unknown, node: IndustryChainNode) => (
-        node.market_share || node.metric ? (
-          <Tag className="industry-chain-table__tag" color="gold">{[node.market_share, node.metric].filter(Boolean).join(" · ")}</Tag>
-        ) : <Text type="secondary">-</Text>
-      ),
+      width: 170,
+      render: (_: unknown, node: IndustryChainNode) => {
+        const parts = [
+          node.market_share,
+          node.metric,
+          node.gross_margin ? `毛利: ${node.gross_margin}` : "",
+        ].filter(Boolean);
+        return parts.length > 0 ? (
+          <Tag className="industry-chain-table__tag" color="gold">{parts.join(" · ")}</Tag>
+        ) : <Text type="secondary">-</Text>;
+      },
     },
     {
       title: "核心代表公司 (点击可穿透至个股资料)",

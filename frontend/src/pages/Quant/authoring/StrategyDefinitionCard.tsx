@@ -6,6 +6,8 @@ const { Text } = Typography;
 
 interface StrategyDefinitionCardProps {
   canPublish: boolean;
+  /** 是否能发布到全局策略注册表（仅管理员） */
+  canManagePublish: boolean;
   definitionText: string;
   isDefinitionDirty: boolean;
   isDefinitionLocked: boolean;
@@ -21,6 +23,7 @@ interface StrategyDefinitionCardProps {
 
 export default function StrategyDefinitionCard({
   canPublish,
+  canManagePublish,
   definitionText,
   isDefinitionDirty,
   isDefinitionLocked,
@@ -61,26 +64,30 @@ export default function StrategyDefinitionCard({
         >
           编译校验
         </Button>
-        <Popconfirm
-          title="确认发布当前策略？"
-          description="系统将校验定义哈希与质量门禁并原子发布；请求中断后可安全重试。"
-          okText="确认发布"
-          cancelText="取消"
-          onConfirm={() => void onPublish()}
-        >
-          <Button
-            type="primary"
-            icon={<RocketOutlined />}
-            disabled={!canPublish}
-            loading={isPublishing}
+        {canManagePublish && (
+          <Popconfirm
+            title="确认发布当前策略？"
+            description="系统将校验定义哈希与质量门禁并原子发布；请求中断后可安全重试。"
+            okText="确认发布"
+            cancelText="取消"
+            onConfirm={() => void onPublish()}
           >
-            发布策略
-          </Button>
-        </Popconfirm>
+            <Button
+              type="primary"
+              icon={<RocketOutlined />}
+              disabled={!canPublish}
+              loading={isPublishing}
+            >
+              发布策略
+            </Button>
+          </Popconfirm>
+        )}
       </Space>
-      <Text type="secondary">
-        Registry generation：{registry?.generation ?? "-"}，发布目录：{registry?.published_directory ?? "未配置"}
-      </Text>
+      {canManagePublish && (
+        <Text type="secondary">
+          Registry generation：{registry?.generation ?? "-"}，发布目录：{registry?.published_directory ?? "未配置"}
+        </Text>
+      )}
     </Card>
   );
 }

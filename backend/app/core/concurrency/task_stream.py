@@ -20,6 +20,42 @@ ProgressCallback = Callable[[EventT], Awaitable[None]]
 TaskRunner = Callable[[ProgressCallback[EventT]], Awaitable[None]]
 
 
+_Cleanup = Callable[[], Awaitable[None]]
+
+
+class ManagedEventStream(Generic[EventT]):
+    """对外暴露的流对象：**关闭即清理**，无论有没有被迭代过。
+
+    裸 async generator 的 ``finally`` 只在生成器真正开始执行后才会运行。若调用方拿到流
+    就关闭或丢弃（客户端在首帧之前断开就是这种情况），``finally`` 不会执行，后台任务
+    会在无消费者的情况下继续跑——对一次 LLM/抓取任务来说是白烧额度与数据源配额。
+
+    因此这里用一层薄包装，把 ``aclose()`` 显式映射到「注销 + 取消后台任务」。
+    """
+
+    __slots__ = ("_generator", "_cleanup", "_closed")
+
+    def __init__(self, generator: AsyncGenerator[dict, None], cleanup: _Cleanup) -> None:
+        self._generator = generator
+        self._cleanup = cleanup
+        self._closed = False
+
+    def __aiter__(self) -> "ManagedEventStream[EventT]":
+        return self
+
+    async def __anext__(self) -> dict:
+        return await self._generator.__anext__()
+
+    async def aclose(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            await self._generator.aclose()
+        finally:
+            await self._cleanup()
+
+
 class KeyedTaskEventStream(Generic[EventT]):
     """防止同一业务键重复执行，并统一处理事件、心跳和取消。"""
 
@@ -52,7 +88,7 @@ class KeyedTaskEventStream(Generic[EventT]):
         runner: TaskRunner[EventT],
         *,
         error_handler: Callable[[Exception], None] | None = None,
-    ) -> AsyncGenerator[dict, None]:
+    ) -> ManagedEventStream[EventT]:
         queue: asyncio.Queue[EventT | None] = asyncio.Queue()
 
         async def progress_callback(event: EventT) -> None:
@@ -76,6 +112,13 @@ class KeyedTaskEventStream(Generic[EventT]):
                 await task
             raise
 
+        async def cleanup() -> None:
+            await self._unregister(key, task)
+            if not task.done():
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+
         async def event_generator() -> AsyncGenerator[dict, None]:
             try:
                 while True:
@@ -95,10 +138,8 @@ class KeyedTaskEventStream(Generic[EventT]):
                         "data": json.dumps(event.model_dump(), ensure_ascii=False, default=str),
                     }
             finally:
-                await self._unregister(key, task)
-                if not task.done():
-                    task.cancel()
-                    with contextlib.suppress(asyncio.CancelledError):
-                        await task
+                await cleanup()
 
-        return event_generator()
+        return ManagedEventStream(event_generator(), cleanup)
+
+__all__ = ["KeyedTaskEventStream", "ManagedEventStream"]

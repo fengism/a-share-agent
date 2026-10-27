@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from typing import Annotated
 from urllib.parse import quote
 
@@ -11,12 +10,15 @@ from app.api.auth.dependencies import require_active_user, require_admin
 from app.api.errors import (
     BadRequestError,
     ConflictError,
+    ForbiddenError,
     NotFoundError,
     TooManyRequestsError,
 )
+from app.api.rate_limit import llm_rate_limit
 from app.api.schemas import DeleteResponse
 from app.api.streaming import SSE_RESPONSES
 from app.domain.identity import AuthenticatedUser
+from app.domain.timezones import market_now
 from app.modules.industry_chain.atlas import (
     AtlasBatchMineResponse,
     AtlasCatalog,
@@ -27,6 +29,7 @@ from app.modules.industry_chain.atlas import (
     build_atlas_catalog,
     build_atlas_graph,
     delete_imported_chain,
+    delete_user_atlas_chain,
     get_atlas_chain,
     import_atlas_chains,
     mine_and_save_atlas_chain,
@@ -62,7 +65,7 @@ async def export_custom_industry_chain_pdf(
     pdf_bytes = await render_industry_chain_pdf_bytes(html_content)
 
     name = result.name or "产业链"
-    report_date = datetime.now().strftime("%Y%m%d")
+    report_date = market_now().strftime("%Y%m%d")
     filename = f"{name}_产业链深度研究报告_{report_date}.pdf"
 
     return Response(
@@ -101,7 +104,7 @@ async def export_industry_chain_pdf(
     pdf_bytes = await render_industry_chain_pdf_bytes(html_content)
 
     chain_name = result.name or name
-    report_date = datetime.now().strftime("%Y%m%d")
+    report_date = market_now().strftime("%Y%m%d")
     filename = f"{chain_name}_产业链深度研究报告_{report_date}.pdf"
 
     return Response(
@@ -118,8 +121,8 @@ async def export_industry_chain_pdf(
 async def get_industry_chain_atlas_catalog(
     user: AuthenticatedUser = Depends(require_active_user),
 ) -> AtlasCatalog:
-    """产业链知识库目录：分类、链条摘要与规模统计。"""
-    return build_atlas_catalog()
+    """产业链知识库目录：分类、链条摘要与规模统计（合并官方公共库与当前用户私有图谱）。"""
+    return build_atlas_catalog(user_id=user["id"])
 
 
 @router.get("/atlas/chains/{slug}", response_model=AtlasChain)
@@ -127,8 +130,8 @@ async def get_industry_chain_atlas_chain(
     slug: str,
     user: AuthenticatedUser = Depends(require_active_user),
 ) -> AtlasChain:
-    """按 slug 获取单条产业链的上/中/下游完整图谱。"""
-    chain = get_atlas_chain(slug)
+    """按 slug 获取单条产业链的上/中/下游完整图谱（优先加载用户私有图谱）。"""
+    chain = get_atlas_chain(slug, user_id=user["id"])
     if chain is None:
         raise NotFoundError(f"产业链知识库中不存在: {slug}")
     return chain
@@ -139,6 +142,7 @@ class AtlasImportRequest(BaseModel):
 
     content: str = Field(min_length=1)
     overwrite: bool = False
+    scope: str | None = None
 
 
 class AtlasMineRequest(BaseModel):
@@ -146,6 +150,7 @@ class AtlasMineRequest(BaseModel):
 
     name: str = Field(min_length=1)
     archive_id: str = ""
+    scope: str | None = None
 
 
 @router.get("/atlas/graph", response_model=AtlasGraph)
@@ -153,39 +158,53 @@ async def get_industry_chain_atlas_graph(
     chains: Annotated[str | None, Query()] = None,
     user: AuthenticatedUser = Depends(require_active_user),
 ) -> AtlasGraph:
-    """跨链全局产业链图谱；chains 传逗号分隔 slug 时只统计这些链。"""
+    """跨链全局产业链图谱（包含官方公共链与当前用户私有链）。"""
     slugs = [item.strip() for item in chains.split(",") if item.strip()] if chains else None
-    return build_atlas_graph(slugs)
+    return build_atlas_graph(slugs, user_id=user["id"])
 
 
-@router.post("/atlas/mine", response_model=AtlasChain)
+@router.post("/atlas/mine", response_model=AtlasChain, dependencies=[Depends(llm_rate_limit)])
 async def mine_industry_chain_atlas(
     request: AtlasMineRequest,
-    admin: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(require_active_user),
 ) -> AtlasChain:
-    """把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目（管理员）。"""
+    """把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目。
+
+    普通用户默认沉淀为个人专属私有知识库；管理员可沉淀为全局公共知识库或个人知识库。
+    """
+    is_admin = bool(user.get("is_admin"))
+    if request.scope == "global" and not is_admin:
+        raise ForbiddenError("仅管理员可沉淀为全局公共知识库", code="auth.admin_required")
+
+    target_scope = request.scope or ("global" if is_admin else "user")
+    target_user_id = user["id"] if target_scope == "user" else None
+
     archive_id = request.archive_id
     if not archive_id:
         latest = await get_latest_industry_chain_archive(
             request.name,
-            admin["id"],
-            can_delete_legacy=True,
+            user["id"],
+            can_delete_legacy=is_admin,
         )
         archive_id = (latest.archive_id or "") if latest is not None else ""
     if not archive_id:
         raise NotFoundError(f"没有可挖掘的产业链分析存档: {request.name}")
-    result = await load_industry_chain_archive(request.name, archive_id, admin["id"])
+    result = await load_industry_chain_archive(request.name, archive_id, user["id"])
     if result is None:
         raise NotFoundError("产业链存档不存在")
     if result.quality_status != "complete":
         raise BadRequestError("该存档未通过质量门（降级报告），不允许挖掘入库")
-    chain = await mine_and_save_atlas_chain(result)
+    chain = await mine_and_save_atlas_chain(result, user_id=target_user_id)
     if chain is None:
         raise BadRequestError("分析结果可挖掘内容不足（至少 2 个环节、3 家公司），未入库")
     return chain
 
 
-@router.post("/atlas/mine-batch", response_model=AtlasBatchMineResponse)
+@router.post(
+    "/atlas/mine-batch",
+    response_model=AtlasBatchMineResponse,
+    dependencies=[Depends(llm_rate_limit)],
+)
 async def batch_mine_industry_chain_atlas(
     admin: AuthenticatedUser = Depends(require_admin),
 ) -> AtlasBatchMineResponse:
@@ -220,11 +239,22 @@ async def batch_mine_industry_chain_atlas(
 @router.post("/atlas/import", response_model=list[AtlasChain])
 async def import_industry_chain_atlas(
     request: AtlasImportRequest,
-    admin: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(require_active_user),
 ) -> list[AtlasChain]:
-    """导入外部产业链定义（管理员），校验通过后写入导入目录并立即生效。"""
+    """导入外部产业链定义：普通用户导入至个人专属知识库；管理员可导入至公共知识库或个人知识库。"""
+    is_admin = bool(user.get("is_admin"))
+    if request.scope == "global" and not is_admin:
+        raise ForbiddenError("仅管理员可导入为全局公共知识库", code="auth.admin_required")
+
+    target_scope = request.scope or ("global" if is_admin else "user")
+    target_user_id = user["id"] if target_scope == "user" else None
+
     try:
-        chains: list[AtlasChain] = import_atlas_chains(request.content, overwrite=request.overwrite)
+        chains: list[AtlasChain] = import_atlas_chains(
+            request.content,
+            overwrite=request.overwrite,
+            user_id=target_user_id,
+        )
         return chains
     except AtlasImportError as exc:
         message = str(exc)
@@ -234,13 +264,21 @@ async def import_industry_chain_atlas(
 
 
 @router.delete("/atlas/chains/{slug}", response_model=DeleteResponse)
-async def delete_industry_chain_atlas_import(
+async def delete_industry_chain_atlas_chain(
     slug: str,
-    admin: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(require_active_user),
 ) -> DeleteResponse:
-    """删除一条外部导入的产业链（管理员）；内置链条不可删除。"""
-    if get_atlas_chain(slug) is None:
+    """删除一条产业链知识库条目：优先删除用户私有图谱；若为公共导入图谱仅管理员可删。"""
+    if delete_user_atlas_chain(slug, user["id"]):
+        return DeleteResponse()
+
+    chain = get_atlas_chain(slug)
+    if chain is None:
         raise NotFoundError(f"产业链知识库中不存在: {slug}")
+
+    if not user.get("is_admin"):
+        raise ForbiddenError("仅管理员可删除公共知识库条目", code="auth.admin_required")
+
     if not delete_imported_chain(slug):
         raise BadRequestError(f"内置产业链不可删除: {slug}")
     return DeleteResponse()
@@ -303,9 +341,15 @@ async def get_industry_chain_archive(
     if result is None:
         raise NotFoundError("产业链存档不存在", code="industry_chain.archive_not_found")
     try:
+        from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
         from app.modules.industry_chain.enrichment import enrich_stock_market_snapshots
 
-        result = enrich_stock_market_snapshots(result, refresh_existing=True)
+        result = await call_blocking(
+            enrich_stock_market_snapshots,
+            result,
+            refresh_existing=True,
+            semaphore=misc_semaphore,
+        )
     except Exception as enrich_exc:
         logger.debug("历史存档刷新最新行情快照跳过: %s", enrich_exc)
     return result
@@ -328,7 +372,12 @@ async def delete_industry_chain_archive(
     return DeleteResponse()
 
 
-@router.get("/{name}/stream", response_class=EventSourceResponse, responses=SSE_RESPONSES)
+@router.get(
+    "/{name}/stream",
+    response_class=EventSourceResponse,
+    responses=SSE_RESPONSES,
+    dependencies=[Depends(llm_rate_limit)],
+)
 async def stream_industry_chain(name: str, user: AuthenticatedUser = Depends(require_active_user)):
     """SSE 端点，流式推送产业链分析进度。
 

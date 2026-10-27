@@ -59,6 +59,7 @@ import { useImportFile } from "./useImportFile";
 import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
 import { useStyles } from "../../styles/ui";
+import { formatMarketDateTime } from "../../utils/marketTime";
 import "./industry-classification.css";
 
 const { Paragraph, Text, Title } = Typography;
@@ -94,8 +95,7 @@ function errorMessage(error: unknown): string {
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "—";
-  const date = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
+  return formatMarketDateTime(value, value);
 }
 
 function marketLabel(value: string): string {

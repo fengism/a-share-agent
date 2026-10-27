@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AnalysisResult } from "../../types/stock";
 import AnalysisDecisionBoard from "./AnalysisDecisionBoard";
 
@@ -65,5 +65,48 @@ describe("AnalysisDecisionBoard", () => {
     expect(screen.getByText("当前估值没有覆盖主要下行情景")).toBeInTheDocument();
     expect(screen.getByText(/已持有者：/)).toHaveTextContent("考虑减持");
     expect(screen.getByText(/首要失效条件/)).toHaveTextContent("品牌定价权持续削弱");
+  });
+
+  it("supports copying decision summary to clipboard", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    const result = {
+      stock_code: "600519",
+      stock_name: "贵州茅台",
+      signal: "buy",
+      research_framework: {
+        actions: {
+          new_investor_action: "buy",
+          holder_action: "add",
+          rationale: "安全边际充足 [^analyze_financials]",
+          thesis_breakers: ["批价大幅倒挂 [^get_interactive_qa]"],
+        },
+      },
+    } as unknown as AnalysisResult;
+
+    render(
+      <MemoryRouter>
+        <AnalysisDecisionBoard result={result} />
+      </MemoryRouter>,
+    );
+
+    const copyBtn = screen.getByRole("button", { name: "复制投资备忘" });
+    expect(copyBtn).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(copyBtn);
+    });
+
+    expect(writeTextMock).toHaveBeenCalledTimes(1);
+    const copiedText = writeTextMock.mock.calls[0][0];
+    expect(copiedText).toContain("贵州茅台 (600519)");
+    expect(copiedText).toContain("考虑买入");
+    expect(copiedText).toContain("安全边际充足");
+    expect(copiedText).not.toContain("[^analyze_financials]");
+    expect(copiedText).toContain("风控证伪条件");
   });
 });

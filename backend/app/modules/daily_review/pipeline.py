@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from app.configuration import get_effective_settings
 from app.configuration.schema import Settings
 from app.core.cache import analysis_cache
+from app.core.concurrency.keyed_lock import KeyedLockRegistry
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 from app.core.progress import ProgressCallback, ProgressEmitter
 from app.core.timezones import SHANGHAI_TIMEZONE
@@ -84,21 +85,11 @@ _CYCLE_TREND_DAYS = 20
 
 # 同一（有效交易日, 用户）的生成串行化：Bot 直呼与 Web 工作流同时触发时，
 # 后来者等前一次写库完成后命中缓存直接返回，避免双份采集与双份长耗时 LLM 调用。
-_generation_locks: dict[tuple[str, int], asyncio.Lock] = {}
-_generation_locks_guard = asyncio.Lock()
+# 用 KeyedLockRegistry 而不是裸 dict：键随 (日期, 用户) 增长，裸 dict 只增不减。
+_generation_locks = KeyedLockRegistry()
 # 同一 Prompt（同日 + 同模型）的在途 LLM 调用串行化：多个用户同时首次生成时，
 # 后来者在锁内二次检查输出缓存，从而只真实调用一次 LLM。
-_prompt_locks: dict[str, asyncio.Lock] = {}
-
-
-async def _generation_lock(key: tuple[str, int]) -> asyncio.Lock:
-    async with _generation_locks_guard:
-        return _generation_locks.setdefault(key, asyncio.Lock())
-
-
-async def _prompt_lock(key: str) -> asyncio.Lock:
-    async with _generation_locks_guard:
-        return _prompt_locks.setdefault(key, asyncio.Lock())
+_prompt_locks = KeyedLockRegistry()
 
 
 def _collection_cache_key(resolution: "DailyReviewDateResolution") -> str:
@@ -218,8 +209,8 @@ def _cached_prompt_run(cached: object) -> PromptRun[DailyReviewPromptOutput] | N
             value=DailyReviewPromptOutput.model_validate(output),
             trace=PromptTrace.model_validate(trace),
         )
-    except ValidationError:
-        logger.warning("复盘 LLM 缓存反序列化失败，改为重新生成", exc_info=True)
+    except ValidationError as error:
+        logger.warning("复盘 LLM 缓存反序列化失败，改为重新生成 error=%s: %s", type(error).__name__, error)
         return None
 
 
@@ -247,8 +238,7 @@ async def _generate_review_prompt(
     allow_cache: bool,
 ) -> PromptRun[DailyReviewPromptOutput]:
     """在锁内二次检查缓存后真正调用 LLM，避免多用户重复调用同一 Prompt。"""
-    lock = await _prompt_lock(key)
-    async with lock:
+    async with _prompt_locks.acquire(key):
         if allow_cache:
             cached_run = _cached_prompt_run(analysis_cache.get(key))
             if cached_run is not None:
@@ -306,8 +296,8 @@ async def _macro_analysis_staleness(review: DailyReviewResult) -> str | None:
         return None
     try:
         current = await get_macro_analysis()
-    except Exception:
-        logger.warning("读取宏观解读状态失败，跳过复盘缓存失效判断", exc_info=True)
+    except Exception as error:
+        logger.warning("读取宏观解读状态失败，跳过复盘缓存失效判断 error=%s: %s", type(error).__name__, error)
         return None
     if not current.events or current.pending_count or current.degraded:
         return None
@@ -411,8 +401,8 @@ async def _review_history_inputs(
 
     try:
         previous, records = await call_blocking(_load, semaphore=misc_semaphore)
-    except Exception:  # noqa: BLE001 - 历史摘要缺失不应阻断复盘生成
-        logger.warning("复盘周期摘要读取失败，跳过自检与趋势: date=%s", effective_text, exc_info=True)
+    except Exception as error:  # noqa: BLE001 - 历史摘要缺失不应阻断复盘生成
+        logger.warning("复盘周期摘要读取失败，跳过自检与趋势: date=%s error=%s: %s", effective_text, type(error).__name__, error)
         return None, CycleTrend(note="历史摘要读取失败")
     check = await build_previous_review_check(
         previous,
@@ -440,8 +430,8 @@ async def _save_cycle_record(
     )
     try:
         await call_blocking(save_cycle_record, record, semaphore=misc_semaphore)
-    except Exception:  # noqa: BLE001 - 摘要写入失败不应影响复盘返回
-        logger.warning("复盘周期摘要写入失败: date=%s", date_text, exc_info=True)
+    except Exception as error:  # noqa: BLE001 - 摘要写入失败不应影响复盘返回
+        logger.warning("复盘周期摘要写入失败: date=%s error=%s: %s", date_text, type(error).__name__, error)
 
 
 def _build_snapshot(
@@ -521,8 +511,7 @@ async def generate_daily_review(
     progress = ProgressEmitter(progress_callback)
     resolution = await resolve_daily_review_date(request.date)
     await progress.emit({"type": "stage_started", "stage": "queue", "message": _QUEUE_MESSAGE})
-    lock = await _generation_lock((resolution.effective_date.isoformat(), user_id))
-    async with lock:
+    async with _generation_locks.acquire((resolution.effective_date.isoformat(), user_id)):
         await _stage_completed(progress, "queue", "已获得生成锁，开始采集数据")
         return await _generate_daily_review_locked(request, user_id, resolution, progress)
 
@@ -649,7 +638,7 @@ async def _generate_daily_review_locked(
         if isinstance(error, LLMConfigurationError):
             logger.warning("结构化复盘未调用 LLM，配置不可用: date=%s error=%s", effective_text, error)
         else:
-            logger.warning("结构化复盘生成失败，使用确定性兜底: date=%s", effective_text, exc_info=True)
+            logger.warning("结构化复盘生成失败，使用确定性兜底: date=%s error=%s: %s", effective_text, type(error).__name__, error)
 
     review.requested_date = requested_text
     review.effective_date = effective_text
@@ -683,8 +672,8 @@ async def _generate_daily_review_locked(
     try:
         from app.core.events import event_bus
         await event_bus.publish(review, name="daily_review.completed")
-    except Exception:  # noqa: BLE001 - 事件发布异常绝不阻断复盘返回
-        logger.warning("发布每日复盘完成事件失败: date=%s", effective_text, exc_info=True)
+    except Exception as error:  # noqa: BLE001 - 事件发布异常绝不阻断复盘返回
+        logger.warning("发布每日复盘完成事件失败: date=%s error=%s: %s", effective_text, type(error).__name__, error)
     return review
 
 

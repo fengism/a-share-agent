@@ -82,7 +82,7 @@ describe("StrategyAuthoringWorkbench", () => {
 
   it("blocks validation and publication while the definition has unsaved edits", async () => {
     mocks.drafts = [{ ...draft, status: "validated", quality_gate: null }];
-    render(<StrategyAuthoringWorkbench onBacktestCreated={vi.fn()} />);
+    render(<StrategyAuthoringWorkbench isAdmin onBacktestCreated={vi.fn()} />);
 
     const editor = await screen.findByPlaceholderText("生成草稿后可在这里编辑完整 StrategyDefinition JSON");
     expect(editor).toBeEnabled();
@@ -103,7 +103,7 @@ describe("StrategyAuthoringWorkbench", () => {
   });
 
   it("publishes only after the explicit confirmation", async () => {
-    render(<StrategyAuthoringWorkbench onBacktestCreated={vi.fn()} />);
+    render(<StrategyAuthoringWorkbench isAdmin onBacktestCreated={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("button", { name: /发布策略/ }));
     expect(mocks.publish).not.toHaveBeenCalled();
@@ -122,14 +122,14 @@ describe("StrategyAuthoringWorkbench", () => {
       published_path: "/data/quant-strategies-published/generated_ma_cross-1.0.0.yaml",
     }];
 
-    render(<StrategyAuthoringWorkbench onBacktestCreated={vi.fn()} />);
+    render(<StrategyAuthoringWorkbench isAdmin onBacktestCreated={vi.fn()} />);
 
     expect(await screen.findByText(/generated_ma_cross-1\.0\.0\.yaml/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /发布策略/ })).toBeDisabled();
   });
 
   it("sends the administrator prompt to the generation mutation", async () => {
-    render(<StrategyAuthoringWorkbench onBacktestCreated={vi.fn()} />);
+    render(<StrategyAuthoringWorkbench isAdmin onBacktestCreated={vi.fn()} />);
 
     fireEvent.change(screen.getByPlaceholderText(/例如：使用 20 日和 60 日均线/), {
       target: { value: "生成一个 20 日均线上穿 60 日均线后买入的策略" },
@@ -142,14 +142,14 @@ describe("StrategyAuthoringWorkbench", () => {
   });
 
   it("shows full-sample and holdout quality gate results", async () => {
-    render(<StrategyAuthoringWorkbench onBacktestCreated={vi.fn()} />);
+    render(<StrategyAuthoringWorkbench isAdmin onBacktestCreated={vi.fn()} />);
 
     expect(await screen.findByText(/全样本：交易 4 次/)).toHaveTextContent("夏普 1.1");
     expect(screen.getByText(/后段样本：交易 2 次/)).toHaveTextContent("最大回撤 -8%");
   });
 
   it("sends explicit null when optional holdout gates are cleared", async () => {
-    render(<StrategyAuthoringWorkbench onBacktestCreated={vi.fn()} />);
+    render(<StrategyAuthoringWorkbench isAdmin onBacktestCreated={vi.fn()} />);
     fireEvent.change(screen.getByRole("spinbutton", { name: "后段最低完整平仓次数（可选）" }), {
       target: { value: "" },
     });
@@ -168,7 +168,7 @@ describe("StrategyAuthoringWorkbench", () => {
 
   it("sends optional full-sample and holdout gates to the backtest request", async () => {
     const onBacktestCreated = vi.fn();
-    render(<StrategyAuthoringWorkbench onBacktestCreated={onBacktestCreated} />);
+    render(<StrategyAuthoringWorkbench isAdmin onBacktestCreated={onBacktestCreated} />);
 
     fireEvent.change(screen.getByRole("spinbutton", { name: "整体最低夏普比率（可选）" }), {
       target: { value: "0.6" },

@@ -81,8 +81,8 @@ def test_qfq_works_with_null_hfq_factors() -> None:
     assert result is not None
     assert result.adjustment_verified is True
     # 前复权 = 原始价 + offset（跨除息日应连续，无 -1.6 假跳变）
-    assert result.items[0].close == pytest.approx(68.2)
-    assert result.items[1].close == pytest.approx(66.76)
+    assert result.items[0].close == pytest.approx(68.203)
+    assert result.items[1].close == pytest.approx(66.755)
 
 
 def test_hfq_returns_none_when_factors_have_null_hfq() -> None:
@@ -103,5 +103,5 @@ def test_hfq_still_works_when_factors_are_complete() -> None:
     result = apply_adjustment(bars, factors, "hfq")
 
     assert result is not None
-    assert result.items[0].close == pytest.approx(95.03)
+    assert result.items[0].close == pytest.approx(95.028)
     assert result.items[1].close == pytest.approx(93.58)

@@ -1,8 +1,9 @@
-import { GraphChart, TreeChart } from "echarts/charts";
+import { BarChart, GraphChart, LineChart, ScatterChart, TreeChart } from "echarts/charts";
+import { MarkLineComponent } from "echarts/components";
 import { SVGRenderer } from "echarts/renderers";
 import echarts from "./echarts-setup";
 
-// TreeChart keeps archived reports compatible; new industry-chain charts use GraphChart.
-echarts.use([GraphChart, TreeChart, SVGRenderer]);
+// Register all chart types needed by industry chain research
+echarts.use([BarChart, LineChart, ScatterChart, GraphChart, TreeChart, MarkLineComponent, SVGRenderer]);
 
 export default echarts;

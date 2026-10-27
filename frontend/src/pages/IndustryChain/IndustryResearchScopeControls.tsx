@@ -21,7 +21,7 @@ export default function IndustryResearchScopeControls({
   return (
     <details style={{ marginTop: 12 }}>
       <summary style={{ color: colors.textSecondary, cursor: "pointer", fontSize: "var(--c-font-md)" }}>分析范围（可选）</summary>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginTop: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: 10, marginTop: 12 }}>
         <label>
           <Text type="secondary" style={{ display: "block", marginBottom: 4, fontSize: "var(--c-font-sm)" }}>区域口径</Text>
           <Select

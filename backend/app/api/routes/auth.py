@@ -10,13 +10,20 @@ from app.api.auth.cookies import (
     resolve_secure_cookie,
     set_auth_cookies,
 )
-from app.api.auth.dependencies import get_current_user, require_admin, security_scheme
+from app.api.auth.dependencies import (
+    get_current_user,
+    require_active_user,
+    require_admin,
+    security_scheme,
+)
 from app.api.auth.http import auth_error_to_http, client_ip, invite_out, user_out
 from app.api.errors import ApiError
 from app.configuration import get_settings
 from app.core.security import now_ts
 from app.domain.identity import AuthenticatedUser, UserRecord
 from app.modules.auth.public import (
+    AdminAuditActionItem,
+    AdminAuditActionsResponse,
     AdminResetLinkRequest,
     AuthResponse,
     ChangePasswordRequest,
@@ -33,6 +40,8 @@ from app.modules.auth.public import (
     ResetLinkOut,
     ResetPasswordRequest,
     RevokeSessionsResponse,
+    SessionItem,
+    SessionsResponse,
     UpdateMustChangePasswordRequest,
     UpdateUserRoleRequest,
     UpdateUserStatusRequest,
@@ -58,6 +67,8 @@ def register(req: RegisterRequest, request: Request, response: Response) -> Auth
             req.password,
             req.invite_code,
             _client_ip(request),
+            request.headers.get("user-agent", ""),
+            setup_token=req.setup_token,
         )
     except auth_service.AuthServiceError as error:
         raise _http_error(error) from error
@@ -115,6 +126,34 @@ def me(user: AuthenticatedUser = Depends(get_current_user)) -> UserOut:
     return _user_out(user)
 
 
+@router.get("/sessions", response_model=SessionsResponse)
+def list_sessions(
+    request: Request,
+    user: UserRecord = Depends(get_current_user),
+) -> SessionsResponse:
+    """列出当前账号的有效登录会话（设备/IP/时间），供用户自助踢出可疑设备。"""
+    token, _uses_cookie = request_auth_token(request, None)
+    items = auth_service.list_sessions(user, token)
+    return SessionsResponse(items=[SessionItem(**item) for item in items])
+
+
+@router.delete("/sessions/{session_id}", response_model=OkResponse)
+def revoke_session(
+    session_id: str,
+    request: Request,
+    user: UserRecord = Depends(get_current_user),
+) -> OkResponse:
+    """撤销当前账号的指定会话（句柄取自 `GET /auth/sessions`）。"""
+    token, _uses_cookie = request_auth_token(request, None)
+    if not auth_service.revoke_own_session(user, session_id, token):
+        raise ApiError(
+            status_code=404,
+            code="auth.session_not_found",
+            message="会话不存在或已失效",
+        )
+    return OkResponse()
+
+
 @router.post("/change-password", response_model=ChangePasswordResponse)
 def change_password(
     req: ChangePasswordRequest,
@@ -140,7 +179,11 @@ def change_password(
 @router.get("/needs-setup", response_model=NeedsSetupResponse)
 def needs_setup() -> NeedsSetupResponse:
     """Whether the instance has no users yet (first registration becomes admin)."""
-    return NeedsSetupResponse(needs_setup=auth_service.needs_setup())
+    needs = auth_service.needs_setup()
+    return NeedsSetupResponse(
+        needs_setup=needs,
+        requires_setup_token=needs and auth_service.requires_setup_token(),
+    )
 
 
 def _invite_out(inv: dict) -> InviteOut:
@@ -293,6 +336,53 @@ def update_user_must_change_password(
     except auth_service.AuthServiceError as error:
         raise _http_error(error) from error
     return _user_out(user)
+
+
+@router.get("/admin/audit-actions", response_model=AdminAuditActionsResponse)
+def get_admin_audit_actions(
+    limit: int = 50,
+    offset: int = 0,
+    action: str | None = None,
+    actor_username: str | None = None,
+    admin: AuthenticatedUser = Depends(require_admin),
+) -> AdminAuditActionsResponse:
+    """Admin: 管理员敏感操作审计（改角色/禁用/删除/邀请码/全局配置）。"""
+    from app.infrastructure.persistence import admin_audit_store
+
+    items, total = admin_audit_store.list_admin_actions(
+        limit=min(limit, 200),
+        offset=offset,
+        action=action,
+        actor_username=actor_username,
+    )
+    return AdminAuditActionsResponse(
+        items=[AdminAuditActionItem(**item) for item in items],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/audit-logs/me", response_model=LoginAuditLogsResponse)
+def get_my_login_audit_logs(
+    limit: int = 50,
+    offset: int = 0,
+    status: str | None = None,
+    user: AuthenticatedUser = Depends(require_active_user),
+) -> LoginAuditLogsResponse:
+    """当前用户自助查询自己的登录记录（只返回 user_id 匹配的记录）。"""
+    logs, total = auth_service.get_login_audit_logs(
+        limit=min(limit, 200),
+        offset=offset,
+        status=status,
+        user_id=user["id"],
+    )
+    return LoginAuditLogsResponse(
+        items=[LoginAuditLogItem(**log) for log in logs],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/admin/audit-logs", response_model=LoginAuditLogsResponse)

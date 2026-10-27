@@ -6,7 +6,6 @@ import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from io import BytesIO
 from typing import Any
 from urllib.parse import urlencode, urlsplit
@@ -14,6 +13,7 @@ from urllib.parse import urlencode, urlsplit
 import pandas as pd
 import urllib3
 
+from app.domain.timezones import market_now
 from app.infrastructure.http.client import provider_get, provider_post
 from app.infrastructure.providers import exchange_etf
 
@@ -419,7 +419,7 @@ class OfficialExchangeProvider:
                 "SHOWTYPE": "xlsx",
                 "CATALOGID": "1110",
                 "TABKEY": "tab1",
-                "random": f"{datetime.now().timestamp():.6f}",
+                "random": f"{market_now().timestamp():.6f}",
             },
             headers={
                 "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*;q=0.8",
@@ -443,7 +443,7 @@ class OfficialExchangeProvider:
                     "TABKEY": "tab1",
                     "PAGENO": str(page_no),
                     "PAGESIZE": "500",
-                    "random": f"{datetime.now().timestamp():.6f}",
+                    "random": f"{market_now().timestamp():.6f}",
                 },
                 headers={
                     "Accept": "application/json, text/javascript, */*; q=0.01",

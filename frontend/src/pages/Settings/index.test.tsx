@@ -17,10 +17,15 @@ vi.mock("../../api/queries", () => ({
     mutate: mocks.testOutboundProxy,
     isPending: false,
   }),
+  // 「账号与安全」两张卡片（安全审计 / 登录设备）在别的用例里单独覆盖
+  useAdminAuditActions: () => ({ data: { items: [], total: 0 }, isLoading: false, error: null, refetch: vi.fn() }),
+  useSessions: () => ({ data: { items: [] }, isLoading: false, error: null, refetch: vi.fn() }),
+  useMyLoginAuditLogs: () => ({ data: { items: [], total: 0 }, isLoading: false, error: null, refetch: vi.fn() }),
+  useRevokeSession: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("./ConfigCards", async () => {
-  const { normalizeProxyUrl, validateProxyUrl } = await import("./config-cards/EastmoneyProxyConfigCard");
+  const { normalizeProxyUrl, validateProxyUrl } = await import("./config-cards/EastmoneyProxyConfigCard.utils");
   return {
     normalizeProxyUrl,
     validateProxyUrl,
@@ -247,15 +252,23 @@ let config: ConfigData = {
   http_trust_env: false,
   analysis_llm_timeout_seconds: 1200,
   agent_research_timeout_seconds: 1200,
-  industry_chain_research_timeout_seconds: 1800,
-  industry_chain_repair_research_timeout_seconds: 900,
-  industry_chain_repair_synthesis_timeout_seconds: 600,
-  industry_chain_max_rounds: 6,
-  industry_chain_repair_max_rounds: 3,
-  industry_chain_tool_calls_total: 96,
-  industry_chain_repair_tool_calls_total: 48,
+  industry_chain_research_timeout_seconds: 2400,
+  industry_chain_repair_research_timeout_seconds: 1200,
+  industry_chain_repair_synthesis_timeout_seconds: 900,
+  industry_chain_max_rounds: 10,
+  industry_chain_repair_max_rounds: 5,
+  industry_chain_tool_calls_total: 160,
+  industry_chain_repair_tool_calls_total: 80,
   chat_max_tool_calls_total: 32,
   llm_context_length_tokens: 0,
+  llm_timeout_seconds: 300,
+  llm_max_attempts: 2,
+  llm_generation_timeout_seconds: 1200,
+  llm_generation_max_completion_tokens: 8192,
+  llm_model_max_completion_tokens: null,
+  llm_stream_include_usage: true,
+  llm_json_mode_enabled: true,
+  llm_extra_body: {},
   eastmoney_min_interval_seconds: 0,
   eastmoney_datacenter_min_interval_seconds: 0,
   eastmoney_datacenter_cooldown_seconds: 10,
@@ -267,6 +280,7 @@ let config: ConfigData = {
   outbound_proxy_url: "",
   outbound_proxy_timeout_seconds: 20,
   outbound_proxy_retries: 2,
+  outbound_proxy_scopes: ["eastmoney"],
   market_daily_bar_refresh_enabled: true,
   market_daily_bar_refresh_poll_seconds: 60,
   market_daily_bar_refresh_retry_base_seconds: 60,
@@ -300,6 +314,7 @@ let config: ConfigData = {
   bot_batch_max_stocks: 12,
   bot_admin_users: [" ou_admin ", "", "ou_ops"],
   is_admin: true,
+  inherited_keys: [],
 };
 
 describe("SettingsPage Bot config", () => {
@@ -625,12 +640,15 @@ describe("SettingsPage Bot config", () => {
 
     expect(mocks.mutateConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        llm_model: "model",
         llm_sub_model: "fast-model",
         llm_simple_tasks: "macro_item,chat_routing",
       }),
       expect.anything(),
     );
+    // 未改动的端点字段不会被提交：否则仅改子模型也会把生效值钉成个人覆盖
+    const [patch] = mocks.mutateConfig.mock.calls.at(-1) as [ConfigUpdate];
+    expect(patch).not.toHaveProperty("llm_model");
+    expect(patch).not.toHaveProperty("llm_base_url");
     queryClient.clear();
   });
 

@@ -133,7 +133,7 @@ async def execute_research_stage(
     )
     await ctx.check_cancellation()
 
-    ctx.atlas_chain = _matching_atlas_chain(ctx.name)
+    ctx.atlas_chain = _matching_atlas_chain(ctx.name, user_id=ctx.user_id)
     ctx.atlas_prior = _render_atlas_prior(ctx.atlas_chain)
     ctx.expected_segments = _atlas_expected_segments(ctx.atlas_chain)
     ctx.research_started_at = time.perf_counter()
@@ -573,8 +573,8 @@ async def execute_archive_stage(
             await ctx.before_persist()
         if result.quality_status == "complete":
             start_background_task_fn(
-                auto_mine_from_result(result),
-                f"industry_atlas_auto_mining:{result.name}",
+                auto_mine_from_result(result, user_id=ctx.user_id),
+                f"industry_atlas_auto_mining:{result.name}:{ctx.user_id}",
             )
         cache.set(
             cache_key,

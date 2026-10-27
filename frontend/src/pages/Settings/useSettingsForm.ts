@@ -24,6 +24,7 @@ import {
   isMaskedValue,
   type CardKey,
 } from "./cardSpecs";
+import { PROVIDER_MODEL_PAIRS } from "./llmModelPairs";
 
 export type ConfigSave = (
   patch: ConfigUpdate,
@@ -32,8 +33,13 @@ export type ConfigSave = (
 ) => void;
 
 export interface SettingsCards {
-  /** 保存单张卡片（内部按卡片分派校验/归一化逻辑）。 */
-  save: (key: CardKey) => void;
+  /**
+   * 保存单张卡片（内部按卡片分派校验/归一化逻辑）。
+   *
+   * `overrides` 用于卡片自身的"一键切换"动作：需要发送 `buildCardPatch` 不会生成的字段
+   * （例如清空密钥字段的空串），与卡片补丁合并后提交。
+   */
+  save: (key: CardKey, overrides?: ConfigUpdate) => void;
   /** 撤销单张卡片的未保存修改。 */
   reset: (key: CardKey) => void;
   /** 各卡片是否有未保存修改。 */
@@ -104,10 +110,19 @@ export function useSettingsForm(
     if (!cfg) return {};
     // 表单字段与生效配置一一对应（由 ConfigData 派生），无需逐字段手写。
     const values = Object.fromEntries(
-      Object.entries(cfg).filter(([key]) => key !== "provider_defaults" && key !== "is_admin"),
+      Object.entries(cfg).filter(
+        ([key]) => !["provider_defaults", "is_admin", "inherited_keys"].includes(key),
+      ),
     ) as ConfigUpdate;
     // AnySearch 采用“粘贴新 Key 即替换”的交互，初始化不回填掩码值。
-    return { ...values, anysearch_api_key: "" };
+    // 继承管理员 Key 的私密字段（如 llm_api_key）不回填掩码值，
+    // 保持输入框留空以展示「留空即沿用管理员配置」placeholder 并符合「留空=继承」交互。
+    const inheritedApiKey = cfg.inherited_keys?.includes("llm_api_key");
+    return {
+      ...values,
+      anysearch_api_key: "",
+      ...(inheritedApiKey ? { llm_api_key: "" } : {}),
+    };
   }, []);
 
   useEffect(() => {
@@ -132,6 +147,8 @@ export function useSettingsForm(
     (newProvider: string) => {
       const defaults = config?.provider_defaults?.[newProvider] as ProviderDefault | undefined;
       const oldDefaults = config?.provider_defaults?.[previousProvider] as ProviderDefault | undefined;
+      const pair = PROVIDER_MODEL_PAIRS[newProvider];
+      const oldPair = PROVIDER_MODEL_PAIRS[previousProvider];
       const patch: ConfigUpdate = { llm_provider: newProvider };
 
       if (defaults) {
@@ -140,15 +157,18 @@ export function useSettingsForm(
         if (!form.llm_base_url || form.llm_base_url === oldDefaults?.base_url) {
           patch.llm_base_url = defaults.base_url;
         }
-        if (!form.llm_model || form.llm_model === oldDefaults?.model) {
-          patch.llm_model = defaults.model;
+        if (!form.llm_model || form.llm_model === oldDefaults?.model || form.llm_model === oldPair?.main) {
+          patch.llm_model = pair?.main || defaults.model;
+        }
+        if (!form.llm_sub_model || form.llm_sub_model === oldPair?.sub) {
+          patch.llm_sub_model = pair?.sub || "";
         }
       }
 
       updateForm(patch);
       setPreviousProvider(newProvider);
     },
-    [config, form.llm_base_url, form.llm_model, previousProvider, updateForm],
+    [config, form.llm_base_url, form.llm_model, form.llm_sub_model, previousProvider, updateForm],
   );
 
   // 卡片级脏标记：由声明式 spec 派生，仅数组字段需要归一化后比较。
@@ -209,18 +229,78 @@ export function useSettingsForm(
   }, [cardDirty]);
 
   const cards = useMemo<SettingsCards>(() => {
-    const save = (key: CardKey) => {
+    const save = (key: CardKey, overrides?: ConfigUpdate) => {
       switch (key) {
         case "llm": {
-          const providerName = form.llm_provider || "openai";
+          // 传 config：继承字段（端点/凭据）未改动则不提交，避免静默钉住管理员配置
+          const patch = { ...buildCardPatch(form, CARD_SPECS.llm, config), ...overrides };
+          // 一键回退到管理员配置时端点为继承值，Key 由管理员提供，不该被本地校验拦住
+          const revertingToAdminConfig =
+            overrides?.llm_provider === "" && overrides?.llm_base_url === "";
+          const providerName = (patch.llm_provider || form.llm_provider || "openai") as string;
           const selectedDefaults = config?.provider_defaults?.[providerName] as
             | ProviderDefault
             | undefined;
-          if (selectedDefaults?.api_key_required && !form.llm_api_key?.trim()) {
-            message.error(`${selectedDefaults.label || providerName} 需要填写 API Key`);
-            return;
+
+          // 是否正在沿用管理员端点
+          const isInheritingEndpoint =
+            revertingToAdminConfig
+            || (!patch.llm_provider
+              && !patch.llm_base_url
+              && Boolean(config?.inherited_keys?.includes("llm_provider"))
+              && Boolean(config?.inherited_keys?.includes("llm_base_url")));
+
+          // 是否沿用管理员的 Key
+          const isInheritingKey =
+            isInheritingEndpoint && Boolean(config?.inherited_keys?.includes("llm_api_key"));
+
+          // 用户在本次保存中是否有提供新 Key、新 URL
+          const hasNewKey = Boolean(typeof patch.llm_api_key === "string" && patch.llm_api_key.trim());
+          const hasNewUrl = Boolean(typeof patch.llm_base_url === "string" && patch.llm_base_url.trim());
+          const requiresKey = selectedDefaults?.api_key_required !== false;
+
+          // 简化规则（普通用户）：
+          // 1. 如果用户要修改 URL 或 Key，必须同时都改（不能只设置 Key 不改 URL；也不能只改 URL 不设 Key）
+          // 2. 不改 URL 和 Key 的情况下，可以自由修改温度系数（llm_temperature）和模型（llm_model）
+          if (!revertingToAdminConfig && !config?.is_admin) {
+            // 不能只设置 Key 而不修改 Base URL
+            if (hasNewKey && !hasNewUrl) {
+              const currentHasPersonalUrl =
+                !config?.inherited_keys?.includes("llm_base_url") && Boolean(form.llm_base_url);
+              if (!currentHasPersonalUrl) {
+                message.error("不能只设置 API Key，自定义端点需同时配置 Base URL 与 API Key");
+                return;
+              }
+            }
+
+            // 不能只修改 Base URL 而不设置 API Key（针对需要 Key 的服务）
+            if (hasNewUrl && !hasNewKey && requiresKey) {
+              const currentHasPersonalKey =
+                !config?.inherited_keys?.includes("llm_api_key") && Boolean(form.llm_api_key);
+              if (!currentHasPersonalKey) {
+                message.error("不能只修改 Base URL，自定义端点需同时配置 Base URL 与 API Key");
+                return;
+              }
+            }
+
+            // 切换了需 Key 的服务商但未填 Key
+            if (patch.llm_provider && !hasNewKey && requiresKey && !isInheritingKey) {
+              message.error(`${selectedDefaults?.label || providerName} 需要同时配置 Base URL 与 API Key`);
+              return;
+            }
+
+            // 用户若既无新 Key 也无新 URL，但此前未继承 Key 且无已保存 Key
+            const hasExistingKey = Boolean(
+              !config?.inherited_keys?.includes("llm_api_key")
+                && typeof form.llm_api_key === "string"
+                && form.llm_api_key.trim(),
+            );
+            if (requiresKey && !hasNewKey && !isInheritingKey && !hasExistingKey) {
+              message.error(`${selectedDefaults?.label || providerName} 需要填写 API Key`);
+              return;
+            }
           }
-          saveConfig(buildCardPatch(form, CARD_SPECS.llm), CARD_SPECS.llm.saveMessage);
+          saveConfig(patch, CARD_SPECS.llm.saveMessage);
           return;
         }
         case "twitter": {
@@ -307,6 +387,7 @@ export function useSettingsForm(
                   outbound_proxy_url: updatedConfig.outbound_proxy_url ?? "",
                   outbound_proxy_timeout_seconds: updatedConfig.outbound_proxy_timeout_seconds,
                   outbound_proxy_retries: updatedConfig.outbound_proxy_retries,
+                  outbound_proxy_scopes: updatedConfig.outbound_proxy_scopes,
                 });
               }
             },

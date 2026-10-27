@@ -506,3 +506,22 @@ def test_successful_proxy_request_resets_proxy_failure_counter(monkeypatch: pyte
     monkeypatch.setattr(provider.em_session, "get", lambda url, **kwargs: _FakeResponse())
     provider.em_get_response(FUND_FLOW_URL, timeout=15)
     assert provider._em_proxy_failures == 0
+
+
+def test_outbound_proxy_scopes_selection() -> None:
+    settings = _FakeSettings(proxy_type=PROXY_TYPE_HTTP, proxy_url="http://proxy.local:3128")
+    settings.outbound_proxy_scopes = ["eastmoney", "ths"]
+
+    # 包含在 scopes 内的东财与同花顺 URL 应解析出代理
+    ths_url = "https://basic.10jqka.com.cn/000001/company.html"
+    assert resolve_outbound_proxy(KLINE_URL, settings, EASTMONEY_SCOPE) is not None
+    assert resolve_outbound_proxy(ths_url, settings) is not None
+
+    # 未包含在 scopes 内的财联社应直连
+    cls_url = "https://api3.cls.cn/v2/dingPan/mainline"
+    assert resolve_outbound_proxy(cls_url, settings) is None
+
+    # scopes 为空时，全部直连
+    settings.outbound_proxy_scopes = []
+    assert resolve_outbound_proxy(KLINE_URL, settings, EASTMONEY_SCOPE) is None
+    assert resolve_outbound_proxy(ths_url, settings) is None

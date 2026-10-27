@@ -1,5 +1,6 @@
 """ECharts options for the industry-chain relationship graph."""
 
+import re
 from html import escape
 
 from app.modules.industry_chain.models import IndustryChainChart, IndustryChainNode, IndustryChainResult
@@ -298,7 +299,7 @@ def build_industry_charts(result: IndustryChainResult) -> list[IndustryChainChar
             }
         ],
     }
-    return [
+    charts = [
         IndustryChainChart(
             title=f"{root_name}产业链全景图谱",
             description="基于上中下游核心环节与代表公司构建的分层关系图（支持缩放、拖拽与关联高亮）",
@@ -306,6 +307,258 @@ def build_industry_charts(result: IndustryChainResult) -> list[IndustryChainChar
             option=option,
         )
     ]
+    val_chart = build_value_distribution_chart(result)
+    if val_chart is not None:
+        charts.append(val_chart)
+    matrix_chart = build_stock_valuation_matrix_chart(result)
+    if matrix_chart is not None:
+        charts.append(matrix_chart)
+    overseas_chart = build_overseas_exposure_chart(result)
+    if overseas_chart is not None:
+        charts.append(overseas_chart)
+    return charts
+
+
+def _parse_percent(value: str) -> float | None:
+    if not value:
+        return None
+    match = re.search(r"(\d+(?:\.\d+)?)\s*%", str(value))
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_float(value: str) -> float | None:
+    if not value:
+        return None
+    match = re.search(r"(\d+(?:\.\d+)?)", str(value))
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_market_cap_billions(value: str) -> float | None:
+    if not value:
+        return None
+    match = re.search(r"(\d+(?:\.\d+)?)\s*(亿|万)?", str(value))
+    if match:
+        val = float(match.group(1))
+        unit = match.group(2)
+        if unit == "万":
+            return val / 10000.0
+        return val
+    return None
+
+
+def build_value_distribution_chart(result: IndustryChainResult) -> IndustryChainChart | None:
+    """基于 BOM 成本占比与毛利率区间构建价值链与利润池拆解双轴图。"""
+    if not getattr(result, "value_distribution", None):
+        return None
+
+    segments: list[str] = []
+    cost_shares: list[float] = []
+    gross_margins: list[float] = []
+    pricing_powers: list[str] = []
+
+    for item in result.value_distribution:
+        seg = item.segment or "未命名环节"
+        cost_val = _parse_percent(item.cost_share)
+        gm_val = _parse_percent(item.gross_margin_range)
+        if cost_val is None and gm_val is None:
+            continue
+        segments.append(seg)
+        cost_shares.append(cost_val if cost_val is not None else 0.0)
+        gross_margins.append(gm_val if gm_val is not None else 0.0)
+        pricing_powers.append(item.pricing_power)
+
+    if not segments:
+        return None
+
+    power_color_map = {
+        "high": "#16a34a",
+        "medium": "#0284c7",
+        "low": "#d97706",
+        "unverified": "#64748b",
+    }
+    bar_data = [
+        {
+            "name": seg,
+            "value": cost,
+            "itemStyle": {"color": power_color_map.get(power, "#0284c7")},
+        }
+        for seg, cost, power in zip(segments, cost_shares, pricing_powers)
+    ]
+
+    option = {
+        "backgroundColor": "transparent",
+        "tooltip": {
+            "trigger": "axis",
+            "axisPointer": {"type": "shadow"},
+            "confine": True,
+        },
+        "legend": {
+            "data": ["BOM 成本占比 (%)", "毛利率中枢 (%)"],
+            "top": "3%",
+            "textStyle": {"color": "#334155"},
+        },
+        "grid": {
+            "left": "5%",
+            "right": "5%",
+            "top": "16%",
+            "bottom": "14%",
+            "containLabel": True,
+        },
+        "xAxis": {
+            "type": "category",
+            "data": segments,
+            "axisLabel": {"interval": 0, "rotate": 25 if len(segments) > 4 else 0, "fontSize": 12},
+        },
+        "yAxis": [
+            {
+                "type": "value",
+                "name": "BOM 成本占比 (%)",
+                "min": 0,
+                "axisLabel": {"formatter": "{value}%"},
+            },
+            {
+                "type": "value",
+                "name": "毛利率 (%)",
+                "min": 0,
+                "axisLabel": {"formatter": "{value}%"},
+            },
+        ],
+        "series": [
+            {
+                "name": "BOM 成本占比 (%)",
+                "type": "bar",
+                "data": bar_data,
+                "barMaxWidth": 36,
+                "label": {"show": True, "position": "top", "formatter": "{c}%"},
+            },
+            {
+                "name": "毛利率中枢 (%)",
+                "type": "line",
+                "yAxisIndex": 1,
+                "data": gross_margins,
+                "itemStyle": {"color": "#dc2626"},
+                "lineStyle": {"width": 2.5},
+                "symbol": "circle",
+                "symbolSize": 7,
+                "label": {"show": True, "position": "top", "formatter": "{c}%"},
+            },
+        ],
+    }
+
+    return IndustryChainChart(
+        title=f"{result.name or '产业链'}价值链 BOM 成本与毛利分布",
+        description="拆解各核心环节/零部件的单机价值量（BOM）占比与毛利率中枢，柱形颜色按环节议价定价权区分",
+        type="bar",
+        option=option,
+    )
+
+
+def build_stock_valuation_matrix_chart(result: IndustryChainResult) -> IndustryChainChart | None:
+    """基于重点标的动态 PE、ROE 资本回报与总市值构建投资四象限矩阵图。"""
+    if not getattr(result, "key_stocks", None):
+        return None
+
+    valid_stocks: list[dict] = []
+    for s in result.key_stocks:
+        pe_val = _parse_float(s.pe)
+        roe_val = _parse_percent(s.roe)
+        cap_val = _parse_market_cap_billions(s.total_market_cap)
+        if pe_val is not None and roe_val is not None and pe_val > 0:
+            valid_stocks.append({
+                "name": s.name or s.company or s.code or "重点标的",
+                "code": s.code or "",
+                "pe": pe_val,
+                "roe": roe_val,
+                "market_cap": cap_val if cap_val is not None else 50.0,
+                "cap_str": s.total_market_cap or "--",
+            })
+
+    if len(valid_stocks) < 2:
+        return None
+
+    cap_list = [item["market_cap"] for item in valid_stocks]
+    max_cap = max(cap_list) if cap_list else 100.0
+
+    series_data = []
+    for item in valid_stocks:
+        size = int(max(14, min(48, 14 + (item["market_cap"] / max(max_cap, 1.0)) * 34)))
+        name_str = f"{item['name']}" + (f" ({item['code']})" if item['code'] else "")
+        series_data.append({
+            "name": name_str,
+            "value": [item["pe"], item["roe"], item["market_cap"], item["cap_str"]],
+            "symbolSize": size,
+            "itemStyle": {"color": "#0284c7", "opacity": 0.85, "borderColor": "#0369a1", "borderWidth": 1.5},
+        })
+
+    pe_list = [item["pe"] for item in valid_stocks]
+    roe_list = [item["roe"] for item in valid_stocks]
+    median_pe = sorted(pe_list)[len(pe_list) // 2]
+    median_roe = sorted(roe_list)[len(roe_list) // 2]
+
+    option = {
+        "backgroundColor": "transparent",
+        "tooltip": {
+            "trigger": "item",
+            "confine": True,
+            "formatter": "function(p) { var d = p.value; return '<b>' + p.name + '</b><br/>PE(动): ' + d[0] + 'x<br/>ROE: ' + d[1] + '%<br/>总市值: ' + d[3]; }",
+        },
+        "grid": {
+            "left": "6%",
+            "right": "6%",
+            "top": "14%",
+            "bottom": "12%",
+            "containLabel": True,
+        },
+        "xAxis": {
+            "name": "动态 PE (倍)",
+            "type": "value",
+            "splitLine": {"lineStyle": {"type": "dashed", "color": "#e2e8f0"}},
+        },
+        "yAxis": {
+            "name": "ROE 净资产收益率 (%)",
+            "type": "value",
+            "splitLine": {"lineStyle": {"type": "dashed", "color": "#e2e8f0"}},
+        },
+        "series": [
+            {
+                "type": "scatter",
+                "data": series_data,
+                "label": {
+                    "show": True,
+                    "formatter": "{b}",
+                    "position": "top",
+                    "fontSize": 11,
+                    "fontWeight": 600,
+                    "color": "#0f172a",
+                },
+                "markLine": {
+                    "silent": True,
+                    "lineStyle": {"color": "#94a3b8", "type": "dotted", "width": 1.5},
+                    "data": [
+                        {"xAxis": median_pe, "label": {"formatter": f"PE中枢: {median_pe:.1f}x", "position": "end"}},
+                        {"yAxis": median_roe, "label": {"formatter": f"ROE中枢: {median_roe:.1f}%", "position": "end"}},
+                    ],
+                },
+            }
+        ],
+    }
+
+    return IndustryChainChart(
+        title=f"{result.name or '产业链'}核心标的估值与资本回报象限图",
+        description="横轴为动态市盈率（PE），纵轴为净资产收益率（ROE），气泡大小对应总市值，虚线划分为行业中枢四象限",
+        type="scatter",
+        option=option,
+    )
 
 
 def build_relationship_chart(result: IndustryChainResult) -> IndustryChainChart | None:
@@ -346,4 +599,105 @@ def build_relationship_chart(result: IndustryChainResult) -> IndustryChainChart 
                 }
             ],
         },
+    )
+
+
+def build_overseas_exposure_chart(result: IndustryChainResult) -> IndustryChainChart | None:
+    """基于重点标的出海与海外营收占比构建全球化与出口敞口对比横向柱状图。"""
+    if not getattr(result, "key_stocks", None):
+        return None
+
+    valid_items: list[dict] = []
+    for s in result.key_stocks:
+        overseas_str = getattr(s, "overseas_share", "") or ""
+        pct = _parse_percent(overseas_str)
+        if pct is not None and pct > 0:
+            name = (s.name or s.company or s.code or "重点标的").strip()
+            code_str = f" ({s.code})" if s.code else ""
+            valid_items.append({
+                "label": f"{name}{code_str}",
+                "name": name,
+                "code": s.code or "",
+                "pct": pct,
+                "desc": overseas_str,
+                "gross_margin": getattr(s, "gross_margin", "") or "--",
+            })
+
+    if len(valid_items) < 2:
+        return None
+
+    valid_items.sort(key=lambda x: x["pct"])
+    y_labels = [item["label"] for item in valid_items]
+    bar_data = []
+    for item in valid_items:
+        pct = item["pct"]
+        color = "#0284c7" if pct >= 70.0 else "#38bdf8" if pct >= 30.0 else "#94a3b8"
+        bar_data.append({
+            "name": item["label"],
+            "value": pct,
+            "raw_desc": item["desc"],
+            "gross_margin": item["gross_margin"],
+            "itemStyle": {
+                "color": color,
+                "borderRadius": [0, 4, 4, 0],
+            },
+        })
+
+    option = {
+        "backgroundColor": "transparent",
+        "tooltip": {
+            "trigger": "axis",
+            "axisPointer": {"type": "shadow"},
+            "confine": True,
+            "formatter": "function(params) { var p = params[0]; var d = p.data; return '<b>' + p.name + '</b><br/>海外营收占比: <b>' + p.value + '%</b><br/>出海详情: ' + (d.raw_desc || '--') + '<br/>公司综合毛利率: ' + d.gross_margin; }",
+        },
+        "grid": {
+            "left": "4%",
+            "right": "8%",
+            "top": "8%",
+            "bottom": "8%",
+            "containLabel": True,
+        },
+        "xAxis": {
+            "type": "value",
+            "name": "海外营收占比 (%)",
+            "min": 0,
+            "max": 100,
+            "splitLine": {"lineStyle": {"type": "dashed", "color": "#e2e8f0"}},
+            "axisLabel": {"formatter": "{value}%"},
+        },
+        "yAxis": {
+            "type": "category",
+            "data": y_labels,
+            "axisLabel": {"interval": 0, "fontSize": 12, "color": "#1e293b"},
+        },
+        "series": [
+            {
+                "name": "海外营收占比 (%)",
+                "type": "bar",
+                "data": bar_data,
+                "barMaxWidth": 28,
+                "label": {
+                    "show": True,
+                    "position": "right",
+                    "formatter": "{c}%",
+                    "fontWeight": 600,
+                    "color": "#0369a1",
+                },
+                "markLine": {
+                    "silent": True,
+                    "lineStyle": {"color": "#cbd5e1", "type": "dotted"},
+                    "data": [
+                        {"xAxis": 50, "label": {"formatter": "出海主导 (50%)", "position": "end"}},
+                    ],
+                },
+            }
+        ],
+    }
+
+    return IndustryChainChart(
+        title=f"{result.name or '产业链'}重点标的海外营收占比与出海敞口对比",
+        description="统计各核心标的海外或出口业务营收占比（%）及出海毛利率，直观对比出海全球化渗透度与外贸关税敏感度",
+        type="bar",
+        option=option,
     )

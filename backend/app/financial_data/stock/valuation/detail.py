@@ -115,7 +115,7 @@ async def _fetch_institution_forecasts(code: str) -> list[InstitutionForecast]:
                     )
                 )
     except Exception:
-        logger.info(f"同花顺机构预测获取失败: {code}")
+        logger.info('同花顺机构预测获取失败: %s', code)
     return forecasts
 
 

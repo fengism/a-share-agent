@@ -57,6 +57,7 @@ import type {
   StockProfileListFilters,
 } from "../../api/stockProfile";
 import SectionDataState from "../../components/SectionDataState";
+import { formatMarketDateTime } from "../../utils/marketTime";
 import { useImportFile } from "./useImportFile";
 import "./stock-profile.css";
 
@@ -325,7 +326,7 @@ export default function StockProfileTab() {
       const res = await syncMasterMutation.mutateAsync();
       const summary = `新增 ${res.added} 条，更新 ${res.updated} 条，无变化 ${res.unchanged} 条，跳过 ${res.skipped} 条`;
       const timestamps = Object.entries(res.fetched_at).map(([exchange, timestamp]) =>
-        `${exchange}: ${new Date(timestamp * 1000).toLocaleString()}`,
+        `${exchange}: ${formatMarketDateTime(timestamp)}`,
       ).join("；");
       if (!res.complete) {
         Modal.warning({

@@ -239,7 +239,7 @@ def calculate_all(items: list[KlineItem]) -> dict:
     volume_ma10 = calculate_ma(volumes, 10)
 
     latest_idx = len(items) - 1
-    logger.info(f"技术指标计算完成: 数据点={len(items)}, MA5={ma5[latest_idx]}, RSI={rsi[latest_idx]}, MACD_DIF={dif[latest_idx]}")
+    logger.info('技术指标计算完成: 数据点=%s, MA5=%s, RSI=%s, MACD_DIF=%s', len(items), ma5[latest_idx], rsi[latest_idx], dif[latest_idx])
 
     return {
         "ma": {

@@ -5,7 +5,6 @@ import logging
 import math
 import time
 from dataclasses import dataclass
-from datetime import datetime
 from typing import cast
 
 from app.configuration import get_settings
@@ -19,6 +18,7 @@ from app.core.concurrency.rate_limiter import (
 from app.core.exceptions import UpstreamEmptyResponseError, UpstreamUnavailableError
 from app.core.market import normalize_code, safe_float
 from app.core.metrics import metrics
+from app.domain.timezones import market_now
 from app.financial_data.stock.quotes.realtime_cache import (
     QuoteCacheEntry,
     build_quote_batch,
@@ -176,7 +176,7 @@ def _quote_cache_ttls() -> tuple[int, int]:
     return fresh, stale
 
 def _cached_quote_set(codes: list[str], *, now: float) -> RealtimeQuoteSet:
-    fallback_time = datetime.now().isoformat(timespec="seconds")
+    fallback_time = market_now().isoformat(timespec="seconds")
     fresh_ttl, stale_ttl = _quote_cache_ttls()
     batch = build_quote_batch(
         _quote_cache,
@@ -218,7 +218,7 @@ async def fetch_realtime_quote_set(codes: list[str]) -> RealtimeQuoteSet:
                 now=now,
                 fresh_ttl=fresh_ttl,
                 stale_ttl=stale_ttl,
-                fallback_quoted_at=datetime.now().isoformat(timespec="seconds"),
+                fallback_quoted_at=market_now().isoformat(timespec="seconds"),
             ),
             now=now,
             fresh_ttl=fresh_ttl,
@@ -234,7 +234,7 @@ async def fetch_realtime_quote_set(codes: list[str]) -> RealtimeQuoteSet:
             raise
 
         cached_at = time.monotonic()
-        fallback_time = datetime.now().isoformat(timespec="seconds")
+        fallback_time = market_now().isoformat(timespec="seconds")
         store_fetched_quotes(
             _quote_cache,
             fetched.quotes,

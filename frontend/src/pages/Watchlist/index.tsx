@@ -54,6 +54,7 @@ import type {
   WatchlistItem,
 } from "../../types/watchlist";
 import { buildWatchlistStockUrl } from "../../utils/stockLinks";
+import { formatMarketDate, formatMarketMonthDayClock, marketDateStamp } from "../../utils/marketTime";
 import "./watchlist.css";
 
 const { Paragraph, Text, Title } = Typography;
@@ -117,16 +118,7 @@ function sourceLabel(value: string | undefined): string {
 }
 
 function formatQuotedTime(value: string | undefined): string {
-  if (!value) return "尚未更新";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "尚未更新";
-  return parsed.toLocaleString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  return formatMarketMonthDayClock(value, "尚未更新");
 }
 
 function formatPrice(value: number | null): string {
@@ -196,7 +188,7 @@ function downloadWatchlistCsv(items: WatchlistItem[]) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
-  link.setAttribute("download", `我的自选股_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute("download", `我的自选股_${marketDateStamp()}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -204,9 +196,7 @@ function downloadWatchlistCsv(items: WatchlistItem[]) {
 }
 
 function formatDate(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value || "-";
-  return parsed.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+  return formatMarketDate(value, value || "-");
 }
 
 function marketDirection(value: number | null): MarketDirection {

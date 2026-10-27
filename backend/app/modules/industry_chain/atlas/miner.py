@@ -9,18 +9,20 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from app.configuration import get_settings
-from app.core.market import is_a_share_code
+from app.core.market import is_a_share_code, is_hk_code
+from app.domain.timezones import market_now
 from app.financial_data.stock.profile.name_map import get_stock_name_map
 from app.modules.industry_chain.atlas.contracts import AtlasChain
 from app.modules.industry_chain.atlas.loader import (
     _import_dir,
     _registry,
+    _user_atlas_dir,
     _write_chain_file,
 )
 from app.modules.industry_chain.models import IndustryChainResult
@@ -38,54 +40,118 @@ def mining_slug(name: str) -> str:
     return f"auto-{digest}"
 
 
-def _build_name_to_code(code_to_name: dict[str, str]) -> dict[str, str]:
+_COMPANY_CLEAN_RE = re.compile(
+    r"(?:股份有限公司|有限责任公司|有限公司|（集团）有限公司|集团有限公司|集团股份公司|股份公司|集团|科技)+$"
+)
+
+
+def _normalize_name(name: str) -> str:
+    cleaned = re.sub(r"[\(\)（）\s]", "", name)
+    return _COMPANY_CLEAN_RE.sub("", cleaned).strip()
+
+
+def _build_name_to_code(code_to_name: dict[str, str]) -> tuple[dict[str, str], dict[str, str]]:
     name_to_code: dict[str, str] = {}
+    clean_name_to_code: dict[str, str] = {}
     for code, name in code_to_name.items():
         name_to_code.setdefault(name, code)
-    return name_to_code
+        norm = _normalize_name(name)
+        if norm and len(norm) >= 2:
+            clean_name_to_code.setdefault(norm, code)
+    return name_to_code, clean_name_to_code
+
+
+def _match_code(name: str, name_to_code: dict[str, str], clean_name_to_code: dict[str, str]) -> str:
+    if name in name_to_code:
+        return name_to_code[name]
+    norm = _normalize_name(name)
+    if norm in clean_name_to_code:
+        return clean_name_to_code[norm]
+    return ""
+
+
+def _is_supported_market_code(code: str) -> bool:
+    return is_a_share_code(code) or is_hk_code(code)
 
 
 def _resolve_companies(
     result_node,
     name_to_code: dict[str, str],
+    clean_name_to_code: dict[str, str],
     code_to_name: dict[str, str],
+    key_stocks_notes: dict[str, str] | None = None,
 ) -> list[dict]:
-    """解析节点代表公司；代码与公司名必须能对上名称表，防止幻觉配对污染知识库。"""
+    """解析节点代表公司；支持A股与港股标的，并兼容简称归一化匹配。"""
     companies: dict[str, dict] = {}
+    key_notes = key_stocks_notes or {}
     code = str(result_node.code or "").strip()
     company = (result_node.company or "").strip()
-    if company and is_a_share_code(code):
-        if name_to_code.get(company) == code:
+    if company and _is_supported_market_code(code):
+        matched_code = _match_code(company, name_to_code, clean_name_to_code)
+        if matched_code == code or is_hk_code(code) or (not matched_code and code in code_to_name):
+            display_name = code_to_name.get(code) or company
+            custom_note = key_notes.get(code) or (result_node.role or "")
             companies[code] = {
-                "name": company,
+                "name": display_name,
                 "code": code,
-                "note": (result_node.role or "")[:40],
+                "note": custom_note[:50],
             }
-        # 代码与公司名对不上时丢弃该配对
-    elif not company and is_a_share_code(code) and code in code_to_name:
+    elif not company and _is_supported_market_code(code) and code in code_to_name:
         # 仅给出代码时，用名称表反查公司名
+        custom_note = key_notes.get(code) or (result_node.role or "")
         companies[code] = {
             "name": code_to_name[code],
             "code": code,
-            "note": (result_node.role or "")[:40],
+            "note": custom_note[:50],
         }
     for name in result_node.companies or []:
         normalized = (name or "").strip()
         if not normalized:
             continue
-        resolved = name_to_code.get(normalized)
+        resolved = _match_code(normalized, name_to_code, clean_name_to_code)
         if resolved and resolved not in companies:
-            companies[resolved] = {"name": normalized, "code": resolved, "note": ""}
+            display_name = code_to_name.get(resolved) or normalized
+            custom_note = key_notes.get(resolved) or ""
+            companies[resolved] = {"name": display_name, "code": resolved, "note": custom_note[:50]}
     return list(companies.values())
 
 
-async def build_mined_chain(result: IndustryChainResult) -> AtlasChain | None:
+async def build_mined_chain(
+    result: IndustryChainResult,
+    user_id: int | None = None,
+) -> AtlasChain | None:
     """把分析结果转换为 AtlasChain；可挖掘内容不足时返回 None。"""
     name = (result.name or "").strip()
     if not name:
         return None
     code_map = await get_stock_name_map()
-    name_to_code = _build_name_to_code(code_map)
+    name_to_code, clean_name_to_code = _build_name_to_code(code_map)
+
+    # 提炼重点标的的核心受益逻辑、壁垒及出海敞口，注入到图谱标的 Note
+    key_notes: dict[str, str] = {}
+    for ks in getattr(result, "key_stocks", []) or []:
+        ks_code = str(getattr(ks, "code", "") or "").strip()
+        ks_parts = []
+        core_desc = getattr(ks, "benefit_path", "") or getattr(ks, "moat", "") or getattr(ks, "role", "")
+        if core_desc:
+            ks_parts.append(core_desc)
+        if getattr(ks, "overseas_share", ""):
+            ks_parts.append(f"出海: {ks.overseas_share}")
+        if ks_code and ks_parts:
+            key_notes[ks_code] = " ｜ ".join(ks_parts)
+
+    # 建立环节到价值量与毛利率的映射
+    bom_map: dict[str, str] = {}
+    for vd in getattr(result, "value_distribution", []) or []:
+        seg_k = (getattr(vd, "segment", "") or "").strip().lower()
+        if seg_k:
+            details = []
+            if getattr(vd, "cost_share", ""):
+                details.append(f"BOM: {vd.cost_share}")
+            if getattr(vd, "gross_margin_range", ""):
+                details.append(f"毛利: {vd.gross_margin_range}")
+            if details:
+                bom_map[seg_k] = " · ".join(details)
 
     layers: list[dict] = []
     total_companies = 0
@@ -96,13 +162,19 @@ async def build_mined_chain(result: IndustryChainResult) -> AtlasChain | None:
     ):
         segments: list[dict] = []
         for node in nodes:
-            companies = _resolve_companies(node, name_to_code, code_map)
+            companies = _resolve_companies(node, name_to_code, clean_name_to_code, code_map, key_notes)
             if not companies:
                 continue
             segment_name = (node.name or node.role or node.company or "").strip()
+            desc_parts = [p for p in (node.role, node.description, node.market_share or node.metric) if p]
+            bom_info = bom_map.get(segment_name.lower())
+            if bom_info:
+                desc_parts.append(bom_info)
+            segment_desc = "；".join(desc_parts) if desc_parts else ""
             segments.append(
                 {
                     "name": segment_name or "未命名环节",
+                    "description": segment_desc[:120],
                     "companies": companies,
                 }
             )
@@ -131,53 +203,72 @@ async def build_mined_chain(result: IndustryChainResult) -> AtlasChain | None:
         raw_summary = f"由 AI 产业链分析自动挖掘的{name}产业链结构。"
     summary = raw_summary[: _SUMMARY_LIMIT - 1] + "…" if len(raw_summary) > _SUMMARY_LIMIT else raw_summary
 
+    category = "个人专属" if user_id is not None else "AI 挖掘"
+    tags = ["个人专属"] if user_id is not None else ["AI挖掘"]
+    source = "user" if user_id is not None else "mined"
+    slug = f"user-{mining_slug(name)[5:]}" if user_id is not None else mining_slug(name)
+
     return AtlasChain.model_validate(
         {
-            "slug": mining_slug(name),
+            "slug": slug,
             "name": name,
-            "category": "AI 挖掘",
+            "category": category,
             "summary": summary,
             "aliases": (result.aliases or [])[:5],
-            "tags": ["AI挖掘"],
+            "tags": tags,
             "drivers": (result.drivers or [])[:3],
             "layers": layers,
+            "source": source,
             "mined": True,
-            "mined_at": datetime.now().isoformat(timespec="seconds"),
+            "mined_at": market_now().isoformat(timespec="seconds"),
             "archive_id": result.archive_id or "",
         }
     )
 
 
-def save_mined_chain(chain: AtlasChain) -> None:
+def save_mined_chain(chain: AtlasChain, user_id: int | None = None) -> None:
     """挖掘结果直接覆盖同 slug 的历史挖掘文件并立即生效。"""
-    import_dir = _import_dir()
-    import_dir.mkdir(parents=True, exist_ok=True)
-    _write_chain_file(import_dir, chain)
+    target_dir = _user_atlas_dir(user_id) if user_id is not None else _import_dir()
+    target_dir.mkdir(parents=True, exist_ok=True)
+    _write_chain_file(target_dir, chain)
     _registry.force_refresh()
 
 
-async def mine_and_save_atlas_chain(result: IndustryChainResult) -> AtlasChain | None:
+async def mine_and_save_atlas_chain(
+    result: IndustryChainResult,
+    user_id: int | None = None,
+) -> AtlasChain | None:
     """挖掘并落盘；由自动与手动入口共用，失败只影响本次挖掘。"""
-    chain = await build_mined_chain(result)
+    chain = await build_mined_chain(result, user_id=user_id)
     if chain is None:
         return None
-    save_mined_chain(chain)
-    logger.info("产业链知识库挖掘入库: name=%s, slug=%s", chain.name, chain.slug)
-    # 返回重载后的条目，让 source 反映 mined 映射
+    save_mined_chain(chain, user_id=user_id)
+    logger.info(
+        "产业链知识库挖掘入库: name=%s, slug=%s, user_id=%s",
+        chain.name,
+        chain.slug,
+        user_id,
+    )
+    if user_id is not None:
+        return chain.model_copy(update={"source": "user"})
     state = _registry.current()
     return state.chains.get(chain.slug, chain)
 
 
-async def auto_mine_from_result(result: IndustryChainResult) -> None:
+async def auto_mine_from_result(
+    result: IndustryChainResult,
+    user_id: int | None = None,
+) -> None:
     """分析完成后的自动挖掘钩子；失败只记日志，不影响分析结果。"""
     if not get_settings().industry_atlas_auto_mining:
         return
     try:
-        await mine_and_save_atlas_chain(result)
+        await mine_and_save_atlas_chain(result, user_id=user_id)
     except Exception:
         logger.warning(
-            "产业链知识库自动挖掘失败: name=%s",
+            "产业链知识库自动挖掘失败: name=%s, user_id=%s",
             result.name,
+            user_id,
             exc_info=True,
         )
 

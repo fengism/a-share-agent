@@ -404,7 +404,7 @@ export default function IntradayChart({
       priceLineRef.current = null;
       appliedRef.current = null;
     };
-  }, [height]);
+  }, [height, paneRatio]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -508,7 +508,7 @@ export default function IntradayChart({
     });
     chart.priceScale("right", 0).applyOptions({ borderColor: c.border });
     chart.priceScale("right", VOLUME_PANE_INDEX).applyOptions({ borderColor: c.border });
-  }, [c.accent, c.border, c.cardBg, c.isLight, c.primary, c.textMuted, c.textSecondary, height]);
+  }, [c, height]);
 
   const diffAmount = activePoint && prevClose != null ? activePoint.price - prevClose : null;
   const diffPct = activePoint && prevClose != null && prevClose > 0 ? ((activePoint.price - prevClose) / prevClose) * 100 : null;

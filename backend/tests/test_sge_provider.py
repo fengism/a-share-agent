@@ -84,6 +84,11 @@ def test_non_403_error_is_not_misreported_as_rate_limit(monkeypatch: pytest.Monk
         sge_module.sge_provider.fetch("Au99.99")
 
 
+#: 计时类断言的容差：线程唤醒/上下文切换会带来几十微秒抖动，
+#: 不放容差时 0.19991s 这样的值会让 CI 随机失败。
+_TIMING_TOLERANCE = 0.02
+
+
 def test_throttle_enforces_minimum_interval() -> None:
     throttle = sge_module._MinIntervalThrottle(0.2)
 
@@ -93,8 +98,11 @@ def test_throttle_enforces_minimum_interval() -> None:
     throttle.acquire()
     elapsed = time.monotonic() - started
 
-    # 三次放行之间有两个间隔，至少 0.4s
-    assert elapsed >= 0.4
+    # 三次放行之间有两个间隔，至少 0.4s。
+    # _MinIntervalThrottle 用「放行时刻 + 间隔」计算下一次允许时间，
+    # 调用方记录的墙上时间会包含微秒级的调度抖动，这里留 20ms 容差，
+    # 避免极偶发的 0.1999s 让 CI 变红（真正的串行性由下面的并发用例保证）。
+    assert elapsed >= 0.4 - _TIMING_TOLERANCE
 
 
 def test_throttle_serializes_concurrent_callers() -> None:
@@ -113,9 +121,9 @@ def test_throttle_serializes_concurrent_callers() -> None:
 
     assert len(release_times) == 3
     ordered = sorted(release_times)
-    # 并发调用也必须串行，彼此间隔不小于最小间隔
-    assert ordered[1] - ordered[0] >= 0.2
-    assert ordered[2] - ordered[1] >= 0.2
+    # 并发调用也必须串行，彼此间隔不小于最小间隔（留调度抖动容差）
+    assert ordered[1] - ordered[0] >= 0.2 - _TIMING_TOLERANCE
+    assert ordered[2] - ordered[1] >= 0.2 - _TIMING_TOLERANCE
 
 
 def test_zero_interval_disables_throttle() -> None:

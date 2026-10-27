@@ -36,11 +36,10 @@ async def screen_stocks(filters: ScreenerFilter):
     Return:
         ScreenerResult: 符合条件的股票列表与总数。
     """
-    logger.info(f"选股筛选: PE={filters.pe_min}-{filters.pe_max}, PB={filters.pb_min}-{filters.pb_max}, "
-                f"行业={filters.industries}, page={filters.page}")
+    logger.info('选股筛选: PE=%s-%s, PB=%s-%s, 行业=%s, page=%s', filters.pe_min, filters.pe_max, filters.pb_min, filters.pb_max, filters.industries, filters.page)
 
     result = await screen_stocks_service(filters)
-    logger.info(f"筛选结果: {result.total} 只, 返回第 {filters.page} 页")
+    logger.info('筛选结果: %s 只, 返回第 %s 页', result.total, filters.page)
     return result
 
 

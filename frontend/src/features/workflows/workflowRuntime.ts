@@ -1,7 +1,10 @@
 import {
   resumeAnalysis,
+  resumeDailyReview,
   resumeIndustryChain,
+  StreamInterruptedError,
   type AnalysisProgress,
+  type DailyReviewProgress,
   type IndustryChainProgress,
   type WorkflowStream,
 } from "../../api/sse";
@@ -9,10 +12,15 @@ import { queryClient } from "../../api/queryClient";
 import { queryKeys } from "../../api/queryKeys";
 import { useAnalysisStore, type AnalysisRunIdentity } from "../../store/analysisStore";
 import { useIndustryChainWorkflowStore } from "../../store/industryChainWorkflowStore";
+import { useDailyReviewWorkflowStore } from "../../store/dailyReviewWorkflowStore";
 import type { AnalysisResult, IndustryChainResult } from "../../types/stock";
+import type { DailyReviewResult } from "../../types/dailyReview";
 import { normalizeAnalysisDate } from "../investment-research/analysisHistoryUrl";
 import { agentProcessFromEvents, applyAgentEvent, stopAgentProcess } from "../agent-process/agentProcess";
 import { INDUSTRY_CHAIN_STAGES, industryStageIndex } from "../../pages/IndustryChain/industryWorkflow";
+import { DAILY_REVIEW_STAGES } from "../../pages/DailyReview/progress";
+import { streamDailyReview } from "../../api/sse";
+import { message } from "antd";
 import type { WorkflowJob } from "../../api/queries";
 
 let resumeSequence = 0;
@@ -49,6 +57,8 @@ export function resumeAnalysisWorkflow(job: WorkflowJob) {
   const code = String(job.request.code || job.dedupe_key);
   const current = useAnalysisStore.getState();
   if (current.isAnalyzing && current.activeRun?.code === code) return;
+  // 同一任务的流已在本端结束（中断/停止等待/失败）时不自动重启，避免轮询循环恢复。
+  if (!current.isAnalyzing && current.jobId === job.id) return;
   const identity = nextIdentity(code);
   current.beginRun(identity);
   const stream = resumeAnalysis(job.id, (progress) => applyAnalysisProgress(identity, progress));
@@ -107,10 +117,67 @@ function applyIndustryProgress(runId: number, progress: IndustryChainProgress) {
   }
 }
 
+function applyDailyReviewProgress(runId: number, progress: DailyReviewProgress) {
+  useDailyReviewWorkflowStore.getState().applyProgress(runId, progress);
+}
+
+function dailyReviewDoneKeys() {
+  return DAILY_REVIEW_STAGES.map((stage) => stage.key);
+}
+
+export function startDailyReviewWorkflow(date: string, force: boolean) {
+  const current = useDailyReviewWorkflowStore.getState();
+  const runId = current.begin(date);
+  const stream = streamDailyReview({ date, force }, (progress) => applyDailyReviewProgress(runId, progress));
+  current.setStream(runId, stream);
+  return stream;
+}
+
+export function resumeDailyReviewWorkflow(job: WorkflowJob) {
+  const date = String(job.request.date || job.dedupe_key);
+  const current = useDailyReviewWorkflowStore.getState();
+  if (current.isGenerating && current.date === date) return;
+  // 流已在本端结束的同一任务不自动重启，防止轮询循环恢复。
+  if (!current.isGenerating && current.jobId === job.id) return;
+  const runId = current.begin(date);
+  const stream = resumeDailyReview(job.id, (progress) => applyDailyReviewProgress(runId, progress));
+  current.setStream(runId, stream);
+  current.patch(runId, { jobId: job.id });
+  void stream.promise.then((result: DailyReviewResult) => {
+    const state = useDailyReviewWorkflowStore.getState();
+    if (state.runId !== runId || !state.isGenerating) return;
+    state.patch(runId, {
+      isGenerating: false,
+      isCancelling: false,
+      message: "生成完成",
+      progress: { ...state.progress, done: dailyReviewDoneKeys(), current: "" },
+      stream: null,
+    });
+    queryClient.setQueryData(queryKeys.workflows.dailyReview(result.date), result);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.dailyReviewHistoryRoot });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
+  }).catch((error: unknown) => {
+    const state = useDailyReviewWorkflowStore.getState();
+    if (state.runId !== runId || !state.isGenerating) return;
+    if (error instanceof StreamInterruptedError) {
+      state.stopRun(runId, "detached");
+    } else if (error instanceof Error && (error.message === "已停止等待" || error.message === "已取消")) {
+      state.stopRun(runId, error.message === "已取消" ? "cancelled" : "detached");
+    } else {
+      const detail = error instanceof Error ? error.message : String(error);
+      state.patch(runId, { isGenerating: false, isCancelling: false, message: `生成失败: ${detail}`, stream: null });
+      message.error(`每日复盘生成失败: ${detail}`);
+    }
+    void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
+  });
+}
+
 export function resumeIndustryChainWorkflow(job: WorkflowJob) {
   const name = String(job.request.name || job.dedupe_key);
   const current = useIndustryChainWorkflowStore.getState();
   if (current.isAnalyzing && current.name === name) return;
+  // 同一任务的流已在本端结束（中断/停止等待/失败）时不自动重启，避免轮询循环恢复。
+  if (!current.isAnalyzing && current.jobId === job.id) return;
   const scope = (job.request.scope || {}) as Parameters<typeof current.begin>[1];
   const runId = current.begin(name, scope);
   const stream: WorkflowStream<IndustryChainResult> = resumeIndustryChain(

@@ -9,6 +9,7 @@ from app.configuration.api_models import (
     PRIVATE_USER_KEYS,
     SECRET_KEYS,
 )
+from app.configuration.effective import inherited_private_keys
 from app.configuration.provider_catalog import PROVIDER_DEFAULTS
 from app.configuration.runtime import (
     configure_user_settings_loader,
@@ -39,5 +40,6 @@ __all__ = [
     "effective_settings_for_user",
     "get_effective_settings",
     "get_settings",
+    "inherited_private_keys",
     "update_settings",
 ]

@@ -117,7 +117,7 @@ async def _gather_news(sources: list[NewsSource]) -> list[NewsSearchItem]:
     collected: list[NewsSearchItem] = []
     for source, result in zip(sources, results, strict=True):
         if isinstance(result, Exception):
-            logger.warning(f"{source.name}获取失败: error={result}")
+            logger.warning('%s获取失败: error=%s', source.name, result)
         else:
             collected.extend(
                 NewsSearchItem.model_validate(item).model_copy(

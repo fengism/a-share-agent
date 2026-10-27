@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from threading import Lock
+from typing import Annotated
+
+from pydantic import TypeAdapter, ValidationError
 
 from app.configuration.crypto_contracts import ConfigEncryptionError
 from app.configuration.effective import is_masked_secret, overlay_private
@@ -21,6 +24,30 @@ _settings_lock = Lock()
 _user_settings_loader: Callable[[int], dict] | None = None
 
 
+def _validated_patch_value(key: str, value) -> tuple[object, bool]:
+    """按字段注解校验单个补丁值。
+
+    ``model_copy`` 与 ``setattr`` 都不触发 pydantic 校验：裸 dict 会被直接写进
+    快照（``list[LLMCompatibilityOverride]`` 退化成 dict 列表后，能力解析里的
+    属性访问会崩）。这里显式校验一次，使补丁值与 ``Settings(...)`` 构造走同一
+    套规则，并把 JSON 形态的值转换成目标模型。
+    """
+    field = Settings.model_fields.get(key)
+    if field is None:
+        return value, True
+    annotation = field.annotation
+    if field.metadata:
+        try:
+            annotation = Annotated[annotation, *field.metadata]
+        except TypeError:  # 元数据不可注解时退回裸注解，仍能拦住明显的类型错误
+            annotation = field.annotation
+    try:
+        return TypeAdapter(annotation).validate_python(value), True
+    except ValidationError:
+        logger.warning("忽略无法校验的配置项: %s", key)
+        return value, False
+
+
 def build_updated_settings(current: Settings, patch: dict) -> Settings:
     """Build a copy-on-write global settings snapshot."""
     old_provider = current.llm_provider.lower()
@@ -30,7 +57,10 @@ def build_updated_settings(current: Settings, patch: dict) -> Settings:
     for key, value in patch.items():
         if value is None or not hasattr(current, key) or is_masked_secret(key, value):
             continue
-        setattr(updated, key, value)
+        validated, ok = _validated_patch_value(key, value)
+        if not ok:
+            continue
+        setattr(updated, key, validated)
 
     new_provider = updated.llm_provider.lower()
     new_defaults = PROVIDER_DEFAULTS.get(new_provider, {})

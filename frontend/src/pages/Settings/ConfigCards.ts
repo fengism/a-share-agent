@@ -8,11 +8,12 @@ export {
   default as EastmoneyRateLimitConfigCard,
   EASTMONEY_RATE_LIMIT_KEYS,
 } from "./config-cards/EastmoneyRateLimitConfigCard";
+export { default as EastmoneyProxyConfigCard } from "./config-cards/EastmoneyProxyConfigCard";
 export {
-  default as EastmoneyProxyConfigCard,
   normalizeProxyUrl,
   validateProxyUrl,
-} from "./config-cards/EastmoneyProxyConfigCard";
+  PROXY_SCOPE_OPTIONS,
+} from "./config-cards/EastmoneyProxyConfigCard.utils";
 export { default as FeishuConfigCard } from "./config-cards/FeishuConfigCard";
 export { default as FredConfigCard } from "./config-cards/FredConfigCard";
 export { default as IwencaiConfigCard } from "./config-cards/IwencaiConfigCard";

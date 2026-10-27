@@ -70,7 +70,10 @@ export default function AnalysisHistoryRail({
             >
               <span className="analysis-history-item__name">{item.stock_name}</span>
               <span className="analysis-history-item__score">评分 {item.overall_rating?.toFixed(1) ?? "-"}</span>
-              <span className="analysis-history-item__meta">{item.stock_code} · {formatAnalysisDate(item.analysis_date)}</span>
+              <span className="analysis-history-item__meta">
+                {item.stock_code} · {formatAnalysisDate(item.analysis_date)}
+                {item.current_price != null ? ` · ¥${item.current_price.toFixed(2)}` : ""}
+              </span>
               <span className={`analysis-history-item__signal is-${signalLabel(item.signal)}`}>{signalLabel(item.signal)}</span>
             </PreloadLink>
           );

@@ -27,6 +27,10 @@ class MaintenanceGroup(ConfigGroup):
     valuation_snapshot_retention_days: int = Field(default=30, ge=7, le=3650)
     analysis_archive_retention_days: int = Field(default=90, ge=7, le=3650)
     industry_chain_retention_days: int = Field(default=180, ge=7, le=3650)
+    # 管理员操作审计（admin_audit_logs）保留天数；0 = 永久保留
+    admin_audit_retention_days: int = Field(default=365, ge=0, le=3650)
+    # 登录审计（login_audit_logs）保留天数；公网实例会持续记录失败登录，必须有上限
+    login_audit_retention_days: int = Field(default=180, ge=0, le=3650)
     # 常驻后台任务开关，默认全部关闭，支持在前端按需开启
     macro_analysis_prewarm_enabled: bool = False
     daily_review_prewarm_enabled: bool = False

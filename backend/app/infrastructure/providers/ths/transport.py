@@ -45,14 +45,24 @@ class ThsTransport:
         headers: dict | None = None,
         timeout: int | float = 10,
     ) -> requests.Response:
+        settings = self._settings_provider()
+        from app.infrastructure.http.proxy import resolve_proxy_request
+
+        proxy_options = resolve_proxy_request(url, settings)
+        request_kwargs: dict = {
+            "params": params,
+            "data": data,
+            "json": json_body,
+            "headers": headers,
+            "timeout": proxy_options.timeout or timeout,
+        }
+        if proxy_options.active:
+            request_kwargs["proxies"] = proxy_options.proxies
+
         response = self.session().request(
             method,
             url,
-            params=params,
-            data=data,
-            json=json_body,
-            headers=headers,
-            timeout=timeout,
+            **request_kwargs,
         )
         response.raise_for_status()
         return response

@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { ClockCircleOutlined, DeleteOutlined, FilterOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Button, Card, Input, Popconfirm, Select, Tag, Typography } from "antd";
-import dayjs from "dayjs";
 import type { QuantBacktestRun } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { useStyles, useColors, semanticTagStyle } from "../../styles/ui";
+import { formatMarketPattern } from "../../utils/marketTime";
 import { QUANT_RUN_STATUS_META, quantStrategyLabel, quantUniverseLabel } from "./quantRun";
 
 const { Text } = Typography;
@@ -154,7 +154,7 @@ export default function BacktestHistory({
                     <Tag style={semanticTagStyle(status.color)}>{status.label}</Tag>
                   </span>
                   <Text type="secondary" className="quant-history-meta">
-                    {strategy} · {codes} · {run.request.start_date} 至 {run.request.end_date} · {dayjs.unix(run.created_at).format("MM-DD HH:mm")}
+                    {strategy} · {codes} · {run.request.start_date} 至 {run.request.end_date} · {formatMarketPattern(run.created_at, "MM-DD HH:mm")}
                   </Text>
                   {metrics ? (
                     <span className="quant-history-metrics-summary">

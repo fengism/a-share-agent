@@ -330,7 +330,7 @@ async def get_kline(
         except Exception:
             # 缺口补采失败不应拖累本地已有历史：非交易日/上游异常时直接用本地数据返回
             if local is not None and local.items:
-                logger.info(
+                logger.debug(
                     "K线缺口补采失败，回退本地历史: code=%s windows=%s",
                     sym.raw,
                     upstream_windows,

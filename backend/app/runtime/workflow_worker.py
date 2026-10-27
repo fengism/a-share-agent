@@ -20,6 +20,7 @@ from app.domain.identity import UserRecord
 from app.infrastructure.llm.policy import is_llm_failure
 from app.infrastructure.persistence.workflow_jobs import (
     WorkflowJob,
+    WorkflowJobStore,
     WorkflowLeaseLostError,
     workflow_job_store,
 )
@@ -31,6 +32,111 @@ from app.modules.screener.public import ScreenerStrategyRequest, screen_candidat
 
 logger = logging.getLogger(__name__)
 _SHUTDOWN_CANCEL_MESSAGE = "服务关闭，任务已取消"
+
+_EVENT_BATCH_MAX_EVENTS = 20
+_EVENT_BATCH_MAX_DELAY_SECONDS = 0.15
+
+
+class _WorkflowEventBatcher:
+    """把进度事件微批聚合后单事务入库，显著降低长任务的 SQLite 写事务数。
+
+    事件顺序严格保持；满批（_EVENT_BATCH_MAX_EVENTS）或静默超时
+    （_EVENT_BATCH_MAX_DELAY_SECONDS）即 flush。终态事件（error/complete）
+    不经过这里，仍由 worker 在任务结束时一次性写入。持久化失败（如用户
+    取消导致租约失效）保存在 _failure，在下次 emit/flush/close 时重抛，
+    保证管线与 worker 及时感知并中止。
+    """
+
+    def __init__(
+        self,
+        job_id: str,
+        owner_id: str,
+        store: WorkflowJobStore = workflow_job_store,
+    ) -> None:
+        self.job_id = job_id
+        self._owner_id = owner_id
+        self._store = store
+        self._pending: list[tuple[str, dict[str, Any]]] = []
+        self._signal = asyncio.Event()
+        self._flusher: asyncio.Task[None] | None = None
+        self._failure: BaseException | None = None
+        self._closed = False
+
+    async def emit(self, event: Any) -> None:
+        if self._failure is not None:
+            raise self._failure
+        payload = event if isinstance(event, dict) else event.model_dump(mode="json")
+        self._pending.append((str(payload.get("type")), payload))
+        if len(self._pending) >= _EVENT_BATCH_MAX_EVENTS:
+            await self.flush()
+            return
+        if self._flusher is None:
+            self._signal.set()
+            self._flusher = asyncio.create_task(self._flush_after_delay())
+        else:
+            self._signal.set()
+
+    async def flush(self) -> None:
+        if self._failure is not None:
+            raise self._failure
+        await self._drain()
+
+    async def close(self) -> None:
+        self._closed = True
+        self._signal.set()
+        flusher = self._flusher
+        if flusher is not None:
+            try:
+                await flusher
+            except asyncio.CancelledError:
+                pass
+        if self._failure is not None:
+            raise self._failure
+        await self._drain()
+
+    async def _flush_after_delay(self) -> None:
+        try:
+            while True:
+                self._signal.clear()
+                try:
+                    await asyncio.wait_for(self._signal.wait(), timeout=_EVENT_BATCH_MAX_DELAY_SECONDS)
+                except TimeoutError:
+                    pass
+                if self._pending:
+                    await self._drain()
+                if self._closed:
+                    return
+        except asyncio.CancelledError:
+            raise
+        except BaseException as error:  # noqa: BLE001 - 转存失败，由 emit/flush/close 重抛
+            self._failure = error
+        finally:
+            self._flusher = None
+
+    async def _drain(self) -> None:
+        if not self._pending:
+            return
+        events = self._pending
+        self._pending = []
+        try:
+            await call_blocking(
+                self._store.append_events,
+                self.job_id,
+                self._owner_id,
+                events,
+                semaphore=database_semaphore,
+            )
+        except BaseException:
+            self._pending = [*events, *self._pending]
+            raise
+
+
+async def _safe_flush(batcher: _WorkflowEventBatcher) -> None:
+    """失败/取消路径尽力保留已产生的进度事件；租约已失效则静默放弃。"""
+    try:
+        await batcher.flush()
+    except Exception:
+        logger.debug("Workflow 进度事件刷写失败: job_id=%s", batcher.job_id, exc_info=True)
 
 
 async def _renew_workflow_lease(job_id: str, owner_id: str, lease_seconds: float) -> None:
@@ -93,6 +199,7 @@ async def process_next_workflow_job(
 
     deferred_error: dict[str, Any] | None = None
     deferred_complete: dict[str, Any] | None = None
+    batcher = _WorkflowEventBatcher(job.id, owner_id)
 
     async def emit(event) -> None:
         nonlocal deferred_complete, deferred_error
@@ -104,14 +211,7 @@ async def process_next_workflow_job(
         if event_type == "complete":
             deferred_complete = payload
             return
-        await call_blocking(
-            workflow_job_store.append_event,
-            job.id,
-            owner_id,
-            str(event_type),
-            payload,
-            semaphore=database_semaphore,
-        )
+        await batcher.emit(event)
 
     async def ensure_job_owned() -> None:
         owned = await call_blocking(
@@ -189,6 +289,7 @@ async def process_next_workflow_job(
             heartbeat.result()
             raise WorkflowLeaseLostError(f"Workflow Job 租约任务意外结束: {job.id}")
         await execution
+        await batcher.flush()
         completed = await call_blocking(
             workflow_job_store.complete,
             job.id,
@@ -200,11 +301,18 @@ async def process_next_workflow_job(
             logger.info("Workflow Job 租约失效，丢弃完成状态: job_id=%s", job.id)
             metrics.record_workflow_event(job.kind, "lease_lost")
         else:
+            duration_ms = (time.perf_counter() - started_at) * 1000
             metrics.record_workflow_event(job.kind, "completed")
             metrics.record_workflow_run(
                 job.kind,
                 success=True,
-                duration_ms=(time.perf_counter() - started_at) * 1000,
+                duration_ms=duration_ms,
+            )
+            logger.info(
+                "Workflow Job 执行完成: job_id=%s kind=%s duration_ms=%.0f",
+                job.id,
+                job.kind,
+                duration_ms,
             )
     except WorkflowLeaseLostError as error:
         metrics.record_workflow_event(job.kind, "lease_lost")
@@ -212,6 +320,7 @@ async def process_next_workflow_job(
     except asyncio.CancelledError:
         execution.cancel()
         await asyncio.gather(execution, return_exceptions=True)
+        await _safe_flush(batcher)
         if shutdown_event is not None and shutdown_event.is_set():
             cancelled = await call_blocking(
                 workflow_job_store.cancel_owned,
@@ -235,6 +344,7 @@ async def process_next_workflow_job(
             metrics.record_workflow_event(job.kind, "released")
         raise
     except Exception as error:
+        await _safe_flush(batcher)
         allow_retry = not is_llm_failure(error) and not isinstance(error, AnalysisArchiveError)
         terminal_event = (
             "error",
@@ -277,6 +387,10 @@ async def process_next_workflow_job(
         execution.cancel()
         heartbeat.cancel()
         await asyncio.gather(execution, heartbeat, return_exceptions=True)
+        try:
+            await batcher.close()
+        except Exception:
+            logger.debug("Workflow 事件批量刷写收尾失败: job_id=%s", job.id, exc_info=True)
     return True
 
 

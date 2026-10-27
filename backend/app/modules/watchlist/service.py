@@ -1,9 +1,9 @@
 import asyncio
 import logging
-from datetime import datetime
 
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
 from app.core.market import normalize_code, safe_float
+from app.domain.timezones import market_now
 from app.financial_data.hk.service import hk_market_service, normalize_hk_code
 from app.financial_data.stock.public import fetch_realtime_quote_set, get_stock_concept_map, get_stock_name_map
 from app.infrastructure.persistence import watchlist as watchlist_store
@@ -208,16 +208,16 @@ async def get_watchlist(user_id: int) -> WatchlistResponse:
 
     if cn_codes and hk_codes:
         source = "mixed"
-        quoted_at = datetime.now().isoformat(timespec="seconds")
+        quoted_at = market_now().isoformat(timespec="seconds")
     elif quote_set is not None:
         source = quote_set.source
-        quoted_at = quote_set.quoted_at or datetime.now().isoformat(timespec="seconds")
+        quoted_at = quote_set.quoted_at or market_now().isoformat(timespec="seconds")
     elif hk_quote_page is not None:
         source = hk_quote_page.source
-        quoted_at = hk_quote_page.updated_at or datetime.now().isoformat(timespec="seconds")
+        quoted_at = hk_quote_page.updated_at or market_now().isoformat(timespec="seconds")
     else:
         source = ""
-        quoted_at = datetime.now().isoformat(timespec="seconds")
+        quoted_at = market_now().isoformat(timespec="seconds")
     return WatchlistResponse(items=response_items, source=source, quoted_at=quoted_at)
 
 

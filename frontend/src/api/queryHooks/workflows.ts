@@ -280,7 +280,7 @@ export function useImportIndustryChainAtlas() {
 
 export function useMineIndustryChainAtlas() {
   return useMutation({
-    mutationFn: (request: { name: string; archive_id?: string }) => openApiPost(
+    mutationFn: (request: { name: string; archive_id?: string; scope?: string }) => openApiPost(
       "/api/industry-chain/atlas/mine",
       {
         body: request,

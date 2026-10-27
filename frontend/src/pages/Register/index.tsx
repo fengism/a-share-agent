@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Alert, Button, Form, Input, Tag } from "antd";
-import { KeyOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
+import { KeyOutlined, LockOutlined, SafetyOutlined, UserOutlined } from "@ant-design/icons";
 import { useAuthStore } from "../../store/authStore";
 import { needsSetupApi } from "../../api/auth";
 import AuthHeader from "../../components/AuthHeader";
@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const register = useAuthStore((s) => s.register);
 
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [requiresSetupToken, setRequiresSetupToken] = useState(false);
   const [checking, setChecking] = useState(true);
   const [setupError, setSetupError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,6 +30,7 @@ export default function RegisterPage() {
     try {
       const r = await needsSetupApi();
       setNeedsSetup(r.needs_setup);
+      setRequiresSetupToken(Boolean(r.requires_setup_token));
     } catch (e) {
       setNeedsSetup(null);
       setSetupError(e instanceof Error ? e.message : "无法确认初始化状态，请稍后重试");
@@ -70,11 +72,17 @@ export default function RegisterPage() {
     password: string;
     confirm: string;
     invite_code?: string;
+    setup_token?: string;
   }) => {
     setError(null);
     setLoading(true);
     try {
-      await register(values.username.trim(), values.password, values.invite_code?.trim());
+      await register(
+        values.username.trim(),
+        values.password,
+        values.invite_code?.trim(),
+        values.setup_token?.trim(),
+      );
       navigate("/", { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "注册失败");
@@ -139,6 +147,16 @@ export default function RegisterPage() {
         >
           <Input.Password prefix={<LockOutlined />} placeholder="确认密码" autoComplete="new-password" />
         </Form.Item>
+
+        {needsSetup === true && requiresSetupToken && (
+          <Form.Item
+            name="setup_token"
+            label="部署口令"
+            rules={[{ required: true, message: "请输入部署时配置的 ADMIN_SETUP_TOKEN" }]}
+          >
+            <Input.Password prefix={<SafetyOutlined />} placeholder="ADMIN_SETUP_TOKEN" autoComplete="off" />
+          </Form.Item>
+        )}
 
         {needsSetup === false && (
           <Form.Item

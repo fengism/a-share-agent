@@ -81,6 +81,11 @@ class ConflictError(ApiError):
         super().__init__(status_code=409, code=code, message=message)
 
 
+class ForbiddenError(ApiError):
+    def __init__(self, message: str = "需要管理员权限", *, code: str = "forbidden") -> None:
+        super().__init__(status_code=403, code=code, message=message)
+
+
 class TooManyRequestsError(ApiError):
     def __init__(
         self,

@@ -29,7 +29,9 @@ export type ConfigData = Omit<GeneratedConfigResponse, "provider_defaults"> & {
   provider_defaults: Record<string, ProviderDefault>;
 };
 
-export type ConfigUpdate = Partial<Omit<ConfigData, "provider_defaults" | "is_admin">>;
+export type ConfigUpdate = Partial<
+  Omit<ConfigData, "provider_defaults" | "is_admin" | "inherited_keys">
+>;
 
 /** 出站代理连通性探测请求（留空则使用默认探测目标）。 */
 export interface ProxyTestRequest {

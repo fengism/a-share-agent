@@ -44,8 +44,18 @@ def create_user(
 ) -> UserRecord:
     with unit_of_work(connection=_connection(), immediate=True) as work:
         cursor = work.connection.execute(
-            "INSERT INTO users (username, password_hash, is_admin, must_change_password, is_active) VALUES (?, ?, ?, ?, ?)",
-            (username.strip().lower(), hash_password(password), int(is_admin), int(must_change_password), int(is_active)),
+            """
+            INSERT INTO users (username, password_hash, is_admin, must_change_password, is_active, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                username.strip().lower(),
+                hash_password(password),
+                int(is_admin),
+                int(must_change_password),
+                int(is_active),
+                now_ts(),
+            ),
         )
         user_id = cursor.lastrowid
     return cast(UserRecord, get_user_by_id(user_id))
@@ -112,8 +122,11 @@ def create_account(
             else:
                 is_admin = False
             cursor = connection.execute(
-                "INSERT INTO users (username, password_hash, is_admin, is_active) VALUES (?, ?, ?, 1)",
-                (normalized_username, password_hash, int(is_admin)),
+                """
+                INSERT INTO users (username, password_hash, is_admin, is_active, created_at)
+                VALUES (?, ?, ?, 1, ?)
+                """,
+                (normalized_username, password_hash, int(is_admin), now_ts()),
             )
             user_id = cursor.lastrowid
             if invite_code is not None:
@@ -236,6 +249,9 @@ def delete_user(user_id: int) -> bool:
         connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
         connection.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
         connection.execute("DELETE FROM user_config WHERE user_id = ?", (user_id,))
+        # bot_command_jobs.request_user_id 是 TEXT 且无外键，删用户时必须显式清理，
+        # 否则残留孤儿任务行（auth_sessions/watchlist/chat_states 等均有 CASCADE）。
+        connection.execute("DELETE FROM bot_command_jobs WHERE request_user_id = ?", (str(user_id),))
         cursor = connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
         return cursor.rowcount > 0
 
@@ -293,11 +309,33 @@ def record_login_audit(
     with unit_of_work(connection=_connection(), immediate=True) as work:
         work.connection.execute(
             """
-            INSERT INTO login_audit_logs (username, user_id, ip_address, user_agent, status, details)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO login_audit_logs (
+                username, user_id, ip_address, user_agent, status, details, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (username, user_id, ip_address, user_agent, status, details),
+            (username, user_id, ip_address, user_agent, status, details, now_ts()),
         )
+
+
+def purge_login_audit_logs(retention_days: int) -> int:
+    """按保留期裁剪登录审计；``retention_days <= 0`` 表示永久保留。"""
+    if retention_days <= 0:
+        return 0
+    from datetime import timedelta
+
+    from app.domain.timezones import market_now
+    from app.infrastructure.persistence.retention import purge_rows_in_batches
+
+    cutoff = (market_now() - timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
+    result = purge_rows_in_batches(
+        _connection(),
+        table_name="login_audit_logs",
+        predicate_sql="created_at < ?",
+        parameters=(cutoff,),
+        order_by="created_at, rowid",
+    )
+    return result.deleted
 
 
 def list_login_audit_logs(
@@ -305,7 +343,13 @@ def list_login_audit_logs(
     offset: int = 0,
     status: str | None = None,
     username: str | None = None,
+    user_id: int | None = None,
 ) -> tuple[list[LoginAuditRecord], int]:
+    """查询登录审计。
+
+    ``user_id`` 用于「我的登录记录」自助查询：按用户主键精确过滤，
+    不能用 username（``LIKE`` 会被 `%`/`_` 通配符放大查询范围）。
+    """
     connection = _connection()
     where_clauses: list[str] = []
     params: list[Any] = []
@@ -315,6 +359,9 @@ def list_login_audit_logs(
     if username:
         where_clauses.append("username LIKE ?")
         params.append(f"%{username}%")
+    if user_id is not None:
+        where_clauses.append("user_id = ?")
+        params.append(user_id)
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     count_row = connection.execute(

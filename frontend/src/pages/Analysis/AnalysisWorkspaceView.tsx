@@ -31,6 +31,7 @@ import AnalysisResultSection from "./AnalysisResultSection";
 import AnalysisStateSection from "./AnalysisStateSection";
 import { buildAnalysisMarkdown } from "./analysisMarkdown";
 import type { AnalysisReportPageState } from "./useAnalysisReportPage";
+import { marketDateStamp } from "../../utils/marketTime";
 import "./analysis-workspace.css";
 
 type MessageApi = ReturnType<typeof message.useMessage>[0];
@@ -128,7 +129,7 @@ export default function AnalysisWorkspaceView({
       const a = document.createElement("a");
       a.href = url;
       const fileCode = displayResult.stock_code || code || "stock";
-      const fileDate = normalizeAnalysisDate(displayResult.analysis_date) || historyDate || new Date().toISOString().slice(0, 10);
+      const fileDate = normalizeAnalysisDate(displayResult.analysis_date) || historyDate || marketDateStamp();
       a.download = `投研报告_${fileCode}_${fileDate}.md`;
       a.click();
       URL.revokeObjectURL?.(url);

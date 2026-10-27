@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { Card, Progress, Typography } from "antd";
 import RatingBadge from "../../components/RatingBadge";
 import SignalBadge from "../../components/SignalBadge";
+import { renderWithCitations } from "../../features/investment-research/CitationText";
 import type { AnalysisResult } from "../../types/stock";
 import { useColors, useStyles, useTokens } from "../../theme/hooks";
 import "./analysis-conclusion.css";
@@ -79,7 +80,7 @@ export default function AIConclusion({ result, embedded = false }: Props) {
         <div className="analysis-conclusion__decision-row">
           <div className="analysis-conclusion__decision-copy">
             <span className="analysis-conclusion__eyebrow">核心判断</span>
-            <p className="analysis-conclusion__summary">{overall_summary}</p>
+            <p className="analysis-conclusion__summary">{renderWithCitations(overall_summary)}</p>
           </div>
           <div className="analysis-conclusion__signal-cluster">
             <RatingBadge score={overall_rating} size={56} />

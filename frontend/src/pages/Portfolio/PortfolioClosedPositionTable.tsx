@@ -6,6 +6,7 @@ import type { PortfolioClosedPosition } from "../../types/portfolio";
 import { formatInteger, formatMoney, formatTime } from "./portfolioFormatters";
 import PortfolioTableCard from "./PortfolioTableCard";
 import { PORTFOLIO_TABLE_PAGINATION } from "./portfolioTableConfig";
+import { marketDateStamp } from "../../utils/marketTime";
 import type { PortfolioTableRenderers } from "./portfolioTableRenderers";
 
 interface PortfolioClosedPositionTableProps {
@@ -53,7 +54,7 @@ function PortfolioClosedPositionTable({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `投资组合已清仓股票_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `投资组合已清仓股票_${marketDateStamp()}.csv`;
       a.click();
       URL.revokeObjectURL?.(url);
     }

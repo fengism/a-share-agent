@@ -39,6 +39,8 @@ def _canonical_definition_payload(definition: StrategyDefinition) -> dict[str, A
         for field in _OPTIONAL_INDICATOR_FIELDS_ADDED_IN_V1:
             if indicator.get(field) is None:
                 indicator.pop(field, None)
+    if "position" in payload and payload["position"].get("target_weight") is None:
+        payload["position"].pop("target_weight", None)
     return cast(dict[str, Any], payload)
 
 

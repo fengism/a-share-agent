@@ -13,6 +13,7 @@ from app.core.cache import dated_cache_key_no_day
 from app.core.cache import reference_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking
 from app.core.concurrency.singleflight import AsyncSingleFlight
+from app.domain.timezones import market_now
 from app.financial_data.market.macro import collector as macro_collector
 from app.financial_data.market.macro import normalizer as macro_normalizer
 from app.infrastructure.persistence.json_storage import atomic_write_json, durable_unlink
@@ -186,7 +187,7 @@ def _latest_period(operation: str, rows: list[dict]) -> str | None:
 def _is_stale_metric(operation: str, latest_period: str | None) -> bool:
     if latest_period is None:
         return True
-    now = datetime.now()
+    now = market_now()
     if operation in _MONTHLY_OPERATIONS:
         match = re.search(r"(\d{4})\D?(\d{2})", latest_period)
         if match is None:

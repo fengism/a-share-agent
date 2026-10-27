@@ -642,11 +642,12 @@ class ClsDataProvider:
         last_exc: Exception | None = None
         for endpoint, host in endpoints:
             try:
+                # 主端点收紧至 5 秒超时（连接 2s，读取 3s，严格限制在 5s 内快速切换备用源）
                 response = provider_get(
                     endpoint,
                     params=_cls_app_params(),
                     headers={**_CLS_APP_HEADERS, "Host": host},
-                    timeout=5,
+                    timeout=(2.0, 3.0),
                 )
                 break
             except Exception as exc:
@@ -808,7 +809,7 @@ class ClsDataProvider:
                 )
             return results
         except Exception as e:
-            logger.warning(f"财联社头条获取失败: {e}")
+            logger.warning('财联社头条获取失败: %s', e)
             return []
 
 cls_provider = ClsDataProvider()

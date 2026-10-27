@@ -19,6 +19,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_stock_valuation_detail: "估值分析",
   iwencai_query: "问财结构化查询",
   iwencai_search: "问财搜索",
+  compare_stocks: "同业龙头对比",
   public_industry_data: "产业公共数据",
   python_interpreter: "隔离 Python 计算",
   read_pdf: "阅读 PDF 研报/公告",
@@ -28,6 +29,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_hk_stock_kline: "港股 K 线行情",
   get_hk_stock_quote: "港股实时行情",
   get_hk_financial_statements: "港股财务报表",
+  get_hk_stock_industry_comparison: "港股同业对比",
   // 核心财务与投研数据工具
   get_stock_profile: "公司画像与基本面",
   get_financial_statements: "财务三大报表",

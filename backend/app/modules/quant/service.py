@@ -1,6 +1,8 @@
 """量化回测应用服务。"""
 
 import asyncio
+import logging
+import statistics
 import threading
 from dataclasses import replace
 from datetime import timedelta
@@ -8,6 +10,7 @@ from typing import Any
 
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore, misc_semaphore
 from app.core.market import market_today, normalize_code, normalize_index_code
+from app.domain.market import KlineItem
 from app.financial_data.market.public import get_completed_market_date, get_index_kline
 from app.financial_data.stock.public import HistoricalBarSet, get_historical_bars, historical_bar_hash
 from app.modules.portfolio.public import list_held_stock_codes
@@ -19,6 +22,9 @@ from app.modules.quant.schemas import (
     QuantBacktestList,
     QuantBacktestPayload,
     QuantBacktestRun,
+    QuantParameterScanPoint,
+    QuantParameterScanRequest,
+    QuantParameterScanResult,
     QuantSavedStrategy,
     QuantStrategyConfig,
     QuantStrategyConstraintDescriptor,
@@ -29,6 +35,8 @@ from app.modules.quant.schemas import (
 )
 from app.modules.quant.strategies.contracts import StrategySnapshot
 from app.modules.quant.strategies.registry import get_strategy_registry
+
+logger = logging.getLogger(__name__)
 
 MAX_ACTIVE_RUNS_PER_USER = 2
 
@@ -263,8 +271,8 @@ async def _resolve_request(
     ))
     if not payload.universe.codes:
         raise ValueError("股票池不能为空")
-    if len(payload.universe.codes) > 10:
-        raise ValueError("股票池最多支持 10 只股票")
+    if len(payload.universe.codes) > 30:
+        raise ValueError("股票池最多支持 30 只股票")
     payload.benchmark = normalize_index_code(payload.benchmark.strip().lower())
     if not payload.benchmark.isdigit() or len(payload.benchmark) != 6:
         raise ValueError("基准指数代码必须为 6 位数字")
@@ -404,3 +412,138 @@ async def retry_backtest(run_id: str, user_id: int) -> bool:
 
 async def delete_backtest(run_id: str, user_id: int) -> bool:
     return await call_blocking(run_store.delete_run, user_id, run_id, semaphore=database_semaphore)
+
+
+def _apply_param_value(
+    strategy_config: QuantStrategyConfig,
+    execution_config: Any,
+    param_name: str,
+    value: Any,
+) -> None:
+    if hasattr(execution_config, param_name):
+        setattr(execution_config, param_name, value)
+    else:
+        strategy_config.parameters[param_name] = value
+
+
+async def scan_parameter_sensitivity(
+    run_id: str,
+    scan_request: QuantParameterScanRequest,
+    user_id: int,
+) -> QuantParameterScanResult:
+    row = await call_blocking(run_store.get_run, user_id, run_id, semaphore=database_semaphore)
+    if row is None:
+        raise ValueError("回测记录不存在")
+    if row.status != "succeeded":
+        raise ValueError("仅已成功完成的回测任务可执行参数敏感性扫描")
+
+    payload = QuantBacktestPayload.model_validate(row.request)
+
+    if row.input_snapshot and "stocks" in row.input_snapshot and "benchmark" in row.input_snapshot:
+        bars_by_code = {
+            code: [KlineItem.model_validate(item) for item in items]
+            for code, items in row.input_snapshot["stocks"].items()
+        }
+        benchmark_items = [KlineItem.model_validate(item) for item in row.input_snapshot["benchmark"]]
+    else:
+        strategy_snapshot = _resolve_strategy(payload.strategy)
+        warmup = strategy_warmup_bars(strategy_snapshot)
+        if payload.execution.target_annual_volatility is not None:
+            warmup = max(warmup, 21)
+        req_bars = warmup + 1
+        stock_start = payload.start_date - timedelta(days=req_bars * 2 + 14)
+        stock_task = asyncio.gather(
+            *(
+                get_historical_bars(code, stock_start, payload.end_date, period="daily", adjust="qfq")
+                for code in payload.universe.codes
+            )
+        )
+        bench_task = asyncio.create_task(
+            get_index_kline(
+                payload.benchmark,
+                period="daily",
+                start_date=(payload.start_date - timedelta(days=14)).isoformat(),
+                end_date=payload.end_date.isoformat(),
+            )
+        )
+        bar_sets, benchmark_kline = await asyncio.gather(stock_task, bench_task)
+        bar_sets = _normalize_bar_sets(bar_sets, payload.start_date.isoformat(), warmup)
+        bars_by_code = {bs.code: bs.items for bs in bar_sets}
+        benchmark_items = benchmark_kline.items
+
+    param1_vals = scan_request.param1_values[:15]
+    param2_vals = (
+        scan_request.param2_values[:15]
+        if scan_request.param2_name and scan_request.param2_values
+        else [None]
+    )
+
+    eval_start = payload.start_date.isoformat()
+    eval_end = payload.end_date.isoformat()
+
+    def _run_grid() -> list[QuantParameterScanPoint]:
+        points: list[QuantParameterScanPoint] = []
+        for v1 in param1_vals:
+            for v2 in param2_vals:
+                strat_copy = payload.strategy.model_copy(deep=True)
+                exec_copy = payload.execution.model_copy(deep=True)
+                _apply_param_value(strat_copy, exec_copy, scan_request.param1_name, v1)
+                if scan_request.param2_name is not None and v2 is not None:
+                    _apply_param_value(strat_copy, exec_copy, scan_request.param2_name, v2)
+
+                snapshot = _resolve_strategy(strat_copy)
+                try:
+                    res = run_backtest(
+                        bars_by_code,
+                        benchmark_items,
+                        snapshot,
+                        exec_copy,
+                        data_hashes=["grid-hash"],
+                        data_sources=["grid-source"],
+                        evaluation_start_date=eval_start,
+                        evaluation_end_date=eval_end,
+                    )
+                    points.append(
+                        QuantParameterScanPoint(
+                            param1_value=v1,
+                            param2_value=v2,
+                            sharpe_ratio=res.metrics.sharpe_ratio,
+                            total_return=res.metrics.total_return,
+                            annualized_return=res.metrics.annualized_return,
+                            max_drawdown=res.metrics.max_drawdown,
+                            win_rate=res.metrics.win_rate,
+                        )
+                    )
+                except Exception as exc:
+                    logger.debug("[Quant] 参数网格回测点 (%s, %s) 执行跳过: %s", v1, v2, exc)
+                    continue
+        return points
+
+    points = await call_blocking(_run_grid, semaphore=misc_semaphore)
+    if not points:
+        raise ValueError("参数网格扫描未产生有效回测结果")
+
+    profitable_count = sum(1 for p in points if p.total_return > 0)
+    profitable_ratio = round(profitable_count / len(points) * 100, 2)
+
+    optimal = max(
+        points,
+        key=lambda p: (p.sharpe_ratio if p.sharpe_ratio is not None else -999, p.total_return),
+    )
+
+    valid_sharpes = [p.sharpe_ratio for p in points if p.sharpe_ratio is not None]
+    avg_sharpe = statistics.fmean(valid_sharpes) if valid_sharpes else 0.0
+    sharpe_component = min(max(avg_sharpe, 0.0), 2.0) / 2.0 * 30.0
+    robustness = round(profitable_ratio * 0.7 + sharpe_component, 1)
+
+    return QuantParameterScanResult(
+        param1_name=scan_request.param1_name,
+        param1_values=param1_vals,
+        param2_name=scan_request.param2_name,
+        param2_values=scan_request.param2_values if scan_request.param2_name else None,
+        points=points,
+        optimal_point=optimal,
+        robustness_score=robustness,
+        profitable_ratio=profitable_ratio,
+    )
+

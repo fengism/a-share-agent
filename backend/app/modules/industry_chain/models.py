@@ -81,6 +81,17 @@ class IndustryChainNode(IndustryChainClaim):
     pe: str = ""
     pb: str = ""
     total_market_cap: str = ""
+    pe_percentile: str = ""
+    consensus_forecast: str = ""
+    gross_margin: str = ""
+    net_margin: str = ""
+    moat: str = ""
+    eps_elasticity: str = ""
+    roe: str = Field(default="", description="净资产收益率（ROE），如 18.5%")
+    growth_rate: str = Field(default="", description="业绩增速（营收/净利 YoY），如 营收+15.2% / 净利+28.0%")
+    price_change: str = Field(default="", description="最新股价及涨跌幅，如 128.50 (+2.3%)")
+    restricted_risk: str = Field(default="", description="限售解禁抛压风险提示")
+    overseas_share: str = Field(default="", description="海外或出口业务营收占比及毛利率，如 94.8% (境外 · 毛利47.9%)")
 
     @field_validator(
         "companies", "realization_conditions", "invalidation_conditions", "tracking_metrics", mode="before"
@@ -220,6 +231,36 @@ class IndustryChainConflict(BaseModel):
     evidence_ids: list[str] = Field(default_factory=list)
 
 
+class IndustryChainValueDistribution(BaseModel):
+    """价值链价值量（BOM）与利润池分配。"""
+
+    segment: str = Field(default="", description="环节或核心零部件/组件名称")
+    cost_share: str = Field(default="", description="单机/系统价值量或 BOM 成本占比，如 35%")
+    gross_margin_range: str = Field(default="", description="毛利率区间，如 40%~50%")
+    profit_share: str = Field(default="", description="产业链利润池占比或定性分布")
+    pricing_power: Literal["high", "medium", "low", "unverified"] = "unverified"
+    detail: str = Field(default="", description="成本构成、议价权及技术门槛简述")
+
+
+class IndustryChainCycleAnalysis(BaseModel):
+    """产业链供需周期与顺价机制定位。"""
+
+    stage: str = Field(default="", description="周期所处阶段，如主动补库/产能出清/供需紧平衡")
+    capacity_utilization: str = Field(default="", description="行业产能利用率或开工率")
+    expansion_lead_time: str = Field(default="", description="扩产建设与认证壁垒周期，如 12-18 个月")
+    inflection_point: str = Field(default="", description="供需缺口或景气拐点推演")
+    pass_through_ability: str = Field(default="", description="成本顺价传导能力与毛利率弹性")
+
+
+class IndustryChainExpectationDivergence(BaseModel):
+    """市场一致预期 vs 本次研究分歧（预期差推演）。"""
+
+    topic: str = Field(default="", description="预期差主题，如出海增速/渗透率节奏/替代路线")
+    consensus: str = Field(default="", description="市场主流一致预期")
+    divergence: str = Field(default="", description="本次研究审慎/独立推断")
+    catalyst_trigger: str = Field(default="", description="预期差验证的核心观测指标与时间窗口")
+
+
 class IndustryChainChart(BaseModel):
     title: str = ""
     description: str = ""
@@ -339,5 +380,8 @@ class IndustryChainResult(BaseModel):
     changes: IndustryChainChangeSet = Field(default_factory=IndustryChainChangeSet)
     opportunities: list[IndustryChainOpportunity] = Field(default_factory=list)
     relationships: list[IndustryChainRelationship] = Field(default_factory=list)
+    value_distribution: list[IndustryChainValueDistribution] = Field(default_factory=list)
+    cycle_analysis: IndustryChainCycleAnalysis = Field(default_factory=IndustryChainCycleAnalysis)
+    expectation_divergences: list[IndustryChainExpectationDivergence] = Field(default_factory=list)
     topic_resolution: IndustryChainTopicResolution = Field(default_factory=IndustryChainTopicResolution)
     analysis_metadata: IndustryChainAnalysisMetadata = Field(default_factory=IndustryChainAnalysisMetadata)

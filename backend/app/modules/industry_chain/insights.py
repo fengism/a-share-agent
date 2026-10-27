@@ -74,7 +74,15 @@ def build_opportunities(result: IndustryChainResult) -> list[IndustryChainOpport
     """仅按资料完整度排序；保留旧评分字段为零，不暗示基本面优劣。"""
     opportunities: list[IndustryChainOpportunity] = []
     seen: set[str] = set()
-    for node in result.key_stocks:
+
+    nodes_pool = list(result.key_stocks)
+    if len(nodes_pool) < 6:
+        # 从产业链上中下游环节补充有代码或明确公司身份的代表性节点
+        for tier_node in [*result.upstream, *result.midstream, *result.downstream]:
+            if tier_node.code or tier_node.company or tier_node.name:
+                nodes_pool.append(tier_node)
+
+    for node in nodes_pool:
         name = (node.name or node.company or "").strip()
         code = (node.code or "").strip()
         key = code or _normalize_topic(name)
@@ -86,9 +94,40 @@ def build_opportunities(result: IndustryChainResult) -> list[IndustryChainOpport
         valid_ids = {item.evidence_id for item in result.evidence_catalog if item.status == "success"}
         linked = set(node.evidence_ids) & valid_ids
         evidence = min(100, 25 * len(linked))
-        completeness = sum(bool(value) for value in (node.role, node.description, node.metric, linked)) * 25
-        rationale_parts = [part for part in (node.role, node.description, node.metric) if part]
-        rationale = "；".join(rationale_parts[:2]) or "基于产业链角色与现有公开证据纳入研究跟踪。"
+        has_benefit = bool(getattr(node, "benefit_path", None))
+        has_moat = bool(getattr(node, "moat", None))
+        has_financials = bool(getattr(node, "gross_margin", None) or getattr(node, "roe", None))
+        has_forecast = bool(getattr(node, "consensus_forecast", None))
+        completeness = min(
+            100,
+            sum(
+                bool(value)
+                for value in (
+                    node.role,
+                    node.description,
+                    node.metric,
+                    has_benefit,
+                    has_moat,
+                    has_financials,
+                    has_forecast,
+                    linked,
+                )
+            )
+            * 15,
+        )
+        rationale_parts = [
+            part
+            for part in (
+                f"受益逻辑: {node.benefit_path}" if getattr(node, "benefit_path", None) else "",
+                f"壁垒: {node.moat}" if getattr(node, "moat", None) else "",
+                f"弹性: {node.eps_elasticity}" if getattr(node, "eps_elasticity", None) else "",
+                node.role,
+                node.description,
+                node.metric,
+            )
+            if part
+        ]
+        rationale = "；".join(rationale_parts[:3]) or "基于产业链角色与现有公开证据纳入研究跟踪。"
         opportunities.append(
             IndustryChainOpportunity(
                 name=name or code,

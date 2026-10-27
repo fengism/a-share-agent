@@ -1,3 +1,4 @@
+import { marketDateStamp } from "../../utils/marketTime";
 import type { ScreenerItem } from "../../types/stock";
 
 export interface ExportCsvOptions {
@@ -103,7 +104,7 @@ export function generateScreenerCsv({
 }
 
 export function downloadScreenerCsv(options: ExportCsvOptions, filename?: string) {
-  const dateStr = new Date().toISOString().slice(0, 10);
+  const dateStr = marketDateStamp();
   const targetFilename = filename || `选股结果_${dateStr}.csv`;
   const csvContent = generateScreenerCsv(options);
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });

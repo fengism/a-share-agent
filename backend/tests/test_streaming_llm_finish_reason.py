@@ -60,3 +60,43 @@ async def test_streaming_client_tolerates_none_finish_reason_when_json_is_valid(
         client = StreamingLLMClient(AsyncMock(), "test-model", max_tokens=1000)
         res = await client.chat_result([{"role": "user", "content": "hi"}], json_format=True)
         assert res.text == '{"valid": true}'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reason", ["", "null", "NULL", "none", "  "])
+async def test_streaming_client_treats_empty_finish_reason_as_missing(reason):
+    """部分兼容网关（vLLM/llama.cpp 等）用空串或字符串 "null" 表示无结束原因。
+
+    这类响应内容可能已经完整，按缺失处理交给 JSON 完整性校验，而不是判成
+    "输出未正常结束" 直接丢弃。
+    """
+    chunks = [
+        {"choices": [{"delta": {"content": '{"valid": true}'}, "finish_reason": reason}]},
+    ]
+    with patch("app.infrastructure.llm.streaming.stream_chat_completion", return_value=_mock_stream(chunks)):
+        client = StreamingLLMClient(AsyncMock(), "test-model", max_tokens=1000)
+        res = await client.chat_result([{"role": "user", "content": "hi"}], json_format=True)
+        assert res.text == '{"valid": true}'
+        assert res.finish_reason is None
+
+
+@pytest.mark.asyncio
+async def test_streaming_client_still_rejects_empty_finish_reason_with_truncated_json():
+    chunks = [
+        {"choices": [{"delta": {"content": '{"cut_off": '}, "finish_reason": ""}]},
+    ]
+    with patch("app.infrastructure.llm.streaming.stream_chat_completion", return_value=_mock_stream(chunks)):
+        client = StreamingLLMClient(AsyncMock(), "test-model", max_tokens=1000)
+        with pytest.raises(LLMInvalidResponseError, match="内容不完整"):
+            await client.chat_result([{"role": "user", "content": "hi"}], json_format=True)
+
+
+@pytest.mark.asyncio
+async def test_streaming_client_normalizes_uppercase_success_reason():
+    chunks = [
+        {"choices": [{"delta": {"content": '{"ok": 1}'}, "finish_reason": "STOP"}]},
+    ]
+    with patch("app.infrastructure.llm.streaming.stream_chat_completion", return_value=_mock_stream(chunks)):
+        client = StreamingLLMClient(AsyncMock(), "test-model", max_tokens=1000)
+        res = await client.chat_result([{"role": "user", "content": "hi"}], json_format=True)
+        assert res.finish_reason == "stop"

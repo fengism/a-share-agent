@@ -14,6 +14,7 @@ from app.api.errors import (
     NotFoundError,
     ServiceUnavailableError,
 )
+from app.core.csv_export import csv_safe_row
 from app.domain.identity import AuthenticatedUser
 from app.modules.industry_classification.public import (
     ImportCommitRequest,
@@ -221,7 +222,7 @@ def export_industries(
         "更新时间",
     ])
     for item in items:
-        writer.writerow([
+        writer.writerow(csv_safe_row([
             item.get("stock_code", ""),
             item.get("stock_name", ""),
             item.get("market_group", ""),
@@ -231,7 +232,7 @@ def export_industries(
             item.get("sw_industry_code", ""),
             item.get("source", ""),
             item.get("updated_at", ""),
-        ])
+        ]))
 
     csv_data = output.getvalue().encode("utf-8")
     filename = "industry_classification_export.csv"

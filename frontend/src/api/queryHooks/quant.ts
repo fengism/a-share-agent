@@ -7,6 +7,7 @@ import { queryKeys } from "../queryKeys";
 export type QuantBacktestCreate = components["schemas"]["QuantBacktestCreate"];
 export type QuantBacktestRun = components["schemas"]["QuantBacktestRun"];
 export type QuantBacktestResult = components["schemas"]["QuantBacktestResult"];
+export type QuantEquityPoint = components["schemas"]["QuantEquityPoint"];
 export type QuantStrategyPreset = components["schemas"]["QuantStrategyPreset"];
 export type QuantSavedStrategy = components["schemas"]["QuantSavedStrategy"];
 export type QuantStrategyConfig = components["schemas"]["QuantStrategyConfig"];
@@ -15,6 +16,9 @@ export type QuantStrategyDraftBacktestRequest = components["schemas"]["QuantStra
 export type QuantStrategyDraftUpdateRequest = components["schemas"]["QuantStrategyDraftUpdateRequest"];
 export type QuantStrategyDefinitionInput = components["schemas"]["StrategyDefinition-Input"];
 export type QuantStrategyRegistryStatus = components["schemas"]["QuantStrategyRegistryStatus"];
+export type QuantParameterScanRequest = components["schemas"]["QuantParameterScanRequest"];
+export type QuantParameterScanPoint = components["schemas"]["QuantParameterScanPoint"];
+export type QuantParameterScanResult = components["schemas"]["QuantParameterScanResult"];
 type DeleteResponse = components["schemas"]["DeleteResponse"];
 
 const isActive = (status?: string) => status === "pending" || status === "running";
@@ -29,10 +33,12 @@ export function useQuantStrategyPresets() {
   });
 }
 
-export function useQuantStrategyRegistryStatus() {
+/** 策略注册表状态（管理员接口）；非管理员传 `enabled=false` 以避免无意义的 403。 */
+export function useQuantStrategyRegistryStatus(enabled = true) {
   return useQuery({
     queryKey: queryKeys.quant.registry,
     queryFn: () => apiGet<QuantStrategyRegistryStatus>("/quant/strategy-registry"),
+    enabled,
   });
 }
 
@@ -230,3 +236,11 @@ export function useDeleteQuantBacktest() {
     `/quant/backtests/${runId}`,
   ));
 }
+
+export function useScanQuantParameterSensitivity() {
+  return useMutation({
+    mutationFn: ({ runId, request }: { runId: string; request: QuantParameterScanRequest }) =>
+      apiPost<QuantParameterScanResult>(`/quant/backtests/${runId}/sensitivity-scan`, request),
+  });
+}
+

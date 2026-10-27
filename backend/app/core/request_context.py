@@ -46,6 +46,14 @@ current_request_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 current_settings_cache: contextvars.ContextVar[_RequestSettingsCache | None] = contextvars.ContextVar(
     "current_settings_cache", default=None
 )
+#: 客户端 IP / User-Agent，仅用于审计留痕（登录审计、管理员操作审计）。
+#: 由 ``UserContextMiddleware`` 在请求入口绑定；后台任务与 CLI 中为 ``None``。
+current_client_ip: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "current_client_ip", default=None
+)
+current_user_agent: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "current_user_agent", default=None
+)
 
 
 def set_current_user(user: UserRecord | None) -> contextvars.Token[UserRecord | None]:
@@ -75,6 +83,27 @@ def set_current_request_id(request_id: str):
 
 def reset_current_request_id(token) -> None:
     current_request_id.reset(token)
+
+
+def set_request_origin(client_ip: str, user_agent: str) -> tuple[contextvars.Token, contextvars.Token]:
+    """Bind the client IP / User-Agent for audit trail; returns tokens to reset."""
+    return current_client_ip.set(client_ip), current_user_agent.set(user_agent)
+
+
+def reset_request_origin(tokens: tuple[contextvars.Token, contextvars.Token]) -> None:
+    ip_token, ua_token = tokens
+    current_user_agent.reset(ua_token)
+    current_client_ip.reset(ip_token)
+
+
+def get_current_client_ip() -> str:
+    """Return the bound client IP (empty string outside a request)."""
+    return current_client_ip.get() or ""
+
+
+def get_current_user_agent() -> str:
+    """Return the bound User-Agent (empty string outside a request)."""
+    return current_user_agent.get() or ""
 
 
 def get_current_request_id() -> str | None:

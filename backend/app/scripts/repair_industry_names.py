@@ -4,10 +4,10 @@ import argparse
 import json
 import sqlite3
 from contextlib import closing
-from datetime import datetime
 from pathlib import Path
 
 from app.configuration.paths import DATA_DIR
+from app.domain.timezones import market_now
 from app.infrastructure.persistence.master_data_repair import backfill_industry_stock_names
 
 
@@ -32,7 +32,7 @@ def main() -> None:
         if args.apply and eligible:
             backup_dir = database.parent / "backups"
             backup_dir.mkdir(parents=True, exist_ok=True)
-            backup = backup_dir / f"industry-before-name-repair-{datetime.now():%Y%m%d-%H%M%S-%f}.db"
+            backup = backup_dir / f"industry-before-name-repair-{market_now():%Y%m%d-%H%M%S-%f}.db"
             with closing(sqlite3.connect(backup)) as destination:
                 connection.backup(destination)
             result["applied"] = backfill_industry_stock_names(connection)

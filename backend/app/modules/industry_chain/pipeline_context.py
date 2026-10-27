@@ -82,8 +82,11 @@ class PipelineContext:
         result: IndustryChainResult | None = None,
         agent_event=None,
     ) -> IndustryChainProgress:
-        """构造管道进度事件。"""
+        """构造管道进度事件（中间过渡事件对臃肿追踪和证据进行轻量化剪枝以节省带宽）。"""
         res = result if result is not None else self.result
+        if res is not None and event_type in ("stage_started", "stage_completed", "stage_failed"):
+            if res.agent_trace or res.evidence_catalog:
+                res = res.model_copy(update={"agent_trace": [], "evidence_catalog": []})
         return IndustryChainProgress(
             type=event_type,
             stage=stage,
@@ -130,6 +133,23 @@ class PipelineContext:
                     "result": self.result.model_dump(),
                     "warnings": self.warnings,
                     "evidence_stats": self.evidence_stats.model_dump(),
+                    "all_evidence": [
+                        {
+                            "tool_call_id": e.tool_call_id,
+                            "tool_name": e.tool_name,
+                            "arguments": e.arguments,
+                            "content": e.content,
+                            "is_error": e.is_error,
+                        }
+                        for e in self.all_evidence
+                    ],
+                    "public_data": self.public_data,
+                    "collection_metadata": self.collection_metadata,
+                    "prompt_context": self.prompt_context,
+                    "research_duration_ms": self.research_duration_ms,
+                    "draft_duration_ms": self.draft_duration_ms,
+                    "structured_prompt_succeeded": self.structured_prompt_succeeded,
+                    "fallback_research": self.fallback_research,
                 },
                 ttl=1800,
             )
@@ -149,6 +169,31 @@ class PipelineContext:
                 self.warnings = list(data.get("warnings", []))
                 if "evidence_stats" in data:
                     self.evidence_stats = IndustryChainEvidenceStats.model_validate(data["evidence_stats"])
+                if "all_evidence" in data and isinstance(data["all_evidence"], list):
+                    self.all_evidence = [
+                        AgentEvidence(
+                            tool_call_id=str(item.get("tool_call_id", "")),
+                            tool_name=str(item.get("tool_name", "")),
+                            arguments=str(item.get("arguments", "")),
+                            content=str(item.get("content", "")),
+                            is_error=bool(item.get("is_error", False)),
+                        )
+                        for item in data["all_evidence"]
+                        if isinstance(item, dict)
+                    ]
+                    from app.modules.industry_chain.evidence import build_evidence_catalog
+
+                    self.evidence_catalog = build_evidence_catalog(self.all_evidence)
+                if "public_data" in data and isinstance(data["public_data"], dict):
+                    self.public_data = data["public_data"]
+                if "collection_metadata" in data and isinstance(data["collection_metadata"], dict):
+                    self.collection_metadata = data["collection_metadata"]
+                if "prompt_context" in data and isinstance(data["prompt_context"], dict):
+                    self.prompt_context = data["prompt_context"]
+                self.research_duration_ms = int(data.get("research_duration_ms", 0))
+                self.draft_duration_ms = int(data.get("draft_duration_ms", 0))
+                self.structured_prompt_succeeded = bool(data.get("structured_prompt_succeeded", True))
+                self.fallback_research = bool(data.get("fallback_research", False))
                 return True
         except Exception as exc:
             logger.debug("恢复检查点失败 (%s): %s", stage_name, exc)

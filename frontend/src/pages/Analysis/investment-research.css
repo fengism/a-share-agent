@@ -88,6 +88,40 @@
 }
 
 
+@media (max-width: 767px) {
+  .investment-research-page {
+    padding-inline: 0;
+  }
+  .investment-research-content {
+    gap: 12px;
+  }
+  .investment-research-report {
+    --stock-research-title-size: 22px;
+    --stock-research-body-size: 14px;
+    --stock-research-section-size: 16px;
+    --stock-research-support-size: 13px;
+    width: 100%;
+    padding: 14px 12px;
+    border-radius: var(--c-radius-md);
+  }
+  .investment-research-report__header {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px 10px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+  }
+  .investment-research-report__header > div {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: flex-start;
+    gap: 6px 10px;
+    font-size: 12px;
+  }
+  .investment-research-report__header h2 {
+    font-size: var(--stock-research-title-size);
+  }
+}
+
 @container investment-research-page (max-width: 700px) {
   .investment-research-report {
     --stock-research-title-size: 24px;
@@ -109,7 +143,16 @@
 
 @media (max-width: 480px) {
   .investment-research-report {
-    padding: 12px;
+    --stock-research-title-size: 20px;
+    --stock-research-body-size: 13.5px;
+    padding: 12px 10px;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+  .investment-research-report__header > div {
+    gap: 4px 8px;
+    font-size: 11px;
   }
 }
 

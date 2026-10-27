@@ -1,4 +1,5 @@
 import json
+import logging
 import threading
 from collections.abc import Callable
 from typing import Any
@@ -8,6 +9,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from app.configuration import get_settings
+
+logger = logging.getLogger(__name__)
 
 _session: requests.Session | None = None
 _provider_session: requests.Session | None = None
@@ -104,8 +107,10 @@ def _request_with_session(
     data: Any = None,
     json_body: Any = None,
     headers: dict | None = None,
-    timeout: int | float = 10,
+    timeout: int | float | tuple[float, float] = 10,
     allow_redirects: bool = True,
+    proxies: dict[str, str] | None = None,
+    **kwargs: Any,
 ) -> requests.Response:
     request_options: dict[str, Any] = {
         "params": params,
@@ -114,8 +119,11 @@ def _request_with_session(
         "headers": headers,
         "timeout": timeout,
     }
+    if proxies is not None:
+        request_options["proxies"] = proxies
     if not allow_redirects:
         request_options["allow_redirects"] = False
+    request_options.update(kwargs)
     response = session_provider().request(method, url, **request_options)
     response.raise_for_status()
     return response
@@ -184,6 +192,16 @@ def post(url: str, **kwargs) -> requests.Response:
 
 def provider_request(method: str, url: str, **kwargs) -> requests.Response:
     """Send one Provider transport attempt; ProviderGateway owns retries."""
+    try:
+        from app.configuration import get_settings
+        from app.infrastructure.http.proxy import resolve_proxy_request
+
+        settings = get_settings()
+        options = resolve_proxy_request(url, settings)
+        if options.active and "proxies" not in kwargs:
+            kwargs["proxies"] = options.proxies
+    except Exception as exc:
+        logger.debug("解析出站代理失败，使用直连: %s", exc)
     return _request_with_session(get_provider_session, method, url, **kwargs)
 
 

@@ -41,4 +41,103 @@ describe("buildAnalysisMarkdown", () => {
     expect(md).toContain("公允价值区间**：¥1600 - ¥1800");
     expect(md).toContain("支撑位**：¥1480");
   });
+
+  it("includes investment research framework sections when present", () => {
+    const result: Partial<AnalysisResult> = {
+      stock_code: "600519",
+      stock_name: "贵州茅台",
+      research_framework: {
+        information_quality: { grade: "A", grade_rationale: "", limitations: [], evidence_confidence: 90, investment_certainty: 85, coverage_summary: "" },
+        business_model: {
+          economic_engine: "品牌定价权驱动超额利润",
+          earnings_quality: "高现金流且极低坏账",
+          revenue_drivers: [],
+          segment_quality: [],
+          operating_leverage: "",
+          strengths: [],
+          concerns: [],
+        },
+        moat: {
+          overall_durability: "长久稳固",
+          moats: [
+            {
+              moat_type: "brand_pricing",
+              strength: "strong",
+              direction: "stable",
+              evidence: ["批价保持高端"],
+              counterevidence: [],
+              durability: "",
+              threats: [],
+              confidence: 0.9,
+            },
+          ],
+          key_threats: [],
+        },
+        management: {
+          track_record: "",
+          capital_allocation: "",
+          shareholder_alignment: "",
+          succession_or_key_person_risk: "",
+          strengths: [],
+          concerns: [],
+          confidence: null,
+        },
+        industry_position: {
+          secular_context: "",
+          value_chain_position: "",
+          growth_drivers: [],
+          competitive_position: "",
+          technology_or_obsolescence_risk: "",
+          concentration_risks: [],
+          confidence: null,
+        },
+        inversion: {
+          bear_case: "商务宴请消费严重滑坡导致渠道库存堰塞湖",
+          risks: [
+            {
+              risk: "批价倒挂抛压",
+              failure_path: "黄牛与经销商踩踏甩货",
+              probability: "low",
+              impact: "high",
+              time_horizon: "1-2年",
+              leading_indicators: ["整箱批价下跌破线"],
+              mitigants: [],
+              scenario: "bear",
+            },
+          ],
+          bias_checks: [],
+        },
+        valuation: {
+          method_summary: "",
+          current_valuation: "",
+          assumptions: [],
+          scenarios: null,
+          margin_of_safety: "",
+          limitations: [],
+        },
+        actions: {
+          new_investor_action: "watch",
+          holder_action: "hold",
+          rationale: "安全边际充足，但短期等待批价企稳",
+          buy_or_add_range: [1400, 1500],
+          add_triggers: [],
+          sell_triggers: [],
+          thesis_breakers: ["飞天批价跌破2000元且库存超过6个月"],
+          monitoring_metrics: ["批价变化趋势", "经销商打款意愿"],
+        },
+        data_gaps: [],
+      },
+    };
+
+    const md = buildAnalysisMarkdown(result as AnalysisResult);
+    expect(md).toContain("## 六、商业模式与核心护城河");
+    expect(md).toContain("品牌定价权驱动超额利润");
+    expect(md).toContain("brand_pricing");
+    expect(md).toContain("## 七、逆向思考与最强做空/下行逻辑 (Inversion)");
+    expect(md).toContain("商务宴请消费严重滑坡导致渠道库存堰塞湖");
+    expect(md).toContain("批价倒挂抛压");
+    expect(md).toContain("## 八、条件化投资决策与失效跟踪");
+    expect(md).toContain("飞天批价跌破2000元且库存超过6个月");
+    expect(md).toContain("¥1400 - ¥1500");
+  });
 });

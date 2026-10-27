@@ -7,20 +7,29 @@ from app.modules.industry_chain.atlas.loader import get_atlas_chain, list_atlas_
 from app.modules.industry_chain.atlas.miner import mining_slug
 
 
-def matching_atlas_chain(name: str) -> AtlasChain | None:
+def matching_atlas_chain(name: str, user_id: int | None = None) -> AtlasChain | None:
     normalized = name.strip()
-    chains = list_atlas_chains()
-    # 优先严格匹配 chain.name
+    chains = list_atlas_chains(user_id=user_id)
+    # 优先严格匹配 chain.name（优先用户私有图谱，其次非 auto 内置/导入，再次挖掘条目）
     name_matches = [chain for chain in chains if chain.name == normalized]
     if name_matches:
+        user_matches = [chain for chain in name_matches if chain.source == "user"]
+        if user_matches:
+            return user_matches[0]
         curated_name = [chain for chain in name_matches if not chain.slug.startswith("auto-")]
         return (curated_name or name_matches)[0]
 
     exact = [chain for chain in chains if normalized in (chain.aliases or [])]
+    user_exact = [chain for chain in exact if chain.source == "user"]
+    if user_exact:
+        return user_exact[0]
     curated = [chain for chain in exact if not chain.slug.startswith("auto-")]
     matched = (curated or exact)[0] if len(curated or exact) == 1 else None
     if matched is None and not exact:
-        matched = get_atlas_chain(mining_slug(normalized))
+        if user_id:
+            matched = get_atlas_chain(f"user-{mining_slug(normalized)[5:]}", user_id=user_id)
+        if matched is None:
+            matched = get_atlas_chain(mining_slug(normalized))
     if matched is None and not exact and len(normalized) >= 2:
         partial = [
             chain

@@ -15,6 +15,7 @@ import {
 } from "./portfolioFormatters";
 import PortfolioTableCard from "./PortfolioTableCard";
 import { PORTFOLIO_TABLE_PAGINATION } from "./portfolioTableConfig";
+import { marketDateStamp } from "../../utils/marketTime";
 import type { PortfolioTableRenderers } from "./portfolioTableRenderers";
 
 interface PortfolioTransactionTableProps {
@@ -65,7 +66,7 @@ function PortfolioTransactionTable({ transactions, renderers }: PortfolioTransac
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `投资组合交易流水_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `投资组合交易流水_${marketDateStamp()}.csv`;
       a.click();
       URL.revokeObjectURL?.(url);
     }

@@ -111,6 +111,71 @@ _LLM_ACCOUNT_ERROR_MESSAGES: dict[int, str] = {
     404: "模型不存在或接口地址错误，请在设置中检查模型配置",
 }
 
+#: 网关明确"不支持工具调用"的措辞。只收窄义短语：schema 校验错误里也会出现
+#: "tools"，把它当成"不支持工具"会把我们自己的 bug 静默降级成"没有工具可用"。
+_TOOL_REJECTION_MARKERS = (
+    "does not support tools",
+    "does not support tool",
+    "tools are not supported",
+    "tools is not supported",
+    "tool calling is not supported",
+    "tool_calls are not supported",
+    "function calling is not supported",
+    "function_call is not supported",
+    "unsupported parameter: tools",
+    "unsupported parameter 'tools'",
+    "no tool support",
+    "tool_choice is not supported",
+    "不支持工具",
+    "不支持 function calling",
+    "不支持函数调用",
+)
+
+#: 命中这些词说明是参数/schema 层面的错误（我们自己的问题），不能降级成"不支持工具"。
+_TOOL_SCHEMA_HINTS = (
+    "parameters",
+    "schema",
+    "required",
+    "additionalproperties",
+    "properties",
+)
+
+_TOOL_STATUS_CODES = frozenset({400, 422})
+
+
+def is_tool_rejection_message(text: str) -> bool:
+    """错误文本是否是"网关不支持工具调用"。"""
+    lowered = text.strip().lower()
+    if not lowered:
+        return False
+    if not any(marker in lowered for marker in _TOOL_REJECTION_MARKERS):
+        return False
+    return not any(hint in lowered for hint in _TOOL_SCHEMA_HINTS)
+
+
+def looks_like_tools_unsupported(error: BaseException) -> bool:
+    """沿 ``__cause__`` 链判断这次失败是不是"该网关不支持 tools"。
+
+    只认 400/422：401/403 是凭证问题、429/5xx 是瞬时问题，都不能当成能力缺失，
+    否则会把可修复的配置错误永久降级成"没有工具"。
+    """
+    current: BaseException | None = error
+    depth = 0
+    while current is not None and depth < 8:
+        status_code = getattr(current, "status_code", None)
+        if status_code is None:
+            response = getattr(current, "response", None)
+            status_code = getattr(response, "status_code", None)
+        if isinstance(status_code, int) and status_code in _TOOL_STATUS_CODES:
+            if is_tool_rejection_message(str(current)):
+                return True
+        elif isinstance(status_code, int):
+            return False  # 明确的非 400/422：直接否定，不再往下猜
+        current = current.__cause__
+        depth += 1
+    return False
+
+
 _CONTEXT_LENGTH_MARKERS = (
     "context_length",
     "maximum context",
@@ -137,6 +202,11 @@ def describe_llm_account_error(error: BaseException) -> str | None:
             message = _LLM_ACCOUNT_ERROR_MESSAGES.get(status_code)
             if message is not None:
                 return message
+            if status_code in _TOOL_STATUS_CODES and is_tool_rejection_message(str(current)):
+                return (
+                    "当前模型网关不支持工具调用，请改用支持 tools 的模型，"
+                    "或在部署层用 LLM_COMPATIBILITY_OVERRIDES 关闭工具能力"
+                )
             if status_code == 400:
                 text = str(current).lower()
                 if any(marker in text for marker in _CONTEXT_LENGTH_MARKERS):

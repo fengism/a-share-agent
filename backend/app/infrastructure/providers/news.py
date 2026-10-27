@@ -280,7 +280,7 @@ class NewsDataProvider:
         }
         req = request("GET", reqUrl, params=payload, headers=headers, timeout=10)
         if req.status_code != 200:
-            logger.error(f"获取华尔街见闻失败: error={req.status_code}, content={req.text}")
+            logger.error('获取华尔街见闻失败: error=%s, content=%s', req.status_code, req.text)
             raise RuntimeError(f"获取华尔街见闻失败: {req.status_code}")
         data = req.json()
         items = data.get("data", {}).get("items", []) or []

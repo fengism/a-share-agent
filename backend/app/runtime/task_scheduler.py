@@ -7,10 +7,11 @@ import random
 import socket
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from uuid import uuid4
 
 from app.configuration import get_settings
+from app.domain.timezones import market_now
 from app.infrastructure.persistence.task_leader import TaskLeaderLease
 from app.runtime.task_health import background_task_health, new_task_health
 
@@ -29,7 +30,7 @@ class _PeriodicState:
 
     def schedule(self, delay: float) -> None:
         self.entry["next_run"] = (
-            datetime.now() + timedelta(seconds=delay)
+            market_now() + timedelta(seconds=delay)
         ).isoformat()
 
     def record_error(self, error: Exception, duration_ms: float | None = None) -> float:
@@ -46,7 +47,7 @@ class _PeriodicState:
 
     def record_success(self, duration_ms: float) -> None:
         self.entry["last_duration_ms"] = duration_ms
-        self.entry["last_run"] = datetime.now().isoformat()
+        self.entry["last_run"] = market_now().isoformat()
         self.entry["last_error"] = None
         self.entry["consecutive_errors"] = 0
         self.consecutive_errors = 0

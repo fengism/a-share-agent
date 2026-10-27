@@ -13,15 +13,15 @@ class ResearchGroup(ConfigGroup):
     PREFIX = ""
 
     agent_research_timeout_seconds: float = Field(default=1200.0, gt=0)
-    # 产业链调研预算独立于交互式 Chat/通用 Agent；有进展时允许更多轮次，无进展仍提前停止。
-    industry_chain_tool_calls_total: int = Field(default=96, ge=8, le=128)
-    industry_chain_repair_tool_calls_total: int = Field(default=48, ge=4, le=64)
-    industry_chain_max_rounds: int = Field(default=6, ge=2, le=10)
-    industry_chain_repair_max_rounds: int = Field(default=3, ge=1, le=6)
-    industry_chain_research_timeout_seconds: float = Field(default=1800.0, gt=0)
+    # 产业链调研预算独立于交互式 Chat/通用 Agent；针对当前产业链全链路分析复杂度升级
+    industry_chain_tool_calls_total: int = Field(default=160, ge=8, le=300)
+    industry_chain_repair_tool_calls_total: int = Field(default=80, ge=4, le=160)
+    industry_chain_max_rounds: int = Field(default=10, ge=2, le=24)
+    industry_chain_repair_max_rounds: int = Field(default=5, ge=1, le=12)
+    industry_chain_research_timeout_seconds: float = Field(default=2400.0, gt=0)
     # 产业链定向补证分为独立的取证与报告重写时限；任一阶段超时都保留初稿并标记 degraded。
-    industry_chain_repair_research_timeout_seconds: float = Field(default=900.0, gt=0)
-    industry_chain_repair_synthesis_timeout_seconds: float = Field(default=600.0, gt=0)
+    industry_chain_repair_research_timeout_seconds: float = Field(default=1200.0, gt=0)
+    industry_chain_repair_synthesis_timeout_seconds: float = Field(default=900.0, gt=0)
     # Long report generation: one deadline shared by streaming and schema repair.
     analysis_llm_timeout_seconds: float = Field(default=1200.0, gt=0)
     analysis_llm_max_completion_tokens: int = Field(default=32768, ge=1)
@@ -39,6 +39,11 @@ class ResearchGroup(ConfigGroup):
     max_concurrent_chat_per_user: int = 2
     max_concurrent_chat_total: int = 8
     max_concurrent_llm_requests: int = 6
+    # 每用户 LLM 触发频率上限（滑动窗口）。LLM 端点会有「用户 Key → 全局 Key」
+    # 回退，且共享 max_concurrent_llm_requests 全局槽位：没有频率上限时单个账号
+    # 反复触发长任务既烧掉管理员的额度，也会把其他用户挤进排队。
+    user_llm_rate_limit_requests: int = Field(default=20, ge=1, le=1000)
+    user_llm_rate_limit_window: int = Field(default=60, ge=1, le=3600)
     blocking_thread_pool_workers: int = 20
     chat_max_completion_tokens: int = 4096
     chat_total_timeout_seconds: int = 300

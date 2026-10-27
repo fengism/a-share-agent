@@ -2,8 +2,8 @@
 
 import asyncio
 import logging
-from datetime import datetime
 
+from app.domain.timezones import market_now
 from app.financial_data.hk.schemas import HKStockQuotePage
 from app.financial_data.hk.service import hk_market_service
 from app.financial_data.stock.public import fetch_realtime_quote_set
@@ -22,7 +22,7 @@ async def fetch_quote_batch(codes: list[str]) -> QuoteBatch:
     if not codes:
         return QuoteBatch(
             quotes={},
-            quoted_at=datetime.now().isoformat(timespec="seconds"),
+            quoted_at=market_now().isoformat(timespec="seconds"),
             source="none",
             stale=False,
             quote_sources={},
@@ -91,19 +91,19 @@ async def fetch_quote_batch(codes: list[str]) -> QuoteBatch:
 
     if cn_codes and hk_codes:
         source = "mixed"
-        quoted_at = datetime.now().isoformat(timespec="seconds")
+        quoted_at = market_now().isoformat(timespec="seconds")
         stale = bool(quote_set and quote_set.stale)
     elif quote_set is not None:
         source = quote_set.source
-        quoted_at = quote_set.quoted_at or datetime.now().isoformat(timespec="seconds")
+        quoted_at = quote_set.quoted_at or market_now().isoformat(timespec="seconds")
         stale = quote_set.stale
     elif hk_quote_page is not None:
         source = hk_quote_page.source
-        quoted_at = hk_quote_page.updated_at or datetime.now().isoformat(timespec="seconds")
+        quoted_at = hk_quote_page.updated_at or market_now().isoformat(timespec="seconds")
         stale = False
     else:
         source = "none"
-        quoted_at = datetime.now().isoformat(timespec="seconds")
+        quoted_at = market_now().isoformat(timespec="seconds")
         stale = False
 
     return QuoteBatch(

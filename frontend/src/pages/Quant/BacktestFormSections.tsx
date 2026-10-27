@@ -1,5 +1,5 @@
 import { DeleteOutlined, HistoryOutlined, ReloadOutlined, SaveOutlined, SettingOutlined } from "@ant-design/icons";
-import { Button, Col, Form, Input, InputNumber, Popconfirm, Row, Select, Switch, Tag, Typography } from "antd";
+import { Button, Col, Form, Input, InputNumber, Popconfirm, Row, Select, Switch, Tag, Tooltip, Typography } from "antd";
 import { useState } from "react";
 import {
   stockCodesValidationError,
@@ -108,6 +108,39 @@ const QUICK_STOCK_PRESETS = [
   { label: "长江电力", code: "600900" },
 ];
 
+const THEMATIC_UNIVERSE_PRESETS = [
+  {
+    name: "沪深300白马",
+    desc: "贵州茅台 / 宁德时代 / 中国平安 / 招商银行 / 比亚迪 / 长江电力 / 美的集团 / 紫金矿业",
+    codes: "600519, 300750, 601318, 600036, 002594, 600900, 000333, 601899",
+    color: "blue",
+  },
+  {
+    name: "AI算力科技",
+    desc: "中际旭创 / 新易盛 / 工业富联 / 澜起科技 / 中微公司 / 寒武纪",
+    codes: "300308, 300502, 601138, 688008, 688012, 688256",
+    color: "purple",
+  },
+  {
+    name: "红利低波高股息",
+    desc: "中国神华 / 陕西煤业 / 中国移动 / 工商银行 / 大秦铁路 / 中国石化",
+    codes: "601088, 601225, 600941, 601398, 601006, 600028",
+    color: "gold",
+  },
+  {
+    name: "高端制造出海",
+    desc: "比亚迪 / 汇川技术 / 阳光电源 / 三一重工 / 福耀玻璃",
+    codes: "002594, 300124, 300274, 600031, 600660",
+    color: "cyan",
+  },
+  {
+    name: "医药医疗创新",
+    desc: "恒瑞医药 / 药明康德 / 百济神州 / 迈瑞医疗 / 片仔癀",
+    codes: "600276, 603259, 688235, 300760, 600436",
+    color: "green",
+  },
+];
+
 export function UniverseFields({ source }: { source: QuantFormValues["source"] }) {
   const form = Form.useFormInstance<QuantFormValues>();
 
@@ -118,9 +151,16 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
       return;
     }
     const list = current.split(/[,\s，]+/).map((s: string) => s.trim()).filter(Boolean);
-    if (!list.includes(code) && list.length < 10) {
+    if (!list.includes(code) && list.length < 30) {
       form.setFieldValue("codes", `${current}, ${code}`);
     }
+  };
+
+  const handleThematicPreset = (codes: string) => {
+    form.setFieldsValue({
+      source: "custom",
+      codes,
+    });
   };
 
   return (
@@ -152,22 +192,44 @@ export function UniverseFields({ source }: { source: QuantFormValues["source"] }
                 if (error) throw new Error(error);
               },
             }]}
-            extra={source === "portfolio" ? "运行时读取当前持仓股票，最多 10 只" : "支持空格或逗号分隔，最多 10 只"}
+            extra={source === "portfolio" ? "运行时读取当前持仓股票，最多 10 只" : "支持空格或逗号分隔，最多 30 只"}
           >
             <Input disabled={source === "portfolio"} placeholder="600519, 000001" />
           </Form.Item>
           {source === "custom" ? (
-            <div className="quant-quick-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "-12px", marginBottom: "12px" }}>
-              <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)", alignSelf: "center" }}>快捷添加:</span>
-              {QUICK_STOCK_PRESETS.map((preset) => (
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "-12px", marginBottom: "12px" }}>
+              <div className="quant-quick-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>精选主题池:</span>
+                {THEMATIC_UNIVERSE_PRESETS.map((preset) => (
+                  <Tooltip key={preset.name} title={preset.desc}>
+                    <Tag
+                      color={preset.color}
+                      style={{ cursor: "pointer", fontSize: "var(--c-font-xs)", marginInlineEnd: 0 }}
+                      onClick={() => handleThematicPreset(preset.codes)}
+                    >
+                      {preset.name}
+                    </Tag>
+                  </Tooltip>
+                ))}
+              </div>
+              <div className="quant-quick-stocks" style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontSize: "var(--c-font-xs)", color: "var(--c-text-muted)" }}>快捷加单股:</span>
+                {QUICK_STOCK_PRESETS.map((preset) => (
+                  <Tag
+                    key={preset.code}
+                    style={{ cursor: "pointer", fontSize: "var(--c-font-xs)", marginInlineEnd: 0 }}
+                    onClick={() => handleQuickCode(preset.code)}
+                  >
+                    {preset.label}
+                  </Tag>
+                ))}
                 <Tag
-                  key={preset.code}
-                  style={{ cursor: "pointer", fontSize: "var(--c-font-xs)", marginInlineEnd: 0 }}
-                  onClick={() => handleQuickCode(preset.code)}
+                  style={{ cursor: "pointer", fontSize: "var(--c-font-xs)", marginInlineEnd: 0, opacity: 0.7 }}
+                  onClick={() => form.setFieldValue("codes", "")}
                 >
-                  {preset.label}
+                  清空
                 </Tag>
-              ))}
+              </div>
             </div>
           ) : null}
         </Col>

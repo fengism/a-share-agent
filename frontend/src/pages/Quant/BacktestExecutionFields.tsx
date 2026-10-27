@@ -1,5 +1,5 @@
 import { InfoCircleOutlined, PlayCircleOutlined } from "@ant-design/icons";
-import { Button, Col, Collapse, DatePicker, Form, Input, InputNumber, Row, Typography } from "antd";
+import { AutoComplete, Button, Col, Collapse, DatePicker, Form, InputNumber, Row, Typography } from "antd";
 import dayjs from "dayjs";
 import BacktestAdvancedFields from "./BacktestAdvancedFields";
 import { FormSectionHeader } from "./BacktestFormSections";
@@ -7,6 +7,14 @@ import { dateRangeValidationError, type QuantFormValues } from "./quantForm";
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
+
+const BENCHMARK_OPTIONS = [
+  { value: "000300", label: "000300 · 沪深300 (大盘蓝筹)" },
+  { value: "000905", label: "000905 · 中证500 (中盘成长)" },
+  { value: "000852", label: "000852 · 中证1000 (小盘创新)" },
+  { value: "399006", label: "399006 · 创业板指 (高成长创新)" },
+  { value: "000001", label: "000001 · 上证指数 (综合大盘)" },
+];
 
 export default function BacktestExecutionFields({ isSubmitting }: { isSubmitting: boolean }) {
   return (
@@ -39,7 +47,14 @@ export default function BacktestExecutionFields({ isSubmitting }: { isSubmitting
               },
             }]}
           >
-            <Input maxLength={8} />
+            <AutoComplete
+              options={BENCHMARK_OPTIONS}
+              filterOption={(inputValue, option) =>
+                (option?.value?.toUpperCase().includes(inputValue.toUpperCase()) ?? false) ||
+                (option?.label?.includes(inputValue) ?? false)
+              }
+              placeholder="000300"
+            />
           </Form.Item>
         </Col>
         <Col xs={12} sm={8} md={7}>

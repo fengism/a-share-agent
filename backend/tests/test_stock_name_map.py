@@ -218,8 +218,14 @@ def test_missing_name_file_degrades_without_crashing(monkeypatch, tmp_path):
     from app.financial_data.stock.profile import name_map as module
 
     monkeypatch.setattr(module, "_STOCK_NAME_FILE", tmp_path / "absent.json")
+    # 名称文件缺失时实现会回退到本地全市场快照（backend/data/stock_spot_snapshot.json）；
+    # 那是真实部署里存在的文件，开发机跑过应用后就会让本用例失去意义，因此显式隔离。
+    monkeypatch.setattr(module, "_load_stock_name_map_from_spot_snapshot", lambda: None)
     monkeypatch.setattr(module, "_stock_source_key", None)
     monkeypatch.setattr(module, "_stock_name_detection_index", None)
+    monkeypatch.setattr(module, "_stock_reference_names", None)
+    monkeypatch.setattr(module, "_stock_short_name_index", None)
+    monkeypatch.setattr(module, "_stock_pinyin_index", None)
     monkeypatch.setattr(module, "_STOCK_NAME_MAP_SERVICE", type(
         "S", (), {"get_cached": staticmethod(lambda: None)},
     )())

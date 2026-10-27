@@ -2,10 +2,36 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from collections.abc import Mapping
+from typing import Any, Literal
 from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+#: ``extra_body`` 是给厂商私有开关留的通道（如 Qwen ``enable_thinking``、
+#: GLM ``thinking``）。这些字段影响模型、消息、预算或协议语义，只允许走顶层
+#: 参数，否则等于绕开全部请求整形与部署上限。
+GOVERNED_BODY_FIELDS = frozenset({
+    "model", "messages", "stream", "max_tokens", "max_completion_tokens",
+    "temperature", "response_format", "stream_options", "tools", "tool_choice",
+    "parallel_tool_calls",
+})
+
+
+def validate_extra_body(value: Any) -> dict[str, Any]:
+    """校验 extra_body 是 JSON 对象且不覆盖受治理字段。
+
+    报错信息不回显取值：扩展里可能混入密钥或提示词片段。
+    """
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError("extra_body 必须是 JSON 对象")
+    if any(key in value for key in GOVERNED_BODY_FIELDS):
+        raise ValueError(
+            "extra_body 不能覆盖受治理的模型、消息、预算或协议参数，请使用顶层参数"
+        )
+    return {str(key): item for key, item in value.items()}
 
 
 def normalize_llm_endpoint(value: str) -> str:

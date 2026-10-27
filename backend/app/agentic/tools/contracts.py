@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from app.agentic.protocol import ToolCallInfo, ToolResultInfo
+from app.agentic.runtime.metrics import metrics
 from app.agentic.runtime.settings import get_default_settings
+from app.agentic.tools.json_repair import load_arguments
 from app.agentic.tools.serialization import (
     result_error_message,
     serialize_error,
@@ -146,7 +148,14 @@ class Tool:
             )
         try:
             if arguments is None:
-                arguments = coerce_arguments(json.loads(call.function.arguments), self.parameters)
+                parsed_arguments, repair_rule = load_arguments(call.function.arguments)
+                if parsed_arguments is None:
+                    raise json.JSONDecodeError(
+                        "工具参数不是合法 JSON", str(call.function.arguments), 0,
+                    )
+                if repair_rule is not None:
+                    metrics.record_agentic_event(f"tool_args_repaired:{repair_rule}")
+                arguments = coerce_arguments(parsed_arguments, self.parameters)
             settings = execution_context.settings if execution_context is not None else get_default_settings()
             requested_timeout = self.policy.timeout_seconds or settings.chat_tool_timeout_seconds
             timeout_seconds = max(1.0, float(requested_timeout))

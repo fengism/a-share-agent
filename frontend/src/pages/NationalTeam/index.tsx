@@ -44,6 +44,7 @@ import { APP_FONT_FAMILY } from "../../theme/typography";
 import { formatNumberWithSeparators } from "../../utils/format";
 import { buildStockProfileUrl } from "../../utils/stockLinks";
 import type { NationalTeamEtfSeries, NationalTeamIndexSeries } from "../../types/stock";
+import { marketDateStamp } from "../../utils/marketTime";
 import "./national-team.css";
 
 const { Text, Title } = Typography;
@@ -97,7 +98,7 @@ function downloadNationalTeamCsv(etfs: NationalTeamEtfSeries[], asOfDate?: strin
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
-  link.setAttribute("download", `国家队ETF监测_${asOfDate || new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute("download", `国家队ETF监测_${asOfDate || marketDateStamp()}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

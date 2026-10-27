@@ -231,6 +231,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/admin/audit-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Admin Audit Actions
+         * @description Admin: 管理员敏感操作审计（改角色/禁用/删除/邀请码/全局配置）。
+         */
+        get: operations["get_admin_audit_actions_api_auth_admin_audit_actions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/admin/audit-logs": {
         parameters: {
             query?: never;
@@ -387,6 +407,26 @@ export interface paths {
          * @description Admin: enable or disable a user account.
          */
         put: operations["update_user_status_api_auth_admin_users__user_id__status_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/audit-logs/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Login Audit Logs
+         * @description 当前用户自助查询自己的登录记录（只返回 user_id 匹配的记录）。
+         */
+        get: operations["get_my_login_audit_logs_api_auth_audit_logs_me_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -595,6 +635,46 @@ export interface paths {
          */
         post: operations["reset_password_api_auth_reset_password_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description 列出当前账号的有效登录会话（设备/IP/时间），供用户自助踢出可疑设备。
+         */
+        get: operations["list_sessions_api_auth_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Session
+         * @description 撤销当前账号的指定会话（句柄取自 `GET /auth/sessions`）。
+         */
+        delete: operations["revoke_session_api_auth_sessions__session_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1181,7 +1261,7 @@ export interface paths {
         };
         /**
          * Get Industry Chain Atlas Catalog
-         * @description 产业链知识库目录：分类、链条摘要与规模统计。
+         * @description 产业链知识库目录：分类、链条摘要与规模统计（合并官方公共库与当前用户私有图谱）。
          */
         get: operations["get_industry_chain_atlas_catalog_api_industry_chain_atlas_chains_get"];
         put?: never;
@@ -1201,16 +1281,16 @@ export interface paths {
         };
         /**
          * Get Industry Chain Atlas Chain
-         * @description 按 slug 获取单条产业链的上/中/下游完整图谱。
+         * @description 按 slug 获取单条产业链的上/中/下游完整图谱（优先加载用户私有图谱）。
          */
         get: operations["get_industry_chain_atlas_chain_api_industry_chain_atlas_chains__slug__get"];
         put?: never;
         post?: never;
         /**
-         * Delete Industry Chain Atlas Import
-         * @description 删除一条外部导入的产业链（管理员）；内置链条不可删除。
+         * Delete Industry Chain Atlas Chain
+         * @description 删除一条产业链知识库条目：优先删除用户私有图谱；若为公共导入图谱仅管理员可删。
          */
-        delete: operations["delete_industry_chain_atlas_import_api_industry_chain_atlas_chains__slug__delete"];
+        delete: operations["delete_industry_chain_atlas_chain_api_industry_chain_atlas_chains__slug__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1225,7 +1305,7 @@ export interface paths {
         };
         /**
          * Get Industry Chain Atlas Graph
-         * @description 跨链全局产业链图谱；chains 传逗号分隔 slug 时只统计这些链。
+         * @description 跨链全局产业链图谱（包含官方公共链与当前用户私有链）。
          */
         get: operations["get_industry_chain_atlas_graph_api_industry_chain_atlas_graph_get"];
         put?: never;
@@ -1247,7 +1327,7 @@ export interface paths {
         put?: never;
         /**
          * Import Industry Chain Atlas
-         * @description 导入外部产业链定义（管理员），校验通过后写入导入目录并立即生效。
+         * @description 导入外部产业链定义：普通用户导入至个人专属知识库；管理员可导入至公共知识库或个人知识库。
          */
         post: operations["import_industry_chain_atlas_api_industry_chain_atlas_import_post"];
         delete?: never;
@@ -1267,7 +1347,9 @@ export interface paths {
         put?: never;
         /**
          * Mine Industry Chain Atlas
-         * @description 把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目（管理员）。
+         * @description 把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目。
+         *
+         *     普通用户默认沉淀为个人专属私有知识库；管理员可沉淀为全局公共知识库或个人知识库。
          */
         post: operations["mine_industry_chain_atlas_api_industry_chain_atlas_mine_post"];
         delete?: never;
@@ -3162,6 +3244,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quant/backtests/{run_id}/sensitivity-scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scan Backtest Parameter Sensitivity */
+        post: operations["scan_backtest_parameter_sensitivity_api_quant_backtests__run_id__sensitivity_scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quant/strategies": {
         parameters: {
             query?: never;
@@ -3204,7 +3303,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Strategy Drafts */
+        /**
+         * Get Strategy Drafts
+         * @description 列出策略草稿：普通用户只返回自己创建的，管理员返回全量。
+         */
         get: operations["get_strategy_drafts_api_quant_strategy_drafts_get"];
         put?: never;
         post?: never;
@@ -4549,6 +4651,42 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdminAuditActionItem */
+        AdminAuditActionItem: {
+            /** Action */
+            action: string;
+            /** Actor Id */
+            actor_id?: number | null;
+            /** Actor Ip */
+            actor_ip: string;
+            /** Actor User Agent */
+            actor_user_agent: string;
+            /** Actor Username */
+            actor_username: string;
+            /** Created At */
+            created_at: string;
+            /** Details */
+            details: string;
+            /** Id */
+            id: number;
+            /** Target Id */
+            target_id: string;
+            /** Target Label */
+            target_label: string;
+            /** Target Type */
+            target_type: string;
+        };
+        /** AdminAuditActionsResponse */
+        AdminAuditActionsResponse: {
+            /** Items */
+            items: components["schemas"]["AdminAuditActionItem"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
         /** AdminResetLinkRequest */
         AdminResetLinkRequest: {
             /**
@@ -4969,7 +5107,7 @@ export interface components {
              * @default builtin
              * @enum {string}
              */
-            source: "builtin" | "imported" | "mined";
+            source: "builtin" | "imported" | "mined" | "user";
             /** Summary */
             summary: string;
             /** Tags */
@@ -4994,7 +5132,7 @@ export interface components {
              * @default builtin
              * @enum {string}
              */
-            source: "builtin" | "imported" | "mined";
+            source: "builtin" | "imported" | "mined" | "user";
             /** Summary */
             summary: string;
             /** Tags */
@@ -5042,6 +5180,8 @@ export interface components {
              * @default false
              */
             overwrite: boolean;
+            /** Scope */
+            scope?: string | null;
         };
         /** AtlasLayer */
         AtlasLayer: {
@@ -5067,6 +5207,8 @@ export interface components {
             archive_id: string;
             /** Name */
             name: string;
+            /** Scope */
+            scope?: string | null;
         };
         /** AtlasSegment */
         AtlasSegment: {
@@ -5893,6 +6035,8 @@ export interface components {
             industry_chain_research_timeout_seconds: number;
             /** Industry Chain Tool Calls Total */
             industry_chain_tool_calls_total: number;
+            /** Inherited Keys */
+            inherited_keys: string[];
             /** Is Admin */
             is_admin: boolean;
             /** Iwencai Api Key */
@@ -5916,16 +6060,34 @@ export interface components {
             llm_base_url: string;
             /** Llm Context Length Tokens */
             llm_context_length_tokens: number;
+            /** Llm Extra Body */
+            llm_extra_body: {
+                [key: string]: unknown;
+            };
+            /** Llm Generation Max Completion Tokens */
+            llm_generation_max_completion_tokens: number;
+            /** Llm Generation Timeout Seconds */
+            llm_generation_timeout_seconds: number;
+            /** Llm Json Mode Enabled */
+            llm_json_mode_enabled: boolean;
+            /** Llm Max Attempts */
+            llm_max_attempts: number;
             /** Llm Model */
             llm_model: string;
+            /** Llm Model Max Completion Tokens */
+            llm_model_max_completion_tokens: number | null;
             /** Llm Provider */
             llm_provider: string;
             /** Llm Simple Tasks */
             llm_simple_tasks: string;
+            /** Llm Stream Include Usage */
+            llm_stream_include_usage: boolean;
             /** Llm Sub Model */
             llm_sub_model: string;
             /** Llm Temperature */
             llm_temperature: number;
+            /** Llm Timeout Seconds */
+            llm_timeout_seconds: number;
             /** Macro Analysis Prewarm Enabled */
             macro_analysis_prewarm_enabled: boolean;
             /** Market Daily Attempt Retention Days */
@@ -5952,6 +6114,8 @@ export interface components {
             notion_parent_page_id: string;
             /** Outbound Proxy Retries */
             outbound_proxy_retries: number;
+            /** Outbound Proxy Scopes */
+            outbound_proxy_scopes: string[];
             /** Outbound Proxy Timeout Seconds */
             outbound_proxy_timeout_seconds: number;
             /**
@@ -6139,16 +6303,34 @@ export interface components {
             llm_base_url?: string | null;
             /** Llm Context Length Tokens */
             llm_context_length_tokens?: number | null;
+            /** Llm Extra Body */
+            llm_extra_body?: {
+                [key: string]: unknown;
+            } | null;
+            /** Llm Generation Max Completion Tokens */
+            llm_generation_max_completion_tokens?: number | null;
+            /** Llm Generation Timeout Seconds */
+            llm_generation_timeout_seconds?: number | null;
+            /** Llm Json Mode Enabled */
+            llm_json_mode_enabled?: boolean | null;
+            /** Llm Max Attempts */
+            llm_max_attempts?: number | null;
             /** Llm Model */
             llm_model?: string | null;
+            /** Llm Model Max Completion Tokens */
+            llm_model_max_completion_tokens?: number | null;
             /** Llm Provider */
             llm_provider?: string | null;
             /** Llm Simple Tasks */
             llm_simple_tasks?: string | null;
+            /** Llm Stream Include Usage */
+            llm_stream_include_usage?: boolean | null;
             /** Llm Sub Model */
             llm_sub_model?: string | null;
             /** Llm Temperature */
             llm_temperature?: number | null;
+            /** Llm Timeout Seconds */
+            llm_timeout_seconds?: number | null;
             /** Macro Analysis Prewarm Enabled */
             macro_analysis_prewarm_enabled?: boolean | null;
             /** Market Daily Attempt Retention Days */
@@ -6175,6 +6357,8 @@ export interface components {
             notion_parent_page_id?: string | null;
             /** Outbound Proxy Retries */
             outbound_proxy_retries?: number | null;
+            /** Outbound Proxy Scopes */
+            outbound_proxy_scopes?: string[] | null;
             /** Outbound Proxy Timeout Seconds */
             outbound_proxy_timeout_seconds?: number | null;
             /** Outbound Proxy Type */
@@ -8116,6 +8300,42 @@ export interface components {
              */
             technology: "complete" | "partial" | "missing";
         };
+        /**
+         * IndustryChainCycleAnalysis
+         * @description 产业链供需周期与顺价机制定位。
+         */
+        IndustryChainCycleAnalysis: {
+            /**
+             * Capacity Utilization
+             * @description 行业产能利用率或开工率
+             * @default
+             */
+            capacity_utilization: string;
+            /**
+             * Expansion Lead Time
+             * @description 扩产建设与认证壁垒周期，如 12-18 个月
+             * @default
+             */
+            expansion_lead_time: string;
+            /**
+             * Inflection Point
+             * @description 供需缺口或景气拐点推演
+             * @default
+             */
+            inflection_point: string;
+            /**
+             * Pass Through Ability
+             * @description 成本顺价传导能力与毛利率弹性
+             * @default
+             */
+            pass_through_ability: string;
+            /**
+             * Stage
+             * @description 周期所处阶段，如主动补库/产能出清/供需紧平衡
+             * @default
+             */
+            stage: string;
+        };
         /** IndustryChainEvent */
         IndustryChainEvent: {
             /** Citations */
@@ -8264,6 +8484,36 @@ export interface components {
              * @default 0
              */
             unique_count: number;
+        };
+        /**
+         * IndustryChainExpectationDivergence
+         * @description 市场一致预期 vs 本次研究分歧（预期差推演）。
+         */
+        IndustryChainExpectationDivergence: {
+            /**
+             * Catalyst Trigger
+             * @description 预期差验证的核心观测指标与时间窗口
+             * @default
+             */
+            catalyst_trigger: string;
+            /**
+             * Consensus
+             * @description 市场主流一致预期
+             * @default
+             */
+            consensus: string;
+            /**
+             * Divergence
+             * @description 本次研究审慎/独立推断
+             * @default
+             */
+            divergence: string;
+            /**
+             * Topic
+             * @description 预期差主题，如出海增速/渗透率节奏/替代路线
+             * @default
+             */
+            topic: string;
         };
         /**
          * IndustryChainHistoryItem
@@ -8473,10 +8723,20 @@ export interface components {
              */
             confidence: "high" | "medium" | "low";
             /**
+             * Consensus Forecast
+             * @default
+             */
+            consensus_forecast: string;
+            /**
              * Description
              * @default
              */
             description: string;
+            /**
+             * Eps Elasticity
+             * @default
+             */
+            eps_elasticity: string;
             /**
              * Evidence Basis
              * @default disclosed
@@ -8485,6 +8745,17 @@ export interface components {
             evidence_basis: "disclosed" | "forecast" | "inference" | "opinion";
             /** Evidence Ids */
             evidence_ids?: string[];
+            /**
+             * Gross Margin
+             * @default
+             */
+            gross_margin: string;
+            /**
+             * Growth Rate
+             * @description 业绩增速（营收/净利 YoY），如 营收+15.2% / 净利+28.0%
+             * @default
+             */
+            growth_rate: string;
             /** Invalidation Conditions */
             invalidation_conditions?: string[];
             /**
@@ -8497,8 +8768,24 @@ export interface components {
              * @default
              */
             metric: string;
+            /**
+             * Moat
+             * @default
+             */
+            moat: string;
             /** Name */
             name?: string | null;
+            /**
+             * Net Margin
+             * @default
+             */
+            net_margin: string;
+            /**
+             * Overseas Share
+             * @description 海外或出口业务营收占比及毛利率，如 94.8% (境外 · 毛利47.9%)
+             * @default
+             */
+            overseas_share: string;
             /**
              * Pb
              * @default
@@ -8509,8 +8796,25 @@ export interface components {
              * @default
              */
             pe: string;
+            /**
+             * Pe Percentile
+             * @default
+             */
+            pe_percentile: string;
+            /**
+             * Price Change
+             * @description 最新股价及涨跌幅，如 128.50 (+2.3%)
+             * @default
+             */
+            price_change: string;
             /** Realization Conditions */
             realization_conditions?: string[];
+            /**
+             * Restricted Risk
+             * @description 限售解禁抛压风险提示
+             * @default
+             */
+            restricted_risk: string;
             /**
              * Revenue Period
              * @default
@@ -8521,6 +8825,12 @@ export interface components {
              * @default
              */
             revenue_share: string;
+            /**
+             * Roe
+             * @description 净资产收益率（ROE），如 18.5%
+             * @default
+             */
+            roe: string;
             /**
              * Role
              * @default
@@ -8784,6 +9094,7 @@ export interface components {
             /** Conflicts */
             conflicts?: components["schemas"]["IndustryChainConflict"][];
             coverage?: components["schemas"]["IndustryChainCoverage"];
+            cycle_analysis?: components["schemas"]["IndustryChainCycleAnalysis"];
             /** Downstream */
             downstream?: components["schemas"]["IndustryChainNode"][];
             /** Driver Insights */
@@ -8793,6 +9104,8 @@ export interface components {
             /** Evidence Catalog */
             evidence_catalog?: components["schemas"]["IndustryChainEvidence"][];
             evidence_stats?: components["schemas"]["IndustryChainEvidenceStats"];
+            /** Expectation Divergences */
+            expectation_divergences?: components["schemas"]["IndustryChainExpectationDivergence"][];
             /** Key Events */
             key_events?: components["schemas"]["IndustryChainEvent"][];
             /** Key Stocks */
@@ -8862,6 +9175,8 @@ export interface components {
             trends?: components["schemas"]["IndustryChainInsight"][];
             /** Upstream */
             upstream?: components["schemas"]["IndustryChainNode"][];
+            /** Value Distribution */
+            value_distribution?: components["schemas"]["IndustryChainValueDistribution"][];
             verification_repair?: components["schemas"]["IndustryChainVerificationRepair"];
             /** Warnings */
             warnings?: string[];
@@ -8989,6 +9304,48 @@ export interface components {
              * @default
              */
             requested_name: string;
+        };
+        /**
+         * IndustryChainValueDistribution
+         * @description 价值链价值量（BOM）与利润池分配。
+         */
+        IndustryChainValueDistribution: {
+            /**
+             * Cost Share
+             * @description 单机/系统价值量或 BOM 成本占比，如 35%
+             * @default
+             */
+            cost_share: string;
+            /**
+             * Detail
+             * @description 成本构成、议价权及技术门槛简述
+             * @default
+             */
+            detail: string;
+            /**
+             * Gross Margin Range
+             * @description 毛利率区间，如 40%~50%
+             * @default
+             */
+            gross_margin_range: string;
+            /**
+             * Pricing Power
+             * @default unverified
+             * @enum {string}
+             */
+            pricing_power: "high" | "medium" | "low" | "unverified";
+            /**
+             * Profit Share
+             * @description 产业链利润池占比或定性分布
+             * @default
+             */
+            profit_share: string;
+            /**
+             * Segment
+             * @description 环节或核心零部件/组件名称
+             * @default
+             */
+            segment: string;
         };
         /** IndustryChainVerificationRepair */
         IndustryChainVerificationRepair: {
@@ -11512,6 +11869,11 @@ export interface components {
         NeedsSetupResponse: {
             /** Needs Setup */
             needs_setup: boolean;
+            /**
+             * Requires Setup Token
+             * @default false
+             */
+            requires_setup_token: boolean;
         };
         /** NewsAnalysisItem */
         NewsAnalysisItem: {
@@ -12648,15 +13010,35 @@ export interface components {
         QuantEquityPoint: {
             /** Benchmark */
             benchmark?: number | null;
+            /** Cash */
+            cash?: number | null;
             /** Date */
             date: string;
             /** Drawdown */
             drawdown: number;
             /** Equity */
             equity: number;
+            /** Excess Return */
+            excess_return?: number | null;
+            /** Position Weights */
+            position_weights?: {
+                [key: string]: number;
+            } | null;
+            /** Positions Value */
+            positions_value?: number | null;
+            /** Rolling Beta */
+            rolling_beta?: number | null;
+            /** Rolling Sharpe */
+            rolling_sharpe?: number | null;
         };
         /** QuantExecutionConfig */
         QuantExecutionConfig: {
+            /**
+             * Allocation Method
+             * @default equal
+             * @enum {string}
+             */
+            allocation_method: "equal" | "risk_parity";
             /**
              * Cash Reserve Ratio
              * @default 0
@@ -12684,6 +13066,11 @@ export interface components {
              */
             lot_size: number;
             /**
+             * Market Impact Coefficient
+             * @default 10
+             */
+            market_impact_coefficient: number;
+            /**
              * Max Daily Participation Rate
              * @default 0.1
              */
@@ -12701,6 +13088,23 @@ export interface components {
              */
             minimum_commission: number;
             /**
+             * Ranking Lookback
+             * @default 20
+             */
+            ranking_lookback: number;
+            /**
+             * Ranking Metric
+             * @default momentum
+             * @enum {string}
+             */
+            ranking_metric: "momentum" | "inverse_volatility" | "turnover" | "equal";
+            /**
+             * Rebalance Frequency
+             * @default daily
+             * @enum {string}
+             */
+            rebalance_frequency: "daily" | "weekly" | "monthly";
+            /**
              * Rebalance Window Days
              * @default 3
              */
@@ -12716,6 +13120,12 @@ export interface components {
              */
             slippage_bps: number;
             /**
+             * Slippage Model
+             * @default fixed
+             * @enum {string}
+             */
+            slippage_model: "fixed" | "square_root";
+            /**
              * Stamp Duty Rate
              * @default 0.0005
              */
@@ -12724,6 +13134,8 @@ export interface components {
             stop_loss_pct?: number | null;
             /** Target Annual Volatility */
             target_annual_volatility?: number | null;
+            /** Top N Selection */
+            top_n_selection?: number | null;
             /** Trailing Stop Pct */
             trailing_stop_pct?: number | null;
             /**
@@ -12766,40 +13178,84 @@ export interface components {
         };
         /** QuantMetrics */
         QuantMetrics: {
+            /** Allocation Effect */
+            allocation_effect?: number | null;
+            /** Alpha */
+            alpha?: number | null;
             /** Annualized Return */
             annualized_return: number;
             /** Annualized Volatility */
             annualized_volatility: number;
+            /** Avg Holding Days */
+            avg_holding_days?: number | null;
+            /** Avg Loss Holding Days */
+            avg_loss_holding_days?: number | null;
+            /** Avg Loss Pnl */
+            avg_loss_pnl?: number | null;
+            /** Avg Win Holding Days */
+            avg_win_holding_days?: number | null;
+            /** Avg Win Pnl */
+            avg_win_pnl?: number | null;
             /** Benchmark Return */
             benchmark_return?: number | null;
+            /** Beta */
+            beta?: number | null;
             /** Calmar Ratio */
             calmar_ratio?: number | null;
             /** Closed Trade Count */
             closed_trade_count?: number | null;
+            /** Deflated Sharpe Ratio */
+            deflated_sharpe_ratio?: number | null;
+            /** Downside Capture */
+            downside_capture?: number | null;
             /** Downside Volatility */
             downside_volatility?: number | null;
             /** Excess Return */
             excess_return?: number | null;
             /** Information Ratio */
             information_ratio?: number | null;
+            /** Interaction Effect */
+            interaction_effect?: number | null;
             /** Max Drawdown */
             max_drawdown: number;
+            /** Max Drawdown Duration Days */
+            max_drawdown_duration_days?: number | null;
+            /** Max Loss Pct */
+            max_loss_pct?: number | null;
+            /** Max Win Pct */
+            max_win_pct?: number | null;
             /** Observation Count */
             observation_count?: number | null;
+            /** Omega Ratio */
+            omega_ratio?: number | null;
+            /** Probabilistic Sharpe Ratio */
+            probabilistic_sharpe_ratio?: number | null;
             /** Profit Loss Ratio */
             profit_loss_ratio?: number | null;
+            /** Selection Effect */
+            selection_effect?: number | null;
             /** Sharpe Ratio */
             sharpe_ratio?: number | null;
             /** Sortino Ratio */
             sortino_ratio?: number | null;
+            /** Stress Tests */
+            stress_tests?: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            } | null;
             /** Total Return */
             total_return: number;
             /** Tracking Error */
             tracking_error?: number | null;
             /** Trade Count */
             trade_count: number;
+            /** Treynor Ratio */
+            treynor_ratio?: number | null;
             /** Turnover Rate */
             turnover_rate: number;
+            /** Upside Capture */
+            upside_capture?: number | null;
             /** Win Rate */
             win_rate?: number | null;
         };
@@ -12827,6 +13283,58 @@ export interface components {
             shares: number;
             /** Unrealized Pnl */
             unrealized_pnl: number;
+        };
+        /** QuantParameterScanPoint */
+        QuantParameterScanPoint: {
+            /** Annualized Return */
+            annualized_return: number;
+            /** Max Drawdown */
+            max_drawdown: number;
+            /** Param1 Value */
+            param1_value: unknown;
+            /** Param2 Value */
+            param2_value?: unknown | null;
+            /** Sharpe Ratio */
+            sharpe_ratio?: number | null;
+            /** Total Return */
+            total_return: number;
+            /** Win Rate */
+            win_rate?: number | null;
+        };
+        /** QuantParameterScanRequest */
+        QuantParameterScanRequest: {
+            /** Param1 Name */
+            param1_name: string;
+            /** Param1 Values */
+            param1_values: unknown[];
+            /** Param2 Name */
+            param2_name?: string | null;
+            /** Param2 Values */
+            param2_values?: unknown[] | null;
+        };
+        /** QuantParameterScanResult */
+        QuantParameterScanResult: {
+            optimal_point?: components["schemas"]["QuantParameterScanPoint"] | null;
+            /** Param1 Name */
+            param1_name: string;
+            /** Param1 Values */
+            param1_values: unknown[];
+            /** Param2 Name */
+            param2_name?: string | null;
+            /** Param2 Values */
+            param2_values?: unknown[] | null;
+            /** Points */
+            points: components["schemas"]["QuantParameterScanPoint"][];
+            /**
+             * Profitable Ratio
+             * @default 0
+             */
+            profitable_ratio: number;
+            /**
+             * Robustness Score
+             * @default 0
+             */
+            robustness_score: number;
         };
         /** QuantSavedStrategy */
         QuantSavedStrategy: {
@@ -13234,6 +13742,8 @@ export interface components {
             invite_code?: string | null;
             /** Password */
             password: string;
+            /** Setup Token */
+            setup_token?: string | null;
             /** Username */
             username: string;
         };
@@ -13800,6 +14310,28 @@ export interface components {
             role: string;
             /** Segment */
             segment: string;
+        };
+        /** SessionItem */
+        SessionItem: {
+            /** Created At */
+            created_at: string;
+            /** Expires At */
+            expires_at: string;
+            /** Ip Address */
+            ip_address: string;
+            /** Is Current */
+            is_current: boolean;
+            /** Last Seen At */
+            last_seen_at: string;
+            /** Session Id */
+            session_id: string;
+            /** User Agent */
+            user_agent: string;
+        };
+        /** SessionsResponse */
+        SessionsResponse: {
+            /** Items */
+            items: components["schemas"]["SessionItem"][];
         };
         /** SgeGoldHistoryPoint */
         SgeGoldHistoryPoint: {
@@ -14769,9 +15301,9 @@ export interface components {
         "StrategyDefinition-Input": {
             /**
              * Api Version
-             * @constant
+             * @enum {string}
              */
-            api_version: "quant.strategy/v1";
+            api_version: "quant.strategy/v1" | "quant.strategy/v2";
             /**
              * Constraints
              * @default []
@@ -14813,9 +15345,9 @@ export interface components {
         "StrategyDefinition-Output": {
             /**
              * Api Version
-             * @constant
+             * @enum {string}
              */
-            api_version: "quant.strategy/v1";
+            api_version: "quant.strategy/v1" | "quant.strategy/v2";
             /**
              * Constraints
              * @default []
@@ -14868,7 +15400,7 @@ export interface components {
              * Operator
              * @enum {string}
              */
-            operator: "sma" | "ema" | "rsi" | "rolling_max" | "rolling_min" | "rolling_std" | "add" | "subtract" | "multiply" | "divide" | "obv" | "shift";
+            operator: "sma" | "ema" | "rsi" | "rolling_max" | "rolling_min" | "rolling_std" | "add" | "subtract" | "multiply" | "divide" | "obv" | "shift" | "atr" | "momentum" | "min" | "max" | "abs";
             /** Period */
             period?: number | string | null;
             /** Right */
@@ -14925,9 +15457,11 @@ export interface components {
             /**
              * Mode
              * @default binary
-             * @constant
+             * @enum {string}
              */
-            mode: "binary";
+            mode: "binary" | "continuous_weight";
+            /** Target Weight */
+            target_weight?: number | string | null;
         };
         /** StrategyPresentation */
         StrategyPresentation: {
@@ -16402,6 +16936,40 @@ export interface operations {
             };
         };
     };
+    get_admin_audit_actions_api_auth_admin_audit_actions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                action?: string | null;
+                actor_username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAuditActionsResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_login_audit_logs_api_auth_admin_audit_logs_get: {
         parameters: {
             query?: {
@@ -16652,6 +17220,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_my_login_audit_logs_api_auth_audit_logs_me_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginAuditLogsResponse"];
                 };
             };
             /** @description 统一错误响应 */
@@ -16985,6 +17586,66 @@ export interface operations {
                 "application/json": components["schemas"]["ResetPasswordRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_sessions_api_auth_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionsResponse"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    revoke_session_api_auth_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -18041,7 +18702,7 @@ export interface operations {
             };
         };
     };
-    delete_industry_chain_atlas_import_api_industry_chain_atlas_chains__slug__delete: {
+    delete_industry_chain_atlas_chain_api_industry_chain_atlas_chains__slug__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -21477,6 +22138,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuantBacktestRun"];
+                };
+            };
+            /** @description 统一错误响应 */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    scan_backtest_parameter_sensitivity_api_quant_backtests__run_id__sensitivity_scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuantParameterScanRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuantParameterScanResult"];
                 };
             };
             /** @description 统一错误响应 */

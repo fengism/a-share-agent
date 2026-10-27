@@ -153,6 +153,9 @@ def test_get_concept_constituents_degrades_when_quotes_unavailable(monkeypatch: 
         raise RuntimeError("行情上游不可用")
 
     monkeypatch.setattr(module, "fetch_realtime_quote_set", _boom)
+    # 行情不可用时实现会回退到"本地当日已确认收盘价"（market_daily 库）；
+    # 开发机跑过归档后该兜底会命中真实数据，故显式置空以验证纯降级路径。
+    _patch_local_closes(monkeypatch, {})
 
     result = asyncio.run(module.get_concept_constituents("机器人概念"))
 
@@ -329,6 +332,8 @@ def test_get_concept_constituents_degrades_on_timeout(monkeypatch: pytest.Monkey
 
     monkeypatch.setattr(module, "QUOTE_FETCH_TIMEOUT_SECONDS", 0.05)
     monkeypatch.setattr(module, "fetch_realtime_quote_set", _slow_fetch)
+    # 本地当日已确认收盘兜底同样要隔离，否则跑过归档的开发机会命中真实数据。
+    _patch_local_closes(monkeypatch, {})
 
     result = asyncio.run(module.get_concept_constituents("机器人概念", quote_codes=["000002"]))
 

@@ -8,7 +8,7 @@ import os
 import shutil
 import sqlite3
 from collections.abc import Callable, Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from app.infrastructure.persistence.connection import ALL_DATABASES, DB_DIR, DatabaseName, get_connection
@@ -505,6 +505,15 @@ def create_online_backups(
             _cleanup_incomplete_backups(mirror_dir, database)
         suffix = ".sqlite3.gz" if compression else ".sqlite3"
         destination = backup_dir / f"{database}-{timestamp}{suffix}"
+        # 同一秒内重复触发（手动触发与周期任务竞争、或重试）
+        # 会与既有备份同名冲突导致整轮备份失败；
+        # 按整秒递增找到未占用的时间戳，保持文件名时间戳可解析
+        while destination.exists() or _checksum_path(destination).exists():
+            timestamp = (
+                datetime.strptime(timestamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+                + timedelta(seconds=1)
+            ).strftime("%Y%m%dT%H%M%SZ")
+            destination = backup_dir / f"{database}-{timestamp}{suffix}"
         temporary = backup_dir / f".{database}-{timestamp}.sqlite3.tmp"
         durable_unlink(temporary)
         try:

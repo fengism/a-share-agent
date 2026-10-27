@@ -80,16 +80,20 @@ def _event(
     result: IndustryChainResult | None = None,
     agent_event=None,
 ) -> IndustryChainProgress:
+    res = result
+    if res is not None and event_type in ("stage_started", "stage_completed", "stage_failed"):
+        if res.agent_trace or res.evidence_catalog:
+            res = res.model_copy(update={"agent_trace": [], "evidence_catalog": []})
     return IndustryChainProgress(
         type=event_type,
         stage=stage,
         message=message,
-        result=result,
+        result=res,
         agent_event=agent_event,
-        archive_id=result.archive_id if result is not None else "",
-        archive_status=result.archive_status if result is not None else "none",
-        quality_status=result.quality_status if result is not None else "complete",
-        warnings=list(result.warnings) if result is not None else [],
+        archive_id=res.archive_id if res is not None else "",
+        archive_status=res.archive_status if res is not None else "none",
+        quality_status=res.quality_status if res is not None else "complete",
+        warnings=list(res.warnings) if res is not None else [],
     )
 
 

@@ -126,7 +126,7 @@ class TTLCache:
             count = len(self._store)
             self._store.clear()
             metrics.record_cache_event(self._name, "clear", size=0)
-            logger.info(f"缓存清空: 清除{count}条")
+            logger.info('缓存清空: 清除%s条', count)
 
     def snapshot(self) -> dict[str, int]:
         with self._lock:

@@ -128,17 +128,34 @@ async def run_analysis(
             3,
             detail="正在生成完整投研报告，支持流式接收；完成后将校验输出…",
         )
+        await emit_agent_event(AgentEvent(
+            type="status",
+            content=(
+                f"全维度证据采集完毕（共 {len(research.evidence)} 条事实证据），"
+                "正在基于多空博弈框架合成深度投研报告…"
+            ),
+        ))
 
         async def _report_generation_heartbeat():
             started_at = asyncio.get_running_loop().time()
+            step_tips = [
+                "正在解析财务报表与估值情景…",
+                "正在推演商业壁垒、护城河反证与管理层资本配置…",
+                "正在从空头做空视角进行逆向压力测试与失败路径推演…",
+                "正在执行结构化校验、证据缺口降级与买卖行动规划…",
+            ]
+            interval = 10
+            count = 0
             while True:
+                await asyncio.sleep(interval)
                 elapsed = int(asyncio.get_running_loop().time() - started_at)
+                tip = step_tips[count % len(step_tips)]
+                count += 1
                 await emit_agent_event(AgentEvent(
                     type="status",
-                    content=(f"报告生成中，已等待 {elapsed} 秒；等待完整输出后校验保存"
-                             f"（本次生成时限 {settings.analysis_llm_timeout_seconds:g} 秒）…"),
+                    content=(f"深度研报生成中（已等待 {elapsed} 秒，{tip}）"
+                             f"（本次时限 {settings.analysis_llm_timeout_seconds:g} 秒）…"),
                 ))
-                await asyncio.sleep(15)
 
         thinking_task = asyncio.create_task(_report_generation_heartbeat())
         try:

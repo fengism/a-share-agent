@@ -11,6 +11,7 @@ import { useUrlSearchParam } from "../../hooks/useUrlSearchParam";
 import type { MarketLimitUpLadderStock } from "../../types/stock";
 import { normalizeIsoDate } from "../../utils/date";
 import { formatAmount } from "../../utils/format";
+import { formatMarketDateTime } from "../../utils/marketTime";
 import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
 import LimitHistoryPanel from "./LimitHistoryPanel";
 
@@ -18,9 +19,7 @@ const { Text, Title } = Typography;
 
 function formatFetchedAt(value: string | undefined) {
   if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
+  return formatMarketDateTime(value, value);
 }
 
 function getLadderTagStyle(boardCount: number, colors: ReturnType<typeof useColors>) {

@@ -11,6 +11,7 @@ from app.financial_data.market.public import (
 )
 from app.infrastructure.http.client import reset_session
 from app.infrastructure.integrations.feishu.auth import clear_token_cache
+from app.infrastructure.llm.tool_support import reset_tool_support
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,11 @@ def apply_update_side_effects(updated: Settings, patch: dict) -> None:
 
     if "http_trust_env" in patch:
         reset_session()
+
+    if any(key.startswith("llm_") for key in patch):
+        # 换了网关/模型/Key 就是另一条路由，之前"不支持工具"的推断不能再沿用，
+        # 否则用户升级网关后仍要等 TTL 过期或重启才重探。
+        reset_tool_support()
 
     if "fred_api_key" in patch:
         invalidate_us_macro_snapshot()

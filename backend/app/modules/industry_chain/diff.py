@@ -49,6 +49,15 @@ def _node_detail(node: IndustryChainNode) -> str:
             node.description,
             f"代表企业：{'、'.join(node.companies)}" if node.companies else "",
             f"市场份额：{node.market_share}" if node.market_share else "",
+            f"毛利率：{node.gross_margin}" if getattr(node, "gross_margin", "") else "",
+            f"ROE：{node.roe}" if getattr(node, "roe", "") else "",
+            f"增速：{node.growth_rate}" if getattr(node, "growth_rate", "") else "",
+            f"出海占比：{node.overseas_share}" if getattr(node, "overseas_share", "") else "",
+            f"壁垒：{node.moat}" if getattr(node, "moat", "") else "",
+            f"弹性：{node.eps_elasticity}" if getattr(node, "eps_elasticity", "") else "",
+            f"估值分位：{node.pe_percentile}" if getattr(node, "pe_percentile", "") else "",
+            f"预期：{node.consensus_forecast}" if getattr(node, "consensus_forecast", "") else "",
+            f"解禁：{node.restricted_risk}" if getattr(node, "restricted_risk", "") else "",
             node.metric,
         )
         if part
@@ -67,6 +76,30 @@ def _event_detail(event: IndustryChainEvent) -> str:
     return " · ".join(part for part in (event.date, event.impact) if part)
 
 
+def _similarity_score(a: str, b: str) -> float:
+    """计算两个短文本的字符与 2-gram 相似度，支持前缀/包含与同义修饰对齐。"""
+    a_clean = re.sub(r"[^\w\u4e00-\u9fff]", "", a.lower())
+    b_clean = re.sub(r"[^\w\u4e00-\u9fff]", "", b.lower())
+    if not a_clean or not b_clean:
+        return 0.0
+    if a_clean == b_clean:
+        return 1.0
+    len_diff = abs(len(a_clean) - len(b_clean))
+    min_len = min(len(a_clean), len(b_clean))
+    if min_len >= 2 and (a_clean in b_clean or b_clean in a_clean) and len_diff <= 4:
+        return 0.85 - (len_diff * 0.05)
+
+    def ngrams(s: str) -> set[str]:
+        if len(s) < 2:
+            return {s}
+        return {s[i : i + 2] for i in range(len(s) - 1)}
+
+    g_a, g_b = ngrams(a_clean), ngrams(b_clean)
+    inter = len(g_a & g_b)
+    union = len(g_a | g_b)
+    return inter / union if union > 0 else 0.0
+
+
 def _append_collection_changes(
     changes: list[IndustryChainChangeItem],
     *,
@@ -79,26 +112,7 @@ def _append_collection_changes(
 ) -> None:
     before = {key(item): item for item in previous if key(item)}
     after = {key(item): item for item in current if key(item)}
-    for item_key in sorted(after.keys() - before.keys()):
-        item = after[item_key]
-        changes.append(
-            IndustryChainChangeItem(
-                category=category,
-                change_type="added",
-                title=title(item),
-                after=detail(item),
-            )
-        )
-    for item_key in sorted(before.keys() - after.keys()):
-        item = before[item_key]
-        changes.append(
-            IndustryChainChangeItem(
-                category=category,
-                change_type="removed",
-                title=title(item),
-                before=detail(item),
-            )
-        )
+
     for item_key in sorted(before.keys() & after.keys()):
         old_item = before[item_key]
         new_item = after[item_key]
@@ -114,6 +128,65 @@ def _append_collection_changes(
                     after=new_detail,
                 )
             )
+
+    unmatched_after = set(after.keys() - before.keys())
+    unmatched_before = set(before.keys() - after.keys())
+
+    # 针对链条环节/驱动/风险等文本条目，优先语义相近配对（同义词/修饰词微调）
+    fuzzy_matched_pairs: list[tuple[str, str]] = []
+    if category in ("chain", "driver", "risk"):
+        for a_k in sorted(unmatched_after):
+            best_b_k = None
+            best_score = 0.0
+            for b_k in sorted(unmatched_before):
+                score = _similarity_score(a_k, b_k)
+                if score >= 0.6 and score > best_score:
+                    best_score = score
+                    best_b_k = b_k
+            if best_b_k is not None:
+                fuzzy_matched_pairs.append((best_b_k, a_k))
+                unmatched_before.remove(best_b_k)
+
+    for b_k, a_k in fuzzy_matched_pairs:
+        unmatched_after.remove(a_k)
+        old_item = before[b_k]
+        new_item = after[a_k]
+        old_detail = detail(old_item)
+        new_detail = detail(new_item)
+        old_t = title(old_item)
+        new_t = title(new_item)
+        label_note = f"（原表述：{old_t}）" if old_t != new_t else ""
+        changes.append(
+            IndustryChainChangeItem(
+                category=category,
+                change_type="updated",
+                title=f"{new_t}{label_note}",
+                before=old_detail,
+                after=new_detail,
+                detail=f"条目表述调整{label_note}",
+            )
+        )
+
+    for item_key in sorted(unmatched_after):
+        item = after[item_key]
+        changes.append(
+            IndustryChainChangeItem(
+                category=category,
+                change_type="added",
+                title=title(item),
+                after=detail(item),
+            )
+        )
+    for item_key in sorted(unmatched_before):
+        item = before[item_key]
+        changes.append(
+            IndustryChainChangeItem(
+                category=category,
+                change_type="removed",
+                title=title(item),
+                before=detail(item),
+            )
+        )
 
 
 def _normalized(value: str) -> str:
@@ -316,6 +389,29 @@ def compute_industry_chain_changes(
             title=tier_title,
             detail=_node_detail,
         )
+
+    def _val_dist_key(item: Any) -> str:
+        return (getattr(item, "segment", "") or "").strip().lower()
+
+    def _val_dist_detail(item: Any) -> str:
+        parts = [
+            f"BOM占比: {item.cost_share}" if getattr(item, "cost_share", "") else "",
+            f"毛利率: {item.gross_margin_range}" if getattr(item, "gross_margin_range", "") else "",
+            f"议价权: {item.pricing_power}" if getattr(item, "pricing_power", "") else "",
+            getattr(item, "detail", ""),
+        ]
+        return "；".join(filter(None, parts))
+
+    _append_collection_changes(
+        items,
+        category="chain",
+        previous=getattr(previous, "value_distribution", []) or [],
+        current=getattr(current, "value_distribution", []) or [],
+        key=_val_dist_key,
+        title=lambda item: f"价值链BOM · {getattr(item, 'segment', '未命名环节')}",
+        detail=_val_dist_detail,
+    )
+
     _append_collection_changes(
         items,
         category="company",
@@ -326,6 +422,27 @@ def compute_industry_chain_changes(
         detail=_node_detail,
     )
     _append_metric_changes(items, previous, current)
+
+    def _div_key(item: Any) -> str:
+        return (getattr(item, "topic", "") or "").strip().lower()
+
+    def _div_detail(item: Any) -> str:
+        parts = [
+            f"共识: {item.consensus}" if getattr(item, "consensus", "") else "",
+            f"分歧: {item.divergence}" if getattr(item, "divergence", "") else "",
+            f"催化: {item.catalyst_trigger}" if getattr(item, "catalyst_trigger", "") else "",
+        ]
+        return "；".join(filter(None, parts))
+
+    _append_collection_changes(
+        items,
+        category="driver",
+        previous=getattr(previous, "expectation_divergences", []) or [],
+        current=getattr(current, "expectation_divergences", []) or [],
+        key=_div_key,
+        title=lambda item: f"预期差 · {getattr(item, 'topic', '未命名分歧')}",
+        detail=_div_detail,
+    )
     _append_collection_changes(
         items,
         category="event",

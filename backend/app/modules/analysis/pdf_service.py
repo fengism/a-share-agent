@@ -82,6 +82,7 @@ _TOOL_NAME_MAP: dict[str, str] = {
     "get_hk_stock_kline": "港股历史行情与K线走势",
     "get_hk_stock_quote": "港股实时行情与挂单",
     "get_hk_financial_statements": "港股财务报表与经营指标",
+    "get_hk_stock_industry_comparison": "港股同业地位与估值对比",
     # A股与通用投研数据源
     "get_stock_profile": "公司基本面画像与主营业务",
     "get_stock_info": "公司基础资料与主营业务",
@@ -90,6 +91,7 @@ _TOOL_NAME_MAP: dict[str, str] = {
     "get_stock_documents": "权威公告与研报目录",
     "get_stock_technical_indicators": "量化技术面与动量指标",
     "get_stock_valuation_detail": "估值指标与历史分位",
+    "compare_stocks": "同业龙头横向对比",
     "get_stock_risk_data": "质押减持与风险警示",
     "get_stock_sentiment": "市场情绪与舆情指标",
     "get_financial_statements": "企业三大财务报表数据",

@@ -102,9 +102,12 @@ def _collect_layer_codes(
     return result
 
 
-def build_atlas_graph(chain_slugs: list[str] | None = None) -> AtlasGraph:
+def build_atlas_graph(
+    chain_slugs: list[str] | None = None,
+    user_id: int | None = None,
+) -> AtlasGraph:
     """构建跨链全局产业链图谱。"""
-    all_chains = list_atlas_chains()
+    all_chains = list_atlas_chains(user_id=user_id)
     if chain_slugs:
         slug_set = set(chain_slugs)
         all_chains = [c for c in all_chains if c.slug in slug_set]

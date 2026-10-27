@@ -1,74 +1,20 @@
 import { useMemo } from "react";
-import { GlobalOutlined, WifiOutlined } from "@ant-design/icons";
-import { Alert, Button, Col, Divider, Input, InputNumber, Row, Segmented, Typography } from "antd";
+import { GlobalOutlined, InfoCircleOutlined, WifiOutlined } from "@ant-design/icons";
+import { Alert, Button, Checkbox, Col, Divider, Input, InputNumber, Row, Segmented, Tag, Tooltip, Typography } from "antd";
 import { useColors, useStyles } from "../../../styles/ui";
 import { SettingsCard, type ConfigCardProps } from "../SettingsCard";
 import type { OutboundProxyType, ProxyTestResponse } from "../../../types/settings";
+import {
+  PLACEHOLDER,
+  PROXY_SCOPE_OPTIONS,
+  validateProxyUrl,
+} from "./EastmoneyProxyConfigCard.utils";
 
 const PROXY_TYPE_OPTIONS: { value: OutboundProxyType; label: string }[] = [
   { value: "none", label: "直连（不使用代理）" },
   { value: "http", label: "HTTP 代理" },
   { value: "socks5", label: "SOCKS5 代理" },
 ];
-
-const PLACEHOLDER: Record<OutboundProxyType, string> = {
-  none: "未启用代理",
-  http: "http://用户名:密码@代理地址:端口",
-  socks5: "socks5h://用户名:密码@代理地址:端口",
-};
-
-/** 规范化代理地址：未提供协议头时自动补齐，便于提交与后续处理。 */
-export function normalizeProxyUrl(rawUrl: string, proxyType: OutboundProxyType): string {
-  const value = rawUrl.trim();
-  if (!value) return "";
-  const schemeMatch = value.match(/^([a-zA-Z0-9+-]+):\/\/(.*)$/);
-  if (!schemeMatch) {
-    return `${proxyType === "socks5" ? "socks5h" : "http"}://${value}`;
-  }
-  const scheme = schemeMatch[1].toLowerCase();
-  const remainder = schemeMatch[2];
-  if (proxyType === "socks5" && scheme === "socks") {
-    return `socks5h://${remainder}`;
-  }
-  return value;
-}
-
-/** 提交前的前端校验，避免把明显非法的地址写进全局配置。 */
-export function validateProxyUrl(url: string, proxyType: OutboundProxyType): string | null {
-  const value = url.trim();
-  if (!value) return "启用代理后必须填写代理地址";
-  if (/\s/.test(value)) return "代理地址不能包含空格";
-
-  const schemeMatch = value.match(/^([a-zA-Z0-9+-]+):\/\/(.*)$/);
-  const rawScheme = schemeMatch ? schemeMatch[1].toLowerCase() : null;
-  const remainder = schemeMatch ? schemeMatch[2] : value;
-
-  const isSocksScheme = Boolean(rawScheme && rawScheme.startsWith("socks"));
-  if (proxyType === "socks5" && rawScheme && !isSocksScheme) {
-    return "代理类型为 SOCKS5 时，地址协议必须是 socks5/socks5h";
-  }
-  if (proxyType === "http" && isSocksScheme) {
-    return "代理类型为 HTTP 时，地址协议必须是 http/https";
-  }
-  if (proxyType === "http" && rawScheme && rawScheme !== "http" && rawScheme !== "https") {
-    return "代理类型为 HTTP 时，地址协议必须是 http/https";
-  }
-
-  // 浏览器原生 new URL() 对非标准协议（如 socks5/socks5h）在部分环境下不会解析 authority
-  // （导致 hostname/port 为空）。这里借用 http:// 构造虚拟对象做稳健解析。
-  let dummy: URL;
-  try {
-    dummy = new URL(`http://${remainder}`);
-  } catch {
-    return "代理地址格式无法解析";
-  }
-
-  if (!dummy.hostname) return "代理地址缺少主机名";
-  if (proxyType === "socks5" && !dummy.port) {
-    return "SOCKS5 代理必须指定端口，例如 socks5h://user:pass@host:2260";
-  }
-  return null;
-}
 
 export default function OutboundProxyConfigCard({
   form,
@@ -92,12 +38,41 @@ export default function OutboundProxyConfigCard({
   const proxyType = (form.outbound_proxy_type ?? "none") as OutboundProxyType;
   const proxyUrl = form.outbound_proxy_url ?? "";
   const proxyEnabled = proxyType !== "none";
+  const selectedScopes = form.outbound_proxy_scopes ?? ["eastmoney"];
 
   const urlError = useMemo(() => {
     if (!proxyEnabled) return null;
     if (!proxyUrl || proxyUrl.includes("***")) return null;
     return validateProxyUrl(proxyUrl, proxyType);
   }, [proxyEnabled, proxyType, proxyUrl]);
+
+  const scopeOptions = useMemo(
+    () =>
+      PROXY_SCOPE_OPTIONS.map((opt) => ({
+        value: opt.value,
+        label: (
+          <span>
+            <span style={{ fontWeight: 500 }}>{opt.label}</span>
+            <Tag
+              color={opt.tagColor}
+              style={{
+                marginLeft: 6,
+                fontSize: "11px",
+                lineHeight: "18px",
+                padding: "0 4px",
+                borderRadius: 2,
+              }}
+            >
+              {opt.tag}
+            </Tag>
+            <span style={{ color: colors.textMuted, fontSize: "var(--c-font-xs)" }}>
+              （{opt.desc}）
+            </span>
+          </span>
+        ),
+      })),
+    [colors.textMuted],
+  );
 
   return (
     <SettingsCard
@@ -114,8 +89,8 @@ export default function OutboundProxyConfigCard({
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        title="供按出口 IP 风控的上游接口共用"
-        description="东方财富按出口 IP 风控，境外或机房 IP 直连历史接口会返回 403。代理按接口粒度启用：每个数据源自行声明生效范围，未声明的接口保持直连，不影响其反爬策略。当前生效：东财 K 线与资金流接口。"
+        title="数据源出站代理路由"
+        description="国内财经站点常对境外或机房出口 IP 实行严格风控（如返回 403 或重置连接）。您可灵活勾选下方需要走代理的数据源；未勾选的接口将保持直连以获得最优速度。"
       />
       <Row gutter={[24, 16]}>
         <Col span={24}>
@@ -191,6 +166,29 @@ export default function OutboundProxyConfigCard({
             代理不稳定时按指数退避重试，仅对代理请求生效。
           </div>
         </Col>
+        <Col span={24}>
+          <div style={fieldLabelStyle}>走代理的接口与数据源</div>
+          <Checkbox.Group
+            aria-label="走代理的接口与数据源"
+            disabled={!proxyEnabled}
+            options={scopeOptions}
+            value={selectedScopes}
+            onChange={(checkedValues) =>
+              onChange({ outbound_proxy_scopes: checkedValues as string[] })
+            }
+          />
+          {proxyEnabled && selectedScopes.length === 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginTop: 8 }}
+              message="当前未选中任何数据源，所有出网请求将保持直连；如需代理请至少勾选一项（海外服务器推荐勾选东财与 AkShare）。"
+            />
+          )}
+          <div style={{ marginTop: 6, fontSize: "var(--c-font-sm)", color: colors.textMuted }}>
+            仅选中的数据源出网请求会通过代理转发；未勾选的接口保持直连以获得最优速度与稳定性。
+          </div>
+        </Col>
       </Row>
 
       <Divider style={{ margin: "16px 0 12px" }} />
@@ -199,6 +197,14 @@ export default function OutboundProxyConfigCard({
           <Button icon={<WifiOutlined />} loading={isTesting} onClick={onTest} disabled={!proxyEnabled}>
             测试连通性
           </Button>
+          {isDirty && proxyEnabled && (
+            <Tooltip title="配置已修改但尚未保存，连通性测试将测试后端当前已保存生效的配置">
+              <span style={{ marginLeft: 8, color: colors.warning, fontSize: "var(--c-font-xs)", cursor: "help" }}>
+                <InfoCircleOutlined style={{ marginRight: 4 }} />
+                配置有变动，请先保存再测试
+              </span>
+            </Tooltip>
+          )}
           {testResult && (
             <span style={{ marginLeft: 12, color: testResult.ok ? colors.success : colors.down }}>
               {testResult.ok ? "代理可用" : "代理不可用"} · {testResult.latency_ms}ms

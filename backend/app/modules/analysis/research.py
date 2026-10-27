@@ -11,6 +11,7 @@ from app.agentic_integration.public import (
     run_agentic_research,
 )
 from app.core.market import is_hk_code
+from app.modules.analysis.prefetch import prefetch_stock_baseline
 
 
 def _body_records(value: Any) -> list[tuple[str, str]]:
@@ -92,10 +93,15 @@ ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
 - 自主决定工具调用顺序，可多轮调用并根据结果补充调查。
 - 覆盖基础资料、估值、财务、长期公开研究、技术择时、新闻情绪、风险和市场环境。
 - 长期研究需调查盈利引擎与分部质量、护城河及反证、管理层与资本配置、行业与价值链、失败路径和估值假设。
+- 权威信源优先：
+  * 可调用 get_interactive_qa 获取深交所互动易与上交所 e 互动官方董秘答复，实锤上市公司业务合作、重大订单与生产进展；
+  * 可调用 get_restricted_shares_lift 检查未来与历史限售股解禁日历，测算股东抛压风险；
+  * 可调用 get_stock_documents 获取权威公告与券商研报目录。
 - 使用搜索工具发现公告、公司披露、交易所资料和权威行业材料后，优先调用 web_fetch 或 fetch_urls 阅读正文；若链接或资料为 PDF 研报/公告，调用 read_pdf 提取结构化文本与数据表格；搜索摘要不能替代正文证据。
 - 保留来源、发布日期、报告期和统计口径；财务与技术判断必须基于工具返回的具体数据。
 - 分析营收与毛利构成时关注产品、业务和地区集中度；上游未提供报告期时不得推断日期，各维度不可直接相加。
 - 技术面和情绪面仅作为短期择时信息，不用于替代长期商业质量和投资确定性判断。
+- 逆向多空对抗：避免预设立场的确认偏差，站在最苛刻的空头视角（Short-seller view）审查应收账款异动、行业产能过剩与价格战压力。
 - 对冲突信息指出口径差异，不得使用常识补写工具未返回的事实；资料不足时明确待核验问题。
 - 最终摘要区分事实、推断与数据缺口，并同时给出支持证据、反证和最重要的多空逻辑。""",
     tool_names=(
@@ -107,7 +113,11 @@ ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
         "get_stock_news",
         "get_stock_sentiment",
         "get_stock_risk_data",
+        "get_restricted_shares_lift",
+        "get_interactive_qa",
+        "get_stock_documents",
         "get_market_overview",
+        "compare_stocks",
         "iwencai_query",
         "iwencai_search",
         "web_search",
@@ -131,7 +141,7 @@ ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
         EvidenceRequirement(
             "industry_research",
             "行业与价值链公开资料",
-            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf"),
+            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf", "compare_stocks"),
             validator=_has_industry_research_evidence,
             fatal=False,
         ),
@@ -145,7 +155,7 @@ ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
         EvidenceRequirement(
             "management_research",
             "管理层与资本配置公开资料",
-            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf"),
+            ("iwencai_query", "web_fetch", "fetch_urls", "read_pdf", "get_interactive_qa"),
             validator=_has_management_research_evidence,
             fatal=False,
         ),
@@ -159,7 +169,7 @@ ANALYSIS_RESEARCH_SPEC = AgentResearchSpec(
             "新闻与情绪择时",
             ("get_stock_news", "get_stock_sentiment"),
         ),
-        EvidenceRequirement("risk", "风险与熊市线索", ("get_stock_risk_data",)),
+        EvidenceRequirement("risk", "风险与熊市线索", ("get_stock_risk_data", "get_restricted_shares_lift")),
         EvidenceRequirement("market", "市场环境", ("get_market_overview",)),
     ),
     allow_incomplete_summary=True,
@@ -249,6 +259,10 @@ async def research_stock(
     settings: Any = None,
     event_callback: AgentEventCallback | None = None,
 ) -> AgenticResearchResult:
+    # 1. 确定性基线事实并发预取（0 Token 纯异步并发，大幅缩减首轮等待时间并保证核心事实不遗漏）
+    baseline_evidences = await prefetch_stock_baseline(code, event_callback=event_callback)
+
+    # 2. 启动增量 Agent 探索
     if is_hk_code(code):
         return await run_agentic_research(
             HK_ANALYSIS_RESEARCH_SPEC,
@@ -256,10 +270,12 @@ async def research_stock(
             "完成可用维度的证据采集，明确列出数据缺口并给出研究摘要。",
             settings=settings,
             event_callback=event_callback,
+            initial_evidence=baseline_evidences,
         )
     return await run_agentic_research(
         ANALYSIS_RESEARCH_SPEC,
         f"请动态调研股票 {code}，分析日期为 {analysis_date}。完成全维度证据采集并给出研究摘要。",
         settings=settings,
         event_callback=event_callback,
+        initial_evidence=baseline_evidences,
     )

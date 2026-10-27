@@ -3,6 +3,8 @@ import { RobotOutlined, UndoOutlined } from "@ant-design/icons";
 import { Button, message, Popconfirm, Tag } from "antd";
 import { useConfig, useTestOutboundProxy } from "../../api/queries";
 import ChangePasswordCard from "../../components/ChangePasswordCard";
+import SessionManagerCard from "./SessionManagerCard";
+import LoginHistoryCard from "./LoginHistoryCard";
 import ResponsiveSectionNav from "../../components/ResponsiveSectionNav";
 import SectionDataState from "../../components/SectionDataState";
 import { useAuthStore } from "../../store/authStore";
@@ -166,6 +168,8 @@ export default function SettingsPage() {
               <section aria-labelledby="account-settings-title">
                 <h3 id="account-settings-title" style={sectionTitleStyle}>账号与安全</h3>
                 <ChangePasswordCard />
+                <SessionManagerCard />
+                <LoginHistoryCard />
                 <SystemUpdateCard />
               </section>
             ),
@@ -198,6 +202,8 @@ export default function SettingsPage() {
                   isSaving={isSaving}
                   sectionTitleStyle={sectionTitleStyle}
                   providerDefaults={config.provider_defaults || {}}
+                  inheritedKeys={config.inherited_keys}
+                  isAdmin={isAdmin}
                   onProviderChange={handleProviderChange}
                   cards={cards}
                 />

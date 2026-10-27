@@ -77,11 +77,27 @@ def _node_list(value) -> list[dict]:
             "metric",
             "source",
             "source_url",
+            "revenue_share",
+            "revenue_period",
+            "benefit_path",
+            "pe_percentile",
+            "consensus_forecast",
+            "gross_margin",
+            "net_margin",
+            "moat",
+            "eps_elasticity",
+            "roe",
+            "growth_rate",
+            "price_change",
+            "restricted_risk",
         ):
             node[field] = _string_value(node.get(field))
         node["code"] = _stock_code(node.get("code"))
         node["companies"] = _string_list(node.get("companies"))
         node["evidence_ids"] = _string_list(node.get("evidence_ids"))
+        node["realization_conditions"] = _string_list(node.get("realization_conditions"))
+        node["invalidation_conditions"] = _string_list(node.get("invalidation_conditions"))
+        node["tracking_metrics"] = _string_list(node.get("tracking_metrics"))
         nodes.append(node)
     return nodes
 
@@ -112,6 +128,37 @@ def _conflict_list(value) -> list[dict]:
     for record in records:
         record["values"] = _string_list(record.get("values"))
     return records
+
+
+def _value_distribution_list(value) -> list[dict]:
+    if not isinstance(value, list):
+        return []
+    records = _record_list(
+        value,
+        ("segment", "cost_share", "gross_margin_range", "profit_share", "pricing_power", "detail"),
+    )
+    for r in records:
+        if r.get("pricing_power") not in ("high", "medium", "low", "unverified"):
+            r["pricing_power"] = "unverified"
+    return records
+
+
+def _cycle_analysis_dict(value) -> dict:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        "stage": _string_value(value.get("stage")),
+        "capacity_utilization": _string_value(value.get("capacity_utilization")),
+        "expansion_lead_time": _string_value(value.get("expansion_lead_time")),
+        "inflection_point": _string_value(value.get("inflection_point")),
+        "pass_through_ability": _string_value(value.get("pass_through_ability")),
+    }
+
+
+def _expectation_divergences_list(value) -> list[dict]:
+    if not isinstance(value, list):
+        return []
+    return _record_list(value, ("topic", "consensus", "divergence", "catalyst_trigger"))
 
 
 def _section_nodes(parsed: dict, level: str) -> list[dict]:
@@ -161,6 +208,9 @@ def result_from_payload(name: str, parsed: dict) -> IndustryChainResult:
         key_events=_record_list(parsed.get("key_events"), ("date", "title", "impact", "source", "source_url")),
         key_stocks=_node_list(parsed.get("key_stocks")),
         relationships=parsed.get("relationships") or [],
+        value_distribution=_value_distribution_list(parsed.get("value_distribution")),
+        cycle_analysis=_cycle_analysis_dict(parsed.get("cycle_analysis")),
+        expectation_divergences=_expectation_divergences_list(parsed.get("expectation_divergences")),
         sources=_record_list(parsed.get("sources"), ("title", "publisher", "date", "url")),
         llm_review="",
         charts=[],

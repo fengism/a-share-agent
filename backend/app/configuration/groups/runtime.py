@@ -47,3 +47,6 @@ class RuntimeGroup(ConfigGroup):
     auth_cookie_secure: bool = False
     default_admin_username: str = "admin"
     default_admin_password: str = ""
+    # 空库时的首个注册者会直接成为管理员。若实例在注册前已可被公网访问，
+    # 这里配一个一次性口令，注册首用户时必须携带（留空 = 保持旧行为，不做校验）。
+    admin_setup_token: str = ""

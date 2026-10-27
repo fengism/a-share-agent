@@ -5,13 +5,13 @@ import ResearchBudgetCard from "./ResearchBudgetCard";
 const baseForm = {
   analysis_llm_timeout_seconds: 1200,
   agent_research_timeout_seconds: 1200,
-  industry_chain_research_timeout_seconds: 1800,
-  industry_chain_repair_research_timeout_seconds: 900,
-  industry_chain_repair_synthesis_timeout_seconds: 600,
-  industry_chain_max_rounds: 6,
-  industry_chain_repair_max_rounds: 3,
-  industry_chain_tool_calls_total: 96,
-  industry_chain_repair_tool_calls_total: 48,
+  industry_chain_research_timeout_seconds: 2400,
+  industry_chain_repair_research_timeout_seconds: 1200,
+  industry_chain_repair_synthesis_timeout_seconds: 900,
+  industry_chain_max_rounds: 10,
+  industry_chain_repair_max_rounds: 5,
+  industry_chain_tool_calls_total: 160,
+  industry_chain_repair_tool_calls_total: 80,
   chat_max_tool_calls_total: 32,
 };
 
@@ -20,15 +20,14 @@ describe("ResearchBudgetCard", () => {
     render(<ResearchBudgetCard form={baseForm} onChange={vi.fn()} onSave={vi.fn()} isSaving={false} />);
 
     expect(screen.getByText("研究预算与超时（全局）")).toBeInTheDocument();
-    // 两个超时字段默认同为 1200，其余值唯一
-    expect(screen.getAllByDisplayValue(1200)).toHaveLength(2);
-    expect(screen.getByDisplayValue(1800)).toBeInTheDocument();
+    // 个股分析超时、调研超时以及补证取证超时均为 1200，共 3 处
+    expect(screen.getAllByDisplayValue(1200)).toHaveLength(3);
+    expect(screen.getByDisplayValue(2400)).toBeInTheDocument();
     expect(screen.getByDisplayValue(900)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(600)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(6)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(3)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(96)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(48)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(10)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(5)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(160)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(80)).toBeInTheDocument();
     expect(screen.getByDisplayValue(32)).toBeInTheDocument();
   });
 
@@ -45,9 +44,13 @@ describe("ResearchBudgetCard", () => {
   it("falls back to defaults when form fields are missing", () => {
     render(<ResearchBudgetCard form={{}} onChange={vi.fn()} onSave={vi.fn()} isSaving={false} />);
 
-    expect(screen.getAllByDisplayValue(1200)).toHaveLength(2);
-    expect(screen.getByDisplayValue(1800)).toBeInTheDocument();
+    // 个股报告超时与采集超时为 1200，补证取证时限也为 1200，共 3 处
+    expect(screen.getAllByDisplayValue(1200)).toHaveLength(3);
+    expect(screen.getByDisplayValue(2400)).toBeInTheDocument();
     expect(screen.getByDisplayValue(900)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(600)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(10)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(5)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(160)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(80)).toBeInTheDocument();
   });
 });

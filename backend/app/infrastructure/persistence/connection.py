@@ -141,7 +141,7 @@ def get_connection(database: DatabaseName = "market") -> sqlite3.Connection:
         with _registry_lock:
             _all_connections.append(conn)
             _connection_names[id(conn)] = database
-        logger.info(
+        logger.debug(
             "SQLite 线程连接已建立: database=%s path=%s thread=%s",
             database,
             path,
@@ -329,7 +329,7 @@ def close_connection():
         try:
             conn.close()
         except Exception as exc:
-            logger.warning(f"关闭 SQLite 连接失败: {exc}")
+            logger.warning('关闭 SQLite 连接失败: %s', exc)
     _local.connections = {}
     _local.generation = _connection_generation
     _local.savepoint_counter = 0

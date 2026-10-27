@@ -29,6 +29,7 @@ from app.core.cache_policies import SINA_SPOT_SNAPSHOT, SINA_STOCK_NAMES
 from app.core.concurrency.singleflight import SyncSingleFlight
 from app.core.dataframes import coerce_numeric_columns, normalize_intraday_df, rename_and_keep_columns, rename_columns
 from app.core.market import normalize_code, normalize_index_symbol, normalize_stock_name, safe_float
+from app.domain.timezones import market_now
 from app.infrastructure.providers.sina import bulletins as sina_bulletins
 from app.infrastructure.providers.sina import financials as sina_financials
 from app.infrastructure.providers.sina import futures as sina_futures
@@ -64,7 +65,7 @@ _sina_snapshot_health: dict[str, object] = {
 def _update_sina_snapshot_health(**updates: object) -> None:
     with _sina_snapshot_health_lock:
         _sina_snapshot_health.update(updates)
-        _sina_snapshot_health["updated_at"] = datetime.now().isoformat(timespec="seconds")
+        _sina_snapshot_health["updated_at"] = market_now().isoformat(timespec="seconds")
 
 
 def sina_snapshot_health_snapshot() -> dict[str, object]:
@@ -129,10 +130,22 @@ class SinaDataProvider:
 
     def __init__(self):
         """初始化独立的新浪请求会话。"""
-        # Sina 接口常常无法通过代理访问，使用独立 session 并禁用代理
+        # Sina 接口常常无法通过代理访问，使用独立 session 并默认禁用全局环境代理
         self._session = requests.Session()
         self._session.trust_env = False
         self._hq_singleflight = SyncSingleFlight[list[dict]]()
+
+    def _get(self, url: str, **kwargs) -> requests.Response:
+        from app.configuration import get_settings
+        from app.infrastructure.http.proxy import resolve_proxy_request
+
+        settings = get_settings()
+        options = resolve_proxy_request(url, settings)
+        if options.active and "proxies" not in kwargs:
+            kwargs["proxies"] = options.proxies
+        if options.timeout and "timeout" not in kwargs:
+            kwargs["timeout"] = options.timeout
+        return self._session.get(url, **kwargs)
 
     def fetch_kline(self, code: str, period: str, start_date: str = "", end_date: str = "") -> pd.DataFrame:
         """新浪股票 K 线（自行处理 JSONP/范围截取与列重命名）。
@@ -152,7 +165,7 @@ class SinaDataProvider:
         try:
             start_dt = datetime.strptime(start_date, "%Y%m%d")
             end_dt = datetime.strptime(end_date, "%Y%m%d")
-            delta_days = (datetime.now() - start_dt).days
+            delta_days = (market_now() - start_dt).days
             if period == "daily":
                 datalen = max(delta_days * 5 // 7 + 20, 30)
             elif period == "weekly":
@@ -169,7 +182,7 @@ class SinaDataProvider:
             "ma": "no",
             "datalen": str(datalen),
         }
-        r = self._session.get(SINA_STOCK_KLINE_URL, params=params, headers=SINA_FINANCE_HEADERS, timeout=10)
+        r = self._get(SINA_STOCK_KLINE_URL, params=params, headers=SINA_FINANCE_HEADERS, timeout=10)
         text = r.text.strip()
         if text.startswith("=") or text.startswith("/*"):
             m = re.search(r"\[.*\]", text)
@@ -206,7 +219,7 @@ class SinaDataProvider:
         symbol = normalize_code(code).prefixed_lower
         result: dict[str, pd.DataFrame] = {}
         for method in ("qfq", "hfq"):
-            response = self._session.get(
+            response = self._get(
                 f"https://finance.sina.com.cn/realstock/company/{symbol}/{method}.js",
                 headers=SINA_FINANCE_HEADERS,
                 timeout=10,
@@ -217,7 +230,7 @@ class SinaDataProvider:
 
     def fetch_index_intraday(self, symbol: str) -> pd.DataFrame:
         """Fetch and normalize the current-session minute line for a market index."""
-        response = self._session.get(
+        response = self._get(
             SINA_INDEX_INTRADAY_URL,
             params={
                 "symbol": normalize_index_symbol(symbol.strip().lower()),
@@ -273,7 +286,7 @@ class SinaDataProvider:
             "_s_r_a": "init",
         }
         big_df = pd.DataFrame()
-        response = self._session.get(SINA_INDEX_QUOTE_URL, params=payload, timeout=10)
+        response = self._get(SINA_INDEX_QUOTE_URL, params=payload, timeout=10)
         response.raise_for_status()
         data_json = json.loads(response.text)
         if not data_json:
@@ -355,7 +368,7 @@ class SinaDataProvider:
 
     def _fetch_cnrank_page(self, page: int) -> list[dict]:
         try:
-            response = self._session.get(
+            response = self._get(
                 SINA_CN_RANK_URL,
                 params={
                     "sort": "percent",
@@ -485,7 +498,7 @@ class SinaDataProvider:
     @staticmethod
     def _spot_snapshot_ttl(now: datetime | None = None) -> int:
         """交易时段保持较短 TTL，休市后降低全市场重复抓取频率。"""
-        current = now or datetime.now()
+        current = now or market_now()
         is_live = (
             current.weekday() < 5
             and datetime_time(9, 0) <= current.time() <= datetime_time(15, 30)
@@ -572,7 +585,7 @@ class SinaDataProvider:
         last_error: Exception | None = None
         for attempt in range(1, self.HQ_PAGE_MAX_ATTEMPTS + 1):
             try:
-                response = self._session.get(
+                response = self._get(
                     SINA_MARKET_HQ_COUNT_URL,
                     params={"node": "hs_a"},
                     timeout=15,
@@ -596,7 +609,7 @@ class SinaDataProvider:
         for attempt in range(1, self.HQ_PAGE_MAX_ATTEMPTS + 1):
             page_started_at = time.perf_counter()
             try:
-                response = self._session.get(
+                response = self._get(
                     SINA_MARKET_HQ_URL,
                     params={
                         "page": page,
@@ -775,7 +788,7 @@ class SinaDataProvider:
             "version": "7.11.0",
             "dpc": "1",
         }
-        response = self._session.get("https://cn.finance.sina.com.cn/minline/getMinlineData", params=params, timeout=10)
+        response = self._get("https://cn.finance.sina.com.cn/minline/getMinlineData", params=params, timeout=10)
         response.raise_for_status()
         payload = parse_jsonp(response.text)
         rows = payload.get("result", {}).get("data", [])

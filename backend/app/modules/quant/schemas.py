@@ -1,7 +1,7 @@
 """量化策略、回测请求与结果协议。"""
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -49,7 +49,7 @@ class QuantStrategyConfig(BaseModel):
 
 class QuantUniverse(BaseModel):
     source: Literal["custom", "portfolio"] = "custom"
-    codes: list[str] = Field(default_factory=list, max_length=10)
+    codes: list[str] = Field(default_factory=list, max_length=30)
 
     @model_validator(mode="after")
     def validate_codes(self):
@@ -71,6 +71,13 @@ class QuantExecutionConfig(BaseModel):
     fee_schedule: Literal["custom", "a_share_historical"] = "custom"
     max_daily_participation_rate: float | None = Field(default=0.1, gt=0, le=1)
     slippage_bps: float = Field(default=5, ge=0, le=500)
+    slippage_model: Literal["fixed", "square_root"] = "fixed"
+    market_impact_coefficient: float = Field(default=10.0, ge=0, le=500)
+    allocation_method: Literal["equal", "risk_parity"] = "equal"
+    rebalance_frequency: Literal["daily", "weekly", "monthly"] = "daily"
+    top_n_selection: int | None = Field(default=None, ge=1, le=30)
+    ranking_metric: Literal["momentum", "inverse_volatility", "turnover", "equal"] = "momentum"
+    ranking_lookback: int = Field(default=20, ge=3, le=120)
     lot_size: int = Field(default=100, ge=1, le=10_000)
     max_position_weight: float = Field(default=1, gt=0, le=1)
     cash_reserve_ratio: float = Field(default=0, ge=0, lt=1)
@@ -122,6 +129,12 @@ class QuantEquityPoint(BaseModel):
     equity: float
     benchmark: float | None = None
     drawdown: float
+    cash: float | None = None
+    positions_value: float | None = None
+    position_weights: dict[str, float] | None = None
+    excess_return: float | None = None
+    rolling_sharpe: float | None = None
+    rolling_beta: float | None = None
 
 
 class QuantMonthlyReturn(BaseModel):
@@ -169,13 +182,33 @@ class QuantMetrics(BaseModel):
     calmar_ratio: float | None = None
     tracking_error: float | None = None
     information_ratio: float | None = None
+    alpha: float | None = None
+    beta: float | None = None
+    treynor_ratio: float | None = None
+    upside_capture: float | None = None
+    downside_capture: float | None = None
     max_drawdown: float
+    max_drawdown_duration_days: int | None = None
+    omega_ratio: float | None = None
     win_rate: float | None = None
     profit_loss_ratio: float | None = None
     turnover_rate: float
     trade_count: int
     closed_trade_count: int | None = Field(default=None, ge=0)
     observation_count: int | None = Field(default=None, ge=0)
+    avg_holding_days: float | None = None
+    avg_win_holding_days: float | None = None
+    avg_loss_holding_days: float | None = None
+    avg_win_pnl: float | None = None
+    avg_loss_pnl: float | None = None
+    max_win_pct: float | None = None
+    max_loss_pct: float | None = None
+    probabilistic_sharpe_ratio: float | None = None
+    deflated_sharpe_ratio: float | None = None
+    allocation_effect: float | None = None
+    selection_effect: float | None = None
+    interaction_effect: float | None = None
+    stress_tests: dict[str, dict[str, float]] | None = None
 
 
 class QuantHoldoutValidation(BaseModel):
@@ -368,3 +401,34 @@ class QuantSavedStrategy(BaseModel):
     config: QuantStrategyConfig
     created_at: float
     updated_at: float
+
+
+class QuantParameterScanRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    param1_name: str = Field(min_length=1, max_length=64)
+    param1_values: list[Any] = Field(min_length=1, max_length=20)
+    param2_name: str | None = Field(default=None, max_length=64)
+    param2_values: list[Any] | None = Field(default=None, max_length=20)
+
+
+class QuantParameterScanPoint(BaseModel):
+    param1_value: Any
+    param2_value: Any | None = None
+    sharpe_ratio: float | None = None
+    total_return: float
+    annualized_return: float
+    max_drawdown: float
+    win_rate: float | None = None
+
+
+class QuantParameterScanResult(BaseModel):
+    param1_name: str
+    param1_values: list[Any]
+    param2_name: str | None = None
+    param2_values: list[Any] | None = None
+    points: list[QuantParameterScanPoint]
+    optimal_point: QuantParameterScanPoint | None = None
+    robustness_score: float = Field(default=0.0, ge=0, le=100)
+    profitable_ratio: float = Field(default=0.0, ge=0, le=100)
+

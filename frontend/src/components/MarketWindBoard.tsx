@@ -14,15 +14,13 @@ import RefreshBadge from "./RefreshBadge";
 import SectionDataState from "./SectionDataState";
 import StockExternalLink from "./StockExternalLink";
 import { useUrlSearchParam } from "../hooks/useUrlSearchParam";
+import { formatMarketDateTime } from "../utils/marketTime";
 import { semanticTagStyle } from "../styles/ui";
 import type { MarketWindStock } from "../types/stock";
 import "./market-wind.css";
 
 function formatFetchedAt(value: string | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
+  return formatMarketDateTime(value, value || "-");
 }
 
 function formatPrice(value: number | null) {

@@ -9,6 +9,8 @@ from typing import Any
 
 from app.agentic.catalog import CapabilityCatalog, registry
 from app.agentic.protocol import ToolCallFunction, ToolCallInfo
+from app.agentic.runtime.metrics import metrics
+from app.agentic.tools.json_repair import load_arguments
 from app.agentic.tools.validation import ToolArgumentsError, coerce_arguments
 
 # Model echoes the wire-format argument name into the payload body. Only unwrap
@@ -45,30 +47,40 @@ class PreparedToolCall:
     arguments: Any | None
 
 
+def _rewrite_arguments(tool_call: ToolCallInfo, arguments: Any) -> ToolCallInfo:
+    """把解析/修复后的参数写回调用，保证回放历史、缓存键和 Tool.execute 看到同一份 JSON。"""
+    return tool_call.model_copy(update={
+        "function": ToolCallFunction(
+            name=tool_call.function.name,
+            arguments=json.dumps(arguments, ensure_ascii=False, separators=(",", ":")),
+        )
+    })
+
+
 def prepare_tool_call(tool_call: ToolCallInfo) -> PreparedToolCall:
-    """Parse and validate arguments once; ``None`` defers error reporting to Tool.execute."""
+    """Parse and validate arguments once; ``None`` defers error reporting to Tool.execute.
+
+    解析前会做一次**纯语法**修复（代码围栏/尾逗号/单引号/Python 字面量/双重编码），
+    命中的规则计入指标；无法修复时保持原样，仍由 Tool.execute 报参数错误。
+    """
     tool = registry.get_tool(tool_call.function.name)
     if tool is None:
         return PreparedToolCall(tool_call, None)
-    try:
-        parsed = json.loads(tool_call.function.arguments)
-    except json.JSONDecodeError:
+    parsed, repair_rule = load_arguments(tool_call.function.arguments)
+    if parsed is None:
         return PreparedToolCall(tool_call, None)
+    if repair_rule is not None:
+        metrics.record_agentic_event(f"tool_args_repaired:{repair_rule}")
+        tool_call = _rewrite_arguments(tool_call, parsed)
     try:
         coerced = coerce_arguments(parsed, tool.parameters)
     except ToolArgumentsError:
+        # 语法已修好：保留修好的 arguments，让 Tool.execute 的兜底路径至少能解析，
+        # 错误信息也能指向真正的 schema 不符，而不是"JSON 解析失败"。
         return PreparedToolCall(tool_call, None)
     if coerced is parsed:
         return PreparedToolCall(tool_call, parsed)
-    return PreparedToolCall(
-        tool_call.model_copy(update={
-            "function": ToolCallFunction(
-                name=tool_call.function.name,
-                arguments=json.dumps(coerced, ensure_ascii=False, separators=(",", ":")),
-            )
-        }),
-        coerced,
-    )
+    return PreparedToolCall(_rewrite_arguments(tool_call, coerced), coerced)
 
 
 def _find_matching_parenthesis(text: str, start: int) -> int:
@@ -100,12 +112,11 @@ def _parse_arguments(arguments: str, parameter_order: list[str]) -> dict | None:
     if not arguments:
         return {}
 
-    try:
-        parsed = json.loads(arguments)
-        if isinstance(parsed, dict):
-            return parsed
-    except json.JSONDecodeError:
-        pass
+    # 正文方言里的参数同样常带尾逗号/单引号：先走统一的语法修复，再退回位置参数
+    # 与单值启发式（修复器只接受对象，非对象形态自然落到下面的分支）。
+    repaired, _rule = load_arguments(arguments)
+    if repaired is not None:
+        return repaired
 
     try:
         parsed = json.loads(f"[{arguments}]")

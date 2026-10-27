@@ -72,7 +72,7 @@ async def _safe_fetch_intraday(source_name: str, fetcher, code: str, date: str |
             max_attempts=1,
         )
     except Exception as exc:
-        logger.info(f"{source_name}分时数据不可用，尝试下一数据源: code={code}, error={exc}")
+        logger.debug("%s分时数据不可用，尝试下一数据源: code=%s, error=%s", source_name, code, exc)
         return pd.DataFrame()
 
 

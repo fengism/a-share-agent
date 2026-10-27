@@ -31,6 +31,7 @@ import IndustryDecisionResearch from "./IndustryDecisionResearch";
 import IndustryResearchSections, { IndustryResearchAudit } from "./IndustryResearchSections";
 import MarkdownReport from "./MarkdownReport";
 import LazyIndustryChart from "./LazyIndustryChart";
+import { marketDateStamp } from "../../utils/marketTime";
 import "./industry-report.css";
 
 const IndustryChart = lazy(() => import("./IndustryChart"));
@@ -62,12 +63,16 @@ function MineToAtlasButton({ name, archiveId }: { name: string; archiveId: strin
       size="small"
       loading={mineMutation.isPending}
       disabled={!archiveId}
+      title="将当前分析报告解析沉淀为知识库图谱条目"
       onClick={() => {
         mineMutation.mutate(
           { name, archive_id: archiveId },
           {
             onSuccess: async (chain) => {
-              message.success(`已沉淀到知识库：${chain.name}`);
+              const tip = chain.source === "user"
+                ? `已沉淀到个人专属知识库：${chain.name}`
+                : `已沉淀到公共知识库：${chain.name}`;
+              message.success(tip);
               await queryClient.invalidateQueries({
                 queryKey: queryKeys.workflows.industryChainAtlasCatalog,
               });
@@ -121,7 +126,7 @@ export default function IndustryReport({
       const a = document.createElement("a");
       a.href = url;
       const downloadName = (rawResult.name || activeName || "产业链").replace(/[/\\?%*:|"<>]/g, "_");
-      a.download = `产业链投研报告_${downloadName}_${new Date().toISOString().slice(0, 10)}.md`;
+      a.download = `产业链投研报告_${downloadName}_${marketDateStamp()}.md`;
       a.click();
       URL.revokeObjectURL?.(url);
     }
@@ -140,10 +145,20 @@ export default function IndustryReport({
       "环节角色",
       "业务相关度",
       "相关收入占比",
+      "出海/海外营收占比",
       "最新市值",
+      "最新价",
       "动态PE",
+      "估值分位",
       "PB",
+      "ROE",
+      "毛利率",
+      "业绩增速",
+      "机构一致预期",
+      "护城河壁垒",
+      "业绩利润弹性",
       "受益路径",
+      "限售解禁风险",
       "兑现条件",
       "失效条件",
     ];
@@ -159,10 +174,20 @@ export default function IndustryReport({
       s.role || s.description || "",
       relevanceMap[s.business_relevance || "unverified"] || s.business_relevance || "待验证",
       s.revenue_share ? `${s.revenue_share}${s.revenue_period ? ` (${s.revenue_period})` : ""}` : "",
+      s.overseas_share || "",
       s.total_market_cap || "",
+      s.price_change || "",
       s.pe || "",
+      s.pe_percentile || "",
       s.pb || "",
+      s.roe || "",
+      s.gross_margin || "",
+      s.growth_rate || "",
+      s.consensus_forecast || "",
+      s.moat || "",
+      s.eps_elasticity || "",
       s.benefit_path || "",
+      s.restricted_risk || "",
       (s.realization_conditions || []).join("；"),
       (s.invalidation_conditions || []).join("；"),
     ]);
@@ -175,7 +200,7 @@ export default function IndustryReport({
       const a = document.createElement("a");
       a.href = url;
       const downloadName = (rawResult.name || activeName || "产业链").replace(/[/\\?%*:|"<>]/g, "_");
-      a.download = `重点公司清单_${downloadName}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `重点公司清单_${downloadName}_${marketDateStamp()}.csv`;
       a.click();
       URL.revokeObjectURL?.(url);
     }

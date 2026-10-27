@@ -17,6 +17,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=32, pattern=USERNAME_PATTERN)
     password: str = Field(min_length=8, max_length=128)
     invite_code: str | None = Field(default=None, max_length=256)
+    setup_token: str | None = Field(default=None, max_length=256)
 
     @field_validator("password")
     @classmethod
@@ -63,6 +64,8 @@ class ChangePasswordResponse(OkResponse):
 
 class NeedsSetupResponse(BaseModel):
     needs_setup: bool
+    #: 是否要求首用户注册时携带 ADMIN_SETUP_TOKEN
+    requires_setup_token: bool = False
 
 
 class CreateInviteRequest(BaseModel):
@@ -129,6 +132,42 @@ class LoginAuditLogItem(BaseModel):
 
 class LoginAuditLogsResponse(BaseModel):
     items: list[LoginAuditLogItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class SessionItem(BaseModel):
+    session_id: str
+    created_at: str
+    expires_at: str
+    ip_address: str
+    user_agent: str
+    #: 最近活跃时间（滑动续期时更新；老库无该列时回退为创建时间）
+    last_seen_at: str
+    is_current: bool
+
+
+class SessionsResponse(BaseModel):
+    items: list[SessionItem]
+
+
+class AdminAuditActionItem(BaseModel):
+    id: int
+    actor_id: int | None = None
+    actor_username: str
+    actor_ip: str
+    actor_user_agent: str
+    action: str
+    target_type: str
+    target_id: str
+    target_label: str
+    details: str
+    created_at: str
+
+
+class AdminAuditActionsResponse(BaseModel):
+    items: list[AdminAuditActionItem]
     total: int
     limit: int
     offset: int

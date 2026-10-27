@@ -13,6 +13,7 @@ from app.api.errors import (
     ConflictError,
     NotFoundError,
 )
+from app.core.csv_export import csv_safe_row
 from app.domain.identity import AuthenticatedUser
 from app.modules.master_data_revision import MasterDataConflictError
 from app.modules.stock_concept.public import (
@@ -209,14 +210,14 @@ def export_concepts(
     ])
     for item in items:
         concepts_list = item.get("concepts") or []
-        writer.writerow([
+        writer.writerow(csv_safe_row([
             item.get("stock_code", ""),
             item.get("stock_name", ""),
             item.get("market_group", ""),
             "；".join(concepts_list),
             item.get("source", ""),
             item.get("updated_at", ""),
-        ])
+        ]))
 
     csv_data = output.getvalue().encode("utf-8")
     filename = "stock_concept_export.csv"

@@ -51,6 +51,17 @@ export interface IndustryChainNode extends IndustryChainClaim {
   pe?: string;
   pb?: string;
   total_market_cap?: string;
+  pe_percentile?: string;
+  consensus_forecast?: string;
+  gross_margin?: string;
+  net_margin?: string;
+  moat?: string;
+  eps_elasticity?: string;
+  roe?: string;
+  growth_rate?: string;
+  price_change?: string;
+  restricted_risk?: string;
+  overseas_share?: string;
   [key: string]: unknown;
 }
 
@@ -171,6 +182,30 @@ export interface IndustryChainConflict {
   evidence_ids?: string[];
 }
 
+export interface IndustryChainValueDistribution {
+  segment: string;
+  cost_share?: string;
+  gross_margin_range?: string;
+  profit_share?: string;
+  pricing_power?: "high" | "medium" | "low" | "unverified";
+  detail?: string;
+}
+
+export interface IndustryChainCycleAnalysis {
+  stage?: string;
+  capacity_utilization?: string;
+  expansion_lead_time?: string;
+  inflection_point?: string;
+  pass_through_ability?: string;
+}
+
+export interface IndustryChainExpectationDivergence {
+  topic: string;
+  consensus?: string;
+  divergence: string;
+  catalyst_trigger?: string;
+}
+
 export interface IndustryChainChangeItem {
   category: "chain" | "company" | "market" | "event" | "driver" | "risk" | "summary";
   change_type: "added" | "removed" | "updated";
@@ -286,6 +321,9 @@ export interface IndustryChainResult {
   changes?: IndustryChainChangeSet;
   opportunities?: IndustryChainOpportunity[];
   relationships?: IndustryChainRelationship[];
+  value_distribution?: IndustryChainValueDistribution[];
+  cycle_analysis?: IndustryChainCycleAnalysis;
+  expectation_divergences?: IndustryChainExpectationDivergence[];
   topic_resolution?: IndustryChainTopicResolution;
   analysis_metadata?: IndustryChainAnalysisMetadata;
 }
@@ -326,7 +364,7 @@ export interface AtlasChain {
   name: string;
   category: string;
   summary: string;
-  source?: "builtin" | "imported" | "mined";
+  source?: "builtin" | "imported" | "mined" | "user";
   aliases?: string[];
   tags?: string[];
   drivers?: string[];
@@ -340,7 +378,7 @@ export interface AtlasChainSummary {
   name: string;
   category: string;
   summary: string;
-  source?: "builtin" | "imported" | "mined";
+  source?: "builtin" | "imported" | "mined" | "user";
   aliases?: string[];
   tags?: string[];
   segment_count: number;

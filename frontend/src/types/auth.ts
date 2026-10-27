@@ -43,6 +43,42 @@ export interface LoginAuditLogItem {
   created_at: string;
 }
 
+export interface SessionItem {
+  session_id: string;
+  created_at: string;
+  expires_at: string;
+  ip_address: string;
+  user_agent: string;
+  /** 最近活跃时间（滑动续期时更新） */
+  last_seen_at: string;
+  is_current: boolean;
+}
+
+export interface SessionsResponse {
+  items: SessionItem[];
+}
+
+export interface AdminAuditActionItem {
+  id: number;
+  actor_id?: number | null;
+  actor_username: string;
+  actor_ip: string;
+  actor_user_agent: string;
+  action: string;
+  target_type: string;
+  target_id: string;
+  target_label: string;
+  details: string;
+  created_at: string;
+}
+
+export interface AdminAuditActionsResponse {
+  items: AdminAuditActionItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface LoginAuditLogsResponse {
   items: LoginAuditLogItem[];
   total: number;

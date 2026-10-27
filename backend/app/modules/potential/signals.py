@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 
 from app.modules.potential import constants
 from app.modules.potential.common import _float_or_none, _limit_ratio
@@ -22,7 +23,7 @@ _MIN_MARKET_CAP_YI = constants._MIN_MARKET_CAP_YI
 _MAX_MARKET_CAP_YI = constants._MAX_MARKET_CAP_YI
 
 
-def _latest_entry_index(positions: list[int]) -> int | None:
+def _latest_entry_index(positions: Sequence[int | float]) -> int | None:
     for index in range(len(positions) - 1, -1, -1):
         if positions[index] == 1 and (index == 0 or positions[index - 1] != 1):
             return index

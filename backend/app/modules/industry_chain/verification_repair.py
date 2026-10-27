@@ -158,11 +158,47 @@ def build_repair_targets(result: IndustryChainResult, evidence: list[AgentEviden
             "depth",
             "围绕需求数量/价格/结构、有效供给、价格成本、利润分配和公司兑现，选最多3个核心矛盾；查事实前提与反向证据，不用行业常识凑数。",
         )
+
+    # 深度投研红蓝军逆向审计（Bear Audit）：检查核心论点是否缺少反向证据或失效条件
+    theses_lacking_bear_view = [
+        t.title
+        for t in result.research_theses
+        if not t.counter_evidence or "未取得" in t.counter_evidence or not t.invalidation
+    ]
+    if theses_lacking_bear_view and "audit:bear" not in targets:
+        targets["audit:bear"] = RepairTarget(
+            "audit:bear",
+            f"逆向/空头审计（Bear Audit）：论点【{'、'.join(theses_lacking_bear_view[:2])}】缺少实质反向事实或失效边界。"
+            "定向检索行业产能过剩、下游需求不及预期、海外加征关税/出口限制、技术路线替代或客户砍单等证伪线索，补充反向事实与失效条件。",
+        )
+
+    # 价值链与预期差审计
+    if not result.value_distribution and "audit:profit_pool" not in targets:
+        targets["audit:profit_pool"] = RepairTarget(
+            "audit:profit_pool",
+            "价值链拆解审计：初稿缺少 BOM 成本占比与利润池分配。"
+            "核查终端产品各核心组件单机价值量、BOM 占比及各环节毛利率水平，明确哪一环节吃掉产业链最大利润池。",
+        )
+    if not result.expectation_divergences and "audit:divergence" not in targets:
+        targets["audit:divergence"] = RepairTarget(
+            "audit:divergence",
+            "预期差审计：初稿缺少市场一致预期 vs 本次研究分歧点。"
+            "核查当前主流卖方一致预期的增速/出货量假定，对比实际高频开工率或供应链订单，提炼至少 1 条关键预期差与验证时间窗口。",
+        )
+
     chain_targets = [RepairTarget(key, question) for key, question in chain_gap_questions(result)]
-    # Reserve every chain-level gap before company/source expansion. In complex
-    # chains, transmission is commonly the fifth gap after three tiers + path.
+    # 优先保证链路完整度与投研逆向/深度审计（Bear & Depth Audit）入选，剩余名额分配给其他声明
+    audit_targets = [t for k, t in targets.items() if k.startswith("audit:")]
+    other_targets = [t for k, t in targets.items() if not k.startswith("audit:")]
+
     selected = chain_targets[:MAX_REPAIR_TARGETS]
-    selected.extend(list(targets.values())[: MAX_REPAIR_TARGETS - len(selected)])
+    remaining = MAX_REPAIR_TARGETS - len(selected)
+    if remaining > 0 and audit_targets:
+        take_audit = audit_targets[:remaining]
+        selected.extend(take_audit)
+        remaining -= len(take_audit)
+    if remaining > 0 and other_targets:
+        selected.extend(other_targets[:remaining])
     return selected[:MAX_REPAIR_TARGETS]
 
 
@@ -251,7 +287,17 @@ def build_repair_spec(result: IndustryChainResult, evidence: list[AgentEvidence]
                 fatal=False,
             )
         )
-    if not requirements or any(target.key.startswith(("source:", "claim:", "depth")) for target in targets):
+    if "audit:bear" in target_keys:
+        requirements.append(
+            EvidenceRequirement(
+                "repair_bear_counter",
+                f"{result.name}行业风险/产能过剩/需求放缓/反向线索正文",
+                ("web_search", "iwencai_search", "web_fetch", "fetch_urls", "read_pdf"),
+                validator=_has_web_body,
+                fatal=False,
+            )
+        )
+    if not requirements or any(target.key.startswith(("source:", "claim:", "depth", "audit:")) for target in targets):
         requirements.append(
             EvidenceRequirement(
                 "repair_body",
@@ -265,8 +311,8 @@ def build_repair_spec(result: IndustryChainResult, evidence: list[AgentEvidence]
         INDUSTRY_CHAIN_RESEARCH_SPEC,
         name="industry-chain-verification-repair",
         display_name="关键缺口定向补证",
-        max_rounds=3,
-        max_tool_turns=6,
+        max_rounds=5,
+        max_tool_turns=10,
         requirements=tuple(requirements),
     )
 
@@ -331,7 +377,7 @@ async def repair_report(
             settings,
             repair=True,
             overrides={
-                "chat_max_tool_calls_per_round": min(settings.chat_max_tool_calls_per_round, 6),
+                "chat_max_tool_calls_per_round": min(settings.chat_max_tool_calls_per_round, 12),
                 "agent_research_timeout_seconds": research_timeout,
             },
         )
@@ -341,7 +387,7 @@ async def repair_report(
             max_rounds=repair_rounds,
             **search_policy_limits(total_calls, repair=True),
             reserved_tool_names=BODY_TOOLS,
-            reserved_tool_calls=min(12, total_calls // 3),
+            reserved_tool_calls=min(24, total_calls // 3),
         )
         from app.domain.industry_chain import render_industry_chain_scope
 
@@ -448,6 +494,9 @@ async def repair_report(
                     "midstream",
                     "downstream",
                     "relationships",
+                    "value_distribution",
+                    "cycle_analysis",
+                    "expectation_divergences",
                     "missing_evidence",
                 )
             }
@@ -491,6 +540,13 @@ async def repair_report(
             candidate = result_from_payload(name, run.value.model_dump())
             if not candidate.summary.strip() or not (candidate.upstream or candidate.midstream or candidate.downstream):
                 raise ValueError("repair output lacks usable report structure")
+            # 深度投研维度安全回填：避免重写过程中初稿已有的价值链、供需周期或预期差意外丢失
+            if not candidate.value_distribution and result.value_distribution:
+                candidate.value_distribution = list(result.value_distribution)
+            if not candidate.cycle_analysis.stage and result.cycle_analysis.stage:
+                candidate.cycle_analysis = result.cycle_analysis.model_copy()
+            if not candidate.expectation_divergences and result.expectation_divergences:
+                candidate.expectation_divergences = list(result.expectation_divergences)
             candidate.research_scope = dict(result.research_scope)
             candidate.prompt_trace = run.trace
             candidate.evidence_stats = synthesis_stats
@@ -529,9 +585,16 @@ async def repair_report(
         if note not in result.missing_evidence:
             result.missing_evidence.append(note)
     for tier, (label, _) in TIER_QUESTIONS.items():
-        if getattr(original_result, tier) and not getattr(result, tier):
+        orig_nodes = getattr(original_result, tier)
+        cand_nodes = getattr(result, tier)
+        if orig_nodes and not cand_nodes:
+            setattr(result, tier, orig_nodes)
             result.quality_status = "degraded"
-            result.missing_evidence.append(f"补证后{label}节点被移除，需重新取证；不代表该环节不适用或缺口已解决。")
+            result.missing_evidence.append(f"补证重写时{label}节点遗漏，已自动回填保留初稿节点结构。")
+    if original_result.key_stocks and not result.key_stocks:
+        result.key_stocks = original_result.key_stocks
+        result.quality_status = "degraded"
+        result.missing_evidence.append("补证重写时重点标的遗漏，已自动回填保留初稿标的列表。")
     unresolved = build_repair_targets(result, merged)
     remaining_keys = {target.key for target in unresolved}
     company_keys = {

@@ -13,6 +13,7 @@ import {
 } from "./portfolioFormatters";
 import PortfolioTableCard from "./PortfolioTableCard";
 import { PORTFOLIO_TABLE_PAGINATION } from "./portfolioTableConfig";
+import { marketDateStamp } from "../../utils/marketTime";
 import type { PortfolioTableRenderers } from "./portfolioTableRenderers";
 
 interface PortfolioStockTableProps {
@@ -62,7 +63,7 @@ function PortfolioStockTable({ stocks, renderers, onSell }: PortfolioStockTableP
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `投资组合当前持仓_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `投资组合当前持仓_${marketDateStamp()}.csv`;
       a.click();
       URL.revokeObjectURL?.(url);
     }

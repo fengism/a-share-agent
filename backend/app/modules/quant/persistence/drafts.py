@@ -108,19 +108,36 @@ def create_draft(
     return _require_draft(draft_id)
 
 
-def get_draft(draft_id: str) -> StrategyDraftRow | None:
-    row = get_connection("user").execute(
-        "SELECT * FROM quant_strategy_drafts WHERE id = ?",
-        (draft_id,),
-    ).fetchone()
+def get_draft(draft_id: str, *, created_by: int | None = None) -> StrategyDraftRow | None:
+    """按 ID 取草稿；``created_by`` 非空时同时校验归属（普通用户只能取自己的）。"""
+    if created_by is None:
+        row = get_connection("user").execute(
+            "SELECT * FROM quant_strategy_drafts WHERE id = ?",
+            (draft_id,),
+        ).fetchone()
+    else:
+        row = get_connection("user").execute(
+            "SELECT * FROM quant_strategy_drafts WHERE id = ? AND created_by = ?",
+            (draft_id, created_by),
+        ).fetchone()
     return _to_draft(row) if row is not None else None
 
 
-def list_drafts(*, limit: int = 100) -> list[StrategyDraftRow]:
-    rows = get_connection("user").execute(
-        "SELECT * FROM quant_strategy_drafts ORDER BY updated_at DESC, id DESC LIMIT ?",
-        (limit,),
-    ).fetchall()
+def list_drafts(
+    *, limit: int = 100, created_by: int | None = None
+) -> list[StrategyDraftRow]:
+    """列出草稿；``created_by`` 非空时只返回该用户创建的（管理员不传 = 全量）。"""
+    if created_by is None:
+        rows = get_connection("user").execute(
+            "SELECT * FROM quant_strategy_drafts ORDER BY updated_at DESC, id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    else:
+        rows = get_connection("user").execute(
+            "SELECT * FROM quant_strategy_drafts WHERE created_by = ? "
+            "ORDER BY updated_at DESC, id DESC LIMIT ?",
+            (created_by, limit),
+        ).fetchall()
     return [_to_draft(row) for row in rows]
 
 

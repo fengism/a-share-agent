@@ -2,10 +2,10 @@
 
 import json
 from collections.abc import Callable
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
+from app.domain.timezones import market_now
 from app.infrastructure.persistence.json_storage import atomic_write_json
 from app.modules.industry_chain.models import IndustryChainResult
 
@@ -19,7 +19,7 @@ def safe_name(name: str) -> str:
 def archive_id(timestamp: str | None = None) -> str:
     if timestamp:
         return timestamp
-    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    return market_now().strftime("%Y%m%d_%H%M%S_%f")
 
 
 def legacy_archive_path(
@@ -50,7 +50,7 @@ def build_archive_payload(
     return {
         "archive_id": archive_id,
         "name": name,
-        "saved_at": datetime.now().isoformat(timespec="seconds"),
+        "saved_at": market_now().isoformat(timespec="seconds"),
         "result": result.model_dump(),
     }
 

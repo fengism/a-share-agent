@@ -56,7 +56,7 @@ def normalize_code(raw: str) -> SymbolFormats:
         prefixed_lower=f"{exchange.lower()}{raw}",
         exchange=exchange,
     )
-    logger.debug(f"代码标准化: input→{result.raw}, exchange={result.exchange}")
+    logger.debug('代码标准化: input→%s, exchange=%s', result.raw, result.exchange)
     return result
 
 

@@ -1,7 +1,20 @@
 import { apiGet, apiPost, apiPut, apiDelete } from "./client";
-import type { AdminUserItem, AuthResponse, AuthUser, InviteItem, LoginAuditLogsResponse } from "../types/auth";
+import type {
+  AdminAuditActionsResponse,
+  AdminUserItem,
+  AuthResponse,
+  AuthUser,
+  InviteItem,
+  LoginAuditLogsResponse,
+  SessionsResponse,
+} from "../types/auth";
 
-export function registerApi(body: { username: string; password: string; invite_code?: string }) {
+export function registerApi(body: {
+  username: string;
+  password: string;
+  invite_code?: string;
+  setup_token?: string;
+}) {
   return apiPost<AuthResponse>("/auth/register", body);
 }
 
@@ -30,7 +43,7 @@ export function meApi() {
 }
 
 export function needsSetupApi() {
-  return apiGet<{ needs_setup: boolean }>("/auth/needs-setup");
+  return apiGet<{ needs_setup: boolean; requires_setup_token?: boolean }>("/auth/needs-setup");
 }
 
 export function createInviteApi(expiresInDays?: number) {
@@ -73,6 +86,29 @@ export function deleteUserApi(userId: number) {
 
 export function revokeUserSessionsApi(userId: number) {
   return apiPost<{ ok: boolean; revoked_sessions: number }>(`/auth/admin/users/${userId}/revoke-sessions`);
+}
+
+export function fetchSessionsApi(signal?: AbortSignal) {
+  return apiGet<SessionsResponse>("/auth/sessions", undefined, { signal });
+}
+
+export function revokeSessionApi(sessionId: string) {
+  return apiDelete<{ ok: boolean }>(`/auth/sessions/${encodeURIComponent(sessionId)}`);
+}
+
+export function fetchAdminAuditActionsApi(
+  params?: { limit?: number; offset?: number; action?: string; actor_username?: string },
+  signal?: AbortSignal,
+) {
+  return apiGet<AdminAuditActionsResponse>("/auth/admin/audit-actions", params, { signal });
+}
+
+/** 当前登录用户自己的登录记录（只返回本人 user_id 的记录）。 */
+export function fetchMyLoginAuditLogsApi(
+  params?: { limit?: number; offset?: number; status?: string },
+  signal?: AbortSignal,
+) {
+  return apiGet<LoginAuditLogsResponse>("/auth/audit-logs/me", params, { signal });
 }
 
 export function fetchLoginAuditLogsApi(

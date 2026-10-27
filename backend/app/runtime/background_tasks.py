@@ -227,7 +227,12 @@ async def periodic_wal_checkpoint() -> None:
             workflow_job_retention_seconds=settings.workflow_job_retention_seconds,
             semaphore=database_semaphore,
         )
-        auth_purged = await call_blocking(purge_expired_auth_data, semaphore=database_semaphore)
+        auth_purged = await call_blocking(
+            purge_expired_auth_data,
+            login_audit_retention_days=settings.login_audit_retention_days,
+            admin_audit_retention_days=settings.admin_audit_retention_days,
+            semaphore=database_semaphore,
+        )
         file_purged = await call_blocking(
             purge_expired_file_data,
             semaphore=misc_semaphore,

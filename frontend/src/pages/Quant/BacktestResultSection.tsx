@@ -44,7 +44,7 @@ export default function BacktestResultSection({
       ) : null}
       {hasResult && run?.result ? (
         <Suspense fallback={<QuantWorkspaceFallback label="回测结果加载中" />}>
-          <BacktestResult result={run.result} strategy={run.request.strategy} />
+          <BacktestResult result={run.result} strategy={run.request.strategy} runId={run.id} />
         </Suspense>
       ) : (
         <div className="quant-panel-empty">

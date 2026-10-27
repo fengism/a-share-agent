@@ -43,6 +43,21 @@ describe("RegisterPage", () => {
     expect(screen.getByRole("button", { name: "创建管理员账号" })).toBeInTheDocument();
   });
 
+  it("asks for the deploy setup token when the backend requires it", async () => {
+    asMock(needsSetupApi).mockResolvedValue({ needs_setup: true, requires_setup_token: true });
+    renderRegister();
+
+    expect(await screen.findByPlaceholderText("ADMIN_SETUP_TOKEN")).toBeInTheDocument();
+  });
+
+  it("hides the setup token field when the backend does not require it", async () => {
+    asMock(needsSetupApi).mockResolvedValue({ needs_setup: true, requires_setup_token: false });
+    renderRegister();
+
+    expect(await screen.findByText("首位注册用户将成为管理员")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("ADMIN_SETUP_TOKEN")).toBeNull();
+  });
+
   it("invite mode requires an invite code", async () => {
     asMock(needsSetupApi).mockResolvedValue({ needs_setup: false });
     renderRegister();

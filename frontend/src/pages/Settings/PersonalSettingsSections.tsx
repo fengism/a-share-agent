@@ -7,12 +7,15 @@ import {
   NotionConfigCard,
   ProviderDefaultsCard,
 } from "./ConfigCards";
+import { PERSONAL_LLM_CLEAR_PATCH } from "./llmInheritance";
 import type { ConfigSectionProps } from "./sectionTypes";
 import type { SettingsCards } from "./useSettingsForm";
 
 interface AiSettingsSectionProps extends ConfigSectionProps {
   providerDefaults: Record<string, ProviderDefault>;
   onProviderChange: (provider: string) => void;
+  inheritedKeys?: string[];
+  isAdmin?: boolean;
   cards: SettingsCards;
 }
 
@@ -23,6 +26,8 @@ export function AiSettingsSection({
   sectionTitleStyle,
   providerDefaults,
   onProviderChange,
+  inheritedKeys,
+  isAdmin,
   cards,
 }: AiSettingsSectionProps) {
   return (
@@ -36,6 +41,9 @@ export function AiSettingsSection({
         onChange={onChange}
         isSaving={isSaving}
         providerDefaults={providerDefaults}
+        inheritedKeys={inheritedKeys}
+        isAdmin={isAdmin}
+        onUseAdminConfig={() => cards.save("llm", PERSONAL_LLM_CLEAR_PATCH)}
         onSave={() => cards.save("llm")}
         onProviderChange={onProviderChange}
         isDirty={cards.dirty.llm}

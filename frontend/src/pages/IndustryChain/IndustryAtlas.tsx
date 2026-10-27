@@ -94,6 +94,12 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
   const catalog = catalogQuery.data;
   const graphData = graphQuery.data;
 
+  // 用户个人专属图谱统计
+  const userChainsCount = useMemo(
+    () => catalog?.chains.filter((c) => c.source === "user").length ?? 0,
+    [catalog],
+  );
+
   // 产业链目录过滤
   const filteredChains = useMemo(() => {
     if (!catalog) return [];
@@ -150,6 +156,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
             chain={chainQuery.data}
             onAnalyze={onAnalyze}
             onCompanyClick={(code) => navigate(buildStockProfileUrl(code))}
+            onDeleteSuccess={() => setSelectedSlug("")}
           />
         )}
       </div>
@@ -221,15 +228,22 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
             </Popover>
           </div>
 
-          {isAdmin && (
-            <div style={{ marginLeft: isMobile ? 0 : "auto", width: isMobile ? "100%" : "auto", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <Button
-                icon={<CloudDownloadOutlined />}
-                size={isMobile ? "small" : "middle"}
-                onClick={() => setMineOpen(true)}
-              >
-                从分析挖掘
-              </Button>
+          <div style={{ marginLeft: isMobile ? 0 : "auto", width: isMobile ? "100%" : "auto", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <Button
+              icon={<CloudDownloadOutlined />}
+              size={isMobile ? "small" : "middle"}
+              onClick={() => setMineOpen(true)}
+            >
+              {isAdmin ? "从分析挖掘" : "沉淀个人图谱"}
+            </Button>
+            <Button
+              icon={<ImportOutlined />}
+              size={isMobile ? "small" : "middle"}
+              onClick={() => setImportOpen(true)}
+            >
+              {isAdmin ? "导入产业链" : "导入私有产业链"}
+            </Button>
+            {isAdmin && (
               <Button
                 icon={<RobotOutlined />}
                 size={isMobile ? "small" : "middle"}
@@ -237,15 +251,8 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
               >
                 {isMobile ? "批量挖掘" : "批量挖掘历史研报"}
               </Button>
-              <Button
-                icon={<ImportOutlined />}
-                size={isMobile ? "small" : "middle"}
-                onClick={() => setImportOpen(true)}
-              >
-                导入产业链
-              </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* 目录视图：分类与来源标签 */}
@@ -282,6 +289,9 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
                 onChange={(e) => setSourceFilter(e.target.value)}
               >
                 <Radio.Button value="all">全部来源</Radio.Button>
+                <Radio.Button value="user">
+                  个人专属{userChainsCount > 0 ? ` (${userChainsCount})` : ""}
+                </Radio.Button>
                 <Radio.Button value="builtin">内置策划</Radio.Button>
                 <Radio.Button value="mined">AI 自动挖掘</Radio.Button>
                 <Radio.Button value="imported">外部导入</Radio.Button>
@@ -322,8 +332,30 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
             />
           )}
           {catalog && filteredChains.length === 0 && (
-            <div style={{ ...cardStyle, padding: 40 }}>
-              <Empty description="没有匹配的产业链" />
+            <div style={{ ...cardStyle, padding: 40, textAlign: "center" }}>
+              {sourceFilter === "user" ? (
+                <Empty
+                  description={
+                    <div style={{ maxWidth: 420, margin: "0 auto", lineHeight: "1.8" }}>
+                      <p style={{ fontWeight: 500, marginBottom: 4 }}>暂无个人专属图谱</p>
+                      <span style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)" }}>
+                        您可以从已有的产业链分析研报中点击「沉淀到知识库」，或直接通过上方按钮导入 YAML 文件建立您的私有知识库。
+                      </span>
+                    </div>
+                  }
+                >
+                  <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 12 }}>
+                    <Button type="primary" icon={<CloudDownloadOutlined />} onClick={() => setMineOpen(true)}>
+                      沉淀个人图谱
+                    </Button>
+                    <Button icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>
+                      导入私有产业链
+                    </Button>
+                  </div>
+                </Empty>
+              ) : (
+                <Empty description="没有匹配的产业链" />
+              )}
             </div>
           )}
           {catalog && filteredChains.length > 0 && (
@@ -345,6 +377,11 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
                     display: "flex",
                     flexDirection: "column",
                     gap: 10,
+                    borderColor: chain.source === "user" ? "rgba(114, 46, 209, 0.4)" : undefined,
+                    background:
+                      chain.source === "user"
+                        ? "linear-gradient(180deg, rgba(114, 46, 209, 0.05), transparent 70%)"
+                        : undefined,
                   }}
                   onClick={() => setSelectedSlug(chain.slug)}
                 >
@@ -373,6 +410,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
                     >
                       {chain.name}
                     </strong>
+                    {chain.source === "user" && <Tag color="purple">个人专属</Tag>}
                     {chain.source === "mined" && <Tag color="processing">AI 挖掘</Tag>}
                     {chain.source === "imported" && <Tag color="gold">外部导入</Tag>}
                     <Tag className="atlas-wrap-tag" style={{ marginLeft: "auto" }}>
@@ -403,7 +441,7 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
                     <span>{chain.segment_count} 个环节</span>
                     <span>·</span>
                     <span>{chain.company_count} 家公司</span>
-                    {isAdmin && (chain.source === "imported" || chain.source === "mined") && (
+                    {((isAdmin && (chain.source === "imported" || chain.source === "mined")) || chain.source === "user") && (
                       <Popconfirm
                         title="删除这条产业链？"
                         onConfirm={(event) => {
@@ -457,65 +495,62 @@ export default function IndustryAtlas({ onAnalyze }: IndustryAtlasProps) {
       )}
 
       {/* 导入与挖掘模态框 */}
+      <AtlasImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        importing={importMutation.isPending}
+        onSubmit={(content, overwrite) => {
+          importMutation.mutate(
+            { content, overwrite },
+            {
+              onSuccess: async (chains) => {
+                message.success(`导入成功：${chains.map((chain) => chain.name).join("、")}`);
+                setImportOpen(false);
+                await queryClient.invalidateQueries({
+                  queryKey: queryKeys.workflows.industryChainAtlasCatalog,
+                });
+                await queryClient.invalidateQueries({
+                  queryKey: ["industryChainAtlas", "graph"],
+                });
+              },
+              onError: (error: Error) =>
+                message.error({
+                  content: error.message,
+                  duration: 8,
+                }),
+            },
+          );
+        }}
+      />
+
       {isAdmin && (
-        <>
-          <AtlasImportModal
-            open={importOpen}
-            onClose={() => setImportOpen(false)}
-            importing={importMutation.isPending}
-            onSubmit={(content, overwrite) => {
-              importMutation.mutate(
-                { content, overwrite },
-                {
-                  onSuccess: async (chains) => {
-                    message.success(`导入成功：${chains.map((chain) => chain.name).join("、")}`);
-                    setImportOpen(false);
-                    await queryClient.invalidateQueries({
-                      queryKey: queryKeys.workflows.industryChainAtlasCatalog,
-                    });
-                    await queryClient.invalidateQueries({
-                      queryKey: ["industryChainAtlas", "graph"],
-                    });
-                  },
-                  onError: (error: Error) =>
-                    message.error({
-                      content: error.message,
-                      duration: 8,
-                    }),
-                },
-              );
-            }}
-          />
-
-          <AtlasMineModal
-            open={mineOpen}
-            onClose={() => setMineOpen(false)}
-            onSuccess={async (name) => {
-              message.success(`已从「${name}」分析报告成功挖掘知识库条目！`);
-              setMineOpen(false);
-              await queryClient.invalidateQueries({
-                queryKey: queryKeys.workflows.industryChainAtlasCatalog,
-              });
-              await queryClient.invalidateQueries({
-                queryKey: ["industryChainAtlas", "graph"],
-              });
-            }}
-          />
-
-          <AtlasBatchMineModal
-            open={batchMineOpen}
-            onClose={() => setBatchMineOpen(false)}
-            onSuccess={async () => {
-              await queryClient.invalidateQueries({
-                queryKey: queryKeys.workflows.industryChainAtlasCatalog,
-              });
-              await queryClient.invalidateQueries({
-                queryKey: ["industryChainAtlas", "graph"],
-              });
-            }}
-          />
-        </>
+        <AtlasBatchMineModal
+          open={batchMineOpen}
+          onClose={() => setBatchMineOpen(false)}
+          onSuccess={async () => {
+            await queryClient.invalidateQueries({
+              queryKey: queryKeys.workflows.industryChainAtlasCatalog,
+            });
+            await queryClient.invalidateQueries({
+              queryKey: ["industryChainAtlas", "graph"],
+            });
+          }}
+        />
       )}
+
+      <AtlasMineModal
+        open={mineOpen}
+        onClose={() => setMineOpen(false)}
+        onSuccess={async () => {
+          setMineOpen(false);
+          await queryClient.invalidateQueries({
+            queryKey: queryKeys.workflows.industryChainAtlasCatalog,
+          });
+          await queryClient.invalidateQueries({
+            queryKey: ["industryChainAtlas", "graph"],
+          });
+        }}
+      />
     </div>
   );
 }
@@ -1153,14 +1188,19 @@ function ChainAtlasDetail({
   chain,
   onAnalyze,
   onCompanyClick,
+  onDeleteSuccess,
 }: {
   chain: AtlasChain;
   onAnalyze: (name: string) => void;
   onCompanyClick: (code: string) => void;
+  onDeleteSuccess?: () => void;
 }) {
   const colors = useColors();
   const { cardStyle } = useStyles();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const isAdmin = useAuthStore((s) => s.user?.is_admin ?? false);
+  const deleteMutation = useDeleteIndustryChainAtlasChain();
   const [detailMode, setDetailMode] = useState<"cards" | "graph">("cards");
   const isNarrow = useMediaQuery("(max-width: 768px)");
   const isMobile = useMediaQuery("(max-width: 576px)");
@@ -1178,6 +1218,7 @@ function ChainAtlasDetail({
           >
             {chain.name}
           </strong>
+          {chain.source === "user" && <Tag color="purple">个人专属</Tag>}
           {chain.source === "mined" && <Tag color="processing">AI 自动挖掘</Tag>}
           {chain.source === "imported" && <Tag color="gold">外部导入</Tag>}
           <Tag className="atlas-wrap-tag">{chain.category}</Tag>
@@ -1235,6 +1276,30 @@ function ChainAtlasDetail({
             >
               导出 YAML
             </Button>
+            {((isAdmin && chain.source !== "builtin") || chain.source === "user") && (
+              <Popconfirm
+                title="确定删除这条产业链知识库图谱？"
+                onConfirm={() => {
+                  deleteMutation.mutate(chain.slug, {
+                    onSuccess: async () => {
+                      message.success(`已删除产业链：${chain.name}`);
+                      onDeleteSuccess?.();
+                      await queryClient.invalidateQueries({
+                        queryKey: queryKeys.workflows.industryChainAtlasCatalog,
+                      });
+                      await queryClient.invalidateQueries({
+                        queryKey: ["industryChainAtlas", "graph"],
+                      });
+                    },
+                    onError: (error: Error) => message.error(error.message),
+                  });
+                }}
+              >
+                <Button danger icon={<DeleteOutlined />} size={isMobile ? "small" : "middle"}>
+                  删除
+                </Button>
+              </Popconfirm>
+            )}
             <Button
               type="primary"
               icon={<ExperimentOutlined />}

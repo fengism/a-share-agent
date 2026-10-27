@@ -5,13 +5,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import time as monotonic_time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import date, datetime, time, timedelta
 from functools import cache
 from uuid import uuid4
 
 import exchange_calendars as xcals
 
+from app.core.concurrency.keyed_lock import KeyedLockRegistry
 from app.core.exceptions import InvalidRequestError
 from app.core.timezones import SHANGHAI_TIMEZONE
 from app.financial_data.market.trading_session import get_trading_calendar_view
@@ -42,8 +44,8 @@ RECHECK_CONFIRMATION_TIME = time(17, 0)
 FAILED_RECOVERY_LOOKBACK_DAYS = 3
 SEGMENTS: tuple[MarketDailySegment, ...] = ("cn_stock", "cn_index", "hk_stock", "hk_index")
 
-_segment_locks: dict[tuple[date, RefreshCheckpoint, str], asyncio.Lock] = {}
-_segment_locks_guard = asyncio.Lock()
+# 键是 (交易日, 检查点, 市场段)，随日期增长；用引用计数的注册表避免只增不减。
+_segment_locks = KeyedLockRegistry()
 
 Collector = Callable[[str, date], Awaitable[CollectedMarketDailyBars]]
 MarketNowProvider = Callable[[], datetime]
@@ -99,9 +101,10 @@ def is_hk_trading_day(target: date) -> bool:
     return _is_exchange_trading_day("XHKG", target)
 
 
-async def _segment_lock(key: tuple[date, RefreshCheckpoint, str]) -> asyncio.Lock:
-    async with _segment_locks_guard:
-        return _segment_locks.setdefault(key, asyncio.Lock())
+@asynccontextmanager
+async def _segment_lock(key: tuple[date, RefreshCheckpoint, str]) -> AsyncIterator[None]:
+    async with _segment_locks.acquire(key):
+        yield
 
 
 class MarketDailyBarService:
@@ -229,8 +232,7 @@ class MarketDailyBarService:
     ) -> bool:
         key = (target, checkpoint, segment)
         request_version = requested_at if requested_at is not None else monotonic_time.monotonic()
-        lock = await _segment_lock(key)
-        async with lock:
+        async with _segment_lock(key):
             if force and self._segment_completed_at.get(key, -1.0) >= request_version:
                 return False
             lease = await asyncio.to_thread(
@@ -457,16 +459,13 @@ class MarketDailyBarService:
         selected = list(dict.fromkeys(segments or SEGMENTS))
         phases: tuple[RefreshCheckpoint, ...] = ("initial", "recheck")
         lock_keys = [(trade_date, phase, segment) for phase in phases for segment in selected]
-        locks = [await _segment_lock(key) for key in lock_keys]
-        for lock in locks:
-            await lock.acquire()
-        try:
+        # 固定顺序获取多个段锁（与旧实现一致，避免与单段路径交叉死锁）。
+        async with AsyncExitStack() as stack:
+            for key in lock_keys:
+                await stack.enter_async_context(_segment_lock(key))
             bars, observations, jobs = await asyncio.to_thread(
                 self.repository.delete_day, trade_date, segments=selected
             )
-        finally:
-            for lock in reversed(locks):
-                lock.release()
         rebuild_result = None
         if rebuild:
             rebuild_result = await self.refresh(

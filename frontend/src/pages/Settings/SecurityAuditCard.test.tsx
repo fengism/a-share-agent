@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SecurityAuditCard from "./SecurityAuditCard";
+import { summarizeDetails } from "./auditMeta";
 
 const mocks = vi.hoisted(() => ({
   refetch: vi.fn(),
@@ -17,6 +18,44 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
 });
 
 vi.mock("../../api/queries", () => ({
+  useAdminAuditActions: () => ({
+    data: {
+      items: [
+        {
+          id: 11,
+          actor_id: 1,
+          actor_username: "admin",
+          actor_ip: "203.0.113.7",
+          actor_user_agent: "Mozilla/5.0",
+          action: "user.role",
+          target_type: "user",
+          target_id: "7",
+          target_label: "alice",
+          details: '{"is_admin": true}',
+          created_at: "2026-09-22 11:00:00",
+        },
+        {
+          id: 12,
+          actor_id: 1,
+          actor_username: "admin",
+          actor_ip: "203.0.113.7",
+          actor_user_agent: "Mozilla/5.0",
+          action: "config.update_global",
+          target_type: "config",
+          target_id: "global",
+          target_label: "",
+          details: '{"fields": ["llm_api_key", "llm_base_url"]}',
+          created_at: "2026-09-22 11:05:00",
+        },
+      ],
+      total: 2,
+      limit: 20,
+      offset: 0,
+    },
+    isLoading: false,
+    error: null,
+    refetch: mocks.refetch,
+  }),
   useLoginAuditLogs: (params: { username?: string; status?: string } | undefined) => {
     const allItems = [
       {
@@ -114,5 +153,30 @@ describe("SecurityAuditCard", () => {
     fireEvent.change(input, { target: { value: "hacker" } });
     expect(screen.getByText("hacker_target")).toBeInTheDocument();
     expect(screen.queryByText("admin")).not.toBeInTheDocument();
+  });
+
+  it("switches to admin action tab and shows change details", () => {
+    render(<SecurityAuditCard />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "管理员操作" }));
+
+    expect(screen.getByText("修改角色")).toBeInTheDocument();
+    expect(screen.getByText("修改全局配置")).toBeInTheDocument();
+    expect(screen.getByText("alice")).toBeInTheDocument();
+    expect(screen.getByText(/is_admin: 是/)).toBeInTheDocument();
+    // 全局配置只显示字段名，绝不显示取值
+    expect(screen.getByText(/llm_api_key, llm_base_url/)).toBeInTheDocument();
+    expect(screen.queryByText(/sk-/)).not.toBeInTheDocument();
+  });
+});
+
+describe("summarizeDetails", () => {
+  it("flattens json details and tolerates broken payloads", () => {
+    expect(summarizeDetails('{"is_active": false}')).toBe("is_active: 否");
+    expect(summarizeDetails('{"fields": ["a", "b"]}')).toBe("fields: a, b");
+    expect(summarizeDetails('{"fields": ["a","b","c","d","e","f","g"]}')).toContain("等 7 项");
+    expect(summarizeDetails("")).toBe("—");
+    expect(summarizeDetails("not-json")).toBe("not-json");
+    expect(summarizeDetails("[1,2]")).toBe("[1,2]");
   });
 });

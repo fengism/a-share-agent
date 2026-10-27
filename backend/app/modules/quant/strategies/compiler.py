@@ -13,11 +13,21 @@ from app.modules.quant.strategies.contracts import (
 )
 from app.modules.quant.strategies.loader import canonical_definition_hash
 
-DATA_FIELDS = frozenset({"open", "high", "low", "close", "volume"})
+DATA_FIELDS = frozenset({
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "amount",
+    "turnover_pct",
+    "amplitude",
+    "change_pct",
+})
 
 # 持仓路径依赖的运行时序列：由 evaluator 在扫描持仓状态时填充，
 # 仅在持仓中有值（空仓时为 None，信号比较按 False 处理），用于表达跟踪止损类退出条件
-ARITHMETIC_OPERATORS = frozenset({"add", "subtract", "multiply", "divide"})
+ARITHMETIC_OPERATORS = frozenset({"add", "subtract", "multiply", "divide", "min", "max", "abs"})
 
 RUNTIME_SERIES = frozenset({
     # 这些是信号状态而非组合成交状态：入场信号 bar 当日即开始计数。
@@ -60,17 +70,27 @@ class CompiledStrategy:
             indicator = self.definition.indicators[name]
             offset = argument(indicator.offset)
             if indicator.operator in ARITHMETIC_OPERATORS:
-                required = max(operand(indicator.left), operand(indicator.right))
+                if indicator.operator == "abs":
+                    required = operand(indicator.left or indicator.input)
+                else:
+                    required = max(operand(indicator.left), operand(indicator.right))
             elif indicator.operator == "obv":
                 required = max(
                     warmup.get(indicator.input or "", 0),
                     warmup.get(indicator.volume_input or "", 0),
                     OBV_WARMUP_BARS,
                 )
+            elif indicator.operator == "atr":
+                period = argument(indicator.period, 14)
+                required = max(
+                    warmup.get("high", 0),
+                    warmup.get("low", 0),
+                    warmup.get("close", 0),
+                ) + 2 * period
             else:
                 period = argument(indicator.period, 1)
                 input_warmup = warmup.get(indicator.input or "", 0)
-                if indicator.operator in {"rsi", "shift"}:
+                if indicator.operator in {"rsi", "shift", "momentum"}:
                     required = input_warmup + period
                 elif indicator.operator == "ema":
                     # EMA 以 SMA 种子起步，需要约 2 倍周期才收敛到稳态。
@@ -203,6 +223,8 @@ def compile_strategy(
     order = _indicator_order(definition)
     _validate_expression(definition, definition.signals.entry)
     _validate_expression(definition, definition.signals.exit)
+    if definition.position.target_weight is not None:
+        _validate_operand(definition, definition.position.target_weight, "position target_weight")
     for constraint in definition.constraints:
         _validate_operand(definition, constraint.left, "约束 left")
         _validate_operand(definition, constraint.right, "约束 right")

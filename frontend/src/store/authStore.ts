@@ -9,7 +9,12 @@ interface AuthState {
   /** True once the initial token-validation (/me) has completed. */
   bootstrapped: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string, inviteCode?: string) => Promise<void>;
+  register: (
+    username: string,
+    password: string,
+    inviteCode?: string,
+    setupToken?: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   /** Clear local session without hitting the API (used on 401 expiry). */
   clearLocal: () => void;
@@ -30,11 +35,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: res.user });
   },
 
-  register: async (username, password, inviteCode) => {
+  register: async (username, password, inviteCode, setupToken) => {
     const res = await registerApi({
       username,
       password,
       invite_code: inviteCode || undefined,
+      setup_token: setupToken || undefined,
     });
     setToken(null);
     setActiveUserScope(res.user.id);

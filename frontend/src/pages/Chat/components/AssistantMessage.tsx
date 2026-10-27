@@ -16,6 +16,7 @@ import {
 } from "../chatResultActions";
 import { AssistantProcess } from "./AssistantProcess";
 import { BlinkingCursor } from "./BlinkingCursor";
+import { marketDateStamp } from "../../../utils/marketTime";
 import { ChatResultActions } from "./ChatResultActions";
 
 const markdownPlugins = [remarkGfm];
@@ -66,7 +67,7 @@ export const AssistantMessage = React.memo(function AssistantMessage({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `AI投研回答_${message.id.slice(0, 8)}_${new Date().toISOString().slice(0, 10)}.md`;
+      a.download = `AI投研回答_${message.id.slice(0, 8)}_${marketDateStamp()}.md`;
       a.click();
       URL.revokeObjectURL?.(url);
     }

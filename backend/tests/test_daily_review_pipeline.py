@@ -280,14 +280,44 @@ def _historical_resolution() -> pipeline.DailyReviewDateResolution:
     )
 
 
-async def test_generation_lock_is_shared_per_date_and_user() -> None:
-    pipeline._generation_locks.clear()
+async def test_generation_lock_serializes_same_date_and_user_only() -> None:
+    """同一 (日期, 用户) 必须串行；不同键互不阻塞；释放后注册表不留条目。"""
+    registry = pipeline._generation_locks
+    registry.clear()
+    events: list[str] = []
+    a_entered = asyncio.Event()
+    c_entered = asyncio.Event()
+    release_a = asyncio.Event()
 
-    first = await pipeline._generation_lock(("2026-10-14", 7))
+    async def holder() -> None:
+        async with registry.acquire(("2026-10-14", 7)):
+            events.append("a:enter")
+            a_entered.set()
+            await release_a.wait()
+            events.append("a:exit")
 
-    assert await pipeline._generation_lock(("2026-10-14", 7)) is first
-    assert await pipeline._generation_lock(("2026-10-14", 8)) is not first
-    assert await pipeline._generation_lock(("2026-10-13", 7)) is not first
+    async def same_key_waiter() -> None:
+        async with registry.acquire(("2026-10-14", 7)):
+            events.append("b:enter")
+
+    async def other_key_waiter() -> None:
+        async with registry.acquire(("2026-10-14", 8)):
+            events.append("c:enter")
+            c_entered.set()
+
+    task_a = asyncio.create_task(holder())
+    await a_entered.wait()
+    task_b = asyncio.create_task(same_key_waiter())
+    task_c = asyncio.create_task(other_key_waiter())
+    # 异键立刻拿到锁；同键仍在排队（事件驱动，不依赖 sleep）。
+    await c_entered.wait()
+    assert "b:enter" not in events
+    release_a.set()
+    await asyncio.gather(task_a, task_b, task_c)
+
+    assert events.index("a:exit") < events.index("b:enter")
+    assert registry.active_keys() == 0
+    assert registry.tracked_references() == 0
 
 
 async def test_collection_snapshot_is_shared_for_both_session_kinds(monkeypatch: pytest.MonkeyPatch) -> None:

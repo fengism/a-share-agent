@@ -1,7 +1,13 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "../api/queryKeys";
-import { streamIndustryChain, type IndustryChainProgress, type WorkflowCancelResult } from "../api/sse";
+import {
+  resumeIndustryChain,
+  streamIndustryChain,
+  type IndustryChainProgress,
+  type WorkflowCancelResult,
+  type WorkflowStream,
+} from "../api/sse";
 import { useIndustryChainWorkflowStore } from "../store/industryChainWorkflowStore";
 import type { IndustryChainResearchScope, IndustryChainResult } from "../types/stock";
 import {
@@ -9,6 +15,7 @@ import {
   applyAgentEvent,
   stopAgentProcess,
 } from "../features/agent-process/agentProcess";
+import { DEFAULT_INDUSTRY_SCOPE } from "../pages/IndustryChain/industryScope";
 import { INDUSTRY_CHAIN_STAGES, industryStageIndex } from "../pages/IndustryChain/industryWorkflow";
 
 interface IndustryChainWorkflowControllerOptions {
@@ -23,8 +30,6 @@ export function useIndustryChainWorkflowController({
   onCancelled,
 }: IndustryChainWorkflowControllerOptions = {}) {
   const queryClient = useQueryClient();
-  // 逐字段订阅：避免任何一次无关 patch（如 jobId 写入）触发整页重渲染；
-  // 运行期每个 SSE 事件都会更新 agentProcess，未变化的字段不应引起重渲染
   const runId = useIndustryChainWorkflowStore((s) => s.runId);
   const jobId = useIndustryChainWorkflowStore((s) => s.jobId);
   const name = useIndustryChainWorkflowStore((s) => s.name);
@@ -39,51 +44,7 @@ export function useIndustryChainWorkflowController({
   const error = useIndustryChainWorkflowStore((s) => s.error);
   const agentProcess = useIndustryChainWorkflowStore((s) => s.agentProcess);
 
-  const runAnalysis = useCallback((
-    name: string,
-    scope: IndustryChainResearchScope,
-    options: { force?: boolean } = {},
-  ) => {
-    const normalizedName = name.trim();
-    if (!normalizedName || useIndustryChainWorkflowStore.getState().isAnalyzing) return false;
-    const store = useIndustryChainWorkflowStore.getState();
-    const runId = store.begin(normalizedName, scope);
-    const stream = streamIndustryChain(normalizedName, (event: IndustryChainProgress) => {
-      const current = useIndustryChainWorkflowStore.getState();
-      if (current.runId !== runId || !current.isAnalyzing) return;
-      if (event.type === "error" && event.cancelled) {
-        current.stopRun(runId, "cancelled");
-        void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
-      } else if (event.type === "stage_started" && event.stage) {
-        const nextStage = industryStageIndex(event.stage);
-        current.patch(runId, {
-          currentStage: nextStage >= 0 ? nextStage : current.currentStage,
-          stageMessage: event.message || "",
-        });
-      } else if (event.type === "stage_completed") {
-        current.patch(runId, {
-          stageMessage: event.message || "完成",
-          ...(event.result ? { result: event.result } : {}),
-        });
-      } else if (event.type === "stage_failed" && event.stage) {
-        const failedStage = industryStageIndex(event.stage);
-        current.patch(runId, {
-          currentStage: failedStage >= 0 ? failedStage : current.currentStage,
-          failedStage,
-          stageMessage: event.message || "阶段执行失败",
-        });
-      } else if (event.type === "agent_event" && event.agent_event) {
-        current.patch(runId, {
-          agentProcess: applyAgentEvent(current.agentProcess, event.agent_event),
-        });
-      }
-    }, scope, options);
-    store.setStream(runId, stream);
-    void stream.started.then((submission) => {
-      useIndustryChainWorkflowStore.getState().patch(runId, { jobId: submission.job.id });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
-    }).catch(() => undefined);
-
+  const handleStreamEvents = useCallback((runId: number, stream: WorkflowStream<IndustryChainResult>, normalizedName: string) => {
     void stream.promise.then((result) => {
       const current = useIndustryChainWorkflowStore.getState();
       if (current.runId !== runId || !current.isAnalyzing) return;
@@ -128,8 +89,78 @@ export function useIndustryChainWorkflowController({
       }
       void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
     });
-    return true;
   }, [onError, onSuccess, queryClient]);
+
+  const onProgressEvent = useCallback((runId: number, event: IndustryChainProgress) => {
+    const current = useIndustryChainWorkflowStore.getState();
+    if (current.runId !== runId || !current.isAnalyzing) return;
+    if (event.type === "error" && event.cancelled) {
+      current.stopRun(runId, "cancelled");
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
+    } else if (event.type === "stage_started" && event.stage) {
+      const nextStage = industryStageIndex(event.stage);
+      current.patch(runId, {
+        currentStage: nextStage >= 0 ? nextStage : current.currentStage,
+        stageMessage: event.message || "",
+      });
+    } else if (event.type === "stage_completed") {
+      current.patch(runId, {
+        stageMessage: event.message || "完成",
+        ...(event.result ? { result: event.result } : {}),
+      });
+    } else if (event.type === "stage_failed" && event.stage) {
+      const failedStage = industryStageIndex(event.stage);
+      current.patch(runId, {
+        currentStage: failedStage >= 0 ? failedStage : current.currentStage,
+        failedStage,
+        stageMessage: event.message || "阶段执行失败",
+      });
+    } else if (event.type === "agent_event" && event.agent_event) {
+      current.patch(runId, {
+        agentProcess: applyAgentEvent(current.agentProcess, event.agent_event),
+      });
+    }
+  }, [queryClient]);
+
+  const runAnalysis = useCallback((
+    name: string,
+    scope: IndustryChainResearchScope,
+    options: { force?: boolean } = {},
+  ) => {
+    const normalizedName = name.trim();
+    if (!normalizedName || useIndustryChainWorkflowStore.getState().isAnalyzing) return false;
+    const store = useIndustryChainWorkflowStore.getState();
+    const runId = store.begin(normalizedName, scope);
+    const stream = streamIndustryChain(
+      normalizedName,
+      (event: IndustryChainProgress) => onProgressEvent(runId, event),
+      scope,
+      options,
+    );
+    store.setStream(runId, stream);
+    void stream.started.then((submission) => {
+      useIndustryChainWorkflowStore.getState().patch(runId, { jobId: submission.job.id });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.active });
+    }).catch(() => undefined);
+
+    handleStreamEvents(runId, stream, normalizedName);
+    return true;
+  }, [handleStreamEvents, onProgressEvent, queryClient]);
+
+  const resumeAnalysis = useCallback((jobId: string, name: string) => {
+    const normalizedName = name.trim();
+    if (!normalizedName || useIndustryChainWorkflowStore.getState().isAnalyzing) return false;
+    const store = useIndustryChainWorkflowStore.getState();
+    const runId = store.begin(normalizedName, DEFAULT_INDUSTRY_SCOPE);
+    store.patch(runId, { jobId });
+    const stream = resumeIndustryChain(
+      jobId,
+      (event: IndustryChainProgress) => onProgressEvent(runId, event),
+    );
+    store.setStream(runId, stream);
+    handleStreamEvents(runId, stream, normalizedName);
+    return true;
+  }, [handleStreamEvents, onProgressEvent]);
 
   const loadResult = useCallback((name: string, result: ReturnType<typeof useIndustryChainWorkflowStore.getState>["result"], archiveId = "") => {
     if (!result) return;
@@ -195,6 +226,7 @@ export function useIndustryChainWorkflowController({
     error,
     agentProcess,
     runAnalysis,
+    resumeAnalysis,
     cancelAnalysis,
     loadResult,
     clearResult,

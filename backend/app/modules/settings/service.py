@@ -4,8 +4,10 @@ from urllib.parse import urlparse
 
 from app import configuration as config
 from app.configuration.effective import is_masked_secret, overlay_private
+from app.configuration.provider_catalog import PROVIDER_DEFAULTS
 from app.core.concurrency.rate_limiter import call_blocking, misc_semaphore
 from app.core.request_context import invalidate_settings_cache
+from app.domain.llm import LLMConfigurationError
 from app.infrastructure.llm.spec import resolve_llm_client_spec
 from app.infrastructure.persistence import global_config_store, user_config_store
 from app.modules.settings.schemas import LlmModelsRequest
@@ -58,6 +60,11 @@ def _normalize_chat_capability_preferences(patch: dict) -> dict:
     return normalized
 
 
+def get_inherited_private_keys(user_id: int) -> list[str]:
+    """该用户仍沿用全局基线的私密配置字段（其余为个人覆盖）。"""
+    return config.inherited_private_keys(user_config_store.get_user_config(user_id))
+
+
 def get_user_settings(user_id: int) -> config.Settings:
     return config.effective_settings_for_user(
         user_id,
@@ -87,6 +94,19 @@ def update_user_settings(
     values_to_store = {key: value for key, value in private_patch.items() if not is_masked_secret(key, value)}
     global_values_to_store = {key: value for key, value in global_patch.items() if not is_masked_secret(key, value)}
 
+    # 显式传空串的私密字段 = "清空个人覆盖"（前端「改用管理员配置」走这条路）。
+    #
+    # 直接删行而不是写空串：`overlay_private` 本来就跳过空值，两种写法生效结果相同，
+    # 但删行不会留下永远读不到的死数据，也避免"看着清掉了其实还留着一行"的困惑。
+    # 掩码值（前端回显的脱敏串）依然忽略，不会被误删。
+    cleared_keys = [
+        key
+        for key, value in values_to_store.items()
+        if isinstance(value, str) and not value.strip()
+    ]
+    for key in cleared_keys:
+        values_to_store.pop(key, None)
+
     # 管理员保存大模型/推送通道配置时，自动同步至系统全局配置，
     # 供后台常驻任务及未独立配置 Key 的用户复用
     if is_admin:
@@ -96,6 +116,27 @@ def update_user_settings(
         }
         if llm_global_values:
             global_values_to_store.update(llm_global_values)
+
+    # 简化约束：普通用户若修改大模型端点或凭据，必须同时设置 Base URL 与 API Key；
+    # 不能只设置 key 而沿用管理员 url，也不能只改 url 而不设 key。
+    # 仅修改温度（llm_temperature）、模型（llm_model）等其他字段不受此限。
+    if not is_admin:
+        has_new_key = bool((values_to_store.get("llm_api_key") or "").strip())
+        has_new_url = bool((values_to_store.get("llm_base_url") or "").strip())
+        is_clearing_llm = "llm_api_key" in cleared_keys and "llm_base_url" in cleared_keys
+
+        if not is_clearing_llm:
+            if has_new_key and not has_new_url:
+                current_user_cfg = user_config_store.get_user_config(user_id)
+                if not (current_user_cfg.get("llm_base_url") or "").strip():
+                    raise LLMConfigurationError("不能只设置 API Key，自定义端点需同时配置 Base URL 与 API Key")
+            if has_new_url and not has_new_key:
+                provider = values_to_store.get("llm_provider") or config.get_settings().llm_provider
+                provider_def = PROVIDER_DEFAULTS.get(str(provider).lower(), {})
+                if provider_def.get("api_key_required", True):
+                    current_user_cfg = user_config_store.get_user_config(user_id)
+                    if not (current_user_cfg.get("llm_api_key") or "").strip():
+                        raise LLMConfigurationError("不能只修改 Base URL，自定义端点需同时配置 Base URL 与 API Key")
 
     if {
         "llm_provider", "llm_api_mode", "llm_api_version", "llm_api_key",
@@ -118,6 +159,9 @@ def update_user_settings(
             if "outbound_proxy_url" in global_values_to_store:
                 global_values_to_store["outbound_proxy_url"] = normalized
 
+    if cleared_keys:
+        user_config_store.delete_user_config_keys(user_id, cleared_keys)
+
     if values_to_store:
         user_config_store.set_user_config(user_id, values_to_store)
         invalidate_settings_cache()
@@ -128,9 +172,10 @@ def update_user_settings(
         updated_global_settings = config.update_settings(global_values_to_store)
 
     logger.info(
-        "Config update by user=%s private=%s global=%s",
+        "Config update by user=%s private=%s cleared=%s global=%s",
         user_id,
         list(private_patch),
+        cleared_keys,
         list(global_values_to_store),
     )
     return SettingsUpdateResult(
@@ -178,6 +223,18 @@ async def fetch_llm_models(
     parsed = urlparse(base_url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise LlmModelsUnavailableError("Base URL 必须是有效的 HTTP/HTTPS 地址")
+    # 出网策略：这条路径会带着用户的 API Key 请求用户自填的地址，是最直接的 SSRF 面。
+    from app.infrastructure.http.url_guard import (
+        MAX_REDIRECT_HOPS,
+        OutboundUrlBlockedError,
+        describe_blocked_target,
+        resolve_redirect_target,
+    )
+
+    allow_private = bool(getattr(config.get_settings(), "llm_allow_private_endpoints", False))
+    blocked = describe_blocked_target(base_url, allow_private=allow_private)
+    if blocked is not None:
+        raise LlmModelsUnavailableError(f"Base URL 被出网策略拒绝：{blocked}")
 
     url = _models_request_url(base_url, api_version)
     headers = {}
@@ -187,7 +244,21 @@ async def fetch_llm_models(
         headers["Authorization"] = f"Bearer {api_key}"
 
     def _default_get():
-        return get_session().get(url, headers=headers or None, timeout=15)
+        # 逐跳校验重定向：requests 默认跟随 3xx，否则公网地址可以用 302 把服务端
+        # 引到元数据/内网地址，绕过上面的第一跳校验。
+        target = url
+        response = get_session().get(
+            target, headers=headers or None, timeout=15, allow_redirects=False
+        )
+        hops = 0
+        while response.is_redirect and hops < MAX_REDIRECT_HOPS:
+            location = response.headers.get("Location") or response.headers.get("location") or ""
+            target = resolve_redirect_target(target, location, allow_private=allow_private)
+            hops += 1
+            response = get_session().get(
+                target, headers=headers or None, timeout=15, allow_redirects=False
+            )
+        return response
 
     def _parse(response) -> list[str]:
         if response.status_code >= 400:
@@ -214,5 +285,7 @@ async def fetch_llm_models(
         return await blocking_runner(lambda: _parse(response), semaphore=misc_semaphore)
     except LlmModelsUnavailableError:
         raise
+    except OutboundUrlBlockedError as error:
+        raise LlmModelsUnavailableError(f"Base URL 被出网策略拒绝：{error.reason}") from error
     except Exception as error:
         raise LlmModelsUnavailableError(f"{type(error).__name__}: {error}") from error

@@ -16,6 +16,15 @@ export type ConfigFieldKey = keyof ConfigUpdate;
 export interface CardSpec {
   fields: readonly ConfigFieldKey[];
   secrets?: readonly ConfigFieldKey[];
+  /**
+   * 只提交"被用户改动过"的字段（与当前生效配置逐字段比较）。
+   *
+   * 适用于存在**继承语义**的卡片：字段留空/未改即沿用管理员（全局）配置。
+   * 否则表单用生效值初始化后，用户仅仅改了别的项（例如温度）再保存，
+   * 就会把管理员的 Provider / Base URL / Model 悄悄写成自己的覆盖，
+   * 之后管理员调整全局配置这个人就再也跟不上了。
+   */
+  skipUnchanged?: boolean;
   /** 保存成功提示 */
   saveMessage: string;
   /** 撤销成功提示 */
@@ -26,6 +35,8 @@ export const CARD_SPECS = {
   llm: {
     saveMessage: "大模型配置已保存",
     resetMessage: "已撤销大模型配置修改",
+    // LLM 端点/凭据可留空继承管理员配置，因此只提交改动过的字段
+    skipUnchanged: true,
     fields: [
       "llm_provider",
       "llm_api_mode",
@@ -36,6 +47,14 @@ export const CARD_SPECS = {
       "llm_simple_tasks",
       "llm_temperature",
       "llm_context_length_tokens",
+      "llm_timeout_seconds",
+      "llm_max_attempts",
+      "llm_generation_timeout_seconds",
+      "llm_generation_max_completion_tokens",
+      "llm_model_max_completion_tokens",
+      "llm_stream_include_usage",
+      "llm_json_mode_enabled",
+      "llm_extra_body",
     ],
     secrets: ["llm_api_key"],
   },
@@ -122,6 +141,7 @@ export const CARD_SPECS = {
       "outbound_proxy_url",
       "outbound_proxy_timeout_seconds",
       "outbound_proxy_retries",
+      "outbound_proxy_scopes",
     ],
   },
   eastmoneyRateLimit: {
@@ -210,11 +230,25 @@ export function isMaskedValue(value: unknown): boolean {
 }
 
 /** 生成保存补丁：普通字段原样，敏感字段仅在填入新值时提交。 */
-export function buildCardPatch(form: ConfigUpdate, spec: CardSpec): ConfigUpdate {
+/** 值比较：配置项都是 JSON 可序列化的原始值/数组/对象。 */
+function isSameValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (left === undefined || right === undefined) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+export function buildCardPatch(
+  form: ConfigUpdate,
+  spec: CardSpec,
+  config?: ConfigData,
+): ConfigUpdate {
   const patch: Record<string, unknown> = {};
   for (const key of spec.fields) {
     const value = form[key];
-    if (value !== undefined) patch[key] = value;
+    if (value === undefined) continue;
+    // 继承卡片：未改动的字段不提交，避免把继承值"钉"成个人覆盖
+    if (spec.skipUnchanged && config && isSameValue(value, config[key])) continue;
+    patch[key] = value;
   }
   for (const key of spec.secrets ?? []) {
     const value = form[key];
@@ -230,7 +264,13 @@ export function buildCardReset(config: ConfigData, spec: CardSpec): ConfigUpdate
   const patch: Record<string, unknown> = {};
   for (const key of [...spec.fields, ...(spec.secrets ?? [])]) {
     const value = config[key];
-    if (value !== undefined) patch[key] = value;
+    if (value !== undefined) {
+      if (spec.secrets?.includes(key) && config.inherited_keys?.includes(key)) {
+        patch[key] = "";
+      } else {
+        patch[key] = value;
+      }
+    }
   }
   return patch as ConfigUpdate;
 }
@@ -239,7 +279,7 @@ export function buildCardReset(config: ConfigData, spec: CardSpec): ConfigUpdate
 export function isCardDirty(form: ConfigUpdate, config: ConfigData, spec: CardSpec): boolean {
   for (const key of spec.fields) {
     const next = form[key];
-    if (next !== undefined && next !== config[key]) return true;
+    if (next !== undefined && !isSameValue(next, config[key])) return true;
   }
   for (const key of spec.secrets ?? []) {
     const next = form[key];

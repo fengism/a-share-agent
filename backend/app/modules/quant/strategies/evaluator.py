@@ -209,6 +209,55 @@ def _obv(
     return result
 
 
+def _atr(
+    highs: Sequence[float | None],
+    lows: Sequence[float | None],
+    closes: Sequence[float | None],
+    period: int,
+) -> list[float | None]:
+    result: list[float | None] = [None] * len(closes)
+    if period <= 0 or len(closes) < period:
+        return result
+    tr_list: list[float | None] = []
+    for i in range(len(closes)):
+        h, lo, c_prev = highs[i], lows[i], (closes[i - 1] if i > 0 else None)
+        if h is None or lo is None:
+            tr_list.append(None)
+        elif c_prev is None:
+            tr_list.append(float(h - lo))
+        else:
+            tr_list.append(float(max(h - lo, abs(h - c_prev), abs(lo - c_prev))))
+
+    tr_sma = _sma(tr_list, period)
+    multiplier = 1.0 / period
+    prev_atr: float | None = None
+    for i in range(len(tr_list)):
+        tr = tr_list[i]
+        if tr is None:
+            prev_atr = None
+            continue
+        if prev_atr is None:
+            if tr_sma[i] is not None:
+                prev_atr = tr_sma[i]
+                result[i] = prev_atr
+        else:
+            prev_atr = prev_atr * (1.0 - multiplier) + tr * multiplier
+            result[i] = prev_atr
+    return result
+
+
+def _momentum(values: Sequence[float | None], period: int) -> list[float | None]:
+    result: list[float | None] = [None] * len(values)
+    if period <= 0:
+        return result
+    for index in range(period, len(values)):
+        current = values[index]
+        past = values[index - period]
+        if current is not None and past is not None and past != 0:
+            result[index] = float((current - past) / past * 100.0)
+    return result
+
+
 def _shift(values: Sequence[float | None], offset: int) -> list[float | None]:
     if offset == 0:
         return list(values)
@@ -252,6 +301,12 @@ def _arithmetic_series(
             result.append(float(left - right))
         elif indicator.operator == "multiply":
             result.append(float(left * right))
+        elif indicator.operator == "min":
+            result.append(float(min(left, right)))
+        elif indicator.operator == "max":
+            result.append(float(max(left, right)))
+        elif indicator.operator == "abs":
+            result.append(float(abs(left)))
         elif right != 0:
             result.append(float(left / right))
         elif indicator.zero_value is not None:
@@ -312,7 +367,7 @@ def evaluate_target_positions(
     parameters: dict[str, ParameterValue],
     *,
     evaluation_start_date: str | None = None,
-) -> list[int]:
+) -> list[int | float]:
     evaluation_start_index = next(
         (
             index
@@ -327,6 +382,10 @@ def evaluate_target_positions(
         "low": [item.low for item in items],
         "close": [item.close for item in items],
         "volume": [item.volume for item in items],
+        "amount": [item.amount for item in items],
+        "turnover_pct": [getattr(item, "turnover_pct", None) for item in items],
+        "amplitude": [getattr(item, "amplitude", None) for item in items],
+        "change_pct": [getattr(item, "change_pct", None) for item in items],
     }
     runtime_indicator_names = set(strategy.runtime_indicators)
     for name in strategy.indicator_order:
@@ -335,7 +394,7 @@ def evaluate_target_positions(
             continue
         indicator = strategy.definition.indicators[name]
         offset = _integer_argument(indicator.offset, parameters)
-        if indicator.operator in {"add", "subtract", "multiply", "divide"}:
+        if indicator.operator in {"add", "subtract", "multiply", "divide", "min", "max", "abs"}:
             values = _arithmetic_series(indicator, series, parameters, len(items))
         elif indicator.operator == "obv":
             if indicator.input is None or indicator.volume_input is None:
@@ -345,6 +404,16 @@ def evaluate_target_positions(
                 series[indicator.volume_input],
                 anchor_index=max(0, evaluation_start_index - OBV_WARMUP_BARS),
             )
+        elif indicator.operator == "atr":
+            if indicator.period is None:
+                raise ValueError(f"指标 {name} 缺少 period")
+            period = _integer_argument(indicator.period, parameters)
+            values = _atr(series["high"], series["low"], series["close"], period)
+        elif indicator.operator == "momentum":
+            if indicator.input is None or indicator.period is None:
+                raise ValueError(f"指标 {name} 缺少 input 或 period")
+            period = _integer_argument(indicator.period, parameters)
+            values = _momentum(series[indicator.input], period)
         else:
             if indicator.input is None or indicator.period is None:
                 raise ValueError(f"指标 {name} 缺少 input 或 period")
@@ -381,16 +450,24 @@ def evaluate_target_positions(
             indicator = strategy.definition.indicators[name]
             left = _resolve_operand(indicator.left, index, series, parameters) if indicator.left is not None else None
             right = _resolve_operand(indicator.right, index, series, parameters) if indicator.right is not None else None
-            if left is None or right is None:
+            if left is None:
                 series[name][index] = None
                 continue
             value: float | None
-            if indicator.operator == "add":
+            if indicator.operator == "abs":
+                value = float(abs(left))
+            elif right is None:
+                value = None
+            elif indicator.operator == "add":
                 value = float(left + right)
             elif indicator.operator == "subtract":
                 value = float(left - right)
             elif indicator.operator == "multiply":
                 value = float(left * right)
+            elif indicator.operator == "min":
+                value = float(min(left, right))
+            elif indicator.operator == "max":
+                value = float(max(left, right))
             elif right != 0:
                 value = float(left / right)
             elif indicator.zero_value is not None:
@@ -400,8 +477,11 @@ def evaluate_target_positions(
                 value = None
             series[name][index] = value
 
-    targets: list[int] = []
-    current = 0
+    mode = getattr(strategy.definition.position, "mode", "binary")
+    target_weight_op = getattr(strategy.definition.position, "target_weight", None)
+
+    targets: list[int | float] = []
+    current: int | float = 0
     entry_price: float | None = None
     holding_bars = 0
     highest: float | None = None
@@ -415,7 +495,7 @@ def evaluate_target_positions(
         evaluate_runtime_indicators(index)
 
     for index, item in enumerate(items):
-        if current == 1:
+        if current > 0:
             # 持仓中的 bar：先累积路径状态并填充运行时序列，再评估退出条件
             holding_bars += 1
             highest = max(highest, item.high)
@@ -431,7 +511,14 @@ def evaluate_target_positions(
             continue
 
         if _evaluate_expression(strategy.definition.signals.entry, index, series, parameters):
-            current = 1
+            if mode == "continuous_weight":
+                if target_weight_op is not None:
+                    weight_val = _resolve_operand(target_weight_op, index, series, parameters)
+                    current = float(weight_val) if weight_val is not None else 1.0
+                else:
+                    current = 1.0
+            else:
+                current = 1
             entry_price = item.close
             holding_bars = 1
             highest = item.high

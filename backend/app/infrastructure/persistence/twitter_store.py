@@ -57,7 +57,7 @@ def save_twitter_posts(posts: list[dict]) -> None:
         return
     with unit_of_work("market", immediate=True) as work:
         _upsert_twitter_posts(work.connection, rows)
-    logger.info(f"写入 Twitter 数据: rows={len(rows)}, authors={set(p.get('author', '') for p in posts)}")
+    logger.info('写入 Twitter 数据: rows=%s, authors=%s', len(rows), set((p.get('author', '') for p in posts)))
 
 
 def save_twitter_refresh(authors: list[str], posts: list[dict], *, refreshed_at: float | None = None) -> None:

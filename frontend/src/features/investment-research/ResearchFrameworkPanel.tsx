@@ -1,5 +1,6 @@
 import AnalysisFreshness from "./AnalysisFreshness";
 import { buildStockValuationUrl } from "./analysisHistoryUrl";
+import { renderWithCitations } from "./CitationText";
 import { ArrowRightOutlined, AuditOutlined, WarningOutlined } from "@ant-design/icons";
 import { Alert, Button, Empty, Progress, Segmented, Tag, Typography } from "antd";
 import { useState } from "react";
@@ -143,7 +144,7 @@ function TextList({ items, empty = "未覆盖" }: { items: string[]; empty?: str
   if (!items.length) return <Text type="secondary">{empty}</Text>;
   return (
     <ul className="research-text-list">
-      {items.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
+      {items.map((item, index) => <li key={`${item}-${index}`}>{renderWithCitations(item)}</li>)}
     </ul>
   );
 }
@@ -200,7 +201,7 @@ function NamedNarrative({ label, value }: { label: string; value: string }) {
   return (
     <div className="research-narrative">
       <span>{label}</span>
-      <p>{value || "证据不足，暂未形成结论"}</p>
+      <p>{value ? renderWithCitations(value) : "证据不足，暂未形成结论"}</p>
     </div>
   );
 }
@@ -339,10 +340,10 @@ export default function ResearchFrameworkPanel({
         />
       ) : null}
 
-      <ResearchSection id="research-business" eyebrow="01" title="生意与盈利引擎" compact={compact} summary={<strong>{research.business_model.economic_engine || "证据不足，尚不能概括盈利引擎"}</strong>}>
+      <ResearchSection id="research-business" eyebrow="01" title="生意与盈利引擎" compact={compact} summary={<strong>{research.business_model.economic_engine ? renderWithCitations(research.business_model.economic_engine) : "证据不足，尚不能概括盈利引擎"}</strong>}>
         <div className="research-hero-thesis">
           <span>公司如何赚钱</span>
-          <strong>{research.business_model.economic_engine || "证据不足，尚不能概括盈利引擎"}</strong>
+          <strong>{research.business_model.economic_engine ? renderWithCitations(research.business_model.economic_engine) : "证据不足，尚不能概括盈利引擎"}</strong>
         </div>
         <div className="research-two-column">
           <NamedNarrative label="盈利质量" value={research.business_model.earnings_quality} />
@@ -358,7 +359,7 @@ export default function ResearchFrameworkPanel({
             {research.business_model.segment_quality.map((segment, index) => (
               <article key={`${segment.segment}-${index}`}>
                 <header><strong>{segment.segment}</strong><span>{segment.evidence_confidence == null ? "证据待核验" : `${formatConfidence(segment.evidence_confidence)}% 证据`}</span></header>
-                <p>{segment.role || "分部角色未覆盖"}</p>
+                <p>{segment.role ? renderWithCitations(segment.role) : "分部角色未覆盖"}</p>
                 <dl>
                   <div><dt>成长质量</dt><dd>{segment.growth_quality || "待核验"}</dd></div>
                   <div><dt>盈利质量</dt><dd>{segment.profitability_quality || "待核验"}</dd></div>
@@ -370,7 +371,7 @@ export default function ResearchFrameworkPanel({
         ) : null}
       </ResearchSection>
 
-      <ResearchSection id="research-moat" eyebrow="02" title="护城河与反证" compact={compact} summary={research.moat.overall_durability || "尚无足够证据识别可持续护城河"}>
+      <ResearchSection id="research-moat" eyebrow="02" title="护城河与反证" compact={compact} summary={research.moat.overall_durability ? renderWithCitations(research.moat.overall_durability) : "尚无足够证据识别可持续护城河"}>
         {research.moat.moats.length ? (
           <div className="research-moat-grid">
             {research.moat.moats.map((moat, index) => (
@@ -382,7 +383,7 @@ export default function ResearchFrameworkPanel({
                     <Tag>{DIRECTION_LABELS[moat.direction]}</Tag>
                   </div>
                 </header>
-                <p>{moat.durability || "持续性待核验"}</p>
+                <p>{moat.durability ? renderWithCitations(moat.durability) : "持续性待核验"}</p>
                 <div className="research-evidence-pair">
                   <div><h5>支持证据</h5><TextList items={moat.evidence} /></div>
                   <div><h5>反证与威胁</h5><TextList items={[...moat.counterevidence, ...moat.threats]} /></div>
@@ -391,7 +392,7 @@ export default function ResearchFrameworkPanel({
             ))}
           </div>
         ) : <Text type="secondary">尚无足够证据识别可持续护城河</Text>}
-        {research.moat.overall_durability ? <Paragraph className="research-section__conclusion">持续性判断：{research.moat.overall_durability}</Paragraph> : null}
+        {research.moat.overall_durability ? <Paragraph className="research-section__conclusion">持续性判断：{renderWithCitations(research.moat.overall_durability)}</Paragraph> : null}
       </ResearchSection>
 
       <div id="research-stewardship" className="research-two-column research-section-pair research-anchor" data-pdf-section>
@@ -409,13 +410,13 @@ export default function ResearchFrameworkPanel({
         </ResearchSection>
       </div>
 
-      <ResearchSection id="research-inversion" eyebrow="04" title="反向推演与熊市情景" compact={compact} summary={research.inversion.bear_case || "熊市逻辑待核验"}>
+      <ResearchSection id="research-inversion" eyebrow="04" title="反向推演与熊市情景" compact={compact} summary={research.inversion.bear_case ? renderWithCitations(research.inversion.bear_case) : "熊市逻辑待核验"}>
         <Alert
           type="error"
           showIcon
           icon={<WarningOutlined />}
           title="最强熊市逻辑"
-          description={research.inversion.bear_case || "证据不足，尚未形成可检验的熊市逻辑"}
+          description={research.inversion.bear_case ? renderWithCitations(research.inversion.bear_case) : "证据不足，尚未形成可检验的熊市逻辑"}
         />
         {research.inversion.risks.length ? (
           <div className="research-risk-register" role="list" aria-label="风险登记表">
@@ -425,7 +426,7 @@ export default function ResearchFrameworkPanel({
                   <strong>{risk.risk}</strong>
                   <span>概率 {RISK_LABELS[risk.probability]} · 影响 {RISK_LABELS[risk.impact]}</span>
                 </header>
-                <p>{risk.failure_path || "失败路径待核验"}</p>
+                <p>{risk.failure_path ? renderWithCitations(risk.failure_path) : "失败路径待核验"}</p>
                 <div><span>观察窗口</span><strong>{risk.time_horizon || "未明确"}</strong></div>
                 <div><span>领先指标</span><TextList items={risk.leading_indicators} /></div>
                 <div><span>缓释因素</span><TextList items={risk.mitigants} /></div>
@@ -443,7 +444,7 @@ export default function ResearchFrameworkPanel({
         compact={compact}
         summary={(
           <div className="research-valuation-compact-summary">
-            <strong>{research.valuation.current_valuation || "估值证据不足"}</strong>
+            <strong>{research.valuation.current_valuation ? renderWithCitations(research.valuation.current_valuation) : "估值证据不足"}</strong>
             <Button type="link" size="small" onClick={openValuation}>
               查看估值明细 <ArrowRightOutlined />
             </Button>
@@ -452,8 +453,8 @@ export default function ResearchFrameworkPanel({
       >
         <div className="research-valuation-heading">
           <div>
-            <strong>{research.valuation.current_valuation || "估值证据不足"}</strong>
-            <p>{research.valuation.method_summary || "复用估值面已有方法，当前未形成方法摘要"}</p>
+            <strong>{research.valuation.current_valuation ? renderWithCitations(research.valuation.current_valuation) : "估值证据不足"}</strong>
+            <p>{research.valuation.method_summary ? renderWithCitations(research.valuation.method_summary) : "复用估值面已有方法，当前未形成方法摘要"}</p>
           </div>
           <Button type="link" onClick={openValuation}>查看估值明细 <ArrowRightOutlined /></Button>
         </div>
@@ -464,7 +465,7 @@ export default function ResearchFrameworkPanel({
               <article key={name} data-scenario={name}>
                 <span>{SCENARIO_LABELS[name]}</span>
                 <strong>{formatScenarioFairValue(scenario?.fair_value_range ?? null, scenario?.valuation_view)}</strong>
-                <p>{scenario?.valuation_view || "该情景证据不足"}</p>
+                <p>{scenario?.valuation_view ? renderWithCitations(scenario.valuation_view) : "该情景证据不足"}</p>
                 <h5>关键假设</h5>
                 <TextList items={scenario?.assumptions ?? []} />
                 <h5>失效条件</h5>
@@ -478,7 +479,7 @@ export default function ResearchFrameworkPanel({
           <div>
             <h5>安全边际</h5>
             <p className="research-list-columns__text">
-              {research.valuation.margin_of_safety || "证据不足，未形成安全边际判断"}
+              {research.valuation.margin_of_safety ? renderWithCitations(research.valuation.margin_of_safety) : "证据不足，未形成安全边际判断"}
             </p>
           </div>
           <div><h5>估值限制</h5><TextList items={research.valuation.limitations} /></div>
@@ -490,13 +491,13 @@ export default function ResearchFrameworkPanel({
         eyebrow="06"
         title="行动与持续跟踪"
         compact={compact}
-        summary={research.actions.rationale || "暂不形成行动结论"}
+        summary={research.actions.rationale ? renderWithCitations(research.actions.rationale) : "暂不形成行动结论"}
       >
         <div className="research-decision-hero">
           <div className="research-decision-hero__body">
             <span className="research-decision-hero__label">行动研判总述</span>
             <p className="research-decision-hero__text">
-              {research.actions.rationale || "证据不足，暂不形成行动结论"}
+              {research.actions.rationale ? renderWithCitations(research.actions.rationale) : "证据不足，暂不形成行动结论"}
             </p>
           </div>
           {research.actions.buy_or_add_range && (
@@ -540,10 +541,10 @@ export default function ResearchFrameworkPanel({
             {research.data_gaps.map((gap, index) => (
               <article key={`${gap.topic}-${index}`}>
                 <strong className="research-gap-list__topic">{gap.topic}</strong>
-                <p className="research-gap-list__description">{gap.missing_data || "缺失内容未说明"}</p>
+                <p className="research-gap-list__description">{gap.missing_data ? renderWithCitations(gap.missing_data) : "缺失内容未说明"}</p>
                 <dl>
-                  <div><dt>决策影响</dt><dd>{gap.decision_impact || "待评估"}</dd></div>
-                  <div><dt>下一步</dt><dd>{gap.follow_up || "待补充核验"}</dd></div>
+                  <div><dt>决策影响</dt><dd>{gap.decision_impact ? renderWithCitations(gap.decision_impact) : "待评估"}</dd></div>
+                  <div><dt>下一步</dt><dd>{gap.follow_up ? renderWithCitations(gap.follow_up) : "待补充核验"}</dd></div>
                 </dl>
               </article>
             ))}

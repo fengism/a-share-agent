@@ -4,12 +4,15 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.api.auth.dependencies import require_active_user, require_admin
 from app.api.errors import ApiError, BadRequestError, ConflictError, NotFoundError
+from app.api.rate_limit import llm_rate_limit
 from app.api.schemas import DeleteResponse
 from app.domain.identity import AuthenticatedUser
 from app.modules.quant.public import (
     QuantBacktestCreate,
     QuantBacktestList,
     QuantBacktestRun,
+    QuantParameterScanRequest,
+    QuantParameterScanResult,
     QuantSavedStrategy,
     QuantStrategyDraft,
     QuantStrategyDraftBacktestRequest,
@@ -37,6 +40,7 @@ from app.modules.quant.public import (
     publish_strategy_draft,
     retry_backtest,
     save_user_strategy,
+    scan_parameter_sensitivity,
     strategy_presets,
     strategy_registry_status,
     update_strategy_draft,
@@ -44,6 +48,11 @@ from app.modules.quant.public import (
 )
 
 router = APIRouter()
+
+
+def _owner_scope(user: AuthenticatedUser) -> int | None:
+    """草稿归属过滤：管理员（``is_admin``）看全量，普通用户只看自己创建的。"""
+    return None if bool(user.get("is_admin")) else int(user["id"])
 
 
 @router.get("/strategy-presets", response_model=list[QuantStrategyPreset])
@@ -61,19 +70,21 @@ async def get_strategy_registry_status(
 @router.get("/strategy-drafts", response_model=list[QuantStrategyDraft])
 async def get_strategy_drafts(
     limit: int = Query(default=100, ge=1, le=200),
-    _user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(require_active_user),
 ):
-    return await list_strategy_drafts(limit=limit)
+    """列出策略草稿：普通用户只返回自己创建的，管理员返回全量。"""
+    return await list_strategy_drafts(limit=limit, owner_id=_owner_scope(user))
 
 
 @router.post(
     "/strategy-drafts/generate",
     response_model=QuantStrategyDraft,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(llm_rate_limit)],
 )
 async def generate_quant_strategy_draft(
     request: QuantStrategyDraftGenerateRequest,
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(require_active_user),
 ):
     try:
         return await generate_strategy_draft(request, user_id=user["id"])
@@ -90,10 +101,10 @@ async def generate_quant_strategy_draft(
 @router.get("/strategy-drafts/{draft_id}", response_model=QuantStrategyDraft)
 async def get_quant_strategy_draft(
     draft_id: str,
-    _user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(require_active_user),
 ):
     try:
-        return await get_strategy_draft(draft_id)
+        return await get_strategy_draft(draft_id, owner_id=_owner_scope(user))
     except StrategyDraftNotFoundError as error:
         raise NotFoundError(str(error), code="quant.strategy_draft_not_found") from error
 
@@ -102,10 +113,12 @@ async def get_quant_strategy_draft(
 async def update_quant_strategy_draft(
     draft_id: str,
     request: QuantStrategyDraftUpdateRequest,
-    _user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(require_active_user),
 ):
     try:
-        return await update_strategy_draft(draft_id, request)
+        return await update_strategy_draft(
+            draft_id, request, owner_id=_owner_scope(user)
+        )
     except StrategyDraftNotFoundError as error:
         raise NotFoundError(str(error), code="quant.strategy_draft_not_found") from error
     except StrategyDraftConflictError as error:
@@ -115,10 +128,10 @@ async def update_quant_strategy_draft(
 @router.post("/strategy-drafts/{draft_id}/validate", response_model=QuantStrategyDraft)
 async def validate_quant_strategy_draft(
     draft_id: str,
-    _user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(require_active_user),
 ):
     try:
-        return await validate_strategy_draft(draft_id)
+        return await validate_strategy_draft(draft_id, owner_id=_owner_scope(user))
     except StrategyDraftNotFoundError as error:
         raise NotFoundError(str(error), code="quant.strategy_draft_not_found") from error
     except StrategyDraftConflictError as error:
@@ -135,10 +148,15 @@ async def validate_quant_strategy_draft(
 async def backtest_quant_strategy_draft(
     draft_id: str,
     request: QuantStrategyDraftBacktestRequest,
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(require_active_user),
 ):
     try:
-        return await backtest_strategy_draft(draft_id, request, user_id=user["id"])
+        return await backtest_strategy_draft(
+            draft_id,
+            request,
+            user_id=user["id"],
+            owner_id=_owner_scope(user),
+        )
     except StrategyDraftNotFoundError as error:
         raise NotFoundError(str(error), code="quant.strategy_draft_not_found") from error
     except StrategyDraftConflictError as error:
@@ -171,10 +189,10 @@ async def publish_quant_strategy_draft(
 @router.delete("/strategy-drafts/{draft_id}", response_model=DeleteResponse)
 async def delete_quant_strategy_draft(
     draft_id: str,
-    _user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(require_active_user),
 ):
     try:
-        if not await delete_strategy_draft(draft_id):
+        if not await delete_strategy_draft(draft_id, owner_id=_owner_scope(user)):
             raise StrategyDraftNotFoundError("策略草稿不存在")
     except StrategyDraftNotFoundError as error:
         raise NotFoundError(str(error), code="quant.strategy_draft_not_found") from error
@@ -264,3 +282,16 @@ async def delete_quant_backtest(run_id: str, user: AuthenticatedUser = Depends(r
     if not await delete_backtest(run_id, user["id"]):
         raise ConflictError("运行中的回测不能删除", code="quant.run_not_deletable")
     return DeleteResponse()
+
+
+@router.post("/backtests/{run_id}/sensitivity-scan", response_model=QuantParameterScanResult)
+async def scan_backtest_parameter_sensitivity(
+    run_id: str,
+    request: QuantParameterScanRequest,
+    user: AuthenticatedUser = Depends(require_active_user),
+):
+    try:
+        return await scan_parameter_sensitivity(run_id, request, user["id"])
+    except ValueError as error:
+        raise BadRequestError(str(error), code="quant.invalid_scan_request") from error
+

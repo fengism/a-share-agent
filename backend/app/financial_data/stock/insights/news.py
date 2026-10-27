@@ -44,7 +44,7 @@ async def _load_stock_news(sym) -> list[NewsSearchItem]:
         stock_name_map = await get_stock_name_map()
         stock_name = str(stock_name_map.get(sym.raw, "")).strip()
     except Exception as e:
-        logger.info(f"股票名称映射获取失败: {sym.raw}, error={e}")
+        logger.info('股票名称映射获取失败: %s, error=%s', sym.raw, e)
 
     em_task = provider_gateway.call_blocking(
         "eastmoney",
@@ -65,12 +65,12 @@ async def _load_stock_news(sym) -> list[NewsSearchItem]:
     em_result, cls_result = await asyncio.gather(em_task, cls_task, return_exceptions=True)
 
     if isinstance(em_result, Exception):
-        logger.warning(f"个股新闻获取失败: {sym.raw}, error={em_result}")
+        logger.warning('个股新闻获取失败: %s, error=%s', sym.raw, em_result)
     else:
         result.extend(em_result[:10])
 
     if isinstance(cls_result, Exception):
-        logger.warning(f"财联社电报获取失败: {sym.raw}, error={cls_result}")
+        logger.warning('财联社电报获取失败: %s, error=%s', sym.raw, cls_result)
     else:
         result.extend(cls_result)
 

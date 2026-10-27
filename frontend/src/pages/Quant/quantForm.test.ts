@@ -60,9 +60,9 @@ describe("quant form helpers", () => {
   });
 
   it("mirrors backend validation boundaries", () => {
-    const elevenCodes = Array.from({ length: 11 }, (_, index) => String(600000 + index)).join(",");
+    const thirtyOneCodes = Array.from({ length: 31 }, (_, index) => String(600000 + index)).join(",");
     expect(stockCodesValidationError("custom", " ")).toBe("请输入股票代码");
-    expect(stockCodesValidationError("custom", elevenCodes)).toBe("股票池最多支持 10 只股票");
+    expect(stockCodesValidationError("custom", thirtyOneCodes)).toBe("股票池最多支持 30 只股票");
     expect(stockCodesValidationError("portfolio", "")).toBeUndefined();
     expect(dateRangeValidationError([dayjs("2026-01-01"), dayjs("2026-01-01")])).toBe("开始日期必须早于结束日期");
     expect(dateRangeValidationError([dayjs("2020-01-01"), dayjs("2026-01-02")])).toBe("回测周期不能超过 5 年");

@@ -1,0 +1,69 @@
+api_version: quant.strategy/v2
+key: turnover_momentum
+version: 1.0.0
+enabled: true
+name: 换手量价动量突破
+description: 结合换手率活跃度过滤与高阶价格动量加速，规避无量阴跌与散户杂波，捕捉资金主升浪。
+scenario: 资金活跃与主升行情
+risk_level: high
+presentation:
+  icon: fire
+parameters:
+  mom_period:
+    type: integer
+    label: 动量周期
+    description: 衡量区间涨幅动量的观察周期
+    default: 10
+    minimum: 3
+    maximum: 60
+  turnover_ma_period:
+    type: integer
+    label: 换手率均线周期
+    description: 衡量筹码活跃度的换手率均线周期
+    default: 5
+    minimum: 2
+    maximum: 30
+  min_turnover:
+    type: number
+    label: 最低换手门槛(%)
+    description: 筛选活跃度基准日均换手率
+    default: 2.0
+    minimum: 0.5
+    maximum: 15.0
+indicators:
+  turnover_ma:
+    operator: sma
+    input: turnover_pct
+    period: $turnover_ma_period
+    offset: 1
+  price_mom:
+    operator: momentum
+    input: close
+    period: $mom_period
+    offset: 1
+  ma_exit:
+    operator: sma
+    input: close
+    period: 10
+    offset: 1
+signals:
+  entry:
+    operator: and
+    operands:
+      - operator: greater_than
+        left: turnover_ma
+        right: $min_turnover
+      - operator: greater_than
+        left: price_mom
+        right: 3.0
+  exit:
+    operator: or
+    operands:
+      - operator: less_than
+        left: close
+        right: ma_exit
+      - operator: less_than
+        left: price_mom
+        right: -2.0
+position:
+  mode: binary

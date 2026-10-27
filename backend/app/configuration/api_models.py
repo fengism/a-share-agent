@@ -18,10 +18,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator
 
+from app.configuration.llm_compatibility import validate_extra_body
 from app.configuration.provider_catalog import LLMApiMode
 
 __all__ = [
@@ -79,6 +80,35 @@ class ConfigUpdateRequest(BaseModel):
     llm_context_length_tokens: Annotated[
         int | None, ConfigMeta("private", "llm", synced_global=True)
     ] = Field(default=None, ge=0)
+    llm_timeout_seconds: Annotated[
+        int | None, ConfigMeta("private", "llm", synced_global=True)
+    ] = Field(default=None, gt=0, le=3600)
+    llm_max_attempts: Annotated[
+        int | None, ConfigMeta("private", "llm", synced_global=True)
+    ] = Field(default=None, ge=1, le=3)
+    llm_generation_timeout_seconds: Annotated[
+        float | None, ConfigMeta("private", "llm", synced_global=True)
+    ] = Field(default=None, gt=0)
+    llm_generation_max_completion_tokens: Annotated[
+        int | None, ConfigMeta("private", "llm", synced_global=True)
+    ] = Field(default=None, ge=1)
+    llm_model_max_completion_tokens: Annotated[
+        int | None, ConfigMeta("private", "llm", synced_global=True)
+    ] = Field(default=None, ge=1)
+    llm_stream_include_usage: Annotated[
+        bool | None, ConfigMeta("private", "llm", synced_global=True)
+    ] = None
+    llm_json_mode_enabled: Annotated[
+        bool | None, ConfigMeta("private", "llm", synced_global=True)
+    ] = None
+    llm_extra_body: Annotated[
+        dict[str, Any] | None, ConfigMeta("private", "llm", synced_global=True)
+    ] = None
+
+    @field_validator("llm_extra_body")
+    @classmethod
+    def validate_llm_extra_body(cls, value: Any) -> dict[str, Any] | None:
+        return None if value is None else validate_extra_body(value)
 
     # ---------------------------------------------------------------- 飞书文档
     feishu_enabled: Annotated[bool | None, ConfigMeta("private", "feishu")] = None
@@ -210,6 +240,9 @@ class ConfigUpdateRequest(BaseModel):
     outbound_proxy_retries: Annotated[
         int | None, ConfigMeta("global", "proxy")
     ] = Field(default=None, ge=0, le=6)
+    outbound_proxy_scopes: Annotated[
+        list[str] | None, ConfigMeta("global", "proxy")
+    ] = None
 
     # ---------------------------------------------------------------- 行情归档
     market_daily_bar_refresh_enabled: Annotated[
@@ -319,17 +352,17 @@ class ConfigUpdateRequest(BaseModel):
         float | None, ConfigMeta("global", "research")
     ] = Field(default=None, gt=0)
     industry_chain_max_rounds: Annotated[int | None, ConfigMeta("global", "research")] = Field(
-        default=None, ge=2, le=10
+        default=None, ge=2, le=24
     )
     industry_chain_repair_max_rounds: Annotated[
         int | None, ConfigMeta("global", "research")
-    ] = Field(default=None, ge=1, le=6)
+    ] = Field(default=None, ge=1, le=12)
     industry_chain_tool_calls_total: Annotated[
         int | None, ConfigMeta("global", "research")
-    ] = Field(default=None, ge=8, le=128)
+    ] = Field(default=None, ge=8, le=300)
     industry_chain_repair_tool_calls_total: Annotated[
         int | None, ConfigMeta("global", "research")
-    ] = Field(default=None, ge=4, le=64)
+    ] = Field(default=None, ge=4, le=160)
     analysis_llm_timeout_seconds: Annotated[
         float | None, ConfigMeta("global", "research")
     ] = Field(default=None, gt=0)
@@ -394,6 +427,18 @@ for _name in CONFIG_VALUE_FIELDS:
 # 由 ConfigUpdateRequest 派生只读响应模型（字段必填，另含元信息字段）
 # ---------------------------------------------------------------------------
 
+def _settings_defaults_to_none(name: str) -> bool:
+    """该字段在生效配置里可以为 null（``Settings`` 默认值即 None）。
+
+    响应模型是"当前生效值"的快照，必须能承载 null；否则可空配置项会让
+    配置接口直接 500。
+    """
+    from app.configuration.schema import Settings
+
+    field = Settings.model_fields.get(name)
+    return field is not None and field.get_default(call_default_factory=True) is None
+
+
 def _required_annotation(annotation):
     """去掉 Optional 的 None 分支，得到响应模型的必填类型。"""
     args = get_args(annotation)
@@ -408,9 +453,16 @@ ConfigResponse = create_model(
     __module__=__name__,
     __doc__="Current effective configuration with secrets masked.",
     **{
-        name: (_required_annotation(field.annotation), ...)
+        name: (
+            field.annotation
+            if _settings_defaults_to_none(name)
+            else _required_annotation(field.annotation),
+            ...,
+        )
         for name, field in ConfigUpdateRequest.model_fields.items()
     },
     provider_defaults=(dict, ...),
     is_admin=(bool, ...),
+    #: 仍沿用全局（管理员）配置的私密字段名；前端据此显示「使用管理员配置」
+    inherited_keys=(list[str], ...),
 )

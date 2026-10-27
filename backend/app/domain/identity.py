@@ -6,9 +6,9 @@ from typing_extensions import NotRequired, TypedDict
 class AuthenticatedUser(TypedDict):
     id: int
     username: str
-    is_admin: bool | int
-    is_active: NotRequired[bool | int]
-    must_change_password: NotRequired[bool | int]
+    is_admin: bool
+    is_active: NotRequired[bool]
+    must_change_password: NotRequired[bool]
     created_at: NotRequired[str]
 
 

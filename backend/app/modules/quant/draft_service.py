@@ -255,8 +255,22 @@ def _to_api(row: draft_store.StrategyDraftRow) -> QuantStrategyDraft:
     )
 
 
-async def _require_draft(draft_id: str) -> draft_store.StrategyDraftRow:
-    row = await call_blocking(draft_store.get_draft, draft_id, semaphore=database_semaphore)
+async def _require_draft(
+    draft_id: str, *, owner_id: int | None = None
+) -> draft_store.StrategyDraftRow:
+    """取草稿；``owner_id`` 非空时只允许访问本人草稿。
+
+    越权访问统一返回「草稿不存在」而不是 403，避免泄露他人草稿是否存在。
+    """
+    if owner_id is None:
+        row = await call_blocking(draft_store.get_draft, draft_id, semaphore=database_semaphore)
+    else:
+        row = await call_blocking(
+            draft_store.get_draft,
+            draft_id,
+            created_by=owner_id,
+            semaphore=database_semaphore,
+        )
     if row is None:
         raise StrategyDraftNotFoundError("策略草稿不存在")
     return row
@@ -334,20 +348,34 @@ async def generate_strategy_draft(
     return _to_api(row)
 
 
-async def list_strategy_drafts(*, limit: int = 100) -> list[QuantStrategyDraft]:
-    rows = await call_blocking(draft_store.list_drafts, limit=limit, semaphore=database_semaphore)
+async def list_strategy_drafts(
+    *, limit: int = 100, owner_id: int | None = None
+) -> list[QuantStrategyDraft]:
+    if owner_id is None:
+        rows = await call_blocking(draft_store.list_drafts, limit=limit, semaphore=database_semaphore)
+    else:
+        rows = await call_blocking(
+            draft_store.list_drafts,
+            limit=limit,
+            created_by=owner_id,
+            semaphore=database_semaphore,
+        )
     return [_to_api(await _sync_draft(row)) for row in rows]
 
 
-async def get_strategy_draft(draft_id: str) -> QuantStrategyDraft:
-    return _to_api(await _sync_draft(await _require_draft(draft_id)))
+async def get_strategy_draft(
+    draft_id: str, *, owner_id: int | None = None
+) -> QuantStrategyDraft:
+    return _to_api(await _sync_draft(await _require_draft(draft_id, owner_id=owner_id)))
 
 
 async def update_strategy_draft(
     draft_id: str,
     request: QuantStrategyDraftUpdateRequest,
+    *,
+    owner_id: int | None = None,
 ) -> QuantStrategyDraft:
-    row = await _require_draft(draft_id)
+    row = await _require_draft(draft_id, owner_id=owner_id)
     if row.definition_hash != request.expected_definition_hash:
         raise StrategyDraftConflictError("草稿已被其他操作更新，请刷新后重试")
     if row.status not in {"draft", "validated"}:
@@ -367,8 +395,10 @@ async def update_strategy_draft(
     return _to_api(updated)
 
 
-async def validate_strategy_draft(draft_id: str) -> QuantStrategyDraft:
-    row = await _require_draft(draft_id)
+async def validate_strategy_draft(
+    draft_id: str, *, owner_id: int | None = None
+) -> QuantStrategyDraft:
+    row = await _require_draft(draft_id, owner_id=owner_id)
     if row.status not in {"draft", "validated"}:
         raise StrategyDraftConflictError("仅待校验或已校验草稿可以重新校验")
     definition = StrategyDefinition.model_validate(row.definition)
@@ -405,8 +435,9 @@ async def backtest_strategy_draft(
     request: QuantStrategyDraftBacktestRequest,
     *,
     user_id: int,
+    owner_id: int | None = None,
 ) -> QuantBacktestRun:
-    row = await _require_draft(draft_id)
+    row = await _require_draft(draft_id, owner_id=owner_id)
     if row.status not in {"validated", "backtested"}:
         raise StrategyDraftConflictError("仅已校验或已通过门禁的草稿可以发起回测")
     definition = StrategyDefinition.model_validate(row.definition)
@@ -508,8 +539,8 @@ async def publish_strategy_draft(
     return _to_api(updated)
 
 
-async def delete_strategy_draft(draft_id: str) -> bool:
-    row = await _require_draft(draft_id)
+async def delete_strategy_draft(draft_id: str, *, owner_id: int | None = None) -> bool:
+    row = await _require_draft(draft_id, owner_id=owner_id)
     if row.status not in {"draft", "validated"}:
         raise StrategyDraftConflictError("仅待校验或已校验草稿可以删除")
     return await call_blocking(draft_store.delete_draft, draft_id, semaphore=database_semaphore)

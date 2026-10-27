@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
+from app.domain.timezones import market_now
 from app.financial_data.stock.public import update_industry_mapping_sw_files
 from app.modules.industry_classification import importer, repository
 from app.modules.industry_classification.models import (
@@ -115,7 +116,7 @@ def commit_import(request: ImportCommitRequest) -> dict[str, int]:
 
 
 async def refresh_a_share_industries() -> RefreshResponse:
-    repository.update_refresh_state(last_started_at=datetime.now().isoformat(timespec="seconds"))
+    repository.update_refresh_state(last_started_at=market_now().isoformat(timespec="seconds"))
     try:
         result = await call_blocking(
             update_industry_mapping_sw_files,
@@ -135,7 +136,7 @@ async def refresh_a_share_industries() -> RefreshResponse:
         )
     except Exception as exc:
         repository.update_refresh_state(
-            last_failed_at=datetime.now().isoformat(timespec="seconds"),
+            last_failed_at=market_now().isoformat(timespec="seconds"),
             last_error=str(exc)[:1000],
         )
         if isinstance(exc, IndustryRefreshError):
@@ -143,7 +144,7 @@ async def refresh_a_share_industries() -> RefreshResponse:
         raise IndustryRefreshError(f"申万行业自动更新失败: {exc}") from exc
 
     repository.update_refresh_state(
-        last_succeeded_at=datetime.now().isoformat(timespec="seconds"),
+        last_succeeded_at=market_now().isoformat(timespec="seconds"),
         last_error=None,
         last_added=counts["added"],
         last_updated=counts["updated"],
@@ -162,7 +163,7 @@ def refresh_is_due(state: dict[str, Any], *, now: datetime | None = None) -> boo
         succeeded_at = datetime.fromisoformat(str(last_succeeded))
     except ValueError:
         return True
-    current = now or datetime.now()
+    current = now or market_now()
     return (current - succeeded_at).total_seconds() >= int(state["interval_seconds"])
 
 

@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 from openai import APIConnectionError, APITimeoutError, OpenAI
 
+from app.configuration.llm_compatibility import GOVERNED_BODY_FIELDS
 from app.domain.agent_llm import extract_message_text as extract_message_text
 from app.domain.llm import (
     LLMConfigurationError,
@@ -133,22 +134,33 @@ def validate_chat_completion_response(response: Any) -> Any:
     return response
 
 
-# SDK extra_body is merged after normal parameters. Never let it rewrite fields
-# already governed here; vendor-only extensions remain available unchanged.
-_GOVERNED_BODY_FIELDS = frozenset({
-    "model", "messages", "stream", "max_tokens", "max_completion_tokens",
-    "temperature", "response_format", "stream_options", "tools", "tool_choice",
-    "parallel_tool_calls",
-})
+def merge_extra_body(
+    base: Mapping[str, Any] | None, override: Any = None,
+) -> dict[str, Any] | None:
+    """合并部署/用户级 ``extra_body`` 与调用级扩展（后者优先，嵌套对象浅合并）。
+
+    返回 None 表示不带该字段；是否合法由 ``prepare_completion_kwargs`` 统一校验。
+    """
+    merged: dict[str, Any] = dict(base or {})
+    if isinstance(override, Mapping):
+        for key, value in override.items():
+            existing = merged.get(key)
+            if isinstance(existing, Mapping) and isinstance(value, Mapping):
+                merged[key] = {**existing, **value}
+            else:
+                merged[key] = value
+    # 非 Mapping 的调用级 override 直接忽略：不因为一个坏参数把配置级扩展整段丢掉，
+    # 合法性由 prepare_completion_kwargs 统一判定。
+    return merged or None
 
 
 def _validate_extra_body(value: Any) -> None:
+    # 受治理字段清单与配置层共用一份；错误信息不回显取值（可能含密钥或提示词）。
     if value is None:
         return
     if not isinstance(value, Mapping):
         raise LLMConfigurationError("extra_body 必须是 JSON 对象")
-    if any(key in value for key in _GOVERNED_BODY_FIELDS):
-        # Do not include values: extensions may contain secrets or prompt data.
+    if any(key in value for key in GOVERNED_BODY_FIELDS):
         raise LLMConfigurationError("extra_body 不能覆盖受治理的模型、消息、预算或协议参数，请使用顶层参数")
 
 
@@ -243,8 +255,10 @@ class OpenAICompatibleClient(LLMClient):
         openai_factory: Callable[..., Any] = OpenAI,
         http_client_factory: Callable[..., Any] = httpx.Client,
         capabilities: LLMCapabilities | None = None,
+        extra_body: Mapping[str, Any] | None = None,
     ):
         self._http_client = http_client_factory(trust_env=False)
+        self._extra_body = dict(extra_body or {})
         self.client = openai_factory(
             api_key=api_key,
             base_url=base_url,
@@ -282,6 +296,9 @@ class OpenAICompatibleClient(LLMClient):
             }
             if json_format:
                 kwargs["response_format"] = {"type": "json_object"}
+            extra_body = merge_extra_body(self._extra_body, kwargs.pop("extra_body", None))
+            if extra_body is not None:
+                kwargs["extra_body"] = extra_body
             response = self.client.chat.completions.create(
                 **prepare_completion_kwargs(kwargs, self.capabilities)
             )
@@ -329,8 +346,10 @@ class LiteLLMClient(LLMClient):
         timeout: float = 120.0,
         api_version: str = "",
         capabilities: LLMCapabilities | None = None,
+        extra_body: Mapping[str, Any] | None = None,
     ):
         self.api_key = api_key
+        self._extra_body = dict(extra_body or {})
         self.model = model
         self.capabilities = capabilities
         self.base_url = base_url
@@ -365,6 +384,9 @@ class LiteLLMClient(LLMClient):
         if self.api_version:
             kwargs["api_version"] = self.api_version
 
+        extra_body = merge_extra_body(self._extra_body, kwargs.pop("extra_body", None))
+        if extra_body is not None:
+            kwargs["extra_body"] = extra_body
         try:
             response = completion(**prepare_completion_kwargs(kwargs, self.capabilities))
             content = extract_message_text(response.choices[0].message.content)

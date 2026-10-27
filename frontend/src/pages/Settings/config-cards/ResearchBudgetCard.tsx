@@ -62,9 +62,9 @@ export default function ResearchBudgetCard({
           <div style={fieldLabelStyle}>产业链主调研时限（秒）</div>
           <InputNumber
             min={60}
-            max={7200}
-            value={form.industry_chain_research_timeout_seconds ?? 1800}
-            onChange={(value) => onChange({ industry_chain_research_timeout_seconds: value ?? 1800 })}
+            max={14400}
+            value={form.industry_chain_research_timeout_seconds ?? 2400}
+            onChange={(value) => onChange({ industry_chain_research_timeout_seconds: value ?? 2400 })}
             style={{ width: "100%" }}
           />
         </Col>
@@ -73,8 +73,8 @@ export default function ResearchBudgetCard({
           <InputNumber
             min={30}
             max={7200}
-            value={form.industry_chain_repair_research_timeout_seconds ?? 900}
-            onChange={(value) => onChange({ industry_chain_repair_research_timeout_seconds: value ?? 900 })}
+            value={form.industry_chain_repair_research_timeout_seconds ?? 1200}
+            onChange={(value) => onChange({ industry_chain_repair_research_timeout_seconds: value ?? 1200 })}
             style={{ width: "100%" }}
           />
         </Col>
@@ -83,8 +83,8 @@ export default function ResearchBudgetCard({
           <InputNumber
             min={30}
             max={7200}
-            value={form.industry_chain_repair_synthesis_timeout_seconds ?? 600}
-            onChange={(value) => onChange({ industry_chain_repair_synthesis_timeout_seconds: value ?? 600 })}
+            value={form.industry_chain_repair_synthesis_timeout_seconds ?? 900}
+            onChange={(value) => onChange({ industry_chain_repair_synthesis_timeout_seconds: value ?? 900 })}
             style={{ width: "100%" }}
           />
         </Col>
@@ -92,9 +92,9 @@ export default function ResearchBudgetCard({
           <div style={fieldLabelStyle}>主调研最大轮次</div>
           <InputNumber
             min={2}
-            max={10}
-            value={form.industry_chain_max_rounds ?? 6}
-            onChange={(value) => onChange({ industry_chain_max_rounds: value ?? 6 })}
+            max={24}
+            value={form.industry_chain_max_rounds ?? 10}
+            onChange={(value) => onChange({ industry_chain_max_rounds: value ?? 10 })}
             style={{ width: "100%" }}
           />
         </Col>
@@ -102,9 +102,9 @@ export default function ResearchBudgetCard({
           <div style={fieldLabelStyle}>补证最大轮次</div>
           <InputNumber
             min={1}
-            max={6}
-            value={form.industry_chain_repair_max_rounds ?? 3}
-            onChange={(value) => onChange({ industry_chain_repair_max_rounds: value ?? 3 })}
+            max={12}
+            value={form.industry_chain_repair_max_rounds ?? 5}
+            onChange={(value) => onChange({ industry_chain_repair_max_rounds: value ?? 5 })}
             style={{ width: "100%" }}
           />
         </Col>
@@ -112,9 +112,9 @@ export default function ResearchBudgetCard({
           <div style={fieldLabelStyle}>主调研工具调用上限</div>
           <InputNumber
             min={8}
-            max={128}
-            value={form.industry_chain_tool_calls_total ?? 96}
-            onChange={(value) => onChange({ industry_chain_tool_calls_total: value ?? 96 })}
+            max={300}
+            value={form.industry_chain_tool_calls_total ?? 160}
+            onChange={(value) => onChange({ industry_chain_tool_calls_total: value ?? 160 })}
             style={{ width: "100%" }}
           />
         </Col>
@@ -122,9 +122,9 @@ export default function ResearchBudgetCard({
           <div style={fieldLabelStyle}>补证工具调用上限</div>
           <InputNumber
             min={4}
-            max={64}
-            value={form.industry_chain_repair_tool_calls_total ?? 48}
-            onChange={(value) => onChange({ industry_chain_repair_tool_calls_total: value ?? 48 })}
+            max={160}
+            value={form.industry_chain_repair_tool_calls_total ?? 80}
+            onChange={(value) => onChange({ industry_chain_repair_tool_calls_total: value ?? 80 })}
             style={{ width: "100%" }}
           />
         </Col>

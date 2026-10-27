@@ -138,13 +138,13 @@ describe("BacktestForm", () => {
   });
 
   it("blocks submission when the stock universe exceeds the backend limit", async () => {
-    const elevenCodes = Array.from({ length: 11 }, (_, index) => String(600000 + index)).join(",");
+    const thirtyOneCodes = Array.from({ length: 31 }, (_, index) => String(600000 + index)).join(",");
     render(<BacktestForm onCreated={vi.fn()} />);
 
-    fireEvent.change(screen.getByLabelText("股票代码"), { target: { value: elevenCodes } });
+    fireEvent.change(screen.getByLabelText("股票代码"), { target: { value: thirtyOneCodes } });
     fireEvent.click(screen.getByRole("button", { name: "开始回测" }));
 
-    expect(await screen.findByText("股票池最多支持 10 只股票")).toBeInTheDocument();
+    expect(await screen.findByText("股票池最多支持 30 只股票")).toBeInTheDocument();
     expect(mocks.createRun).not.toHaveBeenCalled();
   });
 

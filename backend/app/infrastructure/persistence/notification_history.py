@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 _HISTORY_FILE = DATA_DIR / "notification_history.json"
 _MAX_HISTORY_ENTRIES = 100
+# 投递记录为共享文件的读改写：并发投递不加锁会相互覆盖丢记录，进程内互斥即可覆盖当前单进程部署；文件本身仍走原子替换。
+_HISTORY_WRITE_LOCK = threading.Lock()
 
 
 class NotificationDeliveryRecord(BaseModel):
@@ -58,7 +62,7 @@ def record_notification_delivery(
 ) -> NotificationDeliveryRecord:
     """追加单次通知投递记录，自动截断保留最近 100 条。"""
     now = datetime.now(SHANGHAI_TIMEZONE).isoformat(timespec="seconds")
-    record_id = f"notif_{int(datetime.now().timestamp() * 1000)}"
+    record_id = f"notif_{time.time_ns()}"
 
     record = NotificationDeliveryRecord(
         id=record_id,
@@ -72,10 +76,11 @@ def record_notification_delivery(
     )
 
     try:
-        existing = load_notification_history(limit=_MAX_HISTORY_ENTRIES)
-        updated = [record] + [r for r in existing if r.id != record.id][: _MAX_HISTORY_ENTRIES - 1]
-        payload = [r.model_dump(mode="json") for r in updated]
-        atomic_write_text(_HISTORY_FILE, json.dumps(payload, ensure_ascii=False, indent=2))
+        with _HISTORY_WRITE_LOCK:
+            existing = load_notification_history(limit=_MAX_HISTORY_ENTRIES)
+            updated = [record] + [r for r in existing if r.id != record.id][: _MAX_HISTORY_ENTRIES - 1]
+            payload = [r.model_dump(mode="json") for r in updated]
+            atomic_write_text(_HISTORY_FILE, json.dumps(payload, ensure_ascii=False, indent=2))
     except Exception as exc:
         logger.warning("写入通知历史记录失败: %s", exc)
 

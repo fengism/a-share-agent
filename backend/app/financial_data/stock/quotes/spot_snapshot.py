@@ -15,6 +15,7 @@ from app.core.concurrency.rate_limiter import (
     sina_semaphore,
 )
 from app.core.concurrency.singleflight import AsyncSingleFlight
+from app.domain.timezones import market_now
 from app.financial_data.stock.quotes.sources import (
     AKSHARE_SPOT_SOURCE_ID,
     EASTMONEY_SPOT_SOURCE_ID,
@@ -101,7 +102,7 @@ def load_spot_snapshot_file() -> pd.DataFrame | None:
         if parsed_updated_at.tzinfo is not None:
             now = datetime.now(parsed_updated_at.tzinfo)
         else:
-            now = datetime.now()
+            now = market_now()
         age_seconds = max(0.0, (now - parsed_updated_at).total_seconds())
         if age_seconds > _SPOT_FILE_MAX_STALE_SECONDS:
             logger.warning(
@@ -126,7 +127,7 @@ def load_spot_snapshot_file() -> pd.DataFrame | None:
         )
         return df
     except Exception as e:
-        logger.warning(f"读取本地全市场快照失败: {e}")
+        logger.warning('读取本地全市场快照失败: %s', e)
         return None
 
 
@@ -141,7 +142,7 @@ def _save_spot_snapshot_file(df: pd.DataFrame) -> None:
     try:
         _SPOT_SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
         normalized_df = _normalize_market_cap_units(df)
-        updated_at = datetime.now().isoformat()
+        updated_at = market_now().isoformat()
         payload = {
             "updated_at": updated_at,
             "source_id": get_spot_source(normalized_df),
@@ -153,9 +154,9 @@ def _save_spot_snapshot_file(df: pd.DataFrame) -> None:
         )
         df.attrs[_SPOT_AS_OF_ATTR] = updated_at
         df.attrs[_SPOT_IS_STALE_ATTR] = False
-        logger.info(f"全市场快照已写入本地文件: {len(df)} 条")
+        logger.info('全市场快照已写入本地文件: %s 条', len(df))
     except Exception as e:
-        logger.warning(f"保存本地全市场快照失败: {e}")
+        logger.warning('保存本地全市场快照失败: %s', e)
 
 
 async def _fetch_spot_east() -> pd.DataFrame | None:
@@ -179,7 +180,7 @@ async def _fetch_spot_east() -> pd.DataFrame | None:
             return None
         return mark_spot_source(frame, EASTMONEY_SPOT_SOURCE_ID)
     except Exception as e:
-        logger.info(f"东方财富直连快照获取失败: {e}")
+        logger.info('东方财富直连快照获取失败: %s', e)
         return None
 
 
@@ -204,7 +205,7 @@ async def _fetch_spot_sina_vip() -> pd.DataFrame | None:
             return None
         return mark_spot_source(frame, SINA_SPOT_SOURCE_ID)
     except Exception as e:
-        logger.info(f"新浪VIP快照获取失败: {e}")
+        logger.info('新浪VIP快照获取失败: %s', e)
         return None
 
 

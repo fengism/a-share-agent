@@ -97,6 +97,8 @@ def test_api_fields_match_settings_and_response() -> None:
     assert set(ConfigResponse.model_fields) == CONFIG_VALUE_FIELDS | {
         "provider_defaults",
         "is_admin",
+        # 只读派生字段：哪些私密项仍继承全局（管理员）配置，供前端标注「使用管理员配置」
+        "inherited_keys",
     }
     assert set(ConfigUpdateRequest.model_fields) == CONFIG_VALUE_FIELDS
 

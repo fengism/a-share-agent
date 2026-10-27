@@ -166,7 +166,7 @@ async def compute_percentiles(codes: list[str], indicator: str = "市盈率(TTM)
         try:
             return key, await _compute_percentile_singleflight(original_code, indicator, period)
         except Exception as e:
-            logger.warning(f"计算估值百分位失败: {original_code}, {e}")
+            logger.warning('计算估值百分位失败: %s, %s', original_code, e)
             return key, None
 
     pairs = await asyncio.gather(*(compute_one(key, unique_codes[key]) for key in ordered_keys))

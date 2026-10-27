@@ -16,6 +16,8 @@ from openai import APITimeoutError
 from app.configuration import get_settings
 from app.configuration.schema import Settings
 from app.core.metrics import metrics
+from app.domain.llm import looks_like_tools_unsupported
+from app.infrastructure.llm import tool_support
 from app.infrastructure.llm.adapters import (
     LLMRetryableError,
     extract_usage,
@@ -112,6 +114,44 @@ def _prepare_request(
     return prepare_completion_kwargs(request, capabilities)
 
 
+def _degrade_tools_if_rejected(
+    error: BaseException,
+    request_kwargs: dict[str, Any],
+    *,
+    settings: Settings,
+    metric_stage: str,
+) -> bool:
+    """网关明确拒绝 tools 时：记住该路由不支持工具，摘掉工具参数并允许重试一次。
+
+    与 ``normalize_retryable_llm_error`` 的分工：那条负责"这次错误能不能重试"，
+    这条只负责"这个路由有没有工具能力"，不改变错误分类，也不会把 401/403/429
+    误判成能力缺失（判定在 domain 层统一收口）。
+    """
+    if not request_kwargs.get("tools"):
+        return False
+    if not looks_like_tools_unsupported(error):
+        return False
+    model = str(request_kwargs.get("model", "") or "")
+    route = tool_support.route_key_for_settings(settings, model=model)
+    tool_support.mark_tools_unsupported(route)
+    for key in ("tools", "tool_choice", "parallel_tool_calls"):
+        request_kwargs.pop(key, None)
+    metrics.record_provider_attempt(
+        "llm_chat",
+        operation="tools_unsupported",
+        success=False,
+        duration_ms=0.0,
+        error_type="ToolsUnsupported",
+    )
+    logger.warning(
+        "模型网关拒绝工具调用，已按无工具网关重试一次: model=%s provider=%s stage=%s",
+        model,
+        route.provider,
+        metric_stage,
+    )
+    return True
+
+
 async def create_chat_completion(
     client,
     *,
@@ -132,18 +172,31 @@ async def create_chat_completion(
     async with generation_scope(settings, timeout_seconds=settings.llm_generation_timeout_seconds), _llm_limiter.slot():
         queue_wait_ms = (time.perf_counter() - started_at) * 1000
         try:
-            for attempt in range(1, settings.llm_max_attempts + 1):
+            # 工具降级重试与瞬时故障重试分开计数：前者每个调用最多一次，
+            # 不能吃掉 llm_max_attempts 里给 429/5xx 准备的预算。
+            transient_attempt = 0
+            tool_retry_used = False
+            while True:
+                transient_attempt += 1
                 try:
                     response = await client.chat.completions.create(**request_kwargs)
                     validate_chat_completion_response(response)
                     break
                 except Exception as error:
+                    if not tool_retry_used and _degrade_tools_if_rejected(
+                        error, request_kwargs, settings=settings, metric_stage=metric_stage,
+                    ):
+                        tool_retry_used = True
+                        continue
                     normalized = normalize_retryable_llm_error(error)
-                    if not isinstance(normalized, LLMRetryableError) or attempt >= settings.llm_max_attempts:
+                    if (
+                        not isinstance(normalized, LLMRetryableError)
+                        or transient_attempt >= settings.llm_max_attempts
+                    ):
                         if normalized is error:
                             raise
                         raise normalized from error
-                    await asyncio.sleep(_compute_retry_delay(normalized, attempt))
+                    await asyncio.sleep(_compute_retry_delay(normalized, transient_attempt))
         except asyncio.CancelledError:
             duration_ms = (time.perf_counter() - started_at) * 1000
             metrics.record_llm_prompt(
@@ -231,7 +284,11 @@ async def stream_chat_completion(
     deadline = asyncio.get_running_loop().time() + settings.llm_generation_timeout_seconds
     async with _llm_limiter.slot(deadline=deadline):
         queue_wait_ms = (time.perf_counter() - started_at) * 1000
-        for attempt in range(1, settings.llm_max_attempts + 1):
+        # 与 create_chat_completion 一致：工具降级重试独立于瞬时故障重试预算。
+        transient_attempt = 0
+        tool_retry_used = False
+        while True:
+            transient_attempt += 1
             read_timeout = float(settings.llm_timeout_seconds)
             try:
                 async with _stream_read_guard(deadline, read_timeout):
@@ -266,6 +323,16 @@ async def stream_chat_completion(
                 )
                 raise
             except Exception as exc:
+                if (
+                    not tool_retry_used
+                    and not yielded_chunk
+                    and _degrade_tools_if_rejected(
+                        exc, request_kwargs, settings=settings, metric_stage=metric_stage,
+                    )
+                ):
+                    # 首块之前才允许重放：已经吐过内容再重试会重复计费/重复输出。
+                    tool_retry_used = True
+                    continue
                 normalized = (
                     request_timeout_error(
                         exc, settings=settings, elapsed_seconds=time.perf_counter() - started_at,
@@ -277,10 +344,10 @@ async def stream_chat_completion(
                 can_retry = (
                     isinstance(normalized, LLMRetryableError)
                     and not yielded_chunk
-                    and attempt < settings.llm_max_attempts
+                    and transient_attempt < settings.llm_max_attempts
                 )
                 if can_retry:
-                    delay = _compute_retry_delay(normalized, attempt)
+                    delay = _compute_retry_delay(normalized, transient_attempt)
                     metrics.record_provider_attempt(
                         "llm_chat",
                         operation="stream",
@@ -291,7 +358,7 @@ async def stream_chat_completion(
                     logger.info(
                         "LLM流式上游临时失败，准备重试: model=%s attempt=%s/%s delay=%.2fs error_type=%s",
                         request_kwargs.get("model", ""),
-                        attempt,
+                        transient_attempt,
                         settings.llm_max_attempts,
                         delay,
                         type(normalized).__name__,

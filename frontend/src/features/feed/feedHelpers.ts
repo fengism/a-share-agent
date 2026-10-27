@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
 import type { FeedNewsItem } from "../../types/stock";
+import { formatMarketPattern, parseMarketTime } from "../../utils/marketTime";
 import type { ThemeColors } from "../../theme/themes";
 
 /** Shared presentation helpers for market news and social feeds. */
@@ -81,19 +82,20 @@ export function getSourcePlatform(source: string): string {
 
 export function formatTime(time: string): string {
   if (!time) return "";
-  const d = dayjs(time);
-  if (!d.isValid()) return time;
+  const parsed = parseMarketTime(time);
+  if (!parsed) return time;
+  const d = dayjs(parsed);
   const diffMin = dayjs().diff(d, "minute");
   if (diffMin < 60) return `${diffMin}分钟前`;
   const diffHour = dayjs().diff(d, "hour");
   if (diffHour < 24) return `${diffHour}小时前`;
-  return d.format("MM-DD HH:mm");
+  return formatMarketPattern(parsed, "MM-DD HH:mm");
 }
 
 export function getTimeColor(time: string, c: ThemeColors): string {
-  const d = dayjs(time);
-  if (!d.isValid()) return c.textMuted;
-  const diffMin = dayjs().diff(d, "minute");
+  const parsed = parseMarketTime(time);
+  if (!parsed) return c.textMuted;
+  const diffMin = dayjs().diff(dayjs(parsed), "minute");
   if (diffMin < 30) return c.warning;
   if (diffMin < 120) return c.textSecondary;
   return c.textMuted;

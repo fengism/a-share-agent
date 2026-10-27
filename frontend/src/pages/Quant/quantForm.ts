@@ -33,6 +33,13 @@ export interface QuantFormValues {
   trailingStopPercent?: number | null;
   maxDrawdownPercent?: number | null;
   targetVolatilityPercent?: number | null;
+  allocationMethod?: "equal" | "risk_parity";
+  rebalanceFrequency?: "daily" | "weekly" | "monthly";
+  slippageModel?: "fixed" | "square_root";
+  marketImpactCoefficient?: number;
+  topNSelection?: number | null;
+  rankingMetric?: "momentum" | "inverse_volatility" | "turnover" | "equal";
+  rankingLookback?: number;
 }
 
 export interface StrategyOption {
@@ -146,6 +153,13 @@ export const INITIAL_VALUES: QuantFormValues = {
   participationPercent: 10,
   maxPositionPercent: 100,
   cashReservePercent: 0,
+  allocationMethod: "equal",
+  rebalanceFrequency: "daily",
+  slippageModel: "fixed",
+  marketImpactCoefficient: 10,
+  topNSelection: null,
+  rankingMetric: "momentum",
+  rankingLookback: 20,
 };
 
 function strategyParameterSummary(preset: QuantStrategyPreset): string {
@@ -200,7 +214,7 @@ export function stockCodesValidationError(source: QuantFormValues["source"], val
   if (source !== "custom") return undefined;
   const codes = parseStockCodes(value ?? "");
   if (codes.length === 0) return "请输入股票代码";
-  if (codes.length > 10) return "股票池最多支持 10 只股票";
+  if (codes.length > 30) return "股票池最多支持 30 只股票";
   return undefined;
 }
 
@@ -280,6 +294,13 @@ export function buildBacktestRequest(values: QuantFormValues): QuantBacktestCrea
       stamp_duty_rate: values.stampDutyBps / 10_000,
       transfer_fee_rate: values.transferFeeBps / 10_000,
       slippage_bps: values.slippageBps,
+      slippage_model: values.slippageModel ?? "fixed",
+      market_impact_coefficient: values.marketImpactCoefficient ?? 10,
+      allocation_method: values.allocationMethod ?? "equal",
+      rebalance_frequency: values.rebalanceFrequency ?? "daily",
+      top_n_selection: values.topNSelection == null ? null : values.topNSelection,
+      ranking_metric: values.rankingMetric ?? "momentum",
+      ranking_lookback: values.rankingLookback ?? 20,
       lot_size: values.lotSize,
       risk_free_rate: values.riskFreeRatePercent / 100,
       rebalance_window_days: 3,

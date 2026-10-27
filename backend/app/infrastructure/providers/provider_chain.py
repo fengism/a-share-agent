@@ -113,7 +113,7 @@ class BaseProviderChain(Generic[T]):
                         error_message=str(exc),
                     )
                 )
-                logger.info(
+                logger.debug(
                     "provider attempt failed: label=%s, elapsed_ms=%.2f, error_type=%s, hint=%s, message=%s",
                     attempt.label,
                     elapsed_ms,

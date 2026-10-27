@@ -66,8 +66,8 @@ class AtlasChain(BaseModel):
     tags: list[str] = Field(default_factory=list)
     drivers: list[str] = Field(default_factory=list)
     layers: list[AtlasLayer] = Field(min_length=1)
-    """builtin=随代码内置，imported=外部导入目录提供，mined=AI 分析自动挖掘"""
-    source: Literal["builtin", "imported", "mined"] = "builtin"
+    """builtin=随代码内置，imported=外部导入目录提供，mined=AI 分析自动挖掘，user=用户个人私有沉淀"""
+    source: Literal["builtin", "imported", "mined", "user"] = "builtin"
     """mined=由 AI 产业链分析结果自动挖掘生成（落盘在导入目录）"""
     mined: bool = False
     """挖掘入库时间（ISO 字符串）；仅 mined 来源有值"""
@@ -108,7 +108,7 @@ class AtlasChainSummary(BaseModel):
     tags: list[str] = Field(default_factory=list)
     segment_count: int
     company_count: int
-    source: Literal["builtin", "imported", "mined"] = "builtin"
+    source: Literal["builtin", "imported", "mined", "user"] = "builtin"
 
 
 class AtlasCatalog(BaseModel):

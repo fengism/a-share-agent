@@ -27,6 +27,7 @@ import { usePdfExport } from "../../hooks/usePdfExport";
 import { useColors } from "../../theme/hooks";
 import type { FundamentalExportData } from "../../types/stock";
 import { buildStockAnalysisUrl, isHkStockCode } from "../../utils/stockLinks";
+import { marketDateStamp } from "../../utils/marketTime";
 import { preloadAnalysisPanelModules } from "./analysisPanelLoaders";
 
 export type AnalysisViewMode = "workspace" | "report";
@@ -135,7 +136,7 @@ export function useAnalysisReportPage({
   const { exportPdf, isExporting } = usePdfExport({
     targetRef: exportRef,
     filename: () => {
-      const dateText = reportDate || new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const dateText = reportDate || marketDateStamp().replace(/-/g, "");
       return view === "report"
         ? `${code}-投资研究-${dateText}.pdf`
         : `${code}-个股研究-${dateText}.pdf`;

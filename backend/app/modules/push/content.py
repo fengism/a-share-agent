@@ -73,10 +73,30 @@ def _strip_markdown(text: str) -> str:
 def _parse_markdown_blocks(text: str) -> list[ContentBlock]:
     """将 markdown 文本解析为 ContentBlock 列表，适配飞书文档呈现。"""
     blocks: list[ContentBlock] = []
+    table_header: list[str] = []
+
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
+            table_header = []
             continue
+
+        # 忽略表格对齐分隔行，如 | --- | --- |
+        if re.match(r"^\|(?:\s*:?-+:?\s*\|)+$", stripped):
+            continue
+
+        # 表格数据自适应转换为结构化条目，避免移动端竖线乱排
+        if stripped.startswith("|") and stripped.endswith("|"):
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
+            if not table_header:
+                table_header = cells
+                continue
+            parts = [f"{h}：{c}" if h else c for h, c in zip(table_header, cells) if c and c != "-"]
+            if parts:
+                blocks.append(ContentBlock(type="bullet", text=_strip_markdown(" ｜ ".join(parts))))
+            continue
+
+        table_header = []
         heading_match = re.match(r"^(#{1,6})\s+(.+)$", stripped)
         if heading_match:
             level = len(heading_match.group(1))
@@ -595,15 +615,64 @@ def _build_industry_chain(result) -> list[ContentBlock]:
         blocks.append(ContentBlock(type="heading", level=3, text="风险提示"))
         blocks.extend(ContentBlock(type="bullet", text=str(r)) for r in risks)
 
+    val_dist = _get("value_distribution", []) or []
+    if val_dist:
+        blocks.append(ContentBlock(type="heading", level=3, text="价值链 BOM 与利润池"))
+        for item in val_dist:
+            seg = item.get("segment", "") if isinstance(item, dict) else getattr(item, "segment", "")
+            cost = item.get("cost_share", "") if isinstance(item, dict) else getattr(item, "cost_share", "")
+            gm = item.get("gross_margin_range", "") if isinstance(item, dict) else getattr(item, "gross_margin_range", "")
+            power = item.get("pricing_power", "") if isinstance(item, dict) else getattr(item, "pricing_power", "")
+            parts = [f"BOM: {cost}" if cost else "", f"毛利率: {gm}" if gm else "", f"定价权: {power}" if power else ""]
+            suffix = f"（{' · '.join(filter(None, parts))}）" if any(parts) else ""
+            blocks.append(ContentBlock(type="bullet", text=f"{seg}{suffix}"))
+
+    cycle = _get("cycle_analysis", {}) or {}
+    if cycle:
+        stage = cycle.get("stage", "") if isinstance(cycle, dict) else getattr(cycle, "stage", "")
+        inflection = cycle.get("inflection_point", "") if isinstance(cycle, dict) else getattr(cycle, "inflection_point", "")
+        if stage or inflection:
+            blocks.append(ContentBlock(type="heading", level=3, text="周期定位与顺价机制"))
+            if stage:
+                blocks.append(ContentBlock(type="bullet", text=f"周期阶段：{stage}"))
+            if inflection:
+                blocks.append(ContentBlock(type="bullet", text=f"拐点推演：{inflection}"))
+
+    divergences = _get("expectation_divergences", []) or []
+    if divergences:
+        blocks.append(ContentBlock(type="heading", level=3, text="预期差推演"))
+        for d in divergences:
+            topic = d.get("topic", "") if isinstance(d, dict) else getattr(d, "topic", "")
+            cons = d.get("consensus", "") if isinstance(d, dict) else getattr(d, "consensus", "")
+            div = d.get("divergence", "") if isinstance(d, dict) else getattr(d, "divergence", "")
+            blocks.append(ContentBlock(type="bullet", text=f"{topic}：市场预期[{cons}] vs 研判[{div}]"))
+
     key_stocks = _get("key_stocks", []) or []
     if key_stocks:
-        blocks.append(ContentBlock(type="heading", level=3, text="重点关注"))
+        blocks.append(ContentBlock(type="heading", level=3, text="重点关注标的"))
         for stock in key_stocks:
             if isinstance(stock, dict):
-                text = str(stock.get("name") or stock.get("code") or stock)
+                name = stock.get("name") or stock.get("company") or stock.get("code") or "标的"
+                code = stock.get("code", "")
+                role = stock.get("role", "")
+                roe = stock.get("roe", "")
+                growth = stock.get("growth_rate", "")
+                pe = stock.get("pe", "")
             else:
-                text = str(stock)
-            blocks.append(ContentBlock(type="bullet", text=text))
+                name = getattr(stock, "name", "") or getattr(stock, "company", "") or getattr(stock, "code", "") or "标的"
+                code = getattr(stock, "code", "")
+                role = getattr(stock, "role", "")
+                roe = getattr(stock, "roe", "")
+                growth = getattr(stock, "growth_rate", "")
+                pe = getattr(stock, "pe", "")
+            parts = [
+                f"{name} ({code})" if code else name,
+                role,
+                f"PE: {pe}" if pe else "",
+                f"ROE: {roe}" if roe else "",
+                f"增速: {growth}" if growth else "",
+            ]
+            blocks.append(ContentBlock(type="bullet", text=" ｜ ".join(filter(None, parts))))
 
     if llm_review:
         blocks.append(ContentBlock(type="heading", level=2, text="AI 复盘报告"))

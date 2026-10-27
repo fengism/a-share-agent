@@ -79,5 +79,69 @@ export function buildAnalysisMarkdown(
     lines.push("");
   }
 
+  const rf = result.research_framework;
+  if (rf) {
+    if (rf.business_model || rf.moat) {
+      lines.push("## 六、商业模式与核心护城河");
+      lines.push("");
+      if (rf.business_model?.economic_engine) {
+        lines.push(`- **盈利引擎**：${rf.business_model.economic_engine}`);
+      }
+      if (rf.business_model?.earnings_quality) {
+        lines.push(`- **盈利质量**：${rf.business_model.earnings_quality}`);
+      }
+      if (rf.moat?.overall_durability) {
+        lines.push(`- **护城河持续性**：${rf.moat.overall_durability}`);
+      }
+      if (rf.moat?.moats && rf.moat.moats.length > 0) {
+        lines.push("### 护城河明细与正反证");
+        rf.moat.moats.forEach((m) => {
+          lines.push(`- **${m.moat_type}**（强弱：${m.strength}，方向：${m.direction}）`);
+          if (m.evidence?.length) lines.push(`  - 支持证据：${m.evidence.join("；")}`);
+          if (m.counterevidence?.length) lines.push(`  - 反证/破坏因素：${m.counterevidence.join("；")}`);
+        });
+      }
+      lines.push("");
+    }
+
+    if (rf.inversion) {
+      lines.push("## 七、逆向思考与最强做空/下行逻辑 (Inversion)");
+      lines.push("");
+      if (rf.inversion.bear_case) {
+        lines.push(`> **最强熊市观点**：${rf.inversion.bear_case}`);
+        lines.push("");
+      }
+      if (rf.inversion.risks && rf.inversion.risks.length > 0) {
+        lines.push("### 失败路径与下行风险");
+        rf.inversion.risks.forEach((r, idx) => {
+          lines.push(`${idx + 1}. **${r.risk}**（概率：${r.probability}，冲击：${r.impact}）`);
+          if (r.failure_path) lines.push(`   - 失败演化路径：${r.failure_path}`);
+          if (r.leading_indicators?.length) lines.push(`   - 领先先行指标：${r.leading_indicators.join("、")}`);
+        });
+        lines.push("");
+      }
+    }
+
+    if (rf.actions) {
+      lines.push("## 八、条件化投资决策与失效跟踪");
+      lines.push("");
+      lines.push(`- **新投资者建议**：${rf.actions.new_investor_action}`);
+      lines.push(`- **已持有者建议**：${rf.actions.holder_action}`);
+      if (rf.actions.rationale) lines.push(`- **决策依据**：${rf.actions.rationale}`);
+      if (rf.actions.buy_or_add_range) {
+        lines.push(`- **参考买入/加仓区间**：¥${rf.actions.buy_or_add_range[0]} - ¥${rf.actions.buy_or_add_range[1]}`);
+      }
+      if (rf.actions.thesis_breakers && rf.actions.thesis_breakers.length > 0) {
+        lines.push("### 核心投资逻辑失效条件 (Thesis Breakers)");
+        rf.actions.thesis_breakers.forEach((tb) => lines.push(`- ⚠️ ${tb}`));
+      }
+      if (rf.actions.monitoring_metrics && rf.actions.monitoring_metrics.length > 0) {
+        lines.push("### 持续跟踪指标");
+        rf.actions.monitoring_metrics.forEach((mm) => lines.push(`- 🔍 ${mm}`));
+      }
+      lines.push("");
+    }
+  }
+
   return lines.join("\n");
 }

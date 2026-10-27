@@ -95,7 +95,7 @@ class IndustryMixin:
                     if stock_code and stock_code.isdigit():
                         mapping[stock_code] = board_name
             except Exception as exc:
-                logger.warning(f"东方财富直连获取行业成分失败: {board_name}({board_code}), error={exc}")
+                logger.warning('东方财富直连获取行业成分失败: %s(%s), error=%s', board_name, board_code, exc)
                 continue
         return mapping, industries
 

@@ -79,6 +79,28 @@ def resolve_tool_request(
     )
 
 
+def _normalize_legacy_function_call(function_call: Any) -> ToolCallInfo | None:
+    """把 ``message.function_call`` 归一成单元素 tool_calls。
+
+    OpenAI 在 tools 之前用 ``function_call``（流式则是 ``delta.function_call``），
+    部分自建/老版本网关至今仍只实现这一种。名称缺失时返回 None，避免驱动一轮
+    注定失败的调用。
+    """
+    if not function_call:
+        return None
+    name = str(_value(function_call, "name", "") or "").strip()
+    if not name:
+        return None
+    return ToolCallInfo(
+        id="call_legacy_0",
+        type="function",
+        function=ToolCallFunction(
+            name=name,
+            arguments=normalize_tool_arguments(_value(function_call, "arguments", None)),
+        ),
+    )
+
+
 def normalize_tool_arguments(arguments: Any) -> str:
     """Normalize SDK/provider argument values to the canonical JSON string form."""
     if isinstance(arguments, str):
@@ -109,6 +131,24 @@ def extract_message_text(content: Any) -> str:
     return str(content)
 
 
+_EMPTY_FINISH_REASONS = frozenset({"", "none", "null"})
+
+
+def normalize_finish_reason(value: Any) -> str | None:
+    """收敛网关对"无结束原因"的不同写法。
+
+    部分 OpenAI 兼容网关（vLLM/llama.cpp 等）在流末尾返回空串或字符串
+    ``"null"``。按缺失处理，让上层的"缺失则校验内容完整性"兜底生效，而不是
+    直接判成异常中止把已经完整的内容丢掉。统一小写以便与成功集合比较。
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if text.lower() in _EMPTY_FINISH_REASONS:
+        return None
+    return text.lower()
+
+
 def _value(value: Any, name: str, default: Any = None) -> Any:
     if isinstance(value, dict):
         return value.get(name, default)
@@ -132,11 +172,19 @@ def normalize_chat_completion(response: Any) -> LLMTurn:
     choice = _value(response, "choices")[0]
     message = _value(choice, "message")
     raw_tool_calls = _value(message, "tool_calls", None) or []
+    tool_calls = tuple(
+        _normalize_tool_call(tool_call, index) for index, tool_call in enumerate(raw_tool_calls)
+    )
+    if not tool_calls:
+        # 老网关只回 legacy 的单次 function_call；丢掉它等于"模型调了工具但什么都没发生"。
+        legacy = _normalize_legacy_function_call(_value(message, "function_call", None))
+        if legacy is not None:
+            tool_calls = (legacy,)
     return LLMTurn(
         content=extract_message_text(_value(message, "content", "")),
         reasoning_content=extract_message_text(_value(message, "reasoning_content", "")),
-        tool_calls=tuple(_normalize_tool_call(tool_call, index) for index, tool_call in enumerate(raw_tool_calls)),
-        finish_reason=_value(choice, "finish_reason"),
+        tool_calls=tool_calls,
+        finish_reason=normalize_finish_reason(_value(choice, "finish_reason")),
     )
 
 
@@ -161,9 +209,9 @@ class ChatCompletionStreamNormalizer:
         if not choices:
             return LLMStreamDelta()
         choice = choices[0]
-        finish_reason = _value(choice, "finish_reason")
+        finish_reason = normalize_finish_reason(_value(choice, "finish_reason"))
         if finish_reason is not None:
-            self._finish_reason = str(finish_reason)
+            self._finish_reason = finish_reason
         delta = _value(choice, "delta")
         content = extract_message_text(_value(delta, "content", ""))
         reasoning_content = extract_message_text(_value(delta, "reasoning_content", ""))
@@ -172,7 +220,24 @@ class ChatCompletionStreamNormalizer:
         if reasoning_content:
             self._reasoning_parts.append(reasoning_content)
 
-        for position, raw_tool_call in enumerate(_value(delta, "tool_calls", None) or []):
+        raw_tool_calls = _value(delta, "tool_calls", None) or []
+        if not raw_tool_calls:
+            # 老网关流式只发 delta.function_call，且后续分片只带参数片段（没有 name），
+            # 因此必须逐片合并字段，不能走"名称缺失即跳过"的整包归一化。
+            legacy_delta = _value(delta, "function_call", None)
+            if legacy_delta is not None:
+                accumulated = self._tool_calls.setdefault(0, _StreamingToolCall())
+                legacy_name = str(_value(legacy_delta, "name", "") or "").strip()
+                if legacy_name:
+                    accumulated.name = legacy_name
+                legacy_arguments = _value(legacy_delta, "arguments", None)
+                if isinstance(legacy_arguments, str):
+                    accumulated.argument_parts.append(legacy_arguments)
+                elif legacy_arguments is not None:
+                    accumulated.argument_parts.append(
+                        json.dumps(legacy_arguments, ensure_ascii=False, separators=(",", ":"))
+                    )
+        for position, raw_tool_call in enumerate(raw_tool_calls):
             raw_index = _value(raw_tool_call, "index", position)
             index = int(raw_index if raw_index is not None else position)
             accumulated = self._tool_calls.setdefault(index, _StreamingToolCall())

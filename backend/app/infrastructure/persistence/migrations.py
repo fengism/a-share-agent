@@ -173,6 +173,47 @@ def _add_macro_analysis_cache(conn: sqlite3.Connection) -> None:
     )
 
 
+def _repair_twitter_refresh_state_timezone(conn: sqlite3.Connection) -> None:
+    """修正迁移 5 回填 twitter_feed_refresh_state 时引入的时区偏移。
+
+    SQLite 日期函数把 'YYYY-MM-DD HH:MM:SS' 文本按 UTC 解析，而
+    twitter_posts.fetched_at 存的是 localtime 文本，因此迁移 5 的回填
+    ``strftime('%s', MAX(fetched_at))`` 把 last_refreshed_at 写大了本地
+    UTC 偏移（如东八区 +8h），导致升级后 12 小时刷新节流额外多压 8 小时。
+
+    修复只作用于仍等于“按旧口径重算结果”的行：之后经
+    ``save_twitter_refresh``（time.time()）覆写过的行不匹配，保持不动；
+    服务器运行在 UTC（偏移为 0）时天然幂等空操作。不可修改迁移 5 本身，
+    否则已应用库的迁移校验和会失败。
+    """
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'twitter_feed_refresh_state'"
+    ).fetchone()
+    if exists is None:
+        return
+    offset_seconds = int(
+        conn.execute(
+            "SELECT CAST(strftime('%s', datetime('now','localtime')) AS INTEGER)"
+            " - CAST(strftime('%s', 'now') AS INTEGER)"
+        ).fetchone()[0]
+    )
+    if offset_seconds == 0:
+        return
+    conn.execute(
+        """
+        UPDATE twitter_feed_refresh_state AS state
+        SET last_refreshed_at = last_refreshed_at - ?
+        WHERE last_refreshed_at > 0
+          AND last_refreshed_at = (
+              SELECT COALESCE(CAST(strftime('%s', MAX(posts.fetched_at)) AS REAL), 0)
+              FROM twitter_posts AS posts
+              WHERE posts.author = state.author
+          )
+        """,
+        (offset_seconds,),
+    )
+
+
 def _add_user_config_key_index(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_user_config_key ON user_config(key)")
 
@@ -569,6 +610,53 @@ def _add_login_audit_logs(conn: sqlite3.Connection) -> None:
     )
 
 
+def _add_admin_audit_logs(conn: sqlite3.Connection) -> None:
+    """管理员敏感操作审计。
+
+    ``created_at`` 不依赖 SQLite 的 ``localtime``：写入方显式传 ``now_ts()``
+    （北京时间），避免容器/裸机 TZ 不同导致同一张表出现两种时区的时间戳。
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS admin_audit_logs (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_id        INTEGER,
+            actor_username  TEXT    NOT NULL DEFAULT '',
+            actor_ip        TEXT    NOT NULL DEFAULT '',
+            actor_user_agent TEXT   NOT NULL DEFAULT '',
+            action          TEXT    NOT NULL,
+            target_type     TEXT    NOT NULL DEFAULT '',
+            target_id       TEXT    NOT NULL DEFAULT '',
+            target_label    TEXT    NOT NULL DEFAULT '',
+            details         TEXT    NOT NULL DEFAULT '',
+            created_at      TEXT    NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_logs(created_at DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_admin_audit_actor ON admin_audit_logs(actor_id, created_at DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_admin_audit_action ON admin_audit_logs(action, created_at DESC)"
+    )
+
+
+# 说明：``last_seen_at`` 只在创建会话与滑动续期时写入（约 7 天一次），不做每请求更新，
+# 否则 SQLite 单写者模型会变成"每次已认证请求一次写"。「登录设备」列表以登录/过期时间为主。
+def _add_session_origin_columns(conn: sqlite3.Connection) -> None:
+    """会话记录客户端 IP / UA / 最近活动，供「登录设备」自助管理。"""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(auth_sessions)").fetchall()}
+    if columns and "ip_address" not in columns:
+        conn.execute("ALTER TABLE auth_sessions ADD COLUMN ip_address TEXT NOT NULL DEFAULT ''")
+    if columns and "user_agent" not in columns:
+        conn.execute("ALTER TABLE auth_sessions ADD COLUMN user_agent TEXT NOT NULL DEFAULT ''")
+    if columns and "last_seen_at" not in columns:
+        conn.execute("ALTER TABLE auth_sessions ADD COLUMN last_seen_at TEXT NOT NULL DEFAULT ''")
+
+
 USER_MIGRATIONS = (
     Migration(1, "add users.must_change_password", _add_must_change_password),
     Migration(2, "add authentication lookup indexes", _add_auth_indexes),
@@ -592,6 +680,8 @@ USER_MIGRATIONS = (
     Migration(20, "add portfolio account settings", _add_portfolio_account_settings),
     Migration(21, "add users is_active", _add_users_is_active),
     Migration(22, "add login audit logs", _add_login_audit_logs),
+    Migration(23, "add admin audit logs", _add_admin_audit_logs),
+    Migration(24, "add session origin columns", _add_session_origin_columns),
 )
 
 
@@ -691,6 +781,7 @@ MARKET_MIGRATIONS = (
     Migration(11, "add sector constituent tables", _add_sector_constituent_tables),
     Migration(12, "add national team provenance", _add_national_team_provenance),
     Migration(13, "add macro analysis cache", _add_macro_analysis_cache),
+    Migration(14, "repair twitter refresh state timezone", _repair_twitter_refresh_state_timezone),
 )
 
 def _add_stock_concepts_tables(conn: sqlite3.Connection) -> None:

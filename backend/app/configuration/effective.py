@@ -21,6 +21,11 @@ def coerce_setting_value(key: str, raw):
         return int(raw)
     if annotation is float:
         return float(raw)
+    if get_origin(annotation) is dict or annotation is dict:
+        value = json.loads(raw) if isinstance(raw, str) else raw
+        if not isinstance(value, dict):
+            raise ValueError(f"{key} 必须是 JSON 对象")
+        return value
     if get_origin(annotation) is list:
         value = json.loads(raw) if isinstance(raw, str) else raw
         if not isinstance(value, list):
@@ -67,13 +72,50 @@ def overlay_private(base: Settings, overrides: dict) -> Settings:
         if "llm_api_version" not in patch:
             merged.llm_api_version = defaults.get("api_version", "")
 
-    # 用户未独立配置个人 API Key 时，自动回退复用系统全局 Key；
-    # 未提供 key 时 merged 已继承 base 的值，因此只需处理“回退复用”一种情况。
+    # 用户未独立配置个人 API Key 时，**只有端点仍然是管理员那套**才复用管理员 Key。
+    #
+    # 否则会出现凭据泄漏：普通用户把 llm_base_url 指向自己的服务（或把 provider 换成别家），
+    # 而 llm_api_key 仍继承全局值 —— 管理员 Key 就会被发送到用户/第三方指定的地址。
+    # 端点不一致时一律要求用户自备 Key（本地 Ollama 这类无需 Key 的服务本来就是空值）。
     if not (patch.get("llm_api_key") or "").strip() and base.llm_api_key:
-        merged.llm_api_key = base.llm_api_key
+        if _same_llm_endpoint(merged, base):
+            merged.llm_api_key = base.llm_api_key
+        else:
+            merged.llm_api_key = ""
     if "iwencai_api_key" not in patch and merged.iwencai_base_url != base.iwencai_base_url:
         merged.iwencai_api_key = ""
     return merged
+
+
+def _same_llm_endpoint(left: Settings, right: Settings) -> bool:
+    """两个配置是否指向同一个 LLM 端点（决定能否共用同一个 Key）。"""
+
+    def normalize(value: str) -> str:
+        return str(value or "").strip().rstrip("/").lower()
+
+    return (
+        normalize(left.llm_base_url) == normalize(right.llm_base_url)
+        and str(left.llm_provider or "").strip().lower()
+        == str(right.llm_provider or "").strip().lower()
+    )
+
+
+def inherited_private_keys(overrides: dict) -> list[str]:
+    """列出该用户仍沿用**全局基线**的私密配置字段。
+
+    用户值为空串/空白或只剩掩码（前端回显的脱敏值）时视为"未配置"，
+    即生效值来自管理员（全局）配置——前端据此显示「使用管理员配置」。
+    """
+    inherited: list[str] = []
+    for key in sorted(PRIVATE_USER_KEYS):
+        value = overrides.get(key)
+        if value is None:
+            inherited.append(key)
+        elif isinstance(value, str) and not value.strip():
+            inherited.append(key)
+        elif key in SECRET_KEYS and is_masked_secret(key, value):
+            inherited.append(key)
+    return inherited
 
 
 def mask_secret(value: str, visible: int = 4) -> str:

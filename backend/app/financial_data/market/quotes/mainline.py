@@ -32,10 +32,12 @@ async def get_market_mainline() -> MarketMainlineResponse:
             return MarketMainlineResponse.model_validate(cached_inside_flight)
         provider = get_provider("cls")
         try:
+            # fetch_market_mainline 内部自带主/备端点自动容灾，外层限定 1 次尝试避免重复耗时
             data = await provider_gateway.call(
                 "cls",
                 "market_mainline",
                 lambda: call_blocking(provider.fetch_market_mainline, semaphore=cls_semaphore),
+                max_attempts=1,
             )
             result = MarketMainlineResponse(
                 fetched_at=datetime.now(UTC).isoformat(timespec="seconds"),

@@ -37,6 +37,42 @@ user_config 表   ─┘        │
 > ⚠️ 不要再手写配置键清单。历史上 `PRIVATE_USER_KEYS` 等多份清单曾导致
 > 推送通道、fuyao 凭证等字段「界面能填、后端静默丢弃」。
 
+### 私密字段的继承规则（以 LLM 为例）
+
+普通用户不需要配 Key：没有个人覆盖的字段一律继承管理员写入的全局基线。
+界面上只有状态标签（`沿用管理员配置` / `个人端点`）与一句提示，
+端点类字段（Base URL / API 模式 / 子模型 / 上下文长度）收在「端点与模型」折叠区，默认不展开。
+
+| 用户操作 | 生效结果 |
+| :--- | :--- |
+| 什么都不配 | 完全使用管理员配置（Provider / Base URL / Model / Key） |
+| 不改 URL 和 Key，单独修改模型或温度 | 自由修改模型与温度，端点与 Key 依然安全继承管理员配置 |
+| 自定义端点（同时提供 Base URL 与 Key） | 使用完整的个人自建端点与私有凭据 |
+| 只填 Key 不改 URL / 只改 URL 不填 Key | **前端与后端双重拦截**：自定义端点需同时配置 Base URL 与 API Key |
+| 清空个人配置并保存（界面上的「改用管理员配置」） | 删除个人覆盖，全量回退到管理员配置 |
+
+> [!NOTE]
+> **未改动的字段不会提交**：LLM 卡片声明了 `skipUnchanged`（`cardSpecs.ts`），保存时只提交与当前生效值
+> 不同的字段。否则表单用生效值初始化后，用户仅仅改了温度再保存，就会把管理员的 Provider / Base URL /
+> Model 静默写成自己的覆盖，之后管理员调整全局配置这个人再也跟不上。
+
+实现见 `app/configuration/effective.py::overlay_private`：只有端点（`llm_base_url` + `llm_provider`）
+与全局一致时才复用全局 Key，同一规则此前已用于问财自定义地址。`GET /api/config` 的
+`inherited_keys` 会列出仍继承全局的字段，前端据此显示「当前使用管理员配置」并提供「改用管理员配置」。
+
+> [!IMPORTANT]
+> **私密字段的"空串"是删除指令**：`PUT /api/config` 里某个私密字段传空串，表示删除该用户的个人覆盖
+> （`user_config` 直接删行），而不是写入空值。它与 `overlay_private` 跳过空值的结果等价，但不留死数据。
+> 否则前端"改用管理员配置"会因为 `buildCardPatch` 跳过空密钥而删不掉旧 Key。掩码值（含 `***`）依然视为
+> "未修改"，不会误删。`llm_api_mode` 是 `Literal` 契约、不接受空串，清空时按文档语义写回 `auto`（跟随 Provider）。
+
+> [!CAUTION]
+> 换端点必须自备 Key。这条规则在**两个层次**同时生效，任何一层都能独立挡住凭据外泄：
+> 1. 语义层 `overlay_private`：端点和全局不一致时，不把全局 Key 填进用户生效配置；
+> 2. 咽喉层 `resolve_llm_client_spec`（把配置变成实际出网请求的唯一位置）：Key 为空时，只有端点与全局
+>    一致才回退复用全局 Key，否则报错 `LLM_API_ERROR / config.llm_credentials_missing`（HTTP 422），
+>    提示用户填自己的 Key。本地无需 Key 的 provider（如 Ollama）不受影响。
+
 ## 三、字段作用域速查
 
 | 作用域 | 存储 | 谁能改 | 例子 |
@@ -44,7 +80,18 @@ user_config 表   ─┘        │
 | `private` | `user_config` | 任意登录用户 | 大模型 Key、问财 Key、飞书私有空间 |
 | `private` + `synced_global` | `user_config` + `global_config` | 任意用户；管理员保存时同步全局 | 大模型、推送通道、飞书应用凭证 |
 | `global` | `global_config` | 仅管理员 | 数据源 Cookie、出站代理、备份策略 |
-| 非 API（deployment-only） | 仅 `.env` / 环境变量 | 部署者 | `PDF_MAX_CONCURRENCY`、`WORKFLOW_JOB_*` |
+| 非 API（deployment-only） | 仅 `.env` / 环境变量 | 部署者 | `PDF_MAX_CONCURRENCY`、`WORKFLOW_JOB_*`、`*_AUDIT_RETENTION_DAYS` |
+
+> [!NOTE]
+> 两类审计表的清理期限是部署项（不可从界面改）：`LOGIN_AUDIT_RETENTION_DAYS`（默认 180 天）
+> 与 `ADMIN_AUDIT_RETENTION_DAYS`（默认 365 天），`0` 表示永久保留。它们由 6 小时一次的
+> 维护任务执行，与 `auth_sessions` / `password_resets` 的清理同批。
+
+> [!IMPORTANT]
+> `ADMIN_SETUP_TOKEN`（默认空）用于锁住**空库首用户注册**：不配时第一个注册者直接成为管理员，
+> 只适合「部署后立刻注册」。若实例在注册前即可被公网访问，请配一个随机口令——注册页面会
+> 多出一个「部署口令」输入框，口令错误返回 403 `auth.setup_token_invalid`。
+> 用户表非空后该口令不再参与任何校验。
 
 ## 四、新增一个配置项（标准流程）
 
@@ -96,5 +143,9 @@ settings.llm.provider = "openai" # 写回同一份状态
 
 ## 八、相关文档
 
+- 部署、常用配置与常见问题：[README](../README.md)
+- 本地开发、质量门禁与测试约定：[development.md](development.md)
+- 分层与依赖规则：[architecture.md](architecture.md)
+- 数据源与降级机制：[data-sources.md](data-sources.md)
+- 故障排查：[troubleshooting.md](troubleshooting.md)
 - 推送与通知通道：[push-notifications.md](push-notifications.md)
-- 部署与环境变量：仓库根目录 `README.md`

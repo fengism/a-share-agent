@@ -102,7 +102,7 @@ class KlineMixin:
             )
             data = (response.json() or {}).get("data") or {}
         except Exception as exc:
-            logger.warning(f"大盘指数K线直连失败: symbol={symbol}, error={exc}")
+            logger.warning('大盘指数K线直连失败: symbol=%s, error=%s', symbol, exc)
             raise
 
         if str(data.get("code", "")) and str(data.get("code", "")) != symbol:

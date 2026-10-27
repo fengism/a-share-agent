@@ -1,10 +1,12 @@
 import json
 import logging
 import time
+from collections.abc import Iterable
 from threading import Lock
 
 from app.configuration import crypto as config_crypto
 from app.configuration.crypto_contracts import GLOBAL_CONFIG_SCOPE_ID
+from app.core.request_context import invalidate_settings_cache
 from app.infrastructure.persistence.connection import database_path, get_connection, unit_of_work
 
 logger = logging.getLogger(__name__)
@@ -54,6 +56,28 @@ def _cache_ready_encryption_status(cache_key: tuple[str, str]) -> None:
             cache_key,
             time.monotonic() + _ENCRYPTION_STATUS_CACHE_SECONDS,
         )
+
+
+def delete_user_config_keys(user_id: int, keys: Iterable[str]) -> int:
+    """删除该用户的若干配置覆盖（用于「改用管理员配置」这类显式清空）。
+
+    与写入空串不同：空串在 overlay 时会被跳过（等价于继承全局），但仍是"存在一行"，
+    这里直接删行，语义更明确，也避免脏数据堆积。
+    """
+    targets = [key for key in dict.fromkeys(keys) if key]
+    if not targets:
+        return 0
+    placeholders = ", ".join("?" for _ in targets)
+    with unit_of_work("user", immediate=True) as work:
+        cursor = work.connection.execute(
+            f"DELETE FROM user_config WHERE user_id = ? AND key IN ({placeholders})",
+            (user_id, *targets),
+        )
+        deleted = cursor.rowcount
+    if deleted:
+        invalidate_config_encryption_status_cache()
+        invalidate_settings_cache()
+    return deleted
 
 
 def get_user_config(user_id: int) -> dict[str, str]:

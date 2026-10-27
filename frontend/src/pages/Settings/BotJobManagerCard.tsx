@@ -3,6 +3,7 @@ import { Button, Card, Space, Tag, message } from "antd";
 import { useBotJobs, useRetryBotJob } from "../../api/queries";
 import SectionDataState from "../../components/SectionDataState";
 import { useColors, useStyles, semanticTagStyle } from "../../styles/ui";
+import { formatMarketDateTime } from "../../utils/marketTime";
 import type { BotAdminJob } from "../../types/settings";
 
 export default function BotJobManagerCard() {
@@ -78,7 +79,7 @@ export default function BotJobManagerCard() {
                 <div style={{ color: colors.textMuted, fontSize: "var(--c-font-sm)", marginTop: 4, wordBreak: "break-all" }}>
                   用户 {job.request_user_id || "未知"} · 尝试 {job.attempts}/{job.max_attempts}
                   {job.last_error ? ` · ${job.last_error}` : ""}
-                  {` · ${new Date(job.updated_at * 1000).toLocaleString()}`}
+                  {` · ${formatMarketDateTime(job.updated_at)}`}
                 </div>
               </div>
               <Button

@@ -600,7 +600,7 @@ class MarketDailyBackfillService:
                 UPDATE market_daily_backfill_items
                 SET status=?, stored_bars=?, source=?, quality_score=?, validation_json=?,
                     failure_kind=?, last_error=?, updated_at=?
-                WHERE job_id=? AND code=?
+                WHERE job_id=? AND code=? AND status='running'
                 """,
                 (
                     status, stored, source, quality_score,

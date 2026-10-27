@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense } from "react";
 import { ExperimentOutlined, RobotOutlined } from "@ant-design/icons";
 import { useSearchParams } from "react-router-dom";
 import type { QuantBacktestRun } from "../../api/queries";
@@ -23,25 +23,14 @@ export default function QuantWorkspaceSwitcher({
   isAdmin: boolean;
   runController: QuantRunController;
 }) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
   const [workspaceView, setWorkspaceView] = useUrlSearchParam<WorkspaceView>("view", "backtest", {
     allowedValues: WORKSPACE_VIEWS,
   });
 
-  useEffect(() => {
-    if (isAdmin || !searchParams.has("view")) return;
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.delete("view");
-      return next;
-    }, { replace: true });
-  }, [isAdmin, searchParams, setSearchParams]);
-
   const backtestWorkspace = (
     <QuantBacktestWorkspace initialCodes={initialCodes} runController={runController} />
   );
-
-  if (!isAdmin) return backtestWorkspace;
 
   const handleAuthoringCreated = (run: QuantBacktestRun) => {
     setSearchParams((current) => selectQuantBacktestFromAuthoring(current, run.id));
@@ -70,7 +59,10 @@ export default function QuantWorkspaceSwitcher({
             onIntent: () => preloadQuantModule(loadStrategyAuthoringWorkbench),
             children: (
               <Suspense fallback={<QuantWorkspaceFallback label="在线策略工作台加载中" />}>
-                <StrategyAuthoringWorkbench onBacktestCreated={handleAuthoringCreated} />
+                <StrategyAuthoringWorkbench
+                  isAdmin={isAdmin}
+                  onBacktestCreated={handleAuthoringCreated}
+                />
               </Suspense>
             ),
           },

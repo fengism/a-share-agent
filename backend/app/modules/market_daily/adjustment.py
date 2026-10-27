@@ -8,6 +8,8 @@ import json
 import logging
 import math
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -15,6 +17,7 @@ import pandas as pd
 from tdxhub import __version__ as tdxhub_version
 from tdxhub.gbbq import CATEGORY_NAMES, adjustment_factors, normalize_gbbq
 
+from app.core.concurrency.keyed_lock import KeyedLockRegistry
 from app.core.concurrency.rate_limiter import call_blocking, sina_semaphore, tdx_semaphore
 from app.domain.market import KlineData, KlineItem
 from app.infrastructure.providers.registry import get_provider
@@ -44,12 +47,18 @@ _SINA_FACTOR_SOURCE = "sina.qfq_hfq"
 _ACTION_SOURCE = "tdxhub.xdxr"
 _CANONICAL_ANCHOR = date(1990, 1, 1)
 _OHLC = ("open", "high", "low", "close")
+# 复权后价格的对齐精度必须与市场最小报价单位一致：A 股为 0.01 元；
+# 港股低价股最小报价单位可到 0.001，统一舍入到 0.01 会静默改写真实价格
+# （如 0.315→0.32）。全部港股 tick 尺寸都是 0.001 的整数倍，按 0.001 对齐
+# 既能保留原始精度，也不会在仿射换算后引入非标价格。
+_CN_PRICE_TICK = Decimal("0.01")
+_HK_PRICE_TICK = Decimal("0.001")
 # 会引起除权参考价变化的公司行为字段：任一非零即意味着该股确实有过除权除息。
 _PRICE_AFFECTING_ACTION_COLUMNS = ("fenhong", "songzhuangu", "peigu", "suogu")
 
 _repository = MarketDailyBarRepository(MARKET_DAILY_DATABASE_PATH)
-_code_locks: dict[str, asyncio.Lock] = {}
-_code_locks_guard = asyncio.Lock()
+# 键是股票代码；用引用计数的注册表避免只增不减。
+_code_locks = KeyedLockRegistry()
 
 
 def _number(value: object) -> float:
@@ -338,15 +347,15 @@ def _last_good_failure_is_cooling_down(
     return now.astimezone(UTC) - checked_at.astimezone(UTC) < FACTOR_FAILURE_RETRY_TTL
 
 
-async def _lock_for(code: str) -> asyncio.Lock:
-    async with _code_locks_guard:
-        return _code_locks.setdefault(code, asyncio.Lock())
+@asynccontextmanager
+async def _lock_for(code: str) -> AsyncIterator[None]:
+    async with _code_locks.acquire(code):
+        yield
 
 
 async def ensure_adjustment_factors(code: str, *, force: bool = False) -> bool:
     """确保 A 股本地交易日有可用复权系数；TDX 仿射优先，新浪乘法兜底。"""
-    lock = await _lock_for(code)
-    async with lock:
+    async with _lock_for(code):
         # 已确认健康则直接返回，跳过 3 次点查 + 1 次 DDL 检查；盘中高频读取的主要开销在此。
         now_monotonic = time.monotonic()
         if not force and _healthy_cache_get(code, now_monotonic):
@@ -427,12 +436,13 @@ async def ensure_adjustment_factors(code: str, *, force: bool = False) -> bool:
                     using_last_good=True,
                 )
                 logger.warning(
-                    "TDX 复权因子刷新失败，继续使用覆盖完整的 TDX last-good: code=%s",
+                    "TDX 复权因子刷新失败，继续使用覆盖完整的 TDX last-good: code=%s error=%s: %s",
                     code,
-                    exc_info=True,
+                    type(tdx_error).__name__,
+                    tdx_error,
                 )
                 return True
-            logger.warning("TDX 复权因子刷新失败，尝试新浪乘法因子: code=%s", code, exc_info=True)
+            logger.warning("TDX 复权因子刷新失败，尝试新浪乘法因子: code=%s error=%s: %s", code, type(tdx_error).__name__, tdx_error)
             try:
                 raw_sina_factors = await call_blocking(
                     get_provider("sina").fetch_adjustment_factors,
@@ -470,17 +480,17 @@ async def ensure_adjustment_factors(code: str, *, force: bool = False) -> bool:
                         using_last_good=True,
                     )
                     logger.warning(
-                        "TDX 与新浪因子刷新均失败，继续使用覆盖完整的 last-good: code=%s",
+                        "TDX 与新浪因子刷新均失败，继续使用覆盖完整的 last-good: code=%s error=%s: %s",
                         code,
-                        exc_info=True,
-                    )
+                        type(sina_error).__name__,
+                        sina_error,
+                        )
                     return True
                 logger.warning(
                     "新浪乘法复权因子也不可用，回退既有 K 线上游: code=%s tdx_error=%s sina_error=%s",
                     code,
                     tdx_error,
                     sina_error,
-                    exc_info=True,
                 )
                 return False
 
@@ -567,11 +577,16 @@ async def invalidate_adjustment_factors(code: str, market: str = "cn") -> Market
     return await get_adjustment_factor_status(code, market=market)
 
 
-def _adjust_price(value: float | None, multiplier: float, offset: float) -> float | None:
+def _adjust_price(
+    value: float | None,
+    multiplier: float,
+    offset: float,
+    tick: Decimal = _CN_PRICE_TICK,
+) -> float | None:
     if value is None:
         return None
     adjusted = Decimal(str(value)) * Decimal(str(multiplier)) + Decimal(str(offset))
-    return float(adjusted.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    return float(adjusted.quantize(tick, rounding=ROUND_HALF_UP))
 
 
 def apply_adjustment(
@@ -585,6 +600,7 @@ def apply_adjustment(
     factor_by_date = {factor.trade_date: factor for factor in factors}
     if any(bar.trade_date not in factor_by_date for bar in bars):
         return None
+    price_tick = _HK_PRICE_TICK if str(bars[0].market) == "hk" else _CN_PRICE_TICK
     items: list[KlineItem] = []
     previous_adjusted_close: float | None = None
     for bar in sorted(bars, key=lambda item: item.trade_date):
@@ -593,8 +609,11 @@ def apply_adjustment(
         offset = factor.qfq_offset if method == "qfq" else factor.hfq_offset
         if multiplier is None or offset is None:
             return None
-        adjusted = {field: _adjust_price(getattr(bar, field), multiplier, offset) for field in _OHLC}
-        fallback_pre_close = _adjust_price(bar.pre_close, multiplier, offset)
+        adjusted = {
+            field: _adjust_price(getattr(bar, field), multiplier, offset, price_tick)
+            for field in _OHLC
+        }
+        fallback_pre_close = _adjust_price(bar.pre_close, multiplier, offset, price_tick)
         pre_close = previous_adjusted_close if previous_adjusted_close is not None else fallback_pre_close
         close = adjusted["close"]
         open_price = adjusted["open"] if adjusted["open"] is not None else close
@@ -696,6 +715,6 @@ async def load_local_adjusted_daily_kline(
         if not filtered:
             return None
         return adjusted.model_copy(update={"items": filtered})
-    except Exception:
-        logger.warning("本地复权行情读取失败，回退既有 K 线上游: market=%s code=%s", market, code, exc_info=True)
+    except Exception as error:
+        logger.warning("本地复权行情读取失败，回退既有 K 线上游: market=%s code=%s error=%s: %s", market, code, type(error).__name__, error)
         return None

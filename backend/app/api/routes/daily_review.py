@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query, Response
 
 from app.api.auth.dependencies import require_active_user
 from app.api.errors import BadRequestError, NotFoundError, ServiceUnavailableError
+from app.api.rate_limit import llm_rate_limit
 from app.api.schemas import DeleteResponse
 from app.core.exceptions import UpstreamUnavailableError
 from app.domain.identity import AuthenticatedUser
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/generate", response_model=DailyReviewResult)
+@router.post("/generate", response_model=DailyReviewResult, dependencies=[Depends(llm_rate_limit)])
 async def generate_review(request: DailyReviewRequest, user: AuthenticatedUser = Depends(require_active_user)):
     """触发生成指定日期的每日市场复盘。"""
     try:

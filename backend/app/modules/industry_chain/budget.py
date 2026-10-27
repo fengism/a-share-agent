@@ -8,11 +8,11 @@ SEARCH_TOOLS = ("web_search", "iwencai_search", "iwencai_query", "iwencai_select
 
 
 def search_policy_limits(total: int, *, repair: bool = False) -> dict:
-    limit = min(8 if repair else 24, max(1, total // 3))
+    limit = min(18 if repair else 48, max(1, total // 3))
     return {
         "search_tool_names": SEARCH_TOOLS,
         "search_total_limit": limit,
-        "search_burst_limit": min(2 if repair else 4, limit),
+        "search_burst_limit": min(4 if repair else 6, limit),
     }
 
 

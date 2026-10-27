@@ -20,9 +20,11 @@ function errorText(error: unknown): string {
 
 export function useStrategyAuthoringController(
   onBacktestCreated: (run: QuantBacktestRun) => void,
+  isAdmin = false,
 ) {
   const draftsQuery = useQuantStrategyDrafts();
-  const registryQuery = useQuantStrategyRegistryStatus();
+  // 注册表状态是管理员接口：普通用户不查询，页脚也不展示
+  const registryQuery = useQuantStrategyRegistryStatus(isAdmin);
   const generateDraft = useGenerateQuantStrategyDraft();
   const updateDraft = useUpdateQuantStrategyDraft();
   const validateDraft = useValidateQuantStrategyDraft();

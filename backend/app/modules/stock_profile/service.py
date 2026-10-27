@@ -9,6 +9,7 @@ from typing import Any
 
 from app.configuration.paths import DATA_DIR
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore, misc_semaphore
+from app.core.csv_export import csv_safe_row
 from app.core.exceptions import UpstreamUnavailableError
 from app.financial_data.stock.profile.exchange_master import ExchangeStockMaster
 from app.financial_data.stock.public import get_exchange_stock_master
@@ -501,10 +502,10 @@ def export_profiles_csv(
     writer = csv.writer(output)
     writer.writerow([header for header, _field in _PROFILE_EXPORT_COLUMNS])
     for record in records:
-        writer.writerow([
+        writer.writerow(csv_safe_row(
             "" if record.get(field) is None else str(record.get(field, ""))
             for _header, field in _PROFILE_EXPORT_COLUMNS
-        ])
+        ))
 
     filename = "stock_profile_export.csv"
     encoded_fn = urllib.parse.quote(filename)

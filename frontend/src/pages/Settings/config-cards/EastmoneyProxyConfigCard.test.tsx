@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import OutboundProxyConfigCard, { normalizeProxyUrl, validateProxyUrl } from "./EastmoneyProxyConfigCard";
+import OutboundProxyConfigCard from "./EastmoneyProxyConfigCard";
+import { normalizeProxyUrl, validateProxyUrl } from "./EastmoneyProxyConfigCard.utils";
 
 function renderCard(overrides: Partial<Parameters<typeof OutboundProxyConfigCard>[0]> = {}) {
   const onChange = vi.fn();
@@ -82,11 +83,25 @@ describe("OutboundProxyConfigCard", () => {
     expect(screen.getByText(/内容已脱敏/)).toBeInTheDocument();
   });
 
-  it("disables the address input and the test button when the proxy is off", () => {
+  it("disables the address input, scopes, and the test button when the proxy is off", () => {
     renderCard();
 
     expect(screen.getByLabelText("出站代理地址")).toBeDisabled();
     expect(screen.getByRole("button", { name: /测试连通性/ })).toBeDisabled();
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes.length).toBeGreaterThan(0);
+    checkboxes.forEach((cb) => expect(cb).toBeDisabled());
+  });
+
+  it("changes selected proxy scopes", () => {
+    const { onChange } = renderCard({
+      form: { outbound_proxy_type: "socks5", outbound_proxy_url: "socks5h://h:2260", outbound_proxy_scopes: ["eastmoney"] },
+    });
+
+    fireEvent.click(screen.getByLabelText(/同花顺/));
+    expect(onChange).toHaveBeenCalledWith({
+      outbound_proxy_scopes: expect.arrayContaining(["eastmoney", "ths"]),
+    });
   });
 
   it("renders the connectivity test result", () => {

@@ -15,7 +15,7 @@ from app.domain.llm import (
 from app.domain.llm import (
     is_llm_connection_error as is_llm_connection_error,
 )
-from app.infrastructure.llm.adapters import prepare_completion_kwargs
+from app.infrastructure.llm.adapters import merge_extra_body, prepare_completion_kwargs
 from app.infrastructure.llm.capabilities import LLMCapabilities
 from app.infrastructure.llm.pool import AsyncResourcePool
 from app.infrastructure.llm.spec import LLMClientSpec, apply_task_model, resolve_llm_client_spec
@@ -42,9 +42,11 @@ class LiteLLMAsyncCompletions:
         max_retries: int | None = 0,
         capabilities: LLMCapabilities | None = None,
         model: str | None = None,
+        extra_body: dict[str, Any] | None = None,
     ) -> None:
         self._model = model
         self.capabilities = capabilities
+        self._extra_body = dict(extra_body or {})
         self._api_key = api_key
         self._base_url = base_url
         self._api_version = api_version
@@ -54,6 +56,9 @@ class LiteLLMAsyncCompletions:
     async def create(self, **kwargs):
         from litellm import acompletion
 
+        extra_body = merge_extra_body(self._extra_body, kwargs.pop("extra_body", None))
+        if extra_body is not None:
+            kwargs["extra_body"] = extra_body
         kwargs = prepare_completion_kwargs(kwargs, self.capabilities, expected_model=self._model)
         kwargs.update(
             api_key=self._api_key,
@@ -83,6 +88,7 @@ class LiteLLMAsyncClient:
         capabilities: LLMCapabilities | None = None,
         model: str | None = None,
         max_retries: int | None = 0,
+        extra_body: dict[str, Any] | None = None,
     ) -> None:
         self.capabilities = capabilities
         self.chat = SimpleNamespace(
@@ -94,6 +100,7 @@ class LiteLLMAsyncClient:
                 max_retries=max_retries,
                 capabilities=capabilities,
                 model=model,
+                extra_body=extra_body,
             )
         )
 
@@ -102,12 +109,22 @@ class LiteLLMAsyncClient:
 
 
 class OpenAIAsyncCompletions:
-    def __init__(self, completions: Any, capabilities: LLMCapabilities | None = None, model: str | None = None) -> None:
+    def __init__(
+        self,
+        completions: Any,
+        capabilities: LLMCapabilities | None = None,
+        model: str | None = None,
+        extra_body: dict[str, Any] | None = None,
+    ) -> None:
         self._model = model
         self._completions = completions
         self.capabilities = capabilities
+        self._extra_body = dict(extra_body or {})
 
     async def create(self, **kwargs):
+        extra_body = merge_extra_body(self._extra_body, kwargs.pop("extra_body", None))
+        if extra_body is not None:
+            kwargs["extra_body"] = extra_body
         return await self._completions.create(**prepare_completion_kwargs(kwargs, self.capabilities, expected_model=self._model))
 
 
@@ -118,11 +135,14 @@ class OpenAIAsyncClient:
         *,
         capabilities: LLMCapabilities | None = None,
         model: str | None = None,
+        extra_body: dict[str, Any] | None = None,
     ) -> None:
         self._client = client
         self.capabilities = capabilities
         self.chat = SimpleNamespace(
-            completions=OpenAIAsyncCompletions(client.chat.completions, capabilities, model)
+            completions=OpenAIAsyncCompletions(
+                client.chat.completions, capabilities, model, extra_body=extra_body
+            )
         )
 
     async def close(self) -> None:
@@ -130,13 +150,23 @@ class OpenAIAsyncClient:
 
 
 class OpenAISyncClient:
-    def __init__(self, client: Any, capabilities: LLMCapabilities, model: str) -> None:
+    def __init__(
+        self,
+        client: Any,
+        capabilities: LLMCapabilities,
+        model: str,
+        extra_body: dict[str, Any] | None = None,
+    ) -> None:
         self._model = model
         self._client = client
         self.capabilities = capabilities
+        self._extra_body = dict(extra_body or {})
         self.chat = SimpleNamespace(completions=self)
 
     def create(self, **kwargs):
+        extra_body = merge_extra_body(self._extra_body, kwargs.pop("extra_body", None))
+        if extra_body is not None:
+            kwargs["extra_body"] = extra_body
         return self._client.chat.completions.create(**prepare_completion_kwargs(kwargs, self.capabilities, expected_model=self._model))
 
     def close(self) -> None:
@@ -157,7 +187,10 @@ def _create_openai_chat_runtime(
         http_client=http_client_factory(trust_env=False),
     )
     return OpenAIChatRuntime(
-        client=OpenAISyncClient(client, spec.effective_capabilities, spec.model), model=spec.model,
+        client=OpenAISyncClient(
+            client, spec.effective_capabilities, spec.model, extra_body=spec.extra_body,
+        ),
+        model=spec.model,
     )
 
 
@@ -180,6 +213,7 @@ def _create_async_openai_chat_runtime(
                 timeout=spec.timeout,
                 capabilities=capabilities,
                 model=spec.model,
+                extra_body=spec.extra_body,
                 **({"max_retries": max_retries} if max_retries is not None else {}),
             ),
             model=spec.model,
@@ -193,7 +227,9 @@ def _create_async_openai_chat_runtime(
         http_client=http_client_factory(trust_env=False),
     )
     return AsyncOpenAIChatRuntime(
-        client=openai_client_type(raw_client, capabilities=capabilities, model=spec.model),
+        client=openai_client_type(
+            raw_client, capabilities=capabilities, model=spec.model, extra_body=spec.extra_body,
+        ),
         model=spec.model,
         capabilities=capabilities,
     )

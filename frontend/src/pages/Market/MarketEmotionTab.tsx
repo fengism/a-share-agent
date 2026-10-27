@@ -14,6 +14,7 @@ import SectionDataState from "../../components/SectionDataState";
 import { useColors, semanticTagStyle } from "../../styles/ui";
 import type { ThemeColors } from "../../styles/ui";
 import type { MarketEmotionDistribution } from "../../types/stock";
+import { formatMarketDateTime } from "../../utils/marketTime";
 import "./market-emotion.css";
 
 type EmotionTone = "cold" | "neutral" | "hot";
@@ -56,9 +57,7 @@ function displayValue(value: string | number | null | undefined) {
 
 function formatFetchedAt(value: string | undefined) {
   if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
+  return formatMarketDateTime(value, value);
 }
 
 function breadthLabel(riseCount: number, fallCount: number) {

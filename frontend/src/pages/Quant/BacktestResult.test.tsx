@@ -1,8 +1,16 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import type { QuantBacktestResult } from "../../api/queries";
 import BacktestResult from "./BacktestResult";
+
+function renderWithProviders(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 vi.mock("../../hooks/useMediaQuery", () => ({ useMediaQuery: () => true }));
 vi.mock("./results/BacktestTradeKline", () => ({
@@ -69,7 +77,7 @@ describe("BacktestResult", () => {
     const result = makeResult({ model_assumptions: ["前复权行情不含分红送转资金账本"] });
     result.metrics.closed_trade_count = 3;
     result.metrics.observation_count = 120;
-    render(<BacktestResult result={result} />);
+    renderWithProviders(<BacktestResult result={result} />);
     expect(screen.getByText("日线近似模拟，历史表现不代表未来收益。")).toBeVisible();
     expect(screen.getByText("前复权行情不含分红送转资金账本")).not.toBeVisible();
     fireEvent.click(screen.getByText("回测模型与适用边界"));
@@ -85,7 +93,7 @@ describe("BacktestResult", () => {
   it.each([undefined, 0])("distinguishes missing and zero observation counts (%s)", (count) => {
     const result = makeResult();
     result.metrics.observation_count = count;
-    render(<BacktestResult result={result} />);
+    renderWithProviders(<BacktestResult result={result} />);
     expect(screen.getByText("交易日样本数").closest(".ant-statistic"))
       .toHaveTextContent(count === undefined ? "未记录" : "0天");
   });
@@ -95,7 +103,7 @@ describe("BacktestResult", () => {
     result.metrics.total_return = -4;
     result.metrics.annualized_return = 0;
     result.metrics.max_drawdown = -26;
-    render(<BacktestResult result={result} />);
+    renderWithProviders(<BacktestResult result={result} />);
     expect(screen.getByText("总收益").closest(".quant-metric-card")).toHaveClass("quant-metric-card--negative");
     expect(screen.getByText("年化收益").closest(".quant-metric-card")).toHaveClass("quant-metric-card--neutral");
     expect(screen.getByText("夏普比率").closest(".quant-metric-card")).toHaveClass("quant-metric-card--neutral");
@@ -104,7 +112,7 @@ describe("BacktestResult", () => {
   });
 
   it("renders metrics, compact charts and result tables", () => {
-    render(<BacktestResult result={makeResult()} />);
+    renderWithProviders(<BacktestResult result={makeResult()} />);
 
     expect(screen.getByRole("region", { name: "回测结果" })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "回测结果导航" })).toBeInTheDocument();
@@ -131,7 +139,7 @@ describe("BacktestResult", () => {
   });
 
   it("shows clear empty states for charts and detail tables", () => {
-    render(<BacktestResult result={makeResult({ equity_curve: [], monthly_returns: [], trades: [] })} />);
+    renderWithProviders(<BacktestResult result={makeResult({ equity_curve: [], monthly_returns: [], trades: [] })} />);
 
     expect(screen.getByText("暂无净值数据")).toBeInTheDocument();
     expect(screen.getByText("暂无回撤数据")).toBeInTheDocument();
@@ -145,7 +153,7 @@ describe("BacktestResult", () => {
     result.metrics.benchmark_return = null;
     result.metrics.excess_return = null;
 
-    render(<BacktestResult result={result} />);
+    renderWithProviders(<BacktestResult result={result} />);
 
     expect(screen.getByText("该回测没有可用的基准收益")).toBeInTheDocument();
     expect(screen.queryByText(/跑赢基准/)).not.toBeInTheDocument();
@@ -153,7 +161,7 @@ describe("BacktestResult", () => {
   });
 
   it("renders independent holdout validation metrics when available", () => {
-    render(<BacktestResult result={makeResult({
+    renderWithProviders(<BacktestResult result={makeResult({
       holdout_validation: {
         method: "holdout",
         start_date: "2025-09-01",
@@ -188,7 +196,7 @@ describe("BacktestResult", () => {
   });
 
   it("labels the exact strategy used for the result", () => {
-    render(<BacktestResult
+    renderWithProviders(<BacktestResult
       result={makeResult()}
       strategy={{
         type: "bias_reversal",
@@ -213,7 +221,7 @@ describe("BacktestResult", () => {
     window.URL.revokeObjectURL = vi.fn();
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 
-    render(<BacktestResult result={makeResult()} />);
+    renderWithProviders(<BacktestResult result={makeResult()} />);
 
     // Test copy summary
     const copyBtn = screen.getByRole("button", { name: "复制回测摘要" });

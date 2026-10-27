@@ -52,6 +52,7 @@ SETTING_TYPE = "outbound_proxy_type"
 SETTING_URL = "outbound_proxy_url"
 SETTING_TIMEOUT = "outbound_proxy_timeout_seconds"
 SETTING_RETRIES = "outbound_proxy_retries"
+SETTING_SCOPES = "outbound_proxy_scopes"
 
 
 class ProxyConfigError(ValueError):
@@ -88,6 +89,52 @@ class ProxyScope:
             return True
         path = split.path or ""
         return any(path.startswith(prefix) for prefix in self.path_prefixes)
+
+
+DEFAULT_PROXY_SCOPES = ("eastmoney",)
+
+SCOPE_PRESETS: dict[str, ProxyScope] = {
+    "eastmoney": ProxyScope(
+        hosts=frozenset({
+            "push2his.eastmoney.com",
+            "push2.eastmoney.com",
+            "datacenter-web.eastmoney.com",
+            "datacenter.eastmoney.com",
+            "emweb.securities.eastmoney.com",
+            "quote.eastmoney.com",
+            "reportapi.eastmoney.com",
+        })
+    ),
+    "ths": ProxyScope(
+        hosts=frozenset({
+            "basic.10jqka.com.cn",
+            "data.10jqka.com.cn",
+            "q.10jqka.com.cn",
+            "stockpage.10jqka.com.cn",
+        })
+    ),
+    "cls": ProxyScope(
+        hosts=frozenset({
+            "api3.cls.cn",
+            "www.cls.cn",
+            "x-quote.cls.cn",
+        })
+    ),
+    "sina": ProxyScope(
+        hosts=frozenset({
+            "vip.stock.finance.sina.com.cn",
+            "hq.sinajs.cn",
+            "cn.finance.sina.com.cn",
+            "finance.sina.com.cn",
+        })
+    ),
+    "akshare": ProxyScope(
+        hosts=frozenset({
+            "emweb.securities.eastmoney.com",
+            "data.eastmoney.com",
+        })
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,6 +245,17 @@ def resolve_outbound_proxy(
     """
     if scope is not None and not scope.matches(url):
         return None
+
+    configured_scopes = getattr(settings, SETTING_SCOPES, None)
+    if configured_scopes is not None:
+        active_scopes = set(configured_scopes)
+        split = urlsplit(url)
+        hostname = (split.hostname or "").lower()
+        matched_preset_keys = [k for k, preset in SCOPE_PRESETS.items() if hostname in preset.hosts]
+        if matched_preset_keys and not any(k in active_scopes for k in matched_preset_keys):
+            return None
+        if scope is None and not any(k in active_scopes for k in matched_preset_keys):
+            return None
 
     proxy_type = str(getattr(settings, SETTING_TYPE, PROXY_TYPE_NONE) or PROXY_TYPE_NONE)
     raw_url = str(getattr(settings, SETTING_URL, "") or "")

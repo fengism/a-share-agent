@@ -23,6 +23,17 @@ const fixtures = vi.hoisted(() => {
     segment_count: 1,
     company_count: 1,
   };
+  const userSummary = {
+    slug: "user-chain-1",
+    name: "量子通信私有链",
+    category: "前沿科技",
+    summary: "个人私有知识库",
+    source: "user" as const,
+    aliases: [],
+    tags: ["个人专属"],
+    segment_count: 1,
+    company_count: 1,
+  };
   return {
     longName,
     longCategory,
@@ -32,10 +43,10 @@ const fixtures = vi.hoisted(() => {
     longSegment,
     longCompany,
     catalog: {
-      categories: [longCategory],
-      chains: [summary],
-      total_chains: 1,
-      total_companies: 1,
+      categories: [longCategory, "前沿科技"],
+      chains: [summary, userSummary],
+      total_chains: 2,
+      total_companies: 2,
     },
     detail: {
       ...summary,
@@ -154,6 +165,21 @@ describe("IndustryAtlas long content wrapping", () => {
     // 切换到个股反查产业链
     fireEvent.click(screen.getByText("个股反查产业链"));
     expect(screen.getByText("🔍 从个股反查产业链分布")).toBeInTheDocument();
+  });
+
+  it("renders personal atlas button and allows filtering by personal exclusive chains", () => {
+    renderAtlas();
+
+    // 存在普通用户沉淀入口
+    expect(screen.getByRole("button", { name: /沉淀个人图谱/ })).toBeInTheDocument();
+
+    // 展示个人专属单选与卡片标签
+    expect(screen.getByRole("radio", { name: /个人专属/ })).toBeInTheDocument();
+    expect(screen.getByText("个人专属")).toBeInTheDocument();
+
+    // 点击个人专属来源过滤
+    fireEvent.click(screen.getByRole("radio", { name: /个人专属/ }));
+    expect(screen.getByText("量子通信私有链")).toBeInTheDocument();
   });
 });
 

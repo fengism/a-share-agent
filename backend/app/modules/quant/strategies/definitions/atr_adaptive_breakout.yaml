@@ -1,0 +1,70 @@
+api_version: quant.strategy/v2
+key: atr_adaptive_breakout
+version: 1.0.0
+enabled: true
+name: ATR 自适应通道突破
+description: 运用真实波幅 ATR 构建自适应波动率包络通道，收盘突破自适应上轨时入场，跌破中轨或触发吊灯跟踪止损时退出。
+scenario: 强趋势与波段主升浪
+risk_level: medium
+presentation:
+  icon: thunderbolt
+parameters:
+  trend_period:
+    type: integer
+    label: 基准均线周期
+    description: 衡量中期趋势的基准平滑均线周期
+    default: 20
+    minimum: 5
+    maximum: 120
+  atr_period:
+    type: integer
+    label: ATR 真实波幅周期
+    description: 计算历史波动率窗口周期
+    default: 14
+    minimum: 3
+    maximum: 60
+  atr_multiplier:
+    type: number
+    label: 突破倍数
+    description: 通道扩张与突破系数
+    default: 2.0
+    minimum: 0.5
+    maximum: 5.0
+indicators:
+  mid_ma:
+    operator: sma
+    input: close
+    period: $trend_period
+    offset: 1
+  vol_atr:
+    operator: atr
+    period: $atr_period
+    offset: 1
+  atr_band:
+    operator: multiply
+    left: vol_atr
+    right: $atr_multiplier
+  upper_band:
+    operator: add
+    left: mid_ma
+    right: atr_band
+  trailing_stop:
+    operator: subtract
+    left: highest_since_entry
+    right: atr_band
+signals:
+  entry:
+    operator: greater_than
+    left: close
+    right: upper_band
+  exit:
+    operator: or
+    operands:
+      - operator: less_than
+        left: close
+        right: mid_ma
+      - operator: less_than
+        left: close
+        right: trailing_stop
+position:
+  mode: binary

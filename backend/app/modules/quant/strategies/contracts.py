@@ -80,6 +80,11 @@ class StrategyIndicatorDefinition(BaseModel):
         "divide",
         "obv",
         "shift",
+        "atr",
+        "momentum",
+        "min",
+        "max",
+        "abs",
     ]
     input: str | None = Field(default=None, min_length=1, max_length=64)
     volume_input: str | None = Field(default=None, min_length=1, max_length=64)
@@ -91,8 +96,8 @@ class StrategyIndicatorDefinition(BaseModel):
 
     @model_validator(mode="after")
     def validate_shape(self):
-        window_operators = {"sma", "ema", "rsi", "rolling_max", "rolling_min", "rolling_std", "shift"}
-        arithmetic_operators = {"add", "subtract", "multiply", "divide"}
+        window_operators = {"sma", "ema", "rsi", "rolling_max", "rolling_min", "rolling_std", "shift", "momentum"}
+        arithmetic_operators = {"add", "subtract", "multiply", "divide", "min", "max"}
         if any(type(value) is bool for value in (self.left, self.right, self.zero_value)):
             raise ValueError("指标操作数不能是布尔值")
         if self.operator in window_operators:
@@ -107,6 +112,16 @@ class StrategyIndicatorDefinition(BaseModel):
                 raise ValueError(f"{self.operator} 只能提供算术操作数")
             if self.zero_value is not None and self.operator != "divide":
                 raise ValueError("仅 divide 支持 zero_value")
+        elif self.operator == "atr":
+            if self.period is None:
+                raise ValueError("atr 必须提供 period")
+            if any(value is not None for value in (self.volume_input, self.left, self.right, self.zero_value)):
+                raise ValueError("atr 不支持算术或成交量字段")
+        elif self.operator == "abs":
+            if self.left is None and self.input is None:
+                raise ValueError("abs 必须提供 left 或 input")
+            if any(value is not None for value in (self.period, self.volume_input, self.right, self.zero_value)):
+                raise ValueError("abs 只能提供单一操作数")
         elif self.operator == "obv":
             if self.input is None or self.volume_input is None:
                 raise ValueError("obv 必须提供 input 和 volume_input")
@@ -180,7 +195,8 @@ class StrategyParameterConstraint(BaseModel):
 class StrategyPositionDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    mode: Literal["binary"] = "binary"
+    mode: Literal["binary", "continuous_weight"] = "binary"
+    target_weight: SignalOperand | None = None
 
 
 class StrategyPresentation(BaseModel):
@@ -192,7 +208,7 @@ class StrategyPresentation(BaseModel):
 class StrategyDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    api_version: Literal["quant.strategy/v1"]
+    api_version: Literal["quant.strategy/v1", "quant.strategy/v2"]
     key: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
     version: str = Field(pattern=r"^[0-9]+\.[0-9]+\.[0-9]+$")
     enabled: bool = True

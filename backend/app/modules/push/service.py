@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime
 
 from app.configuration import get_effective_settings
 from app.core.exceptions import ResourceNotFoundError
 from app.domain.content import ContentBlock
+from app.domain.timezones import market_now
 from app.infrastructure.integrations.feishu.adapter import to_feishu_card, to_feishu_doc_blocks
 from app.infrastructure.integrations.feishu.client import feishu_client
 from app.infrastructure.integrations.feishu.errors import FeishuConfigError
@@ -63,7 +63,7 @@ def _resolve_content(
     if request.type == "chat":
         if not request.chat_content.strip():
             raise ValueError("chat_content 不能为空")
-        title = request.chat_title or f"AI 对话 - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        title = request.chat_title or f"AI 对话 - {market_now().strftime('%Y-%m-%d %H:%M')}"
         return ResolvedPushContent(
             title=title,
             content=build_content("chat", request.chat_content),

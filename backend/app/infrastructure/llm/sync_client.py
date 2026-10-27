@@ -19,13 +19,22 @@ _POOL_MAXSIZE = 16
 
 
 class _OpenAICompatibleClient(adapters.OpenAICompatibleClient):
-    def __init__(self, api_key: str, base_url: str, model: str, timeout: float, capabilities: LLMCapabilities):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        model: str,
+        timeout: float,
+        capabilities: LLMCapabilities,
+        extra_body: dict | None = None,
+    ):
         super().__init__(
             api_key=api_key,
             base_url=base_url,
             model=model,
             timeout=timeout,
             capabilities=capabilities,
+            extra_body=extra_body,
             openai_factory=OpenAI,
             http_client_factory=httpx.Client,
         )
@@ -57,6 +66,7 @@ def _build_llm_client(client_spec: spec.LLMClientSpec) -> adapters.LLMClient:
             model=client_spec.model,
             timeout=client_spec.timeout,
             capabilities=client_spec.effective_capabilities,
+            extra_body=client_spec.extra_body,
         )
     return adapters.LiteLLMClient(
         api_key=client_spec.api_key,
@@ -65,6 +75,7 @@ def _build_llm_client(client_spec: spec.LLMClientSpec) -> adapters.LLMClient:
         timeout=client_spec.timeout,
         api_version=client_spec.api_version,
         capabilities=client_spec.effective_capabilities,
+        extra_body=client_spec.extra_body,
     )
 
 

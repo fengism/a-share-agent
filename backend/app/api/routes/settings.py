@@ -29,6 +29,7 @@ from app.modules.settings.public import (
     LlmModelsUnavailableError,
     UnknownChatCapabilityError,
     fetch_llm_models,
+    load_inherited_private_keys,
     load_user_settings,
     save_user_settings,
 )
@@ -36,7 +37,11 @@ from app.modules.settings.public import (
 router = APIRouter()
 
 
-def _to_response(settings, is_admin: bool = False) -> ConfigResponse:
+def _to_response(
+    settings,
+    is_admin: bool = False,
+    inherited_keys: list[str] | None = None,
+) -> ConfigResponse:
     """Convert effective settings to a masked API response."""
     values = settings.model_dump(include=CONFIG_VALUE_FIELDS)
     for key in SECRET_KEYS & CONFIG_VALUE_FIELDS:
@@ -45,6 +50,8 @@ def _to_response(settings, is_admin: bool = False) -> ConfigResponse:
         **values,
         provider_defaults=PROVIDER_DEFAULTS,
         is_admin=is_admin,
+        # 管理员的生效值就是全局基线本身，不存在"继承"概念
+        inherited_keys=[] if is_admin else list(inherited_keys or ()),
     )
 
 
@@ -63,7 +70,11 @@ async def get_config(user: AuthenticatedUser = Depends(require_active_user)) -> 
         settings = await load_user_settings(user["id"])
     except ConfigEncryptionError as error:
         raise _encryption_unavailable(error) from error
-    return _to_response(settings, is_admin=bool(user["is_admin"]))
+    return _to_response(
+        settings,
+        is_admin=bool(user["is_admin"]),
+        inherited_keys=await load_inherited_private_keys(user["id"]),
+    )
 
 
 @router.put("", response_model=ConfigResponse)
@@ -104,7 +115,11 @@ async def put_config(
         ) from error
     except ConfigEncryptionError as error:
         raise _encryption_unavailable(error) from error
-    return _to_response(result.settings, is_admin=bool(user["is_admin"]))
+    return _to_response(
+        result.settings,
+        is_admin=bool(user["is_admin"]),
+        inherited_keys=await load_inherited_private_keys(user["id"]),
+    )
 
 
 class ProxyTestRequest(BaseModel):

@@ -162,7 +162,7 @@ async def _load_valuation(code: str) -> StockValuation:
         if len(df) > 0:
             pe_ttm, pb, ps_ttm, pe_forward, peers = _parse_valuation_comparison(df, sym.raw)
     except Exception:
-        logger.info(f"估值数据获取失败，回退到基础信息: {sym.raw}")
+        logger.info('估值数据获取失败，回退到基础信息: %s', sym.raw)
 
     if pe_ttm is None or pb is None:
         try:
@@ -172,7 +172,7 @@ async def _load_valuation(code: str) -> StockValuation:
             if pb is None:
                 pb = basic_info.pb
         except Exception:
-            logger.info(f"基础信息估值回退失败: {sym.raw}")
+            logger.info('基础信息估值回退失败: %s', sym.raw)
 
     result = StockValuation(
         code=sym.raw,

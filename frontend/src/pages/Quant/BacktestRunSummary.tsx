@@ -1,8 +1,8 @@
 import { SettingOutlined } from "@ant-design/icons";
 import { Card, Descriptions, Tag, Typography } from "antd";
-import dayjs from "dayjs";
 import type { QuantBacktestRun } from "../../api/queries";
 import { useStyles, semanticTagStyle } from "../../styles/ui";
+import { formatMarketPattern } from "../../utils/marketTime";
 import { QUANT_RUN_STATUS_META, quantStrategyIdentity, quantStrategyParameterSummary, quantUniverseLabel } from "./quantRun";
 
 const { Text } = Typography;
@@ -47,12 +47,44 @@ export default function BacktestRunSummary({ run }: { run: QuantBacktestRun }) {
           size="small"
           column={1}
           items={[
-            { key: "created", label: "提交时间", children: dayjs.unix(run.created_at).format("YYYY-MM-DD HH:mm") },
+            { key: "created", label: "提交时间", children: formatMarketPattern(run.created_at, "YYYY-MM-DD HH:mm") },
             { key: "attempts", label: "执行次数", children: `${run.attempts} 次` },
             {
               key: "cash",
               label: "初始资金",
               children: execution ? `${currencyFormatter.format(execution.initial_cash)} 元` : "默认执行参数",
+            },
+            {
+              key: "allocation",
+              label: "资产配置",
+              children: execution?.allocation_method === "risk_parity" ? "风险平价 (Risk Parity 倒数波动率)" : "等权分配 (Equal Weight)",
+            },
+            {
+              key: "rebalance",
+              label: "调仓周期",
+              children: execution?.rebalance_frequency === "weekly" ? "每周首日" : execution?.rebalance_frequency === "monthly" ? "每月首日" : "每日",
+            },
+            {
+              key: "top_n",
+              label: "截面优选",
+              children: execution?.top_n_selection
+                ? `Top ${execution.top_n_selection} 只 (${
+                    execution.ranking_metric === "momentum"
+                      ? "动量优先"
+                      : execution.ranking_metric === "inverse_volatility"
+                      ? "低波优先"
+                      : execution.ranking_metric === "turnover"
+                      ? "活跃度优先"
+                      : "默认原序"
+                  })`
+                : "全选持仓 (不筛选)",
+            },
+            {
+              key: "slippage-model",
+              label: "滑点模型",
+              children: execution?.slippage_model === "square_root"
+                ? `平方根市场冲击 (基础 ${compactNumber(execution.slippage_bps)} BP · 系数 ${compactNumber(execution.market_impact_coefficient ?? 10)})`
+                : `固定滑点 (${compactNumber(execution?.slippage_bps ?? 5)} BP)`,
             },
             { key: "costs", label: "交易成本", children: costSummary },
             { key: "participation", label: "日成交额参与率", children: execution?.max_daily_participation_rate == null ? "不限制 / 旧版未记录" : `${compactNumber(execution.max_daily_participation_rate * 100)}%` },

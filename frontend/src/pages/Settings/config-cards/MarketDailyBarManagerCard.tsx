@@ -53,6 +53,7 @@ import type {
   MarketDailySegment,
 } from "../../../types/settings";
 import { summarizeRefreshResult } from "../marketDailyRefreshSummary";
+import { formatMarketDateTime } from "../../../utils/marketTime";
 import type { ConfigSectionProps } from "../sectionTypes";
 import "./market-daily-bar-manager.css";
 
@@ -737,7 +738,7 @@ export default function MarketDailyBarManagerCard({ form, onChange, onSave, isSa
             <div className="market-daily-factor__meta">
               <span>日线范围 {factorStatus.data.first_bar_date ?? "-"} ~ {factorStatus.data.last_bar_date ?? "-"}</span>
               <span>因子范围 {factorStatus.data.first_factor_date ?? "-"} ~ {factorStatus.data.last_factor_date ?? "-"}</span>
-              {factorStatus.data.last_checked_at ? <span>最近检查 {new Date(factorStatus.data.last_checked_at).toLocaleString()}</span> : null}
+              {factorStatus.data.last_checked_at ? <span>最近检查 {formatMarketDateTime(factorStatus.data.last_checked_at)}</span> : null}
               {factorStatus.data.algorithm_version ? <span>算法 {factorStatus.data.algorithm_version}</span> : null}
             </div>
             {factorStatus.data.last_error ? <div className="market-daily-factor__error">{factorStatus.data.last_error}</div> : null}

@@ -7,13 +7,16 @@ from app.modules.industry_chain.models import (
     IndustryChainCompetitionGroup,
     IndustryChainConflict,
     IndustryChainCoverage,
+    IndustryChainCycleAnalysis,
     IndustryChainEvent,
+    IndustryChainExpectationDivergence,
     IndustryChainInsight,
     IndustryChainMetric,
     IndustryChainNode,
     IndustryChainRelationship,
     IndustryChainSource,
     IndustryChainThesis,
+    IndustryChainValueDistribution,
 )
 from app.modules.industry_chain.templates import research_guidance
 
@@ -50,7 +53,12 @@ SYSTEM_PROMPT = """你是一位严谨的产业研究分析师。请把输入的�
 - relationships 最多 12 条，source_node / target_node 必须是本报告中的环节或公司名称。供货/采购/替代/竞争关系必须有本次来源；利润传导只能写定性推断，标为 inference，不得编造影响比例。
 - 每条关系说明 impact_direction、传导机制 detail、conditions 和 invalidation；明确利好/利空针对目标节点，不能从相关性断言因果。
 - 重点公司填写 business_relevance：concept 仅布局、business 已有产品/客户/订单、earnings 可验证收入/利润贡献；无法确认用 unverified。收入占比 revenue_share 与统计期 revenue_period 必须来自引用原文，无法确认留空。
-- 每家公司列 benefit_path、realization_conditions、invalidation_conditions、tracking_metrics。条件和跟踪指标属于研究假设而不是已发生事实，证据不足不做确定性受益判断。
+- 每家公司列 benefit_path、realization_conditions、invalidation_conditions、tracking_metrics。条件和跟踪指标属于研究假设而不是已发生事实，证据不足不做确定性受益判断。如有材料，补充毛利率 gross_margin、核心壁垒 moat 及业绩利润弹性看点 eps_elasticity。
+
+## 深度投研机制（价值量拆解、供需周期与预期差）
+- value_distribution 最多 6 条：提炼产业链中各环节的 BOM 成本/单机价值量占比 cost_share、毛利率区间 gross_margin_range、利润池占比 profit_share、议价权定价能力 pricing_power（high/medium/low），并简述技术与壁垒 detail。
+- cycle_analysis 提炼：周期所处阶段 stage（如主动补库/产能出清/供需紧平衡）、产能利用率 capacity_utilization、扩产与认证周期 expansion_lead_time、供需缺口拐点 inflection_point，以及成本顺价传导能力与毛利弹性 pass_through_ability。无明确材料时留空，不编造。
+- expectation_divergences 最多 3 条：明确指出当前市场主流一致预期 consensus 与本次深入推演的分歧/审慎判断 divergence，并列出验证该预期差的核心催化指标与时间窗口 catalyst_trigger。
 
 ## 核心研究判断（深度优先，禁止凑数）
 - research_theses 最多 3 条，围绕本行业最重要的经营矛盾，不复述上下游名单。每条包含判断 title/detail、机制 mechanism、成立条件 conditions、反向证据 counter_evidence、失效条件 invalidation、跟踪指标 tracking_metrics 和相关公司 beneficiaries。
@@ -108,6 +116,9 @@ class IndustryChainPromptOutput(BaseModel):
     key_events: list[IndustryChainEvent] = Field(default_factory=list)
     key_stocks: list[IndustryChainNode] = Field(default_factory=list)
     relationships: list[IndustryChainRelationship] = Field(default_factory=list)
+    value_distribution: list[IndustryChainValueDistribution] = Field(default_factory=list)
+    cycle_analysis: IndustryChainCycleAnalysis = Field(default_factory=IndustryChainCycleAnalysis)
+    expectation_divergences: list[IndustryChainExpectationDivergence] = Field(default_factory=list)
     sources: list[IndustryChainSource] = Field(default_factory=list)
     coverage: IndustryChainCoverage = Field(default_factory=IndustryChainCoverage)
     missing_evidence: list[str] = Field(default_factory=list)

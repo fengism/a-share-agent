@@ -33,6 +33,14 @@ export type ProgressHandler = (event: AnalysisProgress) => void;
 
 const isDev = import.meta.env.DEV;
 const MAX_RECONNECT_ATTEMPTS = 4;
+
+/** 流式重连次数耗尽：任务仍在服务端运行，仅本端放弃实时跟随。 */
+export class StreamInterruptedError extends Error {
+  constructor() {
+    super("连接中断，后台任务仍在运行");
+    this.name = "StreamInterruptedError";
+  }
+}
 const RECONNECT_BASE_DELAY_MS = 250;
 
 interface WorkflowSubmission {
@@ -326,11 +334,11 @@ function streamWorkflow<Result, Progress>(
           if (cancelRequested || detached || isAbortError(error)) throw error;
           if (error instanceof SSEPayloadError) throw error;
           if (error instanceof SSERequestError && !error.retryable) throw error;
-          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) throw error;
+          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) throw new StreamInterruptedError();
         }
         if (terminal) break;
         if (!madeProgress && reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          throw new Error("连接已结束但未返回结果");
+          throw new StreamInterruptedError();
         }
         const delay = RECONNECT_BASE_DELAY_MS * (2 ** reconnectAttempts);
         reconnectAttempts += 1;
@@ -447,20 +455,26 @@ export interface DailyReviewProgress {
   result?: DailyReviewResult;
 }
 
+function dailyReviewTerminal(
+  event: DailyReviewProgress,
+): WorkflowTerminal<DailyReviewResult> | null {
+  if (event.type === "complete" && event.result) return { status: "resolved", result: event.result };
+  if (event.type === "error") return { status: "rejected", error: new Error(event.message || "每日复盘生成失败") };
+  return null;
+}
+
 export function streamDailyReview(
   request: DailyReviewRequest,
   onProgress: (event: DailyReviewProgress) => void,
 ): WorkflowStream<DailyReviewResult> {
-  return streamWorkflow(
-    "/workflows/daily-review",
-    onProgress,
-    (event) => {
-      if (event.type === "complete" && event.result) return { status: "resolved", result: event.result };
-      if (event.type === "error") return { status: "rejected", error: new Error(event.message || "每日复盘生成失败") };
-      return null;
-    },
-    { body: request },
-  );
+  return streamWorkflow("/workflows/daily-review", onProgress, dailyReviewTerminal, { body: request });
+}
+
+export function resumeDailyReview(
+  jobId: string,
+  onProgress: (event: DailyReviewProgress) => void,
+): WorkflowStream<DailyReviewResult> {
+  return resumeWorkflow(jobId, onProgress, dailyReviewTerminal);
 }
 
 function industryChainTerminal(

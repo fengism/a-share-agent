@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from app.core.cache import dated_cache_key
@@ -13,6 +13,7 @@ from app.core.cache import market_cache as cache
 from app.core.concurrency.rate_limiter import nbs_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
 from app.core.market import market_today
+from app.domain.timezones import market_now
 from app.financial_data.market.macro.schemas import (
     MacroFeedItem,
     MacroFeedResponse,
@@ -196,7 +197,7 @@ async def _load_macro_feed(days: int) -> MacroFeedResponse:
         policy_news=_to_feed_items(sections["policy_news"]),
         policy_readings=_to_feed_items(sections["policy_readings"]),
         rates=rates,
-        updated_at=datetime.now().isoformat(timespec="seconds"),
+        updated_at=market_now().isoformat(timespec="seconds"),
         status=status,
         failed_sources=failed,
     )

@@ -12,6 +12,7 @@ import { useColors, useTokens, semanticTagStyle } from "../../styles/ui";
 import type { MarketLimitHistoryCategory, MarketLimitHistoryItem } from "../../types/stock";
 import { normalizeIsoDate } from "../../utils/date";
 import { formatAmount } from "../../utils/format";
+import { formatMarketDateTime } from "../../utils/marketTime";
 
 const { Text, Title } = Typography;
 const HISTORY_CATEGORIES = ["limit_up", "limit_down", "wind_vane"] as const;
@@ -23,9 +24,7 @@ const CATEGORY_LABELS: Record<MarketLimitHistoryCategory, string> = {
 
 function formatFetchedAt(value: string | undefined) {
   if (!value) return "-";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString("zh-CN", { hour12: false });
+  return formatMarketDateTime(value, value);
 }
 
 function formatRate(value: number | null) {

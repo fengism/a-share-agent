@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 from uuid import uuid4
@@ -250,7 +250,21 @@ class WorkflowJobStore:
 
     def _expire_terminal_leases(self, now: float) -> None:
         message = "Workflow 租约过期且已达到最大重试次数"
-        with unit_of_work(connection=self._connection_provider(), immediate=True) as work:
+        # claim 前置调用：绝大多数轮询没有可过期的运行中任务，先只读探测，
+        # 避免每次 claim 都开 BEGIN IMMEDIATE 写事务去争抢写锁。
+        connection = self._connection_provider()
+        has_expired = connection.execute(
+            """
+            SELECT 1 FROM workflow_jobs
+            WHERE status = 'running' AND lease_until IS NOT NULL
+              AND lease_until <= ? AND attempts >= max_attempts
+            LIMIT 1
+            """,
+            (now,),
+        ).fetchone()
+        if has_expired is None:
+            return
+        with unit_of_work(connection=connection, immediate=True) as work:
             connection = work.connection
             rows = connection.execute(
                 """
@@ -419,6 +433,64 @@ class WorkflowJobStore:
                 (job_id, attempt, sequence, event_type, serialized, current_time),
             )
         return WorkflowEvent(job_id, attempt, sequence, event_type, payload, current_time)
+
+    def append_events(
+        self,
+        job_id: str,
+        owner_id: str,
+        events: Sequence[tuple[str, dict[str, Any]]],
+        *,
+        now: float | None = None,
+    ) -> list[WorkflowEvent]:
+        """在同一写事务内批量追加进度事件，返回持久化后的列表。
+
+        长任务（产业分析等）事件密集，逐条 append_event 每条各开一个
+        BEGIN IMMEDIATE 事务，写放大明显；批量版本一次校验租约、一次取
+        起始 sequence 后 executemany，任一校验失败整体不入库。
+        """
+        if not events:
+            return []
+        current_time = time.time() if now is None else now
+        serialized = [
+            (str(event_type), json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str))
+            for event_type, payload in events
+        ]
+        with unit_of_work(connection=self._connection_provider(), immediate=True) as work:
+            connection = work.connection
+            job = connection.execute(
+                """
+                SELECT attempts FROM workflow_jobs
+                WHERE id = ? AND status = 'running' AND lease_owner = ?
+                  AND lease_until > ?
+                """,
+                (job_id, owner_id, current_time),
+            ).fetchone()
+            if job is None:
+                raise WorkflowLeaseLostError(f"Workflow Job 租约已失效: {job_id}")
+            attempt = int(job["attempts"])
+            sequence = _next_event_sequence(connection, job_id, attempt)
+            connection.executemany(
+                """
+                INSERT INTO workflow_job_events(
+                    job_id, attempt, sequence, event_type, payload_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (job_id, attempt, sequence + offset, event_type, payload_json, current_time)
+                    for offset, (event_type, payload_json) in enumerate(serialized)
+                ],
+            )
+        return [
+            WorkflowEvent(
+                job_id=job_id,
+                attempt=attempt,
+                sequence=sequence + offset,
+                event_type=event_type,
+                payload=events[offset][1],
+                created_at=current_time,
+            )
+            for offset, (event_type, _) in enumerate(serialized)
+        ]
 
     def list_events(
         self,

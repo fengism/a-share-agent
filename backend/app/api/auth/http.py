@@ -110,6 +110,10 @@ def auth_error_to_http(error: AuthServiceError) -> ApiError:
         return response(400, "原密码错误")
     if code == AuthErrorCode.UNCHANGED_PASSWORD:
         return response(400, "新密码不能与原密码相同")
+    if code == AuthErrorCode.WEAK_PASSWORD:
+        return response(400, error.reason or "密码强度不足")
+    if code == AuthErrorCode.SETUP_TOKEN_INVALID:
+        return response(403, "部署口令无效：请填写部署时配置的 ADMIN_SETUP_TOKEN")
     if code == AuthErrorCode.INVITE_NOT_FOUND:
         return response(404, "邀请码不存在")
     if code == AuthErrorCode.INVITE_USED:

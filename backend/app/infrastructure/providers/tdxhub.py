@@ -27,6 +27,7 @@ from app.core.market import (
     safe_string,
 )
 from app.core.timezones import SHANGHAI_TIMEZONE
+from app.domain.timezones import market_now
 
 logger = logging.getLogger(__name__)
 
@@ -399,7 +400,7 @@ class TdxhubDataProvider:
         if not isinstance(frame, pd.DataFrame) or frame.empty:
             return {}
         quotes: dict[str, dict[str, Any]] = {}
-        quoted_at = datetime.now().isoformat(timespec="seconds")
+        quoted_at = market_now().isoformat(timespec="seconds")
         for row in frame.to_dict("records"):
             quote = _parse_quote_row(row, requested_codes, quoted_at)
             if quote is not None:

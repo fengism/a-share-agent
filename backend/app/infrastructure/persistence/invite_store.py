@@ -9,8 +9,8 @@ def _connection():
 def create_invite(created_by: int, code: str, expires_at: str | None = None) -> dict:
     with unit_of_work("user", immediate=True) as work:
         work.connection.execute(
-            "INSERT INTO invites (code, created_by, expires_at) VALUES (?, ?, ?)",
-            (code, created_by, expires_at),
+            "INSERT INTO invites (code, created_by, expires_at, created_at) VALUES (?, ?, ?, ?)",
+            (code, created_by, expires_at, now_ts()),
         )
     return get_invite(code)
 
@@ -67,8 +67,11 @@ def cleanup_expired_invites() -> int:
 def create_password_reset(user_id: int, created_by: int, token: str, expires_at: str) -> None:
     with unit_of_work("user", immediate=True) as work:
         work.connection.execute(
-            "INSERT INTO password_resets (token_hash, user_id, created_by, expires_at) VALUES (?, ?, ?, ?)",
-            (hash_token(token), user_id, created_by, expires_at),
+            """
+            INSERT INTO password_resets (token_hash, user_id, created_by, expires_at, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (hash_token(token), user_id, created_by, expires_at, now_ts()),
         )
 
 

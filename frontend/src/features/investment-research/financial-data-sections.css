@@ -123,3 +123,27 @@
   font-size: var(--stock-research-label-size);
   line-height: var(--c-leading-normal);
 }
+
+@media (max-width: 767px) {
+  .financial-data-sections {
+    gap: 10px;
+  }
+  .financial-statement-table-wrap {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .financial-data-sections .ant-table {
+    font-size: 11.5px;
+  }
+  .financial-data-sections .ant-table-thead > tr > th,
+  .financial-data-sections .terminal-table-row td,
+  .financial-data-sections .ant-table-tbody > tr > td {
+    padding: 6px 8px !important;
+  }
+  .financial-revenue-card .ant-card-body {
+    padding: 8px 10px;
+  }
+  .financial-statement-section {
+    margin-bottom: 12px;
+  }
+}

@@ -17,6 +17,7 @@ import pandas as pd
 import requests
 
 from app.core.market import market_today
+from app.domain.timezones import market_now
 from app.infrastructure.http.client import provider_get, provider_post
 
 API_BASE = "https://data.stats.gov.cn/dg/website/publicrelease/web/external"
@@ -278,7 +279,7 @@ def _period_label(code: str, freq: str) -> str | None:
 
 
 def _shibor_history_window() -> tuple[datetime, datetime]:
-    end_date = datetime.now()
+    end_date = market_now()
     start_month_index = end_date.year * 12 + end_date.month - 1 - 2
     start_year, start_month = divmod(start_month_index, 12)
     return end_date.replace(year=start_year, month=start_month + 1, day=1), end_date

@@ -288,15 +288,15 @@ def _load_stock_name_file() -> StockNameMapSnapshot | None:
                 source_id = LEGACY_STOCK_NAMES_SOURCE_ID
                 source_overrides = {}
             if isinstance(mapping, dict) and len(mapping) >= _STOCK_NAME_MAP_MIN_SIZE:
-                logger.info(f"从本地文件加载股票名称映射: {len(mapping)} 只")
+                logger.info('从本地文件加载股票名称映射: %s 只', len(mapping))
                 return StockNameMapSnapshot(
                     mapping={str(code): str(name) for code, name in mapping.items()},
                     default_source_id=source_id,
                     source_overrides=source_overrides,
                 )
-            logger.info(f"本地文件映射不足({len(mapping) if isinstance(mapping, dict) else 0}只)，需重新获取")
+            logger.info('本地文件映射不足(%s只)，需重新获取', len(mapping) if isinstance(mapping, dict) else 0)
     except Exception as e:
-        logger.warning(f"读取本地股票名称文件失败: {e}")
+        logger.warning('读取本地股票名称文件失败: %s', e)
     return None
 
 
@@ -316,10 +316,10 @@ def _load_stock_name_map_from_spot_snapshot() -> StockNameMapSnapshot | None:
         valid = df["代码"].notna() & df["名称"].notna()
         mapping = dict(zip(df.loc[valid, "代码"].astype(str), df.loc[valid, "名称"].astype(str)))
         if len(mapping) >= _STOCK_NAME_MAP_MIN_SIZE:
-            logger.info(f"从本地快照文件加载股票名称映射: {len(mapping)} 只")
+            logger.info('从本地快照文件加载股票名称映射: %s 只', len(mapping))
             return StockNameMapSnapshot.from_source(mapping, get_spot_source(df))
     except Exception as e:
-        logger.warning(f"从本地快照文件加载股票名称映射失败: {e}")
+        logger.warning('从本地快照文件加载股票名称映射失败: %s', e)
     return None
 
 
@@ -341,9 +341,9 @@ def _save_stock_name_file(snapshot: StockNameMapSnapshot) -> None:
             _STOCK_NAME_FILE,
             json.dumps(payload, ensure_ascii=False, indent=2),
         )
-        logger.info(f"股票名称映射已保存到本地文件: {len(snapshot.mapping)} 只")
+        logger.info('股票名称映射已保存到本地文件: %s 只', len(snapshot.mapping))
     except Exception as e:
-        logger.warning(f"保存本地股票名称文件失败: {e}")
+        logger.warning('保存本地股票名称文件失败: %s', e)
 
 
 def _load_local_stock_name_map() -> StockNameMapSnapshot | None:
@@ -366,9 +366,9 @@ def _mapping_from_stocks(stocks: list[dict], source: str) -> dict[str, str]:
         if stock.get("code") and stock.get("name")
     }
     if len(mapping) >= _STOCK_NAME_MAP_MIN_SIZE:
-        logger.info(f"股票名称映射({source}): {len(mapping)} 只")
+        logger.info('股票名称映射(%s): %s 只', source, len(mapping))
         return mapping
-    logger.info(f"{source}股票列表不足({len(mapping)}只)")
+    logger.info('%s股票列表不足(%s只)', source, len(mapping))
     return {}
 
 
@@ -378,7 +378,7 @@ def _stock_name_file_needs_refresh() -> bool:
             return True
         return bool(time() - _STOCK_NAME_FILE.stat().st_mtime > _STOCK_NAME_FILE_MAX_AGE_SECONDS)
     except OSError as e:
-        logger.warning(f"检查本地股票名称文件新鲜度失败: {e}")
+        logger.warning('检查本地股票名称文件新鲜度失败: %s', e)
         return True
 
 
@@ -561,7 +561,7 @@ async def _refresh_stock_name_map() -> None:
     if snapshot is None or not snapshot.mapping:
         raise RuntimeError("远程股票名称映射为空")
     await _cache_and_persist_stock_name_map(snapshot)
-    logger.info(f"股票名称映射后台刷新完成: {len(snapshot.mapping)} 只")
+    logger.info('股票名称映射后台刷新完成: %s 只', len(snapshot.mapping))
 
 
 async def build_stock_name_map() -> None:

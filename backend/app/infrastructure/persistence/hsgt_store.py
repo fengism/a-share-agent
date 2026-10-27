@@ -28,7 +28,7 @@ def save_hsgt_flow(date: str, points: list[dict], updated_at: str) -> None:
             "VALUES (?, ?, ?, ?, ?, ?)",
             rows,
         )
-    logger.debug(f"写入北向数据: date={date}, rows={len(rows)}")
+    logger.debug('写入北向数据: date=%s, rows=%s', date, len(rows))
 
 
 def query_hsgt_flow(date: str) -> list[dict]:

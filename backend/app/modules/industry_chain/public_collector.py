@@ -415,36 +415,60 @@ async def collect_public_industry_data(
         return payload
 
     needs_market_context = bool(requested & {"market", "competition", "events"})
-    market_payload: dict = {}
-    if needs_market_context:
-        try:
-            market_payload = await load_dimension("market", collect_market)
-        except Exception:
-            failed_dimensions.append("market")
-        else:
-            if "market" in requested:
-                dimension_payloads["market"] = market_payload
-    matched_sectors = list((market_payload.get("market_data") or {}).get("matched_sectors") or [])
+    independent_dimensions = [
+        dim for dim in sorted(requested) if dim in {"stocks", "technology", "chain", "drivers_risks", "reports"}
+    ]
 
-    collectors: dict[str, Callable[[], Awaitable[dict]]] = {
+    independent_collectors: dict[str, Callable[[], Awaitable[dict]]] = {
         "stocks": collect_stocks,
-        "competition": lambda: collect_competition(matched_sectors),
         "technology": collect_technology,
         "chain": collect_chain,
         "drivers_risks": collect_drivers_risks,
         "reports": collect_reports,
-        "events": lambda: collect_events(matched_sectors),
     }
-    selected = [dimension for dimension in sorted(requested) if dimension != "market"]
-    outcomes = await asyncio.gather(
-        *(load_dimension(dimension, collectors[dimension]) for dimension in selected),
-        return_exceptions=True,
-    )
-    for dimension, outcome in zip(selected, outcomes):
-        if isinstance(outcome, Exception):
-            failed_dimensions.append(dimension)
-            continue
-        dimension_payloads[dimension] = outcome
+
+    # 阶段一：解耦并行——同时并发执行所有独立维度与 market 维度
+    first_wave_tasks: list[tuple[str, Awaitable[dict]]] = [
+        (dim, load_dimension(dim, independent_collectors[dim])) for dim in independent_dimensions
+    ]
+    if needs_market_context:
+        first_wave_tasks.append(("market", load_dimension("market", collect_market)))
+
+    market_payload: dict = {}
+    if first_wave_tasks:
+        first_wave_outcomes = await asyncio.gather(
+            *(task for _, task in first_wave_tasks),
+            return_exceptions=True,
+        )
+        for (dim, _), outcome in zip(first_wave_tasks, first_wave_outcomes):
+            if isinstance(outcome, Exception):
+                failed_dimensions.append(dim)
+                continue
+            if dim == "market":
+                market_payload = outcome
+                if "market" in requested:
+                    dimension_payloads["market"] = outcome
+            else:
+                dimension_payloads[dim] = outcome
+
+    matched_sectors = list((market_payload.get("market_data") or {}).get("matched_sectors") or [])
+
+    # 阶段二：并行采集依赖 matched_sectors 的维度（competition, events）
+    dependent_dimensions = [dim for dim in sorted(requested) if dim in {"competition", "events"}]
+    if dependent_dimensions:
+        dependent_collectors: dict[str, Callable[[], Awaitable[dict]]] = {
+            "competition": lambda: collect_competition(matched_sectors),
+            "events": lambda: collect_events(matched_sectors),
+        }
+        dependent_outcomes = await asyncio.gather(
+            *(load_dimension(dim, dependent_collectors[dim]) for dim in dependent_dimensions),
+            return_exceptions=True,
+        )
+        for dim, outcome in zip(dependent_dimensions, dependent_outcomes):
+            if isinstance(outcome, Exception):
+                failed_dimensions.append(dim)
+                continue
+            dimension_payloads[dim] = outcome
 
     combined: dict[str, Any] = {
         "research_scope": resolved_scope.model_dump(mode="json", exclude_none=True, exclude={"refresh_dimensions"}),

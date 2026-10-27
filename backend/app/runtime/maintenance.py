@@ -39,7 +39,43 @@ def _run_cleanup(
     return result.deleted
 
 
-def purge_expired_auth_data() -> dict[str, int]:
+def _run_int_cleanup(database: str, name: str, cleanup: Callable[[], int]) -> int:
+    """清理函数只返回删除行数时的指标包装（``_run_cleanup`` 需要 PurgeResult）。"""
+    started_at = perf_counter()
+    try:
+        deleted = cleanup()
+    except Exception as error:
+        metrics.record_persistence_operation(
+            database,
+            f"retention.{name}",
+            success=False,
+            duration_ms=(perf_counter() - started_at) * 1000,
+            error_type=type(error).__name__,
+        )
+        raise
+    metrics.record_persistence_operation(
+        database,
+        f"retention.{name}",
+        success=True,
+        duration_ms=(perf_counter() - started_at) * 1000,
+        processed=deleted,
+        pending=False,
+    )
+    return deleted
+
+
+def purge_expired_auth_data(
+    *,
+    login_audit_retention_days: int = 0,
+    admin_audit_retention_days: int = 0,
+) -> dict[str, int]:
+    """清理过期会话/重置令牌，并按保留期裁剪两张审计表。
+
+    ``login_audit_logs`` 记录所有登录尝试（公网扫描器会持续写入），
+    ``admin_audit_logs`` 记录管理员操作；``*_retention_days <= 0`` 表示永久保留。
+    """
+    from app.infrastructure.persistence import account_store
+    from app.infrastructure.persistence.admin_audit_store import purge_admin_actions
     from app.infrastructure.persistence.session_store import purge_expired_with_status
 
     started_at = perf_counter()
@@ -64,7 +100,20 @@ def purge_expired_auth_data() -> dict[str, int]:
             processed=result.deleted,
             pending=result.has_more,
         )
-    return {name: result.deleted for name, result in results.items()}
+    purged = {name: result.deleted for name, result in results.items()}
+    if login_audit_retention_days > 0:
+        purged["login_audit_logs"] = _run_int_cleanup(
+            "user",
+            "login_audit_logs",
+            lambda: account_store.purge_login_audit_logs(login_audit_retention_days),
+        )
+    if admin_audit_retention_days > 0:
+        purged["admin_audit_logs"] = _run_int_cleanup(
+            "user",
+            "admin_audit_logs",
+            lambda: purge_admin_actions(admin_audit_retention_days),
+        )
+    return purged
 
 
 def purge_expired_runtime_data(

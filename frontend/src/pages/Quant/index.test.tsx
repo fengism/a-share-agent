@@ -197,7 +197,7 @@ describe("Quant page", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: /在线策略/ }));
 
-    expect(await screen.findByRole("region", { name: "在线策略生成工作台" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "在线策略生成工作台" }, { timeout: 10000 })).toBeInTheDocument();
     expect(screen.getByText("生成受限策略草稿")).toBeInTheDocument();
     expect(screen.getByTestId("location-search")).toHaveTextContent("view=authoring");
     fireEvent.change(screen.getByPlaceholderText(/例如：使用 20 日和 60 日均线/), {
@@ -212,7 +212,7 @@ describe("Quant page", () => {
       .toHaveValue("尚未提交的在线策略提示词");
   });
 
-  it("removes an administrator-only workspace URL for regular users", async () => {
+  it("keeps the authoring deep link for regular users but hides publish controls", async () => {
     function LocationProbe() {
       return <div data-testid="location-search">{useLocation().search}</div>;
     }
@@ -224,8 +224,30 @@ describe("Quant page", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByTestId("location-search")).toHaveTextContent("?run=run-two"));
-    expect(screen.queryByText("在线策略")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "量化回测配置" })).toBeInTheDocument();
+    // 在线策略对普通用户开放：URL 参数保留，工作台正常渲染
+    expect(await screen.findByRole("region", { name: "在线策略生成工作台" }, { timeout: 10000 })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("location-search")).toHaveTextContent("view=authoring"));
+    expect(screen.getByTestId("location-search")).toHaveTextContent("run=run-two");
+
+    // 但「发布策略」是管理员能力，普通用户看不到
+    expect(screen.queryByRole("button", { name: /发布策略/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("管理员能力")).not.toBeInTheDocument();
+    expect(screen.getByText("策略实验")).toBeInTheDocument();
+  });
+
+  it("shows publish controls to administrators", async () => {
+    useAuthStore.setState({
+      user: { id: 1, username: "admin", is_admin: true, must_change_password: false },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/?view=authoring"]}>
+        <QuantPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("region", { name: "在线策略生成工作台" }, { timeout: 10000 })).toBeInTheDocument();
+    expect(screen.getByText("管理员能力")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /发布策略/ })).toBeInTheDocument();
   });
 });

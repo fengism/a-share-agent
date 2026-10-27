@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button, Input, Modal, Switch, Upload } from "antd";
+import { useAuthStore } from "../../../store/authStore";
 import { useColors } from "../../../styles/ui";
 import { IMPORT_PLACEHOLDER } from "./constants";
 
@@ -15,21 +16,27 @@ export function AtlasImportModal({
   onSubmit: (content: string, overwrite: boolean) => void;
 }) {
   const colors = useColors();
+  const isAdmin = useAuthStore((s) => s.user?.is_admin ?? false);
   const [content, setContent] = useState("");
   const [overwrite, setOverwrite] = useState(false);
 
   return (
     <Modal
-      title="导入产业链知识库"
+      title={isAdmin ? "导入产业链知识库" : "导入个人专属产业链"}
       open={open}
       onCancel={onClose}
       onOk={() => onSubmit(content, overwrite)}
-      okText="导入"
+      okText={isAdmin ? "导入公共知识库" : "导入个人知识库"}
       okButtonProps={{ disabled: !content.trim() || importing }}
       confirmLoading={importing}
       width="min(720px, calc(100vw - 24px))"
       destroyOnClose
     >
+      <div style={{ marginBottom: 12, color: colors.textSecondary, fontSize: "var(--c-font-sm)" }}>
+        {isAdmin
+          ? "导入的产业链定义将存入全站公共知识库，供所有用户查看与分析先验参考。"
+          : "导入的产业链定义将存入您的个人专属知识库，仅您可见，并在您执行该主题分析时作为专属先验知识。"}
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
         <Upload
           accept=".yaml,.yml,.json,.txt"

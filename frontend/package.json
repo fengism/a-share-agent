@@ -11,7 +11,7 @@
     "api:generate:financial-labels": "node scripts/generate-financial-field-labels.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint . && node scripts/check-page-boundaries.mjs",
+    "lint": "eslint . && node scripts/check-page-boundaries.mjs && node scripts/check-market-time.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
@@ -53,5 +53,8 @@
     "typescript-eslint": "^8.11.0",
     "vite": "^5.4.10",
     "vitest": "^2.1.9"
+  },
+  "overrides": {
+    "dompurify": "^3.4.17"
   }
 }

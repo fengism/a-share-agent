@@ -472,7 +472,7 @@ class AgentExecutor:
                 profile, state, [tool_calls[index] for index in indices],
                 [cache_keys[index] for index in indices],
                 [prepared_arguments[index] for index in indices], emit,
-                execution_context, tool_call_reserve, capabilities,
+                execution_context, tool_call_reserve,
             )
             completed_indices.extend(indices)
         # Execution may prioritize reads or grouped duplicates; model-visible
@@ -491,7 +491,6 @@ class AgentExecutor:
         emit: Callable[[AgentEvent], Awaitable[None]],
         execution_context: AgentExecutionContext | None,
         tool_call_reserve: int,
-        capabilities: LLMCapabilities,
     ) -> None:
         tool_results, accepted_calls, rejected_calls = await self._classify_tool_calls(
             state,
@@ -527,24 +526,22 @@ class AgentExecutor:
                         execution_context.settle_tool_reservation(reservation, shared=shared)
                     ))
 
+        # 本地并发与 ``capabilities.parallel_tool_calls`` 无关：那个能力位描述的是
+        # "模型能否在一条回复里发多个 tool call"，而这里的多个调用已经在手上了，
+        # 串行执行只是把整轮延迟乘以调用数（聚合/自建网关的该位为 False，最坏
+        # 单轮 16 个调用全部排队）。真正的并发上限由各工具自己的 ToolPolicy
+        # 信号量、共享缓存合并和限流器约束。
         tasks: list[asyncio.Task[tuple[ToolResultInfo, bool]]] = []
         try:
-            if capabilities.parallel_tool_calls:
-                tasks = [
-                    asyncio.create_task(
-                        execute_accepted(
-                            call, reservation, cache_keys[index], prepared_arguments[index]
-                        )
-                    )
-                    for index, call, reservation in accepted_calls
-                ]
-                accepted_pairs = await asyncio.gather(*tasks)
-            else:
-                accepted_pairs = []
-                for index, call, reservation in accepted_calls:
-                    accepted_pairs.append(await execute_accepted(
+            tasks = [
+                asyncio.create_task(
+                    execute_accepted(
                         call, reservation, cache_keys[index], prepared_arguments[index]
-                    ))
+                    )
+                )
+                for index, call, reservation in accepted_calls
+            ]
+            accepted_pairs = await asyncio.gather(*tasks)
         finally:
             async def settle_unstarted() -> None:
                 for task in tasks:
@@ -1186,6 +1183,10 @@ class AgentExecutor:
                     registry,
                     allowed_names=state.effective_tool_names,
                 )
+                if tool_calls:
+                    # 模型没走原生 tool_calls、靠正文方言发起：说明该网关/模型需要
+                    # 关注（可能要配 override 或换模型），必须可观测而不是只留 warning。
+                    metrics.record_agentic_event("agent_pseudo_tool_call")
             if not tool_calls:
                 # 没被执行（方言不认识、或工具已被预算收走）的标记绝不能当结论给用户：
                 # 真实事故里用户收到的「回答」是一串 <｜DSML｜invoke ...>。
@@ -1201,6 +1202,7 @@ class AgentExecutor:
                     # 部分模型在 auto 模式下只叙述"正在调用工具"而不真正发起
                     # tool_calls；补一轮强制要求调用工具，仍失败才按无证据处理。
                     forced_tool_round = True
+                    metrics.record_agentic_event("agent_forced_tool_round")
                     continue
                 if require_tool_evidence and not any(
                     result.evidence_state.usable_context for result in state.tool_results

@@ -473,10 +473,10 @@ async def research_industry_chain(
     spec = replace(
         INDUSTRY_CHAIN_RESEARCH_SPEC,
         max_rounds=max_rounds,
-        max_tool_turns=10,
+        max_tool_turns=16,
         **search_policy_limits(total_calls),
         reserved_tool_names=BODY_TOOLS,
-        reserved_tool_calls=min(28, total_calls // 3),
+        reserved_tool_calls=min(48, total_calls // 3),
         requirements=(
             *INDUSTRY_CHAIN_RESEARCH_SPEC.requirements,
             *(

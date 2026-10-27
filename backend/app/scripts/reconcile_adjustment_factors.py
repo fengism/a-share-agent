@@ -19,10 +19,11 @@ import argparse
 import json
 import sys
 from dataclasses import dataclass, field
-from datetime import date
 from typing import Any
 
 import pandas as pd
+
+from app.domain.timezones import market_today
 
 # 因子序列的"跳变点"就是除权日；每段只取末值即可还原阶梯函数。
 _SOURCE_LABELS = ("tdx_xdxr", "sina", "tencent", "eastmoney")
@@ -370,7 +371,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="复权因子对账（只读）")
     parser.add_argument("--codes", default="600519", help="逗号分隔的股票代码")
     parser.add_argument("--start", default="2019-01-01")
-    parser.add_argument("--end", default=date.today().isoformat())
+    parser.add_argument("--end", default=market_today().isoformat())
     parser.add_argument("--tol", type=float, default=0.005, help="事件级步长偏差告警阈值")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
     args = parser.parse_args(argv)

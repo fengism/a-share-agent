@@ -7,7 +7,7 @@ from typing import Any
 from app.agentic.agents.contracts import AgentProfile
 from app.agentic.agents.executor import _MAX_REPLAY_REASONING_CHARACTERS, AgentExecutor
 from app.agentic.catalog import registry
-from app.agentic.protocol import ToolResultInfo
+from app.agentic.protocol import ToolCallFunction, ToolCallInfo, ToolResultInfo
 from app.agentic.runtime.context import AgentExecutionContext
 from app.agentic.tools.contracts import ToolPolicy
 from app.agentic.tools.serialization import serialize_error
@@ -653,3 +653,135 @@ async def test_assistant_message_cleans_pseudo_tool_markup(monkeypatch):
     # 伪标记被剥离，避免污染后续轮次 prompt
     assert assistant_messages[0].get("content") is None
     assert any("模型以正文形式输出了工具调用标记" in warning for warning in result.warnings)
+
+
+def _distinct_argument_tool_calls() -> dict:
+    def call(call_id: str, arguments: str) -> dict:
+        return {
+            "id": call_id,
+            "type": "function",
+            "function": {"name": _FAKE_TOOL, "arguments": arguments},
+        }
+
+    return {
+        "choices": [{
+            "message": {
+                "content": "",
+                "tool_calls": [call("call_1", '{"a":1}'), call("call_2", '{"b":2}')],
+            },
+            "finish_reason": "tool_calls",
+        }],
+    }
+
+
+async def test_local_tool_execution_is_concurrent_even_when_provider_flag_is_false(monkeypatch):
+    """``parallel_tool_calls`` 描述模型能否一次发多个调用，不能把本地执行串行化。
+
+    聚合/自建网关该能力位为 False，此前一轮内多个工具调用被逐个 await，
+    整轮延迟按调用数线性放大。
+    """
+    import asyncio
+
+    completions = _FakeCompletions([_distinct_argument_tool_calls(), _final_response()])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+
+    # 用事件而不是 sleep 判定并发：两个调用都必须先"启动"并等待，释放才会发生。
+    # 串行执行时第二个调用永远等不到启动，release 只被消费一次，测试以超时失败。
+    started: list[str] = []
+    running: set[str] = set()
+    both_started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def fake_execute(call, allowed_names=None, execution_context=None, arguments=None):
+        started.append(call.id)
+        running.add(call.id)
+        if len(running) == 2:
+            both_started.set()
+        try:
+            await asyncio.wait_for(both_started.wait(), timeout=2.0)
+        except asyncio.TimeoutError:  # pragma: no cover - 串行时会走到这里
+            raise AssertionError("工具调用被串行执行：第二个调用未与第一个并发启动") from None
+        release.set()
+        running.discard(call.id)
+        return ToolResultInfo(
+            tool_call_id=call.id,
+            name=call.function.name,
+            content='{"ok":true,"data":{"value":1}}',
+            is_error=False,
+        )
+
+    monkeypatch.setattr(
+        registry,
+        "get_tool_definitions_for",
+        lambda names: [_TOOL_DEFINITION] if _FAKE_TOOL in names else [],
+    )
+    monkeypatch.setattr(registry, "get_tool_policy", lambda name: ToolPolicy(cache_ttl_seconds=0))
+    monkeypatch.setattr(registry, "get_tool", lambda name: None)
+    monkeypatch.setattr(registry, "execute_tool", fake_execute)
+
+    capabilities = replace(DEFAULT_LLM_CAPABILITIES, parallel_tool_calls=False)
+    result = await AgentExecutor().run(
+        _profile(),
+        "问题",
+        None,
+        _FakeClient(capabilities),
+        "fake-model",
+        execution_context=_context(),
+        require_tool_first_round=True,
+    )
+
+    # 两个调用都进入过"等待放行"状态，说明它们在同一批次里并发执行。
+    # 串行实现下第二个调用永远等不到启动，这里会直接失败并指明原因。
+    assert both_started.is_set(), f"工具调用未并发执行，实际启动顺序：{started}"
+    assert release.is_set()
+    assert result.status == "completed"
+    assert len(started) == 2
+
+
+def _content_only_response(content: str) -> dict:
+    return {"choices": [{"message": {"content": content, "tool_calls": []}, "finish_reason": "stop"}]}
+
+
+async def test_pseudo_tool_call_fallback_is_counted(monkeypatch):
+    """模型不返回原生 tool_calls、靠正文方言发起调用时必须可观测。"""
+    from app.agentic.agents import executor as executor_module
+    from app.core.metrics import MetricsRegistry
+
+    fresh = MetricsRegistry()
+    monkeypatch.setattr(executor_module, "metrics", fresh)
+    calls: list[list[ToolCallInfo]] = [
+        [
+            ToolCallInfo(
+                id="pseudo_0",
+                type="function",
+                function=ToolCallFunction(name=_FAKE_TOOL, arguments="{}"),
+            )
+        ],
+        [],  # 后续轮次没有方言调用
+    ]
+    monkeypatch.setattr(
+        executor_module,
+        "extract_pseudo_tool_calls",
+        lambda *args, **kwargs: calls.pop(0) if calls else [],
+    )
+    completions = _FakeCompletions([
+        _content_only_response("fake_tool()"),
+        _final_response(),
+        _final_response(),
+    ])
+    monkeypatch.setattr("app.agentic.agents.executor.create_chat_completion", completions)
+    _install_registry(monkeypatch, [('{"ok":true,"data":{"value":1}}', False)])
+
+    result = await AgentExecutor().run(
+        _profile(),
+        "问题",
+        None,
+        _FakeClient(),
+        "fake-model",
+        execution_context=_context(),
+        require_tool_first_round=True,
+    )
+
+    assert result.status == "completed"
+    events = fresh.snapshot()["agentic"]["events"]
+    assert events["agent_pseudo_tool_call"] == 1

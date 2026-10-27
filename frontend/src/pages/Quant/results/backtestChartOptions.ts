@@ -151,3 +151,194 @@ export function buildDrawdownChartOption(
     }],
   };
 }
+
+export function buildHoldingsAllocationChartOption(
+  equityCurve: QuantBacktestResult["equity_curve"],
+  colors: ChartPalette,
+  isNarrow: boolean,
+) {
+  const assetSet = new Set<string>();
+  for (const pt of equityCurve) {
+    if (pt.position_weights) {
+      for (const k of Object.keys(pt.position_weights)) {
+        assetSet.add(k);
+      }
+    }
+  }
+
+  const allAssets = Array.from(assetSet).filter((a) => a !== "CASH");
+  allAssets.sort();
+  if (assetSet.has("CASH")) {
+    allAssets.unshift("CASH");
+  }
+
+  const series = allAssets.map((asset) => {
+    return {
+      name: asset === "CASH" ? "现金 (CASH)" : asset,
+      type: "line",
+      stack: "Total",
+      areaStyle: {},
+      showSymbol: false,
+      sampling: "lttb",
+      emphasis: { focus: "series" },
+      data: equityCurve.map((pt) => {
+        if (!pt.position_weights) return 0;
+        const wt = pt.position_weights[asset] ?? 0;
+        return Number((wt * 100).toFixed(2));
+      }),
+    };
+  });
+
+  return {
+    animation: equityCurve.length <= 120,
+    textStyle: { fontFamily: APP_FONT_FAMILY, fontSize: APP_FONT_SIZE.sm },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "line" },
+      valueFormatter: (value: unknown) => formatValue(value, 2, "%"),
+    },
+    legend: {
+      top: isNarrow ? 6 : 4,
+      left: "center",
+      itemGap: isNarrow ? 8 : 16,
+      textStyle: { color: colors.textSecondary, fontSize: APP_FONT_SIZE.xs },
+      type: "scroll",
+    },
+    grid: {
+      left: isNarrow ? 12 : 16,
+      right: isNarrow ? 12 : 20,
+      top: isNarrow ? 62 : 58,
+      bottom: isNarrow ? 12 : 16,
+      containLabel: true,
+    },
+    xAxis: {
+      type: "category",
+      boundaryGap: false,
+      data: equityCurve.map((point) => point.date),
+      axisLabel: {
+        color: colors.textMuted,
+        fontSize: APP_FONT_SIZE.xs,
+        hideOverlap: true,
+        margin: 12,
+        formatter: (value: string) => formatDateLabel(value, isNarrow),
+      },
+      axisLine: { lineStyle: { color: colors.border } },
+      axisTick: { alignWithLabel: true },
+    },
+    yAxis: {
+      type: "value",
+      min: 0,
+      max: 100,
+      axisLabel: {
+        formatter: (value: number) => formatValue(value, 0, "%"),
+        color: colors.textMuted,
+        fontSize: APP_FONT_SIZE.xs,
+        margin: 10,
+      },
+      splitLine: { lineStyle: { color: colors.border } },
+    },
+    series,
+  };
+}
+
+export function buildAlphaRiskChartOption(
+  equityCurve: QuantBacktestResult["equity_curve"],
+  colors: ChartPalette,
+  isNarrow: boolean,
+) {
+  return {
+    animation: equityCurve.length <= 120,
+    textStyle: { fontFamily: APP_FONT_FAMILY, fontSize: APP_FONT_SIZE.sm },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "cross" },
+    },
+    legend: {
+      data: ["超额收益 (Alpha)", "60日滚动夏普", "60日滚动贝塔"],
+      top: isNarrow ? 6 : 4,
+      left: "center",
+      itemGap: isNarrow ? 10 : 20,
+      textStyle: { color: colors.textSecondary, fontSize: APP_FONT_SIZE.sm },
+    },
+    grid: {
+      left: isNarrow ? 12 : 16,
+      right: isNarrow ? 12 : 24,
+      top: isNarrow ? 62 : 58,
+      bottom: isNarrow ? 12 : 16,
+      containLabel: true,
+    },
+    xAxis: {
+      type: "category",
+      boundaryGap: false,
+      data: equityCurve.map((point) => point.date),
+      axisLabel: {
+        color: colors.textMuted,
+        fontSize: APP_FONT_SIZE.xs,
+        hideOverlap: true,
+        margin: 12,
+        formatter: (value: string) => formatDateLabel(value, isNarrow),
+      },
+      axisLine: { lineStyle: { color: colors.border } },
+      axisTick: { alignWithLabel: true },
+    },
+    yAxis: [
+      {
+        type: "value",
+        name: "超额收益",
+        nameTextStyle: { color: colors.textMuted, fontSize: APP_FONT_SIZE.xs },
+        scale: true,
+        axisLabel: {
+          color: colors.textMuted,
+          fontSize: APP_FONT_SIZE.xs,
+          formatter: (value: number) => formatValue(value, 1, "%"),
+        },
+        splitLine: { lineStyle: { color: colors.border } },
+      },
+      {
+        type: "value",
+        name: "滚动风险",
+        nameTextStyle: { color: colors.textMuted, fontSize: APP_FONT_SIZE.xs },
+        scale: true,
+        axisLabel: {
+          color: colors.textMuted,
+          fontSize: APP_FONT_SIZE.xs,
+          formatter: (value: number) => formatValue(value, 2),
+        },
+        splitLine: { show: false },
+      },
+    ],
+    series: [
+      {
+        name: "超额收益 (Alpha)",
+        type: "line",
+        yAxisIndex: 0,
+        showSymbol: false,
+        sampling: "lttb",
+        data: equityCurve.map((p) => p.excess_return ?? 0),
+        lineStyle: { color: colors.primary, width: 2 },
+        areaStyle: { color: `${colors.primary}15` },
+        emphasis: { focus: "series" },
+      },
+      {
+        name: "60日滚动夏普",
+        type: "line",
+        yAxisIndex: 1,
+        showSymbol: false,
+        sampling: "lttb",
+        data: equityCurve.map((p) => p.rolling_sharpe ?? null),
+        lineStyle: { color: "#52c41a", width: 1.5 },
+        emphasis: { focus: "series" },
+      },
+      {
+        name: "60日滚动贝塔",
+        type: "line",
+        yAxisIndex: 1,
+        showSymbol: false,
+        sampling: "lttb",
+        data: equityCurve.map((p) => p.rolling_beta ?? null),
+        lineStyle: { color: "#fa8c16", width: 1.5, type: "dashed" },
+        emphasis: { focus: "series" },
+      },
+    ],
+  };
+}

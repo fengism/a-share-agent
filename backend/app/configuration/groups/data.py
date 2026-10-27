@@ -53,6 +53,8 @@ class NetworkGroup(ConfigGroup):
     outbound_proxy_url: str = ""
     outbound_proxy_timeout_seconds: float = Field(default=20.0, ge=5, le=120)
     outbound_proxy_retries: int = Field(default=2, ge=0, le=6)
+    # 允许走代理的数据源接口作用域列表（如 eastmoney、ths、cls、sina、akshare）
+    outbound_proxy_scopes: list[str] = Field(default_factory=lambda: ["eastmoney"])
     tdxhub_timeout_seconds: float = Field(default=5.0, gt=0)
     # 客户端重建失败的冷却窗口。SDK 每次重建都会全量探测候选行情服务器，
     # 冷却期内快速失败可避免故障期间反复付出探测代价；到期后自动重新探测，

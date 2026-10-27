@@ -1259,7 +1259,7 @@ export default function KlineChart({
     }
     chart.priceScale("right", 0).applyOptions({ borderColor: c.border });
     chart.priceScale("right", VOLUME_PANE_INDEX).applyOptions({ borderColor: c.border });
-  }, [c.border, c.cardBg, c.down, c.primary, c.accent, c.isLight, c.textMuted, c.textSecondary, c.up, candleStyle, height, rows, subIndicator]);
+  }, [c, candleStyle, height, rows, subIndicator]);
 
   useEffect(() => {
     const chart = chartRef.current;

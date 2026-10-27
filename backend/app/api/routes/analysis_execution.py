@@ -7,6 +7,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.auth.dependencies import require_active_user
 from app.api.errors import ConflictError, NotFoundError, ServiceUnavailableError, TooManyRequestsError
+from app.api.rate_limit import llm_rate_limit
 from app.api.streaming import SSE_RESPONSES
 from app.configuration import get_settings
 from app.domain.identity import AuthenticatedUser
@@ -38,7 +39,7 @@ def _sync_wait_timeout_seconds() -> float:
     return settings.agent_research_timeout_seconds + settings.analysis_llm_timeout_seconds + 60.0
 
 
-@router.post("/{code}", response_model=AnalysisResult)
+@router.post("/{code}", response_model=AnalysisResult, dependencies=[Depends(llm_rate_limit)])
 async def trigger_analysis(code: str, user: AuthenticatedUser = Depends(require_active_user)):
     """触发指定股票的同步 AI 分析。
 
@@ -98,7 +99,12 @@ async def get_analysis_result(code: str, user: AuthenticatedUser = Depends(requi
     raise NotFoundError("暂无分析结果，请先触发分析", code="analysis.result_not_found")
 
 
-@router.get("/{code}/stream", response_class=EventSourceResponse, responses=SSE_RESPONSES)
+@router.get(
+    "/{code}/stream",
+    response_class=EventSourceResponse,
+    responses=SSE_RESPONSES,
+    dependencies=[Depends(llm_rate_limit)],
+)
 async def stream_analysis(code: str, user: AuthenticatedUser = Depends(require_active_user)):
     """SSE 端点，流式推送分析进度事件。
 

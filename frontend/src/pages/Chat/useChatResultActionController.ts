@@ -8,6 +8,7 @@ import { useAuthStore } from "../../store/authStore";
 import type { PushRequest } from "../../types/stock";
 import type { WatchlistAlertCondition } from "../../types/watchlist";
 import type { ChatResultActionHandler } from "./chatResultActions";
+import { formatMarketDateTime } from "../../utils/marketTime";
 
 export function useChatResultActionController() {
   const navigate = useNavigate();
@@ -74,7 +75,7 @@ export function useChatResultActionController() {
       return;
     }
     if (action === "screener" && context.screenerState && userId != null) {
-      const label = `AI 筛选 ${new Date().toLocaleString("zh-CN", { hour12: false })}`;
+      const label = `AI 筛选 ${formatMarketDateTime(Date.now())}`;
       saveFilter(window.localStorage, userId, label, context.screenerState);
       message.success("对话筛选条件已保存");
       navigate(`/screener?${serializeScreenerUrlState(context.screenerState).toString()}`);

@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from app.agentic.events import auditable_agent_event
 from app.api.auth.dependencies import require_active_user
 from app.api.errors import ApiError, ConflictError
+from app.api.rate_limit import llm_rate_limit
 from app.api.streaming import SSE_RESPONSES
 from app.domain.identity import AuthenticatedUser
 from app.modules.chat.public import (
@@ -63,7 +64,12 @@ def get_chat_capability_availability() -> ChatCapabilityAvailabilityResponse:
     return load_chat_capability_availability()
 
 
-@router.post("", response_class=StreamingResponse, responses=SSE_RESPONSES)
+@router.post(
+    "",
+    response_class=StreamingResponse,
+    responses=SSE_RESPONSES,
+    dependencies=[Depends(llm_rate_limit)],
+)
 async def chat(request: ChatRequest, user: AuthenticatedUser = Depends(require_active_user)):
     """对话端点，以 SSE 流式返回 AI 选股助手的回复增量。
 

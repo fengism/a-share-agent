@@ -4,10 +4,14 @@ import {
   cleanupExpiredInvitesApi,
   createInviteApi,
   deleteUserApi,
+  fetchAdminAuditActionsApi,
+  fetchSessionsApi,
   fetchLoginAuditLogsApi,
+  fetchMyLoginAuditLogsApi,
   listInvitesApi,
   listUsersApi,
   revokeInviteApi,
+  revokeSessionApi,
   revokeUserSessionsApi,
   updateUserMustChangePasswordApi,
   updateUserRoleApi,
@@ -15,7 +19,13 @@ import {
 } from "../auth";
 import { QUERY_CACHE_POLICIES } from "../cachePolicies";
 import { queryKeys } from "../queryKeys";
-import type { AdminUserItem, InviteItem, LoginAuditLogsResponse } from "../../types/auth";
+import type {
+  AdminAuditActionsResponse,
+  AdminUserItem,
+  InviteItem,
+  LoginAuditLogsResponse,
+  SessionsResponse,
+} from "../../types/auth";
 import type {
   BotAdminJob,
   BotAdminJobsResponse,
@@ -150,6 +160,51 @@ export function useCleanupExpiredInvites() {
     mutationFn: () => cleanupExpiredInvitesApi(),
   });
 }
+
+export function useSessions(enabled = true) {
+  return useQuery<SessionsResponse>({
+    queryKey: queryKeys.settings.sessions,
+    queryFn: ({ signal }) => fetchSessionsApi(signal),
+    enabled,
+    staleTime: 5_000,
+  });
+}
+
+export function useRevokeSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => revokeSessionApi(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.sessions });
+    },
+  });
+}
+
+export function useAdminAuditActions(
+  params?: { limit?: number; offset?: number; action?: string; actor_username?: string },
+  enabled = true,
+) {
+  return useQuery<AdminAuditActionsResponse>({
+    queryKey: queryKeys.settings.auditActions(params),
+    queryFn: ({ signal }) => fetchAdminAuditActionsApi(params, signal),
+    enabled,
+    staleTime: QUERY_CACHE_POLICIES.settingsAuditLogs.staleMs,
+  });
+}
+
+/** 「我的登录记录」：普通用户自助查询，只返回本人记录。 */
+export function useMyLoginAuditLogs(
+  params?: { limit?: number; offset?: number; status?: string },
+  enabled = true,
+) {
+  return useQuery<LoginAuditLogsResponse>({
+    queryKey: queryKeys.settings.myAuditLogs(params),
+    queryFn: ({ signal }) => fetchMyLoginAuditLogsApi(params, signal),
+    enabled,
+    staleTime: QUERY_CACHE_POLICIES.settingsAuditLogs.staleMs,
+  });
+}
+
 
 export function useLoginAuditLogs(
   params?: { limit?: number; offset?: number; status?: string; username?: string },

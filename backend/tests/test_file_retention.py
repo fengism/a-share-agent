@@ -128,6 +128,8 @@ async def test_wal_checkpoint_iteration_passes_all_retention_settings(monkeypatc
         industry_chain_retention_days=180,
         market_daily_observation_retention_days=1095,
         market_daily_attempt_retention_days=1095,
+        login_audit_retention_days=180,
+        admin_audit_retention_days=365,
     )
     captured: dict[str, object] = {}
 

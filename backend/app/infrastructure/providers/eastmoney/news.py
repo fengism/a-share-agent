@@ -53,7 +53,7 @@ class NewsMixin:
                 )
                 all_news.extend(items)
             except Exception as e:
-                logger.warning(f"东方财富{label}获取失败: {e}")
+                logger.warning('东方财富%s获取失败: %s', label, e)
         return all_news
 
     def _fetch_finance_news(self, column: str = "", news_ids: list[str] | None = None,

@@ -226,8 +226,9 @@ async def test_stream_interruption_retries_and_succeeds(monkeypatch):
 def test_normalize_sse_stream_ended_error():
     """验证 OpenAI/第三方兼容网关的 SSE 异常流中断被准确归一化为可重试上游错误。"""
     from openai import APIError
-    from app.infrastructure.llm.adapters import normalize_retryable_llm_error
+
     from app.domain.llm import LLMUpstreamResponseError
+    from app.infrastructure.llm.adapters import normalize_retryable_llm_error
 
     err = APIError("upstream SSE stream ended before a terminal event", request=None, body=None)
     normalized = normalize_retryable_llm_error(err)

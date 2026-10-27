@@ -1,0 +1,68 @@
+api_version: quant.strategy/v2
+key: low_volatility_trend
+version: 1.0.0
+enabled: true
+name: 低波均线稳健策略
+description: 结合中期移动平均趋势与真实波幅相对比率，过滤剧烈脉冲与假突破，在低波动稳健主升段以连续目标权重平稳运行。
+scenario: 慢牛与稳健趋势
+risk_level: low
+presentation:
+  icon: safety
+parameters:
+  trend_period:
+    type: integer
+    label: 均线趋势周期
+    description: 衡量中期多头趋势的平滑均线周期
+    default: 20
+    minimum: 5
+    maximum: 120
+  vol_period:
+    type: integer
+    label: ATR 真实波幅周期
+    description: 衡量资产短期波动幅度的周期窗口
+    default: 14
+    minimum: 5
+    maximum: 60
+  max_vol_ratio:
+    type: number
+    label: 最大波动率门槛(%)
+    description: 允许建仓的最高相对真实波幅比率（ATR/收盘价）
+    default: 3.5
+    minimum: 1.0
+    maximum: 10.0
+indicators:
+  trend_ma:
+    operator: sma
+    input: close
+    period: $trend_period
+    offset: 1
+  vol_atr:
+    operator: atr
+    period: $vol_period
+    offset: 1
+  vol_ratio_raw:
+    operator: divide
+    left: vol_atr
+    right: close
+    zero_value: 0.0
+  vol_ratio:
+    operator: multiply
+    left: vol_ratio_raw
+    right: 100.0
+signals:
+  entry:
+    operator: and
+    operands:
+      - operator: greater_than
+        left: close
+        right: trend_ma
+      - operator: less_than
+        left: vol_ratio
+        right: $max_vol_ratio
+  exit:
+    operator: less_than
+    left: close
+    right: trend_ma
+position:
+  mode: continuous_weight
+  target_weight: 0.7

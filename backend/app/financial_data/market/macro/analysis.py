@@ -17,12 +17,12 @@ import json
 import logging
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 from app.core.cache import analysis_cache as cache
 from app.core.concurrency.rate_limiter import call_blocking, database_semaphore
 from app.core.concurrency.singleflight import AsyncSingleFlight
+from app.domain.timezones import market_now
 from app.financial_data.market.macro.feed import MACRO_FEED_DEFAULT_DAYS, get_macro_feed
 from app.financial_data.market.macro.schemas import (
     MacroAnalysisEvent,
@@ -397,7 +397,7 @@ def _empty_response(feed: MacroFeedResponse) -> MacroAnalysisResponse:
         sentiment="中性",
         events=[],
         policy_signals=[],
-        generated_at=datetime.now().isoformat(timespec="seconds"),
+        generated_at=market_now().isoformat(timespec="seconds"),
     )
 
 
@@ -448,7 +448,7 @@ async def get_macro_analysis(days: int = MACRO_FEED_DEFAULT_DAYS) -> MacroAnalys
             degraded=degraded,
             pending_count=pending_count,
             warning=warning,
-            generated_at=datetime.now().isoformat(timespec="seconds"),
+            generated_at=market_now().isoformat(timespec="seconds"),
             cached=summary_cached,
         )
 

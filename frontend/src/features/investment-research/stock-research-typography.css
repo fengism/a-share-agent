@@ -33,6 +33,23 @@
   .analysis-research-conclusion,
   .research-framework,
   .financial-data-sections {
-    --stock-research-title-size: 24px;
+    --stock-research-title-size: 22px;
+    --stock-research-section-size: 16px;
+    --stock-research-body-size: 14px;
+    --stock-research-subhead-size: 13px;
+    --stock-research-support-size: 12.5px;
+    --stock-research-table-size: 12px;
+    --stock-research-label-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stock-research-report,
+  .analysis-research-conclusion,
+  .research-framework,
+  .financial-data-sections {
+    --stock-research-title-size: 20px;
+    --stock-research-section-size: 15px;
+    --stock-research-body-size: 13.5px;
   }
 }

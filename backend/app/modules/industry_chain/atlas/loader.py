@@ -19,6 +19,7 @@ from typing import Any
 import yaml
 
 from app.configuration import get_settings
+from app.configuration.paths import DATA_DIR
 from app.modules.industry_chain.atlas.contracts import (
     AtlasCatalog,
     AtlasChain,
@@ -44,6 +45,10 @@ class _AtlasState:
 
 def _import_dir() -> Path:
     return get_settings().industry_atlas_import_dir
+
+
+def _user_atlas_dir(user_id: int) -> Path:
+    return DATA_DIR / "industry_atlas_users" / str(user_id)
 
 
 def _legacy_import_dir() -> Path:
@@ -212,17 +217,33 @@ def _ensure_loaded() -> None:
     _registry.current()
 
 
-def get_atlas_chain(slug: str) -> AtlasChain | None:
+def _load_user_chains(user_id: int) -> dict[str, AtlasChain]:
+    user_dir = _user_atlas_dir(user_id)
+    if not user_dir.is_dir():
+        return {}
+    errors: list[str] = []
+    chains = _load_directory(user_dir, errors, strict=False)
+    # 用户私有目录加载的链条，确保标记为 user 来源
+    return {slug: chain.model_copy(update={"source": "user"}) for slug, chain in chains.items()}
+
+
+def get_atlas_chain(slug: str, user_id: int | None = None) -> AtlasChain | None:
+    if user_id is not None:
+        user_chain = _load_user_chains(user_id).get(slug)
+        if user_chain is not None:
+            return user_chain
     return _registry.current().chains.get(slug)
 
 
-def list_atlas_chains() -> list[AtlasChain]:
-    chains = _registry.current().chains
+def list_atlas_chains(user_id: int | None = None) -> list[AtlasChain]:
+    chains = dict(_registry.current().chains)
+    if user_id is not None:
+        chains.update(_load_user_chains(user_id))
     return sorted(chains.values(), key=lambda chain: chain.name)
 
 
-def build_atlas_catalog() -> AtlasCatalog:
-    chains = list_atlas_chains()
+def build_atlas_catalog(user_id: int | None = None) -> AtlasCatalog:
+    chains = list_atlas_chains(user_id=user_id)
     unique_codes = {
         company.code
         for chain in chains
@@ -293,23 +314,36 @@ def _parse_import_payload(content: str) -> list[AtlasChain]:
     return chains
 
 
-def import_atlas_chains(content: str, *, overwrite: bool) -> list[AtlasChain]:
+def import_atlas_chains(
+    content: str,
+    *,
+    overwrite: bool,
+    user_id: int | None = None,
+) -> list[AtlasChain]:
     """校验并把外部链条写入导入目录；冲突（slug 已存在）时按 overwrite 决定。"""
     _ensure_loaded()
     chains = _parse_import_payload(content)
-    existing = _registry.current().chains
+    if user_id is not None:
+        target_dir = _user_atlas_dir(user_id)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        existing = _load_user_chains(user_id)
+        chains = [c.model_copy(update={"source": "user"}) for c in chains]
+    else:
+        target_dir = _import_dir()
+        existing = _registry.current().chains
+
     conflicts = sorted(chain.slug for chain in chains if chain.slug in existing)
     if conflicts and not overwrite:
         raise AtlasImportError(
             "以下产业链已存在，需 overwrite=true 才能覆盖: " + ", ".join(conflicts),
         )
 
-    import_dir = _import_dir()
-    import_dir.mkdir(parents=True, exist_ok=True)
     for chain in chains:
-        _write_chain_file(import_dir, chain)
-        logger.info("产业链知识库导入: %s", chain.slug)
+        _write_chain_file(target_dir, chain)
+        logger.info("产业链知识库导入: slug=%s, user_id=%s", chain.slug, user_id)
     _registry.force_refresh()
+    if user_id is not None:
+        return [chain.model_copy(update={"source": "user"}) for chain in chains]
     state = _registry.current()
     return [state.chains[chain.slug] for chain in chains if chain.slug in state.chains]
 
@@ -322,6 +356,21 @@ def _write_chain_file(import_dir: Path, chain: AtlasChain) -> Path:
         encoding="utf-8",
     )
     return target
+
+
+def delete_user_atlas_chain(slug: str, user_id: int) -> bool:
+    """删除当前用户的私有产业链条目。返回是否存在并删除成功。"""
+    user_dir = _user_atlas_dir(user_id)
+    if not user_dir.is_dir():
+        return False
+    deleted = False
+    for suffix in (".yaml", ".yml"):
+        target = user_dir / f"{slug}{suffix}"
+        if target.is_file():
+            target.unlink()
+            deleted = True
+            logger.info("产业链知识库删除用户私有链条: user_id=%s, slug=%s", user_id, slug)
+    return deleted
 
 
 def delete_imported_chain(slug: str) -> bool:

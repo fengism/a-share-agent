@@ -29,6 +29,7 @@ import type {
 import { HotRankContent as HotRankBoard } from "../../components/HotRankBoard";
 import MarketOverviewBoard from "../../components/MarketOverviewBoard";
 import MarketWindBoard from "../../components/MarketWindBoard";
+import { marketDateStamp } from "../../utils/marketTime";
 import WatchlistPanel from "./WatchlistPanel";
 
 const { Text } = Typography;
@@ -160,7 +161,7 @@ function MainlineFaucetTableCard({ rows }: { rows: MainlineFaucetRow[] }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `今日主线龙头_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `今日主线龙头_${marketDateStamp()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };

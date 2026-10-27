@@ -137,4 +137,11 @@ performance 5/10/20 日前瞻复盘
 
 `make check` 覆盖：版本一致性、ruff、模块边界、mypy、覆盖率（≥44%）、OpenAPI 产物
 同步、前端测试/构建。新增 Python 文件若属于核心链路，应同步加入 `pyproject.toml`
-的 mypy `files` 清单。
+的 mypy `files` 清单。命令明细与调试方式见 [本地开发指南](development.md)。
+
+## 延伸阅读
+
+- [本地开发指南](development.md) — 环境、命令、测试约定
+- [配置系统开发指南](configuration.md) — 配置来源与作用域
+- [数据源与降级机制](data-sources.md) — Provider 层与容错策略
+- [故障排查手册](troubleshooting.md)

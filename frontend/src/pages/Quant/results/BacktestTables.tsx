@@ -4,6 +4,7 @@ import { DownloadOutlined } from "@ant-design/icons";
 import type { QuantBacktestResult } from "../../../api/queries";
 import PreloadLink from "../../../components/PreloadLink";
 import { useColors, useStyles, semanticTagStyle } from "../../../styles/ui";
+import { marketDateStamp } from "../../../utils/marketTime";
 import { formatPercent } from "./formatters";
 
 const { Text } = Typography;
@@ -11,9 +12,10 @@ const { Text } = Typography;
 interface BacktestTablesProps {
   monthlyReturns: QuantBacktestResult["monthly_returns"];
   trades: QuantBacktestResult["trades"];
+  metrics?: QuantBacktestResult["metrics"];
 }
 
-export default function BacktestTables({ monthlyReturns, trades }: BacktestTablesProps) {
+export default function BacktestTables({ monthlyReturns, trades, metrics }: BacktestTablesProps) {
   const colors = useColors();
   const { cardStyle } = useStyles();
 
@@ -34,7 +36,7 @@ export default function BacktestTables({ monthlyReturns, trades }: BacktestTable
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `量化回测成交明细_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `量化回测成交明细_${marketDateStamp()}.csv`;
       a.click();
       URL.revokeObjectURL?.(url);
     }
@@ -43,6 +45,63 @@ export default function BacktestTables({ monthlyReturns, trades }: BacktestTable
 
   return (
     <Row gutter={[16, 16]}>
+      {metrics?.avg_holding_days != null && (
+        <Col xs={24}>
+          <Card
+            title="交易特征与持仓周期诊断 (Trade Horizon & Payoff Diagnostics)"
+            extra={<Tag color="purple">交易行为深度穿透</Tag>}
+            size="small"
+            style={cardStyle}
+            className="quant-result-card"
+          >
+            <Row gutter={[16, 12]}>
+              <Col xs={12} sm={6}>
+                <div>
+                  <div style={{ color: "var(--c-text-muted)", fontSize: 12 }}>平均持仓周期</div>
+                  <strong style={{ fontSize: 16 }}>{metrics.avg_holding_days} 天</strong>
+                </div>
+              </Col>
+              <Col xs={12} sm={6}>
+                <div>
+                  <div style={{ color: "var(--c-text-muted)", fontSize: 12 }}>盈/亏平均持仓</div>
+                  <strong style={{ fontSize: 14 }}>
+                    <span style={{ color: colors.up }}>{metrics.avg_win_holding_days ?? "-"}天</span> / <span style={{ color: colors.down }}>{metrics.avg_loss_holding_days ?? "-"}天</span>
+                  </strong>
+                  {(metrics.avg_win_holding_days ?? 0) > (metrics.avg_loss_holding_days ?? 0) && (
+                    <Tag color="success" style={{ marginLeft: 6, fontSize: 11 }}>让利润奔跑</Tag>
+                  )}
+                  {metrics.avg_loss_holding_days && metrics.avg_loss_holding_days > 0 && metrics.avg_win_holding_days ? (
+                    <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>
+                      盈利时长期望: {(metrics.avg_win_holding_days / metrics.avg_loss_holding_days).toFixed(1)}x
+                    </div>
+                  ) : null}
+                </div>
+              </Col>
+              <Col xs={12} sm={6}>
+                <div>
+                  <div style={{ color: "var(--c-text-muted)", fontSize: 12 }}>平均单笔盈亏额</div>
+                  <strong style={{ fontSize: 14 }}>
+                    <span style={{ color: colors.up }}>{metrics.avg_win_pnl != null ? `+${metrics.avg_win_pnl}元` : "-"}</span> / <span style={{ color: colors.down }}>{metrics.avg_loss_pnl != null ? `${metrics.avg_loss_pnl}元` : "-"}</span>
+                  </strong>
+                  {metrics.avg_win_pnl && metrics.avg_loss_pnl && Math.abs(metrics.avg_loss_pnl) > 0 ? (
+                    <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>
+                      平均盈亏比: {(metrics.avg_win_pnl / Math.abs(metrics.avg_loss_pnl)).toFixed(2)}:1
+                    </div>
+                  ) : null}
+                </div>
+              </Col>
+              <Col xs={12} sm={6}>
+                <div>
+                  <div style={{ color: "var(--c-text-muted)", fontSize: 12 }}>单笔极端盈亏率</div>
+                  <strong style={{ fontSize: 14 }}>
+                    <span style={{ color: colors.up }}>{metrics.max_win_pct != null ? `+${metrics.max_win_pct}%` : "-"}</span> / <span style={{ color: colors.down }}>{metrics.max_loss_pct != null ? `${metrics.max_loss_pct}%` : "-"}</span>
+                  </strong>
+                </div>
+              </Col>
+            </Row>
+          </Card>
+        </Col>
+      )}
       <Col xs={24} lg={8}>
         <Card title="月度收益" size="small" style={cardStyle} className="quant-result-card quant-table-card">
           <Table

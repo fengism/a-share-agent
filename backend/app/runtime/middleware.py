@@ -19,6 +19,7 @@ from collections.abc import Sequence
 from http.cookies import SimpleCookie
 from uuid import uuid4
 
+from starlette.requests import Request
 from starlette.responses import Response
 
 from app.api.auth.cookies import (
@@ -34,12 +35,28 @@ from app.core.request_context import (
     bind_settings_cache,
     reset_current_request_id,
     reset_current_user,
+    reset_request_origin,
     reset_settings_cache,
     set_current_request_id,
     set_current_user,
+    set_request_origin,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _request_origin(scope) -> tuple[str, str]:
+    """Resolve client IP / User-Agent for the audit trail (best-effort)."""
+    from app.api.auth.http import client_ip as resolve_client_ip
+
+    try:
+        request = Request(scope)
+        address = resolve_client_ip(request, trust_proxy_headers=get_settings().trust_proxy_headers)
+        user_agent = request.headers.get("user-agent", "")
+    except Exception:  # pragma: no cover - 审计字段缺失不能影响业务请求
+        logger.debug("解析客户端 IP/UA 失败，审计字段留空", exc_info=True)
+        return "", ""
+    return address[:64], user_agent[:512]
 
 
 class UserContextMiddleware:
@@ -53,6 +70,7 @@ class UserContextMiddleware:
 
         token, uses_cookie, csrf_token = _extract_auth_context(scope.get("headers") or [])
         settings_reset = bind_settings_cache()
+        origin_reset = set_request_origin(*_request_origin(scope))
         reset = None
         renewed = False
         if token:
@@ -109,11 +127,15 @@ class UserContextMiddleware:
         finally:
             if reset is not None:
                 reset_current_user(reset)
+            reset_request_origin(origin_reset)
             reset_settings_cache(settings_reset)
 
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _QUIET_POLL_PATHS = frozenset({"/api/workflows/active"})
+# 探活端点被 docker healthcheck / 编排周期性 GET：2xx 快速响应不打点，
+# 否则每天数千行同质访问日志挤占轮转窗口；慢探活仍会以 WARNING 露出。
+_QUIET_HEALTH_PATHS = frozenset({"/api/health", "/api/health/live", "/api/health/ready"})
 _SLOW_POLL_MS = 1000
 
 
@@ -164,6 +186,8 @@ class RequestObservabilityMiddleware:
             elif method == "GET" and request_path in _QUIET_POLL_PATHS and 200 <= status < 300:
                 # Only short polling requests are quiet; long-lived SSE is not a slow poll.
                 level = logging.WARNING if duration_ms >= _SLOW_POLL_MS else logging.DEBUG
+            elif method == "GET" and request_path in _QUIET_HEALTH_PATHS and 200 <= status < 300:
+                level = logging.DEBUG
             try:
                 metrics.record_request(method, metric_path, status, duration_ms)
                 logger.log(

@@ -1,6 +1,106 @@
 {
   "components": {
     "schemas": {
+      "AdminAuditActionItem": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "actor_ip": {
+            "title": "Actor Ip",
+            "type": "string"
+          },
+          "actor_user_agent": {
+            "title": "Actor User Agent",
+            "type": "string"
+          },
+          "actor_username": {
+            "title": "Actor Username",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "details": {
+            "title": "Details",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          },
+          "target_label": {
+            "title": "Target Label",
+            "type": "string"
+          },
+          "target_type": {
+            "title": "Target Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "actor_username",
+          "actor_ip",
+          "actor_user_agent",
+          "action",
+          "target_type",
+          "target_id",
+          "target_label",
+          "details",
+          "created_at"
+        ],
+        "title": "AdminAuditActionItem",
+        "type": "object"
+      },
+      "AdminAuditActionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminAuditActionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "AdminAuditActionsResponse",
+        "type": "object"
+      },
       "AdminResetLinkRequest": {
         "properties": {
           "expires_in_hours": {
@@ -1212,7 +1312,8 @@
             "enum": [
               "builtin",
               "imported",
-              "mined"
+              "mined",
+              "user"
             ],
             "title": "Source",
             "type": "string"
@@ -1273,7 +1374,8 @@
             "enum": [
               "builtin",
               "imported",
-              "mined"
+              "mined",
+              "user"
             ],
             "title": "Source",
             "type": "string"
@@ -1396,6 +1498,17 @@
             "default": false,
             "title": "Overwrite",
             "type": "boolean"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
           }
         },
         "required": [
@@ -1449,6 +1562,17 @@
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
           }
         },
         "required": [
@@ -3484,6 +3608,13 @@
             "title": "Industry Chain Tool Calls Total",
             "type": "integer"
           },
+          "inherited_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inherited Keys",
+            "type": "array"
+          },
           "is_admin": {
             "title": "Is Admin",
             "type": "boolean"
@@ -3529,9 +3660,41 @@
             "title": "Llm Context Length Tokens",
             "type": "integer"
           },
+          "llm_extra_body": {
+            "additionalProperties": true,
+            "title": "Llm Extra Body",
+            "type": "object"
+          },
+          "llm_generation_max_completion_tokens": {
+            "title": "Llm Generation Max Completion Tokens",
+            "type": "integer"
+          },
+          "llm_generation_timeout_seconds": {
+            "title": "Llm Generation Timeout Seconds",
+            "type": "number"
+          },
+          "llm_json_mode_enabled": {
+            "title": "Llm Json Mode Enabled",
+            "type": "boolean"
+          },
+          "llm_max_attempts": {
+            "title": "Llm Max Attempts",
+            "type": "integer"
+          },
           "llm_model": {
             "title": "Llm Model",
             "type": "string"
+          },
+          "llm_model_max_completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Model Max Completion Tokens"
           },
           "llm_provider": {
             "title": "Llm Provider",
@@ -3541,6 +3704,10 @@
             "title": "Llm Simple Tasks",
             "type": "string"
           },
+          "llm_stream_include_usage": {
+            "title": "Llm Stream Include Usage",
+            "type": "boolean"
+          },
           "llm_sub_model": {
             "title": "Llm Sub Model",
             "type": "string"
@@ -3548,6 +3715,10 @@
           "llm_temperature": {
             "title": "Llm Temperature",
             "type": "number"
+          },
+          "llm_timeout_seconds": {
+            "title": "Llm Timeout Seconds",
+            "type": "integer"
           },
           "macro_analysis_prewarm_enabled": {
             "title": "Macro Analysis Prewarm Enabled",
@@ -3600,6 +3771,13 @@
           "outbound_proxy_retries": {
             "title": "Outbound Proxy Retries",
             "type": "integer"
+          },
+          "outbound_proxy_scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Outbound Proxy Scopes",
+            "type": "array"
           },
           "outbound_proxy_timeout_seconds": {
             "title": "Outbound Proxy Timeout Seconds",
@@ -3694,6 +3872,14 @@
           "llm_simple_tasks",
           "llm_temperature",
           "llm_context_length_tokens",
+          "llm_timeout_seconds",
+          "llm_max_attempts",
+          "llm_generation_timeout_seconds",
+          "llm_generation_max_completion_tokens",
+          "llm_model_max_completion_tokens",
+          "llm_stream_include_usage",
+          "llm_json_mode_enabled",
+          "llm_extra_body",
           "feishu_enabled",
           "feishu_app_id",
           "feishu_app_secret",
@@ -3747,6 +3933,7 @@
           "outbound_proxy_url",
           "outbound_proxy_timeout_seconds",
           "outbound_proxy_retries",
+          "outbound_proxy_scopes",
           "market_daily_bar_refresh_enabled",
           "market_daily_bar_refresh_poll_seconds",
           "market_daily_bar_refresh_retry_base_seconds",
@@ -3790,7 +3977,8 @@
           "agent_research_timeout_seconds",
           "chat_max_tool_calls_total",
           "provider_defaults",
-          "is_admin"
+          "is_admin",
+          "inherited_keys"
         ],
         "title": "ConfigResponse",
         "type": "object"
@@ -4450,7 +4638,7 @@
           "industry_chain_max_rounds": {
             "anyOf": [
               {
-                "maximum": 10.0,
+                "maximum": 24.0,
                 "minimum": 2.0,
                 "type": "integer"
               },
@@ -4463,7 +4651,7 @@
           "industry_chain_repair_max_rounds": {
             "anyOf": [
               {
-                "maximum": 6.0,
+                "maximum": 12.0,
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -4500,7 +4688,7 @@
           "industry_chain_repair_tool_calls_total": {
             "anyOf": [
               {
-                "maximum": 64.0,
+                "maximum": 160.0,
                 "minimum": 4.0,
                 "type": "integer"
               },
@@ -4525,7 +4713,7 @@
           "industry_chain_tool_calls_total": {
             "anyOf": [
               {
-                "maximum": 128.0,
+                "maximum": 300.0,
                 "minimum": 8.0,
                 "type": "integer"
               },
@@ -4640,6 +4828,66 @@
             ],
             "title": "Llm Context Length Tokens"
           },
+          "llm_extra_body": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Extra Body"
+          },
+          "llm_generation_max_completion_tokens": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Generation Max Completion Tokens"
+          },
+          "llm_generation_timeout_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Generation Timeout Seconds"
+          },
+          "llm_json_mode_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Json Mode Enabled"
+          },
+          "llm_max_attempts": {
+            "anyOf": [
+              {
+                "maximum": 3.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Max Attempts"
+          },
           "llm_model": {
             "anyOf": [
               {
@@ -4650,6 +4898,18 @@
               }
             ],
             "title": "Llm Model"
+          },
+          "llm_model_max_completion_tokens": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Model Max Completion Tokens"
           },
           "llm_provider": {
             "anyOf": [
@@ -4673,6 +4933,17 @@
             ],
             "title": "Llm Simple Tasks"
           },
+          "llm_stream_include_usage": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Stream Include Usage"
+          },
           "llm_sub_model": {
             "anyOf": [
               {
@@ -4694,6 +4965,19 @@
               }
             ],
             "title": "Llm Temperature"
+          },
+          "llm_timeout_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 3600.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Timeout Seconds"
           },
           "macro_analysis_prewarm_enabled": {
             "anyOf": [
@@ -4851,6 +5135,20 @@
               }
             ],
             "title": "Outbound Proxy Retries"
+          },
+          "outbound_proxy_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outbound Proxy Scopes"
           },
           "outbound_proxy_timeout_seconds": {
             "anyOf": [
@@ -9745,6 +10043,43 @@
         "title": "IndustryChainCoverage",
         "type": "object"
       },
+      "IndustryChainCycleAnalysis": {
+        "description": "产业链供需周期与顺价机制定位。",
+        "properties": {
+          "capacity_utilization": {
+            "default": "",
+            "description": "行业产能利用率或开工率",
+            "title": "Capacity Utilization",
+            "type": "string"
+          },
+          "expansion_lead_time": {
+            "default": "",
+            "description": "扩产建设与认证壁垒周期，如 12-18 个月",
+            "title": "Expansion Lead Time",
+            "type": "string"
+          },
+          "inflection_point": {
+            "default": "",
+            "description": "供需缺口或景气拐点推演",
+            "title": "Inflection Point",
+            "type": "string"
+          },
+          "pass_through_ability": {
+            "default": "",
+            "description": "成本顺价传导能力与毛利率弹性",
+            "title": "Pass Through Ability",
+            "type": "string"
+          },
+          "stage": {
+            "default": "",
+            "description": "周期所处阶段，如主动补库/产能出清/供需紧平衡",
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "title": "IndustryChainCycleAnalysis",
+        "type": "object"
+      },
       "IndustryChainEvent": {
         "properties": {
           "citations": {
@@ -9958,6 +10293,37 @@
           }
         },
         "title": "IndustryChainEvidenceStats",
+        "type": "object"
+      },
+      "IndustryChainExpectationDivergence": {
+        "description": "市场一致预期 vs 本次研究分歧（预期差推演）。",
+        "properties": {
+          "catalyst_trigger": {
+            "default": "",
+            "description": "预期差验证的核心观测指标与时间窗口",
+            "title": "Catalyst Trigger",
+            "type": "string"
+          },
+          "consensus": {
+            "default": "",
+            "description": "市场主流一致预期",
+            "title": "Consensus",
+            "type": "string"
+          },
+          "divergence": {
+            "default": "",
+            "description": "本次研究审慎/独立推断",
+            "title": "Divergence",
+            "type": "string"
+          },
+          "topic": {
+            "default": "",
+            "description": "预期差主题，如出海增速/渗透率节奏/替代路线",
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "title": "IndustryChainExpectationDivergence",
         "type": "object"
       },
       "IndustryChainHistoryItem": {
@@ -10310,9 +10676,19 @@
             "title": "Confidence",
             "type": "string"
           },
+          "consensus_forecast": {
+            "default": "",
+            "title": "Consensus Forecast",
+            "type": "string"
+          },
           "description": {
             "default": "",
             "title": "Description",
+            "type": "string"
+          },
+          "eps_elasticity": {
+            "default": "",
+            "title": "Eps Elasticity",
             "type": "string"
           },
           "evidence_basis": {
@@ -10333,6 +10709,17 @@
             "title": "Evidence Ids",
             "type": "array"
           },
+          "gross_margin": {
+            "default": "",
+            "title": "Gross Margin",
+            "type": "string"
+          },
+          "growth_rate": {
+            "default": "",
+            "description": "业绩增速（营收/净利 YoY），如 营收+15.2% / 净利+28.0%",
+            "title": "Growth Rate",
+            "type": "string"
+          },
           "invalidation_conditions": {
             "items": {
               "type": "string"
@@ -10350,6 +10737,11 @@
             "title": "Metric",
             "type": "string"
           },
+          "moat": {
+            "default": "",
+            "title": "Moat",
+            "type": "string"
+          },
           "name": {
             "anyOf": [
               {
@@ -10361,6 +10753,17 @@
             ],
             "title": "Name"
           },
+          "net_margin": {
+            "default": "",
+            "title": "Net Margin",
+            "type": "string"
+          },
+          "overseas_share": {
+            "default": "",
+            "description": "海外或出口业务营收占比及毛利率，如 94.8% (境外 · 毛利47.9%)",
+            "title": "Overseas Share",
+            "type": "string"
+          },
           "pb": {
             "default": "",
             "title": "Pb",
@@ -10371,12 +10774,29 @@
             "title": "Pe",
             "type": "string"
           },
+          "pe_percentile": {
+            "default": "",
+            "title": "Pe Percentile",
+            "type": "string"
+          },
+          "price_change": {
+            "default": "",
+            "description": "最新股价及涨跌幅，如 128.50 (+2.3%)",
+            "title": "Price Change",
+            "type": "string"
+          },
           "realization_conditions": {
             "items": {
               "type": "string"
             },
             "title": "Realization Conditions",
             "type": "array"
+          },
+          "restricted_risk": {
+            "default": "",
+            "description": "限售解禁抛压风险提示",
+            "title": "Restricted Risk",
+            "type": "string"
           },
           "revenue_period": {
             "default": "",
@@ -10386,6 +10806,12 @@
           "revenue_share": {
             "default": "",
             "title": "Revenue Share",
+            "type": "string"
+          },
+          "roe": {
+            "default": "",
+            "description": "净资产收益率（ROE），如 18.5%",
+            "title": "Roe",
             "type": "string"
           },
           "role": {
@@ -10846,6 +11272,9 @@
           "coverage": {
             "$ref": "#/components/schemas/IndustryChainCoverage"
           },
+          "cycle_analysis": {
+            "$ref": "#/components/schemas/IndustryChainCycleAnalysis"
+          },
           "downstream": {
             "items": {
               "$ref": "#/components/schemas/IndustryChainNode"
@@ -10876,6 +11305,13 @@
           },
           "evidence_stats": {
             "$ref": "#/components/schemas/IndustryChainEvidenceStats"
+          },
+          "expectation_divergences": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainExpectationDivergence"
+            },
+            "title": "Expectation Divergences",
+            "type": "array"
           },
           "key_events": {
             "items": {
@@ -11041,6 +11477,13 @@
               "$ref": "#/components/schemas/IndustryChainNode"
             },
             "title": "Upstream",
+            "type": "array"
+          },
+          "value_distribution": {
+            "items": {
+              "$ref": "#/components/schemas/IndustryChainValueDistribution"
+            },
+            "title": "Value Distribution",
             "type": "array"
           },
           "verification_repair": {
@@ -11270,6 +11713,54 @@
           }
         },
         "title": "IndustryChainTopicResolution",
+        "type": "object"
+      },
+      "IndustryChainValueDistribution": {
+        "description": "价值链价值量（BOM）与利润池分配。",
+        "properties": {
+          "cost_share": {
+            "default": "",
+            "description": "单机/系统价值量或 BOM 成本占比，如 35%",
+            "title": "Cost Share",
+            "type": "string"
+          },
+          "detail": {
+            "default": "",
+            "description": "成本构成、议价权及技术门槛简述",
+            "title": "Detail",
+            "type": "string"
+          },
+          "gross_margin_range": {
+            "default": "",
+            "description": "毛利率区间，如 40%~50%",
+            "title": "Gross Margin Range",
+            "type": "string"
+          },
+          "pricing_power": {
+            "default": "unverified",
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unverified"
+            ],
+            "title": "Pricing Power",
+            "type": "string"
+          },
+          "profit_share": {
+            "default": "",
+            "description": "产业链利润池占比或定性分布",
+            "title": "Profit Share",
+            "type": "string"
+          },
+          "segment": {
+            "default": "",
+            "description": "环节或核心零部件/组件名称",
+            "title": "Segment",
+            "type": "string"
+          }
+        },
+        "title": "IndustryChainValueDistribution",
         "type": "object"
       },
       "IndustryChainVerificationRepair": {
@@ -17076,6 +17567,11 @@
           "needs_setup": {
             "title": "Needs Setup",
             "type": "boolean"
+          },
+          "requires_setup_token": {
+            "default": false,
+            "title": "Requires Setup Token",
+            "type": "boolean"
           }
         },
         "required": [
@@ -19980,6 +20476,17 @@
             ],
             "title": "Benchmark"
           },
+          "cash": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash"
+          },
           "date": {
             "title": "Date",
             "type": "string"
@@ -19991,6 +20498,64 @@
           "equity": {
             "title": "Equity",
             "type": "number"
+          },
+          "excess_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excess Return"
+          },
+          "position_weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Weights"
+          },
+          "positions_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positions Value"
+          },
+          "rolling_beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rolling Beta"
+          },
+          "rolling_sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rolling Sharpe"
           }
         },
         "required": [
@@ -20003,6 +20568,15 @@
       },
       "QuantExecutionConfig": {
         "properties": {
+          "allocation_method": {
+            "default": "equal",
+            "enum": [
+              "equal",
+              "risk_parity"
+            ],
+            "title": "Allocation Method",
+            "type": "string"
+          },
           "cash_reserve_ratio": {
             "default": 0,
             "exclusiveMaximum": 1.0,
@@ -20039,6 +20613,13 @@
             "minimum": 1.0,
             "title": "Lot Size",
             "type": "integer"
+          },
+          "market_impact_coefficient": {
+            "default": 10.0,
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Market Impact Coefficient",
+            "type": "number"
           },
           "max_daily_participation_rate": {
             "anyOf": [
@@ -20081,6 +20662,34 @@
             "title": "Minimum Commission",
             "type": "number"
           },
+          "ranking_lookback": {
+            "default": 20,
+            "maximum": 120.0,
+            "minimum": 3.0,
+            "title": "Ranking Lookback",
+            "type": "integer"
+          },
+          "ranking_metric": {
+            "default": "momentum",
+            "enum": [
+              "momentum",
+              "inverse_volatility",
+              "turnover",
+              "equal"
+            ],
+            "title": "Ranking Metric",
+            "type": "string"
+          },
+          "rebalance_frequency": {
+            "default": "daily",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "title": "Rebalance Frequency",
+            "type": "string"
+          },
           "rebalance_window_days": {
             "default": 3,
             "maximum": 10.0,
@@ -20101,6 +20710,15 @@
             "minimum": 0.0,
             "title": "Slippage Bps",
             "type": "number"
+          },
+          "slippage_model": {
+            "default": "fixed",
+            "enum": [
+              "fixed",
+              "square_root"
+            ],
+            "title": "Slippage Model",
+            "type": "string"
           },
           "stamp_duty_rate": {
             "default": 0.0005,
@@ -20134,6 +20752,19 @@
               }
             ],
             "title": "Target Annual Volatility"
+          },
+          "top_n_selection": {
+            "anyOf": [
+              {
+                "maximum": 30.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top N Selection"
           },
           "trailing_stop_pct": {
             "anyOf": [
@@ -20232,6 +20863,28 @@
       },
       "QuantMetrics": {
         "properties": {
+          "allocation_effect": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocation Effect"
+          },
+          "alpha": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha"
+          },
           "annualized_return": {
             "title": "Annualized Return",
             "type": "number"
@@ -20239,6 +20892,61 @@
           "annualized_volatility": {
             "title": "Annualized Volatility",
             "type": "number"
+          },
+          "avg_holding_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Holding Days"
+          },
+          "avg_loss_holding_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Loss Holding Days"
+          },
+          "avg_loss_pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Loss Pnl"
+          },
+          "avg_win_holding_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Win Holding Days"
+          },
+          "avg_win_pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Win Pnl"
           },
           "benchmark_return": {
             "anyOf": [
@@ -20250,6 +20958,17 @@
               }
             ],
             "title": "Benchmark Return"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
           },
           "calmar_ratio": {
             "anyOf": [
@@ -20273,6 +20992,28 @@
               }
             ],
             "title": "Closed Trade Count"
+          },
+          "deflated_sharpe_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deflated Sharpe Ratio"
+          },
+          "downside_capture": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Downside Capture"
           },
           "downside_volatility": {
             "anyOf": [
@@ -20307,9 +21048,53 @@
             ],
             "title": "Information Ratio"
           },
+          "interaction_effect": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Effect"
+          },
           "max_drawdown": {
             "title": "Max Drawdown",
             "type": "number"
+          },
+          "max_drawdown_duration_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Duration Days"
+          },
+          "max_loss_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Loss Pct"
+          },
+          "max_win_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Win Pct"
           },
           "observation_count": {
             "anyOf": [
@@ -20323,6 +21108,28 @@
             ],
             "title": "Observation Count"
           },
+          "omega_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Omega Ratio"
+          },
+          "probabilistic_sharpe_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probabilistic Sharpe Ratio"
+          },
           "profit_loss_ratio": {
             "anyOf": [
               {
@@ -20333,6 +21140,17 @@
               }
             ],
             "title": "Profit Loss Ratio"
+          },
+          "selection_effect": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Effect"
           },
           "sharpe_ratio": {
             "anyOf": [
@@ -20356,6 +21174,23 @@
             ],
             "title": "Sortino Ratio"
           },
+          "stress_tests": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "number"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stress Tests"
+          },
           "total_return": {
             "title": "Total Return",
             "type": "number"
@@ -20375,9 +21210,31 @@
             "title": "Trade Count",
             "type": "integer"
           },
+          "treynor_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treynor Ratio"
+          },
           "turnover_rate": {
             "title": "Turnover Rate",
             "type": "number"
+          },
+          "upside_capture": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upside Capture"
           },
           "win_rate": {
             "anyOf": [
@@ -20457,6 +21314,186 @@
           "unrealized_pnl"
         ],
         "title": "QuantOpenPosition",
+        "type": "object"
+      },
+      "QuantParameterScanPoint": {
+        "properties": {
+          "annualized_return": {
+            "title": "Annualized Return",
+            "type": "number"
+          },
+          "max_drawdown": {
+            "title": "Max Drawdown",
+            "type": "number"
+          },
+          "param1_value": {
+            "title": "Param1 Value"
+          },
+          "param2_value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param2 Value"
+          },
+          "sharpe_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe Ratio"
+          },
+          "total_return": {
+            "title": "Total Return",
+            "type": "number"
+          },
+          "win_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate"
+          }
+        },
+        "required": [
+          "param1_value",
+          "total_return",
+          "annualized_return",
+          "max_drawdown"
+        ],
+        "title": "QuantParameterScanPoint",
+        "type": "object"
+      },
+      "QuantParameterScanRequest": {
+        "properties": {
+          "param1_name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Param1 Name",
+            "type": "string"
+          },
+          "param1_values": {
+            "items": {},
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Param1 Values",
+            "type": "array"
+          },
+          "param2_name": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param2 Name"
+          },
+          "param2_values": {
+            "anyOf": [
+              {
+                "items": {},
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param2 Values"
+          }
+        },
+        "required": [
+          "param1_name",
+          "param1_values"
+        ],
+        "title": "QuantParameterScanRequest",
+        "type": "object"
+      },
+      "QuantParameterScanResult": {
+        "properties": {
+          "optimal_point": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuantParameterScanPoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "param1_name": {
+            "title": "Param1 Name",
+            "type": "string"
+          },
+          "param1_values": {
+            "items": {},
+            "title": "Param1 Values",
+            "type": "array"
+          },
+          "param2_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param2 Name"
+          },
+          "param2_values": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param2 Values"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/QuantParameterScanPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "profitable_ratio": {
+            "default": 0.0,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Profitable Ratio",
+            "type": "number"
+          },
+          "robustness_score": {
+            "default": 0.0,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Robustness Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "param1_name",
+          "param1_values",
+          "points"
+        ],
+        "title": "QuantParameterScanResult",
         "type": "object"
       },
       "QuantSavedStrategy": {
@@ -21517,7 +22554,7 @@
             "items": {
               "type": "string"
             },
-            "maxItems": 10,
+            "maxItems": 30,
             "title": "Codes",
             "type": "array"
           },
@@ -21728,6 +22765,18 @@
             "minLength": 8,
             "title": "Password",
             "type": "string"
+          },
+          "setup_token": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setup Token"
           },
           "username": {
             "maxLength": 32,
@@ -23289,6 +24338,65 @@
           "segment"
         ],
         "title": "SegmentQuality",
+        "type": "object"
+      },
+      "SessionItem": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "ip_address": {
+            "title": "Ip Address",
+            "type": "string"
+          },
+          "is_current": {
+            "title": "Is Current",
+            "type": "boolean"
+          },
+          "last_seen_at": {
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "user_agent": {
+            "title": "User Agent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "created_at",
+          "expires_at",
+          "ip_address",
+          "user_agent",
+          "last_seen_at",
+          "is_current"
+        ],
+        "title": "SessionItem",
+        "type": "object"
+      },
+      "SessionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "SessionsResponse",
         "type": "object"
       },
       "SgeGoldHistoryPoint": {
@@ -25287,7 +26395,10 @@
         "additionalProperties": false,
         "properties": {
           "api_version": {
-            "const": "quant.strategy/v1",
+            "enum": [
+              "quant.strategy/v1",
+              "quant.strategy/v2"
+            ],
             "title": "Api Version",
             "type": "string"
           },
@@ -25386,7 +26497,10 @@
         "additionalProperties": false,
         "properties": {
           "api_version": {
-            "const": "quant.strategy/v1",
+            "enum": [
+              "quant.strategy/v1",
+              "quant.strategy/v2"
+            ],
             "title": "Api Version",
             "type": "string"
           },
@@ -25539,7 +26653,12 @@
               "multiply",
               "divide",
               "obv",
-              "shift"
+              "shift",
+              "atr",
+              "momentum",
+              "min",
+              "max",
+              "abs"
             ],
             "title": "Operator",
             "type": "string"
@@ -25780,10 +26899,30 @@
         "additionalProperties": false,
         "properties": {
           "mode": {
-            "const": "binary",
             "default": "binary",
+            "enum": [
+              "binary",
+              "continuous_weight"
+            ],
             "title": "Mode",
             "type": "string"
+          },
+          "target_weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight"
           }
         },
         "title": "StrategyPositionDefinition",
@@ -29653,6 +30792,97 @@
         ]
       }
     },
+    "/api/auth/admin/audit-actions": {
+      "get": {
+        "description": "Admin: 管理员敏感操作审计（改角色/禁用/删除/邀请码/全局配置）。",
+        "operationId": "get_admin_audit_actions_api_auth_admin_audit_actions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_username",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAuditActionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Admin Audit Actions",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/admin/audit-logs": {
       "get": {
         "description": "Admin: list login audit log records with filtering and pagination.",
@@ -30097,6 +31327,81 @@
           }
         ],
         "summary": "Update User Status",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/audit-logs/me": {
+      "get": {
+        "description": "当前用户自助查询自己的登录记录（只返回 user_id 匹配的记录）。",
+        "operationId": "get_my_login_audit_logs_api_auth_audit_logs_me_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginAuditLogsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get My Login Audit Logs",
         "tags": [
           "auth"
         ]
@@ -30550,6 +31855,91 @@
           }
         },
         "summary": "Reset Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/sessions": {
+      "get": {
+        "description": "列出当前账号的有效登录会话（设备/IP/时间），供用户自助踢出可疑设备。",
+        "operationId": "list_sessions_api_auth_sessions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Sessions",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/sessions/{session_id}": {
+      "delete": {
+        "description": "撤销当前账号的指定会话（句柄取自 `GET /auth/sessions`）。",
+        "operationId": "revoke_session_api_auth_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Session",
         "tags": [
           "auth"
         ]
@@ -32116,7 +33506,7 @@
     },
     "/api/industry-chain/atlas/chains": {
       "get": {
-        "description": "产业链知识库目录：分类、链条摘要与规模统计。",
+        "description": "产业链知识库目录：分类、链条摘要与规模统计（合并官方公共库与当前用户私有图谱）。",
         "operationId": "get_industry_chain_atlas_catalog_api_industry_chain_atlas_chains_get",
         "responses": {
           "200": {
@@ -32153,8 +33543,8 @@
     },
     "/api/industry-chain/atlas/chains/{slug}": {
       "delete": {
-        "description": "删除一条外部导入的产业链（管理员）；内置链条不可删除。",
-        "operationId": "delete_industry_chain_atlas_import_api_industry_chain_atlas_chains__slug__delete",
+        "description": "删除一条产业链知识库条目：优先删除用户私有图谱；若为公共导入图谱仅管理员可删。",
+        "operationId": "delete_industry_chain_atlas_chain_api_industry_chain_atlas_chains__slug__delete",
         "parameters": [
           {
             "in": "path",
@@ -32193,13 +33583,13 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Delete Industry Chain Atlas Import",
+        "summary": "Delete Industry Chain Atlas Chain",
         "tags": [
           "industry-chain"
         ]
       },
       "get": {
-        "description": "按 slug 获取单条产业链的上/中/下游完整图谱。",
+        "description": "按 slug 获取单条产业链的上/中/下游完整图谱（优先加载用户私有图谱）。",
         "operationId": "get_industry_chain_atlas_chain_api_industry_chain_atlas_chains__slug__get",
         "parameters": [
           {
@@ -32247,7 +33637,7 @@
     },
     "/api/industry-chain/atlas/graph": {
       "get": {
-        "description": "跨链全局产业链图谱；chains 传逗号分隔 slug 时只统计这些链。",
+        "description": "跨链全局产业链图谱（包含官方公共链与当前用户私有链）。",
         "operationId": "get_industry_chain_atlas_graph_api_industry_chain_atlas_graph_get",
         "parameters": [
           {
@@ -32302,7 +33692,7 @@
     },
     "/api/industry-chain/atlas/import": {
       "post": {
-        "description": "导入外部产业链定义（管理员），校验通过后写入导入目录并立即生效。",
+        "description": "导入外部产业链定义：普通用户导入至个人专属知识库；管理员可导入至公共知识库或个人知识库。",
         "operationId": "import_industry_chain_atlas_api_industry_chain_atlas_import_post",
         "requestBody": {
           "content": {
@@ -32353,7 +33743,7 @@
     },
     "/api/industry-chain/atlas/mine": {
       "post": {
-        "description": "把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目（管理员）。",
+        "description": "把指定存档（或该链最新存档）的分析结果挖掘进知识库并返回条目。\n\n普通用户默认沉淀为个人专属私有知识库；管理员可沉淀为全局公共知识库或个人知识库。",
         "operationId": "mine_industry_chain_atlas_api_industry_chain_atlas_mine_post",
         "requestBody": {
           "content": {
@@ -37907,6 +39297,63 @@
         ]
       }
     },
+    "/api/quant/backtests/{run_id}/sensitivity-scan": {
+      "post": {
+        "operationId": "scan_backtest_parameter_sensitivity_api_quant_backtests__run_id__sensitivity_scan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuantParameterScanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuantParameterScanResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "统一错误响应"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Scan Backtest Parameter Sensitivity",
+        "tags": [
+          "quant"
+        ]
+      }
+    },
     "/api/quant/strategies": {
       "get": {
         "operationId": "get_saved_strategies_api_quant_strategies_get",
@@ -38040,6 +39487,7 @@
     },
     "/api/quant/strategy-drafts": {
       "get": {
+        "description": "列出策略草稿：普通用户只返回自己创建的，管理员返回全量。",
         "operationId": "get_strategy_drafts_api_quant_strategy_drafts_get",
         "parameters": [
           {

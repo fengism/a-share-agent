@@ -137,14 +137,21 @@ def _render_panorama_graph(result: IndustryChainResult) -> str:
             )
             label = escape_html(_truncate_graph_label(node.name or node.company or "核心环节", 16))
             companies = escape_html(_truncate_graph_label(_node_companies(node), 22))
-            parts.append(f'''
-        <rect x="{tier_x + 10}" y="{current_y}" width="{column_width - 20}" height="{node_height}" rx="10" fill="{soft_color}" stroke="{color}" stroke-opacity="0.55"/>
-        <circle cx="{tier_x + 28}" cy="{current_y + 17}" r="5" fill="{color}"/>
-        <text x="{tier_x + 40}" y="{current_y + 21}" fill="#172033" font-size="13" font-weight="700">{label}</text>''')
             if companies:
-                parts.append(
-                    f'<text x="{tier_x + 28}" y="{current_y + 39}" fill="#64748b" font-size="10.5">代表：{companies}</text>'
-                )
+                title_y = current_y + 21
+                dot_y = current_y + 17
+                parts.append(f'''
+        <rect x="{tier_x + 10}" y="{current_y}" width="{column_width - 20}" height="{node_height}" rx="10" fill="{soft_color}" stroke="{color}" stroke-opacity="0.55"/>
+        <circle cx="{tier_x + 28}" cy="{dot_y}" r="5" fill="{color}"/>
+        <text x="{tier_x + 40}" y="{title_y}" fill="#172033" font-size="13" font-weight="700">{label}</text>
+        <text x="{tier_x + 28}" y="{current_y + 39}" fill="#64748b" font-size="10.5">代表：{companies}</text>''')
+            else:
+                title_y = current_y + 29
+                dot_y = current_y + 24
+                parts.append(f'''
+        <rect x="{tier_x + 10}" y="{current_y}" width="{column_width - 20}" height="{node_height}" rx="10" fill="{soft_color}" stroke="{color}" stroke-opacity="0.55"/>
+        <circle cx="{tier_x + 28}" cy="{dot_y}" r="5" fill="{color}"/>
+        <text x="{tier_x + 40}" y="{title_y}" fill="#172033" font-size="13" font-weight="700">{label}</text>''')
 
         omitted = len(nodes) - len(visible_nodes)
         if omitted > 0:
@@ -448,10 +455,19 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             val_parts = []
             if s.total_market_cap:
                 val_parts.append(f"总市值: {escape_html(s.total_market_cap)}")
+            if getattr(s, "price_change", ""):
+                val_parts.append(f"现价: {escape_html(s.price_change)}")
             if s.pe:
-                val_parts.append(f"PE: {escape_html(s.pe)}")
+                pe_text = f"PE: {escape_html(s.pe)}"
+                if s.pe_percentile:
+                    pe_text += f' <span style="font-size:9px; color:#0284c7;">[{escape_html(s.pe_percentile)}]</span>'
+                val_parts.append(pe_text)
             if s.pb:
                 val_parts.append(f"PB: {escape_html(s.pb)}")
+            if getattr(s, "roe", ""):
+                val_parts.append(f"ROE: {escape_html(s.roe)}")
+            if s.gross_margin:
+                val_parts.append(f"毛利: {escape_html(s.gross_margin)}")
             val_html = (
                 f'<div style="font-size:10px; color:#475569; line-height:1.35;">{"<br>".join(val_parts)}</div>'
                 if val_parts
@@ -461,6 +477,47 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             rev_info = (
                 f'<span style="display:inline-block; font-size:9.5px; color:#0284c7; background:#e0f2fe; padding:1px 5px; border-radius:3px; margin-left:4px;">业务占比: {escape_html(s.revenue_share)}</span>'
                 if s.revenue_share
+                else ""
+            )
+
+            benefit_html = (
+                f'<div style="font-size:10px; color:#0284c7; margin-top:2px;"><b>受益路径：</b>{escape_html(s.benefit_path)}</div>'
+                if s.benefit_path
+                else ""
+            )
+            consensus_html = (
+                f'<div style="font-size:9.5px; color:#2563eb; margin-top:1px;"><b>一致预期：</b>{escape_html(s.consensus_forecast)}</div>'
+                if s.consensus_forecast
+                else ""
+            )
+            moat_html = (
+                f'<div style="font-size:9.5px; color:#0f766e; margin-top:1px;"><b>竞争壁垒：</b>{escape_html(s.moat)}</div>'
+                if s.moat
+                else ""
+            )
+            growth_html = (
+                f'<div style="font-size:9.5px; color:#16a34a; margin-top:1px;"><b>业绩增速：</b>{escape_html(s.growth_rate)}</div>'
+                if getattr(s, "growth_rate", "")
+                else ""
+            )
+            overseas_html = (
+                f'<div style="font-size:9.5px; color:#0369a1; margin-top:1px;"><b>出海敞口：</b>{escape_html(s.overseas_share)}</div>'
+                if getattr(s, "overseas_share", "")
+                else ""
+            )
+            restricted_html = (
+                f'<div style="font-size:9.5px; color:#dc2626; margin-top:1px;"><b>限售解禁：</b>{escape_html(s.restricted_risk)}</div>'
+                if getattr(s, "restricted_risk", "")
+                else ""
+            )
+            elasticity_html = (
+                f'<div style="font-size:9.5px; color:#b45309; margin-top:1px;"><b>业绩弹性：</b>{escape_html(s.eps_elasticity)}</div>'
+                if s.eps_elasticity
+                else ""
+            )
+            conditions_html = (
+                f'<div style="font-size:9.5px; color:#64748b; margin-top:1px;"><b>兑现条件：</b>{escape_html("；".join(s.realization_conditions))}</div>'
+                if s.realization_conditions
                 else ""
             )
 
@@ -474,6 +531,14 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
                 <td style="padding:6px 10px; font-size:10px; width:100px;">{val_html}</td>
                 <td style="padding:6px 10px; font-size:11px; color:#334155;">
                     <div>{role_desc} {rev_info}</div>
+                    {benefit_html}
+                    {growth_html}
+                    {overseas_html}
+                    {consensus_html}
+                    {moat_html}
+                    {elasticity_html}
+                    {restricted_html}
+                    {conditions_html}
                 </td>
                 <td style="padding:6px 10px; width:110px; text-align:right;">
                     <div>{source_badge}</div>
@@ -499,6 +564,90 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             </div>
             """)
         events_html = "".join(e_cards)
+
+    # 深度投研模块: 价值链 BOM 拆解与利润池分配
+    value_dist_html = ""
+    if result.value_distribution:
+        v_rows = []
+        power_map = {
+            "high": ("强", "#16a34a", "#f0fdf4"),
+            "medium": ("中", "#0284c7", "#f0f9ff"),
+            "low": ("弱", "#d97706", "#fffbeb"),
+        }
+        for v in result.value_distribution:
+            p_text, p_fg, p_bg = power_map.get(v.pricing_power, ("-", "#64748b", "#f1f5f9"))
+            p_badge = f'<span style="font-size:9.5px; color:{p_fg}; background:{p_bg}; padding:1px 5px; border-radius:3px;">{p_text}</span>'
+            v_rows.append(f"""
+            <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:6px 10px; font-weight:700; color:#0f172a; font-size:11px;">{escape_html(v.segment)}</td>
+                <td style="padding:6px 10px; font-size:10.5px; color:#0284c7;">{escape_html(v.cost_share or "--")}</td>
+                <td style="padding:6px 10px; font-size:10.5px; color:#334155;">{escape_html(v.gross_margin_range or "--")}</td>
+                <td style="padding:6px 10px; font-size:10.5px; color:#16a34a;">{escape_html(v.profit_share or "--")}</td>
+                <td style="padding:6px 10px; text-align:center;">{p_badge}</td>
+                <td style="padding:6px 10px; font-size:10.5px; color:#64748b;">{escape_html(v.detail or "--")}</td>
+            </tr>
+            """)
+        value_dist_html = f"""
+        <div style="margin-top:10px;">
+            <div style="font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">💎 价值链价值量（BOM）与利润池分配</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>环节/核心组件</th>
+                        <th>BOM成本占比</th>
+                        <th>毛利率区间</th>
+                        <th>利润池占比</th>
+                        <th style="text-align:center;">议价定价权</th>
+                        <th>核心壁垒与机制说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {"".join(v_rows)}
+                </tbody>
+            </table>
+        </div>
+        """
+
+    # 深度投研模块: 供需格局、周期定位与成本顺价
+    cycle_html = ""
+    c = result.cycle_analysis
+    if any((c.stage, c.capacity_utilization, c.expansion_lead_time, c.inflection_point, c.pass_through_ability)):
+        c_items = []
+        if c.stage:
+            c_items.append(f'<div><b>周期阶段：</b><span style="color:#0284c7; font-weight:600;">{escape_html(c.stage)}</span></div>')
+        if c.capacity_utilization:
+            c_items.append(f'<div><b>开工/产能利用率：</b>{escape_html(c.capacity_utilization)}</div>')
+        if c.expansion_lead_time:
+            c_items.append(f'<div><b>扩产与认证周期：</b>{escape_html(c.expansion_lead_time)}</div>')
+        if c.inflection_point:
+            c_items.append(f'<div><b>供需拐点推演：</b>{escape_html(c.inflection_point)}</div>')
+        if c.pass_through_ability:
+            c_items.append(f'<div><b>顺价能力与弹性：</b>{escape_html(c.pass_through_ability)}</div>')
+        cycle_html = f"""
+        <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:8px 12px; margin-top:8px; font-size:10.5px; color:#0369a1; display:grid; grid-template-columns: 1fr 1fr; gap:6px 12px;">
+            {"".join(c_items)}
+        </div>
+        """
+
+    # 深度投研模块: 市场一致预期 vs 本次研究分歧（预期差推演）
+    divergence_html = ""
+    if result.expectation_divergences:
+        d_cards = []
+        for d in result.expectation_divergences:
+            d_cards.append(f"""
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px; margin-bottom:6px;">
+                <div style="font-size:11px; font-weight:700; color:#0f172a; margin-bottom:3px;">⚡ 预期差焦点：{escape_html(d.topic)}</div>
+                <div style="font-size:10.5px; color:#64748b; margin-bottom:2px;">• <b>市场一致预期：</b>{escape_html(d.consensus or "广泛一致计价")}</div>
+                <div style="font-size:10.5px; color:#b45309; margin-bottom:2px;">• <b>本次审慎推断：</b>{escape_html(d.divergence)}</div>
+                {f'<div style="font-size:10px; color:#0284c7;">• 核心观测/催化：{escape_html(d.catalyst_trigger)}</div>' if d.catalyst_trigger else ""}
+            </div>
+            """)
+        divergence_html = f"""
+        <div style="margin-top:10px;">
+            <div style="font-size:11px; font-weight:700; color:#b45309; margin-bottom:4px;">🎯 市场一致预期 vs 本次研究分歧（预期差推演）</div>
+            {"".join(d_cards)}
+        </div>
+        """
 
     # 9. 证据审计与信息源
     sources_html = ""
@@ -750,12 +899,15 @@ def generate_industry_chain_pdf_html(result: IndustryChainResult) -> str:
             </div>
         </div>
         {metrics_cards_html}
+        {cycle_html}
+        {divergence_html}
     </div>
 
     <!-- 02 产业链上下游全景与价值链分配 -->
     <div class="section-card chain-section">
         <div class="section-title">02 · 产业链上下游全景环节与代表厂商</div>
         {panorama_html}
+        {value_dist_html}
         <table>
             <thead>
                 <tr>
