@@ -543,14 +543,14 @@ test("shows mobile history access without horizontal overflow", async ({ page })
     };
   });
   expect(mobileTypography).toEqual({
-    bodySize: "15px",
-    titleSize: "24px",
+    bodySize: "13.5px",
+    titleSize: "20px",
     headerMarginBottom: "12px",
     headerPaddingBottom: "12px",
     toolbarPaddingTop: "6px",
-    toolbarGap: "6px",
-    sectionPaddingTop: "12px",
-    sectionPaddingBottom: "12px",
+    toolbarGap: "8px",
+    sectionPaddingTop: "10px",
+    sectionPaddingBottom: "10px",
   });
   await expect(page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).resolves.toBe(true);
   await page.screenshot({ path: "/tmp/stock-research-typography-mobile.png", fullPage: true });

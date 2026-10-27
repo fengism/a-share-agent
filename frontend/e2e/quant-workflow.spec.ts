@@ -301,7 +301,7 @@ for (const { width, theme } of [
     await expect(core.locator(".quant-metric-card")).toHaveCount(4);
     await expect(core.getByText("交易日样本数")).toBeVisible();
     await expect(core).toContainText("120");
-    await expect(page.getByRole("group", { name: "补充回测指标" }).locator(".quant-metric-card")).toHaveCount(5);
+    await expect(page.getByRole("group", { name: "补充回测指标" }).locator(".quant-metric-card")).toHaveCount(6);
     const assumptions = page.getByRole("complementary", { name: "回测模型与适用边界" });
     await expect(assumptions).toContainText("历史表现不代表未来收益");
     await expect(assumptions.locator("ul")).toBeHidden();
