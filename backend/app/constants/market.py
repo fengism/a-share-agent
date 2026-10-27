@@ -51,6 +51,8 @@ EASTMONEY_SEARCH_URL = "https://search-codetable.eastmoney.com/codetable/search"
 # 其余（指数/板块/债券/基金/LOF/B股/港美股/退市）都不是「股票」——注意 000001
 # 上证指数与 000001 平安银行代码完全相同，只能靠标签区分。
 EASTMONEY_A_SHARE_LABELS = frozenset({"沪A", "深A", "京A", "科创"})
+# 以下 token 是东方财富网页内嵌的公开客户端常量（全网抓取库通用，如 efinance 的同名字面值），
+# 不是本项目的账号凭据，也无法轮换；.gitleaks.toml 已将这几行列入白名单。
 EASTMONEY_API_TOKEN = "fa5fd1943c7b386f172d6893dbfba10b"
 EASTMONEY_UT_TOKEN = "b2884a393a59ad64002292a3e90d46a5"
 EASTMONEY_UT_TOKEN_ALT = "8dec03ba335b81bf4ebdf7b29ec27d15"

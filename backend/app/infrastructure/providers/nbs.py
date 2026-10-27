@@ -92,6 +92,8 @@ _SHIBOR_TERMS = (
     ("1Y", "1Y"),
 )
 _ENGLISH_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+# _TRADE_CID / _TRADE_SERIES / _NBS_MONTHLY_GROUPS 中的 32 位 hex 是统计局接口的
+# 序列与目录 ID（URL 参数），非账号凭据；.gitleaks.toml 已按常量名列入白名单。
 _TRADE_CID = "7e11b47c828d4e4e925f1c5a98305558"
 _TRADE_SERIES = {
     "EXIT_BASE": "9e38b39f55a7461ea195508c1bb7dbdc",

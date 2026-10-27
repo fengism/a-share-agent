@@ -149,7 +149,7 @@ cd frontend && npx playwright install chromium  # 前端 E2E 与 README 配图�
 - **前端**（`frontend/src/**/*.test.tsx`）：vitest + Testing Library，按组件就近放置用例。
 - **E2E**（`frontend/e2e/`）：Playwright 拦截 `/api/**` 并注入夹具，不依赖真实后端，可在 CI 运行。
 - **README 配图**（`frontend/scripts/capture-readme-screenshots.mjs`）：依赖真实运行实例，不进 CI，
-  用法见 [README「项目开发与维护」](../README.md#项目开发与维护)。
+  用法见 [README「开发与维护」](../README.md#开发与维护)。
 
 ## 七、本地调试技巧
 
@@ -165,7 +165,11 @@ cd frontend && npx playwright install chromium  # 前端 E2E 与 README 配图�
 ## 八、提交与发布约定
 
 - 按仓库 `AGENTS.md`：**修改后先说明改动内容并获得确认，不要自行 `git commit` / `git push`。**
-- 发版由 tag 驱动：`make release V=vX.Y.Z` 推送标签后，GitHub Actions 构建并发布镜像。
+- 发版由 tag 驱动：`make release V=vX.Y.Z` 推送标签后，GitHub Actions 构建并发布多架构镜像。
+- **镜像构建/发布只在 tag 或手动触发时进行**（Actions → *Build & Publish Docker Images* → *Run workflow*）：
+  推送到 `main` 只跑质量门禁 + E2E，避免每次推送都完整构建四个镜像而快速耗尽
+  （私有仓库按量计费的）Actions 分钟。改动 Dockerfile / nginx.conf / 沙箱运行时时，PR 会由
+  `docker-build-check.yml` 额外做一次不推送镜像的构建与冒烟。
 - 破坏性配置变更必须向后兼容（见 [配置系统开发指南](configuration.md) 第六节）。
 
 ## 九、相关文档

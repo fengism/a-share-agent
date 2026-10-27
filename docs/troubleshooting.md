@@ -175,7 +175,7 @@ make backend-export-seeds   # 用运行库反导出种子（确认后再提交�
 
 - 备份位置：`data/db/backups/<db>-<UTC时间戳>.sqlite3.gz` + `.sha256` 校验文件；
   默认保留 2 份（`DATABASE_BACKUP_RETENTION_COUNT` 可调，设置页保存后下一轮生效）。
-- 恢复必须先停服，再执行（详见 [README「数据备份与离线恢复」](../README.md#数据备份与离线恢复)）：
+- 恢复必须先停服，再执行（详见 [README「备份与离线恢复」](../README.md#备份与离线恢复)）：
 
 ```bash
 docker compose down

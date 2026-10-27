@@ -1,0 +1,27 @@
+# gitleaks 配置：默认规则集全开（[extend] useDefault），仅对「已人工核对、确认不是凭据」
+# 的命中做白名单。
+#
+# 维护约定：
+#   1. 新增白名单前必须确认该值不可轮换、也不属于任何用户 —— 公开的第三方客户端常量
+#      与测试假值都不算凭据。
+#   2. 白名单收窄到具体常量名或字面值，不要按目录通配，否则会把真实泄漏一起放行。
+#   3. 每条白名单都要写明「为什么不是凭据」。
+[extend]
+useDefault = true
+
+[allowlist]
+description = "已人工核对的非凭据命中：第三方公开客户端常量、统计局序列 ID、测试假值"
+regexTarget = "line"
+regexes = [
+  # 东方财富客户端常量（含 ut/api/搜索 token 等）：对方网页内嵌、全网开源抓取库使用的同一
+  # 字面值，不是本仓库用户的凭据（无从轮换，泄露无害）。
+  '''EASTMONEY_[A-Z0-9_]*TOKEN[A-Z0-9_]*\s*=''',
+  # 国家统计局的序列/目录 ID，仅作为 URL 参数使用，非凭据。
+  '''(_TRADE_CID|_TRADE_SERIES|_NBS_[A-Z0-9_]+)\s*[:=]''',
+  # 测试夹具中的假密钥与假 webhook，只出现在测试与被 mock 的用例里。
+  '''global-secret-key-12345''',
+  '''ci-only-not-a-production-secret-0000''',
+  '''600519-daily-qfq''',
+  '''CITY31_SURVEYED_UNEMPLOYMENT''',
+  '''access_token=(abc|token123|secret-value-123)\b''',
+]

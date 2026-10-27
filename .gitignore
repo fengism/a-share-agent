@@ -3,6 +3,24 @@
 .env.*
 !.env.example
 
+# 密钥与凭据（防误提交：证书、私钥、服务账号 JSON、令牌文件）
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+# 公钥不是凭据，允许提交
+!id_rsa.pub
+!id_ed25519.pub
+*credentials*.json
+*service-account*.json
+*.token
+
 # Python
 __pycache__/
 *.py[cod]

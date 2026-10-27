@@ -1,5 +1,12 @@
 name: Build & Publish Docker Images
 
+# 成本模型（私有仓库的 Actions 分钟是按量计费的，单个 job 分钟数逐个累加）：
+#   PR / 日常推送到 main：verify(amd64) + frontend-e2e            ≈ 25 分钟
+#   tag 发布 / 手动发布    ：verify(amd64+arm64) + e2e + 4 镜像×2 架构
+#                           + 沙箱集成 + publish                 ≈ 67 分钟
+# 结论：镜像构建与发布只在 tag 或手动触发时进行；日常推送不再重复构建镜像。
+# 密钥扫描（gitleaks）在 verify 的 amd64 分支跑一次，不额外开 job。
+
 on:
   push:
     branches: [main]
@@ -24,8 +31,10 @@ on:
 
 concurrency:
   group: docker-publish-${{ github.ref }}
-  # 串行推进发布标记，避免旧任务在别名更新到一半时被新任务取消。
-  cancel-in-progress: false
+  # 只有「分支推送/PR」这类可丢弃的运行允许被更新的推送取消；
+  # tag 发布与手动发布绝不取消：别名提升到一半被打断会让部分镜像停在旧 digest，
+  # 与 release marker 的语义（出现即代表四个镜像同一 revision 都可用）冲突。
+  cancel-in-progress: ${{ (github.event_name == 'push' && github.ref_type == 'branch') || github.event_name == 'pull_request' }}
 
 env:
   DOCKERHUB_NAMESPACE: fengliu1989
@@ -39,15 +48,34 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
+        # arm64 只在 tag / 手动发布时验证（镜像的 arm64 腿也只在此时构建）；
+        # 日常推送与 PR 只跑 amd64，省掉一整条腿的 runner 分钟。
+        include: ${{ (github.ref_type == 'tag' || github.event_name == 'workflow_dispatch') && fromJSON('[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]') || fromJSON('[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          # gitleaks 需要完整历史才能扫全量提交；本仓库 .git 仅 ~40MB，代价可忽略。
+          fetch-depth: 0
+
+      # 密钥扫描：默认规则集 + 仓库内 .gitleaks.toml 白名单（只放行已人工核对的第三方
+      # 公开常量与测试假值，维护约定见该文件）。放在最前面，泄漏时尽快失败、不浪费后续安装。
+      # 只在 amd64 分支跑一次，避免两条矩阵腿重复消耗 runner 分钟。
+      - name: Scan for committed secrets (gitleaks)
+        if: matrix.arch == 'amd64'
+        env:
+          GITLEAKS_VERSION: "8.28.0"
+          GITLEAKS_SHA256_X64: "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb"
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "/tmp/${archive}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          # 固定版本 + 固定校验和，避免在安全门禁里引入供应链风险。
+          echo "${GITLEAKS_SHA256_X64}  /tmp/${archive}" | sha256sum -c -
+          tar -xzf "/tmp/${archive}" -C /tmp gitleaks
+          /tmp/gitleaks git --log-opts="--all" --config .gitleaks.toml --redact --no-banner
 
       - uses: astral-sh/setup-uv@v5
         with:
@@ -75,6 +103,16 @@ jobs:
       - name: Check backend module boundaries
         working-directory: backend
         run: uv run --frozen python -m scripts.check_import_boundaries
+
+      # Chromium 压缩包约 150MB：命中缓存省下一次下载，key 绑定 uv.lock，
+      # patchright 版本变化时自动失效重装（系统依赖仍由 --with-deps 每次安装）。
+      - name: Cache Chromium for rendering tests
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('backend/uv.lock') }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Install native Chromium for rendering tests
         working-directory: backend
@@ -157,107 +195,9 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  # PR 阶段只构建 + 冒烟、不推送镜像：Dockerfile / nginx.conf / 沙箱运行时的回归
-  # 必须在合并前暴露，否则只能在 main 上的串行发布流水线里才被发现。
-  # 只验 amd64（与 GitHub 托管 runner 原生架构一致）；arm64 仍由 main 上的原生 runner 覆盖。
-  # needs: verify —— 单测/类型/lint 都过了再跑重构建，失败时直接跳过，避免白烧 runner 时间
-  # 与两个重任务并行的资源峰值。
-  docker-build-check:
-    name: Docker build check (pull request, no push)
-    needs: [verify]
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          load: true
-          tags: ci-check/a-share-backend:pr
-          # 只读复用 main 的构建缓存：PR 分支自己写缓存（gha scope 按 ref 隔离）
-          # 只能加快同一 PR 的后续推送，却要每次上传 backend 那个 ~650MB 的
-          # chromium/venv 巨层，还会按 LRU 挤掉 main 自己的缓存，得不偿失。
-          cache-from: type=gha,scope=backend-amd64
-          build-args: |
-            APP_UID=1000
-            APP_GID=1000
-            APP_VERSION=pr-${{ github.sha }}
-            APP_REVISION=${{ github.sha }}
-
-      - name: Smoke-test backend image
-        env:
-          IMAGE: ci-check/a-share-backend:pr
-        run: |
-          test "$(docker image inspect --format '{{.Architecture}}' "$IMAGE")" = amd64
-          docker run --rm --network none --read-only --memory=2g --init \
-            --cap-drop ALL --security-opt no-new-privileges:true \
-            --tmpfs /tmp:rw,size=512m,mode=1777 \
-            --tmpfs /app/data:rw,size=128m,uid=1000,gid=1000,mode=0700 \
-            --tmpfs /app/logs:rw,size=32m,uid=1000,gid=1000,mode=0700 \
-            -e PYTHONPATH=/app -e EXPECTED_ARCH=amd64 -e VERIFY_NO_HEADLESS_SHELL=1 \
-            --entrypoint python "$IMAGE" scripts/verify_browser_runtime.py
-          docker run --rm --network none --read-only --memory=2g --init \
-            --cap-drop ALL --security-opt no-new-privileges:true \
-            --tmpfs /tmp:rw,size=512m,mode=1777 \
-            --tmpfs /app/data:rw,size=128m,uid=1000,gid=1000,mode=0700 \
-            --tmpfs /app/logs:rw,size=32m,uid=1000,gid=1000,mode=0700 \
-            -e APP_DATA_DIR=/app/data -e PYTHONPATH=/app -e HTTP_TRUST_ENV=false \
-            --entrypoint python "$IMAGE" scripts/verify_application_runtime.py
-
-      - name: Build frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          load: true
-          tags: ci-check/a-share-frontend:pr
-          cache-from: type=gha,scope=frontend-amd64
-
-      - name: Smoke-test frontend image
-        run: |
-          test "$(docker image inspect --format '{{.Architecture}}' ci-check/a-share-frontend:pr)" = amd64
-          docker run --rm --network none --read-only --tmpfs /tmp:rw,mode=1777 \
-            --add-host backend:127.0.0.1 --entrypoint nginx ci-check/a-share-frontend:pr -t
-
-      - name: Build python-runner image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./sandbox
-          target: runner
-          load: true
-          tags: ci-check/a-share-python-runner:pr
-          cache-from: type=gha,scope=python-runner-amd64
-
-      - name: Build python-sandbox worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./sandbox
-          target: worker
-          load: true
-          tags: ci-check/a-share-python-sandbox:pr
-          cache-from: type=gha,scope=python-sandbox-amd64
-
-      - name: Execute real sandbox jobs on native daemon
-        run: |
-          docker run --rm --network none --entrypoint python ci-check/a-share-python-runner:pr \
-            -c 'import runner, subprocess; subprocess.run(["docker", "--version"], check=True)'
-          docker run --rm --network none --read-only --tmpfs /tmp:rw,mode=1777 \
-            --entrypoint python ci-check/a-share-python-sandbox:pr \
-            -c 'import numpy, pandas; assert numpy.array([1, 2]).sum() == 3'
-          docker run --rm --read-only --init --memory=256m --pids-limit=64 \
-            --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp:size=16m,mode=1777 \
-            -v /var/run/docker.sock:/var/run/docker.sock:ro \
-            -e PYTHON_SANDBOX_TOKEN=ci-only-not-a-production-secret-0000 \
-            -e PYTHON_SANDBOX_IMAGE=ci-check/a-share-python-sandbox:pr \
-            --entrypoint python ci-check/a-share-python-runner:pr /opt/verify_runtime.py
-
   backend:
     needs: [verify, frontend-e2e]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'  # 镜像构建/发布只在 tag 或手动发布时进行
     strategy:
       fail-fast: false
       matrix:
@@ -372,7 +312,7 @@ jobs:
 
   frontend:
     needs: [verify, frontend-e2e]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'  # 镜像构建/发布只在 tag 或手动发布时进行
     strategy:
       fail-fast: false
       matrix:
@@ -447,7 +387,7 @@ jobs:
 
   python-runner:
     needs: [verify, frontend-e2e]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'  # 镜像构建/发布只在 tag 或手动发布时进行
     strategy:
       fail-fast: false
       matrix:
@@ -523,7 +463,7 @@ jobs:
 
   python-sandbox:
     needs: [verify, frontend-e2e]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'  # 镜像构建/发布只在 tag 或手动发布时进行
     strategy:
       fail-fast: false
       matrix:
@@ -599,7 +539,7 @@ jobs:
 
   sandbox-integration:
     needs: [python-runner, python-sandbox]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'  # 镜像构建/发布只在 tag 或手动发布时进行
     strategy:
       fail-fast: false
       matrix:
@@ -651,8 +591,9 @@ jobs:
 
   publish:
     needs: [backend, frontend, python-runner, python-sandbox, sandbox-integration]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'  # 镜像构建/发布只在 tag 或手动发布时进行
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: docker/setup-buildx-action@v3
 
