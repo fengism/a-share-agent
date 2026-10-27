@@ -1,3 +1,9 @@
+import os
+
+# 为测试环境兜底提供合法 32 字节 Base64 密钥，避免 CI / 无 .env 环境下敏感配置读写抛 ConfigEncryptionError
+if not os.environ.get("CONFIG_ENCRYPTION_KEY"):
+    os.environ["CONFIG_ENCRYPTION_KEY"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
 import pytest
 
 from app.infrastructure.persistence import init_db

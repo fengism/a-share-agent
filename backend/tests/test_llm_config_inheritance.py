@@ -153,6 +153,7 @@ def test_config_response_reports_inheritance_for_regular_user() -> None:
 
 
 _LLM_KEYS = ("llm_provider", "llm_base_url", "llm_model", "llm_api_key")
+_DEFAULT_TEST_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
 
 @pytest.fixture()
@@ -163,15 +164,19 @@ def global_llm_config():
     """
     from app import configuration
 
-    original = {key: getattr(get_settings(), key) for key in _LLM_KEYS}
-    configuration.update_settings(
-        {
-            "llm_provider": "openai",
-            "llm_base_url": "https://api.openai.com/v1",
-            "llm_model": "gpt-4o",
-            "llm_api_key": "sk-admin-global",
-        }
-    )
+    tracked_keys = list(_LLM_KEYS)
+    patch = {
+        "llm_provider": "openai",
+        "llm_base_url": "https://api.openai.com/v1",
+        "llm_model": "gpt-4o",
+        "llm_api_key": "sk-admin-global",
+    }
+    if not get_settings().config_encryption_key:
+        tracked_keys.append("config_encryption_key")
+        patch["config_encryption_key"] = _DEFAULT_TEST_KEY
+
+    original = {key: getattr(get_settings(), key) for key in tracked_keys}
+    configuration.update_settings(patch)
     try:
         yield "sk-admin-global"
     finally:

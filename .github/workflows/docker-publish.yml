@@ -80,6 +80,8 @@ jobs:
 
       - name: Test backend
         working-directory: backend
+        env:
+          CONFIG_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
         run: |
           if [ ! -d tests ]; then
             echo "::notice::backend/tests 不存在（测试已随模块重构移除），跳过后端单元测试"
